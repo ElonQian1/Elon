@@ -1535,15 +1535,15 @@
       "implementation_evidence": [
         {
           "path": "docs/reports/binance-grid-observer-v1.md",
-          "content_hash": "e5b0845013f155f6b77b49091146ea38b94198c2b4809a2ed82ddb94039449fd",
+          "content_hash": "84f33cf10fd9530af9c6e3c1c5e9ceded2d2c37ba4a83c4a10da31566576f8de",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "dd4023dd306a871dc44c79d2bd0d633c7a8cb504",
-            "state": "untracked"
+            "head_commit": "22558207bdb920f127d020b28d86a15b4e93d874",
+            "head_blob_oid": "dd4023dd306a871dc44c79d2bd0d633c7a8cb504",
+            "worktree_blob_oid": "df5a1dd3e50cac01d3d39eb8d24a85b0c300b041",
+            "state": "tracked_modified"
           }
         },
         {
@@ -1561,15 +1561,15 @@
         },
         {
           "path": "scripts/test-binance-grid-observer-core.cjs",
-          "content_hash": "ecd0120f31b1111171d1fa39e2e262a01f653d6596c75445bcc76ea0e427d965",
+          "content_hash": "cadf115eb8918cfc9fd105b1f945cb222eae83daa5defb3ef55fd3288c52edf5",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "4c2036740b886e7d1f4f661e6ecdb2351146794e",
-            "state": "untracked"
+            "head_commit": "22558207bdb920f127d020b28d86a15b4e93d874",
+            "head_blob_oid": "4c2036740b886e7d1f4f661e6ecdb2351146794e",
+            "worktree_blob_oid": "3a7344e6701424b4af73a4954c2b2821a6f5f55b",
+            "state": "tracked_modified"
           }
         },
         {
@@ -1691,15 +1691,15 @@
         },
         {
           "path": "tools/binance-grid-observer/sanitize.js",
-          "content_hash": "e18e816b70db40731cb14e3ab305a711de6be175ac68814668b804f470be59a7",
+          "content_hash": "93ac4fc114bd52150eba346b21bce15df8ca1ec0bed10cf5c7ed5b4a0473abc6",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "2fecf4012cfeb38517c2c3b7a1480b9d73b7e259",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "a56ef4d0dcfe17c4c2657ad659514372745bc6d6",
-            "state": "untracked"
+            "head_commit": "22558207bdb920f127d020b28d86a15b4e93d874",
+            "head_blob_oid": "a56ef4d0dcfe17c4c2657ad659514372745bc6d6",
+            "worktree_blob_oid": "daa531a8f52f106fc8b7d33ddf396b284f229ec1",
+            "state": "tracked_modified"
           }
         },
         {
@@ -1730,7 +1730,7 @@
         }
       ],
       "created_at_ms": 1788724675619,
-      "updated_at_ms": 1788725643590
+      "updated_at_ms": 1788725904609
     },
     {
       "id": "compute-attempt-final-usage-fence-verification-v1",
@@ -22534,16 +22534,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_da82d98eb0694e59ac72100fbd691f0b",
-      "feature_id": "esk-sui-address-control-proof-v1",
-      "action": "evidence_recorded",
-      "actor": "codex:/root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788567943595
-    },
-    {
       "id": "feature_event_9acf8a102a114d7eae5e46e837879ec3",
       "feature_id": "esk-sui-address-control-proof-v1",
       "action": "transitioned",
@@ -24532,6 +24522,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1788725643590
+    },
+    {
+      "id": "feature_event_462781f075af40c69c4bc66c0f7ddf24",
+      "feature_id": "binance-grid-observer-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-root",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788725904609
     }
   ]
 }

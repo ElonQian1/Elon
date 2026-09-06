@@ -14,6 +14,14 @@ const clean = value => JSON.parse(JSON.stringify(value));
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 async function flush() { for (let i = 0; i < 15; i++) await Promise.resolve(); }
 
+test('browser injection preserves a page-owned CommonJS module export', () => {
+  const pageExport = { existingLibrary: true };
+  const context = vm.createContext({ URL, TextEncoder, window: {}, module: { exports: pageExport } });
+  vm.runInContext(sanitizerSource, context);
+  assert.equal(context.module.exports, pageExport);
+  assert.equal(typeof context.BinanceGridSanitizer.sanitizeObservation, 'function');
+});
+
 function fixture(options = {}) {
   const calls = [], requests = [], messages = [], timers = new Map(), events = new Map();
   let clock = 1000, timerId = 0, shapeCalls = 0;

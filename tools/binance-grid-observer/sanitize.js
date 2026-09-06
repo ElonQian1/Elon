@@ -137,5 +137,5 @@
 
   const api = Object.freeze({ ORIGIN, CHANNEL, SCHEMA_VERSION, limits, normalizePath, shapeOf, shapeFromJson, sanitizeObservation });
   root.BinanceGridSanitizer = api;
-  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (typeof window === 'undefined' && typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);

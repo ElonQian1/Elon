@@ -18,11 +18,11 @@ reviewed_at: 2026-09-07
 - 包装：`scripts/package-binance-grid-observer.ps1 -OutputDirectory <新目录>`，只接受已提交源码，保留既有输出；生成 `extension/`、zip、SHA-256 和 `artifact.json`，记录源码提交及全部文件哈希。工件明确 `live_browser_verified=false`。
 - 手册：`tools/binance-grid-observer/README.md`，先加载本地扩展，再在原登录页启用；首次仅由用户查看运行中/历史列表。不使用 F12，不刷新、关闭、注销或复制登录页。
 
-2026-09-07 定向验证通过：`node --test scripts/test-binance-grid-observer-core.cjs scripts/test-binance-grid-observer-extension.cjs scripts/test-binance-grid-observer-popup.cjs`，36 项通过，0 失败、0 跳过。经 `invoke-ai-logged-command.ps1` 记录，日志标识 `binance-grid-observer-all-20260907-041239-773`；6 个 JS 语法检查及包装脚本 PowerShell 解析通过。
+2026-09-07 定向验证通过：`node --test scripts/test-binance-grid-observer-core.cjs scripts/test-binance-grid-observer-extension.cjs scripts/test-binance-grid-observer-popup.cjs`，37 项通过，0 失败、0 跳过。经 `invoke-ai-logged-command.ps1` 记录，日志标识 `binance-grid-observer-final-20260907-041721-386`；6 个 JS 语法检查及包装脚本 PowerShell 解析通过。
 
 测试使用 Node 的 VM/浏览器接口桩与实际源码，覆盖：原 fetch promise/响应/接收者/异常、XHR 同步事件与异常、Request 流及 getter 不读取、停用和非候选请求不解析、真实页面路径匹配、相对路径、字节/时间/并发/结构上限、代次和导航后的迟到响应、跨文档与伪造弹窗消息拒绝、worker 失败回滚、摘要去重和上限、重启恢复、真实报告导出及 Blob URL 撤销。这些结果不是实际 Chrome 网络采集证据。
 
-独立审查发现并修复了合约网格页匹配遗漏、停用后 XHR 请求体仍被解析、相对路径模板不准确、导出上限与存储不一致等问题。现有登录页未被本轮工具操作，真实交易、保证金、账号权限和量化部署均无变化。
+独立审查发现并修复了合约网格页匹配遗漏、停用后 XHR 请求体仍被解析、相对路径模板不准确、导出上限与存储不一致等问题。最后补充的兼容回归还确认注入不会覆盖页面自己的 CommonJS 导出。现有登录页未被本轮工具操作，真实交易、保证金、账号权限和量化部署均无变化。
 
 ## 下一步验收
 
