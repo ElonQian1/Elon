@@ -7,6 +7,13 @@ official_page_authoritative: true
 
 # ChatGPT native image assets and gallery
 
+The completed capability below records the earlier DOM-discovery baseline.
+The 2026-09-07 [private catalog extension](chatgpt-private-image-gallery.md)
+reuses this native UI and cache, replacing its transient sync WebView with the
+existing identity session and cursor pagination. That extension is source-only
+pending grouped APK/device acceptance; the earlier device results below do not
+verify the new private transport.
+
 The production friend-chat surface can render ChatGPT image content and open a native
 cache-first gallery without navigating the active conversation away from its official
 page. The official ChatGPT WebView remains the identity, generation, byte-fetch, and
