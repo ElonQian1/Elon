@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -29,27 +29,47 @@
   function authorizationUrl(entry, projectId) {
     const url = new URL('/backend-api/files/download/' + encodeURIComponent(entry.fileId), root.location.origin);
     if (projectId) url.searchParams.set('gizmo_id', projectId);
-    url.searchParams.set(entry.projectId || entry.libraryFileId
+    url.searchParams.set(entry.image || entry.projectId || entry.libraryFileId
       ? 'check_context_scopes_for_conversation_id' : 'conversation_id', entry.conversationId);
     url.searchParams.set('download_intent', 'true');
     return url.href;
   }
 
+  function imageFile(source) {
+    const image = source.image;
+    if (image?.content_type !== 'image_asset_pointer' || typeof image.asset_pointer !== 'string' ||
+        source.attachmentsUnconfirmed || !Array.isArray(source.attachments)) return null;
+    const pointer = /^(?:file-service|sediment):\/\/([A-Za-z0-9_-]{1,160})$/.exec(image.asset_pointer);
+    if (!pointer || ['gizmo_id', 'project_id', 'library_file_id', 'shared_library_file_id',
+      'library_download_id', 'context_scopes', 'source_url', 'context_connector', 'connector_id',
+      'context_connector_info'].some(key => image[key] != null)) return null;
+    // Official jW/A5t pair image pointers with attachment metadata before pEt/fEt.
+    const matches = source.attachments.filter(file => file?.id === pointer[1]);
+    if (matches.length > 1 || matches[0]?.mime_type != null &&
+        (typeof matches[0].mime_type !== 'string' || !/^image\/[A-Za-z0-9.+-]{1,63}$/.test(matches[0].mime_type))) return null;
+    return { ...matches[0], id: pointer[1] };
+  }
+
   function target(path, source, scope) {
     const conversation = PATH.exec(path || '');
-    const file = source?.attachment;
+    const image = source?.image != null;
+    const file = image ? imageFile(source) : source?.attachment;
     if (!conversation || !/^[A-Za-z0-9_-]{1,160}$/.test(file?.id || '')) return null;
     // Shared-library and connector lanes have separate content resolvers.
-    if (['shared_library_file_id', 'source_url',
+    if (['shared_library_file_id', 'library_download_id', 'source_url',
       'context_connector', 'connector_id', 'context_connector_info'].some(key => file[key] != null && file[key] !== '')) return null;
     if (scope?.context_scopes != null && (!Array.isArray(scope.context_scopes) || scope.context_scopes.length)) return null;
+    if (file.context_scopes != null && (!Array.isArray(file.context_scopes) || file.context_scopes.length)) return null;
     const projects = [conversation[1], source.projectId, scope?.gizmo_id, scope?.project_id,
       file.gizmo_id, file.project_id].filter(value => value != null && value !== '');
     if (projects.some(value => typeof value !== 'string' || !PROJECT.test(value)) || new Set(projects).size > 1) return null;
     const libraryFileId = file.library_file_id == null || file.library_file_id === '' ? null : file.library_file_id;
     if (libraryFileId !== null && (typeof libraryFileId !== 'string' || !LIBRARY.test(libraryFileId))) return null;
     return Object.freeze({ conversationId: conversation[2], fileId: file.id,
-      projectId: projects[0] || null, libraryFileId });
+      projectId: projects[0] || null, libraryFileId,
+      ...(image ? { image: true,
+        name: typeof file.name === 'string' && file.name.trim() ? file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180) : 'image.png',
+        mediaType: file.mime_type || '' } : {}) });
   }
 
   async function resolveAuthorization(job, request) {
@@ -91,9 +111,10 @@
       if (!request) return row;
       const bytes = root.crypto.getRandomValues(new Uint8Array(16));
       const handle = 'download_' + Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
-      entries.set(handle, { ...request, path, name: row.name, account, token, expiresAt: Date.now() + 120000 });
+      const name = request.name || row.name;
+      entries.set(handle, { ...request, path, name, account, token, expiresAt: Date.now() + 120000 });
       while (entries.size > 800) entries.delete(entries.keys().next().value);
-      return { ...row, downloadHandle: handle };
+      return { ...row, name, ...(request.image ? { mediaType: request.mediaType } : {}), downloadHandle: handle };
     });
   }
 
@@ -205,5 +226,5 @@
 
   function cancel() { active?.controller.abort(); }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 2, register, start, cancel, dispose });
+  return Object.freeze({ version: 3, register, start, cancel, dispose });
 });

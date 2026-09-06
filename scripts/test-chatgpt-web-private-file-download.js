@@ -66,7 +66,7 @@ test('native descriptors contain opaque expiring handles, not file IDs or author
   assert.match(f.register()[0].downloadHandle, /^download_[a-f0-9]{32}$/);
 });
 
-test('unknown project/library scopes, connectors, image pointers and invalid IDs stay unclaimed', () => {
+test('unknown project/library scopes, connectors, unscoped pointers and invalid IDs stay unclaimed', () => {
   for (const patch of [{ id: '../x' }, { id: 'file-x?scope=other' }, { library_file_id: 'library-1' },
     { library_file_id: false }, { library_file_id: 0 }, { library_file_id: [] },
     { gizmo_id: 'g-p-test' }, { context_connector: {} }, { source_url: 'https://external.test' }]) {
@@ -79,7 +79,7 @@ test('unknown project/library scopes, connectors, image pointers and invalid IDs
   f.payload.gizmo_id = 'g-p-test';
   assert.equal(f.register()[0].downloadHandle, undefined);
   delete f.payload.gizmo_id;
-  f.payload.messages[0].content.parts.unshift({ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file-image' });
+  f.payload.messages[0].content.parts.unshift({ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file-image?unknown=scope' });
   const rows = f.register();
   assert.equal(rows[0].downloadHandle, undefined);
   assert.match(rows[1].downloadHandle, /^download_/);

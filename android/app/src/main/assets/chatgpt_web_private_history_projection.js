@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 3, create: factory });
+  const exported = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateHistoryProjection = exported;
 })(typeof window === 'object' ? window : null, function (dependencies) {
@@ -87,6 +87,7 @@
       .forEach((part) => {
         if (!object(part) || part.content_type !== 'image_asset_pointer') return;
         const value = { type: 'image', text: '\u56fe\u7247', kind: 'image' };
+        if (withSource) value.imageSource = part;
         ['width', 'height'].forEach((key) => {
           const dimension = Number(part[key]);
           if (Number.isInteger(dimension) && dimension > 0 && dimension <= 4096) {
@@ -185,6 +186,14 @@
     const message = matches[0].node.message || matches[0].node;
     const part = mediaParts(message, false, true)[Number(match[2])];
     // Only the private download owner sees the raw descriptor, never the native index.
+    if (part?.imageSource) {
+      const attachments = message.metadata?.attachments;
+      return { image: part.imageSource, name: part.text,
+        attachments: Array.isArray(attachments) ? attachments.slice(0, MAX_PARTS) : [],
+        attachmentsUnconfirmed: attachments != null &&
+          (!Array.isArray(attachments) || attachments.length > MAX_PARTS),
+        projectId: normalized.gizmo_id || normalized.project_id || '' };
+    }
     return part?.source ? { attachment: part.source, name: part.text,
       projectId: normalized.gizmo_id || normalized.project_id || '' } : null;
   }
