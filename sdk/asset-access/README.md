@@ -69,6 +69,9 @@ a BFF and use its protected session. The SDK does not install a popup or cross-o
 - `revoke()` immediately clears locally, aborts any in-flight read and sends an independent
   revocation request using the captured old credential. A late read cannot restore the cleared
   authorization; a later authorization cannot be erased by that older revocation finishing.
+  Repeating `revoke()` while that same session's revocation is in flight rejects with
+  `request_in_progress` without aborting the first request or sending another one. Await the
+  first call for the server result. Explicit `clear()` or new authorization still cancels it.
   If authorization or code exchange has not produced a token yet, it still cancels that local
   flow and blocks late tokens, rejects with `authorization_required`, and sends no revoke HTTP.
   Only a valid successful response confirms server revocation. If the server request fails,

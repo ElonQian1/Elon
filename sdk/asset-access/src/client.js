@@ -19,6 +19,7 @@ class AssetAccessClient {
   #clientId; #clock; #transport; #origin; #pending = null; #token = null;
   #snapshot = null; #epoch = 0; #controller = null; #status = 'unauthenticated';
   #expires = 0; #effectiveExpiry = null;
+  #revocationEpoch = null;
   #pagination = new PaginationChain();
 
   constructor(options) {
@@ -57,6 +58,7 @@ class AssetAccessClient {
     this.#epoch += 1;
     this.#controller?.abort();
     this.#controller = null;
+    this.#revocationEpoch = null;
     this.#pending = null;
     this.#token = null;
     this.#expires = 0;
@@ -186,11 +188,13 @@ class AssetAccessClient {
   }
 
   async revoke() {
+    if (this.#revocationEpoch === this.#epoch) throw new AssetAccessError('request_in_progress');
     let token;
     // Withdrawal also cancels pending consent or exchange before a token exists.
     // Capture an existing token when possible, but always invalidate the old epoch.
     try { token = this.#credential(); } finally { this.clear(); }
     const operation = this.#begin();
+    this.#revocationEpoch = operation.epoch;
     try {
       const data = await this.#transport('revoke', { token: token.access_token,
         clientId: this.#clientId, signal: operation.signal,
