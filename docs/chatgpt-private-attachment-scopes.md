@@ -96,8 +96,10 @@ composer, native byte lease, upload transport and ready-file association. It acc
 only an empty new-project composer at `/g/g-p-<32 hex>[-slug]/project`, without query
 parameters. An explicit user upload reads fresh project permission with `no-store`,
 a 7-second deadline, a 1 MiB body limit and cancellation. Project ID and boolean
-permission must match. Unknown/read-only permission retains the previous compatible
-route before bytes or writes; account, document and URL changes fail without replay.
+permission must match. Unknown permission retains the previous compatible route
+before bytes or writes; account, document and URL changes fail without replay.
+The initial candidate excluded read-only permission; the chat-only extension
+below now supports that explicit permission without writing project files.
 No permission polling or cached sidebar authorization is introduced.
 
 Plain text uses `use_case=gizmo` with that project ID. Non-ingest static images
@@ -115,10 +117,10 @@ and ready-store receipts must retain the same project. Official `RGt` maps
 ready file and file specification unless persistence is temporary. The candidate
 now preserves this mapping rather than losing it at native association.
 
-Read-only project-specific upload dispatch remains unimplemented. The original
-candidate also excluded ingest-project images; the source extension below now
-resolves their retrieval flag. Do not request project writes from a cached
-directory or mark all project attachments complete from source tests.
+The original candidate excluded read-only project dispatch and ingest-project
+images. Both source extensions are described below; their live acceptance still
+remains. Do not request project writes from a cached directory or mark all
+project attachments complete from source tests.
 
 ## Ingest project images
 
@@ -155,6 +157,53 @@ passed. This round did not run Gradle, package/publish/install an APK, access th
 handset or prove a live indexed-image upload. Grouped acceptance must confirm
 the actual account gate/module and one synthetic image's intended project
 association and usable reply without duplicate dispatch.
+
+## Read-only project chats
+
+Capability: `android_chatgpt_private_readonly_project_attachment_upload_v1`.
+Implementation: **implemented**. Verification: **offline verified, device pending**.
+Delivery: **source-only for the grouped APK**, not completed or installed.
+
+The inspected `BQr`/`HQr` contract above returns `chat-only`,
+`canStartUpload=true` and no upload project ID for an explicit
+`can_write=false`. It does not reject all attachments. The upload asset imports
+`WQr` as `obe`: its production composer passes the permission-filtered project
+ID plus the current server thread and selected leaf. Consequently `WQr` emits
+only the paired conversation origins for an existing read-only chat, and no
+library-file metadata for an empty new one. `TGt` still carries
+`is_project_thread=true`. `BZt` does not convert the file use case to `gizmo`
+without an upload project ID. These are source-level contracts, not a live
+permission or persistence acceptance result.
+
+The production native upload path now distinguishes explicit writable and
+read-only scopes. Missing/malformed permission remains unknown and cannot default
+to either. Text/PDF chat-only uploads use the existing `ace_upload` transaction;
+normalized static images keep `multimodal` and the confirmed ingest-image gate.
+Neither create nor processing requests carries `gizmo_id`, `is_project` or
+`should_upload_to_project` for the chat-only branch. Existing chat origins stay
+bound to the selected leaf; a new chat does not invent a thread or leaf.
+
+`projectScopeId` is local transaction ownership, never a serialized request field.
+The private receipt retains that ID and `projectWriteRequested`, which describes
+the requested write scope, not independent proof of server file placement.
+Association checks both against the captured permission. The official ready-file
+store keeps `isProjectThread=true` but no `projectGizmoId` in the chat-only branch;
+it receives only the same optional origin metadata. This prevents native
+association from accidentally upgrading a chat-only upload into a project write.
+All existing account, document, model, selected-branch, cancellation, deadline
+and no-ambiguous-replay guards are reused. A subsequent upload rereads permission,
+so changing from writable to read-only changes the next request's target fields.
+
+Project version 5, composer 9, protocol 8 and transport 6 pass **110 targeted Node
+cases** across eight attachment suites. Production-path tests cover new/existing
+read-only text, image and PDF uploads, exact create/process/ready-store fields,
+receipt-scope mismatch, local removal and cancellation/identity/branch changes.
+The new production cases first failed on the prior implementation. The full
+production asset bundle also parses. No Gradle, APK publication, installation or
+phone operation was performed in this source batch. Grouped device acceptance
+must confirm actual read-only membership, one synthetic attachment/reply and
+absence of a new project file; library placement/retention is not inferred from
+the request fields or synthetic responses.
 
 ## Existing project branches
 
