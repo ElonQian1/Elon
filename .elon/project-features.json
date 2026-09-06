@@ -5051,6 +5051,204 @@
       "updated_at_ms": 1788366843075
     },
     {
+      "id": "esk-early-support-policy-foundation-v1",
+      "title": "ESK 两年保障政策草案合同与离线检查 V1",
+      "summary": "当前主任务主导新工作；建立版本化 ESK 两年保障政策草案及无网络检查器，保留未决条款并区分草案完整、资金证明及生产授权，不运行真实经济操作。",
+      "status": "verified",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/esk-early-support-policy-foundation-v1.md",
+        "content_hash": "12fef7c3b27aefa3fcc4dff87ff8f119ea3d6eceea98b92adca7ee84ccdc69a3",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "3496c6d18d5122b08b4d926e2e2a0171f0024cd0",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "esk-primary",
+      "tags": [],
+      "task_paths": [
+        "contracts/esk/early-support-policy-draft-v1.fixture.json",
+        "contracts/esk/early-support-policy-draft-v1.schema.json",
+        "docs/delivery/esk-early-support-policy-foundation-v1.md",
+        "docs/esk-delivery-ownership.md",
+        "docs/requirements/esk-early-support-policy-foundation-v1.md",
+        "scripts/esk-early-support-policy"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "已确认方向和空决策的fixture可读取，缺失项明确且不填经济默认值",
+        "完整合成草案只允许进入政策审阅，生产授权和资金证明始终为false",
+        "严格输入、日期、条件约束、摘要稳定性和不回显自由文本有独立测试",
+        "真实CLI测试通过；旧预检、资产及账本实现不受修改；交付证据与源码一并推送"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "contracts/esk/early-support-policy-draft-v1.fixture.json",
+          "content_hash": "9359ba13b8f720c7d1ed99e9e0af24e8f8773fc8331b7938512c641ab1fd33be",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2a89b76f04baed678a589762711cd8391cf08735",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "contracts/esk/early-support-policy-draft-v1.schema.json",
+          "content_hash": "04e28815d1654a2b919835bd4150430d3e9951edb2f76e218cc83397f108bb8d",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "41695d6d8f2026a80b91319ce643f4d8a3ae5ec2",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "docs/delivery/esk-early-support-policy-foundation-v1.md",
+          "content_hash": "c56e4e1fe0010031c8dcb2e4c5e1bca6bbc742f35e647cdfe0d82e58a2cb121f",
+          "locator": "34/34 tests, independent review, local CLI only",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "56b8fabf7bda5bae6c9516b142d452d679218988",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "docs/esk-delivery-ownership.md",
+          "content_hash": "0a4fbb34a10fe69df51f79dcd058ec994cd745a94909cd1fb76fa7fd010bbdaa",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6568a47c56c5b4ecc062667bb06c3897cc9b312b",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-early-support-policy/cli.js",
+          "content_hash": "7f9a794cc8d58c26ab6f618775dfbf141773d4f8734d44bb00366805d6cefa9a",
+          "locator": "readBoundedFile",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "251a6f2a3eabed8bf75559a02c11b971e60b4770",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-early-support-policy/contract.js",
+          "content_hash": "5a360be3e871f1e5cd271d475e0ac2af4688d416e6bcdc57dd6bb2766b8c0b09",
+          "locator": "evaluatePolicyBuffer",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7588ab9c25db5b5f0333139e86198f4b4f923da8",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-early-support-policy/tests/cli.test.js",
+          "content_hash": "0b96b4a315921f411837f6a86cd242f9598ec96005dc2148bcf72d22343f0e12",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1856a3827ce5d6065bd3c8a58db688b342e022a8",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-early-support-policy/tests/helpers.js",
+          "content_hash": "f65eb9c8280e45f8a7bb5293bf100e96e20fe1bce6d388528833f1a1166e0858",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "09291c48d28fc5b850dce1e8bb5eb2ea53d68bd6",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-early-support-policy/tests/policy-review.test.js",
+          "content_hash": "1564eaf49e1a262de477283db8a44fd355feae12fa334cc67a5c7470b6e71601",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "dba81b1c71c740fe8d77b6ca67dc4728a308d71b",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-early-support-policy/tests/public-schema.test.js",
+          "content_hash": "4fc5a96b312aab3d50a904539fd09a514cc39addadad3b03c2103f524dd83118",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2f42cfd693f8267f6b173340388326118ee2f396",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-early-support-policy/tests/strict-input.test.js",
+          "content_hash": "d01fd6ca01eb0efeb6be838cbdb8df7dc9d0479bc7c3bc17eafaea46f32d7e49",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a4c3d0baaeb356fab9130680f85f8b6aad0093a5",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/esk-paid-reconciliation/strict-json.js",
+          "content_hash": "c2a35f02da5a4fb753de9fb5a45fd85a4be4828a3b8d7f7d49942387748eacc5",
+          "locator": "parseStrictJson reused without changes",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aebbfc41b910887725179bca46ceb2b0d793458f",
+            "head_blob_oid": "ccd684a291b6a7de55e12d86f3e270d5dd164c83",
+            "worktree_blob_oid": "ccd684a291b6a7de55e12d86f3e270d5dd164c83",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1788662393346,
+      "updated_at_ms": 1788663352122
+    },
+    {
       "id": "esk-native-snapshot-v1",
       "title": "ESK 双 APK 原生只读快照授权 V1",
       "summary": "在官方双 APK 间确认本人账户并展示短期 Paper ESK 快照，HTTP 私有请求失败关闭，不向 WebView 传凭据。",
@@ -21484,66 +21682,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_ffa65b985c50499fb048c308b0172251",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "requirement_rebound",
-      "actor": "/root",
-      "reason": "Bind the reviewed implementation_status=verified metadata to the final accepted requirement.",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1788556107641
-    },
-    {
-      "id": "feature_event_257817675e754257ae8f57a77e19549d",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "transitioned",
-      "actor": "/root",
-      "reason": "Reviewed final new-only scope, strict public client, installed-state gate, and truthful release separation.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788556117089
-    },
-    {
-      "id": "feature_event_e99c53c9cd59465c813451ec2e3d588a",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "transitioned",
-      "actor": "/root",
-      "reason": "Dependencies and final acceptance criteria are current and ready for evidence rebinding.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788556125643
-    },
-    {
-      "id": "feature_event_9af6384e4e9d4fc9b47595a0881f3a63",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "claimed",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788556133793
-    },
-    {
-      "id": "feature_event_62d913cd066f4024b9ec13ff7fcaf2c7",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "claim_released",
-      "actor": "codex/root",
-      "reason": "需求已补充活动服务器透传与 published release 稳定公共路由，先释放旧范围认领后重新评审绑定。",
-      "from_status": "claimed",
-      "to_status": "blocked",
-      "at_ms": 1788557422473
-    },
-    {
-      "id": "feature_event_6091042bae354bc29443c64762b4acd4",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "requirement_rebound",
-      "actor": "codex/root",
-      "reason": "重新绑定已评审的活动服务器与 published release 稳态下载合同。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788557456242
-    },
-    {
       "id": "feature_event_3c543e67697b4ca5ba948153739e3f37",
       "feature_id": "yilong-quant-android-public-download-v2",
       "action": "metadata_updated",
@@ -23482,6 +23620,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788653665983
+    },
+    {
+      "id": "feature_event_56243ccef0ce4d7a9817646d624ba715",
+      "feature_id": "esk-early-support-policy-foundation-v1",
+      "action": "registered",
+      "actor": "codex-esk-primary",
+      "reason": "用户明确要求当前任务主导并启动新工作；只接受草案校验工程，不批准未定经济条款",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788662393346
+    },
+    {
+      "id": "feature_event_2c7aef80f2fd40b6b48b5f619df9d9e8",
+      "feature_id": "esk-early-support-policy-foundation-v1",
+      "action": "claimed",
+      "actor": "codex-esk-primary",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788662407695
+    },
+    {
+      "id": "feature_event_3ed6fcd023fa4b62a903f21294b39b67",
+      "feature_id": "esk-early-support-policy-foundation-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-primary",
+      "reason": "当前主任务实施草案合同；实现与测试子代理按独立路径分工",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788662501471
+    },
+    {
+      "id": "feature_event_3c95797b66b74157af1ebc0164c27f27",
+      "feature_id": "esk-early-support-policy-foundation-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-primary",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788663317912
+    },
+    {
+      "id": "feature_event_ead10b1f73214cc0b4ba16dbfb3ab0e0",
+      "feature_id": "esk-early-support-policy-foundation-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-primary",
+      "reason": "Offline draft checker, 34 tests passed and independent review complete; no production or economic authorization",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788663351916
+    },
+    {
+      "id": "feature_event_6c6c766651854532a8efa817de933e1a",
+      "feature_id": "esk-early-support-policy-foundation-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-primary",
+      "reason": "Offline draft checker, 34 tests passed and independent review complete; no production or economic authorization",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788663352122
     }
   ]
 }

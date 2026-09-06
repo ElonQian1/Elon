@@ -1,0 +1,28 @@
+{
+  "schema": "elon.esk.early_support_policy_draft.v1",
+  "policy_status": "draft",
+  "asset": "ESK",
+  "confirmed_intent": {
+    "sale_proceeds_invested": true,
+    "investment_returns_intended": true,
+    "early_support_intended": true,
+    "policy_duration_years": 2
+  },
+  "decisions": {
+    "protection_scope": null,
+    "principal_denomination": null,
+    "term_basis": null,
+    "program_start_at": null,
+    "program_end_at": null,
+    "guarantor_id": null,
+    "funding_source": null,
+    "funding_description": null,
+    "redemption_rule": null,
+    "transfer_rule": null,
+    "consumption_rule": null,
+    "redemption_token_rule": null,
+    "prior_returns_rule": null,
+    "anniversary_rule": null,
+    "minimum_return_terms": null
+  }
+}

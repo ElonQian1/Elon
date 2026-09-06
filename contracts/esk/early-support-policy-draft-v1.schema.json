@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "elon.esk.early_support_policy_draft.v1",
+  "title": "ESK early support policy draft V1",
+  "description": "An unapproved policy draft. All economic values are declarations, not funding evidence or permission to issue, invest, redeem, or distribute assets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policy_status", "asset", "confirmed_intent", "decisions"],
+  "properties": {
+    "schema": { "const": "elon.esk.early_support_policy_draft.v1" },
+    "policy_status": { "const": "draft" },
+    "asset": { "const": "ESK" },
+    "confirmed_intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sale_proceeds_invested", "investment_returns_intended", "early_support_intended", "policy_duration_years"],
+      "properties": {
+        "sale_proceeds_invested": { "const": true },
+        "investment_returns_intended": { "const": true },
+        "early_support_intended": { "const": true },
+        "policy_duration_years": { "const": 2 }
+      }
+    },
+    "decisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protection_scope", "principal_denomination", "term_basis",
+        "program_start_at", "program_end_at", "guarantor_id", "funding_source",
+        "funding_description", "redemption_rule", "transfer_rule", "consumption_rule",
+        "redemption_token_rule", "prior_returns_rule", "anniversary_rule", "minimum_return_terms"
+      ],
+      "properties": {
+        "protection_scope": {
+          "enum": [null, "principal_only", "principal_and_minimum_return", "limited_funded_loss_support"],
+          "description": "Unapproved alternatives. Limited funded loss support does not satisfy a promise to replenish all principal losses. Selecting any alternative never approves a policy."
+        },
+        "principal_denomination": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Z][A-Z0-9]{1,11}$",
+          "description": "Declared denomination identifier, not a verified currency, price, exchange rate or repayment guarantee."
+        },
+        "term_basis": {
+          "enum": [null, "program_window", "per_purchase_anniversary"],
+          "description": "program_window proposes a common protection end date. per_purchase_anniversary proposes an anniversary for each purchase; program dates then describe the admission window only. Closing admission never automatically clears existing obligations. This checker computes no individual maturity dates."
+        },
+        "program_start_at": { "$ref": "#/$defs/utcTimestamp" },
+        "program_end_at": { "$ref": "#/$defs/utcTimestamp" },
+        "guarantor_id": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "description": "Unverified identifier of the proposed responsible party."
+        },
+        "funding_source": { "$ref": "#/$defs/ruleText" },
+        "funding_description": { "$ref": "#/$defs/longText" },
+        "redemption_rule": { "$ref": "#/$defs/ruleText" },
+        "transfer_rule": { "$ref": "#/$defs/ruleText" },
+        "consumption_rule": { "$ref": "#/$defs/ruleText" },
+        "redemption_token_rule": { "$ref": "#/$defs/ruleText" },
+        "prior_returns_rule": { "$ref": "#/$defs/ruleText" },
+        "anniversary_rule": { "$ref": "#/$defs/ruleText" },
+        "minimum_return_terms": {
+          "$ref": "#/$defs/longText",
+          "description": "Required for review only if principal_and_minimum_return is selected; otherwise must remain null. The checker reports cross-field inconsistencies without approving or interpreting the text."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "utcTimestamp": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+      "description": "Actual UTC calendar date, years 0001 through 9999, whole seconds only. The checker additionally rejects invalid dates and non-increasing program windows. No 730-day, leap-day or anniversary rule is inferred."
+    },
+    "ruleText": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f-\\u009f]+$",
+      "description": "Explicit proposed terms, not approved executable economic rules. Unicode scalar values only; no leading/trailing whitespace or control characters."
+    },
+    "longText": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 2000,
+      "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001f\\u007f-\\u009f]+$",
+      "description": "Unverified proposed terms or funding declaration. Unicode scalar values only; no leading/trailing whitespace or control characters."
+    }
+  }
+}
