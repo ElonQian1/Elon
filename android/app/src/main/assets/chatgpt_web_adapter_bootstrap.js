@@ -34,6 +34,8 @@
     '__elonChatGptAttachmentPolicy',
     '__elonChatGptDictationSessionPolicy',
     '__elonChatGptModelLabelPolicy',
+    '__elonChatGptPrivateModelContract',
+    '__elonChatGptPrivateModelState',
     '__elonChatGptComposer',
     '__elonChatGptNavigationPolicy',
     '__elonChatGptNavigation',

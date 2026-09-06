@@ -10,6 +10,7 @@
   const composerDismissPolicy = window.__elonChatGptComposerDismissPolicy;
   const attachmentPolicy = window.__elonChatGptAttachmentPolicy;
   const modelLabelPolicy = window.__elonChatGptModelLabelPolicy;
+  const privateModels = window.__elonChatGptPrivateModelState?.create(window);
   const dictationSessionPolicy = window.__elonChatGptDictationSessionPolicy;
   const composerToolStatePolicy = window.__elonChatGptComposerToolStatePolicy;
   const composerToolSelectionAdapter = window.__elonChatGptComposerToolSelection;
@@ -548,6 +549,9 @@
 
   function requestOptions(section, composer, emitEvent, result, skipPrivate = false) {
     const action = section === 'model' ? 'list_model_options' : 'list_composer_tools';
+    if (section === 'model' && !skipPrivate && privateModels?.request(
+      () => findModelButton(composer), options => emitOptions(section, options, composer, emitEvent), result,
+      () => requestOptions(section, composer, emitEvent, result, true))) return;
     if (section === 'tools' && !skipPrivate && composerToolSelectionAdapter?.requestPrivateOptions?.(
       options => emitOptions(section, options, composer, emitEvent), result, () => requestOptions(section, composer, emitEvent, result, true))) return;
     if (section === 'tools' && composerToolSelection) {
@@ -636,6 +640,8 @@
   }
 
   function selectOption(section, id, composer, emitEvent, result, scheduleSnapshot) {
+    if (section === 'model' && privateModels?.select(id, result, scheduleSnapshot, () =>
+      requestOptions(section, composer, emitEvent, (_action, ok, detail) => result('select_model_option', ok, detail), true))) return;
     if (section === 'tools' && composerToolSelectionAdapter?.selectPrivate?.(id, result, scheduleSnapshot)) return;
     const action = section === 'model' ? 'select_model_option' : 'select_composer_tool';
     if (!lastOptions[section].some((option) => option.id === id)) {
@@ -760,6 +766,7 @@
       composer, emitEvent, result, documentRef: document, view: window, lastOptions,
       triggerFor, emitTriggerTouch, emitVisibleNodeTouch, findPromptInput, settlePendingOptions,
       dismissPrivate: () => composerToolSelectionAdapter?.dismissPrivateOptions?.(),
+      dismissPrivateModel: () => privateModels?.dismiss(),
       keyboardEvent: (type, init) => new KeyboardEvent(type, init),
       clearOptions: () => { lastOptions = { model: [], tools: [] }; }
     });

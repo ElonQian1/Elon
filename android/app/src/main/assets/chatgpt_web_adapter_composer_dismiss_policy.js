@@ -78,11 +78,19 @@
 
   function dismissMenu(context) {
     const { composer, emitEvent, result, documentRef, view, lastOptions } = context;
+    const privateModelDismissed = context.dismissPrivateModel?.();
     const expandedSection = ['model', 'tools'].find(section => {
       const trigger = context.triggerFor(section, composer);
       return trigger && trigger.getAttribute('aria-expanded') === 'true';
     });
     const expandedTrigger = expandedSection && context.triggerFor(expandedSection, composer);
+    if (!expandedSection && privateModelDismissed) {
+      context.dismissPrivate();
+      context.clearOptions();
+      context.settlePendingOptions('model', false, '官网菜单已关闭。');
+      context.settlePendingOptions('tools', false, '官网菜单已关闭。');
+      return result('dismiss_composer_menu', true, '');
+    }
     if (!expandedSection && !lastOptions.model.length && context.dismissPrivate()) {
       lastOptions.tools = [];
       return result('dismiss_composer_menu', true, '');
