@@ -24,6 +24,7 @@ for website functionality. Persistent WebView identity remains intentional.
 | End-to-end private read deadlines, body limits and late project response isolation | Implemented | Lifecycle and existing JS consumer suites passed | Published/installed 1540; device acceptance pending |
 | Bounded request-shape capture through native MCP, reusing the page observer | Implemented diagnostic only | Node/Android checks passed; actual reservation JSON and conversation SSE capture observed | Published/installed 1540; telemetry-budget follow-up is source-only |
 | Reservation responses cannot prematurely release attachment sends | Implemented regression correction | Node red-to-green, 12 Android tracker tests and file-content smoke contract passed | Source-only; grouped APK and synthetic-file acceptance pending |
+| Private file create/blob upload/process transaction | Implemented small-file transport candidate; native association not connected | One real 78-byte private upload processed; 17 targeted checks passed | Source-only, no production loader/default change; [contract and remaining integration](chatgpt-private-attachment-upload.md) |
 
 Root cause, exact modules, and check results are in
 [the history contract](chatgpt-private-history-native-contract.md).
@@ -81,7 +82,7 @@ because the debugging connection is unavailable. The Goal is not complete.
 |---|---|---|
 | Text send/regenerate | Native send ledger and official transaction; streaming observer | Fresh proof-bound private dispatch is not verified. Do not replay captured proof headers or declare official fallback a private POST success. |
 | Model/effort/tools/temporary mode | Native presets/cache and official controls | Apply the chosen state through a confirmed private contract; cached menu labels alone are not proof of server selection. |
-| Attachment upload | Native picker/progress; official upload owner | Observe and verify prepare/upload/finalize plus composer association before replacing the owner. Metadata display is not an uploader. |
+| Attachment upload | Native picker/progress; official upload owner; verified small-text private upload transport | Legacy create/blob PUT/process now implemented and privately exercised. Finish native byte handoff and composer/message association; images/project/temporary/multipart variants remain. The corrected native-picker smoke currently fails before byte upload. See [upload contract](chatgpt-private-attachment-upload.md). |
 | Images | Native gallery/previews/cache; official creation and library sync | Confirm private library pagination and generation transaction. Download queue improvements do not replace these endpoints. |
 | Share/delete/conversation files | Native pin/rename/archive/move; private file-index candidate; advanced official options | File descriptors now use the private history GET. Download authorization, share/delete contracts, reconciliation and destructive confirmation remain. Do not substitute system sharing for official features. |
 | Google direct send | Native cache and private response observer; official submit | Reproduce the current submit contract and transaction ownership; observed reply endpoints do not imply a working private sender. |
