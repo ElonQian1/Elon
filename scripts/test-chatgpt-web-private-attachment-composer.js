@@ -149,7 +149,7 @@ test('versioned reinjection cancels only the older owner and retains the current
     __elonChatGptPrivateAttachmentSend: { version: 1, cancel: () => { cancelled++; } } };
   vm.runInNewContext(source, { window: root });
   const current = root.__elonChatGptPrivateAttachmentSend;
-  assert.equal(current.version, 7);
+  assert.equal(current.version, 8);
   assert.equal(cancelled, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateAttachmentSend, current);

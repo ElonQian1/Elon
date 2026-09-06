@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 5, create: factory });
+  const exported = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentProject = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -98,7 +98,7 @@
 
   function supports(scope, file) {
     if (!PROJECT.test(scope?.projectId || '') || typeof scope.canWrite !== 'boolean') return false;
-    if (['text/plain', 'application/pdf'].includes(file?.type)) return true;
+    if (root.__elonChatGptPrivateAttachmentProtocol?.isDocument(file)) return true;
     return ['image/jpeg', 'image/png', 'image/webp'].includes(file?.type) &&
       (!scope.usesInjestPath || typeof scope.imageIndexForRetrieval === 'boolean');
   }
@@ -123,5 +123,5 @@
     });
   }
 
-  return Object.freeze({ version: 5, projectId, read, captureThread, supports, uploadContext });
+  return Object.freeze({ version: 6, projectId, read, captureThread, supports, uploadContext });
 });

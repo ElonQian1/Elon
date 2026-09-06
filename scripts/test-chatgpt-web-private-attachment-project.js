@@ -8,6 +8,7 @@ const sendModule = require(assets + 'chatgpt_web_private_attachment_send.js');
 const transportModule = require(assets + 'chatgpt_web_private_attachment_transport.js');
 const protocol = require(assets + 'chatgpt_web_private_attachment_protocol.js');
 const jsonRequest = require(assets + 'chatgpt_web_private_json_request.js');
+const documentCases = require('../android/app/src/test/resources/chatgpt_private_attachment_documents.json');
 const PROJECT = 'g-p-0123456789abcdef0123456789abcdef';
 const OTHER = 'g-p-fedcba9876543210fedcba9876543210';
 const CONVERSATION = '01234567-89ab-4cde-8123-456789abcdef';
@@ -101,6 +102,37 @@ test('existing project conversations bind the selected leaf on both official rou
       should_upload_to_project: true, origination_thread_id: CONVERSATION, origination_message_id: LEAF });
     assert.deepEqual(f.store.readyFiles$()[0].libraryFileInfo, process.metadata.library_file_info);
     assert.equal(f.composer.merge([]).length, 1, 'upload cleanup does not hide the associated attachment');
+  }
+});
+
+test('project documents retain current origins, permission and official spreadsheet indexing', async () => {
+  for (const spec of documentCases.documents) {
+    for (const canWrite of [false, true]) {
+      for (const ingest of [false, true]) {
+        for (const existingPath of [undefined, '/c/' + CONVERSATION]) {
+          const file = new File([new Uint8Array([0, 255, 128, 13, 10])], spec.name, { type: spec.type });
+          const f = fixture({ file, existingPath });
+          f.payload.gizmo.current_user_permission.can_write = canWrite;
+          f.payload.gizmo.use_injest_path = ingest;
+          await f.start();
+          assert.equal(f.fallbacks(), 0, spec.type);
+          assert.equal(f.receipts[0][1], true, spec.type);
+          assert.equal(f.calls.length, 4);
+          const create = JSON.parse(f.calls[1].init.body), body = JSON.parse(f.calls[3].init.body);
+          assert.equal(create.use_case, canWrite ? 'gizmo' : 'ace_upload');
+          assert.equal(create.gizmo_id, canWrite ? PROJECT : undefined);
+          assert.equal(create.mime_type, spec.type);
+          assert.equal(body.index_for_retrieval, ingest && /\.(xls|xlsx|csv)$/i.test(spec.name));
+          assert.equal(body.metadata.is_project_thread, true);
+          assert.equal(body.metadata.library_file_info?.origination_message_id, existingPath ? LEAF : undefined);
+          assert.equal(body.metadata.library_file_info?.should_upload_to_project, canWrite ? true : undefined);
+          assert.equal(f.calls[2].init.body, file);
+          assert.equal(f.store.readyFiles$()[0].fileSpec.mimeType, spec.type);
+          assert.equal(f.store.readyFiles$()[0].projectGizmoId, canWrite ? PROJECT : undefined);
+          assert.equal(f.gateReads.length, 0, 'document types do not wait for an image-only flag');
+        }
+      }
+    }
   }
 });
 
@@ -259,7 +291,8 @@ test('project image keeps multimodal dimensions without inventing an unobserved 
 });
 
 test('project retrieval follows observed spreadsheet suffix rules and exact permission is refreshed per upload', async () => {
-  const scope = { projectId: PROJECT, canWrite: true, usesInjestPath: true }, project = projectModule.create({});
+  const scope = { projectId: PROJECT, canWrite: true, usesInjestPath: true };
+  const project = projectModule.create({ __elonChatGptPrivateAttachmentProtocol: protocol });
   for (const [name, indexed] of [['fixture.txt', false], ['fixture.CSV', true], ['fixture.xlsx', true], ['fixture.pdf', false]]) {
     const options = project.uploadContext(scope, { name, type: 'text/plain' });
     assert.equal(options.indexForRetrieval, indexed);

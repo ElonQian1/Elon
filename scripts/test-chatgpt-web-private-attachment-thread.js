@@ -15,6 +15,7 @@ function fixture(options = {}) {
     nodes: new Set([LEAF, OTHER_LEAF]) };
   const root = { location: { href: 'https://chatgpt.com/c/' + CONVERSATION },
     __elonChatGptDocumentToken: 'doc_synthetic_thread',
+    __elonChatGptPrivateAttachmentProtocol: protocol,
     performance: { getEntriesByName: (url, type) => loaded && url === URL && type === 'resource' ? [{}] : [] },
     document: { querySelector: () => null },
     setTimeout: options.fastTimeout ? fn => setTimeout(fn, 10) : setTimeout, clearTimeout };
