@@ -1,6 +1,6 @@
 # Remaining private-native batch
 
-Current implementation audit: 2026-09-06. This is a work list, not a declaration
+Current implementation audit: 2026-09-07. This is a work list, not a declaration
 that every private protocol has been reproduced. Reuse completed capabilities in
 [the capability matrix](web-ai-private-transport-capability-matrix.md).
 
@@ -12,6 +12,10 @@ round after the candidate batch is ready. Existing proven native audio,
 subtitles, dictation, read-aloud, directory cache, and mutations are not repeated
 research. System alternatives remain explicit choices, not silent replacements
 for website functionality. Persistent WebView identity remains intentional.
+
+Latest user priority: finish the remaining ChatGPT private capabilities first.
+Google work is last; do not start Google protocol research, implementation or
+acceptance while these ChatGPT gaps remain. Completed capabilities stay reused.
 
 ## Current batch
 
@@ -33,7 +37,8 @@ for website functionality. Persistent WebView identity remains intentional.
 | Attachment cancellation without UI-thread I/O | Immediate byte-lease revocation, off-thread file cleanup and stale-read exclusion implemented | All 6 native reader tests passed, including blocked-read/EOF cancellation; grouped Android 33/33 passed | Published/installed 1541; live slow-read cancellation not exercised |
 | Private conversation file download authorization and native transfer | Implemented scoped private GET, expiring selections and production Download action | Official current source contract, targeted JS, Release compilation and Android checks passed; device transfer pending | Published/installed 1541; [scope and contract](chatgpt-private-file-download.md) |
 | Project/library-linked conversation attachment downloads | Existing native Download action now resolves confirmed project scope and library file metadata before private authorization | 48 focused Node cases passed with synthetic HTTP; actual saved bytes and live scope acceptance pending | Published/installed 1541; [scope extension](chatgpt-private-file-download.md#project-and-library-extension) |
-| Private single-conversation deletion | Partial: evidenced legacy PATCH, current/noncurrent native confirmation, voice/send exclusion and exact cache invalidation | 12 deletion JS cases, existing regressions, Release source compilation and 90 Android tests passed; final send guard rechecked in the affected 8-test suite; live deletion pending | Published/installed 1541; [scope and remaining work](chatgpt-private-conversation-delete.md) |
+| Private single-conversation deletion | Both evidenced DELETE/PATCH branches now select from the current official recognized flag; existing native confirmation, voice/send exclusion and exact cache invalidation retained | 18 deletion JS cases pass; current runtime binding and live deletion pending | Legacy branch installed in 1541; flagged version 3 is source-only for grouped APK; [scope and remaining work](chatgpt-private-conversation-delete.md) |
+| Existing file index and upload receipts exposed through production MCP | Current-document/current-route file descriptors and expiring opaque selections; upload receipt survives unrelated send/skin receipts | Release compilation and 43 targeted Android tests pass; no new network/DOM path | Source-only for grouped APK; [contract](chatgpt-private-conversation-files.md#production-mcp-acceptance-access) |
 
 Root cause, exact modules, and check results are in
 [the history contract](chatgpt-private-history-native-contract.md).
@@ -169,8 +174,8 @@ The offline implementation itself did not operate the absent phone.
 | Model/effort/tools/temporary mode | Native presets/cache and official controls | Apply the chosen state through a confirmed private contract; cached menu labels alone are not proof of server selection. |
 | Attachment upload | Earlier small-text private upload verified; production text-file delivery passed on 1541; native byte handoff and ordinary/temporary/writable-project image/PDF transactions packaged | Confirm integrated private-route provenance, images/PDF, official model/branch-runtime access and temporary/project library behavior; finish read-only permission variants, ingest images, other documents and multipart. Production file delivery is not a private-route pass. See [upload contract](chatgpt-private-attachment-upload.md), [PDF extension](chatgpt-private-pdf-upload.md) and [scope contract](chatgpt-private-attachment-scopes.md). |
 | Images | Native gallery/previews/cache; official creation and library sync | Confirm private library pagination and generation transaction. Download queue improvements do not replace these endpoints. |
-| Share/delete/conversation files | Native pin/rename/archive/move; private file index plus ordinary/project/library-linked download candidates; guarded legacy private delete and current-chat reset | Verify saved-file downloads and current/noncurrent deletion. Complete flagged delete endpoint selection, shared-library/connector/image download scope, and official sharing. Do not substitute system sharing for official features. |
-| Google direct send | Native cache and private response observer; official submit | Reproduce the current submit contract and transaction ownership; observed reply endpoints do not imply a working private sender. |
+| Share/delete/conversation files | Native pin/rename/archive/move; private file index plus ordinary/project/library-linked download candidates; guarded flag-selected private delete and current-chat reset | Verify saved-file downloads, live flag binding and current/noncurrent deletion. Complete shared-library/connector/image download scope and official sharing. Do not substitute system sharing for official features. |
+| Google direct send (last) | Native cache and private response observer; official submit | Deferred until remaining ChatGPT private work is ready. Then reproduce the submit contract and transaction ownership; observed reply endpoints do not imply a working private sender. |
 
 An unknown protocol remains a documented code gap. No guessed endpoint, fake
 success, or automatic write replay should be added merely to make this table
