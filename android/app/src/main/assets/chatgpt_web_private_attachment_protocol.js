@@ -12,6 +12,20 @@
   const PROJECT_ID = /^g-p-[a-f0-9]{32}$/i;
   const USE_CASES = new Set(['ace_upload', 'my_files', 'multimodal', 'gizmo']);
   const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+  // These document categories use the inspected composer file transaction, not media conversion.
+  const documentMimeTypes = Object.freeze([
+    'text/plain', 'application/pdf', 'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.oasis.opendocument.text', 'application/rtf', 'text/rtf',
+    'text/csv', 'text/tab-separated-values', 'text/markdown', 'application/json',
+    'application/xml', 'text/xml', 'text/html',
+  ]);
+
+  function isDocument(file) { return documentMimeTypes.includes(file?.type); }
 
   function isPdf(file) {
     return file?.type === 'application/pdf' || /\.pdf$/i.test(file?.name || '');
@@ -189,6 +203,6 @@
     return { metadata, eventCount: count, events };
   }
 
-  return { version: 8, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed,
-    imageDimensions, projectInfo, isPdf, creationHeaders };
+  return { version: 9, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed,
+    imageDimensions, projectInfo, isPdf, creationHeaders, documentMimeTypes, isDocument };
 });

@@ -1,0 +1,28 @@
+{
+  "documents": [
+    { "name": "fixture.txt", "type": "text/plain" },
+    { "name": "fixture.pdf", "type": "application/pdf" },
+    { "name": "fixture.doc", "type": "application/msword" },
+    { "name": "fixture.docx", "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+    { "name": "fixture.ppt", "type": "application/vnd.ms-powerpoint" },
+    { "name": "fixture.pptx", "type": "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
+    { "name": "fixture.xls", "type": "application/vnd.ms-excel" },
+    { "name": "fixture.xlsx", "type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+    { "name": "fixture.odt", "type": "application/vnd.oasis.opendocument.text" },
+    { "name": "fixture.rtf", "type": "application/rtf" },
+    { "name": "fixture.rtf", "type": "text/rtf" },
+    { "name": "fixture.csv", "type": "text/csv" },
+    { "name": "fixture.tsv", "type": "text/tab-separated-values" },
+    { "name": "fixture.md", "type": "text/markdown" },
+    { "name": "fixture.json", "type": "application/json" },
+    { "name": "fixture.xml", "type": "application/xml" },
+    { "name": "fixture.xml", "type": "text/xml" },
+    { "name": "fixture.html", "type": "text/html" }
+  ],
+  "unsupported": [
+    { "name": "fixture.zip", "type": "application/zip" },
+    { "name": "fixture.docx", "type": "application/octet-stream" },
+    { "name": "fixture.hwpx", "type": "application/vnd.hancom.hwpx" },
+    { "name": "fixture.docx", "type": "application/vnd.google-apps.document" }
+  ]
+}
