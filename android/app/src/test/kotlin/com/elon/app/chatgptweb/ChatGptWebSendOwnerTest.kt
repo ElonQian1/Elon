@@ -127,7 +127,7 @@ class ChatGptWebSendOwnerTest {
     }
 
     @Test
-    fun transportCompletionUsesTheReservedSendWhenTheObservedSnapshotIsStable() {
+    fun transportCompletionCannotReleaseTheReservationWithoutAReadyAttachment() {
         val fixture = Fixture()
         assertTrue(fixture.owner.beginAttachments("with transport", listOf(pendingAttachment())))
 
@@ -139,12 +139,13 @@ class ChatGptWebSendOwnerTest {
                 completedCount = 1,
             ),
         )
-        assertEquals(listOf("with transport"), fixture.transport.commands.map(WebChatSendCommand::prompt))
-        assertEquals("sending", fixture.owner.attachmentSendPhase())
+        assertTrue(fixture.transport.commands.isEmpty())
+        assertEquals("uploading", fixture.owner.attachmentSendPhase())
+        assertEquals(0, fixture.owner.completedAttachmentCount())
     }
 
     @Test
-    fun partialTransportCompletionPublishesNativeProgressWithoutDispatchingEarly() {
+    fun partialProgressRequiresAnObservedReadyFileInsteadOfAReservationHint() {
         val fixture = Fixture()
         assertTrue(
             fixture.owner.beginAttachments(
@@ -162,6 +163,12 @@ class ChatGptWebSendOwnerTest {
             ),
         )
 
+        assertTrue(fixture.transport.commands.isEmpty())
+        assertEquals(0, fixture.owner.completedAttachmentCount())
+        fixture.currentSnapshot = snapshot(
+            attachments = listOf(ChatGptWebAttachment("upload-1", "note.txt", "ready", true)),
+        )
+        fixture.owner.observeSnapshot(fixture.currentSnapshot)
         assertTrue(fixture.transport.commands.isEmpty())
         assertEquals(1, fixture.owner.completedAttachmentCount())
         assertEquals("uploading", fixture.attachmentUpdates.last().phase)
@@ -181,12 +188,58 @@ class ChatGptWebSendOwnerTest {
         assertTrue(fixture.attachmentUpdates.isEmpty())
     }
 
-    private class Fixture(stageSucceeds: Boolean = true) {
+    @Test
+    fun privateUploadUsesTheExistingReservationAndDoesNotOpenASecondFileChooser() {
+        val fixture = Fixture(privateUpload = true)
+        assertTrue(fixture.owner.beginAttachments("with file", listOf(pendingAttachment())))
+        assertEquals(1, fixture.privateUploadRequests)
+        assertEquals(0, fixture.attachmentUploadRequests)
+        assertTrue(fixture.transport.commands.isEmpty())
+        fixture.owner.acceptCommandResult(commandResult("request_attachment_upload", ok = true))
+        assertTrue(fixture.transport.commands.isEmpty())
+        fixture.currentSnapshot = snapshot(
+            attachments = listOf(ChatGptWebAttachment("private_attachment_1", "note.txt", "ready", true)),
+        )
+        fixture.owner.observeSnapshot(fixture.currentSnapshot)
+        fixture.owner.observeSnapshot(fixture.currentSnapshot)
+        assertEquals(1, fixture.transport.commands.size)
+    }
+
+    @Test
+    fun privateUploadFailureOrClearCancelsTheByteLeaseWithoutOpeningCompatibilityUpload() {
+        val fixture = Fixture(privateUpload = true)
+        assertTrue(fixture.owner.beginAttachments("with file", listOf(pendingAttachment())))
+        fixture.owner.acceptCommandResult(commandResult("request_attachment_upload", ok = false))
+        assertEquals(1, fixture.privateUploadCancellations)
+        assertEquals(0, fixture.attachmentUploadRequests)
+        assertTrue(fixture.transport.commands.isEmpty())
+        assertTrue(fixture.owner.beginAttachments("another file", listOf(pendingAttachment())))
+        fixture.owner.clear()
+        assertEquals(2, fixture.privateUploadCancellations)
+    }
+
+    @Test
+    fun lateUploadResultCannotFailAReplacementAttachmentSend() {
+        val fixture = Fixture(privateUpload = true)
+        assertTrue(fixture.owner.beginAttachments("first file", listOf(pendingAttachment())))
+        val firstId = fixture.privateRequestIds.single()
+        fixture.owner.clear()
+        assertTrue(fixture.owner.beginAttachments("second file", listOf(pendingAttachment())))
+        fixture.owner.acceptCommandResult(commandResult("request_attachment_upload", ok = false, requestId = firstId))
+        assertEquals("uploading", fixture.owner.attachmentSendPhase())
+        assertEquals("second file", fixture.owner.prompt())
+        assertEquals(0, fixture.attachmentUploadRequests)
+    }
+
+    private class Fixture(stageSucceeds: Boolean = true, privateUpload: Boolean = false) {
         val transport = FakeTransport()
         val scheduler = FakeScheduler()
         val attachmentUpdates = mutableListOf<ChatGptWebAttachmentSendUpdate>()
         val terminalTimeouts = mutableListOf<WebChatPendingSendState.TimeoutResult>()
         var attachmentUploadRequests = 0
+        var privateUploadRequests = 0
+        var privateUploadCancellations = 0
+        val privateRequestIds = mutableListOf<String>()
         var currentSnapshot = snapshot()
         val owner = ChatGptWebSendOwner(
             transport = transport,
@@ -204,6 +257,11 @@ class ChatGptWebSendOwnerTest {
             onSendStateChanged = {},
             confirmationTimeoutMs = 10L,
             attachmentTimeoutMs = 100L,
+            requestPrivateAttachmentUpload = { _, _, id ->
+                if (privateUpload) { privateUploadRequests++; privateRequestIds += id }
+                privateUpload
+            },
+            cancelPrivateAttachmentUpload = { privateUploadCancellations++ },
         )
     }
 

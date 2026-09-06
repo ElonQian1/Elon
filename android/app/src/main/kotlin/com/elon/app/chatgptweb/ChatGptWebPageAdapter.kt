@@ -8,6 +8,7 @@ import android.webkit.WebView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.elon.app.BuildConfig
+import com.elon.app.PendingAttachment
 import com.elon.app.WebBridgeDocumentSession
 import java.nio.charset.StandardCharsets
 import org.json.JSONArray
@@ -122,6 +123,7 @@ internal class ChatGptWebPageAdapter(
         }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val documentSession = WebBridgeDocumentSession()
+    private val nativeAttachments = ChatGptWebNativeAttachmentGateway(context, webView, documentSession::snapshot)
     private val handshake = ChatGptWebBridgeHandshake(
         schedule = { delayMs, action -> mainHandler.postDelayed({ action() }, delayMs) },
         injectAndRequestSnapshot = ::injectAndRequestSnapshot,
@@ -134,6 +136,7 @@ internal class ChatGptWebPageAdapter(
             onStateChanged(State.UNSUPPORTED)
             return
         }
+        nativeAttachments.install()
         WebViewCompat.addWebMessageListener(
             webView,
             BRIDGE_OBJECT,
@@ -213,6 +216,7 @@ internal class ChatGptWebPageAdapter(
     }
 
     fun onPageStarted(url: String) {
+        nativeAttachments.cancel()
         handshake.cancel()
         onDocumentChanged(documentSession.beginPage())
         val state = if (
@@ -400,6 +404,14 @@ internal class ChatGptWebPageAdapter(
 
     fun requestAttachmentUpload() = runCommand("request_attachment_upload")
 
+    fun requestNativeAttachmentUpload(files: List<PendingAttachment>, uris: List<Uri>, requestId: String): Boolean {
+        val descriptor = nativeAttachments.prepare(files, uris) ?: return false
+        runCommand("request_attachment_upload", value = descriptor, requestId = requestId)
+        return true
+    }
+
+    fun cancelNativeAttachmentUpload() = nativeAttachments.cancel()
+
     fun startDictation() {
         ChatGptWebPrivateResearchEventRecorder.beginVoiceWindow()
         runCommand("start_dictation")
@@ -547,6 +559,7 @@ internal class ChatGptWebPageAdapter(
     fun markLoginRequired() = onStateChanged(State.WEB_ONLY)
 
     fun dispose() {
+        nativeAttachments.dispose()
         onHostPaused()
         if (listenerInstalled && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             WebViewCompat.removeWebMessageListener(webView, BRIDGE_OBJECT)
@@ -632,7 +645,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 264
+        internal const val ADAPTER_VERSION = 265
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -687,6 +700,11 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_private_transport_policy.js",
             "chatgpt_web_private_history_projection.js",
             "chatgpt_web_private_transport.js",
+            "chatgpt_web_private_attachment_protocol.js",
+            "chatgpt_web_private_attachment_transport.js",
+            "chatgpt_web_native_attachment_source.js",
+            "chatgpt_web_private_attachment_composer.js",
+            "chatgpt_web_private_attachment_send.js",
             "chatgpt_web_private_conversation_mutation.js",
             "chatgpt_web_private_read_aloud_transport.js",
             "chatgpt_web_private_read_aloud_adapter.js",

@@ -65,6 +65,8 @@ internal class ChatGptWebSendOwner(
     private val onSendStateChanged: () -> Unit,
     confirmationTimeoutMs: Long = DEFAULT_CONFIRMATION_TIMEOUT_MS,
     private val attachmentTimeoutMs: Long = DEFAULT_ATTACHMENT_TIMEOUT_MS,
+    private val requestPrivateAttachmentUpload: (List<PendingAttachment>, List<Uri>, String) -> Boolean = { _, _, _ -> false },
+    private val cancelPrivateAttachmentUpload: () -> Unit = {},
 ) {
     private val coordinator = WebChatSendCoordinator(
         transport = transport,
@@ -132,6 +134,7 @@ internal class ChatGptWebSendOwner(
         queuedUploadUris = uris
         publishAttachmentPhase(ChatGptWebAttachmentSendTracker.Phase.UPLOADING)
         scheduleAttachmentTimeout()
+        if (requestPrivateAttachmentUpload(attachments, uris, requireNotNull(reserved.commandId))) return true
         if (requestAttachmentUpload()) return true
 
         failAttachmentSend("官网附件入口尚未就绪。")
@@ -169,6 +172,12 @@ internal class ChatGptWebSendOwner(
     }
 
     fun acceptCommandResult(event: ChatGptWebEvent.CommandResult): ChatGptWebSendReceipt? {
+        if (event.action == "request_attachment_upload" && !event.requestId.isNullOrBlank() &&
+            event.requestId != coordinator.commandId()
+        ) return null
+        if (event.action == "request_attachment_upload" && event.ok &&
+            event.detail == "private_attachment_associated"
+        ) queuedUploadUris = emptyList()
         if (event.action == "request_attachment_upload" && !event.ok) {
             failAttachmentSend(event.detail.ifBlank { "官网附件操作失败，请重试。" })
             return null
@@ -258,6 +267,7 @@ internal class ChatGptWebSendOwner(
             }
             is ChatGptWebAttachmentSendTracker.Observation.Complete -> {
                 cancelAttachmentTimeout()
+                cancelPrivateAttachmentUpload()
                 attachmentTracker = null
                 queuedUploadUris = emptyList()
                 lastAttachmentPhase = ATTACHMENT_PHASE_COMPLETED
@@ -296,6 +306,7 @@ internal class ChatGptWebSendOwner(
     private fun failAttachmentSend(detail: String) {
         val tracker = attachmentTracker ?: return
         cancelAttachmentTimeout()
+        cancelPrivateAttachmentUpload()
         snapshot()?.let(tracker::uploadedAttachmentIds)?.forEach(removeAttachment)
         if (
             origin == ChatGptWebSendOrigin.ATTACHMENT &&
@@ -322,6 +333,7 @@ internal class ChatGptWebSendOwner(
 
     private fun cancelAttachmentWorkflow() {
         cancelAttachmentTimeout()
+        cancelPrivateAttachmentUpload()
         queuedUploadUris = emptyList()
         attachmentTracker = null
         lastAttachmentPhase = ATTACHMENT_PHASE_IDLE

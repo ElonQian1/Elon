@@ -20,6 +20,7 @@
   const textTransactionOrchestratorModule = window.__elonChatGptTextTransactionOrchestrator;
   const privateStreamTransport = window.__elonChatGptPrivateStreamTransport;
   const attachmentTransportObserver = window.__elonChatGptAttachmentTransportObserver;
+  const privateAttachments = window.__elonChatGptPrivateAttachmentSend;
   const privateConversationDirectory = window.__elonChatGptPrivateConversationDirectory;
   const conversationDirectoryRequestsModule =
     window.__elonChatGptConversationDirectoryRequests;
@@ -234,6 +235,7 @@
   }
 
   function invalidatePrivateTextContext() {
+    if (privateAttachments) privateAttachments.cancel();
     const relay = window.__elonChatGptPrivateTextTransactionRelay;
     if (relay && typeof relay.invalidateContext === 'function') relay.invalidateContext();
   }
@@ -322,7 +324,7 @@
       privateStreamRevision,
       privateStreamState,
       currentModel: optional('', () => composerAdapter ? composerAdapter.currentModel(composer) : ''),
-      attachments: optional([], () => composerAdapter ? composerAdapter.readAttachments(composer) : []),
+      attachments: optional([], () => privateAttachments ? privateAttachments.merge(composerAdapter?.readAttachments(composer) || []) : composerAdapter?.readAttachments(composer) || []),
       dictationActive,
       dictationCaptureActive,
       dictationCapturePending,
@@ -547,6 +549,8 @@
       if (attachmentTransportObserver && typeof attachmentTransportObserver.arm === 'function') {
         attachmentTransportObserver.arm();
       }
+      if (command.value && privateAttachments) return privateAttachments.start(command.value, respond,
+        scheduleSnapshot, () => composerAdapter.requestAttachmentUpload(respond));
       return composerAdapter.requestAttachmentUpload(respond);
     }
     if (action === 'open_model_selector' && composerAdapter) {
@@ -578,6 +582,7 @@
       return composerAdapter.submitDictation(emitEvent, respond);
     }
     if (action === 'remove_attachment' && composerAdapter) {
+      if (privateAttachments?.remove(command.value, respond, scheduleSnapshot)) return;
       return composerAdapter.removeAttachment(String(command.value || ''), emitEvent, respond);
     }
     if (action === 'dismiss_composer_menu' && composerAdapter) {
@@ -734,6 +739,7 @@
     if (typeof privateStreamUnsubscribe === 'function') privateStreamUnsubscribe();
     privateStreamUnsubscribe = null;
     if (privateReadAloudAdapter) privateReadAloudAdapter.dispose();
+    if (privateAttachments) privateAttachments.cancel();
     if (privateConversationDirectory &&
         typeof privateConversationDirectory.setListener === 'function') {
       privateConversationDirectory.setListener(null);

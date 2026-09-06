@@ -1,10 +1,10 @@
 # ChatGPT private attachment upload
 
 Capability: `android_chatgpt_private_attachment_upload_transport_v1`.
-Status: **small-text private protocol verified; production integration pending**.
-This is not a completed attachment-chat capability and is not yet selected by the
-APK send owner. Do not repeat the confirmed protocol acquisition or small-text
-upload without current regression evidence. Continue at the integration gaps below.
+Status: **small-text private protocol verified; bounded native integration
+implemented, grouped-device acceptance pending**. This is not yet an accepted
+end-to-end attachment-chat capability. Do not repeat the confirmed protocol
+acquisition or isolated small-text upload. Continue at the integration gaps below.
 
 ## Current evidence
 
@@ -91,8 +91,9 @@ This path is documented but intentionally not implemented by the candidate.
 - `chatgpt_web_private_attachment_protocol.js` validates request context, blob
   destinations and processing receipts. `chatgpt_web_private_attachment_transport.js`
   owns one transaction, using the existing bounded JSON/text request helper and
-  private identity context. Neither file is added to the automatic adapter loader
-  yet; they do not change existing production defaults.
+  private identity context. The adapter 265 source candidate now loads these
+  modules and connects a narrowly scoped native attachment owner. It has not
+  been packaged or publicly released in this integration batch.
 - No DOM lookup, menu click, file picker, imported vendor uploader, private
   credential persistence, automatic retry, automatic fallback, or background poll.
 - Caller must bind provider, account, document and conversation generation through
@@ -111,17 +112,14 @@ This path is documented but intentionally not implemented by the candidate.
 
 ## Next integration
 
-1. Feed native selected-file bytes through an owned bridge/byte transport, avoiding
-   the currently failing `input.click()` file-picker handoff. Do not silently send
-   text without its file when the handoff is missing.
-2. Bind server file metadata to the current native/official composer transaction,
-   preserving account, project/library and temporary-chat semantics. Never append
-   a late upload to a newly selected conversation.
-3. Send exactly once and require a reply that reads the fixed fixture's first
+1. Accept the new native integration from the ordinary production composer, not
+   by supplying a browser `File` manually. Native byte handoff and official-store
+   association are now implemented; their device verification is still pending.
+2. Send exactly once and require a reply that reads the fixed fixture's first
    line without placing that content in the prompt. Existing native lifecycle
    smoke already enforces this. Do not count the control's file-store readiness
    or the private upload's processed receipt as this acceptance.
-4. Extend only the remaining protocol variants above with actual evidence; then
+3. Extend only the remaining protocol variants above with actual evidence; then
    include the integrated owner in the next grouped APK and enable its verified
    scope. No repeated build or broad voice regression is needed for this module.
 
@@ -134,3 +132,46 @@ destinations, cancellation, context changes, single-flight, timeout and no repla
 The actual small-text private upload was verified in the owned research WebView;
 the final file-ID/terminal-event guards were subsequently covered by these tests.
 Production native file selection and attachment-message association remain unverified.
+
+## Native integration candidate
+
+`ChatGptWebNativeAttachmentGateway` serves only the already staged, selected
+FileProvider URI through a main-frame, exact-origin WebMessage listener. A random
+lease is bound to the document token, page generation and URL, with a 120-second
+lifetime. Reads are sequential 64 KiB chunks on one I/O executor. No arbitrary
+path, URI, page authorization or Cookie is accepted from JavaScript. Cancellation,
+navigation and teardown revoke the reader; truncation/expansion fails the read.
+
+`chatgpt_web_native_attachment_source.js` assembles one bounded `File` without
+opening an official file picker. The private send module uses the verified
+create/PUT/process transport. Its current integration scope is **one plain-text
+file, at most 8 MiB, in an empty ordinary new chat at the exact root URL**.
+Existing conversations, projects, temporary chats, other MIME types and occupied
+official composers still select the compatible official upload route before any
+private write. An uncertain result after starting the private path does not
+trigger a second upload automatically.
+
+`chatgpt_web_private_attachment_composer.js` finds the current official
+FilePickerContext via the file input's bounded React-fiber ancestry. This is still
+a versioned website-runtime association, not an independent native send protocol.
+The observed store uses `files$.set(...)`, `readyFiles$()` and
+`hasUploadInProgress$()`. Association requires the final processing receipt,
+matching file metadata, unchanged page/account/model/store identity, and exact
+readback from the official ready-files signal. It never rewrites unrelated files.
+Native readiness can then come from this confirmed store even if hidden DOM
+attachment chips cannot be read. Consumed files are not recreated from a cache.
+
+The existing `ChatGptWebSendOwner` still reserves the sole send slot and dispatches
+text only after attachment readiness. Private upload receipts carry the reserved
+request ID; a late failure cannot cancel a replacement send. The byte queue is
+cleared only by a private association receipt or the existing official chooser,
+and the native lease is revoked on failure, cancellation or completion.
+
+The focused JS integration suites passed 37 checks, including parsing the complete
+production adapter asset bundle, byte bounds, route/document/account/model changes,
+store replacement, association readback, single-flight, and no write replay.
+Release source compilation and 26 Android tests passed: reader 4, send owner 10,
+tracker 12. Two stale send-owner tests were corrected to require actual file
+readiness rather than generic transport completion, matching the already-fixed
+reservation policy. This is not a full Android-suite or device pass. No APK,
+microphone or proxy changes are part of this integration batch.

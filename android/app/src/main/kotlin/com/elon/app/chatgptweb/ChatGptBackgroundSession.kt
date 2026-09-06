@@ -164,12 +164,9 @@ internal class ChatGptBackgroundSession(
         ),
         snapshot = { latestSnapshot },
         stageUploads = { attachments -> uploadStager.stage(attachments) },
-        requestAttachmentUpload = {
-            pageAdapter?.let {
-                it.requestAttachmentUpload()
-                true
-            } ?: false
-        },
+        requestAttachmentUpload = { pageAdapter?.let { it.requestAttachmentUpload(); true } ?: false },
+        requestPrivateAttachmentUpload = { files, uris, id -> pageAdapter?.requestNativeAttachmentUpload(files, uris, id) == true },
+        cancelPrivateAttachmentUpload = { pageAdapter?.cancelNativeAttachmentUpload() },
         removeAttachment = { id -> pageAdapter?.removeAttachment(id) },
         postDelayed = { task, delayMs -> sendHandler.postDelayed(task, delayMs) },
         removeCallbacks = sendHandler::removeCallbacks,
