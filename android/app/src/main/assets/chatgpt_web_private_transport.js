@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 20) ||
+  if ((existingTransport && Number(existingTransport.version) >= 21) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -487,8 +487,41 @@
     }
   }
 
+  async function readAttachmentContext(path) {
+    const target = conversationTarget(path);
+    if (!target || !/^\/c\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(target.path) ||
+        target.path !== location.pathname || !prefetchEnabled || policy.snapshot().cooldownRemainingMs > 0) {
+      throw new Error('attachment_context_unavailable');
+    }
+    // This explicit user read does not require the background prefetch policy's
+    // recent official response. Acquire identity normally and retain its cooldown.
+    // Membership can change independently of the URL. Do not reuse a cached
+    // prefetch response to authorize a file's project/temporary metadata.
+    let result;
+    try {
+      result = await fetchConversation(target.id, true);
+    } catch (error) {
+      policy.recordFailure(failureKind(error));
+      throw new Error('attachment_context_unavailable');
+    }
+    policy.recordSuccess(result.elapsedMs);
+    // A missing scope field is not a network failure and must not trip the
+    // already-working conversation reader's circuit breaker.
+    const payload = normalizedConversationPayload(result.payload);
+    const ids = [payload?.conversation_id, payload?.id].filter(value => value != null);
+    if (!ids.length || ids.some(id => id !== target.id) ||
+        typeof payload?.is_do_not_remember !== 'boolean' ||
+        !(payload.gizmo_id === null || typeof payload.gizmo_id === 'string') ||
+        target.path !== location.pathname) throw new Error('attachment_context_unavailable');
+    return Object.freeze({ conversationId: target.id,
+      ordinary: payload.is_do_not_remember === false && payload.gizmo_id === null &&
+        !conversationProjectId(result.payload) &&
+        (payload.context_scopes == null ||
+          Array.isArray(payload.context_scopes) && payload.context_scopes.length === 0) });
+  }
+
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 20,
+    version: 21,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,
@@ -497,6 +530,7 @@
     refreshCurrentConversation,
     probeConversationProject,
     listConversationFiles,
+    readAttachmentContext,
     copySameOriginRequestHeaders,
     acquireSameOriginRequestHeaders,
     health: policy.snapshot

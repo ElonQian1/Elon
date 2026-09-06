@@ -144,12 +144,39 @@ navigation and teardown revoke the reader; truncation/expansion fails the read.
 
 `chatgpt_web_native_attachment_source.js` assembles one bounded `File` without
 opening an official file picker. The private send module uses the verified
-create/PUT/process transport. Its current integration scope is **one plain-text
-file, at most 8 MiB, in an empty ordinary new chat at the exact root URL**.
-Existing conversations, projects, temporary chats, other MIME types and occupied
-official composers still select the compatible official upload route before any
-private write. An uncertain result after starting the private path does not
-trigger a second upload automatically.
+create/PUT/process transport. Adapter 269 extends the source integration scope to
+**one plain-text file, at most 8 MiB, in an empty ordinary new-chat composer or
+an existing ordinary `/c/<UUID>` conversation's empty composer**. This extension
+is source-tested, not device-accepted. Project/temporary contexts, other MIME
+types and occupied composers still use the compatible route before private writes.
+An uncertain result after starting the private path does not trigger a second
+upload automatically.
+
+For an existing conversation, the upload owner captures the document, URL,
+account, model and exact official file store first. It reuses the existing bounded
+conversation reader with `cache=no-store`; the response must identify that same
+conversation and explicitly declare `is_do_not_remember=false`, `gizmo_id=null`
+and no conflicting project scope. Missing fields remain unknown, never assumed
+ordinary. No content, credential or full response is passed to Android by this
+scope read. This is a user-requested read, so it does not require a recent DOM
+or official-page fetch, but retains identity acquisition, limits and cooldown.
+Unknown scope does not mark the healthy history reader as a network failure.
+
+The read has a 10-second outer deadline and immediate cancellation. Byte reading
+and writes begin only after confirmation and another context check. A positively
+identified project/temporary scope can select compatibility before any private
+write. An unknown or failed metadata read can also retain the original compatible
+upload path before any bytes or writes, without claiming the provider lacks the
+feature. A cancelled or stale binding fails without opening a replacement chooser.
+A late response cannot attach a file or restart a cancelled upload.
+There is no extra background polling or eager upload on conversation selection.
+
+The same official source fingerprint above supports this ordinary existing-chat
+extension: `SGt`/`jGt` file creation has no conversation-ID field, `TGt` processing
+uses the explicit temporary/project metadata, and `VGt` distinguishes project and
+library cases rather than requiring a new conversation. Composer association and
+the existing single send owner, not file creation alone, determine which chat
+receives the attachment. Project/image/temporary variants remain separate work.
 
 `chatgpt_web_private_attachment_composer.js` finds the current official
 FilePickerContext via the file input's bounded React-fiber ancestry. This is still
@@ -175,3 +202,11 @@ tracker 12. Two stale send-owner tests were corrected to require actual file
 readiness rather than generic transport completion, matching the already-fixed
 reservation policy. This is not a full Android-suite or device pass. No APK,
 microphone or proxy changes are part of this integration batch.
+
+Adapter 269's existing-conversation extension passed the five focused Node suites
+with 47 test-runner cases on 2026-09-06. They include the real production
+conversation-reader module connected to the attachment pipeline with synthetic
+HTTP responses, unknown versus unsupported scope, context changes during the
+read, cancellation, timeout, reinjection and exact ready-store association. The
+new native-code change is only the adapter version constant; Android compilation
+and device checks remain for the grouped build, not claimed from Node tests.

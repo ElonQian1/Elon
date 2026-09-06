@@ -64,7 +64,7 @@ test('ready file association uses the official callable store and deduplicates n
   assert.equal(f.store.files$().length, 0);
 });
 
-test('context selection never guesses project, temporary, existing-thread or occupied composer contracts', () => {
+test('context selection rejects project routes, temporary routes, invalid ids and occupied composers', () => {
   for (const path of ['/c/existing', '/g/g-p-example/project', '/?temporary-chat=true', '/?model=unknown']) {
     const f = fixture();
     f.root.location.href = 'https://chatgpt.com' + path;
@@ -73,6 +73,148 @@ test('context selection never guesses project, temporary, existing-thread or occ
   const f = fixture();
   f.store.files$.set([{ tempId: 'user-owned', status: 'ready' }]);
   assert.equal(f.composer.available(), false);
+});
+
+test('versioned reinjection cancels only the older owner and retains the current one', () => {
+  const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
+  const source = fs.readFileSync(path.join(__dirname,
+    '../android/app/src/main/assets/chatgpt_web_private_attachment_send.js'), 'utf8');
+  let cancelled = 0;
+  const root = { location: { origin: 'https://chatgpt.com' },
+    __elonChatGptPrivateAttachmentSend: { version: 1, cancel: () => { cancelled++; } } };
+  vm.runInNewContext(source, { window: root });
+  const current = root.__elonChatGptPrivateAttachmentSend;
+  assert.equal(current.version, 2);
+  assert.equal(cancelled, 1);
+  vm.runInNewContext(source, { window: root });
+  assert.equal(root.__elonChatGptPrivateAttachmentSend, current);
+  assert.equal(cancelled, 1);
+});
+
+function existingFixture() {
+  const f = fixture();
+  const id = '00000000-0000-4000-8000-000000000001';
+  f.root.location.href = 'https://chatgpt.com/c/' + id;
+  f.descriptor.href = f.root.location.href;
+  f.root.__elonChatGptPrivateTransport.readAttachmentContext = async path => {
+    assert.equal(path, '/c/' + id);
+    return { conversationId: id, ordinary: true };
+  };
+  return { ...f, id };
+}
+
+test('existing ordinary conversation requires positive scope confirmation before association', async () => {
+  const f = existingFixture(), binding = f.composer.capture();
+  assert.equal(f.composer.available(), true);
+  assert.throws(() => f.composer.associate(binding, f.file, f.result(binding), f.descriptor.leaseId));
+  assert.equal(await f.composer.prepare(binding), true);
+  assert.equal(f.composer.associate(binding, f.file, f.result(binding), f.descriptor.leaseId).associated, true);
+  assert.equal(f.composer.merge([]).length, 1);
+});
+
+test('existing conversation reuses the private upload and exact official store without sending text', async () => {
+  const f = existingFixture(), p = pipeline(f);
+  await p.start();
+  assert.deepEqual(p.requests.map(item => item.method), ['POST', 'PUT', 'POST']);
+  assert.equal(p.fallbacks(), 0);
+  assert.deepEqual(p.receipts, [['request_attachment_upload', true, 'private_attachment_associated']]);
+  assert.equal(f.store.readyFiles$()[0].isProjectThread, false);
+  assert.equal(f.store.readyFiles$()[0].isTemporaryChat, false);
+});
+
+test('production conversation reader and attachment pipeline integrate without a substitute scope resolver', async () => {
+  const f = existingFixture(), requests = [];
+  const headers = f.root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders;
+  delete f.root.__elonChatGptPrivateTransport;
+  f.root.__elonChatGptPrivateConversationPrefetchEnabled = true;
+  f.root.__elonChatGptPrivateTransportPolicy = require('../android/app/src/main/assets/chatgpt_web_private_transport_policy.js');
+  f.root.__elonChatGptPrivateJsonRequest = require('../android/app/src/main/assets/chatgpt_web_private_json_request.js');
+  f.root.__elonChatGptPrivateAuthContext = { canAcquire: () => true, copyRequestHeaders: headers };
+  f.root.location.pathname = '/c/' + f.id;
+  f.root.fetch = async (url, init) => {
+    requests.push({ url, init });
+    return { ok: true, status: 200, text: async () => JSON.stringify({ conversation_id: f.id,
+      is_do_not_remember: false, gizmo_id: null, mapping: {} }) };
+  };
+  const fs = require('node:fs'), path = require('node:path');
+  require('node:vm').runInNewContext(fs.readFileSync(path.join(__dirname,
+    '../android/app/src/main/assets/chatgpt_web_private_transport.js'), 'utf8'),
+  { window: f.root, location: f.root.location, URL });
+  const p = pipeline(f);
+  await p.start();
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, '/backend-api/conversations/' + f.id);
+  assert.equal(requests[0].init.method, 'GET');
+  assert.equal(p.requests.length, 3);
+  assert.equal(p.receipts[0][1], true);
+  assert.equal(f.composer.merge([])[0].state, 'ready');
+});
+
+test('known project or temporary metadata selects compatibility before reading bytes or writing', async () => {
+  const f = existingFixture();
+  f.root.__elonChatGptPrivateTransport.readAttachmentContext = async () => ({ conversationId: f.id, ordinary: false });
+  const p = pipeline(f, { options: { source: { read: () => assert.fail('must not read bytes') } } });
+  await p.start();
+  assert.equal(p.fallbacks(), 1);
+  assert.equal(p.requests.length, 0);
+  assert.equal(p.receipts.length, 0);
+});
+
+test('unknown context retains the existing path before any private bytes or writes', async () => {
+  for (const read of [undefined, async () => null, async () => ({}),
+    async () => ({ conversationId: 'wrong', ordinary: true }),
+    async () => { throw new Error('http_503'); }]) {
+    const f = existingFixture();
+    f.root.__elonChatGptPrivateTransport.readAttachmentContext = read;
+    const p = pipeline(f);
+    assert.equal(await f.composer.prepare(f.composer.capture()), null, 'unknown is distinct from confirmed unsupported');
+    await p.start();
+    assert.equal(p.fallbacks(), 1);
+    assert.equal(p.requests.length, 0);
+    assert.equal(p.receipts.length, 0);
+  }
+});
+
+test('context changes while metadata is pending prevent upload and compatibility replay', async () => {
+  for (const mutate of [f => { f.root.location.href += '?changed'; },
+    f => { f.root.__elonChatGptDocumentToken = 'doc_replacement_2'; },
+    f => f.setAccount('Bearer switched-account-token'), f => f.setModel('new-model'),
+    f => { f.input.__reactFiber$synthetic = { memoizedProps: { value: { ...f.store } } }; },
+    f => { f.store.files$.set([{ status: 'ready', tempId: 'user-added' }]); }]) {
+    const f = existingFixture();
+    let release;
+    f.root.__elonChatGptPrivateTransport.readAttachmentContext = () => new Promise(resolve => { release = resolve; });
+    const p = pipeline(f), pending = p.start();
+    await new Promise(resolve => setImmediate(resolve));
+    mutate(f);
+    release({ conversationId: f.id, ordinary: true });
+    await pending;
+    assert.equal(p.requests.length, 0);
+    assert.equal(p.fallbacks(), 0);
+    assert.equal(p.receipts[0][1], false);
+  }
+});
+
+test('cancel and timeout release pending metadata ownership without waiting for its late response', async () => {
+  for (const mode of ['cancel', 'timeout']) {
+    const f = existingFixture();
+    let release;
+    f.root.__elonChatGptPrivateTransport.readAttachmentContext = () => new Promise(resolve => { release = resolve; });
+    if (mode === 'timeout') f.root.setTimeout = (fn, ms) => setTimeout(fn, ms === 10000 ? 1 : ms);
+    const p = pipeline(f), pending = p.start();
+    await new Promise(resolve => setImmediate(resolve));
+    if (mode === 'cancel') p.send.cancel();
+    await pending;
+    release({ conversationId: f.id, ordinary: true });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(p.requests.length, 0);
+    assert.equal(p.fallbacks(), mode === 'timeout' ? 1 : 0);
+    assert.equal(p.receipts.length, mode === 'timeout' ? 0 : 1);
+    if (mode === 'cancel') assert.equal(p.receipts[0][1], false);
+    f.root.__elonChatGptPrivateTransport.readAttachmentContext = async () => ({ conversationId: f.id, ordinary: true });
+    await p.start();
+    assert.equal(p.receipts.at(-1)[1], true, 'next explicit upload is not stuck behind the old read');
+  }
 });
 
 test('ambiguous or missing official store is unknown, not fake readiness', () => {

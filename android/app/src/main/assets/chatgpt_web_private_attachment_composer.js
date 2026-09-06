@@ -1,12 +1,13 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
   'use strict';
   options = options || {};
   let owned = null;
+  const confirmed = new WeakSet();
 
   function storeFromInput() {
     const input = root.document.querySelector('#upload-files');
@@ -47,9 +48,8 @@
   function available() {
     try {
       const url = new URL(root.location.href);
-      // First integration covers the verified plain new-chat context only. Project,
-      // temporary and existing-thread upload contexts need their own confirmed contract.
-      if (url.origin !== 'https://chatgpt.com' || url.pathname !== '/' || url.search || url.hash) return false;
+      const ordinaryRoute = url.pathname === '/' || /^\/c\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(url.pathname);
+      if (url.origin !== 'https://chatgpt.com' || !ordinaryRoute || url.search || url.hash) return false;
       const store = resolveStore();
       const files = store?.files$();
       return !!store && store.skipChatAttachmentLimits !== true && Array.isArray(files) &&
@@ -62,7 +62,44 @@
     const token = root.__elonChatGptDocumentToken;
     const account = identity();
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '') || !account) throw new Error('composer_context_unavailable');
-    return Object.freeze({ store: resolveStore(), href: root.location.href, token, account, model: model() });
+    const path = new URL(root.location.href).pathname;
+    const binding = Object.freeze({ store: resolveStore(), href: root.location.href, token, account,
+      model: model(), path, conversationId: path === '/' ? null : path.slice(3) });
+    if (binding.conversationId === null) confirmed.add(binding);
+    return binding;
+  }
+
+  async function prepare(binding, signal) {
+    if (!current(binding) || signal?.aborted) throw new Error('composer_changed');
+    if (confirmed.has(binding)) return true;
+    const read = root.__elonChatGptPrivateTransport?.readAttachmentContext;
+    if (typeof read !== 'function') return null;
+    let timer, abort;
+    try {
+      const context = await Promise.race([
+        read(binding.path),
+        new Promise((_, reject) => {
+          abort = () => reject(new Error('cancelled'));
+          signal?.addEventListener('abort', abort, { once: true });
+          timer = root.setTimeout(() => reject(new Error('composer_context_timeout')), 10000);
+        }),
+      ]);
+      if (!current(binding) || signal?.aborted || !available()) throw new Error('composer_changed');
+      if (context?.conversationId !== binding.conversationId || typeof context.ordinary !== 'boolean') {
+        throw new Error('composer_context_unavailable');
+      }
+      if (!context.ordinary) return false;
+      confirmed.add(binding);
+      return true;
+    } catch (error) {
+      if (!current(binding) || signal?.aborted || !available()) throw error;
+      // Unknown metadata cannot authorize a private write, nor remove the
+      // existing upload capability. The caller may select compatibility now.
+      return null;
+    } finally {
+      root.clearTimeout(timer);
+      if (abort) signal?.removeEventListener('abort', abort);
+    }
   }
 
   function current(binding, checkModel = true) {
@@ -74,7 +111,7 @@
   }
 
   function associate(binding, file, result, leaseId) {
-    if (!current(binding) || result?.ok !== true || result.associated !== false ||
+    if (!current(binding) || !confirmed.has(binding) || result?.ok !== true || result.associated !== false ||
         result.binding !== binding || result.stage !== 'processed' ||
         !/^[A-Za-z0-9_-]{1,160}$/.test(result.fileId || '') || result.fileSize !== file.size ||
         result.fileName !== file.name || result.mimeType !== file.type) throw new Error('association_invalid');
@@ -133,5 +170,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 1, available, capture, current, associate, merge, remove });
+  return Object.freeze({ version: 2, available, capture, prepare, current, associate, merge, remove });
 });

@@ -1,8 +1,10 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
-  if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateAttachmentSend) {
+  if (root?.location?.origin === 'https://chatgpt.com' &&
+      !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
+    root.__elonChatGptPrivateAttachmentSend?.cancel();
     root.__elonChatGptPrivateAttachmentSend = factory(root);
   }
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -50,6 +52,9 @@
       if (descriptor.documentToken !== binding.token || descriptor.href !== binding.href) throw new Error('context_changed');
       // One low-frequency guard only while an explicit upload is in flight.
       timer = root.setInterval(() => { if (!composer.current(binding)) cancel(); }, 500);
+      // Compatibility selection for unknown/unsupported scope precedes byte reads
+      // and private writes. Cancelled or stale bindings throw instead of replaying.
+      if (!await composer.prepare(binding, job.controller.signal)) return fallback();
       const file = await source.read(descriptor, job.controller.signal);
       if (job.controller.signal.aborted || !composer.current(binding)) throw new Error('context_changed');
       job.transport = createTransport({ isCurrent: candidate => candidate === binding &&
@@ -84,6 +89,6 @@
     return true;
   }
 
-  return Object.freeze({ version: 1, start, cancel, remove,
+  return Object.freeze({ version: 2, start, cancel, remove,
     merge: dom => composer?.merge(dom) || dom });
 });

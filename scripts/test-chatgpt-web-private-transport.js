@@ -137,7 +137,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 20);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 21);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -149,7 +149,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 20);
+  assert.equal(transport.version, 21);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
@@ -428,6 +428,49 @@ const detailPayload = {
     'not-a-project',
     () => assert.fail('invalid membership probes must not dispatch')
   ), false);
+
+  const attachmentId = '00000000-0000-4000-8000-000000000001';
+  const attachmentPath = '/c/' + attachmentId;
+  const ordinaryPayload = { ...detailPayload, conversation_id: attachmentId,
+    gizmo_id: null, is_do_not_remember: false };
+  const scopeRequests = [];
+  let scopePayload = ordinaryPayload;
+  const scope = createContext(async (url, options) => {
+    scopeRequests.push({ url, options });
+    return jsonResponse(scopePayload);
+  }, false, true, new MemoryStorage(), [], {
+    canAcquire: () => true,
+    acquireRequestHeaders: async () => ({ Authorization: 'Bearer synthetic-token' }),
+  });
+  scope.window.location.pathname = attachmentPath;
+  scope.window.location.href = 'https://chatgpt.com' + attachmentPath;
+  const reader = scope.window.__elonChatGptPrivateTransport;
+  assert.equal((await reader.readAttachmentContext(attachmentPath)).ordinary, true);
+  assert.equal(scopeRequests.length, 1);
+  assert.equal(scopeRequests[0].url, '/backend-api/conversations/' + attachmentId);
+  assert.equal(scopeRequests[0].options.method, 'GET');
+  assert.equal(scopeRequests[0].options.cache, 'no-store');
+  assert.equal(scopeRequests[0].options.body, undefined);
+  for (const patch of [{ gizmo_id: 'g-p-project' }, { is_do_not_remember: true },
+    { project_id: 'g-p-conflicting' }, { context_scopes: [{ scope_type: 'project', scope_id: 'g-p-other' }] }]) {
+    scopePayload = { ...ordinaryPayload, ...patch };
+    assert.equal((await reader.readAttachmentContext(attachmentPath)).ordinary, false);
+  }
+  for (const patch of [{ conversation_id: 'wrong' }, { id: 'conflicting' }, { gizmo_id: undefined },
+    { is_do_not_remember: undefined }, { is_do_not_remember: 'false' }]) {
+    scopePayload = { ...ordinaryPayload, ...patch };
+    await assert.rejects(reader.readAttachmentContext(attachmentPath), /attachment_context_unavailable/);
+    assert.equal(reader.health().cooldownRemainingMs, 0, 'unknown upload scope cannot break history prefetch');
+  }
+  scopePayload = { data: { conversation: ordinaryPayload } };
+  assert.equal((await reader.readAttachmentContext(attachmentPath)).ordinary, true);
+  const beforeInvalid = scopeRequests.length;
+  for (const value of ['/c/invalid', '/g/g-p-fixture' + attachmentPath, attachmentPath + '?temporary-chat=true']) {
+    await assert.rejects(reader.readAttachmentContext(value), /attachment_context_unavailable/);
+  }
+  scope.window.location.pathname = '/';
+  await assert.rejects(reader.readAttachmentContext(attachmentPath), /attachment_context_unavailable/);
+  assert.equal(scopeRequests.length, beforeInvalid);
 
   console.log('CHATGPT_WEB_PRIVATE_TRANSPORT_TESTS=passed');
 })().catch((error) => {
