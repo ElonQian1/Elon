@@ -16289,15 +16289,15 @@
       "implementation_evidence": [
         {
           "path": "desktop-shell/src-tauri/browser-research/sites.json",
-          "content_hash": "83a19a671ad6428c443ab89f73acc91746889bc6f7416c4ba5dc20ee1c91ff13",
+          "content_hash": "2c5ce5d4195e8be0948ce200dfa1cc119c17a207f6af039f3346f0517fd8e311",
           "locator": "",
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
-            "head_blob_oid": "",
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "257b811cf5977addc26588debe34639e155ff41f",
             "worktree_blob_oid": "257b811cf5977addc26588debe34639e155ff41f",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -16307,101 +16307,127 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
-            "head_blob_oid": "",
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "307e7379c42da0da586bfa58ec12bc02099788f4",
             "worktree_blob_oid": "307e7379c42da0da586bfa58ec12bc02099788f4",
-            "state": "index_only"
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/browser_research/host/handshake.rs",
+          "content_hash": "846a4553c6dca29d6e82e3c9a74fcfea00d650834864675c8acb99cbf8eaa4ae",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "ea0bc4879937b1d1dc6510c5dd2117ec68327094",
+            "worktree_blob_oid": "ea0bc4879937b1d1dc6510c5dd2117ec68327094",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "desktop-shell/src-tauri/src/browser_research/host/windows.rs",
-          "content_hash": "bcf9597f0ff62298924094a84ef0308f173cd9bd454231cd9ae410bc31dd9146",
+          "content_hash": "3fd3e497727653917f9c0cce786db1a665b560cdc85d75bbc47ed3e779090256",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "f30e36a1e5407d2a674afe1da45ccf6c6554af5d",
-            "state": "index_only"
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "9dcb767b16e485aa2877dc343bda45a05a51cac9",
+            "worktree_blob_oid": "9dcb767b16e485aa2877dc343bda45a05a51cac9",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "desktop-shell/src-tauri/src/browser_research/runtime.rs",
-          "content_hash": "0048252d99174437c0f50e0c6c7dec8aefce95821de8c649ffd38c210a9d5178",
+          "content_hash": "8d7260481f4012da2fed194249e10a3389b82b4ad262ad6fb55403f23a84f9b5",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "1c44d098ec4b4fe10ffdae6b3c98f3061f74948c",
-            "state": "index_only"
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "4c2d600cf947e5c7535a2bbc4664eecdefaa3c68",
+            "worktree_blob_oid": "4c2d600cf947e5c7535a2bbc4664eecdefaa3c68",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "desktop-shell/src-tauri/src/browser_research/tests.rs",
-          "content_hash": "9638580f0a10e34f119c23074b76fb8a2ac1817f0649df68e7bb286b1f930647",
+          "content_hash": "83137b824db3b9840fddec07ed59f60d95079d7ad75134955ba407ba99a770b8",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "d8fe5a3e3f59c78c9e5dfa7dbec210720e042557",
-            "state": "index_only"
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "ef8f92fbcbcfb0653207f8667a629df3c1d82acc",
+            "worktree_blob_oid": "ef8f92fbcbcfb0653207f8667a629df3c1d82acc",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/browser_research/tests/lifecycle.rs",
+          "content_hash": "18de22381179ff1e2fc603689ebec5afad1fd2dc1f6a98bd8d257a5a69478d60",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "eec9624dbd02cbd6079ca16b4e103cd8a3d4b27c",
+            "worktree_blob_oid": "eec9624dbd02cbd6079ca16b4e103cd8a3d4b27c",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "desktop-shell/tests/browser-research-fixture.mjs",
-          "content_hash": "00b85f399b54568abcb395a6e4cf60b09ddca3bfa88d5c23753c38d5c9db346c",
+          "content_hash": "30e51dd15352e307f2f828adcf85f156c06d57493cb0c53794f813c703e9cfa8",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
-            "head_blob_oid": "",
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "59ae9d5b4275dd24aee335a6ff95b9c47f12d951",
             "worktree_blob_oid": "59ae9d5b4275dd24aee335a6ff95b9c47f12d951",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/reports/win-browser-research-mcp-v1-20260907.md",
-          "content_hash": "7ccb6704a8d1816af8da71cbf1dc3785f5c108d86b48141137497c65929c399c",
+          "content_hash": "515cfa61c7497ecaa14be44dafeab3b915af396955b40f5e57c11cab7f8aa86d",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "628c1da78940a8a09d729aff68e0f5766b35dc78",
-            "state": "untracked"
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "9f6886dc515dfa9aee981e8376947ff69fdc510a",
+            "worktree_blob_oid": "9f6886dc515dfa9aee981e8376947ff69fdc510a",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "pc-frontend/src/features/browser-research/BrowserResearchPage.tsx",
-          "content_hash": "84afb1d40d306ff5cb07eceebdb898335cdff27d41e93a9d5e0b90b2f0456fa6",
+          "content_hash": "3b5e77fd0c0e07e5a6ca44178f6a45640dd5dd9dcf8875c208ba49a22564df0b",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "b66e5f36899576dd1ad0a9daaa388490ee89464f",
-            "state": "index_only"
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "949cc08f2455ca20495bead20c95a0d94a554d9f",
+            "worktree_blob_oid": "949cc08f2455ca20495bead20c95a0d94a554d9f",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "pc-frontend/src/features/browser-research/browserResearch.test.cjs",
-          "content_hash": "4ce05aa3c36ef3876a0c9c0770cca38adfcb0c3addbf55135d82e76c11104f44",
+          "content_hash": "0ed74cb76d796ed8e1993ada1abdb08cc645e19e3263a3738468a504a9b2d583",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "8906bd9fe7d9c1f2a8079abadd75c7de9989aa13",
-            "state": "index_only"
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "99e1b513d6873de21458f20ba6c6ba54a8193c8d",
+            "worktree_blob_oid": "99e1b513d6873de21458f20ba6c6ba54a8193c8d",
+            "state": "tracked_clean"
           }
         },
         {
@@ -16411,10 +16437,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
-            "head_blob_oid": "",
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "76c0c9ffa4b73bd8dfc5e3e5043cd99ddb9c99c9",
             "worktree_blob_oid": "76c0c9ffa4b73bd8dfc5e3e5043cd99ddb9c99c9",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -16424,10 +16450,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9c587d4e38c46cacd55b0a63e2dcded10fc67c3a",
-            "head_blob_oid": "",
+            "head_commit": "7a536efdea01ff51f97203ddc7622a61123bfcd1",
+            "head_blob_oid": "d86843ddea92dedd839d5101c2f58883b7d7f488",
             "worktree_blob_oid": "d86843ddea92dedd839d5101c2f58883b7d7f488",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         }
       ],
@@ -16438,7 +16464,7 @@
         "expires_at_ms": 1788742539105
       },
       "created_at_ms": 1788728866806,
-      "updated_at_ms": 1788731990383
+      "updated_at_ms": 1788734552894
     },
     {
       "id": "win-chatgpt-composite-answer-extraction-v1",
@@ -22732,16 +22758,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_cafe41fa2991415fa62b7cb6ea10cba4",
-      "feature_id": "official-quant-release-admission-v1",
-      "action": "transitioned",
-      "actor": "codex:/root",
-      "reason": "服务器定向校验、独立解析器与存储测试、项目广场前端测试及生产构建全部通过；全量服务器测试的既有 node-agent VFS 基线阻塞已独立记录。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788574867882
-    },
-    {
       "id": "feature_event_0d919563bdea4f428bb394aaf637de29",
       "feature_id": "official-quant-release-admission-v1",
       "action": "transitioned",
@@ -24730,6 +24746,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788731990383
+    },
+    {
+      "id": "feature_event_a73d6d9288f64a7d80b9d2bdb25912cc",
+      "feature_id": "win-browser-research-mcp-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-research",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788734552894
     }
   ]
 }
