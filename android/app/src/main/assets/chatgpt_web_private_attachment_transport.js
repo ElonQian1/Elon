@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 6, create: factory });
+  const exported = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root && root.location?.origin === 'https://chatgpt.com') {
     root.__elonChatGptPrivateAttachmentTransport = exported;
@@ -8,6 +8,7 @@
 })(typeof window === 'object' ? window : null, function (root, options) {
   'use strict';
   const protocol = options?.protocol || root.__elonChatGptPrivateAttachmentProtocol;
+  const bytes = options?.bytes || root.__elonChatGptPrivateAttachmentBytes;
   const request = options?.request || root.__elonChatGptPrivateJsonRequest?.request;
   const acquire = options?.acquireHeaders || (() =>
     root.__elonChatGptPrivateTransport.acquireSameOriginRequestHeaders());
@@ -71,6 +72,7 @@
         ...(context.libraryFileInfo == null ? {} : { libraryFileInfo: protocol.projectInfo(context) }),
         ...(context.imageDimensions == null ? {} : { imageDimensions: protocol.imageDimensions(context.imageDimensions) }) });
       const body = protocol.prepare(file, selected);
+      if (bytes?.version === 1) body.supports_direct_azure_multipart = true;
       const creationHeaders = protocol.creationHeaders(file, selected);
       const abort = new Promise((_, reject) => {
         abortListener = () => reject(new Error('cancelled'));
@@ -86,10 +88,15 @@
         method: 'POST', credentials: 'include', headers: { ...headers, ...creationHeaders }, body: JSON.stringify(body),
       }, 'json', 15000);
       job.fileId = prepared.payload?.file_id || null;
-      const destination = protocol.destination(prepared.payload, file.type);
+      const destination = bytes?.version === 1 ? bytes.plan(prepared.payload, file, protocol)
+        : protocol.destination(prepared.payload, file.type);
       job.fileId = destination.fileId;
       change(job, 'uploading');
-      await dispatch(job, destination.url, {
+      if (bytes?.version === 1) await bytes.upload(root, destination, file, headers, {
+        assertCurrent: () => assertCurrent(job), abort: () => job.controller.abort(),
+        dispatch: (url, init, mode, timeout) => dispatch(job, url, init, mode, timeout),
+      });
+      else await dispatch(job, destination.url, {
         method: 'PUT', credentials: 'omit', headers: destination.headers, body: file,
       }, 'none', 30000);
       change(job, 'processing');
@@ -130,6 +137,6 @@
   }
 
   function cancel() { if (active) active.controller.abort(); }
-  function snapshot() { return { version: 6, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
-  return Object.freeze({ version: 6, upload, cancel, dispose: cancel, snapshot });
+  function snapshot() { return { version: 7, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
+  return Object.freeze({ version: 7, upload, cancel, dispose: cancel, snapshot });
 });
