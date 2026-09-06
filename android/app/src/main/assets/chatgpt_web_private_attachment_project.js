@@ -31,12 +31,7 @@
     return Object.freeze({ projectId: id, usesInjestPath: gizmo.use_injest_path === true });
   }
 
-  async function captureThread(binding, expectedProjectId, signal) {
-    const samePage = () => root.location.href === binding.href &&
-      root.__elonChatGptDocumentToken === binding.token;
-    const unchanged = () => !signal?.aborted && samePage();
-    if (!UUID.test(binding.conversationId || '') || !PROJECT.test(expectedProjectId || '') ||
-        binding.isTemporaryChat || !unchanged()) throw new Error('composer_context_unavailable');
+  async function loadedRuntime(signal) {
     let timer, abort;
     try {
       if (!runtime) {
@@ -49,33 +44,42 @@
         runtime = Promise.resolve().then(() => load(RUNTIME_URL));
         runtime.catch(() => { runtime = null; });
       }
-      const namespace = await Promise.race([runtime, new Promise((_, reject) => {
+      return await Promise.race([runtime, new Promise((_, reject) => {
         abort = () => reject(new Error('cancelled'));
         signal?.addEventListener('abort', abort, { once: true });
         timer = root.setTimeout(() => reject(new Error('composer_context_timeout')), 1500);
       })]);
-      if (!unchanged()) throw new Error('composer_changed');
-      const selectors = namespace?.HM;
-      if (typeof namespace?.XM !== 'function' || typeof selectors?.getGizmoId !== 'function' ||
-          typeof selectors.getCurrentLeafId !== 'function' || typeof selectors.hasNode !== 'function') {
-        throw new Error('composer_context_unavailable');
-      }
-      const selectedLeaf = () => {
-        if (!samePage()) return null;
-        const thread = namespace.XM(binding.conversationId);
-        if (!thread || thread.isLoading !== false || thread.is_do_not_remember !== false ||
-            selectors.getGizmoId(thread) !== expectedProjectId) return null;
-        const id = selectors.getCurrentLeafId(thread);
-        return UUID.test(id || '') && selectors.hasNode(thread, id) === true ? id : null;
-      };
-      const leafId = selectedLeaf();
-      if (!leafId) throw new Error('composer_context_unavailable');
-      return Object.freeze({ conversationId: binding.conversationId, projectId: expectedProjectId, leafId,
-        current: () => { try { return selectedLeaf() === leafId; } catch (_) { return false; } } });
     } finally {
       root.clearTimeout(timer);
       if (abort) signal?.removeEventListener('abort', abort);
     }
+  }
+
+  async function captureThread(binding, expectedProjectId, signal) {
+    const samePage = () => root.location.href === binding.href &&
+      root.__elonChatGptDocumentToken === binding.token;
+    const unchanged = () => !signal?.aborted && samePage();
+    if (!UUID.test(binding.conversationId || '') || !PROJECT.test(expectedProjectId || '') ||
+        binding.isTemporaryChat || !unchanged()) throw new Error('composer_context_unavailable');
+    const namespace = await loadedRuntime(signal);
+    if (!unchanged()) throw new Error('composer_changed');
+    const selectors = namespace?.HM;
+    if (typeof namespace?.XM !== 'function' || typeof selectors?.getGizmoId !== 'function' ||
+        typeof selectors.getCurrentLeafId !== 'function' || typeof selectors.hasNode !== 'function') {
+      throw new Error('composer_context_unavailable');
+    }
+    const selectedLeaf = () => {
+      if (!samePage()) return null;
+      const thread = namespace.XM(binding.conversationId);
+      if (!thread || thread.isLoading !== false || thread.is_do_not_remember !== false ||
+          selectors.getGizmoId(thread) !== expectedProjectId) return null;
+      const id = selectors.getCurrentLeafId(thread);
+      return UUID.test(id || '') && selectors.hasNode(thread, id) === true ? id : null;
+    };
+    const leafId = selectedLeaf();
+    if (!leafId) throw new Error('composer_context_unavailable');
+    return Object.freeze({ conversationId: binding.conversationId, projectId: expectedProjectId, leafId,
+      current: () => { try { return selectedLeaf() === leafId; } catch (_) { return false; } } });
   }
 
   function supports(scope, file) {
