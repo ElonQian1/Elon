@@ -1,4 +1,4 @@
-use super::{files, host, ingest, model::*, query};
+use super::{files, host, ingest, ingest_queue, model::*, query};
 use serde_json::{json, Value};
 use std::{
     collections::{HashMap, HashSet},
@@ -259,7 +259,14 @@ impl ResearchRuntime {
         let config = host::HostConfig {
             label: format!("browser-research-{}", &id[..32]),
             start_url: site.entry_url.clone(),
-            profile_dir: scope.root.join("profiles").join(&site.id),
+            // WebView2 creates deep internal paths; keep the profile itself short.
+            // One full digest binds all three scopes without nesting their hashes.
+            profile_dir: app
+                .path()
+                .app_local_data_dir()
+                .map_err(|_| "storage_unavailable")?
+                .join("research-profiles-v1")
+                .join(profile_key(&scope.project, &scope.owner, &site.id)),
             navigation_origins: site.navigation_origins,
             resource_origins: site.resource_origins,
             api_origins: site.api_origins,
@@ -269,7 +276,7 @@ impl ResearchRuntime {
         };
         core.sessions.insert(id.clone(), session);
         drop(core);
-        let (tx, rx) = std::sync::mpsc::sync_channel::<host::HostEvent>(64);
+        let (tx, rx) = ingest_queue::channel();
         let worker = self.clone();
         let worker_id = id.clone();
         let worker_root = scope.root.clone();
@@ -291,7 +298,7 @@ impl ResearchRuntime {
         let overflow = Arc::new(AtomicU64::new(0));
         let sink_overflow = overflow.clone();
         let sink: host::HostSink = Arc::new(move |event| {
-            if tx.try_send(event).is_err() {
+            if !tx.try_send(event) {
                 sink_overflow.fetch_add(1, Ordering::Relaxed);
             }
         });
@@ -320,9 +327,26 @@ impl ResearchRuntime {
     }
 }
 
+fn profile_key(project: &str, owner: &str, site: &str) -> String {
+    hash(
+        serde_json::to_vec(&[project, owner, site])
+            .expect("fixed string tuple")
+            .as_slice(),
+    )
+}
+
 #[cfg(test)]
 mod handle_tests {
     use super::*;
+    #[test]
+    fn compact_profile_key_keeps_project_owner_and_site_isolated() {
+        let key = profile_key("project", "owner", "site");
+        assert_eq!(key.len(), 64);
+        assert_ne!(key, profile_key("another", "owner", "site"));
+        assert_ne!(key, profile_key("project", "another", "site"));
+        assert_ne!(key, profile_key("project", "owner", "another"));
+        assert_ne!(profile_key("ab", "c", "d"), profile_key("a", "bc", "d"));
+    }
     #[test]
     fn closed_windows_release_slots_but_open_paused_login_windows_keep_theirs() {
         let mut hosts: HashMap<String, String> = (0..8)

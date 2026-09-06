@@ -2,7 +2,7 @@ use super::{
     cdp::Method,
     emit, gap,
     reads::{bounded, read},
-    Context, HostEvent,
+    Context, HostEvent, HostHandle,
 };
 use serde_json::{json, Value};
 
@@ -41,7 +41,7 @@ fn within_document(context: &Context, value: &Value) {
     let Some(url) = text(value, "url", 8192) else {
         return;
     };
-    let (handle, generation, business) = {
+    let (handle, generation, business, ready) = {
         let mut state = context.borrow_mut();
         if value.get("frameId").and_then(Value::as_str) != state.frame.as_deref() {
             return;
@@ -62,14 +62,33 @@ fn within_document(context: &Context, value: &Value) {
             state.handle.clone(),
             generation,
             state.config.allows_document(&url),
+            state.ready,
         )
     };
-    let mut event = HostEvent::new(generation, "navigation", if business { &url } else { "" });
+    finish_same_document_navigation(&handle, generation, &url, business, ready);
+}
+
+fn finish_same_document_navigation(
+    handle: &HostHandle,
+    generation: u64,
+    url: &str,
+    business: bool,
+    ready: bool,
+) {
+    if !handle.accepts(generation) {
+        return;
+    }
+    let mut event = HostEvent::new(generation, "navigation", if business { url } else { "" });
     if !business {
         event.error_code = Some("identity_navigation_not_captured".into());
     }
     (handle.control.sink)(event);
     handle.navigation_during_handshake();
+    // SPA history/hash changes keep the document and its enabled observer alive.
+    // Recheck after navigation invalidation so a pending/late handshake cannot revive it.
+    if ready && business && handle.accepts(generation) && !handle.handshake_pending() {
+        (handle.control.sink)(HostEvent::new(generation, "ready", ""));
+    }
 }
 
 fn frame(context: &Context, value: &Value) {
@@ -375,4 +394,91 @@ fn initiator(value: &Value) -> Option<Value> {
         })).collect::<Vec<_>>()
             });
     Some(json!({"type":kind,"url":text(value,"url",8192),"callFrames":frames}))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::super::types::{now_ms, Control};
+    use super::*;
+    use std::sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc, Mutex,
+    };
+
+    #[test]
+    fn same_document_navigation_restores_ready_only_for_current_observed_business_page() {
+        let events = Arc::new(Mutex::new(Vec::<HostEvent>::new()));
+        let output = events.clone();
+        let handle = HostHandle {
+            label: "browser-research-spa-fixture".into(),
+            control: Arc::new(Control {
+                active: AtomicBool::new(true),
+                generation: AtomicU64::new(1),
+                closed: AtomicBool::new(false),
+                expires_at_ms: now_ms() + 60000,
+                handshake: Mutex::default(),
+                sink: Arc::new(move |event| output.lock().unwrap().push(event)),
+            }),
+        };
+        let navigate = |generation, business, ready| {
+            finish_same_document_navigation(
+                &handle,
+                generation,
+                "https://site.example/grid",
+                business,
+                ready,
+            );
+        };
+        navigate(1, true, true);
+        {
+            let captured = events.lock().unwrap();
+            assert_eq!(
+                captured
+                    .iter()
+                    .map(|event| event.kind.as_str())
+                    .collect::<Vec<_>>(),
+                ["navigation", "ready"]
+            );
+            assert!(captured.iter().all(|event| event.generation == 1));
+        }
+        events.lock().unwrap().clear();
+        navigate(1, false, true);
+        {
+            let captured = events.lock().unwrap();
+            assert_eq!(captured.len(), 1);
+            assert_eq!(captured[0].kind, "navigation");
+            assert!(captured[0].url.is_empty());
+            assert_eq!(
+                captured[0].error_code.as_deref(),
+                Some("identity_navigation_not_captured")
+            );
+        }
+        events.lock().unwrap().clear();
+        navigate(1, true, false);
+        assert_eq!(events.lock().unwrap().len(), 1);
+        handle.begin_handshake(false);
+        handle.control.generation.fetch_add(1, Ordering::SeqCst);
+        events.lock().unwrap().clear();
+        navigate(2, true, true);
+        assert_eq!(
+            events
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|event| event.kind.as_str())
+                .collect::<Vec<_>>(),
+            ["navigation", "failed"]
+        );
+        assert!(!handle.active());
+        events.lock().unwrap().clear();
+        navigate(2, true, true);
+        assert!(events.lock().unwrap().is_empty());
+        let current = handle.begin_handshake(true);
+        events.lock().unwrap().clear();
+        navigate(current, true, true);
+        assert_eq!(events.lock().unwrap().len(), 1); // Still waiting for this generation's ACK.
+        events.lock().unwrap().clear();
+        navigate(current - 1, true, true);
+        assert!(events.lock().unwrap().is_empty());
+    }
 }

@@ -2,6 +2,7 @@
 mod files;
 pub(crate) mod host;
 mod ingest;
+mod ingest_queue;
 mod model;
 mod privacy;
 mod query;
