@@ -31,6 +31,7 @@ for website functionality. Persistent WebView identity remains intentional.
 | Private existing-project attachments | Fresh membership plus official selected-branch binding; scoped text/non-ingest-image processing and ready-store origins implemented | 86 focused Node cases passed with synthetic runtime/HTTP, including permission failure plus branch change; actual module access and project upload pending | Source-only JS extension beyond the adapter 272 baseline; no additional APK or handset operation; [branch contract](chatgpt-private-attachment-scopes.md#existing-project-branches) |
 | Attachment cancellation without UI-thread I/O | Immediate byte-lease revocation, off-thread file cleanup and stale-read exclusion implemented | All 6 native reader tests passed, including blocked-read/EOF cancellation; grouped Android 32/32 passed | Source-only; include in the grouped attachment candidate, not a separate APK |
 | Private conversation file download authorization and native transfer | Implemented scoped private GET, expiring selections and production Download action | Official current source contract, targeted JS, Release source compilation and 22 Android tests passed; device transfer pending | Adapter 266 source candidate; [scope and contract](chatgpt-private-file-download.md) |
+| Project/library-linked conversation attachment downloads | Existing native Download action now resolves confirmed project scope and library file metadata before private authorization | 48 focused Node runner cases passed with synthetic HTTP; actual saved bytes and live scope acceptance pending | Source-only download module 2 beyond adapter 272 baseline; no separate build/install; [scope extension](chatgpt-private-file-download.md#project-and-library-extension) |
 | Private single-conversation deletion | Partial: evidenced legacy PATCH, current/noncurrent native confirmation, voice/send exclusion and exact cache invalidation | 12 deletion JS cases, existing regressions, Release source compilation and 90 Android tests passed; final send guard rechecked in the affected 8-test suite; live deletion pending | Adapter 268 source candidate; [scope and remaining work](chatgpt-private-conversation-delete.md) |
 
 Root cause, exact modules, and check results are in
@@ -126,7 +127,7 @@ read-only project dispatch, ingest-image flags and PDF/multipart remain gaps.
 | Model/effort/tools/temporary mode | Native presets/cache and official controls | Apply the chosen state through a confirmed private contract; cached menu labels alone are not proof of server selection. |
 | Attachment upload | Verified small-text private upload; native byte handoff, store association, ordinary/temporary and writable new/existing-project scopes, static-image transaction connected in source | Accept integrated text/images, official branch-runtime access and temporary/project library behavior; finish read-only permission variants, ingest images and PDF/multipart. No integrated-device pass is claimed. See [upload contract](chatgpt-private-attachment-upload.md), [image extension](chatgpt-private-image-upload.md) and [scope contract](chatgpt-private-attachment-scopes.md). |
 | Images | Native gallery/previews/cache; official creation and library sync | Confirm private library pagination and generation transaction. Download queue improvements do not replace these endpoints. |
-| Share/delete/conversation files | Native pin/rename/archive/move; private file index/download candidate; guarded legacy private delete and current-chat reset | Verify ordinary-file download and current/noncurrent deletion. Complete flagged delete endpoint selection, project/library/image download scope, and official sharing. Do not substitute system sharing for official features. |
+| Share/delete/conversation files | Native pin/rename/archive/move; private file index plus ordinary/project/library-linked download candidates; guarded legacy private delete and current-chat reset | Verify saved-file downloads and current/noncurrent deletion. Complete flagged delete endpoint selection, shared-library/connector/image download scope, and official sharing. Do not substitute system sharing for official features. |
 | Google direct send | Native cache and private response observer; official submit | Reproduce the current submit contract and transaction ownership; observed reply endpoints do not imply a working private sender. |
 
 An unknown protocol remains a documented code gap. No guessed endpoint, fake
@@ -157,3 +158,11 @@ copies a link accessible only to existing project members and explains that futu
 messages remain visible to those members. It does not create a public share by
 POST in that module. Do not substitute this membership-scoped link or the
 message-slice writer for the missing whole-conversation public-link creator.
+
+The next offline trace located `Gkt`'s ordinary-share entry in `Sm.openSharingModal`:
+it writes `sharingModalThreadId` and overrides into the official UI store, rather
+than issuing the creation POST itself. The whole-conversation creator remains in
+the unsampled consumer of that store. The existing PC browser bridge failed its
+bounded retry, so no additional live caller or request was observed and no share
+link was created. Continue from that consumer when browser access is available;
+do not repeat the already-inspected message-slice or project-member paths.
