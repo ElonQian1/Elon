@@ -393,6 +393,7 @@ internal class ChatGptWebObservedState(
         val CONVERSATION_MUTATION_ACTIONS = setOf(
             "set_conversation_pinned",
             "set_conversation_archived",
+            "delete_conversation",
             "rename_conversation",
             "move_conversation_to_project",
         )

@@ -110,6 +110,24 @@ class ChatGptSessionNavigationActionsTest {
         assertEquals(0, newConversationCommands)
     }
 
+    @Test
+    fun confirmedDeletionPresentsEmptyContextBeforeLoadingHomeAndCancelsDeferredNavigation() {
+        assertTrue(actions.openConversation("/c/old"))
+        val next = ChatGptWebSnapshotPresentation.newConversation(current)
+        var loads = 0
+        actions.showAfterDeletion(next) {
+            assertEquals("https://chatgpt.com/", current?.url)
+            assertTrue(current?.messages?.isEmpty() == true)
+            loads += 1
+        }
+        bridgeReady = true
+        actions.onBridgeReady()
+        actions.showAfterDeletion(null) { loads += 1 }
+        assertEquals(1, loads)
+        assertTrue(opened.isEmpty())
+        assertFalse(navigation.hasPending())
+    }
+
     private fun snapshot(content: String, path: String) = ChatGptWebSnapshot(
         title = "conversation",
         url = "https://chatgpt.com$path",

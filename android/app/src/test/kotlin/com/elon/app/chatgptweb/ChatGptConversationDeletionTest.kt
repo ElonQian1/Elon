@@ -76,7 +76,7 @@ class ChatGptConversationDeletionTest {
         assertTrue(navigation.shouldAccept(snapshot(target.path)))
     }
 
-    @Test fun onlyConfirmedCachedNoncurrentSelectionDispatchesDeletion() {
+    @Test fun confirmedCachedSelectionsRouteToTheGuardedCommandPort() {
         val sent = mutableListOf<String>()
         val commands = object : ChatGptWebMcpCommandPort by ChatGptWebMcpTestCommandPort() {
             override fun deleteConversation(path: String, requestId: String) { sent += "$path:$requestId" }
@@ -86,10 +86,10 @@ class ChatGptConversationDeletionTest {
             ChatGptWebConversationMutationMcpAction.dispatch(args, commands, snapshot(current), rows) { _, block -> block("mcp_test") }
         assertEquals("user_confirmation_required", run())
         args.put("user_confirmed", true)
-        assertEquals("delete_current_conversation_active", run("/g/g-p-fixture/c/${target.id}"))
+        assertNull(run("/g/g-p-fixture/c/${target.id}"))
         assertEquals("delete_selection_expired", run(rows = emptyList()))
         assertNull(run())
-        assertEquals(listOf("${target.path}:mcp_test"), sent)
+        assertEquals(listOf("${target.path}:mcp_test", "${target.path}:mcp_test"), sent)
     }
 
     @Test fun deletionMarkersAreBoundedAndCanonical() {

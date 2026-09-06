@@ -87,6 +87,16 @@ internal class ChatGptSessionNavigationActions(
         conversationNavigation.clear()
     }
 
+    fun showAfterDeletion(next: ChatGptWebSnapshot?, loadHome: () -> Unit) {
+        if (next == null) return
+        clearDeferred()
+        cancelNewConversationRecovery()
+        presentSnapshot(next)
+        updateLoading()
+        // A confirmed delete must discard the official page's now-invalid current thread.
+        loadHome()
+    }
+
     private fun canDispatch(): Boolean =
         !conversationNavigation.hasPending() &&
             (sessionReady() || sessionCanDefer() && bridgeReady())

@@ -14,12 +14,13 @@ internal class ChatGptConversationDeletionCaches(
     ) : this(navigation::forget, { snapshots.restore()?.url }, snapshots::clear,
         restorer::restoreUrl, restorer::clear)
 
-    fun accept(ids: Set<String>) {
-        if (ids.isEmpty()) return
+    fun accept(ids: Set<String>, current: ChatGptWebSnapshot? = null): ChatGptWebSnapshot? {
+        if (ids.isEmpty()) return null
         val deleted = ChatGptDeletedConversations().apply { remember(ids) }
         forget(deleted.ids())
         // The last persisted snapshot may lag behind a currently streaming chat.
         if (deleted.containsUrl(cachedUrl())) clearCached()
         if (deleted.containsUrl(restoredUrl())) clearRestored()
+        return current?.takeIf { deleted.containsUrl(it.url) }?.let(ChatGptWebSnapshotPresentation::newConversation)
     }
 }

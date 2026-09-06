@@ -143,8 +143,7 @@ internal class ChatGptBackgroundSession(
     private var state = State.IDLE
     private var forceConversationRefreshAfterVoice = false
     private var loadPendingAfterPause = false
-    private val realtimeVoiceBacking: ChatGptRealtimeVoiceBackingController by
-        lazy(LazyThreadSafetyMode.NONE) {
+    private val realtimeVoiceBacking: ChatGptRealtimeVoiceBackingController by lazy(LazyThreadSafetyMode.NONE) {
             ChatGptRealtimeVoiceBackingController(
                 activity.applicationContext,
                 ::ensureInitialized, { webView }, surfaceMode, ::invokeRealtimeVoiceControl,
@@ -161,7 +160,7 @@ internal class ChatGptBackgroundSession(
         transport = chatGptOfficialPageSendTransport(
             pageAdapter = { pageAdapter },
             snapshot = { latestSnapshot },
-            ready = ::canSend,
+            ready = { canSend() && !realtimeVoiceBacking.conversationDeletion.isBusy() },
         ),
         snapshot = { latestSnapshot },
         stageUploads = { attachments -> uploadStager.stage(attachments) },
@@ -209,9 +208,7 @@ internal class ChatGptBackgroundSession(
             bridgeState = { latestBridgeState },
             presentationMode = ::presentationMode,
             verificationEvidenceStore = verificationEvidenceStore,
-            requestComposerOptions = { section, requestId ->
-                requestComposerOptions(section, requestId)
-            },
+            requestComposerOptions = ::requestComposerOptions,
             dismissComposerOptions = ::dismissComposerOptionsRequest,
             refresh = { webView?.reload() },
             realtimeVoiceBacking = realtimeVoiceBacking,
@@ -318,8 +315,7 @@ internal class ChatGptBackgroundSession(
     fun sendReady(): Boolean = sendOwner.isReady()
     fun pendingSendPrompt(): String? = sendOwner.prompt()
     fun pendingSendStatus(): String? = sendOwner.status()
-    fun pendingSendRequiresOfficialConfirmation(): Boolean =
-        sendOwner.requiresOfficialConfirmation()
+    fun pendingSendRequiresOfficialConfirmation(): Boolean = sendOwner.requiresOfficialConfirmation()
     fun dispatchSocialPrompt(prompt: String) = sendOwner.dispatchSocial(prompt)
     fun pauseSendWatchdog() = sendOwner.pauseWatchdog()
     fun clearPendingSend() = sendOwner.clear()
@@ -555,10 +551,12 @@ internal class ChatGptBackgroundSession(
     private fun handleEvent(event: ChatGptWebEvent) {
         if (ChatGptWebPrivateResearchEventRecorder.record(event)) return
         observedMcpState.accept(event)
+        if (event is ChatGptWebEvent.CommandResult) realtimeVoiceBacking.conversationDeletion.accept(event)
         if (event is ChatGptWebEvent.CommandResult && event.action == "private_protocol_probe") return
         when (event) {
             is ChatGptWebEvent.Snapshot -> {
                 if (!conversationNavigation.shouldAccept(event.value)) return
+                realtimeVoiceBacking.conversationDeletion.accept(event)
                 val reconciliation = sessionContinuity.reconcileWithDecision(
                     ChatGptWebContentSnapshotPolicy.reconcile(latestSnapshot, event.value),
                 )
@@ -682,7 +680,9 @@ internal class ChatGptBackgroundSession(
                 }
             }
             is ChatGptWebEvent.ConversationList -> {
-                deletionCaches.accept(event.deletedConversationIds)
+                navigationActions.showAfterDeletion(deletionCaches.accept(event.deletedConversationIds, latestSnapshot)) {
+                    webView?.loadUrl(ChatGptWebNavigationPolicy.START_URL)
+                }
                 conversationRefresh.onSucceeded()
                 conversationDirectory.accept(event)
                 conversationDirectory.save(conversationHistoryStore)

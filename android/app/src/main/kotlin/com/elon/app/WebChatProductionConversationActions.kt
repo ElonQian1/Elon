@@ -225,13 +225,6 @@ internal class WebChatProductionConversationActionsCoordinator(
 
     private fun showDeleteConfirmation(conversation: ChatGptWebConversation) {
         if (activity.isFinishing || activity.isDestroyed) return
-        if (ChatGptWebConversationPath.identity(conversation.path) ==
-            ChatGptWebConversationPath.identity(currentConversationPath())) {
-            AlertDialog.Builder(activity).setTitle("会话仍在打开")
-                .setMessage("请先离开这条会话，结束其中的语音，再从侧边栏删除。")
-                .setPositiveButton("确定", null).show()
-            return
-        }
         AlertDialog.Builder(activity).setTitle("删除会话")
             .setMessage("确定删除“${conversation.title}”？此操作无法撤销。")
             .setPositiveButton("删除") { _, _ ->

@@ -26,7 +26,7 @@ for website functionality. Persistent WebView identity remains intentional.
 | Reservation responses cannot prematurely release attachment sends | Implemented regression correction | Node red-to-green, 12 Android tracker tests and file-content smoke contract passed | Source-only; grouped APK and synthetic-file acceptance pending |
 | Private file create/blob upload/process transaction | Implemented transport and native byte/store integration for one plain-text file in an empty ordinary new chat | One real 78-byte private upload processed; 37 JS checks, Release compilation and 26 Android tests passed; integrated device acceptance pending | Adapter 265 source candidate; no integration APK release yet; [scope and contract](chatgpt-private-attachment-upload.md) |
 | Private conversation file download authorization and native transfer | Implemented scoped private GET, expiring selections and production Download action | Official current source contract, targeted JS, Release source compilation and 22 Android tests passed; device transfer pending | Adapter 266 source candidate; [scope and contract](chatgpt-private-file-download.md) |
-| Private single-conversation deletion | Partial: evidenced legacy PATCH, noncurrent native sidebar confirmation and exact cache invalidation | Nine new JS checks plus existing regression suites; Release compilation and 68 Android tests passed; live deletion pending | Adapter 267 source candidate, voice-owner guard required before release; [scope and remaining work](chatgpt-private-conversation-delete.md) |
+| Private single-conversation deletion | Partial: evidenced legacy PATCH, current/noncurrent native confirmation, voice/send exclusion and exact cache invalidation | 12 deletion JS cases, existing regressions, Release source compilation and 90 Android tests passed; final send guard rechecked in the affected 8-test suite; live deletion pending | Adapter 268 source candidate; [scope and remaining work](chatgpt-private-conversation-delete.md) |
 
 Root cause, exact modules, and check results are in
 [the history contract](chatgpt-private-history-native-contract.md).
@@ -86,9 +86,24 @@ because the debugging connection is unavailable. The Goal is not complete.
 | Model/effort/tools/temporary mode | Native presets/cache and official controls | Apply the chosen state through a confirmed private contract; cached menu labels alone are not proof of server selection. |
 | Attachment upload | Verified small-text private upload; native byte handoff and current official-store association now connected in source | Accept the integrated new-chat plain-text path on-device, then cover existing conversations and images/project/temporary/multipart variants. The original native-picker smoke failed before byte upload; no fresh integrated-device pass is claimed. See [upload contract](chatgpt-private-attachment-upload.md). |
 | Images | Native gallery/previews/cache; official creation and library sync | Confirm private library pagination and generation transaction. Download queue improvements do not replace these endpoints. |
-| Share/delete/conversation files | Native pin/rename/archive/move; private file index/download candidate; scoped legacy private delete with native confirmation | Verify ordinary-file download and noncurrent deletion. Complete current-chat delete/voice settlement, flagged delete endpoint selection, project/library/image download scope, and official sharing. Do not substitute system sharing for official features. |
+| Share/delete/conversation files | Native pin/rename/archive/move; private file index/download candidate; guarded legacy private delete and current-chat reset | Verify ordinary-file download and current/noncurrent deletion. Complete flagged delete endpoint selection, project/library/image download scope, and official sharing. Do not substitute system sharing for official features. |
 | Google direct send | Native cache and private response observer; official submit | Reproduce the current submit contract and transaction ownership; observed reply endpoints do not imply a working private sender. |
 
 An unknown protocol remains a documented code gap. No guessed endpoint, fake
 success, or automatic write replay should be added merely to make this table
 look complete. Existing UI stays usable while each replacement is implemented.
+
+## Sharing protocol checkpoint
+
+The official `8b34dbc2-kjj15hg4y6iyx13p.js` asset read on 2026-09-06 has SHA-256
+`9990fb9a8682917d0d790acf7b6aa78355e8520e4ffd2c5e0a183212d612d4b5`.
+Its `aAn`/`bAn` message-slice flow posts `post_text` and
+`attachments_to_create: [{kind: "message_slice", conversation_id, message_ids}]`
+to `/share/post` or flag `1308952433`'s `/share/post/link` branch. This is not proof
+that the full-conversation Share action uses that writer. Its `jAn` instead awaits
+an externally supplied `shareCreatePromise` with `shareLinkUrl`, `shareLinkId` and
+`currentNodeId`. `Kkn` derives preview IDs from the selected conversation branch;
+it does not create the link. The remaining research entry is the full-conversation
+creation caller/lazy module and exact response contract. No link was published,
+no guessed endpoint was implemented, and system `navigator.share` is only the
+subsequent distribution step after an official link exists.

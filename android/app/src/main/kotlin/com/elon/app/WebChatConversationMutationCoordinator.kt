@@ -65,7 +65,9 @@ internal object WebChatConversationMutationPolicy {
     }
 
     fun failureMessage(detail: String?): String = when {
-        detail == "delete_current_conversation_active" -> "请先离开这条会话，结束其中的语音，再从侧边栏删除。"
+        detail == "delete_voice_active" -> "实时语音仍在占用会话，请先挂断，再删除。"
+        detail == "delete_draft_present" -> "当前会话有未发送文字或附件，请先发送或清除后再删除。"
+        detail == "delete_conversation_busy" -> "当前会话仍在回复、听写或恢复，请结束后再删除。"
         detail == "delete_selection_expired" -> "这条会话的列表状态已经变化，请刷新后确认。"
         detail?.startsWith("delete_") == true -> "尚未确认删除结果，没有自动重试。请刷新列表核对。"
         detail == "mutation_auth_unavailable" -> "网页身份正在恢复，官网尚未确认这次操作。"

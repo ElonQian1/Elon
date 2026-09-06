@@ -22,6 +22,7 @@ internal class ChatGptRealtimeVoiceBackingController(
     private val conversationRecoveredSince: (Long) -> Boolean,
     private val onTranscript: (ChatGptWebNativeVoiceTranscriptEvent) -> Unit,
 ) {
+    val conversationDeletion = ChatGptConversationDeletionGuard(android.os.SystemClock::elapsedRealtime)
     private var active = false
     private val recoveryGate = ChatGptRealtimeVoiceRecoveryGate()
     private val privateVoiceRelay = ChatGptWebPrivateVoiceRelayGateway(webView, schedule)
@@ -58,6 +59,7 @@ internal class ChatGptRealtimeVoiceBackingController(
     private fun startNativePrivateVoice(
         onState: ((ChatGptWebNativeVoiceState) -> Unit)?,
     ): Boolean {
+        if (conversationDeletion.isBusy()) return false
         if (!BuildConfig.CHATGPT_PRIVATE_VOICE_NATIVE_RTC_ENABLED) return false
         ensureInitialized()
         if (webView() == null) return false
@@ -93,6 +95,7 @@ internal class ChatGptRealtimeVoiceBackingController(
         setManagedRealtimeVoiceMuted(muted)
 
     fun begin(): Boolean {
+        if (conversationDeletion.isBusy()) return false
         ensureInitialized()
         val view = webView() ?: return false
         recoveryGate.invalidate()
@@ -159,6 +162,7 @@ internal class ChatGptRealtimeVoiceBackingController(
     }
 
     fun release() {
+        conversationDeletion.clear()
         active = false
         transcriptRefreshGeneration += 1
         officialFallbackPending = false

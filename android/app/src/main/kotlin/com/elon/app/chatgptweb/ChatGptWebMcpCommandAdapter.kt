@@ -7,6 +7,7 @@ internal class ChatGptWebMcpCommandAdapter(
     private val startDictationAction: (String, String, String) -> Unit,
     private val requestComposerOptionsAction: (String, String) -> Unit,
     private val dismissComposerOptionsAction: (String?) -> Unit,
+    private val deleteConversationAction: (String, String) -> Unit,
 ) : ChatGptWebMcpCommandPort {
     override fun setDraft(value: String, expectedDraft: String, requestId: String) =
         pageAdapter.setDraft(value, expectedDraft, requestId)
@@ -53,7 +54,7 @@ internal class ChatGptWebMcpCommandAdapter(
         pageAdapter.downloadConversationFile(path, file, requestId)
     override fun setConversationArchived(path: String, archived: Boolean, requestId: String) =
         pageAdapter.setConversationArchived(path, archived, requestId)
-    override fun deleteConversation(path: String, requestId: String) = pageAdapter.deleteConversation(path, requestId)
+    override fun deleteConversation(path: String, requestId: String) = deleteConversationAction(path, requestId)
     override fun renameConversation(path: String, title: String, requestId: String) =
         pageAdapter.renameConversation(path, title, requestId)
     override fun moveConversationToProject(

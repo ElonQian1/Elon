@@ -17,9 +17,6 @@ internal object ChatGptWebConversationMutationMcpAction {
             "chatgpt_delete_conversation" -> {
                 val id = ChatGptWebConversationPath.identity(path)
                 if (snapshot == null) return "delete_context_unavailable"
-                if (id == ChatGptWebConversationPath.fromUrl(snapshot.url)?.let(ChatGptWebConversationPath::identity)) {
-                    return "delete_current_conversation_active"
-                }
                 if (conversations.none { ChatGptWebConversationPath.identity(it.path) == id }) return "delete_selection_expired"
                 dispatchCommand("delete_conversation") { requestId -> commands.deleteConversation(path, requestId) }
             }

@@ -1,11 +1,14 @@
 # Private conversation deletion
 
 Capability candidate: `android_chatgpt_private_conversation_delete_v1`.
-Implementation: **partial**, noncurrent conversation selection only.
-Delivery: adapter 267 source candidate, no new APK or live deletion acceptance.
-Verification: nine new JS checks and existing mutation/directory/asset-bundle
-regressions passed; Release source compilation and 68 targeted Android tests
-passed (seven new deletion/cache cases). This is not production acceptance.
+Implementation: **partial**, current and noncurrent selections use the evidenced
+legacy single-conversation branch; flagged endpoint selection remains open.
+Delivery: adapter 268 source candidate, no new APK or live deletion acceptance.
+Verification: 12 deletion JS cases and existing mutation/directory/attachment
+composer regressions passed. Release source compilation and 90 targeted Android
+tests passed; the final cross-conversation send guard passed the affected 8-test
+lifecycle suite again. These counts overlap and are not 98 distinct tests.
+This is not production acceptance.
 
 ## Evidence
 
@@ -25,13 +28,24 @@ acceptance remain unverified. No private conversations were deleted for testing.
 
 ## Ownership and native path
 
-- Production sidebar conversation actions show a separate Delete confirmation.
-  The existing current-conversation/official route remains available. Current
-  conversations are deliberately rejected until navigation and voice ownership
-  can be settled safely; this is not a completed current-chat delete workflow.
+- Production sidebar and current-conversation actions share a Delete confirmation.
+  Current deletion requires an idle composer with no native or official draft,
+  pending attachments, recording, streaming, or pending native send. The page
+  rechecks its current snapshot after authentication, before sending the write.
+  Missing snapshot evidence is context-unavailable, not capability-unavailable.
+- All native voice launches share a deletion lease with the consumer command port.
+  Active, paused, connecting, and not-yet-released voice backing blocks deletion,
+  even when the native UI is browsing another conversation. This intentionally
+  serializes deletion against the shared voice/identity session; it does not
+  guess voice ownership from the currently visible conversation. No implicit
+  hangup or microphone restart is performed.
+- While a delete is pending, voice and text-send readiness are held. A matching
+  terminal receipt releases the lease. Successful current deletion keeps voice
+  blocked until a different, actually ready page is observed. Missing receipts
+  expire after the entire bounded request budget, not during reconciliation.
 - UI and MCP use the same consumer port and exact cached conversation selection.
-  Confirmation, canonical identity, native current path, and page current path
-  are checked. Repeated clicks and existing private mutations share exclusion.
+  Confirmation, canonical identity, native context, and page current path are
+  checked. Repeated clicks and existing private mutations share exclusion.
 - The versioned module uses the existing page identity and bounded JSON request
   owner. Identity acquisition is limited to 7 seconds; each HTTP request to
   9 seconds. No cookies, bearer values or proof headers are exported to native
@@ -52,24 +66,39 @@ acceptance remain unverified. No private conversations were deleted for testing.
   URL are also cleared if they still point to the deleted conversation, including
   when the foreground chat is newer than its last persisted snapshot.
   Account-history reset clears markers.
+- A successful current deletion sends its terminal receipt before publishing the
+  deletion directory event. The directory mutation suppresses its synchronous
+  listener until this receipt is emitted. Native clears the matching current
+  text context immediately, cancels deferred navigation, and loads the official
+  home once to discard its deleted-thread frontend state. Repeated markers or a
+  different current conversation do not reload. Failed or uncertain writes do not
+  clear the text context. This is one deliberate post-delete navigation, not a
+  reload on opening a menu or a speculative DOM action.
 
 ## Verification and remaining work
 
-Targeted JS covers nine cases: exact PATCH/body/header policy, confirmation and
+Targeted JS covers 12 cases: exact PATCH/body/header policy, confirmation and
 selection, duplicate ownership, account/document/route changes, late success,
 uncertain-write reconciliation, 404/HTTP rejection, bounded identity acquisition,
-and last-row/late-directory behavior. Android tests cover canonical deletion
-events, native directory/file/snapshot invalidation and the shared MCP gate.
+and last-row/late-directory behavior, current draft/recording guards, draft changes
+during authentication, and receipt-before-navigation ordering. Android tests cover
+canonical deletion events, native directory/file/snapshot invalidation, lease
+ownership, current navigation, and the shared MCP gate.
+
+The 2026-09-06 source batch ran deletion/lifecycle, navigation, consumer-port,
+mutation-MCP, observed-state, protocol and send-coordinator tests: 90 tests with
+zero failures or errors. After tightening the cross-conversation pending-send
+guard, the 8 lifecycle tests passed again with Release source compilation.
+No APK assembly, installation or live destructive acceptance was performed.
 
 Run `scripts/test-chatgpt-web-private-conversation-delete.js`, the existing
 mutation/directory suites, and `ChatGptConversationDeletionTest` together with
 affected navigation, directory, consumer-port and protocol tests. Passing source
 tests is not live protocol acceptance. A grouped production build must verify
 one user-confirmed disposable conversation, without touching private history.
-Before publishing this deletion candidate, complete explicit active-voice-owner
-guarding even when the native UI is browsing a different conversation, plus
-current-conversation navigation/voice settlement. The current-page checks alone
-do not prove a separate native audio session has released that conversation.
+Device acceptance must cover blocked deletion during active/paused voice, current
+draft protection, one disposable current-chat deletion, no late reappearance, and
+starting voice in the subsequent new conversation. Direct manual operations inside
+the official fallback are not a replacement for production-native acceptance.
 Complete the flagged endpoint selection contract and official sharing separately.
-Do not mark this capability
-completed merely because the legacy branch compiles.
+Do not mark this capability completed merely because the legacy branch compiles.

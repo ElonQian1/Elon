@@ -67,6 +67,13 @@ internal class ChatGptWebPortFactory(
             },
             requestComposerOptionsAction = requestComposerOptions,
             dismissComposerOptionsAction = dismissComposerOptions,
+            deleteConversationAction = { path, requestId ->
+                val error = ChatGptConversationDeletionGuard.rejection(path, snapshot(), inputText(),
+                    sendOwner.prompt() != null || sendOwner.hasAttachmentSend())
+                    ?: realtimeVoiceBacking.conversationDeletion.begin(requestId, realtimeVoiceBacking.isActive(), path, snapshot()?.url)
+                if (error != null) observedState.failCommand(requestId, "delete_conversation", error)
+                else adapter.deleteConversation(path, requestId)
+            },
         )
         val officialPort = ChatGptWebMcpActions(
             snapshot = snapshot,
