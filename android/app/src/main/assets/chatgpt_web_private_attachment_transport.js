@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 7, create: factory });
+  const exported = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root && root.location?.origin === 'https://chatgpt.com') {
     root.__elonChatGptPrivateAttachmentTransport = exported;
@@ -19,6 +19,10 @@
   ]);
   let active = null;
   let cooldownUntil = 0;
+  const reservationModule = options?.reservation || root.__elonChatGptPrivateAttachmentReservation;
+  const reservation = reservationModule?.version === 1 ? reservationModule.create(root, {
+    protocol, bytes, request, isCurrent: current, acquireHeaders: async () => allowedHeaders(await acquire()),
+  }) : null;
 
   function allowedHeaders(source) {
     const result = { Accept: 'application/json', 'Content-Type': 'application/json' };
@@ -84,12 +88,13 @@
       authTimer = null;
       assertCurrent(job);
       change(job, 'preparing');
-      const prepared = await dispatch(job, '/backend-api/files', {
+      const reserved = reservation?.take(file, selected, binding);
+      const prepared = reserved?.entry || (await dispatch(job, '/backend-api/files', {
         method: 'POST', credentials: 'include', headers: { ...headers, ...creationHeaders }, body: JSON.stringify(body),
-      }, 'json', 15000);
-      job.fileId = prepared.payload?.file_id || null;
-      const destination = bytes?.version === 1 ? bytes.plan(prepared.payload, file, protocol)
-        : protocol.destination(prepared.payload, file.type);
+      }, 'json', 15000)).payload;
+      job.fileId = prepared?.file_id || null;
+      const destination = bytes?.version === 1 ? bytes.plan(prepared, file, protocol)
+        : protocol.destination(prepared, file.type);
       job.fileId = destination.fileId;
       change(job, 'uploading');
       if (bytes?.version === 1) await bytes.upload(root, destination, file, headers, {
@@ -100,9 +105,11 @@
         method: 'PUT', credentials: 'omit', headers: destination.headers, body: file,
       }, 'none', 30000);
       change(job, 'processing');
-      const processed = await dispatch(job, '/backend-api/files/process_upload_stream', {
-        method: 'POST', credentials: 'include', headers,
-        body: JSON.stringify(protocol.processBody(destination.fileId, file, selected)),
+      const processing = reserved?.claim || { url: '/backend-api/files/process_upload_stream',
+        body: JSON.stringify(protocol.processBody(destination.fileId, file, selected)) };
+      const processed = await dispatch(job, processing.url, {
+        method: 'POST', credentials: 'include', headers: reserved ? { ...headers, ...creationHeaders } : headers,
+        body: processing.body,
       }, 'text', 30000);
       const result = protocol.processed(processed.text, destination.fileId);
       if (selected.imageDimensions && result.metadata.mimeType && result.metadata.mimeType !== file.type ||
@@ -132,11 +139,15 @@
       if (authTimer != null) root.clearTimeout(authTimer);
       if (abortListener) job.controller.signal.removeEventListener('abort', abortListener);
       job.controller.abort();
+      reservation?.cancel();
       if (active === job) active = null;
     }
   }
 
-  function cancel() { if (active) active.controller.abort(); }
-  function snapshot() { return { version: 7, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
-  return Object.freeze({ version: 7, upload, cancel, dispose: cancel, snapshot });
+  function prefetch(context, binding, signal) {
+    if (!active && cooldownUntil <= Date.now()) reservation?.start(context, binding, signal);
+  }
+  function cancel() { reservation?.cancel(); if (active) active.controller.abort(); }
+  function snapshot() { return { version: 8, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
+  return Object.freeze({ version: 8, prefetch, upload, cancel, dispose: cancel, snapshot });
 });

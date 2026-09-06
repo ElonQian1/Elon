@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 8, create: factory });
+  const exported = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -57,6 +57,9 @@
       // Compatibility selection for unknown/unsupported scope precedes byte reads
       // and private writes. Cancelled or stale bindings throw instead of replaying.
       if (!await composer.prepare(binding, job.controller.signal, descriptor)) return fallback();
+      job.transport = createTransport({ isCurrent: candidate => candidate === binding &&
+        !job.controller.signal.aborted && composer.current(binding) });
+      job.transport.prefetch?.(composer.reservationContext?.(binding, descriptor), binding, job.controller.signal);
       let file = await source.read(descriptor, job.controller.signal);
       let imageDimensions;
       if (/^image\//.test(file.type)) {
@@ -65,8 +68,6 @@
         imageDimensions = prepared.dimensions;
       }
       if (job.controller.signal.aborted || !composer.current(binding)) throw new Error('context_changed');
-      job.transport = createTransport({ isCurrent: candidate => candidate === binding &&
-        !job.controller.signal.aborted && composer.current(binding) });
       job.attempted = true;
       const result = await job.transport.upload(file, composer.uploadContext(binding, file, imageDimensions), binding);
       if (!result.ok) throw new Error(result.code);
@@ -95,6 +96,6 @@
     return true;
   }
 
-  return Object.freeze({ version: 8, start, cancel, remove,
+  return Object.freeze({ version: 9, start, cancel, remove,
     merge: dom => composer?.merge(dom) || dom });
 });

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 9, create: factory });
+  const exported = Object.freeze({ version: 10, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -183,6 +183,16 @@
     return { ...context, modelSlug: binding.modelSlug ?? undefined };
   }
 
+  function reservationContext(binding, descriptor) {
+    if (!current(binding) || !confirmed.has(binding) || binding.isTemporaryChat || projects.has(binding) ||
+        binding.projectId || !Number.isSafeInteger(descriptor?.size) || descriptor.size < 1 ||
+        descriptor.size > root.__elonChatGptPrivateAttachmentProtocol.maxFileBytes) return null;
+    const image = ['image/jpeg', 'image/png', 'image/webp'].includes(descriptor.type);
+    if (!image && !root.__elonChatGptPrivateAttachmentProtocol.isDocument(descriptor)) return null;
+    return Object.freeze({ useCase: image ? 'multimodal' : 'ace_upload', storeInLibrary: false,
+      libraryPersistenceMode: 'required', isTemporaryChat: false, modelSlug: binding.modelSlug ?? undefined });
+  }
+
   function associate(binding, file, result, leaseId) {
     const scope = projects.get(binding);
     const projectId = scope?.projectId || binding.projectId;
@@ -258,5 +268,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 9, available, capture, prepare, current, uploadContext, associate, merge, remove });
+  return Object.freeze({ version: 10, available, capture, prepare, current, uploadContext, reservationContext, associate, merge, remove });
 });
