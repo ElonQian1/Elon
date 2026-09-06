@@ -10,6 +10,9 @@ Later source extensions cover [static images](chatgpt-private-image-upload.md),
 [temporary and project scopes](chatgpt-private-attachment-scopes.md), and
 [PDF model-bound upload](chatgpt-private-pdf-upload.md). Their candidate status
 does not upgrade the historical device results below to integrated acceptance.
+The [multipart and same-origin byte-route extension](chatgpt-private-attachment-byte-transports.md)
+now implements those two previously rejected routes in source; it is not yet
+included in the historical APK or live-upload results below.
 
 ## Current evidence
 
@@ -75,8 +78,9 @@ The confirmed legacy path is:
 
 1. `POST /backend-api/files` with file name, size, use case, MIME type,
    timezone offset, entry surface and explicit library preferences. The candidate
-   requests `supports_direct_azure_multipart=false`; the small-file trial accepted
-   this and returned `status`, `file_id` and `upload_url`.
+   requested `supports_direct_azure_multipart=false` in the small-file trial and
+   received `status`, `file_id` and `upload_url`. The later byte-route candidate
+   advertises true only when its multipart implementation is loaded.
 2. PUT bytes to the returned signed HTTPS blob URL, with credentials omitted,
    no page authorization/workspace headers, and redirects rejected. The observed
    host was under `oaiusercontent.com`. Current Azure uploads use blob-type and
@@ -111,8 +115,10 @@ This path is documented but intentionally not implemented by the candidate.
 - Result says `associated=false`. A processed file is not a sent message.
   Signed URLs and identity headers are not included in completion/diagnostic
   receipts. Unknown server error details are reduced to a stable error code.
-- Existing-project and unsupported new-project contexts, custom upload headers, multipart, Estuary and
-  unknown storage hosts are rejected explicitly. Static image integration is
+- In the original trial, existing-project and unsupported new-project contexts,
+  custom upload headers, multipart, Estuary and unknown storage hosts were rejected
+  explicitly. The linked scope and byte-route candidates now extend that baseline.
+  Unknown storage hosts and custom upload headers remain rejected. Static image integration is
   now a separate [adapter 270 source candidate](chatgpt-private-image-upload.md),
   and temporary/new-project uploads are [adapter 271/272 source candidates](chatgpt-private-attachment-scopes.md),
   none device-accepted by inference from the successful small-text trial.
