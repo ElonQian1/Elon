@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptNativeAttachmentSource = exported;
 })(typeof window === 'object' ? window : null, function (root) {
@@ -18,7 +18,7 @@
     if (active || typeof bridge?.postMessage !== 'function') throw new Error('native_source_unavailable');
     if (descriptor?.version !== 1 || !/^[a-f0-9-]{36}$/.test(descriptor.leaseId || '') ||
         !Number.isSafeInteger(descriptor.size) || descriptor.size < 1 || descriptor.size > 8 * 1024 * 1024 ||
-        !['text/plain', 'image/jpeg', 'image/png', 'image/webp'].includes(descriptor.type) ||
+        !['text/plain', 'application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(descriptor.type) ||
         !current(descriptor)) throw new Error('native_source_invalid');
     const job = {};
     active = job;
@@ -71,5 +71,5 @@
     }
   }
 
-  return Object.freeze({ version: 2, read });
+  return Object.freeze({ version: 3, read });
 });

@@ -47,6 +47,18 @@ test('native normalized image bytes use the same bounded handoff as text', async
   }
 });
 
+test('PDF binary bytes retain their MIME type and every chunk boundary without text conversion', async () => {
+  const f = fixture(140000);
+  f.bytes.set(Buffer.from('%PDF-1.7\n'));
+  f.bytes.set([0, 255, 128, 13, 10], 65534);
+  const file = await f.source.read({ ...f.descriptor, name: 'fixture.pdf', type: 'application/pdf' });
+  assert.equal(file.name, 'fixture.pdf');
+  assert.equal(file.type, 'application/pdf');
+  assert.deepEqual(Buffer.from(await file.arrayBuffer()), f.bytes);
+  assert.deepEqual(f.requests.map(item => item.offset), [0, 65536, 131072]);
+  assert.equal(f.root.elonChatGptAttachmentSource.onmessage, null);
+});
+
 test('a short chunk, incorrect offset or expired lease is never made into a file', async () => {
   for (const mutate of [response => { response.data = ''; }, response => { response.offset++; },
     response => { response.code = 'attachment_read_expired'; }]) {

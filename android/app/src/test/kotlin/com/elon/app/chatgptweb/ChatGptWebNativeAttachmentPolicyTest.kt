@@ -18,7 +18,15 @@ class ChatGptWebNativeAttachmentPolicyTest {
         assertFalse(ChatGptWebNativeAttachmentPolicy.supports("image/jpeg", 1024, 3000, 2000))
         assertFalse(ChatGptWebNativeAttachmentPolicy.supports("image/png", 1024, Int.MAX_VALUE, Int.MAX_VALUE))
         assertFalse(ChatGptWebNativeAttachmentPolicy.supports("image/gif", 1024, 100, 100))
-        assertFalse(ChatGptWebNativeAttachmentPolicy.supports("application/pdf", 1024, null, null))
+        assertFalse(ChatGptWebNativeAttachmentPolicy.supports("application/octet-stream", 1024, null, null))
+        assertFalse(ChatGptWebNativeAttachmentPolicy.supports("application/msword", 1024, null, null))
+    }
+
+    @Test fun acceptsPdfBytesWithoutImageMetadataButKeepsTheSameSizeLimit() {
+        assertTrue(ChatGptWebNativeAttachmentPolicy.supports("application/pdf", 1024, null, null))
+        assertTrue(ChatGptWebNativeAttachmentPolicy.supports("application/pdf", 8 * 1024 * 1024L, null, null))
+        assertFalse(ChatGptWebNativeAttachmentPolicy.supports("application/pdf", 0, null, null))
+        assertFalse(ChatGptWebNativeAttachmentPolicy.supports("application/pdf", 8 * 1024 * 1024L + 1, null, null))
     }
 
     @Test fun boundsSelectedBytesBeforeCreatingALease() {
