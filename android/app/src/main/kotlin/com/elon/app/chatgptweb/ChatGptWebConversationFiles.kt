@@ -46,5 +46,6 @@ internal class ChatGptWebConversationFileCache {
     }
 
     fun snapshot(): Map<String, WebChatConversationFileIndex> = indexes.toMap()
+    fun remove(ids: Set<String>) = ids.forEach { indexes.remove(it) }
     fun clear() = indexes.clear()
 }

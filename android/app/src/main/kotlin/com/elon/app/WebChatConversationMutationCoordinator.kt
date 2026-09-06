@@ -16,6 +16,7 @@ internal sealed interface WebChatConversationMutationIntent {
     data class Pinned(val value: Boolean) : WebChatConversationMutationIntent
     data class Archived(val value: Boolean) : WebChatConversationMutationIntent
     data class Renamed(val title: String) : WebChatConversationMutationIntent
+    data object Deleted : WebChatConversationMutationIntent
     data class Moved(val projectId: String, val projectTitle: String) :
         WebChatConversationMutationIntent
 }
@@ -51,6 +52,7 @@ internal object WebChatConversationMutationPolicy {
         is WebChatConversationMutationIntent.Archived ->
             if (intent.value) "正在归档" else "正在恢复会话"
         is WebChatConversationMutationIntent.Renamed -> "正在重命名"
+        WebChatConversationMutationIntent.Deleted -> "正在删除"
         is WebChatConversationMutationIntent.Moved -> "正在移动到“${intent.projectTitle}”"
     }
 
@@ -58,10 +60,14 @@ internal object WebChatConversationMutationPolicy {
         is WebChatConversationMutationIntent.Pinned -> if (intent.value) "已置顶" else "已取消置顶"
         is WebChatConversationMutationIntent.Archived -> if (intent.value) "已归档" else "已恢复会话"
         is WebChatConversationMutationIntent.Renamed -> "已重命名"
+        WebChatConversationMutationIntent.Deleted -> "已删除"
         is WebChatConversationMutationIntent.Moved -> "已移动到“${intent.projectTitle}”"
     }
 
     fun failureMessage(detail: String?): String = when {
+        detail == "delete_current_conversation_active" -> "请先离开这条会话，结束其中的语音，再从侧边栏删除。"
+        detail == "delete_selection_expired" -> "这条会话的列表状态已经变化，请刷新后确认。"
+        detail?.startsWith("delete_") == true -> "尚未确认删除结果，没有自动重试。请刷新列表核对。"
         detail == "mutation_auth_unavailable" -> "网页身份正在恢复，官网尚未确认这次操作。"
         detail == "mutation_busy" -> "另一项会话操作仍在进行，官网尚未确认这次操作。"
         detail == "mutation_circuit_open" -> "直接通道正在短暂恢复，官网尚未确认这次操作。"
@@ -103,6 +109,7 @@ internal class WebChatConversationMutationCoordinator(
                 port.setConversationArchived(path, intent.value, userConfirmed = true)
             is WebChatConversationMutationIntent.Renamed ->
                 port.renameConversation(path, intent.title, userConfirmed = true)
+            WebChatConversationMutationIntent.Deleted -> port.deleteConversation(path, userConfirmed = true)
             is WebChatConversationMutationIntent.Moved ->
                 port.moveConversationToProject(
                     path,
@@ -228,7 +235,10 @@ internal class WebChatConversationMutationCoordinator(
         AlertDialog.Builder(activity)
             .setTitle("会话操作未确认")
             .setMessage(WebChatConversationMutationPolicy.failureMessage(detail))
-            .setNeutralButton("重试") { _, _ -> start(conversation, intent, officialFallback) }
+            .setNeutralButton(if (intent == WebChatConversationMutationIntent.Deleted) "刷新列表" else "重试") { _, _ ->
+                if (intent == WebChatConversationMutationIntent.Deleted) refreshConversationIndex(null)
+                else start(conversation, intent, officialFallback)
+            }
             .setPositiveButton("官网确认") { _, _ -> officialFallback(conversation) }
             .setNegativeButton("取消", null)
             .show()

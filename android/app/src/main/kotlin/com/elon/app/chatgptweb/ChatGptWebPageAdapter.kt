@@ -311,6 +311,11 @@ internal class ChatGptWebPageAdapter(
         selected = archived,
     )
 
+    fun deleteConversation(path: String, requestId: String) = runCommand(
+        action = "delete_conversation", value = path.take(MAX_CONVERSATION_PATH_LENGTH),
+        requestId = requestId, selected = true,
+    )
+
     fun renameConversation(path: String, title: String, requestId: String) = runCommand(
         action = "rename_conversation",
         value = path.take(MAX_CONVERSATION_PATH_LENGTH),
@@ -656,7 +661,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 266
+        internal const val ADAPTER_VERSION = 267
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -718,6 +723,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_private_attachment_composer.js",
             "chatgpt_web_private_attachment_send.js",
             "chatgpt_web_private_conversation_mutation.js",
+            "chatgpt_web_private_conversation_delete.js",
             "chatgpt_web_private_read_aloud_transport.js",
             "chatgpt_web_private_read_aloud_adapter.js",
             "chatgpt_web_private_dictation_transport.js",

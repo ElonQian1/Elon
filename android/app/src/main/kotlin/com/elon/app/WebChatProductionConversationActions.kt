@@ -135,8 +135,13 @@ internal class WebChatProductionConversationActionsCoordinator(
             add(WebChatActionSheetItem(
                 id = ACTION_MORE_SETTINGS,
                 title = "更多会话设置",
-                subtitle = "分享、删除及其他设置",
+                subtitle = "分享及其他设置",
                 contentDescription = "web-chat-conversation-action-more-settings",
+            ))
+            add(WebChatActionSheetItem(
+                id = ACTION_DELETE,
+                title = "删除",
+                contentDescription = "web-chat-conversation-action-delete",
             ))
         }
         activeSheet = WebChatActionSheet.showUpdatable(
@@ -177,6 +182,7 @@ internal class WebChatProductionConversationActionsCoordinator(
             )
             ACTION_RENAME -> showRenameDialog(conversation)
             ACTION_ARCHIVE -> showArchiveConfirmation(conversation)
+            ACTION_DELETE -> showDeleteConfirmation(conversation)
             ACTION_MOVE_TO_PROJECT -> privateProjectMove.show(conversation)
             ACTION_MORE_SETTINGS -> showPageActionsFor(conversation)
             ACTION_FILES -> files.show(conversation)
@@ -215,6 +221,23 @@ internal class WebChatProductionConversationActionsCoordinator(
             }
             .setNegativeButton("取消", null)
             .show()
+    }
+
+    private fun showDeleteConfirmation(conversation: ChatGptWebConversation) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        if (ChatGptWebConversationPath.identity(conversation.path) ==
+            ChatGptWebConversationPath.identity(currentConversationPath())) {
+            AlertDialog.Builder(activity).setTitle("会话仍在打开")
+                .setMessage("请先离开这条会话，结束其中的语音，再从侧边栏删除。")
+                .setPositiveButton("确定", null).show()
+            return
+        }
+        AlertDialog.Builder(activity).setTitle("删除会话")
+            .setMessage("确定删除“${conversation.title}”？此操作无法撤销。")
+            .setPositiveButton("删除") { _, _ ->
+                conversationMutation.start(conversation, WebChatConversationMutationIntent.Deleted)
+            }
+            .setNegativeButton("取消", null).show()
     }
 
     private fun showPageActionsFor(conversation: ChatGptWebConversation) {
@@ -348,6 +371,7 @@ internal class WebChatProductionConversationActionsCoordinator(
         const val ACTION_SET_PINNED = "set-pinned"
         const val ACTION_RENAME = "rename"
         const val ACTION_ARCHIVE = "archive"
+        const val ACTION_DELETE = "delete"
         const val ACTION_MOVE_TO_PROJECT = "move-to-project"
         const val ACTION_MORE_SETTINGS = "more-settings"
         const val ACTION_FILES = "files"

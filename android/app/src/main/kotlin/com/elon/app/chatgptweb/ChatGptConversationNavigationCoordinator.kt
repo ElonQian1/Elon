@@ -12,6 +12,7 @@ internal class ChatGptConversationNavigationCoordinator(
     private var pendingConversationPath: String? = null
     private var awaitingNewConversationBoundary = false
     private var navigationActive = false
+    private val deleted = ChatGptDeletedConversations()
 
     fun beginNew(previous: ChatGptWebSnapshot?): ChatGptWebSnapshot {
         begin(previous, targetPath = null, newConversation = true)
@@ -25,13 +26,14 @@ internal class ChatGptConversationNavigationCoordinator(
 
     fun previewOpen(path: String, previous: ChatGptWebSnapshot?): ChatGptWebSnapshot {
         return ChatGptWebSnapshotPresentation.loadingConversation(
-            cached = snapshotStore.restore(path),
+            cached = if (deleted.containsPath(path)) null else snapshotStore.restore(path),
             previous = previous,
             path = path,
         )
     }
 
     fun shouldAccept(incoming: ChatGptWebSnapshot): Boolean {
+        if (deleted.containsUrl(incoming.url)) return false
         pendingConversationPath?.let { targetPath ->
             if (ChatGptWebConversationPath.fromUrl(incoming.url) == targetPath) {
                 if (
@@ -67,7 +69,17 @@ internal class ChatGptConversationNavigationCoordinator(
         return previousSnapshot.also { clear() }
     }
 
-    fun save(path: String, snapshot: ChatGptWebSnapshot) = snapshotStore.save(path, snapshot)
+    fun save(path: String, snapshot: ChatGptWebSnapshot) {
+        if (!deleted.containsPath(path)) snapshotStore.save(path, snapshot)
+    }
+
+    fun forget(ids: Set<String>) {
+        deleted.remember(ids)
+        ids.forEach { snapshotStore.remove("/c/$it") }
+        if (deleted.containsUrl(previousSnapshot?.url)) previousSnapshot = null
+    }
+
+    fun resetDeletedHistory() = deleted.clear()
 
     fun hasPending(): Boolean = pendingConversationPath != null || awaitingNewConversationBoundary
 

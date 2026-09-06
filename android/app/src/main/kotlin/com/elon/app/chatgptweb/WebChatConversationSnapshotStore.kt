@@ -8,6 +8,7 @@ import java.io.FileOutputStream
 internal interface WebChatConversationSnapshotRepository {
     fun restore(path: String): ChatGptWebSnapshot?
     fun save(path: String, snapshot: ChatGptWebSnapshot)
+    fun remove(path: String) = Unit
 }
 
 internal class WebChatConversationSnapshotStore(
@@ -73,6 +74,12 @@ internal class WebChatConversationSnapshotStore(
         } catch (_: Exception) {
             file.failWrite(output)
         }
+    }
+
+    fun remove(path: String) {
+        val target = cacheFile(path) ?: return
+        synchronized(memory) { memory.remove(target.name) }
+        AtomicFile(target).delete()
     }
 
     private fun cacheFile(path: String): File? {

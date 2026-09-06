@@ -18,6 +18,7 @@ internal class ChatGptConversationSnapshotStore(
     override fun restore(path: String): ChatGptWebSnapshot? = store.restore(path)
 
     override fun save(path: String, snapshot: ChatGptWebSnapshot) = store.save(path, snapshot)
+    override fun remove(path: String) = store.remove(path)
 
     internal companion object {
         fun fileName(path: String): String? = ChatGptWebConversationPath.identity(path)

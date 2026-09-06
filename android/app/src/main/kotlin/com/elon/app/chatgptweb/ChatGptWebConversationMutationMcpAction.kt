@@ -6,12 +6,23 @@ internal object ChatGptWebConversationMutationMcpAction {
     fun dispatch(
         args: JSONObject,
         commands: ChatGptWebMcpCommandPort,
+        snapshot: ChatGptWebSnapshot? = null,
+        conversations: List<ChatGptWebConversation> = emptyList(),
         dispatchCommand: (String, (String) -> Unit) -> Unit,
     ): String? {
         val path = ChatGptWebConversationPath.normalize(args.optString("conversation_path"))
             ?: return "invalid_conversation_path"
         if (!args.optBoolean("user_confirmed", false)) return "user_confirmation_required"
         when (args.optString("action")) {
+            "chatgpt_delete_conversation" -> {
+                val id = ChatGptWebConversationPath.identity(path)
+                if (snapshot == null) return "delete_context_unavailable"
+                if (id == ChatGptWebConversationPath.fromUrl(snapshot.url)?.let(ChatGptWebConversationPath::identity)) {
+                    return "delete_current_conversation_active"
+                }
+                if (conversations.none { ChatGptWebConversationPath.identity(it.path) == id }) return "delete_selection_expired"
+                dispatchCommand("delete_conversation") { requestId -> commands.deleteConversation(path, requestId) }
+            }
             "chatgpt_set_conversation_pinned" -> {
                 val pinned = args.opt("pinned") as? Boolean ?: return "missing_pinned"
                 dispatchCommand("set_conversation_pinned") { requestId ->

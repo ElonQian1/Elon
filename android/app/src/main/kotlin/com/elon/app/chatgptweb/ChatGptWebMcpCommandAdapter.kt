@@ -53,6 +53,7 @@ internal class ChatGptWebMcpCommandAdapter(
         pageAdapter.downloadConversationFile(path, file, requestId)
     override fun setConversationArchived(path: String, archived: Boolean, requestId: String) =
         pageAdapter.setConversationArchived(path, archived, requestId)
+    override fun deleteConversation(path: String, requestId: String) = pageAdapter.deleteConversation(path, requestId)
     override fun renameConversation(path: String, title: String, requestId: String) =
         pageAdapter.renameConversation(path, title, requestId)
     override fun moveConversationToProject(

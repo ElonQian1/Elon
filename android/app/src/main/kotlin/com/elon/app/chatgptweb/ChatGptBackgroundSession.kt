@@ -44,6 +44,7 @@ internal class ChatGptBackgroundSession(
     private val conversationHistoryStore = ChatGptConversationHistoryStore(activity)
     private val conversationNavigation = ChatGptConversationNavigationCoordinator(activity)
     private val snapshotStore = WebChatSnapshotStore(activity, "chatgpt")
+    private val deletionCaches = ChatGptConversationDeletionCaches(conversationNavigation, snapshotStore, sessionRestorer)
     private val restoredConversationHistory = conversationHistoryStore.restore()
     private val conversationDirectory = ChatGptConversationDirectory(restoredConversationHistory)
     private val restoredSnapshot = snapshotStore.restore()
@@ -681,6 +682,7 @@ internal class ChatGptBackgroundSession(
                 }
             }
             is ChatGptWebEvent.ConversationList -> {
+                deletionCaches.accept(event.deletedConversationIds)
                 conversationRefresh.onSucceeded()
                 conversationDirectory.accept(event)
                 conversationDirectory.save(conversationHistoryStore)
@@ -735,6 +737,7 @@ internal class ChatGptBackgroundSession(
     }
 
     private fun clearConversationHistory() {
+        conversationNavigation.resetDeletedHistory()
         conversationDirectory.clear()
         conversationHistoryStore.clear()
         observedMcpState.clearConversationHistory()

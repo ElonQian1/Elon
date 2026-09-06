@@ -175,6 +175,10 @@ internal class ChatGptWebConsumerPortAdapter(
         .put("pinned", pinned)
         .put("user_confirmed", userConfirmed))
 
+    override fun deleteConversation(conversationPath: String, userConfirmed: Boolean): WebChatConsumerCommandResult =
+        execute(JSONObject().put("action", "chatgpt_delete_conversation")
+            .put("conversation_path", conversationPath).put("user_confirmed", userConfirmed))
+
     override fun setConversationArchived(
         conversationPath: String,
         archived: Boolean,

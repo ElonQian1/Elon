@@ -15,6 +15,7 @@ internal class ChatGptWebObservedState(
     } ?: ChatGptWebConversationCollection()
     private var features: List<ChatGptWebFeature> = emptyList()
     private val conversationFiles = ChatGptWebConversationFileCache()
+    private val deleted = ChatGptDeletedConversations()
     private var composerSections: Map<String, List<ChatGptWebComposerOption>> = emptyMap()
     private var lastCommand: ChatGptWebEvent.CommandResult? = null
     private var lastCommandObservedAtMs: Long? = null
@@ -31,6 +32,7 @@ internal class ChatGptWebObservedState(
             is ChatGptWebEvent.ConversationFiles -> {
                 expirePendingCommands(observedAtMs)
                 val value = event.value
+                if (deleted.containsPath(value.path)) return
                 val identity = ChatGptWebConversationPath.identity(value.path)
                 val request = commandRequests.lastOrNull {
                     it.expectedAction == ChatGptWebConversationFiles.ACTION &&
@@ -40,19 +42,21 @@ internal class ChatGptWebObservedState(
                 conversationFiles.accept(value, observedAtMs)
             }
             is ChatGptWebEvent.ConversationList -> {
+                deleted.remember(event.deletedConversationIds)
+                conversationFiles.remove(event.deletedConversationIds)
                 conversations = event.scopeProjectId?.let { projectId ->
                     ChatGptWebConversationIndex.mergeProjectHistory(
                         previous = conversations,
                         observed = event.conversations,
                         projectId = projectId,
                         collectionComplete = event.collection.isComplete,
-                        removedConversationIds = event.removedConversationIds,
+                        removedConversationIds = event.removedConversationIds + deleted.ids(),
                     )
                 } ?: ChatGptWebConversationIndex.mergeOfficialHistory(
                     previous = conversations,
                     observed = event.conversations,
                     collectionComplete = event.collection.isComplete,
-                    removedConversationIds = event.removedConversationIds,
+                    removedConversationIds = event.removedConversationIds + deleted.ids(),
                 )
                 projects = ChatGptWebConversationIndex.mergeObservedProjects(
                     conversations,
@@ -106,6 +110,7 @@ internal class ChatGptWebObservedState(
     }
 
     fun clearConversationHistory() {
+        deleted.clear()
         conversationFiles.clear()
         commandRequests = commandRequests.map { request ->
             if (request.expectedAction == ChatGptWebConversationFiles.ACTION && request.status == CommandRequest.PENDING) {

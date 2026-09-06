@@ -128,6 +128,7 @@ internal sealed interface ChatGptWebEvent {
         val projects: List<ChatGptWebProject> = emptyList(),
         val scopeProjectId: String? = null,
         val removedConversationIds: Set<String> = emptySet(),
+        val deletedConversationIds: Set<String> = emptySet(),
     ) : ChatGptWebEvent
 
     data class ComposerControls(
@@ -207,6 +208,7 @@ internal object ChatGptWebProtocol {
                         removedConversationIds = ChatGptWebConversationRemovalParser.parse(
                             event, "removedConversationIds",
                         ),
+                        deletedConversationIds = ChatGptWebConversationRemovalParser.parse(event, "deletedConversationIds"),
                     )
                 }
                 "composer_controls_snapshot" -> parseComposerControls(event)

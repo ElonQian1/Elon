@@ -251,10 +251,11 @@ internal class ChatGptWebMcpActions(
                     ?.let { return error(action, it) }
             "chatgpt_set_conversation_pinned",
             "chatgpt_set_conversation_archived",
+            "chatgpt_delete_conversation",
             "chatgpt_rename_conversation",
             "chatgpt_move_conversation_to_project",
             ->
-                ChatGptWebConversationMutationMcpAction.dispatch(args, commands, ::dispatch)
+                ChatGptWebConversationMutationMcpAction.dispatch(args, commands, snapshot(), observedAtDispatch.conversations, ::dispatch)
                     ?.let { return error(action, it) }
             "chatgpt_start_dictation" -> {
                 val current = snapshot()

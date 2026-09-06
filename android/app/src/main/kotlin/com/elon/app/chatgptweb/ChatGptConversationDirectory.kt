@@ -8,6 +8,7 @@ internal class ChatGptConversationDirectory(
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
     private var conversations = restored?.conversations.orEmpty()
+    private val deleted = ChatGptDeletedConversations()
     private var projects = restored?.projects.orEmpty()
     private var collection = restored?.let {
         ChatGptWebConversationCollection.cached(it.conversations.size, it.savedAtMs)
@@ -69,6 +70,7 @@ internal class ChatGptConversationDirectory(
     }
 
     fun observeCurrent(snapshot: ChatGptWebSnapshot, activityDate: LocalDate) {
+        if (deleted.containsUrl(snapshot.url)) return
         conversations = ChatGptWebConversationIndex.observeCurrent(
             previous = conversations,
             snapshot = snapshot,
@@ -97,13 +99,14 @@ internal class ChatGptConversationDirectory(
     }
 
     fun accept(event: ChatGptWebEvent.ConversationList) {
+        deleted.remember(event.deletedConversationIds)
         val scopeProjectId = event.scopeProjectId
         conversations = if (scopeProjectId == null) {
             ChatGptWebConversationIndex.mergeOfficialHistory(
                 conversations,
                 event.conversations,
                 collectionComplete = event.collection.isComplete,
-                removedConversationIds = event.removedConversationIds,
+                removedConversationIds = event.removedConversationIds + deleted.ids(),
             )
         } else {
             ChatGptWebConversationIndex.mergeProjectHistory(
@@ -111,7 +114,7 @@ internal class ChatGptConversationDirectory(
                 observed = event.conversations,
                 projectId = scopeProjectId,
                 collectionComplete = event.collection.isComplete,
-                removedConversationIds = event.removedConversationIds,
+                removedConversationIds = event.removedConversationIds + deleted.ids(),
             )
         }
         projects = ChatGptWebConversationIndex.mergeObservedProjects(
@@ -146,6 +149,7 @@ internal class ChatGptConversationDirectory(
     }
 
     fun clear() {
+        deleted.clear()
         conversations = emptyList()
         projects = emptyList()
         collection = ChatGptWebConversationCollection()

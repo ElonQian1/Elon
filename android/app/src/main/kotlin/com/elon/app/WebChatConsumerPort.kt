@@ -98,6 +98,8 @@ internal interface WebChatConsumerPort {
         userConfirmed: Boolean,
     ): WebChatConsumerCommandResult =
         WebChatConsumerCommandResult(false, "unsupported_consumer_command")
+    fun deleteConversation(conversationPath: String, userConfirmed: Boolean): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "unsupported_consumer_command")
     fun moveConversationToProject(
         conversationPath: String,
         conversationTitle: String,
