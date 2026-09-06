@@ -43,7 +43,8 @@ foreach ($required in @(
     'Native attachment upload failed; fixed fixture removed.',
     'web_chat_attachment_phase -eq "completed"',
     'web_chat_pending_attachment_count -eq 0',
-    'Test-NativeAttachmentFileReply -Messages $messages -Marker $marker',
+    '$testFileReply = ${function:Test-NativeAttachmentFileReply}',
+    '& $testFileReply -Messages $messages -Marker $marker',
     'fixture_first_line_verified = $true',
     'Restore-Origin -Checkpoint $checkpoint',
     'Register-ChatGptWebVerificationCases',
@@ -123,6 +124,32 @@ if (Test-NativeAttachmentFileReply -Messages $valid -Marker '') {
 $escaped = @(@{ role = 'friend'; content = "$marker`n$($fileLine.Replace('_', '\_'))" })
 if (-not (Test-NativeAttachmentFileReply -Messages $escaped -Marker $marker)) {
     throw 'Markdown escaping must not reject a correct file-content reply.'
+}
+$testFileReply = ${function:Test-NativeAttachmentFileReply}
+$replyPredicate = $ast.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.ScriptBlockExpressionAst] -and
+        $node.Extent.Text.Contains('& $testFileReply -Messages $messages -Marker $marker')
+}, $true)
+$predicate = $replyPredicate.ScriptBlock.GetScriptBlock().GetNewClosure()
+$runner = New-Module -AsCustomObject -ScriptBlock {
+    function Invoke-ReplyPredicate {
+        param($Predicate, $State)
+        & $Predicate $State
+    }
+    Export-ModuleMember -Function Invoke-ReplyPredicate
+}
+$completedState = @{ social_chat = @{
+    web_chat_attachment_phase = 'completed'
+    web_chat_pending_attachment_count = 0
+    messages = $valid
+} }
+if (-not $runner.'Invoke-ReplyPredicate'($predicate, $completedState)) {
+    throw 'The reply predicate must retain its helper across closure/module boundaries.'
+}
+$completedState.social_chat.web_chat_attachment_phase = 'uploading'
+if ($runner.'Invoke-ReplyPredicate'($predicate, $completedState)) {
+    throw 'A matching reply must not accept an unfinished attachment upload.'
 }
 $prompt = $ast.Find({
     param($node)

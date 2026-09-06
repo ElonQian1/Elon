@@ -308,13 +308,14 @@ try {
                 $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
                 Write-Checkpoint -Value $checkpoint
             }
+            $testFileReply = ${function:Test-NativeAttachmentFileReply}
             try {
                 $completed = Wait-NativeState -Description "native attachment reply" -Predicate {
                     param($state)
                     $messages = @($state.social_chat.messages)
                     [string]$state.social_chat.web_chat_attachment_phase -eq "completed" -and
                         [int]$state.social_chat.web_chat_pending_attachment_count -eq 0 -and
-                        (Test-NativeAttachmentFileReply -Messages $messages -Marker $marker)
+                        (& $testFileReply -Messages $messages -Marker $marker)
                 }.GetNewClosure()
             } catch {
                 $failureState = Get-NativeState
