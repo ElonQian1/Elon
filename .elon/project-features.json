@@ -10390,7 +10390,7 @@
       "id": "esk-sui-reproducible-toolchain-ci-v1",
       "title": "ESK Sui 可复现工具链与 CI V1",
       "summary": "固定官方 Sui testnet-v1.79.0 工具链的下载与双摘要校验，在独立 CI 中以 warnings-as-errors 重建 ESK Currency 与 Participation Move 包，精确验证 3+13 项测试和生产字节码证据；不创建钱包、RPC、交易、签名、广播或链状态。",
-      "status": "in_progress",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/esk-sui-reproducible-toolchain-ci-v1.md",
@@ -10440,15 +10440,218 @@
         "验证使用空 keystore、显式无链环境配置和独立 MOVE_HOME，不读取默认钱包、不连接 Sui RPC、不生成交易、不签名、不广播、不移动资金。",
         "GitHub Actions 独立 Sui job、精确缓存键和只读权限由守卫测试固定，现有 job 不回归。"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_6f65311c6baa47b88d9a0f0e0daa4b86",
-        "agent_id": "codex-sui-ci",
-        "claimed_at_ms": 1788652102944,
-        "expires_at_ms": 1788666502944
-      },
+      "implementation_evidence": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "content_hash": "f0be83af3a2d27c4382cd122392a2adf691e6eb5e1317e8724ccbda3feb1aa2f",
+          "locator": "ESK Sui Move",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "692389f6315455d75fb7f2eb47b621a95e950906",
+            "worktree_blob_oid": "692389f6315455d75fb7f2eb47b621a95e950906",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "contracts/sui/esk-allocation-policy-v1.fixture.json",
+          "content_hash": "9b45c3e61c6d09b6239cbf7a9040c2164e4e0699943418d75b647478140dd09f",
+          "locator": "canonical_test_receipt_sha256_v1",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "a833054b168c7a39ecd89ffa7616d441df37e1a7",
+            "worktree_blob_oid": "a833054b168c7a39ecd89ffa7616d441df37e1a7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "contracts/sui/esk-allocation-policy-v1.schema.json",
+          "content_hash": "79ee92fb4e8e8fc7521e3a555306a14ffeab58383d3fd2e6b3deedcaf3ed44cc",
+          "locator": "canonical_test_receipt_sha256_v1",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "4ada707f4a2e19c374699a758998871e86b59ad2",
+            "worktree_blob_oid": "4ada707f4a2e19c374699a758998871e86b59ad2",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "contracts/sui/esk-genesis-manifest-v1.fixture.json",
+          "content_hash": "bd1fd01c0ca871e4019ec59dafaaea8a696ab27521fcf333c235e7d227b66090",
+          "locator": "build_evidence_digest",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "a3ab5fb131c9c297c372d11509ca76e1e926f71f",
+            "worktree_blob_oid": "a3ab5fb131c9c297c372d11509ca76e1e926f71f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/decisions/esk-sui-allocation-vesting-v1.md",
+          "content_hash": "63e94c846ca80dce43f42da9e12f0f05ad656cdbb5f188a73328fa7f52a77678",
+          "locator": "production bytecode",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "49fbe591e862673aa477167989093a7ae7046f30",
+            "worktree_blob_oid": "49fbe591e862673aa477167989093a7ae7046f30",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/decisions/esk-sui-economic-foundation-v1.md",
+          "content_hash": "bd60fd34826e1c4bd87759f684625f472bf08480908979d3714710744a7eeecf",
+          "locator": "production bytecode",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "1552a6885a929416fe8b8387ac2fd46d4aaa728f",
+            "worktree_blob_oid": "1552a6885a929416fe8b8387ac2fd46d4aaa728f",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/delivery/esk-sui-reproducible-toolchain-ci-v1.md",
+          "content_hash": "baeefa30e2be03756425d2ac393d56d86346983c4de6c80277322e7498773bfb",
+          "locator": "remote_ci_status",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "35db2d29011daee45857d53cc63f34b392bbd53e",
+            "worktree_blob_oid": "01ed21b59bc6e7a3ce6f50863b44696264c375ee",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/requirements/esk-sui-allocation-vesting-v1.md",
+          "content_hash": "a5bbd7aed700ce0e4c376d569dca7f7d911d8137b0990457733432f5e3e801a4",
+          "locator": "Sui",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "9911e8b3f9e27e199c898547eb762d5820aec13c",
+            "worktree_blob_oid": "9911e8b3f9e27e199c898547eb762d5820aec13c",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/esk-sui-genesis-foundation-v1.md",
+          "content_hash": "b04a067e9bdbb1c986f03e02caad6a41fe1230d679b7c426ba45c1cb5c26fb70",
+          "locator": "Sui",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "a9904a7f479c1451768c177d8256eaaa5a728dc6",
+            "worktree_blob_oid": "a9904a7f479c1451768c177d8256eaaa5a728dc6",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/requirements/esk-sui-reproducible-toolchain-ci-v1.md",
+          "content_hash": "575dbcbd33ee935aaf1b3d28cc8e3b3dd79fa9dccf2b68fb140ed42746a1920b",
+          "locator": "验收标准",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "e6ecb9df1db70b0e5ef9bbb58722f5cec664a82e",
+            "worktree_blob_oid": "e6ecb9df1db70b0e5ef9bbb58722f5cec664a82e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-toolchain-ci/toolchain-v1.json",
+          "content_hash": "c7226dcb2e707a5c48d2f469b0b611296e5b65c1cc786dfd832b3b78e22065b6",
+          "locator": "yilong.esk.sui.reproducible_toolchain.v1",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "74b4b27eed9f928da09be8f2ee433711ffc78d91",
+            "worktree_blob_oid": "74b4b27eed9f928da09be8f2ee433711ffc78d91",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-toolchain-ci/validation-helpers.psm1",
+          "content_hash": "6e6b04e09bcaa85b3bac81bcd1393b2f5408e29bab32edd2954062f0ea8f916b",
+          "locator": "Assert-FrameworkTree",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "cb4c6f7f8e8ee34bde7672f63fb304e2cf7c281d",
+            "worktree_blob_oid": "cb4c6f7f8e8ee34bde7672f63fb304e2cf7c281d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/esk-sui-toolchain-ci/verify-artifacts.js",
+          "content_hash": "1d034d4d3db79ba75ae5ea1d511361f8a3606548118605ceb079435cd074b66d",
+          "locator": "canonicalTestReceipt",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "32b77555da5af206a714561b1fe0bbdeeb855142",
+            "worktree_blob_oid": "32b77555da5af206a714561b1fe0bbdeeb855142",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/install-esk-sui-toolchain.ps1",
+          "content_hash": "f3ec890c3d540fa60debfbd754ac8ee3045a719e4a53af1d14bc538664ef0a82",
+          "locator": "Receive-FixedArchive",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "86c73bcc06166007d4671935a34f7bc28d4bf937",
+            "worktree_blob_oid": "86c73bcc06166007d4671935a34f7bc28d4bf937",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-esk-sui-toolchain-ci.js",
+          "content_hash": "99d002ad945d87a29336ccc6d416632c9e6ffb1bfa97b5c75cec2b8b27c2c5ce",
+          "locator": "synthetic dual-artifact installer",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "cfb687381d08e8b97ecae524f3a6305709a057fa",
+            "worktree_blob_oid": "cfb687381d08e8b97ecae524f3a6305709a057fa",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/validate-esk-sui-move.ps1",
+          "content_hash": "a4239bde1427436345fc4fe0bfd51a8abde413cc7c53a1776ce72888b6270b3b",
+          "locator": "ESK_SUI_PUBLICATION_STATE",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "5dd2107134f7c763002d868e55828e8d08f38bdd",
+            "worktree_blob_oid": "5dd2107134f7c763002d868e55828e8d08f38bdd",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1788645947311,
-      "updated_at_ms": 1788652112050
+      "updated_at_ms": 1788653597653
     },
     {
       "id": "esk_paper_quant_allocation_request_v2",
@@ -13089,15 +13292,15 @@
       "implementation_evidence": [
         {
           "path": ".github/workflows/ci.yml",
-          "content_hash": "b504e1ecb923e5e2cdd1bca9f3a87d7ff7d050bfd5c23c837a56d2c158a714d0",
+          "content_hash": "f0be83af3a2d27c4382cd122392a2adf691e6eb5e1317e8724ccbda3feb1aa2f",
           "locator": "Project Feature Registry Adoption",
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d686ab452417776d01da8bf92d74247786883bcd",
-            "head_blob_oid": "fcbf24f1790b57e90fd21fd4ba799a7b6c78f201",
-            "worktree_blob_oid": "8a0b2fb99873a43dc67f7bb8020ce73b845deb94",
-            "state": "tracked_modified"
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
+            "head_blob_oid": "692389f6315455d75fb7f2eb47b621a95e950906",
+            "worktree_blob_oid": "692389f6315455d75fb7f2eb47b621a95e950906",
+            "state": "tracked_clean"
           }
         },
         {
@@ -13107,7 +13310,7 @@
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d686ab452417776d01da8bf92d74247786883bcd",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
             "head_blob_oid": "b7364f7828c4bece9e18bac906309dd3c597c6c3",
             "worktree_blob_oid": "b7364f7828c4bece9e18bac906309dd3c597c6c3",
             "state": "tracked_clean"
@@ -13120,7 +13323,7 @@
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d686ab452417776d01da8bf92d74247786883bcd",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
             "head_blob_oid": "4438f8f14ce42117ff06b6189ac3810a5d96f464",
             "worktree_blob_oid": "4438f8f14ce42117ff06b6189ac3810a5d96f464",
             "state": "tracked_clean"
@@ -13133,7 +13336,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d686ab452417776d01da8bf92d74247786883bcd",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
             "head_blob_oid": "ed2d3d611ddcab717bfba3e55094c20c3dbb637b",
             "worktree_blob_oid": "ed2d3d611ddcab717bfba3e55094c20c3dbb637b",
             "state": "tracked_clean"
@@ -13146,7 +13349,7 @@
           "evidence_kind": "configuration",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d686ab452417776d01da8bf92d74247786883bcd",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
             "head_blob_oid": "647296d6767c84ac85d1c56d1c6962b1eea1bf7c",
             "worktree_blob_oid": "647296d6767c84ac85d1c56d1c6962b1eea1bf7c",
             "state": "tracked_clean"
@@ -13159,7 +13362,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d686ab452417776d01da8bf92d74247786883bcd",
+            "head_commit": "e20b4606acaedbec91aa37e368838cc397ae9261",
             "head_blob_oid": "1f2efc172f6e139c02369d5e4c6482bf711901f7",
             "worktree_blob_oid": "1f2efc172f6e139c02369d5e4c6482bf711901f7",
             "state": "tracked_clean"
@@ -13167,7 +13370,7 @@
         }
       ],
       "created_at_ms": 1786619748837,
-      "updated_at_ms": 1788652245341
+      "updated_at_ms": 1788653665983
     },
     {
       "id": "project-feature-registry-growth-contract-v1",
@@ -21281,146 +21484,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_cee59d91b6874c14a9987514524d629b",
-      "feature_id": "esk-sui-allocation-observer-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-01a05b8d",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788552513009
-    },
-    {
-      "id": "feature_event_46a77cdfd9cf417c87c6f05eb31d5d7e",
-      "feature_id": "esk-sui-allocation-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-root-01a05b8d",
-      "reason": "新版-only 双源分配观察器、严格 BCS、完整对象变化、Lamport/version、时间和 CLI 已实现，16 项当前 Git 证据已绑定。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788552523181
-    },
-    {
-      "id": "feature_event_20783bace5ac40f0aef2b1d37e9eee66",
-      "feature_id": "esk-sui-allocation-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-root-01a05b8d",
-      "reason": "离线 98/98、覆盖率 95.38%、官方 testnet 无关样本 schema smoke、publication 65/65、currency 312/312、静态分配门禁与 Move 3/3+13/13 均通过；真实 ESK 正向验收仍未执行。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788552523933
-    },
-    {
-      "id": "feature_event_79f09a1b3c624a858f0578de5cc326a7",
-      "feature_id": "esk-sui-allocation-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-root-01a05b8d",
-      "reason": "实现提交已推送，显式重新打开以把真实 commit/push 回执写入交付文档并重新绑定全部证据。",
-      "from_status": "verified",
-      "to_status": "ready",
-      "at_ms": 1788552556096
-    },
-    {
-      "id": "feature_event_03cb009ee01040878023edbbc2708227",
-      "feature_id": "esk-sui-allocation-observer-v1",
-      "action": "claimed",
-      "actor": "codex-root-01a05b8d",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788552578192
-    },
-    {
-      "id": "feature_event_61552763105945ddb3e8036331e7448a",
-      "feature_id": "esk-sui-allocation-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-root-01a05b8d",
-      "reason": "实现提交已推送，交付文档写入实际 commit 回执后重新绑定全部证据。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788552579047
-    },
-    {
-      "id": "feature_event_d1eb7b7ea433463088bb03f90ede0afb",
-      "feature_id": "esk-sui-allocation-observer-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-root-01a05b8d",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788552644174
-    },
-    {
-      "id": "feature_event_783ecc85b86c47a8b7829812bb982fdc",
-      "feature_id": "esk-sui-allocation-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-root-01a05b8d",
-      "reason": "推送回执已提交，16 项源码、测试、文档和配置证据重新绑定到当前 Git 状态。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788552645098
-    },
-    {
-      "id": "feature_event_f9917e3f9096402f8d3c265026c88911",
-      "feature_id": "esk-sui-allocation-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-root-01a05b8d",
-      "reason": "离线 98/98、覆盖率 95.38%、官方 testnet 无关样本 schema smoke、publication 65/65、currency 312/312、静态分配门禁与 Move 3/3+13/13 均通过；真实 ESK 正向验收仍未执行。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788552645888
-    },
-    {
-      "id": "feature_event_f493e553d3d048ebac62c51d1d5d4630",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "registered",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788553817397
-    },
-    {
-      "id": "feature_event_3f1efab5f1fe44e39bbffe90b4caae3e",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "claimed",
-      "actor": "codex/root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788553828249
-    },
-    {
-      "id": "feature_event_109f57258d3448579244e3db44fbc1c1",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "transitioned",
-      "actor": "/root",
-      "reason": "Implementing new-only public official quant APK download without bearer token and rejecting pre-v5 APKs.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788554245941
-    },
-    {
-      "id": "feature_event_7564ff45cce445aa8f763c4caa0251d4",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "evidence_recorded",
-      "actor": "/root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788555518299
-    },
-    {
-      "id": "feature_event_e230300228164970ab31554167d54b76",
-      "feature_id": "yilong-quant-android-public-download-v2",
-      "action": "claim_released",
-      "actor": "codex/root",
-      "reason": "Synchronize the accepted requirement implementation metadata after final risk-matched verification.",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1788556093307
-    },
-    {
       "id": "feature_event_ffa65b985c50499fb048c308b0172251",
       "feature_id": "yilong-quant-android-public-download-v2",
       "action": "requirement_rebound",
@@ -23279,6 +23342,146 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1788652826128
+    },
+    {
+      "id": "feature_event_0e3c51d99ac743ac9202fc54f9ec5b4f",
+      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-sui-ci",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788653532761
+    },
+    {
+      "id": "feature_event_3d38c6c411d942398cc00326f647bf1f",
+      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "Fixed toolchain, archive verifier, isolated Move validation, exact CI guard, and remote checkout correction are implemented with 16 current evidence bindings.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788653544554
+    },
+    {
+      "id": "feature_event_ff8a14f4f0d54bafa9d315615deddb4a",
+      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "Local fixed-toolchain validation passed 3/3 and 13/13, independent security review found no P0-P2, and remote ESK Sui Move job 101398354380 passed on windows-2025.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788653555151
+    },
+    {
+      "id": "feature_event_96e801733fea43dbb6237ab3bba3bd26",
+      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "Implementation is on origin/main and the dedicated remote ESK Sui Move job passed; publication remains explicitly not performed.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788653597653
+    },
+    {
+      "id": "feature_event_b943b9368b6243a1ba949320d85ccba1",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "Reopen after the intentional Sui CI long-path checkout step changed the bound workflow evidence.",
+      "from_status": "released",
+      "to_status": "retired",
+      "at_ms": 1788653637015
+    },
+    {
+      "id": "feature_event_d337f060bdff40099766298ff7199d05",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "Begin explicit review of the refreshed CI evidence.",
+      "from_status": "retired",
+      "to_status": "proposed",
+      "at_ms": 1788653637256
+    },
+    {
+      "id": "feature_event_201e9d7c689a420bac8e20545cbea62b",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "The existing adoption requirement remains valid and the added CI step is within its guarded workflow evidence.",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788653637735
+    },
+    {
+      "id": "feature_event_d60280584bf24b188f5bd7da292e31ee",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "Current requirement and governance implementation are ready for evidence refresh.",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788653638481
+    },
+    {
+      "id": "feature_event_2f148f50049e4e5b96f3f2b98ffe37db",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "claimed",
+      "actor": "codex-sui-ci",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788653639122
+    },
+    {
+      "id": "feature_event_dc88dd325fd84963ba66911a5a62aefd",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "Refreshing six evidence bindings after the intentional workflow update.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788653639325
+    },
+    {
+      "id": "feature_event_a93657d567e44dd0a2a490bb27f58f5d",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-sui-ci",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788653641059
+    },
+    {
+      "id": "feature_event_2f24f1049f1e4bcdb2af4f1f721ab70b",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "All six current governance evidence bindings are recorded after the final workflow update.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788653665250
+    },
+    {
+      "id": "feature_event_9b918709621a43d1b2186060f7102fa7",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "Registry adoption test and CI quality-gate guard pass against the refreshed evidence.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788653665785
+    },
+    {
+      "id": "feature_event_297fa153b5e04c02b229cb2a404d2153",
+      "feature_id": "project-feature-registry-adoption-v1",
+      "action": "transitioned",
+      "actor": "codex-sui-ci",
+      "reason": "The refreshed governance evidence is complete and current.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788653665983
     }
   ]
 }

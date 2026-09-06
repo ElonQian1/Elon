@@ -15,15 +15,15 @@ owners: [protocol, ci, platform-assets]
 
 | 状态轴 | 当前值 | 边界 |
 | --- | --- | --- |
-| implementation_status | implemented_in_worktree | 固定双归档安装器、隔离本地依赖验证器、CI job 与失败关闭合同已在当前工作树实现 |
+| implementation_status | implemented_and_pushed | 固定双归档安装器、隔离本地依赖验证器、CI job 与失败关闭合同已推送到 `main` |
 | local_verification_status | passed | 官方源码 tar → 本地依赖的最终路径已真实得到 3/3、13/13、187 文件及两组纠正生产摘要 |
-| remote_ci_status | not_performed | 尚无绑定当前提交的 GitHub Actions run，不能把本地通过写成远端 CI 通过 |
-| push_status | pending | 当前改动尚未推送；本记录不填写未来提交 SHA |
+| remote_ci_status | sui_job_passed | 提交 `e20b4606a` 的远端 `ESK Sui Move` job 已完成并成功；整组 workflow 因既存 Windows job 的 checkout 长路径问题仍为失败 |
+| push_status | pushed_main | 实现与远端 checkout 修复已推送到 `origin/main`，当前远端提交为 `e20b4606acaedbec91aa37e368838cc397ae9261` |
 | publication_status | not_performed | 未执行 Sui testnet/mainnet 发布，所有 package/object/transaction/checkpoint 证据仍为空 |
 
-Feature Registry 的当前功能在本记录生成时仍处于实现收尾阶段；涉及旧功能的需求与
-证据摘要必须通过正式 registry workflow 显式重绑、全量记录并复核，不能手改旧哈希或
-在漂移仍存在时宣称 `released`。最终 registry 状态和 drift 结果以收尾时的只读检查为准。
+Feature Registry 的当前功能仍处于证据收尾阶段；依赖的 genesis、allocation 以及 registry
+adoption 功能均已通过正式 workflow 重绑或刷新并确认无漂移。当前功能只有在本记录、
+远端 job 和实现证据完成绑定后才能推进状态；不能用代码推送冒充链上发布。
 
 ## 固定供应链输入
 
@@ -100,13 +100,19 @@ object ID、transaction digest 或 checkpoint。manifest 与 allocation policy �
 
 ## 远端与交接
 
-固定 `windows-2025` 的独立 `sui-move` job 已写入工作树，但必须在推送后以当前提交对应的 GitHub
-Actions 运行结果另行验收。只有实际 run 完成后，才可记录 run URL、commit SHA、缓存
-命中情况及成功/失败结论；当前 `remote_ci_status=not_performed`。
+固定 `windows-2025` 的独立 `sui-move` job 已在提交
+`e20b4606acaedbec91aa37e368838cc397ae9261` 真实运行。GitHub Actions
+[Quality Gates run 34000490327](https://github.com/ElonQian1/Elon/actions/runs/34000490327)
+中的 [ESK Sui Move job 101398354380](https://github.com/ElonQian1/Elon/actions/runs/34000490327/job/101398354380)
+成功完成长路径设置、checkout、合同守卫、固定缓存、安装和完整 Move 验证；失败证据
+上传步骤因主验证成功而按设计跳过。
 
-当前 `push_status=pending`。推送、Feature Registry 证据刷新和统一 finish 回执均由本批
-主任务后续完成；本文件不预写提交、远端 CI 或发布成功。即使以后 CI 与推送成功，也
-只证明仓库源码可复现 build/test，不授权或证明 ESK 已在任何网络发布。
+整组 Quality Gates 的汇总结论仍为失败：未改动的 Rust Server 与 Android Windows job
+在 checkout 时遇到仓库既存超长路径；在本功能之前的提交 `fdf653c92` 对应 run
+`33993534915` 中，这两个 job 已以相同方式失败，而 PC Frontend 成功。因此本轮远端
+证据只声明 `ESK Sui Move` 成功，并把另外两项记录为既存 CI 基础设施问题，不冒充整组
+workflow 已绿。即使 Sui job 与推送成功，也只证明仓库源码可复现 build/test，不授权
+或证明 ESK 已在任何网络发布。
 
 ## 当前本地验证回执
 
@@ -126,5 +132,5 @@ Actions 运行结果另行验收。只有实际 run 完成后，才可记录 run
   `ESK_SUI_RPC_STATE=not_configured_or_queried` 与
   `ESK_SUI_PUBLICATION_STATE=not_performed`。
 
-这些是本机运行证据，不等于 GitHub Actions 远端运行；后者仍保持
-`remote_ci_status=not_performed`，直至存在绑定已推送提交的真实 run。
+本机最终回归与上述远端 Sui job 均已通过；两者都不包含 Sui RPC、钱包、签名、广播
+或发行交易，`publication_status` 仍保持 `not_performed`。
