@@ -77,3 +77,20 @@ then dismiss during a read and verify no late dialog. Use synthetic attachments.
 No device latency, battery or temperature improvement is claimed from offline
 tests. Upload variants, download scope variants/device acceptance, generated-image
 library pagination, share and delete remain separate protocol gaps.
+
+## Production MCP acceptance access
+
+The 2026-09-07 source candidate exposes the existing active conversation index
+as `chatgpt_web_mcp.conversation_files`; it does not fetch, navigate, or scan DOM.
+The current document, exact route and latest successful list-command receipt
+must match the cached index. At most 100 descriptors are returned. Stale metadata
+is labeled stale and its handles are omitted; unsafe handles and other cached
+conversations are never exported. Download uses the existing native consumer.
+
+`last_attachment_upload` separately retains the existing latest upload command
+receipt, so a subsequent send/skin receipt no longer hides it. Only a matching
+new successful `private_attachment_associated` receipt proves that route; an old
+receipt, picker request or file-content reply alone does not. The cache is cleared
+at document change, and no credentials or signed download links are added.
+Release compilation and all 43 targeted Android tests pass. The installed 1541
+does not yet expose these fields; grouped APK/device acceptance remains pending.

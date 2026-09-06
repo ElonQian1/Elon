@@ -44,4 +44,30 @@ internal object ChatGptWebMcpSnapshotJson {
         .put("feature_count", value.features.size)
         .put("composer_sections", JSONArray(value.composerSections.keys.sorted()))
         .put("cached_at_ms", value.updatedAtMs)
+
+    fun conversationFiles(value: ChatGptWebObservedState.Snapshot, url: String?, nowMs: Long = System.currentTimeMillis()): Any {
+        if (!value.adapterCurrent) return JSONObject.NULL
+        val path = ChatGptWebConversationPath.fromUrl(url) ?: return JSONObject.NULL
+        val index = value.conversationFiles[ChatGptWebConversationPath.identity(path)] ?: return JSONObject.NULL
+        val receipt = value.recentCommandResults[ChatGptWebConversationFiles.ACTION]?.result
+        if (index.path != path || receipt?.ok != true || receipt.requestId != index.requestId) return JSONObject.NULL
+        val fresh = index.isFresh(nowMs)
+        return JSONObject()
+            .put("conversation_path", path)
+            .put("request_id", index.requestId)
+            .put("cached_at_ms", index.savedAtMs)
+            .put("stale", !fresh)
+            .put("truncated", index.truncated || index.files.size > 100)
+            .put("files", JSONArray().apply {
+                index.files.take(100).forEach { file ->
+                    put(JSONObject()
+                        .put("file_id", file.id).put("message_id", file.messageId)
+                        .put("name", file.name).put("kind", file.kind)
+                        .put("role", file.role).put("media_type", file.mediaType)
+                        .put("download_handle", file.downloadHandle.takeIf {
+                            fresh && ChatGptWebFileDownloadPolicy.HANDLE.matches(it)
+                        }.orEmpty()))
+                }
+            })
+    }
 }

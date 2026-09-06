@@ -61,6 +61,8 @@ internal class ChatGptWebMcpActions(
             .put("ui_manifest", manifestJson(currentManifest))
             .put("navigation", ChatGptWebMcpSnapshotJson.navigation(observed))
             .put("last_command", ChatGptWebCommandReceipts.lastResultJson(observed))
+            .put("last_attachment_upload", ChatGptWebCommandReceipts.recentResultJson(observed, "request_attachment_upload"))
+            .put("conversation_files", ChatGptWebMcpSnapshotJson.conversationFiles(observed, current?.url))
             .put(
                 "last_project_membership_probe",
                 ChatGptWebCommandReceipts.recentProjectMembershipProbeJson(observed),
