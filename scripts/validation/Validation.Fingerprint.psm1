@@ -95,7 +95,11 @@ function Get-ValidationGitPathHashes {
 
 function Get-ValidationGitSnapshot {
     param([Parameter(Mandatory)][string]$RepoRoot)
-    $relevantPattern = '^(server/|\.cargo/(config|config\.toml)$|rust-toolchain(\.toml)?$|rust-cache\.project\.json$|\.rustfmt-version$|\.githooks/pre-push$|scripts/(cargo-dev|cargo-network|cargo-source-repair|prepare-push|push|validate-rust|format-rust|check-source-size)|scripts/(validation|rust-cache)/)'
+    # Tauri compiles src-tauri plus frontendDist (../dist), and include_str! embeds
+    # the shared Android adapters. Its tests also compare the two Kotlin adapters.
+    # The separately served pc-frontend is not a Rust embed input.
+    $desktopInputs = 'desktop-shell/(src-tauri|dist)/|android/app/src/main/assets/(chatgpt|google)_[^/]+\.js$|android/app/src/main/kotlin/com/elon/app/(chatgptweb/ChatGptWebPageAdapter|googleweb/GoogleWebPageAdapter)\.kt$'
+    $relevantPattern = '^(server/|' + $desktopInputs + '|\.cargo/(config|config\.toml)$|rust-toolchain(\.toml)?$|rust-cache\.project\.json$|\.rustfmt-version$|\.githooks/pre-push$|scripts/(cargo-dev|cargo-network|cargo-source-repair|prepare-push|push|validate-rust|format-rust|check-source-size)|scripts/(validation|rust-cache)/)'
     $tracked = @(& git -c core.quotepath=false -C $RepoRoot ls-files | Where-Object { $_.Replace('\','/') -match $relevantPattern })
     if ($LASTEXITCODE -ne 0) { throw "Unable to enumerate tracked validation inputs." }
     $untracked = @(& git -c core.quotepath=false -C $RepoRoot ls-files --others --exclude-standard | Where-Object { $_.Replace('\','/') -match $relevantPattern })

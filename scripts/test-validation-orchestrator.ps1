@@ -1,3 +1,4 @@
+param([switch]$FingerprintOnly)
 $ErrorActionPreference = "Stop"
 $RepoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel).Trim()
 $Modules = Join-Path $PSScriptRoot "validation"
@@ -44,6 +45,26 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -E
     New-Item -ItemType Directory -Force -Path (Join-Path $SnapshotRepo "server"),(Join-Path $SnapshotRepo "docs"),(Join-Path $SnapshotRepo "pc-frontend\src") | Out-Null
     & git -C $SnapshotRepo init --quiet; & git -C $SnapshotRepo config user.email validation@example.invalid; & git -C $SnapshotRepo config user.name validation-test
     Set-Content -LiteralPath (Join-Path $SnapshotRepo "server\Cargo.lock") -Value "lock"; Set-Content -LiteralPath (Join-Path $SnapshotRepo "server\Z.rs") -Value "pub fn upper() {}"; Set-Content -LiteralPath (Join-Path $SnapshotRepo "server\lib.rs") -Value "pub fn stable() {}"
+    $desktopInputs = @(
+        'desktop-shell/src-tauri/src/main.rs',
+        'desktop-shell/src-tauri/Cargo.toml',
+        'desktop-shell/src-tauri/Cargo.lock',
+        'desktop-shell/src-tauri/build.rs',
+        'desktop-shell/src-tauri/tauri.conf.json',
+        'desktop-shell/src-tauri/capabilities/main.json',
+        'desktop-shell/src-tauri/permissions/research.toml',
+        'desktop-shell/src-tauri/src/adapter.js',
+        'desktop-shell/dist/index.html',
+        'android/app/src/main/assets/chatgpt_web_adapter.js',
+        'android/app/src/main/assets/google_web_adapter.js',
+        'android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt',
+        'android/app/src/main/kotlin/com/elon/app/googleweb/GoogleWebPageAdapter.kt'
+    )
+    foreach ($relative in $desktopInputs) {
+        $inputPath = Join-Path $SnapshotRepo $relative
+        New-Item -ItemType Directory -Force -Path (Split-Path $inputPath -Parent) | Out-Null
+        Set-Content -LiteralPath $inputPath -Value 'synthetic baseline'
+    }
     Set-Content -LiteralPath (Join-Path $SnapshotRepo "docs\note.md") -Value "one"; Set-Content -LiteralPath (Join-Path $SnapshotRepo "pc-frontend\src\app.tsx") -Value "export const ui = 1"; & git -C $SnapshotRepo add .; & git -C $SnapshotRepo commit -m baseline --quiet
     $fingerprintModule = Get-Module Validation.Fingerprint | Select-Object -First 1
     $chunkPaths = @('server/Cargo.lock','server/Z.rs','server/lib.rs')
@@ -56,6 +77,21 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -E
     Assert-True ($upperIndex -ge 0 -and $upperIndex -lt $lowerIndex) "validation paths must use ordinal ordering across PowerShell runtimes"
     $baseDetails = Get-ValidationFingerprint -RepoRoot $SnapshotRepo -CargoArgs @("check")
     $baseFingerprint = $baseDetails.fingerprint
+    $desktopCargoArgs = @('test','--manifest-path','desktop-shell/src-tauri/Cargo.toml')
+    $desktopBaseline = (Get-ValidationFingerprint $SnapshotRepo $desktopCargoArgs).fingerprint
+    foreach ($relative in $desktopInputs) {
+        Set-Content -LiteralPath (Join-Path $SnapshotRepo $relative) -Value 'synthetic changed input'
+        Assert-True ($baseDetails.snapshot.digest -ne (Get-ValidationGitSnapshot $SnapshotRepo).digest) "changed desktop build input must invalidate evidence: $relative"
+        & git -C $SnapshotRepo checkout -- $relative
+    }
+    $newDesktopSource = Join-Path $SnapshotRepo 'desktop-shell/src-tauri/src/new_host.rs'
+    Set-Content -LiteralPath $newDesktopSource -Value 'pub fn new_host() {}'
+    Assert-True ($desktopBaseline -ne (Get-ValidationFingerprint $SnapshotRepo $desktopCargoArgs).fingerprint) "new untracked desktop module must invalidate the desktop Cargo result"
+    Remove-Item -LiteralPath $newDesktopSource
+    Remove-Item -LiteralPath (Join-Path $SnapshotRepo 'desktop-shell/src-tauri/permissions/research.toml')
+    Assert-True ($desktopBaseline -ne (Get-ValidationFingerprint $SnapshotRepo $desktopCargoArgs).fingerprint) "deleted desktop permission must invalidate the desktop Cargo result"
+    & git -C $SnapshotRepo checkout -- desktop-shell/src-tauri/permissions/research.toml
+    Assert-Equal $desktopBaseline (Get-ValidationFingerprint $SnapshotRepo $desktopCargoArgs).fingerprint "restoring exact desktop inputs must restore the reusable fingerprint"
     Assert-True ($baseDetails.payload.project -like 'no-origin:*') "project without origin must use safe hashed fallback"
     $priorOutputEncoding = $OutputEncoding
     try {
@@ -85,6 +121,10 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -E
     Set-Content (Join-Path $SnapshotRepo '.cargo\config.toml') '[build]'; Assert-True ($baseFingerprint -ne (Get-ValidationFingerprint $SnapshotRepo @('check')).fingerprint) ".cargo config must invalidate evidence"
     Remove-Item (Join-Path $SnapshotRepo '.cargo') -Recurse -Force
     $oldRustflags=$env:RUSTFLAGS; try { $env:RUSTFLAGS='--cfg elon_secret_value'; $envDetails=Get-ValidationFingerprint $SnapshotRepo @('check'); Assert-True ($envDetails.fingerprint -ne $baseFingerprint) "compile environment must invalidate evidence"; Assert-True (($envDetails.payload.environment_hashes.RUSTFLAGS -ne $env:RUSTFLAGS) -and (($envDetails.payload|ConvertTo-Json -Depth 8) -notmatch 'elon_secret_value')) "raw environment value must not persist" } finally { if($null -eq $oldRustflags){Remove-Item Env:RUSTFLAGS -ErrorAction SilentlyContinue}else{$env:RUSTFLAGS=$oldRustflags} }
+    if ($FingerprintOnly) {
+        Write-Host "PASS: validation fingerprint tests ($script:Assertions assertions)." -ForegroundColor Green
+        return
+    }
     $stale = Join-Path $CacheRoot "stale.lock"; New-Item -ItemType Directory -Force -Path $stale | Out-Null
     '{"pid":2147483000}' | Set-Content -LiteralPath (Join-Path $stale "owner.json") -Encoding UTF8
     $lease = Enter-ValidationLock -LockPath $stale -Kind "crash-recovery" -TimeoutSeconds 2
