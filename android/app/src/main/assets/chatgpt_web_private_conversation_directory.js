@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptPrivateConversationDirectory;
-  if (existing && Number(existing.version) >= 9) return;
+  if (existing && Number(existing.version) >= 10) return;
   if (location.origin !== 'https://chatgpt.com') return;
 
   const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
@@ -241,7 +241,7 @@
     return true;
   }
 
-  function acceptDeletedState(rawId) {
+  function acceptDeletedState(rawId, emitListener) {
     const id = cleanText(rawId);
     if (!SAFE_ID.test(id)) return false;
     conversations.delete(id);
@@ -251,7 +251,7 @@
     deletedConversationIds.add(id);
     trimSet(removedConversationIds, MAX_CONVERSATIONS);
     trimSet(deletedConversationIds, MAX_CONVERSATIONS);
-    notify();
+    notify(emitListener);
     return true;
   }
 
@@ -435,7 +435,7 @@
   }
 
   window.__elonChatGptPrivateConversationDirectory = Object.freeze({
-    version: 9,
+    version: 10,
     snapshot,
     refreshProject,
     acceptConversationMembership,

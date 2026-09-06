@@ -1,7 +1,7 @@
 (function (root, factory) {
   'use strict';
 
-  const exported = Object.freeze({ version: 6, create: factory });
+  const exported = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (!root || !root.location || root.location.origin !== 'https://chatgpt.com') return;
   const current = root.__elonChatGptPrivateConversationMutation;
@@ -14,7 +14,7 @@
 })(typeof window === 'object' ? window : globalThis, function (root, dependencies) {
   'use strict';
 
-  const VERSION = 6;
+  const VERSION = 7;
   const WRITE_TIMEOUT_MS = 9000;
   const RECONCILE_TIMEOUT_MS = 4000;
   const UNCERTAIN_RECONCILE_WINDOW_MS = 16000;
@@ -521,9 +521,9 @@
     return null;
   }
 
-  function handle(action, command, respond, scheduleSnapshot, directoryRequests) {
+  function handle(action, command, respond, scheduleSnapshot, directoryRequests, readSnapshot) {
     if (root.__elonChatGptPrivateConversationDelete?.handle(
-      action, command, respond, scheduleSnapshot, directoryRequests
+      action, command, respond, scheduleSnapshot, directoryRequests, readSnapshot
     )) return true;
     const mutation = commandMutation(action, command);
     if (!mutation) return false;

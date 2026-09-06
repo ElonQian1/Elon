@@ -170,7 +170,7 @@ async function flush() {
 (async () => {
   const directory = window.__elonChatGptPrivateConversationDirectory;
   assert(directory);
-  assert.strictEqual(directory.version, 9);
+  assert.strictEqual(directory.version, 10);
   let notifications = 0;
   directory.setListener(() => { notifications += 1; });
 

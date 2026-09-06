@@ -47,15 +47,58 @@ test('one confirmed delete writes only is_visible and never forwards cookie or c
   assert.deepEqual(f.accepted, ['target-chat']);
 });
 
-test('requires confirmation, exact cached target and a noncurrent canonical path', async () => {
+test('requires confirmation and exact cached target', async () => {
   const f = fixture();
   for (const [target, confirmed, code] of [
     ['/c/target-chat', false, 'user_confirmation_required'],
     ['/c/target-chat?all=true', true, 'invalid_conversation_path'],
     ['/c/missing-chat', true, 'delete_selection_expired'],
-    ['/g/g-p-fixture/c/active-chat', true, 'delete_current_conversation_active'],
+    ['/g/g-p-fixture/c/active-chat', true, 'delete_selection_expired'],
   ]) assert.equal((await f.api.start(target, confirmed)).code, code);
   assert.equal(f.calls.length, 0);
+});
+
+function currentSnapshot(f) {
+  f.root.location.pathname = '/g/g-p-fixture/c/target-chat';
+  f.root.location.href = f.root.location.origin + f.root.location.pathname;
+  return { url: f.root.location.href, composerReady: true, streaming: false, draft: '',
+    attachments: [], dictationActive: false, dictationCaptureActive: false, dictationCapturePending: false };
+}
+
+test('current conversation deletion requires a ready idle snapshot without draft or attachments', async () => {
+  const missing = fixture(); currentSnapshot(missing);
+  assert.equal((await missing.api.start('/c/target-chat', true)).code, 'delete_context_unavailable');
+  for (const change of [{ draft: 'unsent' }, { attachments: [{}] }, { streaming: true },
+    { composerReady: false }, { dictationActive: true }, { dictationCaptureActive: true }, { dictationCapturePending: true }]) {
+    const f = fixture(), snapshot = { ...currentSnapshot(f), ...change };
+    assert.equal((await f.api.start('/c/target-chat', true, () => snapshot)).ok, false);
+    assert.equal(f.calls.length, 0);
+  }
+  const ready = fixture(), snapshot = currentSnapshot(ready);
+  assert.equal((await ready.api.start('/c/target-chat', true, () => snapshot)).ok, true);
+  assert.equal(ready.calls.length, 1);
+});
+
+test('draft appearing during authentication is preserved and prevents the write', async () => {
+  const gate = deferred(), f = fixture(), snapshot = currentSnapshot(f);
+  f.root.__elonChatGptPrivateTransport.acquireSameOriginRequestHeaders = () => gate.promise;
+  const pending = f.api.start('/c/target-chat', true, () => snapshot);
+  snapshot.draft = 'new unsent draft';
+  gate.resolve(f.root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders());
+  assert.equal((await pending).code, 'delete_draft_present');
+  assert.equal(f.calls.length, 0);
+});
+
+test('current deletion sends terminal receipt before any directory-triggered native navigation', async () => {
+  const f = fixture(), snapshot = currentSnapshot(f), events = [];
+  f.root.__elonChatGptPrivateConversationDirectory.acceptDeletedState = (_, notify) => {
+    if (notify !== false) events.push('early-listener');
+  };
+  f.api.handle('delete_conversation', { value: '/c/target-chat', selected: true },
+    (_, ok) => events.push(ok ? 'confirmed' : 'failed'), () => events.push('snapshot'),
+    { emitSnapshot: () => events.push('directory') }, () => snapshot);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(events, ['confirmed', 'directory', 'snapshot']);
 });
 
 test('duplicate clicks and other mutations cannot overlap the delete owner', async () => {
@@ -133,13 +176,17 @@ test('deleting last row emits an empty directory with deletion markers and ignor
   vm.runInContext(asset('chatgpt_web_private_conversation_directory.js'), context);
   vm.runInContext(asset('chatgpt_web_adapter_conversation_directory_requests.js'), context);
   const directory = window.__elonChatGptPrivateConversationDirectory;
+  let notifications = 0;
+  directory.setListener(() => { notifications += 1; });
   await window.fetch('/backend-api/conversations');
   await new Promise(resolve => setImmediate(resolve));
   const emitted = [];
   const adapter = window.__elonChatGptConversationDirectoryRequests.create({ privateDirectory: directory,
     optional: (fallback, fn) => fn(), emitEvent: event => emitted.push(event) });
   adapter.emitSnapshot(null);
-  directory.acceptDeletedState('target-chat');
+  const beforeDelete = notifications;
+  directory.acceptDeletedState('target-chat', false);
+  assert.equal(notifications, beforeDelete);
   await window.fetch('/backend-api/conversations');
   await new Promise(resolve => setImmediate(resolve));
   directory.acceptArchivedState('target-chat', false, { title: 'Stale restore' });
