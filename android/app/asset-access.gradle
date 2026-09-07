@@ -1,5 +1,10 @@
 // Independent verified TLS ingress. Empty keeps delegated asset access unavailable.
-def assetAccessOrigin = System.getenv('ELON_ASSET_ACCESS_ORIGIN') ?: ''
+// Read repository defaults directly: merged Gradle properties can prefer stale user values.
+// A nonempty environment variable is the explicit override, including in release builds.
+def assetAccessDefaults = new Properties()
+rootProject.file('gradle.properties').withInputStream { assetAccessDefaults.load(it) }
+def assetAccessOrigin = System.getenv('ELON_ASSET_ACCESS_ORIGIN') ?:
+        assetAccessDefaults.getProperty('ELON_ASSET_ACCESS_ORIGIN', '')
 if (assetAccessOrigin) {
     def uri = new URI(assetAccessOrigin)
     if (uri.scheme != 'https' || !uri.host || uri.rawUserInfo || uri.rawQuery || uri.rawFragment ||
