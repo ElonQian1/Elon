@@ -6,12 +6,15 @@
 - Extensions: `android_chatgpt_private_model_version_state_v1` and
   `android_chatgpt_private_service_tier_state_v1`.
 - Status: implemented, source-only candidate; not `completed` or device accepted.
-- Contract version: 2, page adapter 290. Production native model selection reuses the current
+- Contract/controller version: 3, page adapter 294 (next grouped build pending). Production native model selection reuses the current
   official picker state and its model/effort mutators when the guards pass.
 - Scope: available normal-chat presets and thinking effort, available model
   versions, restricted-current-model thinking efforts, and the official
   standard/fast response tier when offered for the current selection.
-  Internal/special model discovery retains the existing menu path.
+  Normal-chat additional model groups now use the
+  [private catalog extension](chatgpt-private-model-catalog.md), including
+  native paging and the official asynchronous privacy check. Work-mode promoted
+  model discovery still retains its existing path.
 - This is a page-runtime private state bridge, not an independent Android HTTP
   sender. WebView still owns identity and the live official conversation.
 - This batch does not replace work-model selection or text/image generation

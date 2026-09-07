@@ -10,6 +10,11 @@ consumers still require their own acceptance; this is not completion of every
 private feature or an independent native HTTP text sender. See the
 [1547 evidence and remaining regressions](reports/chatgpt-runtime-release-1547.md).
 
+Source-only extension after 1547: the
+[additional model catalog](chatgpt-private-model-catalog.md) adds four exact
+export mappings for category construction, group IDs, eligibility and its gate.
+Its native menu and selection have offline evidence, not device acceptance.
+
 ## Confirmed regression
 
 The installed APK 1545 public-script inventory observed
