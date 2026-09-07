@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateModelContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -82,11 +82,51 @@
 
   function selectionKey(item) { return JSON.stringify([item.modelSlug, item.thinkingEffort ?? null, item.bucket]); }
 
+  function restrictedSelections(live, modules) {
+    const menu = live.binding.menu, state = menu.composerIntelligencePickerState;
+    const capability = state.restrictedModelCapability, model = capability?.modelConfig;
+    if (state.bucketSelections != null || capability?.kind !== 'thinking-effort' ||
+        model?.id !== live.model || menu.modelsData.models.get(live.model)?.id !== live.model ||
+        !SLUG.test(capability.thinkingEffortLane || '') ||
+        !Array.isArray(menu.modelsData.categories) || menu.modelsData.categories.length > 100 ||
+        !Array.isArray(model.thinkingEfforts) || !model.thinkingEfforts.length || model.thinkingEfforts.length > 30 ||
+        typeof model.title !== 'string' || !model.title.trim() || model.title.length > 120 ||
+        modules.conversation.p8t({ modelSlug: live.model,
+          modelSwitcherDenialsBySlug: menu.modelSwitcherDenialsBySlug })?.status !== 'available') return null;
+    const allowed = modules.conversation.vRt(model);
+    if (!Array.isArray(allowed) || !allowed.length || allowed.length > 30 || !allowed.every(value => SLUG.test(value))) return null;
+    const seen = new Set();
+    for (const effort of model.thinkingEfforts) {
+      if (!SLUG.test(effort?.thinking_effort || '') || seen.has(effort.thinking_effort)) return null;
+      seen.add(effort.thinking_effort);
+    }
+    const efforts = model.thinkingEfforts.filter(item => allowed.includes(item.thinking_effort));
+    // fqn resolves the effective display value without persisting a default.
+    const selected = efforts.find(item => item.thinking_effort === live.effort) ??
+      efforts.find(item => item.thinking_effort === model.defaultThinkingEffort) ?? efforts[0];
+    const category = menu.modelsData.categories.find(item => item?.modelLane === capability.thinkingEffortLane) ??
+      menu.modelsData.categories[0];
+    const label = item => item?.short_label ?? item?.full_label;
+    if (!category || typeof label(selected) !== 'string' || !label(selected).trim()) return null;
+    const base = { availability: { status: 'available' },
+      bucket: state.selectedVersionEntry?.intelligencePresets?.[0]?.id ?? 0,
+      category: { ...category, categoryId: live.model, defaultModel: live.model,
+        label: model.title, modelLane: capability.thinkingEffortLane,
+        shortLabel: model.title, shorterLabel: model.title, supportedModels: [live.model] },
+      modelConfig: model, modelSlug: live.model, thinkingEffortLane: capability.thinkingEffortLane,
+      defaultServiceTier: model.defaultServiceTier, serviceTierOptions: model.serviceTierOptions };
+    const selections = efforts.filter(item => label(item) != null).map(item => ({ ...base,
+      thinkingEffort: item.thinking_effort, title: label(item),
+      selectedDisplayTitle: model.title + ' ' + label(item) }));
+    return { selections, currentSelection: selections.find(item => item.thinkingEffort === selected.thinking_effort) };
+  }
+
   function catalog(binding, modules) {
     const live = read(binding, modules);
     if (!live) return null;
     const menu = live.binding.menu, pickerState = menu.composerIntelligencePickerState;
-    const selections = pickerState.bucketSelections, version = pickerState.selectedVersionEntry?.id;
+    const restricted = pickerState.bucketSelections == null ? restrictedSelections(live, modules) : null;
+    const selections = pickerState.bucketSelections ?? restricted?.selections, version = pickerState.selectedVersionEntry?.id;
     if (!Array.isArray(selections) || selections.length < 1 || selections.length > 30 ||
         typeof version !== 'string' || !version || !menu.modelSwitcherDenialsBySlug ||
         typeof menu.modelSwitcherDenialsBySlug !== 'object') return null;
@@ -107,7 +147,8 @@
       if (seen.has(key)) return null;
       seen.add(key);
       choices.push({ key, label: label.trim(), selection: item,
-        selected: live.model === item.modelSlug && (item.thinkingEffort == null || live.effort === item.thinkingEffort) });
+        selected: live.model === item.modelSlug && (item.thinkingEffort == null ||
+          (restricted?.currentSelection?.thinkingEffort ?? live.effort) === item.thinkingEffort) });
     }
     return choices.length && choices.filter(item => item.selected).length <= 1 ? { live, version, choices } : null;
   }
@@ -171,8 +212,11 @@
   }
 
   function tierChoices(live, modules) {
-    const menu = live.binding.menu, selection = menu.composerIntelligencePickerState.currentSelection;
-    if (menu.hideServiceTier === true || menu.lockedUpgradePreview != null || !selection || !matches(live, selection)) return [];
+    const menu = live.binding.menu, pickerState = menu.composerIntelligencePickerState;
+    const restricted = pickerState.bucketSelections == null ? restrictedSelections(live, modules) : null;
+    const selection = pickerState.bucketSelections == null ? restricted?.currentSelection : pickerState.currentSelection;
+    if (menu.hideServiceTier === true || menu.lockedUpgradePreview != null || !selection ||
+        !restricted && !matches(live, selection)) return [];
     const options = selection.serviceTierOptions;
     // The inspected normal-chat fast-mode switch requires both standard and fast.
     if (!Array.isArray(options) || options.length > 10 ||
@@ -296,6 +340,6 @@
     return advancedState(after);
   }
 
-  return Object.freeze({ version: 1, urls: URLS, capture, current, validate, catalog, read, matches, apply,
+  return Object.freeze({ version: 2, urls: URLS, capture, current, validate, catalog, read, matches, apply,
     advancedCatalog, applyAdvanced, matchesAdvanced });
 });

@@ -6,15 +6,16 @@
 - Extensions: `android_chatgpt_private_model_version_state_v1` and
   `android_chatgpt_private_service_tier_state_v1`.
 - Status: implemented, source-only candidate; not `completed` or device accepted.
-- Contract version: 1. Production native model selection reuses the current
+- Contract version: 2, page adapter 290. Production native model selection reuses the current
   official picker state and its model/effort mutators when the guards pass.
 - Scope: available normal-chat presets and thinking effort, available model
-  versions, and the official standard/fast response tier when offered for the
-  current selection. Internal/special models retain the existing menu path.
+  versions, restricted-current-model thinking efforts, and the official
+  standard/fast response tier when offered for the current selection.
+  Internal/special model discovery retains the existing menu path.
 - This is a page-runtime private state bridge, not an independent Android HTTP
   sender. WebView still owns identity and the live official conversation.
-- This batch does not replace work-model selection, restricted-model effort
-  controls or text/image generation POST. Temporary chat has its separate
+- This batch does not replace work-model selection or text/image generation
+  POST. Temporary chat has its separate
   [guarded state transaction](chatgpt-private-temporary-chat.md).
 - Google stays last. Existing native official audio, captions, dictation and
   read-aloud are unchanged. No APK was built or installed for this source batch.
@@ -74,6 +75,29 @@ The adapter uses the same `c0` resolver and `l0().setServiceTier`, then checks b
 conversation and draft tier. Hidden, upgrade-preview, stale or unrecognized
 tier state is not offered as an actionable private choice.
 
+### Restricted current-model efforts
+
+The same inspected `fqn` source handles `bucketSelections == null` with
+`restrictedModelCapability.kind == 'thinking-effort'`. Contract 2 now derives
+the corresponding selections from that current model's `thinkingEfforts`, the
+official `vRt` allowed-effort helper, and its supplied thinking-effort lane.
+It uses the official short/full labels and category fallback; it does not
+invent model IDs, discover hidden models or bypass denials. Normal presets
+retain their existing path. Work mode remains excluded.
+
+The selected display follows current allowed effort, allowed default, then
+first allowed effort. Displaying that effective default does not write a
+preference. Explicit selection reuses the existing same-model transaction,
+including Pro defaults and the official preference mutator. The live model,
+permission, capability, effort choices, account and document are rechecked
+before writing. Fresh readback confirms the actual effort; an ignored or
+uncertain mutation never triggers a DOM retry.
+
+Advanced obtains standard/fast options from the same restricted selection and
+can return to its effort list. An invalid restricted capability cannot reuse
+stale normal-picker tier options. No new native UI, endpoint, poller, module
+import path or independently stored model preference is introduced.
+
 ## Ownership and lifecycle
 
 1. Resolve one committed picker ancestor from the connected model trigger.
@@ -132,8 +156,20 @@ selection, ignored/partially applied mutations and production command wiring.
 Native policy and semantic tests were added but have not been compiled or run in
 this source batch; include them in the grouped Android check.
 
+The restricted-effort extension first reproduced the missing native options,
+then passed **158 focused Node cases** across the shared model fixture, model
+state, restricted model, composer tools and attachment-composer integration.
+This includes production asset-bundle parsing, default-display ordering, same
+model and Pro mutations, tier/back navigation, stale state and denied/unknown
+schemas. The existing fixture was extracted without changing behavior in
+`36d1db841`; the extension reuses it rather than copying a second fixture.
+The command log is `restricted-model-integration-20260907-151132-625` in the
+repository Git log directory. The official composer asset hash was rechecked.
+These remain synthetic runtime tests, not a live account or Android build pass.
+
 Grouped device acceptance still needs production native UI selection across
-model/effort presets, versions and available response tiers, reopening the menu,
+model/effort presets, restricted current-model efforts when offered, versions
+and available response tiers, reopening the menu,
 switching chats, and one explicit test send to confirm the effective selected
 state. Check native scrolling, Back/Other navigation and an unknown runtime
 preserve existing functionality. No measured latency, heat or
