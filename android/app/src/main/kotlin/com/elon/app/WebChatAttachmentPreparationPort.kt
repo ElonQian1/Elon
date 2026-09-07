@@ -6,6 +6,12 @@ internal enum class WebChatAttachmentSelectionKind(val wireValue: String) {
 
 internal fun interface WebChatAttachmentPreparationPort {
     fun begin(kind: WebChatAttachmentSelectionKind): WebChatAttachmentSelection?
+
+    fun showUploadOptions(
+        anchor: android.view.View,
+        attachment: PendingAttachment,
+        onSelected: (Boolean) -> Unit,
+    ): Boolean = false
 }
 
 internal interface WebChatAttachmentSelection {

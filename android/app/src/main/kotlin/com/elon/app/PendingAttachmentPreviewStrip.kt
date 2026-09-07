@@ -21,7 +21,8 @@ internal class PendingAttachmentPreviewStrip(
     private val context: Context,
     private val pendingAttachments: MutableList<PendingAttachment>,
     private val onChanged: () -> Unit,
-    private val onEditImage: (Int) -> Unit
+    private val onEditImage: (Int) -> Unit,
+    private val onUploadOptions: ((View, PendingAttachment, (Boolean) -> Unit) -> Boolean)? = null,
 ) {
     private val list = LinearLayout(context).apply {
         layoutParams = ViewGroup.LayoutParams(
@@ -65,7 +66,18 @@ internal class PendingAttachmentPreviewStrip(
             }
         }
         val isImage = attachment.isImage()
-        wrapper.addView(if (isImage) createImagePreview(attachment) else createFilePreview(attachment))
+        val preview = if (isImage) createImagePreview(attachment) else createFilePreview(attachment)
+        preview.contentDescription = if (attachment.chatGptUploadCopy) "重新上传一份：${attachment.displayName}"
+            else attachment.displayName
+        if (onUploadOptions != null) preview.setOnLongClickListener { anchor ->
+            onUploadOptions.invoke(anchor, attachment) { uploadCopy ->
+                if (updatePendingAttachmentUploadChoice(pendingAttachments, attachment, uploadCopy)) {
+                    refresh()
+                    onChanged()
+                }
+            }
+        }
+        wrapper.addView(preview)
         if (isImage) {
             wrapper.addView(createEditButton(index))
         }
