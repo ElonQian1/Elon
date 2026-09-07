@@ -119,10 +119,25 @@
     return true;
   }
 
+  function retainConfirmation(owner) {
+    try {
+      if (!page.document.querySelector('[data-testid="modal-no-auth-new-chat"]')) return false;
+      // The website records "seen" when opening, not accepting, this modal.
+      // Reissuing newChat after lease expiry could therefore skip consent.
+      pending = owner;
+      offerConfirmation(owner);
+    } catch (_) {
+      pending = owner;
+      finish(owner, false, 'invocation_unconfirmed');
+    }
+    return true;
+  }
+
   function unavailable(owner) {
     if (pending !== owner) return;
     const current = context(owner.inspect);
     if (!sameContext(owner, current)) return finish(owner, false, 'context_changed');
+    if (retainConfirmation(owner)) return;
     release(owner);
     owner.fallback();
   }
@@ -156,6 +171,7 @@
     if (pending !== owner) return;
     const current = context(owner.inspect);
     if (!sameContext(owner, current)) return finish(owner, false, 'context_changed');
+    if (retainConfirmation(owner)) return;
     try {
       if (typeof shared?.Ur !== 'function' || typeof shared.zr !== 'function') return unavailable(owner);
       const action = shared.Ur('newChat');
@@ -186,13 +202,15 @@
       return true;
     }
     const bindings = page.__elonChatGptPrivateRuntimeBindings, before = context(inspect);
+    if (!before) return false;
+    const owner = { before, inspect, result, fallback, startedAt: now(), invoked: false, timer: null };
+    if (retainConfirmation(owner)) return true;
     let cached;
     try {
-      if (!before || typeof bindings?.observed !== 'function' || typeof bindings.peek !== 'function' ||
+      if (typeof bindings?.observed !== 'function' || typeof bindings.peek !== 'function' ||
           typeof bindings.load !== 'function' || !bindings.observed('shared')) return false;
       cached = bindings.peek('shared');
     } catch (_) { return false; }
-    const owner = { before, inspect, result, fallback, startedAt: now(), invoked: false, timer: null };
     pending = owner;
     if (cached) invoke(owner, cached);
     else Promise.resolve().then(() => bindings.load('shared')).then(

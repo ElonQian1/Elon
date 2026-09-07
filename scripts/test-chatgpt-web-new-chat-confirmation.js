@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const assets = path.join(__dirname, '../android/app/src/main/assets');
 const modalApi = require(path.join(assets, 'chatgpt_web_new_chat_confirmation'));
 const navigationApi = require(path.join(assets, 'chatgpt_web_private_new_conversation'));
@@ -70,10 +71,10 @@ for (const change of ['profile', 'logged_in', 'session_unknown', 'detached', 'di
 }
 
 function navigationFixture() {
-  let time = 0, serial = 0, modal = false, messages = 2, revision = 'unchanged', draft = '';
+  let time = 0, serial = 0, ticketSerial = 0, modal = false, messages = 2, revision = 'unchanged', draft = '';
   const tasks = new Map(), results = [], writes = [];
   const page = { location: new URL('https://chatgpt.com/'), __elonChatGptDocumentToken: 'doc_confirmation',
-    document: { querySelector: () => modal ? {} : null }, crypto: { getRandomValues: bytes => bytes.fill(7) },
+    document: { querySelector: () => modal ? {} : null }, crypto: { getRandomValues: bytes => bytes.fill(++ticketSerial) },
     KeyboardEvent: class {}, setTimeout(fn, ms) { const id = ++serial; tasks.set(id, { at: time + ms, fn }); return id; },
     clearTimeout: id => tasks.delete(id) };
   const shared = { Ur: () => ({ id: 'newChat', isAvailable: true, disabled: false, scope: 'global',
@@ -93,6 +94,7 @@ function navigationFixture() {
     request: (decision = 'confirm', ticket) => JSON.stringify({ decision,
       confirmationTicket: ticket || /\[confirmation_id:([a-f0-9]{32})\]/.exec(results[0]?.[2] || '')?.[1] }),
     messages: value => { messages = value; }, revision: value => { revision = value; }, draft: value => { draft = value; },
+    modal: value => { modal = value; },
     tick() { const next = [...tasks].sort((a,b) => a[1].at - b[1].at)[0];
       if (next) { tasks.delete(next[0]); time = next[1].at; next[1].fn(); } },
     drain() { let limit = 100; while (tasks.size && limit-- > 0) this.tick(); assert.ok(limit > 0); }
@@ -178,4 +180,82 @@ test('production confirmation resolver loads before new-chat navigation', () => 
   const index = catalog.indexOf('"chatgpt_web_new_chat_confirmation.js"');
   assert.ok(index > catalog.indexOf('"chatgpt_web_committed_owner_path.js"'));
   assert.ok(index < catalog.indexOf('"chatgpt_web_private_new_conversation.js"'));
+});
+
+for (const reason of ['expired', 'suspend']) {
+  test('reopening after ' + reason + ' rebinds the existing guest modal without another registered action', () => {
+    const f = navigationFixture(); f.start(); const oldRequest = f.request();
+    if (reason === 'expired') f.tick(); else f.api.suspend();
+    f.start();
+    assert.deepEqual(f.writes, ['open']);
+    assert.match(f.results.at(-1)[2], /confirmation_required.*confirmation_id:/);
+    const ticket = /confirmation_id:([a-f0-9]{32})/.exec(f.results.at(-1)[2])[1];
+    f.start(oldRequest); assert.match(f.results.at(-1)[2], /confirmation_expired/);
+    assert.deepEqual(f.writes, ['open']);
+    f.start(f.request('confirm', ticket)); f.drain();
+    assert.deepEqual(f.writes, ['open', 'confirm']); assert.equal(f.results.at(-1)[1], true);
+  });
+}
+
+for (const unavailable of ['bindings', 'modal_bridge']) {
+  test('an existing guest modal remains authoritative when ' + unavailable + ' is unavailable', () => {
+    const f = navigationFixture(); f.modal(true);
+    if (unavailable === 'bindings') delete f.page.__elonChatGptPrivateRuntimeBindings;
+    else delete f.page.__elonChatGptNewChatConfirmation;
+    assert.equal(f.start(), true);
+    assert.deepEqual(f.writes, []); assert.match(f.results.at(-1)[2], /confirmation_required/);
+    f.api.suspend();
+  });
+}
+
+test('a guest modal appearing during import is not bypassed by the delayed registered action', async () => {
+  const f = navigationFixture(); let release;
+  f.page.__elonChatGptPrivateRuntimeBindings.peek = () => null;
+  f.page.__elonChatGptPrivateRuntimeBindings.load = () => new Promise(resolve => { release = resolve; });
+  f.start(); await Promise.resolve(); f.modal(true); release(f.shared);
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.deepEqual(f.writes, []); assert.match(f.results.at(-1)[2], /confirmation_required/);
+  f.api.suspend();
+});
+
+test('production conversation adapter passes decisions to the same runtime owner without DOM fallback', () => {
+  const calls = [], results = [], value = JSON.stringify({ decision: 'cancel', confirmationTicket: 'a'.repeat(32) });
+  const window = { __elonChatGptPrivateNewConversation: { version: 2, start: (...args) => { calls.push(args); return true; } } };
+  const document = { querySelector() { throw Error('DOM fallback forbidden for a decision'); },
+    querySelectorAll() { throw Error('DOM fallback forbidden for a decision'); } };
+  vm.runInNewContext(fs.readFileSync(path.join(assets, 'chatgpt_web_adapter_conversations.js'), 'utf8'), {
+    window, document, location: { origin: 'https://chatgpt.com' }
+  });
+  window.__elonChatGptConversations.newConversation(() => ({}), (...args) => results.push(args), value);
+  assert.equal(calls[0][3], value);
+  calls.length = 0;
+  window.__elonChatGptPrivateNewConversation.version = 1;
+  window.__elonChatGptConversations.newConversation(() => ({}), (...args) => results.push(args), value);
+  assert.equal(calls.length, 0, 'old runtime must not interpret a decision as another new-chat request');
+  assert.equal(results.at(-1)[1], false);
+  delete window.__elonChatGptPrivateNewConversation;
+  window.__elonChatGptConversations.newConversation(() => ({}), (...args) => results.push(args), value);
+  assert.equal(results[0][1], false);
+});
+
+test('production command preserves streaming until acceptance and binds unchanged content plus draft', () => {
+  const source = fs.readFileSync(path.join(assets, 'chatgpt_web_adapter.js'), 'utf8');
+  const start = source.indexOf("    if (action === 'new_conversation') {");
+  const end = source.indexOf("    respond(action || 'unknown'", start);
+  const execute = new Function('command', 'action', 'comparableText', 'composerValue', 'findComposer',
+    'messageAdapter', 'conversationAdapter', 'invalidatePrivateTextContext', 'streamingPolicy',
+    'privateStreamTransport', 'respond', 'scheduleSnapshot', source.slice(start, end));
+  const calls = [], composer = {}, messages = [{ id: 'fixture', role: 'assistant', text: 'synthetic' }];
+  let draft = '', observed, settle;
+  const invoke = value => execute({ value }, 'new_conversation', value => value, () => draft, () => composer,
+    { readMessages: () => messages }, { newConversation(inspect, callback, decision) {
+      observed = { snapshot: inspect(), decision }; settle = callback;
+    } }, () => calls.push('invalidate'), { reset: () => calls.push('reset') },
+    { reset: () => calls.push('private-reset') }, (...args) => calls.push(args), () => calls.push('snapshot'));
+  invoke(); assert.deepEqual(calls, []);
+  assert.equal(observed.snapshot.revision, JSON.stringify([['fixture', 'assistant', 'synthetic']]));
+  settle('new_conversation', false, 'confirmation'); assert.deepEqual(calls, [['new_conversation', false, 'confirmation']]);
+  calls.length = 0; draft = 'new unsent text'; const decision = JSON.stringify({ decision: 'cancel' });
+  invoke(decision); assert.equal(observed.snapshot.draft, draft); assert.equal(observed.decision, decision);
+  settle('new_conversation', true, 'ready'); assert.deepEqual(calls.slice(0, 3), ['invalidate', 'reset', 'private-reset']);
 });

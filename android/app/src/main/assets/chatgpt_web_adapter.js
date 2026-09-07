@@ -698,29 +698,29 @@
       return fallback();
     }
     if (action === 'new_conversation') {
-      if (comparableText(composerValue(findComposer()))) {
+      if (command.value == null && comparableText(composerValue(findComposer()))) {
         return respond(action, false, '网页中有未发送草稿，请先处理草稿。');
       }
       if (!conversationAdapter) return respond(action, false, '会话适配器尚未就绪。');
-      invalidatePrivateTextContext();
-      if (streamingPolicy) streamingPolicy.reset();
-      if (privateStreamTransport && typeof privateStreamTransport.reset === 'function') {
-        privateStreamTransport.reset();
-      }
       const inspect = () => {
         const composer = findComposer();
-        const messages = messageAdapter && typeof messageAdapter.readMessages === 'function'
-          ? messageAdapter.readMessages(false)
-          : [];
+        const rows = messageAdapter?.readMessages?.(false);
+        const messages = Array.isArray(rows) ? rows : [];
         return {
-          messageCount: Array.isArray(messages) ? messages.length : 0,
-          composerReady: !!composer
+          messageCount: messages.length, composerReady: !!composer,
+          draft: comparableText(composerValue(composer)),
+          revision: JSON.stringify(messages.map(({ id, role, text }) => [id, role, text]))
         };
       };
       return conversationAdapter.newConversation(inspect, (resultAction, ok, detail) => {
+        if (ok) {
+          invalidatePrivateTextContext();
+          streamingPolicy?.reset();
+          privateStreamTransport?.reset?.();
+        }
         respond(resultAction, ok, detail);
         if (ok) scheduleSnapshot(true);
-      });
+      }, command.value);
     }
     respond(action || 'unknown', false, '不支持的本地命令。');
   }
@@ -731,6 +731,7 @@
       skinAdapter.setEnabled(false);
     }
     disposed = true;
+    window.__elonChatGptPrivateNewConversation?.suspend();
     if (streamingPolicy) streamingPolicy.dispose();
     if (streamWatchdogAcceptance) streamWatchdogAcceptance.dispose();
     if (snapshotScheduler) snapshotScheduler.dispose();

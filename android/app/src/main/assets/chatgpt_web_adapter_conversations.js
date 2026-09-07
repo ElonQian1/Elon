@@ -681,10 +681,14 @@
     collectAndEmitDirectory(existing, command, emitEvent, result, false, generation);
   }
 
-  function newConversation(inspect, result) {
+  function newConversation(inspect, result, decision) {
     const runtime = window.__elonChatGptPrivateNewConversation;
     const fallback = () => newConversationFallback(inspect, result);
-    if (runtime && typeof runtime.start === 'function' && runtime.start(inspect, result, fallback)) return;
+    if (decision != null && !(runtime?.version >= 2)) {
+      return result('new_conversation', false, '确认已失效，请重新点击新会话。');
+    }
+    if (runtime && typeof runtime.start === 'function' && runtime.start(inspect, result, fallback, decision)) return;
+    if (decision != null) return result('new_conversation', false, '确认已失效，请重新点击新会话。');
     return fallback();
   }
 
