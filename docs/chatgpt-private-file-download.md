@@ -15,13 +15,16 @@ not a guessed endpoint or a device download acceptance result.
 ## Scope
 
 Capability candidate: `android_chatgpt_private_file_download_v1`.
-Status: `implemented_device_pending`, not `completed`.
+Status: `implemented`; ordinary saved-byte case `completed` on `1544` through
+the production MCP handler. Rendered native-menu acceptance and the separate
+project/library/connector scopes are not covered by that case.
 
-Current device checkpoint: `1543` successfully indexed the already-uploaded
-synthetic text file, but its single download returned
-`download_source_unsupported`; no bytes were saved. The actual returned URL
-shape still needs inspection before extending any source policy. This is not
-a successful end-to-end download; see the
+Current device checkpoint: `1544` indexed the existing synthetic text attachment
+and completed one download in 1,960 ms with `download_saved`. Downloads contains
+exactly one matching 78-byte fixture whose SHA-256 equals the uploaded fixture.
+The original blank conversation and conversation-home surface were restored.
+This supersedes the `1543` zero-byte rejection for the tested ordinary fixture,
+not every file scope; see the
 [grouped acceptance report](reports/chatgpt-grouped-release-20260907.md).
 
 ### Same-origin content candidate (adapter 293)
@@ -53,9 +56,14 @@ Six targeted new tests and existing related suites pass: 118 Node runner cases,
 plus the file-index script's 17 checks. The new route's three positive cases
 failed against the old code first. Commit `54a89232e` was Release-built,
 published and replacement-installed as `v1.1.1544`; MCP independently read back
-build 1544. Initial USB absence/wireless interruptions recovered, but the phone
-was then confirmed locked before the native download check. Device transfer and
-the actual saved-byte digest remain pending. No completed capability is registered.
+build 1544. Initial wireless interruptions recovered, followed by a locked-phone
+pause. After unlock, the production handler returned `download_saved`, and an
+independent filesystem check confirmed 78 saved bytes with SHA-256
+`75e2ed9bfe5772c9918e552ed07c2c0e689e7039367c81bb6906c63e396fa1f3`.
+The case `android_chatgpt_private_file_download_v1:ordinary_saved_bytes` is
+completed and should not be repeated without a regression. No all-scope completed
+capability or rendered-menu pass is claimed. The rejected `1543` URL itself is
+still uncaptured; the current pass does not retroactively identify that response.
 
 `chatgpt_web_private_file_download.js` owns a bounded, two-minute in-memory
 selection registry and one active authorization request. It registers only

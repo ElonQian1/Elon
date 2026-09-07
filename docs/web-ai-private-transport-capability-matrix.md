@@ -10,7 +10,10 @@ and separates content refresh from live interaction state. See the
 [remaining private-native work](web-ai-private-native-remaining-batch.md). Prior
 completed labels do not mean those remaining private protocols are implemented.
 It also adds a [private conversation attachment index](chatgpt-private-conversation-files.md)
-with a cache-first file sheet; device acceptance and private upload/download remain pending.
+with a cache-first file sheet. The ordinary text-file upload/association and
+saved-byte download are device verified through `1544`; additional file scopes
+and rendered-menu acceptance remain pending. See the
+[grouped acceptance evidence](reports/chatgpt-grouped-release-20260907.md).
 The [request lifetime repair](chatgpt-private-request-lifetime.md) bounds private response
 consumption and prevents timed-out project reads from replacing newer results.
 
@@ -43,6 +46,7 @@ consumption and prevents timed-out project reads from replacing newer results.
 | Interaction presets and deferred chat actions | ChatGPT | Completed, enabled, and device verified on research build `v1.1.1367 (1388)` | Current official control and WebView navigation |
 | Attachment upload reconciliation | ChatGPT | Existing capability retained; reservation false-completion regression corrected in source, grouped device acceptance pending | Official DOM attachment snapshot and bounded timeout |
 | Native attachment upload progress | ChatGPT | Existing UI retained; only ready attachments count after the reservation regression correction | Indeterminate native status and official DOM attachment snapshot |
+| Ordinary private conversation file download | ChatGPT | Production-handler saved-byte case completed on `1.1.1544`, adapter `293`: 78 bytes, matching SHA-256, 1,960 ms. Scoped variants and rendered-menu acceptance remain pending | No automatic write/download replay; explicit official page remains available |
 | Native image assets and cache-first gallery | ChatGPT | Completed, enabled, and device verified on Release candidate `v1.1.1375 (1396)`, adapter `208` | Bounded local image cache and official `/images` fallback |
 | Native image-generation operation status | ChatGPT | Completed, enabled, and device verified on `v1.1.1518 (1518)`, adapter `247` | Official composer and `/images` page |
 | Native private-response rich content | ChatGPT | Completed, enabled, and structurally device verified on Release `v1.1.1379 (1400)` for finance and line-chart cards | Official WebView rich content |

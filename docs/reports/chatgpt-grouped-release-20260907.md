@@ -99,11 +99,40 @@ on 1544. User unlock is requested. The 1543 rejected URL was never captured;
 source evidence for the added route does not prove it caused that failure.
 Actual saved bytes and their digest are still required before claiming a fix.
 
+## Resumed 1544 saved-byte acceptance
+
+After the user's retry request, wireless ADB was already online and confirmed the
+same Xiaomi hardware. MCP independently returned `1.1.1544`; no installation or
+data reset was needed. The handset was initially locked, then a later readiness
+check confirmed it unlocked. The baseline was `conversation_home`.
+
+The native social ChatGPT surface became ready with adapter 293, an empty draft
+and no pending attachment. The existing synthetic conversation was opened and
+its private file index returned one fresh descriptor. One production MCP download
+completed successfully: `download_saved`, native state `saved`, 78 received bytes,
+and 1,960 ms from command start to terminal receipt. A filesystem check restricted
+to the synthetic fixture name found exactly one saved file in Downloads:
+
+- Bytes: `78`.
+- SHA-256: `75e2ed9bfe5772c9918e552ed07c2c0e689e7039367c81bb6906c63e396fa1f3`.
+- Digest matches the original uploaded fixture.
+- The original blank chat was restored, then `conversation_home`; draft length
+  and pending attachment count were both zero.
+
+Case `android_chatgpt_private_file_download_v1:ordinary_saved_bytes` is completed.
+Reuse this evidence; do not repeat its upload or download without a regression.
+This is a production-handler and actual-file acceptance, not rendered native-menu,
+multi-file, project/library or gallery acceptance. No new message, microphone,
+login, Cookie/data clear or proxy-core change occurred.
+
+The separate image exporter v4 follow-up is source-only and not in this installed
+APK; see [its implementation and offline evidence](../chatgpt-private-image-gallery.md#same-origin-preview-source-follow-up).
+
 ## Next boundary
 
-After unlock, accept the 1544 content-route candidate; inspect any remaining
-download-source rejection before changing another policy. Reuse the already-uploaded fixture;
-do not repeat its successful upload merely to test downloads. Grouped image/PDF,
+The ordinary saved-byte check above passed; inspect any new scoped download-source
+rejection before changing another policy. Do not repeat the successful ordinary
+upload/download as a substitute for untested scopes. Grouped image/PDF,
 multi-file/project attachment, gallery, share and runtime generation checks are
 still pending where the work list says so. Do not mark all ChatGPT work complete,
 revisit proven voice/dictation transports or start Google ahead of this gate.
