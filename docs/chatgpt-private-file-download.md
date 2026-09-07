@@ -27,8 +27,11 @@ attachment descriptors as described below. Version 3 adds scoped
 rejects attachment-level context scopes and `library_download_id` lanes.
 Version 4 accepts recognized [imported connector file copies](chatgpt-private-connector-file-download.md)
 without fetching their external source URL. Connector-only cloud references,
-shared/mounted library and parameterized image-pointer variants remain unclaimed
-until their separate resolvers are covered.
+mounted library and parameterized image-pointer variants remain unclaimed until
+their separate resolvers are covered. Version 5 adds a separate
+[shared-library attachment binary download candidate](chatgpt-private-shared-library-download.md)
+using the same production action, not the signed-URL resolver. Standalone library
+downloads and separate metadata-only references remain outside that candidate.
 
 The native index receives random opaque selection handles, not private file
 IDs or signed URLs. Registration uses the selected history branch, preserving
@@ -46,6 +49,11 @@ MCP responses or stored in conversation caches. Android's download service owns
 transfer progress, storage and completion notifications. `download_queued`
 means enqueued, not downloaded or saved successfully. Failure or an unconfirmed
 acknowledgement is never automatically replayed.
+
+The version 5 shared-library lane instead streams same-origin response bytes
+into bounded native storage and reports `download_saved` only after publication.
+Its identity, timeout, notification and remaining UI/crash-recovery boundaries
+are documented separately above; it does not use Android's download service.
 
 The existing production conversation-file detail dialog has a Download action
 for registered descriptors. The consumer and MCP ports use the same tracked

@@ -67,6 +67,10 @@ The shared asset's `AX` builds a distinct
 `dEt` also forwards parsed image-pointer parameters and normalizes `#` in a file
 ID, but the required parameter meanings and scope combinations are not yet
 confirmed. Neither route is claimed implemented by this copy extension.
+The subsequent [shared-library attachment candidate](chatgpt-private-shared-library-download.md)
+implements a bounded binary-to-native-storage lane for recognized indexed
+references. Its native build and live transfer remain pending; standalone and
+mounted library, metadata-only references and parameterized pointers remain gaps.
 
 ## Verification and grouped acceptance
 
