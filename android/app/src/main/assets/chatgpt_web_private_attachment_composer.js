@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 14, create: factory });
+  const exported = Object.freeze({ version: 15, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -294,5 +294,49 @@
     return true;
   }
 
-  return Object.freeze({ version: 14, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, merge, remove });
+  function prepareSubmit(store) {
+    try {
+      const value = attachedNow();
+      if (!value || store !== value.binding.store || !current(value.binding)) return null;
+      const { attached, binding } = value, file = attached.file;
+      const fingerprint = () => JSON.stringify({ ...attached, file: undefined });
+      const metadata = fingerprint();
+      // The official prepared_action accepts ready entries, not just file IDs.
+      // Keep File identity, but detach and freeze its small metadata tree.
+      function freeze(data) {
+        for (const child of Object.values(data)) if (child && typeof child === 'object') freeze(child);
+        return Object.freeze(data);
+      }
+      const readyFiles = Object.freeze([Object.freeze({ ...freeze(JSON.parse(metadata)), file })]);
+      let consumed = false;
+      function unchanged() { return attached.file === file && fingerprint() === metadata; }
+      function currentLease() {
+        try {
+          const files = store.files$(), ready = store.readyFiles$();
+          return !consumed && owned === value && current(binding) && unchanged() &&
+            Array.isArray(files) && files.length === 1 && files[0] === attached &&
+            Array.isArray(ready) && ready.length === 1 && ready[0] === attached &&
+            store.hasUploadInProgress$() === false;
+        } catch (_) { return false; }
+      }
+      function consumeAccepted() {
+        try {
+          // The caller must first confirm official dispatch and conversation ownership.
+          // New-thread navigation can already have cleared the display-only owner.
+          if (consumed || root.__elonChatGptDocumentToken !== binding.token ||
+              identity() !== binding.account || resolveStore() !== store || !unchanged()) return false;
+          const files = store.files$();
+          if (!Array.isArray(files) || !files.includes(attached)) return false;
+          store.files$.set(files.filter(item => item !== attached));
+          if (store.files$().includes(attached)) return false;
+          consumed = true;
+          if (owned === value) owned = null;
+          return true;
+        } catch (_) { return false; }
+      }
+      return currentLease() ? Object.freeze({ readyFiles, current: currentLease, consumeAccepted }) : null;
+    } catch (_) { return null; }
+  }
+
+  return Object.freeze({ version: 15, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, merge, remove, prepareSubmit });
 });
