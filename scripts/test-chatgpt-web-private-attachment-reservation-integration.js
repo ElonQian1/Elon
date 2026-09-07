@@ -124,6 +124,34 @@ test('native attachment preparation overlaps reservation and final claim associa
   }
 });
 
+test('admitted HWP aliases use the existing reservation conversion without changing temporary persistence', async () => {
+  const documents = require('../android/app/src/test/resources/chatgpt_private_attachment_documents.json').documents;
+  for (const spec of documents.filter(value => /\.hwpx?$/.test(value.name))) {
+    assert.equal(protocol.isDocument(spec), true);
+    for (const temporary of [false, true]) {
+      const selectedFile = new File(['synthetic HWP bytes'], spec.name, { type: spec.type });
+      const f = fixture({ file: selectedFile, temporary });
+      await f.start();
+      assert.deepEqual(f.receipts, [['request_attachment_upload', true, 'private_attachment_associated']]);
+      assert.equal(f.fallbacks(), 0);
+      assert.equal(f.requests.length, 3);
+      const allocation = JSON.parse(f.requests[0].init.body);
+      const claim = JSON.parse(f.requests[2].init.body);
+      assert.equal(allocation.intended_use_case, 'ace_upload');
+      assert.ok(f.requests[2].url.endsWith('/claim_and_finish'));
+      assert.equal(claim.use_case, 'my_files');
+      assert.equal(claim.index_for_retrieval, true);
+      assert.equal(claim.mime_type, spec.type);
+      assert.equal(claim.store_in_library, false);
+      assert.equal(claim.library_persistence_mode, 'required');
+      assert.equal(claim.metadata.is_temporary_chat, temporary);
+      assert.equal(f.store.readyFiles$().length, 1);
+      assert.equal(f.store.readyFiles$()[0].fileSpec.mimeType, spec.type);
+      assert.equal(await f.requests[1].init.body.text(), await selectedFile.text());
+    }
+  }
+});
+
 test('pending or failed reservations cannot hold up the existing private create route', async () => {
   for (const mode of ['pending', 'failed', 'ineligible', 'disabled']) {
     let late;
