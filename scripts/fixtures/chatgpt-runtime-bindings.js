@@ -10,11 +10,11 @@ const files = {
 const expectedExports = {
   shared: { H3: 'c6', mq: 'Pq', wV: 'UV', SV: 'VV', XM: 'mN', HM: 'oN',
     'M$': 'Q$', RW: 'rG', uo: 'uo', t4: 'x4', IX: 'nZ', t6: 'x6', cX: 'OX',
-    Fx: 'Lx', Fl: 'Il', v7: 'R7' },
+    Fx: 'Lx', Fl: 'Il', v7: 'R7', $3: 'y6' },
   conversation: { AGt: 'uKt', J5t: 'O7t', Nrn: 'Cin', yRt: '$Rt', Grn: 'Fin',
     vRt: 'QRt', p8t: 'q8t', l0: 'E0', M1t: 'f0t', Rdn: 'Ofn', Rrn: 'Oin',
     win: 'man', Ein: 'gan', ay: 'Sy', iy: 'xy', ry: 'by', Jrn: 'Rin', Hrn: 'Min',
-    f8t: 'K8t', c0: 'T0', FVt: 'hHt' }, composer: { Ih: 'Qh' }
+    f8t: 'K8t', c0: 'T0', FVt: 'hHt', u1t: 'W1t', l1t: 'U1t', iin: 'Jin' }, composer: { Ih: 'Qh' }
 };
 
 function attach(page, modules) {
