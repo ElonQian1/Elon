@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 3, create: factory });
+  const exported = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -35,6 +35,30 @@
     return url.href;
   }
 
+  function connectorCopy(file) {
+    const info = file.context_connector_info;
+    if (info == null) return true;
+    if (typeof info !== 'object' || Array.isArray(info) ||
+        Object.keys(info).some(key => !['context_connector', 'source_url', 'synthetic_extension', 'type'].includes(key)) ||
+        typeof info.context_connector !== 'string' || !/^[A-Za-z0-9_-]{1,96}$/.test(info.context_connector) ||
+        file.source != null && !['connector', 'library', 'local'].includes(file.source)) return false;
+    for (const key of ['synthetic_extension', 'type']) {
+      if (info[key] != null && (typeof info[key] !== 'string' || info[key].length > 96 ||
+          /[\x00-\x1f\x7f]/.test(info[key]))) return false;
+    }
+    if (info.source_url != null && info.source_url !== '') {
+      if (typeof info.source_url !== 'string' || info.source_url.length > 8192 ||
+          /[\x00-\x20\x7f]/.test(info.source_url)) return false;
+      try {
+        const url = new URL(info.source_url);
+        if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return false;
+      } catch (_) { return false; }
+    }
+    // Gar emits this attribution for an uploaded connector copy. C4t and
+    // jW/A5t download the ChatGPT file ID; source_url is display-only.
+    return true;
+  }
+
   function imageFile(source) {
     const image = source.image;
     if (image?.content_type !== 'image_asset_pointer' || typeof image.asset_pointer !== 'string' ||
@@ -55,9 +79,10 @@
     const image = source?.image != null;
     const file = image ? imageFile(source) : source?.attachment;
     if (!conversation || !/^[A-Za-z0-9_-]{1,160}$/.test(file?.id || '')) return null;
-    // Shared-library and connector lanes have separate content resolvers.
+    // Cloud references and alternate preview targets have separate resolvers.
     if (['shared_library_file_id', 'library_download_id', 'source_url',
-      'context_connector', 'connector_id', 'context_connector_info'].some(key => file[key] != null && file[key] !== '')) return null;
+      'context_connector', 'connector_id', 'mounted_library_file_id', 'shared_library_file_reference',
+      'preview_file'].some(key => file[key] != null && file[key] !== '') || !connectorCopy(file)) return null;
     if (scope?.context_scopes != null && (!Array.isArray(scope.context_scopes) || scope.context_scopes.length)) return null;
     if (file.context_scopes != null && (!Array.isArray(file.context_scopes) || file.context_scopes.length)) return null;
     const projects = [conversation[1], source.projectId, scope?.gizmo_id, scope?.project_id,
@@ -226,5 +251,5 @@
 
   function cancel() { active?.controller.abort(); }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 3, register, start, cancel, dispose });
+  return Object.freeze({ version: 4, register, start, cancel, dispose });
 });
