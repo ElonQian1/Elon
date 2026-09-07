@@ -59,15 +59,16 @@ test('enabled official reuse hashes the exact file and waits for the losing byte
   assert.equal(f.timers.size, 0);
 });
 
-test('upload completion wins without waiting for a slow hash, runtime or lookup', async () => {
+test('upload completion wins without waiting for a slow hash, runtime or lookup', { timeout: 3000 }, async () => {
   for (const stage of ['runtime', 'hash', 'lookup']) {
-    let release;
-    const wait = () => new Promise(resolve => { release = resolve; });
+    let release, entered;
+    const started = new Promise(resolve => { entered = resolve; });
+    const wait = () => new Promise(resolve => { release = resolve; entered(); });
     const f = fixture(stage === 'runtime' ? { loadRuntime: wait } : stage === 'lookup' ? { request: wait } : {});
     if (stage === 'hash') f.root.crypto = { subtle: { digest: wait } };
     let done;
     const run = f.run(() => new Promise(resolve => { done = resolve; }));
-    for (let i = 0; i < 100 && !release; i++) await tick();
+    await started;
     assert.equal(typeof release, 'function');
     done('uploaded');
     assert.deepEqual(await run, { kind: 'uploaded', result: 'uploaded' });
