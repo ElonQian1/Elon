@@ -34,6 +34,7 @@
       }
       const request = async (path, method, body) => {
         if (!contract.current(binding)) throw new Error('share_context_changed');
+        management?.invalidate();
         attempted = true;
         return (await page.__elonChatGptPrivateJsonRequest.request(page, path, {
           method, headers, credentials: 'include', cache: 'no-store', redirect: 'error', body: JSON.stringify(body),
@@ -58,7 +59,6 @@
       if (state !== 'allowed') return outcome(false, state === 'blocked' ?
         'share_moderation_blocked' : 'share_result_unconfirmed', true);
       const result = outcome(true, 'share_link_ready', true, link.url);
-      management?.invalidate();
       last = { binding, at: Date.now(), outcome: result };
       return result;
     } catch (error) {

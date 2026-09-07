@@ -159,3 +159,20 @@ test('invalid management commands cannot fall through to public creation', async
   assert.deepEqual(receipt, ['share_conversation', false, 'share_invalid_selection']);
   assert.equal(f.requests.length, 0);
 });
+
+test('uncertain publication invalidates the old empty list and allows read-only reconciliation', async () => {
+  const f = fixture(); let created = false, reads = 0;
+  f.page.crypto = { getRandomValues: bytes => { bytes.fill(29); return bytes; } };
+  f.page.__elonChatGptPrivateJsonRequest.request = async (_, url, init) => {
+    if (url === LIST) { reads++; return { payload: { total: created ? 1 : 0,
+      items: created ? [{ id: SID, conversation_id: CID, create_time: null }] : [] } }; }
+    assert.equal(init.method, 'POST'); created = true; throw new Error('timeout');
+  };
+  const api = share.create(f.page, { contract, management, loadRuntime: f.loadRuntime });
+  const list = () => api.start({ operation: 'list', path: PATH }, false);
+  assert.equal((await list()).data.items.length, 0);
+  assert.equal((await api.start(PATH, true, () => f.snapshot)).code, 'share_result_unconfirmed');
+  assert.equal((await list()).data.items[0].id, SID);
+  assert.equal(reads, 2);
+  assert.equal((await api.start(PATH, true, () => f.snapshot)).code, 'share_cooldown');
+});
