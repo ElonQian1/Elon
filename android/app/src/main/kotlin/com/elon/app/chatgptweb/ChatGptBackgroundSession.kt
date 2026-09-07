@@ -202,7 +202,7 @@ internal class ChatGptBackgroundSession(
         )
     }
     private val newConversationRecovery = ChatGptNewConversationRecoveryCoordinator(
-        webView = { webView },
+        requestSnapshot = { pageAdapter?.requestSnapshot() },
         navigationActive = conversationNavigation::isNavigating,
         loading = { state == State.LOADING },
         composerReady = { latestSnapshot?.composerReady == true },

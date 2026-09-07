@@ -2,8 +2,7 @@ package com.elon.app.chatgptweb
 
 internal enum class ChatGptNewConversationRecoveryAction {
     NONE,
-    RELOAD_HOME,
-    LOAD_HOME,
+    REQUEST_SNAPSHOT,
 }
 
 internal object ChatGptNewConversationRecoveryPolicy {
@@ -11,15 +10,12 @@ internal object ChatGptNewConversationRecoveryPolicy {
         navigationActive: Boolean,
         loading: Boolean,
         composerReady: Boolean,
-        webViewAtHome: Boolean,
     ): ChatGptNewConversationRecoveryAction {
         if (!navigationActive || !loading || composerReady) {
             return ChatGptNewConversationRecoveryAction.NONE
         }
-        return if (webViewAtHome) {
-            ChatGptNewConversationRecoveryAction.RELOAD_HOME
-        } else {
-            ChatGptNewConversationRecoveryAction.LOAD_HOME
-        }
+        // The active page command owns navigation and any guest confirmation.
+        // A missing composer during that transaction only calls for fresh evidence.
+        return ChatGptNewConversationRecoveryAction.REQUEST_SNAPSHOT
     }
 }

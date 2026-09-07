@@ -5,19 +5,33 @@ import org.junit.Test
 
 class ChatGptNewConversationRecoveryPolicyTest {
     @Test
-    fun reloadsAHomeRouteThatDidNotRestoreItsComposer() {
+    fun asksForEvidenceWhileTheCurrentPageCommandIsUnsettled() {
         assertEquals(
-            ChatGptNewConversationRecoveryAction.RELOAD_HOME,
-            action(webViewAtHome = true),
+            ChatGptNewConversationRecoveryAction.REQUEST_SNAPSHOT,
+            action(),
         )
     }
 
     @Test
-    fun loadsHomeWhenTheOfficialClickDidNotLeaveTheConversation() {
+    fun recoveryCannotReplaceThePageOrDiscardAGuestConversation() {
         assertEquals(
-            ChatGptNewConversationRecoveryAction.LOAD_HOME,
-            action(webViewAtHome = false),
+            setOf("NONE", "REQUEST_SNAPSHOT"),
+            ChatGptNewConversationRecoveryAction.values().map { it.name }.toSet(),
         )
+    }
+
+    @Test
+    fun onlyAnActiveLoadingNavigationWithoutAComposerNeedsAProbe() {
+        for (active in listOf(false, true)) {
+            for (loading in listOf(false, true)) {
+                for (ready in listOf(false, true)) {
+                    val expected = if (active && loading && !ready) {
+                        ChatGptNewConversationRecoveryAction.REQUEST_SNAPSHOT
+                    } else ChatGptNewConversationRecoveryAction.NONE
+                    assertEquals(expected, action(active, loading, ready))
+                }
+            }
+        }
     }
 
     @Test
@@ -40,11 +54,9 @@ class ChatGptNewConversationRecoveryPolicyTest {
         navigationActive: Boolean = true,
         loading: Boolean = true,
         composerReady: Boolean = false,
-        webViewAtHome: Boolean = true,
     ) = ChatGptNewConversationRecoveryPolicy.action(
         navigationActive = navigationActive,
         loading = loading,
         composerReady = composerReady,
-        webViewAtHome = webViewAtHome,
     )
 }
