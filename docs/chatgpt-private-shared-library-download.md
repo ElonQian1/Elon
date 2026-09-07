@@ -87,8 +87,10 @@ control or complete page snapshot is polled for each progress update.
   parameterized-image references are not implemented by this candidate.
 - References present only in separate shared-library metadata/citation graphs,
   rather than the selected conversation attachment index, are not yet indexed.
-- Process-death resume and startup cleanup of orphaned pending rows/part files
-  are not implemented. Normal cancellation cleanup is not crash recovery.
+- Startup cleanup now has [durable native ownership and focused crash tests](chatgpt-private-download-recovery.md).
+  Actual Android storage acceptance is pending. Process-death byte-range resume,
+  persistent download history and old unjournaled artifacts remain unsupported;
+  cleanup is not a resume or a restored completion receipt.
 - Native progress/cancel controls are implemented in source but await grouped
   Android compilation and production UI acceptance, including notifications
   disabled. They are not a live UI pass yet.
@@ -104,9 +106,10 @@ native cancel and lost commit acknowledgement without replay. The two new
 request-bound cancellation cases fail against the original module at
 `17e41589c` and pass against module 6; three existing matching cases pass on both.
 
-The preceding five pure Kotlin transfer tests and one command-lifecycle test,
-plus ten progress/session/consumer/MCP/UI-contract tests, are written but not
-executed yet. The UI-contract test checks source wiring, not rendered pixels.
+The five pure Kotlin transfer cases and six download-session cases subsequently
+passed as part of the 31-case [crash-cleanup checkpoint](chatgpt-private-download-recovery.md).
+The broader command-lifecycle, consumer/MCP and UI-contract tests still await
+grouped Android execution. The UI-contract test checks source wiring, not rendered pixels.
 No Android build, APK publication or phone file transfer
 occurred in this source batch. No speed, heat or battery improvement is claimed.
 
