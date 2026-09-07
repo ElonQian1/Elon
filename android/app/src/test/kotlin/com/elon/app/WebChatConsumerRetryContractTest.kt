@@ -20,6 +20,7 @@ class WebChatConsumerRetryContractTest {
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundExecutionController.kt",
         )
         val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
+        val retry = read("android/app/src/main/kotlin/com/elon/app/WebChatConsumerSessionRetry.kt")
 
         listOf(chatGpt, google).forEach { source ->
             assertTrue(source.contains("fun retryConnection(): Boolean"))
@@ -34,9 +35,10 @@ class WebChatConsumerRetryContractTest {
         }
         assertTrue(backgroundExecution.contains("webView()?.onPause()"))
         assertTrue(backgroundExecution.contains("it.onResume()"))
-        assertTrue(feature.contains("controller.retryGuestAccess()"))
-        assertTrue(feature.contains("controller.retryConnection()"))
-        assertTrue(feature.contains("if (!retried) controller.onHostResumed()"))
+        assertTrue(feature.contains("retryWebChatConsumerSession(activeController())"))
+        assertTrue(retry.contains("controller.retryGuestAccess()"))
+        assertTrue(retry.contains("controller.retryConnection()"))
+        assertTrue(retry.contains("if (!retried) controller.onHostResumed()"))
     }
 
     private fun read(relativePath: String): String =

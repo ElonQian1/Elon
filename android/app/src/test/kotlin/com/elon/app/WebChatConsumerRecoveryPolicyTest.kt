@@ -37,10 +37,12 @@ class WebChatConsumerRecoveryPolicyTest {
         val session = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt")
         val controller = read("android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt")
         val feature = read("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt")
+        val retry = read("android/app/src/main/kotlin/com/elon/app/WebChatConsumerSessionRetry.kt")
 
         assertTrue(session.contains("view.loadUrl(ChatGptWebNavigationPolicy.START_URL)"))
         assertTrue(controller.contains("override fun retryGuestAccess(): Boolean"))
-        assertTrue(feature.contains("controller.stateWireValue() == \"login_required\""))
+        assertTrue(feature.contains("retryWebChatConsumerSession(activeController())"))
+        assertTrue(retry.contains("controller.stateWireValue() == \"login_required\""))
         assertTrue(feature.contains("binding.moreButton.visibility = View.GONE"))
     }
 

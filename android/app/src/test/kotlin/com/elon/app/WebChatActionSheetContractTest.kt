@@ -10,9 +10,8 @@ import org.junit.Test
 
 class WebChatActionSheetContractTest {
     @Test
-    fun primaryConsumerOptionListsUseTheSharedBottomSheet() {
+    fun consumerListsUseBottomSheetsAndModelLevelsUseTheAnchoredPopup() {
         listOf(
-            "android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionFeatureNavigation.kt",
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionPageActions.kt",
@@ -20,6 +19,10 @@ class WebChatActionSheetContractTest {
         ).forEach { path ->
             assertTrue("$path must use the consumer action sheet", read(path).contains("WebChatActionSheet.show"))
         }
+        val model = read("android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt")
+        assertTrue(model.contains("WebChatModelControlPopup.show("))
+        assertTrue(model.contains("anchor = anchor"))
+        assertTrue(model.contains("onProviderSwitch = openProviderPicker"))
     }
 
     @Test
@@ -39,7 +42,7 @@ class WebChatActionSheetContractTest {
     }
 
     @Test
-    fun composerSheetsCloseTheHiddenOfficialMenuWhenCancelled() {
+    fun modelDismissClosesOfficialOptionsAndPresetToolSheetDoesNotOpenThem() {
         val model = read("android/app/src/main/kotlin/com/elon/app/ChatGptSocialChatController.kt")
         val tools = read("android/app/src/main/kotlin/com/elon/app/WebChatProductionComposerTools.kt")
 
@@ -47,9 +50,15 @@ class WebChatActionSheetContractTest {
         assertTrue(model.contains("socialConsumerPort.dismissComposerOptions()"))
         assertTrue(tools.contains("requestEpoch += 1"))
         assertTrue(tools.contains("port.dismissComposerOptions()"))
-        val commandDispatch = tools.substringBefore("executeCommand(provider, port, it)")
-        assertTrue(commandDispatch.endsWith("port.dismissComposerOptions()\r\n                ") ||
-            commandDispatch.endsWith("port.dismissComposerOptions()\n                "))
+        val show = tools.substringAfter("fun show(provider:").substringBefore("fun quickActions(")
+        assertTrue(show.contains("cancelPending()"))
+        assertTrue(show.contains("val actions = quickActions(provider)"))
+        assertTrue(show.contains("onCancelled = { requestEpoch += 1 }"))
+        assertFalse(show.contains("requestComposerTools"))
+        val cancel = tools.substringAfter("fun cancelPending()").substringBefore("private fun pollQuickAction")
+        assertTrue(cancel.contains("pendingQuickAction = null"))
+        assertTrue(cancel.contains("pendingSessionCommand = null"))
+        assertTrue(cancel.contains("activeSheet?.dismiss()"))
     }
 
     @Test

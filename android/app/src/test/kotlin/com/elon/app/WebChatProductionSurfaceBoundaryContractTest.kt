@@ -54,6 +54,9 @@ class WebChatProductionSurfaceBoundaryContractTest {
         val chatGptTouchRequests = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTouchRequestHandler.kt",
         )
+        val conversationOpenRecovery = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptConversationOpenRecoveryCoordinator.kt",
+        )
 
         assertTrue(feature.contains("ChatGptSocialChatController"))
         assertFalse(modeController.contains("ChatGptWebTestActivity"))
@@ -81,7 +84,8 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(sideMenu.contains("WebChatSideMenuRefreshPolicy.shouldRefreshOnOpen"))
         assertTrue(sideMenu.contains("ChatGptNativeNavigationSelector.REFRESH_CONVERSATIONS"))
         assertTrue(chatGptBackground.contains("ChatGptConversationNavigationCoordinator"))
-        assertTrue(chatGptBackground.contains("observedMcpState::beginOpenConversationCommand"))
+        assertTrue(chatGptBackground.contains("conversationOpenRecovery.openTracked(path, observedMcpState, pageAdapter)"))
+        assertTrue(conversationOpenRecovery.contains("observedState.beginOpenConversationCommand(path)"))
         assertTrue(chatGptNavigationActions.contains("conversationNavigation.beginOpen"))
         assertTrue(chatGptNavigationActions.contains("conversationNavigation.beginNew"))
         assertTrue(chatGptBackground.contains("conversationNavigation.save"))

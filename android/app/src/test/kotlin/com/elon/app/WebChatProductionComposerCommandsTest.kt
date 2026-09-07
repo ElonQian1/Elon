@@ -37,14 +37,17 @@ class WebChatProductionComposerCommandsTest {
     }
 
     @Test
-    fun offersSubmitInsteadOfStartingAnotherDictation() {
+    fun offersSubmitAndCancelInsteadOfStartingAnotherDictation() {
         val commands = WebChatProductionComposerCommandCatalog.resolve(
             chatGpt,
             streaming = false,
             dictationActive = true,
         )
 
-        assertEquals(listOf("chatgpt_submit_dictation"), commands.map { it.action })
+        assertEquals(
+            listOf("chatgpt_submit_dictation", "chatgpt_cancel_dictation"),
+            commands.map { it.action },
+        )
     }
 
     @Test
