@@ -21,7 +21,7 @@ internal class MainSocialAiChatFeature(
     clearPendingSendState: () -> Unit,
     collapseInputComposer: () -> Unit,
     private val inputComposerViews: () -> MainInputComposerViews?,
-    pendingInputAttachmentCount: () -> Int,
+    private val pendingInputAttachmentCount: () -> Int,
     prepareInputForProviderSwitch: (Boolean) -> Unit, private val nativeDictation: WebChatNativeDictationPort,
     private val showWorkModelSelector: () -> Unit,
     private val updateWorkModel: () -> Unit,
@@ -597,7 +597,7 @@ internal class MainSocialAiChatFeature(
             }
         }
         inputComposerViews()?.let { views ->
-            views.attachmentPreparation = WebChatAttachmentPreparationPort(controller::beginAttachmentSelection)
+            views.attachmentPreparation = WebChatAttachmentUploadOptions(controller, pendingInputAttachmentCount)
             views.modelButtonShell.tag = WEB_CHAT_MODEL_BUTTON_OWNER
             views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
                 width = dp(

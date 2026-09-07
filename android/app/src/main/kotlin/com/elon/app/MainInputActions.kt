@@ -133,7 +133,10 @@ internal class MainInputActions(
             },
             onEditImage = { index ->
                 openImageEditor(index)
-            }
+            },
+            onUploadOptions = { anchor, attachment, selected ->
+                inputComposerViews?.attachmentPreparation?.showUploadOptions(anchor, attachment, selected) == true
+            },
         )
         views.pendingAttachmentHost.addView(requireNotNull(pendingAttachmentPreviewStrip).view)
         voiceModeActions.applyVoiceMode()

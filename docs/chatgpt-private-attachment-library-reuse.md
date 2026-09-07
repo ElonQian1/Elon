@@ -104,6 +104,58 @@ verify one reused file is associated and its contents reach one reply; where
 disabled or unobserved, record that limitation instead of forcing the gate.
 Existing browser login and original conversation/draft state must be preserved.
 
-Remaining advanced behavior includes a user-controlled upload-anyway override,
-unsupported file categories, and live gate/association acceptance. Do not
-rediscover the endpoint or reimplement this module while those checks wait.
+## Explicit upload-copy choice
+
+The current native source adds a pre-send choice, rather than reproducing the
+website's post-reuse toast. The inspected composer asset's `VGt` upload-anyway
+callback invokes the same uploader with `checkForReusableLibraryFile: false`
+and `takeUploadSlotPrefetchSelection: undefined`. This is source evidence for
+bypassing reuse and its earlier slot, not a new HTTP endpoint or a live capture.
+
+In production ChatGPT chat, long-pressing a supported pending attachment opens
+the existing native popup style with reuse-first and upload-copy choices. The
+default remains reuse-first. `PendingAttachment.chatGptUploadCopy` belongs only
+to that exact local selection, not to an account, project or global setting.
+The choice is available before upload, with no DOM or network synchronization.
+Copy requires one file accepted by the existing private MIME/size/image policy;
+an earlier copy choice can still be reset after adding another file. Existing
+image preview/edit/remove controls, Google and work-mode paths are retained.
+
+The menu checks active ChatGPT ownership, no streaming/pending upload, the
+original conversation and an attached anchor. The mutation uses reference
+identity, so a removed, edited, replaced or submitted file cannot be changed by
+an old menu. Choosing the current mode does not replace the file or invalidate
+its picker preparation unnecessarily.
+
+Adapter 287, sender 15, transport 12 and library 2 carry the choice through the
+existing native byte lease and upload owner. Explicit copy cancels picker
+preparation, does not take or create a reservation, skips library import/hash/
+lookup, and uses the existing create/byte/process/association transaction.
+Transport independently enforces this even with an older library module and
+snapshots the option before async authentication. The internal choice is not
+added to the official JSON request body; temporary/project/library retention
+continues to follow the existing official composer policy.
+
+Explicit copy cannot silently fall back to a chooser/DOM path that could reuse
+the file. Unavailable private upload fails the reserved send without submitting
+its text, while default selection retains existing compatibility behavior.
+After a private allocation, cancellation or context loss cannot associate or
+replay. Already allocated server slots are not speculatively deleted. This
+guarantees the client uses selected bytes, not that the server stores duplicate
+physical bytes. Replacing an already-associated file after sending is not part
+of this pre-send interaction.
+
+Verification: four new cases first failed against the previous sender/library.
+The final focused run passed all 247 Node cases, including actual production
+sender/selection/reservation/bytes integration, stale/cancel guards, native
+wiring contracts and the asset-bundle parse. Fifteen Kotlin/JUnit cases passed
+for selection identity and send ownership. Current menu, preview, model and
+send-owner sources also compiled against the Android SDK and cached untouched
+app dependencies; this is not a full Android build. Gateway and large-entry
+consumer compilation, popup rendering and real request/byte/reply acceptance
+remain for the grouped APK. No phone, browser session, microphone, release or
+thermal benchmark was used in this source-only extension.
+
+Remaining work includes unsupported file categories and grouped live
+gate/association/copy-choice acceptance. Do not rediscover the endpoint or
+reimplement these modules while those checks wait.

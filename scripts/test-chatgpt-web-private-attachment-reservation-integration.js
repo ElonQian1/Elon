@@ -435,9 +435,19 @@ test('production picker and background lifecycle are connected to the scoped res
   }
   assert.match(picker, /finishSelection\(if \(uris.size == 1\) files else emptyList\(\)\)/);
   assert.match(readNative('MainInputActions.kt'), /preparationPort = \{ inputComposerViews\?\.attachmentPreparation \}/);
-  assert.match(readNative('MainSocialAiChatFeature.kt'), /WebChatAttachmentPreparationPort\(controller::beginAttachmentSelection\)/);
+  assert.match(readNative('MainSocialAiChatFeature.kt'), /WebChatAttachmentUploadOptions\(controller, pendingInputAttachmentCount\)/);
+  const options = readNative('WebChatAttachmentUploadOptions.kt');
+  assert.match(options, /override fun begin\(kind: WebChatAttachmentSelectionKind\) = controller.beginAttachmentSelection\(kind\)/);
+  assert.match(options, /controller.providerId == WebChatProviderId.CHATGPT_WEB/);
+  assert.match(options, /!controller.streaming\(\) && controller.pendingAttachmentCount\(\) == 0/);
+  assert.match(options, /selectionCount\(\) == 1 && ChatGptWebNativeAttachmentPolicy.supports/);
+  assert.match(options, /controller.currentConversationPath\(\) != conversation/);
+  assert.match(readNative('MainInputActions.kt'), /attachmentPreparation\?\.showUploadOptions\(anchor, attachment, selected\)/);
+  assert.match(readNative('PendingAttachmentPreviewStrip.kt'), /preview.setOnLongClickListener/);
+  assert.match(readNative('PendingAttachmentPreviewStrip.kt'), /updatePendingAttachmentUploadChoice\(pendingAttachments, attachment, uploadCopy\)/);
   const gateway = readNative('chatgptweb/ChatGptWebNativeAttachmentGateway.kt');
-  assert.match(gateway, /val selectionId = pickerPreparation.take\(file\)\s+revokeLease\(preserveSelection = true\)/);
+  assert.match(gateway, /val selectionId = if \(file.chatGptUploadCopy\) \{\s+pickerPreparation.cancel\(\)\s+null\s+\} else pickerPreparation.take\(file\)\s+revokeLease\(preserveSelection = true\)/);
+  assert.match(gateway, /\.put\("uploadCopy", file.chatGptUploadCopy\)/);
   assert.match(gateway, /\.put\("selectionId", selectionId\)/);
   const adapter = fs.readFileSync(path.join(__dirname, base, 'chatgpt_web_adapter.js'), 'utf8');
   const dispose = adapter.slice(adapter.indexOf('  function dispose()'), adapter.indexOf('  window.__elonChatGptBridge ='));
