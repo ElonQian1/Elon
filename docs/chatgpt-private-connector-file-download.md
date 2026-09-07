@@ -70,7 +70,9 @@ confirmed. Neither route is claimed implemented by this copy extension.
 The subsequent [shared-library attachment candidate](chatgpt-private-shared-library-download.md)
 implements a bounded binary-to-native-storage lane for recognized indexed
 references. Its native build and live transfer remain pending; standalone and
-mounted library, metadata-only references and parameterized pointers remain gaps.
+mounted library and metadata-only references remain gaps. Bounded parameterized
+image pointers are now covered by the separate [image-pointer extension](chatgpt-private-image-download.md#parameterized-pointers);
+path-bearing pointers and context overrides remain unsupported.
 
 ## Verification and grouped acceptance
 

@@ -27,11 +27,15 @@ attachment descriptors as described below. Version 3 adds scoped
 rejects attachment-level context scopes and `library_download_id` lanes.
 Version 4 accepts recognized [imported connector file copies](chatgpt-private-connector-file-download.md)
 without fetching their external source URL. Connector-only cloud references,
-mounted library and parameterized image-pointer variants remain unclaimed until
+mounted library and path-bearing image-pointer variants remain unclaimed until
 their separate resolvers are covered. Version 5 adds a separate
 [shared-library attachment binary download candidate](chatgpt-private-shared-library-download.md)
 using the same production action, not the signed-URL resolver. Standalone library
 downloads and separate metadata-only references remain outside that candidate.
+Version 7 / adapter 288 additionally supports bounded parameterized image
+pointers through the same resolver, preserving full-ID metadata matching and
+official query/fragment normalization without accepting context overrides.
+See the [parameterized-pointer contract and verification](chatgpt-private-image-download.md#parameterized-pointers).
 
 The native index receives random opaque selection handles, not private file
 IDs or signed URLs. Registration uses the selected history branch, preserving

@@ -2,7 +2,8 @@
 
 Capability candidate: `android_chatgpt_private_conversation_image_download_v1`.
 Status: **implemented, offline verified, grouped APK/device acceptance pending**.
-Implementation commit: `31f1c10d4`. This is not a live private download pass.
+Initial implementation: `31f1c10d4`; parameterized-pointer extension: `0ed2edcf2`.
+Neither source checkpoint is a live private download pass.
 
 ## Confirmed official contract
 
@@ -50,8 +51,8 @@ native download service uses the response metadata.
 Duplicate matching attachments, truncated or malformed metadata, conflicting
 projects, extra context scopes and non-image MIME metadata are rejected. Version
 4 additionally accepts matching metadata for [imported connector copies](chatgpt-private-connector-file-download.md).
-Shared/mounted library and connector-only references, parameterized pointers,
-path-bearing pointers and arbitrary URLs remain unsupported. Scope-like fields directly inside image
+Shared/mounted library and connector-only references, path-bearing pointers
+and arbitrary URLs remain unsupported. Scope-like fields directly inside image
 parts are also rejected rather than silently ignored. `library_download_id` and
 attachment-level context scopes now reject broad file-download registration too.
 
@@ -60,6 +61,48 @@ route or selection changes and cancellation prevent a late response from
 enqueueing another file. Existing deadline, response-size, signed-origin and
 one-use native lease checks are reused. A queue acknowledgement still means
 only **queued**, never saved or downloaded successfully.
+
+## Parameterized pointers
+
+Adapter 288 / private file download 7 extends this same capability, rather than
+introducing another downloader. The same hashed official assets show that `TTt`
+removes only the scheme: `jW` matches attachment metadata against the complete
+remaining string. `A5t` passes that string to `fEt`. Its `dEt` resolver splits at
+the first `?`, parses the suffix with `URLSearchParams` and `Object.fromEntries`
+(last duplicate value wins), and replaces `#` in the file ID with `*` before
+issuing the existing file-download request. `WTt` still receives the complete
+unmodified ID when library metadata resolution is required.
+
+The implementation now preserves those distinctions: the original ID is used
+for exact metadata matching, while the normalized download ID and immutable
+query entries are captured in the private selection registry. Percent encoding
+and plus signs use standard query semantics. The native index still receives
+only an opaque handle, filename and media type; raw pointer parameters are not
+added to native receipts or persisted conversation projections.
+
+Bounds are 4096 pointer characters, 32 query pairs, 64-character parameter names
+and 1024-character values. Simple ID segments with bounded `#` suffixes are
+supported; path-bearing IDs, malformed encoding and control characters are not.
+Parameters that override project, conversation, post, context, inline/download
+intent or credential fields are rejected rather than silently changing their
+meaning. Remaining opaque parameters are forwarded as supplied by the selected
+official history response; this does not assert that any particular parameter
+name or image transformation is available. Test `variant`/`label` values are
+synthetic parser fixtures, not observed production options.
+
+The four new cases cover parameter preservation/normalization, complete-ID
+metadata matching with mutation after selection, bounds/context rejection and
+project-scoped authorization rejecting another file ID. The two new positive
+cases failed against version 6. The final focused download/projection/index/
+transport/gallery run passes 118 Node runner cases; six wiring cases also pass,
+including parsing the complete production asset bundle. This extension changes
+no Android storage code. No full Android build, APK publication, live browser
+request or phone download was performed for this source batch.
+
+Grouped acceptance must include one real parameterized image pointer when the
+account has one, in addition to the simple image below. Check the saved bytes
+and scope, not only the queue receipt. Unsupported pointer forms remain an
+explicit gap; do not claim every possible official image reference is covered.
 
 ## Verification and next acceptance
 
