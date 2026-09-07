@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 6, create: factory });
+  const exported = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -15,7 +15,12 @@
   const UUID = '[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}';
   const CONVERSATION = new RegExp('^(?:/g/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?)?/c/(' + UUID + ')$', 'i');
   const PROJECT = /^\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?\/project$/i;
-  let active = null;
+  let active = null, captureCode = 'not_observed';
+
+  function unavailable(code) {
+    captureCode = code;
+    return null;
+  }
 
   function route() {
     const url = new URL(page.location.href);
@@ -37,12 +42,19 @@
   }
 
   function committedAncestors(node) {
-    const key = Object.keys(node).find(name => name.startsWith('__reactFiber$'));
-    for (const start of [node[key], node[key]?.alternate]) {
-      const ancestors = [];
-      for (let fiber = start; fiber && ancestors.length < 90; fiber = fiber.return) ancestors.push(fiber);
-      const top = ancestors.at(-1);
-      if (top && !top.return && top.stateNode?.current === top) return ancestors;
+    // The current official composer appends its ProseMirror DOM imperatively.
+    // Use its nearest React host, never a sibling editor or an uncommitted root.
+    for (let host = node, depth = 0; host?.isConnected && depth < 12; host = host.parentElement, depth++) {
+      if (host === page.document.body || host === page.document.documentElement) break;
+      const key = Object.keys(host).find(name => name.startsWith('__reactFiber$'));
+      if (!key) continue;
+      for (const start of [host[key], host[key]?.alternate]) {
+        const ancestors = [];
+        for (let fiber = start; fiber && ancestors.length < 90; fiber = fiber.return) ancestors.push(fiber);
+        const top = ancestors.at(-1);
+        if (top && !top.return && top.stateNode?.current === top) return ancestors;
+      }
+      break;
     }
     return [];
   }
@@ -55,13 +67,16 @@
       if (typeof value?.files$ === 'function' && typeof value.readyFiles$ === 'function' &&
           typeof value.hasUploadInProgress$ === 'function') files.add(value);
     }
-    for (const fiber of committedAncestors(node)) {
+    const ancestors = committedAncestors(node);
+    if (!ancestors.length) return unavailable('react_owner_unavailable');
+    for (const fiber of ancestors) {
       accept(fiber.memoizedProps?.value);
       let context = fiber.dependencies?.firstContext;
       for (let count = 0; context && count < 30; context = context.next, count++) accept(context.memoizedValue);
     }
-    return shared.size === 1 && files.size === 1
-      ? { shared: shared.values().next().value, files: files.values().next().value } : null;
+    if (shared.size !== 1) return unavailable(shared.size ? 'shared_store_ambiguous' : 'shared_store_unavailable');
+    if (files.size !== 1) return unavailable(files.size ? 'file_store_ambiguous' : 'file_store_unavailable');
+    return { shared: shared.values().next().value, files: files.values().next().value };
   }
 
   function loaded() {
@@ -73,16 +88,21 @@
   }
 
   function captureConversation(node) {
-    if (!node?.isConnected || !loaded()) return null;
+    if (!node?.isConnected) return unavailable('composer_detached');
+    if (!loaded()) return unavailable('runtime_not_observed');
     const token = page.__elonChatGptDocumentToken, account = identity(), currentRoute = route();
-    if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '') || account === null || !currentRoute) return null;
-    const context = stores(node), props = context?.shared.getSharedProps();
+    if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '')) return unavailable('document_unavailable');
+    if (account === null) return unavailable('identity_unavailable');
+    if (!currentRoute) return unavailable('route_unsupported');
+    const context = stores(node);
+    if (!context) return null;
+    const props = context.shared.getSharedProps();
     const conversation = props?.conversation, controller = props?.composerController;
-    if (!conversation || !controller || controller.conversation !== conversation ||
-        typeof conversation.serverId$ !== 'function' ||
-        (conversation.serverId$() || null) !== currentRoute.conversationId ||
-        typeof props.isNewThread !== 'boolean' || props.structuredInputHost != null ||
-        props.structuredInputMessageId != null) return null;
+    if (!conversation || !controller || controller.conversation !== conversation) return unavailable('conversation_owner_unavailable');
+    if (typeof conversation.serverId$ !== 'function' ||
+        (conversation.serverId$() || null) !== currentRoute.conversationId) return unavailable('conversation_route_mismatch');
+    if (typeof props.isNewThread !== 'boolean' || props.structuredInputHost != null ||
+        props.structuredInputMessageId != null) return unavailable('composer_mode_unsupported');
     return { ...context, ...currentRoute, token, account, node, conversation, controller,
       requestId: props.currentRequestId };
   }
@@ -91,21 +111,23 @@
     const binding = captureConversation(node);
     if (!binding) return null;
     const context = binding, props = context.shared.getSharedProps();
-    if (typeof props.submitComposer !== 'function' ||
-        props.isDisabled !== false || props.isComposerSubmissionReady !== true ||
-        props.isConsumerLockdownModeLoadingForConversation !== false ||
-        typeof props.shouldBlockConsumerLockdownModeActionsForConversation !== 'boolean') return null;
+    if (typeof props.submitComposer !== 'function') return unavailable('submit_owner_unavailable');
+    if (props.isDisabled !== false) return unavailable('composer_disabled');
+    if (props.isComposerSubmissionReady !== true) return unavailable('submission_not_ready');
+    if (props.isConsumerLockdownModeLoadingForConversation !== false ||
+        typeof props.shouldBlockConsumerLockdownModeActionsForConversation !== 'boolean') return unavailable('lockdown_not_ready');
     const pending = context.files.files$(), ready = context.files.readyFiles$();
-    if (!Array.isArray(pending) || !Array.isArray(ready) ||
-        context.files.hasUploadInProgress$() !== false) return null;
+    if (!Array.isArray(pending) || !Array.isArray(ready)) return unavailable('file_state_unavailable');
+    if (context.files.hasUploadInProgress$() !== false) return unavailable('upload_in_progress');
     const attachment = previousAttachment || (pending.length || ready.length
       ? page.__elonChatGptPrivateAttachmentSend?.prepareSubmit?.(context.files) : null);
     if (attachment) {
       if (typeof attachment.current !== 'function' || !attachment.current() ||
           typeof attachment.consumeAccepted !== 'function' || !Array.isArray(attachment.readyFiles) ||
           attachment.readyFiles.length < 1 || attachment.readyFiles.length > 9 ||
-          pending.length !== attachment.readyFiles.length || ready.length !== pending.length) return null;
-    } else if (pending.length || ready.length) return null;
+          pending.length !== attachment.readyFiles.length || ready.length !== pending.length) return unavailable('attachment_lease_invalid');
+    } else if (pending.length || ready.length) return unavailable('attachment_not_owned');
+    captureCode = 'ready';
     return { ...binding, leaf: props.currentLeafId, submit: props.submitComposer, attachment };
   }
 
@@ -137,11 +159,12 @@
         typeof expected !== 'string' || !/^mcp_[a-z0-9]{1,32}$/.test(command.requestId || '')) return { handled: false, code: 'invalid_command' };
     let binding;
     try {
+      captureCode = 'context_unavailable';
       binding = capture(command.composer);
-      if (!binding || command.requireNativeAttachment === true && !binding.attachment ||
-          command.readDraft() !== expected || expected && expected !== value || !current(binding)) {
-        return { handled: false, code: 'context_unavailable' };
-      }
+      if (!binding) return { handled: false, code: captureCode };
+      if (command.requireNativeAttachment === true && !binding.attachment) return { handled: false, code: 'attachment_not_owned' };
+      if (command.readDraft() !== expected || expected && expected !== value) return { handled: false, code: 'draft_mismatch' };
+      if (!current(binding)) return { handled: false, code: 'context_changed' };
       command.beforeSubmit?.();
       if (!current(binding) || command.readDraft() !== expected) return { handled: false, code: 'context_changed' };
     } catch (_) { return { handled: false, code: 'context_unavailable' }; }
@@ -191,5 +214,5 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 6, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 7, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

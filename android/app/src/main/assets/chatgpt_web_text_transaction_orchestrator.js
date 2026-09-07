@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptTextTransactionOrchestrator;
-  if (existing && Number(existing.version) >= 5) return;
+  if (existing && Number(existing.version) >= 6) return;
 
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
@@ -138,16 +138,16 @@
     }
 
     function tryRuntimeSend(composer, value, expectedDraft, assistantBeforeSend, respond, requireNativeAttachment) {
-      if (!runtimeSubmit || typeof runtimeSubmit.submit !== 'function') return false;
+      if (!runtimeSubmit || typeof runtimeSubmit.submit !== 'function') return { handled: false, code: '' };
       if (requireNativeAttachment && !(Number(runtimeSubmit.version) >= 2) &&
-          runtimeSubmit.state?.().pending !== true) return false;
+          runtimeSubmit.state?.().pending !== true) return { handled: false, code: 'runtime_version_unsupported' };
       const transaction = runtimeSubmit.submit({
         prompt: value, expectedDraft, composer, requestId: respond.requestId || '', requireNativeAttachment,
         readDraft: () => options.composerValue(composer),
         clearDraft: () => options.setComposerValue(composer, ''),
         beforeSubmit: () => privateStreamTransport?.prepareSend?.()
       });
-      if (!transaction?.handled) return false;
+      if (!transaction?.handled) return { handled: false, code: safeCode(transaction?.code, 'not_ready') };
       options.scheduleSnapshot(true);
       Promise.resolve(transaction.completion).then(receipt => {
         const accepted = receipt?.status === 'accepted';
@@ -160,7 +160,7 @@
         respond('send_prompt', false, 'official_runtime_v1:unknown:completion_failed');
         options.scheduleSnapshot(true);
       });
-      return true;
+      return { handled: true, code: '' };
     }
 
     function sendPrompt(value, expectedDraft, respond, allowPrivateTextTransaction) {
@@ -173,8 +173,13 @@
       let privateFallbackCode = '';
       // Attachment reservations forbid text-template replay, not the official
       // prepared_action carrying this sender's exact ready-file lease.
-      if (tryRuntimeSend(composer, value, expectedDraft, assistantBeforeSend, respond,
-          allowPrivateTextTransaction !== true)) return;
+      const runtimeAttempt = tryRuntimeSend(composer, value, expectedDraft, assistantBeforeSend, respond,
+        allowPrivateTextTransaction !== true);
+      if (runtimeAttempt.handled) return;
+      function fallbackResult(action, ok, detail) {
+        respond(action, ok, detail +
+          (runtimeAttempt.code ? ' [runtime_fallback:' + runtimeAttempt.code + ']' : ''));
+      }
       if (allowPrivateTextTransaction === true) {
         const attempt = tryPrivateSend(
           composer, value, expectedDraft, assistantBeforeSend, respond
@@ -182,13 +187,13 @@
         if (attempt.handled) return;
         privateFallbackCode = attempt.code;
       }
-      if (!composer) return respond('send_prompt', false, '未找到输入框，请切换网页模式。');
+      if (!composer) return fallbackResult('send_prompt', false, '未找到输入框，请切换网页模式。');
       if (options.comparableText(options.composerValue(composer)) !==
           options.comparableText(expectedDraft)) {
-        return respond('send_prompt', false, '网页草稿已变化，请返回官网确认后重试。');
+        return fallbackResult('send_prompt', false, '网页草稿已变化，请返回官网确认后重试。');
       }
       if (!options.setComposerValue(composer, value)) {
-        return respond('send_prompt', false, '官方输入框未接受文本，请返回官网重试。');
+        return fallbackResult('send_prompt', false, '官方输入框未接受文本，请返回官网重试。');
       }
       waitForStableSendButton(composer, value, (button) => {
         const sendMarker = privateSendObserver && typeof privateSendObserver.marker === 'function'
@@ -201,7 +206,7 @@
         options.scheduleSnapshot(true);
         waitForSendAccepted(composer, value, sendMarker, (acceptance) => {
           if (options.streamingPolicy) options.streamingPolicy.begin(assistantBeforeSend);
-          respond(
+          fallbackResult(
             'send_prompt',
             true,
             (acceptance === 'official_request_dispatched'
@@ -210,8 +215,8 @@
               (privateFallbackCode ? ' [private_fallback:' + privateFallbackCode + ']' : '')
           );
           options.scheduleSnapshot();
-        }, () => respond('send_prompt', false, '官方网页未确认发送，请重试。'));
-      }, () => respond('send_prompt', false, '发送按钮尚未就绪，请返回官网重试。'));
+        }, () => fallbackResult('send_prompt', false, '官方网页未确认发送，请重试。'));
+      }, () => fallbackResult('send_prompt', false, '发送按钮尚未就绪，请返回官网重试。'));
     }
 
     function tryPrivateRegeneration(respond) {
@@ -324,5 +329,5 @@
     return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, stopPrivate, stopGeneration });
   }
 
-  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 5, create });
+  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 6, create });
 })();

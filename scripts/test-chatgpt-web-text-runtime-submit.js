@@ -129,6 +129,61 @@ test('committed alternate is preferred to stale host fiber props', async () => {
   assert.equal((await result.completion).status, 'accepted');
 });
 
+test('imperatively mounted official editor resolves its nearest committed React host', async () => {
+  const f = fixture();
+  const host = { isConnected: true, __reactFiber$test: f.fiber };
+  delete f.node.__reactFiber$test;
+  f.node.parentElement = { isConnected: true, parentElement: host };
+  const result = f.api.submit(f.command);
+  assert.equal(result.handled, true);
+  assert.equal(f.calls.length, 1);
+  f.settle(true);
+  assert.equal((await result.completion).status, 'accepted');
+});
+
+for (const condition of ['uncommitted', 'body', 'detached', 'limit', 'wrong_conversation']) {
+  test('imperative editor does not escape its owner boundary: ' + condition, () => {
+    const f = fixture(), validHost = { isConnected: true, __reactFiber$test: f.fiber };
+    delete f.node.__reactFiber$test;
+    f.node.parentElement = validHost;
+    if (condition === 'uncommitted') f.node.__reactFiber$stale = { return: { stateNode: { current: {} } } };
+    if (condition === 'body') f.page.document.body = validHost;
+    if (condition === 'detached') validHost.isConnected = false;
+    if (condition === 'limit') for (let i = 0; i < 12; i++) f.node.parentElement = { isConnected: true, parentElement: f.node.parentElement };
+    if (condition === 'wrong_conversation') f.setServer('99999999-2222-3333-4444-555555555555');
+    assert.equal(f.api.submit(f.command).handled, false);
+    assert.equal(f.calls.length, 0);
+  });
+}
+
+test('reparenting the imperative editor before dispatch invalidates the captured owner', () => {
+  const f = fixture(), replacement = fixture();
+  delete f.node.__reactFiber$test;
+  f.node.parentElement = { isConnected: true, __reactFiber$test: f.fiber };
+  f.command.beforeSubmit = () => { f.node.parentElement = replacement.node; };
+  assert.equal(f.api.submit(f.command).code, 'context_changed');
+  assert.equal(f.calls.length, 0);
+  assert.equal(replacement.calls.length, 0);
+});
+
+for (const [code, change] of Object.entries({
+  react_owner_unavailable: f => { delete f.node.__reactFiber$test; },
+  shared_store_unavailable: f => { f.fiber.dependencies.firstContext = f.fiber.dependencies.firstContext.next; },
+  file_store_unavailable: f => { f.fiber.dependencies.firstContext.next = null; },
+  runtime_not_observed: f => f.setLoaded(false),
+  identity_unavailable: f => { f.page.__elonChatGptPrivateTransport = null; },
+  conversation_route_mismatch: f => f.setServer('99999999-2222-3333-4444-555555555555'),
+  submission_not_ready: f => { f.props.isComposerSubmissionReady = false; },
+  attachment_not_owned: f => { f.fileStore.readyFiles$ = () => [{ status: 'ready' }]; },
+  draft_mismatch: f => f.setDraft('another draft'),
+})) {
+  test('pre-dispatch rejection identifies its structural gate: ' + code, () => {
+    const f = fixture(); change(f);
+    assert.deepEqual(f.api.submit(f.command), { handled: false, code });
+    assert.equal(f.calls.length, 0);
+  });
+}
+
 test('ambiguous context stores are not guessed', () => {
   const f = fixture(); f.fiber.memoizedProps.value = { store: { ...f.shared } };
   assert.equal(f.api.submit(f.command).handled, false);
