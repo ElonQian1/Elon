@@ -1,11 +1,15 @@
 # Private conversation deletion
 
-Capability candidate: `android_chatgpt_private_conversation_delete_v1`.
+Capability: `android_chatgpt_private_conversation_delete_v1`.
 Implementation: current and noncurrent selections use the evidenced official
-single-conversation branches. Module version 3 now reads the current official
-flag before choosing DELETE or legacy PATCH. Runtime binding and deletion on a
-disposable conversation remain device-pending, not completed.
-Delivery: 1541 includes the legacy branch; version 3 awaits the grouped APK.
+single-conversation branches. Module version 4 resolves the verified current
+runtime and reads the official flag before choosing DELETE or legacy PATCH.
+Delivery: published and installed in `1.1.1547`. Case
+`android_chatgpt_private_conversation_delete_v1:personal_current` is completed:
+the production handler deleted only the dedicated synthetic conversation and
+returned `delete_server_acknowledged`. Original conversation restoration passed.
+See [device evidence](reports/chatgpt-runtime-release-1547.md). Noncurrent/project
+selection, both flag variants and rendered native confirmation remain unaccepted.
 Verification: the latest 18 deletion JS cases pass, including both branches,
 unknown configuration, timeouts, context changes and no cross-endpoint replay.
 Earlier verification: 12 deletion JS cases and existing mutation/directory/attachment

@@ -3,9 +3,12 @@
 ## Status
 
 Capability: `android_chatgpt_private_runtime_bindings_v1`.
-Code: implemented. Verification: offline contracts passed; current-build device
-acceptance pending. This is a shared dependency repair, not completion of every
-private feature or an independent native HTTP text sender.
+Code: implemented and shipped in `1.1.1547`. Offline contracts and Release
+compilation passed. Personal share/create/list/revoke and disposable conversation
+deletion passed through production handlers on the current website build. Other
+consumers still require their own acceptance; this is not completion of every
+private feature or an independent native HTTP text sender. See the
+[1547 evidence and remaining regressions](reports/chatgpt-runtime-release-1547.md).
 
 ## Confirmed regression
 
@@ -93,6 +96,8 @@ Resolver tests cover old/new builds, wrong aliases, every mapped identity,
 truncated timing, mixed/unknown builds, coalescing, timeout, cooldown, document
 replacement, foreign origin and production assembly order.
 
-Device evidence must still show current-profile operations on the production
-native page. Do not infer whole-feature acceptance from these synthetic tests.
-Google remains deferred until the ChatGPT acceptance gate passes.
+The installed 1547 production-handler sharing/deletion cases are completed, not
+inferred from these synthetic tests. Direct sending was not accepted: the reply
+arrived through the existing `template_unavailable` fallback and the native list
+retained a thinking-status bubble. Google remains deferred until the remaining
+ChatGPT acceptance gate passes.

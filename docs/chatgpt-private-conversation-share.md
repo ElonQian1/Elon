@@ -3,10 +3,13 @@
 Capability: `android_chatgpt_private_conversation_share_v1`.
 Status: implemented for the standard authenticated personal-account,
 non-project conversation flow, including legacy and redesigned variants;
-offline verified; grouped Android compilation
-and production-phone acceptance pending. This is not a completed capability
-or a claim that all website sharing variants are implemented.
-Adapter 285, share contract 2 and transaction module 4. The separate
+offline verified and shipped in `1.1.1547`. Case
+`android_chatgpt_private_conversation_share_v1:personal_create` is completed:
+production handler created a link from a synthetic conversation, its private list
+returned that exact link, and revocation succeeded. This does not accept every
+website variant or the rendered native confirmation/Copy/share-sheet interaction.
+Adapter 293, share contract 3 and transaction module 4; see
+[current device evidence](reports/chatgpt-runtime-release-1547.md). The separate
 [project-member resolver](chatgpt-private-project-conversation-share.md) now
 reuses this command owner with distinct member-only consent and receipts;
 it does not use the public writer described here.
