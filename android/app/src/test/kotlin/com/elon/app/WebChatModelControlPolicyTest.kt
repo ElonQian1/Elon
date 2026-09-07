@@ -92,6 +92,25 @@ class WebChatModelControlPolicyTest {
         assertFalse(WebChatModelControlPolicy.resolve(versions.subList(1, 3), "5.2").usesLevelSlider)
     }
 
+    @Test
+    fun explicitCatalogModelsNeverBecomeAnEffortSliderOrMatchByShortLabel() {
+        val models = listOf(
+            option("back", "返回高级", opensSubmenu = true),
+            option("one", "Fast").copy(semantic = "model_catalog"),
+            option("two", "High", selected = true).copy(semantic = "model_catalog"),
+        )
+        val presentation = WebChatModelControlPolicy.resolve(models, "Fast")
+        assertFalse(presentation.usesLevelSlider)
+        assertEquals("back", presentation.advanced?.id)
+        assertEquals(listOf("one", "two"), presentation.listOptions.map { it.id })
+        assertFalse(WebChatModelControlPolicy.isSelected(models[1], "Fast"))
+        assertTrue(WebChatModelControlPolicy.isSelected(models[2], "Fast"))
+        val paged = WebChatModelControlPolicy.resolve(
+            models + option("next", "下一页", opensSubmenu = true), "Fast",
+        )
+        assertEquals(listOf("one", "two", "next"), paged.listOptions.map { it.id })
+    }
+
     private fun option(
         id: String,
         label: String,
