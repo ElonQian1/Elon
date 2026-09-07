@@ -21,5 +21,9 @@ internal object ChatGptWebConversationShareReceipt {
         return Link(url, match.groupValues[1], match.groupValues[2])
     }
 
-    fun detail(raw: String): String = if (parse(raw) != null || error.matches(raw)) raw else "share_result_unconfirmed"
+    fun detail(raw: String): String = when {
+        raw.startsWith("{") -> ChatGptWebSharedLinks.detail(raw)
+        parse(raw) != null || error.matches(raw) -> raw
+        else -> "share_result_unconfirmed"
+    }
 }
