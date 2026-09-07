@@ -17,6 +17,7 @@ internal class ChatGptWebConsumerPortAdapter(
     private val uiManifest: () -> ChatGptWebUiManifest?,
     private val observedState: () -> ChatGptWebObservedState.Snapshot,
     private val executeControl: (JSONObject) -> JSONObject,
+    private val readFileDownload: () -> com.elon.app.WebChatFileDownloadState? = { null },
 ) : WebChatConsumerPort {
     override fun conversationFiles(path: String): com.elon.app.WebChatConversationFileIndex? =
         ChatGptWebConversationPath.identity(path)?.let { observedState().conversationFiles[it] }
@@ -28,6 +29,10 @@ internal class ChatGptWebConsumerPortAdapter(
     override fun downloadConversationFile(path: String, fileId: String, downloadHandle: String): WebChatConsumerCommandResult =
         execute(JSONObject().put("action", "chatgpt_download_conversation_file")
             .put("conversation_path", path).put("file_id", fileId).put("download_handle", downloadHandle))
+
+    override fun fileDownloadState(): com.elon.app.WebChatFileDownloadState? = readFileDownload()
+    override fun cancelFileDownload(requestId: String): WebChatConsumerCommandResult =
+        execute(JSONObject().put("action", "chatgpt_cancel_file_download").put("download_request_id", requestId))
 
     override fun state(): WebChatConsumerState {
         val observed = observedState()

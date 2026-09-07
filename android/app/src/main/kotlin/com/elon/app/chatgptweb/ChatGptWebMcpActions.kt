@@ -63,6 +63,11 @@ internal class ChatGptWebMcpActions(
             .put("last_command", ChatGptWebCommandReceipts.lastResultJson(observed))
             .put("last_attachment_upload", ChatGptWebCommandReceipts.recentResultJson(observed, "request_attachment_upload"))
             .put("conversation_files", ChatGptWebMcpSnapshotJson.conversationFiles(observed, current?.url))
+            .put("file_download", commands.fileDownloadState()?.let { download ->
+                JSONObject().put("request_id", download.requestId).put("state", download.stage.wireName)
+                    .put("received_bytes", download.receivedBytes).put("total_bytes", download.totalBytes)
+                    .put("can_cancel", download.canCancel)
+            } ?: JSONObject.NULL)
             .put(
                 "last_project_membership_probe",
                 ChatGptWebCommandReceipts.recentProjectMembershipProbeJson(observed),
@@ -95,6 +100,12 @@ internal class ChatGptWebMcpActions(
             dispatchRequest(beginCommand(expectedAction), block)
         }
         when (action) {
+            "chatgpt_cancel_file_download" -> {
+                val id = args.optString("download_request_id")
+                if (id.isBlank() || id.length > 160 || !commands.cancelFileDownload(id)) {
+                    return error(action, "download_not_active")
+                }
+            }
             "chatgpt_download_conversation_file" -> {
                 val path = ChatGptWebConversationPath.normalize(args.optString("conversation_path"))
                     ?: return error(action, "invalid_conversation_path")
@@ -756,6 +767,7 @@ internal class ChatGptWebMcpActions(
         val CONTROL_ID = Regex("control_[a-z0-9_]{1,63}")
         val COMPOSER_SECTIONS = setOf("model", "tools")
         val LOCAL_ACTIONS = setOf(
+            "chatgpt_cancel_file_download",
             "state",
             "open_chatgpt_web",
             "chatgpt_refresh",

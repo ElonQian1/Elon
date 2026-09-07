@@ -37,6 +37,7 @@ internal object ChatGptWebMcpActionCatalog {
         "chatgpt_list_conversations",
         "chatgpt_list_conversation_files",
         "chatgpt_download_conversation_file",
+        "chatgpt_cancel_file_download",
         "chatgpt_list_composer_options",
         "chatgpt_dismiss_composer_options",
         "chatgpt_select_composer_option",

@@ -110,5 +110,6 @@ internal class ChatGptWebPortFactory(
             uiManifest = uiManifest,
             observedState = observedState::snapshot,
             executeControl = mcpPort::control,
+            readFileDownload = { pageAdapter()?.nativeDownloads?.snapshot() },
         )
 }
