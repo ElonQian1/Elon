@@ -5,7 +5,7 @@ Status: implemented for authenticated personal-account conversations in an
 already shared, non-sensitive project; offline verified; grouped Android
 compilation, native consumer/MCP tests and production-phone acceptance pending.
 This is not a completed capability or a live permission/access verification.
-Adapter 284; shared transaction module 3; member resolver module 1.
+Adapter 285; shared transaction module 4; member resolver module 1.
 
 ## Official evidence
 
@@ -98,6 +98,10 @@ membership. Confirm no `share/create`, public publication or permission mutation
 Check the ordinary public path once for regression, then preserve both results.
 
 Guest, workspace, private/non-shared project public sharing, temporary-chat
-sharing, link management/revocation and unsupported sensitive project types
+sharing, account-wide link management and unsupported sensitive project types
 remain distinct code gaps. Do not report them as implemented or widen this
 member-only consent to cover them.
+
+Personal public-link management for a selected conversation is now implemented
+in the [shared-link module](chatgpt-private-shared-links.md), with grouped Android
+acceptance pending. It cannot revoke a project-member URL or project membership.

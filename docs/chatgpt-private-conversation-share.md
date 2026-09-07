@@ -6,7 +6,7 @@ non-project conversation flow, including legacy and redesigned variants;
 offline verified; grouped Android compilation
 and production-phone acceptance pending. This is not a completed capability
 or a claim that all website sharing variants are implemented.
-Adapter 284, share contract 2 and transaction module 3. The separate
+Adapter 285, share contract 2 and transaction module 4. The separate
 [project-member resolver](chatgpt-private-project-conversation-share.md) now
 reuses this command owner with distinct member-only consent and receipts;
 it does not use the public writer described here.
@@ -137,8 +137,10 @@ tests and full Android compilation remain pending; no real link was created.
 
 The redesigned authenticated route is now implemented; guest `/share/v2/create`
 remains a distinct unsupported scope. Personal shared-project member links are
-source-implemented separately. Still separate code gaps: workspace and
-private-project public sharing, eligible temporary-chat sharing, share management and
-link revocation. Do not reuse this public confirmation for a members-only link,
+source-implemented separately. [Conversation-scoped public-link management and
+revocation](chatgpt-private-shared-links.md) are also source-implemented, with
+grouped Android acceptance pending. Still separate code gaps: workspace and
+private-project public sharing, eligible temporary-chat sharing, account-wide
+management, bulk revocation and Canvas/post shares. Do not reuse this public confirmation for a members-only link,
 or mistake `/share/post` message-slice creation for full-conversation sharing.
 Keep these gaps in the [remaining batch](web-ai-private-native-remaining-batch.md).
