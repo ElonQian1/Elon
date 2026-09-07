@@ -17,6 +17,13 @@ not a guessed endpoint or a device download acceptance result.
 Capability candidate: `android_chatgpt_private_file_download_v1`.
 Status: `implemented_device_pending`, not `completed`.
 
+Current device checkpoint: `1543` successfully indexed the already-uploaded
+synthetic text file, but its single download returned
+`download_source_unsupported`; no bytes were saved. The actual returned URL
+shape still needs inspection before extending any source policy. This is not
+a successful end-to-end download; see the
+[grouped acceptance report](reports/chatgpt-grouped-release-20260907.md).
+
 `chatgpt_web_private_file_download.js` owns a bounded, two-minute in-memory
 selection registry and one active authorization request. It registers only
 ordinary conversation attachment descriptors with an explicit simple file ID

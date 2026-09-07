@@ -22,11 +22,22 @@ reused; source-only or installation status does not satisfy the acceptance gate.
 
 ## Current batch
 
+Latest grouped delivery: `1542` compiled and passed 1,007 Android tests, was
+published and installed, and confirmed one production private text-file upload
+with actual file-content reply. `1543` includes the file-index freshness fix;
+the production private index returned the same fixture in 716 ms. Its download
+returned `download_source_unsupported`; no saved-file acceptance is claimed.
+See [the grouped release evidence](reports/chatgpt-grouped-release-20260907.md).
+The source candidates below are bundled through `ca672ea5c`; older delivery
+cells are historical checkpoints, not current source-only blockers. Bundling
+does not upgrade any pending protocol or rendered-UI acceptance claim.
+
 Latest source extension: [private multi-attachment batches](chatgpt-private-attachment-batch.md)
 now join up to nine native selections to one prepared-action message, reusing
 existing per-file upload owners. 305 focused Node cases, 32 Kotlin/JUnit tests
-and SDK partial compilation passed. Full Android compilation and production
-private-route/multiple-file acceptance remain in the grouped ChatGPT round.
+and SDK partial compilation passed. Full Android compilation subsequently passed
+in 1542; multiple-file production acceptance remains pending. The confirmed
+private route in this round used one text fixture, not a multi-file selection.
 This extends the historical single-file entries below; it does not upgrade
 their device-verification claims.
 
@@ -72,13 +83,22 @@ Request ownership and the confirmed baseline failures are in
 The opt-in research command and its limits are in
 [the protocol evidence contract](chatgpt-private-protocol-evidence.md). It is not
 a replacement for any missing business protocol below.
-Five legacy source-location assertions also fail on the unchanged baseline;
-their exact scope is recorded there. They are not a full-suite pass or a reason
-to repeat already-verified private transports.
+Earlier legacy source-location failures are historical. The grouped 2026-09-07
+run updated obsolete source contracts to the current owners without skipping
+tests; all 1,007 Android tests then passed. This is not device acceptance of
+every private transport or a reason to repeat already-verified capabilities.
 
 ## Grouped release
 
-### Current 1541 acceptance
+### Current 1542 and 1543 acceptance
+
+The [current report](reports/chatgpt-grouped-release-20260907.md) records unified
+compilation/tests, both replacement installations, actual private attachment
+association and file-content reply, the file-index regression/fix, and the
+remaining download-source rejection. Keep the Goal active and Google deferred;
+the complete ChatGPT acceptance gate has not passed.
+
+### Earlier 1541 acceptance
 
 On 2026-09-06 after the handset returned, the grouped Release production and
 unit-test compilation passed all **33 tests across seven attachment suites**,

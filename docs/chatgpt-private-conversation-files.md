@@ -3,8 +3,13 @@
 ## Scope
 
 Capability: `android_chatgpt_private_conversation_files_v1`.
-Code is published and installed in `v1.1.1540`, not yet device UI verified.
-Candidate adapter: `262`; history transport: `18`; directory requests module: `2`.
+Latest: published/installed in `v1.1.1543`, adapter `292`, transport `24`.
+A production MCP read returned the real synthetic attachment in 716 ms;
+rendered file-sheet acceptance remains separate. Explicit reads no longer
+require a recent official history response, while identity, cooldown and
+bounded GET handling remain enforced. See the
+[current regression and device evidence](reports/chatgpt-grouped-release-20260907.md).
+The following earlier checkpoints do not override that result.
 The original published capability is an attachment **index**, not an uploader
 or downloader. Adapter 266 adds a source-only [private download candidate](chatgpt-private-file-download.md).
 
