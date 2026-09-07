@@ -31,5 +31,10 @@ class WebChatConversationSharePolicyTest {
         assertTrue(WebChatConversationSharePolicy.sameConversation("/c/$id", "https://chatgpt.com/c/$id"))
         assertFalse(WebChatConversationSharePolicy.sameConversation("/c/$id", "https://example.com/c/$id"))
         assertFalse(WebChatConversationSharePolicy.sameConversation("/c/$id", "https://chatgpt.com/"))
+        for (value in listOf("http://chatgpt.com/c/$id", "https://chatgpt.com.evil/c/$id",
+                "https://user@chatgpt.com/c/$id", "https://chatgpt.com:444/c/$id", "/c/$id")) {
+            assertFalse(value, WebChatConversationSharePolicy.sameConversation("/c/$id", value))
+        }
+        assertTrue(WebChatConversationSharePolicy.sameConversation("/c/$id", "https://chatgpt.com/g/g-p-fixture/c/$id"))
     }
 }

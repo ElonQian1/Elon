@@ -11,7 +11,7 @@ internal object WebChatConversationSharePolicy {
 
     fun sameConversation(path: String, url: String): Boolean {
         val id = ChatGptWebConversationPath.identity(path) ?: return false
-        return id == ChatGptWebConversationPath.identity(url)
+        return id == ChatGptWebConversationPath.identity(ChatGptWebConversationPath.fromUrl(url))
     }
 
     fun errorMessage(code: String?): String = when (code) {
