@@ -15,7 +15,8 @@
   const UUID = '[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}';
   const CONVERSATION = new RegExp('^(?:/g/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?)?/c/(' + UUID + ')$', 'i');
   const PROJECT = /^\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?\/project$/i;
-  const OWNER_MAX_DEPTH = 512, OWNER_MAX_VISITS = 1024;
+  const ownerPath = page.__elonChatGptCommittedOwnerPath ||
+    (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path') : null);
   let active = null, captureCode = 'not_observed';
 
   function unavailable(code) {
@@ -71,68 +72,9 @@
   }
 
   function currentOwnerPath(start) {
-    const paths = new Map(), children = new Map(), visiting = new Set();
-    let fault = null, visited = 0, inspected = 0;
-    function contains(parent, fiber) {
-      if (!children.has(parent)) {
-        const set = new Set();
-        for (let child = parent.child; child; child = child.sibling) {
-          if (set.has(child)) { fault = 'react_owner_cycle'; return false; }
-          if (set.size >= 512 || ++inspected > 4096) { fault = 'react_owner_child_limit'; return false; }
-          set.add(child);
-        }
-        children.set(parent, set);
-      }
-      return children.get(parent).has(fiber);
-    }
-    function resolve(fiber, depth) {
-      if (!fiber || typeof fiber !== 'object' || fault) return null;
-      if (depth >= OWNER_MAX_DEPTH) { fault = 'react_owner_depth_limit'; return null; }
-      if (visiting.has(fiber)) { fault = 'react_owner_cycle'; return null; }
-      if (paths.has(fiber)) {
-        const cached = paths.get(fiber);
-        if (cached && depth + cached.length > OWNER_MAX_DEPTH) { fault = 'react_owner_depth_limit'; return null; }
-        return cached;
-      }
-      if (++visited > OWNER_MAX_VISITS) { fault = 'react_owner_visit_limit'; return null; }
-      if (!fiber.return) {
-        const path = fiber.stateNode?.current === fiber ? { fiber, next: null, length: 1 } : null;
-        paths.set(fiber, path);
-        return path;
-      }
-      visiting.add(fiber);
-      let path = null;
-      // A React bailout can reuse a child with a return pointer to the old
-      // parent. Prove membership through child/sibling edges, including the
-      // parent's alternate, all the way to root.current. Never combine props
-      // from the old branch just because its return chain reaches a live root.
-      for (const parent of new Set([fiber.return, fiber.return.alternate])) {
-        if (!parent || !contains(parent, fiber)) continue;
-        const tail = resolve(parent, depth + 1);
-        if (!tail) continue;
-        if (path) { fault = 'react_owner_ambiguous'; break; }
-        path = { fiber, next: tail, length: tail.length + 1 };
-      }
-      visiting.delete(fiber);
-      paths.set(fiber, path);
-      return path;
-    }
-    let path = null;
-    for (const candidate of new Set([start, start?.alternate])) {
-      const found = resolve(candidate, 0);
-      if (!found) continue;
-      if (path) { fault = 'react_owner_ambiguous'; break; }
-      path = found;
-    }
-    if (fault || !path) {
-      captureCode = fault || 'react_owner_uncommitted';
-      return [];
-    }
-    // Keep memoized paths as linked records; copying each ancestor array would
-    // allocate quadratically for the provider's deeply nested composer tree.
-    const ancestors = [];
-    for (let link = path; link; link = link.next) ancestors.push(link.fiber);
-    return ancestors;
+    const result = ownerPath?.resolve(start);
+    if (result?.code) captureCode = result.code;
+    return result?.ancestors || [];
   }
 
   function stores(node) {

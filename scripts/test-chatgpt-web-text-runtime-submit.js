@@ -14,6 +14,13 @@ const id = '11111111-2222-3333-4444-555555555555';
 const runtimeUrl = 'https://chatgpt.com/cdn/assets/8b34dbc2-kjj15hg4y6iyx13p.js';
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 
+test('production loads the shared committed-owner resolver before runtime consumers', () => {
+  const catalog = fs.readFileSync(path.join(assets, '../kotlin/com/elon/app/chatgptweb/ChatGptWebAdapterAssets.kt'), 'utf8');
+  const resolver = catalog.indexOf('"chatgpt_web_committed_owner_path.js"');
+  assert.ok(resolver > 0 && resolver < catalog.indexOf('"chatgpt_web_private_text_runtime_submit.js"'));
+  assert.ok(resolver < catalog.indexOf('"chatgpt_web_private_new_conversation.js"'));
+});
+
 function fixture(guest) {
   const calls = [], timers = new Map();
   let serial = 0, settle, draft = '', serverId = id, credentials = 'Bearer synthetic-only', loaded = true;
