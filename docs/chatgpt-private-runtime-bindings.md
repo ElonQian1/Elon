@@ -15,6 +15,16 @@ Source-only extension after 1547: the
 export mappings for category construction, group IDs, eligibility and its gate.
 Its native menu and selection have offline evidence, not device acceptance.
 
+Version 3 adds exact shared exports `Ur` (registered action configuration) and
+`zr` (invoke registered action) for both known builds. Public old symbols are
+`d2`/`Vzt`; current symbols are `p2`/`iBt`. The new-chat consumer can call the
+official `newChat` action without finding a visible button or synthesizing a
+router reset. `Ur` reports missing/disabled actions; `zr` selects the last live
+registration and enforces the current disabled-group/override state. Its Boolean
+return acknowledges invocation, not conversation completion. It must not be
+treated as a generic native/MCP arbitrary-action executor. These source bindings
+do not establish a real-device new-conversation acceptance result.
+
 ## Confirmed regression
 
 The installed APK 1545 public-script inventory observed

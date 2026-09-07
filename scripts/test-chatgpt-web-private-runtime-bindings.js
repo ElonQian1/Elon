@@ -48,6 +48,21 @@ test('old cached website still uses its original singleton and aliases', async (
   assert.deepEqual(f.calls, [old.shared]); assert.equal(f.api.state().profile_id, 'web_20260906');
 });
 
+for (const legacy of [false, true]) {
+  test('official registered action bindings preserve ' + (legacy ? 'legacy' : 'current') + ' singleton identity', async () => {
+    const inspect = key => ({ id: key, isAvailable: true, disabled: false });
+    const calls = [], invoke = key => { calls.push(key); return true; };
+    const f = fixture({ loadRuntime: () => ({ Ur: inspect, zr: invoke }) });
+    if (legacy) { f.observed.clear(); f.observed.add(old.shared); }
+    const shared = await f.api.load('shared');
+    assert.equal(shared.Ur, inspect);
+    assert.equal(shared.zr, invoke);
+    assert.equal(shared.Ur('newChat').id, 'newChat');
+    assert.equal(shared.zr('newChat'), true);
+    assert.deepEqual(calls, ['newChat']);
+  });
+}
+
 test('on-page static dependency anchor works when resource timing has been truncated', async () => {
   const f = fixture(); f.observed.clear(); f.observed.add(CDN + 'c2675c8c-kconnwitb9zzv81k.js');
   assert.equal(f.api.observed(old.composer), true);
