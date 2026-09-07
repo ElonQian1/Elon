@@ -206,6 +206,37 @@ class ChatGptWebSendOwnerTest {
     }
 
     @Test
+    fun explicitCopyCannotFallBackAndReleasesTheSendSlotOnUnavailablePrivateUpload() {
+        val fixture = Fixture()
+        val attachment = pendingAttachment().copy(chatGptUploadCopy = true)
+        assertFalse(fixture.owner.beginAttachments("copy", listOf(attachment)))
+        assertEquals(1, fixture.privateUploadRequests)
+        assertEquals(0, fixture.attachmentUploadRequests)
+        assertEquals("failed", fixture.owner.attachmentSendPhase())
+        assertTrue(fixture.owner.consumeQueuedUploadUris().isEmpty())
+        assertTrue(fixture.transport.commands.isEmpty())
+        assertNull(fixture.owner.prompt())
+        assertFalse(fixture.owner.hasAttachmentSend())
+        assertEquals(WebChatSendCoordinator.DispatchOutcome.DISPATCHED,
+            fixture.owner.dispatchSocial("next").outcome)
+    }
+
+    @Test
+    fun explicitCopyKeepsTheSamePrivateUploadOwnerUntilReady() {
+        val fixture = Fixture(privateUpload = true)
+        assertTrue(fixture.owner.beginAttachments("copy", listOf(pendingAttachment().copy(chatGptUploadCopy = true))))
+        assertEquals(1, fixture.privateUploadRequests)
+        assertEquals(0, fixture.attachmentUploadRequests)
+        assertTrue(fixture.transport.commands.isEmpty())
+        fixture.currentSnapshot = snapshot(
+            attachments = listOf(ChatGptWebAttachment("private_attachment_copy", "note.txt", "ready", true)),
+        )
+        fixture.owner.observeSnapshot(fixture.currentSnapshot)
+        fixture.owner.observeSnapshot(fixture.currentSnapshot)
+        assertEquals(1, fixture.transport.commands.size)
+    }
+
+    @Test
     fun privateUploadFailureOrClearCancelsTheByteLeaseWithoutOpeningCompatibilityUpload() {
         val fixture = Fixture(privateUpload = true)
         assertTrue(fixture.owner.beginAttachments("with file", listOf(pendingAttachment())))
@@ -258,7 +289,8 @@ class ChatGptWebSendOwnerTest {
             confirmationTimeoutMs = 10L,
             attachmentTimeoutMs = 100L,
             requestPrivateAttachmentUpload = { _, _, id ->
-                if (privateUpload) { privateUploadRequests++; privateRequestIds += id }
+                privateUploadRequests++
+                if (privateUpload) privateRequestIds += id
                 privateUpload
             },
             cancelPrivateAttachmentUpload = { privateUploadCancellations++ },

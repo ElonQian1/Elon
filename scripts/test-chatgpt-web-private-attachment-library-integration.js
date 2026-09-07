@@ -41,6 +41,7 @@ function fixture(options = {}) {
       ...config, loadRuntime: options.loadRuntime || (async () => gates()),
     }) },
   };
+  if (options.selection) root.__elonChatGptPrivateAttachmentSelection = load('selection');
   if (options.reserved) root.__elonChatGptPrivateAttachmentReservation = {
     version: reservation.version, create: (host, config) => reservation.create(host, { ...config,
       loadRuntime: async () => ({ t6: () => ({ loadingStatus: 'Ready', getExperiment: name => ({ name,
@@ -220,6 +221,40 @@ test('malformed upload choice fails before reads or writes, while explicit false
   }
   const f = fixture({ uploadCopy: false }); await f.start();
   assert.equal(f.receipts[0][1], true); assert.equal(f.store.files$()[0].fileId, 'file-reused');
+});
+
+test('choosing copy after opening the picker abandons its old slot without claiming it', async () => {
+  const f = fixture({ selection: true, reserved: true, uploadCopy: true, fastBytes: true });
+  f.descriptor.selectionId = 'selection_' + 'a'.repeat(32);
+  assert.equal(f.instance.beginSelection(JSON.stringify({ id: f.descriptor.selectionId,
+    kind: 'document', documentToken: f.descriptor.documentToken, href: f.descriptor.href })), true);
+  for (let i = 0; i < 100 && !f.calls.some(call => call.url.endsWith('/upload_reservations')); i++) await tick();
+  assert.equal(f.calls.filter(call => call.url.endsWith('/upload_reservations')).length, 1);
+  await tick(); await f.start();
+  assert.equal(f.receipts[0][1], true); assert.equal(f.writes(), 1); assert.equal(f.fallbacks(), 0);
+  assert.equal(f.calls.filter(call => call.url.endsWith('/upload_reservations')).length, 1);
+  assert.equal(f.calls.filter(call => call.url.endsWith('/files')).length, 1);
+  assert.equal(f.calls.some(call => /claim_and_finish|library\/reuse/.test(call.url)), false);
+  assert.equal(f.store.files$()[0].fileId, 'file-uploaded');
+});
+
+test('copy cancellation or context change after allocation cannot associate or replay', async () => {
+  for (const mode of ['cancel', 'document', 'account']) {
+    const f = fixture({ uploadCopy: true, fastBytes: true });
+    const fetch = f.root.fetch;
+    f.root.fetch = async (url, init) => {
+      const result = await fetch(url, init);
+      if (url.endsWith('/files')) {
+        if (mode === 'cancel') f.instance.cancel();
+        if (mode === 'document') f.root.__elonChatGptDocumentToken = 'doc_changed';
+        if (mode === 'account') f.setAccount('Bearer another-account');
+      }
+      return result;
+    };
+    await f.start();
+    assert.equal(f.receipts[0][1], false); assert.equal(f.writes(), 0); assert.equal(f.fallbacks(), 0);
+    assert.equal(f.calls.length, 1); assert.equal(f.calls[0].url, '/backend-api/files');
+  }
 });
 
 test('context changes and cancellation during reuse cannot attach, replay or switch to compatibility', async () => {

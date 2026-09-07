@@ -94,7 +94,10 @@ internal class ChatGptWebNativeAttachmentGateway(
             pickerPreparation.cancel()
             return null
         }
-        val selectionId = pickerPreparation.take(file)
+        val selectionId = if (file.chatGptUploadCopy) {
+            pickerPreparation.cancel()
+            null
+        } else pickerPreparation.take(file)
         revokeLease(preserveSelection = true)
         val size = file.file.length().toInt()
         val next = Lease(
@@ -105,6 +108,7 @@ internal class ChatGptWebNativeAttachmentGateway(
         lease = next
         main.postDelayed({ if (lease === next) cancel() }, 120_000L)
         return JSONObject().put("version", 1).put("leaseId", next.id)
+            .put("uploadCopy", file.chatGptUploadCopy)
             .put("selectionId", selectionId)
             .put("documentToken", next.documentToken).put("href", href)
             .put("name", ChatGptWebUploadPolicy.stagedName(file.displayName, file.fileName, 0))

@@ -135,6 +135,10 @@ internal class ChatGptWebSendOwner(
         publishAttachmentPhase(ChatGptWebAttachmentSendTracker.Phase.UPLOADING)
         scheduleAttachmentTimeout()
         if (requestPrivateAttachmentUpload(attachments, uris, requireNotNull(reserved.commandId))) return true
+        if (attachments.any { it.chatGptUploadCopy }) {
+            failAttachmentSend("尚未能重新上传这份附件，文字未发送，请重试。")
+            return false
+        }
         if (requestAttachmentUpload()) return true
 
         failAttachmentSend("官网附件入口尚未就绪。")
