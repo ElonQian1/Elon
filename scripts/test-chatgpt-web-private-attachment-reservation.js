@@ -95,7 +95,7 @@ test('unknown, control or unrecognized experiments do not allocate or infer miss
   }
 });
 
-test('new and existing project, temporary, library and source scopes cannot accidentally allocate ordinary slots', async () => {
+test('project, mismatched temporary persistence, library and source scopes cannot allocate slots', async () => {
   for (const patch of [{ isProjectThread: true }, { isTemporaryChat: true }, { isTemporaryChat: 'false' },
     { projectScopeId: 'g-p-synthetic' }, { gizmoId: 'g-p-synthetic' }, { libraryFileInfo: {} },
     { directoryId: 'directory' }, { uploadSource: 'connector' }, { libraryPersistenceMode: undefined },
@@ -105,6 +105,43 @@ test('new and existing project, temporary, library and source scopes cannot acci
     assert.equal(f.take(), null);
     assert.equal(f.imports.length, 0);
   }
+});
+
+test('temporary reservations default only their slot persistence while retaining non-library processing', async () => {
+  const f = fixture();
+  f.context = { ...context(), isTemporaryChat: true, libraryPersistenceMode: undefined };
+  f.start(); await tick();
+  assert.equal(f.requests.length, 1);
+  assert.deepEqual(JSON.parse(f.requests[0].init.body), {
+    intended_use_case: 'ace_upload', entry_surface: 'chat_composer', requires_gizmo_id: false,
+    store_in_library: false, library_persistence_mode: 'required',
+  });
+  const result = f.take();
+  assert.ok(result);
+  const claim = JSON.parse(result.claim.body);
+  assert.equal(claim.library_persistence_mode, 'required');
+  assert.equal(claim.store_in_library, false);
+  assert.equal(claim.metadata.is_temporary_chat, true);
+  assert.equal(claim.metadata.store_in_library, false);
+  assert.equal(claim.index_for_retrieval, false);
+  assert.equal(f.context.libraryPersistenceMode, undefined, 'do not rewrite the legacy create/process contract');
+  assert.equal(Object.hasOwn(protocol.prepare(f.file, f.context), 'library_persistence_mode'), false);
+  assert.equal(f.take(), null);
+});
+
+test('temporary slots reject library persistence or indexing and cannot transfer to ordinary chats', async () => {
+  for (const patch of [{ storeInLibrary: true }, { indexForRetrieval: true },
+    { libraryPersistenceMode: 'opportunistic' }, { libraryPersistenceMode: 'required' }]) {
+    const f = fixture();
+    f.context = { ...context(), isTemporaryChat: true, libraryPersistenceMode: undefined, ...patch };
+    f.start(); await tick();
+    assert.equal(f.requests.length, 0);
+    assert.equal(f.take(), null);
+  }
+  const f = fixture();
+  f.context = { ...context(), isTemporaryChat: true, libraryPersistenceMode: undefined };
+  f.start(); await tick();
+  assert.equal(f.take(context()), null, 'same normalized persistence does not make the scopes interchangeable');
 });
 
 test('both expiry clocks must leave at least sixty seconds at consumption', async () => {

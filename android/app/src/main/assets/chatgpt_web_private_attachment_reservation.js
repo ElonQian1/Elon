@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentReservation = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -13,11 +13,15 @@
   let slot = null;
 
   function eligible(context) {
-    // Temporary persistence has a different legacy contract; do not infer a
-    // reservation policy from an omitted field or route label.
+    const temporary = context?.isTemporaryChat === true;
+    // Official temporary uploads omit legacy persistence; only the reservation
+    // selection/claim defaults it to required, with store_in_library still false.
     return !!context && ['ace_upload', 'my_files', 'multimodal'].includes(context.useCase) &&
-      typeof context.storeInLibrary === 'boolean' && context.libraryPersistenceMode === 'required' &&
-      (context.isTemporaryChat === undefined || context.isTemporaryChat === false) &&
+      typeof context.storeInLibrary === 'boolean' &&
+      context.libraryPersistenceMode === (temporary ? undefined : 'required') &&
+      (context.isTemporaryChat === undefined || typeof context.isTemporaryChat === 'boolean') &&
+      (!temporary || context.storeInLibrary === false &&
+        (context.indexForRetrieval === undefined || context.indexForRetrieval === false)) &&
       (context.isProjectThread === undefined || context.isProjectThread === false) &&
       !context.projectScopeId && !context.gizmoId && !context.libraryFileInfo &&
       !context.directoryId && !context.uploadSource;
@@ -81,7 +85,7 @@
         signal: value.controller.signal,
         body: JSON.stringify({ intended_use_case: value.context.useCase, entry_surface: 'chat_composer',
           requires_gizmo_id: false, store_in_library: value.context.storeInLibrary,
-          library_persistence_mode: value.context.libraryPersistenceMode }),
+          library_persistence_mode: value.context.libraryPersistenceMode ?? 'required' }),
       }, { mode: 'json', timeoutMs: 3000, maxBytes: 16 * 1024 });
       if (!current(value)) return;
       const payload = response.payload;
@@ -119,7 +123,7 @@
       url: '/backend-api/files/upload_reservations/' + encodeURIComponent(entry.file_id) + '/claim_and_finish',
       body: JSON.stringify({ file_name: file.name, file_size: file.size, use_case: useCase,
         index_for_retrieval: context.indexForRetrieval || context.useCase === 'ace_upload' && useCase === 'my_files',
-        store_in_library: context.storeInLibrary, library_persistence_mode: context.libraryPersistenceMode,
+        store_in_library: context.storeInLibrary, library_persistence_mode: context.libraryPersistenceMode ?? 'required',
         mime_type: created.mime_type, entry_surface: 'chat_composer', metadata: processing.metadata,
         ...(context.imageDimensions ? protocol.imageDimensions(context.imageDimensions) : {}) }),
     });
@@ -133,6 +137,7 @@
       if (!current(value) || binding !== value.binding || !eligible(context) ||
           context.useCase !== value.context.useCase || context.storeInLibrary !== value.context.storeInLibrary ||
           context.libraryPersistenceMode !== value.context.libraryPersistenceMode ||
+          (context.isTemporaryChat === true) !== (value.context.isTemporaryChat === true) ||
           context.modelSlug !== value.context.modelSlug || context.storeInLibrary && file.size > 2 * 1024 * 1024 ||
           !result || result.uploadExpires - now() < 60000 || result.reservationExpires - now() < 60000) return null;
       return Object.freeze({ entry: result.entry, claim: claim(result.entry, file, context) });
@@ -142,5 +147,5 @@
 
   // Selection never waits for allocation. Taking a pending slot abandons it, so
   // a late response cannot replace an already selected upload transaction.
-  return Object.freeze({ version: 1, start, take, cancel });
+  return Object.freeze({ version: 2, start, take, cancel });
 });

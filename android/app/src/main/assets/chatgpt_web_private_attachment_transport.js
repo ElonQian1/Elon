@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 8, create: factory });
+  const exported = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root && root.location?.origin === 'https://chatgpt.com') {
     root.__elonChatGptPrivateAttachmentTransport = exported;
@@ -20,7 +20,7 @@
   let active = null;
   let cooldownUntil = 0;
   const reservationModule = options?.reservation || root.__elonChatGptPrivateAttachmentReservation;
-  const reservation = reservationModule?.version === 1 ? reservationModule.create(root, {
+  const reservation = [1, 2].includes(reservationModule?.version) ? reservationModule.create(root, {
     protocol, bytes, request, isCurrent: current, acquireHeaders: async () => allowedHeaders(await acquire()),
   }) : null;
 
@@ -148,6 +148,6 @@
     if (!active && cooldownUntil <= Date.now()) reservation?.start(context, binding, signal);
   }
   function cancel() { reservation?.cancel(); if (active) active.controller.abort(); }
-  function snapshot() { return { version: 8, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
-  return Object.freeze({ version: 8, prefetch, upload, cancel, dispose: cancel, snapshot });
+  function snapshot() { return { version: 9, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
+  return Object.freeze({ version: 9, prefetch, upload, cancel, dispose: cancel, snapshot });
 });
