@@ -13,27 +13,28 @@ internal class WebChatProductionCapabilityPrewarmer(
 ) {
     private var epoch = 0
     private var runningKey: RunKey? = null
-    private val nextEligibleAtMs = mutableMapOf<RunKey, Long>()
+    private val attempts = WebChatProductionPrewarmAttempts(nowMs)
 
     fun schedule(provider: WebChatProviderIdentity) {
-        if (requirements(provider).isEmpty()) return
+        if (activeProvider() != provider.id) return
+        val state = consumerPort()?.state() ?: return
+        interactionCache.capture(provider.id, state)
         val runKey = RunKey(
             provider.id,
-            consumerPort()?.state()?.let(WebChatProductionPageIdentity::from)?.cacheKey ?: "unknown:/",
+            WebChatProductionPageIdentity.from(state).cacheKey,
         )
-        val now = nowMs()
-        nextEligibleAtMs.entries.removeAll { now >= it.value }
-        if (runningKey == runKey || now < nextEligibleAtMs.getOrDefault(runKey, 0L)) {
-            capture(provider.id)
-            return
+        if (runningKey != null && runningKey != runKey) cancel()
+        val pending = requirements(provider).filter { requirement ->
+            !available(requirement, runKey, state) && attempts.eligible(attemptKey(requirement, runKey))
         }
+        if (runningKey == runKey || pending.isEmpty()) return
         runningKey = runKey
         val runEpoch = ++epoch
         requestNext(
             provider = provider,
             runKey = runKey,
             runEpoch = runEpoch,
-            pending = requirements(provider).toList(),
+            pending = pending,
             retry = 0,
             delayMs = 0L,
         )
@@ -56,15 +57,18 @@ internal class WebChatProductionCapabilityPrewarmer(
             if (!isCurrent(runKey, runEpoch)) return@scheduleAction
             val port = consumerPort()
             if (port == null) {
-                finish(runKey, success = false)
+                finish(runKey)
                 return@scheduleAction
             }
             val state = port.state()
             interactionCache.capture(provider.id, state)
             val unresolved = pending.filterNot {
-                it.isAvailable(provider.id, state, interactionCache)
+                available(it, runKey, state)
             }
             val requirement = unresolved.firstOrNull()
+            // Claim the attempt before dispatch, including rejection/cancellation.
+            // An accepted command is not evidence that a catalog was observed.
+            if (requirement != null && retry == 0) attempts.started(attemptKey(requirement, runKey))
             when {
                 requirement == null -> settle(provider, runKey, runEpoch)
                 requirement.request(port).accepted -> requestNext(
@@ -104,14 +108,11 @@ internal class WebChatProductionCapabilityPrewarmer(
             scheduleAction(delayMs) {
                 if (!isCurrent(runKey, runEpoch)) return@scheduleAction
                 capture(provider.id)
+                consumerPort()?.state()?.let { state ->
+                    requirements(provider).forEach { available(it, runKey, state) }
+                }
                 if (index == SETTLE_DELAYS_MS.lastIndex) {
-                    val state = consumerPort()?.state()
-                    finish(
-                        runKey,
-                        success = state != null && requirements(provider).all {
-                            it.isAvailable(provider.id, state, interactionCache)
-                        },
-                    )
+                    finish(runKey)
                 }
             }
         }
@@ -122,15 +123,21 @@ internal class WebChatProductionCapabilityPrewarmer(
         consumerPort()?.state()?.let { interactionCache.capture(providerId, it) }
     }
 
-    private fun finish(runKey: RunKey, success: Boolean) {
+    private fun finish(runKey: RunKey) {
         if (runningKey != runKey) return
         runningKey = null
-        nextEligibleAtMs[runKey] = nowMs() + if (success) {
-            SUCCESS_COOLDOWN_MS
-        } else {
-            FAILURE_COOLDOWN_MS
-        }
     }
+
+    private fun available(requirement: Requirement, runKey: RunKey, state: WebChatConsumerState): Boolean =
+        requirement.isAvailable(runKey.providerId, state, interactionCache).also { available ->
+            if (available) attempts.confirmed(attemptKey(requirement, runKey))
+        }
+
+    private fun attemptKey(requirement: Requirement, runKey: RunKey) = WebChatProductionPrewarmAttempts.Key(
+        providerId = runKey.providerId,
+        capability = requirement.name,
+        pageKey = runKey.pageKey.takeIf { requirement == Requirement.CONTROLS },
+    )
 
     private fun isCurrent(runKey: RunKey, runEpoch: Int): Boolean =
         epoch == runEpoch && runningKey == runKey && activeProvider() == runKey.providerId &&
@@ -176,8 +183,6 @@ internal class WebChatProductionCapabilityPrewarmer(
     private companion object {
         const val MODEL_SECTION = "model"
         const val TOOLS_SECTION = "tools"
-        const val SUCCESS_COOLDOWN_MS = 60_000L
-        const val FAILURE_COOLDOWN_MS = 5_000L
         const val REQUEST_SPACING_MS = 750L
         val RETRY_DELAYS_MS = longArrayOf(800L)
         val SETTLE_DELAYS_MS = longArrayOf(450L, 1_400L)

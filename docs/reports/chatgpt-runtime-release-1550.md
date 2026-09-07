@@ -70,3 +70,23 @@ lookups. Reuse a proven shared owner resolver rather than copying this fix into
 each consumer. New-chat reset, failed model-discovery retries, the installed
 submit-10 route, and other listed private scopes remain unaccepted. Google
 stays last. The overall Goal remains active.
+
+## Background discovery retry repair
+
+The native prewarmer was re-entered from every composer-state render. After an
+accepted command produced no catalog, its whole-page failure cooldown was only
+five seconds; changing pages or cancel/resume could start another model read.
+Three regression tests reproduce these paths on the preceding source. The
+prewarmer now budgets each capability separately at 1/5/15-minute backoff,
+claimed before dispatch and reset only by a fresh nonempty observed catalog.
+Provider catalogs share that budget across conversations; contextual controls
+remain page-scoped. The 128-key bound preserves provider entries. No recurring
+retry timer is added, presets and old snapshots remain available, and explicit
+consumer commands do not consult the background budget.
+
+Release Kotlin compilation and 28 selected JUnit cases passed: prewarmer 9,
+attempt budget 5, interaction cache 8, composer request coordinator 6. Red log:
+`prewarm-retry-red-20260908-20260908-023518-019` (9 cases, 3 failures). Green log:
+`prewarm-retry-green-20260908-20260908-024355-912` (zero failures/errors/skips).
+This source change is not in APK 1550; real idle-request and thermal acceptance
+remain pending. New-chat reset is still a separate open issue.

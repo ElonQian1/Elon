@@ -103,6 +103,87 @@ class WebChatProductionCapabilityPrewarmerTest {
         )
     }
 
+    @Test
+    fun acceptedRequestsWithoutResultsDoNotRepeatOnEverySnapshot() {
+        val scheduler = Scheduler()
+        val port = FakePort(unavailableSections = setOf("model"))
+        val prewarmer = prewarmer(port, scheduler) { WebChatProviderId.CHATGPT_WEB }
+        val provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
+
+        prewarmer.schedule(provider)
+        scheduler.drain()
+        repeat(10) {
+            scheduler.advanceBy(9_000L)
+            prewarmer.schedule(provider)
+            scheduler.drain()
+        }
+
+        assertEquals(2, port.requests.count { it == "model" })
+        assertEquals(1, port.requests.count { it == "tools" })
+        assertEquals(1, port.requests.count { it == "features" })
+    }
+
+    @Test
+    fun changingConversationDoesNotResetFailedProviderCatalogBackoff() {
+        val scheduler = Scheduler()
+        val port = FakePort(unavailableSections = setOf("model"))
+        val prewarmer = prewarmer(port, scheduler) { WebChatProviderId.CHATGPT_WEB }
+        val provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
+
+        prewarmer.schedule(provider)
+        scheduler.drain()
+        repeat(3) {
+            port.openConversation("next-$it")
+            prewarmer.schedule(provider)
+            scheduler.drain()
+        }
+
+        assertEquals(1, port.requests.count { it == "model" })
+        assertEquals(4, port.requests.count { it == "controls" })
+    }
+
+    @Test
+    fun cancelAndResumeDoesNotDiscardTheFailedAttemptBudget() {
+        val scheduler = Scheduler()
+        val port = FakePort(unavailableSections = setOf("model"))
+        val prewarmer = prewarmer(port, scheduler) { WebChatProviderId.CHATGPT_WEB }
+        val provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
+
+        prewarmer.schedule(provider)
+        scheduler.runNext()
+        prewarmer.cancel()
+        prewarmer.schedule(provider)
+        scheduler.drain()
+
+        assertEquals(1, port.requests.count { it == "model" })
+        assertTrue(port.requests.contains("tools"))
+    }
+
+    @Test
+    fun manualRequestCanRecoverTheCatalogDuringAutomaticBackoff() {
+        val scheduler = Scheduler()
+        val port = FakePort(unavailableSections = setOf("model"))
+        val cache = WebChatProductionInteractionCache(nowMs = scheduler::now)
+        val prewarmer = prewarmer(port, scheduler, cache) { WebChatProviderId.CHATGPT_WEB }
+        val provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
+
+        prewarmer.schedule(provider)
+        scheduler.drain()
+        assertTrue(cache.hasComposerSnapshot(provider.id, "model"))
+        assertTrue(cache.needsComposerRefresh(provider.id, "model"))
+
+        port.unavailableSections = emptySet()
+        assertTrue(port.requestComposerOptions("model").accepted)
+        prewarmer.schedule(provider)
+        scheduler.drain()
+        scheduler.advanceBy(60_000L)
+        prewarmer.schedule(provider)
+        scheduler.drain()
+
+        assertEquals(2, port.requests.count { it == "model" })
+        assertTrue(!cache.needsComposerRefresh(provider.id, "model"))
+    }
+
     private fun prewarmer(
         port: FakePort,
         scheduler: Scheduler,
@@ -121,6 +202,10 @@ class WebChatProductionCapabilityPrewarmerTest {
         private val tasks = mutableListOf<Scheduled>()
 
         fun now(): Long = nowMs
+
+        fun advanceBy(durationMs: Long) {
+            nowMs += durationMs
+        }
 
         fun schedule(delayMs: Long, action: () -> Unit) {
             tasks += Scheduled(nowMs + delayMs, action)
@@ -144,6 +229,7 @@ class WebChatProductionCapabilityPrewarmerTest {
 
     private class FakePort(
         private val acceptRequests: Boolean = true,
+        var unavailableSections: Set<String> = emptySet(),
     ) : WebChatConsumerPort {
         val requests = mutableListOf<String>()
         private var current = emptyState()
@@ -181,7 +267,7 @@ class WebChatProductionCapabilityPrewarmerTest {
 
         private fun respond(label: String, update: () -> Unit): WebChatConsumerCommandResult {
             requests += label
-            if (acceptRequests) update()
+            if (acceptRequests && label !in unavailableSections) update()
             return WebChatConsumerCommandResult(accepted = acceptRequests)
         }
 
