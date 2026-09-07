@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 4, create: factory });
+  const exported = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -78,7 +78,8 @@
     const conversation = PATH.exec(path || '');
     const image = source?.image != null;
     const file = image ? imageFile(source) : source?.attachment;
-    if (!conversation || !/^[A-Za-z0-9_-]{1,160}$/.test(file?.id || '')) return null;
+    const libraryReference = !image && root.__elonChatGptPrivateLibraryDownload?.target?.(file);
+    if (!conversation || !file || !libraryReference && !/^[A-Za-z0-9_-]{1,160}$/.test(file.id || '')) return null;
     // Cloud references and alternate preview targets have separate resolvers.
     if (['shared_library_file_id', 'library_download_id', 'source_url',
       'context_connector', 'connector_id', 'mounted_library_file_id', 'shared_library_file_reference',
@@ -92,6 +93,8 @@
     if (libraryFileId !== null && (typeof libraryFileId !== 'string' || !LIBRARY.test(libraryFileId))) return null;
     return Object.freeze({ conversationId: conversation[2], fileId: file.id,
       projectId: projects[0] || null, libraryFileId,
+      ...(libraryReference || {}),
+      ...(libraryReference ? { name: file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180), mediaType: file.mime_type || '' } : {}),
       ...(image ? { image: true,
         name: typeof file.name === 'string' && file.name.trim() ? file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180) : 'image.png',
         mediaType: file.mime_type || '' } : {}) });
@@ -146,7 +149,7 @@
   function current(job) {
     return !disposed && active === job && !job.controller.signal.aborted &&
       root.location.href === job.descriptor.href && root.__elonChatGptDocumentToken === job.entry.token &&
-      identity() === job.entry.account && job.entry.expiresAt > Date.now();
+      identity() === job.entry.account && (Boolean(job.entry.sharedLibraryFileId) || job.entry.expiresAt > Date.now());
   }
 
   function downloadUrl(value) {
@@ -216,8 +219,14 @@
     }
     const job = { descriptor, entry, controller: new root.AbortController() };
     active = job;
-    const timer = root.setTimeout(() => job.controller.abort(), 15000);
+    const timer = root.setTimeout(() => job.controller.abort(), entry.sharedLibraryFileId ? 120000 : 15000);
     try {
+      if (entry.sharedLibraryFileId) {
+        const detail = await root.__elonChatGptPrivateLibraryDownload.run(root, job, current, downloadUrl);
+        job.queued = true;
+        respond(ACTION, true, detail);
+        return;
+      }
       const request = root.__elonChatGptPrivateJsonRequest;
       if (!request?.request || !current(job)) throw new Error('download_cancelled');
       const url = await resolveAuthorization(job, request);
@@ -238,7 +247,8 @@
     } catch (error) {
       const reason = String(error?.message || '');
       const code = ['download_file_not_ready', 'download_source_unsupported', 'download_confirmation_unknown',
-        'download_enqueue_failed', 'download_cancelled'].includes(reason) ? reason :
+        'download_enqueue_failed', 'download_cancelled', 'download_file_unavailable', 'download_storage_failed',
+        'download_file_too_large', 'download_content_invalid', 'download_transfer_timeout'].includes(reason) ? reason :
         reason === 'http_404' ? 'download_file_unavailable' : 'download_prepare_failed';
       respond(ACTION, false, code);
     } finally {
@@ -251,5 +261,5 @@
 
   function cancel() { active?.controller.abort(); }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 4, register, start, cancel, dispose });
+  return Object.freeze({ version: 5, register, start, cancel, dispose });
 });
