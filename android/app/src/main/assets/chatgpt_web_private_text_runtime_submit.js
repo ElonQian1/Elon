@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 9, create: factory });
+  const exported = Object.freeze({ version: 10, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -15,6 +15,7 @@
   const UUID = '[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}';
   const CONVERSATION = new RegExp('^(?:/g/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?)?/c/(' + UUID + ')$', 'i');
   const PROJECT = /^\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?\/project$/i;
+  const OWNER_MAX_DEPTH = 512, OWNER_MAX_VISITS = 1024;
   let active = null, captureCode = 'not_observed';
 
   function unavailable(code) {
@@ -86,16 +87,16 @@
     }
     function resolve(fiber, depth) {
       if (!fiber || typeof fiber !== 'object' || fault) return null;
-      if (depth >= 90) { fault = 'react_owner_path_limit'; return null; }
+      if (depth >= OWNER_MAX_DEPTH) { fault = 'react_owner_depth_limit'; return null; }
       if (visiting.has(fiber)) { fault = 'react_owner_cycle'; return null; }
       if (paths.has(fiber)) {
         const cached = paths.get(fiber);
-        if (cached && depth + cached.length > 90) { fault = 'react_owner_path_limit'; return null; }
+        if (cached && depth + cached.length > OWNER_MAX_DEPTH) { fault = 'react_owner_depth_limit'; return null; }
         return cached;
       }
-      if (++visited > 180) { fault = 'react_owner_path_limit'; return null; }
+      if (++visited > OWNER_MAX_VISITS) { fault = 'react_owner_visit_limit'; return null; }
       if (!fiber.return) {
-        const path = fiber.stateNode?.current === fiber ? [fiber] : null;
+        const path = fiber.stateNode?.current === fiber ? { fiber, next: null, length: 1 } : null;
         paths.set(fiber, path);
         return path;
       }
@@ -110,7 +111,7 @@
         const tail = resolve(parent, depth + 1);
         if (!tail) continue;
         if (path) { fault = 'react_owner_ambiguous'; break; }
-        path = [fiber, ...tail];
+        path = { fiber, next: tail, length: tail.length + 1 };
       }
       visiting.delete(fiber);
       paths.set(fiber, path);
@@ -127,7 +128,11 @@
       captureCode = fault || 'react_owner_uncommitted';
       return [];
     }
-    return path;
+    // Keep memoized paths as linked records; copying each ancestor array would
+    // allocate quadratically for the provider's deeply nested composer tree.
+    const ancestors = [];
+    for (let link = path; link; link = link.next) ancestors.push(link.fiber);
+    return ancestors;
   }
 
   function stores(node) {
@@ -288,5 +293,5 @@
   try {
     if (page.__elonChatGptPrivateTextTransactionsEnabled === true && route()) identity(true);
   } catch (_) {}
-  return Object.freeze({ version: 9, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 10, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

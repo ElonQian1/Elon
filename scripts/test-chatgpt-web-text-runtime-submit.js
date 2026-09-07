@@ -271,8 +271,8 @@ for (const [code, change] of Object.entries({
   react_owner_child_limit: f => {
     for (let i = 0; i < 512; i++) f.top.child = { sibling: f.top.child };
   },
-  react_owner_path_limit: f => {
-    for (let i = 0; i < 90; i++) {
+  react_owner_depth_limit: f => {
+    for (let i = 0; i < 512; i++) {
       const parent = { return: f.fiber.return, child: f.fiber };
       f.fiber.return.child = parent; f.fiber.return = parent;
     }
@@ -306,6 +306,25 @@ test('reused children across several alternate parents resolve without exponenti
   assert.equal(result.handled, true); assert.equal(f.calls.length, 1);
   f.settle(true); assert.equal((await result.completion).status, 'accepted');
 });
+
+for (const count of [120, 400, 510]) {
+  test('a deep committed composer keeps a bounded path without the old 90-level ceiling: ' + count, () => {
+    const f = fixture(); let childrenRead = 0;
+    for (let i = 0; i < count; i++) {
+      const parent = { return: f.fiber.return, child: f.fiber };
+      f.fiber.return.child = parent; f.fiber.return = parent;
+    }
+    for (let parent = f.fiber.return; parent; parent = parent.return) {
+      const child = parent.child;
+      Object.defineProperty(parent, 'child', { get() { childrenRead++; return child; } });
+    }
+    const context = f.api.captureConversation(f.node);
+    assert.equal(context?.shared, f.shared);
+    assert.equal(context?.controller, f.controller);
+    assert.equal(childrenRead, count + 1, 'child membership is scanned once per visited parent');
+    assert.equal(f.calls.length, 0); assert.equal(f.timers.size, 0);
+  });
+}
 
 test('current-tree removal between capture and dispatch preserves the native draft', () => {
   const f = fixture(); f.setDraft(f.command.prompt); f.command.expectedDraft = f.command.prompt;

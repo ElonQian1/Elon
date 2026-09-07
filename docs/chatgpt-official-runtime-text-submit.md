@@ -6,12 +6,12 @@ official page-runtime bridge, **not an independent Android HTTP/private POST
 transport**. Include it in the grouped ChatGPT APK; do not reimplement it while
 waiting for production acceptance.
 
-Latest installed checkpoint: APK 1549 / adapter 294 includes runtime submit 8
-and bindings 2. A real guest reply still used DOM fallback. The identity gate
-passed; the receipt now identifies `runtime_fallback:react_owner_unavailable`.
-See [the release and production evidence](reports/chatgpt-runtime-release-1549.md).
-Runtime submit 9 repairs a reproduced current-tree ownership defect below;
-it is not yet installed or device accepted.
+Latest installed checkpoint: APK 1550 / adapter 294 includes runtime submit 9
+and bindings 2. One real guest reply still used DOM fallback; the exact native
+send receipt now identifies `runtime_fallback:react_owner_path_limit`.
+See [release and production evidence](reports/chatgpt-runtime-release-1550.md).
+Submit 10 addresses the bounded traversal budget with linear-memory paths and
+is an offline-tested source candidate, not installed or device accepted.
 
 ## Current-tree membership
 
@@ -25,19 +25,24 @@ It considers each child's parent and parent alternate, verifies child/sibling
 membership at every edge and requires exactly one path to the current root.
 Only that path supplies context values; stale-branch props are not merged.
 
-The nearest DOM host boundary and 90-fiber path limit are retained. Memoized
-paths avoid exponential alternate traversal. Visits are capped at 180 fibers,
-512 siblings per parent and 4096 sibling inspections per resolution. Cycles,
-ambiguous ownership and either limit fail closed with fixed structural reason
-codes. Pre/post-dispatch checks use the same resolver and preserve changed drafts;
-no polling, page reload, alternate writer or credential change is introduced.
+Submit 9 retained the nearest DOM host boundary and 90-fiber path limit, with
+180 visits, 512 siblings per parent and 4096 sibling inspections. The 1550
+phone subsequently hit its combined path/visit limit; this does not establish
+the actual complete website depth or prove bailout caused the earlier failure.
+Submit 10 raises the engineering budget to 512 path entries and 1024 visits,
+leaving the DOM-host and sibling budgets unchanged. Memoized linked records
+replace copied ancestor arrays: path storage grows linearly with visits and
+only the final selected path is flattened. Depth and visit failures now have
+separate fixed codes. Cycles and ambiguous membership remain rejected, without
+polling, page reload, alternate writes or credential changes.
 
-Eleven added cases failed on submit 8 and pass on submit 9. The integrated run
-passed 236 Node cases, including bindings, text/attachment dispatch, stopping,
-regeneration, lifecycle and fallback receipts. This proves a source defect and
-its fix, not that the uninstrumented 1549 phone failure was necessarily caused
-by bailout. The next installed probe must distinguish current-tree failure from
-depth/child limits and then obtain an accepted runtime receipt plus one reply.
+Eleven added cases failed on submit 8 and passed on submit 9; its integrated
+run passed 236 Node cases. Three deep-tree cases (120/400/510 added ancestors)
+fail on submit 9 and pass on submit 10, asserting one child-list read per parent;
+the over-budget case still rejects. Submit 10's integrated run passes 239 cases
+across bindings, text/attachments, stop, regeneration, lifecycle and receipts.
+This is not live runtime acceptance or a measured device latency/thermal gain.
+The next grouped APK must obtain an accepted runtime receipt plus one reply.
 
 ## Confirmed guest transactions
 
