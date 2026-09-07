@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 4, create: factory });
+  const exported = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateHistoryProjection = exported;
 })(typeof window === 'object' ? window : null, function (dependencies) {
@@ -107,6 +107,21 @@
       if (/^[A-Za-z0-9.+-]{1,63}\/[A-Za-z0-9.+-]{1,63}$/.test(mime)) value.mediaType = mime;
       parts.push(value);
     });
+    // The official composer serializes shared references outside attachments.
+    // Match its attachment-first rendering while keeping existing row positions.
+    const shared = message.metadata && message.metadata.shared_library_file_references;
+    const seen = new Set((Array.isArray(attachments) ? attachments : []).slice(0, MAX_PARTS)
+      .filter(file => clean(file && file.name, 180)).map(file => file.library_file_id).filter(Boolean));
+    (Array.isArray(shared) ? shared : []).slice(0, MAX_PARTS).forEach((reference) => {
+      const name = clean(reference && reference.name, 180);
+      if (!name || seen.has(reference.library_file_id)) return;
+      if (typeof reference.library_file_id === 'string') seen.add(reference.library_file_id);
+      const value = { type: 'file', text: name, kind: 'file' };
+      if (withSource) value.sharedLibraryReference = reference;
+      const mime = clean(reference.mime_type, 96);
+      if (/^[A-Za-z0-9.+-]{1,63}\/[A-Za-z0-9.+-]{1,63}$/.test(mime)) value.mediaType = mime;
+      parts.push(value);
+    });
     return bounded ? parts.slice(0, MAX_PARTS - 1) : parts;
   }
 
@@ -161,6 +176,8 @@
       const parts = mediaParts(message, false);
       const rawAttachments = message.metadata && message.metadata.attachments;
       if (Array.isArray(rawAttachments) && rawAttachments.length > MAX_PARTS) truncated = true;
+      const rawShared = message.metadata && message.metadata.shared_library_file_references;
+      if (Array.isArray(rawShared) && rawShared.length > MAX_PARTS) truncated = true;
       const rawParts = message.content && message.content.parts;
       if (Array.isArray(rawParts) && rawParts.length > MAX_PARTS) truncated = true;
       parts.forEach((part, index) => {
@@ -194,6 +211,8 @@
           (!Array.isArray(attachments) || attachments.length > MAX_PARTS),
         projectId: normalized.gizmo_id || normalized.project_id || '' };
     }
+    if (part?.sharedLibraryReference) return { sharedLibraryReference: part.sharedLibraryReference,
+      name: part.text, projectId: normalized.gizmo_id || normalized.project_id || '' };
     return part?.source ? { attachment: part.source, name: part.text,
       projectId: normalized.gizmo_id || normalized.project_id || '' } : null;
   }

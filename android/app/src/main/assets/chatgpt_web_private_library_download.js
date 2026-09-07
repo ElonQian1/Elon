@@ -21,6 +21,20 @@
     return { sharedLibraryFileId: file.library_file_id };
   }
 
+  function sharedReference(file) {
+    if (!file || typeof file !== 'object' || Array.isArray(file) ||
+        typeof file.library_file_id !== 'string' || !LIBRARY.test(file.library_file_id) ||
+        typeof file.name !== 'string' || !file.name.trim() || /[\x00-\x1f\x7f]/.test(file.name) ||
+        Object.keys(file).some(key => !['library_file_id', 'name', 'display_path', 'mime_type',
+          'size_bytes', 'entrypoint'].includes(key)) ||
+        file.mime_type != null && (typeof file.mime_type !== 'string' ||
+          !/^[A-Za-z0-9.+-]{1,63}\/[A-Za-z0-9.+-]{1,63}$/.test(file.mime_type)) ||
+        file.size_bytes != null && (!Number.isSafeInteger(file.size_bytes) || file.size_bytes < 0)) return null;
+    // attachSharedLibraryFileReference -> metadata.shared_library_file_references
+    // -> document reference preview's sharedLibraryFileId -> fEt/AX binary route.
+    return { sharedLibraryFileId: file.library_file_id };
+  }
+
   async function run(root, job, current, validateSignedUrl) {
     if (job.descriptor.byteTransferVersion !== 1) throw new Error('download_bridge_unavailable');
     const bridge = root.elonChatGptFileDownload;
@@ -133,5 +147,5 @@
       try { reader?.releaseLock(); } catch (_) {}
     }
   }
-  return Object.freeze({ version: 1, target, run });
+  return Object.freeze({ version: 2, target, sharedReference, run });
 });

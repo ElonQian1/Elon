@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 7, create: factory });
+  const exported = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -101,8 +101,13 @@
   function target(path, source, scope) {
     const conversation = PATH.exec(path || '');
     const image = source?.image != null;
-    const file = image ? imageFile(source) : source?.attachment;
-    const libraryReference = !image && root.__elonChatGptPrivateLibraryDownload?.target?.(file);
+    const shared = source?.sharedLibraryReference != null;
+    if (shared && (image || source.attachment != null)) return null;
+    const file = image ? imageFile(source) : shared ? source.sharedLibraryReference : source?.attachment;
+    const libraryReference = !image && (shared
+      ? root.__elonChatGptPrivateLibraryDownload?.sharedReference?.(file)
+      : root.__elonChatGptPrivateLibraryDownload?.target?.(file));
+    if (shared && !libraryReference) return null;
     if (!conversation || !file || !image && !libraryReference && !/^[A-Za-z0-9_-]{1,160}$/.test(file.id || '')) return null;
     // Cloud references and alternate preview targets have separate resolvers.
     if (['shared_library_file_id', 'library_download_id', 'source_url',
@@ -291,5 +296,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 7, register, start, cancel, dispose });
+  return Object.freeze({ version: 8, register, start, cancel, dispose });
 });

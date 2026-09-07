@@ -3,7 +3,8 @@
 Capability candidate: `android_chatgpt_private_shared_library_download_v1`.
 Status: **implemented source candidate, offline JS verified, native build and
 grouped device acceptance pending**. This is not a `completed` capability.
-Adapter 282, file-download module 6, library-download module 1.
+Current source: file-download module 8, library-download module 2, history
+projection 5. The existing adapter asset list is reused unchanged.
 
 ## Official source evidence
 
@@ -84,9 +85,11 @@ control or complete page snapshot is polled for each progress update.
 ## Exact remaining gaps
 
 - Standalone `libraryDownloadId`, mounted-library, connector-only cloud and
-  parameterized-image references are not implemented by this candidate.
-- References present only in separate shared-library metadata/citation graphs,
-  rather than the selected conversation attachment index, are not yet indexed.
+  remaining image-pointer scopes/path forms are not implemented by this candidate.
+  [Bounded parameterized image pointers](chatgpt-private-image-download.md#parameterized-pointers)
+  are implemented separately in the same download owner.
+- Separate `metadata.shared_library_file_references` are now indexed as described
+  below. Citation-graph-only references without that metadata remain unimplemented.
 - Startup cleanup now has [durable native ownership and focused crash tests](chatgpt-private-download-recovery.md).
   Actual Android storage acceptance is pending. Process-death byte-range resume,
   persistent download history and old unjournaled artifacts remain unsupported;
@@ -94,6 +97,48 @@ control or complete page snapshot is polled for each progress update.
 - Native progress/cancel controls are implemented in source but await grouped
   Android compilation and production UI acceptance, including notifications
   disabled. They are not a live UI pass yet.
+
+## Metadata-only shared references
+
+The 2026-09-07 source extension reuses this capability, not another downloader.
+The retained public assets above were hash-checked again; no authenticated
+request or device result is inferred from reading them.
+
+`attachSharedLibraryFileReference` in the `8b34dbc2` asset constructs
+`{library_file_id, name, display_path, mime_type, size_bytes, entrypoint}`.
+The composer sends those ready-file references through `EOn`; `zVr` in the
+conversation asset places them in `metadata.shared_library_file_references`,
+separately from ordinary attachments. The message reference renderer looks up
+the library ID there and passes it to `dA` as `sharedLibraryFileId`. `j$n`
+passes that preview target to `fEt`, which uses the existing `AX` binary route.
+This establishes the descriptor-to-download mapping, not merely a matching URL.
+
+History projection now appends these files after existing image/attachment
+parts, keeping their previous row positions and the selected regeneration
+branch. Ordinary attachments take precedence when the same library ID appears
+in both collections; duplicate shared IDs do not create repeated rows. The
+per-message 20-reference, 100-index-row and 80-displayed-message bounds remain;
+an older shared file can still appear in the conversation file sheet. A bounded
+index reports truncation instead of claiming to be complete.
+
+Only the download owner receives the raw reference, as a distinct descriptor.
+It admits the evidenced fields, a valid library ID/name and typed optional
+MIME/size; alternate IDs, scopes, preview targets and unknown fields cannot
+fall through to the ordinary file resolver. Identity/project/document guards,
+opaque selection handles, cancellation, byte ordering and native publication
+reuse the existing implementation. Display paths, IDs and entrypoints are not
+exported to native display rows. No additional metadata GET, DOM query, new
+native UI or second transfer owner was added. Module reinjection retires the
+old download registry once without restarting the identity transport.
+
+The new projection cases failed on the unchanged source. The final focused
+runs pass **149 Node runner cases**, including shared/ordinary/connector/image
+downloads, history, file index, identity transport and production asset-bundle
+parsing. Two synthetic scope variants verify exact saved bytes and immutable
+selection, with cancellation/identity loss preventing publication. HTTP and
+native acknowledgements are simulated. Android compilation, actual shared
+metadata, binary-route redirect/CORS and device saved-file acceptance remain
+pending for the grouped build; this is still `implemented_device_pending`.
 
 ## Verification and grouped acceptance
 

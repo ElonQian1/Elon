@@ -15,8 +15,11 @@ function fixture(options = {}) {
   const calls = [], packets = [], receipts = [], stored = [];
   let identity = 'Bearer synthetic-library-identity', sequence = 0, reads = 0, saved = false, cancelled = false;
   const attachment = { name: 'fixture.bin', source: 'library', library_file_id: LIBRARY, mime_type: 'application/octet-stream' };
+  const sharedReference = { library_file_id: LIBRARY, name: 'fixture.bin', mime_type: 'application/octet-stream',
+    size_bytes: data.byteLength, display_path: '/Shared/fixture.bin', entrypoint: 'library' };
   const payload = { ...(options.project ? { gizmo_id: PROJECT } : {}), messages: [{ id: 'message-synthetic',
-    author: { role: 'user' }, content: { parts: ['fixture'] }, metadata: { attachments: [attachment] } }] };
+    author: { role: 'user' }, content: { parts: ['fixture'] }, metadata: options.shared
+      ? { shared_library_file_references: [sharedReference] } : { attachments: [attachment] } }] };
   const bridge = { onmessage: null, postMessage(raw) {
     const packet = JSON.parse(raw); packets.push(packet);
     if (packet.cancel) { cancelled = true; if (!saved) stored.length = 0; return; }
@@ -69,11 +72,46 @@ function fixture(options = {}) {
     leaseId: '00000000-0000-4000-8000-000000000001', documentToken: root.__elonChatGptDocumentToken,
     href: root.location.href, path: '/c/selected', name: row.name, downloadHandle: row.downloadHandle }),
     (...args) => receipts.push(args));
-  const f = { api, root, payload, attachment, calls, packets, receipts, data, stored, register, run,
+  const f = { api, root, payload, attachment, sharedReference, calls, packets, receipts, data, stored, register, run,
     setIdentity: value => { identity = value; }, get reads() { return reads; }, get saved() { return saved; },
     get cancelled() { return cancelled; } };
   return f;
 }
+
+test('metadata-only shared files reuse the production download byte lease without a DOM or metadata lookup', async () => {
+  for (const project of [false, true]) {
+    const f = fixture({ shared: true, project });
+    const rows = f.register();
+    assert.match(rows[0]?.downloadHandle || '', /^download_[a-f0-9]{32}$/);
+    f.sharedReference.library_file_id = 'libfile_changed';
+    await f.run(rows[0]);
+    assert.deepEqual(f.calls.map(call => call.url), [DOWNLOAD]);
+    assert.equal(f.calls[0].init.headers, undefined);
+    assert.deepEqual(Buffer.concat(f.stored), Buffer.from(f.data));
+    assert.deepEqual(f.receipts, [['download_conversation_file', true, 'download_saved']]);
+    assert.equal(f.root.location.href, 'https://chatgpt.com/c/current');
+    assert.doesNotMatch(JSON.stringify({ rows, packets: f.packets, receipts: f.receipts }), /libfile|display_path|entrypoint/);
+  }
+});
+
+test('unrecognized shared metadata cannot be silently dispatched to the ordinary download resolver', () => {
+  for (const fields of [{ id: 'file-other' }, { source: 'library' }, { context_scopes: [] },
+    { library_file_id: '../other' }, { mounted_library_file_id: LIBRARY }]) {
+    const f = fixture({ shared: true }); Object.assign(f.sharedReference, fields);
+    assert.equal(f.register()[0]?.downloadHandle, undefined);
+    assert.equal(f.calls.length, 0);
+  }
+});
+
+test('shared metadata retains cancellation and identity guards across native byte publication', async () => {
+  const f = fixture({ shared: true, onPacket: (packet, owner) => {
+    if (packet.byteOperation === 'chunk') owner.setIdentity('Bearer another-library-account');
+  } });
+  const row = f.register()[0]; assert.ok(row?.downloadHandle);
+  await f.run(row);
+  assert.equal(f.saved, false); assert.equal(f.stored.length, 0);
+  assert.deepEqual(f.receipts, [['download_conversation_file', false, 'download_cancelled']]);
+});
 
 for (const sameId of [false, true]) {
   test('production file selection downloads a library reference with bounded native packets: ' + sameId, async () => {

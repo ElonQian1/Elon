@@ -36,6 +36,9 @@ Version 7 / adapter 288 additionally supports bounded parameterized image
 pointers through the same resolver, preserving full-ID metadata matching and
 official query/fragment normalization without accepting context overrides.
 See the [parameterized-pointer contract and verification](chatgpt-private-image-download.md#parameterized-pointers).
+Version 8 also connects separate shared-library message metadata to the same
+native file index and binary download owner; see the
+[metadata-only reference contract](chatgpt-private-shared-library-download.md#metadata-only-shared-references).
 
 The native index receives random opaque selection handles, not private file
 IDs or signed URLs. Registration uses the selected history branch, preserving
