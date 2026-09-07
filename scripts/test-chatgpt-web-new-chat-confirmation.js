@@ -182,6 +182,24 @@ test('production confirmation resolver loads before new-chat navigation', () => 
   assert.ok(index < catalog.indexOf('"chatgpt_web_private_new_conversation.js"'));
 });
 
+test('an installed v294 bridge is replaced once without discarding identity or audio owners', () => {
+  const adapter = fs.readFileSync(path.join(assets, '../kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const version = Number(/ADAPTER_VERSION = (\d+)/.exec(adapter)[1]);
+  const identity = {}, audio = {};
+  let disposed = 0;
+  const window = { __elonChatGptAdapterVersion: 294, __elonChatGptAdapterTargetVersion: version,
+    __elonChatGptBridge: { dispose() { disposed++; } }, __elonChatGptConversations: { stale: true },
+    __elonChatGptPrivateAuthContext: identity, __elonChatGptPrivateRealtimeVoice: audio };
+  const bootstrap = fs.readFileSync(path.join(assets, 'chatgpt_web_adapter_bootstrap.js'), 'utf8');
+  const context = { window, location: { origin: 'https://chatgpt.com' } };
+  vm.runInNewContext(bootstrap, context);
+  assert.equal(disposed, 1); assert.equal(window.__elonChatGptConversations, undefined);
+  assert.equal(window.__elonChatGptAdapterVersion, version);
+  assert.equal(window.__elonChatGptPrivateAuthContext, identity);
+  assert.equal(window.__elonChatGptPrivateRealtimeVoice, audio);
+  vm.runInNewContext(bootstrap, context); assert.equal(disposed, 1);
+});
+
 for (const reason of ['expired', 'suspend']) {
   test('reopening after ' + reason + ' rebinds the existing guest modal without another registered action', () => {
     const f = navigationFixture(); f.start(); const oldRequest = f.request();

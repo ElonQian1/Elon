@@ -65,6 +65,8 @@ It calls the website's own router/close callbacks, not a DOM click or guessed PO
 - Native UI restores the existing transcript before presenting `New chat?`,
   with clear-and-create versus keep-current actions. The native lease lasts at
   most 50 seconds; leaving the foreground or dismissing cancels, never approves.
+  Expired native consent can still cancel its page lease, eliminating the remaining
+  ten-second busy interval; expiration can never authorize destructive approval.
   Stable controls are `web_chat_new_conversation_confirm` and
   `web_chat_new_conversation_cancel`. Protocol tags/tickets are not user text.
 - A decision consumes the page lease before invoking the official callback.
@@ -98,11 +100,12 @@ acceptance; the handset was locked afterward. The snapshot-only recovery repair
 `62a5a7708` and native guest-confirmation batch are not in that installed artifact.
 See [1551 delivery and recovery evidence](reports/chatgpt-runtime-release-1551.md).
 
-The native-confirmation production/test compilation passed in 302.7 seconds,
+The initial native-confirmation production/test compilation passed in 302.7 seconds,
 with 26 selected JUnit tests and no failures/errors/skips. Its log stem is
 `new-chat-native-confirmation-android-20260908-20260908-042754-927`.
-The continuation preserves exactly the same Kotlin content (only checkout line
-endings differ), so this compilation is reused rather than restarted.
+Its continuation initially reused the same Kotlin content. The subsequent expiry
+cancellation correction passed 28 selected tests, followed by the final adapter
+version check below; the earlier 26-case result is a historical checkpoint.
 
 Six new red cases reproduced lease-expiry/suspension reentry, a preexisting modal
 with missing bindings/helper, a modal opening during import, and v1 decision
@@ -110,6 +113,20 @@ misdispatch. The corrected navigation, production wiring, text/current consumers
 runtime assets and Windows guard suites pass 185 Node runner cases, zero failures:
 `new-chat-confirmation-reentry-red-20260908-20260908-044752-779` and
 `new-chat-confirmation-reentry-green-20260908-20260908-044947-777`.
+
+The installed adapter-294 bootstrap skips equal-version command bridges. A new
+upgrade regression reproduced that stale bridge, then passed after advancing the
+production adapter to 295 through the existing version mechanism. The final
+related Node run passes 186 cases, and Release production/test compilation plus
+28 selected JUnit tests passed in 310.3 seconds, with no failures/errors/skips.
+Log stems: `new-chat-confirmation-upgrade-red-20260908-20260908-050808-297`,
+`new-chat-confirmation-upgrade-green-20260908-20260908-050849-354`, and
+`new-chat-adapter295-android-20260908-20260908-050858-303`.
+The bootstrap fixture preserves the identity/audio namespace references; that is
+not a new live-audio acceptance claim. Production changes are in the ordinary
+friend-chat UI, not a test page. No APK was assembled or published for these
+source-only increments. A bounded read-only check found the pinned Xiaomi online,
+asleep and keyguard showing; no conversation or microphone was operated.
 
 These are offline evidence, not an observed guest-data deletion or live protocol
 acceptance. Group the source changes into the next APK. Registered action/modal

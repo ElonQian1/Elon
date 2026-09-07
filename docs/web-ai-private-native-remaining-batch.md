@@ -58,6 +58,16 @@ the existing `template_unavailable` fallback, with an extra thinking-status bubb
 direct sending is not accepted. [1547 evidence](reports/chatgpt-runtime-release-1547.md)
 is the current checkpoint; other acceptance gaps below remain.
 
+Later navigation delivery: [APK 1551](reports/chatgpt-runtime-release-1551.md)
+contains the deep-composer resolver, bounded background discovery backoff and
+registered new-chat action v1; publication/install passed but the handset was
+locked afterward. The 1550 fallback send remains the latest actual text-send
+route evidence. The subsequent [new-chat confirmation](chatgpt-private-new-conversation.md)
+candidate removes forced navigation recovery, provides a native guest confirm/cancel
+flow and protects expiry/reentry. Adapter 295 passes 186 focused Node cases and
+Release compilation with 28 selected Android tests. It is source-only, not an
+installed consent or direct-send acceptance pass; do not reimplement it.
+
 Latest source extension: [private multi-attachment batches](chatgpt-private-attachment-batch.md)
 now join up to nine native selections to one prepared-action message, reusing
 existing per-file upload owners. 305 focused Node cases, 32 Kotlin/JUnit tests
