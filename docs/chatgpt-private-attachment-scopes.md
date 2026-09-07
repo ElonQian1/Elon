@@ -50,8 +50,12 @@ with the requested mode, and project/scoped contexts are excluded. A present
 `is_temporary_chat` must be boolean and cannot contradict the canonical flag.
 Unknown scope chooses the existing compatible route before byte reads or writes.
 
-Temporary uploads explicitly send `store_in_library=false`, no library
-persistence mode and processing metadata `is_temporary_chat=true`. They keep
+Legacy temporary uploads explicitly send `store_in_library=false`, no library
+persistence mode and processing metadata `is_temporary_chat=true`. The source-only
+adapter 276 additionally supports [temporary reservation prewarm and claim](chatgpt-private-upload-reservations.md#temporary-persistence):
+its selection/claim defaults the slot persistence to `required`, as the official
+caller does, without changing the non-library processing intent. A pending or
+disabled reservation leaves the legacy request shapes unchanged. Both paths keep
 retrieval indexing disabled. The private receipt retains the mode, and ready-file
 association checks it against the captured binding before updating the official
 store. This applies to text and normalized static images using the existing

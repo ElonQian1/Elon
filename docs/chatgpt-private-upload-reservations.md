@@ -4,7 +4,8 @@ Capability: `android_chatgpt_private_upload_reservations_v1`.
 Status: production upload integration implemented and offline verified on
 2026-09-07; grouped APK build and device acceptance pending. Not `completed`.
 The native camera/photo/file actions now start a bounded reservation preparation
-when opening the system picker. Matching selected files reuse it on send; the
+when opening the system picker, including new and confirmed existing temporary
+chats. Matching selected files reuse it on send; the
 existing post-selection byte/image preparation overlap remains available.
 
 ## Confirmed source contract
@@ -37,15 +38,31 @@ retrieval indexing; this mapping does not expand the native MIME allowlist.
 
 These are public source observations, not a new successful live claim capture.
 
+### Temporary persistence
+
+The same first asset's composer resolves temporary mode as `Br=true`,
+`Vr=false`, `Hr=false` and `Ur=undefined` (byte offset 2828582 in the pinned
+asset). Its `KJ` call passes those values as temporary, store-in-library and
+persistence arguments (2849430). `KJ` preserves explicit false via `eVe`, the
+second asset's `jRr` export `V5`; both picker and drag prewarm default only the
+reservation persistence with `h ?? 'required'` (1366515/1367155).
+`VGt` applies the same default when consuming a selection (468905), and `BGt`
+copies that selection value into the final claim. `TGt` still carries
+`store_in_library=false` and `is_temporary_chat=true` into processing metadata.
+The `required` slot value is therefore not permission to store a temporary
+attachment in the personal library. Legacy create/process still omit the field.
+
 ## Production ownership
 
-- `chatgpt_web_private_attachment_reservation.js` owns the version-1 ephemeral
+- `chatgpt_web_private_attachment_reservation.js` owns the version-2 ephemeral
   slot, experiment check, exact allocation and final claim shape. It does not
   own native UI, file reading, WebView identity, audio, or message sending.
 - `chatgpt_web_private_attachment_selection.js` owns one picker selection. It
   uses already available page identity and a current composer, with a 5-second
-  context deadline and a 120-second lifetime. Unknown, temporary or project
-  scope does not authorize allocation. The picker never waits for this work.
+  context deadline and a 120-second lifetime. Unknown or project scope does not
+  authorize allocation. Temporary scope must retain explicit non-library intent;
+  only the reservation protocol normalizes its omitted persistence field.
+  The picker never waits for this work.
 - `ChatGptWebAttachmentPickerPreparation` binds the selection ID to its page
   generation, document token, route and the exact prepared native file object,
   length and modification time. Empty/multiple selections, expired files,
@@ -78,8 +95,8 @@ These are public source observations, not a new successful live claim capture.
   failed final processing. Private credentials go only to the official origin;
   signed blob destinations receive no account headers or page credentials.
 
-Native module versions: composer 11, sender 10, selection 1, transport 8,
-reservation 1; page adapter 275. The loader registers reservation before
+Native module versions: composer 12, sender 11, selection 2, transport 9,
+reservation 2; page adapter 276. The loader registers reservation before
 transport and selection before sender. No duplicate picker, sender, polling
 loop or system fallback was introduced. The production composer passes a typed
 preparation port to its existing attachment actions; work/Google defaults stay
@@ -96,16 +113,20 @@ background polling was added for picker prewarm.
 
 ## Verification and remaining work
 
-183 focused Node tests passed with no failures or skips across selection, reservation,
+190 focused Node tests passed with no failures or skips across selection, reservation,
 production integration, byte routes, transport, composer, image, project,
 selected-thread, read-only project, document and native-byte-source suites.
-The reservation contract suite has 13 tests; integration has 17, and the new
-selection lifecycle suite has 5. Integration
+The reservation contract suite has 15 tests; integration has 21, and the
+selection lifecycle suite has 6. Integration
 uses the production modules and bounded request helper with synthetic Fetch
 responses, including PDF/image claims, Estuary byte forwarding, no-wait legacy
 selection, incomplete/wrong-file processing, cancellation and current-owner
 changes, picker-open ordering, suspension/reinjection, replacement selection,
-fresh membership and real production wiring. Existing attachment behavior
+fresh membership and real production wiring. Temporary coverage includes
+new/existing text/PDF/image picker claims, preparation without a picker lease,
+zero-wait legacy selection, changed server scope and contradictory library
+processing results. The new protocol and picker tests failed on the prior
+implementation, then passed after integration. Existing attachment behavior
 remains covered. Source-size checks pass. Six new Kotlin owner tests cover
 exact-file selection, edits/replacements, cancellation/multiple/expiry,
 late callbacks, document changes and background pause; they have not run yet.
@@ -117,9 +138,9 @@ An account outside the current official experiment is an unobserved reservation
 case, not a reason to force the experiment or claim a successful private route.
 Actual latency, heat and energy improvement remains unmeasured.
 
-Still unfinished: the temporary reservation persistence contract,
-direct-library hash/reuse, remaining file
-categories and grouped acceptance. Temporary and project attachments continue
-using their established scoped private upload paths; they are not silently
-converted to ordinary reservations. A conversation at an ordinary `/c/` route
+Still unfinished: direct-library hash/reuse, remaining file categories and
+grouped acceptance. Temporary reservations are implemented, not live-verified;
+disabled, pending or incompatible reservations retain the established temporary
+create/process path unchanged. Projects keep their established scoped private
+upload path and are not converted to ordinary reservations. A `/c/` route
 can still belong to a project, so confirmed membership takes precedence.

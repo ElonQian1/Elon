@@ -80,9 +80,30 @@ If the server does not select a route, record that case as unobserved rather
 than manufacturing a production response or calling it verified.
 
 Reservation prefetch/claim is now [integrated in source](chatgpt-private-upload-reservations.md),
-including bounded native picker-open prewarm and byte preparation overlap without
-waiting; temporary reservation persistence, direct-library reuse and remaining file categories
-are still separate gaps. Existing [native integration](chatgpt-private-attachment-upload.md)
+including bounded ordinary/temporary native picker-open prewarm and byte
+preparation overlap without waiting. Direct-library reuse and remaining file
+categories are still separate gaps. Existing [native integration](chatgpt-private-attachment-upload.md)
 and [scope rules](chatgpt-private-attachment-scopes.md) are reused. Do not repeat
 protocol implementation merely because live acceptance remains pending. Actual
 latency, energy and thermal improvement has not been measured.
+
+### Direct-library reuse research checkpoint
+
+The pinned first asset's `EGt` computes incremental SHA-256 from `File.stream()`;
+`DGt` posts `{file_size_bytes, sha256_digest}` to `/files/library/reuse` through
+the same-origin client and reads `reusable_library_file`. `VGt` only supplies
+this path when `storeInLibrary===true`, the reuse callback exists and the
+current library-reuse policy allows it. The second asset's `uqt` export `K$t`
+(imported as `Ywe`) resolves gates `1342446482`/`2354748696` and experiment
+`2711463943`. Do not override them or infer permission from an unknown value.
+`OGt` stops the lookup once upload bytes are accepted; `kGt` awaits cancellation
+of the losing upload before associating the reused file. This is not permission
+to race two successful associations or replay an uncertain upload.
+
+This is source evidence only, not implemented or device-verified reuse. The
+ordinary native uploader currently passes explicit `storeInLibrary=false`.
+The next implementation prerequisite is exact current-composer library intent
+and reuse association, not another hash/HTTP module behind an unreachable flag.
+Do not change retention intent merely to enable deduplication. Temporary
+attachments must remain excluded from library reuse. Keep this checkpoint so
+the same endpoint and call chain need not be rediscovered.
