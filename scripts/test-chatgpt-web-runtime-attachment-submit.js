@@ -32,6 +32,7 @@ function fixture({ temporary = false, image = false, reused = false, count = 1 }
   const fiber = { return: top, memoizedProps: props, dependencies: { firstContext: {
     memoizedValue: { store: shared }, next: { memoizedValue: store }
   } } };
+  top.child = fiber;
   const node = { isConnected: true, __reactFiber$fixture: fiber };
   const page = { location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' + (temporary ? '?temporary-chat=true' : '') },
     document: { querySelector: () => node, querySelectorAll: () => [] },

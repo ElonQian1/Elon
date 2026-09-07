@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 8, create: factory });
+  const exported = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -63,15 +63,71 @@
       if (host === page.document.body || host === page.document.documentElement) break;
       const key = Object.keys(host).find(name => name.startsWith('__reactFiber$'));
       if (!key) continue;
-      for (const start of [host[key], host[key]?.alternate]) {
-        const ancestors = [];
-        for (let fiber = start; fiber && ancestors.length < 90; fiber = fiber.return) ancestors.push(fiber);
-        const top = ancestors.at(-1);
-        if (top && !top.return && top.stateNode?.current === top) return ancestors;
-      }
-      break;
+      return currentOwnerPath(host[key]);
     }
+    captureCode = 'react_owner_unavailable';
     return [];
+  }
+
+  function currentOwnerPath(start) {
+    const paths = new Map(), children = new Map(), visiting = new Set();
+    let fault = null, visited = 0, inspected = 0;
+    function contains(parent, fiber) {
+      if (!children.has(parent)) {
+        const set = new Set();
+        for (let child = parent.child; child; child = child.sibling) {
+          if (set.has(child)) { fault = 'react_owner_cycle'; return false; }
+          if (set.size >= 512 || ++inspected > 4096) { fault = 'react_owner_child_limit'; return false; }
+          set.add(child);
+        }
+        children.set(parent, set);
+      }
+      return children.get(parent).has(fiber);
+    }
+    function resolve(fiber, depth) {
+      if (!fiber || typeof fiber !== 'object' || fault) return null;
+      if (depth >= 90) { fault = 'react_owner_path_limit'; return null; }
+      if (visiting.has(fiber)) { fault = 'react_owner_cycle'; return null; }
+      if (paths.has(fiber)) {
+        const cached = paths.get(fiber);
+        if (cached && depth + cached.length > 90) { fault = 'react_owner_path_limit'; return null; }
+        return cached;
+      }
+      if (++visited > 180) { fault = 'react_owner_path_limit'; return null; }
+      if (!fiber.return) {
+        const path = fiber.stateNode?.current === fiber ? [fiber] : null;
+        paths.set(fiber, path);
+        return path;
+      }
+      visiting.add(fiber);
+      let path = null;
+      // A React bailout can reuse a child with a return pointer to the old
+      // parent. Prove membership through child/sibling edges, including the
+      // parent's alternate, all the way to root.current. Never combine props
+      // from the old branch just because its return chain reaches a live root.
+      for (const parent of new Set([fiber.return, fiber.return.alternate])) {
+        if (!parent || !contains(parent, fiber)) continue;
+        const tail = resolve(parent, depth + 1);
+        if (!tail) continue;
+        if (path) { fault = 'react_owner_ambiguous'; break; }
+        path = [fiber, ...tail];
+      }
+      visiting.delete(fiber);
+      paths.set(fiber, path);
+      return path;
+    }
+    let path = null;
+    for (const candidate of new Set([start, start?.alternate])) {
+      const found = resolve(candidate, 0);
+      if (!found) continue;
+      if (path) { fault = 'react_owner_ambiguous'; break; }
+      path = found;
+    }
+    if (fault || !path) {
+      captureCode = fault || 'react_owner_uncommitted';
+      return [];
+    }
+    return path;
   }
 
   function stores(node) {
@@ -83,7 +139,7 @@
           typeof value.hasUploadInProgress$ === 'function') files.add(value);
     }
     const ancestors = committedAncestors(node);
-    if (!ancestors.length) return unavailable('react_owner_unavailable');
+    if (!ancestors.length) return null;
     for (const fiber of ancestors) {
       accept(fiber.memoizedProps?.value);
       let context = fiber.dependencies?.firstContext;
@@ -232,5 +288,5 @@
   try {
     if (page.__elonChatGptPrivateTextTransactionsEnabled === true && route()) identity(true);
   } catch (_) {}
-  return Object.freeze({ version: 8, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 9, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

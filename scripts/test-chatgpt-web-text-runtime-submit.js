@@ -31,6 +31,7 @@ function fixture(guest) {
   const fiber = { return: top, memoizedProps: {}, dependencies: { firstContext: {
     memoizedValue: { store: shared }, next: { memoizedValue: fileStore, next: null }
   } } };
+  top.child = fiber;
   const node = { isConnected: true, __reactFiber$test: fiber };
   const page = { location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/c/' + id },
     document: { querySelectorAll: () => [] },
@@ -225,6 +226,100 @@ test('committed alternate is preferred to stale host fiber props', async () => {
   f.node.__reactFiber$test = { return: staleTop, alternate: f.fiber };
   const result = f.api.submit(f.command); f.settle(true);
   assert.equal((await result.completion).status, 'accepted');
+});
+
+test('bailed-out child follows the committed parent rather than its stale return pointer', async () => {
+  const f = fixture(), oldRoot = { stateNode: f.top.stateNode };
+  const currentParent = { return: f.top, child: f.fiber, dependencies: f.fiber.dependencies };
+  const oldParent = { return: oldRoot, child: f.fiber, alternate: currentParent };
+  currentParent.alternate = oldParent;
+  oldRoot.child = oldParent; f.top.child = currentParent;
+  f.fiber.return = oldParent; f.fiber.dependencies = null;
+  const result = f.api.submit(f.command);
+  assert.equal(result.handled, true);
+  assert.equal(f.calls.length, 1);
+  f.settle(true);
+  assert.equal((await result.completion).status, 'accepted');
+});
+
+test('a return chain reaching current root cannot authorize a child outside that tree', async () => {
+  const f = fixture(), obsolete = [];
+  const staleStore = { ...f.shared, getSharedProps: () => ({ ...f.props,
+    submitComposer() { obsolete.push(true); return { accepted: false }; }
+  }) };
+  const stale = { return: f.top, alternate: f.fiber, dependencies: { firstContext: {
+    memoizedValue: { store: staleStore }, next: { memoizedValue: f.fileStore }
+  } } };
+  f.fiber.alternate = stale; f.node.__reactFiber$test = stale;
+  const result = f.api.submit(f.command);
+  assert.equal(result.handled, true);
+  assert.equal(obsolete.length, 0, 'stale state must never be invoked');
+  assert.equal(f.calls.length, 1);
+  f.settle(true); assert.equal((await result.completion).status, 'accepted');
+});
+
+for (const [code, change] of Object.entries({
+  react_owner_uncommitted: f => { f.top.child = null; },
+  react_owner_ambiguous: f => {
+    const alternate = { ...f.fiber, alternate: f.fiber };
+    f.fiber.alternate = alternate; f.fiber.sibling = alternate;
+  },
+  react_owner_cycle: f => {
+    const parent = { return: null, child: f.fiber };
+    f.fiber.return = parent; f.fiber.child = parent; parent.return = f.fiber;
+  },
+  react_owner_child_limit: f => {
+    for (let i = 0; i < 512; i++) f.top.child = { sibling: f.top.child };
+  },
+  react_owner_path_limit: f => {
+    for (let i = 0; i < 90; i++) {
+      const parent = { return: f.fiber.return, child: f.fiber };
+      f.fiber.return.child = parent; f.fiber.return = parent;
+    }
+  }
+})) {
+  test('current-tree resolution rejects its exact structural fault: ' + code, () => {
+    const f = fixture(); change(f);
+    assert.deepEqual(f.api.submit(f.command), { handled: false, code });
+    assert.equal(f.calls.length, 0); assert.equal(f.timers.size, 0);
+  });
+}
+
+test('sibling traversal cycles fail closed without polling or invoking a writer', () => {
+  const f = fixture(), sibling = {};
+  sibling.sibling = sibling; f.top.child = sibling;
+  assert.deepEqual(f.api.submit(f.command), { handled: false, code: 'react_owner_cycle' });
+  assert.equal(f.calls.length, 0);
+});
+
+test('reused children across several alternate parents resolve without exponential search', async () => {
+  const f = fixture();
+  let current = f.top, stale = { stateNode: f.top.stateNode };
+  for (let i = 0; i < 35; i++) {
+    const next = { return: current }, previous = { return: stale, alternate: next };
+    next.alternate = previous;
+    current.child = stale.child = next;
+    current = next; stale = previous;
+  }
+  current.child = stale.child = f.fiber; f.fiber.return = stale;
+  const result = f.api.submit(f.command);
+  assert.equal(result.handled, true); assert.equal(f.calls.length, 1);
+  f.settle(true); assert.equal((await result.completion).status, 'accepted');
+});
+
+test('current-tree removal between capture and dispatch preserves the native draft', () => {
+  const f = fixture(); f.setDraft(f.command.prompt); f.command.expectedDraft = f.command.prompt;
+  f.command.beforeSubmit = () => { f.top.child = null; };
+  assert.equal(f.api.submit(f.command).code, 'context_changed');
+  assert.equal(f.calls.length, 0); assert.equal(f.draft(), f.command.prompt);
+});
+
+test('current-tree removal after dispatch cannot acknowledge or clear the draft', async () => {
+  const f = fixture(); f.setDraft(f.command.prompt); f.command.expectedDraft = f.command.prompt;
+  const result = f.api.submit(f.command);
+  f.top.child = null; f.settle(true);
+  assert.equal((await result.completion).code, 'context_changed');
+  assert.equal(f.calls.length, 1); assert.equal(f.draft(), f.command.prompt);
 });
 
 test('imperatively mounted official editor resolves its nearest committed React host', async () => {

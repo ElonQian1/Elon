@@ -22,6 +22,7 @@ function fixture(options = {}) {
   const fiber = { return: top, dependencies: { firstContext: {
     memoizedValue: { store: shared }, next: { memoizedValue: files }
   } } };
+  top.child = fiber;
   const node = { isConnected: true, __reactFiber$fixture: fiber };
   const page = {
     location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/c/' + id },
