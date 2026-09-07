@@ -13,6 +13,9 @@ does not upgrade the historical device results below to integrated acceptance.
 The [multipart and same-origin byte-route extension](chatgpt-private-attachment-byte-transports.md)
 now implements those two previously rejected routes in source; it is not yet
 included in the historical APK or live-upload results below.
+The [native batch extension](chatgpt-private-attachment-batch.md) now connects
+multiple selected files through the same upload and message owners. It is a
+source candidate and does not change the historical acceptance status.
 
 ## Current evidence
 
@@ -108,7 +111,8 @@ This path is documented but intentionally not implemented by the candidate.
 - Caller must bind provider, account, document and conversation generation through
   `isCurrent(binding)`. URL and cancellation guards also run between every stage.
   Options are snapshotted before awaiting authentication.
-- Limits: one file at a time, 8 MiB per file, 120-character name, 7-second auth
+- Limits: one file transaction at a time (up to nine sequential files in the
+  current native batch), 8 MiB per file, 120-character name, 7-second auth
   deadline, 15-second creation, 30-second upload and processing deadlines,
   256 KiB processing body and 256 records. Failure after dispatch reports possible
   side effects and a short cooldown; it never replays a write.

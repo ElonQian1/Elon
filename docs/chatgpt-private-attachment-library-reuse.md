@@ -117,8 +117,9 @@ the existing native popup style with reuse-first and upload-copy choices. The
 default remains reuse-first. `PendingAttachment.chatGptUploadCopy` belongs only
 to that exact local selection, not to an account, project or global setting.
 The choice is available before upload, with no DOM or network synchronization.
-Copy requires one file accepted by the existing private MIME/size/image policy;
-an earlier copy choice can still be reset after adding another file. Existing
+Copy requires a selected file accepted by the existing private MIME/size/image
+policy. The [batch extension](chatgpt-private-attachment-batch.md) keeps this
+choice independently for each file in a selection of up to nine. Existing
 image preview/edit/remove controls, Google and work-mode paths are retained.
 
 The menu checks active ChatGPT ownership, no streaming/pending upload, the

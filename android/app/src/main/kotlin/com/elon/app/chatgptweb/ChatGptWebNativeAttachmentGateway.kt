@@ -13,6 +13,7 @@ import com.elon.app.PendingAttachment
 import com.elon.app.WebBridgeDocumentSession
 import java.util.UUID
 import java.util.concurrent.Executors
+import org.json.JSONArray
 import org.json.JSONObject
 
 internal class ChatGptWebNativeAttachmentGateway(
@@ -27,7 +28,7 @@ internal class ChatGptWebNativeAttachmentGateway(
     private val io by ioDelegate
     private var installed = false
     private var disposed = false
-    private var lease: Lease? = null
+    private val leases = linkedMapOf<String, Lease>()
     private var reading: Lease? = null
     val pickerPreparation = ChatGptWebAttachmentPickerPreparation(
         document, { webView.url }, { installed && !disposed },
@@ -51,7 +52,7 @@ internal class ChatGptWebNativeAttachmentGateway(
             val payload = message.data?.takeIf { it.length <= 4096 } ?: return@addWebMessageListener
             val request = runCatching { JSONObject(payload) }.getOrNull() ?: return@addWebMessageListener
             val id = request.optString("requestId").takeIf { REQUEST_ID.matches(it) } ?: return@addWebMessageListener
-            val current = lease
+            val current = leases[request.optString("leaseId")]
             val offset = request.optInt("offset", -1)
             if (current == null || reading != null || !isCurrent(current) || request.optString("leaseId") != current.id ||
                 request.optString("documentToken") != current.documentToken || offset < 0
@@ -79,41 +80,48 @@ internal class ChatGptWebNativeAttachmentGateway(
     }
 
     fun prepare(attachments: List<PendingAttachment>, uris: List<Uri>): String? {
-        if (!installed || disposed || attachments.size != 1 || uris.size != 1) {
+        if (!installed || disposed || attachments.size !in 1..ChatGptWebNativeAttachmentPolicy.MAX_FILES ||
+            uris.size != attachments.size
+        ) {
             pickerPreparation.cancel()
             return null
         }
-        val file = attachments.single()
-        val uri = uris.single()
         val state = document()
         val href = webView.url ?: return null
-        if (!state.adapterCurrent || uri.scheme != "content" || uri.authority != authority ||
-            !ChatGptWebNativeAttachmentPolicy.supports(file.mimeType, file.file.length(), file.imageWidth, file.imageHeight) ||
+        if (!state.adapterCurrent || attachments.zip(uris).any { (file, uri) ->
+                uri.scheme != "content" || uri.authority != authority ||
+                    !ChatGptWebNativeAttachmentPolicy.supports(file.mimeType, file.file.length(), file.imageWidth, file.imageHeight)
+            } ||
             Uri.parse(href).let { it.scheme != "https" || it.host != "chatgpt.com" || it.port != -1 }
         ) {
             pickerPreparation.cancel()
             return null
         }
-        val selectionId = if (file.chatGptUploadCopy) {
+        val selectionId = if (attachments.size != 1 || attachments.single().chatGptUploadCopy) {
             pickerPreparation.cancel()
             null
-        } else pickerPreparation.take(file)
+        } else pickerPreparation.take(attachments.single())
         revokeLease(preserveSelection = true)
-        val size = file.file.length().toInt()
-        val next = Lease(
-            UUID.randomUUID().toString(), state.documentToken, state.pageGeneration, href,
-            SystemClock.elapsedRealtime() + 120_000L,
-            ChatGptWebNativeAttachmentReader(size) { requireNotNull(resolver.openInputStream(uri)) },
-        )
-        lease = next
-        main.postDelayed({ if (lease === next) cancel() }, 120_000L)
-        return JSONObject().put("version", 1).put("leaseId", next.id)
-            .put("uploadCopy", file.chatGptUploadCopy)
-            .put("selectionId", selectionId)
-            .put("documentToken", next.documentToken).put("href", href)
-            .put("name", ChatGptWebUploadPolicy.stagedName(file.displayName, file.fileName, 0))
-            .put("size", size).put("type", file.mimeType)
-            .put("width", file.imageWidth).put("height", file.imageHeight).toString()
+        val expiresAt = SystemClock.elapsedRealtime() + 120_000L
+        val descriptors = attachments.zip(uris).mapIndexed { index, (file, uri) ->
+            val size = file.file.length().toInt()
+            val next = Lease(
+                UUID.randomUUID().toString(), state.documentToken, state.pageGeneration, href, expiresAt,
+                ChatGptWebNativeAttachmentReader(size) { requireNotNull(resolver.openInputStream(uri)) },
+            )
+            leases[next.id] = next
+            JSONObject().put("version", 1).put("leaseId", next.id)
+                .put("uploadCopy", file.chatGptUploadCopy).put("selectionId", selectionId)
+                .put("documentToken", next.documentToken).put("href", href)
+                .put("name", ChatGptWebUploadPolicy.stagedName(file.displayName, file.fileName, index))
+                .put("size", size).put("type", file.mimeType)
+                .put("width", file.imageWidth).put("height", file.imageHeight)
+        }
+        val first = leases.values.first()
+        main.postDelayed({ if (leases[first.id] === first) cancel() }, 120_000L)
+        return if (descriptors.size == 1) descriptors.single().toString() else
+            JSONObject().put("version", 2).put("documentToken", state.documentToken).put("href", href)
+                .put("files", JSONArray(descriptors)).toString()
     }
 
     fun cancel() {
@@ -122,12 +130,13 @@ internal class ChatGptWebNativeAttachmentGateway(
     }
 
     private fun revokeLease(preserveSelection: Boolean) {
-        val previous = lease ?: return
-        lease = null
-        if (reading === previous) reading = null
-        previous.reader.revoke()
-        if (ioDelegate.isInitialized()) io.execute { previous.reader.close() }
-        val token = JSONObject.quote(previous.documentToken)
+        if (leases.isEmpty()) return
+        val previous = leases.values.toList()
+        leases.clear()
+        if (reading in previous) reading = null
+        previous.forEach { it.reader.revoke() }
+        if (ioDelegate.isInitialized()) io.execute { previous.forEach { it.reader.close() } }
+        val token = JSONObject.quote(previous.first().documentToken)
         val command = if (preserveSelection) "suspend" else "cancel"
         webView.evaluateJavascript(
             "if(window.__elonChatGptDocumentToken===$token)window.__elonChatGptPrivateAttachmentSend?.$command();",
@@ -148,7 +157,7 @@ internal class ChatGptWebNativeAttachmentGateway(
 
     private fun isCurrent(value: Lease): Boolean {
         val state = document()
-        return !disposed && lease === value && SystemClock.elapsedRealtime() < value.expiresAt &&
+        return !disposed && leases[value.id] === value && SystemClock.elapsedRealtime() < value.expiresAt &&
             state.adapterCurrent && state.documentToken == value.documentToken &&
             state.pageGeneration == value.generation && webView.url == value.href
     }

@@ -5,6 +5,7 @@ const composerModule = require('../android/app/src/main/assets/chatgpt_web_priva
 const sendModule = require('../android/app/src/main/assets/chatgpt_web_private_attachment_send.js');
 const transportModule = require('../android/app/src/main/assets/chatgpt_web_private_attachment_transport.js');
 const protocol = require('../android/app/src/main/assets/chatgpt_web_private_attachment_protocol.js');
+const fixture = require('./fixtures/chatgpt-attachment-composer.js');
 
 test('production asset loader includes the dependency chain and the complete bundle parses', () => {
   const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
@@ -22,37 +23,6 @@ test('production asset loader includes the dependency chain and the complete bun
   }
   new vm.Script(assets.map(name => fs.readFileSync(path.join(__dirname, '../android/app/src/main/assets', name), 'utf8')).join('\n'));
 });
-
-function fixture() {
-  let values = [], account = 'Bearer synthetic-page-token', model = 'synthetic-model';
-  const files$ = () => values;
-  files$.set = next => { values = next; };
-  const store = { files$, readyFiles$: () => values.filter(item => item.status === 'ready'),
-    hasUploadInProgress$: () => values.some(item => item.status === 'uploading') };
-  const fiber = { memoizedProps: { value: store }, dependencies: { firstContext: { memoizedValue: store } } };
-  const input = { isConnected: true, __reactFiber$synthetic: fiber };
-  const headers = () => ({ Authorization: account, 'chatgpt-account-id': 'synthetic-workspace' });
-  const root = {
-    location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' },
-    document: { querySelector: name => name === '#upload-files' ? input : {} },
-    __elonChatGptDocumentToken: 'doc_synthetic_1',
-    __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: headers, acquireSameOriginRequestHeaders: async () => headers() },
-    __elonChatGptPrivateAttachmentTransport: transportModule,
-    __elonChatGptPrivateAttachmentProtocol: protocol,
-    __elonChatGptComposer: { currentModel: () => model },
-    AbortController, setTimeout, clearTimeout, setInterval, clearInterval,
-  };
-  const composer = composerModule.create(root);
-  const file = new File(['synthetic bytes'], 'fixture.txt', { type: 'text/plain' });
-  const descriptor = { version: 1, leaseId: '00000000-0000-4000-8000-000000000000',
-    documentToken: root.__elonChatGptDocumentToken, href: root.location.href,
-    name: file.name, size: file.size, type: file.type };
-  const result = binding => ({ ok: true, stage: 'processed', associated: false, binding,
-    fileId: 'file-synthetic', fileName: file.name, fileSize: file.size, mimeType: file.type,
-    isTemporaryChat: binding.isTemporaryChat, metadata: { fileTokenSize: 5 } });
-  return { root, composer, store, input, fiber, file, descriptor, result,
-    setAccount: next => { account = next; }, setModel: next => { model = next; } };
-}
 
 test('ready file association uses the official callable store and deduplicates native display', () => {
   const f = fixture(), binding = f.composer.capture();
@@ -146,10 +116,10 @@ test('versioned reinjection cancels only the older owner and retains the current
     '../android/app/src/main/assets/chatgpt_web_private_attachment_send.js'), 'utf8');
   let cancelled = 0;
   const root = { location: { origin: 'https://chatgpt.com' },
-    __elonChatGptPrivateAttachmentSend: { version: 15, cancel: () => { cancelled++; } } };
+    __elonChatGptPrivateAttachmentSend: { version: 16, cancel: () => { cancelled++; } } };
   vm.runInNewContext(source, { window: root });
   const current = root.__elonChatGptPrivateAttachmentSend;
-  assert.equal(current.version, 16);
+  assert.equal(current.version, 17);
   assert.equal(cancelled, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateAttachmentSend, current);

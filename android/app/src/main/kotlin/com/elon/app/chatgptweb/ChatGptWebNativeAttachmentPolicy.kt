@@ -1,6 +1,7 @@
 package com.elon.app.chatgptweb
 
 internal object ChatGptWebNativeAttachmentPolicy {
+    const val MAX_FILES = 9
     private val imageTypes = setOf("image/jpeg", "image/png", "image/webp")
     private val documentTypes = setOf(
         "text/plain", "application/pdf", "application/msword",

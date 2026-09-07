@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 3, create: factory });
+  const exported = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -91,7 +91,8 @@
     if (attachment) {
       if (typeof attachment.current !== 'function' || !attachment.current() ||
           typeof attachment.consumeAccepted !== 'function' || !Array.isArray(attachment.readyFiles) ||
-          attachment.readyFiles.length !== 1 || pending.length !== 1 || ready.length !== 1) return null;
+          attachment.readyFiles.length < 1 || attachment.readyFiles.length > 9 ||
+          pending.length !== attachment.readyFiles.length || ready.length !== pending.length) return null;
     } else if (pending.length || ready.length) return null;
     return { ...context, ...currentRoute, token, account, node, conversation, controller,
       leaf: props.currentLeafId, submit: props.submitComposer, attachment };
@@ -178,5 +179,5 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 3, submit, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 4, submit, state: () => ({ pending: active !== null }) });
 });

@@ -42,9 +42,11 @@ does not prove that the response finished or that first-token latency improved.
 ## Native attachment handoff
 
 The 2026-09-07 extension reuses the private upload sender's existing composer
-owner. Composer 15 and sender 14 expose a page-local submission lease for exactly
-one native-owned ready file. Runtime submit 2 uses the official `prepared_action`
-with that entry; orchestrator 3 and adapter 279 wire it into production sending.
+owner. The initial composer 15/sender 14 lease admitted exactly one native-owned
+ready file. Composer 16, sender 17 and runtime submit 4 now admit the exact
+ordered batch of up to nine owned ready entries in one `prepared_action`;
+see [native batch ownership and checks](chatgpt-private-attachment-batch.md).
+The existing orchestrator and adapter wiring are reused.
 This removes DOM fill/button polling for recognized ready attachments; it is
 still official-runtime submission, not independent private HTTP generation.
 
@@ -63,7 +65,7 @@ retains its previous behavior. Older runtime instances cannot ignore this new
 restriction, and an in-flight older writer survives adapter reinjection.
 
 After official acceptance and conversation-owner confirmation, cleanup removes
-only the submitted object. A new thread may already have acquired its server URL,
+only the submitted objects. A new thread may already have acquired its server URL,
 and a display snapshot may have released its previous URL-bound owner. Later
 user files/drafts are preserved; a user removing the submitted file in flight
 does not turn acceptance into an error. A failed local store cleanup reports

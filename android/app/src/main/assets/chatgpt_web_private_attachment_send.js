@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 16, create: factory });
+  const exported = Object.freeze({ version: 17, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -31,12 +31,21 @@
     if (active) return respond('request_attachment_upload', false, '附件上传尚未结束。');
     let descriptor;
     try { descriptor = JSON.parse(raw); } catch (_) {}
-    if (descriptor && typeof descriptor === 'object' && 'uploadCopy' in descriptor &&
-        typeof descriptor.uploadCopy !== 'boolean') {
+    const batch = descriptor?.version === 2;
+    const descriptors = batch ? descriptor.files : [descriptor];
+    if (batch && (!Array.isArray(descriptors) || !descriptors.length || descriptors.length > 9 ||
+        descriptors.some(file => file?.version !== 1 || file.href !== descriptor.href ||
+          file.documentToken !== descriptor.documentToken || !/^[a-f0-9-]{36}$/.test(file.leaseId || '') ||
+          !Number.isSafeInteger(file.size) || file.size < 1 || file.size > 8 * 1024 * 1024 ||
+          typeof file.name !== 'string' || !file.name.trim() || file.name.length > 120 ||
+          /[\x00-\x1f\x7f/\\]/.test(file.name)) ||
+        new Set(descriptors.map(file => file.leaseId)).size !== descriptors.length) ||
+        Array.isArray(descriptors) && descriptors.some(file => file && typeof file === 'object' &&
+          'uploadCopy' in file && typeof file.uploadCopy !== 'boolean')) {
       selections?.cancel();
       return respond('request_attachment_upload', false, '附件上传选项无效，请重新选择。');
     }
-    const uploadCopy = descriptor?.uploadCopy === true;
+    const uploadCopy = descriptors.some(file => file?.uploadCopy === true);
     const unavailable = () => {
       selections?.cancel();
       return uploadCopy ? respond('request_attachment_upload', false,
@@ -45,8 +54,11 @@
     if (uploadCopy) selections?.cancel();
     // Compatibility selection is before any private write, never an automatic replay.
     if (!descriptor || !composer?.available() || !source || !root.__elonChatGptPrivateTransport ||
-        !root.__elonChatGptPrivateAttachmentTransport) return unavailable();
-    if (/^image\//.test(descriptor.type) && !image?.available(descriptor)) return unavailable();
+        !root.__elonChatGptPrivateAttachmentTransport || batch && typeof composer.associateMany !== 'function') return unavailable();
+    if (batch && descriptors.some(file => !root.__elonChatGptPrivateAttachmentProtocol?.isDocument(file) &&
+        !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) return unavailable();
+    if (descriptors.some(file => /^image\//.test(file?.type) && !image?.available(file))) return unavailable();
+    if (batch) selections?.cancel();
     const job = { controller: new root.AbortController(), transport: null, attempted: false };
     active = job;
     let timer;
@@ -67,7 +79,7 @@
         if (abortListener) job.controller.signal.removeEventListener('abort', abortListener);
       }
       if (job.controller.signal.aborted) throw new Error('cancelled');
-      const selected = uploadCopy ? null : selections?.take(descriptor);
+      const selected = uploadCopy || batch ? null : selections?.take(descriptor);
       if (selected) { job.controller.abort(); job.controller = selected.controller; job.transport = selected.transport; }
       const binding = selected?.binding || composer.capture();
       if (descriptor.documentToken !== binding.token || descriptor.href !== binding.href) throw new Error('context_changed');
@@ -75,25 +87,35 @@
       timer = root.setInterval(() => { if (!composer.current(binding)) cancel(); }, 500);
       // Compatibility selection for unknown/unsupported scope precedes byte reads
       // and private writes. Cancelled or stale bindings throw instead of replaying.
-      if (!await composer.prepare(binding, job.controller.signal, descriptor, !!selected)) return unavailable();
-      job.transport = job.transport || createTransport({ isCurrent: candidate => candidate === binding &&
-        !job.controller.signal.aborted && composer.current(binding) });
-      if (!selected && !uploadCopy) job.transport.prefetch?.(composer.reservationContext?.(binding, descriptor), binding, job.controller.signal);
-      let file = await source.read(descriptor, job.controller.signal);
-      let imageDimensions;
-      if (/^image\//.test(file.type)) {
-        const prepared = await image.prepare(file, descriptor, job.controller.signal);
-        file = prepared.file;
-        imageDimensions = prepared.dimensions;
+      for (const item of descriptors) {
+        if (!await composer.prepare(binding, job.controller.signal, item, !!selected)) return unavailable();
       }
-      if (job.controller.signal.aborted || !composer.current(binding)) throw new Error('context_changed');
-      job.attempted = true;
-      const context = { ...composer.uploadContext(binding, file, imageDimensions),
-        ...(uploadCopy ? { checkForReusableLibraryFile: false } : {}) };
-      const result = await job.transport.upload(file, context, binding);
-      if (!result.ok) throw new Error(result.code);
-      if (job.controller.signal.aborted) throw new Error('cancelled');
-      composer.associate(binding, file, result, descriptor.leaseId);
+      const completed = [];
+      for (const item of descriptors) {
+        if (job.controller.signal.aborted || !composer.current(binding) || !composer.available()) throw new Error('context_changed');
+        job.transport = job.transport || createTransport({ isCurrent: candidate => candidate === binding &&
+          !job.controller.signal.aborted && composer.current(binding) });
+        if (!selected && !item.uploadCopy) job.transport.prefetch?.(composer.reservationContext?.(binding, item), binding, job.controller.signal);
+        let file = await source.read(item, job.controller.signal);
+        let imageDimensions;
+        if (/^image\//.test(file.type)) {
+          const prepared = await image.prepare(file, item, job.controller.signal);
+          file = prepared.file;
+          imageDimensions = prepared.dimensions;
+        }
+        if (job.controller.signal.aborted || !composer.current(binding)) throw new Error('context_changed');
+        job.attempted = true;
+        const context = { ...composer.uploadContext(binding, file, imageDimensions),
+          ...(item.uploadCopy ? { checkForReusableLibraryFile: false } : {}) };
+        const result = await job.transport.upload(file, context, binding);
+        if (!result.ok) throw new Error(result.code);
+        if (job.controller.signal.aborted) throw new Error('cancelled');
+        completed.push({ file, result, leaseId: item.leaseId });
+        job.transport.dispose();
+        job.transport = null;
+      }
+      if (batch) composer.associateMany(binding, completed);
+      else composer.associate(binding, completed[0].file, completed[0].result, descriptor.leaseId);
       respond('request_attachment_upload', true, 'private_attachment_associated');
       changed(true);
     } catch (_) {
@@ -118,7 +140,7 @@
     return true;
   }
 
-  return Object.freeze({ version: 16, start, cancel, suspend, remove,
+  return Object.freeze({ version: 17, start, cancel, suspend, remove,
     prepareSubmit: store => composer?.prepareSubmit?.(store) || null,
     beginSelection: raw => selections?.begin(raw) === true, cancelSelection: id => selections?.cancel(id),
     merge: dom => composer?.merge(dom) || dom });

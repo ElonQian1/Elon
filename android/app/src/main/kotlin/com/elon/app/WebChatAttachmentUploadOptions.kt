@@ -16,7 +16,7 @@ internal class WebChatAttachmentUploadOptions(
         onSelected: (Boolean) -> Unit,
     ): Boolean {
         if (!available() || !anchor.isAttachedToWindow) return false
-        fun copySupported() = selectionCount() == 1 && ChatGptWebNativeAttachmentPolicy.supports(
+        fun copySupported() = selectionCount() in 1..ChatGptWebNativeAttachmentPolicy.MAX_FILES && ChatGptWebNativeAttachmentPolicy.supports(
             attachment.mimeType, attachment.file.length(), attachment.imageWidth, attachment.imageHeight,
         )
         if (!copySupported() && !attachment.chatGptUploadCopy) return false

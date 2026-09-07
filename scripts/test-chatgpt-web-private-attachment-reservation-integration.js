@@ -468,13 +468,15 @@ test('production picker and background lifecycle are connected to the scoped res
   assert.match(options, /override fun begin\(kind: WebChatAttachmentSelectionKind\) = controller.beginAttachmentSelection\(kind\)/);
   assert.match(options, /controller.providerId == WebChatProviderId.CHATGPT_WEB/);
   assert.match(options, /!controller.streaming\(\) && controller.pendingAttachmentCount\(\) == 0/);
-  assert.match(options, /selectionCount\(\) == 1 && ChatGptWebNativeAttachmentPolicy.supports/);
+  assert.match(options, /selectionCount\(\) in 1\.\.ChatGptWebNativeAttachmentPolicy.MAX_FILES && ChatGptWebNativeAttachmentPolicy.supports/);
   assert.match(options, /controller.currentConversationPath\(\) != conversation/);
   assert.match(readNative('MainInputActions.kt'), /attachmentPreparation\?\.showUploadOptions\(anchor, attachment, selected\)/);
   assert.match(readNative('PendingAttachmentPreviewStrip.kt'), /preview.setOnLongClickListener/);
   assert.match(readNative('PendingAttachmentPreviewStrip.kt'), /updatePendingAttachmentUploadChoice\(pendingAttachments, attachment, uploadCopy\)/);
   const gateway = readNative('chatgptweb/ChatGptWebNativeAttachmentGateway.kt');
-  assert.match(gateway, /val selectionId = if \(file.chatGptUploadCopy\) \{\s+pickerPreparation.cancel\(\)\s+null\s+\} else pickerPreparation.take\(file\)\s+revokeLease\(preserveSelection = true\)/);
+  assert.match(gateway, /val selectionId = if \(attachments.size != 1 \|\| attachments.single\(\).chatGptUploadCopy\) \{\s+pickerPreparation.cancel\(\)\s+null\s+\} else pickerPreparation.take\(attachments.single\(\)\)\s+revokeLease\(preserveSelection = true\)/);
+  assert.match(gateway, /leases\[request.optString\("leaseId"\)\]/);
+  assert.match(gateway, /\.put\("files", JSONArray\(descriptors\)\)/);
   assert.match(gateway, /\.put\("uploadCopy", file.chatGptUploadCopy\)/);
   assert.match(gateway, /\.put\("selectionId", selectionId\)/);
   const adapter = fs.readFileSync(path.join(__dirname, base, 'chatgpt_web_adapter.js'), 'utf8');

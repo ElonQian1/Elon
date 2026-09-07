@@ -22,6 +22,14 @@ reused; source-only or installation status does not satisfy the acceptance gate.
 
 ## Current batch
 
+Latest source extension: [private multi-attachment batches](chatgpt-private-attachment-batch.md)
+now join up to nine native selections to one prepared-action message, reusing
+existing per-file upload owners. 305 focused Node cases, 32 Kotlin/JUnit tests
+and SDK partial compilation passed. Full Android compilation and production
+private-route/multiple-file acceptance remain in the grouped ChatGPT round.
+This extends the historical single-file entries below; it does not upgrade
+their device-verification claims.
+
 | Work | Code | Verification | Delivery |
 |---|---|---|---|
 | Private history to native wire format, citations, file/image descriptors | Implemented | JS and shared Android fixture passed | Published/installed 1540; device UI acceptance pending |

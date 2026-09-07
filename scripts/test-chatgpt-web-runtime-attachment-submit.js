@@ -14,7 +14,7 @@ const protocol = require(path.join(assets, 'chatgpt_web_private_attachment_proto
 const id = '11111111-2222-3333-4444-555555555555';
 const flush = async () => { for (let i = 0; i < 16; i++) await Promise.resolve(); };
 
-function fixture({ temporary = false, image = false, reused = false } = {}) {
+function fixture({ temporary = false, image = false, reused = false, count = 1 } = {}) {
   let values = [], serverId = null, identity = 'Bearer synthetic-only', draft = '', settle;
   let response = () => ({ accepted: true, completion: new Promise(resolve => { settle = resolve; }) });
   const calls = [], events = [], timers = new Map(), counts = { prepared: 0, click: 0, relay: 0, draftWrites: 0 };
@@ -45,11 +45,17 @@ function fixture({ temporary = false, image = false, reused = false } = {}) {
     __elonChatGptPrivateTextTransactionRelay: { dispatch() { counts.relay++; return { dispatched: false }; } } };
   const composer = composerModule.create(page), binding = composer.capture();
   const file = new File(['synthetic upload'], image ? 'fixture.png' : 'fixture.txt', { type: image ? 'image/png' : 'text/plain' });
-  composer.associate(binding, file, { ok: true, associated: false, binding,
+  const result = { ok: true, associated: false, binding,
     stage: reused ? 'reused' : 'processed', fileId: 'file-synthetic', fileName: file.name, fileSize: file.size, mimeType: file.type,
     isTemporaryChat: temporary, ...(image ? { imageDimensions: { width: 20, height: 30 } } : {}),
     ...(reused ? { reusedFileName: 'original.txt', metadata: { libraryFileId: 'library-synthetic', libraryPersistenceResult: 'library' } } : {}),
-  }, 'synthetic');
+  };
+  if (count === 1) composer.associate(binding, file, result, 'synthetic');
+  else composer.associateMany(binding, Array.from({ length: count }, (_, i) => {
+    const selected = new File(['synthetic file ' + i], 'fixture-' + i + '.txt', { type: 'text/plain' });
+    return { file: selected, leaseId: 'synthetic-' + i, result: { ...result, fileId: 'file-' + i,
+      fileName: selected.name, fileSize: selected.size, mimeType: selected.type } };
+  }));
   const attached = values[0];
   page.__elonChatGptPrivateAttachmentSend = senderModule.create(page, { composer });
   page.__elonChatGptPrivateTextRuntimeSubmit = runtimeModule.create(page);
@@ -70,6 +76,23 @@ function fixture({ temporary = false, image = false, reused = false } = {}) {
     timeout: () => { for (const fn of [...timers.values()]) fn(); },
     setIdentity: value => { identity = value; }, setDraft: value => { draft = value; }, draft: () => draft,
     navigate() { serverId = id; page.location.href = 'https://chatgpt.com/c/' + id + (temporary ? '?temporary-chat=true' : ''); } };
+}
+
+for (const count of [2, 9]) {
+  test('one official prepared_action dispatches an entire owned attachment batch: ' + count, async () => {
+    const f = fixture({ count }), selected = f.store.files$().slice();
+    f.send(false);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.calls[0][1].kind, 'prepared_action');
+    assert.equal(f.calls[0][1].readyFiles.length, count);
+    assert.deepEqual(f.calls[0][1].readyFiles.map(item => item.file), selected.map(item => item.file));
+    assert.equal(f.store.files$().length, count);
+    f.navigate(); f.settle(true); await flush();
+    assert.equal(f.events[0].detail, 'official_runtime_v1:accepted');
+    assert.equal(f.store.files$().length, 0);
+    assert.equal(f.calls.length, 1);
+    assert.deepEqual(f.counts, { prepared: 1, click: 0, relay: 0, draftWrites: 0 });
+  });
 }
 
 for (const config of [{}, { temporary: true }, { image: true }, { reused: true }]) {
@@ -204,7 +227,7 @@ test('reinjection upgrades idle runtime but preserves an older in-flight writer'
   assert.equal(f.page.__elonChatGptPrivateTextRuntimeSubmit, old);
   old.state = () => ({ pending: false });
   vm.runInNewContext(runtimeSource, { window: f.page });
-  assert.equal(f.page.__elonChatGptPrivateTextRuntimeSubmit.version, 3);
+  assert.equal(f.page.__elonChatGptPrivateTextRuntimeSubmit.version, 4);
 });
 
 test('an older retained runtime cannot ignore the native-attachment-only restriction', async () => {

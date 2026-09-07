@@ -33,11 +33,14 @@ class PendingAttachmentUploadChoiceTest {
         }
     }
 
-    @Test fun addingAnotherAttachmentCannotEnableCopyButCanResetAnEarlierChoice() {
+    @Test fun eachBatchFileKeepsItsOwnCopyChoice() {
         val original = file()
         val files = mutableListOf(original, file())
-        assertFalse(updatePendingAttachmentUploadChoice(files, original, true))
-        files[0] = original.copy(chatGptUploadCopy = true)
+        val other = files[1]
+        assertTrue(updatePendingAttachmentUploadChoice(files, original, true))
+        assertTrue(files[0].chatGptUploadCopy)
+        assertSame(other, files[1])
+        assertFalse(files[1].chatGptUploadCopy)
         assertTrue(updatePendingAttachmentUploadChoice(files, files[0], false))
         assertFalse(files[0].chatGptUploadCopy)
     }

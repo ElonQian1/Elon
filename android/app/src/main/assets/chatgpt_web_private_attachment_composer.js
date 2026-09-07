@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 15, create: factory });
+  const exported = Object.freeze({ version: 16, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -114,7 +114,7 @@
     if (!current(binding) || signal?.aborted) throw new Error('composer_changed');
     if (root.__elonChatGptPrivateAttachmentProtocol?.isPdf(descriptor) && !binding.modelSlug) return null;
     if (refreshScope && binding.conversationId) { confirmed.delete(binding); projects.delete(binding); }
-    if (confirmed.has(binding)) return true;
+    if (confirmed.has(binding)) return !projects.has(binding) || project.supports(projects.get(binding), descriptor);
     const read = binding.projectId && !binding.conversationId ? () => project?.read(binding, signal, descriptor)
       : root.__elonChatGptPrivateTransport?.readAttachmentContext;
     if (typeof read !== 'function') return null;
@@ -208,7 +208,7 @@
       isTemporaryChat: binding.isTemporaryChat, modelSlug: binding.modelSlug ?? undefined });
   }
 
-  function associate(binding, file, result, leaseId) {
+  function readyAttachment(binding, file, result, leaseId) {
     const scope = projects.get(binding);
     const projectId = scope?.projectId || binding.projectId;
     const metadata = result?.metadata || {};
@@ -226,8 +226,6 @@
         (scope && result.projectWriteRequested !== scope.canWrite) ||
         !/^[A-Za-z0-9_-]{1,160}$/.test(result.fileId || '') || result.fileSize !== file.size ||
         result.fileName !== file.name || result.mimeType !== file.type) throw new Error('association_invalid');
-    const store = binding.store;
-    if (store.files$().length !== 0 || store.hasUploadInProgress$()) throw new Error('composer_changed');
     const tempId = 'native_upload_' + leaseId;
     const spec = { name: reused ? result.reusedFileName : file.name, id: result.fileId,
       size: file.size, isBigPaste: false, mimeType: file.type };
@@ -251,26 +249,42 @@
       ...(libraryFileInfo ? { libraryFileInfo } : {}),
       ...(spec.libraryFileId ? { libraryFileId: spec.libraryFileId } : {}),
     };
-    store.files$.set([attached]);
+    return { attached, id: 'private_attachment_' + leaseId };
+  }
+
+  function associateMany(binding, completed) {
+    if (!Array.isArray(completed) || !completed.length || completed.length > 9 ||
+        new Set(completed.map(item => item.leaseId)).size !== completed.length) throw new Error('association_invalid');
+    const items = completed.map(item => readyAttachment(binding, item.file, item.result, item.leaseId));
+    const store = binding.store;
+    if (!current(binding) || store.files$().length !== 0 || store.hasUploadInProgress$()) throw new Error('composer_changed');
+    const attached = items.map(item => item.attached);
+    // Publish only after every selected file is processed; a partial batch must
+    // never release the existing native text-send owner.
+    store.files$.set(attached);
     const ready = store.readyFiles$();
-    if (!current(binding) || !Array.isArray(ready) || !ready.some(item =>
-      item === attached && item.fileSpec?.id === result.fileId && item.status === 'ready'
-    )) {
-      // Roll back only our exact local object. Never overwrite concurrent user files.
+    if (!current(binding) || !Array.isArray(ready) || ready.length !== attached.length ||
+        !attached.every(item => ready.includes(item) && item.fileSpec?.id === item.fileId && item.status === 'ready')) {
       const files = store.files$();
-      if (Array.isArray(files)) store.files$.set(files.filter(item => item !== attached));
+      if (Array.isArray(files)) store.files$.set(files.filter(item => !attached.includes(item)));
       throw new Error('association_unconfirmed');
     }
-    owned = { binding, attached, id: 'private_attachment_' + leaseId };
+    owned = { binding, items };
     return { associated: true };
+  }
+
+  function associate(binding, file, result, leaseId) {
+    return associateMany(binding, [{ file, result, leaseId }]);
   }
 
   function attachedNow() {
     if (!owned) return null;
     if (!current(owned.binding, false)) { owned = null; return null; }
     const ready = owned.binding.store.readyFiles$();
-    if (!Array.isArray(ready) || !ready.some(item => item === owned.attached &&
-      item.fileSpec?.id === owned.attached.fileId && item.status === 'ready')) owned = null;
+    const remaining = Array.isArray(ready) ? owned.items.filter(({ attached }) => ready.includes(attached) &&
+      attached.fileSpec?.id === attached.fileId && attached.status === 'ready') : [];
+    if (!remaining.length) owned = null;
+    else if (remaining.length !== owned.items.length) owned = { ...owned, items: remaining };
     return owned;
   }
 
@@ -278,19 +292,21 @@
     try {
       const value = attachedNow();
       if (!value) return dom;
-      const name = value.attached.file.name;
-      return [...dom.filter(item => !String(item.name || '').includes(name)),
-        { id: value.id, name, state: 'ready', removable: true }];
+      const names = value.items.map(item => item.attached.file.name);
+      return [...dom.filter(item => !names.some(name => String(item.name || '').includes(name))),
+        ...value.items.map(item => ({ id: item.id, name: item.attached.file.name, state: 'ready', removable: true }))];
     } catch (_) { return dom; }
   }
 
   function remove(id) {
     const value = attachedNow();
-    if (!value || value.id !== id) return false;
+    const selected = value?.items.find(item => item.id === id);
+    if (!selected) return false;
     const store = value.binding.store;
-    store.files$.set(store.files$().filter(item => item !== value.attached));
-    if (store.files$().includes(value.attached)) throw new Error('attachment_remove_unconfirmed');
-    owned = null;
+    store.files$.set(store.files$().filter(item => item !== selected.attached));
+    if (store.files$().includes(selected.attached)) throw new Error('attachment_remove_unconfirmed');
+    const remaining = value.items.filter(item => item !== selected);
+    owned = remaining.length ? { ...value, items: remaining } : null;
     return true;
   }
 
@@ -298,8 +314,9 @@
     try {
       const value = attachedNow();
       if (!value || store !== value.binding.store || !current(value.binding)) return null;
-      const { attached, binding } = value, file = attached.file;
-      const fingerprint = () => JSON.stringify({ ...attached, file: undefined });
+      const { binding } = value, attached = value.items.map(item => item.attached);
+      const files = attached.map(item => item.file);
+      const fingerprint = () => JSON.stringify(attached.map(item => ({ ...item, file: undefined })));
       const metadata = fingerprint();
       // The official prepared_action accepts ready entries, not just file IDs.
       // Keep File identity, but detach and freeze its small metadata tree.
@@ -307,15 +324,16 @@
         for (const child of Object.values(data)) if (child && typeof child === 'object') freeze(child);
         return Object.freeze(data);
       }
-      const readyFiles = Object.freeze([Object.freeze({ ...freeze(JSON.parse(metadata)), file })]);
+      const readyFiles = Object.freeze(JSON.parse(metadata).map((item, index) =>
+        Object.freeze({ ...freeze(item), file: files[index] })));
       let consumed = false;
-      function unchanged() { return attached.file === file && fingerprint() === metadata; }
+      function unchanged() { return attached.every((item, index) => item.file === files[index]) && fingerprint() === metadata; }
       function currentLease() {
         try {
           const files = store.files$(), ready = store.readyFiles$();
           return !consumed && owned === value && current(binding) && unchanged() &&
-            Array.isArray(files) && files.length === 1 && files[0] === attached &&
-            Array.isArray(ready) && ready.length === 1 && ready[0] === attached &&
+            Array.isArray(files) && files.length === attached.length && files.every((item, index) => item === attached[index]) &&
+            Array.isArray(ready) && ready.length === attached.length && ready.every((item, index) => item === attached[index]) &&
             store.hasUploadInProgress$() === false;
         } catch (_) { return false; }
       }
@@ -327,9 +345,9 @@
               identity() !== binding.account || resolveStore() !== store || !unchanged()) return false;
           const files = store.files$();
           if (!Array.isArray(files)) return false;
-          if (files.includes(attached)) {
-            store.files$.set(files.filter(item => item !== attached));
-            if (store.files$().includes(attached)) return false;
+          if (files.some(item => attached.includes(item))) {
+            store.files$.set(files.filter(item => !attached.includes(item)));
+            if (store.files$().some(item => attached.includes(item))) return false;
           }
           consumed = true;
           if (owned === value) owned = null;
@@ -340,5 +358,5 @@
     } catch (_) { return null; }
   }
 
-  return Object.freeze({ version: 15, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, merge, remove, prepareSubmit });
+  return Object.freeze({ version: 16, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, merge, remove, prepareSubmit });
 });
