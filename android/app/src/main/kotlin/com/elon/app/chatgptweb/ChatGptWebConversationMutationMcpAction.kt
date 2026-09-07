@@ -12,6 +12,19 @@ internal object ChatGptWebConversationMutationMcpAction {
     ): String? {
         val path = ChatGptWebConversationPath.normalize(args.optString("conversation_path"))
             ?: return "invalid_conversation_path"
+        if (args.optString("action") == "chatgpt_share_conversation" && args.has("operation")) {
+            val request = ChatGptWebSharedLinks.request(path, args.optString("operation"),
+                args.optString("share_id"), args.optString("selection_ticket")) ?: return "share_invalid_selection"
+            if (request.getString("operation") == "revoke" && !args.optBoolean("user_confirmed", false)) {
+                return "user_confirmation_required"
+            }
+            val page = runCatching { java.net.URI(snapshot?.url ?: "") }.getOrNull()
+            if (page?.scheme != "https" || page.host != "chatgpt.com" || page.port != -1 || page.userInfo != null) {
+                return "share_context_unavailable"
+            }
+            dispatchCommand("share_conversation") { requestId -> commands.manageConversationShares(request, requestId) }
+            return null
+        }
         if (!args.optBoolean("user_confirmed", false)) return "user_confirmation_required"
         when (args.optString("action")) {
             "chatgpt_share_conversation" -> {

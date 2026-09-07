@@ -8,6 +8,43 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ChatGptWebConversationShareMcpTest {
+    @Test fun managementUsesTrackedReadAndConfirmedRevokeWithoutNavigatingOrPublishing() {
+        val id = "44444444-4444-4444-8444-444444444444"
+        val path = "/c/$id"
+        val state = ChatGptWebObservedState()
+        state.updateDocument(WebBridgeDocumentSession.Snapshot(1, 1, "doc_share_test"))
+        val snapshot = ChatGptWebSnapshot(
+            title = "Fixture", url = "https://chatgpt.com/", draft = "preserve",
+            messages = emptyList(), authenticated = true, composerReady = true, streaming = false,
+            currentModel = "", attachments = emptyList(), dictationActive = false,
+            capabilities = ChatGptWebCapabilities.EMPTY,
+        )
+        val sent = mutableListOf<JSONObject>()
+        val commands = object : ChatGptWebMcpCommandPort by ChatGptWebMcpTestCommandPort(
+            onOpenConversation = { fail("management must not navigate") },
+            onInvoke = { fail("management must not invoke DOM") },
+        ) {
+            override fun shareConversation(path: String, requestId: String) { fail("must not publish") }
+            override fun manageConversationShares(request: JSONObject, requestId: String) { sent += request }
+        }
+        val actions = ChatGptWebMcpActions(
+            snapshot = { snapshot }, uiManifest = { null }, observedState = state::snapshot,
+            beginCommand = state::beginCommand, bridgeState = { ChatGptWebPageAdapter.State.READY },
+            mode = { ChatGptWebPresentationMode.NATIVE }, inputText = { "preserve native draft" },
+            setInputText = { fail("must not change draft") }, commands = commands,
+            refresh = { fail("must not reload") }, selectMode = {}, revealMessage = { _, _, _ -> false },
+        )
+        val consumer = ChatGptWebConsumerPortAdapter({ snapshot }, { null }, state::snapshot, actions::control)
+        assertTrue(consumer.manageConversationShares(path).accepted)
+        assertEquals("list", sent.single().getString("operation"))
+        val ticket = "sl_" + "17".repeat(16) + "_1"
+        assertFalse(consumer.manageConversationShares(path, id, ticket, false).accepted)
+        assertFalse(consumer.manageConversationShares(path, "all", ticket, true).accepted)
+        assertTrue(consumer.manageConversationShares(path, id, ticket, true).accepted)
+        assertEquals(listOf("list", "revoke"), sent.map { it.getString("operation") })
+        assertTrue(state.snapshot().commandRequests.all { it.expectedAction == "share_conversation" })
+    }
+
     @Test fun projectMemberIntentUsesTheSameTrackedCommandWithoutPublicScopeConversion() {
         val id = "44444444-4444-4444-8444-444444444444"
         val project = "g-p-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
