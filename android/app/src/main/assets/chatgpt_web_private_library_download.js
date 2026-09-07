@@ -1,9 +1,11 @@
 (function (root, factory) {
   'use strict';
-  const api = factory();
+  const contentSource = typeof module === 'object' && module.exports
+    ? require('./chatgpt_web_private_content_source.js') : root?.__elonChatGptPrivateContentSource;
+  const api = factory(contentSource);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateLibraryDownload = api;
-})(typeof window === 'object' ? window : null, function () {
+})(typeof window === 'object' ? window : null, function (contentSource) {
   'use strict';
   const MAX_BYTES = 512 * 1024 * 1024;
   const CHUNK_BYTES = 49152;
@@ -36,9 +38,7 @@
   }
 
   function contentUrl(value) {
-    if (typeof value !== 'string' || value.length > 16384 || /[\\\x00-\x20\x7f]/.test(value) ||
-        !/^(?:https:\/\/chatgpt\.com(?::443)?)?\/(?:backend-api|api)\/estuary\/content(?:\?[^#]*)?$/.test(value)) return null;
-    try { return new URL(value, 'https://chatgpt.com').href; } catch (_) { return null; }
+    return contentSource?.contentUrl(value) || null;
   }
 
   function run(root, job, current, validateSignedUrl) {

@@ -693,7 +693,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_conversations.js",
             "chatgpt_web_adapter_message_action_policy.js",
             "chatgpt_web_adapter_message_portal_policy.js",
-            "chatgpt_web_image_assets.js",
+            "chatgpt_web_private_content_source.js", "chatgpt_web_image_assets.js",
             "chatgpt_web_private_image_gallery.js",
             "chatgpt_web_adapter_messages.js",
             "chatgpt_web_adapter_model_label_policy.js",
