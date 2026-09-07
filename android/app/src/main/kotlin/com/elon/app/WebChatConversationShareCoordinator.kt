@@ -20,9 +20,22 @@ internal class WebChatConversationShareCoordinator(
 ) {
     private var epoch = 0
     private var dialog: AlertDialog? = null
+    private val links = WebChatConversationSharedLinksCoordinator(activity, host, activeProvider, consumerPort, openOfficial)
 
     fun show(conversation: ChatGptWebConversation) {
         cancel()
+        if (!active()) return
+        val path = WebChatConversationSharePolicy.sharePath(conversation.path, conversation.projectId)
+            ?: return failure(conversation, "share_project_scope_unconfirmed")
+        track(AlertDialog.Builder(activity).setTitle("分享会话")
+            .setItems(arrayOf(if (WebChatConversationSharePolicy.membersOnly(path)) "获取项目成员链接" else "创建公开链接",
+                "管理已有公开链接")) { _, position ->
+                if (position == 0) create(conversation) else links.show(conversation)
+            }.setNegativeButton("取消", null).create())
+        dialog?.listView?.contentDescription = "web-chat-conversation-share-options"
+    }
+
+    private fun create(conversation: ChatGptWebConversation) {
         val path = WebChatConversationSharePolicy.sharePath(conversation.path, conversation.projectId)
             ?: return failure(conversation, "share_project_scope_unconfirmed")
         val state = consumerPort()?.state() ?: return
@@ -44,6 +57,7 @@ internal class WebChatConversationShareCoordinator(
     fun cancel() {
         epoch += 1
         dismiss()
+        links.cancel()
     }
 
     private fun active(): Boolean = activeProvider() == WebChatProviderId.CHATGPT_WEB &&

@@ -126,3 +126,36 @@ test('single flight and account rejection remain scoped', async () => {
   release({ payload: { items: [], total: 0 } }); assert.equal((await first).ok, true);
   f.headers.Authorization = ''; assert.equal((await f.list()).ok, false);
 });
+
+test('revoking a link invalidates the existing create-result cache', async () => {
+  const f = fixture(); const original = f.page.__elonChatGptPrivateJsonRequest.request;
+  f.page.crypto = { getRandomValues: bytes => { bytes.fill(29); return bytes; } };
+  let removed = false;
+  f.page.__elonChatGptPrivateJsonRequest.request = async (...args) => {
+    const [, url, init] = args;
+    if (url === LIST) return { payload: { total: removed ? 0 : 1,
+      items: removed ? [] : [{ id: SID, conversation_id: CID, create_time: null }] } };
+    if (init.method === 'DELETE') { removed = true; return { ok: true, status: 204 }; }
+    return original(...args);
+  };
+  const api = share.create(f.page, { contract, management, loadRuntime: f.loadRuntime });
+  const create = () => api.start(PATH, true, () => f.snapshot);
+  assert.equal((await create()).ok, true); assert.equal((await create()).ok, true);
+  assert.equal(f.requests.filter(r => r.init.method === 'POST').length, 1);
+  const listed = await api.start({ operation: 'list', path: PATH }, false);
+  assert.equal((await api.start({ operation: 'revoke', path: PATH, id: SID, ticket: listed.data.ticket }, true)).ok, true);
+  assert.equal((await create()).ok, true);
+  assert.equal(f.requests.filter(r => r.init.method === 'POST').length, 2);
+});
+
+test('invalid management commands cannot fall through to public creation', async () => {
+  const f = setup();
+  for (const input of [{ operation: 'delete_all', path: PATH }, { operation: 'list', path: '/c/../all' },
+    { operation: 'revoke', path: PATH, id: SID, ticket: 'invalid' }]) {
+    assert.equal((await f.command(input, true)).ok, false);
+  }
+  let receipt;
+  f.api.handle('share_conversation', { value: '{broken', selected: true }, (...args) => { receipt = args; });
+  assert.deepEqual(receipt, ['share_conversation', false, 'share_invalid_selection']);
+  assert.equal(f.requests.length, 0);
+});
