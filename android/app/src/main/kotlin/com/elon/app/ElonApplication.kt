@@ -55,6 +55,7 @@ class ElonApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.elon.app.chatgptweb.ChatGptWebFileByteRecovery.start(this)
         ChatMessageNotifications.createChannel(this)
         ChatBackgroundService.ensureChannel(this)
         AppUpdateNotifications.createChannels(this)

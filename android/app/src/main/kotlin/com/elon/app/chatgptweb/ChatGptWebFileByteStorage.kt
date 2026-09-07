@@ -8,14 +8,22 @@ import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import java.io.File
+import java.nio.file.Files
 
 internal object ChatGptWebFileByteStorage {
     fun open(context: Context, lease: ChatGptWebFileDownloadLease.Value, onSaved: (Uri?) -> Unit): ChatGptWebFileByteDestination {
+        // Persist and lock ownership before creating anything in external storage.
+        return ChatGptWebFileByteOwnership.open(ChatGptWebFileByteRecovery.journal(context), lease.id) {
+            openDestination(context, lease, onSaved)
+        }
+    }
+
+    private fun openDestination(context: Context, lease: ChatGptWebFileDownloadLease.Value, onSaved: (Uri?) -> Unit): ChatGptWebFileByteDestination {
         val name = "elon-${lease.id}-${lease.name}"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val resolver = context.contentResolver
             val values = ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, name)
+                put(MediaStore.Downloads.DISPLAY_NAME, ChatGptWebFileByteRecovery.pendingName(lease.id))
                 put(MediaStore.Downloads.MIME_TYPE, lease.mediaType.ifBlank { "application/octet-stream" })
                 put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                 put(MediaStore.Downloads.IS_PENDING, 1)
@@ -29,17 +37,21 @@ internal object ChatGptWebFileByteStorage {
                 override fun write(bytes: ByteArray) { output.write(bytes) }
                 override fun publish() {
                     output.close()
-                    check(resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null) == 1)
-                    onSaved(uri)
+                    check(resolver.update(uri, ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, name)
+                        put(MediaStore.Downloads.IS_PENDING, 0)
+                    }, null, null) == 1)
+                    runCatching { onSaved(uri) }
                 }
                 override fun discard() {
                     runCatching { output.close() }
-                    resolver.delete(uri, null, null)
+                    resolver.delete(uri, "${MediaStore.Downloads.IS_PENDING} = ?", arrayOf("1"))
                 }
             }
         }
         val directory = checkNotNull(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS))
-        val pending = File(directory, "$name.part")
+        val pending = ChatGptWebFileByteRecovery.pendingFile(context, lease.id)
+        check(pending.parentFile!!.isDirectory || pending.parentFile!!.mkdirs())
         val destination = File(directory, name)
         check(!destination.exists() && pending.createNewFile())
         val output = try { pending.outputStream() } catch (failure: Exception) {
@@ -50,12 +62,12 @@ internal object ChatGptWebFileByteStorage {
             override fun write(bytes: ByteArray) { output.write(bytes) }
             override fun publish() {
                 output.close()
-                check(!destination.exists() && pending.renameTo(destination))
-                onSaved(runCatching { FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", destination) }.getOrNull())
+                Files.move(pending.toPath(), destination.toPath())
+                runCatching { onSaved(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", destination)) }
             }
             override fun discard() {
                 runCatching { output.close() }
-                pending.delete()
+                Files.deleteIfExists(pending.toPath())
             }
         }
     }
