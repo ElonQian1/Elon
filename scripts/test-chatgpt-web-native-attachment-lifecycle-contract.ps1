@@ -46,6 +46,9 @@ foreach ($required in @(
     '$testFileReply = ${function:Test-NativeAttachmentFileReply}',
     '& $testFileReply -Messages $messages -Marker $marker',
     'fixture_first_line_verified = $true',
+    'private_attachment_associated = $privateAssociated',
+    '-Receipt $completed.chatgpt_web_mcp.last_attachment_upload',
+    '-SinceMs ([long]$checkpoint.send_started_at_ms)',
     'Restore-Origin -Checkpoint $checkpoint',
     'Register-ChatGptWebVerificationCases',
     '-CaseIds @("supervised/attachment_lifecycle")',
@@ -97,6 +100,31 @@ $replyFunction = $ast.Find({
         $node.Name -eq 'Test-NativeAttachmentFileReply'
 }, $true)
 . ([scriptblock]::Create($replyFunction.Extent.Text))
+$receiptFunction = $ast.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Test-NativeAttachmentPrivateReceipt'
+}, $true)
+. ([scriptblock]::Create($receiptFunction.Extent.Text))
+$receipt = @{ action = 'request_attachment_upload'; ok = $true
+    detail = 'private_attachment_associated'; observed_at_ms = 1001 }
+if (-not (Test-NativeAttachmentPrivateReceipt -Receipt $receipt -SinceMs 1000)) {
+    throw 'The current successful private association receipt should pass.'
+}
+foreach ($invalid in @(
+    @{},
+    @{ action = 'request_attachment_upload'; ok = $true; detail = ''; observed_at_ms = 1001 },
+    @{ action = 'send_message'; ok = $true; detail = 'private_attachment_associated'; observed_at_ms = 1001 },
+    @{ action = 'request_attachment_upload'; ok = $false; detail = 'private_attachment_associated'; observed_at_ms = 1001 },
+    @{ action = 'request_attachment_upload'; ok = $true; detail = 'private_attachment_associated'; observed_at_ms = 999 }
+)) {
+    if (Test-NativeAttachmentPrivateReceipt -Receipt $invalid -SinceMs 1000) {
+        throw 'Missing, fallback, failed, unrelated or stale receipts must not prove private upload.'
+    }
+}
+if (Test-NativeAttachmentPrivateReceipt -Receipt $receipt -SinceMs 0) {
+    throw 'A resumed checkpoint without a send timestamp cannot prove private upload.'
+}
 $marker = 'ELON-NATIVE-ATTACHMENT-synthetic'
 $fileLine = 'ELON_CHATGPT_ATTACHMENT_FIXTURE_V1=ready'
 $fixtureSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot `

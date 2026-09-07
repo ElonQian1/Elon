@@ -107,6 +107,16 @@ function Test-NativeAttachmentFileReply {
     return $false
 }
 
+function Test-NativeAttachmentPrivateReceipt {
+    param($Receipt, [long]$SinceMs)
+
+    return $SinceMs -gt 0 -and $null -ne $Receipt -and
+        [string]$Receipt.action -eq 'request_attachment_upload' -and
+        $Receipt.ok -eq $true -and
+        [string]$Receipt.detail -eq 'private_attachment_associated' -and
+        [long]$Receipt.observed_at_ms -ge $SinceMs
+}
+
 function Wait-NativeState {
     param(
         [Parameter(Mandatory = $true)][scriptblock]$Predicate,
@@ -301,6 +311,8 @@ try {
                     text = "Read the attached test file. Reply with $marker on the first line and copy the file's first line on the second line. Use plain text. If the file is unavailable, say so instead of guessing."
                 } | Out-Null
                 $checkpoint.phase = "send_dispatching"
+                $checkpoint | Add-Member -NotePropertyName send_started_at_ms `
+                    -NotePropertyValue ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Force
                 $checkpoint.updated_utc = [DateTimeOffset]::UtcNow.ToString("o")
                 Write-Checkpoint -Value $checkpoint
                 Invoke-NativeAction -Action "send_input" | Out-Null
@@ -329,6 +341,12 @@ try {
                 }
                 throw
             }
+            $privateAssociated = Test-NativeAttachmentPrivateReceipt `
+                -Receipt $completed.chatgpt_web_mcp.last_attachment_upload `
+                -SinceMs ([long]$checkpoint.send_started_at_ms)
+            $checkpoint | Add-Member -NotePropertyName private_attachment_associated `
+                -NotePropertyValue $privateAssociated -Force
+            Write-Checkpoint -Value $checkpoint
             Invoke-NativeAction -Action "remove_chatgpt_web_acceptance_attachment" `
                 -Arguments @{ fixture_id = $fixtureId } | Out-Null
             $restored = Restore-Origin -Checkpoint $checkpoint
@@ -347,6 +365,7 @@ try {
                 native_chat_surface = $true
                 fixed_fixture_uploaded = 1
                 fixture_first_line_verified = $true
+                private_attachment_associated = $privateAssociated
                 assistant_completed = $true
                 original_conversation_restored = [string]::IsNullOrWhiteSpace(
                     [string]$checkpoint.origin_conversation_path
