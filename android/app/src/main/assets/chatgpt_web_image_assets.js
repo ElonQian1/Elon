@@ -3,7 +3,7 @@
 
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptImageAssets;
-  if (existing && Number(existing.version) >= 3) return;
+  if (existing && Number(existing.version) >= 4) return;
   if (existing && typeof existing.dispose === 'function') existing.dispose();
 
   const MAX_ENTRIES = 96;
@@ -161,12 +161,13 @@
       if (entry.isCurrent && !entry.isCurrent()) throw new Error('cancelled');
       const source = entry.resolveSource ? await entry.resolveSource(job.controller?.signal) : entry.source;
       if (job.done || entry.isCurrent && !entry.isCurrent()) throw new Error('cancelled');
-      const parsed = new URL(source, location.origin);
-      if (entry.resolveSource && (parsed.protocol !== 'https:' || parsed.username || parsed.password ||
+      const content = entry.resolveSource && window.__elonChatGptPrivateContentSource?.contentUrl(source);
+      const parsed = new URL(content || source, location.origin);
+      if (entry.resolveSource && !content && (parsed.protocol !== 'https:' || parsed.username || parsed.password ||
           parsed.port || parsed.hash || !/(^|\.)oaiusercontent\.com$/.test(parsed.hostname))) {
         throw new Error('invalid_source');
       }
-      const response = await fetch(source, {
+      const response = await fetch(content || source, {
         credentials: parsed.origin === location.origin ? 'include' : 'omit',
         cache: 'force-cache',
         redirect: entry.resolveSource ? 'error' : 'follow',
@@ -175,6 +176,7 @@
       if (job.done) return;
       if (entry.isCurrent && !entry.isCurrent()) throw new Error('cancelled');
       if (!response.ok) throw new Error('http_error');
+      if (content && response.url !== content) throw new Error('invalid_source');
       const declaredLength = Number(response.headers.get('content-length') || 0);
       if (declaredLength > MAX_SOURCE_BYTES) throw new Error('source_too_large');
       const blob = await sourceBlob(response, job);
@@ -280,5 +282,5 @@
     if (!job.listeners.size) finish(job, { ok: false, error: 'cancelled' });
   }
 
-  window.__elonChatGptImageAssets = Object.freeze({ version: 3, describe, request, scan, dispose, registerPrivate, cancel });
+  window.__elonChatGptImageAssets = Object.freeze({ version: 4, describe, request, scan, dispose, registerPrivate, cancel });
 })();

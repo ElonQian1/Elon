@@ -36,9 +36,10 @@ The candidate uses same-origin GET `/backend-api/my/recent/image_gen`, validates
 tiles. Ordinary `file-service://` and `sediment://` pointers use the inspected
 `Zy` / `WXe` / shared `dEt` preview resolver:
 `/backend-api/files/download/{id}`, optional `conversation_id`, `inline=true`
-and `download_intent=false`. It requires `status=success` and a signed image
-URL on HTTPS `oaiusercontent.com` or a subdomain. Preview bytes use no cross-origin
-credentials and reject redirects. The current shared module has SHA-256
+and `download_intent=false`. It requires `status=success` and either a signed
+HTTPS `oaiusercontent.com` URL (or subdomain), or one of the two exact same-origin
+Estuary content routes described below. Preview bytes use no cross-origin
+credentials and reject redirects. The inspected official shared module has SHA-256
 `89c95d937bac1191e91d5ceb4872eb0c328d39a98ce05399093a663f18921aa0`.
 
 This contract is based on current official source, not a successful current
@@ -87,3 +88,37 @@ page against the account library, next/back ordering, warm reopen, preview/viewe
 close during a request, same-conversation/draft preservation and explicit official
 fallback. Record private-route evidence and only then mark completed. Reuse the
 implementation; do not build another gallery or repeat protocol discovery.
+
+## Same-origin preview source follow-up
+
+The grouped release through `1.1.1544` includes the private gallery but its image
+exporter v3 only accepts external storage URLs. The official shared source above
+also recognizes `/api/estuary/content` and `/backend-api/estuary/content` and
+passes the file resolver's returned URL to a download anchor without imposing an
+external-host restriction. This establishes the supported source shape, not the
+current account's resolver response. A mocked exporter in the catalog tests did
+not exercise this incompatibility.
+
+The source-only exporter v4 reuses the released download URL policy in
+`chatgpt_web_private_content_source.js`. Only absolute or root-relative ChatGPT
+URLs for those two exact paths are accepted. Bytes stay in the page and use
+ambient cookies, never copied authorization headers. Redirects and a mismatched
+final response URL fail closed. Existing signed external URLs, DOM compatibility,
+image MIME checks, 12 MiB limit, scaled JPEG output, cancellation and scope guards
+are unchanged. The page adapter loads the policy before both consumers.
+
+The new regression suite composes the real catalog, resolver and image exporter,
+including a warm reopen with no network requests. It separately covers source
+rejection, cookie isolation, response URL validation, MIME/size limits and account
+change during fetch. These are synthetic offline tests, not account-library or
+visual acceptance. The installed `1544` does not include exporter v4; packaging
+and the page-adapter version bump belong to the next grouped release. Do not mark
+this capability completed or claim a device preview/download fix from source
+tests alone.
+
+The related Node run passes 96 cases, including seven new private-image content
+tests, with zero failures, cancellations or skips. Evidence stem:
+`chatgpt-image-content-regression-20260907-190656-837`. The initial pre-fix run
+demonstrated rejected same-origin previews, then hit its 120-second timeout due
+to a test waiting for a fetch that the old policy never starts. That test now
+also observes early completion, so policy rejection fails promptly.
