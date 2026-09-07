@@ -12,6 +12,8 @@
   ]);
   const INVISIBLE_PLACEHOLDERS = /[\u00ad\u034f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/gu;
   const THINKING_CURSOR_PLACEHOLDERS = /[\u2022\u2026\u22ef\u25cf\u25cb\u2580-\u259f\ue000-\uf8ff]/gu;
+  const TRANSIENT_CONTENT = '[data-streaming-response-fallback], [data-streaming-response-indicator], '
+    + '[data-dotball-loading-indicator], .sr-only, [hidden], script, style';
   const messageActionPolicy = window.__elonChatGptMessageActionPolicy;
   const richContent = window.__elonChatGptRichContent;
   const imageAssets = window.__elonChatGptImageAssets;
@@ -35,6 +37,12 @@
 
   function childrenMarkdown(node, context) {
     return Array.from(node.childNodes).map((child) => markdown(child, context)).join('');
+  }
+
+  function isTransientContent(node) {
+    // Website progress and accessibility chrome are not message bodies. Do not
+    // match their wording: an actual answer may legitimately say "Thinking".
+    return Boolean(node?.matches?.(TRANSIENT_CONTENT) || node?.closest?.(TRANSIENT_CONTENT));
   }
 
   function speakerHeadingRole(value) {
@@ -93,6 +101,7 @@
   function markdown(node, context) {
     if (node.nodeType === Node.TEXT_NODE) return escapeMarkdown(node.nodeValue);
     if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    if (isTransientContent(node)) return '';
     if (richContent && richContent.owns(node)) return '';
     const tag = node.tagName;
     if (tag === 'BR') return '\n';
@@ -223,12 +232,13 @@
     // and append the prose as a sibling under the conversation-turn container.
     // Always scan the complete turn when it is available.
     const owner = messageScope(node);
+    if (isTransientContent(owner)) return [];
     const selector = role === 'assistant'
       ? '.markdown, [data-message-content], [class*="assistantMessage"]'
       : '.whitespace-pre-wrap, [data-message-content], .markdown, [class*="userMessage"]';
     const candidates = Array.from(owner.querySelectorAll(
       selector
-    )).filter((candidate) => isVisible(candidate) && !isActionContainer(candidate));
+    )).filter((candidate) => isVisible(candidate) && !isActionContainer(candidate) && !isTransientContent(candidate));
     // ChatGPT now renders one assistant turn as multiple sibling content islands
     // (for example finance card, prose and source controls). Keep the leaf islands
     // in DOM order so a wrapper and its nested markdown are not serialized twice.
@@ -359,7 +369,7 @@
   function structuredParts(content) {
     const parts = [];
     function add(type, label, node, metadata) {
-      if (parts.length >= MAX_STRUCTURED_PARTS || !isVisible(node) ||
+      if (parts.length >= MAX_STRUCTURED_PARTS || !isVisible(node) || isTransientContent(node) ||
           (richContent && richContent.owns(node))) return;
       parts.push(Object.assign({ type, text: label }, metadata || {}));
       lastStructuredTypes.add(type);
@@ -526,10 +536,10 @@
         .replace(INVISIBLE_PLACEHOLDERS, '')
         .replace(THINKING_CURSOR_PLACEHOLDERS, '')
         .trim();
-      const richCount = content.querySelectorAll(
+      const richCount = Array.from(content.querySelectorAll(
         'table, pre, blockquote, ol, ul, img, video, audio, canvas, iframe, '
         + '[data-testid*="artifact" i], [data-testid*="code-interpreter" i]'
-      ).length + richParts.length;
+      )).filter((node) => !isTransientContent(node)).length + richParts.length;
       return {
         key: messageIdentity(turn, 'assistant', index),
         fingerprint: text + '\u0000' + richCount,

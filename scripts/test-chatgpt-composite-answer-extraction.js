@@ -48,6 +48,11 @@ class ElementNode {
   get innerText() { return this.textContent; }
   getAttribute(name) { return this.attributes[name] || null; }
   matches(selector) {
+    if (selector.includes('[data-streaming-response-fallback]')) {
+      return ['data-streaming-response-fallback', 'data-streaming-response-indicator',
+        'data-dotball-loading-indicator', 'hidden'].some(name => Object.hasOwn(this.attributes, name)) ||
+        String(this.attributes.class || '').split(/\s+/).includes('sr-only') || ['SCRIPT', 'STYLE'].includes(this.tagName);
+    }
     if (selector === '[data-message-author-role]') return Boolean(this.attributes['data-message-author-role']);
     if (selector === '[role="listitem"]') return this.attributes.role === 'listitem';
     return false;
@@ -65,6 +70,10 @@ class ElementNode {
   }
   getBoundingClientRect() { return this.visible ? { width: 400, height: 40 } : { width: 0, height: 0 }; }
   closest(selector) {
+    if (selector.includes('[data-streaming-response-fallback]')) {
+      for (let node = this; node; node = node.parentElement) if (node.matches(selector)) return node;
+      return null;
+    }
     if (Object.hasOwn(this.closestMap, selector)) return this.closestMap[selector];
     return this.actionContainer ? this : null;
   }
@@ -268,5 +277,56 @@ assert.equal(
   'a large generated-image preview wrapped in an official link remains native image media',
 );
 assert.equal(generatedMessages[0].content[1].assetHandle, 'image_0123456789abcdef');
+
+// Current website cV progress is nested under these markers, not an answer.
+for (const attribute of ['data-streaming-response-fallback', 'data-streaming-response-indicator', 'data-dotball-loading-indicator']) {
+  const progress = new ElementNode('正在思考', { attributes: { [attribute]: '' } });
+  const pendingTurn = new ElementNode('', {
+    attributes: { 'data-testid': 'conversation-turn-pending', 'data-message-author-role': 'assistant' },
+  });
+  pendingTurn.childNodes = [progress]; progress.parentElement = pendingTurn;
+  const completeTurn = new ElementNode('', {
+    attributes: { 'data-testid': 'conversation-turn-completed', 'data-message-author-role': 'assistant' },
+    candidates: [new ElementNode('Synthetic completed answer')],
+  });
+  context.document.querySelector = selector => selector === 'main' ? {
+    querySelectorAll: () => [completeTurn, pendingTurn],
+  } : null;
+  for (const streaming of [false, true]) {
+    const window = messages.readMessageWindow(streaming, 'conversation-turn-pending');
+    assert.equal(window.messages.length, 1, 'progress-only turn is not a second assistant bubble');
+    assert.equal(window.observedCount, 2, 'DOM indices remain stable for observation/action matching');
+    assert.equal(window.messages[0].content[0].text, 'Synthetic completed answer');
+    assert.equal(window.messages[0].state, 'completed', 'placeholder must not reopen the previous completed answer');
+  }
+  assert.equal(messages.lastAssistantObservation().pending, true);
+  assert.equal(messages.lastAssistantObservation().fingerprint, '\u00000');
+  pendingTurn.querySelectorAllMap[
+    'table, pre, blockquote, ol, ul, img, video, audio, canvas, iframe, '
+    + '[data-testid*="artifact" i], [data-testid*="code-interpreter" i]'
+  ] = [new ElementNode('', { tagName: 'CANVAS', parent: progress })];
+  assert.equal(messages.lastAssistantObservation().pending, true, 'an animated indicator is not answer media');
+
+  const inner = new ElementNode('正在思考', { parent: progress });
+  pendingTurn.candidates = [inner]; progress.childNodes = [inner];
+  assert.equal(messages.messageContent(pendingTurn, 'assistant'), '', 'nested content marker cannot bypass progress ownership');
+  const body = new ElementNode('正文在这里');
+  pendingTurn.candidates = [inner, body];
+  assert.equal(messages.messageContent(pendingTurn, 'assistant'), '正文在这里');
+}
+
+for (const text of ['正在思考', 'Thinking', '我正在思考这个问题。']) {
+  const actual = new ElementNode('', { candidates: [new ElementNode(text)] });
+  assert.equal(messages.messageContent(actual, 'assistant'), text, 'ordinary answer wording is not a status filter');
+}
+const liveCaption = new ElementNode('Synthetic live caption', {
+  attributes: { role: 'status', 'aria-live': 'polite', 'data-testid': 'voice-commentary-message' },
+});
+assert.equal(messages.messageContent(new ElementNode('', { candidates: [liveCaption] }), 'assistant'),
+  'Synthetic live caption', 'real voice commentary is not removed by a broad role=status filter');
+const hiddenStatus = new ElementNode('正在思考', { attributes: { class: 'sr-only' } });
+const visibleText = new ElementNode('Visible answer');
+const withStatus = new ElementNode(''); withStatus.childNodes = [hiddenStatus, visibleText];
+assert.equal(messages.messageContent(withStatus, 'assistant'), 'Visible answer');
 
 console.log('CHATGPT_COMPOSITE_ANSWER_EXTRACTION=passed');
