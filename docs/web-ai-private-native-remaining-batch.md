@@ -30,12 +30,20 @@ returned `download_source_unsupported`; no saved-file acceptance is claimed.
 `1544` adds the source-evidenced same-origin content download candidate through
 the existing native byte/save owner. Its 118 related Node runner cases and
 Release build passed; publication, replacement installation and MCP build
-readback passed. Actual download acceptance is waiting for the locked handset
-to be unlocked; the rejected 1543 URL shape has not been captured.
+readback passed. After unlock, the ordinary fixture download saved 78 bytes in
+1,960 ms and its device SHA-256 matched the original. This narrow saved-bytes
+case is completed; project/library variants and rendered-menu acceptance remain
+pending. The rejected 1543 URL shape has not been captured.
 See [the grouped release evidence](reports/chatgpt-grouped-release-20260907.md).
 The source candidates below are bundled through `54a89232e`; older delivery
 cells are historical checkpoints, not current source-only blockers. Bundling
 does not upgrade any pending protocol or rendered-UI acceptance claim.
+
+Current correction batch: same-origin generated-image preview v4 (96 focused
+Node cases passed), shared-link management v2 (179 focused cases passed after a
+1544 read failed at its unnecessary runtime gate), and an on-demand public-script
+inventory through existing MCP diagnostics. One grouped APK will carry these;
+no normal-user polling, account changes, or independent proxy changes are added.
 
 Latest source extension: [private multi-attachment batches](chatgpt-private-attachment-batch.md)
 now join up to nine native selections to one prepared-action message, reusing

@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 /** Validates structural diagnostics before they enter the native command ledger. */
 internal object ChatGptWebPrivateProtocolEvidence {
-    val MODES = setOf("start", "read", "stop", "clear")
+    val MODES = setOf("start", "read", "stop", "clear", "runtime_assets")
     private const val ACTION = "private_protocol_probe"
     private const val SCHEMA = "elon.private_protocol_probe.v1"
     private val kinds = setOf("json", "multipart", "stream", "other", "unknown")
@@ -26,6 +26,9 @@ internal object ChatGptWebPrivateProtocolEvidence {
     private fun sanitize(raw: String): String {
         require(raw.length <= 12000)
         val value = JSONObject(raw)
+        if (value.opt("schema") == ChatGptWebPrivateRuntimeAssets.SCHEMA) {
+            return ChatGptWebPrivateRuntimeAssets.sanitize(value)
+        }
         require(value.keys().asSequence().toSet() == rootKeys)
         require(value.opt("schema") == SCHEMA && value.opt("active") is Boolean)
         require(integer(value, "dropped", 0..999))

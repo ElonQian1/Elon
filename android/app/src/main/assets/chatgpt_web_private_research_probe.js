@@ -4,7 +4,7 @@
   const legacyEnabled = window.__elonChatGptPrivateResearchEnabled === true;
   if (location.origin !== 'https://chatgpt.com') return;
   const existingProbe = window.__elonChatGptPrivateResearchProbe;
-  if (existingProbe && Number(existingProbe.version) >= 12) return;
+  if (existingProbe && Number(existingProbe.version) >= 13) return;
 
   const nativeBridge = window.elonChatGptNative;
   const adapterVersion = Number(window.__elonChatGptAdapterTargetVersion || 0);
@@ -494,11 +494,13 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 12,
+    version: 13,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
       if (action !== 'private_protocol_probe') return false;
-      const detail = evidence?.command(String(command.value || ''));
+      const mode = String(command.value || '');
+      const detail = mode === 'runtime_assets'
+        ? window.__elonChatGptPrivateProtocolEvidence?.runtimeAssets(window) : evidence?.command(mode);
       respond(action, typeof detail === 'string', detail || 'protocol_probe_unavailable');
       return true;
     },

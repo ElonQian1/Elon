@@ -52,6 +52,18 @@ function fixture(options = {}) {
 
 const tick = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
 
+test('runtime asset inventory is on demand and does not enable capture or extra requests', () => {
+  const f = fixture({ window: { performance: { getEntriesByType: () => [
+    { name: 'https://chatgpt.com/cdn/assets/shared-abc123.js' },
+  ] } } });
+  const result = f.command('runtime_assets');
+  assert.equal(result.ok, true);
+  assert.deepEqual(JSON.parse(result.detail).assets, ['shared-abc123.js']);
+  assert.equal(f.read().active, false);
+  assert.deepEqual(f.events, []);
+  assert.deepEqual(f.requests, []);
+});
+
 test('production observer stays dormant, preserves promise identity and emits no legacy telemetry', async () => {
   const original = Promise.resolve(new Response('untouched'));
   const f = fixture({ fetch: () => original });
@@ -134,5 +146,10 @@ test('reinjection is idempotent and document/native bridge gates remain enforced
 test('native diagnostic receipt is retained without triggering UI feedback or a DOM snapshot', () => {
   const background = fs.readFileSync(path.join(__dirname,
     '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt'), 'utf8');
-  assert.match(background, /observedMcpState\.accept\(event\)\s+if \(event is ChatGptWebEvent\.CommandResult && event\.action == "private_protocol_probe"\) return\s+when \(event\)/);
+  const start = background.indexOf('private fun handleEvent(event: ChatGptWebEvent)');
+  const dispatch = background.indexOf('when (event)', start);
+  const receipt = background.indexOf('observedMcpState.accept(event)', start);
+  const earlyReturn = background.indexOf('if (event is ChatGptWebEvent.CommandResult && event.action == "private_protocol_probe") return', start);
+  assert.ok(start >= 0 && receipt > start && earlyReturn > receipt && dispatch > earlyReturn);
+  assert.doesNotMatch(background.slice(start, earlyReturn), /requestSnapshot|onCommandResult/);
 });
