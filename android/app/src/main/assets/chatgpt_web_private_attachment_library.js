@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentLibrary = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -11,7 +11,7 @@
   let runtime;
 
   function eligible(file, context) {
-    return context?.storeInLibrary === true && context.isTemporaryChat !== true &&
+    return context?.checkForReusableLibraryFile !== false && context?.storeInLibrary === true && context.isTemporaryChat !== true &&
       context.isProjectThread !== true && !context.projectScopeId && !context.gizmoId &&
       !context.libraryFileInfo && !context.directoryId && !context.uploadSource &&
       ['required', 'opportunistic'].includes(context.libraryPersistenceMode) &&
@@ -123,5 +123,5 @@
     }
   }
 
-  return Object.freeze({ version: 1, transfer });
+  return Object.freeze({ version: 2, transfer });
 });

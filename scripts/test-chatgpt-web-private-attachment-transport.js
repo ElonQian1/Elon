@@ -46,6 +46,31 @@ test('prepare uses the verified legacy route contract without enabling multipart
   assert.equal(result.store_in_library, false);
 });
 
+test('copy intent bypasses even older library and reservation modules and is snapshotted before auth', async () => {
+  let release, cancelled = 0;
+  const forbidden = () => { throw new Error('copy_must_not_reuse'); };
+  const f = fixture({ options: {
+    acquireHeaders: () => new Promise(resolve => { release = resolve; }),
+    library: { version: 1, create: () => ({ transfer: forbidden }) },
+    reservation: { version: 3, create: () => ({ start: forbidden, take: forbidden, cancel: () => { cancelled++; } }) },
+  } });
+  const context = { ...selected(), checkForReusableLibraryFile: false };
+  f.instance.prefetch(context, f.binding, new AbortController().signal);
+  const pending = f.upload(context);
+  context.checkForReusableLibraryFile = true;
+  release({ Authorization: 'Bearer synthetic-account' });
+  const result = await pending;
+  assert.equal(result.ok, true); assert.equal(result.stage, 'processed');
+  assert.equal(f.calls.length, 3); assert.ok(cancelled >= 2);
+  assert.equal(JSON.parse(f.calls[0].init.body).checkForReusableLibraryFile, undefined);
+  for (const checkForReusableLibraryFile of ['false', null, 0]) {
+    const other = fixture();
+    const result = await other.upload({ ...selected(), checkForReusableLibraryFile });
+    assert.equal(result.ok, false); assert.equal(result.code, 'unsupported_upload_context');
+    assert.equal(other.calls.length, 0);
+  }
+});
+
 test('PDF creation binds the selected model only to the official create request', async () => {
   for (const type of ['application/pdf', 'text/plain']) {
     const pdf = new File(['%PDF-1.7\nsynthetic'], 'fixture.PDF', { type });

@@ -99,6 +99,15 @@ test('temporary, project, non-library and oversized files never hash or query', 
   await f.run(async () => 1); assert.equal(f.imports.length, 0);
 });
 
+test('an explicit upload-copy choice does not import, hash or query the library', async () => {
+  const f = fixture({ context: { checkForReusableLibraryFile: false } });
+  let uploads = 0;
+  const result = await f.run(async () => { uploads++; await tick(); return 'fresh'; });
+  assert.deepEqual(result, { kind: 'uploaded', result: 'fresh' });
+  assert.equal(uploads, 1); assert.equal(f.imports.length, 0);
+  assert.equal(f.calls.length, 0); assert.equal(f.timers.size, 0);
+});
+
 test('only the recognized current direct gate or enabled experiment permits reuse', async () => {
   const f = fixture({ gate: name => good(name, name !== '1342446482') });
   assert.equal((await f.run(cancelable)).kind, 'reused');

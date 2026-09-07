@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 11, create: factory });
+  const exported = Object.freeze({ version: 12, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root && root.location?.origin === 'https://chatgpt.com') {
     root.__elonChatGptPrivateAttachmentTransport = exported;
@@ -24,7 +24,7 @@
     protocol, bytes, request, isCurrent: current, acquireHeaders: async () => allowedHeaders(await acquire()),
   }) : null;
   const libraryModule = options?.library || root.__elonChatGptPrivateAttachmentLibrary;
-  const library = libraryModule?.version === 1 ? libraryModule.create(root, { protocol, request }) : null;
+  const library = [1, 2].includes(libraryModule?.version) ? libraryModule.create(root, { protocol, request }) : null;
 
   function allowedHeaders(source) {
     const result = { Accept: 'application/json', 'Content-Type': 'application/json' };
@@ -100,6 +100,11 @@
       const selected = Object.freeze({ ...context,
         ...(context.libraryFileInfo == null ? {} : { libraryFileInfo: protocol.projectInfo(context) }),
         ...(context.imageDimensions == null ? {} : { imageDimensions: protocol.imageDimensions(context.imageDimensions) }) });
+      if ('checkForReusableLibraryFile' in selected && typeof selected.checkForReusableLibraryFile !== 'boolean') {
+        throw new Error('unsupported_upload_context');
+      }
+      const uploadCopy = selected.checkForReusableLibraryFile === false;
+      if (uploadCopy) reservation?.cancel();
       const body = protocol.prepare(file, selected);
       if (bytes?.version === 1) body.supports_direct_azure_multipart = true;
       const creationHeaders = protocol.creationHeaders(file, selected);
@@ -113,7 +118,7 @@
       authTimer = null;
       assertCurrent(job);
       change(job, 'preparing');
-      const reserved = reservation?.take(file, selected, binding);
+      const reserved = uploadCopy ? null : reservation?.take(file, selected, binding);
       const prepared = reserved?.entry || (await dispatch(job, '/backend-api/files', {
         method: 'POST', credentials: 'include', headers: { ...headers, ...creationHeaders }, body: JSON.stringify(body),
       }, 'json', 15000)).payload;
@@ -122,7 +127,7 @@
         : protocol.destination(prepared, file.type);
       job.fileId = destination.fileId;
       change(job, 'uploading');
-      const transfer = library ? await library.transfer(file, selected, headers, {
+      const transfer = library && !uploadCopy ? await library.transfer(file, selected, headers, {
         signal: job.controller.signal, assertCurrent: () => assertCurrent(job),
         upload: signal => uploadBytes(job, destination, file, headers, signal),
       }) : { kind: 'uploaded', result: await uploadBytes(job, destination, file, headers, job.controller.signal) };
@@ -176,9 +181,10 @@
   }
 
   function prefetch(context, binding, signal) {
+    if (context?.checkForReusableLibraryFile === false) { reservation?.cancel(); return; }
     if (!active && cooldownUntil <= Date.now()) reservation?.start(context, binding, signal);
   }
   function cancel() { reservation?.cancel(); if (active) active.controller.abort(); }
-  function snapshot() { return { version: 11, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
-  return Object.freeze({ version: 11, prefetch, upload, cancel, dispose: cancel, snapshot });
+  function snapshot() { return { version: 12, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
+  return Object.freeze({ version: 12, prefetch, upload, cancel, dispose: cancel, snapshot });
 });
