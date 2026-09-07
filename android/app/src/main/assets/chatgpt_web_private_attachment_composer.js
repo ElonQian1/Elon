@@ -326,9 +326,11 @@
           if (consumed || root.__elonChatGptDocumentToken !== binding.token ||
               identity() !== binding.account || resolveStore() !== store || !unchanged()) return false;
           const files = store.files$();
-          if (!Array.isArray(files) || !files.includes(attached)) return false;
-          store.files$.set(files.filter(item => item !== attached));
-          if (store.files$().includes(attached)) return false;
+          if (!Array.isArray(files)) return false;
+          if (files.includes(attached)) {
+            store.files$.set(files.filter(item => item !== attached));
+            if (store.files$().includes(attached)) return false;
+          }
           consumed = true;
           if (owned === value) owned = null;
           return true;

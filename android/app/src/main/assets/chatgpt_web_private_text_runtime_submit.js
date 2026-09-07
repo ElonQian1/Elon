@@ -1,9 +1,12 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
-  if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateTextRuntimeSubmit) {
-    root.__elonChatGptPrivateTextRuntimeSubmit = exported.create(root);
+  if (root?.location?.origin === 'https://chatgpt.com') {
+    const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
+    if (!(Number(existing?.version) >= exported.version) && !existing?.state?.().pending) {
+      root.__elonChatGptPrivateTextRuntimeSubmit = exported.create(root);
+    }
   }
 })(typeof window === 'object' ? window : null, function (page, options) {
   'use strict';
@@ -66,7 +69,7 @@
       Array.from(page.document.querySelectorAll('link[rel="modulepreload"]')).some(node => node.href === RUNTIME_URL);
   }
 
-  function capture(node) {
+  function capture(node, previousAttachment) {
     if (!node?.isConnected || !loaded()) return null;
     const token = page.__elonChatGptDocumentToken, account = identity(), currentRoute = route();
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '') || account === null || !currentRoute) return null;
@@ -81,10 +84,17 @@
         props.isConsumerLockdownModeLoadingForConversation !== false ||
         typeof props.shouldBlockConsumerLockdownModeActionsForConversation !== 'boolean') return null;
     const pending = context.files.files$(), ready = context.files.readyFiles$();
-    if (!Array.isArray(pending) || pending.length || !Array.isArray(ready) || ready.length ||
+    if (!Array.isArray(pending) || !Array.isArray(ready) ||
         context.files.hasUploadInProgress$() !== false) return null;
+    const attachment = previousAttachment || (pending.length || ready.length
+      ? page.__elonChatGptPrivateAttachmentSend?.prepareSubmit?.(context.files) : null);
+    if (attachment) {
+      if (typeof attachment.current !== 'function' || !attachment.current() ||
+          typeof attachment.consumeAccepted !== 'function' || !Array.isArray(attachment.readyFiles) ||
+          attachment.readyFiles.length !== 1 || pending.length !== 1 || ready.length !== 1) return null;
+    } else if (pending.length || ready.length) return null;
     return { ...context, ...currentRoute, token, account, node, conversation, controller,
-      leaf: props.currentLeafId, submit: props.submitComposer };
+      leaf: props.currentLeafId, submit: props.submitComposer, attachment };
   }
 
   function sameOwner(binding) {
@@ -100,7 +110,7 @@
   }
 
   function current(binding) {
-    const next = capture(binding.node);
+    const next = capture(binding.node, binding.attachment);
     return next && Object.keys(binding).every(key => binding[key] === next[key]);
   }
 
@@ -113,7 +123,8 @@
     let binding;
     try {
       binding = capture(command.composer);
-      if (!binding || command.readDraft() !== expected || expected && expected !== value || !current(binding)) {
+      if (!binding || command.requireNativeAttachment === true && !binding.attachment ||
+          command.readDraft() !== expected || expected && expected !== value || !current(binding)) {
         return { handled: false, code: 'context_unavailable' };
       }
       command.beforeSubmit?.();
@@ -125,7 +136,10 @@
     let receipt;
     try {
       // Official submitComposer owns readiness, fresh request preparation and React updates.
-      receipt = binding.submit(new page.Event('submit'), { kind: 'text_action', text: value },
+      const action = binding.attachment
+        ? { kind: 'prepared_action', text: value, readyFiles: binding.attachment.readyFiles }
+        : { kind: 'text_action', text: value };
+      receipt = binding.submit(new page.Event('submit'), action,
         { requireDispatchAcceptance: true });
     } catch (_) {
       return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'invocation_failed' }) };
@@ -142,12 +156,19 @@
     const settled = Promise.resolve(receipt.completion).then(accepted => {
       if (!sameOwner(binding)) return { status: 'unknown', code: 'context_changed' };
       if (accepted !== true) return { status: 'unknown', code: 'dispatch_not_confirmed' };
-      // text_action intentionally does not reset the editor. Only clear our unchanged draft.
+      // prepared_action does not reset ready files. Never let a failed local
+      // cleanup accidentally include the accepted attachment in another send.
+      if (binding.attachment) {
+        owned.retain = true;
+        if (!binding.attachment.consumeAccepted()) return { status: 'unknown', code: 'attachment_cleanup_unconfirmed' };
+        owned.retain = false;
+      }
+      // Explicit actions do not reset the editor. Only clear our unchanged draft.
       if (expected && command.readDraft() === expected) command.clearDraft?.();
       return { status: 'accepted', code: 'accepted' };
     }).catch(() => ({ status: 'unknown', code: 'completion_failed' })).finally(() => {
       page.clearTimeout(timer);
-      if (active === owned) active = null;
+      if (active === owned && !owned.retain) active = null;
     });
     const completion = Promise.race([settled, new Promise(resolve => {
       timer = page.setTimeout(() => resolve({ status: 'unknown', code: 'timeout' }), options.timeoutMs || 15000);
@@ -155,5 +176,5 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 1, submit, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 2, submit, state: () => ({ pending: active !== null }) });
 });

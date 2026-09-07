@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptTextTransactionOrchestrator;
-  if (existing && Number(existing.version) >= 2) return;
+  if (existing && Number(existing.version) >= 3) return;
 
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
@@ -137,10 +137,12 @@
       return { handled: true, code: '' };
     }
 
-    function tryRuntimeSend(composer, value, expectedDraft, assistantBeforeSend, respond) {
+    function tryRuntimeSend(composer, value, expectedDraft, assistantBeforeSend, respond, requireNativeAttachment) {
       if (!runtimeSubmit || typeof runtimeSubmit.submit !== 'function') return false;
+      if (requireNativeAttachment && !(Number(runtimeSubmit.version) >= 2) &&
+          runtimeSubmit.state?.().pending !== true) return false;
       const transaction = runtimeSubmit.submit({
-        prompt: value, expectedDraft, composer, requestId: respond.requestId || '',
+        prompt: value, expectedDraft, composer, requestId: respond.requestId || '', requireNativeAttachment,
         readDraft: () => options.composerValue(composer),
         clearDraft: () => options.setComposerValue(composer, ''),
         beforeSubmit: () => privateStreamTransport?.prepareSend?.()
@@ -166,8 +168,11 @@
       const assistantBeforeSend = options.streamingPolicyModule &&
         options.streamingPolicyModule.messageObservation(options.messageAdapter);
       let privateFallbackCode = '';
+      // Attachment reservations forbid text-template replay, not the official
+      // prepared_action carrying this sender's exact ready-file lease.
+      if (tryRuntimeSend(composer, value, expectedDraft, assistantBeforeSend, respond,
+          allowPrivateTextTransaction !== true)) return;
       if (allowPrivateTextTransaction === true) {
-        if (tryRuntimeSend(composer, value, expectedDraft, assistantBeforeSend, respond)) return;
         const attempt = tryPrivateSend(
           composer, value, expectedDraft, assistantBeforeSend, respond
         );
@@ -260,5 +265,5 @@
     return Object.freeze({ sendPrompt, tryPrivateRegeneration, stopPrivate });
   }
 
-  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 2, create });
+  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 3, create });
 })();
