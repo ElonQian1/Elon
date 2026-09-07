@@ -185,7 +185,7 @@ The offline implementation itself did not operate the absent phone.
 
 | Area | Existing usable path | Actual remaining private work |
 |---|---|---|
-| Text send/regenerate | Native send ledger and streaming observer; [direct official-runtime text transaction](chatgpt-official-runtime-text-submit.md) now implemented without DOM fill/button polling | Accept the current-runtime bridge in the grouped APK. Independent fresh proof-bound private dispatch and regeneration remain unverified; runtime acceptance is still official-page authority, not private HTTP success. Do not replay captured proof headers. |
+| Text send/regenerate | Native send ledger and streaming observer; [direct official-runtime text/owned-attachment transaction](chatgpt-official-runtime-text-submit.md) now implemented without DOM fill/button polling | Accept the current-runtime bridge, exact ready-file handoff and cleanup in the grouped APK. Independent fresh proof-bound private dispatch and regeneration remain unverified; runtime acceptance is still official-page authority, not private HTTP success. Do not replay captured proof headers. |
 | Model/effort/tools/temporary mode | Native presets/cache and official controls; [search/image private live-state bridge](chatgpt-private-composer-tools.md), [model/effort plus advanced version/response-tier bridges](chatgpt-private-model-state.md) and [guarded temporary-chat transaction](chatgpt-private-temporary-chat.md) implemented in source | Accept these pinned runtime bridges in grouped device testing; finish work/internal/special-model, restricted-model effort and remaining temporary-mode contexts. Cached labels or local readback do not prove asynchronous server-preference persistence; these callbacks are not independent generation/privacy POSTs. |
 | Attachment upload | Earlier small-text private upload verified; production text-file delivery passed on 1541; native byte handoff and ordinary/temporary/writable-project image/PDF transactions packaged; ingest/read-only projects, [common documents](chatgpt-private-document-upload.md), [multipart/Estuary byte routes](chatgpt-private-attachment-byte-transports.md), [ordinary/temporary picker prewarm and reservation claim](chatgpt-private-upload-reservations.md) and [intent-bound library reuse](chatgpt-private-attachment-library-reuse.md) now implemented in source | Confirm integrated private-route provenance, image/PDF/Office reading, runtime access, native picker, byte/reservation/reuse routes, read-only file placement and temporary/project library behavior; finish remaining MIME categories and advanced upload-anyway choice. Persistence follows the existing official option, never deduplication convenience. Production file delivery is not a private-route pass. See [upload contract](chatgpt-private-attachment-upload.md), [PDF extension](chatgpt-private-pdf-upload.md) and [scope contract](chatgpt-private-attachment-scopes.md). |
 | Images | Native gallery/previews/cache; private generated-catalog pagination and scoped previews now implemented; official creation preserved | Accept the [private gallery candidate](chatgpt-private-image-gallery.md) on the device, cover remaining pointer scopes, and implement the confirmed generation transaction. Do not repeat catalog discovery or count source tests as live API success. |
@@ -195,6 +195,12 @@ The offline implementation itself did not operate the absent phone.
 An unknown protocol remains a documented code gap. No guessed endpoint, fake
 success, or automatic write replay should be added merely to make this table
 look complete. Existing UI stays usable while each replacement is implemented.
+
+The 2026-09-07 runtime attachment extension (adapter 279) passed 196 focused Node
+cases and retains Android's ban on text-template replay for attachment commands.
+It uses the official prepared action and one sender-owned ready-file lease, not
+an independent generation POST. Grouped build, live project/file dispatch and
+resource/latency acceptance remain pending; do not repeat this source integration.
 
 ## Sharing protocol checkpoint
 
