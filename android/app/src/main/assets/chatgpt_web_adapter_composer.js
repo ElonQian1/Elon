@@ -774,6 +774,7 @@
 
   window.__elonChatGptComposer = Object.freeze({
     capabilities,
+    modelTrigger: findModelButton,
     currentModel,
     readAttachments,
     requestAttachmentUpload,

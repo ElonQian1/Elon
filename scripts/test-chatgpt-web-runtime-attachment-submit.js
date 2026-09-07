@@ -204,7 +204,7 @@ test('reinjection upgrades idle runtime but preserves an older in-flight writer'
   assert.equal(f.page.__elonChatGptPrivateTextRuntimeSubmit, old);
   old.state = () => ({ pending: false });
   vm.runInNewContext(runtimeSource, { window: f.page });
-  assert.equal(f.page.__elonChatGptPrivateTextRuntimeSubmit.version, 2);
+  assert.equal(f.page.__elonChatGptPrivateTextRuntimeSubmit.version, 3);
 });
 
 test('an older retained runtime cannot ignore the native-attachment-only restriction', async () => {

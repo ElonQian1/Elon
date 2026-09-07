@@ -210,6 +210,13 @@ test('same-document reinjection preserves in-flight ownership', () => {
   f.settle(true);
 });
 
+test('pending runtime regeneration blocks native text before draft mutation or another write', async () => {
+  const f = fixture();
+  f.page.__elonChatGptPrivateRegenerateRuntime = { state: () => ({ pending: true }) };
+  assert.equal((await f.api.submit(f.command).completion).code, 'busy');
+  assert.equal(f.calls.length, 0);
+});
+
 test('production orchestrator prioritizes the runtime and never clicks after an uncertain write', async () => {
   for (const timeout of [false, true]) {
     const f = fixture(), events = [];

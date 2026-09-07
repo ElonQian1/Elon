@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -116,7 +116,9 @@
 
   function submit(command) {
     if (page.__elonChatGptPrivateTextTransactionsEnabled !== true) return { handled: false, code: 'disabled' };
-    if (active) return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'busy' }) };
+    if (active || page.__elonChatGptPrivateRegenerateRuntime?.state?.().pending) {
+      return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'busy' }) };
+    }
     const value = command?.prompt, expected = command?.expectedDraft;
     if (typeof value !== 'string' || !value.trim() || value.length > 20000 ||
         typeof expected !== 'string' || !/^mcp_[a-z0-9]{1,32}$/.test(command.requestId || '')) return { handled: false, code: 'invalid_command' };
@@ -176,5 +178,5 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 2, submit, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 3, submit, state: () => ({ pending: active !== null }) });
 });

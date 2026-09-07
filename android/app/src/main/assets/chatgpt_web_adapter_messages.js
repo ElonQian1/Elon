@@ -651,6 +651,7 @@
     messageContent,
     isCitationDisclosure,
     lastAssistantObservation,
+    lastAssistantTurn,
     lastAssistantPending,
     readMessages,
     readMessageWindow,

@@ -672,14 +672,8 @@
       return conversationAdapter.openProject(String(command.value || ''), respond);
     }
     if (action === 'regenerate_response' && messageAdapter) {
-      if (privateStreamTransport && typeof privateStreamTransport.prepareSend === 'function') {
-        privateStreamTransport.prepareSend();
-      }
-      if (streamingPolicyModule) streamingPolicyModule.begin(
-        streamingPolicy, messageAdapter, { allowSameTurn: true }
-      );
-      if (textTransactionOrchestrator &&
-          textTransactionOrchestrator.tryPrivateRegeneration(respond)) return;
+      if (textTransactionOrchestrator) return textTransactionOrchestrator.regenerateResponse(
+        respond, () => messageAdapter.regenerate(emitEvent, respond));
       return messageAdapter.regenerate(emitEvent, respond);
     }
     if (action === 'stop_generation') {

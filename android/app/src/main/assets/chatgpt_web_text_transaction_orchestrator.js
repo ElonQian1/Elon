@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptTextTransactionOrchestrator;
-  if (existing && Number(existing.version) >= 3) return;
+  if (existing && Number(existing.version) >= 4) return;
 
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
@@ -249,6 +249,36 @@
       return true;
     }
 
+    function regenerateResponse(respond, fallback) {
+      function begin() {
+        options.streamingPolicyModule?.begin(options.streamingPolicy, options.messageAdapter, { allowSameTurn: true });
+      }
+      function legacy() {
+        privateStreamTransport?.prepareSend?.();
+        begin();
+        if (!tryPrivateRegeneration(respond)) fallback();
+      }
+      const runtime = window.__elonChatGptPrivateRegenerateRuntime;
+      const transaction = runtime?.regenerate({
+        requestId: respond.requestId || '', turn: options.messageAdapter?.lastAssistantTurn?.(),
+        getModelTrigger: () => window.__elonChatGptComposer?.modelTrigger?.(options.findComposer()),
+        beforeSubmit: begin
+      });
+      if (!transaction?.handled) return legacy();
+      options.scheduleSnapshot(true);
+      Promise.resolve(transaction.completion).then(receipt => {
+        if (receipt?.status === 'unavailable') return legacy();
+        const accepted = receipt?.status === 'accepted';
+        respond('regenerate_response', accepted, 'official_runtime_v1:' +
+          (accepted ? 'regenerate_observed' : (receipt?.status === 'rejected'
+            ? 'regenerate_rejected:' : 'regenerate_unknown:') + safeCode(receipt?.code, 'unknown')));
+        options.scheduleSnapshot(true);
+      }).catch(() => {
+        respond('regenerate_response', false, 'official_runtime_v1:regenerate_unknown:completion_failed');
+        options.scheduleSnapshot(true);
+      });
+    }
+
     function stopPrivate(respond) {
       if (!privateTextTransactionRelay ||
           typeof privateTextTransactionRelay.stop !== 'function' ||
@@ -262,8 +292,8 @@
       return true;
     }
 
-    return Object.freeze({ sendPrompt, tryPrivateRegeneration, stopPrivate });
+    return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, stopPrivate });
   }
 
-  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 3, create });
+  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 4, create });
 })();
