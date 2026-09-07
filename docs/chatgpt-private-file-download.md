@@ -51,9 +51,11 @@ requires the native publication acknowledgement, not just an HTTP 200.
 
 Six targeted new tests and existing related suites pass: 118 Node runner cases,
 plus the file-index script's 17 checks. The new route's three positive cases
-failed against the old code first. Device transfer and actual saved-byte digest
-remain pending because USB was absent and the previously connected wireless
-handset became offline during this batch. No completed capability is registered.
+failed against the old code first. Commit `54a89232e` was Release-built,
+published and replacement-installed as `v1.1.1544`; MCP independently read back
+build 1544. Initial USB absence/wireless interruptions recovered, but the phone
+was then confirmed locked before the native download check. Device transfer and
+the actual saved-byte digest remain pending. No completed capability is registered.
 
 `chatgpt_web_private_file_download.js` owns a bounded, two-minute in-memory
 selection registry and one active authorization request. It registers only

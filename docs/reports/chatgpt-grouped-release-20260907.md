@@ -22,7 +22,7 @@ SHA-256: `3693afa18b7f0061a969ca3e6e4eff1a9de1903f582514fbfb7b4172edaf4297`.
 
 ## Published builds
 
-Both builds used the approved `publish-apk.ps1`, verified the remote artifact,
+All three builds used the approved `publish-apk.ps1`, verified the remote artifact,
 and completed whitelisted replacement installation on Xiaomi 14 Pro. Native
 MCP independently read back each installed version. USB and wireless referred
 to the same physical phone; the stale second-device mDNS entry was not used.
@@ -31,6 +31,7 @@ to the same physical phone; the stale second-device mDNS entry was not used.
 |---|---|---|
 | 1542 | `d5e3e3d829df589bbd6e15394adfb69dac15d944` | `aabb6c12d1934c9e7eb20b58d3ca11f4d704153d49e5386b8eca729bf85ee2b6` |
 | 1543 | `ca672ea5cfb1e361a97fe112ea9b1db291d1458c` | `36cfc33d050ccaf99f740df9f763189935be6fd6ee74332e96f64d907b235a2c` |
+| 1544 | `54a89232e` | `9354fbb84c9617fb35bcdc2df7999863db044c49d4f8bac6647c99d51cb8a61c` |
 
 1543 is a correction found during the grouped phone round, not a rebuild per
 unrelated feature. Its Release build passed; the 1,007-test result above belongs
@@ -73,10 +74,35 @@ The original WebView identity, Cookie, login state and independent proxy were
 preserved. No credentials or private conversation text are included here.
 The handset was restored to `conversation_home` after the bounded checks.
 
+## Same-origin download follow-up (1544)
+
+The already-retained, SHA-256-verified official shared source identifies the
+two exact Estuary content routes and passes resolver URLs to download anchors.
+Our external-origin-only handoff had no corresponding binary route. Adapter 293
+adds that candidate by reusing the library byte/save owner, with cookies kept
+in the page, redirects rejected, selected-file authorization and continuous
+account/document/route/cancellation guards. No storage-domain whitelist was
+expanded. See [the exact source boundary](../chatgpt-private-file-download.md#same-origin-content-candidate-adapter-293).
+
+Six new targeted tests plus existing related suites pass 118 Node runner cases
+and the file-index script's 17 checks. The positive cases failed against the
+old implementation first. Release Kotlin/Java compilation and assemble passed
+in 6m 43s; this is not a repeat of the earlier 1,007-test Android run.
+The release publisher verified remote size/hash and replacement installation
+at 1544. MCP independently confirmed `1.1.1544`, running=true.
+
+Wireless ADB briefly went offline and subsequent MCP bootstrap reads timed out.
+After reconnecting only the pinned transport and opening the existing main
+activity, MCP recovered. The readiness check then reported the phone locked,
+so no fixture navigation, upload, send, microphone or download was attempted
+on 1544. User unlock is requested. The 1543 rejected URL was never captured;
+source evidence for the added route does not prove it caused that failure.
+Actual saved bytes and their digest are still required before claiming a fix.
+
 ## Next boundary
 
-Inspect the actual download resolver/source shape, then complete the supported
-byte route using the existing download owner. Reuse the already-uploaded fixture;
+After unlock, accept the 1544 content-route candidate; inspect any remaining
+download-source rejection before changing another policy. Reuse the already-uploaded fixture;
 do not repeat its successful upload merely to test downloads. Grouped image/PDF,
 multi-file/project attachment, gallery, share and runtime generation checks are
 still pending where the work list says so. Do not mark all ChatGPT work complete,
@@ -92,6 +118,8 @@ Logs are under `<git-common-dir>/ai-command-logs/`, with these stem names:
 - `chatgpt-1542-attachment-send-20260907-174548-975`
 - `chatgpt-explicit-files-regression-20260907-175459-602`
 - `chatgpt-explicit-file-read-publish-20260907-175832-019`
+- `chatgpt-content-download-regression-pass-20260907-183106-269`
+- `chatgpt-content-download-publish-20260907-183325-187`
 
 Each has structured result/state plus stdout/stderr files. The bounded
 `acceptance-1543.json` and resumable synthetic attachment checkpoint are in the

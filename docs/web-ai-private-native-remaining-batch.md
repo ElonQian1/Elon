@@ -27,8 +27,13 @@ published and installed, and confirmed one production private text-file upload
 with actual file-content reply. `1543` includes the file-index freshness fix;
 the production private index returned the same fixture in 716 ms. Its download
 returned `download_source_unsupported`; no saved-file acceptance is claimed.
+`1544` adds the source-evidenced same-origin content download candidate through
+the existing native byte/save owner. Its 118 related Node runner cases and
+Release build passed; publication, replacement installation and MCP build
+readback passed. Actual download acceptance is waiting for the locked handset
+to be unlocked; the rejected 1543 URL shape has not been captured.
 See [the grouped release evidence](reports/chatgpt-grouped-release-20260907.md).
-The source candidates below are bundled through `ca672ea5c`; older delivery
+The source candidates below are bundled through `54a89232e`; older delivery
 cells are historical checkpoints, not current source-only blockers. Bundling
 does not upgrade any pending protocol or rendered-UI acceptance claim.
 
@@ -90,12 +95,13 @@ every private transport or a reason to repeat already-verified capabilities.
 
 ## Grouped release
 
-### Current 1542 and 1543 acceptance
+### Current 1542 through 1544 acceptance
 
 The [current report](reports/chatgpt-grouped-release-20260907.md) records unified
-compilation/tests, both replacement installations, actual private attachment
+compilation/tests, three replacement installations, actual private attachment
 association and file-content reply, the file-index regression/fix, and the
-remaining download-source rejection. Keep the Goal active and Google deferred;
+remaining download-source rejection and 1544 same-origin candidate awaiting
+an unlocked-phone saved-byte check. Keep the Goal active and Google deferred;
 the complete ChatGPT acceptance gate has not passed.
 
 ### Earlier 1541 acceptance
