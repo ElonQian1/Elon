@@ -5,8 +5,9 @@
 - Capability: `android_chatgpt_private_model_preset_state_v1`.
 - Extensions: `android_chatgpt_private_model_version_state_v1` and
   `android_chatgpt_private_service_tier_state_v1`.
-- Status: implemented, source-only candidate; not `completed` or device accepted.
-- Contract/controller version: 3, page adapter 294 (next grouped build pending). Production native model selection reuses the current
+- Status: implemented and packaged in 1.1.1548; not `completed` or account-specific
+  device accepted. [Grouped evidence](reports/chatgpt-grouped-native-20260907.md).
+- Contract/controller version: 3, page adapter 294. Production native model selection reuses the current
   official picker state and its model/effort mutators when the guards pass.
 - Scope: available normal-chat presets and thinking effort, available model
   versions, restricted-current-model thinking efforts, and the official

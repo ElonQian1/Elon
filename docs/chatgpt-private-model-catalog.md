@@ -7,11 +7,12 @@
   in normal ChatGPT chat. Verification: offline verified; not `completed`.
 - Delivery commits: runtime exports `985ad1d87`, native option semantics
   `ccef92a78`, private catalog/controller `a47c51473`.
-- Catalog module version 1; model contract/controller version 3. Page adapter
-  remains 294 in this source-only batch. Include one adapter-version increment
-  with the next grouped Android build, rather than rebuilding for each module.
-- No APK, Android compilation, Kotlin/JUnit execution, installation or device
-  acceptance in this batch. Last device APK remains 1.1.1547.
+- Catalog module version 1; model contract/controller version 3. The previously
+  pending adapter 294 increment is now packaged in release 1.1.1548. See the
+  [grouped build and device evidence](reports/chatgpt-grouped-native-20260907.md).
+- Android compilation and 46 selected JUnit cases passed; APK publication and
+  installation are verified. Account-specific model selection is not device
+  accepted: this device session currently reports guest/no runtime identity.
 - This is a native-menu/page-runtime private-state integration, not an
   independent Android HTTP model selector. The background WebView still owns
   authentication and the official conversation and preference stores.
@@ -99,14 +100,14 @@ models, malformed/cyclic catalogs, empty-vs-unknown behavior, both runtime alias
 families, duplicate clicks, privacy failure/timeout, late-result cancellation,
 context races, preserved effort/tier/version and no post-write DOM replay.
 
-Added Kotlin tests: `ChatGptWebModelCatalogProtocolTest` and an additional
-`WebChatModelControlPolicyTest` case. They require the next grouped Android
-unit-test run; Node source assertions are not a substitute for Kotlin execution.
-Source-size and staged whitespace checks passed.
+The grouped Android run executed `ChatGptWebModelCatalogProtocolTest` and the
+additional `WebChatModelControlPolicyTest` case among 46 passing tests. The first
+run exposed a missing protocol envelope in the new test fixture; commit
+`cdfe8e6b6` corrected that fixture, and the identical test selection passed.
+Production parsing was not relaxed. Source-size and whitespace checks passed.
 
-Next: compile the grouped ChatGPT candidate, run those native tests with the
-existing model-policy/protocol suites, then inspect the actual production menu
-using the restored device connection. If the account has an eligible extra
+Next: after a signed-in session is confirmed, inspect the actual production
+menu using installed 1.1.1548 or its successor. If the account has an eligible extra
 model, select once and restore the original model/effort/tier. If its official
 catalog is empty, verify the absent entry only; do not claim a model-switch
 device pass or invent one. Restore the original conversation afterward.
