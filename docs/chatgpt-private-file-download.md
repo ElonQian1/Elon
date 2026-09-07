@@ -25,8 +25,10 @@ Module version 2 additionally registers confirmed project and library-linked
 attachment descriptors as described below. Version 3 adds scoped
 [conversation image-pointer downloads](chatgpt-private-image-download.md) and
 rejects attachment-level context scopes and `library_download_id` lanes.
-Shared-library, connector and parameterized image-pointer variants remain
-unclaimed until their separate resolvers are covered.
+Version 4 accepts recognized [imported connector file copies](chatgpt-private-connector-file-download.md)
+without fetching their external source URL. Connector-only cloud references,
+shared/mounted library and parameterized image-pointer variants remain unclaimed
+until their separate resolvers are covered.
 
 The native index receives random opaque selection handles, not private file
 IDs or signed URLs. Registration uses the selected history branch, preserving

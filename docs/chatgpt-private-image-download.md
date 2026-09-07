@@ -48,9 +48,10 @@ is not a conversion or proof of PNG bytes; without an explicit MIME type the
 native download service uses the response metadata.
 
 Duplicate matching attachments, truncated or malformed metadata, conflicting
-projects, extra context scopes and non-image MIME metadata are rejected. Shared
-library and connector descriptors, parameterized pointers, path-bearing pointers
-and arbitrary URLs remain unsupported. Scope-like fields directly inside image
+projects, extra context scopes and non-image MIME metadata are rejected. Version
+4 additionally accepts matching metadata for [imported connector copies](chatgpt-private-connector-file-download.md).
+Shared/mounted library and connector-only references, parameterized pointers,
+path-bearing pointers and arbitrary URLs remain unsupported. Scope-like fields directly inside image
 parts are also rejected rather than silently ignored. `library_download_id` and
 attachment-level context scopes now reject broad file-download registration too.
 
