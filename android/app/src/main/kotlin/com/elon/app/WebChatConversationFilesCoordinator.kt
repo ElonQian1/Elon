@@ -39,6 +39,7 @@ internal class WebChatConversationFilesCoordinator(
     private var sheet: WebChatActionSheetHandle? = null
     private var detail: AlertDialog? = null
     private var pollTask: Runnable? = null
+    private val downloads = WebChatFileDownloadDialog(activity, host, consumerPort)
 
     fun show(conversation: ChatGptWebConversation, force: Boolean = false) {
         cancel()
@@ -49,14 +50,19 @@ internal class WebChatConversationFilesCoordinator(
         var selected: WebChatConversationFile? = null
         sheet = WebChatActionSheet.showUpdatable(activity, "会话附件",
             WebChatConversationFilesPresentation.rows(index, needsRefresh, false),
-            footerActions = listOf(
-                WebChatActionSheetFooterAction("刷新", "web-chat-conversation-files-refresh") {
+            footerActions = buildList {
+                add(WebChatActionSheetFooterAction("刷新", "web-chat-conversation-files-refresh") {
                     host.post { if (currentEpoch == epoch && consumerPort() === owner) show(conversation, force = true) }
-                },
-                WebChatActionSheetFooterAction("官网选项", "web-chat-conversation-files-official") {
+                })
+                owner.fileDownloadState()?.let { download ->
+                    add(WebChatActionSheetFooterAction("下载进度", "web-chat-conversation-files-download-progress") {
+                        host.post { if (currentEpoch == epoch && consumerPort() === owner) downloads.show(owner, download.requestId) }
+                    })
+                }
+                add(WebChatActionSheetFooterAction("官网选项", "web-chat-conversation-files-official") {
                     host.post { if (currentEpoch == epoch && consumerPort() === owner) openOfficial(conversation) }
-                },
-            ),
+                })
+            },
             onDismissed = {
                 if (currentEpoch == epoch) {
                     sheet = null
@@ -115,7 +121,6 @@ internal class WebChatConversationFilesCoordinator(
 
     private fun download(file: WebChatConversationFile, conversation: ChatGptWebConversation) {
         val owner = consumerPort() ?: return
-        val currentEpoch = epoch
         val request = owner.downloadConversationFile(conversation.path, file.id, file.downloadHandle)
         fun notice(message: String) {
             if (!activity.isFinishing && !activity.isDestroyed) Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
@@ -124,39 +129,8 @@ internal class WebChatConversationFilesCoordinator(
             notice("暂时无法准备下载，请刷新附件列表后重试")
             return
         }
-        notice("正在准备下载")
-        val startedAt = android.os.SystemClock.elapsedRealtime()
         stopPolling()
-        val task = object : Runnable {
-            override fun run() {
-                if (currentEpoch != epoch || consumerPort() !== owner) return
-                val result = owner.state().commandRequests.firstOrNull { it.id == request.requestId }
-                val elapsed = android.os.SystemClock.elapsedRealtime() - startedAt
-                val expired = elapsed >= com.elon.app.chatgptweb.ChatGptWebFileByteTransfer.COMMAND_TIMEOUT_MS
-                if (result?.status == WebChatConsumerCommandStatus.SUCCEEDED) {
-                    notice(if (result.detail == "download_saved") "已保存到下载目录" else "已加入下载列表")
-                } else if (expired || result?.status in setOf(WebChatConsumerCommandStatus.FAILED,
-                        WebChatConsumerCommandStatus.TIMED_OUT)) {
-                    notice(when (result?.detail) {
-                        "download_confirmation_unknown" -> "尚未确认下载，请先查看下载目录"
-                        "download_file_unavailable" -> "此文件已失效或无法访问"
-                        "download_selection_expired" -> "附件列表已过期，请刷新后重试"
-                        "download_file_not_ready" -> "文件尚未就绪，请稍后重试"
-                        "download_file_too_large" -> "文件超过本次下载大小限制"
-                        "download_storage_failed" -> "无法保存文件，请检查存储空间后重试"
-                        "download_transfer_timeout" -> "文件下载超时，请检查网络后重试"
-                        "download_content_invalid" -> "未收到完整文件，请稍后重试"
-                        else -> "未能准备下载，请稍后重试"
-                    })
-                } else {
-                    host.postDelayed(this, if (elapsed >= 5_000) 1_000 else 250)
-                    return
-                }
-                pollTask = null
-            }
-        }
-        pollTask = task
-        host.post(task)
+        downloads.show(owner, request.requestId)
     }
 
     private fun stopPolling() {
@@ -166,6 +140,7 @@ internal class WebChatConversationFilesCoordinator(
 
     fun cancel() {
         epoch += 1
+        downloads.dismiss()
         stopPolling()
         val current = sheet
         sheet = null
