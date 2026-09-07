@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 7, create: factory });
+  const exported = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -32,11 +32,26 @@
     return { href: url.href, conversationId, temporary: url.search === '?temporary-chat=true' };
   }
 
-  function identity() {
+  function identity(allowGuest = false) {
     const headers = page.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.();
-    if (!headers || typeof headers !== 'object') return null;
+    if (!headers || typeof headers !== 'object') {
+      if (!allowGuest) return null;
+      const bindings = page.__elonChatGptPrivateRuntimeBindings;
+      if (typeof bindings?.peek !== 'function' || !bindings.observed('shared')) return null;
+      const shared = bindings.peek('shared');
+      if (!shared) {
+        // Warm the shared cache without holding or replaying a user command.
+        bindings.load('shared').catch(() => {});
+        return null;
+      }
+      // Exact public getters: bootstrap must say logged_out and the live session
+      // must still be null. Missing headers alone are not a guest identity.
+      return typeof shared.R5 === 'function' && typeof shared.F5 === 'function' &&
+        shared.R5()?.authStatus === 'logged_out' && shared.F5() === null ? shared : null;
+    }
     const values = {};
     for (const [key, value] of Object.entries(headers)) values[key.toLowerCase()] = value;
+    if (typeof values.authorization !== 'string' || !/^Bearer \S+$/i.test(values.authorization)) return null;
     // Kept inside this document. Neither request credentials nor text enter receipts.
     return JSON.stringify(['authorization', 'chatgpt-account-id', 'oai-device-id'].map(key => values[key] || ''));
   }
@@ -87,10 +102,10 @@
       Array.from(page.document.querySelectorAll('link[rel="modulepreload"]')).some(node => node.href === RUNTIME_URL);
   }
 
-  function captureConversation(node) {
+  function captureConversation(node, allowGuest = false) {
     if (!node?.isConnected) return unavailable('composer_detached');
     if (!loaded()) return unavailable('runtime_not_observed');
-    const token = page.__elonChatGptDocumentToken, account = identity(), currentRoute = route();
+    const token = page.__elonChatGptDocumentToken, account = identity(allowGuest), currentRoute = route();
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '')) return unavailable('document_unavailable');
     if (account === null) return unavailable('identity_unavailable');
     if (!currentRoute) return unavailable('route_unsupported');
@@ -108,7 +123,7 @@
   }
 
   function capture(node, previousAttachment) {
-    const binding = captureConversation(node);
+    const binding = captureConversation(node, true);
     if (!binding) return null;
     const context = binding, props = context.shared.getSharedProps();
     if (typeof props.submitComposer !== 'function') return unavailable('submit_owner_unavailable');
@@ -135,7 +150,7 @@
     try {
       const currentRoute = route(), context = stores(binding.node), props = context?.shared.getSharedProps();
       return binding.node.isConnected && page.__elonChatGptDocumentToken === binding.token &&
-        identity() === binding.account && currentRoute && context?.shared === binding.shared &&
+        identity(true) === binding.account && currentRoute && context?.shared === binding.shared &&
         currentRoute.temporary === binding.temporary &&
         context.files === binding.files && props?.conversation === binding.conversation &&
         props.composerController === binding.controller &&
@@ -214,5 +229,8 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 7, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  try {
+    if (page.__elonChatGptPrivateTextTransactionsEnabled === true && route()) identity(true);
+  } catch (_) {}
+  return Object.freeze({ version: 8, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

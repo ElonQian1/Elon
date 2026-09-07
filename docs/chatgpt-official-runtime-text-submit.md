@@ -6,11 +6,52 @@ official page-runtime bridge, **not an independent Android HTTP/private POST
 transport**. Include it in the grouped ChatGPT APK; do not reimplement it while
 waiting for production acceptance.
 
-Latest: APK 1547 reached a real reply through the DOM fallback, not this runtime
-writer. Adapter 294 / runtime submit 7 repairs committed-owner resolution for
-the official imperative editor and preserves admission reasons in DOM fallback
-receipts. This remains a source/test candidate pending device acceptance; see
-[current evidence and focused acceptance](reports/chatgpt-runtime-owner-status-294.md).
+Latest installed checkpoint: APK 1548 / adapter 294 reached a real guest reply
+through DOM fallback, not this runtime writer. Its fixed receipt was
+`runtime_fallback:identity_unavailable`; see
+[the grouped device evidence](reports/chatgpt-grouped-native-20260907.md).
+Runtime submit 8 and bindings 2 now add the confirmed-guest source candidate below.
+They are not yet built or device-accepted. The committed-owner resolution and
+fallback reasons from runtime submit 7 remain unchanged.
+
+## Confirmed guest transactions
+
+Missing request headers are not an authenticated identity, but neither do they
+prove the official guest composer cannot send. Runtime submit 8 allows its text
+transaction to use a positively recognized guest context: the official bootstrap
+must report exactly `logged_out` and the live session getter must return exactly
+`null`. Undefined, loading, throwing, missing or conflicting state is not accepted.
+The authenticated path still needs valid captured Bearer headers and imports no
+additional module. The shared `captureConversation` API remains authenticated by
+default, so this extension does not silently widen stopping or regeneration.
+
+The existing versioned binding cache now exposes a synchronous `peek`. The text
+module warms one recognized shared module asynchronously; imports retain the
+existing single-flight, 1.5-second timeout and 10-second failure cooldown. A cold
+send remains available to the existing path immediately. Warming never queues,
+retries or replays a user command. Subsequent sends use the frozen current-page
+namespace as guest identity and recheck both official getters before and after
+dispatch. Login, changed headers, document/token replacement or mixed runtime
+builds invalidate ownership and cannot clear another context's draft.
+
+The public shared assets were hash-checked on 2026-09-08:
+
+- Legacy `4813494d-hrplraurzfyvxb10.js`, SHA-256
+  `89c95d937bac1191e91d5ceb4872eb0c328d39a98ce05399093a663f18921aa0`:
+  exported `R5` is bootstrap getter `Pn`; exported `F5` is live session getter `In`.
+- Current `4813494d-o593jrji51wy4azk.js`, SHA-256
+  `48563cd22f0dafe6c0b89220348fa3add81ff3abb82a62ed9d68a04d569cc375`:
+  the corresponding exports are `i7` and `t7`. Import aliases inside these files
+  are not their public export names. `In` returns the official store's current
+  session; bootstrap text alone is not used as live identity proof.
+
+Verification: **222 targeted Node tests passed**, zero failures/cancellations/
+skips, across bindings, text submit, attachments, transaction lifecycle, send
+settling/observation, stop, regeneration and current-runtime consumers. New guest
+acceptance/cold-cache/ownership cases failed on runtime submit 7 before the fix.
+This proves source integration, not a live guest writer or latency improvement.
+The next grouped APK must produce `official_runtime_v1:accepted` plus one actual
+reply in the production native UI; the previous DOM result is not reused as proof.
 
 ## Scope and ownership
 
@@ -133,11 +174,11 @@ arguments, unchanged private-replay prohibition, URL allocation, later drafts/fi
 stale owners, timeout/rejection/malformed receipts, cleanup failure and reinjection.
 Project upload tests are retained; real project prepared dispatch is not yet proved.
 
-The initial source-only round did not build an APK. The subsequent grouped APK
-1547 was built, published and installed, but its text sample fell back to DOM;
-see [1547 acceptance](reports/chatgpt-runtime-release-1547.md). Adapter 294 adds
-the owner correction and regression tests without another per-fix APK. It has
-not yet been built into or accepted on a phone.
+The initial source-only round did not build an APK. Grouped APKs 1547 and 1548
+were subsequently built, published and installed, but their text samples fell
+back to DOM. Adapter 294 in 1548 includes the owner correction and regression
+tests; the runtime submit 8 guest extension above still awaits the next grouped
+build. Neither installed fallback result accepts the direct runtime writer.
 
 In the grouped production UI round, confirm that the actual committed context
 resolves, send one synthetic text, retain the `official_runtime_v1` receipt and

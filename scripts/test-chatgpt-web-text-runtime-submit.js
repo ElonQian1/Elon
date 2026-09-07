@@ -14,7 +14,7 @@ const id = '11111111-2222-3333-4444-555555555555';
 const runtimeUrl = 'https://chatgpt.com/cdn/assets/8b34dbc2-kjj15hg4y6iyx13p.js';
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 
-function fixture() {
+function fixture(guest) {
   const calls = [], timers = new Map();
   let serial = 0, settle, draft = '', serverId = id, credentials = 'Bearer synthetic-only', loaded = true;
   let response = () => ({ accepted: true, completion: new Promise(resolve => { settle = resolve; }) });
@@ -39,11 +39,20 @@ function fixture() {
     performance: { getEntriesByName: url => loaded && url === runtimeUrl ? [{}] : [] },
     Event: class { constructor(type) { this.type = type; } preventDefault() {} },
     setTimeout(fn) { timers.set(++serial, fn); return serial; }, clearTimeout(key) { timers.delete(key); } };
+  let bridge;
+  if (guest) {
+    page.__elonChatGptPrivateTransport = null;
+    page.location.href = 'https://chatgpt.com/'; serverId = null; props.isNewThread = true;
+    bridge = require('./fixtures/chatgpt-runtime-bindings').attach(page, { shared: {
+      R5: () => { if (guest.throws) throw Error('synthetic bootstrap unavailable'); return { authStatus: guest.authStatus }; },
+      F5: guest.missingGetter ? undefined : () => guest.session
+    } });
+  }
   page.__elonChatGptPrivateTextRuntimeSubmit = moduleApi.create(page);
   const command = { requestId: 'mcp_test', prompt: 'synthetic prompt', expectedDraft: '', composer: node,
     readDraft: () => draft, clearDraft: () => { draft = ''; }, beforeSubmit() {} };
   return { calls, props, shared, fileStore, fiber, top, node, page, command, controller,
-    api: page.__elonChatGptPrivateTextRuntimeSubmit, timers,
+    api: page.__elonChatGptPrivateTextRuntimeSubmit, timers, bridge, guest,
     setDraft(value) { draft = value; }, draft: () => draft,
     setServer(value) { serverId = value; }, setIdentity(value) { credentials = value; },
     setLoaded(value) { loaded = value; }, response(value) { response = value; },
@@ -71,6 +80,95 @@ test('current website composer accepts the native submit transaction without a l
   assert.equal(result.handled, true); assert.equal(f.calls.length, 1);
   f.settle(true); assert.equal((await result.completion).status, 'accepted');
   assert.equal(bridge.loads.length, 0, 'uses the current committed submit owner without importing another composer');
+});
+
+test('confirmed guest uses the official text transaction without an authorization header', async () => {
+  const f = fixture({ authStatus: 'logged_out', session: null }); await flush();
+  assert.equal(f.bridge.loads.length, 1, 'one asynchronous module warmup');
+  assert.equal(f.api.captureConversation(f.node), null, 'other runtime actions retain their authenticated contract');
+  for (let i = 0; i < 2; i++) {
+    const result = f.api.submit(f.command); assert.equal(result.handled, true);
+    f.settle(true); assert.equal((await result.completion).status, 'accepted');
+  }
+  assert.equal(f.calls.length, 2); assert.equal(f.bridge.loads.length, 1);
+  assert.equal(f.timers.size, 0);
+});
+
+test('cold guest identity never waits, queues a send, or replays the DOM fallback', async () => {
+  const f = fixture({ authStatus: 'logged_out', session: null });
+  assert.deepEqual(f.api.submit(f.command), { handled: false, code: 'identity_unavailable' });
+  await flush(); assert.equal(f.calls.length, 0);
+  assert.equal(f.api.state().pending, false); assert.equal(f.timers.size, 0);
+  const result = f.api.submit(f.command); assert.equal(result.handled, true);
+  f.settle(true); assert.equal((await result.completion).status, 'accepted');
+});
+
+test('legacy website guest uses its own verified bootstrap and session exports', async () => {
+  const f = fixture(), loads = [], sharedUrl = 'https://chatgpt.com/cdn/assets/4813494d-hrplraurzfyvxb10.js';
+  f.page.__elonChatGptPrivateTransport = null;
+  f.page.performance.getEntriesByName = url => [runtimeUrl, sharedUrl].includes(url) ? [{}] : [];
+  f.page.__elonChatGptPrivateRuntimeBindings = require('../android/app/src/main/assets/chatgpt_web_private_runtime_bindings').create(f.page, {
+    loadRuntime: async url => { loads.push(url); return { R5: () => ({ authStatus: 'logged_out' }), F5: () => null }; }
+  });
+  const api = moduleApi.create(f.page); await flush();
+  const result = api.submit(f.command); assert.equal(result.handled, true);
+  f.settle(true); assert.equal((await result.completion).status, 'accepted');
+  assert.deepEqual(loads, [sharedUrl]);
+});
+
+test('empty or invalid captured headers cannot stand in for authenticated identity', () => {
+  for (const headers of [{}, { 'oai-device-id': 'synthetic' }, { Authorization: '' }, { Authorization: 'Bearer ' }]) {
+    const f = fixture(); f.page.__elonChatGptPrivateTransport.copySameOriginRequestHeaders = () => headers;
+    assert.equal(f.api.submit(f.command).code, 'identity_unavailable'); assert.equal(f.calls.length, 0);
+  }
+});
+
+for (const state of [
+  { authStatus: 'logged_in', session: null },
+  { authStatus: 'loading', session: null },
+  { authStatus: undefined, session: null },
+  { authStatus: 'logged_out', session: undefined },
+  { authStatus: 'logged_out', session: {} },
+  { authStatus: 'logged_out', session: null, missingGetter: true },
+  { authStatus: 'logged_out', session: null, throws: true }
+]) {
+  test('missing headers alone are not guest proof: ' + JSON.stringify(state), async () => {
+    const f = fixture(state); await flush();
+    assert.equal(f.api.submit(f.command).handled, false); assert.equal(f.calls.length, 0);
+    assert.equal(f.api.state().pending, false); assert.equal(f.timers.size, 0);
+  });
+}
+
+for (const [name, change] of Object.entries({
+  login: f => { f.guest.session = {}; },
+  headers: f => { f.page.__elonChatGptPrivateTransport = { copySameOriginRequestHeaders: () => ({ Authorization: 'Bearer synthetic-login' }) }; },
+  document: f => { f.page.document = { querySelectorAll: () => [] }; },
+  token: f => { f.page.__elonChatGptDocumentToken = 'doc_changed'; },
+  mixed_build: f => { f.bridge.observed.add(runtimeUrl); },
+  unavailable_auth: f => { f.guest.authStatus = 'unknown'; }
+})) {
+  test('guest ' + name + ' before dispatch cannot invoke the writer', async () => {
+    const f = fixture({ authStatus: 'logged_out', session: null }); await flush();
+    f.command.beforeSubmit = () => change(f);
+    assert.equal(f.api.submit(f.command).code, 'context_changed'); assert.equal(f.calls.length, 0);
+    await flush();
+  });
+  test('guest ' + name + ' after dispatch cannot clear the changed context', async () => {
+    const f = fixture({ authStatus: 'logged_out', session: null }); await flush();
+    f.setDraft(f.command.prompt); f.command.expectedDraft = f.command.prompt;
+    const result = f.api.submit(f.command); assert.equal(result.handled, true);
+    change(f); f.settle(true); assert.equal((await result.completion).code, 'context_changed');
+    assert.equal(f.draft(), f.command.prompt); assert.equal(f.calls.length, 1);
+    await flush();
+  });
+}
+
+test('guest invocation uncertainty keeps single-writer ownership', async () => {
+  const f = fixture({ authStatus: 'logged_out', session: null }); await flush();
+  f.response(() => { throw Error('synthetic dispatch uncertainty'); });
+  assert.equal((await f.api.submit(f.command).completion).status, 'unknown');
+  assert.equal((await f.api.submit(f.command).completion).code, 'busy');
+  assert.equal(f.calls.length, 1);
 });
 
 test('matching draft is cleared only after accepted official dispatch', async () => {
