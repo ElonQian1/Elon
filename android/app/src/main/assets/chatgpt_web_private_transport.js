@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 23) ||
+  if ((existingTransport && Number(existingTransport.version) >= 24) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -469,7 +469,11 @@
     if (!target || !/^mcp_[a-z0-9]{1,32}$/.test(String(requestId || ''))) {
       return respond(action, false, 'invalid_file_request');
     }
-    if (!conversationPrefetchReady()) return respond(action, false, 'files_not_ready');
+    // An explicit file read must not wait for another official history request.
+    // Keep identity, opt-in and failure cooldown separate from prefetch freshness.
+    const canAcquire = authContext && typeof authContext.canAcquire === 'function' && authContext.canAcquire();
+    if (!prefetchEnabled || policy.snapshot().cooldownRemainingMs > 0 ||
+        !(copiedRequestHeaders() || canAcquire)) return respond(action, false, 'files_not_ready');
     try {
       const result = await fetchConversation(target.id);
       const projection = window.__elonChatGptPrivateHistoryProjection;
@@ -533,7 +537,7 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 23,
+    version: 24,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,

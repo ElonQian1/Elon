@@ -121,6 +121,27 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
     assert.equal(events.filter(e => e.type === 'conversation_files_snapshot').length, 2);
     assert.equal(events.filter(e => e.type === 'message_snapshot').length, 1);
   });
+  await test('explicit file reads work after official observation expires without enabling background prefetch', async () => {
+    let count = 0; const events = []; const receipts = [];
+    const { transport, advance } = runtime(async () => { count++; return response(fixture.input); });
+    advance(120_001);
+    assert.equal(transport.conversationPrefetchReady(), false);
+    await transport.listConversationFiles('/c/fixture', 'mcp_files', e => events.push(e), (...a) => receipts.push(a));
+    assert.equal(count, 1);
+    assert.equal(events.length, 1);
+    assert.deepEqual(receipts, [['list_conversation_files', true, 'private_files_ready']]);
+    assert.equal(transport.conversationPrefetchReady(), false);
+  });
+  await test('explicit file reads still respect active failure cooldown', async () => {
+    let count = 0; const receipts = [];
+    const { transport, advance } = runtime(async () => { count++; throw new Error('network'); });
+    advance(120_001);
+    const read = () => transport.listConversationFiles('/c/fixture', 'mcp_files', () => assert.fail('no snapshot'),
+      (...a) => receipts.push(a));
+    await read(); await read();
+    assert.equal(count, 1);
+    assert.deepEqual(receipts.map(r => r[2]), ['files_read_failed', 'files_not_ready']);
+  });
   await test('file read attaches download selection through the private owner without an extra request', async () => {
     const events = []; let count = 0;
     const { window, transport } = runtime(async () => { count++; return response(fixture.input); });
