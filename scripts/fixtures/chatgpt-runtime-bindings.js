@@ -8,7 +8,7 @@ const files = {
 };
 // Independent expected export identities from the inspected public build.
 const expectedExports = {
-  shared: { H3: 'c6', mq: 'Pq', wV: 'UV', SV: 'VV', XM: 'mN', HM: 'oN',
+  shared: { H3: 'c6', R5: 'i7', F5: 't7', mq: 'Pq', wV: 'UV', SV: 'VV', XM: 'mN', HM: 'oN',
     'M$': 'Q$', RW: 'rG', uo: 'uo', t4: 'x4', IX: 'nZ', t6: 'x6', cX: 'OX',
     Fx: 'Lx', Fl: 'Il', v7: 'R7', $3: 'y6' },
   conversation: { AGt: 'uKt', J5t: 'O7t', Nrn: 'Cin', yRt: '$Rt', Grn: 'Fin',

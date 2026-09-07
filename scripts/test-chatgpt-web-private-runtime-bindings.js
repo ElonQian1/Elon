@@ -79,6 +79,40 @@ test('concurrent consumers and warm revisits share one bounded import', async ()
   assert.equal(await f.api.load('shared'), value); assert.equal(f.calls.length, 1);
 });
 
+test('synchronous cache reads never import or wait for an unresolved module', async () => {
+  let complete; const f = fixture({ loadRuntime: () => new Promise(resolve => { complete = resolve; }) });
+  assert.equal(f.api.peek('shared'), null); assert.equal(f.calls.length, 0);
+  const request = f.api.load('shared'); await Promise.resolve();
+  assert.equal(f.api.peek('shared'), null);
+  complete({ c6: () => true }); const value = await request;
+  assert.equal(f.api.peek(old.shared), value); assert.equal(f.calls.length, 1);
+  assert.equal(f.api.peek('https://example.invalid/module.js'), null);
+});
+
+for (const kind of ['document', 'token', 'mixed_build', 'foreign_origin']) {
+  test('cached synchronous namespace is unavailable after ' + kind, async () => {
+    const f = fixture(); await f.api.load('shared');
+    if (kind === 'document') f.page.document = { querySelector: () => null };
+    if (kind === 'token') f.page.__elonChatGptDocumentToken = 'doc_replaced';
+    if (kind === 'mixed_build') f.observed.add(old.composer);
+    if (kind === 'foreign_origin') f.page.location.origin = 'https://example.invalid';
+    assert.equal(f.api.peek('shared'), null); assert.equal(f.calls.length, 1);
+  });
+}
+
+test('failed or late old-context imports cannot become a synchronous guest identity', async () => {
+  const pending = [], f = fixture({ loadRuntime: () => new Promise(resolve => pending.push(resolve)) });
+  const oldRequest = f.api.load('shared'); await Promise.resolve();
+  f.page.__elonChatGptDocumentToken = 'doc_new';
+  const newRequest = f.api.load('shared'); await Promise.resolve();
+  pending[0]({ i7: () => ({ authStatus: 'logged_out' }), t7: () => null });
+  await assert.rejects(oldRequest, /context_changed/); assert.equal(f.api.peek('shared'), null);
+  pending[1]({ i7: () => ({ authStatus: 'logged_in' }), t7: () => ({}) });
+  const current = await newRequest;
+  assert.equal(f.api.peek('shared'), current);
+  assert.equal(current.R5().authStatus, 'logged_in');
+});
+
 test('late completion from a replaced document cannot populate the new cache', async () => {
   const pending = [];
   const f = fixture({ loadRuntime: () => new Promise(resolve => pending.push(resolve)) });

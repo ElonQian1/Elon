@@ -1,8 +1,9 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateRuntimeBindings) {
+  if (root?.location?.origin === 'https://chatgpt.com' &&
+      !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
     root.__elonChatGptPrivateRuntimeBindings = factory(root);
   }
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -18,7 +19,7 @@
   // Exact public source contracts, not wildcard imports or guessed minified names.
   // Evidence and hashes: docs/chatgpt-private-runtime-bindings.md.
   const currentExports = {
-    shared: { H3: 'c6', mq: 'Pq', wV: 'UV', SV: 'VV', XM: 'mN', HM: 'oN',
+    shared: { H3: 'c6', R5: 'i7', F5: 't7', mq: 'Pq', wV: 'UV', SV: 'VV', XM: 'mN', HM: 'oN',
       'M$': 'Q$', RW: 'rG', uo: 'uo', t4: 'x4', IX: 'nZ', t6: 'x6', cX: 'OX',
       Fx: 'Lx', Fl: 'Il', v7: 'R7', $3: 'y6' },
     conversation: { AGt: 'uKt', J5t: 'O7t', Nrn: 'Cin', yRt: '$Rt', Grn: 'Fin',
@@ -39,7 +40,7 @@
   ];
   const roles = Object.keys(legacy);
   let document, token, selected, error = '';
-  const cache = new Map(), failedUntil = new Map();
+  const cache = new Map(), resolved = new Map(), failedUntil = new Map();
   const now = options.now || (() => Date.now());
 
   function seen(file) {
@@ -52,7 +53,7 @@
     if (page.location?.origin !== 'https://chatgpt.com') return null;
     if (document !== page.document || token !== page.__elonChatGptDocumentToken) {
       document = page.document; token = page.__elonChatGptDocumentToken;
-      selected = null; cache.clear(); failedUntil.clear(); error = '';
+      selected = null; cache.clear(); resolved.clear(); failedUntil.clear(); error = '';
     }
     const candidates = profiles.filter(p => seen(p.anchor) ||
       ['shared', 'conversation', 'composer'].some(role => seen(p.files[role])));
@@ -91,6 +92,13 @@
     return Object.freeze(result);
   }
 
+  function peek(url) {
+    try {
+      const role = roleOf(url);
+      return role && profile() ? resolved.get(role) || null : null;
+    } catch (_) { return null; }
+  }
+
   function load(url) {
     let p, role;
     try { role = roleOf(url); p = role && profile(); } catch (_) {}
@@ -112,6 +120,7 @@
       }
       const result = expose(namespace, p, role);
       if (!Object.keys(result).length) throw Error('runtime_exports_unknown');
+      resolved.set(role, result);
       error = ''; return result;
     }).catch(reason => {
       if (cache.get(role) === promise) {
@@ -132,8 +141,8 @@
 
   function state() {
     const p = profile();
-    return { version: 1, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 2, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 1, observed, load, temporary, state });
+  return Object.freeze({ version: 2, observed, load, peek, temporary, state });
 });
