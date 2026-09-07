@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const projectionModule = require('../android/app/src/main/assets/chatgpt_web_private_history_projection.js');
 const projection = projectionModule.create({});
 const library = require('../android/app/src/main/assets/chatgpt_web_private_library_download.js');
+const download = require('../android/app/src/main/assets/chatgpt_web_private_file_download.js');
 
 function reference(id = 'libfile_synthetic') {
   return { library_file_id: id, name: 'shared.txt', mime_type: 'text/plain',
@@ -97,7 +98,7 @@ test('module reinjection updates file projection without replacing the proven id
   const transport = { identity: 'synthetic' };
   const window = { location: { origin: 'https://chatgpt.com' },
     __elonChatGptPrivateTransport: transport,
-    __elonChatGptPrivateFileDownload: { version: 7, dispose() { retired++; } } };
+    __elonChatGptPrivateFileDownload: { version: download.version - 1, dispose() { retired++; } } };
   const context = vm.createContext({ window, Map, Set, URL, URLSearchParams });
   for (let i = 0; i < 2; i++) {
     for (const name of ['history_projection', 'library_download', 'file_download']) {
@@ -107,6 +108,6 @@ test('module reinjection updates file projection without replacing the proven id
   assert.equal(retired, 1);
   assert.equal(window.__elonChatGptPrivateTransport, transport);
   assert.equal(window.__elonChatGptPrivateHistoryProjection.create({}).files({ messages: [message()] }).files.length, 1);
-  assert.equal(window.__elonChatGptPrivateLibraryDownload.version, 2);
-  assert.equal(window.__elonChatGptPrivateFileDownload.version, 8);
+  assert.equal(window.__elonChatGptPrivateLibraryDownload.version, library.version);
+  assert.equal(window.__elonChatGptPrivateFileDownload.version, download.version);
 });

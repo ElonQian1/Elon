@@ -35,7 +35,24 @@
     return { sharedLibraryFileId: file.library_file_id };
   }
 
-  async function run(root, job, current, validateSignedUrl) {
+  function contentUrl(value) {
+    if (typeof value !== 'string' || value.length > 16384 || /[\\\x00-\x20\x7f]/.test(value) ||
+        !/^(?:https:\/\/chatgpt\.com(?::443)?)?\/(?:backend-api|api)\/estuary\/content(?:\?[^#]*)?$/.test(value)) return null;
+    try { return new URL(value, 'https://chatgpt.com').href; } catch (_) { return null; }
+  }
+
+  function run(root, job, current, validateSignedUrl) {
+    const url = new URL('/api/library/files/' + encodeURIComponent(job.entry.sharedLibraryFileId) + '/download', root.location.origin);
+    return transfer(root, job, current, validateSignedUrl, url.href, false);
+  }
+
+  function runContent(root, job, current, value) {
+    const url = contentUrl(value);
+    if (root.location.origin !== 'https://chatgpt.com' || !url) throw new Error('download_source_unsupported');
+    return transfer(root, job, current, null, url, true);
+  }
+
+  async function transfer(root, job, current, validateSignedUrl, url, content) {
     if (job.descriptor.byteTransferVersion !== 1) throw new Error('download_bridge_unavailable');
     const bridge = root.elonChatGptFileDownload;
     if (!bridge?.postMessage) throw new Error('download_bridge_unavailable');
@@ -94,16 +111,18 @@
     bridge.onmessage = listener;
     try {
       check();
-      const url = new URL('/api/library/files/' + encodeURIComponent(job.entry.sharedLibraryFileId) + '/download', root.location.origin);
-      // The official anchor uses the page's cookies. No copied bearer headers or
-      // Android HTTP identity are needed for this same-origin binary request.
-      response = await wait(root.fetch(url.href, {
-        method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'follow', signal,
+      // Official download anchors use ambient cookies. Keep identity and URLs in
+      // the page; the native lease receives only bounded bytes and acknowledgements.
+      response = await wait(root.fetch(url, {
+        method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: content ? 'error' : 'follow', signal,
       }), 8000);
       check();
       if (response.status === 404) throw new Error('download_file_unavailable');
       if (!response.ok || response.status !== 200 || !response.body?.getReader) throw new Error('download_prepare_failed');
-      if (response.url !== url.href) validateSignedUrl(response.url);
+      if (response.url !== url) {
+        if (content) throw new Error('download_source_unsupported');
+        validateSignedUrl(response.url);
+      }
       const mime = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
       const attachment = /^attachment(?:;|$)/i.test(response.headers.get('content-disposition') || '');
       if (mime === 'text/html' && !attachment || mime === 'application/json' && !attachment &&
@@ -147,5 +166,5 @@
       try { reader?.releaseLock(); } catch (_) {}
     }
   }
-  return Object.freeze({ version: 2, target, sharedReference, run });
+  return Object.freeze({ version: 3, target, sharedReference, contentUrl, run, runContent });
 });

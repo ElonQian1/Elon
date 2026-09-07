@@ -24,6 +24,37 @@ shape still needs inspection before extending any source policy. This is not
 a successful end-to-end download; see the
 [grouped acceptance report](reports/chatgpt-grouped-release-20260907.md).
 
+### Same-origin content candidate (adapter 293)
+
+The SHA-256-verified official shared asset above separately identifies
+`/api/estuary/content` and `/backend-api/estuary/content` in `Dhe` and its
+same-origin content request helpers. `fEt` assigns the resolver's `download_url`
+to a download anchor without requiring an external storage origin. That is
+source evidence for a missing URL family, **not evidence that the 1543 device
+failure returned that family**. The actual failed response remains uncaptured.
+
+File download module 9 recognizes only those two exact HTTPS same-origin paths
+in a freshly authorized response, absolute or root-relative. It does not accept
+arbitrary ChatGPT routes, protocol-relative URLs, userinfo, fragments, whitespace
+or alternate hosts/ports. Existing external signed-URL validation is unchanged.
+The selected response URL and cookies stay in the page; library download module
+3 reuses its existing byte stream, backpressure, native save and cancellation
+owner. No bearer headers are copied for this cookie-authenticated content read,
+and redirects are rejected rather than forwarding identity to another source.
+
+After authorization the active stream has its own bounded 120-second deadline;
+the selection's two-minute expiry still prevents starting another request, but
+does not interrupt an already-authorized transfer. Account, document, route and
+user-cancellation checks continue throughout every chunk. Declared JSON files
+are distinguishable from undeclared JSON error responses. `download_saved` still
+requires the native publication acknowledgement, not just an HTTP 200.
+
+Six targeted new tests and existing related suites pass: 118 Node runner cases,
+plus the file-index script's 17 checks. The new route's three positive cases
+failed against the old code first. Device transfer and actual saved-byte digest
+remain pending because USB was absent and the previously connected wireless
+handset became offline during this batch. No completed capability is registered.
+
 `chatgpt_web_private_file_download.js` owns a bounded, two-minute in-memory
 selection registry and one active authorization request. It registers only
 ordinary conversation attachment descriptors with an explicit simple file ID

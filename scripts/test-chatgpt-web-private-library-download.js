@@ -78,6 +78,112 @@ function fixture(options = {}) {
   return f;
 }
 
+function contentFixture(options = {}) {
+  const f = fixture(options), binaryFetch = f.root.fetch;
+  delete f.attachment.source;
+  delete f.attachment.library_file_id;
+  f.attachment.id = 'file-synthetic';
+  f.attachment.mime_type = options.mime || 'application/octet-stream';
+  f.root.fetch = async (url, init) => {
+    if (new URL(url).pathname === '/backend-api/files/download/file-synthetic') {
+      f.calls.push({ url, init });
+      return Response.json({ status: 'success', file_id: 'file-synthetic',
+        download_url: options.source || '/backend-api/estuary/content?id=file-synthetic&sig=synthetic' });
+    }
+    return binaryFetch(url, init);
+  };
+  return f;
+}
+
+test('authorized same-origin content reuses native byte publication, never Android identity transfer', async () => {
+  for (const source of ['/backend-api/estuary/content?id=file-synthetic&sig=synthetic',
+    'https://chatgpt.com/api/estuary/content?id=file-synthetic&sig=synthetic']) {
+    const f = contentFixture({ source });
+    await f.run(f.register()[0]);
+    assert.equal(f.calls.length, 2);
+    assert.equal(f.calls[1].url, new URL(source, f.root.location.origin).href);
+    assert.equal(f.calls[1].init.credentials, 'same-origin');
+    assert.equal(f.calls[1].init.redirect, 'error');
+    assert.equal(f.calls[1].init.headers, undefined);
+    assert.deepEqual(Buffer.concat(f.stored), Buffer.from(f.data));
+    assert.deepEqual(f.receipts, [['download_conversation_file', true, 'download_saved']]);
+    assert.doesNotMatch(JSON.stringify({ packets: f.packets, receipts: f.receipts }), /sig=|file-synthetic|Bearer|https:/);
+  }
+});
+
+test('authorized content is bound to the selected file, document, cancellation and storage acknowledgement', async () => {
+  for (const onPacket of [(p, f) => { if (p.byteOperation === 'chunk') f.setIdentity('Bearer changed-account'); },
+    (p, f) => { if (p.byteOperation === 'chunk') f.root.__elonChatGptDocumentToken = 'doc_changed'; },
+    (p, f) => { if (p.byteOperation === 'chunk') f.api.cancel(p.leaseId); }]) {
+    const f = contentFixture({ onPacket });
+    await f.run(f.register()[0]);
+    assert.equal(f.saved, false);
+    assert.equal(f.stored.length, 0);
+    assert.equal(f.receipts.at(-1)[2], 'download_cancelled');
+  }
+  const f = contentFixture({ failCommit: true });
+  await f.run(f.register()[0]);
+  assert.equal(f.saved, false);
+  assert.equal(f.receipts.at(-1)[2], 'download_storage_failed');
+});
+
+test('same-origin content permits declared JSON files but never authentication HTML or changed response origins', async () => {
+  const json = contentFixture({ mime: 'application/json' });
+  await json.run(json.register()[0]);
+  assert.equal(json.receipts.at(-1)[2], 'download_saved');
+  for (const options of [{ mime: 'text/html' }, { finalUrl: 'https://chatgpt.com/auth/login' },
+    { finalUrl: 'https://files.oaiusercontent.com/redirected' }, { status: 403 }, { noNativeBytes: true }]) {
+    const f = contentFixture(options);
+    await f.run(f.register()[0]);
+    assert.equal(f.saved, false);
+    assert.equal(f.receipts.at(-1)[1], false);
+  }
+});
+
+test('same-origin downloads do not admit arbitrary routes, origins, userinfo or normalized hostile URLs', async () => {
+  for (const source of ['https://external.test/backend-api/estuary/content', '/auth/login',
+    '//chatgpt.com/backend-api/estuary/content', '/backend-api/estuary/content/../conversation',
+    'https://user:pass@chatgpt.com/backend-api/estuary/content', '/backend-api/estuary/content#fragment',
+    '/backend-api/estuary/content\n?id=file-synthetic', '/backend-api/estuary/content2',
+    'https://chatgpt.com:8443/api/estuary/content', 'data:text/plain,fixture']) {
+    const f = contentFixture({ source });
+    await f.run(f.register()[0]);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.packets.some(p => p.byteOperation), false);
+    assert.equal(f.receipts.at(-1)[2], 'download_source_unsupported');
+  }
+});
+
+test('an authorized byte transfer can finish after selection TTL without extending new selections', async () => {
+  const now = Date.now;
+  try {
+    const startedAt = now();
+    const f = contentFixture({ onPacket: packet => {
+      if (packet.byteOperation === 'chunk') Date.now = () => startedAt + 180000;
+    } });
+    const row = f.register()[0];
+    await f.run(row);
+    assert.equal(f.receipts.at(-1)[2], 'download_saved');
+    await f.run(row);
+    assert.equal(f.receipts.at(-1)[2], 'download_selection_expired');
+    assert.equal(f.calls.length, 2);
+  } finally { Date.now = now; }
+});
+
+test('an unconfirmed authorization never starts cookie content transfer or replays a request', async () => {
+  for (const response of [{ status: 'retry' }, { status: 'success', file_id: 'file-another' }]) {
+    const f = contentFixture();
+    f.root.fetch = async (url, init) => {
+      f.calls.push({ url, init });
+      return Response.json({ ...response, download_url: '/api/estuary/content?id=file-synthetic' });
+    };
+    await f.run(f.register()[0]);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.packets.some(p => p.byteOperation), false);
+    assert.equal(f.receipts.at(-1)[1], false);
+  }
+});
+
 test('metadata-only shared files reuse the production download byte lease without a DOM or metadata lookup', async () => {
   for (const project of [false, true]) {
     const f = fixture({ shared: true, project });

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 8, create: factory });
+  const exported = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -122,6 +122,7 @@
     if (libraryFileId !== null && (typeof libraryFileId !== 'string' || !LIBRARY.test(libraryFileId))) return null;
     return Object.freeze({ conversationId: conversation[2], fileId: file.id,
       projectId: projects[0] || null, libraryFileId,
+      mediaType: typeof file.mime_type === 'string' ? file.mime_type : '',
       ...(libraryReference || {}),
       ...(libraryReference ? { name: file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180), mediaType: file.mime_type || '' } : {}),
       ...(image ? { image: true,
@@ -179,7 +180,7 @@
   function current(job) {
     return !disposed && active === job && !job.controller.signal.aborted &&
       root.location.href === job.descriptor.href && root.__elonChatGptDocumentToken === job.entry.token &&
-      identity() === job.entry.account && (Boolean(job.entry.sharedLibraryFileId) || job.entry.expiresAt > Date.now());
+      identity() === job.entry.account && (Boolean(job.entry.sharedLibraryFileId) || job.byteTransfer || job.entry.expiresAt > Date.now());
   }
 
   function downloadUrl(value) {
@@ -249,7 +250,7 @@
     }
     const job = { descriptor, entry, controller: new root.AbortController() };
     active = job;
-    const timer = root.setTimeout(() => job.controller.abort(), entry.sharedLibraryFileId ? 120000 : 15000);
+    let timer = root.setTimeout(() => job.controller.abort(), entry.sharedLibraryFileId ? 120000 : 15000);
     try {
       if (entry.sharedLibraryFileId) {
         const detail = await root.__elonChatGptPrivateLibraryDownload.run(root, job, current, downloadUrl);
@@ -272,9 +273,21 @@
           payload.file_id !== entry.downloadFileId)) {
         throw new Error('download_authorization_failed');
       }
-      await enqueue(job, downloadUrl(payload.download_url));
-      job.queued = true;
-      respond(ACTION, true, 'download_queued');
+      const binary = root.__elonChatGptPrivateLibraryDownload;
+      if (binary?.contentUrl?.(payload.download_url)) {
+        // A fresh authorization may return the official same-origin content route,
+        // not a signed external URL. Reuse the existing byte owner and save receipt.
+        job.byteTransfer = true;
+        root.clearTimeout(timer);
+        timer = root.setTimeout(() => job.controller.abort(), 120000);
+        const detail = await binary.runContent(root, job, current, payload.download_url);
+        job.queued = true;
+        respond(ACTION, true, detail);
+      } else {
+        await enqueue(job, downloadUrl(payload.download_url));
+        job.queued = true;
+        respond(ACTION, true, 'download_queued');
+      }
     } catch (error) {
       const reason = String(error?.message || '');
       const code = ['download_file_not_ready', 'download_source_unsupported', 'download_confirmation_unknown',
@@ -296,5 +309,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 8, register, start, cancel, dispose });
+  return Object.freeze({ version: 9, register, start, cancel, dispose });
 });
