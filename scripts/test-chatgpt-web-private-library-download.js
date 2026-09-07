@@ -178,3 +178,30 @@ test('native notification cancellation aborts the stream without waiting for the
   assert.equal(f.saved, false); assert.equal(f.stored.length, 0);
   assert.equal(f.root.elonChatGptFileDownload.onmessage, prior);
 });
+
+test('a stale native progress panel cannot cancel another lease', async () => {
+  let ignored = 0;
+  const f = fixture({ onPacket: (packet, owner) => {
+    if (packet.byteOperation === 'chunk') {
+      assert.equal(owner.api.cancel('00000000-0000-4000-8000-000000000099'), false);
+      ignored++;
+    }
+  } });
+  await f.run(f.register()[0]);
+  assert.equal(ignored, 3);
+  assert.equal(f.saved, true);
+  assert.equal(f.receipts[0][2], 'download_saved');
+});
+
+test('request-bound native cancellation aborts preparation before the byte bridge begins', async () => {
+  const f = fixture({ hangFetch: true });
+  const running = f.run(f.register()[0]);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.api.cancel('00000000-0000-4000-8000-000000000001'), true);
+  await running;
+  assert.equal(f.calls[0].init.signal.aborted, true);
+  assert.equal(f.packets.some(p => p.byteOperation === 'begin'), false);
+  assert.deepEqual(f.receipts, [['download_conversation_file', false, 'download_cancelled']]);
+  assert.equal(f.api.cancel('00000000-0000-4000-8000-000000000001'), false);
+});

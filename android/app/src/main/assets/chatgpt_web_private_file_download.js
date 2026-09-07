@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 5, create: factory });
+  const exported = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -259,7 +259,11 @@
     }
   }
 
-  function cancel() { active?.controller.abort(); }
+  function cancel(leaseId) {
+    if (!active || leaseId != null && leaseId !== active.descriptor.leaseId) return false;
+    active.controller.abort();
+    return true;
+  }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 5, register, start, cancel, dispose });
+  return Object.freeze({ version: 6, register, start, cancel, dispose });
 });
