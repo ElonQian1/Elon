@@ -11,6 +11,7 @@ class ChatGptWebSkinContractTest {
     @Test
     fun skinUsesTheExistingOfficialWebViewAndKeepsBothFallbacks() {
         val session = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt")
+        val portFactory = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPortFactory.kt")
         val surfaceMode = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSurfaceModeController.kt")
         val controller = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSkinPresentationController.kt")
         val pageAdapter = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt")
@@ -21,10 +22,16 @@ class ChatGptWebSkinContractTest {
 
         assertTrue(surfaceMode.contains("showWebChatSkinSurface()"))
         assertTrue(surfaceMode.contains("showWebChatBackgroundSurface()"))
-        assertTrue(session.contains("mode = ::presentationMode"))
-        assertTrue(session.contains("surfaceMode.isSkin() || state == State.LOADING"))
+        assertTrue(session.contains("presentationMode = ::presentationMode"))
+        assertTrue(portFactory.contains("mode = presentationMode"))
+        assertTrue(session.contains("surfaceMode.isSkin() || realtimeVoiceBacking.isActive()"))
+        assertTrue(session.contains("latestSnapshot.keepsBackgroundExecutionActive()"))
+        assertTrue(session.contains("conversationNavigation.hasPending() || sendOwner.hasAttachmentSend()"))
         assertTrue(session.contains("{ webExecution.interactionRequested() }"))
-        assertFalse(session.contains("webExecution::interactionRequested"))
+        val executionInit = session.indexOf("private val webExecution:")
+        val dictationInit = session.indexOf("private val privateDictation =")
+        assertTrue(executionInit >= 0 && dictationInit > executionInit)
+        assertTrue(session.contains("private val touchRequestHandler by lazy("))
         assertTrue(controller.contains("binding.chatList.visibility = View.GONE"))
         assertTrue(controller.contains("binding.inputLayout.visibility = View.GONE"))
         assertTrue(controller.contains("web-chat-skin-exit:chatgpt"))

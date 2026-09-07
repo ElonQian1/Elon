@@ -43,13 +43,19 @@ class WebChatSendOwnershipContractTest {
         val owner = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebSendOwner.kt",
         )
+        val portFactory = read(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPortFactory.kt",
+        )
 
         assertTrue(session.contains("private val sendOwner = ChatGptWebSendOwner("))
         assertTrue(session.contains("sendOwner.dispatchSocial(prompt)"))
-        assertTrue(session.contains("sendOwner.dispatchMcp(inputText().trim(), requestId)"))
+        assertTrue(session.contains("portFactory.createMcpPort("))
+        assertTrue(session.contains("sendOwner = sendOwner"))
+        assertTrue(portFactory.contains("sendOwner.dispatchMcp(inputText().trim(), requestId)"))
         assertTrue(session.contains("sendOwner.beginAttachments(prompt, attachments)"))
         assertTrue(session.contains("sendOwner.acceptCommandResult(event)"))
         assertFalse(session.contains(".sendPrompt("))
+        assertFalse(portFactory.contains(".sendPrompt("))
         assertEquals(1, Regex("\\.sendPrompt\\(").findAll(owner).count())
     }
 

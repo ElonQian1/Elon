@@ -119,14 +119,19 @@ class ChatGptWebConversationContractTest {
         val move = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/WebChatProductionConversationProjectMove.kt",
         )
+        val refreshRuntime = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptConversationRefreshRuntime.kt",
+        )
 
         assertTrue(directoryRequests.contains("generation += 1"))
         assertTrue(adapter.contains("conversationDirectoryRequests.handleCommand(command, respond)"))
         assertTrue(directoryRequests.contains("action === 'cancel_conversation_directory'"))
         assertTrue(directoryRequests.contains("if (!current()) return;"))
-        assertTrue(session.contains("ChatGptConversationRefreshSession(conversationRefresh)"))
-        assertTrue(session.contains("conversationRefreshSession.suspend"))
-        assertTrue(session.contains("pageAdapter?.cancelConversationDirectoryWork()"))
+        assertTrue(session.contains("ChatGptConversationRefreshRuntime("))
+        assertTrue(session.contains("conversationRefresh.suspendForConversationAction()"))
+        assertTrue(refreshRuntime.contains("ChatGptConversationRefreshSession(coordinator)"))
+        assertTrue(refreshRuntime.contains("session.suspend(owner, preserveInterruptedRefresh)"))
+        assertTrue(refreshRuntime.contains("pageAdapter()?.cancelConversationDirectoryWork()"))
         assertTrue(move.contains("holdConversationRefresh()"))
         assertTrue(move.contains("releaseConversationRefresh()"))
     }
@@ -161,13 +166,18 @@ class ChatGptWebConversationContractTest {
         val background = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
+        val refreshRuntime = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptConversationRefreshRuntime.kt",
+        )
         val conversations = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_conversations.js",
         )
 
         assertTrue(pageAdapter.contains("projectHints.take(MAX_PROJECT_HINTS)"))
         assertTrue(pageAdapter.contains("chatgpt_web_adapter_project_hints.js"))
-        assertTrue(background.contains("scopeProjectId = refreshRequest.scopeProjectId"))
+        assertTrue(background.contains("ChatGptConversationRefreshRuntime("))
+        assertTrue(refreshRuntime.contains("scopeProjectId = refresh.scopeProjectId"))
+        assertTrue(refreshRuntime.contains("projectHints = refresh.projectHints"))
         assertTrue(pageAdapter.contains("put(\"projectScopeId\", it)"))
         assertTrue(conversations.contains("scopeProjectId: scopeProjectId || null"))
     }
@@ -193,6 +203,9 @@ class ChatGptWebConversationContractTest {
         val backgroundSession = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundSession.kt",
         )
+        val refreshRuntime = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptConversationRefreshRuntime.kt",
+        )
 
         assertTrue(conversations.contains("Date.now() - started >= 10000"))
         assertTrue(conversations.contains("let sidebarOpenedByAdapter = false"))
@@ -201,7 +214,8 @@ class ChatGptWebConversationContractTest {
                 "!existing.length && sidebarOpenedByAdapter && findSidebarButton(false)",
             ),
         )
-        assertTrue(backgroundSession.contains("ChatGptConversationRefreshCoordinator("))
+        assertTrue(backgroundSession.contains("ChatGptConversationRefreshRuntime("))
+        assertTrue(refreshRuntime.contains("ChatGptConversationRefreshCoordinator("))
         assertTrue(backgroundSession.contains("conversationRefresh.onFailed()"))
         assertTrue(backgroundSession.contains("conversationRefresh.onSucceeded()"))
         assertTrue(backgroundSession.contains("conversationDirectory.needsOfficialRefresh()"))
