@@ -6,6 +6,12 @@ official page-runtime bridge, **not an independent Android HTTP/private POST
 transport**. Include it in the grouped ChatGPT APK; do not reimplement it while
 waiting for production acceptance.
 
+Latest: APK 1547 reached a real reply through the DOM fallback, not this runtime
+writer. Adapter 294 / runtime submit 7 repairs committed-owner resolution for
+the official imperative editor and preserves admission reasons in DOM fallback
+receipts. This remains a source/test candidate pending device acceptance; see
+[current evidence and focused acceptance](reports/chatgpt-runtime-owner-status-294.md).
+
 ## Scope and ownership
 
 The native send transaction can invoke the current official `submitComposer`
@@ -127,9 +133,11 @@ arguments, unchanged private-replay prohibition, URL allocation, later drafts/fi
 stale owners, timeout/rejection/malformed receipts, cleanup failure and reinjection.
 Project upload tests are retained; real project prepared dispatch is not yet proved.
 
-New native receipt tests are written but await grouped Android compilation and
-execution. No APK was built, published or installed for this module. Browser
-navigation timed out, so this round obtained no live runtime/send evidence.
+The initial source-only round did not build an APK. The subsequent grouped APK
+1547 was built, published and installed, but its text sample fell back to DOM;
+see [1547 acceptance](reports/chatgpt-runtime-release-1547.md). Adapter 294 adds
+the owner correction and regression tests without another per-fix APK. It has
+not yet been built into or accepted on a phone.
 
 In the grouped production UI round, confirm that the actual committed context
 resolves, send one synthetic text, retain the `official_runtime_v1` receipt and
@@ -137,7 +145,7 @@ stream result, and check draft preservation and conversation ownership. Check
 the admitted project/temporary contexts and the native picker/upload/ready-entry
 handoff without claiming unsupported scopes. Verify no extra upload, duplicate
 message or lost attachment, and confirm the response actually references the file.
-Multi-file native leases are not implemented by this extension; existing paths
-remain available before a runtime write.
+Multi-file native leases are implemented as described above, but live prepared
+dispatch remains unaccepted; existing paths remain available before a runtime write.
 Independent fresh-proof private HTTP dispatch, private regeneration, measured
 latency and resource improvement are still separate unfinished work.
