@@ -3,7 +3,7 @@
 Capability candidate: `android_chatgpt_private_shared_library_download_v1`.
 Status: **implemented source candidate, offline JS verified, native build and
 grouped device acceptance pending**. This is not a `completed` capability.
-Adapter 281, file-download module 5, library-download module 1.
+Adapter 282, file-download module 6, library-download module 1.
 
 ## Official source evidence
 
@@ -63,6 +63,24 @@ cancel, and opening the saved local URI. No new permission prompt is introduced.
 Native cancellation aborts the page stream. Navigation and disposal revoke the
 lease; private identifiers, URLs and file contents stay out of MCP receipts.
 
+## Native progress and cancellation
+
+The production conversation-file Download action now opens an in-app progress
+dialog, independent of notification permission. Collapsing/dismissing it stops
+only its one-second UI poll; the existing native worker continues. The file
+sheet's Download progress action reopens the same request, without another GET.
+The dialog distinguishes preparation, transfer, save, cancellation, saved,
+system-queued, failed and unconfirmed states. A queued DownloadManager request
+is not represented as a completed native save.
+
+Consumer UI and MCP use the same request-bound cancellation command. A stale
+panel cannot cancel the next transfer. Cancellation aborts our page-local fetch
+owner and waits for native cleanup; repeated page aborts cannot finish an
+in-flight save early. Successful publication wins a simultaneous cancellation.
+Progress receipts expose only request ID, phase, byte counts and cancelability,
+not the private lease, file name, URL, headers or contents. No official DOM
+control or complete page snapshot is polled for each progress update.
+
 ## Exact remaining gaps
 
 - Standalone `libraryDownloadId`, mounted-library, connector-only cloud and
@@ -71,22 +89,30 @@ lease; private identifiers, URLs and file contents stay out of MCP receipts.
   rather than the selected conversation attachment index, are not yet indexed.
 - Process-death resume and startup cleanup of orphaned pending rows/part files
   are not implemented. Normal cancellation cleanup is not crash recovery.
-- When notifications are disabled, there is not yet a dedicated in-app
-  progress/cancel control. The existing file sheet gets a terminal result, and
-  page-context revocation cancels the transfer. This is a UI gap, not a pass.
+- Native progress/cancel controls are implemented in source but await grouped
+  Android compilation and production UI acceptance, including notifications
+  disabled. They are not a live UI pass yet.
 
 ## Verification and grouped acceptance
 
-The final combined run passed **147 Node cases**, zero failures or skips. It
+The final combined run passed **149 Node cases**, zero failures or skips. It
 covers the new binary stream plus ordinary/image/connector downloads, history,
 file index, attachment composer, private transport, gallery and production asset
 bundle parsing. HTTP, binary content and native acknowledgements are synthetic.
 Cases include ordering, limits, immutable targets, late identity/route changes,
-native cancel and lost commit acknowledgement without replay.
+native cancel and lost commit acknowledgement without replay. The two new
+request-bound cancellation cases fail against the original module at
+`17e41589c` and pass against module 6; three existing matching cases pass on both.
 
-Five new pure Kotlin transfer tests and one command-lifecycle test are written
-but not executed yet. No Android build, APK publication or phone file transfer
+The preceding five pure Kotlin transfer tests and one command-lifecycle test,
+plus ten progress/session/consumer/MCP/UI-contract tests, are written but not
+executed yet. The UI-contract test checks source wiring, not rendered pixels.
+No Android build, APK publication or phone file transfer
 occurred in this source batch. No speed, heat or battery improvement is claimed.
+
+The 2026-09-07 attempt found a wireless ADB service but its connection timed out;
+no device was connected. Browser navigation also timed out, so no authenticated
+library response, redirect or download was verified in this attempt.
 
 In the grouped ChatGPT round, select a synthetic shared-library attachment from
 the production native file sheet and verify actual saved bytes/MIME and route
