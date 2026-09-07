@@ -37,4 +37,41 @@ class WebChatConversationSharePolicyTest {
         }
         assertTrue(WebChatConversationSharePolicy.sameConversation("/c/$id", "https://chatgpt.com/g/g-p-fixture/c/$id"))
     }
+
+    private val project = "g-p-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    private val otherProject = "g-p-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    private val memberPath = "/g/$project/c/$id"
+    private val memberUrl = "https://chatgpt.com/g/$project-fixture/shared/c/$id?owner_user_id=user-synthetic"
+
+    @Test fun shareSelectionEncodesTheConfirmedAudienceWithoutTrustingADisplayName() {
+        assertEquals("/c/$id", WebChatConversationSharePolicy.sharePath("/c/$id", null))
+        assertEquals(memberPath, WebChatConversationSharePolicy.sharePath("/c/$id", project))
+        assertEquals(memberPath, WebChatConversationSharePolicy.sharePath("/g/$project-fixture/c/$id", null))
+        assertEquals(memberPath, WebChatConversationSharePolicy.sharePath(memberPath, "$project-fixture"))
+        assertNull(WebChatConversationSharePolicy.sharePath(memberPath, otherProject))
+        assertNull(WebChatConversationSharePolicy.sharePath("/c/$id", "not-a-project"))
+        assertNull(WebChatConversationSharePolicy.sharePath("/g/g-p-unknown/c/$id", null))
+        assertNull(WebChatConversationSharePolicy.sharePath("/c/local-draft", project))
+        assertTrue(WebChatConversationSharePolicy.membersOnly(memberPath))
+        assertFalse(WebChatConversationSharePolicy.membersOnly("/c/$id"))
+    }
+
+    @Test fun memberReceiptCannotTurnIntoAPublicShareOrADifferentConversation() {
+        assertEquals(memberUrl, WebChatConversationSharePolicy.resultUrl("project_share_link_ready:$memberUrl", memberPath))
+        assertNull(WebChatConversationSharePolicy.resultUrl("share_link_ready:$url", memberPath))
+        assertNull(WebChatConversationSharePolicy.resultUrl("project_share_link_ready:$memberUrl", "/c/$id"))
+        assertNull(WebChatConversationSharePolicy.resultUrl("project_share_link_ready:$memberUrl"))
+        for (candidate in listOf(memberUrl.replace(project, otherProject), memberUrl.replace(id, "55555555-5555-4555-8555-555555555555"),
+                "$memberUrl&other=1", "$memberUrl#fragment", memberUrl.replace("chatgpt.com", "example.com"),
+                memberUrl.replace("user-synthetic", "user-synthetic%26other"), memberUrl.replace("/shared/c/", "/c/"),
+                memberUrl.replace("https://", "https://user@"))) {
+            assertNull(candidate, WebChatConversationSharePolicy.resultUrl("project_share_link_ready:$candidate", memberPath))
+        }
+    }
+
+    @Test fun projectContextCanUseCanonicalRouteButCannotSwitchProjectsSilently() {
+        assertTrue(WebChatConversationSharePolicy.sameConversation(memberPath, "https://chatgpt.com/c/$id"))
+        assertTrue(WebChatConversationSharePolicy.sameConversation(memberPath, "https://chatgpt.com/g/$project-fixture/c/$id"))
+        assertFalse(WebChatConversationSharePolicy.sameConversation(memberPath, "https://chatgpt.com/g/$otherProject/c/$id"))
+    }
 }

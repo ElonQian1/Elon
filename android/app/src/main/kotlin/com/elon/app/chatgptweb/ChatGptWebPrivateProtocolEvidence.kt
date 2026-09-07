@@ -17,6 +17,7 @@ internal object ChatGptWebPrivateProtocolEvidence {
         "requestState", "responseState", "requestFields", "responseFields")
 
     fun detail(action: String, raw: String): String {
+        if (action == "share_conversation") return ChatGptWebConversationShareReceipt.detail(raw)
         if (action != ACTION) return raw.take(160)
         if (raw == "protocol_probe_unavailable") return raw
         return runCatching { sanitize(raw) }.getOrNull() ?: "invalid_protocol_evidence"

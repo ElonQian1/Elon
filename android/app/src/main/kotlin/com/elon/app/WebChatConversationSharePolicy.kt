@@ -1,17 +1,39 @@
 package com.elon.app
 
 import com.elon.app.chatgptweb.ChatGptWebConversationPath
+import com.elon.app.chatgptweb.ChatGptWebConversationShareReceipt
 
 internal object WebChatConversationSharePolicy {
-    private const val PREFIX = "share_link_ready:"
-    private val publicLink = Regex("https://chatgpt\\.com/share/[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}")
+    private val projectId = Regex("g-p-[a-fA-F0-9]{32}")
+    private val conversationId = Regex("[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}")
 
-    fun resultUrl(detail: String?): String? = detail?.takeIf { it.startsWith(PREFIX) }
-        ?.removePrefix(PREFIX)?.takeIf { publicLink.matches(it) }
+    fun sharePath(path: String, project: String?): String? {
+        val normalized = ChatGptWebConversationPath.normalize(path) ?: return null
+        val inPath = ChatGptWebConversationPath.projectId(normalized)
+        val inMetadata = project?.takeIf(String::isNotBlank)?.let(ChatGptWebConversationPath::canonicalProjectId)
+        if (!project.isNullOrBlank() && inMetadata == null || inPath != null && inMetadata != null && inPath != inMetadata) return null
+        val selected = inMetadata ?: inPath ?: return normalized
+        val id = ChatGptWebConversationPath.identity(normalized) ?: return null
+        return if (projectId.matches(selected) && conversationId.matches(id)) "/g/$selected/c/$id" else null
+    }
+
+    fun membersOnly(path: String): Boolean = ChatGptWebConversationPath.projectId(path) != null
+
+    fun resultUrl(detail: String?, expectedPath: String? = null): String? {
+        val link = ChatGptWebConversationShareReceipt.parse(detail) ?: return null
+        val project = expectedPath?.let(ChatGptWebConversationPath::projectId)
+        if (project == null) return link.url.takeIf { link.projectId == null }
+        val id = ChatGptWebConversationPath.identity(expectedPath) ?: return null
+        return link.url.takeIf { link.projectId == project && link.conversationId == id }
+    }
 
     fun sameConversation(path: String, url: String): Boolean {
         val id = ChatGptWebConversationPath.identity(path) ?: return false
-        return id == ChatGptWebConversationPath.identity(ChatGptWebConversationPath.fromUrl(url))
+        val current = ChatGptWebConversationPath.fromUrl(url) ?: return false
+        val expectedProject = ChatGptWebConversationPath.projectId(path)
+        val actualProject = ChatGptWebConversationPath.projectId(current)
+        return id == ChatGptWebConversationPath.identity(current) &&
+            (expectedProject == null || actualProject == null || expectedProject == actualProject)
     }
 
     fun errorMessage(code: String?): String = when (code) {
