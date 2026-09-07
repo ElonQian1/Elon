@@ -41,7 +41,7 @@ function fixture(options = {}) {
     __elonChatGptPrivateAttachmentProtocol: protocol, __elonChatGptPrivateAttachmentTransport: transport,
     __elonChatGptPrivateAttachmentSelection: selection,
     __elonChatGptPrivateAttachmentBytes: bytes, __elonChatGptPrivateJsonRequest: request,
-    __elonChatGptPrivateAttachmentReservation: { version: 1, create: (host, config) => reservation.create(host, {
+    __elonChatGptPrivateAttachmentReservation: { version: reservation.version, create: (host, config) => reservation.create(host, {
       ...config, loadRuntime: async () => ({ t6: () => ({ loadingStatus: 'Ready',
         getExperiment: () => ({ name: '3119290944', groupName: 'treatment', details: { reason: 'Network:Recognized' },
           get: () => options.enabled !== false }) }) }),
@@ -175,8 +175,8 @@ test('same-origin reserved byte upload uses FormData and still requires final pr
   assert.equal(f.requests[2].url.endsWith('/claim_and_finish'), true);
 });
 
-test('temporary upload stays on its established private privacy contract', async () => {
-  const f = fixture({ temporary: true }); await f.start();
+test('temporary upload keeps its legacy privacy contract when the official experiment is disabled', async () => {
+  const f = fixture({ temporary: true, enabled: false }); await f.start();
   assert.equal(f.receipts[0][1], true);
   assert.equal(f.events.includes('reserve'), false);
   const body = JSON.parse(f.requests[2].init.body);
@@ -296,10 +296,7 @@ test('document picker selecting an image does not reuse the document reservation
   assert.equal(f.requests.some(value => value.url.endsWith('/claim_and_finish')), false);
 });
 
-test('unconfirmed or temporary picker context never allocates a reservation', async () => {
-  const temporary = fixture({ temporary: true });
-  assert.equal(temporary.begin(), false);
-  assert.equal(temporary.requests.length, 0);
+test('unconfirmed or hidden project picker context never allocates a reservation', async () => {
   const f = fixture();
   const id = '00000000-0000-4000-8000-000000000001';
   f.root.location.href = 'https://chatgpt.com/c/' + id;
@@ -309,6 +306,92 @@ test('unconfirmed or temporary picker context never allocates a reservation', as
   assert.equal(f.begin(), true); await tick();
   assert.equal(f.requests.length, 0);
   f.instance.cancel();
+});
+
+test('new and existing temporary pickers reserve text, PDF and images without changing persistence', async t => {
+  for (const existing of [false, true]) for (const type of ['text/plain', 'application/pdf', 'image/png']) {
+    const name = type === 'text/plain' ? 'fixture.txt' : type === 'application/pdf' ? 'fixture.pdf' : 'image.png';
+    const f = fixture({ temporary: true, file: new File(['synthetic bytes'], name, { type }) });
+    t.after(() => f.instance.cancel());
+    let reads = 0;
+    if (existing) {
+      const id = '00000000-0000-4000-8000-000000000001';
+      f.root.location.href = 'https://chatgpt.com/c/' + id + '?temporary-chat=true';
+      f.descriptor.href = f.root.location.href;
+      f.root.__elonChatGptPrivateTransport.readAttachmentContext = async () => {
+        reads++; return { conversationId: id, temporary: true, ordinary: false };
+      };
+    }
+    assert.equal(f.begin(type === 'image/png' ? 'image' : 'document'), true); await tick();
+    assert.deepEqual(f.events, ['reserve'], 'no file bytes are read while the picker is open');
+    f.instance.suspend();
+    await f.start();
+    assert.equal(reads, existing ? 2 : 0);
+    assert.deepEqual(f.events.filter(value => ['reserve', 'create', 'bytes', 'claim', 'associated'].includes(value)),
+      ['reserve', 'bytes', 'claim', 'associated']);
+    const allocation = JSON.parse(f.requests[0].init.body);
+    const claim = JSON.parse(f.requests[2].init.body);
+    assert.equal(allocation.store_in_library, false);
+    assert.equal(allocation.library_persistence_mode, 'required');
+    assert.equal(claim.library_persistence_mode, 'required');
+    assert.deepEqual(claim.metadata, { store_in_library: false, is_temporary_chat: true, is_project_thread: false });
+    assert.equal(claim.index_for_retrieval, false);
+    if (type === 'application/pdf') assert.equal(f.requests[2].init.headers['x-oai-model-slug'], 'synthetic-model');
+    if (type === 'image/png') { assert.equal(claim.width, 30); assert.equal(claim.height, 20); }
+    assert.equal(f.receipts[0][1], true);
+    assert.equal(f.store.files$().length, 1);
+    assert.equal(f.store.files$()[0].storeInLibrary, false);
+    assert.equal(f.store.files$()[0].isTemporaryChat, true);
+    assert.equal(f.fallbacks(), 0);
+  }
+});
+
+test('temporary reservations also overlap byte preparation without a picker lease', async () => {
+  const f = fixture({ temporary: true }); await f.start();
+  assert.equal(f.receipts[0][1], true);
+  assert.ok(f.events.indexOf('reserve') < f.events.indexOf('read_done'));
+  assert.equal(f.requests.filter(value => value.url.endsWith('/claim_and_finish')).length, 1);
+  assert.equal(f.store.files$()[0].isTemporaryChat, true);
+});
+
+test('temporary pending allocation does not add waiting or change the established create/process requests', async t => {
+  let release;
+  const f = fixture({ temporary: true, respond: url => url.endsWith('/upload_reservations')
+    ? new Promise(resolve => { release = resolve; }) : null });
+  t.after(() => f.instance.cancel());
+  assert.equal(f.begin(), true); await tick(); await f.start();
+  assert.equal(f.requests.filter(value => value.url.endsWith('/upload_reservations')).length, 1);
+  assert.equal(f.requests.some(value => value.url.endsWith('/claim_and_finish')), false);
+  const create = JSON.parse(f.requests.find(value => value.url.endsWith('/files')).init.body);
+  const processing = JSON.parse(f.requests.find(value => value.url.endsWith('/process_upload_stream')).init.body);
+  assert.equal(create.store_in_library, false);
+  assert.equal(Object.hasOwn(create, 'library_persistence_mode'), false);
+  assert.equal(Object.hasOwn(processing, 'library_persistence_mode'), false);
+  assert.equal(processing.metadata.is_temporary_chat, true);
+  assert.equal(f.receipts[0][1], true);
+  release(Response.json({ eligible: true })); await tick();
+  assert.equal(f.store.files$().length, 1);
+});
+
+test('temporary selection rejects changed server scope and privacy-mismatched processing without replay', async t => {
+  for (const mode of ['scope', 'library']) {
+    const f = fixture({ temporary: true, respond: url => mode === 'library' && url.endsWith('/claim_and_finish')
+      ? new Response(JSON.stringify({ file_id: 'reservation-synthetic', event: 'file.processing.completed', progress: 100,
+        extra: { library_persistence_result: 'library', metadata_object_id: 'library-synthetic' } })) : null });
+    t.after(() => f.instance.cancel());
+    if (mode === 'scope') {
+      const id = '00000000-0000-4000-8000-000000000001';
+      f.root.location.href = 'https://chatgpt.com/c/' + id + '?temporary-chat=true'; f.descriptor.href = f.root.location.href;
+      let reads = 0;
+      f.root.__elonChatGptPrivateTransport.readAttachmentContext = async () => ({ conversationId: id, temporary: ++reads === 1 });
+    }
+    assert.equal(f.begin(), true); await tick(); await f.start();
+    assert.equal(f.store.files$().length, 0);
+    assert.equal(f.events.includes('bytes'), mode === 'library');
+    assert.equal(f.requests.some(value => value.url.endsWith('/files')), false);
+    assert.equal(f.fallbacks(), mode === 'scope' ? 1 : 0);
+    if (mode === 'library') assert.equal(f.receipts[0][1], false);
+  }
 });
 
 test('a pending picker reservation is abandoned without adding another wait or allocation', async () => {

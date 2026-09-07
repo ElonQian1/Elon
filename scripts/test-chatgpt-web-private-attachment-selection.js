@@ -61,8 +61,18 @@ test('take never waits for context preparation and its late result cannot create
   assert.equal(f.timers.size, 0);
 });
 
-test('busy, unsupported, stale, temporary and project selections cannot start allocation', async () => {
-  for (const options of [{ busy: true }, { binding: { isTemporaryChat: true } }, { binding: { projectId: 'project' } }]) {
+test('temporary selection transfers its scope unchanged and cancellation releases preparation', async () => {
+  const f = fixture({ binding: { isTemporaryChat: true, href: 'https://chatgpt.com/?temporary-chat=true' } });
+  assert.equal(f.begin(), true); await tick();
+  const selected = f.instance.take(f.descriptor);
+  assert.equal(selected.binding.isTemporaryChat, true);
+  assert.equal(selected.binding, f.binding);
+  selected.controller.abort(); selected.transport.dispose();
+  assert.equal(f.timers.size, 0);
+});
+
+test('busy, unsupported, stale and project selections cannot start allocation', async () => {
+  for (const options of [{ busy: true }, { binding: { projectId: 'project' } }]) {
     const f = fixture(options); assert.equal(f.begin(), false); assert.equal(f.timers.size, 0);
   }
   for (const changed of [{ kind: 'audio' }, { id: '../unsafe' }, { documentToken: 'doc_other_1' }, { href: 'https://chatgpt.com/c/other' }]) {

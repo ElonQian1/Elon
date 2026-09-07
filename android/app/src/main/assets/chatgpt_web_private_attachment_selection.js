@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentSelection = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -50,7 +50,7 @@
       // Only already available page identity is used. Opening a picker never waits for login or hydration.
       const binding = composer.capture();
       if (intent.documentToken !== binding.token || intent.href !== binding.href ||
-          binding.isTemporaryChat || binding.projectId) return false;
+          binding.projectId) return false;
       const value = { id: intent.id, binding, controller: new root.AbortController(), transport: null, ready: false };
       pending = value;
       value.setupTimer = root.setTimeout(() => release(value), 5000);
@@ -75,5 +75,5 @@
     return value;
   }
 
-  return Object.freeze({ version: 1, begin, take, cancel });
+  return Object.freeze({ version: 2, begin, take, cancel });
 });

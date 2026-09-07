@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 11, create: factory });
+  const exported = Object.freeze({ version: 12, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -185,7 +185,7 @@
   }
 
   function reservationContext(binding, descriptor) {
-    if (!current(binding) || !confirmed.has(binding) || binding.isTemporaryChat || projects.has(binding) ||
+    if (!current(binding) || !confirmed.has(binding) || projects.has(binding) ||
         binding.projectId || !Number.isSafeInteger(descriptor?.size) || descriptor.size < 1 ||
         descriptor.size > root.__elonChatGptPrivateAttachmentProtocol.maxFileBytes) return null;
     const image = ['image/jpeg', 'image/png', 'image/webp'].includes(descriptor.type);
@@ -195,9 +195,10 @@
 
   function pickerReservationContext(binding, kind) {
     if (!['image', 'document'].includes(kind) || !current(binding) || !confirmed.has(binding) ||
-        binding.isTemporaryChat || projects.has(binding) || binding.projectId) return null;
+        projects.has(binding) || binding.projectId) return null;
     return Object.freeze({ useCase: kind === 'image' ? 'multimodal' : 'ace_upload', storeInLibrary: false,
-      libraryPersistenceMode: 'required', isTemporaryChat: false, modelSlug: binding.modelSlug ?? undefined });
+      libraryPersistenceMode: binding.isTemporaryChat ? undefined : 'required',
+      isTemporaryChat: binding.isTemporaryChat, modelSlug: binding.modelSlug ?? undefined });
   }
 
   function associate(binding, file, result, leaseId) {
@@ -275,5 +276,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 11, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, merge, remove });
+  return Object.freeze({ version: 12, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, merge, remove });
 });
