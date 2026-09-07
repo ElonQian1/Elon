@@ -41,6 +41,7 @@ pub(super) fn fixture() -> Connection {
 pub(super) fn body() -> AuthorizeBody {
     AuthorizeBody {
         schema: AUTHORIZE_SCHEMA.into(),
+        purpose: None,
         client_id: "quant.android".into(),
         redirect_uri: "com.elon.quant:/asset-access/callback".into(),
         state: "s".repeat(32),
@@ -248,6 +249,55 @@ fn secret_material_is_absent_from_persisted_rows() {
     ] {
         assert!(!persisted.contains(secret));
     }
+}
+
+#[test]
+fn grid_snapshot_grant_is_separate_revocable_and_bound_to_its_parent_session() {
+    let mut conn = fixture();
+    let esk = issued(&mut conn);
+    assert!(verify_read_on(
+        &conn,
+        &esk.access_token,
+        "quant.android",
+        "grid.snapshot.read"
+    )
+    .is_err());
+    let mut input = body();
+    input.purpose = Some("binance_grid_read".into());
+    input.confirmation = GRID_AUTHORIZE_CONFIRMATION.into();
+    input.redirect_uri = "com.elon.quant:/grid-access/callback".into();
+    input.scopes = vec![AccessScope::GridSnapshotRead];
+    input.expires_in = 900;
+    let code = authorize_on(&mut conn, "alice", SESSION, &input, PUBLIC).unwrap();
+    let grid = exchange_on(&mut conn, &exchange_body(&code), PUBLIC).unwrap();
+    let read = verify_read_on(
+        &conn,
+        &grid.access_token,
+        "quant.android",
+        "grid.snapshot.read",
+    )
+    .unwrap();
+    assert_eq!(read.user_id(), "alice");
+    assert!(verify_read_on(
+        &conn,
+        &grid.access_token,
+        "quant.android",
+        "esk.summary.read"
+    )
+    .is_err());
+    assert!(verify_read_on(&conn, &grid.access_token, "quant.web", "grid.snapshot.read").is_err());
+    conn.execute(
+        "UPDATE sessions SET revoked_at=?1 WHERE id='session-a'",
+        params![now()],
+    )
+    .unwrap();
+    assert!(verify_read_on(
+        &conn,
+        &grid.access_token,
+        "quant.android",
+        "grid.snapshot.read"
+    )
+    .is_err());
 }
 
 #[test]

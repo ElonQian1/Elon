@@ -6,6 +6,7 @@ pub(crate) const AUTHORIZE_SCHEMA: &str = "yilong.asset_access.authorize.v1";
 pub(crate) const TOKEN_SCHEMA: &str = "yilong.asset_access.token_request.v1";
 pub(crate) const REVOKE_SCHEMA: &str = "yilong.asset_access.revoke.v1";
 pub(crate) const AUTHORIZE_CONFIRMATION: &str = "授权量化只读我的资产";
+pub(crate) const GRID_AUTHORIZE_CONFIRMATION: &str = "授权量化只读我的币安网格";
 pub(crate) const REVOKE_CONFIRMATION: &str = "撤销只读资产授权";
 pub(crate) const CLIENT_HEADER: &str = "x-elon-asset-client";
 pub(crate) const CODE_LIFETIME_SECONDS: i64 = 120;
@@ -13,6 +14,8 @@ pub(crate) const MAX_GRANT_SECONDS: i64 = 3600;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub(crate) enum AccessScope {
+    #[serde(rename = "grid.snapshot.read")]
+    GridSnapshotRead,
     #[serde(rename = "profile.read")]
     ProfileRead,
     #[serde(rename = "esk.summary.read")]
@@ -24,6 +27,7 @@ pub(crate) enum AccessScope {
 impl AccessScope {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
+            Self::GridSnapshotRead => "grid.snapshot.read",
             Self::ProfileRead => "profile.read",
             Self::EskSummaryRead => "esk.summary.read",
             Self::EskProgressRead => "esk.progress.read",
@@ -36,6 +40,8 @@ impl AccessScope {
 #[serde(deny_unknown_fields)]
 pub(crate) struct AuthorizeBody {
     pub schema: String,
+    #[serde(default)]
+    pub purpose: Option<String>,
     pub client_id: String,
     pub redirect_uri: String,
     pub state: String,

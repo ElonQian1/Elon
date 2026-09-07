@@ -103,6 +103,22 @@ pub(super) fn profile_on(conn: &Connection, read: &AuthorizedAssetRead) -> Resul
 }
 
 impl Store {
+    /// Execute a domain projection in the same transaction as grant/current-session validation.
+    pub(crate) fn asset_access_private_read<T>(
+        &self,
+        token: &str,
+        client_id: &str,
+        required_scope: &str,
+        read: impl FnOnce(&rusqlite::Transaction<'_>, &AuthorizedAssetRead) -> Result<T>,
+    ) -> Result<T> {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let authority = verify_read_on(&tx, token, client_id, required_scope)?;
+        let result = read(&tx, &authority)?;
+        tx.commit()?;
+        Ok(result)
+    }
+
     /// Resolves only a real session and never updates last_seen_at or the session expiry.
     pub(crate) fn asset_access_owner_id(&self, session_token: &str) -> Result<String> {
         if session_token.is_empty() || session_token.len() > 8192 {

@@ -526,6 +526,8 @@ mod pc_workspace_git_remote;
 mod pc_workspace_provisioner;
 mod peer_relay;
 mod presence_events;
+mod private_read_projection;
+mod private_read_projection_api;
 mod project_android_device_leases_migration;
 mod project_android_devices_migration;
 mod project_api;
@@ -768,32 +770,7 @@ async fn main() -> anyhow::Result<()> {
     }
     ai_cli::pc_completion_replay::spawn_pending_pc_cli_completion_replay(state.clone());
 
-    const STALE_RUNNING_TASK_TIMEOUT_SECS: u64 = 45 * 60;
-
-    // 定期清理：长期 running 的任务自动标记为 failed。
-    // 阈值覆盖 PC 节点的构建、上传和重启窗口，避免发布成功前频道任务被标记失败。
-    {
-        let state_cleanup = state.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(120));
-            loop {
-                interval.tick().await;
-                let active_channel_tasks = project_space::active_channel_ai_task_ids();
-                match state_cleanup
-                    .store
-                    .mark_stale_running_tasks_with_channel_results_excluding(
-                        STALE_RUNNING_TASK_TIMEOUT_SECS,
-                        &active_channel_tasks,
-                    ) {
-                    Ok(n) if n > 0 => {
-                        info!("{n} 个超时 running 任务已自动标记为 failed")
-                    }
-                    Ok(_) => {}
-                    Err(e) => tracing::warn!("stale task cleanup error: {e}"),
-                }
-            }
-        });
-    }
+    server_background_workers::spawn_stale_task_cleanup(state.clone());
 
     let app = router::build_app(Arc::clone(&state));
     account_security::https::serve(app, state).await

@@ -126,7 +126,7 @@ fn browser_research_site_manifest_has_exact_origins_and_no_script_escape() {
 #[test]
 fn browser_research_result_preserves_business_values_and_blocks_credentials() {
     let value = json!({"data":{"unknownStrategyCollection":[{"amount":"123.4500","symbol":"TESTUSDT"}]},
-        "session_id":"research-session","token":"ESK","text":"中文业务资料",
+        "session_id":"research-session","owner_hash":"a".repeat(64),"token":"ESK","text":"中文业务资料",
         "content":"const authorization = request.headers.get('Authorization'); const token = 'ESK';"});
     let before = value.clone();
     assert!(validate_result(&value).is_ok());

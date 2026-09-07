@@ -19,6 +19,7 @@ fn grant(fixture: &Fixture, user: &str, progress: bool) -> AccessToken {
             &token(user),
             &AuthorizeBody {
                 schema: AUTHORIZE_SCHEMA.into(),
+                purpose: None,
                 client_id: CLIENT.into(),
                 redirect_uri: REDIRECT.into(),
                 state: "s".repeat(32),

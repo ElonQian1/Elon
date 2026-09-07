@@ -12,10 +12,10 @@ mod mutations;
 mod normalize;
 
 use bearer_currentness::require_registration_bearer_current_on;
+pub(super) use currentness::require_legacy_credential_current_on;
 use currentness::{
     endpoint_authority_at_end_on, endpoint_authority_at_start_on,
-    require_legacy_credential_current_on, require_legacy_endpoint_authority_absent_on,
-    verify_legacy_secret_proof_on,
+    require_legacy_endpoint_authority_absent_on, verify_legacy_secret_proof_on,
 };
 use mutations::{
     create_legacy_credential_on, renew_by_existing_secret_on, renew_by_install_id_on,

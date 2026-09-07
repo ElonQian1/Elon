@@ -141,6 +141,7 @@ pub struct Session {
 impl Session {
     pub fn summary(&self) -> Value {
         serde_json::json!({"id":self.id,"site_id":self.site.id,
+            "owner_hash":self.owner_hash,
             "active":self.active && now_ms()<self.expires_at_ms,"generation":self.generation,
             "expires_at_ms":self.expires_at_ms,"phase":self.phase,"host_stage":self.host_stage,
             "resource_count":self.resources.len(),"request_count":self.requests.len(),

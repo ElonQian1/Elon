@@ -4,7 +4,9 @@ use rusqlite::{params, OptionalExtension, Transaction};
 use super::{clean_optional, now, Store};
 
 mod endpoint_authority;
+mod grid_projection;
 mod legacy_registration;
+pub(crate) mod private_projection;
 pub(in crate::store) use endpoint_authority::{
     current_node_endpoint_credential_for_user_node_provider_binding_on,
     current_node_endpoint_credential_source_for_user_node_provider_binding_on,

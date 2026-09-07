@@ -1,0 +1,82 @@
+---
+title: "本人网格只读投影传输 V1 交付证据草稿"
+version_status: current
+status: in_progress
+implementation_status: in_progress
+reviewed_at: 2026-09-07
+owners: [private-read-bridge]
+authority: evidence
+---
+
+# 当前结论
+
+主项目已实现本人网格的通用私密投影传输、持久待同步记录、主账号隔离和独立只读授权，仍在验证和发布前准备中。尚未发布本批主服务器、节点、Win 与 APK 工件，未完成真实 Win → 私密接口 → 量化 APK 验收，不能据此宣称手机已读到本人网格。
+
+需求以 [本人网格只读投影传输 V1](../requirements/private-grid-read-bridge-v1.md) 为准。本报告只记录实现和验证结果；币安字段转换及手机列表详情属于独立量化仓，本仓没有新增交易执行或收益计算规则。
+
+既有资产授权仍为已测未接通，先前结果见 [统一账号与资产授权证据](unified-account-asset-access-v1.md)；量化交易模式仍为 Paper，签名上传、验收及资金分配未完成。
+
+## 已实现范围
+
+| 层次 | 实现与边界 | 源码入口 |
+|---|---|---|
+| 本机节点 | 当前已绑定账号领取不透明 binding；本地管理员保护的入口接收有界快照，事务写入 SQLite outbox 后才返回 queued/unchanged；状态区分 pending、synced、rejected，并包含当前修订、待同步修订及最后成功时间 | `server/src/node_agent_private_read_projection.rs` |
+| 保密上行 | 独立显式 `ELON_PRIVATE_READ_HTTPS_ORIGIN`，默认关闭；只接受规范 HTTPS origin，禁止代理、重定向和 HTTP/WS 回退；当前节点凭据及 epoch 变化停止旧批次 | `server/src/node_agent_private_read_projection/sync.rs` |
+| 云端保存 | HTTPS 路由从当前有效节点凭据及数据库绑定推导 owner/node/install，同事务复核后持久提交，再返回匹配修订及连接的 ACK | `server/src/private_read_projection_api.rs`、`server/src/store/node_credentials/private_projection.rs` |
+| 数据合同 | `yilong.private_read_projection.v1`；固定首期 source，递归排序 JSON 的 SHA-256 修订；相同修订幂等，代次必须前进，列表观察时间不倒退，相同列表时间不能延长新鲜期 | `server/src/private_read_projection.rs`、其 `storage.rs` 与 `strict_json.rs` |
+| 本人读取 | `/api/asset-access/grids` 返回按来源区分的 snapshots，以及 subject/client_id/grant_id/expires_at；grant、主账号会话、节点当前性和每份私密投影在同一事务中复核 | `server/src/store/node_credentials/grid_projection.rs` |
+| 独立同意 | 精确 scope `grid.snapshot.read`、purpose `binance_grid_read`、独立确认文案和 `com.elon.quant:/grid-access/callback`；量化 Android 专用且最长 900 秒；旧 ESK grant 不增加新权限 | `server/src/esk_platform/access/`、`android/app/src/main/kotlin/com/elon/app/grid/access/` |
+| 传输装配 | 复用正式原生 TLS listener 的服务内标记；代理请求头不能伪造 TLS 权威；上传局部 256KiB 限额与普通账号 16KiB 限额分开 | `server/src/node_endpoint_transport/asset_access.rs`、`server/src/account_security/https/` |
+
+持久 schema 通过迁移 291 新建投影表；既有 ESK 授权表保持原结构。快照最多 32 个来源、每份最多 500 个机器人、响应总量不超过 256KiB，超限显式失败，不静默截断。GET 保留原始 status、时间及 revision，客户端依据 fresh_until_ms 派生过期状态。
+
+私人正文不进入公共 `/quant` 代理、公开团队资产接口或旧明文节点 WebSocket。上行只携带版本化业务投影，不携带浏览器凭据和原始请求头。
+
+## 来源账号绑定补充
+
+跨端审查发现：本机入队 binding 单独只能证明接收端的当前账号，不能证明 UI 缓存 owner 所选研究会话属于同一人。
+
+本批增加了来源证明：Win 原生研究会话摘要返回持久绑定的 `owner_hash`，节点 binding 同时返回 `research_owner_hash=SHA256(current owner_user_id bytes)`。worker 在状态读取前后比对二者，并保持启动时 binding；最终 POST 在同一次当前凭据锁与 epoch 校验中入队。缺少证明或账号变化时停止，不自动把旧资料重绑给新账号，也不导出原 owner。
+
+此项需要发布含新摘要字段的 Win 版本；旧 Win 不返回证明时必须停止同步。原研究会话的一小时期限不被延长。源码补丁与跨端验证不能替代新 Win 工件及现场验收。
+
+当前真实节点已按持久模式的源码解析规则确认 `endpoint_required=false`，确认过程只输出布尔值。首版可使用其现有正式节点凭据走受信任 HTTPS；若进入 endpoint 模式，本机入口显式返回 `projection_endpoint_authority_required`，不能降级旧凭据。
+
+## 已完成的验证
+
+| 验证 | 实际结果 | 证据 |
+|---|---|---|
+| 旧 ESK 与网格独立授权、PKCE、scope/client/session 隔离 | 25 passed，0 failed，136 filtered | 官方日志 `private-grid-access-harness-final-20260907-155254-500`；validation fingerprint `8739aa7f1e73a5d8eb7db947af1707c591c145c2091d067842174f6442a1fb02` |
+| 私有投影合同、持久 outbox、回执、重复/乱序、owner 隔离、Kotlin 完整 GET 互认 | 10 passed，0 failed，0 filtered；实际执行全部测试 | 官方日志 `private-read-projection-harness-path-fix-20260907-162119-964`；fingerprint `b7a6f34adaa772565b288ec8b1d52a78cbff462aa5c7082aba3838456cfa7702`；26.4 秒 |
+| 最终 HTTPS policy：owner 撤销路由、请求边界与正文上限隔离 | 5 passed，0 failed，6 filtered；包含真实撤销路由测试与 256KiB/16KiB 隔离测试；非证据复用 | 官方日志 `private-grid-final-https-policy-after-crate-rebuild-20260907-164826-149`；fingerprint `1d0c14d89c1306e92848e971362bb4dab9b4f6bbee675347d900c25abbf920d0`；90.5 秒 |
+| 主 APK 原生同意与交接定向验证 | `GridAccessRequestTest` 4 项、`AssetAccessRequestTest` 6 项通过；完整主 Kotlin 编译成功 | `:app:testDebugUnitTest` 定向两类；官方日志 `main-grid-consent-android-compiled-20260907-154517-206`，exit 0，167 秒；不混入量化仓测试数量 |
+| 最终 production 节点与主服务器编译 | `elon-pc-node` 与 `elon-server` 两个真实 binary 的官方 check 通过，356.4 秒；包含最后的模块路径及 owner 撤销 policy 修复；非证据复用 | 日志 `private-grid-final-production-after-crate-rebuild-20260907-163733-996`；fingerprint `7800bf3d7b5ce1392882958a85ecc6670daa8258dc36d7f7e683573903689a42`；不是局部 harness 推断 |
+| 最终 Win 原生来源证明与生命周期 | 真实 Tauri test binary 编译成功；`browser_research::tests::lifecycle` 2 passed、0 failed、196 filtered；验证 owner_hash 绑定及只有已确认 host 可进入观察状态、失败不可复活 | 日志 `private-grid-final-native-owner-20260907-165026-355`；fingerprint `c7754536b62d487d5d9b6cf484881d6e3589a3d80a554abb55a226e7a2f464ed`；fresh run，434.1 秒；测试不操作已登录 Win 窗口 |
+| Rust 格式与源码体积 | 本批 Rust 按官方入口格式化；源码体积门禁通过 | `scripts/format-rust.ps1`、`scripts/check-source-size.ps1`；新源文件均小于 500 行 |
+| 量化 APK 对照证据（独立仓） | 87 项通过、0 失败/错误，`assembleDebug` 成功；包含实际 Rust adapter 行 → Android 完整 GET 解析 | 日志 `quant-grid-android-adapter-interop-final-20260907-161624-476`；`GridAdapterInteropTest`；不计入主仓测试数量，不是正式包或真机验收 |
+
+官方命令日志位于仓库共用 Git 目录的 `ai-command-logs/`，Rust 验证证据位于本机缓存根的 `validation-v1/evidence/`；旧缓存保留。
+
+Kotlin 实际导出的合成完整 GET fixture 已纳入 `server/tests/private-read-projection-harness/fixtures/android-grid-read-wire.json`，修订为 `e9a1bd2c5dfd79b1e5e38fe7902ba5550439a93d060ad95178f75314308f9b31`。上述 10 项中的实际互认测试已验证 Rust `projected()` 完整相等、摘要相等及 `0.000000000000000001` 金额字符串不损失精度，未把重复断言另计为测试数量。
+
+### 验证恢复记录
+
+此前投影 harness 的正式构建遇 `libsqlite3-sys v0.28.0` 构建脚本 `0xc0000005 STATUS_ACCESS_VIOLATION`。主任务按原临界磁盘阈值保护构建，并通过本次 Cargo config 显式禁用被用户配置覆盖的 wrapper 后，进入实际 Rust 编译；编译暴露独立 harness 的子模块相对路径错误。生产模块现对 `storage/strict_json/transport/tests` 使用明确 `#[path]`，harness 与生产继续读取同一实现，没有复制源码。修复后经过官方入口取得上表 10 项通过结果，旧失败不再作为当前阻断。
+
+最终生产及 policy 验证随后分别遇 `num-traits v0.2.19` 与 `thiserror v1.0.69` 构建脚本的同类 AV。为排除工件因素，只通过官方验证入口在本项目 `validation-light-0` 注册分区对这两个已知失败 crate 分别定向 clean，再各做一次重建，取得上表最终通过结果；未清理目录、未知缓存或量化分区。AV 本身不能证明 EXE 损坏，本报告不据此认定故障根因。原 8% 临界磁盘门槛保持，验证前平台 doctor 为 healthy，磁盘约 10% 可用且无活动编译者。
+
+上述生产、policy 和 Win native 检查串行执行，最后 native 检查同样复用此注册分区并明确关闭 wrapper，两个目标测试实际通过；完成时缓存盘可用空间约 9.35%。没有在通过后追加整仓测试或重复构建。
+
+## 尚未完成的验证与外部条件
+
+- 最终 production node/server check 已通过并覆盖本批最后的模块路径及 owner 撤销 policy 修复；编译通过仍不等于发布构建、服务部署和真实运行验收。
+- 主 APK 的编译和测试不等于主 APK／量化 APK 正式发布、安装或真实授权交接通过；手机读取真实本人网格仍待验收。
+- 公网 HTTPS 证书申请中，ACME 的公网 80 端口验证已两次连接超时。主任务已请求放行云安全组 80/443；可信 HTTPS、证书及真实上传尚未验收。继续保留现有 8080 兼容路径不能作为私人正文走明文的理由。
+
+## 本批现场边界
+
+2026-09-07 主任务通过 `/api/status` 的正式原生 bootstrap 在内存取得本机管理 token，仅输出 `native_bootstrap_available=true`。带正确管理 token 读取 `/api/private-read-projections/binding` 得到 404，证明当前安装节点尚缺本批新 API，需要正式发布升级；此结果不是缺少 token 的 403。该检查未提交投影正文、未输出 token 或私密内容、未读取过期研究会话，Win 登录窗口保持。
+
+本批没有创建网格、修改仓位、结束策略、签名或移动资金；没有关闭已登录币安窗口、清理或复制登录 Profile。没有发布本批工件，没有把本地 queued 回执当作云端持久成功，也没有把私有 API 源码发现当作 APK 已经读到真实数据。
+
+完成可信 HTTPS、正式工件发布及真实 Win → 云端 → APK 验收前，交付状态保持 `in_progress`。

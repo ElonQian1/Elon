@@ -17,7 +17,7 @@ impl VerifiedAssetTransport {
     }
 }
 
-pub(super) fn routes(public_url: &str) -> Router<Arc<AppState>> {
+pub(crate) fn routes(public_url: &str) -> Router<Arc<AppState>> {
     let allowed_origin = reqwest::Url::parse(public_url)
         .ok()
         .filter(|url| {
@@ -30,7 +30,9 @@ pub(super) fn routes(public_url: &str) -> Router<Arc<AppState>> {
                 && url.path() == "/"
         })
         .map(|url| url.origin().ascii_serialization());
-    access::routes().layer(Extension(VerifiedAssetTransport { allowed_origin }))
+    access::routes()
+        .merge(crate::private_read_projection_api::routes())
+        .layer(Extension(VerifiedAssetTransport { allowed_origin }))
 }
 
 #[cfg(test)]

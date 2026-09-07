@@ -32,6 +32,7 @@ pub(super) async fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
         }
     };
     tokio::spawn(async move {
+        crate::node_agent_private_read_projection::spawn(runtime.clone());
         let cors = node_agent_local_admin::cors_layer(&runtime.cfg.cloud_http_url);
         let local_admin_guard = axum::middleware::from_fn_with_state(
             runtime.clone(),
@@ -102,6 +103,7 @@ pub(super) async fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .merge(node_agent_local_tasks::routes())
             .merge(node_agent_win_codex_control::routes())
             .merge(crate::node_agent_browser_research::routes())
+            .merge(crate::node_agent_private_read_projection::routes())
             .route(
                 "/api/project-folder/pick",
                 axum::routing::post(node_agent_project_picker::pick_local_project_folder),

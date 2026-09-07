@@ -136,7 +136,7 @@ pub(super) fn require_legacy_endpoint_authority_absent_on(
     Ok(())
 }
 
-pub(super) fn require_legacy_credential_current_on(
+pub(in crate::store::node_credentials) fn require_legacy_credential_current_on(
     transaction: &Transaction<'_>,
     agent_id: &str,
     expected_owner_user_id: Option<&str>,

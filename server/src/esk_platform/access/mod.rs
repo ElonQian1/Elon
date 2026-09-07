@@ -31,6 +31,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route("/api/asset-access/revoke", post(api::revoke_self))
         .route("/api/asset-access/me", get(api::me))
         .route("/api/asset-access/esk", get(api::esk))
+        .route("/api/asset-access/grids", get(api::grids))
         .layer(DefaultBodyLimit::max(8 * 1024))
         .layer(middleware::from_fn(transport::require_secure_transport))
         .layer(middleware::from_fn(super::api::private_no_store))

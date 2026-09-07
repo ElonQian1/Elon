@@ -30,6 +30,9 @@ pub(crate) async fn serve(legacy_app: Router, state: Arc<AppState>) -> Result<()
         .route("/api/auth/register", post(crate::auth_api::register))
         .route("/api/me", get(crate::auth_api::me))
         .merge(crate::account_security::routes())
+        .merge(crate::node_endpoint_transport::asset_access::routes(
+            &state.public_url,
+        ))
         .with_state(state.clone());
     tokio::try_join!(
         crate::node_endpoint_transport::serve(legacy_app, state),

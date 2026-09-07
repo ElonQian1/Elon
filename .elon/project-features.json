@@ -14174,6 +14174,222 @@
       "updated_at_ms": 1786758085963
     },
     {
+      "id": "private-grid-read-bridge-v1",
+      "title": "本人网格只读投影传输",
+      "summary": "Win 当前节点绑定本人账号的私密只读投影经可信 HTTPS 上送，量化 APK 经独立可撤销授权读取；不执行交易。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/private-grid-read-bridge-v1.md",
+        "content_hash": "24e70c9445f7f95bd6b8b3bc9ae227db860bd8cb7e15aa426a447f336238831a",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "12f0c588c76423d19408a6ac9a685f65586ba2d3",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "private-read-bridge",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main",
+        "server/src/account_security/https",
+        "server/src/node_agent_private_read_projection.rs",
+        "server/src/private_read_projection.rs",
+        "server/src/private_read_projection_api.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "同账号认证节点可写，跨账号、过期、撤销和代次倒退拒绝",
+        "旧 ESK grant 不能读取网格",
+        "私人正文仅通过可信 HTTPS，API 不进入公开团队资产",
+        "真实 Win 到私人 API 再到量化 APK 完成验收才宣称已接通"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/access/GridAccessConsentActivity.kt",
+          "content_hash": "9079f2da3693b9883a30e057c0f347cffd0e30d98d723402fef4faea4505cde6",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bafe558b91772b1bbaca431ac9087197d108628b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/access/GridAccessRequestTest.kt",
+          "content_hash": "3c365bfc9bb0fd7f35a571996f98f3ebf41277423950532983bd49f9d0a687c0",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5d78f3fff27f1be68c38271523bc6c8851df6691",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/browser_research/model.rs",
+          "content_hash": "09681b779b5379360094d622809eba5c695981b511af923a4298d6aaa6ec3d37",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "a8e2eb5067ab042efa688a3d154b35d82269cf07",
+            "worktree_blob_oid": "a8528e63e97947ac228e4bea857ad3aae31e6ba2",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/reports/private-grid-read-bridge-v1-20260907.md",
+          "content_hash": "a62d491491a0cce24dd7606376944af1669a88431d4ce0a0da2295c6bf086395",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "641a95456a103ab854d127fecb4a2ef0c33ea9e3",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/account_security/https/policy.rs",
+          "content_hash": "bc6c2c2937e0beeac49b6f1fdd606326e1cc51ca3275b2ed6256d8d36822273b",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "54f4fab589bd5d2569081c50b8f97a8c2b7bb32d",
+            "worktree_blob_oid": "2bb1f7ad18fd95fc533d0c2e2dd961759c14ca41",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_private_read_projection.rs",
+          "content_hash": "9441ef1402dca91502396b40bd34aace8df69315f10056cd750162e99a946428",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1914bbe8d201415ca3a9c2b9e8ff52ee37a46334",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_private_read_projection/sync.rs",
+          "content_hash": "bf1587a451eb73319c6ab94882b70355e20d13d22bf13e93b5949e5073ff48bb",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5248123ce86eaace37d3a9dd0d007e37c8d54d58",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/private_read_projection.rs",
+          "content_hash": "90adf738ac4fcf32c54bfb506297daaa12c0e18f0726c81c6cd8d0263d96d64e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c01d3bbf978cb014b032e912ce0eee62e069ecf9",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/private_read_projection/storage.rs",
+          "content_hash": "742e68face307e8748104f1035bda009a4910e6559b9ea8f84457df4e110e717",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e9c4829042509649741b135d4eb47144d6ac6af2",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/private_read_projection/tests.rs",
+          "content_hash": "9b7ec4226452882846e4fa544ea6fe106b49f256d0c81002542b56e91da7942c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c20cdd2c278873e3bd23b5d856ecabda04e0a854",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/private_read_projection_api.rs",
+          "content_hash": "c207e3cd9213b93376287dd3022eb55805182bf92716bb2c6a0e7d558f494cde",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "dbb97b20022ed07c34946ce220be4f87b58a2d87",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/node_credentials/grid_projection.rs",
+          "content_hash": "50847a09eaabd8a5e3d19e335e3f79e2d672591441269a679ffc487043885e2e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "15fd7c143953638d01abae48abb966e980319dfb",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/tests/private-read-projection-harness/fixtures/android-grid-read-wire.json",
+          "content_hash": "4f824a24984280f7f8675639b6caa97640492e66c2cbcb3524b86711bacf6a1b",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1e795eaae32fbb043af665392ccd9711b40198b5",
+            "state": "untracked"
+          }
+        }
+      ],
+      "claim": {
+        "claim_id": "claim_2b431b27f6d94ff7838c3ca4601c229e",
+        "agent_id": "codex-grid-read",
+        "claimed_at_ms": 1788767242049,
+        "expires_at_ms": 1788810442049
+      },
+      "created_at_ms": 1788767191531,
+      "updated_at_ms": 1788771628404
+    },
+    {
       "id": "project-feature-registry-adoption-v1",
       "title": "一龙项目功能注册表启用 V1",
       "summary": "为一龙项目自身启用低 token、Git 共享、证据绑定的功能注册表，减少代理重复实现和误用旧议案。",
@@ -22784,56 +23000,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_c6c0e91b32bc4001a42f892af62f69cf",
-      "feature_id": "yilong-quant-android-public-empty-v3",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788578101629
-    },
-    {
-      "id": "feature_event_22f07daa5bbc48408a4fd105eb9fbd1a",
-      "feature_id": "yilong-quant-android-public-empty-v3",
-      "action": "claimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788578131986
-    },
-    {
-      "id": "feature_event_0ea2313b761040dca0b64b168468c4fb",
-      "feature_id": "yilong-quant-android-public-empty-v3",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "生产公开空状态实际返回成员鉴权 401，开始修复并补回归。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788578174758
-    },
-    {
-      "id": "feature_event_e679bde6c81a40d5b44245f218fea0cd",
-      "feature_id": "yilong-quant-android-public-empty-v3",
-      "action": "reclaimed",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "claimed",
-      "at_ms": 1788593683399
-    },
-    {
-      "id": "feature_event_e569e3d5d79f40ba93d9e6ff6ee685e7",
-      "feature_id": "yilong-quant-android-public-empty-v3",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Recovered the expired lease after verified active work; continuing the same bounded implementation.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788593683428
-    },
-    {
       "id": "feature_event_edcb4e9af3754837b244b1d7805f77e4",
       "feature_id": "yilong-quant-android-public-empty-v3",
       "action": "evidence_recorded",
@@ -24782,6 +24948,56 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788736415141
+    },
+    {
+      "id": "feature_event_7426e83037d648a39e6d07439642e8d3",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "registered",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788767191531
+    },
+    {
+      "id": "feature_event_afbb1f29342d43acaa90807194f1f080",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "claimed",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788767242050
+    },
+    {
+      "id": "feature_event_0e251cd5a9d841ae9bf61fd7bfd1b4d0",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-read",
+      "reason": "已认领主账号私密投影通道并实现首版，正在与量化APK合同联调；公网和真实终端验收尚未完成。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788767292727
+    },
+    {
+      "id": "feature_event_8f3b3337442d442ba61359cfecfdf921",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788770615710
+    },
+    {
+      "id": "feature_event_8cc52d05ad8b42c8ad88021cf2c3d0f6",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788771628404
     }
   ]
 }

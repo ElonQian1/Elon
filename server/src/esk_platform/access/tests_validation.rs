@@ -13,6 +13,11 @@ fn pkce_s256_uses_rfc_vector_and_rejects_weak_verifiers() {
 
 #[test]
 fn scopes_require_summary_and_never_accept_wildcards_or_duplicates() {
+    assert!(valid_scopes(&[AccessScope::GridSnapshotRead]));
+    assert!(!valid_scopes(&[
+        AccessScope::GridSnapshotRead,
+        AccessScope::EskSummaryRead
+    ]));
     assert!(valid_scopes(&[AccessScope::EskSummaryRead]));
     assert!(!valid_scopes(&[AccessScope::ProfileRead]));
     assert!(!valid_scopes(&[
@@ -21,6 +26,27 @@ fn scopes_require_summary_and_never_accept_wildcards_or_duplicates() {
     ]));
     assert!(serde_json::from_str::<Vec<AccessScope>>("[\"*\"]").is_err());
     assert!(serde_json::from_str::<Vec<AccessScope>>("[\"esk.sellback.write\"]").is_err());
+}
+
+#[test]
+fn grid_authorization_requires_its_own_purpose_callback_and_consent() {
+    let mut body: AuthorizeBody = serde_json::from_value(serde_json::json!({
+      "schema":AUTHORIZE_SCHEMA,"purpose":"binance_grid_read","client_id":"quant.android",
+      "redirect_uri":"com.elon.quant:/grid-access/callback","state":"s".repeat(32),
+      "code_challenge":challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk").unwrap(),
+      "code_challenge_method":"S256","scopes":["grid.snapshot.read"],"expires_in":900,
+      "explicit_consent":true,"confirmation":GRID_AUTHORIZE_CONFIRMATION
+    }))
+    .unwrap();
+    assert!(validate_authorize(&body, "https://main.example.test").is_ok());
+    body.confirmation = AUTHORIZE_CONFIRMATION.into();
+    assert!(validate_authorize(&body, "https://main.example.test").is_err());
+    body.confirmation = GRID_AUTHORIZE_CONFIRMATION.into();
+    body.purpose = None;
+    assert!(validate_authorize(&body, "https://main.example.test").is_err());
+    body.purpose = Some("binance_grid_read".into());
+    body.redirect_uri = "com.elon.quant:/asset-access/callback".into();
+    assert!(validate_authorize(&body, "https://main.example.test").is_err());
 }
 
 #[test]

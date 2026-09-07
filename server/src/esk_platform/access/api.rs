@@ -285,3 +285,21 @@ fn error(cause: anyhow::Error) -> Response {
     // Never expose SQL text, tokens, session identifiers or request content.
     (status, Json(json!({"code":code,"message":code}))).into_response()
 }
+
+pub(super) async fn grids(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    query: Result<Query<EmptyQuery>, QueryRejection>,
+) -> Response {
+    let (token, client) = match credential(&headers) {
+        Ok(v) => v,
+        Err(v) => return v,
+    };
+    if let Err(response) = empty(query) {
+        return response;
+    }
+    match state.store.asset_access_grids(token, client) {
+        Ok(value) => Json(value).into_response(),
+        Err(cause) => error(cause),
+    }
+}

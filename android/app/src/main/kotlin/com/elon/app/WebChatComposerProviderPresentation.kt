@@ -9,7 +9,7 @@ internal object WebChatComposerProviderPresentation {
         views: MainInputComposerViews,
         modelButton: TextView,
         modelWidth: Int,
-        clearQuickAction: () -> Unit,
+        clearQuickAction: (WebChatProductionQuickComposerAction) -> Unit,
         showWorkModelSelector: () -> Unit,
     ) {
         views.activeWebToolChip.render(null, clearQuickAction)

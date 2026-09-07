@@ -9,9 +9,13 @@ pub(crate) fn valid_client(client: &str) -> bool {
 }
 
 pub(crate) fn valid_scopes(scopes: &[AccessScope]) -> bool {
+    if scopes == [AccessScope::GridSnapshotRead] {
+        return true;
+    }
     !scopes.is_empty()
         && scopes.len() <= 3
         && scopes.contains(&AccessScope::EskSummaryRead)
+        && !scopes.contains(&AccessScope::GridSnapshotRead)
         && scopes
             .iter()
             .enumerate()
@@ -55,7 +59,10 @@ pub(crate) fn validate_redirect(client: &str, redirect: &str, public_url: &str) 
         return Err(AccessError::InvalidInput.into());
     }
     let valid = match client {
-        "quant.android" => redirect == "com.elon.quant:/asset-access/callback",
+        "quant.android" => matches!(
+            redirect,
+            "com.elon.quant:/asset-access/callback" | "com.elon.quant:/grid-access/callback"
+        ),
         "quant.web" => {
             let public = reqwest::Url::parse(public_url).map_err(|_| AccessError::Unavailable)?;
             if public.scheme() != "https"
@@ -92,9 +99,21 @@ pub(crate) fn validate_redirect(client: &str, redirect: &str, public_url: &str) 
 }
 
 pub(crate) fn validate_authorize(body: &AuthorizeBody, public_url: &str) -> Result<()> {
+    let grid = body.scopes == [AccessScope::GridSnapshotRead];
+    let purpose_valid = if grid {
+        body.purpose.as_deref() == Some("binance_grid_read")
+            && body.expires_in <= 900
+            && body.confirmation == GRID_AUTHORIZE_CONFIRMATION
+            && body.client_id == "quant.android"
+            && body.redirect_uri == "com.elon.quant:/grid-access/callback"
+    } else {
+        body.purpose.is_none()
+            && body.confirmation == AUTHORIZE_CONFIRMATION
+            && body.redirect_uri != "com.elon.quant:/grid-access/callback"
+    };
     if body.schema != AUTHORIZE_SCHEMA
         || !body.explicit_consent
-        || body.confirmation != AUTHORIZE_CONFIRMATION
+        || !purpose_valid
         || !valid_scopes(&body.scopes)
         || !(1..=MAX_GRANT_SECONDS).contains(&body.expires_in)
         || !unreserved(&body.state, 32, 128)

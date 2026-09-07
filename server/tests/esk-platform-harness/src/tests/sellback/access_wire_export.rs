@@ -19,6 +19,7 @@ fn synthetic_delegated_wire_export_matches_formal_truth_without_credentials() {
             &master,
             &AuthorizeBody {
                 schema: AUTHORIZE_SCHEMA.into(),
+                purpose: None,
                 client_id: "quant.android".into(),
                 redirect_uri: "com.elon.quant:/asset-access/callback".into(),
                 state: "synthetic-wire-state-00000000000000".into(),

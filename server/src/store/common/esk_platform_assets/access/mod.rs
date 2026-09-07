@@ -15,7 +15,7 @@ mod tests;
 mod tests_recovery;
 
 /// Only this module can construct an authority; callers use it inside the same read transaction.
-pub(super) struct AuthorizedAssetRead {
+pub(crate) struct AuthorizedAssetRead {
     user_id: String,
     subject: String,
     grant_id: String,

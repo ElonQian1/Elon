@@ -1,6 +1,33 @@
 use super::*;
 
 #[test]
+fn source_summary_reports_native_session_owner_for_sink_binding_check() {
+    let fixture = Fixture::new();
+    let result = query::execute(
+        &fixture.root,
+        &fixture.session,
+        &ResearchCommand {
+            kind: "status".into(),
+            site_id: None,
+            session_id: Some(fixture.session.id.clone()),
+            resource_id: None,
+            request_id: None,
+            query: None,
+            offset: None,
+            limit: None,
+            manifest: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(result["session"]["owner_hash"], hash(b"owner"));
+    assert_ne!(result["session"]["owner_hash"], hash(b"different-owner"));
+    assert!(!result["session"]
+        .as_object()
+        .unwrap()
+        .contains_key("owner_user_id"));
+}
+
+#[test]
 fn only_acknowledged_host_becomes_observing_and_failure_cannot_revive() {
     let mut fixture = Fixture::new();
     fixture.session.phase = "opening".into();

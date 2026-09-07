@@ -231,6 +231,7 @@ mod node_agent_tts;
 pub use node_agent_tts::run_tts_synthesis;
 mod node_agent_browser_research;
 mod node_agent_browser_research_mcp;
+mod node_agent_private_read_projection;
 #[cfg(test)]
 mod node_agent_project_docs_mcp_tests;
 mod node_agent_tool_approval;
@@ -257,6 +258,7 @@ mod pc_storage_git_http;
 mod pc_storage_repo;
 mod pc_workspace_git_remote;
 mod pc_workspace_provisioner;
+mod private_read_projection;
 mod project_default_docs;
 mod project_discussion_document_projection;
 mod project_discussion_graph;
