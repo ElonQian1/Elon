@@ -19,9 +19,22 @@ internal object ChatGptWebFileDownloadMetadata {
         if (name.length !in 1..1024 || name.isBlank() || name.any { it < ' ' || it == '\u007f' } ||
             mediaType.isNotEmpty() && !mime.matches(mediaType)) return null
         val suffix = extension.find(name.trimEnd())?.value.orEmpty()
-        var destination = ChatGptWebFileDownloadPolicy.safeName(name)
-        // A long cloud document title must not truncate its exported format suffix.
-        if (name.length > 150 && suffix.isNotEmpty()) destination = destination.take(150 - suffix.length) + suffix
-        return lease.copy(name = destination, mediaType = mediaType.lowercase(Locale.ROOT))
+        val destination = ChatGptWebFileDownloadPolicy.safeName(name, maxLength = 1024)
+        // Bound complete code points while reserving the exported suffix and native prefix.
+        val stem = destination.removeSuffix(suffix)
+        val bounded = StringBuilder()
+        var remaining = 255 - "elon-${lease.id}-$suffix".toByteArray(Charsets.UTF_8).size
+        var offset = 0
+        while (offset < stem.length) {
+            val codePoint = stem.codePointAt(offset)
+            if (codePoint in 0xd800..0xdfff) return null
+            val part = String(Character.toChars(codePoint))
+            val size = part.toByteArray(Charsets.UTF_8).size
+            if (size > remaining || bounded.length + part.length > 150 - suffix.length) break
+            bounded.append(part)
+            remaining -= size
+            offset += Character.charCount(codePoint)
+        }
+        return lease.copy(name = bounded.toString() + suffix, mediaType = mediaType.lowercase(Locale.ROOT))
     }
 }

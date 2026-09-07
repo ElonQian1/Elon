@@ -15,9 +15,9 @@ internal object ChatGptWebFileDownloadPolicy {
         }
     }.getOrNull()
 
-    fun safeName(value: String): String = value
+    fun safeName(value: String, maxLength: Int = 150): String = value
         .replace(Regex("[\\x00-\\x1f\\x7f-\\x9f/\\\\:*?\"<>|\\u202a-\\u202e\\u2066-\\u2069]"), "_")
-        .trim(' ', '.').take(150).ifBlank { "download.bin" }
+        .trim(' ', '.').take(maxLength.coerceIn(1, 1024)).ifBlank { "download.bin" }
 }
 
 internal class ChatGptWebFileDownloadLease {

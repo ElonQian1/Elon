@@ -2,7 +2,7 @@
 
 Capability candidate: `android_chatgpt_private_mounted_file_download_v1`.
 Implementation: scoped provider-file materialization and existing native download.
-Verification: 185 related Node cases and 12 pure Kotlin/JUnit cases passed;
+Verification: 185 related Node cases and 13 pure Kotlin/JUnit cases passed;
 full Android integration and real account/device pending.
 Delivery: source candidate for the next grouped APK, not `completed` or installed.
 Adapter version: 297; file/history/library modules 12/6/6.
@@ -124,6 +124,11 @@ Eight new export cases failed on the preceding implementation, then all 185
 related Node runner cases passed (`mounted-export-green-20260908-20260908-062132-706`).
 The native policy/lease tests were freshly compiled with Kotlin 2.0.21 and all
 12 JUnit cases passed (`download-metadata-native-20260908-20260908-061553-622`).
+The subsequent mixed-Unicode title regression reproduced truncation failure.
+The final 13-case run passed (`download-metadata-final-20260908-20260908-063059-908`):
+resolved titles reserve both the native UUID prefix and exported suffix within
+255 UTF-8 bytes, do not split code points, and retain the 150-character bound.
+The shared sanitizer's existing callers keep their original default behavior.
 The gateway integration test checks source wiring; it does not compile/run the
 Android gateway. This batch did not assemble, publish or install an APK, access
 an authenticated provider file, or measure performance/thermal improvements.

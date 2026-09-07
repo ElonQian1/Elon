@@ -85,6 +85,16 @@ class ChatGptWebFileDownloadMetadataTest {
         assertTrue(source.indexOf("bytes.accept(value, lease)") > source.indexOf("consumeResolved(id, value, state)"))
     }
 
+    @Test fun unicodeExportTitlesFitTheNativeDestinationByteBudget() {
+        for (stem in listOf("\u6587".repeat(160), "\ud83d\udcc4".repeat(160), "a".repeat(144) + "\ud83d\udcc4" + "b".repeat(20))) {
+            val result = requireNotNull(ChatGptWebFileDownloadMetadata.resolve(lease(), packet(stem + ".docx")))
+            val destination = "elon-${result.id}-${result.name}"
+            assertTrue(destination.toByteArray(Charsets.UTF_8).size <= 255)
+            assertTrue(result.name.endsWith(".docx"))
+            assertEquals(result.name, result.name.toByteArray(Charsets.UTF_8).toString(Charsets.UTF_8))
+        }
+    }
+
     private companion object {
         const val DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     }
