@@ -90,6 +90,66 @@ test('current website composer accepts the native submit transaction without a l
   assert.equal(bridge.loads.length, 0, 'uses the current committed submit owner without importing another composer');
 });
 
+for (const guest of [false, true]) {
+  test('ordinary composer retains an inert structured-input host: guest=' + guest, async () => {
+    const f = fixture(guest ? { authStatus: 'logged_out', session: null } : undefined);
+    await flush();
+    f.props.structuredInputHost = {
+      canOpen$() { throw Error('host capability must not be invoked'); },
+      tryOpen$() { throw Error('host must not be opened'); }
+    };
+    f.props.structuredInputMessageId = null;
+    const result = f.api.submit(f.command);
+    assert.equal(result.handled, true);
+    assert.equal(f.calls.length, 1);
+    f.settle(true);
+    assert.equal((await result.completion).status, 'accepted');
+    assert.equal(f.timers.size, 0);
+  });
+}
+
+test('unrecognized structured hosts remain unavailable without invoking their members', () => {
+  for (const host of [{}, false, 'host', { canOpen$() {} }, { tryOpen$() {} },
+    { canOpen$: true, tryOpen$() {} }, { canOpen$() {}, tryOpen$() {}, unknown: true }]) {
+    const f = fixture(); f.props.structuredInputHost = host;
+    assert.equal(f.api.submit(f.command).handled, false);
+    assert.equal(f.calls.length, 0);
+  }
+  const f = fixture(); f.props.structuredInputHost = { canOpen$() {}, tryOpen$() {} };
+  assert.equal(f.api.submit(f.command).code, 'structured_host_unrecognized',
+    'a recognized host still requires an explicit inactive message state');
+  assert.equal(f.calls.length, 0);
+});
+
+test('active structured input and invalid thread modes still cannot use ordinary submission', () => {
+  for (const mutate of [
+    p => { p.structuredInputMessageId = 'synthetic-structured-message'; },
+    p => { p.structuredInputMessageId = ''; },
+    p => { p.isNewThread = undefined; },
+    p => { p.isNewThread = 'false'; }
+  ]) {
+    const f = fixture();
+    f.props.structuredInputHost = { canOpen$() {}, tryOpen$() {} };
+    mutate(f.props);
+    assert.equal(f.api.submit(f.command).handled, false);
+    assert.equal(f.calls.length, 0);
+  }
+});
+
+test('a replaced host or newly active structured input invalidates the captured submit', () => {
+  for (const mutate of [
+    p => { p.structuredInputHost = { canOpen$() {}, tryOpen$() {} }; },
+    p => { p.structuredInputMessageId = 'synthetic-new-structured-input'; },
+    p => { p.isNewThread = true; }
+  ]) {
+    const f = fixture(); f.props.structuredInputHost = { canOpen$() {}, tryOpen$() {} };
+    f.props.structuredInputMessageId = null;
+    f.command.beforeSubmit = () => mutate(f.props);
+    assert.equal(f.api.submit(f.command).code, 'context_changed');
+    assert.equal(f.calls.length, 0);
+  }
+});
+
 test('confirmed guest uses the official text transaction without an authorization header', async () => {
   const f = fixture({ authStatus: 'logged_out', session: null }); await flush();
   assert.equal(f.bridge.loads.length, 1, 'one asynchronous module warmup');

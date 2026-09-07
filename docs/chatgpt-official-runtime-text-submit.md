@@ -6,12 +6,39 @@ official page-runtime bridge, **not an independent Android HTTP/private POST
 transport**. Include it in the grouped ChatGPT APK; do not reimplement it while
 waiting for production acceptance.
 
-Latest installed checkpoint: APK 1550 / adapter 294 includes runtime submit 9
-and bindings 2. One real guest reply still used DOM fallback; the exact native
-send receipt now identifies `runtime_fallback:react_owner_path_limit`.
-See [release and production evidence](reports/chatgpt-runtime-release-1550.md).
-Submit 10 addresses the bounded traversal budget with linear-memory paths and
-is an offline-tested source candidate, not installed or device accepted.
+Latest installed checkpoint: APK 1551 / adapter 294 includes runtime submit 10
+and bindings 3. On 2026-09-08 a single native production send received one exact
+test reply, with the private stream observer reaching `completed`. The receipt
+was still DOM fallback: `private_fallback:template_unavailable` and
+`runtime_fallback:composer_mode_unsupported`. This is a real basic-chat success,
+not acceptance of either the independent private POST or runtime submit route.
+The previous `react_owner_path_limit` was not the failure on this send.
+See [installed artifact evidence](reports/chatgpt-runtime-release-1551.md).
+
+## Resident structured-input host
+
+Runtime submit 11 / global adapter 298 is a source repair candidate. The retained
+current public composer (SHA-256
+`36644eb82aac9c399bce384c18140f8c878dd780c8f787440b80f27971729733`)
+unconditionally calls `Iue` inside `uqn`, then passes the returned
+`structuredInputHost` to shared props. Current conversation SHA-256
+`7973d518b083f0f3e23905a279ed019378481bdbdd10fc0196afe9fc7b3b7d35`
+exports that function as `AY` (`z9r`): it returns `canOpen$` and `tryOpen$` methods,
+not an active-input flag. Rejecting every non-null host blocks ordinary chat.
+
+The repair allows only this exact two-method host with an explicitly null
+structured message ID. It does not call either method. Unknown host shapes,
+active structured messages, missing mode proof, disabled submission and policy
+checks still reject before any write. Captured host identity and thread mode are
+revalidated before submission; the existing single-writer rule remains unchanged.
+
+The production MCP receipt identifies the mode-gate failure, but the exact
+subcondition was not live-inspected: this Release APK exposes no debug socket.
+Temporary debug forwards were removed; no other browser was inspected or changed.
+The source evidence establishes the overstrict guard, not a successful handset
+repair. New synthetic cases failed before the repair; 172 focused runner cases
+then passed across submit, attachments, bindings, stop wiring and diagnostics.
+The next grouped APK still needs `official_runtime_v1:accepted` plus one reply.
 
 ## Current-tree membership
 

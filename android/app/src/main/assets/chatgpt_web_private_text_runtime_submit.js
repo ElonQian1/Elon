@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 10, create: factory });
+  const exported = Object.freeze({ version: 11, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -119,10 +119,17 @@
     if (!conversation || !controller || controller.conversation !== conversation) return unavailable('conversation_owner_unavailable');
     if (typeof conversation.serverId$ !== 'function' ||
         (conversation.serverId$() || null) !== currentRoute.conversationId) return unavailable('conversation_route_mismatch');
-    if (typeof props.isNewThread !== 'boolean' || props.structuredInputHost != null ||
-        props.structuredInputMessageId != null) return unavailable('composer_mode_unsupported');
+    if (typeof props.isNewThread !== 'boolean') return unavailable('composer_mode_unsupported');
+    if (props.structuredInputMessageId != null) return unavailable('structured_input_active');
+    // The official composer always creates this capability host, even with no
+    // active structured input. Its existence is not an active-mode signal.
+    const host = props.structuredInputHost;
+    if (host != null && (typeof host !== 'object' ||
+        Object.keys(host).sort().join(',') !== 'canOpen$,tryOpen$' ||
+        typeof host.canOpen$ !== 'function' || typeof host.tryOpen$ !== 'function' ||
+        props.structuredInputMessageId !== null)) return unavailable('structured_host_unrecognized');
     return { ...context, ...currentRoute, token, account, node, conversation, controller,
-      requestId: props.currentRequestId };
+      requestId: props.currentRequestId, structuredHost: host, newThread: props.isNewThread };
   }
 
   function capture(node, previousAttachment) {
@@ -235,5 +242,5 @@
   try {
     if (page.__elonChatGptPrivateTextTransactionsEnabled === true && route()) identity(true);
   } catch (_) {}
-  return Object.freeze({ version: 10, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 11, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });
