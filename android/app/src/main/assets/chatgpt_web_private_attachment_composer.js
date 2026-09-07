@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 12, create: factory });
+  const exported = Object.freeze({ version: 13, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -47,11 +47,11 @@
     return root.__elonChatGptComposer?.currentModel?.(root.document.querySelector('#prompt-textarea')) || '';
   }
 
-  function modelSlug() {
+  function composerPolicy() {
     const input = root.document.querySelector('#upload-files');
     if (!input?.isConnected) return null;
     const key = Object.keys(input).find(name => name.startsWith('__reactFiber$'));
-    const candidates = new Set();
+    const candidates = new Map();
     // The host node can still reference React's previous alternate. Accept only
     // a branch that reaches its root's current pointer, never work-in-progress props.
     for (const start of [input[key], input[key]?.alternate]) {
@@ -66,7 +66,9 @@
         // Official file-drop handler receives currentModelId ?? currentModelConfig.id.
         const slug = props.currentModelId ?? props.currentModelConfig?.id;
         if (typeof slug !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(slug)) return null;
-        candidates.add(slug);
+        const policy = { modelSlug: slug,
+          libraryEnabled: props.entrySurface === 'chat_composer' && props.isLibraryEnabled === true };
+        candidates.set(JSON.stringify(policy), policy);
       }
     }
     return candidates.size === 1 ? candidates.values().next().value : null;
@@ -101,8 +103,9 @@
     const token = root.__elonChatGptDocumentToken;
     const account = identity();
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '') || !account) throw new Error('composer_context_unavailable');
+    const policy = composerPolicy();
     const binding = Object.freeze({ store: resolveStore(), href: root.location.href, token, account,
-      model: model(), modelSlug: modelSlug(), ...route() });
+      model: model(), modelSlug: policy?.modelSlug ?? null, libraryEnabled: policy?.libraryEnabled === true, ...route() });
     if (binding.conversationId === null && !binding.projectId) confirmed.add(binding);
     return binding;
   }
@@ -167,9 +170,11 @@
 
   function current(binding, checkModel = true) {
     try {
+      const policy = checkModel ? composerPolicy() : null;
       return !!binding && root.location.href === binding.href &&
         root.__elonChatGptDocumentToken === binding.token && identity() === binding.account &&
-        (!checkModel || model() === binding.model && modelSlug() === binding.modelSlug &&
+        (!checkModel || model() === binding.model && (policy?.modelSlug ?? null) === binding.modelSlug &&
+          (policy?.libraryEnabled === true) === binding.libraryEnabled &&
           projects.get(binding)?.thread?.current() !== false) &&
         resolveStore() === binding.store;
     } catch (_) { return false; }
@@ -177,9 +182,10 @@
 
   function uploadContext(binding, file, imageDimensions) {
     if (!current(binding) || !confirmed.has(binding)) throw new Error('composer_changed');
+    const library = !binding.isTemporaryChat && binding.libraryEnabled;
     const context = projects.has(binding) ? project.uploadContext(projects.get(binding), file, imageDimensions)
-      : { useCase: imageDimensions ? 'multimodal' : 'ace_upload', storeInLibrary: false,
-      libraryPersistenceMode: binding.isTemporaryChat ? undefined : 'required',
+      : { useCase: imageDimensions ? 'multimodal' : 'ace_upload', storeInLibrary: library,
+      libraryPersistenceMode: binding.isTemporaryChat ? undefined : library ? 'opportunistic' : 'required',
       isTemporaryChat: binding.isTemporaryChat, indexForRetrieval: false, imageDimensions };
     return { ...context, modelSlug: binding.modelSlug ?? undefined };
   }
@@ -196,8 +202,9 @@
   function pickerReservationContext(binding, kind) {
     if (!['image', 'document'].includes(kind) || !current(binding) || !confirmed.has(binding) ||
         projects.has(binding) || binding.projectId) return null;
-    return Object.freeze({ useCase: kind === 'image' ? 'multimodal' : 'ace_upload', storeInLibrary: false,
-      libraryPersistenceMode: binding.isTemporaryChat ? undefined : 'required',
+    const library = !binding.isTemporaryChat && binding.libraryEnabled;
+    return Object.freeze({ useCase: kind === 'image' ? 'multimodal' : 'ace_upload', storeInLibrary: library,
+      libraryPersistenceMode: binding.isTemporaryChat ? undefined : library ? 'opportunistic' : 'required',
       isTemporaryChat: binding.isTemporaryChat, modelSlug: binding.modelSlug ?? undefined });
   }
 
@@ -228,7 +235,8 @@
       tempId, file, fileSignature: JSON.stringify({ name: file.name, size: file.size,
         lastModified: file.lastModified, type: file.type }),
       status: 'ready', progress: 100, fileId: result.fileId, cdnUrl: null, fileSpec: spec,
-      source: 'local', storeInLibrary: false, isTemporaryChat: binding.isTemporaryChat, isProjectThread: !!projectId,
+      source: 'local', storeInLibrary: !binding.isTemporaryChat && !projectId && binding.libraryEnabled,
+      isTemporaryChat: binding.isTemporaryChat, isProjectThread: !!projectId,
       ...(scope?.canWrite ? { projectGizmoId: projectId } : {}),
       ...(libraryFileInfo ? { libraryFileInfo } : {}),
       ...(spec.libraryFileId ? { libraryFileId: spec.libraryFileId } : {}),
@@ -276,5 +284,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 12, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, merge, remove });
+  return Object.freeze({ version: 13, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, merge, remove });
 });

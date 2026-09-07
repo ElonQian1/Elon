@@ -248,3 +248,16 @@ test('large direct-library uploads retain their existing multipart route', async
   f.file = new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'large.txt', { type: 'text/plain' });
   f.start(); await tick(); assert.equal(f.take(), null);
 });
+
+test('enabled library intent preserves opportunistic persistence in allocation and claim', async () => {
+  const f = fixture();
+  f.context = { ...context(), storeInLibrary: true, libraryPersistenceMode: 'opportunistic' };
+  f.start(); await tick();
+  const allocation = JSON.parse(f.requests[0].init.body);
+  const claim = JSON.parse(f.take().claim.body);
+  assert.equal(allocation.store_in_library, true);
+  assert.equal(allocation.library_persistence_mode, 'opportunistic');
+  assert.equal(claim.store_in_library, true);
+  assert.equal(claim.library_persistence_mode, 'opportunistic');
+  assert.equal(claim.metadata.store_in_library, true);
+});

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentReservation = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -18,7 +18,8 @@
     // selection/claim defaults it to required, with store_in_library still false.
     return !!context && ['ace_upload', 'my_files', 'multimodal'].includes(context.useCase) &&
       typeof context.storeInLibrary === 'boolean' &&
-      context.libraryPersistenceMode === (temporary ? undefined : 'required') &&
+      (context.libraryPersistenceMode === (temporary ? undefined : 'required') ||
+        !temporary && context.storeInLibrary && context.libraryPersistenceMode === 'opportunistic') &&
       (context.isTemporaryChat === undefined || typeof context.isTemporaryChat === 'boolean') &&
       (!temporary || context.storeInLibrary === false &&
         (context.indexForRetrieval === undefined || context.indexForRetrieval === false)) &&
@@ -147,5 +148,5 @@
 
   // Selection never waits for allocation. Taking a pending slot abandons it, so
   // a late response cannot replace an already selected upload transaction.
-  return Object.freeze({ version: 2, start, take, cancel });
+  return Object.freeze({ version: 3, start, take, cancel });
 });

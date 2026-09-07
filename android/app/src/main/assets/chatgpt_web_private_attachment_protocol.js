@@ -98,8 +98,11 @@
     if (typeof file.name !== 'string' || !file.name.trim() || file.name.length > 120 ||
         /[\x00-\x1f\x7f/\\]/.test(file.name)) throw new Error('invalid_file_name');
     const temporary = context?.isTemporaryChat === true;
+    const persistence = context?.libraryPersistenceMode;
+    const opportunistic = context?.storeInLibrary === true && !temporary && !context.isProjectThread &&
+      persistence === 'opportunistic';
     if (!context || !USE_CASES.has(context.useCase) || typeof context.storeInLibrary !== 'boolean' ||
-        context.libraryPersistenceMode !== (temporary ? undefined : 'required') ||
+        !opportunistic && persistence !== (temporary ? undefined : 'required') ||
         typeof context.indexForRetrieval !== 'boolean' ||
         context.isTemporaryChat !== undefined && typeof context.isTemporaryChat !== 'boolean' ||
         temporary && (context.storeInLibrary || context.indexForRetrieval)) {
@@ -203,6 +206,6 @@
     return { metadata, eventCount: count, events };
   }
 
-  return { version: 9, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed,
+  return { version: 10, maxFileBytes: MAX_BYTES, prepare, destination, processBody, processed,
     imageDimensions, projectInfo, isPdf, creationHeaders, documentMimeTypes, isDocument };
 });
