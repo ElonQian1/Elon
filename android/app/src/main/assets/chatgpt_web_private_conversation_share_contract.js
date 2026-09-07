@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateConversationShareContract = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -42,7 +42,7 @@
     if (typeof s?.H3 !== 'function' || s.H3() !== true || typeof s.mq !== 'function' ||
         typeof s.wV !== 'function' || typeof s.SV?.isPersonalWorkspace !== 'function' ||
         s.wV(s.SV.isPersonalWorkspace) !== true || typeof s.XM !== 'function' ||
-        typeof c?.AGt !== 'function' || typeof s.HM?.getGizmoId !== 'function' ||
+        typeof c?.AGt !== 'function' || typeof c.J5t !== 'function' || typeof s.HM?.getGizmoId !== 'function' ||
         typeof s.HM.getCurrentLeafId !== 'function' || typeof s.HM.hasNode !== 'function') return null;
     const account = s.mq();
     if (typeof account?.isQuorum !== 'function' || account.isQuorum() !== false ||
@@ -53,9 +53,12 @@
         thread.continuingFromSharedProjectConversationId != null ||
         thread.contextScopes != null && (!Array.isArray(thread.contextScopes) || thread.contextScopes.length)) return null;
     const leaf = s.HM.getCurrentLeafId(thread), node = c.AGt(thread);
+    // Same getter used by the current-conversation Share button; no exposure event on readback.
+    const variant = c.J5t({ disableExposureLog: true });
+    if (!['control', 'modal_redesigned', 'toast'].includes(variant)) return null;
     if (!UUID.test(leaf || '') || !UUID.test(node || '') || s.HM.hasNode(thread, leaf) !== true ||
         s.HM.hasNode(thread, node) !== true) return null;
-    return { leaf, node, title: typeof thread.title === 'string' ? thread.title : '' };
+    return { leaf, node, variant, title: typeof thread.title === 'string' ? thread.title : '' };
   }
 
   function ready(binding) {
@@ -84,7 +87,8 @@
       if (page.location.href !== binding.href || page.__elonChatGptDocumentToken !== binding.token ||
           identity() !== binding.account || !ready(binding)) return false;
       const selected = scope(binding.modules, binding.id);
-      return selected?.leaf === binding.leaf && selected?.node === binding.node && selected?.title === binding.title;
+      return selected?.leaf === binding.leaf && selected?.node === binding.node &&
+        selected?.title === binding.title && selected?.variant === binding.variant;
     } catch (_) { return false; }
   }
 
@@ -95,10 +99,11 @@
     return keys.every(key => value[key] === undefined || value[key] === false) ? 'allowed' : 'unknown';
   }
 
-  function created(payload, node) {
+  function created(payload, node, variant) {
     if (!payload || !UUID.test(payload.share_id || '') || payload.current_node_id != null &&
         !UUID.test(payload.current_node_id) || payload.is_visible !== true ||
         typeof payload.is_public !== 'boolean' || payload.is_anonymous !== true) return null;
+    if (variant !== 'control' && (payload.is_public !== true || (payload.current_node_id ?? node) !== node)) return null;
     const expected = 'https://chatgpt.com/share/' + payload.share_id;
     if (payload.share_url !== expected) return null;
     return Object.freeze({ id: payload.share_id, url: expected, node,
@@ -107,5 +112,5 @@
       moderation: payload.moderation_state });
   }
 
-  return Object.freeze({ version: 1, capture, current, identity, created, moderation, urls });
+  return Object.freeze({ version: 2, capture, current, identity, created, moderation, urls });
 });

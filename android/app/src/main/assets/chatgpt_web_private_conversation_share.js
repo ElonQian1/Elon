@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateConversationShare) {
     root.__elonChatGptPrivateConversationShare = factory(root);
@@ -28,22 +28,22 @@
         attempted = true;
         return (await page.__elonChatGptPrivateJsonRequest.request(page, path, {
           method, headers, credentials: 'include', cache: 'no-store', redirect: 'error', body: JSON.stringify(body),
-          __elonPrivateTransport: 'conversation_share_v1',
+          __elonPrivateTransport: 'conversation_share_v2',
         }, { timeoutMs: 7000, maxBytes: 256 * 1024, mode: 'json' })).payload;
       };
-      // The standard authenticated full-conversation modal uses legacy create + publish.
-      // Do not substitute message-slice /share/post or the v2 redesigned/guest route.
-      const response = await request('/backend-api/share/create', 'POST', {
+      // The redesigned flow publishes in create; the legacy modal requires a separate PATCH.
+      const redesigned = binding.variant !== 'control';
+      const response = await request(redesigned ? '/backend-api/share/v2/create' : '/backend-api/share/create', 'POST', {
         current_node_id: binding.node, conversation_id: binding.id, is_anonymous: true,
       });
       if (!contract.current(binding)) return outcome(false, 'share_result_unconfirmed', true);
-      const link = contract.created(response, binding.node);
+      const link = contract.created(response, binding.node, binding.variant);
       if (!link) return outcome(false, 'share_result_unconfirmed', true);
       if (contract.moderation(link.moderation) === 'blocked') return outcome(false, 'share_moderation_blocked', true);
-      const published = await request('/backend-api/share/' + encodeURIComponent(link.id), 'PATCH', {
-        highlighted_message_id: link.highlighted, title: link.title, is_public: true,
-        is_visible: true, is_anonymous: true, current_node_id: binding.node,
-      });
+      const published = redesigned ? response : await request('/backend-api/share/' + encodeURIComponent(link.id), 'PATCH', {
+          highlighted_message_id: link.highlighted, title: link.title, is_public: true,
+          is_visible: true, is_anonymous: true, current_node_id: binding.node,
+        });
       if (!contract.current(binding)) return outcome(false, 'share_result_unconfirmed', true);
       const state = contract.moderation(published?.moderation_state);
       if (state !== 'allowed') return outcome(false, state === 'blocked' ?
@@ -83,5 +83,5 @@
     }).catch(() => respond(action, false, 'share_result_unconfirmed'));
     return true;
   }
-  return Object.freeze({ version: 1, start, handle, busy: () => active !== null });
+  return Object.freeze({ version: 2, start, handle, busy: () => active !== null });
 });

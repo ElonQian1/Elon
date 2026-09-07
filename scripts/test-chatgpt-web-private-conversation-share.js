@@ -15,7 +15,7 @@ const PATH = '/c/' + CID;
 const LINK = 'https://chatgpt.com/share/' + SID;
 const MODERATION = { has_been_auto_blocked: false, has_been_auto_moderated: false, has_been_blocked: false };
 
-function fixture() {
+function fixture(variant = 'control') {
   const requests = [];
   const headers = { Authorization: 'Bearer synthetic-test-only', 'chatgpt-account-id': 'synthetic-personal',
     'chatgpt-sentinel-proof-token': 'must-not-replay', cookie: 'must-not-export' };
@@ -25,7 +25,10 @@ function fixture() {
     shared: { H3: () => true, mq: () => account, wV: selector => selector({ personal: true }),
       SV: { isPersonalWorkspace: value => value.personal }, XM: id => id === CID ? thread : null,
       HM: { getGizmoId: t => t.gizmo, getCurrentLeafId: t => t.leaf, hasNode: (t, id) => [NODE, NEXT].includes(id) } },
-    conversation: { AGt: t => t.node },
+    conversation: { AGt: t => t.node, J5t: options => {
+      assert.deepEqual(options, { disableExposureLog: true });
+      return variant;
+    } },
   };
   const snapshot = { url: 'https://chatgpt.com' + PATH, composerReady: true, streaming: false, attachments: [] };
   let loaded = true;
@@ -38,7 +41,8 @@ function fixture() {
     __elonChatGptPrivateJsonRequest: { request: async (_page, url, init, limits) => {
       requests.push({ url, init, limits });
       if (init.method === 'POST') return { payload: { share_id: SID, share_url: LINK, current_node_id: NODE,
-        is_visible: true, is_public: false, is_anonymous: true, title: 'Synthetic fixture', moderation_state: MODERATION } };
+        is_visible: true, is_public: url.endsWith('/v2/create'), is_anonymous: true,
+        title: 'Synthetic fixture', moderation_state: MODERATION } };
       return { payload: { moderation_state: MODERATION } };
     } },
   };
@@ -46,7 +50,7 @@ function fixture() {
   const api = share.create(page, { contract, loadRuntime });
   return { page, requests, headers, thread, modules, account, snapshot, api,
     start: (confirmed = true) => api.start(PATH, confirmed, () => snapshot),
-    setLoaded: value => { loaded = value; }, loadRuntime };
+    setLoaded: value => { loaded = value; }, setVariant: value => { variant = value; }, loadRuntime };
 }
 
 test('confirmed full conversation creates then publishes exact selected node with no proof replay', async () => {
@@ -78,6 +82,105 @@ test('validated current-branch result reused without a second write', async () =
   const f = fixture();
   await f.start(); await f.start();
   assert.equal(f.requests.length, 2);
+});
+
+for (const variant of ['modal_redesigned', 'toast']) {
+  test('v2 sharing variant ' + variant + ' creates exactly once without legacy publication', async () => {
+    const f = fixture(variant);
+    assert.deepEqual(await f.start(), { ok: true, code: 'share_link_ready', attempted: true, url: LINK });
+    assert.equal(f.requests.length, 1);
+    const { url, init, limits } = f.requests[0];
+    assert.equal(url, '/backend-api/share/v2/create');
+    assert.equal(init.method, 'POST');
+    assert.deepEqual(JSON.parse(init.body), { current_node_id: NODE, conversation_id: CID, is_anonymous: true });
+    assert.equal(init.credentials, 'include');
+    assert.equal(init.headers.cookie, undefined);
+    assert.equal(init.headers['chatgpt-sentinel-proof-token'], undefined);
+    assert.equal(limits.timeoutMs, 7000);
+    assert.equal(limits.maxBytes, 256 * 1024);
+    await f.start();
+    assert.equal(f.requests.length, 1);
+  });
+}
+
+for (const variant of [undefined, null, 'unrecognized']) {
+  test('unconfirmed sharing variant cannot choose an endpoint: ' + variant, async () => {
+    const f = fixture(); f.setVariant(variant);
+    const result = await f.start();
+    assert.equal(result.attempted, false);
+    assert.equal(result.ok, false);
+    assert.equal(f.requests.length, 0);
+  });
+}
+
+test('missing sharing variant export is not silently treated as legacy', async () => {
+  const f = fixture(); delete f.modules.conversation.J5t;
+  assert.equal((await f.start()).attempted, false);
+  assert.equal(f.requests.length, 0);
+});
+
+test('sharing variant changes invalidate cached links in both directions', async () => {
+  const f = fixture(); await f.start();
+  f.setVariant('toast'); await f.start();
+  f.setVariant('control'); await f.start();
+  assert.deepEqual(f.requests.map(value => value.url), [
+    '/backend-api/share/create', '/backend-api/share/' + SID, '/backend-api/share/v2/create',
+    '/backend-api/share/create', '/backend-api/share/' + SID,
+  ]);
+});
+
+for (const variant of ['control', 'toast']) {
+  test('sharing variant drift after creation cannot publish, distribute or replay: ' + variant, async () => {
+    const f = fixture(variant), request = f.page.__elonChatGptPrivateJsonRequest.request;
+    f.page.__elonChatGptPrivateJsonRequest.request = async (...args) => {
+      const result = await request(...args);
+      f.setVariant(variant === 'control' ? 'toast' : 'control');
+      return result;
+    };
+    const result = await f.start();
+    assert.equal(result.code, 'share_result_unconfirmed');
+    assert.equal(result.url, undefined);
+    assert.equal((await f.start()).code, 'share_cooldown');
+    assert.equal(f.requests.length, 1);
+  });
+}
+
+for (const error of ['timeout', 'http_403', 'http_500']) {
+  test('v2 failure never falls through to the legacy writer: ' + error, async () => {
+    const f = fixture('toast'), request = f.page.__elonChatGptPrivateJsonRequest.request;
+    f.page.__elonChatGptPrivateJsonRequest.request = async (...args) => { await request(...args); throw Error(error); };
+    const result = await f.start();
+    assert.equal(result.ok, false); assert.equal(result.url, undefined);
+    assert.equal((await f.start()).code, 'share_cooldown');
+    assert.deepEqual(f.requests.map(value => value.url), ['/backend-api/share/v2/create']);
+  });
+}
+
+for (const [name, change] of [
+  ['older node', value => { value.current_node_id = NEXT; }],
+  ['not public', value => { value.is_public = false; }],
+  ['not visible', value => { value.is_visible = false; }],
+  ['missing moderation', value => { delete value.moderation_state; }],
+  ['blocked moderation', value => { value.moderation_state = { has_been_blocked: true }; }],
+  ['unknown moderation', value => { value.moderation_state = { has_been_blocked: 'false' }; }],
+]) test('v2 ' + name + ' cannot expose a link or issue a repairing PATCH', async () => {
+  const f = fixture('modal_redesigned'), request = f.page.__elonChatGptPrivateJsonRequest.request;
+  f.page.__elonChatGptPrivateJsonRequest.request = async (...args) => {
+    const result = await request(...args); change(result.payload); return result;
+  };
+  const result = await f.start();
+  assert.equal(result.ok, false); assert.equal(result.url, undefined);
+  assert.equal(f.requests.length, 1);
+  assert.equal(f.requests[0].url, '/backend-api/share/v2/create');
+});
+
+test('v2 missing response node uses the requested node as in the official modal', async () => {
+  const f = fixture('toast'), request = f.page.__elonChatGptPrivateJsonRequest.request;
+  f.page.__elonChatGptPrivateJsonRequest.request = async (...args) => {
+    const result = await request(...args); delete result.payload.current_node_id; return result;
+  };
+  assert.equal((await f.start()).ok, true);
+  assert.equal(f.requests.length, 1);
 });
 
 for (const [name, mutate] of [
@@ -229,7 +332,7 @@ test('share modules parse in the same concatenated asset scope and are registere
     .map(file => fs.readFileSync(path.join(assets, file), 'utf8')).join('\n');
   const f = fixture();
   vm.runInNewContext(source, { window: f.page, URL, setTimeout, clearTimeout });
-  assert.equal(f.page.__elonChatGptPrivateConversationShare.version, 1);
+  assert.equal(f.page.__elonChatGptPrivateConversationShare.version, 2);
   assert.equal(typeof f.page.__elonChatGptPrivateConversationShare.start, 'function');
   const owned = f.page.__elonChatGptPrivateConversationShare;
   vm.runInNewContext(source, { window: f.page, URL, setTimeout, clearTimeout });
