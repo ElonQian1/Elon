@@ -6,6 +6,8 @@ implementation_status: in_progress
 
 # Win 浏览器研究 MCP V1 验证记录
 
+后续 23:29 起的正式安装版取证见[币安运行合同研究](binance-grid-runtime-contract-20260907.md)：原项目登录 Profile 已读到列表、详情和页面采集的创建/修改/结束响应。下面“登录、业务回执待验证”是早期验收记录；后续研究成功仍不代表交易执行或 APK 同步已验收。
+
 本报告记录实现证据，不能代替[需求](../requirements/win-browser-research-mcp-v1.md)。截至 2026-09-07，真实 Windows WebView2 已完成无交易样例的自动采集、MCP 搜索/正文读取和暂停恢复，并读出币安实际加载脚本里的 U 本位网格私有接口候选。本人币安首次登录及认证后的列表业务回执仍待验证，因此整体需求保持进行中；没有执行真实金融交易。
 
 ## 已验证

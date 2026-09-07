@@ -14289,15 +14289,41 @@
           }
         },
         {
-          "path": "docs/reports/private-grid-read-bridge-v1-20260907.md",
-          "content_hash": "4d6268029f58688b41507f2562bfe6bc2427507426c9e2b3667112a84e3ff610",
+          "path": "docs/reports/binance-grid-runtime-contract-20260907.json",
+          "content_hash": "6f036a899e7e085164ee279f3bf8cacfd2eb3c27808d8882d601fd6f346331e9",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9369d88e900ff0636fd5942a7482b441ee000550",
-            "head_blob_oid": "d233ed9be341777855d71f87a3ba98f7c3f90c9d",
-            "worktree_blob_oid": "a054400b02d0c2583ea9880cf2a8f60e977a385e",
+            "head_commit": "8dd6e1df9a8e8382dd9e2a03f02412db9111a505",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0ca8eb7a3e8b28303e52c5884cefe0ce52a19b23",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/reports/binance-grid-runtime-contract-20260907.md",
+          "content_hash": "c8dcfda86853b04a3cab4b99a9c759836a44c95ea3cd79f4ea054a67320b0148",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8dd6e1df9a8e8382dd9e2a03f02412db9111a505",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5b698a1ab610befbb34a7d1472f42c26e22a5993",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/reports/private-grid-read-bridge-v1-20260907.md",
+          "content_hash": "d0d6e56d8924797e02c537df7057345520633c320bf10a85c5d4dba1a396d0df",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "8dd6e1df9a8e8382dd9e2a03f02412db9111a505",
+            "head_blob_oid": "a054400b02d0c2583ea9880cf2a8f60e977a385e",
+            "worktree_blob_oid": "cabe80f0faf89a3ec9908ee11e44297ef8962a7b",
             "state": "tracked_modified"
           }
         },
@@ -14517,7 +14543,7 @@
         "expires_at_ms": 1788810442049
       },
       "created_at_ms": 1788767191531,
-      "updated_at_ms": 1788787660121
+      "updated_at_ms": 1788797008392
     },
     {
       "id": "project-feature-registry-adoption-v1",
@@ -23130,16 +23156,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_2d83a7e5cc614d2bb5e2a3ca18e616d4",
-      "feature_id": "yilong-quant-android-public-empty-v3",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Current source and delivery evidence are bound after production acceptance.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788594605082
-    },
-    {
       "id": "feature_event_ca358df495ed4829ba0afee630acb6b2",
       "feature_id": "yilong-quant-android-public-empty-v3",
       "action": "transitioned",
@@ -25128,6 +25144,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788787660121
+    },
+    {
+      "id": "feature_event_e0cb69a3b64440f1b664dfbf478a1e3f",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788797008393
     }
   ]
 }

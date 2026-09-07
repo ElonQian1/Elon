@@ -1,0 +1,1136 @@
+{
+  "schema": "yilong.binance_grid.research_evidence.v1",
+  "version_status": "research_only",
+  "reviewed_at": "2026-09-08",
+  "scope": "USD-M futures grid; observed website traffic and source analysis only",
+  "session_id": "10b36428eca051a967de49a223a122e9632a09230298f41747d0c20ca68cbb3a",
+  "release_identity": "0.3.69+aa6874c70b6090d13d8f22e8c16f4de55678336d",
+  "trading_enabled": false,
+  "account_verified": false,
+  "projection_binding_verified": false,
+  "inventory": {
+    "retained_requests_scanned": 512,
+    "exhaustive_history": false,
+    "account_inventory_complete": false
+  },
+  "interpretation": {
+    "shapes": "Observed types and union of fields; never a required-field or complete variant schema.",
+    "hashes": "Credential-filtered stored UTF-8; not original wire payload or CDP source coordinates.",
+    "timestamps": "Capture times; not reliable request/response execution-order proof.",
+    "operation_attribution": "Passive capture does not identify the actor who caused a website request.",
+    "response_semantics": "HTTP and business success observed; terminal exposure/order postconditions not verified."
+  },
+  "observed_operations": [
+    {
+      "id": "list",
+      "effect": "read",
+      "evidence_level": "account_observed",
+      "executable": false,
+      "submitted_by_research": false,
+      "origin": "https://www.binance.com",
+      "path": "/bapi/futures/v2/private/future/grid/query-open-grids",
+      "method": "POST",
+      "request_id": "298074b17f9c24c80f6a3edde71c29db575ff9ca3564fe025fc2cf81fb33a379",
+      "query_keys": [],
+      "request_body_observation": "not_available_no_bodylessness_inference",
+      "request_body_resource": null,
+      "observed_request_shape": null,
+      "http_status": 200,
+      "response_resource": {
+        "id": "5ea5d21a77e3268369c45716e845581fb6045a9575cf43fff33c656fa6cc9b2c",
+        "origin": "https://www.binance.com",
+        "path": "/bapi/futures/v2/private/future/grid/query-open-grids",
+        "sha256": "d37be4ea9e6336e2c9fd4f552cbc8db872d3b323dd184d262c518babb0ce82cd",
+        "size_bytes": 23428,
+        "generation": 4,
+        "captured_at_ms": 1788795042487,
+        "resource_type": "response_body",
+        "truncated": false
+      },
+      "response_hash_verified": true,
+      "business": {
+        "code": "000000",
+        "success": true,
+        "top_keys": [
+          "code",
+          "message",
+          "messageDetail",
+          "data",
+          "success"
+        ],
+        "data_type": "array",
+        "data_shape": {
+          "strategyId": [
+            "number"
+          ],
+          "rootUserId": [
+            "number"
+          ],
+          "strategyUserId": [
+            "number"
+          ],
+          "strategyAccountId": [
+            "number"
+          ],
+          "symbol": [
+            "string"
+          ],
+          "gridType": [
+            "string"
+          ],
+          "strategyStatus": [
+            "string"
+          ],
+          "bookTime": [
+            "number"
+          ],
+          "triggerTime": [
+            "number"
+          ],
+          "updateTime": [
+            "number"
+          ],
+          "gridInitialValue": [
+            "string"
+          ],
+          "initialLeverage": [
+            "number"
+          ],
+          "gridProfit": [
+            "string"
+          ],
+          "direction": [
+            "string"
+          ],
+          "matchedPnl": [
+            "string"
+          ],
+          "unmatchedAvgPrice": [
+            "string"
+          ],
+          "unmatchedQty": [
+            "string"
+          ],
+          "unmatchedFee": [
+            "string"
+          ],
+          "gridEntryPrice": [
+            "string"
+          ],
+          "gridPosition": [
+            "string"
+          ],
+          "version": [
+            "number"
+          ],
+          "copyCount": [
+            "number"
+          ],
+          "sharing": [
+            "boolean"
+          ],
+          "isSubAccount": [
+            "boolean"
+          ],
+          "strategyAmount": [
+            "string"
+          ],
+          "trailingUp": [
+            "boolean"
+          ],
+          "trailingDown": [
+            "boolean"
+          ],
+          "trailingStopUpperLimit": [
+            "boolean"
+          ],
+          "trailingStopLowerLimit": [
+            "boolean"
+          ],
+          "trailingDownLimitPrice": [
+            "string"
+          ],
+          "orderCurrency": [
+            "string"
+          ],
+          "gridUpperLimit": [
+            "string"
+          ],
+          "gridLowerLimit": [
+            "string"
+          ],
+          "stopTpPnl": [
+            "string"
+          ],
+          "pnlStopTriggerType": [
+            "string"
+          ],
+          "matchedCount": [
+            "number"
+          ],
+          "gridCount": [
+            "number"
+          ],
+          "perGridQuoteQty": [
+            "string"
+          ],
+          "perGridQty": [
+            "string"
+          ],
+          "fundingFee": [
+            "string"
+          ],
+          "insuranceClearFee": [
+            "string"
+          ],
+          "fee": [
+            "string"
+          ],
+          "marginType": [
+            "string"
+          ],
+          "totalAdjustmentAmount": [
+            "string"
+          ],
+          "autoInitPos": [
+            "boolean"
+          ],
+          "autoAddMargin": [
+            "boolean"
+          ],
+          "slideWindow": [
+            "boolean"
+          ],
+          "windowCount": [
+            "number"
+          ],
+          "orderBufferCount": [
+            "number"
+          ],
+          "stopLowerLimit": [
+            "string"
+          ],
+          "trailingUpLimitPrice": [
+            "string"
+          ]
+        },
+        "row_count": 20,
+        "nonempty": true,
+        "enums": {
+          "strategyStatus": [
+            "CLOSE_WITH_POSITION",
+            "WORKING"
+          ],
+          "direction": [
+            "LONG",
+            "SHORT"
+          ],
+          "gridType": [
+            "ARITH"
+          ],
+          "marginType": [
+            "CROSSED",
+            "ISOLATED"
+          ]
+        },
+        "account_proof_present_in_all_rows": true,
+        "account_proof_consistent": true
+      },
+      "postconditions_verified": false,
+      "evidence_file": "list-contract.json",
+      "evidence_file_sha256": "783ff7590e590d1c3b85dcda53428c44954ace5642184e5298ca621ac89cc341",
+      "supplemental_status_evidence": null
+    },
+    {
+      "id": "detail",
+      "effect": "read",
+      "evidence_level": "account_observed",
+      "executable": false,
+      "submitted_by_research": false,
+      "origin": "https://www.binance.com",
+      "path": "/bapi/futures/v1/private/future/grid/query-grid-detail",
+      "method": "GET",
+      "request_id": "6b2a033bcc1976b1e62018a8c297c442ae720c840a70f664ce922732b9de85d2",
+      "query_keys": [
+        "strategyId"
+      ],
+      "request_body_observation": "not_available_no_bodylessness_inference",
+      "request_body_resource": null,
+      "observed_request_shape": null,
+      "http_status": 200,
+      "response_resource": {
+        "id": "0b04f7b9f353382ac1a08cfb53ea90b51573d9a80e7d77974911c21bc42d44ce",
+        "origin": "https://www.binance.com",
+        "path": "/bapi/futures/v1/private/future/grid/query-grid-detail",
+        "sha256": "173e8cd65d5c5ff0c67d09697da1119eac56ebeee6cd2edb84f5e434bde9103c",
+        "size_bytes": 1363,
+        "generation": 4,
+        "captured_at_ms": 1788795014406,
+        "resource_type": "response_body",
+        "truncated": false
+      },
+      "response_hash_verified": true,
+      "business": {
+        "code": "000000",
+        "success": true,
+        "top_keys": [
+          "code",
+          "message",
+          "messageDetail",
+          "data",
+          "success"
+        ],
+        "data_type": "object",
+        "data_shape": {
+          "strategyId": [
+            "number"
+          ],
+          "symbol": [
+            "string"
+          ],
+          "direction": [
+            "string"
+          ],
+          "isolated": [
+            "boolean"
+          ],
+          "gridInitialValue": [
+            "string"
+          ],
+          "initialLeverage": [
+            "number"
+          ],
+          "gridType": [
+            "string"
+          ],
+          "gridCount": [
+            "number"
+          ],
+          "gridUpperLimit": [
+            "string"
+          ],
+          "gridLowerLimit": [
+            "string"
+          ],
+          "initialUpperLimit": [
+            "string"
+          ],
+          "initialLowerLimit": [
+            "string"
+          ],
+          "triggerType": [
+            "null"
+          ],
+          "triggerLever": [
+            "null"
+          ],
+          "triggerPrice": [
+            "string"
+          ],
+          "stopTriggerType": [
+            "null"
+          ],
+          "stopUpperLimit": [
+            "string"
+          ],
+          "stopLowerLimit": [
+            "string"
+          ],
+          "stopTpPnl": [
+            "string"
+          ],
+          "stopSlPnl": [
+            "string"
+          ],
+          "pnlStopTriggerType": [
+            "string"
+          ],
+          "cos": [
+            "boolean"
+          ],
+          "cps": [
+            "boolean"
+          ],
+          "tpslCps": [
+            "null"
+          ],
+          "bookTime": [
+            "number"
+          ],
+          "triggerTime": [
+            "number"
+          ],
+          "endTime": [
+            "number"
+          ],
+          "perGridQty": [
+            "string"
+          ],
+          "perGridQuoteQty": [
+            "string"
+          ],
+          "trailingUp": [
+            "boolean"
+          ],
+          "trailingDown": [
+            "boolean"
+          ],
+          "trailingStopUpperLimit": [
+            "boolean"
+          ],
+          "trailingStopLowerLimit": [
+            "boolean"
+          ],
+          "trailingUpLimitPrice": [
+            "null"
+          ],
+          "trailingDownLimitPrice": [
+            "null"
+          ],
+          "orderCurrency": [
+            "string"
+          ],
+          "opCode": [
+            "number"
+          ],
+          "opCodeMsg": [
+            "string"
+          ],
+          "strategyStatus": [
+            "string"
+          ],
+          "isSubAccount": [
+            "boolean"
+          ],
+          "strategyUserId": [
+            "number"
+          ],
+          "strategyFuturesUid": [
+            "number"
+          ],
+          "strategyAmount": [
+            "string"
+          ],
+          "sharing": [
+            "boolean"
+          ],
+          "fundingFee": [
+            "string"
+          ],
+          "insuranceClearFee": [
+            "string"
+          ],
+          "fee": [
+            "string"
+          ],
+          "marginType": [
+            "string"
+          ],
+          "gridProfit": [
+            "string"
+          ],
+          "totalAdjustmentAmount": [
+            "string"
+          ],
+          "autoInitPos": [
+            "boolean"
+          ],
+          "autoAddMargin": [
+            "boolean"
+          ],
+          "slideWindow": [
+            "boolean"
+          ],
+          "upperCursor": [
+            "null"
+          ],
+          "lowerCursor": [
+            "null"
+          ],
+          "windowCount": [
+            "number"
+          ],
+          "orderBufferCount": [
+            "number"
+          ]
+        },
+        "enums": {
+          "strategyStatus": "WORKING",
+          "direction": "LONG",
+          "gridType": "ARITH",
+          "marginType": "CROSSED"
+        },
+        "nested_arrays": {}
+      },
+      "postconditions_verified": false,
+      "evidence_file": "detail-contract.json",
+      "evidence_file_sha256": "8c882a0a05b75700fc9354ea811a3df4116ab788f9e64a8d9be5b93063aee087",
+      "supplemental_status_evidence": null
+    },
+    {
+      "id": "create",
+      "effect": "write",
+      "evidence_level": "account_observed",
+      "executable": false,
+      "submitted_by_research": false,
+      "origin": "https://www.binance.com",
+      "path": "/bapi/futures/v2/private/future/grid/place-grid",
+      "method": "POST",
+      "request_id": "106b57cdecc79d10c4561483a94ff7b540d6e05b13a65e2f56cac06035230b0c",
+      "query_keys": [],
+      "request_body_observation": "captured",
+      "request_body_resource": {
+        "id": "470a18109eb5425c94d1bb89515a54b322313a6c4af9ee3f37faa8e5f5d5b1a8",
+        "origin": "https://www.binance.com",
+        "path": "/bapi/futures/v2/private/future/grid/place-grid",
+        "sha256": "baddd40532ecd8f87d82b261afd7230242c458b361b512c117da3c690a11d41a",
+        "size_bytes": 323,
+        "generation": 7,
+        "captured_at_ms": 1788795126615,
+        "resource_type": "request_body",
+        "truncated": false
+      },
+      "observed_request_shape": {
+        "symbol": [
+          "string"
+        ],
+        "direction": [
+          "string"
+        ],
+        "leverage": [
+          "number"
+        ],
+        "marginType": [
+          "string"
+        ],
+        "gridType": [
+          "string"
+        ],
+        "gridCount": [
+          "number"
+        ],
+        "gridLowerLimit": [
+          "string"
+        ],
+        "gridUpperLimit": [
+          "string"
+        ],
+        "gridInitialValue": [
+          "string"
+        ],
+        "cos": [
+          "boolean"
+        ],
+        "cps": [
+          "boolean"
+        ],
+        "autoInitPos": [
+          "boolean"
+        ],
+        "orderCurrency": [
+          "string"
+        ],
+        "slideWindow": [
+          "boolean"
+        ],
+        "clientStrategyId": [
+          "string"
+        ]
+      },
+      "http_status": 200,
+      "response_resource": {
+        "id": "719b808218ffd04ceee52c92a8cdfee65ba3a69c9e8c2a33fbff27c0228463b6",
+        "origin": "https://www.binance.com",
+        "path": "/bapi/futures/v2/private/future/grid/place-grid",
+        "sha256": "4ea2c7630e011fb027b4e8326e777200fe22c1838fe7c4514e5734f324ee0e5c",
+        "size_bytes": 224,
+        "generation": 7,
+        "captured_at_ms": 1788795127010,
+        "resource_type": "response_body",
+        "truncated": false
+      },
+      "response_hash_verified": true,
+      "business": {
+        "code": "000000",
+        "success": true,
+        "top_keys": [
+          "code",
+          "message",
+          "messageDetail",
+          "data",
+          "success"
+        ],
+        "data_type": "object",
+        "data_shape": {
+          "strategyId": [
+            "number"
+          ],
+          "clientStrategyId": [
+            "string"
+          ],
+          "strategyType": [
+            "string"
+          ],
+          "strategyStatus": [
+            "string"
+          ],
+          "updateTime": [
+            "number"
+          ]
+        },
+        "enums": {
+          "strategyStatus": "NEW",
+          "strategyType": "GRID"
+        },
+        "nested_arrays": {}
+      },
+      "postconditions_verified": false,
+      "evidence_file": "observed-create-contract.json",
+      "evidence_file_sha256": "6bb50a60317b6c34f0a8235562d587c868e41beae96ab15c9f5502580f5c3ba8",
+      "supplemental_status_evidence": null
+    },
+    {
+      "id": "update_settings",
+      "effect": "write",
+      "evidence_level": "account_observed",
+      "executable": false,
+      "submitted_by_research": false,
+      "origin": "https://www.binance.com",
+      "path": "/bapi/futures/v1/private/future/grid/update-grid",
+      "method": "POST",
+      "request_id": "399cc77739c764804ef8f9fb91723fdc87085317475218151e0f285c1e358df5",
+      "query_keys": [],
+      "request_body_observation": "captured",
+      "request_body_resource": {
+        "id": "ec8bf508b09e0382d1a305f8bc10fe756c9743ed8c819c0f0607fba928308667",
+        "origin": "https://www.binance.com",
+        "path": "/bapi/futures/v1/private/future/grid/update-grid",
+        "sha256": "35c60283bc04ef32eeccde22c13784660dcb99c1d1e1079457da01ba9e358922",
+        "size_bytes": 131,
+        "generation": 4,
+        "captured_at_ms": 1788795041090,
+        "resource_type": "request_body",
+        "truncated": false
+      },
+      "observed_request_shape": {
+        "strategyId": [
+          "number"
+        ],
+        "symbol": [
+          "string"
+        ],
+        "cps": [
+          "boolean"
+        ],
+        "sharing": [
+          "boolean"
+        ],
+        "trailingStopLowerLimit": [
+          "boolean"
+        ],
+        "trailingStopUpperLimit": [
+          "boolean"
+        ]
+      },
+      "http_status": 200,
+      "response_resource": {
+        "id": "01e25c57b79a2556a28c57e032848e1f3ee0752f77fe9eb5a50ff5946e224ff4",
+        "origin": "https://www.binance.com",
+        "path": "/bapi/futures/v1/private/future/grid/update-grid",
+        "sha256": "71ea686bf970a74b6622aefcb1d2b2a033a22821f193fd54b904e1c834ccd447",
+        "size_bytes": 278,
+        "generation": 4,
+        "captured_at_ms": 1788795041276,
+        "resource_type": "response_body",
+        "truncated": false
+      },
+      "response_hash_verified": true,
+      "business": {
+        "code": "000000",
+        "success": true,
+        "top_keys": [
+          "code",
+          "message",
+          "messageDetail",
+          "data",
+          "success"
+        ],
+        "data_type": "object",
+        "data_shape": {
+          "strategyId": [
+            "number"
+          ],
+          "clientStrategyId": [
+            "string"
+          ],
+          "strategyType": [
+            "string"
+          ],
+          "strategyStatus": [
+            "string"
+          ],
+          "updatedSubOrder": [
+            "null"
+          ],
+          "updateStatus": [
+            "string"
+          ],
+          "updateTime": [
+            "number"
+          ]
+        },
+        "enums": {
+          "strategyStatus": "WORKING",
+          "updateStatus": "SUCCESS",
+          "strategyType": "GRID"
+        },
+        "nested_arrays": {}
+      },
+      "postconditions_verified": false,
+      "evidence_file": "observed-update-contract.json",
+      "evidence_file_sha256": "8c761c3aad22157f71412173f81e6d04d18e9398756bfa94f3d2a358773fc53d",
+      "supplemental_status_evidence": {
+        "file": "observed-update-status.json",
+        "sha256": "dd41683888a2b5a7b0ec3824868345957e8251bb957c17f9ed81e4fc119c060e"
+      }
+    },
+    {
+      "id": "terminate",
+      "effect": "write",
+      "evidence_level": "account_observed",
+      "executable": false,
+      "submitted_by_research": false,
+      "origin": "https://www.binance.com",
+      "path": "/bapi/futures/v1/private/future/grid/close-grid",
+      "method": "POST",
+      "request_id": "7b400f4f4e7adfc38b40ed61821a641e3625ad3d8cb7a488a0c657c790d19423",
+      "query_keys": [],
+      "request_body_observation": "captured",
+      "request_body_resource": {
+        "id": "f513bf18ac2238928ea6a93a9530ee7aa4c64ca9bb54f624b26c7cdb03535c53",
+        "origin": "https://www.binance.com",
+        "path": "/bapi/futures/v1/private/future/grid/close-grid",
+        "sha256": "7218ea97258706756ad5ad35fa549c95b4653a5b73dd2743009f67cf96cfe4cd",
+        "size_bytes": 24,
+        "generation": 4,
+        "captured_at_ms": 1788795041266,
+        "resource_type": "request_body",
+        "truncated": false
+      },
+      "observed_request_shape": {
+        "strategyId": [
+          "number"
+        ]
+      },
+      "http_status": 200,
+      "response_resource": {
+        "id": "00a8ba1b9c38fa051fe45f6563884cc063d684ee62ada91c3fded2e1225afa12",
+        "origin": "https://www.binance.com",
+        "path": "/bapi/futures/v1/private/future/grid/close-grid",
+        "sha256": "e3430fb79ab9838252a506cbc1a40f2595fa285b85aed87928545c88b66ba94e",
+        "size_bytes": 279,
+        "generation": 4,
+        "captured_at_ms": 1788795041560,
+        "resource_type": "response_body",
+        "truncated": false
+      },
+      "response_hash_verified": true,
+      "business": {
+        "code": "000000",
+        "success": true,
+        "top_keys": [
+          "code",
+          "message",
+          "messageDetail",
+          "data",
+          "success"
+        ],
+        "data_type": "object",
+        "data_shape": {
+          "strategyId": [
+            "number"
+          ],
+          "clientStrategyId": [
+            "string"
+          ],
+          "strategyType": [
+            "string"
+          ],
+          "strategyStatus": [
+            "string"
+          ],
+          "updatedSubOrder": [
+            "null"
+          ],
+          "updateStatus": [
+            "string"
+          ],
+          "updateTime": [
+            "number"
+          ]
+        },
+        "enums": {
+          "strategyStatus": "CANCELED",
+          "updateStatus": "SUCCESS",
+          "strategyType": "GRID"
+        },
+        "nested_arrays": {}
+      },
+      "postconditions_verified": false,
+      "evidence_file": "observed-close-contract.json",
+      "evidence_file_sha256": "e480fdb4685e5ca30ea99b183d5ce4d2858017c2833b4be76ba52f907c504401",
+      "supplemental_status_evidence": {
+        "file": "observed-close-status.json",
+        "sha256": "fffd732c52834fdd288591fb5fd2008242ac1d09516536d70e66a53146f195f3"
+      }
+    }
+  ],
+  "static_operations": [
+    {
+      "id": "update_range",
+      "method": "POST",
+      "path": "/bapi/futures/v1/private/future/grid/update-grid-range",
+      "evidence_level": "static_only",
+      "executable": false,
+      "source_anchor": "source-range-builder",
+      "request_fields": [
+        "strategyId",
+        "symbol",
+        "gridUpperLimit",
+        "gridLowerLimit",
+        "gridCount",
+        "updateRangeCps",
+        "investmentDelta",
+        "stopUpperLimit",
+        "stopLowerLimit",
+        "trailingUpLimitPrice",
+        "trailingDownLimitPrice",
+        "tpslCps"
+      ]
+    },
+    {
+      "id": "close_position",
+      "method": "POST",
+      "path": "/bapi/futures/v1/private/future/grid/close-grid-position",
+      "evidence_level": "static_only",
+      "executable": false,
+      "source_anchor": "source-close-position-payload",
+      "request_fields": [
+        "symbol",
+        "type",
+        "side",
+        "quantity",
+        "positionSide",
+        "strategyUserId",
+        "strategyId"
+      ],
+      "conditional_limit_fields": [
+        "timeInForce",
+        "price"
+      ],
+      "selector_removed_before_request": "isCM"
+    }
+  ],
+  "source_anchors": [
+    {
+      "id": "source-create-hook-imports",
+      "resource": {
+        "id": "284fcec99f1c94d30e4e3f17c355554aa99005de4238c90e49313a147f09a9bf",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/chunks/4818.ab7ba930.js",
+        "sha256": "24765919f67706cdb4e894bb491a4904e9000fa64efa5814ee808fd40fc0dcf2",
+        "size_bytes": 161121,
+        "generation": 2,
+        "captured_at_ms": 1788794949175,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 66500,
+      "next_offset": 72300,
+      "evidence_file": "source-create-hook-imports.json",
+      "evidence_file_sha256": "07792a501428a19837deef89ccd9f4b94847f957336b3bf66d6295daa1461dc9"
+    },
+    {
+      "id": "source-create-builder",
+      "resource": {
+        "id": "284fcec99f1c94d30e4e3f17c355554aa99005de4238c90e49313a147f09a9bf",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/chunks/4818.ab7ba930.js",
+        "sha256": "24765919f67706cdb4e894bb491a4904e9000fa64efa5814ee808fd40fc0dcf2",
+        "size_bytes": 161121,
+        "generation": 2,
+        "captured_at_ms": 1788794949175,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 79300,
+      "next_offset": 85500,
+      "evidence_file": "source-create-builder.json",
+      "evidence_file_sha256": "1fb80f728e9ffbb838fa31908558e58ade0314471ddcfa0342ce137127b3744b"
+    },
+    {
+      "id": "source-grid-enums",
+      "resource": {
+        "id": "d46496c9d687796a73e4effa29cb88728a1dcd348931c6cf524723b99721a630",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/chunks/page-ee55.21718cb8.js",
+        "sha256": "de6da80226b765083ad5bfa49ed741e24ec4148587673d88bf14412c786cc446",
+        "size_bytes": 1884546,
+        "generation": 2,
+        "captured_at_ms": 1788794949736,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 1389166,
+      "next_offset": 1394666,
+      "evidence_file": "source-grid-enums.json",
+      "evidence_file_sha256": "0d0899da9bab2084290e3f467badf31242db24247c778b129b78e88d6a8c1a16"
+    },
+    {
+      "id": "source-initial-margin-helper",
+      "resource": {
+        "id": "d46496c9d687796a73e4effa29cb88728a1dcd348931c6cf524723b99721a630",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/chunks/page-ee55.21718cb8.js",
+        "sha256": "de6da80226b765083ad5bfa49ed741e24ec4148587673d88bf14412c786cc446",
+        "size_bytes": 1884546,
+        "generation": 2,
+        "captured_at_ms": 1788794949736,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 1196473,
+      "next_offset": 1198773,
+      "evidence_file": "source-initial-margin-helper.json",
+      "evidence_file_sha256": "63f4cb65670773b737cdcde49ca29ffcaa0f76a6c432f6ef459ef8a94b39a267"
+    },
+    {
+      "id": "source-math-operators",
+      "resource": {
+        "id": "bb2b69e36556ec49db1d5a1709c5e722300522cfbba89ca257e81753ff6c3585",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/common/0ea9e839.4f78b70f.js",
+        "sha256": "5706010994076314b5114776cc79d3bcea8c916aae3157708e3bf10c8cc8a815",
+        "size_bytes": 76108,
+        "generation": 3,
+        "captured_at_ms": 1788794950654,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 0,
+      "next_offset": 3400,
+      "evidence_file": "source-math-operators.json",
+      "evidence_file_sha256": "edf5192a90027b284f2b503c852b97697f8e522f79e600ca9eaf7b3818592d43"
+    },
+    {
+      "id": "source-roi-converter",
+      "resource": {
+        "id": "d46496c9d687796a73e4effa29cb88728a1dcd348931c6cf524723b99721a630",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/chunks/page-ee55.21718cb8.js",
+        "sha256": "de6da80226b765083ad5bfa49ed741e24ec4148587673d88bf14412c786cc446",
+        "size_bytes": 1884546,
+        "generation": 2,
+        "captured_at_ms": 1788794949736,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 169636,
+      "next_offset": 170286,
+      "evidence_file": "source-roi-converter.json",
+      "evidence_file_sha256": "7fd1d0ef1ea883a855724922234adf934ec7f778e86087caa09f3e03657d154b"
+    },
+    {
+      "id": "source-range-builder",
+      "resource": {
+        "id": "d46496c9d687796a73e4effa29cb88728a1dcd348931c6cf524723b99721a630",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/chunks/page-ee55.21718cb8.js",
+        "sha256": "de6da80226b765083ad5bfa49ed741e24ec4148587673d88bf14412c786cc446",
+        "size_bytes": 1884546,
+        "generation": 2,
+        "captured_at_ms": 1788794949736,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 391600,
+      "next_offset": 399500,
+      "evidence_file": "source-range-builder.json",
+      "evidence_file_sha256": "505e7604f0b445b39f914b9780463470977c2afcce50f032e345deb3c5fee808"
+    },
+    {
+      "id": "source-close-module-exports",
+      "resource": {
+        "id": "d21f6b13ca0d8effa8e562f880fec2e31a779c0597f96b59754666e6cb35cc00",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/common/4dd8fa7a.e193caf7.js",
+        "sha256": "db9498381816b948bca1714190e2d0be69328bed703503810eb6d011cc27b382",
+        "size_bytes": 68342,
+        "generation": 3,
+        "captured_at_ms": 1788794950983,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 0,
+      "next_offset": 4000,
+      "evidence_file": "source-close-module-exports.json",
+      "evidence_file_sha256": "f2e74738e8f53c4a4508ba1964f024852ed4064cea30e7d4e30688de61b7c46a"
+    },
+    {
+      "id": "source-close-wrapper-exports",
+      "resource": {
+        "id": "d21f6b13ca0d8effa8e562f880fec2e31a779c0597f96b59754666e6cb35cc00",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/common/4dd8fa7a.e193caf7.js",
+        "sha256": "db9498381816b948bca1714190e2d0be69328bed703503810eb6d011cc27b382",
+        "size_bytes": 68342,
+        "generation": 3,
+        "captured_at_ms": 1788794950983,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 3700,
+      "next_offset": 7300,
+      "evidence_file": "source-close-wrapper-exports.json",
+      "evidence_file_sha256": "1406652c52702fb0bbde5478607a05eee44d827587aba0f8c4131e10c6cd207c"
+    },
+    {
+      "id": "source-close-ui",
+      "resource": {
+        "id": "d46496c9d687796a73e4effa29cb88728a1dcd348931c6cf524723b99721a630",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/chunks/page-ee55.21718cb8.js",
+        "sha256": "de6da80226b765083ad5bfa49ed741e24ec4148587673d88bf14412c786cc446",
+        "size_bytes": 1884546,
+        "generation": 2,
+        "captured_at_ms": 1788794949736,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 349180,
+      "next_offset": 355780,
+      "evidence_file": "source-close-ui.json",
+      "evidence_file_sha256": "1bbe5fafa7613c791336411ad430424621ab3b0e6688472cf789ba90c87e7b6b"
+    },
+    {
+      "id": "source-close-submit",
+      "resource": {
+        "id": "d46496c9d687796a73e4effa29cb88728a1dcd348931c6cf524723b99721a630",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/chunks/page-ee55.21718cb8.js",
+        "sha256": "de6da80226b765083ad5bfa49ed741e24ec4148587673d88bf14412c786cc446",
+        "size_bytes": 1884546,
+        "generation": 2,
+        "captured_at_ms": 1788794949736,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 355780,
+      "next_offset": 360680,
+      "evidence_file": "source-close-submit.json",
+      "evidence_file_sha256": "9a176bb0a2a107dcaadb891fc8cfd979a59f7c6e5806e4d36eb27ad01ab4a38d"
+    },
+    {
+      "id": "source-close-position-exports",
+      "resource": {
+        "id": "d21f6b13ca0d8effa8e562f880fec2e31a779c0597f96b59754666e6cb35cc00",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/common/4dd8fa7a.e193caf7.js",
+        "sha256": "db9498381816b948bca1714190e2d0be69328bed703503810eb6d011cc27b382",
+        "size_bytes": 68342,
+        "generation": 3,
+        "captured_at_ms": 1788794950983,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 12400,
+      "next_offset": 14800,
+      "evidence_file": "source-close-position-exports.json",
+      "evidence_file_sha256": "ffb1a6654197dc934c3b070aba67576f74fbfd5fb3aeaaad3701de9391491534"
+    },
+    {
+      "id": "source-close-position-wrapper",
+      "resource": {
+        "id": "d21f6b13ca0d8effa8e562f880fec2e31a779c0597f96b59754666e6cb35cc00",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/common/4dd8fa7a.e193caf7.js",
+        "sha256": "db9498381816b948bca1714190e2d0be69328bed703503810eb6d011cc27b382",
+        "size_bytes": 68342,
+        "generation": 3,
+        "captured_at_ms": 1788794950983,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 15000,
+      "next_offset": 18700,
+      "evidence_file": "source-close-position-wrapper.json",
+      "evidence_file_sha256": "1e7b1a07a3c37878963e38343c07478ee173e37b8a112db135cbeb9eb90024d8"
+    },
+    {
+      "id": "source-close-position-ui",
+      "resource": {
+        "id": "d46496c9d687796a73e4effa29cb88728a1dcd348931c6cf524723b99721a630",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/chunks/page-ee55.21718cb8.js",
+        "sha256": "de6da80226b765083ad5bfa49ed741e24ec4148587673d88bf14412c786cc446",
+        "size_bytes": 1884546,
+        "generation": 2,
+        "captured_at_ms": 1788794949736,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 329250,
+      "next_offset": 332750,
+      "evidence_file": "source-close-position-ui.json",
+      "evidence_file_sha256": "4c8bf51195faa2425dee6dad267800b0e0eb70210861a9fe9d58069b6878f485"
+    },
+    {
+      "id": "source-position-form-builder",
+      "resource": {
+        "id": "d46496c9d687796a73e4effa29cb88728a1dcd348931c6cf524723b99721a630",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/chunks/page-ee55.21718cb8.js",
+        "sha256": "de6da80226b765083ad5bfa49ed741e24ec4148587673d88bf14412c786cc446",
+        "size_bytes": 1884546,
+        "generation": 2,
+        "captured_at_ms": 1788794949736,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 91095,
+      "next_offset": 97995,
+      "evidence_file": "source-position-form-builder.json",
+      "evidence_file_sha256": "a8107bbd4c2abb573cab092e5ede35d8bcbc715644e19ad15442ca18c0ba277e"
+    },
+    {
+      "id": "source-close-position-payload",
+      "resource": {
+        "id": "d46496c9d687796a73e4effa29cb88728a1dcd348931c6cf524723b99721a630",
+        "origin": "https://bin.bnbstatic.com",
+        "path": "/static/chunks/page-ee55.21718cb8.js",
+        "sha256": "de6da80226b765083ad5bfa49ed741e24ec4148587673d88bf14412c786cc446",
+        "size_bytes": 1884546,
+        "generation": 2,
+        "captured_at_ms": 1788794949736,
+        "resource_type": "Script",
+        "truncated": false
+      },
+      "offset": 131909,
+      "next_offset": 140101,
+      "evidence_file": "source-close-position-payload.json",
+      "evidence_file_sha256": "97fdd6a4a5443a636f8aca6b95bc975d1c75144eee9b90d63e8471d238c3704d"
+    }
+  ],
+  "unverified": [
+    "failure_contracts",
+    "rate_limits",
+    "idempotency",
+    "timeout_reconciliation",
+    "all_create_variants",
+    "range_edit_runtime",
+    "residual_position_runtime",
+    "terminal_open_orders_and_positions",
+    "account_binding_to_private_projection",
+    "APK_end_to_end"
+  ]
+}
