@@ -43,7 +43,7 @@ internal class ChatGptWebFileDownloadGateway(
             if (value.has("byteOperation")) {
                 if (!state.adapterCurrent || value.optString("documentToken") != state.documentToken) return@addWebMessageListener
                 val lease = if (value.optString("byteOperation") == "begin") {
-                    leases.consume(id, state.documentToken, state.pageGeneration, webView.url.orEmpty(), SystemClock.elapsedRealtime())
+                    consumeResolved(id, value, state)
                 } else null
                 bytes.accept(value, lease) { response -> runCatching { reply.postMessage(response) } }
                 return@addWebMessageListener
@@ -51,8 +51,7 @@ internal class ChatGptWebFileDownloadGateway(
             val url = ChatGptWebFileDownloadPolicy.signedUrl(value.optString("url"))
             if (state.adapterCurrent && value.optString("documentToken") == state.documentToken) {
                 if (value.optBoolean("cancel") && !bytes.cancel(id)) session.pageCancelled(id)
-                val lease = leases.consume(id, state.documentToken, state.pageGeneration,
-                    webView.url.orEmpty(), SystemClock.elapsedRealtime())
+                val lease = consumeResolved(id, value, state)
                 if (lease != null && value.optBoolean("cancel")) result.put("state", "cancelled")
                 else if (lease != null && url != null && runCatching { enqueue(lease, url) }.getOrDefault(false)) {
                     result.put("state", "queued")
@@ -78,8 +77,17 @@ internal class ChatGptWebFileDownloadGateway(
         check(session.begin(lease.id, requestId))
         return JSONObject().put("version", 1).put("leaseId", lease.id)
             .put("byteTransferVersion", 1)
+            .put("resolvedFileVersion", ChatGptWebFileDownloadMetadata.VERSION)
             .put("documentToken", lease.token).put("href", href).put("path", path)
             .put("name", file.name).put("downloadHandle", file.downloadHandle).toString()
+    }
+
+    private fun consumeResolved(id: String, value: JSONObject, state: WebBridgeDocumentSession.Snapshot): ChatGptWebFileDownloadLease.Value? {
+        val lease = leases.consume(id, state.documentToken, state.pageGeneration,
+            webView.url.orEmpty(), SystemClock.elapsedRealtime()) ?: return null
+        return ChatGptWebFileDownloadMetadata.resolve(lease, value).also {
+            if (it == null) session.update(id, Stage.FAILED)
+        }
     }
 
     private fun enqueue(lease: ChatGptWebFileDownloadLease.Value, url: String): Boolean {
