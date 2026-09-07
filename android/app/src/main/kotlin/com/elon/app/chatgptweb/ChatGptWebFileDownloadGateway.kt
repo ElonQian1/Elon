@@ -20,6 +20,11 @@ internal class ChatGptWebFileDownloadGateway(
 ) {
     private val app = context.applicationContext
     private val leases = ChatGptWebFileDownloadLease()
+    private val bytes = ChatGptWebFileByteDownload(app) { lease ->
+        val state = document()
+        !disposed && state.adapterCurrent && state.documentToken == lease.token &&
+            state.pageGeneration == lease.generation && webView.url == lease.href
+    }
     private var installed = false
     private var disposed = false
 
@@ -27,13 +32,22 @@ internal class ChatGptWebFileDownloadGateway(
         if (installed || !WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return
         WebViewCompat.addWebMessageListener(webView, BRIDGE, setOf(ORIGIN)) { _, message, origin, mainFrame, reply ->
             if (disposed || !mainFrame || origin.toString().trimEnd('/') != ORIGIN) return@addWebMessageListener
-            val body = message.data?.takeIf { it.length <= 20_000 } ?: return@addWebMessageListener
+            val body = message.data?.takeIf { it.length <= 70_000 } ?: return@addWebMessageListener
             val value = runCatching { JSONObject(body) }.getOrNull() ?: return@addWebMessageListener
             val id = value.optString("leaseId").takeIf { UUID.matches(it) } ?: return@addWebMessageListener
             val result = JSONObject().put("leaseId", id).put("state", "failed")
             val state = document()
+            if (value.has("byteOperation")) {
+                if (!state.adapterCurrent || value.optString("documentToken") != state.documentToken) return@addWebMessageListener
+                val lease = if (value.optString("byteOperation") == "begin") {
+                    leases.consume(id, state.documentToken, state.pageGeneration, webView.url.orEmpty(), SystemClock.elapsedRealtime())
+                } else null
+                bytes.accept(value, lease) { response -> runCatching { reply.postMessage(response) } }
+                return@addWebMessageListener
+            }
             val url = ChatGptWebFileDownloadPolicy.signedUrl(value.optString("url"))
             if (state.adapterCurrent && value.optString("documentToken") == state.documentToken) {
+                if (value.optBoolean("cancel")) bytes.cancel(id)
                 val lease = leases.consume(id, state.documentToken, state.pageGeneration,
                     webView.url.orEmpty(), SystemClock.elapsedRealtime())
                 if (lease != null && value.optBoolean("cancel")) result.put("state", "cancelled")
@@ -56,6 +70,7 @@ internal class ChatGptWebFileDownloadGateway(
         val lease = leases.begin(state.documentToken, state.pageGeneration, href,
             file.name, file.mediaType, SystemClock.elapsedRealtime()) ?: return null
         return JSONObject().put("version", 1).put("leaseId", lease.id)
+            .put("byteTransferVersion", 1)
             .put("documentToken", lease.token).put("href", href).put("path", path)
             .put("name", file.name).put("downloadHandle", file.downloadHandle).toString()
     }
@@ -77,10 +92,11 @@ internal class ChatGptWebFileDownloadGateway(
         return manager.enqueue(request) > 0L
     }
 
-    fun cancel() { leases.cancel() }
+    fun cancel() { leases.cancel(); bytes.cancel() }
     fun dispose() {
         cancel()
         disposed = true
+        bytes.dispose()
         if (installed) WebViewCompat.removeWebMessageListener(webView, BRIDGE)
         installed = false
     }
