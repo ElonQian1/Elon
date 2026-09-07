@@ -125,7 +125,7 @@ internal class ChatGptWebPageAdapter(
     private val mainHandler = Handler(Looper.getMainLooper())
     private val documentSession = WebBridgeDocumentSession()
     private val nativeAttachments = ChatGptWebNativeAttachmentGateway(context, webView, documentSession::snapshot)
-    private val nativeDownloads = ChatGptWebFileDownloadGateway(context, webView, documentSession::snapshot)
+    internal val nativeDownloads = ChatGptWebFileDownloadGateway(context, webView, documentSession::snapshot)
     private val handshake = ChatGptWebBridgeHandshake(
         schedule = { delayMs, action -> mainHandler.postDelayed({ action() }, delayMs) },
         injectAndRequestSnapshot = ::injectAndRequestSnapshot,
@@ -428,7 +428,7 @@ internal class ChatGptWebPageAdapter(
     fun cancelNativeAttachmentUpload() = nativeAttachments.cancel()
 
     fun downloadConversationFile(path: String, file: com.elon.app.WebChatConversationFile, requestId: String) {
-        val descriptor = nativeDownloads.prepare(path, file)
+        val descriptor = nativeDownloads.prepare(path, file, requestId)
         if (descriptor == null) onEvent(ChatGptWebEvent.CommandResult(
             "download_conversation_file", false, "download_not_ready", requestId))
         else runCommand(action = "download_conversation_file", value = descriptor, requestId = requestId)
@@ -677,7 +677,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 281
+        internal const val ADAPTER_VERSION = 282
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",

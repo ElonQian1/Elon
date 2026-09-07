@@ -11,6 +11,8 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.elon.app.WebBridgeDocumentSession
 import com.elon.app.WebChatConversationFile
+import com.elon.app.WebChatFileDownloadState
+import com.elon.app.WebChatFileDownloadState.Stage
 import org.json.JSONObject
 
 internal class ChatGptWebFileDownloadGateway(
@@ -20,11 +22,12 @@ internal class ChatGptWebFileDownloadGateway(
 ) {
     private val app = context.applicationContext
     private val leases = ChatGptWebFileDownloadLease()
-    private val bytes = ChatGptWebFileByteDownload(app) { lease ->
+    private val session = ChatGptWebFileDownloadSession()
+    private val bytes = ChatGptWebFileByteDownload(app, isCurrent = { lease ->
         val state = document()
         !disposed && state.adapterCurrent && state.documentToken == lease.token &&
             state.pageGeneration == lease.generation && webView.url == lease.href
-    }
+    }, onProgress = session::update)
     private var installed = false
     private var disposed = false
 
@@ -47,12 +50,15 @@ internal class ChatGptWebFileDownloadGateway(
             }
             val url = ChatGptWebFileDownloadPolicy.signedUrl(value.optString("url"))
             if (state.adapterCurrent && value.optString("documentToken") == state.documentToken) {
-                if (value.optBoolean("cancel")) bytes.cancel(id)
+                if (value.optBoolean("cancel") && !bytes.cancel(id)) session.pageCancelled(id)
                 val lease = leases.consume(id, state.documentToken, state.pageGeneration,
                     webView.url.orEmpty(), SystemClock.elapsedRealtime())
                 if (lease != null && value.optBoolean("cancel")) result.put("state", "cancelled")
                 else if (lease != null && url != null && runCatching { enqueue(lease, url) }.getOrDefault(false)) {
                     result.put("state", "queued")
+                    session.update(id, Stage.QUEUED)
+                } else if (lease != null) {
+                    session.update(id, Stage.FAILED)
                 }
             }
             // No signed URLs, credentials or server error bodies enter the generic command receipts.
@@ -61,14 +67,15 @@ internal class ChatGptWebFileDownloadGateway(
         installed = true
     }
 
-    fun prepare(path: String, file: WebChatConversationFile): String? {
+    fun prepare(path: String, file: WebChatConversationFile, requestId: String): String? {
         val state = document()
         val href = webView.url ?: return null
         val uri = Uri.parse(href)
-        if (!installed || disposed || !state.adapterCurrent || uri.scheme != "https" ||
+        if (!installed || disposed || session.snapshot()?.active == true || requestId.isBlank() || !state.adapterCurrent || uri.scheme != "https" ||
             uri.host != "chatgpt.com" || uri.port != -1 || !ChatGptWebFileDownloadPolicy.HANDLE.matches(file.downloadHandle)) return null
         val lease = leases.begin(state.documentToken, state.pageGeneration, href,
             file.name, file.mediaType, SystemClock.elapsedRealtime()) ?: return null
+        check(session.begin(lease.id, requestId))
         return JSONObject().put("version", 1).put("leaseId", lease.id)
             .put("byteTransferVersion", 1)
             .put("documentToken", lease.token).put("href", href).put("path", path)
@@ -92,7 +99,25 @@ internal class ChatGptWebFileDownloadGateway(
         return manager.enqueue(request) > 0L
     }
 
-    fun cancel() { leases.cancel(); bytes.cancel() }
+    fun snapshot(): WebChatFileDownloadState? = session.snapshot()
+
+    fun cancelDownload(requestId: String): Boolean {
+        val current = session.snapshot()
+        if (current?.requestId != requestId || !current.active) return false
+        if (current.stage == Stage.CANCELLING) return true
+        val id = session.requestCancel(requestId) ?: return false
+        leases.cancel()
+        if (!bytes.cancel(id)) session.update(id, Stage.CANCELLED)
+        // This calls only our page-local owner, never an official DOM control.
+        runCatching { webView.evaluateJavascript("window.__elonChatGptPrivateFileDownload?.cancel(" + JSONObject.quote(id) + ");", null) }
+        return true
+    }
+
+    fun cancel() {
+        session.snapshot()?.takeIf { it.active }?.let { cancelDownload(it.requestId) }
+        leases.cancel()
+        bytes.cancel()
+    }
     fun dispose() {
         cancel()
         disposed = true

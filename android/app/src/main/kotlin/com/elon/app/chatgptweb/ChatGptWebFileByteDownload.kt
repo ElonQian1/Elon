@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import com.elon.app.WebChatFileDownloadState.Stage
 import org.json.JSONObject
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -12,6 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal class ChatGptWebFileByteDownload(
     private val context: Context,
     private val isCurrent: (ChatGptWebFileDownloadLease.Value) -> Boolean,
+    private val onProgress: (String, Stage, Long, Long) -> Unit = { _, _, _, _ -> },
 ) {
     private class Job(val lease: ChatGptWebFileDownloadLease.Value, val expectedBytes: Long, val reply: (String) -> Unit) {
         val cancelled = AtomicBoolean()
@@ -51,7 +53,10 @@ internal class ChatGptWebFileByteDownload(
             }
             active = Job(lease, expectedBytes, reply)
             val job = checkNotNull(active)
-            job.notice = ChatGptWebFileByteNotifications(context, lease) { cancel(lease.id) }
+            job.notice = ChatGptWebFileByteNotifications(context, lease) {
+                onProgress(lease.id, Stage.CANCELLING, job.received, job.expectedBytes)
+                cancel(lease.id)
+            }
             job.notice.start()
             expiry = Runnable { if (active === job) cancel() }.also {
                 handler.postDelayed(it, ChatGptWebFileByteTransfer.TIMEOUT_MS)
@@ -63,6 +68,7 @@ internal class ChatGptWebFileByteDownload(
             if (job != null && job.lease.id == id && !isCurrent(job.lease)) cancel(id)
             respond("failed"); return
         }
+        if (operation == "commit") onProgress(id, Stage.SAVING, job.received, job.expectedBytes)
         busy = true
         worker.execute {
             val state = runCatching {
@@ -92,6 +98,11 @@ internal class ChatGptWebFileByteDownload(
             handler.post {
                 busy = false
                 val current = !disposed && active === job && !job.cancelled.get() && isCurrent(job.lease)
+                if (state == "saved" || state == "failed" || !job.cancelled.get()) onProgress(id, when {
+                    state == "saved" -> Stage.SAVED
+                    state == "failed" || !current -> Stage.FAILED
+                    else -> Stage.TRANSFERRING
+                }, job.received, job.expectedBytes)
                 if (active === job) {
                     if (state == "saved") job.notice.saved(job.savedUri)
                     else if (state == "failed" || !current) job.notice.failed()
@@ -110,14 +121,18 @@ internal class ChatGptWebFileByteDownload(
         }
     }
 
-    fun cancel(id: String? = null) {
-        val job = active ?: return
-        if (id != null && id != job.lease.id) return
+    fun cancel(id: String? = null): Boolean {
+        val job = active ?: return false
+        if (id != null && id != job.lease.id) return false
         job.cancelled.set(true)
         job.notice.cancel()
         runCatching { job.reply(JSONObject().put("leaseId", job.lease.id).put("state", "cancelled").toString()) }
         clearActive()
-        worker.execute { runCatching { job.transfer?.cancel() } }
+        worker.execute {
+            runCatching { job.transfer?.cancel() }
+            handler.post { onProgress(job.lease.id, Stage.CANCELLED, job.received, job.expectedBytes) }
+        }
+        return true
     }
 
     private fun clearActive() {
