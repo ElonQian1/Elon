@@ -54,7 +54,7 @@ attachment in the personal library. Legacy create/process still omit the field.
 
 ## Production ownership
 
-- `chatgpt_web_private_attachment_reservation.js` owns the version-2 ephemeral
+- `chatgpt_web_private_attachment_reservation.js` owns the version-3 ephemeral
   slot, experiment check, exact allocation and final claim shape. It does not
   own native UI, file reading, WebView identity, audio, or message sending.
 - `chatgpt_web_private_attachment_selection.js` owns one picker selection. It
@@ -79,7 +79,10 @@ attachment in the personal library. Legacy create/process still omit the field.
 - A ready slot replaces only file creation and the final processing endpoint.
   Bytes still use the existing signed PUT or same-origin Estuary module.
   Processing must finish for the exact file ID before the existing official
-  ready-file association can issue `private_attachment_associated`.
+  ready-file association can issue `private_attachment_associated`. A confirmed
+  [library reuse result](chatgpt-private-attachment-library-reuse.md) instead
+  abandons the slot and byte stage without claiming it, then associates the
+  validated existing file once.
 - If a slot is pending, ineligible, expired or malformed, the sender proceeds
   with its established private create/upload/process path without extra waiting.
   Taking a pending slot cancels it; a late response cannot replace the chosen
@@ -95,8 +98,8 @@ attachment in the personal library. Legacy create/process still omit the field.
   failed final processing. Private credentials go only to the official origin;
   signed blob destinations receive no account headers or page credentials.
 
-Native module versions: composer 12, sender 11, selection 2, transport 9,
-reservation 2; page adapter 276. The loader registers reservation before
+Native module versions: composer 14, sender 13, selection 2, transport 11,
+reservation 3; page adapter 278. The loader registers reservation before
 transport and selection before sender. No duplicate picker, sender, polling
 loop or system fallback was introduced. The production composer passes a typed
 preparation port to its existing attachment actions; work/Google defaults stay
@@ -138,8 +141,10 @@ An account outside the current official experiment is an unobserved reservation
 case, not a reason to force the experiment or claim a successful private route.
 Actual latency, heat and energy improvement remains unmeasured.
 
-Still unfinished: direct-library hash/reuse, remaining file categories and
-grouped acceptance. Temporary reservations are implemented, not live-verified;
+Direct-library hash/reuse and current ordinary composer persistence intent are
+now [integrated in source](chatgpt-private-attachment-library-reuse.md), with
+212 focused attachment checks passed. Remaining categories and grouped device
+acceptance are unfinished. Temporary reservations are implemented, not live-verified;
 disabled, pending or incompatible reservations retain the established temporary
 create/process path unchanged. Projects keep their established scoped private
 upload path and are not converted to ordinary reservations. A `/c/` route

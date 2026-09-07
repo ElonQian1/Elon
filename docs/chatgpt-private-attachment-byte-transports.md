@@ -59,8 +59,10 @@ loads the module before the attachment transport; no DOM click is added.
   processing. There is no automatic retry, reload or alternate upload replay.
 
 Creation/PDF model headers and processing privacy/project metadata are unchanged.
-Only the existing final processing and exact composer association can make an
-attachment ready to send. This is page-local private HTTP with WebView identity;
+Uploaded files require final processing and exact composer association to become
+ready. The separate [library reuse path](chatgpt-private-attachment-library-reuse.md)
+requires a validated existing entry and confirmed byte cancellation instead.
+This is page-local private HTTP with WebView identity;
 it is not a fully independent Android networking implementation.
 
 ## Verification and remaining work
@@ -81,8 +83,9 @@ than manufacturing a production response or calling it verified.
 
 Reservation prefetch/claim is now [integrated in source](chatgpt-private-upload-reservations.md),
 including bounded ordinary/temporary native picker-open prewarm and byte
-preparation overlap without waiting. Direct-library reuse and remaining file
-categories are still separate gaps. Existing [native integration](chatgpt-private-attachment-upload.md)
+preparation overlap without waiting. [Direct-library reuse](chatgpt-private-attachment-library-reuse.md)
+is also integrated in source; remaining categories and grouped acceptance are
+still gaps. Existing [native integration](chatgpt-private-attachment-upload.md)
 and [scope rules](chatgpt-private-attachment-scopes.md) are reused. Do not repeat
 protocol implementation merely because live acceptance remains pending. Actual
 latency, energy and thermal improvement has not been measured.
@@ -100,10 +103,9 @@ current library-reuse policy allows it. The second asset's `uqt` export `K$t`
 of the losing upload before associating the reused file. This is not permission
 to race two successful associations or replay an uncertain upload.
 
-This is source evidence only, not implemented or device-verified reuse. The
-ordinary native uploader currently passes explicit `storeInLibrary=false`.
-The next implementation prerequisite is exact current-composer library intent
-and reuse association, not another hash/HTTP module behind an unreachable flag.
-Do not change retention intent merely to enable deduplication. Temporary
-attachments must remain excluded from library reuse. Keep this checkpoint so
-the same endpoint and call chain need not be rediscovered.
+Current composer intent and reuse association are now implemented in
+[the library reuse module](chatgpt-private-attachment-library-reuse.md), with
+212 attachment checks passed but grouped device acceptance still pending.
+Ordinary uploads follow the existing official library option; temporary uploads
+remain excluded. Retention is not changed to enable deduplication. This source
+checkpoint is retained so the endpoint and call chain need not be rediscovered.

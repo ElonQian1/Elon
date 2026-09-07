@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 13, create: factory });
+  const exported = Object.freeze({ version: 14, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -211,8 +211,17 @@
   function associate(binding, file, result, leaseId) {
     const scope = projects.get(binding);
     const projectId = scope?.projectId || binding.projectId;
+    const metadata = result?.metadata || {};
+    const reused = result?.stage === 'reused';
+    if (reused && (binding.isTemporaryChat || projectId || !binding.libraryEnabled ||
+        metadata.libraryPersistenceResult !== 'library' ||
+        !/^[A-Za-z0-9_-]{1,160}$/.test(metadata.libraryFileId || '') ||
+        typeof result.reusedFileName !== 'string' || !result.reusedFileName.trim() ||
+        result.reusedFileName.length > 120 || /[\x00-\x1f\x7f/\\]/.test(result.reusedFileName))) {
+      throw new Error('association_invalid');
+    }
     if (!current(binding) || !confirmed.has(binding) || result?.ok !== true || result.associated !== false ||
-        result.binding !== binding || result.stage !== 'processed' || result.isTemporaryChat !== binding.isTemporaryChat ||
+        result.binding !== binding || !['processed', 'reused'].includes(result.stage) || result.isTemporaryChat !== binding.isTemporaryChat ||
         (result.projectId || null) !== projectId ||
         (scope && result.projectWriteRequested !== scope.canWrite) ||
         !/^[A-Za-z0-9_-]{1,160}$/.test(result.fileId || '') || result.fileSize !== file.size ||
@@ -220,8 +229,8 @@
     const store = binding.store;
     if (store.files$().length !== 0 || store.hasUploadInProgress$()) throw new Error('composer_changed');
     const tempId = 'native_upload_' + leaseId;
-    const metadata = result.metadata || {};
-    const spec = { name: file.name, id: result.fileId, size: file.size, isBigPaste: false, mimeType: file.type };
+    const spec = { name: reused ? result.reusedFileName : file.name, id: result.fileId,
+      size: file.size, isBigPaste: false, mimeType: file.type };
     if (/^image\//.test(file.type)) {
       Object.assign(spec, root.__elonChatGptPrivateAttachmentProtocol.imageDimensions(result.imageDimensions));
     }
@@ -235,7 +244,8 @@
       tempId, file, fileSignature: JSON.stringify({ name: file.name, size: file.size,
         lastModified: file.lastModified, type: file.type }),
       status: 'ready', progress: 100, fileId: result.fileId, cdnUrl: null, fileSpec: spec,
-      source: 'local', storeInLibrary: !binding.isTemporaryChat && !projectId && binding.libraryEnabled,
+      source: reused ? 'library' : 'local', ...(reused ? { autoReused: true } : {}),
+      storeInLibrary: !binding.isTemporaryChat && !projectId && binding.libraryEnabled,
       isTemporaryChat: binding.isTemporaryChat, isProjectThread: !!projectId,
       ...(scope?.canWrite ? { projectGizmoId: projectId } : {}),
       ...(libraryFileInfo ? { libraryFileInfo } : {}),
@@ -284,5 +294,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 13, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, merge, remove });
+  return Object.freeze({ version: 14, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, merge, remove });
 });

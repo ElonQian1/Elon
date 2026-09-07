@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 10, create: factory });
+  const exported = Object.freeze({ version: 11, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root && root.location?.origin === 'https://chatgpt.com') {
     root.__elonChatGptPrivateAttachmentTransport = exported;
@@ -23,6 +23,8 @@
   const reservation = [1, 2, 3].includes(reservationModule?.version) ? reservationModule.create(root, {
     protocol, bytes, request, isCurrent: current, acquireHeaders: async () => allowedHeaders(await acquire()),
   }) : null;
+  const libraryModule = options?.library || root.__elonChatGptPrivateAttachmentLibrary;
+  const library = libraryModule?.version === 1 ? libraryModule.create(root, { protocol, request }) : null;
 
   function allowedHeaders(source) {
     const result = { Accept: 'application/json', 'Content-Type': 'application/json' };
@@ -39,14 +41,37 @@
         typeof current !== 'function' || current(job.binding) !== true) throw new Error('context_changed');
   }
 
-  async function dispatch(job, url, init, mode, timeoutMs) {
+  async function dispatch(job, url, init, mode, timeoutMs, signal = job.controller.signal) {
     assertCurrent(job);
+    if (signal.aborted) throw new Error('cancelled');
     job.dispatched += 1;
     const result = await request(root, url, {
-      ...init, redirect: 'error', signal: job.controller.signal,
+      ...init, redirect: 'error', signal,
     }, { mode, timeoutMs, maxBytes: 256 * 1024 });
     assertCurrent(job);
     return result;
+  }
+
+  async function uploadBytes(job, destination, file, headers, signal) {
+    const controller = new root.AbortController();
+    const abort = () => controller.abort();
+    signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) abort();
+    try {
+      if (bytes?.version === 1) return await bytes.upload(root, destination, file, headers, {
+        assertCurrent: () => {
+          assertCurrent(job);
+          if (controller.signal.aborted) throw new Error('cancelled');
+        }, abort,
+        dispatch: (url, init, mode, timeout) => dispatch(job, url, init, mode, timeout, controller.signal),
+      });
+      return await dispatch(job, destination.url, {
+        method: 'PUT', credentials: 'omit', headers: destination.headers, body: file,
+      }, 'none', 30000, controller.signal);
+    } finally {
+      signal.removeEventListener('abort', abort);
+      abort();
+    }
   }
 
   function change(job, stage) {
@@ -97,29 +122,35 @@
         : protocol.destination(prepared, file.type);
       job.fileId = destination.fileId;
       change(job, 'uploading');
-      if (bytes?.version === 1) await bytes.upload(root, destination, file, headers, {
-        assertCurrent: () => assertCurrent(job), abort: () => job.controller.abort(),
-        dispatch: (url, init, mode, timeout) => dispatch(job, url, init, mode, timeout),
-      });
-      else await dispatch(job, destination.url, {
-        method: 'PUT', credentials: 'omit', headers: destination.headers, body: file,
-      }, 'none', 30000);
-      change(job, 'processing');
-      const processing = reserved?.claim || { url: '/backend-api/files/process_upload_stream',
-        body: JSON.stringify(protocol.processBody(destination.fileId, file, selected)) };
-      const processed = await dispatch(job, processing.url, {
-        method: 'POST', credentials: 'include', headers: reserved ? { ...headers, ...creationHeaders } : headers,
-        body: processing.body,
-      }, 'text', 30000);
-      const result = protocol.processed(processed.text, destination.fileId);
+      const transfer = library ? await library.transfer(file, selected, headers, {
+        signal: job.controller.signal, assertCurrent: () => assertCurrent(job),
+        upload: signal => uploadBytes(job, destination, file, headers, signal),
+      }) : { kind: 'uploaded', result: await uploadBytes(job, destination, file, headers, job.controller.signal) };
+      let result;
+      if (transfer.kind === 'reused') {
+        job.fileId = transfer.file.fileId;
+        result = { metadata: { libraryFileId: transfer.file.libraryFileId, libraryPersistenceResult: 'library',
+          mimeType: transfer.file.mimeType }, eventCount: 0, events: [] };
+      } else {
+        change(job, 'processing');
+        const processing = reserved?.claim || { url: '/backend-api/files/process_upload_stream',
+          body: JSON.stringify(protocol.processBody(destination.fileId, file, selected)) };
+        const processed = await dispatch(job, processing.url, {
+          method: 'POST', credentials: 'include', headers: reserved ? { ...headers, ...creationHeaders } : headers,
+          body: processing.body,
+        }, 'text', 30000);
+        result = protocol.processed(processed.text, destination.fileId);
+      }
       if (selected.imageDimensions && result.metadata.mimeType && result.metadata.mimeType !== file.type ||
           selected.isTemporaryChat === true && result.metadata.libraryPersistenceResult === 'library') {
         throw new Error('processing_metadata_mismatch');
       }
-      change(job, 'processed');
+      const stage = transfer.kind === 'reused' ? 'reused' : 'processed';
+      change(job, stage);
       assertCurrent(job);
       return {
-        ok: true, stage: 'processed', binding, fileId: destination.fileId,
+        ok: true, stage, binding, fileId: job.fileId,
+        ...(stage === 'reused' ? { reusedFileName: transfer.file.fileName } : {}),
         fileName: file.name, fileSize: file.size, mimeType: file.type,
         isTemporaryChat: selected.isTemporaryChat === true,
         projectId: selected.projectScopeId || selected.libraryFileInfo?.gizmo_id || null,
@@ -148,6 +179,6 @@
     if (!active && cooldownUntil <= Date.now()) reservation?.start(context, binding, signal);
   }
   function cancel() { reservation?.cancel(); if (active) active.controller.abort(); }
-  function snapshot() { return { version: 10, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
-  return Object.freeze({ version: 10, prefetch, upload, cancel, dispose: cancel, snapshot });
+  function snapshot() { return { version: 11, stage: active?.stage || 'idle', cooldown: cooldownUntil > Date.now() }; }
+  return Object.freeze({ version: 11, prefetch, upload, cancel, dispose: cancel, snapshot });
 });
