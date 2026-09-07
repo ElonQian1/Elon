@@ -241,8 +241,7 @@ test('production orchestrator prioritizes the runtime and never clicks after an 
 });
 
 test('production module registration precedes the actual send orchestrator', () => {
-  const adapter = fs.readFileSync(path.join(__dirname,
-    '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const adapter = require('./chatgpt-web-adapter-assembly').readAdapterSource();
   assert.ok(adapter.indexOf('"chatgpt_web_private_text_runtime_submit.js"') < adapter.indexOf('"chatgpt_web_text_transaction_orchestrator.js"'));
   const names = [...adapter.split('private val ADAPTER_ASSETS = listOf(')[1].split(')')[0].matchAll(/"([a-z0-9_]+\.js)"/g)].map(match => match[1]);
   new vm.Script(names.map(name => fs.readFileSync(path.join(assets, name), 'utf8')).join('\n'));

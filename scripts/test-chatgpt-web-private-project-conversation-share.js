@@ -165,8 +165,7 @@ test('member command carries a distinct audience receipt', async () => {
 });
 
 test('production bundle registers member scope before the shared command owner', () => {
-  const kotlin = fs.readFileSync(path.join(__dirname,
-    '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const kotlin = require('./chatgpt-web-adapter-assembly').readAdapterSource();
   const names = [...kotlin.matchAll(/"(chatgpt_web_[a-z_]+\.js)"/g)].map(match => match[1]);
   const index = names.indexOf('chatgpt_web_private_project_conversation_share.js');
   assert.ok(index > names.indexOf('chatgpt_web_private_conversation_share_contract.js'));

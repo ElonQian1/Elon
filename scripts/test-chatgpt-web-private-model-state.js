@@ -303,7 +303,7 @@ test('production model request/select/dismiss is registered and does not emit we
   composer.dismissOpenMenu(input, emit, result);
   assert.equal(results.at(-1)[0], 'dismiss_composer_menu');
   assert.equal(events.some(event => event.type === 'web_touch_request'), false);
-  const adapter = fs.readFileSync(path.join(assets, '../kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const adapter = require('./chatgpt-web-adapter-assembly').readAdapterSource();
   assert.ok(adapter.indexOf('"chatgpt_web_private_model_contract.js"') < adapter.indexOf('"chatgpt_web_private_model_state.js"'));
   assert.ok(adapter.indexOf('"chatgpt_web_private_model_state.js"') < adapter.indexOf('"chatgpt_web_adapter_composer.js"'));
 });

@@ -17,10 +17,7 @@ const orchestratorSource = fs.readFileSync(path.join(
   root, 'android', 'app', 'src', 'main', 'assets',
   'chatgpt_web_text_transaction_orchestrator.js'
 ), 'utf8');
-const pageAdapterSource = fs.readFileSync(path.join(
-  root, 'android', 'app', 'src', 'main', 'kotlin', 'com', 'elon', 'app',
-  'chatgptweb', 'ChatGptWebPageAdapter.kt'
-), 'utf8');
+const pageAdapterSource = require('./chatgpt-web-adapter-assembly').readAdapterSource();
 const streamingPolicySource = fs.readFileSync(path.join(
   root, 'android', 'app', 'src', 'main', 'assets', 'chatgpt_web_adapter_streaming_policy.js'
 ), 'utf8');

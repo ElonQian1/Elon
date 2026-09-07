@@ -296,8 +296,7 @@ test('share modules parse in the same concatenated asset scope and are registere
 });
 
 test('production bundle includes the share contract before transport and command routing', () => {
-  const kotlin = fs.readFileSync(path.join(__dirname,
-    '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const kotlin = require('./chatgpt-web-adapter-assembly').readAdapterSource();
   const names = [...kotlin.matchAll(/"(chatgpt_web_[a-z_]+\.js)"/g)].map(match => match[1]);
   const before = names.indexOf('chatgpt_web_private_conversation_share_contract.js');
   const after = names.indexOf('chatgpt_web_private_conversation_share.js');

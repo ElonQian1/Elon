@@ -14,10 +14,7 @@ const relaySource = asset('chatgpt_web_private_text_transaction_relay.js');
 const adapterSource = asset('chatgpt_web_adapter.js');
 const orchestratorSource = asset('chatgpt_web_text_transaction_orchestrator.js');
 const streamSource = asset('chatgpt_web_private_stream_transport.js');
-const pageAdapterSource = fs.readFileSync(path.join(
-  root, 'android', 'app', 'src', 'main', 'kotlin', 'com', 'elon', 'app',
-  'chatgptweb', 'ChatGptWebPageAdapter.kt'
-), 'utf8');
+const pageAdapterSource = require('./chatgpt-web-adapter-assembly').readAdapterSource();
 const buildGradle = fs.readFileSync(path.join(root, 'android', 'app', 'build.gradle'), 'utf8');
 
 class FakeHeaders {

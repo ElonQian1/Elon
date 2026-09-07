@@ -11,10 +11,7 @@ const asset = (name) => fs.readFileSync(path.join(
 const fetchTapSource = asset('chatgpt_web_private_fetch_tap.js');
 const policySource = asset('chatgpt_web_private_stream_policy.js');
 const transportSource = asset('chatgpt_web_private_stream_transport.js');
-const pageAdapter = fs.readFileSync(path.join(
-  __dirname, '..', 'android', 'app', 'src', 'main', 'kotlin',
-  'com', 'elon', 'app', 'chatgptweb', 'ChatGptWebPageAdapter.kt'
-), 'utf8');
+const pageAdapter = require('./chatgpt-web-adapter-assembly').readAdapterSource();
 
 assert.match(pageAdapter, /PRIVATE_FETCH_TAP_ASSET/);
 assert.match(pageAdapter, /chatgpt_web_private_fetch_tap\.js/);

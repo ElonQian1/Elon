@@ -12,10 +12,7 @@ const assetSource = fs.readFileSync(path.join(
 const messagesSource = fs.readFileSync(path.join(
   root, 'android', 'app', 'src', 'main', 'assets', 'chatgpt_web_adapter_messages.js'
 ), 'utf8');
-const pageAdapterSource = fs.readFileSync(path.join(
-  root, 'android', 'app', 'src', 'main', 'kotlin', 'com', 'elon', 'app',
-  'chatgptweb', 'ChatGptWebPageAdapter.kt'
-), 'utf8');
+const pageAdapterSource = require('./chatgpt-web-adapter-assembly').readAdapterSource();
 
 class FakeImage {
   constructor(source, width = 1600, height = 900) {

@@ -15,10 +15,7 @@ const compactFixture = JSON.parse(fs.readFileSync(path.join(
   __dirname, 'fixtures', 'chatgpt-private-stream-compact.json'
 ), 'utf8'));
 const buildGradle = fs.readFileSync(path.join(__dirname, '..', 'android', 'app', 'build.gradle'), 'utf8');
-const pageAdapter = fs.readFileSync(path.join(
-  __dirname, '..', 'android', 'app', 'src', 'main', 'kotlin',
-  'com', 'elon', 'app', 'chatgptweb', 'ChatGptWebPageAdapter.kt'
-), 'utf8');
+const pageAdapter = require('./chatgpt-web-adapter-assembly').readAdapterSource();
 
 assert.match(
   buildGradle,

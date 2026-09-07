@@ -231,7 +231,7 @@ test('production integration keeps gallery receipts separate and removes the ext
   assert.match(adapter, /PrivateImageGallery\?\.handle\(action, command, respond, emitEvent\)/);
   assert.match(adapter, /PrivateImageGallery\?\.dispose\(\)/);
   assert.match(read('chatgpt_web_adapter_bootstrap.js'), /'__elonChatGptPrivateImageGallery'/);
-  assert.match(read('ChatGptWebPageAdapter.kt', true), /"chatgpt_web_private_image_gallery.js"/);
+  assert.match(require('./chatgpt-web-adapter-assembly').readAdapterSource(), /"chatgpt_web_private_image_gallery.js"/);
   const controller = read('ChatGptWebImageGalleryController.kt', true);
   assert.doesNotMatch(controller, /ChatGptWebImageGallerySync\(/);
   assert.match(controller, /state.requestId != activeRequestId/);

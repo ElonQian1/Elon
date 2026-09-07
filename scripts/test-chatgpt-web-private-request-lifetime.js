@@ -222,8 +222,7 @@ test('timed-out project refresh cannot replace a later successful directory', as
 
 test('Android early identity and desktop early directory load the request owner first', () => {
   const root = path.join(__dirname, '..');
-  const android = fs.readFileSync(path.join(root,
-    'android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const android = require('./chatgpt-web-adapter-assembly').readAdapterSource();
   const desktop = fs.readFileSync(path.join(root,
     'desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs'), 'utf8');
   assert.match(android, /privateAuthContextScript = listOf\(\s*"chatgpt_web_private_json_request.js", PRIVATE_AUTH_CONTEXT_ASSET/);

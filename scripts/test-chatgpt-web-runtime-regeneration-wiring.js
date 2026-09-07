@@ -71,7 +71,7 @@ test('the production adapter delegates the same native regeneration command with
 });
 
 test('production assets include the versioned contracts before the command orchestrator', () => {
-  const adapter = fs.readFileSync(path.join(assetRoot, '../kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const adapter = require('./chatgpt-web-adapter-assembly').readAdapterSource();
   const names = [...adapter.split('private val ADAPTER_ASSETS = listOf(')[1].split(')')[0].matchAll(/"([a-z0-9_]+)\.js"/g)].map(m => m[1]);
   for (const name of ['chatgpt_web_private_regenerate_contract', 'chatgpt_web_private_regenerate_runtime']) {
     assert.ok(names.indexOf(name) >= 0 && names.indexOf(name) < names.indexOf('chatgpt_web_text_transaction_orchestrator'));

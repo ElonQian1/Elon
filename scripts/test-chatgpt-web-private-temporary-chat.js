@@ -304,6 +304,6 @@ test('production temporary adapter uses runtime selection and authoritative stat
   assert.doesNotMatch(JSON.stringify([f.results, descriptor]), /Bearer|00000000|client-created|headers|token/);
   const layout = fs.readFileSync(path.join(assets, 'chatgpt_web_adapter_layout.js'), 'utf8');
   assert.match(layout, /temporaryChatAdapter\.describe\(window\.__elonChatGptPageSemanticPolicy,\s*\{\s*node,/);
-  const kotlin = fs.readFileSync(path.join(assets, '../kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const kotlin = require('./chatgpt-web-adapter-assembly').readAdapterSource();
   assert.ok(kotlin.indexOf('"chatgpt_web_private_temporary_chat.js"') < kotlin.indexOf('"chatgpt_web_adapter_temporary_chat.js"'));
 });

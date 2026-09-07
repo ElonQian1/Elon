@@ -266,7 +266,7 @@ test('both byte routes preserve existing image, PDF, document, temporary and pro
 });
 
 test('production assets load byte routing before the attachment transport and parse together', () => {
-  const adapter = fs.readFileSync(path.join(__dirname, '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const adapter = require('./chatgpt-web-adapter-assembly').readAdapterSource();
   const names = [...adapter.split('private val ADAPTER_ASSETS = listOf(')[1].split(')')[0].matchAll(/"([a-z0-9_]+\.js)"/g)].map(m => m[1]);
   assert.ok(names.indexOf('chatgpt_web_private_attachment_bytes.js') >= 0);
   assert.ok(names.indexOf('chatgpt_web_private_attachment_bytes.js') < names.indexOf('chatgpt_web_private_attachment_transport.js'));

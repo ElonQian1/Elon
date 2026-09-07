@@ -14,10 +14,7 @@ const observerSource = fs.readFileSync(assetPath, 'utf8');
 const adapterSource = fs.readFileSync(path.join(
   root, 'android', 'app', 'src', 'main', 'assets', 'chatgpt_web_adapter.js'
 ), 'utf8');
-const pageAdapterSource = fs.readFileSync(path.join(
-  root, 'android', 'app', 'src', 'main', 'kotlin', 'com', 'elon', 'app',
-  'chatgptweb', 'ChatGptWebPageAdapter.kt'
-), 'utf8');
+const pageAdapterSource = require('./chatgpt-web-adapter-assembly').readAdapterSource();
 
 function createContext(options = {}) {
   const events = [];

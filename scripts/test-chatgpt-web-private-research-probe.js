@@ -12,10 +12,7 @@ const source = fs.readFileSync(path.join(
 const buildGradle = fs.readFileSync(path.join(
   __dirname, '..', 'android', 'app', 'build.gradle'
 ), 'utf8');
-const pageAdapter = fs.readFileSync(path.join(
-  __dirname, '..', 'android', 'app', 'src', 'main', 'kotlin',
-  'com', 'elon', 'app', 'chatgptweb', 'ChatGptWebPageAdapter.kt'
-), 'utf8');
+const pageAdapter = require('./chatgpt-web-adapter-assembly').readAdapterSource();
 
 assert.match(
   buildGradle,

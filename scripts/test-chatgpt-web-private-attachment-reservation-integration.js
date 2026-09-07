@@ -89,8 +89,7 @@ function fixture(options = {}) {
 }
 
 test('production asset bundle loads reservation before transport and retains one sender', () => {
-  const adapter = fs.readFileSync(path.join(__dirname,
-    '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const adapter = require('./chatgpt-web-adapter-assembly').readAdapterSource();
   const declaration = adapter.slice(adapter.indexOf('private val ADAPTER_ASSETS = listOf('));
   const assets = [...declaration.slice(0, declaration.indexOf('\n        )')).matchAll(/"([^"\n]+\.js)"/g)].map(match => match[1]);
   const name = 'chatgpt_web_private_attachment_reservation.js';

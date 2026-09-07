@@ -14,10 +14,7 @@ const dataChannelSource = fs.readFileSync(path.join(
   root, 'android', 'app', 'src', 'main', 'assets',
   'chatgpt_web_realtime_data_channel_research.js'
 ), 'utf8');
-const adapter = fs.readFileSync(path.join(
-  root, 'android', 'app', 'src', 'main', 'kotlin', 'com', 'elon', 'app',
-  'chatgptweb', 'ChatGptWebPageAdapter.kt'
-), 'utf8');
+const adapter = require('./chatgpt-web-adapter-assembly').readAdapterSource();
 const recorder = fs.readFileSync(path.join(
   root, 'android', 'app', 'src', 'main', 'kotlin', 'com', 'elon', 'app',
   'chatgptweb', 'ChatGptWebPrivateResearchEventRecorder.kt'

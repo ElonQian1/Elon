@@ -23,7 +23,7 @@ test('shared content policy retains the released download URL boundary', () => {
 });
 
 test('production assembly loads one content policy before image and binary consumers', () => {
-  const adapter = fs.readFileSync('android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt', 'utf8');
+  const adapter = require('./chatgpt-web-adapter-assembly').readAdapterSource();
   const names = [...adapter.matchAll(/"(chatgpt_web_[A-Za-z0-9_]+\.js)"/g)].map(match => match[1]);
   const name = 'chatgpt_web_private_content_source.js';
   assert.equal(names.filter(value => value === name).length, 1);

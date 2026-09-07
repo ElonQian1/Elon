@@ -91,7 +91,7 @@ test('pending stop blocks both send and regeneration before their fallback paths
 });
 
 test('production bundle wires stopping after its shared conversation context', () => {
-  const adapter = fs.readFileSync(path.join(assets, '../kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const adapter = require('./chatgpt-web-adapter-assembly').readAdapterSource();
   const names = [...adapter.split('private val ADAPTER_ASSETS = listOf(')[1].split(')')[0].matchAll(/"([a-z0-9_]+)\.js"/g)].map(m => m[1]);
   const stop = names.indexOf('chatgpt_web_private_stop_runtime');
   assert.ok(stop > names.indexOf('chatgpt_web_private_text_runtime_submit'));

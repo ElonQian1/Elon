@@ -93,8 +93,7 @@ test('existing finance and chart parsers are reused, not reimplemented', () => {
   assert.deepEqual(calls, [value.metadata]);
 });
 test('asset registration precedes private history requests', () => {
-  const adapter = fs.readFileSync(path.join(root,
-    'android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const adapter = require('./chatgpt-web-adapter-assembly').readAdapterSource();
   assert.ok(adapter.indexOf('chatgpt_web_private_history_projection.js') < adapter.indexOf('chatgpt_web_private_transport.js'));
   const desktop = fs.readFileSync(path.join(root,
     'desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs'), 'utf8');
