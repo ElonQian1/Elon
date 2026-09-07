@@ -1,14 +1,16 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateModelState = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
   'use strict';
   options = options || {};
   const contract = (options.contract || page.__elonChatGptPrivateModelContract).create(page);
+  const extra = page.__elonChatGptPrivateModelCatalog?.create(page, contract);
   const PREFIX = 'private_model_';
-  let modules, loading, cooldown = 0, serial = 0, owned = null, pending = null, receipt = null;
+  const PAGE_SIZE = 20;
+  let modules, loading, cooldown = 0, serial = 0, owned = null, pending = null, receipt = null, mutation = null;
 
   function load() {
     if (modules) return Promise.resolve();
@@ -29,23 +31,70 @@
     return loading;
   }
 
+  function cancelMutation() {
+    const previous = mutation; mutation = null;
+    if (!previous) return;
+    previous.cancel?.();
+    previous.waiters.forEach(result => result('select_model_option', false, '模型选择已被新的操作替代。'));
+  }
+
   function cancel() {
+    cancelMutation();
     if (!pending) return;
     const previous = pending; pending = null;
     previous.result('list_model_options', false, '模型请求已被新的操作替代。');
   }
 
-  function emitCatalog(binding, value, emit, view = 'presets') {
+  function emitCatalog(binding, value, emit, view = 'presets', page = 0) {
     serial += 1;
-    const choices = value.choices.map((item, index) => ({ ...item, id: PREFIX + serial + '_' + index }));
+    const lastPage = Math.max(0, Math.ceil(value.choices.length / PAGE_SIZE) - 1);
+    page = Math.max(0, Math.min(page, lastPage));
+    const visible = view === 'models' ? value.choices.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : value.choices;
+    const choices = visible.map((item, index) => ({ ...item, id: PREFIX + serial + '_' + index }));
     const advanced = PREFIX + serial + '_advanced';
     const back = PREFIX + serial + '_back', official = PREFIX + serial + '_official';
-    owned = { binding, ...value, choices, advanced, back, official, emit, view };
+    const previous = PREFIX + serial + '_previous', next = PREFIX + serial + '_next';
+    let showOther = true;
+    if (view === 'advanced') {
+      try { showOther = extra?.catalog(binding, modules)?.choices.length !== 0; }
+      catch (_) { /* Unknown catalog remains reachable through the existing reader. */ }
+    }
+    owned = { binding, ...value, choices, advanced, back, official, previous, next, page, lastPage, emit, view };
     const navigation = (id, label) => ({ id, label, selected: false, semantic: 'model', kind: 'menuitem', opensSubmenu: true });
-    emit([...(view === 'advanced' && value.canGoBack !== false ? [navigation(back, '返回档位')] : []),
+    emit([...(view === 'models' ? [navigation(back, '返回高级')] :
+      view === 'advanced' && value.canGoBack !== false ? [navigation(back, '返回档位')] : []),
       ...choices.map(item => ({ id: item.id, label: item.label, selected: item.selected,
         semantic: item.semantic || 'model', kind: 'menuitemradio', opensSubmenu: false })),
-      view === 'advanced' ? navigation(official, '其他官网模型') : navigation(advanced, '高级')]);
+      ...(view === 'models' ? [...(page > 0 ? [navigation(previous, '上一页')] : []),
+        ...(page < lastPage ? [navigation(next, '下一页')] : [])] :
+        view === 'advanced' ? (showOther ? [navigation(official, '其他官网模型')] : []) : [navigation(advanced, '高级')])]);
+  }
+
+  function readCatalog(menu, view) {
+    return view === 'models' ? extra?.catalog(menu.binding, modules) : view === 'advanced'
+      ? contract.advancedCatalog(menu.binding, modules) : contract.catalog(menu.binding, modules);
+  }
+
+  function selectCatalog(menu, target, result, snapshot) {
+    if (mutation?.id === target.id) { mutation.waiters.push(result); return; }
+    cancelMutation();
+    const operation = { id: target.id, waiters: [result], active: () => mutation === operation };
+    mutation = operation;
+    void extra.apply(menu.binding, modules, target.selection, menu.live, operation).then(catalogState => {
+      if (mutation !== operation) return;
+      receipt = { id: target.id, binding: menu.binding, catalogState };
+      const updated = extra.catalog(menu.binding, modules);
+      if (updated) emitCatalog(menu.binding, updated, menu.emit, 'models', menu.page);
+      else owned = null;
+      mutation = null;
+      operation.waiters.forEach(done => done('select_model_option', true, ''));
+      snapshot();
+    }).catch(() => {
+      if (mutation !== operation) return;
+      mutation = null; owned = null; receipt = null;
+      operation.waiters.forEach(done => done('select_model_option', false, '模型状态或隐私资格未能确认，请重新选择。'));
+      snapshot();
+    });
   }
 
   function request(getTrigger, emit, result, fallback) {
@@ -80,25 +129,30 @@
   function select(id, result, snapshot, advanced) {
     if (typeof id !== 'string' || !id.startsWith(PREFIX)) return false;
     const menu = owned;
-    const navigation = menu && (menu.view === 'presets' ? id === menu.advanced :
-      id === menu.official || menu.canGoBack !== false && id === menu.back);
-    if (navigation && contract.current(menu.binding)) {
+    const destination = menu && (menu.view === 'presets' ? id === menu.advanced && 'advanced' :
+      menu.view === 'advanced' ? id === menu.official ? 'models' : menu.canGoBack !== false && id === menu.back && 'presets' :
+        id === menu.back ? 'advanced' : (id === menu.previous && menu.page > 0 || id === menu.next && menu.page < menu.lastPage) && 'models');
+    if (destination && contract.current(menu.binding)) {
+      cancelMutation();
       receipt = null;
-      if (id === menu.official) { dismiss(); advanced(); return true; }
       let value;
       try {
-        value = id === menu.advanced ? contract.advancedCatalog(menu.binding, modules) : contract.catalog(menu.binding, modules);
+        value = readCatalog(menu, destination);
       } catch (_) { /* An unknown extended contract does not replace existing models. */ }
-      if (!value && id === menu.advanced) { dismiss(); advanced(); return true; }
-      if (value) emitCatalog(menu.binding, value, menu.emit, id === menu.advanced ? 'advanced' : 'presets');
+      if (!value && destination !== 'presets') { dismiss(); advanced(); return true; }
+      const page = menu.view !== 'models' ? 0 : menu.page + (id === menu.next ? 1 : id === menu.previous ? -1 : 0);
+      if (value) emitCatalog(menu.binding, value, menu.emit, destination, page);
       else { owned = null; receipt = null; }
       result('select_model_option', !!value, value ? '' : '档位状态仍在更新，请重新打开选择。');
       snapshot(); return true;
     }
     const target = menu?.choices.find(item => item.id === id);
+    if (target && menu.view === 'models') { selectCatalog(menu, target, result, snapshot); return true; }
+    cancelMutation();
     let ok = false;
     try {
-      if (!target && receipt?.id === id) ok = receipt.advancedState
+      if (!target && receipt?.id === id) ok = receipt.catalogState
+        ? extra.matches(receipt.binding, modules, receipt.catalogState) : receipt.advancedState
         ? contract.matchesAdvanced(receipt.binding, modules, receipt.advancedState)
         : contract.matches(contract.read(receipt.binding, modules), receipt.selection);
       else if (target) {
@@ -122,10 +176,10 @@
   }
 
   function dismiss() {
-    const handled = !!owned || !!pending;
+    const handled = !!owned || !!pending || !!mutation;
     cancel(); owned = null; receipt = null;
     return handled;
   }
 
-  return Object.freeze({ version: 2, request, select, dismiss });
+  return Object.freeze({ version: 3, request, select, dismiss });
 });

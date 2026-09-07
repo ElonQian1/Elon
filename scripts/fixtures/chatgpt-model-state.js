@@ -100,6 +100,7 @@ function fixture(options = {}) {
     syncPicker();
   }
   const page = { location: { href: 'https://chatgpt.com/c/' + CID },
+    __elonChatGptPrivateModelCatalog: options.modelCatalog,
     __elonChatGptDocumentToken: 'doc_fixture_1',
     __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({ Authorization: account }) },
     document: { querySelector: () => null }, performance: { getEntriesByName: () => loaded ? [{}] : [] },

@@ -23,6 +23,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_adapter_messages.js",
         "chatgpt_web_adapter_model_label_policy.js",
         "chatgpt_web_private_model_contract.js",
+        "chatgpt_web_private_model_catalog.js",
         "chatgpt_web_private_model_state.js",
         "chatgpt_web_adapter_composer_option_policy.js",
         "chatgpt_web_adapter_composer_submenu.js",

@@ -1,11 +1,12 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateModelContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
   'use strict';
   const SLUG = /^[a-z0-9][a-z0-9._-]{0,127}$/i;
+  const MODEL_ID = /^[a-z0-9][a-z0-9._:/-]{0,255}$/i;
   const URLS = Object.freeze({
     shared: 'https://chatgpt.com/cdn/assets/4813494d-hrplraurzfyvxb10.js',
     conversation: 'https://chatgpt.com/cdn/assets/conversation-small-hiw4wce20lu6te81.js',
@@ -73,7 +74,7 @@
     if (!now || !validate(modules) || modules.shared.uo(now.conversation) !== false) return null;
     const c = modules.conversation, model = c.Nrn(now.conversation);
     const effortStore = c.yRt(now.conversation), tierStore = c.l0(now.conversation);
-    if (!SLUG.test(model?.id || '') || typeof effortStore?.conversationThinkingEffort$ !== 'function' ||
+    if (!MODEL_ID.test(model?.id || '') || typeof effortStore?.conversationThinkingEffort$ !== 'function' ||
         typeof effortStore.setThinkingEffort !== 'function' ||
         typeof tierStore?.getDraftServiceTier !== 'function') return null;
     return { model: model.id, effort: effortStore.conversationThinkingEffort$(),
@@ -340,6 +341,6 @@
     return advancedState(after);
   }
 
-  return Object.freeze({ version: 2, urls: URLS, capture, current, validate, catalog, read, matches, apply,
-    advancedCatalog, applyAdvanced, matchesAdvanced });
+  return Object.freeze({ version: 3, urls: URLS, capture, current, validate, catalog, read, matches, apply,
+    readAdvanced, advancedCatalog, applyAdvanced, matchesAdvanced });
 });
