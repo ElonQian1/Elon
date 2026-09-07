@@ -2,8 +2,9 @@
 
 Capability candidate: `android_chatgpt_private_mounted_file_download_v1`.
 Implementation: scoped provider-file materialization and existing native download.
-Verification: 119 focused Node cases passed; real account/device pending.
+Verification: 177 related Node cases passed; real account/device pending.
 Delivery: source candidate for the next grouped APK, not `completed` or installed.
+Adapter version: 296; file/history/library modules 11/6/5.
 
 This extends the [existing library download owner](chatgpt-private-shared-library-download.md).
 It does not create a second file picker, progress UI, byte-transfer worker,
@@ -90,3 +91,13 @@ downloads and history projection, with no failures/skips. Log stem:
 `mounted-download-regression-20260908-20260908-055152-533`.
 HTTP and native acknowledgements were synthetic. Android packaging and real
 provider/file acceptance remain deferred to the grouped delivery.
+
+The adapter upgrade case fails with target 295 because an already-loaded 295
+bridge skips reinjection. Target 296 reloads the updated modules, retires the old
+download selection registry once, and preserves the identity/audio owner objects.
+This is a bootstrap contract test, not a live call or installed-APK acceptance.
+No extra runtime asset, Kotlin branch or periodic background work was added.
+The combined upgrade/download/transport/new-chat suite passed 177 Node runner
+cases with zero failures/skips. Log stem:
+`mounted-final-related-20260908-20260908-055915-448`.
+This supersedes the 119-case checkpoint only for offline verification.

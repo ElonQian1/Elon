@@ -3,8 +3,8 @@
 Capability candidate: `android_chatgpt_private_shared_library_download_v1`.
 Status: **implemented, offline JS verified, packaged in Release 1549;
 grouped device acceptance pending**. This is not a `completed` capability.
-Current source: file-download module 10, library-download module 4, history
-projection 5. The existing adapter asset list is reused unchanged. APK 1549
+Current source: file-download module 11, library-download module 5, history
+projection 6. The existing adapter asset list is reused unchanged. APK 1549
 contains modules 10/4 with source-matching asset hashes and is installed on
 Xiaomi. The personal-library extension has not had a saved-byte device test;
 the current guest session cannot establish account-library acceptance. See
@@ -89,7 +89,8 @@ control or complete page snapshot is polled for each progress update.
 ## Exact remaining gaps
 
 - Personal `libraryDownloadId` resolution for a conversation attachment is now
-  implemented below. Standalone library browsing, mounted-library, connector-only
+  implemented below. [Concrete mounted provider files](chatgpt-private-mounted-file-download.md)
+  now have source implementation; exports, standalone browsing, citation-only
   cloud and remaining image-pointer scopes/path forms are still not covered.
   [Bounded parameterized image pointers](chatgpt-private-image-download.md#parameterized-pointers)
   are implemented separately in the same download owner.

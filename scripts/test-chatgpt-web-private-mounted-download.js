@@ -2,6 +2,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { webcrypto } = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 const projection = require('../android/app/src/main/assets/chatgpt_web_private_history_projection.js');
 const download = require('../android/app/src/main/assets/chatgpt_web_private_file_download.js');
 const library = require('../android/app/src/main/assets/chatgpt_web_private_library_download.js');
@@ -227,4 +230,36 @@ test('a mismatched authorization cannot save the wrong materialized file', async
   assert.equal(f.calls.length, 2);
   assert.equal(f.saved, false);
   assert.equal(f.receipts.at(-1)[1], false);
+});
+
+test('installed bridges upgrade once and load mounted modules without replacing identity or audio', () => {
+  const assets = path.join(__dirname, '../android/app/src/main/assets');
+  const adapter = fs.readFileSync(path.join(assets, '../kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
+  const version = Number(/ADAPTER_VERSION = (\d+)/.exec(adapter)[1]);
+  const bootstrap = fs.readFileSync(path.join(assets, 'chatgpt_web_adapter_bootstrap.js'), 'utf8');
+  for (const previous of [294, 295]) {
+    const identity = {}, audio = {};
+    let disposed = 0, retired = 0;
+    const window = { location: { origin: 'https://chatgpt.com' },
+      __elonChatGptAdapterVersion: previous, __elonChatGptAdapterTargetVersion: version,
+      __elonChatGptBridge: { dispose() { disposed++; } },
+      __elonChatGptPrivateAuthContext: identity, __elonChatGptPrivateRealtimeVoice: audio,
+      __elonChatGptPrivateFileDownload: { version: 10, dispose() { retired++; } } };
+    const context = { window, location: window.location };
+    vm.runInNewContext(bootstrap, context);
+    assert.equal(disposed, 1);
+    for (const filename of ['chatgpt_web_private_history_projection.js',
+      'chatgpt_web_private_library_download.js', 'chatgpt_web_private_file_download.js']) {
+      vm.runInNewContext(fs.readFileSync(path.join(assets, filename), 'utf8'), context);
+    }
+    assert.equal(window.__elonChatGptPrivateHistoryProjection.version, 6);
+    assert.equal(window.__elonChatGptPrivateLibraryDownload.version, 5);
+    assert.equal(window.__elonChatGptPrivateFileDownload.version, 11);
+    assert.equal(retired, 1);
+    assert.equal(window.__elonChatGptPrivateAuthContext, identity);
+    assert.equal(window.__elonChatGptPrivateRealtimeVoice, audio);
+    vm.runInNewContext(bootstrap, context);
+    vm.runInNewContext(fs.readFileSync(path.join(assets, 'chatgpt_web_private_file_download.js'), 'utf8'), context);
+    assert.equal(disposed, 1); assert.equal(retired, 1);
+  }
 });
