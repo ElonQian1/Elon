@@ -79,7 +79,7 @@ test('unknown project/library scopes, connectors, unscoped pointers and invalid 
   f.payload.gizmo_id = 'g-p-test';
   assert.equal(f.register()[0].downloadHandle, undefined);
   delete f.payload.gizmo_id;
-  f.payload.messages[0].content.parts.unshift({ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file-image?unknown=scope' });
+  f.payload.messages[0].content.parts.unshift({ content_type: 'image_asset_pointer', asset_pointer: 'sediment://file-image?context_scopes=other' });
   const rows = f.register();
   assert.equal(rows[0].downloadHandle, undefined);
   assert.match(rows[1].downloadHandle, /^download_/);

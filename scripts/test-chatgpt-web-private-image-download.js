@@ -111,10 +111,87 @@ test('ordinary project image pointers keep project and conversation scope togeth
   }
 });
 
+test('image download preserves opaque pointer parameters and official fragment normalization', async () => {
+  for (const scheme of ['file-service', 'sediment']) {
+    const f = fixture(scheme + '://' + ID + '#synthetic?variant=first&variant=last&label=a%2Bb+test');
+    f.root.fetch = async (url, init) => {
+      f.calls.push({ url: new URL(url), init });
+      return Response.json({ status: 'success', file_id: ID + '*synthetic', download_url: SIGNED });
+    };
+    const rows = f.register();
+    assert.match(rows[0].downloadHandle || '', /^download_[a-f0-9]{32}$/);
+    assert.ok(!JSON.stringify(rows).includes('synthetic?'));
+    assert.ok(!JSON.stringify(rows).includes('variant'));
+    await f.run(f.descriptor(rows));
+    assert.equal(f.calls.length, 1);
+    assert.equal(decodeURIComponent(f.calls[0].url.pathname), '/backend-api/files/download/' + ID + '*synthetic');
+    assert.deepEqual([...f.calls[0].url.searchParams], [
+      ['variant', 'last'], ['label', 'a+b test'],
+      ['check_context_scopes_for_conversation_id', 'source'], ['download_intent', 'true'],
+    ]);
+    assert.equal(f.queued.length, 1);
+  }
+});
+
+test('parameterized image metadata matches the complete official pointer, not a different base file', async () => {
+  const rawId = ID + '?variant=synthetic';
+  const f = fixture('sediment://' + rawId);
+  f.message.metadata.attachments = [
+    { id: ID, name: 'different.png', shared_library_file_id: LIBRARY },
+    { id: rawId, name: 'selected.webp', mime_type: 'image/webp', library_file_id: LIBRARY },
+  ];
+  f.root.fetch = async (url, init) => {
+    f.calls.push({ url: new URL(url), init });
+    return Response.json(new URL(url).pathname.endsWith('/simple')
+      ? { file_id: rawId, is_library_file: true, library_file_id: LIBRARY, is_project: false }
+      : { status: 'success', download_url: SIGNED });
+  };
+  const rows = f.register(), selected = rows.find(row => row.kind === 'image');
+  assert.equal(selected.name, 'selected.webp');
+  const value = f.descriptor([selected]);
+  f.image.asset_pointer = 'sediment://' + ID + '?variant=changed';
+  await f.run(value);
+  assert.equal(f.calls.length, 2);
+  assert.equal(decodeURIComponent(f.calls[0].url.pathname), '/backend-api/files/' + rawId + '/simple');
+  assert.equal(f.calls[1].url.searchParams.get('variant'), 'synthetic');
+  assert.equal(f.queued.length, 1);
+});
+
+test('pointer parameters cannot replace context or introduce malformed and unbounded query data', () => {
+  for (const query of [
+    'gizmo_id=other', 'conversation_id=other', 'check_context_scopes_for_conversation_id=other',
+    'post_id=other', 'download_intent=false', 'inline=true', 'context_scopes=other',
+    'project_id=other', 'authorization=synthetic', 'cookie=synthetic', 'access_token=synthetic',
+    'gizmo%5fid=other', 'CONVERSATION_ID=other', 'variant=%00', 'variant=%zz', 'variant=%FF',
+    '=value', 'variant=' + 'x'.repeat(1025), Array.from({ length: 33 }, (_, i) => 'v' + i + '=1').join('&'),
+  ]) {
+    const f = fixture('sediment://' + ID + '?' + query);
+    assert.equal(f.register()[0].downloadHandle, undefined, query.slice(0, 80));
+    assert.equal(f.calls.length, 0);
+  }
+});
+
+test('parameterized project images retain scope and do not accept another file authorization', async () => {
+  const f = fixture('file-service://' + ID + '?variant=synthetic');
+  f.payload.gizmo_id = PROJECT;
+  f.root.fetch = async (url, init) => {
+    f.calls.push({ url: new URL(url), init });
+    return Response.json({ status: 'success', file_id: 'file-other', download_url: SIGNED });
+  };
+  await f.run();
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0].url.searchParams.get('gizmo_id'), PROJECT);
+  assert.equal(f.calls[0].url.searchParams.get('variant'), 'synthetic');
+  assert.equal(f.calls[0].url.searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+  assert.equal(f.queued.length, 0);
+  assert.equal(f.receipts[0][1], false);
+});
+
 test('unknown pointers and shared or connector metadata cannot get an ordinary image download handle', () => {
   for (const pointer of ['https://other.test/image', 'data:image/png;base64,AA', 'file-service://../file',
     'sediment://' + ID + '?gizmo_id=other', 'sediment://' + ID + '#page=1',
-    'sediment://' + ID + '/child', 'sediment://', ['sediment://' + ID]]) {
+    'sediment://' + ID + '/child', 'sediment://' + ID + '\n',
+    'sediment://' + ID + '?variant=synthetic\n', 'sediment://', ['sediment://' + ID]]) {
     const f = fixture(pointer);
     assert.equal(f.register()[0].downloadHandle, undefined);
   }

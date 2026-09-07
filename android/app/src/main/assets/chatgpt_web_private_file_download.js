@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 6, create: factory });
+  const exported = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -15,6 +15,9 @@
   const LIBRARY = /^libfile[_-][A-Za-z0-9_-]{1,152}$/;
   const HANDLE = /^download_[a-f0-9]{32}$/;
   const ACTION = 'download_conversation_file';
+  const RESERVED_QUERY = new Set(['gizmo_id', 'project_id', 'conversation_id', 'post_id',
+    'check_context_scopes_for_conversation_id', 'context_scopes', 'download_intent', 'inline',
+    'authorization', 'cookie', 'access_token']);
   let active = null;
   let disposed = false;
 
@@ -27,12 +30,33 @@
   }
 
   function authorizationUrl(entry, projectId) {
-    const url = new URL('/backend-api/files/download/' + encodeURIComponent(entry.fileId), root.location.origin);
+    const url = new URL('/backend-api/files/download/' + encodeURIComponent(entry.downloadFileId || entry.fileId), root.location.origin);
+    for (const [key, value] of entry.downloadQuery || []) url.searchParams.set(key, value);
     if (projectId) url.searchParams.set('gizmo_id', projectId);
     url.searchParams.set(entry.image || entry.projectId || entry.libraryFileId
       ? 'check_context_scopes_for_conversation_id' : 'conversation_id', entry.conversationId);
     url.searchParams.set('download_intent', 'true');
     return url.href;
+  }
+
+  function imagePointer(value) {
+    if (typeof value !== 'string' || value.length > 4096 || /[\x00-\x1f\x7f]/.test(value)) return null;
+    const match = /^(?:file-service|sediment):\/\/([^?]+)(?:\?(.*))?$/.exec(value);
+    if (!match || !/^[A-Za-z0-9_-]{1,160}(?:#[A-Za-z0-9_-]{1,160}){0,4}$/.test(match[1])) return null;
+    const query = new Map();
+    try {
+      // Official TTt preserves the suffix; dEt splits its query, uses the last
+      // duplicate value, and maps '#' in the file ID to '*', not a URL fragment.
+      decodeURIComponent(match[2] || '');
+      let count = 0;
+      for (const [key, value] of new URLSearchParams(match[2] || '')) {
+        if (++count > 32 || !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(key) ||
+            RESERVED_QUERY.has(key.toLowerCase()) || value.length > 1024 || /[\x00-\x1f\x7f]/.test(value)) return null;
+        query.set(key, value);
+      }
+    } catch (_) { return null; }
+    return { id: value.slice(value.indexOf('://') + 3), downloadFileId: match[1].replaceAll('#', '*'),
+      downloadQuery: Object.freeze(Array.from(query, entry => Object.freeze(entry))) };
   }
 
   function connectorCopy(file) {
@@ -63,15 +87,15 @@
     const image = source.image;
     if (image?.content_type !== 'image_asset_pointer' || typeof image.asset_pointer !== 'string' ||
         source.attachmentsUnconfirmed || !Array.isArray(source.attachments)) return null;
-    const pointer = /^(?:file-service|sediment):\/\/([A-Za-z0-9_-]{1,160})$/.exec(image.asset_pointer);
+    const pointer = imagePointer(image.asset_pointer);
     if (!pointer || ['gizmo_id', 'project_id', 'library_file_id', 'shared_library_file_id',
       'library_download_id', 'context_scopes', 'source_url', 'context_connector', 'connector_id',
       'context_connector_info'].some(key => image[key] != null)) return null;
     // Official jW/A5t pair image pointers with attachment metadata before pEt/fEt.
-    const matches = source.attachments.filter(file => file?.id === pointer[1]);
+    const matches = source.attachments.filter(file => file?.id === pointer.id);
     if (matches.length > 1 || matches[0]?.mime_type != null &&
         (typeof matches[0].mime_type !== 'string' || !/^image\/[A-Za-z0-9.+-]{1,63}$/.test(matches[0].mime_type))) return null;
-    return { ...matches[0], id: pointer[1] };
+    return { ...matches[0], ...pointer };
   }
 
   function target(path, source, scope) {
@@ -79,7 +103,7 @@
     const image = source?.image != null;
     const file = image ? imageFile(source) : source?.attachment;
     const libraryReference = !image && root.__elonChatGptPrivateLibraryDownload?.target?.(file);
-    if (!conversation || !file || !libraryReference && !/^[A-Za-z0-9_-]{1,160}$/.test(file.id || '')) return null;
+    if (!conversation || !file || !image && !libraryReference && !/^[A-Za-z0-9_-]{1,160}$/.test(file.id || '')) return null;
     // Cloud references and alternate preview targets have separate resolvers.
     if (['shared_library_file_id', 'library_download_id', 'source_url',
       'context_connector', 'connector_id', 'mounted_library_file_id', 'shared_library_file_reference',
@@ -96,6 +120,7 @@
       ...(libraryReference || {}),
       ...(libraryReference ? { name: file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180), mediaType: file.mime_type || '' } : {}),
       ...(image ? { image: true,
+        downloadFileId: file.downloadFileId, downloadQuery: file.downloadQuery,
         name: typeof file.name === 'string' && file.name.trim() ? file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180) : 'image.png',
         mediaType: file.mime_type || '' } : {}) });
   }
@@ -238,7 +263,8 @@
       if (!current(job)) throw new Error('download_cancelled');
       const payload = result.payload;
       if (payload?.status === 'retry') throw new Error('download_file_not_ready');
-      if (payload?.status !== 'success' || (payload.file_id && payload.file_id !== entry.fileId)) {
+      if (payload?.status !== 'success' || (payload.file_id && payload.file_id !== entry.fileId &&
+          payload.file_id !== entry.downloadFileId)) {
         throw new Error('download_authorization_failed');
       }
       await enqueue(job, downloadUrl(payload.download_url));
@@ -265,5 +291,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 6, register, start, cancel, dispose });
+  return Object.freeze({ version: 7, register, start, cancel, dispose });
 });
