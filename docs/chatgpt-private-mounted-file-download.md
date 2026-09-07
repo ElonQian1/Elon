@@ -2,9 +2,10 @@
 
 Capability candidate: `android_chatgpt_private_mounted_file_download_v1`.
 Implementation: scoped provider-file materialization and existing native download.
-Verification: 177 related Node cases passed; real account/device pending.
+Verification: 185 related Node cases and 12 pure Kotlin/JUnit cases passed;
+full Android integration and real account/device pending.
 Delivery: source candidate for the next grouped APK, not `completed` or installed.
-Adapter version: 296; file/history/library modules 11/6/5.
+Adapter version: 297; file/history/library modules 12/6/6.
 
 This extends the [existing library download owner](chatgpt-private-shared-library-download.md).
 It does not create a second file picker, progress UI, byte-transfer worker,
@@ -45,10 +46,10 @@ rules remain. Per-message 20 references, 100 index rows and 80 displayed message
 stay bounded; incomplete indexes report truncation. Native rows receive names
 and opaque expiring download selections, never mounted IDs or provider URLs.
 
-Library module 5 recognizes strict current metadata or an exact matching library
+Library module 6 recognizes strict current metadata or an exact matching library
 attachment. Source/provider conflicts, ordinary copied-file identities, alternate
 preview targets and unrelated scope cannot fall through to this new POST.
-File-download module 11 consumes the selected handle before materialization.
+File-download module 12 consumes the selected handle before materialization.
 There is one write attempt, no automatic retry, no alternate writer, and no DOM
 fallback after an ambiguous response. A new explicit selection is required after
 failure. Repeated clicks during the same job report busy without restarting it.
@@ -67,11 +68,9 @@ or an instruction to replay a request. Cookies and request headers stay in-page.
 - This batch covers concrete Drive/Box/Dropbox files and matching history
   metadata. Standalone browsing, SharePoint, other providers, citation-graph-only
   references and mounted files represented only by a separate preview remain gaps.
-- Provider-native exports can change file name/MIME. The current native lease
-  fixes those fields before authorization, so changed exports and Google-native
-  MIME types remain explicitly unsupported rather than saved under a false name.
-  Next implementation: validated exported name/MIME handoff to the same native
-  byte owner, then the source-evidenced Docs/Sheets/Slides download variants.
+- Drive Docs/Sheets/Slides exports and validated resolved name/MIME handoff are
+  now implemented below. Other provider-native formats remain unimplemented.
+  Live export bytes, names, MIME types and final storage still require acceptance.
 - Synthetic tests exercise production history/index/selection, exact POST and
   scoped authorization, immutable IDs, bytes, cancellation, identity changes,
   deadlines, repeat clicks, server errors and malformed/oversize responses.
@@ -101,3 +100,30 @@ The combined upgrade/download/transport/new-chat suite passed 177 Node runner
 cases with zero failures/skips. Log stem:
 `mounted-final-related-20260908-20260908-055915-448`.
 This supersedes the 119-case checkpoint only for offline verification.
+
+## Native export handoff
+
+The same retained official source exposes `cB`/`n$` for supported Google-native
+downloads, `fEt` for DOCX/XLSX/PPTX suffixes, and `SEt` for mounted MIME precedence.
+Adapter 297 uses that source MIME in the existing materialization POST. It checks
+the response name and exported type, using the evidenced format mapping only
+when the optional response MIME is absent. Unknown Google-native types and Box
+native-document formats remain rejected; no endpoint or credential is invented.
+
+The native gateway advertises `resolvedFileVersion: 1`. Materialization attaches
+`resolvedFile: {version, name, mediaType}` to byte `begin` or the signed enqueue
+packet. Only a consumed current document/route lease can apply these fields;
+identity, request ID, expiry and cancellation ownership are unchanged. The
+native validator bounds types/names, rejects unknown fields, sanitizes paths and
+preserves the suffix of long exported titles. Both byte storage/notifications
+and DownloadManager reuse this resolved lease. Neither route opens the file.
+Old APKs reject known exports before materialization instead of saving a false
+format; ordinary old packets keep their original lease unchanged.
+
+Eight new export cases failed on the preceding implementation, then all 185
+related Node runner cases passed (`mounted-export-green-20260908-20260908-062132-706`).
+The native policy/lease tests were freshly compiled with Kotlin 2.0.21 and all
+12 JUnit cases passed (`download-metadata-native-20260908-20260908-061553-622`).
+The gateway integration test checks source wiring; it does not compile/run the
+Android gateway. This batch did not assemble, publish or install an APK, access
+an authenticated provider file, or measure performance/thermal improvements.

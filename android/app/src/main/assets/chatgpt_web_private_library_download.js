@@ -10,6 +10,11 @@
   const MAX_BYTES = 512 * 1024 * 1024;
   const CHUNK_BYTES = 49152;
   const LIBRARY = /^libfile[_-][A-Za-z0-9_-]{1,152}$/;
+  const EXPORTS = Object.freeze({
+    'application/vnd.google-apps.document': ['docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    'application/vnd.google-apps.spreadsheet': ['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+    'application/vnd.google-apps.presentation': ['pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+  });
 
   function target(file) {
     if (!file || file.source !== 'library' || !LIBRARY.test(file.library_file_id || '') ||
@@ -58,11 +63,16 @@
         ['preview_file', 'context_connector_info', 'shared_library_file_reference', 'source_url',
           'context_connector', 'connector_id', 'shared_library_file_id', 'library_download_id']
           .some(key => file[key] != null && file[key] !== '')) return null;
-    if (file.mime_type != null && (typeof file.mime_type !== 'string' ||
-        !/^[A-Za-z0-9.+-]{1,63}\/[A-Za-z0-9.+-]{1,63}$/.test(file.mime_type) ||
-        file.mime_type.toLowerCase().startsWith('application/vnd.google-apps.'))) return null;
+    for (const value of [file.mime_type, file.mounted_library_mime_type]) {
+      if (value != null && (typeof value !== 'string' ||
+          !/^[A-Za-z0-9.+-]{1,63}\/[A-Za-z0-9.+-]{1,63}$/.test(value))) return null;
+    }
+    // SEt prefers mounted source MIME; cB/n$/fEt permit only these Drive exports.
+    const sourceMime = (file.mounted_library_mime_type || file.mime_type || '').toLowerCase();
+    if (sourceMime.startsWith('application/vnd.google-apps.') &&
+        (provider !== 'google_drive' || !EXPORTS[sourceMime])) return null;
     if (provider === 'box' && /\.(?:boxnote|boxcanvas|gdoc|gsheet|gslide|gslides)$/i.test(file.name.trimEnd())) return null;
-    return { mountedFileId: id };
+    return { mountedFileId: id, mountedMediaType: sourceMime };
   }
 
   async function materialize(root, job, current) {
@@ -70,6 +80,10 @@
     check();
     if (root.location.origin !== 'https://chatgpt.com' || !job.entry.mountedFileId ||
         !root.__elonChatGptPrivateJsonRequest?.request) throw new Error('download_source_unsupported');
+    const sourceMime = job.entry.mountedMediaType || job.entry.mediaType;
+    const exported = EXPORTS[sourceMime];
+    const canResolve = job.descriptor.resolvedFileVersion === 1;
+    if (exported && !canResolve) throw new Error('download_bridge_unavailable');
     // qR + a1n: materialize without retrieval indexing, then authorize its returned
     // ordinary file. The caller consumes the selection before this single POST.
     const result = await root.__elonChatGptPrivateJsonRequest.request(root,
@@ -77,25 +91,32 @@
         method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
         headers: { ...root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders(), 'Content-Type': 'application/json' },
         signal: job.controller.signal, body: JSON.stringify({ file_id: job.entry.mountedFileId,
-          name: job.entry.name, mime_type: job.entry.mediaType || null, index_for_retrieval: false }),
+          name: job.entry.name, mime_type: sourceMime || null, index_for_retrieval: false }),
       }, { timeoutMs: 6000, maxBytes: 65536 });
     check();
     const value = result.payload;
     if (typeof value?.file_id !== 'string' || !/^[A-Za-z0-9_-]{1,160}$/.test(value.file_id) ||
-        typeof value.file_name !== 'string' || !value.file_name.trim() || /[\x00-\x1f\x7f]/.test(value.file_name) ||
+        typeof value.file_name !== 'string' || !value.file_name.trim() || value.file_name.length > 1024 ||
+        /[\x00-\x1f\x7f]/.test(value.file_name) ||
         value.file_size_bytes != null && (!Number.isSafeInteger(value.file_size_bytes) || value.file_size_bytes < 0) ||
         value.mime_type != null && (typeof value.mime_type !== 'string' ||
           !/^[A-Za-z0-9.+-]{1,63}\/[A-Za-z0-9.+-]{1,63}$/.test(value.mime_type))) {
       throw new Error('download_prepare_failed');
     }
     if (value.file_size_bytes > MAX_BYTES) throw new Error('download_file_too_large');
-    // The native save lease already owns the selected name/type. Do not silently
-    // save an exported format under its source document's name or MIME.
-    if (value.file_name.replace(/\u00a0/g, ' ').trim().slice(0, 180) !== job.entry.name ||
-        job.entry.mediaType && value.mime_type && value.mime_type.toLowerCase() !== job.entry.mediaType.toLowerCase()) {
+    const name = value.file_name.replace(/\u00a0/g, ' ').trim();
+    const mediaType = (value.mime_type || exported?.[1] || job.entry.mediaType || '').toLowerCase();
+    if (exported && (!name.toLowerCase().endsWith('.' + exported[0]) || mediaType !== exported[1])) {
+      throw new Error('download_content_invalid');
+    }
+    // Old APKs cannot accept a resolved name/type. New APKs bind both to the
+    // consumed lease before either native storage or DownloadManager is opened.
+    if (!canResolve && (name.slice(0, 180) !== job.entry.name ||
+        job.entry.mediaType && value.mime_type && mediaType !== job.entry.mediaType.toLowerCase())) {
       throw new Error('download_source_unsupported');
     }
-    return { fileId: value.file_id, mediaType: value.mime_type || job.entry.mediaType };
+    return { fileId: value.file_id, mediaType, ...(canResolve
+      ? { resolvedFile: Object.freeze({ version: 1, name, mediaType }) } : {}) };
   }
 
   function contentUrl(value) {
@@ -198,7 +219,8 @@
         if (expectedBytes > MAX_BYTES) throw new Error('download_file_too_large');
       }
       reader = response.body.getReader();
-      await packet('begin', { expectedBytes }, 'ready');
+      await packet('begin', { expectedBytes,
+        ...(job.entry.resolvedFile ? { resolvedFile: job.entry.resolvedFile } : {}) }, 'ready');
       while (true) {
         check();
         const next = await wait(reader.read(), 20000);
@@ -228,5 +250,5 @@
       try { reader?.releaseLock(); } catch (_) {}
     }
   }
-  return Object.freeze({ version: 5, target, sharedReference, mountedTarget, materialize, contentUrl, run, runContent });
+  return Object.freeze({ version: 6, target, sharedReference, mountedTarget, materialize, contentUrl, run, runContent });
 });

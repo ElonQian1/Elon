@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 11, create: factory });
+  const exported = Object.freeze({ version: 12, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -238,7 +238,8 @@
       job.controller.signal.addEventListener('abort', cancelled, { once: true });
       try {
         bridge.postMessage(JSON.stringify({ leaseId: job.descriptor.leaseId,
-          documentToken: job.entry.token, url }));
+          documentToken: job.entry.token, url,
+          ...(job.entry.resolvedFile ? { resolvedFile: job.entry.resolvedFile } : {}) }));
       } catch (_) { finish('download_enqueue_failed'); }
     });
   }
@@ -333,5 +334,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 11, register, start, cancel, dispose });
+  return Object.freeze({ version: 12, register, start, cancel, dispose });
 });

@@ -28,7 +28,8 @@ function fixture(options = {}) {
     const p = JSON.parse(raw); packets.push(p);
     if (p.cancel) { if (!saved) stored.length = 0; return; }
     let state;
-    if (p.byteOperation === 'begin') state = 'ready';
+    if (p.byteOperation === 'begin') state = options.rejectMetadata ? 'failed' : 'ready';
+    if (p.url) state = 'queued';
     if (p.byteOperation === 'chunk') { stored.push(Buffer.from(p.data, 'base64')); state = 'written'; }
     if (p.byteOperation === 'commit') { saved = true; state = 'saved'; }
     queueMicrotask(() => bridge.onmessage?.({ data: JSON.stringify({ leaseId: p.leaseId,
@@ -53,16 +54,17 @@ function fixture(options = {}) {
       if (path === '/backend-api/files/download/file-materialized') {
         options.onAuthorization?.(f);
         return Response.json({ status: 'success', file_id: options.authorizationId || 'file-materialized',
-          download_url: CONTENT });
+          download_url: options.signed ? 'https://files.oaiusercontent.com/export?sig=synthetic' : CONTENT });
       }
       assert.equal(url, 'https://chatgpt.com' + CONTENT);
-      const response = new Response('mounted bytes', { headers: { 'content-type': 'text/plain' } });
+      const response = new Response('mounted bytes', { headers: { 'content-type': options.contentType || 'text/plain' } });
       Object.defineProperty(response, 'url', { value: url });
       return response;
     } };
   const api = download.create(root), history = projection.create({});
   const register = () => api.register('/c/selected', payload, history.files(payload));
   const run = row => api.start(JSON.stringify({ version: 1, byteTransferVersion: 1,
+    resolvedFileVersion: options.resolvedFileVersion,
     leaseId: '00000000-0000-4000-8000-000000000001', documentToken: root.__elonChatGptDocumentToken,
     href: root.location.href, path: '/c/selected', name: row.name, downloadHandle: row.downloadHandle }),
   (...args) => receipts.push(args));
@@ -192,6 +194,92 @@ test('exported names and MIME cannot silently replace the pre-existing native sa
   }
 });
 
+const EXPORTS = [
+  ['document', 'docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+  ['spreadsheet', 'xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+  ['presentation', 'pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+];
+for (const [kind, extension, mime] of EXPORTS) {
+  test('cloud ' + kind + ' exports through the same byte and signed native download owners', async () => {
+    for (const signed of [false, true]) {
+      const name = 'Exported fixture.' + extension;
+      const f = fixture({ attachment: true, resolvedFileVersion: 1, signed, contentType: mime,
+        response: { file_id: 'file-materialized', file_name: name, mime_type: mime } });
+      f.attachment.mime_type = 'application/vnd.google-apps.' + kind;
+      const row = f.register()[0];
+      assert.match(row.downloadHandle, /^download_/);
+      await f.run(row);
+      assert.equal(f.receipts.at(-1)[2], signed ? 'download_queued' : 'download_saved');
+      const packet = f.packets.find(p => signed ? p.url : p.byteOperation === 'begin');
+      assert.deepEqual(packet.resolvedFile, { version: 1, name, mediaType: mime });
+      assert.equal(JSON.parse(f.calls[0].init.body).mime_type, f.attachment.mime_type);
+      assert.equal(JSON.parse(f.calls[0].init.body).index_for_retrieval, false);
+      assert.doesNotMatch(JSON.stringify(f.packets), /external-gdrive|Bearer|mounted_library/);
+      if (signed) assert.equal(f.saved, false, 'queued is not saved');
+      else assert.equal(Buffer.concat(f.stored).toString(), 'mounted bytes');
+    }
+  });
+}
+
+test('mounted source MIME takes precedence over a prepared attachment MIME', async () => {
+  const f = fixture({ attachment: true, resolvedFileVersion: 1,
+    response: { file_id: 'file-materialized', file_name: 'resolved.docx' } });
+  f.attachment.mime_type = EXPORTS[0][2];
+  f.attachment.mounted_library_mime_type = 'application/vnd.google-apps.document';
+  await f.run(f.register()[0]);
+  assert.equal(f.receipts.at(-1)[2], 'download_saved');
+  assert.equal(JSON.parse(f.calls[0].init.body).mime_type, 'application/vnd.google-apps.document');
+  assert.equal(f.packets.find(p => p.byteOperation === 'begin').resolvedFile.mediaType, EXPORTS[0][2]);
+});
+
+test('metadata-only references accept the server-resolved format without exposing source identity', async () => {
+  const name = 'a'.repeat(250) + '.xlsx';
+  const f = fixture({ resolvedFileVersion: 1,
+    response: { file_id: 'file-materialized', file_name: name, mime_type: EXPORTS[1][2] } });
+  await f.run(f.register()[0]);
+  assert.equal(f.receipts.at(-1)[2], 'download_saved');
+  assert.deepEqual(f.packets.find(p => p.byteOperation === 'begin').resolvedFile,
+    { version: 1, name, mediaType: EXPORTS[1][2] });
+});
+
+test('unsupported native metadata versions reject known cloud exports before the POST', async () => {
+  for (const version of [undefined, 0, 2, '1']) {
+    const f = fixture({ attachment: true, resolvedFileVersion: version });
+    f.attachment.mime_type = 'application/vnd.google-apps.document';
+    const row = f.register()[0];
+    assert.match(row.downloadHandle, /^download_/);
+    await f.run(row);
+    assert.equal(f.calls.length, 0);
+    assert.equal(f.saved, false);
+  }
+});
+
+test('unsupported cloud formats and providers do not become materialization candidates', () => {
+  for (const id of ['external-box:file:123', 'external-dropbox:file:id:synthetic', MOUNTED]) {
+    const f = fixture({ attachment: true, id, resolvedFileVersion: 1 });
+    f.attachment.mounted_library_mime_type = id === MOUNTED
+      ? 'application/vnd.google-apps.drawing' : 'application/vnd.google-apps.document';
+    assert.equal(f.register()[0]?.downloadHandle, undefined);
+  }
+});
+
+test('mismatched exported formats and rejected native metadata never write file bytes', async () => {
+  for (const patch of [{ file_name: 'wrong.xlsx' }, { mime_type: 'text/html' },
+    { file_name: 'a'.repeat(1025) }, { file_name: 'bad\n.docx' }]) {
+    const f = fixture({ attachment: true, resolvedFileVersion: 1, response: {
+      file_id: 'file-materialized', file_name: 'fixture.docx', mime_type: EXPORTS[0][2], ...patch } });
+    f.attachment.mime_type = 'application/vnd.google-apps.document';
+    await f.run(f.register()[0]);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.saved, false);
+    assert.equal(f.packets.some(p => p.byteOperation === 'begin'), false);
+  }
+  const f = fixture({ attachment: true, resolvedFileVersion: 1, rejectMetadata: true });
+  await f.run(f.register()[0]);
+  assert.equal(f.receipts.at(-1)[2], 'download_storage_failed');
+  assert.equal(f.packets.some(p => p.byteOperation === 'chunk'), false);
+});
+
 test('a second click while materialization is pending does not cancel or replay the first POST', async () => {
   const f = fixture({ hang: true, fastTimeout: true }), row = f.register()[0];
   const first = f.run(row);
@@ -237,7 +325,7 @@ test('installed bridges upgrade once and load mounted modules without replacing 
   const adapter = fs.readFileSync(path.join(assets, '../kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
   const version = Number(/ADAPTER_VERSION = (\d+)/.exec(adapter)[1]);
   const bootstrap = fs.readFileSync(path.join(assets, 'chatgpt_web_adapter_bootstrap.js'), 'utf8');
-  for (const previous of [294, 295]) {
+  for (const previous of [294, 295, 296]) {
     const identity = {}, audio = {};
     let disposed = 0, retired = 0;
     const window = { location: { origin: 'https://chatgpt.com' },
@@ -253,8 +341,8 @@ test('installed bridges upgrade once and load mounted modules without replacing 
       vm.runInNewContext(fs.readFileSync(path.join(assets, filename), 'utf8'), context);
     }
     assert.equal(window.__elonChatGptPrivateHistoryProjection.version, 6);
-    assert.equal(window.__elonChatGptPrivateLibraryDownload.version, 5);
-    assert.equal(window.__elonChatGptPrivateFileDownload.version, 11);
+    assert.equal(window.__elonChatGptPrivateLibraryDownload.version, 6);
+    assert.equal(window.__elonChatGptPrivateFileDownload.version, 12);
     assert.equal(retired, 1);
     assert.equal(window.__elonChatGptPrivateAuthContext, identity);
     assert.equal(window.__elonChatGptPrivateRealtimeVoice, audio);
