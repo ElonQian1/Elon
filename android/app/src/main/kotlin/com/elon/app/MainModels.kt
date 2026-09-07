@@ -203,7 +203,8 @@ data class PendingAttachment(
     val imageHeight: Int? = null,
     val durationSeconds: Int? = null,
     val transcription: String? = null,
-    val annotations: List<ChatImageAnnotation> = emptyList()
+    val annotations: List<ChatImageAnnotation> = emptyList(),
+    val chatGptUploadCopy: Boolean = false,
 )
 
 data class SendTarget(
