@@ -2,9 +2,11 @@
 
 Capability: `android_chatgpt_private_conversation_share_v1`.
 Status: implemented for the standard authenticated personal-account,
-non-project conversation flow; offline verified; grouped Android compilation
+non-project conversation flow, including legacy and redesigned variants;
+offline verified; grouped Android compilation
 and production-phone acceptance pending. This is not a completed capability
 or a claim that all website sharing variants are implemented.
+Adapter 283, share contract and transaction module 2.
 
 ## Official evidence
 
@@ -17,7 +19,7 @@ Its `gt` creator and `St` publisher establish this full-conversation contract:
 
 1. Resolve the selected completed message with the conversation module's
    `AGt` (`H9t`), not the last server message or a sidebar title.
-2. The standard authenticated modal POSTs `/share/create` with
+2. The legacy authenticated modal POSTs `/share/create` with
    `current_node_id`, `conversation_id`, and `is_anonymous: true`.
 3. The response supplies `share_id`, `share_url`, visibility, anonymity,
    current node, title, optional highlighted message, and moderation state.
@@ -43,6 +45,33 @@ Its `Gkt` separately gates project, temporary, health, owner and workspace flows
 These are downloaded official-source observations, not captured authenticated
 POST responses. No actual share link was created during this offline batch.
 
+## Redesigned create transaction
+
+The same official modal's `gt` chooses `/share/v2/create` for `modal_redesigned`
+and `toast` variants (and separately for unauthenticated visitors). `St` omits
+its `beforeShareAction` legacy publisher for those branches. Accordingly, the
+authenticated redesigned path sends one POST with the same conversation/node/
+anonymous body; it must not automatically issue the old publish PATCH afterward.
+
+The inspected conversation module exports `Ojt` as `J5t`. It reads experiment
+`2483695150`'s `dweb_conversation_share_sheet_variant`, yielding `control`,
+`modal_redesigned` or `toast`. The composer asset's `Lnn` current-conversation
+Share action uses this getter; `Inn` also calls it with `disableExposureLog: true`.
+The native coordinator already opens the selected conversation before sharing,
+so its protocol selection uses that current-conversation getter, not the separate
+sidebar override (`Ajt`/`Y5t`). It does not choose a protocol from cached UI labels.
+These asset hashes were rechecked on 2026-09-07 and match the evidence above.
+
+Variant is part of the transaction and 60-second cache identity. Missing exports,
+unknown values or a changed variant reject the binding before writing. A change
+during a request produces an unconfirmed result, never a second request through
+the other writer. The v2 response must validate the canonical public link,
+visibility, anonymity, selected node and nonblocked moderation before native
+distribution. A missing response node follows the official requested-node
+fallback; an explicit older node is not silently published or patched.
+Actual v2 response fields/moderation and current runtime export binding remain
+mandatory live acceptance items, not facts proved by synthetic tests.
+
 ## Production path
 
 The production conversation action sheet now has a dedicated Share action.
@@ -64,6 +93,8 @@ Safety and lifecycle behavior:
 - Require native confirmation before any sharing write.
 - Bind document, route, account, selected leaf/message, and title; reject
   loading, streaming, dictation, project, temporary, health and business scopes.
+- Capture the website's current sharing variant and retain it through creation,
+  optional legacy publication and result-cache validation.
 - Reuse only the inspected modules already loaded by the current website.
   Missing runtime is unconfirmed context, not evidence the feature is absent.
 - Keep identity headers page-local; never replay proof headers or export
@@ -78,19 +109,26 @@ Safety and lifecycle behavior:
 
 ## Verification and remaining work
 
-The focused Node run passed **69 tests** across sharing, deletion and metadata
+The focused Node run passed **88 tests** across sharing, deletion and metadata
 mutation. It covers exact bodies, old-node updates, concurrency, account/route/
 branch drift, malformed/public URL rejection, moderation, timeouts without
 replay, draft preservation, cache invalidation and the production asset bundle.
-Native policy and actual consumer-to-MCP command tests are added but have not
+The 19 new variant cases all fail against the preceding implementation while
+the existing 50 share cases pass. After the fix the combined 88-case run passes,
+including legacy and both redesigned branches, no duplicate PATCH, variant/cache
+drift, unconfirmed responses and no alternate writer after errors. Native policy
+and actual consumer-to-MCP command tests are added but have not
 been compiled or executed in this source batch. No APK was built or installed.
 
 Grouped acceptance must use a synthetic ordinary conversation and explicit
 public-share confirmation. Check the official result, native Copy/share,
-updates after another message, failure state and preserved draft. Verify exact
+updates after another message, failure state and preserved draft. Check both
+officially selected protocol variants without forcing account experiment flags.
+Verify exact
 runtime exports and response shape on the phone before marking completed.
 
-Still separate code gaps: redesigned/guest `/share/v2/create`, workspace and
+The redesigned authenticated route is now implemented; guest `/share/v2/create`
+remains a distinct unsupported scope. Still separate code gaps: workspace and
 project-member sharing, eligible temporary-chat sharing, share management and
 link revocation. Do not reuse this public confirmation for a members-only link,
 or mistake `/share/post` message-slice creation for full-conversation sharing.

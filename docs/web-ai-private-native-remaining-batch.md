@@ -232,9 +232,17 @@ pending. This closes a source UI gap, not the private-protocol acceptance gate.
 The earlier missing-consumer checkpoint below is superseded by the 2026-09-07
 discovery of the official lazy modal and full-conversation create/publish
 protocol. The ordinary personal-account path is now wired to production native
-UI, with 69 focused Node cases passing. See the
+UI. Adapter 283/share modules 2 also implement the current-runtime-selected
+redesigned `/share/v2/create` transaction, without the legacy PATCH. Variant is
+bound through dispatch and cache reuse; unknown or changed state cannot trigger
+an alternate writer. The combined 88-case Node run passes, with all 19 new
+variant cases reproduced as failures on the preceding implementation. See the
 [current protocol, source hashes and remaining sharing scopes](chatgpt-private-conversation-share.md).
 This is source implementation evidence, not a live public-link acceptance pass.
+The browser navigation retry still timed out and ADB reported no device in this
+attempt. Grouped Android compilation and real response/runtime confirmation are
+pending; guest, workspace, project-member, temporary and management/revocation
+scopes remain code gaps, not merely untested parts of this candidate.
 
 The official `8b34dbc2-kjj15hg4y6iyx13p.js` asset read on 2026-09-06 has SHA-256
 `9990fb9a8682917d0d790acf7b6aa78355e8520e4ffd2c5e0a183212d612d4b5`.
