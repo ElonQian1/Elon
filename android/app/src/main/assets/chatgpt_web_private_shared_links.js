@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateSharedLinks = api;
 })(typeof window === 'object' ? window : null, function (page, contract, options) {
@@ -10,27 +10,20 @@
   const now = options?.now || Date.now;
   let cached = null, sequence = 0;
 
-  function personal(modules) {
-    const s = modules?.shared, account = s?.mq?.();
-    return s?.H3?.() === true && typeof s?.SV?.isPersonalWorkspace === 'function' &&
-      s.wV?.(s.SV.isPersonalWorkspace) === true && account?.isQuorum?.() === false &&
-      account?.isWorkspaceAccount?.() === false;
-  }
-
   function current(binding) {
     try {
       return page.location.origin === 'https://chatgpt.com' &&
         page.__elonChatGptDocumentToken === binding.document &&
-        contract.identity() === binding.account && personal(binding.modules);
+        contract.identity() === binding.account;
     } catch (_) { return false; }
   }
 
-  async function bind() {
+  function bind() {
     const binding = { document: page.__elonChatGptDocumentToken, account: contract.identity() };
     if (!/^doc_[a-z0-9_]{3,80}$/.test(binding.document || '') || !binding.account) {
       throw new Error('share_auth_unavailable');
     }
-    binding.modules = await contract.load();
+    // The authenticated list supplies ownership; publication has its own runtime contract.
     if (!current(binding)) throw new Error('share_scope_unconfirmed');
     return binding;
   }
@@ -90,11 +83,12 @@
     try {
       const id = typeof input?.path === 'string' && input.path.startsWith('/c/') ? input.path.slice(3) : '';
       if (!UUID.test(id) || !['list', 'revoke'].includes(input?.operation)) throw new Error('share_invalid_selection');
-      const binding = await bind();
+      const binding = bind();
       if (input.operation === 'list') {
-        const result = await read(binding), matching = result.items.filter(row => row.conversationId === id && !row.workspace);
+        const result = await read(binding), scoped = result.items.filter(row => row.conversationId === id);
+        const matching = scoped.filter(row => !row.workspace);
         return { ok: true, attempted: false, data: { schema: 'elon.conversation_shares.v1', path: input.path,
-          ticket: result.ticket, complete: result.complete && matching.length <= 100,
+          ticket: result.ticket, complete: result.complete && matching.length === scoped.length && matching.length <= 100,
           items: matching.slice(0, 100).map(({ id, createdAt }) => ({ id, createdAt })) } };
       }
       if (confirmed !== true) throw new Error('user_confirmation_required');
@@ -123,5 +117,5 @@
     }
   }
 
-  return Object.freeze({ version: 1, run, invalidate: () => { cached = null; } });
+  return Object.freeze({ version: 2, run, invalidate: () => { cached = null; } });
 });

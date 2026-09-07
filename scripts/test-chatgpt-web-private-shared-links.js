@@ -49,6 +49,36 @@ test('lists without publication or DOM readiness and reuses bounded cache', asyn
   f.advance(60001); await f.list(); assert.equal(f.requests.length, 2);
 });
 
+test('authenticated read does not depend on loaded website conversation modules', async () => {
+  const f = setup(); f.setLoaded(false); f.snapshot.composerReady = false;
+  const result = await f.list();
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.data.items, [{ id: SID, createdAt: '2026-09-01T10:00:00Z' }]);
+  assert.deepEqual(f.requests.map(request => request.init.method), ['GET']);
+  assert.equal((await f.list()).ok, true);
+  assert.equal(f.requests.length, 1, 'cache-first read does not load a conversation module');
+});
+
+test('server-bound link revocation works without conversation modules but public creation stays guarded', async () => {
+  const f = setup(); f.setLoaded(false);
+  const result = await f.list();
+  assert.equal(result.ok, true);
+  assert.equal((await f.revoke(result.data)).detail, 'share_link_revoked');
+  assert.equal((await f.api.start(PATH, true, () => f.snapshot)).ok, false);
+  assert.deepEqual(f.requests.map(request => request.init.method), ['GET', 'DELETE', 'GET']);
+});
+
+test('unsupported workspace links are partial instead of a falsely complete empty list', async () => {
+  const f = setup(); f.setLoaded(false);
+  f.setRows([{ id: SID, conversation_id: CID, workspace_id: 'workspace', create_time: null }]);
+  const result = await f.list();
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.data.items, []);
+  assert.equal(result.data.complete, false);
+  assert.equal((await f.revoke(result.data)).detail, 'share_selection_expired');
+  assert.deepEqual(f.requests.map(request => request.init.method), ['GET']);
+});
+
 test('filters other conversations and workspace links and reports partial coverage', async () => {
   const f = setup(); f.setRows([{ id: SID, conversation_id: NEXT, create_time: null },
     { id: NEXT, conversation_id: CID, workspace_id: 'workspace', create_time: null }]); f.setTotal(3);

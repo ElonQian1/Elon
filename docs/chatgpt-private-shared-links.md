@@ -1,10 +1,10 @@
 # Private conversation shared-link management
 
 Capability: `android_chatgpt_private_conversation_shared_links_v1`.
-Status: source implemented, transport and pure Kotlin contracts verified;
-Android consumer/UI compilation and production acceptance deferred to the grouped
-ChatGPT APK. Not a completed/live-verified capability. Adapter 285, share
-transaction 4, shared-link module 1.
+Status: included in grouped APK 1544, but its authenticated list failed before
+network dispatch (`share_scope_unconfirmed`, 54 ms). Shared-link module 2 removes
+that unnecessary runtime dependency; grouped compilation and phone acceptance of
+this correction are pending. Not a completed/live-verified capability.
 
 ## Official contract evidence
 
@@ -50,9 +50,10 @@ navigating away from the current thread or touching its draft/recording state.
   creation flow. Project-member sharing remains a separate audience; its URL
   does not become a deletable public share or revoke project membership.
 
-The private module reuses the existing version-pinned share contract and
-page-local account identity. Personal-account scope must be confirmed; it does
-not wait for a composer DOM node. Each read/write is bounded to seven seconds,
+The private module reuses the existing share transport and page-local account
+identity. List/revoke bind to that identity and server-returned personal-link
+rows, not to loaded conversation modules. Publication retains its separate
+version-pinned runtime/branch contract. Each read/write is bounded to seven seconds,
 with a one-MiB response limit. Only approved same-origin headers are used; no
 copied proof token, Cookie export, or raw response logging is added.
 
@@ -61,7 +62,9 @@ expose at most 100 links for the selected conversation, plus an explicit
 `complete` flag. A server total larger than the returned rows remains partial;
 no unobserved pagination parameters are invented, and missing/invalid response
 data cannot produce an empty-success result. Workspace rows are not offered in
-this personal-account flow. No background polling or disk credential cache.
+this personal-link flow; a selected conversation with unsupported workspace rows
+remains partial, not falsely complete and empty. No background polling or disk
+credential cache.
 
 Cancellation requires an unexpired (120-second), account/document-bound selection
 ticket and exact source-conversation/link match. The ticket is consumed before
@@ -81,6 +84,13 @@ allows only bounded IDs, timestamps and selection metadata; private titles,
 headers and arbitrary URLs cannot enter the command ledger through this result.
 
 ## Verification and remaining work
+
+- 2026-09-07 correction: 179 focused Node cases passed, including unloaded
+  conversation modules, missing composer, server-bound revocation, stale identity,
+  explicit confirmation and unchanged publication guards. The live 1544 failure
+  is not presented as proof of a specific missing asset or account type; it only
+  confirmed the early runtime scope gate blocked the read. Official manager `J`
+  deletes the selected server-returned row without that conversation-module gate.
 
 - New module absence reproduced the missing feature in the initial Node run.
 - Final targeted Node run: **152 passed**, covering shared links, creation,
