@@ -682,6 +682,13 @@
   }
 
   function newConversation(inspect, result) {
+    const runtime = window.__elonChatGptPrivateNewConversation;
+    const fallback = () => newConversationFallback(inspect, result);
+    if (runtime && typeof runtime.start === 'function' && runtime.start(inspect, result, fallback)) return;
+    return fallback();
+  }
+
+  function newConversationFallback(inspect, result) {
     const initial = conversationSurface(inspect);
 
     function activate(target) {

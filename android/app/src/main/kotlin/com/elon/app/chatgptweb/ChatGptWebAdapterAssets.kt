@@ -6,6 +6,7 @@ internal object ChatGptWebAdapterAssets {
     private val ADAPTER_ASSETS = listOf(
         "chatgpt_web_adapter_bootstrap.js",
         "chatgpt_web_private_runtime_bindings.js",
+        "chatgpt_web_private_new_conversation.js",
         "chatgpt_web_adapter_authentication_policy.js",
         "chatgpt_web_private_conversation_directory.js",
         "chatgpt_web_adapter_conversation_directory_requests.js",
