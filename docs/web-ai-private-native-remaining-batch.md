@@ -1,6 +1,6 @@
 # Remaining private-native batch
 
-Current implementation audit: 2026-09-07. This is a work list, not a declaration
+Current implementation audit: 2026-09-08. This is a work list, not a declaration
 that every private protocol has been reproduced. Reuse completed capabilities in
 [the capability matrix](web-ai-private-transport-capability-matrix.md).
 
@@ -58,25 +58,24 @@ the existing `template_unavailable` fallback, with an extra thinking-status bubb
 direct sending is not accepted. [1547 evidence](reports/chatgpt-runtime-release-1547.md)
 is the current checkpoint; other acceptance gaps below remain.
 
-Later navigation delivery: [APK 1551](reports/chatgpt-runtime-release-1551.md)
-contains the deep-composer resolver, bounded background discovery backoff and
-registered new-chat action v1; publication/install passed but the handset was
-locked afterward. The 1550 fallback send remains the latest actual text-send
-route evidence. The subsequent [new-chat confirmation](chatgpt-private-new-conversation.md)
-candidate removes forced navigation recovery, provides a native guest confirm/cancel
-flow and protects expiry/reentry. Adapter 295 passes 186 focused Node cases and
-Release compilation with 28 selected Android tests. It is source-only, not an
-installed consent or direct-send acceptance pass; do not reimplement it.
+Latest grouped delivery: [APK 1552](reports/chatgpt-runtime-release-1552.md)
+contains the resolver/backoff, [new-chat confirmation](chatgpt-private-new-conversation.md),
+mounted-file changes below and the resident-composer-host correction. Release
+compilation, publication and replacement installation passed. One native text
+send received its exact reply through DOM fallback; runtime submission remains
+`submission_not_ready`, and native generating state did not settle with the
+completed stream. Neither direct-send nor guest-confirmation acceptance passed.
+Reuse these modules and fix the recorded readiness/state failures before Google.
 
 The subsequent [mounted-file download candidate](chatgpt-private-mounted-file-download.md)
 adds concrete Drive/Box/Dropbox conversation references and Drive Docs/Sheets/Slides
 exports to the existing native download owner. Adapter 297 binds server-resolved
 name/MIME to a consumed native lease for both byte storage and signed downloads,
 preserving exported suffixes and bounded Unicode filenames. 185 related Node and
-13 freshly compiled pure Kotlin/JUnit cases pass; the production gateway has a
-source wiring check, not full Android compilation. This candidate is not bundled
-in 1551 or device accepted. Standalone browsing, other mounted providers and
-citation-graph-only references remain code gaps; reuse this implementation.
+13 freshly compiled pure Kotlin/JUnit cases pass; the production gateway now
+passes full Release compilation in 1552. It is installed, not device accepted.
+Standalone browsing, other mounted providers and citation-graph-only references
+remain code gaps; reuse this implementation.
 
 Latest source extension: [private multi-attachment batches](chatgpt-private-attachment-batch.md)
 now join up to nine native selections to one prepared-action message, reusing

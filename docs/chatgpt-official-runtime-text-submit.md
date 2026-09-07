@@ -1,23 +1,23 @@
 # Official runtime message submission
 
 Capability: `android_chatgpt_official_runtime_text_submit_v1`.
-Status: implemented source candidate, not live-accepted or completed. It is an
+Status: implemented and installed, not live-accepted or completed. It is an
 official page-runtime bridge, **not an independent Android HTTP/private POST
-transport**. Include it in the grouped ChatGPT APK; do not reimplement it while
-waiting for production acceptance.
+transport**. Reuse the existing bridge; do not reimplement it while resolving
+the current production readiness failure.
 
-Latest installed checkpoint: APK 1551 / adapter 294 includes runtime submit 10
-and bindings 3. On 2026-09-08 a single native production send received one exact
-test reply, with the private stream observer reaching `completed`. The receipt
-was still DOM fallback: `private_fallback:template_unavailable` and
-`runtime_fallback:composer_mode_unsupported`. This is a real basic-chat success,
-not acceptance of either the independent private POST or runtime submit route.
-The previous `react_owner_path_limit` was not the failure on this send.
-See [installed artifact evidence](reports/chatgpt-runtime-release-1551.md).
+Latest installed checkpoint: APK 1552 / adapter 298 includes runtime submit 11
+and bindings 3. One native production send received its exact test reply, but
+the receipt remained `private_fallback:template_unavailable` and
+`runtime_fallback:submission_not_ready`. The prior `composer_mode_unsupported`
+gate no longer blocked that attempt. This is basic-chat success through DOM,
+not acceptance of independent private POST or runtime submission. The private
+stream reached `completed` while native UI stayed generating; stop later
+reported no active generation. See [1552 evidence and next gate](reports/chatgpt-runtime-release-1552.md).
 
 ## Resident structured-input host
 
-Runtime submit 11 / global adapter 298 is a source repair candidate. The retained
+Runtime submit 11 / global adapter 298 is installed in APK 1552. The retained
 current public composer (SHA-256
 `36644eb82aac9c399bce384c18140f8c878dd780c8f787440b80f27971729733`)
 unconditionally calls `Iue` inside `uqn`, then passes the returned
@@ -35,10 +35,12 @@ revalidated before submission; the existing single-writer rule remains unchanged
 The production MCP receipt identifies the mode-gate failure, but the exact
 subcondition was not live-inspected: this Release APK exposes no debug socket.
 Temporary debug forwards were removed; no other browser was inspected or changed.
-The source evidence establishes the overstrict guard, not a successful handset
-repair. New synthetic cases failed before the repair; 172 focused runner cases
-then passed across submit, attachments, bindings, stop wiring and diagnostics.
-The next grouped APK still needs `official_runtime_v1:accepted` plus one reply.
+The source evidence establishes the overstrict guard. New synthetic cases failed
+before the repair; 172 focused and then 259 integrated runner cases passed. The
+installed send advanced to `submission_not_ready`, not an accepted transaction.
+Current official `submitComposer` also enforces explicit-action readiness inside
+its own transaction; deleting our guard alone is not a proven repair. The next
+gate remains `official_runtime_v1:accepted`, one reply and settled native state.
 
 ## Current-tree membership
 
