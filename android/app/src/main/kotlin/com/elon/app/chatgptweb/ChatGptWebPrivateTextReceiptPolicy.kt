@@ -41,6 +41,7 @@ internal object ChatGptWebPrivateTextReceiptPolicy {
     }
 
     fun userDetail(event: ChatGptWebEvent.CommandResult): String =
+        ChatGptNewConversationConfirmationState.userDetail(event.action, event.detail) ?:
         ChatGptWebRegenerationReceiptPolicy.userDetail(event.action, event.ok, event.detail) ?:
         if (resolve(event).indeterminate) {
             "发送结果正在核对，为避免重复发送，请稍候。"

@@ -6,6 +6,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptBackgroundSession
 import com.elon.app.chatgptweb.ChatGptFriendMessageMapper
 import com.elon.app.chatgptweb.ChatGptMessageClipboard
+import com.elon.app.chatgptweb.ChatGptNewConversationConfirmationDialog
 import com.elon.app.chatgptweb.ChatGptNativeControlPresentation
 import com.elon.app.chatgptweb.ChatGptWebConnectionMessagePolicy
 import com.elon.app.chatgptweb.ChatGptWebAudioPermissionController
@@ -68,6 +69,12 @@ internal class ChatGptSocialChatController(
     )
     private val imageContent by lazy(LazyThreadSafetyMode.NONE) { ChatGptSocialImageContentController(activity, session, openOfficialFallback) }
     private val skinPresentation = ChatGptWebSkinPresentationController(binding, session)
+    private val newConversationConfirmation by lazy(LazyThreadSafetyMode.NONE) {
+        ChatGptNewConversationConfirmationDialog(activity, { active }, {
+            binding.inputEdit.text.isNullOrBlank() && !session.realtimeVoiceActive() &&
+                session.currentSnapshot()?.streaming != true
+        }, session::resolveNewConversation)
+    }
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
     private var active = false
     private var pendingAttachmentPrompt: String? = null
@@ -145,6 +152,7 @@ internal class ChatGptSocialChatController(
 
     override fun deactivate() {
         active = false
+        newConversationConfirmation.dismiss()
         session.pauseSendWatchdog()
         if (!session.realtimeVoiceActive()) realtimeVoiceTranscript.reset()
         skinPresentation.exit()
@@ -534,6 +542,7 @@ internal class ChatGptSocialChatController(
             observedAtMs = System.currentTimeMillis(),
         )
         latestCommandStatus = status
+        if (event.action == "new_conversation") newConversationConfirmation.onResult(event)
         if (event.action == "send_prompt") latestSendCommandStatus = status
         if (event.action in DICTATION_COMMAND_RESULTS) {
             onDictationCommandResult(event.action, event.ok)
