@@ -37,7 +37,7 @@ function fixture(options = {}) {
     __elonChatGptPrivateAttachmentTransport: load('transport'),
     __elonChatGptPrivateAttachmentBytes: load('bytes'),
     __elonChatGptPrivateJsonRequest: require(base + 'chatgpt_web_private_json_request.js'),
-    __elonChatGptPrivateAttachmentLibrary: { version: 1, create: (host, config) => library.create(host, {
+    __elonChatGptPrivateAttachmentLibrary: { version: library.version, create: (host, config) => library.create(host, {
       ...config, loadRuntime: options.loadRuntime || (async () => gates()),
     }) },
   };
@@ -73,12 +73,14 @@ function fixture(options = {}) {
     });
   };
   const composer = composerModule.create(root);
-  const instance = send.create(root, { composer,
+  const instance = send.create(root, { composer: options.composer || composer,
     source: { read: async () => { await tick(); return file; } },
-    image: { available: () => true, prepare: async () => ({ file, dimensions: { width: 32, height: 24 } }) } });
+    image: { available: () => options.imageAvailable !== false,
+      prepare: async () => ({ file, dimensions: { width: 32, height: 24 } }) } });
   const descriptor = { name: file.name, size: file.size, type: file.type, documentToken: root.__elonChatGptDocumentToken,
-    href: root.location.href, leaseId: '00000000-0000-4000-8000-000000000000' };
-  return { root, props, instance, composer, store, file, calls, receipts, writes: () => writes,
+    href: root.location.href, leaseId: '00000000-0000-4000-8000-000000000000',
+    ...('uploadCopy' in options ? { uploadCopy: options.uploadCopy } : {}) };
+  return { root, props, instance, composer, descriptor, store, file, calls, receipts, writes: () => writes,
     setAccount: value => { account = value; }, fallbacks: () => fallbacks,
     releaseBytes: () => releaseBytes?.(), start: () => instance.start(JSON.stringify(descriptor),
       (...value) => receipts.push(value), () => {}, () => { fallbacks++; }) };
@@ -174,6 +176,50 @@ test('temporary chats and disabled library settings never enter reuse', async ()
     assert.equal(f.store.files$()[0].storeInLibrary, false);
     assert.equal(f.store.files$()[0].source, 'local');
   }
+});
+
+test('upload-copy reads local bytes once without reuse, reservations or changing storage intent', async () => {
+  for (const options of [{}, { reserved: true }, { temporary: true }, { libraryEnabled: false },
+    { estuary: true }, { multipart: true }]) {
+    const f = fixture({ ...options, uploadCopy: true, fastBytes: true }); await f.start();
+    assert.deepEqual(f.receipts, [['request_attachment_upload', true, 'private_attachment_associated']]);
+    assert.equal(f.fallbacks(), 0); assert.equal(f.writes(), 1);
+    assert.equal(f.calls.some(call => /library\/reuse|upload_reservations|claim_and_finish/.test(call.url)), false);
+    const creations = f.calls.filter(call => call.url.endsWith('/files'));
+    assert.equal(creations.length, 1);
+    const body = JSON.parse(creations[0].init.body);
+    assert.equal(body.store_in_library, !options.temporary && options.libraryEnabled !== false);
+    assert.equal(body.uploadCopy, undefined); assert.equal(body.checkForReusableLibraryFile, undefined);
+    assert.equal(f.calls.filter(call => call.url.endsWith('/process_upload_stream')).length, 1);
+    const attached = f.store.files$()[0];
+    assert.equal(attached.fileId, 'file-uploaded'); assert.equal(attached.source, 'local');
+    assert.notEqual(attached.autoReused, true); assert.equal(attached.file, f.file);
+  }
+});
+
+test('explicit copy never silently falls back when its composer, image or scope is unavailable', async () => {
+  for (const mode of ['composer', 'image', 'scope', 'transport']) {
+    const fake = { available: () => mode !== 'composer',
+      capture: () => ({ token: 'doc_fixture_library', href: 'https://chatgpt.com/' }),
+      current: () => true, prepare: async () => false };
+    const f = fixture({ uploadCopy: true, fastBytes: true,
+      ...(mode === 'composer' || mode === 'scope' ? { composer: fake } : {}),
+      ...(mode === 'image' ? { file: new File(['png'], 'fixture.png', { type: 'image/png' }), imageAvailable: false } : {}) });
+    if (mode === 'transport') delete f.root.__elonChatGptPrivateTransport;
+    await f.start(); assert.equal(f.fallbacks(), 0);
+    assert.equal(f.receipts.length, 1); assert.equal(f.receipts[0][1], false);
+    assert.equal(f.writes(), 0); assert.equal(f.calls.length, 0);
+  }
+});
+
+test('malformed upload choice fails before reads or writes, while explicit false preserves reuse', async () => {
+  for (const uploadCopy of ['true', 'false', null, 0, {}, []]) {
+    const f = fixture({ uploadCopy, fastBytes: true }); await f.start();
+    assert.equal(f.receipts[0][1], false); assert.equal(f.fallbacks(), 0);
+    assert.equal(f.calls.length, 0); assert.equal(f.writes(), 0);
+  }
+  const f = fixture({ uploadCopy: false }); await f.start();
+  assert.equal(f.receipts[0][1], true); assert.equal(f.store.files$()[0].fileId, 'file-reused');
 });
 
 test('context changes and cancellation during reuse cannot attach, replay or switch to compatibility', async () => {

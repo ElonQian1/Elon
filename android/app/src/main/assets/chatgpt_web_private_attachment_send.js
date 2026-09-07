@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 14, create: factory });
+  const exported = Object.freeze({ version: 15, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -31,10 +31,22 @@
     if (active) return respond('request_attachment_upload', false, '附件上传尚未结束。');
     let descriptor;
     try { descriptor = JSON.parse(raw); } catch (_) {}
+    if (descriptor && typeof descriptor === 'object' && 'uploadCopy' in descriptor &&
+        typeof descriptor.uploadCopy !== 'boolean') {
+      selections?.cancel();
+      return respond('request_attachment_upload', false, '附件上传选项无效，请重新选择。');
+    }
+    const uploadCopy = descriptor?.uploadCopy === true;
+    const unavailable = () => {
+      selections?.cancel();
+      return uploadCopy ? respond('request_attachment_upload', false,
+        '尚未能重新上传这份附件，文字未发送，请重试。') : fallback();
+    };
+    if (uploadCopy) selections?.cancel();
     // Compatibility selection is before any private write, never an automatic replay.
     if (!descriptor || !composer?.available() || !source || !root.__elonChatGptPrivateTransport ||
-        !root.__elonChatGptPrivateAttachmentTransport) { selections?.cancel(); return fallback(); }
-    if (/^image\//.test(descriptor.type) && !image?.available(descriptor)) { selections?.cancel(); return fallback(); }
+        !root.__elonChatGptPrivateAttachmentTransport) return unavailable();
+    if (/^image\//.test(descriptor.type) && !image?.available(descriptor)) return unavailable();
     const job = { controller: new root.AbortController(), transport: null, attempted: false };
     active = job;
     let timer;
@@ -55,7 +67,7 @@
         if (abortListener) job.controller.signal.removeEventListener('abort', abortListener);
       }
       if (job.controller.signal.aborted) throw new Error('cancelled');
-      const selected = selections?.take(descriptor);
+      const selected = uploadCopy ? null : selections?.take(descriptor);
       if (selected) { job.controller.abort(); job.controller = selected.controller; job.transport = selected.transport; }
       const binding = selected?.binding || composer.capture();
       if (descriptor.documentToken !== binding.token || descriptor.href !== binding.href) throw new Error('context_changed');
@@ -63,10 +75,10 @@
       timer = root.setInterval(() => { if (!composer.current(binding)) cancel(); }, 500);
       // Compatibility selection for unknown/unsupported scope precedes byte reads
       // and private writes. Cancelled or stale bindings throw instead of replaying.
-      if (!await composer.prepare(binding, job.controller.signal, descriptor, !!selected)) return fallback();
+      if (!await composer.prepare(binding, job.controller.signal, descriptor, !!selected)) return unavailable();
       job.transport = job.transport || createTransport({ isCurrent: candidate => candidate === binding &&
         !job.controller.signal.aborted && composer.current(binding) });
-      if (!selected) job.transport.prefetch?.(composer.reservationContext?.(binding, descriptor), binding, job.controller.signal);
+      if (!selected && !uploadCopy) job.transport.prefetch?.(composer.reservationContext?.(binding, descriptor), binding, job.controller.signal);
       let file = await source.read(descriptor, job.controller.signal);
       let imageDimensions;
       if (/^image\//.test(file.type)) {
@@ -76,7 +88,9 @@
       }
       if (job.controller.signal.aborted || !composer.current(binding)) throw new Error('context_changed');
       job.attempted = true;
-      const result = await job.transport.upload(file, composer.uploadContext(binding, file, imageDimensions), binding);
+      const context = { ...composer.uploadContext(binding, file, imageDimensions),
+        ...(uploadCopy ? { checkForReusableLibraryFile: false } : {}) };
+      const result = await job.transport.upload(file, context, binding);
       if (!result.ok) throw new Error(result.code);
       if (job.controller.signal.aborted) throw new Error('cancelled');
       composer.associate(binding, file, result, descriptor.leaseId);
@@ -104,7 +118,7 @@
     return true;
   }
 
-  return Object.freeze({ version: 14, start, cancel, suspend, remove,
+  return Object.freeze({ version: 15, start, cancel, suspend, remove,
     prepareSubmit: store => composer?.prepareSubmit?.(store) || null,
     beginSelection: raw => selections?.begin(raw) === true, cancelSelection: id => selections?.cancel(id),
     merge: dom => composer?.merge(dom) || dom });
