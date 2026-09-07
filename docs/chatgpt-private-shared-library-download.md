@@ -1,12 +1,14 @@
 # Shared-library attachment downloads
 
 Capability candidate: `android_chatgpt_private_shared_library_download_v1`.
-Status: **implemented source candidate, offline JS verified, native build and
+Status: **implemented, offline JS verified, packaged in Release 1549;
 grouped device acceptance pending**. This is not a `completed` capability.
 Current source: file-download module 10, library-download module 4, history
-projection 5. The existing adapter asset list is reused unchanged. APK 1548
-contains the earlier modules 9/3; the personal-library extension below is a
-source batch awaiting the next grouped APK, not an installed-phone result.
+projection 5. The existing adapter asset list is reused unchanged. APK 1549
+contains modules 10/4 with source-matching asset hashes and is installed on
+Xiaomi. The personal-library extension has not had a saved-byte device test;
+the current guest session cannot establish account-library acceptance. See
+[release evidence](reports/chatgpt-runtime-release-1549.md).
 
 ## Official source evidence
 

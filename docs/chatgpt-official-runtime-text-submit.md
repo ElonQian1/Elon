@@ -6,13 +6,38 @@ official page-runtime bridge, **not an independent Android HTTP/private POST
 transport**. Include it in the grouped ChatGPT APK; do not reimplement it while
 waiting for production acceptance.
 
-Latest installed checkpoint: APK 1548 / adapter 294 reached a real guest reply
-through DOM fallback, not this runtime writer. Its fixed receipt was
-`runtime_fallback:identity_unavailable`; see
-[the grouped device evidence](reports/chatgpt-grouped-native-20260907.md).
-Runtime submit 8 and bindings 2 now add the confirmed-guest source candidate below.
-They are not yet built or device-accepted. The committed-owner resolution and
-fallback reasons from runtime submit 7 remain unchanged.
+Latest installed checkpoint: APK 1549 / adapter 294 includes runtime submit 8
+and bindings 2. A real guest reply still used DOM fallback. The identity gate
+passed; the receipt now identifies `runtime_fallback:react_owner_unavailable`.
+See [the release and production evidence](reports/chatgpt-runtime-release-1549.md).
+Runtime submit 9 repairs a reproduced current-tree ownership defect below;
+it is not yet installed or device accepted.
+
+## Current-tree membership
+
+The prior resolver accepted a host or its alternate when its return-pointer
+chain reached `root.current`. This both rejected valid reused children and could
+admit stale children absent from the committed parent's child list. React's
+[official tree reflection](https://github.com/facebook/react/blob/main/packages/react-reconciler/src/ReactFiberTreeReflection.js)
+documents child reuse across parent alternates during bailout. The new resolver
+is a bounded, read-only membership search, not a copied React implementation.
+It considers each child's parent and parent alternate, verifies child/sibling
+membership at every edge and requires exactly one path to the current root.
+Only that path supplies context values; stale-branch props are not merged.
+
+The nearest DOM host boundary and 90-fiber path limit are retained. Memoized
+paths avoid exponential alternate traversal. Visits are capped at 180 fibers,
+512 siblings per parent and 4096 sibling inspections per resolution. Cycles,
+ambiguous ownership and either limit fail closed with fixed structural reason
+codes. Pre/post-dispatch checks use the same resolver and preserve changed drafts;
+no polling, page reload, alternate writer or credential change is introduced.
+
+Eleven added cases failed on submit 8 and pass on submit 9. The integrated run
+passed 236 Node cases, including bindings, text/attachment dispatch, stopping,
+regeneration, lifecycle and fallback receipts. This proves a source defect and
+its fix, not that the uninstrumented 1549 phone failure was necessarily caused
+by bailout. The next installed probe must distinguish current-tree failure from
+depth/child limits and then obtain an accepted runtime receipt plus one reply.
 
 ## Confirmed guest transactions
 
