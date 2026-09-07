@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 10, create: factory });
+  const exported = Object.freeze({ version: 11, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -102,30 +102,36 @@
     const conversation = PATH.exec(path || '');
     const image = source?.image != null;
     const shared = source?.sharedLibraryReference != null;
+    const mountedReference = source?.mountedLibraryReference != null;
+    if (mountedReference && (image || shared || source.attachment != null)) return null;
     if (shared && (image || source.attachment != null)) return null;
-    const file = image ? imageFile(source) : shared ? source.sharedLibraryReference : source?.attachment;
+    const file = image ? imageFile(source) : shared ? source.sharedLibraryReference :
+      mountedReference ? source.mountedLibraryReference : source?.attachment;
+    const mounted = !image && !shared && root.__elonChatGptPrivateLibraryDownload?.mountedTarget?.(file, mountedReference);
+    if (mountedReference && !mounted) return null;
     const libraryReference = !image && (shared
       ? root.__elonChatGptPrivateLibraryDownload?.sharedReference?.(file)
       : root.__elonChatGptPrivateLibraryDownload?.target?.(file));
     if (shared && !libraryReference) return null;
-    if (!conversation || !file || !image && !libraryReference && !/^[A-Za-z0-9_-]{1,160}$/.test(file.id || '')) return null;
+    if (!conversation || !file || !image && !libraryReference && !mounted && !/^[A-Za-z0-9_-]{1,160}$/.test(file.id || '')) return null;
     // Cloud references and alternate preview targets have separate resolvers.
     if (['shared_library_file_id', 'library_download_id', 'source_url',
-      'context_connector', 'connector_id', 'mounted_library_file_id', 'shared_library_file_reference',
+      'context_connector', 'connector_id', ...(!mounted ? ['mounted_library_file_id'] : []), 'shared_library_file_reference',
       'preview_file'].some(key => file[key] != null && file[key] !== '') || !connectorCopy(file)) return null;
     if (scope?.context_scopes != null && (!Array.isArray(scope.context_scopes) || scope.context_scopes.length)) return null;
     if (file.context_scopes != null && (!Array.isArray(file.context_scopes) || file.context_scopes.length)) return null;
     const projects = [conversation[1], source.projectId, scope?.gizmo_id, scope?.project_id,
       file.gizmo_id, file.project_id].filter(value => value != null && value !== '');
     if (projects.some(value => typeof value !== 'string' || !PROJECT.test(value)) || new Set(projects).size > 1) return null;
-    const libraryFileId = file.library_file_id == null || file.library_file_id === '' ? null : file.library_file_id;
+    const libraryFileId = mounted || file.library_file_id == null || file.library_file_id === '' ? null : file.library_file_id;
     if (libraryFileId !== null && (typeof libraryFileId !== 'string' || !LIBRARY.test(libraryFileId))) return null;
     return Object.freeze({ conversationId: conversation[2], fileId: file.id,
       projectId: projects[0] || null, libraryFileId,
       connectorCopy: file.context_connector_info != null,
       mediaType: typeof file.mime_type === 'string' ? file.mime_type : '',
+      ...(mounted || {}),
       ...(libraryReference || {}),
-      ...(libraryReference ? { name: file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180), mediaType: file.mime_type || '' } : {}),
+      ...(libraryReference || mounted ? { name: file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180), mediaType: file.mime_type || '' } : {}),
       ...(image ? { image: true,
         downloadFileId: file.downloadFileId, downloadQuery: file.downloadQuery,
         name: typeof file.name === 'string' && file.name.trim() ? file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180) : 'image.png',
@@ -135,6 +141,12 @@
   async function resolveDestination(job, request) {
     const entry = job.entry;
     if (!request?.request || !current(job)) throw new Error('download_cancelled');
+    if (entry.mountedFileId) {
+      const materialized = await root.__elonChatGptPrivateLibraryDownload.materialize(root, job, current);
+      if (!current(job)) throw new Error('download_cancelled');
+      job.entry = Object.freeze({ ...entry, ...materialized });
+      return { url: authorizationUrl(job.entry, entry.projectId), fileId: materialized.fileId };
+    }
     if (!entry.libraryFileId) return { url: authorizationUrl(entry, entry.projectId) };
     // Official WTt/KTt/DX resolve a library file's effective project before dEt.
     const url = new URL('/backend-api/files/' + encodeURIComponent(entry.fileId) + '/simple', root.location.origin);
@@ -256,6 +268,7 @@
       return respond(ACTION, false, 'download_selection_expired');
     }
     const job = { descriptor, entry, controller: new root.AbortController() };
+    if (entry.mountedFileId) entries.delete(descriptor.downloadHandle);
     active = job;
     let timer = root.setTimeout(() => job.controller.abort(), 15000);
     try {
@@ -280,7 +293,7 @@
       if (!current(job)) throw new Error('download_cancelled');
       const payload = result.payload;
       if (payload?.status === 'retry') throw new Error('download_file_not_ready');
-      if (payload?.status !== 'success' || (payload.file_id && payload.file_id !== entry.fileId &&
+      if (payload?.status !== 'success' || (payload.file_id && payload.file_id !== (destination.fileId || entry.fileId) &&
           payload.file_id !== entry.downloadFileId)) {
         throw new Error('download_authorization_failed');
       }
@@ -320,5 +333,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 10, register, start, cancel, dispose });
+  return Object.freeze({ version: 11, register, start, cancel, dispose });
 });

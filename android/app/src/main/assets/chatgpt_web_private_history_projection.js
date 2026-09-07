@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 5, create: factory });
+  const exported = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateHistoryProjection = exported;
 })(typeof window === 'object' ? window : null, function (dependencies) {
@@ -122,6 +122,17 @@
       if (/^[A-Za-z0-9.+-]{1,63}\/[A-Za-z0-9.+-]{1,63}$/.test(mime)) value.mediaType = mime;
       parts.push(value);
     });
+    const mounted = message.metadata && message.metadata.mounted_library_file_references;
+    const mountedSeen = new Set((Array.isArray(attachments) ? attachments : []).slice(0, MAX_PARTS)
+      .filter(file => clean(file && file.name, 180)).map(file => file.mounted_library_file_id).filter(Boolean));
+    (Array.isArray(mounted) ? mounted : []).slice(0, MAX_PARTS).forEach((reference) => {
+      const name = clean(reference && reference.name, 180);
+      if (!name || mountedSeen.has(reference.mounted_library_file_id)) return;
+      if (typeof reference.mounted_library_file_id === 'string') mountedSeen.add(reference.mounted_library_file_id);
+      const value = { type: 'file', text: name, kind: 'file' };
+      if (withSource) value.mountedLibraryReference = reference;
+      parts.push(value);
+    });
     return bounded ? parts.slice(0, MAX_PARTS - 1) : parts;
   }
 
@@ -178,6 +189,8 @@
       if (Array.isArray(rawAttachments) && rawAttachments.length > MAX_PARTS) truncated = true;
       const rawShared = message.metadata && message.metadata.shared_library_file_references;
       if (Array.isArray(rawShared) && rawShared.length > MAX_PARTS) truncated = true;
+      const rawMounted = message.metadata && message.metadata.mounted_library_file_references;
+      if (Array.isArray(rawMounted) && rawMounted.length > MAX_PARTS) truncated = true;
       const rawParts = message.content && message.content.parts;
       if (Array.isArray(rawParts) && rawParts.length > MAX_PARTS) truncated = true;
       parts.forEach((part, index) => {
@@ -212,6 +225,8 @@
         projectId: normalized.gizmo_id || normalized.project_id || '' };
     }
     if (part?.sharedLibraryReference) return { sharedLibraryReference: part.sharedLibraryReference,
+      name: part.text, projectId: normalized.gizmo_id || normalized.project_id || '' };
+    if (part?.mountedLibraryReference) return { mountedLibraryReference: part.mountedLibraryReference,
       name: part.text, projectId: normalized.gizmo_id || normalized.project_id || '' };
     return part?.source ? { attachment: part.source, name: part.text,
       projectId: normalized.gizmo_id || normalized.project_id || '' } : null;

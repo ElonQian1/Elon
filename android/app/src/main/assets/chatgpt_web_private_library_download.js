@@ -37,6 +37,67 @@
     return { sharedLibraryFileId: file.library_file_id };
   }
 
+  function mountedTarget(file, reference = false) {
+    if (!file || typeof file !== 'object' || Array.isArray(file) ||
+        typeof file.mounted_library_file_id !== 'string' ||
+        typeof file.name !== 'string' || !file.name.trim() || file.name.length > 1024 ||
+        /[\x00-\x1f\x7f]/.test(file.name)) return null;
+    const id = file.mounted_library_file_id;
+    // Pjt/zQ admit concrete provider file identities, not source URLs or folders.
+    const match = /^external-(gdrive|box|dropbox):(?:account:([A-Za-z0-9_-]{1,512}):)?file:(\S{1,512})$/.exec(id);
+    if (!match || match[2] && match[1] !== 'gdrive') return null;
+    const provider = { gdrive: 'google_drive', box: 'box', dropbox: 'dropbox' }[match[1]];
+    if (!(match[1] === 'gdrive' ? /^[A-Za-z0-9_-]{5,512}$/.test(match[3]) :
+      match[1] === 'box' ? /^[1-9][0-9]*$/.test(match[3]) :
+        match[3].length <= 256 && /^id:[A-Za-z0-9_:-]+$/.test(match[3]))) return null;
+    if (reference) {
+      if (Object.keys(file).some(key => !['mounted_library_file_id', 'name'].includes(key))) return null;
+    } else if (file.source !== 'library' || file.id != null && file.id !== id ||
+        file.library_file_id != null && file.library_file_id !== id ||
+        file.library_provider != null && file.library_provider !== provider ||
+        ['preview_file', 'context_connector_info', 'shared_library_file_reference', 'source_url',
+          'context_connector', 'connector_id', 'shared_library_file_id', 'library_download_id']
+          .some(key => file[key] != null && file[key] !== '')) return null;
+    if (file.mime_type != null && (typeof file.mime_type !== 'string' ||
+        !/^[A-Za-z0-9.+-]{1,63}\/[A-Za-z0-9.+-]{1,63}$/.test(file.mime_type) ||
+        file.mime_type.toLowerCase().startsWith('application/vnd.google-apps.'))) return null;
+    if (provider === 'box' && /\.(?:boxnote|boxcanvas|gdoc|gsheet|gslide|gslides)$/i.test(file.name.trimEnd())) return null;
+    return { mountedFileId: id };
+  }
+
+  async function materialize(root, job, current) {
+    const check = () => { if (!current(job)) throw new Error('download_cancelled'); };
+    check();
+    if (root.location.origin !== 'https://chatgpt.com' || !job.entry.mountedFileId ||
+        !root.__elonChatGptPrivateJsonRequest?.request) throw new Error('download_source_unsupported');
+    // qR + a1n: materialize without retrieval indexing, then authorize its returned
+    // ordinary file. The caller consumes the selection before this single POST.
+    const result = await root.__elonChatGptPrivateJsonRequest.request(root,
+      new URL('/backend-api/files/library/mounted/materialize', root.location.origin).href, {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+        headers: { ...root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders(), 'Content-Type': 'application/json' },
+        signal: job.controller.signal, body: JSON.stringify({ file_id: job.entry.mountedFileId,
+          name: job.entry.name, mime_type: job.entry.mediaType || null, index_for_retrieval: false }),
+      }, { timeoutMs: 6000, maxBytes: 65536 });
+    check();
+    const value = result.payload;
+    if (typeof value?.file_id !== 'string' || !/^[A-Za-z0-9_-]{1,160}$/.test(value.file_id) ||
+        typeof value.file_name !== 'string' || !value.file_name.trim() || /[\x00-\x1f\x7f]/.test(value.file_name) ||
+        value.file_size_bytes != null && (!Number.isSafeInteger(value.file_size_bytes) || value.file_size_bytes < 0) ||
+        value.mime_type != null && (typeof value.mime_type !== 'string' ||
+          !/^[A-Za-z0-9.+-]{1,63}\/[A-Za-z0-9.+-]{1,63}$/.test(value.mime_type))) {
+      throw new Error('download_prepare_failed');
+    }
+    if (value.file_size_bytes > MAX_BYTES) throw new Error('download_file_too_large');
+    // The native save lease already owns the selected name/type. Do not silently
+    // save an exported format under its source document's name or MIME.
+    if (value.file_name.replace(/\u00a0/g, ' ').trim().slice(0, 180) !== job.entry.name ||
+        job.entry.mediaType && value.mime_type && value.mime_type.toLowerCase() !== job.entry.mediaType.toLowerCase()) {
+      throw new Error('download_source_unsupported');
+    }
+    return { fileId: value.file_id, mediaType: value.mime_type || job.entry.mediaType };
+  }
+
   function contentUrl(value) {
     return contentSource?.contentUrl(value) || null;
   }
@@ -167,5 +228,5 @@
       try { reader?.releaseLock(); } catch (_) {}
     }
   }
-  return Object.freeze({ version: 4, target, sharedReference, contentUrl, run, runContent });
+  return Object.freeze({ version: 5, target, sharedReference, mountedTarget, materialize, contentUrl, run, runContent });
 });
