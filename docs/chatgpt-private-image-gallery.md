@@ -99,7 +99,7 @@ external-host restriction. This establishes the supported source shape, not the
 current account's resolver response. A mocked exporter in the catalog tests did
 not exercise this incompatibility.
 
-The source-only exporter v4 reuses the released download URL policy in
+Exporter v4, now included in grouped APK 1545, reuses the released download URL policy in
 `chatgpt_web_private_content_source.js`. Only absolute or root-relative ChatGPT
 URLs for those two exact paths are accepted. Bytes stay in the page and use
 ambient cookies, never copied authorization headers. Redirects and a mismatched
@@ -111,10 +111,11 @@ The new regression suite composes the real catalog, resolver and image exporter,
 including a warm reopen with no network requests. It separately covers source
 rejection, cookie isolation, response URL validation, MIME/size limits and account
 change during fetch. These are synthetic offline tests, not account-library or
-visual acceptance. The installed `1544` does not include exporter v4; packaging
-and the page-adapter version bump belong to the next grouped release. Do not mark
-this capability completed or claim a device preview/download fix from source
-tests alone.
+visual acceptance. APK 1545 compiled, published and installed exporter v4. The
+global adapter remains 293 because other worktrees own pending version-only
+edits; the exporter and APK versions identify this delivery. Actual gallery
+preview/viewer acceptance is still pending. Do not mark the capability completed
+or claim a device preview fix from source tests alone.
 
 The related Node run passes 96 cases, including seven new private-image content
 tests, with zero failures, cancellations or skips. Evidence stem:

@@ -1,10 +1,11 @@
 # Private conversation shared-link management
 
 Capability: `android_chatgpt_private_conversation_shared_links_v1`.
-Status: included in grouped APK 1544, but its authenticated list failed before
-network dispatch (`share_scope_unconfirmed`, 54 ms). Shared-link module 2 removes
-that unnecessary runtime dependency; grouped compilation and phone acceptance of
-this correction are pending. Not a completed/live-verified capability.
+Status: shared-link module 2 published and installed in APK 1545. The production
+private list returned a complete empty result for the unshared synthetic fixture
+in 1,436 ms, replacing 1544's early `share_scope_unconfirmed` failure (54 ms).
+The personal-empty-list case is verified; the whole capability is not completed.
+Public creation/revocation and rendered native menu acceptance remain pending.
 
 ## Official contract evidence
 
@@ -84,6 +85,13 @@ allows only bounded IDs, timestamps and selection metadata; private titles,
 headers and arbitrary URLs cannot enter the command ledger through this result.
 
 ## Verification and remaining work
+
+- 1545 real-device case
+  `android_chatgpt_private_conversation_shared_links_v1:list_personal_empty`:
+  completed through the production handler/MCP. `complete=true`, zero links for
+  the unshared synthetic conversation, no publication/revocation or new message.
+  Restored `conversation_home` with draft length zero. Reuse this narrow evidence;
+  non-empty lists, actual cancellation and UI selection still need acceptance.
 
 - 2026-09-07 correction: 179 focused Node cases passed, including unloaded
   conversation modules, missing composer, server-bound revocation, stale identity,

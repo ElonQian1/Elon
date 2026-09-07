@@ -26,4 +26,7 @@ Includes no added requests/telemetry,
 strict filtering, bounded results, production receipt routing and existing
 shared-link guards. Android Release Kotlin/Java compilation and six focused
 JUnit tests passed (two new validator tests and four existing receipt tests).
-Authenticated phone inventory awaits the grouped APK.
+APK 1545 was published/installed and its production MCP inventory succeeded in
+3,361 ms. It returned 96 filenames with `truncated=true`; neither pinned shared
+nor conversation module was in that partial result. This is not proof of absence.
+The phone returned to the conversation home without changing content or identity.

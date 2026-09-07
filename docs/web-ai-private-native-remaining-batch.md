@@ -39,11 +39,13 @@ The source candidates below are bundled through `54a89232e`; older delivery
 cells are historical checkpoints, not current source-only blockers. Bundling
 does not upgrade any pending protocol or rendered-UI acceptance claim.
 
-Current correction batch: same-origin generated-image preview v4 (96 focused
-Node cases passed), shared-link management v2 (179 focused cases passed after a
-1544 read failed at its unnecessary runtime gate), and an on-demand public-script
-inventory through existing MCP diagnostics. One grouped APK will carry these;
-no normal-user polling, account changes, or independent proxy changes are added.
+Latest correction delivery: APK 1545 includes same-origin generated-image preview
+v4, shared-link management v2 and on-demand public-script inventory through
+existing MCP diagnostics. Related Node suites, six focused Android tests and the
+Release build passed. Wireless replacement installation was verified. The real
+private share-list read returned a complete empty result in 1,436 ms; inventory
+also worked. Gallery UI and public-share creation/revocation remain pending.
+No normal-user polling, account changes or independent proxy changes were added.
 
 Latest source extension: [private multi-attachment batches](chatgpt-private-attachment-batch.md)
 now join up to nine native selections to one prepared-action message, reusing

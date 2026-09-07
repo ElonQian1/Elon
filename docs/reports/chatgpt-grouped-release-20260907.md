@@ -128,6 +128,37 @@ login, Cookie/data clear or proxy-core change occurred.
 The separate image exporter v4 follow-up is source-only and not in this installed
 APK; see [its implementation and offline evidence](../chatgpt-private-image-gallery.md#same-origin-preview-source-follow-up).
 
+## Sharing/runtime correction delivery (1545)
+
+- Source: `8ca624b2e` (sharing fix `90ea2a63e`), global adapter 293,
+  shared-link module 2, image exporter 4, research probe 13.
+- APK `1.1.1545` / `1545`, SHA-256:
+  `2c73658cc4c268f5a143118bb2d194edc52f77c17f899d540a8ce417dc073ac8`.
+- 179 sharing/image regression cases, 51 diagnostic cases and 73 compatibility
+  runner cases passed. Six focused Android JUnit tests passed. Release build
+  succeeded in 6m 50s; publisher size/hash validation and Xiaomi `install -r`
+  replacement verification passed. Existing compiler warnings were not new errors.
+- Before correction, 1544's private shared-list command failed with
+  `share_scope_unconfirmed` in 54 ms, before HTTP. The list/revoke owner no longer
+  requires loaded conversation runtime modules; server-selected scope, identity,
+  tickets, explicit revoke confirmation and post-delete reconciliation remain.
+- 1545 production list on the unshared synthetic fixture: `succeeded`,
+  `complete=true`, zero links, 1,436 ms. This completes only
+  `android_chatgpt_private_conversation_shared_links_v1:list_personal_empty`.
+  No public link was created or revoked; rendered menu acceptance remains pending.
+- Public runtime inventory returned 96 names in 3,361 ms, `truncated=true`.
+  Both pinned module names were unobserved in this partial sample; absence is
+  inconclusive. No credentials, conversation text or network bodies were read.
+- Restored `conversation_home`, input length zero. Gallery v4 is now installed,
+  but no actual gallery preview/viewer acceptance is claimed.
+- Publisher's optional broad worktree cleanup warned about a missing `Branch`
+  property. Publication and installation passed; mandatory targeted task cleanup
+  is handled separately by the workflow finisher.
+
+Evidence: `chatgpt-runtime-assets-android-tests-20260907-194940-701`,
+`chatgpt-shared-links-image-publish-20260907-195655-388`, plus bounded runtime and
+shared-list JSON under the existing grouped research-artifact directory.
+
 ## Next boundary
 
 The ordinary saved-byte check above passed; inspect any new scoped download-source
