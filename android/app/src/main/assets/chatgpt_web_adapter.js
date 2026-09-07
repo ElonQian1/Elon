@@ -677,22 +677,25 @@
       return messageAdapter.regenerate(emitEvent, respond);
     }
     if (action === 'stop_generation') {
-      if (textTransactionOrchestrator && textTransactionOrchestrator.stopPrivate(respond)) return;
-      const composer = findComposer();
-      const scope = composer && composer.closest('form');
-      const stop = document.querySelector('[data-testid="stop-button"]') ||
-        (scope && Array.from(scope.querySelectorAll('button')).find((button) => {
-          const label = cleanText([
-            button.getAttribute('aria-label'),
-            button.getAttribute('title'),
-            button.textContent
-          ].filter(Boolean).join(' ')).toLowerCase();
-          return isVisible(button) && /stop (?:generating|streaming|response)|停止(?:生成|產生|回答|回覆)/.test(label);
-        }));
-      if (!stop) return respond(action, false, '当前没有正在生成的回复。');
-      stop.click();
-      respond(action, true, '');
-      return scheduleSnapshot();
+      const fallback = () => {
+        const composer = findComposer();
+        const scope = composer && composer.closest('form');
+        const stop = document.querySelector('[data-testid="stop-button"]') ||
+          (scope && Array.from(scope.querySelectorAll('button')).find((button) => {
+            const label = cleanText([
+              button.getAttribute('aria-label'),
+              button.getAttribute('title'),
+              button.textContent
+            ].filter(Boolean).join(' ')).toLowerCase();
+            return isVisible(button) && /stop (?:generating|streaming|response)|停止(?:生成|產生|回答|回覆)/.test(label);
+          }));
+        if (!stop) return respond(action, false, '当前没有正在生成的回复。');
+        stop.click();
+        respond(action, true, '');
+        return scheduleSnapshot();
+      };
+      if (textTransactionOrchestrator) return textTransactionOrchestrator.stopGeneration(respond, fallback);
+      return fallback();
     }
     if (action === 'new_conversation') {
       if (comparableText(composerValue(findComposer()))) {

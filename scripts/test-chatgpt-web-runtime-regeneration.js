@@ -7,7 +7,7 @@ const contract = require('../android/app/src/main/assets/chatgpt_web_private_reg
 const { fixture, id, flush } = require('./fixtures/chatgpt-runtime-regeneration.js');
 
 test('regeneration has a versioned official-runtime transaction', () => {
-  assert.equal(runtime.version, 1);
+  assert.equal(runtime.version, 2);
   assert.equal(typeof runtime.create, 'function');
 });
 

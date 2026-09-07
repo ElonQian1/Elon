@@ -15,6 +15,11 @@ is already ready. Fresh proof preparation, model/tool policy, conversation state
 and generation remain owned by the website. Existing stream observation and the
 native send ledger are reused; voice, dictation and Google are unchanged.
 
+Runtime submit 5 exposes the same committed conversation context for
+[official runtime stopping](chatgpt-official-runtime-stop.md), without requiring
+the composer to be input-ready. Submit and regeneration remain blocked while a
+stop request is in flight; this is not another sender or a new identity layer.
+
 The bridge requires the inspected module to be present, one committed composer
 context, one file store, a matching conversation/controller, and known readiness
 and policy fields. It binds the document, identity, route and selected leaf before

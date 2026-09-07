@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptTextTransactionOrchestrator;
-  if (existing && Number(existing.version) >= 4) return;
+  if (existing && Number(existing.version) >= 5) return;
 
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
@@ -164,6 +164,9 @@
     }
 
     function sendPrompt(value, expectedDraft, respond, allowPrivateTextTransaction) {
+      if (window.__elonChatGptPrivateStopRuntime?.state?.().pending) {
+        return respond('send_prompt', false, 'official_runtime_v1:unknown:stop_pending');
+      }
       const composer = options.findComposer();
       const assistantBeforeSend = options.streamingPolicyModule &&
         options.streamingPolicyModule.messageObservation(options.messageAdapter);
@@ -250,6 +253,9 @@
     }
 
     function regenerateResponse(respond, fallback) {
+      if (window.__elonChatGptPrivateStopRuntime?.state?.().pending) {
+        return respond('regenerate_response', false, 'official_runtime_v1:regenerate_unknown:stop_pending');
+      }
       function begin() {
         options.streamingPolicyModule?.begin(options.streamingPolicy, options.messageAdapter, { allowSameTurn: true });
       }
@@ -292,8 +298,31 @@
       return true;
     }
 
-    return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, stopPrivate });
+    function stopGeneration(respond, fallback) {
+      if (stopPrivate(respond)) return;
+      const transaction = window.__elonChatGptPrivateStopRuntime?.stop({
+        composer: options.findComposer(), requestId: respond.requestId || ''
+      });
+      if (!transaction?.handled) return fallback();
+      options.scheduleSnapshot(true);
+      Promise.resolve(transaction.completion).then(receipt => {
+        if (receipt?.status === 'unavailable') {
+          if (transaction.claimFallback?.() === true) return fallback();
+          receipt = { status: 'rejected', code: 'context_changed' };
+        }
+        const accepted = receipt?.status === 'accepted';
+        respond('stop_generation', accepted, 'official_runtime_v1:' +
+          (accepted ? safeCode(receipt.code, 'stop_observed') :
+            'stop_' + (receipt?.status === 'rejected' ? 'rejected:' : 'unknown:') + safeCode(receipt?.code, 'unknown')));
+        options.scheduleSnapshot(true);
+      }).catch(() => {
+        respond('stop_generation', false, 'official_runtime_v1:stop_unknown:completion_failed');
+        options.scheduleSnapshot(true);
+      });
+    }
+
+    return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, stopPrivate, stopGeneration });
   }
 
-  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 4, create });
+  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 5, create });
 })();

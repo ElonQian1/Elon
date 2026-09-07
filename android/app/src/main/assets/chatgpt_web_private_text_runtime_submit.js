@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 4, create: factory });
+  const exported = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -69,7 +69,7 @@
       Array.from(page.document.querySelectorAll('link[rel="modulepreload"]')).some(node => node.href === RUNTIME_URL);
   }
 
-  function capture(node, previousAttachment) {
+  function captureConversation(node) {
     if (!node?.isConnected || !loaded()) return null;
     const token = page.__elonChatGptDocumentToken, account = identity(), currentRoute = route();
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '') || account === null || !currentRoute) return null;
@@ -78,8 +78,17 @@
     if (!conversation || !controller || controller.conversation !== conversation ||
         typeof conversation.serverId$ !== 'function' ||
         (conversation.serverId$() || null) !== currentRoute.conversationId ||
-        typeof props.submitComposer !== 'function' || typeof props.isNewThread !== 'boolean' ||
-        props.structuredInputHost != null || props.structuredInputMessageId != null ||
+        typeof props.isNewThread !== 'boolean' || props.structuredInputHost != null ||
+        props.structuredInputMessageId != null) return null;
+    return { ...context, ...currentRoute, token, account, node, conversation, controller,
+      requestId: props.currentRequestId };
+  }
+
+  function capture(node, previousAttachment) {
+    const binding = captureConversation(node);
+    if (!binding) return null;
+    const context = binding, props = context.shared.getSharedProps();
+    if (typeof props.submitComposer !== 'function' ||
         props.isDisabled !== false || props.isComposerSubmissionReady !== true ||
         props.isConsumerLockdownModeLoadingForConversation !== false ||
         typeof props.shouldBlockConsumerLockdownModeActionsForConversation !== 'boolean') return null;
@@ -94,8 +103,7 @@
           attachment.readyFiles.length < 1 || attachment.readyFiles.length > 9 ||
           pending.length !== attachment.readyFiles.length || ready.length !== pending.length) return null;
     } else if (pending.length || ready.length) return null;
-    return { ...context, ...currentRoute, token, account, node, conversation, controller,
-      leaf: props.currentLeafId, submit: props.submitComposer, attachment };
+    return { ...binding, leaf: props.currentLeafId, submit: props.submitComposer, attachment };
   }
 
   function sameOwner(binding) {
@@ -117,7 +125,8 @@
 
   function submit(command) {
     if (page.__elonChatGptPrivateTextTransactionsEnabled !== true) return { handled: false, code: 'disabled' };
-    if (active || page.__elonChatGptPrivateRegenerateRuntime?.state?.().pending) {
+    if (active || page.__elonChatGptPrivateRegenerateRuntime?.state?.().pending ||
+        page.__elonChatGptPrivateStopRuntime?.state?.().pending) {
       return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'busy' }) };
     }
     const value = command?.prompt, expected = command?.expectedDraft;
@@ -179,5 +188,5 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 4, submit, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 5, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

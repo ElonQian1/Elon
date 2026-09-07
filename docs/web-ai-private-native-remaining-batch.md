@@ -194,6 +194,13 @@ The offline implementation itself did not operate the absent phone.
 
 ## Protocol gaps
 
+Adapter 291 adds [official-runtime generation stop](chatgpt-official-runtime-stop.md)
+to the grouped ChatGPT acceptance candidate. It reuses the sender's committed
+conversation context, invokes the official stop lifecycle without DOM-button
+polling, and prevents another native send/regenerate while stop is in flight.
+The combined 158-case Node run passes; current-runtime access and production UI
+stopping still await the grouped APK. It is not independent Android HTTP dispatch.
+
 | Area | Existing usable path | Actual remaining private work |
 |---|---|---|
 | Text send/regenerate | Native send ledger and streaming observer; [direct official-runtime text/owned-attachment transaction](chatgpt-official-runtime-text-submit.md) and [guarded runtime regeneration](chatgpt-official-runtime-regeneration.md) now implemented without DOM fill/button/menu polling | Accept the current-runtime bridges, exact ready-file handoff/cleanup and original-parent retry in the grouped APK. Independent fresh proof-bound private dispatch and regeneration remain unverified; runtime acceptance is still official-page authority, not private HTTP success. Do not replay captured proof headers. |
