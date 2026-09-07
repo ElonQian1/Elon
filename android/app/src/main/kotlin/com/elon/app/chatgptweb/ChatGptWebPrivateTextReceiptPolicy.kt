@@ -41,6 +41,7 @@ internal object ChatGptWebPrivateTextReceiptPolicy {
     }
 
     fun userDetail(event: ChatGptWebEvent.CommandResult): String =
+        ChatGptWebRegenerationReceiptPolicy.userDetail(event.action, event.ok, event.detail) ?:
         if (resolve(event).indeterminate) {
             "发送结果正在核对，为避免重复发送，请稍候。"
         } else if (event.action == "send_prompt" && event.detail == RUNTIME_PREFIX + "accepted" && event.ok) {
