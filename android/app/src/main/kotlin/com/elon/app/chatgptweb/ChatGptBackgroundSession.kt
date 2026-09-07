@@ -359,6 +359,9 @@ internal class ChatGptBackgroundSession(
 
     fun startNewConversation(): Boolean = navigationActions.startNewConversation()
 
+    fun resolveNewConversation(ticket: String, confirmed: Boolean): Boolean =
+        pageAdapter?.resolveNewConversation(ticket, confirmed) ?: false
+
     fun currentConversationPath(): String? = ChatGptWebConversationPath.fromUrl(latestSnapshot?.url)
 
     fun currentOfficialUrl(): String? = latestSnapshot?.url

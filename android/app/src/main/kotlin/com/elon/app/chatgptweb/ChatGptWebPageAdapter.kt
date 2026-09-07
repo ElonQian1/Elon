@@ -345,6 +345,13 @@ internal class ChatGptWebPageAdapter(
 
     fun startNewConversation(requestId: String) = runCommand("new_conversation", requestId = requestId)
 
+    fun resolveNewConversation(ticket: String, confirmed: Boolean): Boolean {
+        if (!documentSession.snapshot().adapterCurrent) return false
+        runCommand("new_conversation", value = JSONObject().put("confirmationTicket", ticket)
+            .put("decision", if (confirmed) "confirm" else "cancel").toString())
+        return true
+    }
+
     fun listConversations(
         projectHints: List<ChatGptWebProject> = emptyList(),
         scopeProjectId: String? = null,
