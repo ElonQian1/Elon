@@ -9,6 +9,7 @@ const CID = '00000000-0000-0000-0000-000000000001';
 const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 // The inspected AKt action, with synthetic dependencies below; no real account or network.
 const actionSource = '()=>{cg.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(gB.reset(c),qg()&&$p.delete(n),!o&&!$p(n)&&OKt(s),u(jKt,{replace:!0})):oD(l,{params:o?void 0:new URLSearchParams({[zm]:`true`})})}';
+const currentActionSource = '()=>{No.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(SB.reset(c),_t()&&fh.delete(n),!o&&!fh(n)&&gqt(s),u(yqt,{replace:!0})):Dj(l,{params:o?void 0:new URLSearchParams({[xn]:`true`})})}';
 
 function fixture(options = {}) {
   let time = 0, nextTimer = 1, imports = 0, fallbacks = 0, snapshots = 0, observed = true;
@@ -42,8 +43,11 @@ function fixture(options = {}) {
     };
     const personalize = () => state.personalized;
     personalize.delete = value => { assert.equal(value, id); state.personalized = false; effects.push('personalization-clear'); };
-    const action = new Function('cg', 'a', 'o', 'gB', 'c', 'qg', '$p', 'n', 'OKt', 's', 'u', 'jKt', 'oD', 'l', 'zm',
-      'return ' + actionSource)(
+    const dependencies = options.currentBuild
+      ? ['No', 'a', 'o', 'SB', 'c', '_t', 'fh', 'n', 'gqt', 's', 'u', 'yqt', 'Dj', 'l', 'xn']
+      : ['cg', 'a', 'o', 'gB', 'c', 'qg', '$p', 'n', 'OKt', 's', 'u', 'jKt', 'oD', 'l', 'zm'];
+    const action = new Function(...dependencies,
+      'return ' + (options.currentBuild ? currentActionSource : actionSource))(
       { logEvent: () => effects.push('official-action') }, state.newChat, state.selected,
       { reset: () => { state.files = []; effects.push('attachments-reset'); } }, {}, () => true, personalize, id,
       () => { state.tools = []; effects.push('personalized-tools-reset'); }, {},
@@ -62,7 +66,8 @@ function fixture(options = {}) {
       }, {}, 'temporary-chat');
     const root = { stateNode: {} }; root.stateNode.current = root;
     const conversationFiber = { memoizedProps: { conversation: state.conversation }, return: root };
-    const owner = { type: function AKt() {}, memoizedProps: { clientThreadId: id }, return: conversationFiber };
+    const owner = { type: options.currentBuild ? function vqt() {} : function AKt() {},
+      memoizedProps: { clientThreadId: id }, return: conversationFiber };
     const memo = Array(30);
     memo[0] = id; memo[3] = state.newChat; memo[4] = state.selected; memo[7] = action;
     memo[19] = action; memo[20] = state.selected && !state.newChat; memo[21] = state.selected;
@@ -79,7 +84,8 @@ function fixture(options = {}) {
   const modules = { cX: () => new URL(page.location.href).searchParams.get('temporary-chat') === 'true',
     XM: id => id === state.conversation.id ? { is_do_not_remember: state.privacy, isNew: state.newChat } : null,
     uo: () => state.work, HM: { getIsNewConversation: thread => thread.isNew } };
-  const runtime = runtimeModule.create(page, { now: () => time, loadRuntime: async url => {
+  const bridge = options.currentBuild ? require('./fixtures/chatgpt-runtime-bindings').attach(page, { shared: modules }) : null;
+  const runtime = runtimeModule.create(page, { now: () => time, loadRuntime: options.currentBuild ? undefined : async url => {
     imports++; assert.equal(url, 'https://chatgpt.com/cdn/assets/4813494d-hrplraurzfyvxb10.js');
     return options.loadRuntime ? options.loadRuntime(modules) : modules;
   } });
@@ -98,7 +104,8 @@ function fixture(options = {}) {
     time = target;
   }
   return { page, state, runtime, modules, timers, results, effects, render, values, select, advance,
-    get imports() { return imports; }, get fallbacks() { return fallbacks; }, get snapshots() { return snapshots; },
+    get imports() { return bridge ? bridge.loads.length : imports; },
+    get fallbacks() { return fallbacks; }, get snapshots() { return snapshots; },
     set observed(value) { observed = value; }, set account(value) { account = value; } };
 }
 
@@ -111,6 +118,17 @@ test('empty chat uses the official transaction, preserves cleanup and reuses the
   f.select(false);
   assert.equal(f.results.at(-1)[1], true); assert.equal(f.state.privacy, false); assert.equal(f.imports, 1);
   assert.equal(f.fallbacks, 0); assert.equal(f.timers.size, 0);
+});
+
+for (const newChat of [true, false]) test('current website callback retains temporary privacy and cleanup: ' + newChat, async () => {
+  const f = fixture({ currentBuild: true, newChat }), original = f.state.conversation;
+  assert.equal(f.select(true), true); await flush();
+  assert.equal(f.results.at(-1)[1], true); assert.equal(f.state.privacy, true);
+  assert.equal(f.effects.includes('dom-click'), false); assert.equal(f.fallbacks, 0);
+  if (newChat) {
+    assert.equal(f.state.conversation, original); assert.equal(f.effects.includes('attachments-reset'), true);
+  } else assert.notEqual(f.state.conversation, original);
+  f.select(false); await flush(); assert.equal(f.state.privacy, false); assert.equal(f.imports, 1);
 });
 
 test('an existing regular conversation starts a new temporary conversation, not a privacy rewrite', async () => {

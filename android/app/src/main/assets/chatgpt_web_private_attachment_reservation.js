@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 3, create: factory });
+  const exported = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentReservation = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -61,12 +61,14 @@
   }
 
   async function enabled(value) {
-    const loaded = root.performance?.getEntriesByName?.(RUNTIME_URL, 'resource')?.length > 0 ||
+    const bindings = root.__elonChatGptPrivateRuntimeBindings;
+    const loaded = bindings ? bindings.observed(RUNTIME_URL) :
+      root.performance?.getEntriesByName?.(RUNTIME_URL, 'resource')?.length > 0 ||
       !!root.document?.querySelector?.('link[rel="modulepreload"][href="' + RUNTIME_URL + '"]');
     if (!loaded || !current(value)) return false;
     // Import only the inspected module already used by this page. Its experiment
     // client is authoritative; a missing value is not permission to enable it.
-    const namespace = await (options.loadRuntime || (url => import(url)))(RUNTIME_URL);
+    const namespace = await (options.loadRuntime || (url => bindings ? bindings.load(url) : import(url)))(RUNTIME_URL);
     if (!current(value)) return false;
     const client = namespace?.t6?.();
     if (client?.loadingStatus !== 'Ready') return false;
@@ -148,5 +150,5 @@
 
   // Selection never waits for allocation. Taking a pending slot abandons it, so
   // a late response cannot replace an already selected upload transaction.
-  return Object.freeze({ version: 3, start, take, cancel });
+  return Object.freeze({ version: 4, start, take, cancel });
 });

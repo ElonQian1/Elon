@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 3, create: factory });
+  const exported = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateConversationDelete) {
     root.__elonChatGptPrivateConversationDelete = factory(root);
@@ -36,8 +36,10 @@
     try {
       if (!runtime) {
         // Reuse the inspected official singleton, never load a different website build.
-        if (!root.performance?.getEntriesByName?.(RUNTIME_URL)?.length) return null;
-        const load = options?.loadRuntime || (url => import(url));
+        const bindings = root.__elonChatGptPrivateRuntimeBindings;
+        if (!(bindings ? bindings.observed(RUNTIME_URL) :
+            root.performance?.getEntriesByName?.(RUNTIME_URL)?.length)) return null;
+        const load = options?.loadRuntime || (url => bindings ? bindings.load(url) : import(url));
         runtime = Promise.resolve().then(() => load(RUNTIME_URL));
       }
       pending = runtime;
@@ -163,5 +165,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 3, start, handle, busy: () => Boolean(active) });
+  return Object.freeze({ version: 4, start, handle, busy: () => Boolean(active) });
 });

@@ -47,6 +47,13 @@ private share-list read returned a complete empty result in 1,436 ms; inventory
 also worked. Gallery UI and public-share creation/revocation remain pending.
 No normal-user polling, account changes or independent proxy changes were added.
 
+Current source correction: [versioned website runtime bindings](chatgpt-private-runtime-bindings.md)
+replace stale module selection across sharing, deletion, model state, text,
+regeneration, stop, temporary chat and attachment scope/reuse. The September 7
+website changed both filenames and export aliases. New/old-build and consumer
+regressions passed; grouped Android build and current-build device acceptance
+are pending. This does not upgrade other acceptance gaps below.
+
 Latest source extension: [private multi-attachment batches](chatgpt-private-attachment-batch.md)
 now join up to nine native selections to one prepared-action message, reusing
 existing per-file upload owners. 305 focused Node cases, 32 Kotlin/JUnit tests

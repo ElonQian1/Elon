@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentLibrary = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -28,10 +28,13 @@
   async function enabled(assertCurrent) {
     assertCurrent();
     if (!runtime) {
-      const loaded = root.performance?.getEntriesByName?.(RUNTIME, 'resource')?.length > 0 ||
+      const bindings = root.__elonChatGptPrivateRuntimeBindings;
+      const loaded = bindings ? bindings.observed(RUNTIME) :
+        root.performance?.getEntriesByName?.(RUNTIME, 'resource')?.length > 0 ||
         !!root.document?.querySelector?.('link[rel="modulepreload"][href="' + RUNTIME + '"]');
       if (!loaded) return false;
-      runtime = Promise.resolve().then(() => (options.loadRuntime || (url => import(url)))(RUNTIME));
+      runtime = Promise.resolve().then(() =>
+        (options.loadRuntime || (url => bindings ? bindings.load(url) : import(url)))(RUNTIME));
       runtime.catch(() => { runtime = null; });
     }
     const namespace = await runtime;
@@ -123,5 +126,5 @@
     }
   }
 
-  return Object.freeze({ version: 2, transfer });
+  return Object.freeze({ version: 3, transfer });
 });

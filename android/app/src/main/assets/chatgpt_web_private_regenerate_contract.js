@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateRegenerateContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -60,6 +60,7 @@
 
   function capture(turn, getModelTrigger) {
     if (!models || !Object.values(URLS).every(url =>
+      page.__elonChatGptPrivateRuntimeBindings ? page.__elonChatGptPrivateRuntimeBindings.observed(url) :
       page.performance?.getEntriesByName?.(url, 'resource')?.length > 0 ||
       page.document.querySelector('link[rel="modulepreload"][href="' + url + '"]'))) return null;
     const model = models.capture(getModelTrigger), menu = retryMenu(turn);

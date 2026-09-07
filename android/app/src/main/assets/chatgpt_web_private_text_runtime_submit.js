@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 5, create: factory });
+  const exported = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -65,6 +65,9 @@
   }
 
   function loaded() {
+    if (page.__elonChatGptPrivateRuntimeBindings) {
+      return page.__elonChatGptPrivateRuntimeBindings.observed(RUNTIME_URL);
+    }
     return page.performance?.getEntriesByName?.(RUNTIME_URL, 'resource')?.length > 0 ||
       Array.from(page.document.querySelectorAll('link[rel="modulepreload"]')).some(node => node.href === RUNTIME_URL);
   }
@@ -188,5 +191,5 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 5, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 6, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

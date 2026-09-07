@@ -20,11 +20,11 @@
   let active = null;
   let cooldownUntil = 0;
   const reservationModule = options?.reservation || root.__elonChatGptPrivateAttachmentReservation;
-  const reservation = [1, 2, 3].includes(reservationModule?.version) ? reservationModule.create(root, {
+  const reservation = [1, 2, 3, 4].includes(reservationModule?.version) ? reservationModule.create(root, {
     protocol, bytes, request, isCurrent: current, acquireHeaders: async () => allowedHeaders(await acquire()),
   }) : null;
   const libraryModule = options?.library || root.__elonChatGptPrivateAttachmentLibrary;
-  const library = [1, 2].includes(libraryModule?.version) ? libraryModule.create(root, { protocol, request }) : null;
+  const library = [1, 2, 3].includes(libraryModule?.version) ? libraryModule.create(root, { protocol, request }) : null;
 
   function allowedHeaders(source) {
     const result = { Accept: 'application/json', 'Content-Type': 'application/json' };

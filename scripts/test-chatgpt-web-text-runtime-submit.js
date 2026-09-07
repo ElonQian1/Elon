@@ -65,6 +65,14 @@ test('official text action dispatches once without filling or clicking the websi
   assert.equal(f.timers.size, 0);
 });
 
+test('current website composer accepts the native submit transaction without a legacy module', async () => {
+  const f = fixture(), bridge = require('./fixtures/chatgpt-runtime-bindings').attach(f.page, {});
+  const result = f.api.submit(f.command);
+  assert.equal(result.handled, true); assert.equal(f.calls.length, 1);
+  f.settle(true); assert.equal((await result.completion).status, 'accepted');
+  assert.equal(bridge.loads.length, 0, 'uses the current committed submit owner without importing another composer');
+});
+
 test('matching draft is cleared only after accepted official dispatch', async () => {
   const f = fixture(); f.setDraft(f.command.prompt); f.command.expectedDraft = f.command.prompt;
   const result = f.api.submit(f.command);

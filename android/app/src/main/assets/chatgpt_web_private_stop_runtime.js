@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const old = root.__elonChatGptPrivateStopRuntime;
@@ -38,7 +38,8 @@
   function load() {
     if (modules) return Promise.resolve(modules);
     if (loading) return loading;
-    const importer = options.loadRuntime || (url => import(url));
+    const bindings = page.__elonChatGptPrivateRuntimeBindings;
+    const importer = options.loadRuntime || (url => bindings ? bindings.load(url) : import(url));
     let timer;
     loading = Promise.race([
       Promise.all(Object.entries(URLS).map(async ([key, url]) => [key, await importer(url)])),
@@ -82,7 +83,9 @@
     try {
       binding = capture(command.composer);
       if (!binding || !/^[a-z0-9_-]{1,128}$/i.test(binding.requestId || '') ||
-          !Object.values(URLS).every(url => page.performance?.getEntriesByName?.(url, 'resource')?.length > 0 ||
+          !Object.values(URLS).every(url => page.__elonChatGptPrivateRuntimeBindings
+            ? page.__elonChatGptPrivateRuntimeBindings.observed(url) :
+            page.performance?.getEntriesByName?.(url, 'resource')?.length > 0 ||
             page.document.querySelector('link[rel="modulepreload"][href="' + url + '"]'))) return { handled: false };
     } catch (_) { return { handled: false }; }
     let resolve;
@@ -172,5 +175,5 @@
     return owner.transaction;
   }
 
-  return Object.freeze({ version: 1, stop, state });
+  return Object.freeze({ version: 2, stop, state });
 });

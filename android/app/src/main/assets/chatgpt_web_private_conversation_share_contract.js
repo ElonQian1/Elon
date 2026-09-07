@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateConversationShareContract = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -21,10 +21,12 @@
   }
 
   async function load() {
-    if (!Object.values(urls).every(url => page.performance?.getEntriesByName?.(url, 'resource')?.length > 0 ||
+    const bindings = page.__elonChatGptPrivateRuntimeBindings;
+    if (!Object.values(urls).every(url => bindings ? bindings.observed(url) :
+        page.performance?.getEntriesByName?.(url, 'resource')?.length > 0 ||
         page.document?.querySelector?.('link[rel="modulepreload"][href="' + url + '"]'))) return null;
     if (!runtime) {
-      const importer = options?.loadRuntime || (url => import(url));
+      const importer = options?.loadRuntime || (url => bindings ? bindings.load(url) : import(url));
       runtime = Promise.all(Object.entries(urls).map(async ([key, url]) => [key, await importer(url)]))
         .then(Object.fromEntries);
       runtime.catch(() => { runtime = null; });
@@ -112,5 +114,5 @@
       moderation: payload.moderation_state });
   }
 
-  return Object.freeze({ version: 2, capture, current, identity, created, moderation, urls, load, ready });
+  return Object.freeze({ version: 3, capture, current, identity, created, moderation, urls, load, ready });
 });

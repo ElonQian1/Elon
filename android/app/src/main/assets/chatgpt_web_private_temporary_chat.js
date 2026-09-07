@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateTemporaryChat = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -23,12 +23,16 @@
   }
 
   function observed(url) {
+    if (page.__elonChatGptPrivateRuntimeBindings) return page.__elonChatGptPrivateRuntimeBindings.observed(url);
     return page.performance?.getEntriesByName?.(url, 'resource')?.length > 0 ||
       !!page.document.querySelector('link[rel="modulepreload"][href="' + url + '"]');
   }
 
   function owner(node) {
     if (!node?.isConnected) return null;
+    const spec = page.__elonChatGptPrivateRuntimeBindings
+      ? page.__elonChatGptPrivateRuntimeBindings.temporary() : { owner: 'AKt', action: ACTION };
+    if (!spec) return null;
     const key = Object.keys(node).find(key => key.startsWith('__reactFiber$'));
     const matches = [];
     for (const start of [node[key], node[key]?.alternate]) {
@@ -36,24 +40,24 @@
       for (let fiber = start; fiber && chain.length < 90; fiber = fiber.return) chain.push(fiber);
       const root = chain.at(-1);
       if (!root || root.return || root.stateNode?.current !== root) continue;
-      const index = chain.findIndex(fiber => fiber.type?.name === 'AKt' &&
+      const index = chain.findIndex(fiber => fiber.type?.name === spec.owner &&
         typeof fiber.memoizedProps?.clientThreadId === 'string');
       if (index < 0) continue;
       const id = chain[index].memoizedProps.clientThreadId;
       if (!/^[a-zA-Z0-9_-]{1,160}$/.test(id)) continue;
-      // AKt's single useMemoCache(30) records the closure's isNew/temp inputs.
+      // The inspected owner's single useMemoCache(30) records isNew/temp inputs.
       // Checking these prevents a committed but stale empty-chat callback from rewriting a saved chat.
       const data = chain[index].updateQueue?.memoCache?.data;
       const memo = Array.isArray(data) && data.length === 1 ? data[0] : null;
       if (!Array.isArray(memo) || memo.length !== 30 || memo[0] !== id ||
           typeof memo[3] !== 'boolean' || typeof memo[4] !== 'boolean' ||
-          typeof memo[7] !== 'function' || Function.prototype.toString.call(memo[7]) !== ACTION ||
+          typeof memo[7] !== 'function' || Function.prototype.toString.call(memo[7]) !== spec.action ||
           memo[19] !== memo[7] || memo[20] !== (memo[4] && !memo[3]) || memo[21] !== memo[4]) continue;
       const conversations = new Set(chain.map(fiber => fiber.memoizedProps?.conversation)
         .filter(conversation => conversation?.id === id && typeof conversation.serverId$ === 'function'));
       const callbacks = chain.slice(0, index).map(fiber => fiber.memoizedProps?.onClick)
         .filter(action => typeof action === 'function');
-      const actions = new Set(callbacks.filter(action => Function.prototype.toString.call(action) === ACTION));
+      const actions = new Set(callbacks.filter(action => Function.prototype.toString.call(action) === spec.action));
       if (conversations.size !== 1 || actions.size > 1 || callbacks.length && !actions.size ||
           actions.size && !actions.has(memo[7]) || !actions.size && !memo[20]) continue;
       matches.push({ id, conversation: conversations.values().next().value,
@@ -87,7 +91,8 @@
     if (runtime) return Promise.resolve();
     if (loading) return loading;
     if (now() < cooldown) return Promise.resolve();
-    const importer = options.loadRuntime || (url => import(url));
+    const bindings = page.__elonChatGptPrivateRuntimeBindings;
+    const importer = options.loadRuntime || (url => bindings ? bindings.load(url) : import(url));
     let timer;
     loading = Promise.race([
       Promise.resolve().then(() => importer(SHARED)),
@@ -234,5 +239,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 1, observe, setSelected });
+  return Object.freeze({ version: 2, observe, setSelected });
 });

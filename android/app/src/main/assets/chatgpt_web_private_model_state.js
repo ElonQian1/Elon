@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateModelState = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -13,7 +13,8 @@
   function load() {
     if (modules) return Promise.resolve();
     if (loading) return loading;
-    const importer = options.loadRuntime || (url => import(url));
+    const bindings = page.__elonChatGptPrivateRuntimeBindings;
+    const importer = options.loadRuntime || (url => bindings ? bindings.load(url) : import(url));
     let timer;
     loading = Promise.race([
       Promise.all(Object.entries(contract.urls).map(async ([key, url]) => [key, await importer(url)])),
@@ -53,7 +54,9 @@
     try {
       binding = contract.capture(getTrigger);
       if (!binding || !modules && Date.now() < cooldown || getTrigger()?.getAttribute('aria-expanded') === 'true' ||
-          !Object.values(contract.urls).every(url => page.performance?.getEntriesByName?.(url, 'resource')?.length > 0 ||
+          !Object.values(contract.urls).every(url => page.__elonChatGptPrivateRuntimeBindings
+            ? page.__elonChatGptPrivateRuntimeBindings.observed(url) :
+            page.performance?.getEntriesByName?.(url, 'resource')?.length > 0 ||
             page.document.querySelector('link[rel="modulepreload"][href="' + url + '"]'))) return false;
     } catch (_) { return false; }
     const request = { result }; pending = request;
@@ -124,5 +127,5 @@
     return handled;
   }
 
-  return Object.freeze({ version: 1, request, select, dismiss });
+  return Object.freeze({ version: 2, request, select, dismiss });
 });

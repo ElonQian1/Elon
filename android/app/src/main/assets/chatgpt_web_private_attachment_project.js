@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 6, create: factory });
+  const exported = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentProject = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -49,12 +49,14 @@
     let timer, abort;
     try {
       if (!runtime) {
-        const loaded = root.performance?.getEntriesByName?.(RUNTIME_URL, 'resource')?.length > 0 ||
+        const bindings = root.__elonChatGptPrivateRuntimeBindings;
+        const loaded = bindings ? bindings.observed(RUNTIME_URL) :
+          root.performance?.getEntriesByName?.(RUNTIME_URL, 'resource')?.length > 0 ||
           !!root.document?.querySelector?.('link[rel="modulepreload"][href="' + RUNTIME_URL + '"]');
         if (!loaded) throw new Error('composer_context_unavailable');
         // Bind only the inspected, already-loaded official module; never import a
         // guessed replacement or create a second state store from copied code.
-        const load = options?.loadRuntime || (url => import(url));
+        const load = options?.loadRuntime || (url => bindings ? bindings.load(url) : import(url));
         runtime = Promise.resolve().then(() => load(RUNTIME_URL));
         runtime.catch(() => { runtime = null; });
       }
@@ -123,5 +125,5 @@
     });
   }
 
-  return Object.freeze({ version: 6, projectId, read, captureThread, supports, uploadContext });
+  return Object.freeze({ version: 7, projectId, read, captureThread, supports, uploadContext });
 });

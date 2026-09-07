@@ -1,0 +1,136 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const bindings = require('../android/app/src/main/assets/chatgpt_web_private_runtime_bindings');
+const { attach, CDN, files, expectedExports } = require('./fixtures/chatgpt-runtime-bindings');
+const old = {
+  shared: CDN + '4813494d-hrplraurzfyvxb10.js',
+  conversation: CDN + 'conversation-small-hiw4wce20lu6te81.js',
+  composer: CDN + '8b34dbc2-kjj15hg4y6iyx13p.js'
+};
+function fixture(options = {}) {
+  const observed = new Set([CDN + files.shared]), calls = [];
+  const page = { location: { origin: 'https://chatgpt.com' }, document: { querySelector: () => null },
+    __elonChatGptDocumentToken: 'doc_test', setTimeout, clearTimeout,
+    performance: { getEntriesByName: url => observed.has(url) ? [{}] : [] } };
+  const api = bindings.create(page, { ...options, loadRuntime: async url => {
+    calls.push(url); return options.loadRuntime ? options.loadRuntime(url) : { c6: () => true };
+  } });
+  return { page, observed, calls, api };
+}
+
+test('current aliases resolve the exact observed build, never the unrelated legacy export', async () => {
+  const good = () => true, bad = () => { throw Error('wrong export'); };
+  const f = fixture({ loadRuntime: () => ({ c6: good, H3: bad }) });
+  assert.equal(f.api.observed(old.shared), true);
+  const value = await f.api.load(old.shared);
+  assert.equal(value.H3, good); assert.equal(value.H3(), true);
+  assert.equal(value.c6, undefined);
+  assert.deepEqual(f.calls, [CDN + files.shared]);
+  assert.equal(Object.getPrototypeOf(value), null); assert.equal(Object.isFrozen(value), true);
+});
+
+test('every consumer export preserves its original function or store identity', async () => {
+  const modules = Object.fromEntries(Object.entries(expectedExports).map(([role, keys]) => [role,
+    Object.fromEntries(Object.keys(keys).map(key => [key, () => key]))]));
+  const f = fixture(), current = attach(f.page, modules);
+  for (const role of Object.keys(modules)) {
+    const value = await current.api.load(old[role]);
+    for (const key of Object.keys(modules[role])) assert.equal(value[key], modules[role][key]);
+  }
+  assert.equal(current.loads.length, 3);
+});
+
+test('old cached website still uses its original singleton and aliases', async () => {
+  const getter = () => true, f = fixture({ loadRuntime: () => ({ H3: getter }) });
+  f.observed.clear(); f.observed.add(old.shared);
+  assert.equal((await f.api.load(old.shared)).H3, getter);
+  assert.deepEqual(f.calls, [old.shared]); assert.equal(f.api.state().profile_id, 'web_20260906');
+});
+
+test('on-page static dependency anchor works when resource timing has been truncated', async () => {
+  const f = fixture(); f.observed.clear(); f.observed.add(CDN + 'c2675c8c-kconnwitb9zzv81k.js');
+  assert.equal(f.api.observed(old.composer), true);
+  assert.equal((await f.api.load(old.shared)).H3(), true);
+});
+
+test('unknown websites and arbitrary module URLs are never imported', async () => {
+  const f = fixture(); f.observed.clear();
+  f.observed.add(CDN + '4813494d-unknown.js');
+  assert.equal(f.api.observed(old.shared), false);
+  await assert.rejects(f.api.load(old.shared), /not_observed/);
+  await assert.rejects(f.api.load('https://example.invalid/module.js'), /not_observed/);
+  assert.equal(f.calls.length, 0);
+});
+
+test('mixed website builds cannot combine auth, conversation and composer stores', async () => {
+  const f = fixture(); f.observed.add(old.composer);
+  assert.equal(f.api.observed(old.shared), false);
+  await assert.rejects(f.api.load(old.shared), /not_observed/);
+  assert.equal(f.api.state().error, 'runtime_build_ambiguous'); assert.equal(f.calls.length, 0);
+});
+
+test('concurrent consumers and warm revisits share one bounded import', async () => {
+  let complete; const f = fixture({ loadRuntime: () => new Promise(resolve => { complete = resolve; }) });
+  const a = f.api.load(old.shared), b = f.api.load('shared');
+  assert.equal(a, b); await Promise.resolve(); complete({ c6: () => true });
+  const value = await a;
+  f.observed.clear();
+  assert.equal(await f.api.load('shared'), value); assert.equal(f.calls.length, 1);
+});
+
+test('late completion from a replaced document cannot populate the new cache', async () => {
+  const pending = [];
+  const f = fixture({ loadRuntime: () => new Promise(resolve => pending.push(resolve)) });
+  const oldRequest = f.api.load('shared'); await Promise.resolve();
+  f.page.__elonChatGptDocumentToken = 'doc_other';
+  const newRequest = f.api.load('shared'); await Promise.resolve();
+  pending[0]({ c6: () => false }); await assert.rejects(oldRequest, /context_changed/);
+  pending[1]({ c6: () => true });
+  assert.equal((await newRequest).H3(), true); assert.equal(f.api.state().cached_modules, 1);
+});
+
+test('module failure cools down instead of repeatedly importing on every click', async () => {
+  let time = 0;
+  const f = fixture({ now: () => time, loadRuntime: () => { throw Error('network failure'); } });
+  await assert.rejects(f.api.load('shared'), /network failure/);
+  await assert.rejects(f.api.load('shared'), /cooldown/); assert.equal(f.calls.length, 1);
+  time = 10001; await assert.rejects(f.api.load('shared')); assert.equal(f.calls.length, 2);
+  assert.equal(f.api.state().error, 'runtime_load_failed');
+});
+
+test('a never-settled module times out and a late result does not become usable', async () => {
+  let finish; const f = fixture({ timeoutMs: 100, loadRuntime: () => new Promise(resolve => { finish = resolve; }) });
+  await assert.rejects(f.api.load('shared'), /runtime_timeout/);
+  finish({ c6: () => true }); await Promise.resolve();
+  await assert.rejects(f.api.load('shared'), /cooldown/); assert.equal(f.api.state().cached_modules, 0);
+});
+
+test('missing exports stay unknown instead of calling the reused old alias', async () => {
+  const f = fixture({ loadRuntime: () => ({ H3: () => true }) });
+  await assert.rejects(f.api.load('shared'), /exports_unknown/);
+});
+
+test('foreign origin invalidates access even with previously cached modules', async () => {
+  const f = fixture(); await f.api.load('shared'); f.page.location.origin = 'https://example.invalid';
+  assert.equal(f.api.observed(old.shared), false); await assert.rejects(f.api.load('shared'), /not_observed/);
+});
+
+test('temporary-chat callback is selected by the same build, not only its minified name', () => {
+  const f = fixture();
+  assert.equal(f.api.temporary().owner, 'vqt'); assert.match(f.api.temporary().action, /SB\.reset\(c\)/);
+  f.page.__elonChatGptDocumentToken = 'doc_older'; f.observed.clear(); f.observed.add(old.shared);
+  assert.equal(f.api.temporary().owner, 'AKt');
+});
+
+test('production resolver is assembled before every runtime consumer', () => {
+  const source = require('./chatgpt-web-adapter-assembly').readAdapterSource();
+  const names = [...source.split('private val ADAPTER_ASSETS = listOf(')[1].split(')')[0]
+    .matchAll(/"([a-z0-9_]+\.js)"/g)].map(m => m[1]);
+  const binding = names.indexOf('chatgpt_web_private_runtime_bindings.js');
+  assert.ok(binding >= 0); assert.equal(names.filter(n => n === names[binding]).length, 1);
+  for (const name of ['model_state', 'temporary_chat', 'conversation_share_contract', 'conversation_delete',
+    'attachment_reservation', 'attachment_library', 'attachment_project', 'regenerate_runtime', 'stop_runtime', 'text_runtime_submit']) {
+    assert.ok(names.indexOf('chatgpt_web_private_' + name + '.js') > binding, name);
+  }
+});

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const old = root.__elonChatGptPrivateRegenerateRuntime;
@@ -17,7 +17,8 @@
   function load() {
     if (modules) return Promise.resolve(modules);
     if (loading) return loading;
-    const importer = options.loadRuntime || (url => import(url));
+    const bindings = page.__elonChatGptPrivateRuntimeBindings;
+    const importer = options.loadRuntime || (url => bindings ? bindings.load(url) : import(url));
     let timer;
     loading = Promise.race([
       Promise.all(['shared', 'conversation'].map(async key => [key, await importer(contract.urls[key])])),
@@ -125,5 +126,5 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 2, regenerate, available, state });
+  return Object.freeze({ version: 3, regenerate, available, state });
 });
