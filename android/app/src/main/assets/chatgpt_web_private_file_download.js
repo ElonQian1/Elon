@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 9, create: factory });
+  const exported = Object.freeze({ version: 10, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -122,6 +122,7 @@
     if (libraryFileId !== null && (typeof libraryFileId !== 'string' || !LIBRARY.test(libraryFileId))) return null;
     return Object.freeze({ conversationId: conversation[2], fileId: file.id,
       projectId: projects[0] || null, libraryFileId,
+      connectorCopy: file.context_connector_info != null,
       mediaType: typeof file.mime_type === 'string' ? file.mime_type : '',
       ...(libraryReference || {}),
       ...(libraryReference ? { name: file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180), mediaType: file.mime_type || '' } : {}),
@@ -131,9 +132,10 @@
         mediaType: file.mime_type || '' } : {}) });
   }
 
-  async function resolveAuthorization(job, request) {
+  async function resolveDestination(job, request) {
     const entry = job.entry;
-    if (!entry.libraryFileId) return authorizationUrl(entry, entry.projectId);
+    if (!request?.request || !current(job)) throw new Error('download_cancelled');
+    if (!entry.libraryFileId) return { url: authorizationUrl(entry, entry.projectId) };
     // Official WTt/KTt/DX resolve a library file's effective project before dEt.
     const url = new URL('/backend-api/files/' + encodeURIComponent(entry.fileId) + '/simple', root.location.origin);
     if (entry.projectId) url.searchParams.set('gizmo_id', entry.projectId);
@@ -153,7 +155,12 @@
     const projectId = info.is_project === true || PROJECT.test(info.gizmo_id || '')
       ? info.gizmo_id || entry.projectId : null;
     if (info.is_project === true && !projectId) throw new Error('download_scope_unconfirmed');
-    return authorizationUrl(entry, projectId);
+    // Official preview passes libraryDownloadId only after matching personal
+    // ownership. Images and connector copies retain their separate resolvers.
+    if (!entry.image && !entry.connectorCopy && !projectId && info.is_project !== true) {
+      return { libraryDownloadId: entry.libraryFileId };
+    }
+    return { url: authorizationUrl(entry, projectId) };
   }
 
   function register(path, payload, index) {
@@ -250,19 +257,23 @@
     }
     const job = { descriptor, entry, controller: new root.AbortController() };
     active = job;
-    let timer = root.setTimeout(() => job.controller.abort(), entry.sharedLibraryFileId ? 120000 : 15000);
+    let timer = root.setTimeout(() => job.controller.abort(), 15000);
     try {
-      if (entry.sharedLibraryFileId) {
-        const detail = await root.__elonChatGptPrivateLibraryDownload.run(root, job, current, downloadUrl);
+      const request = root.__elonChatGptPrivateJsonRequest;
+      const destination = entry.sharedLibraryFileId ? { libraryDownloadId: entry.sharedLibraryFileId }
+        : await resolveDestination(job, request);
+      if (!current(job)) throw new Error('download_cancelled');
+      if (destination.libraryDownloadId) {
+        job.byteTransfer = true;
+        root.clearTimeout(timer);
+        timer = root.setTimeout(() => job.controller.abort(), 120000);
+        const detail = await root.__elonChatGptPrivateLibraryDownload.run(root, job, current,
+          downloadUrl, destination.libraryDownloadId);
         job.queued = true;
         respond(ACTION, true, detail);
         return;
       }
-      const request = root.__elonChatGptPrivateJsonRequest;
-      if (!request?.request || !current(job)) throw new Error('download_cancelled');
-      const url = await resolveAuthorization(job, request);
-      if (!current(job)) throw new Error('download_cancelled');
-      const result = await request.request(root, url, {
+      const result = await request.request(root, destination.url, {
         method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
         headers: root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders(), signal: job.controller.signal,
       }, { timeoutMs: 8000, maxBytes: 65536 });
@@ -309,5 +320,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 9, register, start, cancel, dispose });
+  return Object.freeze({ version: 10, register, start, cancel, dispose });
 });

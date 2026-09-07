@@ -3,8 +3,10 @@
 Capability candidate: `android_chatgpt_private_shared_library_download_v1`.
 Status: **implemented source candidate, offline JS verified, native build and
 grouped device acceptance pending**. This is not a `completed` capability.
-Current source: file-download module 8, library-download module 2, history
-projection 5. The existing adapter asset list is reused unchanged.
+Current source: file-download module 10, library-download module 4, history
+projection 5. The existing adapter asset list is reused unchanged. APK 1548
+contains the earlier modules 9/3; the personal-library extension below is a
+source batch awaiting the next grouped APK, not an installed-phone result.
 
 ## Official source evidence
 
@@ -84,8 +86,9 @@ control or complete page snapshot is polled for each progress update.
 
 ## Exact remaining gaps
 
-- Standalone `libraryDownloadId`, mounted-library, connector-only cloud and
-  remaining image-pointer scopes/path forms are not implemented by this candidate.
+- Personal `libraryDownloadId` resolution for a conversation attachment is now
+  implemented below. Standalone library browsing, mounted-library, connector-only
+  cloud and remaining image-pointer scopes/path forms are still not covered.
   [Bounded parameterized image pointers](chatgpt-private-image-download.md#parameterized-pointers)
   are implemented separately in the same download owner.
 - Separate `metadata.shared_library_file_references` are now indexed as described
@@ -168,3 +171,59 @@ provenance. Check cancel during transfer, insufficient storage, notification
 permission, supported Android storage paths and real VPN/redirect behavior.
 Preserve the original draft, conversation and voice session. Test other pending
 ChatGPT candidates in the same APK; Google remains after that acceptance gate.
+
+## Personal-library download resolution
+
+The 2026-09-08 extension reuses this candidate and the existing native byte
+owner. It does not introduce another file picker, download UI or DOM resolver.
+
+The retained 2026-09-07 public assets were SHA-256 checked again on 2026-09-08:
+
+- `conversation-small-owrec55n6vm0ekcc.js`:
+  `7973d518b083f0f3e23905a279ed019378481bdbdd10fc0196afe9fc7b3b7d35`.
+  Its preview download callback passes `libraryDownloadId` when the effective
+  project is absent, file metadata confirms `is_library_file`, the library ID
+  matches, and `is_project` is not true. An omitted project flag is admitted by
+  the official condition. Shared and mounted references have separate branches.
+- `4813494d-o593jrji51wy4azk.js`:
+  `48563cd22f0dafe6c0b89220348fa3add81ff3abb82a62ed9d68a04d569cc375`.
+  `uEt`/`OX` resolve effective project ownership through file metadata. `AEt`
+  chooses `sharedLibraryFileId ?? libraryDownloadId`; `jX` constructs the same
+  `/api/library/files/{id}/download` route already used by this module.
+
+Previously, an ordinary file ID linked to a personal library ID still used
+the ordinary JSON download authorization after that metadata check. The native
+owner now selects the evidenced binary route instead. The selected file,
+library ID and source conversation are snapshotted before the request; mutable
+history cannot retarget them. Unconfirmed identity or conflicting metadata
+stops the operation before the binary GET. There is no guessed alternative URL.
+
+The metadata read stays bounded to six seconds. Once ownership is confirmed,
+the existing 120-second byte-transfer deadline and native save acknowledgement
+apply. A transfer may finish after its selection handle expires, but the stale
+handle cannot start a second transfer. Account/document/navigation changes and
+request-bound cancellation retain their existing checks. A lost final save
+acknowledgement is unconfirmed, not permission to replay an ordinary download.
+
+Project-owned files, image pointers and imported connector copies keep their
+previous resolver contracts. The extension does not claim those source shapes
+are interchangeable with ordinary personal-library attachments, or admit raw
+`library_download_id` fields from native commands/history.
+
+Five targeted test cases were added; four failed against the unchanged download
+owner, while the rejection case already passed. The new route is covered from
+both normal and project conversations, including immutable selection, omitted
+project flags, wrong metadata, cancellation, identity changes, storage failure,
+lost acknowledgements and exact synthetic saved bytes. The compatibility run
+passed 115 cases. The final integration run passed 159 cases with no failures
+or skips and additionally covers private history,
+conversation-file indexing, shared references and production asset-bundle parsing.
+All HTTP and native byte acknowledgements in these tests are simulated.
+
+Status: `code_status=implemented`, `verification_status=offline_verified`,
+`device_status=deferred`. This batch does not rebuild or republish the APK.
+Next grouped acceptance must verify a real authenticated metadata response,
+library redirect/CORS behavior and the resulting saved file through the
+production native file sheet. No latency, temperature or battery improvement
+has been measured. Citation-only and mounted-library mappings remain separate
+research gaps, not completed capabilities.

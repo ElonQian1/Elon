@@ -118,11 +118,11 @@ function libraryFixture(info, projectId = PROJECT) {
   return f;
 }
 
-test('library downloads resolve actual personal or project ownership before authorization', async () => {
+test('project library downloads resolve effective ownership before ordinary authorization', async () => {
   for (const [info, expected] of [
     [{ is_project: true, gizmo_id: OTHER_PROJECT }, OTHER_PROJECT],
     [{ is_project: true, gizmo_id: null }, PROJECT],
-    [{ is_project: false, gizmo_id: null }, null],
+    [{ is_project: false, gizmo_id: OTHER_PROJECT }, OTHER_PROJECT],
     [{ gizmo_id: OTHER_PROJECT }, OTHER_PROJECT],
   ]) {
     const f = libraryFixture({ is_library_file: true, library_file_id: LIBRARY, ...info });
@@ -139,10 +139,6 @@ test('library downloads resolve actual personal or project ownership before auth
     assert.equal(f.queued.length, 1);
     assert.deepEqual(Object.keys(f.queued[0]).sort(), ['documentToken', 'leaseId', 'url']);
   }
-  const personal = libraryFixture({ is_library_file: true, library_file_id: LIBRARY, is_project: false }, null);
-  await personal.run();
-  assert.equal(new URL(personal.calls[0].url).searchParams.has('gizmo_id'), false);
-  assert.equal(personal.queued.length, 1);
 });
 
 test('unknown or contradictory library metadata cannot fall through to broad download scope', async () => {

@@ -41,8 +41,9 @@
     return contentSource?.contentUrl(value) || null;
   }
 
-  function run(root, job, current, validateSignedUrl) {
-    const url = new URL('/api/library/files/' + encodeURIComponent(job.entry.sharedLibraryFileId) + '/download', root.location.origin);
+  function run(root, job, current, validateSignedUrl, libraryFileId = job.entry.sharedLibraryFileId) {
+    if (typeof libraryFileId !== 'string' || !LIBRARY.test(libraryFileId)) throw new Error('download_source_unsupported');
+    const url = new URL('/api/library/files/' + encodeURIComponent(libraryFileId) + '/download', root.location.origin);
     return transfer(root, job, current, validateSignedUrl, url.href, false);
   }
 
@@ -166,5 +167,5 @@
       try { reader?.releaseLock(); } catch (_) {}
     }
   }
-  return Object.freeze({ version: 3, target, sharedReference, contentUrl, run, runContent });
+  return Object.freeze({ version: 4, target, sharedReference, contentUrl, run, runContent });
 });

@@ -15,6 +15,7 @@ function fixture(options = {}) {
   const calls = [], packets = [], receipts = [], stored = [];
   let identity = 'Bearer synthetic-library-identity', sequence = 0, reads = 0, saved = false, cancelled = false;
   const attachment = { name: 'fixture.bin', source: 'library', library_file_id: LIBRARY, mime_type: 'application/octet-stream' };
+  if (options.linked) attachment.id = 'file-synthetic';
   const sharedReference = { library_file_id: LIBRARY, name: 'fixture.bin', mime_type: 'application/octet-stream',
     size_bytes: data.byteLength, display_path: '/Shared/fixture.bin', entrypoint: 'library' };
   const payload = { ...(options.project ? { gizmo_id: PROJECT } : {}), messages: [{ id: 'message-synthetic',
@@ -50,6 +51,12 @@ function fixture(options = {}) {
     setTimeout: (fn, ms) => setTimeout(fn, options.fastTimeout && ms < 120000 ? Math.min(ms, 25) : ms), clearTimeout,
     fetch: async (url, init) => {
       calls.push({ url, init });
+      if (options.linked && new URL(url).pathname === '/backend-api/files/file-synthetic/simple') {
+        const response = Response.json(options.info || { file_id: attachment.id,
+          is_library_file: true, library_file_id: LIBRARY, is_project: false });
+        options.onMetadata?.(f);
+        return response;
+      }
       if (options.hangFetch) return new Promise(() => {});
       const headers = { 'content-type': options.mime || 'application/octet-stream',
         ...(options.noLength ? {} : { 'content-length': String(options.length ?? data.byteLength) }),
@@ -94,6 +101,89 @@ function contentFixture(options = {}) {
   };
   return f;
 }
+
+test('personal library files resolve ownership then stream the library route without ordinary authorization', async () => {
+  for (const project of [false, true]) {
+    const f = fixture({ linked: true, project });
+    await f.run(f.register()[0]);
+    assert.equal(f.calls.length, 2);
+    const metadata = new URL(f.calls[0].url);
+    assert.equal(metadata.pathname, '/backend-api/files/file-synthetic/simple');
+    assert.equal(metadata.searchParams.get('conversation_id'), 'selected');
+    assert.equal(metadata.searchParams.get('gizmo_id'), project ? PROJECT : null);
+    assert.equal(f.calls[1].url, DOWNLOAD);
+    assert.equal(f.calls[1].init.headers, undefined);
+    assert.equal(f.calls[1].init.credentials, 'same-origin');
+    assert.deepEqual(Buffer.concat(f.stored), Buffer.from(f.data));
+    assert.deepEqual(f.receipts, [['download_conversation_file', true, 'download_saved']]);
+    assert.doesNotMatch(JSON.stringify({ packets: f.packets, receipts: f.receipts }), /libfile|file-synthetic|Bearer|https:/);
+  }
+});
+
+test('library ownership resolution uses the immutable selection and accepts an omitted project flag', async () => {
+  const f = fixture({ linked: true, info: { file_id: 'file-synthetic', is_library_file: true,
+    library_file_id: LIBRARY } });
+  const row = f.register()[0];
+  f.attachment.id = 'file-changed';
+  f.attachment.library_file_id = 'libfile_changed';
+  await f.run(row);
+  assert.equal(f.calls[1]?.url, DOWNLOAD);
+  assert.equal(f.saved, true);
+});
+
+test('personal library resolution fails closed before binary transfer when ownership changes or is unconfirmed', async () => {
+  for (const patch of [{ library_file_id: 'libfile_other' }, { file_id: 'file-other' },
+    { is_library_file: false }, { is_project: 'false' }, { gizmo_id: 'invalid-project' }]) {
+    const f = fixture({ linked: true, info: { file_id: 'file-synthetic', is_library_file: true,
+      library_file_id: LIBRARY, is_project: false, ...patch } });
+    await f.run(f.register()[0]);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.saved, false);
+    assert.equal(f.packets.some(packet => packet.byteOperation), false);
+    assert.equal(f.receipts.at(-1)[1], false);
+  }
+  for (const onMetadata of [f => f.api.cancel(), f => f.setIdentity('Bearer changed-identity'),
+    f => { f.root.location.href += '-changed'; }, f => { f.root.__elonChatGptDocumentToken = 'doc_changed'; }]) {
+    const f = fixture({ linked: true, onMetadata });
+    await f.run(f.register()[0]);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.saved, false);
+    assert.equal(f.packets.some(packet => packet.byteOperation), false);
+  }
+});
+
+test('resolved library transfers keep byte cancellation, storage confirmation and no replay semantics', async () => {
+  for (const options of [{ status: 403 }, { failCommit: true }, { noNativeBytes: true },
+    { dropAck: 'commit', fastTimeout: true },
+    { onPacket: (packet, f) => { if (packet.byteOperation === 'chunk') f.api.cancel(packet.leaseId); } }]) {
+    const f = fixture({ linked: true, ...options });
+    await f.run(f.register()[0]);
+    assert.ok(f.calls.length <= 2);
+    assert.equal(f.calls.filter(call => call.url.includes('/backend-api/files/download/')).length, 0);
+    assert.equal(f.receipts.length, 1);
+    assert.equal(f.receipts[0][1], false);
+    assert.equal(f.saved, options.dropAck === 'commit');
+  }
+});
+
+test('a resolved library download gets a byte-transfer deadline without extending selection reuse', async () => {
+  const now = Date.now;
+  try {
+    const startedAt = now(), timers = [];
+    const f = fixture({ linked: true, onPacket: packet => {
+      if (packet.byteOperation === 'chunk') Date.now = () => startedAt + 180000;
+    } });
+    const schedule = f.root.setTimeout;
+    f.root.setTimeout = (fn, delay) => { timers.push(delay); return schedule(fn, delay); };
+    const row = f.register()[0];
+    await f.run(row);
+    assert.equal(f.receipts.at(-1)[2], 'download_saved');
+    assert.ok(timers.includes(120000));
+    await f.run(row);
+    assert.equal(f.receipts.at(-1)[2], 'download_selection_expired');
+    assert.equal(f.calls.length, 2);
+  } finally { Date.now = now; }
+});
 
 test('authorized same-origin content reuses native byte publication, never Android identity transfer', async () => {
   for (const source of ['/backend-api/estuary/content?id=file-synthetic&sig=synthetic',
