@@ -14290,14 +14290,14 @@
         },
         {
           "path": "docs/reports/private-grid-read-bridge-v1-20260907.md",
-          "content_hash": "62cc46325d1d1849086e8aff8dc2a798c6caca5105f8b3027a8c8a43529c32dc",
+          "content_hash": "4d6268029f58688b41507f2562bfe6bc2427507426c9e2b3667112a84e3ff610",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "abc3e6618d1b550d2a2db0b5822a4583de8d6597",
-            "head_blob_oid": "73920dc0c011426798061d89f7594f9dcc3433ac",
-            "worktree_blob_oid": "d233ed9be341777855d71f87a3ba98f7c3f90c9d",
+            "head_commit": "9369d88e900ff0636fd5942a7482b441ee000550",
+            "head_blob_oid": "d233ed9be341777855d71f87a3ba98f7c3f90c9d",
+            "worktree_blob_oid": "a054400b02d0c2583ea9880cf2a8f60e977a385e",
             "state": "tracked_modified"
           }
         },
@@ -14517,7 +14517,7 @@
         "expires_at_ms": 1788810442049
       },
       "created_at_ms": 1788767191531,
-      "updated_at_ms": 1788786362154
+      "updated_at_ms": 1788787660121
     },
     {
       "id": "project-feature-registry-adoption-v1",
@@ -23130,16 +23130,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_ef7d082572b7468aba3f3fd534632732",
-      "feature_id": "yilong-quant-android-public-empty-v3",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788594605053
-    },
-    {
       "id": "feature_event_2d83a7e5cc614d2bb5e2a3ca18e616d4",
       "feature_id": "yilong-quant-android-public-empty-v3",
       "action": "transitioned",
@@ -25128,6 +25118,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788786362154
+    },
+    {
+      "id": "feature_event_271e7c11568b4065bce4af265d6ab20d",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788787660121
     }
   ]
 }
