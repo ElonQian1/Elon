@@ -112,5 +112,5 @@
       moderation: payload.moderation_state });
   }
 
-  return Object.freeze({ version: 2, capture, current, identity, created, moderation, urls });
+  return Object.freeze({ version: 2, capture, current, identity, created, moderation, urls, load, ready });
 });

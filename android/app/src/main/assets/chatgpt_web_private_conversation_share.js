@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateConversationShare) {
     root.__elonChatGptPrivateConversationShare = factory(root);
@@ -8,6 +8,7 @@
 })(typeof window === 'object' ? window : null, function (page, options) {
   'use strict';
   const contract = (options?.contract || page.__elonChatGptPrivateConversationShareContract).create(page, options);
+  const project = (options?.project || page.__elonChatGptPrivateProjectConversationShare)?.create(page, contract);
   const transport = page.__elonChatGptPrivateTransport;
   let active = null, last = null, cooldown = 0;
   const outcome = (ok, code, attempted, url) => Object.freeze({ ok, code, attempted, ...(url ? { url } : {}) });
@@ -15,6 +16,10 @@
   async function execute(job) {
     let attempted = false;
     try {
+      if (job.path?.startsWith('/g/')) {
+        if (!project) throw new Error('share_project_scope_unconfirmed');
+        return outcome(true, 'project_share_link_ready', false, await project.resolve(job.path, job.readSnapshot));
+      }
       const binding = await contract.capture(job.path, job.readSnapshot);
       if (last && Date.now() - last.at < 60000 && contract.current(last.binding) &&
           binding.id === last.binding.id && binding.node === last.binding.node) return last.outcome;
@@ -78,10 +83,10 @@
   function handle(action, command, respond, readSnapshot) {
     if (action !== 'share_conversation') return false;
     start(command?.value, command?.selected, readSnapshot).then(result => {
-      // This is the validated public result, not a credential or conversation body.
-      respond(action, result.ok, result.ok ? 'share_link_ready:' + result.url : result.code);
+      // Preserve the audience-specific prefix; never confuse a members-only link with a public one.
+      respond(action, result.ok, result.ok ? result.code + ':' + result.url : result.code);
     }).catch(() => respond(action, false, 'share_result_unconfirmed'));
     return true;
   }
-  return Object.freeze({ version: 2, start, handle, busy: () => active !== null });
+  return Object.freeze({ version: 3, start, handle, busy: () => active !== null });
 });
