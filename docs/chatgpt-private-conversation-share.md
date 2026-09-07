@@ -6,7 +6,10 @@ non-project conversation flow, including legacy and redesigned variants;
 offline verified; grouped Android compilation
 and production-phone acceptance pending. This is not a completed capability
 or a claim that all website sharing variants are implemented.
-Adapter 283, share contract and transaction module 2.
+Adapter 284, share contract 2 and transaction module 3. The separate
+[project-member resolver](chatgpt-private-project-conversation-share.md) now
+reuses this command owner with distinct member-only consent and receipts;
+it does not use the public writer described here.
 
 ## Official evidence
 
@@ -109,7 +112,7 @@ Safety and lifecycle behavior:
 
 ## Verification and remaining work
 
-The focused Node run passed **88 tests** across sharing, deletion and metadata
+The earlier focused Node run passed **88 tests** across sharing, deletion and metadata
 mutation. It covers exact bodies, old-node updates, concurrency, account/route/
 branch drift, malformed/public URL rejection, moderation, timeouts without
 replay, draft preservation, cache invalidation and the production asset bundle.
@@ -127,9 +130,15 @@ officially selected protocol variants without forcing account experiment flags.
 Verify exact
 runtime exports and response shape on the phone before marking completed.
 
+The subsequent member-sharing batch passes 131 combined Node cases and nine
+pure Kotlin policy/receipt cases. The actual URL comparison bug and 160-character
+member receipt truncation were reproduced and corrected. Native consumer/MCP
+tests and full Android compilation remain pending; no real link was created.
+
 The redesigned authenticated route is now implemented; guest `/share/v2/create`
-remains a distinct unsupported scope. Still separate code gaps: workspace and
-project-member sharing, eligible temporary-chat sharing, share management and
+remains a distinct unsupported scope. Personal shared-project member links are
+source-implemented separately. Still separate code gaps: workspace and
+private-project public sharing, eligible temporary-chat sharing, share management and
 link revocation. Do not reuse this public confirmation for a members-only link,
 or mistake `/share/post` message-slice creation for full-conversation sharing.
 Keep these gaps in the [remaining batch](web-ai-private-native-remaining-batch.md).

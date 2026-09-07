@@ -9,7 +9,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptWebConversation
-import com.elon.app.chatgptweb.ChatGptWebConversationPath
 
 internal class WebChatConversationShareCoordinator(
     private val activity: AppCompatActivity,
@@ -24,13 +23,10 @@ internal class WebChatConversationShareCoordinator(
 
     fun show(conversation: ChatGptWebConversation) {
         cancel()
-        val path = ChatGptWebConversationPath.normalize(conversation.path) ?: return
+        val path = WebChatConversationSharePolicy.sharePath(conversation.path, conversation.projectId)
+            ?: return failure(conversation, "share_project_scope_unconfirmed")
         val state = consumerPort()?.state() ?: return
         if (!active()) return
-        if (!conversation.projectId.isNullOrBlank() || path.startsWith("/g/")) {
-            failure(conversation, "share_project_scope_unconfirmed")
-            return
-        }
         val current = WebChatConversationSharePolicy.sameConversation(path, state.pageUrl)
         if (!current && (state.draftPresent || state.streaming || state.dictationActive ||
                 state.dictationCaptureActive || state.dictationCapturePending)) {
@@ -66,10 +62,12 @@ internal class WebChatConversationShareCoordinator(
 
     private fun confirm(conversation: ChatGptWebConversation, path: String) {
         if (!active()) return
+        val members = WebChatConversationSharePolicy.membersOnly(path)
         track(AlertDialog.Builder(activity)
-            .setTitle("创建公开分享链接")
-            .setMessage("分享“${conversation.title}”当前分支已有的对话内容。任何拿到链接的人都可查看，请确认不含不宜公开的信息。")
-            .setPositiveButton("创建链接") { _, _ -> start(conversation, path) }
+            .setTitle(if (members) "分享给项目成员" else "创建公开分享链接")
+            .setMessage(if (members) "仅该项目的现有成员可查看“${conversation.title}”，后续消息也会对成员可见。此操作不会创建公开链接或添加成员。"
+                else "分享“${conversation.title}”当前分支已有的对话内容。任何拿到链接的人都可查看，请确认不含不宜公开的信息。")
+            .setPositiveButton(if (members) "获取成员链接" else "创建链接") { _, _ -> start(conversation, path) }
             .setNegativeButton("取消", null)
             .create())
         dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.contentDescription = "web-chat-share-confirm"
@@ -85,7 +83,7 @@ internal class WebChatConversationShareCoordinator(
         val result = port.shareConversation(path, userConfirmed = true)
         val requestId = result.requestId
         if (!result.accepted || requestId.isNullOrBlank()) return failure(conversation, result.error)
-        progress("正在创建分享链接")
+        progress(if (WebChatConversationSharePolicy.membersOnly(path)) "正在获取项目成员链接" else "正在创建分享链接")
         awaitResult(conversation, path, requestId, epoch, 0)
     }
 
@@ -98,9 +96,9 @@ internal class WebChatConversationShareCoordinator(
         val receipt = state.commandRequests.firstOrNull { it.id == requestId }
         when (receipt?.status) {
             WebChatConsumerCommandStatus.SUCCEEDED -> {
-                val url = WebChatConversationSharePolicy.resultUrl(receipt.detail)
+                val url = WebChatConversationSharePolicy.resultUrl(receipt.detail, path)
                     ?: return failure(conversation, "share_result_unconfirmed")
-                showResult(url)
+                showResult(url, WebChatConversationSharePolicy.membersOnly(path))
                 return
             }
             WebChatConsumerCommandStatus.FAILED -> return failure(conversation, receipt.detail)
@@ -111,10 +109,10 @@ internal class WebChatConversationShareCoordinator(
         host.postDelayed({ awaitResult(conversation, path, requestId, token, attempt + 1) }, 250L)
     }
 
-    private fun showResult(url: String) {
+    private fun showResult(url: String, members: Boolean) {
         track(AlertDialog.Builder(activity)
-            .setTitle("分享链接已创建")
-            .setMessage(url)
+            .setTitle(if (members) "项目成员链接" else "分享链接已创建")
+            .setMessage(if (members) "仅项目成员可查看，包含后续消息。\n\n$url" else url)
             .setPositiveButton("复制链接") { _, _ ->
                 val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                 clipboard?.setPrimaryClip(ClipData.newPlainText("会话分享链接", url))

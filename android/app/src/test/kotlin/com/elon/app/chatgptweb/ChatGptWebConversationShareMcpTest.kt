@@ -3,10 +3,46 @@ package com.elon.app.chatgptweb
 import com.elon.app.WebBridgeDocumentSession
 import com.elon.app.WebChatConsumerCommandStatus
 import com.elon.app.WebChatConversationSharePolicy
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 
 class ChatGptWebConversationShareMcpTest {
+    @Test fun projectMemberIntentUsesTheSameTrackedCommandWithoutPublicScopeConversion() {
+        val id = "44444444-4444-4444-8444-444444444444"
+        val project = "g-p-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        val path = "/g/$project/c/$id"
+        val snapshot = ChatGptWebSnapshot(
+            title = "Synthetic member fixture", url = "https://chatgpt.com/c/$id", draft = "unsent",
+            messages = emptyList(), authenticated = true, composerReady = true, streaming = false,
+            currentModel = "", attachments = emptyList(), dictationActive = false, capabilities = ChatGptWebCapabilities.EMPTY,
+        )
+        var dispatched = 0
+        val commands = object : ChatGptWebMcpCommandPort by ChatGptWebMcpTestCommandPort(
+            onOpenConversation = { fail("share dispatch must not navigate") },
+            onInvoke = { fail("member share must not invoke DOM") },
+        ) {
+            override fun shareConversation(path: String, requestId: String) {
+                assertEquals("/g/$project/c/$id", path)
+                assertEquals("req_members", requestId)
+                dispatched += 1
+            }
+        }
+        val args = JSONObject().put("action", "chatgpt_share_conversation")
+            .put("conversation_path", path).put("user_confirmed", true)
+        fun dispatch(value: ChatGptWebSnapshot) = ChatGptWebConversationMutationMcpAction.dispatch(args, commands, value) { action, send ->
+            assertEquals("share_conversation", action)
+            send("req_members")
+        }
+        assertNull(dispatch(snapshot))
+        assertNull(dispatch(snapshot.copy(url = "https://chatgpt.com/g/$project-fixture/c/$id")))
+        assertEquals("share_context_unavailable", dispatch(snapshot.copy(url = "https://example.com/c/$id")))
+        assertEquals("share_conversation_busy", dispatch(snapshot.copy(streaming = true)))
+        args.put("user_confirmed", false)
+        assertEquals("user_confirmation_required", dispatch(snapshot))
+        assertEquals(2, dispatched)
+    }
+
     @Test fun nativeConsumerSharesThroughTheTrackedPrivateCommandOnlyAfterConfirmation() {
         val state = ChatGptWebObservedState()
         state.updateDocument(WebBridgeDocumentSession.Snapshot(1, 1, "doc_share_test"))
