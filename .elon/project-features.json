@@ -12756,7 +12756,60 @@
         "生产压缩模块回归通过且响应不超过64 KiB",
         "构建、发布与激活分报，旧节点未激活不算现场修复"
       ],
-      "implementation_evidence": [],
+      "implementation_evidence": [
+        {
+          "path": "docs/reports/node-status-runtime-identity-20260908.md",
+          "content_hash": "6f70b3fb601d3b1f41729dcb57278abbcfa9d26368bf5c5778e8db3cbb3e6069",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ceef70656db27e69943aa91da616783aa652d5e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "246c09eac2cbc23d6c15a69b889c9a97f4f6dc43",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_agent_admin_status_payload.rs",
+          "content_hash": "1451f9d3e6a767af30fb655d2ccda6866c64d225976d38495b4464c3b70e872e",
+          "locator": "enforce_status_response_limit, compact_runtime_identities",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ceef70656db27e69943aa91da616783aa652d5e3",
+            "head_blob_oid": "f58db52c241ce9e285fbc1072806614b70302a2e",
+            "worktree_blob_oid": "3a980021a6f9269b5ea91cba56620762978d025b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_admin_status_payload_tests.rs",
+          "content_hash": "0fc21acf13e39d5ae5889159dfeca7f5333c0f5f397608b7f8812edab9951a0d",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ceef70656db27e69943aa91da616783aa652d5e3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9792b8c180b611490a239cf59197ce8c2e8e5a85",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/tests/node-status-payload-harness/src/lib.rs",
+          "content_hash": "bdd7fa5e06d441efc6d47f37b6b31c3cd7415986c0621bed929288cec60d3c40",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ceef70656db27e69943aa91da616783aa652d5e3",
+            "head_blob_oid": "54ada1ee6763f17551bfd035729fed6a6fffc12f",
+            "worktree_blob_oid": "54ada1ee6763f17551bfd035729fed6a6fffc12f",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "claim": {
         "claim_id": "claim_859a7f04f811460d9eb8209f8b428527",
         "agent_id": "codex-grid-read",
@@ -12764,7 +12817,7 @@
         "expires_at_ms": 1788812844177
       },
       "created_at_ms": 1788798417286,
-      "updated_at_ms": 1788798491977
+      "updated_at_ms": 1788799975004
     },
     {
       "id": "official-quant-release-admission-v1",
@@ -23200,26 +23253,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_e9bc9561fabf42dea9afe314e841896a",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "claimed",
-      "actor": "codex-account-asset-access",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788606255877
-    },
-    {
-      "id": "feature_event_8d19b05f9ef646f19ab78b15ef7b09a4",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "transitioned",
-      "actor": "codex-account-asset-access",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788606736092
-    },
-    {
       "id": "feature_event_a338cbac26144b49a5d8ef44dd6e4666",
       "feature_id": "unified-account-asset-access-v1",
       "action": "claim_released",
@@ -25198,6 +25231,26 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1788798491977
+    },
+    {
+      "id": "feature_event_8f77a3afd3974e98bbf34728a51ff725",
+      "feature_id": "node-status-runtime-identity-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788799674117
+    },
+    {
+      "id": "feature_event_68fbb4f1c31d411fa46676c9009dd298",
+      "feature_id": "node-status-runtime-identity-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788799975004
     }
   ]
 }

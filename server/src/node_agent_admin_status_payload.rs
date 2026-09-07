@@ -3,6 +3,10 @@
 const ADMIN_STATUS_MAX_BYTES: usize = 64 * 1024;
 const ADMIN_STATUS_PAYLOAD_BUDGET: usize = ADMIN_STATUS_MAX_BYTES - 1024;
 
+#[cfg(test)]
+#[path = "node_agent_admin_status_payload_tests.rs"]
+mod runtime_identity_tests;
+
 pub(super) fn enforce_status_response_limit(payload: &mut serde_json::Value) {
     let original_bytes = serde_json::to_vec(payload)
         .map(|bytes| bytes.len())
@@ -72,6 +76,8 @@ pub(super) fn enforce_status_response_limit(payload: &mut serde_json::Value) {
             "user_token_configured": payload.get("user_token_configured").cloned(),
             "active_cli_prompt_count": payload.get("active_cli_prompt_count").cloned(),
             "update_blocker_count": blocker_count,
+            "active_cli_prompt_task_ids": payload.get("active_cli_prompt_task_ids").cloned(),
+            "active_task_runtime": compact_runtime_identities(payload.get("active_task_runtime")),
             "compute_plugin_bootstrap": payload.get("compute_plugin_bootstrap").cloned(),
             "desktop_supervision": payload.get("desktop_supervision").cloned(),
             "desktop_review_broker": payload.get("desktop_review_broker").cloned(),
@@ -114,7 +120,38 @@ pub(super) fn enforce_status_response_limit(payload: &mut serde_json::Value) {
                 "compacted": true,
             }
         });
+        if serde_json::to_vec(payload)
+            .map(|bytes| bytes.len())
+            .unwrap_or(ADMIN_STATUS_MAX_BYTES + 1)
+            > ADMIN_STATUS_MAX_BYTES
+        {
+            let object = payload.as_object_mut().expect("fallback is an object");
+            object.remove("compute_plugin_bootstrap");
+            object.insert("compute_plugin_bootstrap_omitted".into(), true.into());
+        }
     }
+}
+
+fn compact_runtime_identities(value: Option<&serde_json::Value>) -> Option<serde_json::Value> {
+    value.map(|value| match value.as_array() {
+        Some(entries) => serde_json::Value::Array(
+            entries
+                .iter()
+                .map(|entry| match entry.as_object() {
+                    Some(object) => {
+                        let identity = object
+                            .get("task_id")
+                            .map(|id| ("task_id".to_owned(), id.clone()))
+                            .into_iter()
+                            .collect();
+                        serde_json::Value::Object(identity)
+                    }
+                    None => entry.clone(),
+                })
+                .collect(),
+        ),
+        None => value.clone(),
+    })
 }
 
 #[cfg(test)]
