@@ -12723,6 +12723,50 @@
       "updated_at_ms": 1786879547042
     },
     {
+      "id": "node-status-runtime-identity-v1",
+      "title": "节点状态压缩保留更新任务身份",
+      "summary": "修复状态强压缩丢失活动身份导致更新验证失败；保留大小上限和缺失证据拒绝语义。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/node-status-runtime-identity-v1.md",
+        "content_hash": "01b0a926bc467bfc9bd2622254de5d63d7101ff1849e3c532f860f9cc57925e0",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "9e5755ff1159aac25893c90e07a6baf84ae99b6b",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "3fd6e3570c87d02bd9123ea49614f547f8fae5ea",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "node-update-compatibility",
+      "tags": [],
+      "task_paths": [
+        "server/src/node_agent_admin_status.rs",
+        "server/src/node_agent_admin_status_payload.rs",
+        "server/tests/node-status-payload-harness"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "强压缩保留完整活动身份与数量；空闲时为明确空数组",
+        "缺失或超大身份不伪装空闲，更新器保持拒绝",
+        "生产压缩模块回归通过且响应不超过64 KiB",
+        "构建、发布与激活分报，旧节点未激活不算现场修复"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_859a7f04f811460d9eb8209f8b428527",
+        "agent_id": "codex-grid-read",
+        "claimed_at_ms": 1788798444177,
+        "expires_at_ms": 1788812844177
+      },
+      "created_at_ms": 1788798417286,
+      "updated_at_ms": 1788798491977
+    },
+    {
       "id": "official-quant-release-admission-v1",
       "title": "官方量化 APK 新版发布准入 V1",
       "summary": "主服务器只接受 com.elon.quant versionCode>=5、规范版本名、paper 渠道、源码 Git SHA 与本次 APK 工件证明完整绑定的实际新版；旧版从所有用户入口退出，幂等重传可修复原托管工件。",
@@ -23156,36 +23200,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_ca358df495ed4829ba0afee630acb6b2",
-      "feature_id": "yilong-quant-android-public-empty-v3",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Handler and module regressions passed; independent review closed; delivery receipt matches deployed source.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788594605111
-    },
-    {
-      "id": "feature_event_f457505288f9435a8b7854120112569f",
-      "feature_id": "yilong-quant-android-public-empty-v3",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Server 0.3.1730 serves the exact anonymous route as non-cacheable 404 with source fbcde10e2; public catalog remains null until a compliant APK is uploaded.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788594605146
-    },
-    {
-      "id": "feature_event_1b08eaac7d66461bbf90e54cc855e9ae",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "registered",
-      "actor": "codex-account-asset-access",
-      "reason": "用户2026-09-05明确优先实现并授权向原任务发送分工通知；新增模块独立开发，共同入口切换先协调。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788606214401
-    },
-    {
       "id": "feature_event_e9bc9561fabf42dea9afe314e841896a",
       "feature_id": "unified-account-asset-access-v1",
       "action": "claimed",
@@ -25154,6 +25168,36 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788797008393
+    },
+    {
+      "id": "feature_event_98dc32d4d78643e0944fb620650b64b7",
+      "feature_id": "node-status-runtime-identity-v1",
+      "action": "registered",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788798417287
+    },
+    {
+      "id": "feature_event_6b5d739ab86f4c459a364048988147ec",
+      "feature_id": "node-status-runtime-identity-v1",
+      "action": "claimed",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788798444178
+    },
+    {
+      "id": "feature_event_98518578fb3b42238224ef68178f64f7",
+      "feature_id": "node-status-runtime-identity-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-read",
+      "reason": "Fix the observed status compaction compatibility gap while retaining fail-closed update checks.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788798491977
     }
   ]
 }
