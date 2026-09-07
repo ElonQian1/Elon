@@ -14251,14 +14251,14 @@
         },
         {
           "path": "docs/account-https-ingress.md",
-          "content_hash": "55ca51b508398d96a56a9803fef0f82e92a58ec5be740cc15ca3841e4e4aa7a9",
+          "content_hash": "4335d80b2776f39958c60e58580887029302c23d0697ef170bd0b0e3eef27180",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a7d3201234069e4a1f3ec599ecc72fbcb8fed2e8",
-            "head_blob_oid": "2f42264aa650467ee717b7f36c0467e7c984af26",
-            "worktree_blob_oid": "7797edeb920230ba348a7bf2658d923d99577524",
+            "head_commit": "23a76f34370576f1c7dd124dc4fed053b8598a5a",
+            "head_blob_oid": "7797edeb920230ba348a7bf2658d923d99577524",
+            "worktree_blob_oid": "16591a9956ba415964b29b3cf9ea2ff3ea25d495",
             "state": "tracked_modified"
           }
         },
@@ -14289,6 +14289,19 @@
           }
         },
         {
+          "path": "scripts/configure-account-acme.sh",
+          "content_hash": "4eebb48f74c05a21021664c53b2ed53cace38f6f23fa35891c65507d915a93ca",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "23a76f34370576f1c7dd124dc4fed053b8598a5a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8875ad8c12a3a940ab9849527869d6f130be3be9",
+            "state": "untracked"
+          }
+        },
+        {
           "path": "scripts/configure-account-https.sh",
           "content_hash": "b0081fe3ecceb81956a468fdec2d1f2a23e2d4c02e598615f97f66fdf8c408e3",
           "locator": "",
@@ -14299,6 +14312,32 @@
             "head_blob_oid": "8bb3c7dd8bb530790b91cd17aa6816318f9c722d",
             "worktree_blob_oid": "74b4d862655f75a2d7573db910e5c2acb34642fa",
             "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/install-account-acme.sh",
+          "content_hash": "b73f8af76df6f138ee34865ac24994838ba59ad417d7f812ac939691d9a11b83",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "23a76f34370576f1c7dd124dc4fed053b8598a5a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4f84db49699a6cef53ee7a3b2839d826b221ba49",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-account-acme.sh",
+          "content_hash": "20a5b578dc62a0f70457973928aaebc5c4f80473eacdb30612bbcd589a675b0a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "23a76f34370576f1c7dd124dc4fed053b8598a5a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f86de85dfc207f5e412ff77a8519e896c4f0d768",
+            "state": "untracked"
           }
         },
         {
@@ -14452,7 +14491,7 @@
         "expires_at_ms": 1788810442049
       },
       "created_at_ms": 1788767191531,
-      "updated_at_ms": 1788780305071
+      "updated_at_ms": 1788782766165
     },
     {
       "id": "project-feature-registry-adoption-v1",
@@ -23065,16 +23104,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_c1cdcf82f82d4626958c3d50e4ed51f8",
-      "feature_id": "yilong-quant-android-public-empty-v3",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "Real handler auth matrix and full project_store::apk module tests passed; independent read-only review found no remaining P0/P1/P2.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788593708530
-    },
-    {
       "id": "feature_event_4f5b26865d4147a4a39a7eddee900ff4",
       "feature_id": "yilong-quant-android-public-empty-v3",
       "action": "transitioned",
@@ -25063,6 +25092,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788780305071
+    },
+    {
+      "id": "feature_event_d25ec4939ddf4e748f9c40d8ee7b989d",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788782766165
     }
   ]
 }

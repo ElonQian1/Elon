@@ -110,6 +110,41 @@ No Origin is added to native requests. A browser Origin still requires the separ
 exact `PUBLIC_URL` HTTPS match; do not change the legacy global public URL merely
 to configure this native channel.
 
+### IP certificate with port 80 closed
+
+`install-account-acme.sh` installs the checksum-pinned official lego v5.4.1 client
+and the matching operator scripts. It accepts `--archive /absolute/archive.tar.gz`
+for an already downloaded official archive, still checking its fixed SHA-256 before
+extraction. Installation does not request a certificate or restart the main service.
+
+The independent `configure-account-acme.sh` provider uses TLS-ALPN-01 on TCP 443
+and leaves TCP 8443 to the existing native HTTPS listener. It never enables port 80,
+uses no contact email, and keeps staging and production accounts/certificates in
+separate root-only directories. See the [lego v5.4.1 release](https://github.com/go-acme/lego/releases/tag/v5.4.1).
+
+```sh
+bash scripts/configure-account-acme.sh plan 43.139.149.158
+sudo bash scripts/install-account-acme.sh --archive /absolute/lego-v5.4.1.tar.gz
+sudo bash /opt/elon-account-acme/scripts/configure-account-acme.sh staging 43.139.149.158
+sudo bash /opt/elon-account-acme/scripts/configure-account-acme.sh issue 43.139.149.158
+sudo bash /opt/elon-account-acme/scripts/configure-account-acme.sh install-timer 43.139.149.158
+sudo bash /opt/elon-account-acme/scripts/configure-account-https.sh activate https://43.139.149.158:8443 \
+  --certificate-path /var/lib/elon-account-acme/production/certificates/43.139.149.158.crt \
+  --private-key-path /var/lib/elon-account-acme/production/certificates/43.139.149.158.key
+```
+
+Staging proves IP/ALPN issuance and lifetime only; its certificate must never be
+activated for users. Production checks reuse the existing trust/identity/key gates.
+The systemd timer checks every six hours with up to ten minutes of random delay;
+lego v5 repeats `run` and uses its default ARI/dynamic renewal policy. Internal
+random sleeping is disabled because the timer supplies the delay. Each operation
+uses a shared file lock and a five-minute timeout, with no restart of the main
+8443 service during renewal. Existing Certbot state and timers remain separate.
+
+The operator scripts must be committed and deployed together. Keep the 443 ingress
+available for future challenges and monitor the timer's actual result; installing
+the timer is not evidence that a future scheduled renewal has succeeded.
+
 To disable, set `ACCOUNT_HTTPS_ENABLED=false` and restart `elon-server`. This
 breaks child sign-in until restored; existing main HTTP clients are unaffected.
 
@@ -125,6 +160,7 @@ The target parser and guarded deployment entry have offline tests:
 ```sh
 python3 scripts/test_account_https_target.py -v
 bash scripts/test-account-https-config.sh
+bash scripts/test-account-acme.sh
 ```
 
 They cover custom ports, external pairs, strict origins and certificate checks for
