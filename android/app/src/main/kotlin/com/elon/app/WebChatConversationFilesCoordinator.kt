@@ -131,20 +131,25 @@ internal class WebChatConversationFilesCoordinator(
             override fun run() {
                 if (currentEpoch != epoch || consumerPort() !== owner) return
                 val result = owner.state().commandRequests.firstOrNull { it.id == request.requestId }
-                val expired = android.os.SystemClock.elapsedRealtime() - startedAt >= 20_000
+                val elapsed = android.os.SystemClock.elapsedRealtime() - startedAt
+                val expired = elapsed >= com.elon.app.chatgptweb.ChatGptWebFileByteTransfer.COMMAND_TIMEOUT_MS
                 if (result?.status == WebChatConsumerCommandStatus.SUCCEEDED) {
-                    notice("已加入下载列表")
+                    notice(if (result.detail == "download_saved") "已保存到下载目录" else "已加入下载列表")
                 } else if (expired || result?.status in setOf(WebChatConsumerCommandStatus.FAILED,
                         WebChatConsumerCommandStatus.TIMED_OUT)) {
                     notice(when (result?.detail) {
-                        "download_confirmation_unknown" -> "尚未确认下载，请先查看系统下载列表"
+                        "download_confirmation_unknown" -> "尚未确认下载，请先查看下载目录"
                         "download_file_unavailable" -> "此文件已失效或无法访问"
                         "download_selection_expired" -> "附件列表已过期，请刷新后重试"
                         "download_file_not_ready" -> "文件尚未就绪，请稍后重试"
+                        "download_file_too_large" -> "文件超过本次下载大小限制"
+                        "download_storage_failed" -> "无法保存文件，请检查存储空间后重试"
+                        "download_transfer_timeout" -> "文件下载超时，请检查网络后重试"
+                        "download_content_invalid" -> "未收到完整文件，请稍后重试"
                         else -> "未能准备下载，请稍后重试"
                     })
                 } else {
-                    host.postDelayed(this, 250)
+                    host.postDelayed(this, if (elapsed >= 5_000) 1_000 else 250)
                     return
                 }
                 pollTask = null

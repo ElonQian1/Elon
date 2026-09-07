@@ -404,7 +404,9 @@ internal class ChatGptWebObservedState(
         const val OPEN_CONVERSATION_SUPERSEDED = "navigation_superseded"
 
         fun commandTimeoutMs(action: String): Long =
-            if (action in CONVERSATION_MUTATION_ACTIONS) {
+            if (action == "download_conversation_file") {
+                ChatGptWebFileByteTransfer.COMMAND_TIMEOUT_MS
+            } else if (action in CONVERSATION_MUTATION_ACTIONS) {
                 CONVERSATION_MUTATION_COMMAND_TIMEOUT_MS
             } else {
                 COMMAND_TIMEOUT_MS
