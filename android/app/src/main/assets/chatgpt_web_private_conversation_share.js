@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateConversationShare) {
     root.__elonChatGptPrivateConversationShare = factory(root);
@@ -11,11 +11,15 @@
   const project = (options?.project || page.__elonChatGptPrivateProjectConversationShare)?.create(page, contract);
   const transport = page.__elonChatGptPrivateTransport;
   let active = null, last = null, cooldown = 0;
+  const management = (options?.management || page.__elonChatGptPrivateSharedLinks)?.create(page, contract,
+    { now: options?.now, invalidateCreated: () => { last = null; } });
   const outcome = (ok, code, attempted, url) => Object.freeze({ ok, code, attempted, ...(url ? { url } : {}) });
 
   async function execute(job) {
     let attempted = false;
     try {
+      if (job.management) return management ? await management.run(job.management, job.confirmed) :
+        outcome(false, 'share_list_unavailable', false);
       if (job.path?.startsWith('/g/')) {
         if (!project) throw new Error('share_project_scope_unconfirmed');
         return outcome(true, 'project_share_link_ready', false, await project.resolve(job.path, job.readSnapshot));
@@ -54,6 +58,7 @@
       if (state !== 'allowed') return outcome(false, state === 'blocked' ?
         'share_moderation_blocked' : 'share_result_unconfirmed', true);
       const result = outcome(true, 'share_link_ready', true, link.url);
+      management?.invalidate();
       last = { binding, at: Date.now(), outcome: result };
       return result;
     } catch (error) {
@@ -65,15 +70,16 @@
   }
 
   function start(path, confirmed, readSnapshot) {
-    if (confirmed !== true) return Promise.resolve(outcome(false, 'user_confirmation_required', false));
+    const managed = path && typeof path === 'object' ? path : null;
+    if (confirmed !== true && managed?.operation !== 'list') return Promise.resolve(outcome(false, 'user_confirmation_required', false));
     if (page.__elonChatGptPrivateConversationMutationsEnabled !== true || !transport ||
         !page.__elonChatGptPrivateJsonRequest?.request) return Promise.resolve(outcome(false, 'share_context_unavailable', false));
     if (active || page.__elonChatGptPrivateConversationDelete?.busy?.() ||
         page.__elonChatGptPrivateConversationMutation?.state?.().state === 'busy') {
       return Promise.resolve(outcome(false, 'share_busy', false));
     }
-    if (Date.now() < cooldown) return Promise.resolve(outcome(false, 'share_cooldown', false));
-    const job = { path, readSnapshot }; active = job;
+    if (Date.now() < cooldown && managed?.operation !== 'list') return Promise.resolve(outcome(false, 'share_cooldown', false));
+    const job = { path, readSnapshot, management: managed, confirmed }; active = job;
     return execute(job).then(result => {
       if (!result.ok && result.attempted) cooldown = Date.now() + 45000;
       return result;
@@ -82,11 +88,17 @@
 
   function handle(action, command, respond, readSnapshot) {
     if (action !== 'share_conversation') return false;
-    start(command?.value, command?.selected, readSnapshot).then(result => {
+    let value = command?.value;
+    if (typeof value === 'string' && value.startsWith('{')) {
+      try { if (value.length > 1024) throw new Error(); value = JSON.parse(value); }
+      catch (_) { respond(action, false, 'share_invalid_selection'); return true; }
+    }
+    start(value, command?.selected, readSnapshot).then(result => {
       // Preserve the audience-specific prefix; never confuse a members-only link with a public one.
-      respond(action, result.ok, result.ok ? result.code + ':' + result.url : result.code);
+      respond(action, result.ok, result.data ? JSON.stringify(result.data) :
+        result.ok && result.url ? result.code + ':' + result.url : result.code);
     }).catch(() => respond(action, false, 'share_result_unconfirmed'));
     return true;
   }
-  return Object.freeze({ version: 3, start, handle, busy: () => active !== null });
+  return Object.freeze({ version: 4, start, handle, busy: () => active !== null });
 });

@@ -317,8 +317,8 @@ internal class ChatGptWebPageAdapter(
         requestId = requestId, selected = true,
     )
 
-    fun shareConversation(path: String, requestId: String) = runCommand(
-        action = "share_conversation", value = path.take(MAX_CONVERSATION_PATH_LENGTH), requestId = requestId, selected = true,
+    fun shareConversation(path: String, requestId: String, management: JSONObject? = null) = runCommand(
+        action = "share_conversation", value = management?.toString() ?: path.take(MAX_CONVERSATION_PATH_LENGTH), requestId = requestId, selected = true,
     )
 
     fun renameConversation(path: String, title: String, requestId: String) = runCommand(
@@ -677,7 +677,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 284
+        internal const val ADAPTER_VERSION = 285
 
         private val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_bootstrap.js",
@@ -750,7 +750,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_private_attachment_send.js",
             "chatgpt_web_private_conversation_mutation.js",
             "chatgpt_web_private_conversation_delete.js",
-            "chatgpt_web_private_conversation_share_contract.js",
+            "chatgpt_web_private_conversation_share_contract.js", "chatgpt_web_private_shared_links.js",
             "chatgpt_web_private_project_conversation_share.js",
             "chatgpt_web_private_conversation_share.js",
             "chatgpt_web_private_read_aloud_transport.js",

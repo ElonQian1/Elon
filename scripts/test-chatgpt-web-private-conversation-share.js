@@ -288,7 +288,7 @@ test('share modules parse in the same concatenated asset scope and are registere
     .map(file => fs.readFileSync(path.join(assets, file), 'utf8')).join('\n');
   const f = fixture();
   vm.runInNewContext(source, { window: f.page, URL, setTimeout, clearTimeout });
-  assert.equal(f.page.__elonChatGptPrivateConversationShare.version, 3);
+  assert.equal(f.page.__elonChatGptPrivateConversationShare.version, 4);
   assert.equal(typeof f.page.__elonChatGptPrivateConversationShare.start, 'function');
   const owned = f.page.__elonChatGptPrivateConversationShare;
   vm.runInNewContext(source, { window: f.page, URL, setTimeout, clearTimeout });
@@ -302,6 +302,8 @@ test('production bundle includes the share contract before transport and command
   const before = names.indexOf('chatgpt_web_private_conversation_share_contract.js');
   const after = names.indexOf('chatgpt_web_private_conversation_share.js');
   assert.ok(before >= 0 && after > before);
+  assert.ok(names.indexOf('chatgpt_web_private_shared_links.js') > before);
+  assert.ok(names.indexOf('chatgpt_web_private_shared_links.js') < after);
   new vm.Script(names.map(file => fs.readFileSync(path.join(assets, file), 'utf8')).join('\n'));
   const mutation = fs.readFileSync(path.join(assets, 'chatgpt_web_private_conversation_mutation.js'), 'utf8');
   assert.match(mutation, /PrivateConversationShare\?\.handle\(action, command, respond, readSnapshot\)/);
