@@ -516,14 +516,14 @@
         },
         {
           "path": "docs/reports/android-binance-grid-create-v1-20260908.md",
-          "content_hash": "c377d6dfa8337af4688f35b0a9dc5a177da3c0dff6dbf053cb31e1e1e0916504",
+          "content_hash": "082247444f7103934dfe029f7cd867034f74186b6f21e1f038a03ff396fcb991",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "42d055b668716133d2a49a09332e3fee40bc417d",
-            "head_blob_oid": "20c9715274ae4cae3758a8c84d6776f6ee4ebd87",
-            "worktree_blob_oid": "2ba2b72d493502e2ff98d05cdf651c4169755c05",
+            "head_commit": "d45b0b7e56aa8047d75a01acd924e2939739c465",
+            "head_blob_oid": "2ba2b72d493502e2ff98d05cdf651c4169755c05",
+            "worktree_blob_oid": "f29c8fc4731af671205ded2fd91f04d96d5a4654",
             "state": "tracked_modified"
           }
         },
@@ -555,7 +555,7 @@
         }
       ],
       "created_at_ms": 1788855780561,
-      "updated_at_ms": 1788859322929
+      "updated_at_ms": 1788859997404
     },
     {
       "id": "android-binance-host-read-v1",
@@ -23450,16 +23450,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_89d9ba7336194885a4463c8149f19568",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-sui-ci",
-      "reason": "Bind the reviewed installer, cache, production-freeze, canonical receipt, and zero-Sui-RPC requirement wording.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788648170241
-    },
-    {
       "id": "feature_event_b46094ae33b349adbf3958596552771d",
       "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
       "action": "metadata_updated",
@@ -25448,6 +25438,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1788859322929
+    },
+    {
+      "id": "feature_event_a2a22ef6fd5e421da60258b95c90f154",
+      "feature_id": "android-binance-grid-create-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-create",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788859997404
     }
   ]
 }
