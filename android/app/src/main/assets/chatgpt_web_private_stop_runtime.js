@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const old = root.__elonChatGptPrivateStopRuntime;
@@ -23,7 +23,13 @@
   }
 
   function capture(node) {
-    return page.__elonChatGptPrivateTextRuntimeSubmit?.captureConversation?.(node, true);
+    const binding = page.__elonChatGptPrivateTextRuntimeSubmit?.captureConversation?.(node, true);
+    if (!binding) return null;
+    const shared = page.__elonChatGptPrivateRuntimeBindings?.peek?.('shared');
+    if (typeof shared?.XM !== 'function' || typeof shared.HM?.getRequestId !== 'function') return binding;
+    // The composer property is a render snapshot. Pin the live official tree
+    // synchronously, before loading or subscribing can expose a later request.
+    return { ...binding, requestId: shared.HM.getRequestId(shared.XM(binding.conversation.id)) };
   }
 
   function current(binding) {
@@ -187,5 +193,5 @@
     return owner.transaction;
   }
 
-  return Object.freeze({ version: 4, stop, state });
+  return Object.freeze({ version: 5, stop, state });
 });

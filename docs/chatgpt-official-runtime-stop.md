@@ -71,6 +71,33 @@ different stop button. The complete official-page route remains available.
 
 ## Verification and remaining work
 
+### Current-request correction, 2026-09-08
+
+APK 1569 / adapter 305 device acceptance reproduced `request_unavailable`
+and DOM fallback on a fresh guest long reply. The received partial answer
+survived stopping (119 characters before, 201 after). A following native send
+then projected one combined user row and one replacement assistant row, not
+two separate turns. An ordinary two-turn control retained four separate rows.
+The stop/follow-up case therefore remains failed, not completed.
+
+Stop runtime v5 now reads `HM.getRequestId(XM(conversation.id))` from the already
+loaded versioned shared runtime. The current public composer uses that same
+tree selector to populate its render-time `currentRequestId` property. An
+available live tree, including an empty request, takes precedence over that
+property. The request is pinned synchronously before any load/subscription;
+all subsequent ownership and replacement checks use the same live source.
+Cold unavailable state does not queue a late stop or import a module to select
+a later request. No DOM click, credential copying or new HTTP endpoint is added.
+
+`stop-current-request-red` failed 10 of 11 new cases against v4;
+`stop-current-request-tests` passes 73 focused cases (including the 11 new
+cases), with no skips. This proves the stale-property source gap, not that it
+is the sole device root cause. Device proof for v5 is still pending.
+The device logs are `two-turn-device-1569-followup` and
+`stopped-turn-device-1569`; they contain only synthetic structural results.
+The temporary awake setting was restored. The earlier remote test screenshot
+was removed after reconnection. No user messages or credentials were exported.
+
 The eight initial production-wiring cases fail against the preceding source.
 The final focused run passes 158 Node cases, with no skipped or cancelled tests,
 across runtime stopping, production wiring, text submit, attachment submit and
