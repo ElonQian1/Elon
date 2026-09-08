@@ -61,6 +61,7 @@ internal data class WebChatConsumerCommandResult(
 internal interface WebChatConsumerPort {
     fun state(): WebChatConsumerState
     fun libraryFiles(): WebChatLibrarySnapshot? = null
+    fun attachLibraryFile(handle: String): WebChatConsumerCommandResult = WebChatConsumerCommandResult(false)
     fun mutateLibraryFile(handle: String, operation: String, name: String, confirmed: Boolean): WebChatConsumerCommandResult =
         WebChatConsumerCommandResult(false)
     fun requestLibraryFiles(directory: String, query: String, operation: String): WebChatConsumerCommandResult =

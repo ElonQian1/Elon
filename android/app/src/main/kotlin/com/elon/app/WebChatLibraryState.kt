@@ -9,6 +9,7 @@ internal data class WebChatLibraryEntry(
     val downloadHandle: String = "",
     val canRename: Boolean = false,
     val canTrash: Boolean = false,
+    val canAttach: Boolean = false,
 )
 
 internal data class WebChatLibraryBreadcrumb(val handle: String, val name: String)

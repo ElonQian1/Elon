@@ -12,6 +12,17 @@ internal object WebAiPrivateTransportCatalog {
 
     private fun entries(): List<Entry> = listOf(
         Entry(
+            id = "android_chatgpt_private_library_attachment_v1",
+            provider = "chatgpt",
+            status = "implemented_device_pending",
+            verification = "existing_attachment_owner_and_library_reference_contract_tests",
+            productionDefault = true,
+            runtimeEnabled = true,
+            requestMode = "cached_library_reference_to_existing_composer_send_owner",
+            healthPolicy = "fresh_selection_context_binding_single_association_no_auto_send",
+            fallback = "preserved_draft_and_explicit_library_selection_retry",
+        ),
+        Entry(
             id = "android_chatgpt_private_library_file_mutations_v1",
             provider = "chatgpt",
             status = "implemented_device_pending",

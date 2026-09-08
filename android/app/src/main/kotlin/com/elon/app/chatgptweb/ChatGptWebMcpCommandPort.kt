@@ -39,6 +39,7 @@ internal interface ChatGptWebMcpCommandPort {
     fun listConversationFiles(path: String, requestId: String) = Unit
     fun listLibraryFiles(request: org.json.JSONObject, requestId: String) = Unit
     fun mutateLibraryFile(request: org.json.JSONObject, requestId: String) = Unit
+    fun attachLibraryFile(handle: String, requestId: String) = Unit
     fun cancelLibraryFiles(target: String, requestId: String) = Unit
     fun downloadLibraryFile(file: com.elon.app.WebChatLibraryEntry, requestId: String) = Unit
     fun downloadConversationFile(path: String, file: com.elon.app.WebChatConversationFile, requestId: String) = Unit

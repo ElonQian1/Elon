@@ -373,6 +373,9 @@ internal class ChatGptWebPageAdapter(
         runCommand("list_library_files", value = request.toString(), requestId = requestId)
     fun mutateLibraryFile(request: JSONObject, requestId: String) =
         runCommand("mutate_library_file", value = request.toString(), selected = true, requestId = requestId)
+
+    fun attachLibraryFile(handle: String, requestId: String) =
+        runCommand("attach_library_file", value = JSONObject().put("fileHandle", handle).toString(), selected = true, requestId = requestId)
     fun cancelLibraryFiles(target: String, requestId: String) =
         runCommand("cancel_library_files", value = target, requestId = requestId)
     fun downloadLibraryFile(file: com.elon.app.WebChatLibraryEntry, requestId: String) {

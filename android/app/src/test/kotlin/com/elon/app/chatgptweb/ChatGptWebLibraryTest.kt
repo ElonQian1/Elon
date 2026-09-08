@@ -29,6 +29,34 @@ class ChatGptWebLibraryTest {
         assertFalse(json.has("conversation_path"))
     }
 
+    @Test fun attachesOnlyExplicitlySelectedObservedFilesWithBooleanCapability() {
+        val value = payload()
+        val row = value.getJSONArray("items").getJSONObject(0)
+        row.put("canAttach", "true")
+        assertFalse(ChatGptWebLibraryProtocol.parse(value)!!.items.single().canAttach)
+        row.put("canAttach", true)
+        val state = ChatGptWebObservedState.Snapshot.EMPTY.copy(libraryFiles = ChatGptWebLibraryProtocol.parse(value))
+        val calls = mutableListOf<String>()
+        val commands = Proxy.newProxyInstance(javaClass.classLoader, arrayOf(ChatGptWebMcpCommandPort::class.java)) { _, method, args ->
+            calls += method.name
+            assertEquals(handle, args!![0])
+            null
+        } as ChatGptWebMcpCommandPort
+        val request = JSONObject().put("action", "chatgpt_attach_library_file").put("file_handle", handle)
+        val dispatch: (String, (String) -> Unit) -> Unit = { action, run ->
+            assertEquals("attach_library_file", action)
+            run("mcp_attach")
+        }
+        assertEquals("user_confirmation_required", ChatGptWebLibraryCommands.control(request, state, commands, dispatch))
+        request.put("confirmed", true).put("file_handle", "library_" + "c".repeat(32))
+        assertEquals("library_selection_expired", ChatGptWebLibraryCommands.control(request, state, commands, dispatch))
+        request.put("file_handle", handle)
+        assertNull(ChatGptWebLibraryCommands.control(request, state, commands, dispatch))
+        assertEquals(listOf("attachLibraryFile"), calls)
+        val json = ChatGptWebLibraryProtocol.json(state.libraryFiles) as JSONObject
+        assertTrue(json.getJSONArray("items").getJSONObject(0).getBoolean("can_attach"))
+    }
+
     @Test fun invalidRowsArePartialRatherThanEmptySuccess() {
         val value = payload()
         value.getJSONArray("items").put(JSONObject().put("handle", "raw-library-id").put("name", "other"))

@@ -4,6 +4,18 @@ const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
 
+test('native attach waits for the exact receipt and returns without navigating or sending text', () => {
+  const read = name => fs.readFileSync(path.join(__dirname, '../android/app/src/main/kotlin/com/elon/app/', name), 'utf8');
+  const ui = read('WebChatLibraryAttachmentAction.kt');
+  assert.match(ui, /owner\.attachLibraryFile\(file\.handle\)/);
+  assert.match(ui, /receipt\.detail == "library_attachment_associated"/);
+  assert.match(ui, /elapsedRealtime\(\) - started >= 16_000/);
+  assert.match(ui, /host::removeCallbacks/);
+  assert.doesNotMatch(ui, /evaluateJavascript|loadUrl|startVoice|setDraft|sendText/);
+  assert.match(read('WebChatLibraryBrowser.kt'), /attachments\.start\(port, file\)/);
+  assert.match(read('chatgptweb/ChatGptWebMcpActionCatalog.kt'), /"chatgpt_attach_library_file"/);
+});
+
 test('production UI routes folders and search to the native owner without dispatching conversation navigation', () => {
   const ui = fs.readFileSync(path.join(__dirname, '../android/app/src/main/kotlin/com/elon/app/WebChatLibraryBrowser.kt'), 'utf8');
   const navigation = fs.readFileSync(path.join(__dirname, '../android/app/src/main/kotlin/com/elon/app/WebChatProductionFeatureNavigation.kt'), 'utf8');

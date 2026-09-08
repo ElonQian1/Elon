@@ -3,7 +3,8 @@ package com.elon.app.chatgptweb
 import org.json.JSONObject
 
 internal object ChatGptWebLibraryCommands {
-    val actions = setOf("chatgpt_list_library_files", "chatgpt_cancel_library_files", "chatgpt_download_library_file", "chatgpt_mutate_library_file")
+    val actions = setOf("chatgpt_list_library_files", "chatgpt_cancel_library_files", "chatgpt_download_library_file",
+        "chatgpt_mutate_library_file", "chatgpt_attach_library_file")
 
     fun control(
         args: JSONObject,
@@ -12,6 +13,13 @@ internal object ChatGptWebLibraryCommands {
         dispatch: (String, (String) -> Unit) -> Unit,
     ): String? {
         when (args.optString("action").trim().lowercase()) {
+            "chatgpt_attach_library_file" -> {
+                if (args.opt("confirmed") != true) return "user_confirmation_required"
+                val file = observed.libraryFiles?.items?.singleOrNull { it.handle == args.optString("file_handle") }
+                    ?: return "library_selection_expired"
+                if (file.kind != "file" || !file.canAttach) return "library_attachment_unsupported"
+                dispatch("attach_library_file") { commands.attachLibraryFile(file.handle, it) }
+            }
             "chatgpt_mutate_library_file" -> {
                 if (args.opt("confirmed") != true) return "user_confirmation_required"
                 val file = observed.libraryFiles?.items?.singleOrNull { it.handle == args.optString("file_handle") }

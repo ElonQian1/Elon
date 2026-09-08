@@ -20,6 +20,8 @@ internal class ChatGptWebConsumerPortAdapter(
     private val readFileDownload: () -> com.elon.app.WebChatFileDownloadState? = { null },
 ) : WebChatConsumerPort {
     override fun libraryFiles() = observedState().let { it.libraryFiles.takeIf { _ -> it.adapterCurrent } }
+    override fun attachLibraryFile(handle: String) =
+        execute(JSONObject().put("action", "chatgpt_attach_library_file").put("file_handle", handle).put("confirmed", true))
     override fun mutateLibraryFile(handle: String, operation: String, name: String, confirmed: Boolean) =
         execute(JSONObject().put("action", "chatgpt_mutate_library_file").put("file_handle", handle)
             .put("operation", operation).put("name", name).put("confirmed", confirmed))

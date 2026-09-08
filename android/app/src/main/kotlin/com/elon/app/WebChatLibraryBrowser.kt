@@ -50,6 +50,7 @@ internal class WebChatLibraryBrowser(
     private val mutations = WebChatLibraryMutationDialog(activity, host, consumerPort) {
         if (dialog?.isShowing == true) load("refresh")
     }
+    private val attachments = WebChatLibraryAttachmentAction(host, consumerPort, { status?.text = it }, ::dismiss)
 
     fun show(): Boolean {
         if (activity.isFinishing || activity.isDestroyed) return false
@@ -115,6 +116,7 @@ internal class WebChatLibraryBrowser(
             detail = null
             downloads.dismiss()
             mutations.dismiss()
+            attachments.stopWatching()
             dialog = null
             owner = null
             page = null
@@ -259,8 +261,10 @@ internal class WebChatLibraryBrowser(
 
     private fun showFile(file: WebChatLibraryEntry) {
         val port = owner ?: return
+        if (attachments.busy) return
         detail?.dismiss()
         val actions = buildList {
+            if (file.canAttach) add("加入当前聊天")
             if (file.downloadHandle.isNotBlank()) add("下载")
             if (file.canRename) add("重命名")
             if (file.canTrash) add("移到最近删除")
@@ -270,6 +274,7 @@ internal class WebChatLibraryBrowser(
             .setItems(actions.toTypedArray()) { _, index ->
                 if (consumerPort() !== port) return@setItems
                 when (actions[index]) {
+                    "加入当前聊天" -> { stopRead(); attachments.start(port, file) }
                     "重命名" -> mutations.show(port, file, "rename")
                     "移到最近删除" -> mutations.show(port, file, "trash")
                     "官网文件库" -> openOfficial()
