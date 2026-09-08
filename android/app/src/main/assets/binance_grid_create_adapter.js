@@ -123,8 +123,10 @@
       (async () => {
         let dispatched = false;
         try {
-          const h = headers(); await identity(p.account,h);
+          const h = headers();
           if(await coefficient(h) !== p.count) throw Error('configuration_changed');
+          // Identity is the last network check immediately before dispatch, after the potentially slow config read.
+          await identity(p.account,h);
           if(p.cancelled) throw Error('cancelled_before_send');
           const body = {...p.payload,clientStrategyId:p.client,slideWindow:p.payload.gridCount > p.count};
           dispatched = true;

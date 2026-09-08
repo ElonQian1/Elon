@@ -26,7 +26,10 @@ function harness() {
     fetch:async(url, init={})=>{
       calls.push({url,init});
       if(url===INFO) return response(account);
-      if(url===COEF) return response({windowCount:behavior.windowCount});
+      if(url===COEF) {
+        if(behavior.switchDuringConfig) {account.userId='43';account.subUser=true;account.parentUser=false;}
+        return response({windowCount:behavior.windowCount});
+      }
       if(url===CREATE) {
         if(behavior.pending) return behavior.pending;
         if(behavior.fail==='network') throw Error('SENSITIVE_CANARY');
@@ -62,6 +65,11 @@ test('user submit builds observed fields exactly once and NEW only means accepte
 });
 test('account switch after preparation blocks POST',async()=>{
   const h=harness();await h.prepare();h.account.userId='43';h.account.subUser=true;h.account.parentUser=false;
+  h.api.submit('doc_test_123','a'.repeat(32));await tick();
+  assert.equal(h.calls.filter(c=>c.url===CREATE).length,0);assert.equal(h.events.at(-1).kind,'not_sent');
+});
+test('account switch during the last configuration read cannot dispatch under the next account',async()=>{
+  const h=harness();await h.prepare();h.behavior.switchDuringConfig=true;
   h.api.submit('doc_test_123','a'.repeat(32));await tick();
   assert.equal(h.calls.filter(c=>c.url===CREATE).length,0);assert.equal(h.events.at(-1).kind,'not_sent');
 });

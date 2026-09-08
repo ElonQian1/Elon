@@ -82,6 +82,9 @@ internal class BinanceCreateSession(private val host: BinanceHostRuntime, val at
                     require(e.keys == base + setOf("strategy_id","client_id","provider_status") && e["client_id"] == attempt.clientId)
                     attempt.accepted(e["strategy_id"] as String,e["provider_status"] as String)
                     persist(); busy = false; message = "币安已受理创建。请查询策略状态，受理不代表网格已经运行。"
+                    // Website owns the list query. Reload invalidates old grants/document and fetches a new list;
+                    // never leave the pre-create empty snapshot looking fresh or invent its POST pagination body.
+                    host.view?.reload()
                 }
                 "rejected", "not_sent", "unknown" -> {
                     require(e.keys == base + "code")

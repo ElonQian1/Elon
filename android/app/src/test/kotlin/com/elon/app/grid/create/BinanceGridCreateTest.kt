@@ -4,6 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class BinanceGridCreateTest {
+    @Test fun secondWindowCannotOwnOrClearFirstWindowsJournalSlot() {
+        val slot = BinanceCreateSlot(); val first = Any(); val second = Any()
+        assertTrue(slot.acquire(first)); assertFalse(slot.acquire(second))
+        slot.release(second); assertFalse(slot.acquire(second))
+        slot.release(first); assertTrue(slot.acquire(second)); slot.release(second)
+    }
     private fun draft(margin: String = "12.345") = BinanceGridDraft.parse(mapOf(
         "symbol" to "NEARUSDT", "direction" to "LONG", "spacing" to "ARITH", "marginType" to "ISOLATED",
         "lower" to "1.01", "upper" to "2.02", "margin" to margin, "leverage" to "3", "count" to "10",

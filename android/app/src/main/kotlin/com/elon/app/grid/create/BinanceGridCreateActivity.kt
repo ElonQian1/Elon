@@ -22,6 +22,7 @@ class BinanceGridCreateActivity : Activity() {
     private var recoveryBlocked = false
     private var recordResolved = false
     private var ready = false
+    private var ownsSlot = false
     private lateinit var status: TextView
     private lateinit var summary: TextView
     private lateinit var form: BinanceCreateForm
@@ -39,6 +40,8 @@ class BinanceGridCreateActivity : Activity() {
         if (savedInstanceState != null || !BinanceHostCaller.activity(this) || intent.data != null || intent.clipData != null ||
             intent.selector != null || intent.extras?.keySet() != setOf("nonce")) return finish()
         nonce = intent.getStringExtra("nonce")?.takeIf { Regex("[0-9a-f]{64}").matches(it) } ?: return finish()
+        if (!slot.acquire(this)) return finish()
+        ownsSlot = true
         runCatching { journal.read()?.let(attempt::restore) }.onFailure { recoveryBlocked = true }
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20,20,20,12) }
         root.addView(label("创建本人币安 U 本位网格",21f))
@@ -154,12 +157,16 @@ class BinanceGridCreateActivity : Activity() {
         return super.dispatchTouchEvent(event)
     }
     override fun onDestroy() {
-        session?.close()
-        host?.let { it.onChanged = null; it.onCreateObservation = null; it.view?.let { view -> (view.parent as? ViewGroup)?.removeView(view) } }
+        if (ownsSlot) {
+            session?.close()
+            host?.let { it.onChanged = null; it.onCreateObservation = null; it.view?.let { view -> (view.parent as? ViewGroup)?.removeView(view) } }
+            slot.release(this); ownsSlot = false
+        }
         super.onDestroy()
     }
     private fun label(value: String, size: Float) = TextView(this).apply { text = value; textSize = size; isSaveEnabled = false; setPadding(0,8,0,8) }
     private fun button(value: String, id: String, action: () -> Unit) = Button(this).apply {
         text = value; contentDescription = id; isSaveEnabled = false; filterTouchesWhenObscured = true; setOnClickListener { action() }
     }
+    companion object { private val slot = BinanceCreateSlot() }
 }
