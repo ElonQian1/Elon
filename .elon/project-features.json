@@ -424,6 +424,19 @@
           }
         },
         {
+          "path": "docs/reports/android-binance-host-session-v1-20260908.md",
+          "content_hash": "2d4748099c9613e31a3b649a63f9ba541baf87eda51a03bdee2d642ba8b68938",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0de2d7e80e225b9169e78d29955dd353e3968f3a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c1b7f2cd005579f66e9dfe7dc7920137802c126f",
+            "state": "untracked"
+          }
+        },
+        {
           "path": "docs/reports/binance-subaccount-identity-20260908.md",
           "content_hash": "1a248cff8cbabee6fc8c6d2ded63d4431c58bedd9dc98ffe00b8518e5e6d27e6",
           "locator": "",
@@ -470,7 +483,7 @@
         "expires_at_ms": 1788850503793
       },
       "created_at_ms": 1788829139503,
-      "updated_at_ms": 1788837521207
+      "updated_at_ms": 1788838324978
     },
     {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -23127,16 +23140,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_49729f34ab104afdba01c9320b5740bc",
-      "feature_id": "esk-platform-sui-address-binding-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788644093577
-    },
-    {
       "id": "feature_event_c377be75a3cd4e4fa157cb42dfe2d8ea",
       "feature_id": "esk-platform-sui-address-binding-v2",
       "action": "transitioned",
@@ -25125,6 +25128,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788837521207
+    },
+    {
+      "id": "feature_event_3433ad6bc3154585831ad4845f29e8eb",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-host",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788838324978
     }
   ]
 }
