@@ -44,6 +44,9 @@ returned `control_id`, then a correctly tracked click did not dispatch a send.
 The retained 28-character synthetic official draft was subsequently cleared;
 no uncertain send was replayed. Its original harness reported restoration
 false. Evidence: `stopped-turn-official-control-1576-20260908-194556-439`.
+After that controlled draft cleanup, MCP confirmed the original empty native
+view was restored: zero messages, zero native/official draft lengths and no
+streaming. The comparison remains inconclusive despite successful cleanup.
 
 ## Stream visibility correction
 
@@ -72,6 +75,12 @@ including the existing policy/transport assertions. Evidence:
 `stream-visibility-red-20260908-195409-439` and
 `stream-visibility-green-20260908-195433-006`.
 The filtering correction is source-tested but not yet included in APK 1576.
+The expanded focused regression passes 34 Node entries with no skips, covering
+interruption retention, streaming/watchdog behavior and Win binding/recovery:
+`stream-visibility-regression-20260908-195557-267`. Source commit
+`697be9e45650fcc3d24098c0814c2ccfa8cc7cdf` is pushed to `origin/main`.
+Per the grouped-build workflow, it is queued for the next APK batch rather
+than another one-change build. No device acceptance is claimed for that filter.
 
 Next acceptance must start from the actual final-answer stream and separately
 establish official-tree and native projection continuity. Do not replay already
