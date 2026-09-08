@@ -83,11 +83,6 @@ internal class WebChatLibraryBrowser(
                 adapter = entries
                 dividerHeight = 0
                 contentDescription = "web-chat-library-list"
-                setOnItemClickListener { _, _, position, _ ->
-                    page?.items?.getOrNull(position)?.let { item ->
-                        if (item.kind == "directory") navigate(item.handle) else showFile(item)
-                    }
-                }
             }, LinearLayout.LayoutParams(-1, 0, 1f))
             more = Button(activity).also {
                 it.text = "加载更多"
@@ -308,6 +303,11 @@ internal class WebChatLibraryBrowser(
             (row.getChildAt(0) as TextView).text = item.name
             (row.getChildAt(1) as TextView).text = WebChatLibraryPresentation.subtitle(item)
             row.contentDescription = "web-chat-library-entry:${item.handle}"
+            row.setOnClickListener {
+                if (consumerPort() === owner && page?.items?.any { it.handle == item.handle } == true) {
+                    if (item.kind == "directory") navigate(item.handle) else showFile(item)
+                }
+            }
             return row
         }
     }

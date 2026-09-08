@@ -86,6 +86,14 @@ draft were unchanged. Logs: `library-native-open-1584-20260909-032107-735` and
 Earlier attempts used only the preset selector and failed, despite the synced
 entry being visible. Their failures are not app-library or authentication failures.
 
+On normal 1585 the library/search still opened, but its file-row accessibility
+node was visible/enabled without `ACTION_CLICK`. The listener lived on the
+outer `ListView`, not on the semantic row. The row now owns the same existing
+folder/file action with current-provider/handle checks; the outer listener is
+removed to avoid duplicate dispatch. The external `inspect_entry` step reports
+only node flags/bounds. Log: `library-native-menu-1585-20260909-035524-240`.
+The 1585 failure did not attempt an attachment association or file mutation.
+
 ## Remaining Acceptance And Gaps
 
 Validated on 2026-09-08:

@@ -3,7 +3,7 @@
 param(
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
-    [ValidateSet('inspect','features','library','browse','query','file','attach','remove_staged','close_detail','back')]
+    [ValidateSet('inspect','inspect_entry','features','library','browse','query','file','attach','remove_staged','close_detail','back')]
     [string]$Step = 'inspect',
     [string]$Handle = '',
     [string]$SdkRoot = 'D:/Android/sdk',

@@ -89,6 +89,7 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
                 click(description("web-chat-library-back"));
                 break;
             case "inspect":
+            case "inspect_entry":
                 break;
             default:
                 fail("unsupported_step");
@@ -109,6 +110,19 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
             .descriptionStartsWith("web-chat-composer-attachment:")).exists());
         result.put("composer_remove_visible", new UiObject(new UiSelector().packageName(APP)
             .descriptionStartsWith("web-chat-composer-attachment-remove:")).exists());
+        if (step.equals("inspect_entry")) {
+            android.view.accessibility.AccessibilityNodeInfo node = accessibilityNode(
+                description("web-chat-library-entry:" + handle));
+            try {
+                android.graphics.Rect bounds = new android.graphics.Rect();
+                node.getBoundsInScreen(bounds);
+                result.put("entry_clickable", node.isClickable());
+                result.put("entry_enabled", node.isEnabled());
+                result.put("entry_visible", node.isVisibleToUser());
+                result.put("entry_actions", node.getActions());
+                result.put("entry_bounds", bounds.toShortString());
+            } finally { node.recycle(); }
+        }
         android.os.Bundle report = new android.os.Bundle();
         report.putString("stream", "LIBRARY_UI_RESULT=" + result.toString() + "\n");
         getAutomationSupport().sendStatus(0, report);

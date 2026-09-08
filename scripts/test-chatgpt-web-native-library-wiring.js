@@ -33,6 +33,9 @@ test('production UI routes folders and search to the native owner without dispat
   const ui = fs.readFileSync(path.join(__dirname, '../android/app/src/main/kotlin/com/elon/app/WebChatLibraryBrowser.kt'), 'utf8');
   const navigation = fs.readFileSync(path.join(__dirname, '../android/app/src/main/kotlin/com/elon/app/WebChatProductionFeatureNavigation.kt'), 'utf8');
   assert.match(ui, /item\.kind == "directory"\) navigate\(item\.handle\)/);
+  assert.match(ui, /row\.setOnClickListener/);
+  assert.match(ui, /page\?\.items\?\.any \{ it\.handle == item\.handle \}/);
+  assert.doesNotMatch(ui, /setOnItemClickListener/);
   assert.match(ui, /requestLibraryFiles\(directory, query, operation\)/);
   assert.match(ui, /downloadLibraryFile\(file\.handle, file\.downloadHandle\)/);
   assert.match(ui, /WebChatFileDownloadDialog/);
