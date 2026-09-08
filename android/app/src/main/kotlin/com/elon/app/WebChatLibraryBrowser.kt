@@ -47,6 +47,9 @@ internal class WebChatLibraryBrowser(
     private var adapter: Entries? = null
     private var detail: AlertDialog? = null
     private val downloads = WebChatFileDownloadDialog(activity, host, consumerPort)
+    private val mutations = WebChatLibraryMutationDialog(activity, host, consumerPort) {
+        if (dialog?.isShowing == true) load("refresh")
+    }
 
     fun show(): Boolean {
         if (activity.isFinishing || activity.isDestroyed) return false
@@ -111,6 +114,7 @@ internal class WebChatLibraryBrowser(
             detail?.dismiss()
             detail = null
             downloads.dismiss()
+            mutations.dismiss()
             dialog = null
             owner = null
             page = null
@@ -256,18 +260,26 @@ internal class WebChatLibraryBrowser(
     private fun showFile(file: WebChatLibraryEntry) {
         val port = owner ?: return
         detail?.dismiss()
-        val builder = AlertDialog.Builder(activity).setTitle(file.name)
-            .setMessage(WebChatLibraryPresentation.subtitle(file)).setNegativeButton("关闭", null)
-            .setNeutralButton("官网文件库") { _, _ ->
-                openOfficial()
-            }
-        if (file.downloadHandle.isNotBlank()) builder.setPositiveButton("下载") { _, _ ->
-            if (consumerPort() !== port) return@setPositiveButton
-            val result = port.downloadLibraryFile(file.handle, file.downloadHandle)
-            if (result.accepted && result.requestId != null) downloads.show(port, result.requestId)
-            else Toast.makeText(activity, "文件列表已变化，请刷新后重试", Toast.LENGTH_SHORT).show()
+        val actions = buildList {
+            if (file.downloadHandle.isNotBlank()) add("下载")
+            if (file.canRename) add("重命名")
+            if (file.canTrash) add("移到最近删除")
+            add("官网文件库")
         }
-        detail = builder.show()
+        detail = AlertDialog.Builder(activity).setTitle(file.name).setNegativeButton("关闭", null)
+            .setItems(actions.toTypedArray()) { _, index ->
+                if (consumerPort() !== port) return@setItems
+                when (actions[index]) {
+                    "重命名" -> mutations.show(port, file, "rename")
+                    "移到最近删除" -> mutations.show(port, file, "trash")
+                    "官网文件库" -> openOfficial()
+                    else -> {
+                        val result = port.downloadLibraryFile(file.handle, file.downloadHandle)
+                        if (result.accepted && result.requestId != null) downloads.show(port, result.requestId)
+                        else Toast.makeText(activity, "文件列表已变化，请刷新后重试", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }.show()
     }
 
     private fun openOfficial() {

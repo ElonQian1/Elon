@@ -15,3 +15,16 @@ test('production UI routes folders and search to the native owner without dispat
   assert.doesNotMatch(ui, /openConversation|loadUrl|evaluateJavascript|setDraft|startVoice/);
   assert.match(navigation, /feature\.kind == "library" && library\.show\(\)/);
 });
+
+test('production library mutation UI uses confirmed typed commands and keeps a bounded receipt watcher', () => {
+  const read = name => fs.readFileSync(path.join(__dirname, '../android/app/src/main/kotlin/com/elon/app/', name), 'utf8');
+  const ui = read('WebChatLibraryMutationDialog.kt');
+  assert.match(ui, /owner\.mutateLibraryFile\(file\.handle, operation, value, true\)/);
+  assert.match(ui, /command\.detail == "library_mutation_acknowledged"/);
+  assert.match(ui, /started < 30_000/);
+  assert.match(ui, /host::removeCallbacks/);
+  assert.doesNotMatch(ui, /evaluateJavascript|loadUrl|startVoice|setDraft/);
+  assert.match(read('chatgptweb/ChatGptWebMcpActionCatalog.kt'), /"chatgpt_mutate_library_file"/);
+  assert.match(read('chatgptweb/ChatGptWebMcpActions.kt'), /in ChatGptWebLibraryCommands\.actions/);
+  assert.match(read('chatgptweb/ChatGptWebMcpCommandAdapter.kt'), /pageAdapter\.mutateLibraryFile\(request, requestId\)/);
+});

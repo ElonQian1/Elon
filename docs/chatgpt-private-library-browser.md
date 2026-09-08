@@ -73,8 +73,10 @@ saved-byte download after the grouped APK is installed. Verify the original conv
 draft and any active voice session remain unchanged. Do not infer an actual speed
 or temperature improvement from cache fixtures alone.
 
+Ordinary file rename and soft deletion now have a source-only
+[native mutation owner](chatgpt-private-library-mutations.md), pending grouped acceptance.
 Independent-library external mounted-file download, saved-entity/artifact previews,
-file/folder mutation and moving files are not implemented by this browser. Such
+folder mutations and moving files are not implemented by this browser. Such
 rows remain visible where their shape is recognized, without a false Download
 button. The explicit official-library entry remains available. Existing
 conversation-bound mounted-file download support is retained separately.

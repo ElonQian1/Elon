@@ -51,6 +51,7 @@ internal class ChatGptWebMcpCommandAdapter(
     override fun listConversationFiles(path: String, requestId: String) =
         pageAdapter.listConversationFiles(path, requestId)
     override fun listLibraryFiles(request: org.json.JSONObject, requestId: String) = pageAdapter.listLibraryFiles(request, requestId)
+    override fun mutateLibraryFile(request: org.json.JSONObject, requestId: String) = pageAdapter.mutateLibraryFile(request, requestId)
     override fun cancelLibraryFiles(target: String, requestId: String) = pageAdapter.cancelLibraryFiles(target, requestId)
     override fun downloadLibraryFile(file: com.elon.app.WebChatLibraryEntry, requestId: String) = pageAdapter.downloadLibraryFile(file, requestId)
     override fun downloadConversationFile(path: String, file: com.elon.app.WebChatConversationFile, requestId: String) =

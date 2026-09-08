@@ -104,4 +104,48 @@ class ChatGptWebLibraryTest {
         assertFalse(WebChatLibraryPresentation.status(null, false, true).contains("为空"))
         assertEquals("text/plain · 7 B", WebChatLibraryPresentation.subtitle(page.items.single()))
     }
+
+    @Test fun mutationCapabilitiesRequireBooleanFileEvidenceAndExplicitConfirmation() {
+        val value = payload()
+        val row = value.getJSONArray("items").getJSONObject(0)
+        row.put("canRename", "true").put("canTrash", true)
+        val entry = ChatGptWebLibraryProtocol.parse(value)!!.items.single()
+        assertFalse(entry.canRename)
+        assertTrue(entry.canTrash)
+        val calls = mutableListOf<String>()
+        val commands = Proxy.newProxyInstance(javaClass.classLoader, arrayOf(ChatGptWebMcpCommandPort::class.java)) { _, method, _ ->
+            calls += method.name
+            null
+        } as ChatGptWebMcpCommandPort
+        val state = ChatGptWebObservedState.Snapshot.EMPTY.copy(libraryFiles = ChatGptWebLibraryProtocol.parse(value))
+        val request = JSONObject().put("action", "chatgpt_mutate_library_file").put("file_handle", handle).put("operation", "trash")
+        val dispatch: (String, (String) -> Unit) -> Unit = { action, run ->
+            assertEquals("mutate_library_file", action)
+            run("mcp_mutate")
+        }
+        assertEquals("user_confirmation_required", ChatGptWebLibraryCommands.control(request, state, commands, dispatch))
+        request.put("confirmed", "true")
+        assertEquals("user_confirmation_required", ChatGptWebLibraryCommands.control(request, state, commands, dispatch))
+        request.put("confirmed", true)
+        assertNull(ChatGptWebLibraryCommands.control(request, state, commands, dispatch))
+        assertEquals(listOf("mutateLibraryFile"), calls)
+        request.put("operation", "rename").put("name", "renamed.txt")
+        assertEquals("library_mutation_unsupported", ChatGptWebLibraryCommands.control(request, state, commands, dispatch))
+        request.put("operation", "delete_permanently")
+        assertEquals("library_mutation_unsupported", ChatGptWebLibraryCommands.control(request, state, commands, dispatch))
+    }
+
+    @Test fun renameValidationAndReceiptDeadlineDoNotPermitUnsafeOrPrematureWrites() {
+        assertTrue(ChatGptWebLibraryCommands.validName("fixture v2.txt"))
+        listOf("", "..", "a/b", "a\\b", "a\nb", " a", "a".repeat(181)).forEach {
+            assertFalse(ChatGptWebLibraryCommands.validName(it))
+        }
+        var now = 1000L
+        val state = ChatGptWebObservedState(nowMs = { now })
+        state.beginCommand("mutate_library_file")
+        now += 25_000
+        assertEquals(ChatGptWebObservedState.CommandRequest.PENDING, state.snapshot().commandRequests.single().status)
+        now += 11_000
+        assertEquals(ChatGptWebObservedState.CommandRequest.TIMED_OUT, state.snapshot().commandRequests.single().status)
+    }
 }

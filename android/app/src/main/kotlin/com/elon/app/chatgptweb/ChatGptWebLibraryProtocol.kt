@@ -48,7 +48,8 @@ internal object ChatGptWebLibraryProtocol {
         if (size < -1 || number.toDouble() != size.toDouble() || size > 9_007_199_254_740_991L) return null
         val download = row.optString("downloadHandle")
         if (download.isNotEmpty() && (!ChatGptWebFileDownloadPolicy.HANDLE.matches(download) || kind != "file")) return null
-        return WebChatLibraryEntry(handle, kind, name, mime, size, download)
+        return WebChatLibraryEntry(handle, kind, name, mime, size, download,
+            kind == "file" && row.opt("canRename") == true, kind == "file" && row.opt("canTrash") == true)
     }
 
     private fun label(value: String): String? = value.takeIf {
@@ -63,6 +64,7 @@ internal object ChatGptWebLibraryProtocol {
             })).put("items", JSONArray(it.items.map { row ->
                 JSONObject().put("handle", row.handle).put("name", row.name).put("kind", row.kind)
                     .put("media_type", row.mediaType).put("size_bytes", row.sizeBytes).put("download_handle", row.downloadHandle)
+                    .put("can_rename", row.canRename).put("can_trash", row.canTrash)
             }))
     } ?: JSONObject.NULL
 }
