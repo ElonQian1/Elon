@@ -1,0 +1,81 @@
+# Library navigation and temporary attachment checkpoint
+
+Date: 2026-09-09. Production APK: normal `1.1.1591`, adapter 306.
+Source: `b609e779b07f8ce318ca575d19fd6022c8e43dc4`.
+APK SHA-256: `f43d1d0d16b99f00cc45ba06a923bcabd2207b3b0469ae5414ca17ee6bec6aa1`.
+
+## Completed scope
+
+`android_chatgpt_private_library_browser_v1`: native More, folder and back
+interaction is **completed** for this ordinary authenticated library. Existing
+read/cache implementation is reused; no production catalogue rewrite was needed.
+
+- External semantic UI activation exercised the production native library.
+- More retained all 21 earlier rows and extended the list to 41 unique handles.
+- A real folder returned four rows with its own handle and one breadcrumb.
+- Back restored the same 41-row root and cleared the breadcrumb.
+- Original blank chat/draft and temporary awake lease were restored.
+- No file mutation, upload, microphone or account-state change was performed.
+- More took 3,895 ms including the external UI runner; this is not a render or
+  network-only latency benchmark.
+
+Evidence: `library-navigation-1591-20260909-070954-241` in the shared Git
+`ai-command-logs` directory. The final harness additionally includes awake-lease
+restoration in its aggregate pass condition. Do not repeat this completed scope
+without a current regression. The earlier 1589 next-page failure's cause remains
+unattributed; this normal-release pass closes the current navigation check.
+
+## Temporary attachment failure
+
+Evidence: `temporary-attachment-1591-scope-20260909-071705-973`.
+
+- One synthetic 78-byte text file uploaded through the private transport:
+  `private_attachment_associated`.
+- A single user turn produced the requested marker and the actual file's first
+  line. The uploaded content was available to the assistant.
+- Send acknowledgement was `official_runtime_v1:unknown:context_changed`.
+- The post-send temporary-state check failed, so full scope acceptance remains
+  **pending**, including the subsequent personal-library inventory comparison.
+- The fixture was not replayed. Local fixture and blank normal chat were restored.
+- The temporary-mode toggle receipt does not attribute runtime versus compatibility;
+  this case does not independently prove the private toggle transport.
+
+An earlier harness attempt used the official uploaded-file count instead of the
+native staged-fixture count and stopped before sending. Its leftover local
+fixture was explicitly removed and zero pending counts verified. That attempt
+is not an APK upload failure. An additional route-only probe was inconclusive:
+the public snapshot strips URL query parameters and the probe did not await the
+temporary indicator before sending. It is not temporary-chat acceptance evidence.
+
+## Scoped source correction
+
+The private submit owner previously admitted a server-ID-bearing homepage only
+for a confirmed guest. Temporary chats can also remain at the homepage after
+receiving a server ID. Temporary-state capture had the same mismatch.
+
+Submit v16 now requires the exact temporary homepage plus the live official
+thread's temporary privacy, selected state, non-new state and absence of work or
+project context. Temporary-state v4 admits the same persisted home only with
+privacy and existing-thread proof. Account, document, committed component,
+conversation, attachment store and controller ownership remain checked. No
+uncertain write is replayed and no URL-only privacy assumption is introduced.
+
+Public September 9 source examined through the existing versioned bindings:
+
+- Composer `8b34dbc2-cj4kfo18e1ldvw16.js`, SHA-256
+  `c24245fc260253db68ae531c586174a3eeff95e694b7c8a0e76eb77eae5fe906`.
+- Shared `4813494d-bgyv5408fxme7xxv.js`, SHA-256
+  `72ed87dd6d8a5241abac73d9c720f8e92bf87bbee7980331fcf042fea64d14ca`.
+- The existing temporary button becomes read-only after the first turn. Its
+  label alone does not encode selected state. Existing shared thread getters,
+  not a new endpoint or export guess, supply the privacy proof.
+
+Regression evidence: two new cases failed before the correction (71/73 passed);
+the final related attachment, temporary-state, submit and September 9 binding
+batch passed **221/221**. Both acceptance scripts pass PowerShell parsing.
+Log: `temporary-home-regression-final-20260909-073204-334`.
+
+Delivery and fixed-device acceptance are pending. Project attachment and other
+unverified scopes are not completed by this correction. Proven audio, subtitles,
+dictation, read-aloud and authenticated stop/follow-up are unchanged. Google stays
+after the remaining ChatGPT acceptance gate.

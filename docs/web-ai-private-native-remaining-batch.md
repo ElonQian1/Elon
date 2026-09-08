@@ -26,8 +26,10 @@ reused; source-only or installation status does not satisfy the acceptance gate.
 ordinary native library rename/soft-delete, explicit one-text-file upload-copy
 with private upload and file-content reply, and rename/search reconciliation
 passed. Originals and the blank chat/draft were restored. These scopes are
-completed and reused. A current next-page read failed; pagination remains a
-specific open check, not a reason to repeat successful mutations or uploads.
+completed and reused. [Normal 1591 navigation acceptance](reports/chatgpt-library-scopes-1591.md)
+subsequently passed native More (21 to 41 rows), folder and back. Reuse these
+completed scopes. Temporary attachment upload/read passed, but its post-send
+state failed; the guarded source correction awaits fixed-device acceptance.
 
 Current installed build: [normal APK 1591](reports/chatgpt-runtime-bindings-20260909.md).
 Ordinary authenticated native stop/follow-up is **completed**: both sends and

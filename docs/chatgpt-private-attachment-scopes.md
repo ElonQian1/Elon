@@ -2,6 +2,11 @@
 
 Capability: `android_chatgpt_private_temporary_attachment_upload_v1`.
 
+Current checkpoint: [normal 1591](reports/chatgpt-library-scopes-1591.md) privately
+uploaded and read the synthetic file, but post-send temporary state failed.
+The scoped source correction is tested; fixed-device acceptance remains pending.
+The adapter numbers below describe the original implementation checkpoint.
+
 Status: **implemented, offline verified, grouped Android and device acceptance
 pending**. Adapter 271 extends the existing private text/static-image upload into
 temporary chats. It is not a released APK, a real temporary-file transaction, or

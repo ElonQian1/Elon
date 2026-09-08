@@ -2,6 +2,10 @@
 
 ## Status and scope
 
+Current checkpoint: [1591 temporary attachment](reports/chatgpt-library-scopes-1591.md)
+exposed a persisted-home state gap. State v4 adds guarded privacy observation;
+fixed-device acceptance and toggle-transport attribution remain pending.
+
 - Capability: `android_chatgpt_private_temporary_chat_state_v1`.
 - Status: implemented, source-only candidate; not `completed` or device accepted.
 - Contract version: 1. Production native temporary-chat selection invokes the
