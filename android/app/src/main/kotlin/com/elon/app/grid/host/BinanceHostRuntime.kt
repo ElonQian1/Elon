@@ -68,7 +68,13 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         val event = runCatching { StrictJson.parse(raw) }.getOrNull() ?: return fail("响应格式暂不支持")
         if (event["schema"] != "yilong.binance_observation.v1" || document.accept(event["token"] as? String ?: "") == null) return
         runCatching { state.accept(raw) }.onFailure { fail("未取得可验证的本人网格响应，请在官网打开网格列表") }
-            .onSuccess { status = if (state.ready) "已读取 ${state.count} 条网格；仅代表本次页面响应" else "币安响应暂不可用，请重新连接"; onChanged?.invoke() }
+            .onSuccess {
+                val label = when (state.accountKind) { "sub" -> "币安子账户"; "primary" -> "币安主账户"; else -> "当前币安账户" }
+                status = if (state.ready) "$label · 已读取 ${state.count} 条网格；仅代表本次页面响应"
+                    else if (state.account != null) "已确认$label，等待网格列表"
+                    else "币安响应暂不可用，请重新连接"
+                onChanged?.invoke()
+            }
     }
     fun read(token: String): String { require(live()); return state.reply(token) }
     fun refresh(token: String) {
@@ -79,7 +85,13 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     }
     fun detail(token: String, id: String) {
         require(live() && state.authorized(token) && state.contains(id))
-        view?.evaluateJavascript("window.__elonBinanceReadV1?.detail(${StrictJson.encode(id)})", null)
+        val page = view ?: error("HOST_MISSING")
+        val documentToken = document.ensurePage().documentToken
+        page.evaluateJavascript("window.__elonBinanceReadV1?.detail(${StrictJson.encode(id)})") { value ->
+            if (document.accept(documentToken) != null && live() && state.authorized(token) && value != "true") {
+                fail("详情连接尚未就绪，请重新连接币安")
+            }
+        }
     }
     fun revoke(token: String) { state.revoke(token) }
     fun fail(message: String) { state.unavailable(); status = message; onChanged?.invoke() }
