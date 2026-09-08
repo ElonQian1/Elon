@@ -1,7 +1,7 @@
 (function (root, capture) {
   'use strict';
   const observations = new WeakMap();
-  const api = Object.freeze({ version: 2,
+  const api = Object.freeze({ version: 3,
     capture(page, tools) {
       const record = code => {
         observations.set(page, { document: page.document, token: page.__elonChatGptDocumentToken, code });
@@ -25,7 +25,9 @@
     (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path') : null);
   const input = page.document.querySelector('#prompt-textarea');
   const context = page.__elonChatGptPrivateTextRuntimeSubmit?.captureConversation?.(input, true);
-  const node = page.document.querySelector('#composer-plus-btn');
+  // The menu trigger can replace the DOM id while retaining the official test id.
+  const node = page.document.querySelector('#composer-plus-btn') ||
+    page.document.querySelector('[data-testid="composer-plus-btn"]');
   if (!spec) return unavailable('runtime_unavailable');
   if (!context) return unavailable('conversation_unavailable');
   if (!node?.isConnected) return unavailable('composer_detached');

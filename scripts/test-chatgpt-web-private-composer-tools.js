@@ -181,6 +181,43 @@ test('production assembly loads tool context before its consumer', () => {
   assert.ok(catalog.indexOf('chatgpt_web_private_composer_tool_context.js') < catalog.indexOf('chatgpt_web_adapter_composer_tool_selection.js'));
 });
 
+function useMenuAssignedId(f) {
+  f.node.id = 'radix-fixture-trigger';
+  f.page.document.querySelector = selector =>
+    ['[data-testid="composer-plus-btn"]', '#prompt-textarea'].includes(selector) ? f.node : null;
+}
+
+test('menu-assigned DOM id preserves private tool selection through the official test id', async () => {
+  const f = fixture({ current: true }); useMenuAssignedId(f);
+  assert.equal(f.list(), true); await flush();
+  assert.equal(toolContext.state(f.page), 'ready');
+  f.pick(f.choice('web_search').id);
+  assert.equal(f.state.activeSystemHintType, 'search');
+  f.pick(f.choice('web_search').id);
+  assert.equal(f.state.activeSystemHintType, null);
+  assert.equal(f.fallbacks, 0);
+  assert.equal(f.timers.size, 0);
+});
+
+test('the same test-id anchor enforces the open official-menu guard', async () => {
+  const f = fixture({ current: true }); useMenuAssignedId(f);
+  f.expanded = true;
+  assert.equal(f.list(), false); await flush();
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.results.length, 0);
+});
+
+for (const invalid of ['detached', 'foreign owner']) {
+  test('test-id lookup still rejects ' + invalid, async () => {
+    const f = fixture({ current: true }); useMenuAssignedId(f);
+    if (invalid === 'detached') f.node.isConnected = false;
+    else f.ancestor.type = { name: 'Foreign' };
+    assert.equal(f.list(), false); await flush();
+    assert.equal(f.calls.length, 0);
+    assert.equal(f.results.length, 0);
+  });
+}
+
 for (const current of [false, true]) {
   test('guest search uses the current official store with image upsell excluded: ' + current, async () => {
     const f = fixture({ current });

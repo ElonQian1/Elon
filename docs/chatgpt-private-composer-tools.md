@@ -5,7 +5,8 @@
 - Capability: `android_chatgpt_private_composer_tools_state_v1`.
 - Status: implemented and shipped in APK 1561; device acceptance failed before
   selection. Not `completed`. The cache-context follow-up is installed in 1563;
-  its device acceptance awaits unlock. See [delivery evidence](reports/chatgpt-runtime-tools-20260908.md).
+  its unlocked device check identified `composer_detached` before selection.
+  See [delivery evidence](reports/chatgpt-runtime-tools-20260908.md).
 - Provider contract version: 2, using the shared versioned runtime bindings.
 - Production wiring: native Tools -> existing composer adapter -> official live
   tool signal. Search and Create Image use this path when its guards pass.
@@ -88,7 +89,16 @@ Follow-up Node contracts: 234 passed, zero failures/cancellations/skips in
 `runtime-tools-context-tests-20260908-20260908-114241-699`. Release compilation and
 7 selected Kotlin tests passed. APK 1563 is installed; its first check failed at
 activity binding before any tool action, and its next readiness check found the
-phone locked. The specific capture-stage cause is still unobserved.
+phone locked. No capture-stage cause was observed in those initial attempts.
+
+The subsequent unlocked 1563 check returned `composer_tool_context:composer_detached`.
+Context version 3 accepts the inspected `data-testid="composer-plus-btn"` when a
+menu trigger overrides the DOM id; the ordinary composer adapter already supported
+both anchors. The open-menu guard now reads that exact bound node too. Controller,
+committed owner, document and eligibility checks are unchanged. This is an anchor
+compatibility correction; its live pass still requires a new installed adapter.
+The six focused Node suites passed all 238 cases after this correction, including
+test-id-only anchors, expanded menus and detached/foreign-owner rejection.
 
 This is an in-page private runtime state bridge, **not** an independent Android
 HTTP sender. WebView is still needed for identity, that live state and official

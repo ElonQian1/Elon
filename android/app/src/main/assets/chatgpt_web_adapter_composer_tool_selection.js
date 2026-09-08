@@ -161,7 +161,7 @@
         if (namespaceDocument !== page.document || namespaceToken !== page.__elonChatGptDocumentToken) namespace = null;
         binding = capture();
         if (!binding || !loaded() || !namespace && Date.now() < cooldown ||
-            page.document.querySelector('#composer-plus-btn')?.getAttribute('aria-expanded') === 'true') return false;
+            binding.node.getAttribute('aria-expanded') === 'true') return false;
       } catch (_) { return false; }
       const request = { binding, result };
       pending = request;

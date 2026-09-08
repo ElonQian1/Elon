@@ -15,6 +15,8 @@ the accepted guest text/voice tests as a substitute for this missing evidence.
 | Follow-up offline contracts | 234 Node cases passed; 7 Release Kotlin tests passed with zero failures/errors/skips |
 | APK 1563 delivery | Release build, remote hash/size, publication and replacement installation passed |
 | APK 1563 acceptance | First attempt rejected before tool dispatch because MainActivity was not bound; after normal launch the readiness guard observed keyguard and stopped |
+| APK 1563 after unlock | `composer_tool_context:composer_detached`; tool listing failed before any selection |
+| Anchor follow-up | Context v3 accepts the official test id if the DOM id is overridden; 238 focused Node cases passed; device acceptance pending |
 
 Neither 1561 nor 1563 acceptance selected a tool, sent text, recorded audio,
 changed accounts, cleared application data or exported credentials. The 1561
@@ -50,6 +52,8 @@ Log stems in the Git common directory's `ai-command-logs`:
 - `runtime-tools-context-release-20260908-20260908-115452-659` (363.8 seconds)
 - `runtime-tools-1563-device-20260908-20260908-120147-994`
 - `runtime-tools-1563-ready-device-20260908-20260908-120448-642`
+- `runtime-tools-1563-unlocked-device-20260908-20260908-121651-221`
+- `runtime-tools-anchor-tests-20260908-20260908-122440-959`
 
 After the user is ready, use the existing native MCP on the trusted Xiaomi.
 Request `chatgpt_list_composer_options` with `section=tools` once; poll the exact
