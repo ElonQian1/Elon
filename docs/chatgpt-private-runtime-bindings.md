@@ -2,6 +2,11 @@
 
 ## Status
 
+Version 6 adds the observed September 9 build while retaining both earlier
+profiles. See [source mappings and verification boundary](reports/chatgpt-runtime-bindings-20260909.md).
+It repairs build admission, not proof that every consuming feature has passed
+new device acceptance.
+
 Capability: `android_chatgpt_private_runtime_bindings_v1`.
 Code: implemented and shipped in `1.1.1547`. Offline contracts and Release
 compilation passed. Personal share/create/list/revoke and disposable conversation

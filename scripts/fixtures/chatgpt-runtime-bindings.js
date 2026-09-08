@@ -18,7 +18,8 @@ const expectedExports = {
   composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC', Ng: 'Yg', Bg: 'n_' }
 };
 
-function attach(page, modules) {
+function attach(page, modules, profile = { files, expectedExports }) {
+  const { files, expectedExports } = profile;
   const loads = [];
   const observed = new Set(Object.values(files).map(name => CDN + name));
   observed.add(CDN + '2340486e-dyt4epctwx2pn2sj.js');

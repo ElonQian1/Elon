@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -28,15 +28,33 @@
       f8t: 'K8t', c0: 'T0', FVt: 'hHt', u1t: 'W1t', l1t: 'U1t', iin: 'Jin' },
     composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC', Ng: 'Yg', Bg: 'n_' }, react: {}
   };
+  const september9Exports = {
+    shared: { H3: 'L8', R5: 'N9', F5: 'A9', mq: 'UG', wV: 'eR', SV: 'QL', XM: 'SJ', HM: 'mJ',
+      'M$': 'D0', RW: 'QB', uo: 'ws', t4: 'X3', IX: 'LU', t6: 'X8', cX: 'Jq',
+      Fx: 'zS', Fl: 'Xu', v7: 'pet', $3: 'J8', Ur: 'Zi', zr: 'qi' },
+    conversation: { AGt: 'uKt', J5t: 'a9t', Nrn: 'ran', yRt: '$Rt', Grn: 'han',
+      vRt: 'QRt', p8t: 'w5t', l0: 'Z1', M1t: 's0t', Rdn: 'Fpn', Rrn: 'can',
+      win: 'Jan', Ein: 'Xan', ay: 'ty', iy: 'ey', ry: '$v', Jrn: 'van', Hrn: 'fan',
+      f8t: 'C5t', c0: 'X1', FVt: 'hHt', u1t: 'z1t', l1t: 'R1t', iin: 'Oan' },
+    composer: { Ih: '$h', t_: 'v_', AS: 'qS', VS: 'iC', Ng: 'Xg', Bg: 'r_' }, react: {}
+  };
   const profiles = [
     { id: 'web_20260906', anchor: 'c2675c8c-f6cd0ubcb7y7eluj.js', files: legacy,
+      tools: { owner: 'Whn' },
       temporary: { owner: 'AKt', action: '()=>{cg.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(gB.reset(c),qg()&&$p.delete(n),!o&&!$p(n)&&OKt(s),u(jKt,{replace:!0})):oD(l,{params:o?void 0:new URLSearchParams({[zm]:`true`})})}' } },
     { id: 'web_20260907', anchor: 'c2675c8c-kconnwitb9zzv81k.js',
       files: { shared: '4813494d-o593jrji51wy4azk.js',
         conversation: 'conversation-small-owrec55n6vm0ekcc.js',
         composer: '8b34dbc2-nhot65scqrg20d6p.js', react: legacy.react },
       exports: currentExports,
-      temporary: { owner: 'vqt', action: '()=>{No.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(SB.reset(c),_t()&&fh.delete(n),!o&&!fh(n)&&gqt(s),u(yqt,{replace:!0})):Dj(l,{params:o?void 0:new URLSearchParams({[xn]:`true`})})}' } }
+      tools: { owner: 'Kgn' },
+      temporary: { owner: 'vqt', action: '()=>{No.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(SB.reset(c),_t()&&fh.delete(n),!o&&!fh(n)&&gqt(s),u(yqt,{replace:!0})):Dj(l,{params:o?void 0:new URLSearchParams({[xn]:`true`})})}' } },
+    { id: 'web_20260909', anchor: 'c2675c8c-k2kd9yafbfvx5mjw.js',
+      files: { shared: '4813494d-e0hjx102gn5zjvdh.js',
+        conversation: 'conversation-small-fka464yvjn19vebr.js',
+        composer: '8b34dbc2-mx35vjavisrk7hwp.js', react: legacy.react },
+      exports: september9Exports, tools: { owner: 'V_n' },
+      temporary: { owner: 'SJt', action: '()=>{ym.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(dB.reset(c),a_()&&vp.delete(n),!o&&!vp(n)&&bJt(s),u(CJt,{replace:!0})):vx(l,{params:o?void 0:new URLSearchParams({[I_]:`true`})})}' } }
   ];
   const roles = Object.keys(legacy);
   let document, token, selected, error = '';
@@ -142,14 +160,14 @@
   function tools() {
     try {
       const p = profile();
-      return p ? Object.freeze({ owner: p.id === 'web_20260907' ? 'Kgn' : 'Whn' }) : null;
+      return p ? Object.freeze({ ...p.tools }) : null;
     } catch (_) { return null; }
   }
 
   function state() {
     const p = profile();
-    return { version: 5, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 6, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 5, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 6, observed, load, peek, temporary, tools, state });
 });
