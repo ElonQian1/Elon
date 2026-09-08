@@ -385,6 +385,19 @@
           }
         },
         {
+          "path": "docs/reports/android-binance-host-read-v1-20260908.md",
+          "content_hash": "5c584568f581cb790fa91189de690fac228be28a45e1e18c7d6384285cdc63d3",
+          "locator": "实测与离线验证",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ee145704cad8e2c20218f0a03ae0a6e760d10f08",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d4a995a1698ad1dfaf8624a96916981b422c12ff",
+            "state": "untracked"
+          }
+        },
+        {
           "path": "scripts/test-binance-grid-read-adapter.cjs",
           "content_hash": "d618aa0b4b33a52d755b16cf90ef29d8f663ef68990a616d0fdacf2d8a733a65",
           "locator": "",
@@ -405,7 +418,7 @@
         "expires_at_ms": 1788843562163
       },
       "created_at_ms": 1788829139503,
-      "updated_at_ms": 1788831010372
+      "updated_at_ms": 1788832595800
     },
     {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -23062,16 +23075,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_02740d8c23d948298a0da8acbff2d8d4",
-      "feature_id": "team-assets-public-preview-v1",
-      "action": "claimed",
-      "actor": "codex-team-assets",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788616523020
-    },
-    {
       "id": "feature_event_ab7529649d7d4506801fa03eca1dd834",
       "feature_id": "team-assets-public-preview-v1",
       "action": "transitioned",
@@ -25060,6 +25063,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788831010372
+    },
+    {
+      "id": "feature_event_cfe17a84eb9646628a8f6e8a1602d19f",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-host",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788832595800
     }
   ]
 }
