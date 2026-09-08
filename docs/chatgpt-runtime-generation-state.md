@@ -1,7 +1,8 @@
 # Runtime generation state
 
 Capability: `android_chatgpt_runtime_generation_state_v1`.
-Status: implemented, offline verified, not device accepted or completed.
+Status: implemented, offline verified, shipped in 1554. Production send/settle
+workflow passed; reader-path activation itself is not device-confirmed/completed.
 This is a read-only official-runtime state reader, not a new message transport.
 
 ## Problem and scope
@@ -60,7 +61,13 @@ text submission. New reader cases cover a matching completed leaf, absent
 request ID, active text/voice, unknown modules/enums, changed conversation/branch,
 mid-read ownership changes, pending writes and no repeated module import.
 
-Release compilation and a new production text sample are still required.
-This does not resolve `submission_not_ready` or accept private text POST. That
-separate readiness failure remains recorded in the runtime text capability.
-Google stays last, and the broader Goal remains active.
+Release compilation, package/source comparison and pinned Xiaomi replacement
+passed. Two consecutive production sends received the exact reply and settled
+in 6.473s and 4.308s. The specific reader branch has no live receipt, so these
+samples prove workflow behavior, not that this reader caused the improvement.
+See [1554 acceptance](reports/chatgpt-runtime-release-1554.md).
+
+Neither send accepted private text POST/runtime submission. The first retained
+`submission_not_ready`; the second reached `conversation_route_mismatch`.
+Those are separate pending runtime transaction issues. Google stays last, and
+the broader Goal remains active.
