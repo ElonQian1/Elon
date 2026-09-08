@@ -80,6 +80,9 @@ internal class BinanceHostState(private val elapsed: () -> Long, private val epo
     fun authorized(token: String) = Regex("[0-9a-f]{64}").matches(token) && remaining(token) > 0
     fun revoke(token: String) { grants.remove(token) }
     fun contains(id: String) = fresh() && rows.containsKey(id)
+    fun managementChoices(): List<Pair<String,String>> = if (!fresh()) emptyList() else rows.values.map {
+        (it["id"] as String) to "${it["symbol"]} · ${it["status"]} · ${it["id"]}"
+    }
     fun reply(token: String): String {
         require(authorized(token))
         return StrictJson.encode(mapOf("schema" to "yilong.binance_host_read.v1", "source" to "android_webview",

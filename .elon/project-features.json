@@ -347,27 +347,27 @@
       "implementation_evidence": [
         {
           "path": "android/app/src/main/AndroidManifest.xml",
-          "content_hash": "4edd9b2598a8e4c99c0971cfed505774681abdd23dfd6208ef27b9c922fcfd3d",
+          "content_hash": "58220016388b7a884f1352e55d07de254fd3ab8cf8cb88f0bf3da5baf6a5f2ba",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "42d055b668716133d2a49a09332e3fee40bc417d",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
             "head_blob_oid": "c981c9f4be7ae944882202f283e292e58b4eca2b",
-            "worktree_blob_oid": "c981c9f4be7ae944882202f283e292e58b4eca2b",
-            "state": "tracked_clean"
+            "worktree_blob_oid": "7ae9168bbf13eae03f7771ac1d3c260420a2484c",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "android/app/src/main/assets/binance_grid_create_adapter.js",
-          "content_hash": "f5dbc4abe93e66dc267e9ed52d5a23f834954dd0ba5717347339bca4a6bc8e7b",
+          "content_hash": "5ff01d934879470299dcba5bc4e5994352e5efaa05a0c8b668c29fd431c2126d",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "42d055b668716133d2a49a09332e3fee40bc417d",
-            "head_blob_oid": "aa006cb778f786422e9432f0afe19c5ea7264220",
-            "worktree_blob_oid": "ca1fb087b2d5178b02014689e88ee3c703508262",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "ca1fb087b2d5178b02014689e88ee3c703508262",
+            "worktree_blob_oid": "ace05d4952867fb4176dced09d60aa3bc0fbe04b",
             "state": "tracked_modified"
           }
         },
@@ -399,53 +399,53 @@
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateJournal.kt",
-          "content_hash": "9ad42b7512669eff5b67964be1d08963100daa767f1e1f80f587a99652ce8647",
+          "content_hash": "cdee48f40cf6491d8a184194e66f9ea45376d9bebd905f2fe08a17fefe0fd6ab",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "42d055b668716133d2a49a09332e3fee40bc417d",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
             "head_blob_oid": "a20648c7d581ed8cc796eae21332b736547a8a38",
-            "worktree_blob_oid": "a20648c7d581ed8cc796eae21332b736547a8a38",
-            "state": "tracked_clean"
+            "worktree_blob_oid": "d56218b6b60faf04f85ab2634ea396a80946ff57",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateSession.kt",
-          "content_hash": "90e8c7e27165a849630199a04c0075ddecbdf889a9ba1ff08ff089bd12e56ee0",
+          "content_hash": "d3e1499855546ffdae96c3cc5244ecab3c016405f1904d0349087f9b9f942f08",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "42d055b668716133d2a49a09332e3fee40bc417d",
-            "head_blob_oid": "1ea5a4d8c54301a4feec611fcb840206ac902960",
-            "worktree_blob_oid": "8af721e8a9ec7fac8837cc9d6d01364f765fa46f",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "8af721e8a9ec7fac8837cc9d6d01364f765fa46f",
+            "worktree_blob_oid": "a659e1935ea9a27559c77ad1b42a21505dc72987",
             "state": "tracked_modified"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateSlot.kt",
-          "content_hash": "586b289f88231ae98c250c04a3b922eda7bf6d520287c188a06dd51a2a8ac892",
+          "content_hash": "47a42c2c2df4d8f202801bd2e812bbe66d31cbe99fba2eb975888255356d17d5",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "42d055b668716133d2a49a09332e3fee40bc417d",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "c2545cfa3800d87553c1497846259c54bd94b863",
-            "state": "untracked"
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "c2545cfa3800d87553c1497846259c54bd94b863",
+            "worktree_blob_oid": "3dc054ef06b45426d382d7d4bb2df3e1f96bde5c",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceGridCreateActivity.kt",
-          "content_hash": "f8504d5399f887171275fe369a5b61f8474df5fb97b9f64e47cdcea704b6ab50",
+          "content_hash": "30c7e982992b7c42ab64f5b88f6e630f69cbf80fda03781619cbc33a7cea8176",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "42d055b668716133d2a49a09332e3fee40bc417d",
-            "head_blob_oid": "b729df862f281650a95e0eb612688c1212d23c29",
-            "worktree_blob_oid": "2b46935e6da3348e5f03845c6e6b7c3f14a8476e",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "2b46935e6da3348e5f03845c6e6b7c3f14a8476e",
+            "worktree_blob_oid": "0226e6c6a687ac1a3d5f030f4af6cc8f7ed887a2",
             "state": "tracked_modified"
           }
         },
@@ -542,20 +542,265 @@
         },
         {
           "path": "scripts/test-binance-grid-create.ps1",
-          "content_hash": "e4cf6b5dd72439d16bbd4ff2e7c8b47e712df62a81290c0d4657e182323a6981",
+          "content_hash": "a67107f15880335f7fef868640a3f5a96862dd38f5756700768996a0ba7734b7",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "42d055b668716133d2a49a09332e3fee40bc417d",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
             "head_blob_oid": "d4198fb0ce72e25d1731a3839a9a1ffcdb47d3fd",
-            "worktree_blob_oid": "d4198fb0ce72e25d1731a3839a9a1ffcdb47d3fd",
-            "state": "tracked_clean"
+            "worktree_blob_oid": "d3dc00c608bbbffa1174c2bb378c1a265c185e9c",
+            "state": "tracked_modified"
           }
         }
       ],
       "created_at_ms": 1788855780561,
-      "updated_at_ms": 1788859997404
+      "updated_at_ms": 1788861931729
+    },
+    {
+      "id": "android-binance-grid-manage-v1",
+      "title": "本人币安网格设置与结束",
+      "summary": "主APK托管策略选择、cps设置和独立结束确认；单次提交与未知恢复，真实操作仅用户测试。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/android-binance-grid-manage-v1.md",
+        "content_hash": "3550d95128d542bdf380e4b2b00f27ba6ed628ccdeea52e8cc5c9229e381f83a",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "6e8561d845bbea883878b1509d0f7d1d3bb90ed7",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex-binance-manage",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_create_adapter.js",
+        "android/app/src/main/kotlin/com/elon/app/grid/manage"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "同账号策略与快照核验；保留无关设置",
+        "单次提交、跨创建互斥和未知恢复",
+        "正式包与只读入口，真实写由用户测试"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/AndroidManifest.xml",
+          "content_hash": "58220016388b7a884f1352e55d07de254fd3ab8cf8cb88f0bf3da5baf6a5f2ba",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "c981c9f4be7ae944882202f283e292e58b4eca2b",
+            "worktree_blob_oid": "7ae9168bbf13eae03f7771ac1d3c260420a2484c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/binance_grid_create_adapter.js",
+          "content_hash": "5ff01d934879470299dcba5bc4e5994352e5efaa05a0c8b668c29fd431c2126d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "ca1fb087b2d5178b02014689e88ee3c703508262",
+            "worktree_blob_oid": "ace05d4952867fb4176dced09d60aa3bc0fbe04b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateJournal.kt",
+          "content_hash": "cdee48f40cf6491d8a184194e66f9ea45376d9bebd905f2fe08a17fefe0fd6ab",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "a20648c7d581ed8cc796eae21332b736547a8a38",
+            "worktree_blob_oid": "d56218b6b60faf04f85ab2634ea396a80946ff57",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateSession.kt",
+          "content_hash": "d3e1499855546ffdae96c3cc5244ecab3c016405f1904d0349087f9b9f942f08",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "8af721e8a9ec7fac8837cc9d6d01364f765fa46f",
+            "worktree_blob_oid": "a659e1935ea9a27559c77ad1b42a21505dc72987",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateSlot.kt",
+          "content_hash": "47a42c2c2df4d8f202801bd2e812bbe66d31cbe99fba2eb975888255356d17d5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "c2545cfa3800d87553c1497846259c54bd94b863",
+            "worktree_blob_oid": "3dc054ef06b45426d382d7d4bb2df3e1f96bde5c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceDispatchAck.kt",
+          "content_hash": "865790ccbae44665d0a3d2e7aa9f1414b291eafb09ca9f048e2dacf67abfde35",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "dea898352d53c946b9fada9b375a6509140c1906",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceGridCreateActivity.kt",
+          "content_hash": "30c7e982992b7c42ab64f5b88f6e630f69cbf80fda03781619cbc33a7cea8176",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "2b46935e6da3348e5f03845c6e6b7c3f14a8476e",
+            "worktree_blob_oid": "0226e6c6a687ac1a3d5f030f4af6cc8f7ed887a2",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostState.kt",
+          "content_hash": "5cdac10c1cbf4f21626edef4617c064f8648b14747d3f9522d4a6de14d6ff18b",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "aacdea9960d352922d3b215a3636cae08a7e9562",
+            "worktree_blob_oid": "e4fbc6c16323e679e87ec65e911d92883fbf25fb",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceGridManageActivity.kt",
+          "content_hash": "4108dd32e3af6dfef2b28a4f1baa3a873d56f0b6b86e75d1836e16fac467226f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c8097195b247278876a7fd7ae226751936fedfea",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageForm.kt",
+          "content_hash": "6a74b517ccefe3071339b45fe39003111403e610c16a983f60cb20affa288dc0",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b59fc9777fbf9dbf5318a5f00e8cbbcefa13d5bb",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageSession.kt",
+          "content_hash": "69e2579a2cf6578119d724b12cfe835ff925c9782faa9a14583421da5bc4d543",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8074d1e5a80e99757161170f2ffc9d78231709d8",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageState.kt",
+          "content_hash": "956590a484b36131cf9a2b8c40c106744f4fc6f00ee46931e436c1aee7f9981e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "11e2c8cede960808b92d2e856291f83e782fb71a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/manage/BinanceManageStateTest.kt",
+          "content_hash": "ec4c26376f2334497c3b3f7b9561c6fa3641fc78fb27d3b69e7c0d66c691a5d1",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f69a18aab4ef2c3fe61e6f33fb13b1da80f887df",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/reports/android-binance-grid-manage-v1-20260908.md",
+          "content_hash": "dce65ad2706079c2cfb45779435e32947aeb9d9d0dcfb88c1a6087d03eaa32d8",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6ca8c187bcb92ae98a754d047ec97364ae42f3dd",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-create.ps1",
+          "content_hash": "a67107f15880335f7fef868640a3f5a96862dd38f5756700768996a0ba7734b7",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "d4198fb0ce72e25d1731a3839a9a1ffcdb47d3fd",
+            "worktree_blob_oid": "d3dc00c608bbbffa1174c2bb378c1a265c185e9c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-manage-adapter.cjs",
+          "content_hash": "856a29ff6d2afebd0330c456f4c7c96abc10531ce0fdbe2e038ecbc85d08a74a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1b912e7710e780fa44123afaedd54b1932f4d72f",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788860425100,
+      "updated_at_ms": 1788861887151
     },
     {
       "id": "android-binance-host-read-v1",
@@ -23450,66 +23695,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b46094ae33b349adbf3958596552771d",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "metadata_updated",
-      "actor": "codex-sui-ci",
-      "reason": "Include the allocation evidence schema and distinguish permitted fixed GitHub dependency traffic from forbidden Sui RPC access.",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1788648185568
-    },
-    {
-      "id": "feature_event_4828dc9e6c3b4653978fd4b15d89188e",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Reviewed corrected evidence semantics, Sui-RPC boundary, and allocation schema ownership.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788648200190
-    },
-    {
-      "id": "feature_event_886cf621aa7c49ba9dbab62765cf07c9",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Corrected scope is dependency-complete and remains offline from Sui RPC, wallets, signing, broadcast, and funds.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788648200814
-    },
-    {
-      "id": "feature_event_c85138792c054540a1e20767af21b203",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "claimed",
-      "actor": "codex-sui-ci",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788648201422
-    },
-    {
-      "id": "feature_event_f608ea6a63064026b82365a7ac5cb313",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Implement the corrected canonical receipt schema and precise Sui-RPC boundary.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788648210084
-    },
-    {
-      "id": "feature_event_27be9693a8864ab694fc61b00305d8f4",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "claim_released",
-      "actor": "codex-sui-ci",
-      "reason": "Temporarily release the CI claim to refresh drifted prerequisite evidence without overlapping ownership.",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1788648495980
-    },
-    {
       "id": "feature_event_009dac60c8c442c9bd0a138aead57bec",
       "feature_id": "esk-sui-genesis-foundation-v1",
       "action": "transitioned",
@@ -25448,6 +25633,66 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1788859997404
+    },
+    {
+      "id": "feature_event_9d0e9aa0de4e4762b11c24a6a06c15db",
+      "feature_id": "android-binance-grid-manage-v1",
+      "action": "registered",
+      "actor": "codex-binance-manage",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788860425100
+    },
+    {
+      "id": "feature_event_2e14e1f1dbdc4afa93da46100376676d",
+      "feature_id": "android-binance-grid-manage-v1",
+      "action": "claimed",
+      "actor": "codex-binance-manage",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788860425193
+    },
+    {
+      "id": "feature_event_c66d5042e2864c7b89debe89c4c02cfd",
+      "feature_id": "android-binance-grid-manage-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-manage",
+      "reason": "按已接受本人管理需求实现",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788860425235
+    },
+    {
+      "id": "feature_event_e076add612b74b26a5f8b1befc7860b7",
+      "feature_id": "android-binance-grid-manage-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-manage",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788861887091
+    },
+    {
+      "id": "feature_event_d69c2e66693b4a08a83581f6b9bba98e",
+      "feature_id": "android-binance-grid-manage-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-manage",
+      "reason": "35项原生、管理与创建适配器及旧只读回归通过；真实写仍由本人测试",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788861887151
+    },
+    {
+      "id": "feature_event_1d7062d4225e4f4cb84cb483968a34e0",
+      "feature_id": "android-binance-grid-create-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-create",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788861931729
     }
   ]
 }

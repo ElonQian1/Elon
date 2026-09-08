@@ -20,6 +20,7 @@ class BinanceGridCreateActivity : Activity() {
     private val attempt = BinanceCreateAttempt(SystemClock::elapsedRealtime)
     private var nonce = ""
     private var recoveryBlocked = false
+    private var managementPending = false
     private var recordResolved = false
     private var ready = false
     private var ownsSlot = false
@@ -43,6 +44,7 @@ class BinanceGridCreateActivity : Activity() {
         if (!slot.acquire(this)) return finish()
         ownsSlot = true
         runCatching { journal.read()?.let(attempt::restore) }.onFailure { recoveryBlocked = true }
+        managementPending = runCatching { BinanceCreateJournal(this,"binance-manage-attempt-v1.json").read() != null }.getOrDefault(true)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20,20,20,12) }
         root.addView(label("创建本人币安 U 本位网格",21f))
         status = label("正在连接本人币安",15f); root.addView(status)
@@ -107,13 +109,14 @@ class BinanceGridCreateActivity : Activity() {
         val kind = when (runtime?.state?.accountKind) { "sub" -> "币安子账户"; "primary" -> "币安主账户"; else -> "币安账户尚未确认" }
         val fingerprint = runtime?.state?.account?.takeLast(6)?.let { " · 本机账号标记 $it" } ?: ""
         status.text = "$kind$fingerprint\n${runtime?.status ?: "请连接官网"}\n${session?.message ?: "请先确认登录"}"
-        val blocked = recoveryBlocked || attempt.unresolved
+        val blocked = recoveryBlocked || attempt.unresolved || managementPending
         form.root.visibility = if (blocked) View.GONE else View.VISIBLE
         check.isEnabled = !blocked && session?.busy == false && runtime?.state?.fresh() == true
         confirmed.visibility = if (attempt.status == "prepared") View.VISIBLE else View.GONE
         submit.visibility = confirmed.visibility
         submit.isEnabled = !recoveryBlocked && confirmed.isChecked && session?.canSubmit() == true
         summary.text = when {
+            managementPending -> "存在尚未核对的管理操作，请返回量化并进入管理网格，先核对本机记录。"
             recoveryBlocked -> "上次本机记录未能恢复，请先到官网核对。不会自动重发。"
             attempt.status == "prepared" -> attempt.draft!!.summary() + "\n动态挂单：${if (attempt.draft!!.input.getValue("count").toInt() > attempt.windowCount) "启用" else "未启用"}"
             attempt.unresolved && !same -> "存在需要核对的创建记录。请先连接原币安账号；不会在新账号重新提交。"
@@ -122,7 +125,7 @@ class BinanceGridCreateActivity : Activity() {
         }
         detail.visibility = if (same && attempt.strategyId.isNotEmpty()) View.VISIBLE else View.GONE
         detail.isEnabled = session?.busy == false
-        resolved.visibility = if (blocked && attempt.status != "submitting") View.VISIBLE else View.GONE
+        resolved.visibility = if (blocked && !managementPending && attempt.status != "submitting") View.VISIBLE else View.GONE
         resolved.isEnabled = recoveryBlocked || same
     }
     private fun statusLabel() = when (attempt.status) {
@@ -149,7 +152,7 @@ class BinanceGridCreateActivity : Activity() {
     }
     @Deprecated("Deprecated in Java") override fun onBackPressed() = returnResult()
     override fun onResume() { super.onResume(); if (ready) render() }
-    override fun onPause() { if (ready && attempt.status == "prepared") { session?.cancelPreparation(); confirmed.isChecked = false }; super.onPause() }
+    override fun onPause() { if (ready && attempt.status != "submitting") { session?.cancelPreparation(); confirmed.isChecked = false }; super.onPause() }
     override fun onNewIntent(intent: Intent?) { super.onNewIntent(intent); returnResult() }
     override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); outState.clear() }
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
@@ -168,5 +171,5 @@ class BinanceGridCreateActivity : Activity() {
     private fun button(value: String, id: String, action: () -> Unit) = Button(this).apply {
         text = value; contentDescription = id; isSaveEnabled = false; filterTouchesWhenObscured = true; setOnClickListener { action() }
     }
-    companion object { private val slot = BinanceCreateSlot() }
+    companion object { private val slot = BinanceCreateSlot.shared }
 }

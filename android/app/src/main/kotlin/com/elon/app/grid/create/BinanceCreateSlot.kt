@@ -7,4 +7,5 @@ internal class BinanceCreateSlot {
     private val owner = AtomicReference<Any?>(null)
     fun acquire(candidate: Any) = owner.compareAndSet(null,candidate)
     fun release(candidate: Any) { owner.compareAndSet(candidate,null) }
+    companion object { val shared = BinanceCreateSlot() }
 }

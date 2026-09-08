@@ -25,7 +25,7 @@ internal class BinanceCreateSession(private val host: BinanceHostRuntime, val at
         pending = draft; busy = true; message = "正在检查当前账号和币安配置，尚未下单。"; changed()
         val thisId = id
         evaluate("prepare", listOf(token, id, expectedAccount, draft.payload())) { accepted ->
-            if (!accepted && id == thisId && busy) { busy = false; pending = null; message = "请打开官网等待网格响应，再检查参数。"; changed() }
+            if (accepted != true && id == thisId && busy) { busy = false; pending = null; message = "请打开官网等待网格响应，再检查参数。"; changed() }
         }
         host.handler.postDelayed({ if (!closed && thisId == id && pending != null) {
             cancelPreparation(); message = "检查超时，未提交交易；请检查官网连接。"; changed()
@@ -38,8 +38,11 @@ internal class BinanceCreateSession(private val host: BinanceHostRuntime, val at
         if (!persist()) { attempt.notSent("journal_unavailable"); error("无法记录本机提交状态，未发送请求") }
         busy = true; message = "正在提交本次创建；请勿重复操作。"; changed()
         evaluate("submit", listOf(token,id)) { accepted ->
-            if (!accepted && attempt.status == "submitting") {
-                attempt.notSent("bridge_not_ready"); busy = false; persist(); message = "页面未接受提交，请重新检查。"; changed()
+            if (accepted != true && attempt.status == "submitting") {
+                if (accepted == false) attempt.notSent("bridge_not_ready") else attempt.unknown()
+                busy = false; persist()
+                message = if (accepted == false) "页面未接受提交，请重新检查。" else "网页未返回明确提交回执，请先在官网核对；不会重发。"
+                changed()
             }
         }
         host.handler.postDelayed({ if (!closed && attempt.status == "submitting") {
@@ -51,7 +54,7 @@ internal class BinanceCreateSession(private val host: BinanceHostRuntime, val at
         token = host.document.snapshot().documentToken
         busy = true; message = "正在查询刚创建的策略。"; changed()
         evaluate("detail", listOf(token,id,attempt.account,attempt.strategyId)) { accepted ->
-            if (!accepted) { busy = false; message = "查询连接尚未就绪，请打开官网后重试。"; changed() }
+            if (accepted != true) { busy = false; message = "查询连接尚未就绪，请打开官网后重试。"; changed() }
         }
         host.handler.postDelayed({ if (!closed && busy && attempt.status != "submitting") {
             busy = false; message = "详情查询尚未完成，可重新查询；不会重新创建。"; changed()
@@ -117,10 +120,12 @@ internal class BinanceCreateSession(private val host: BinanceHostRuntime, val at
     }
     fun close() { cancelPreparation(); attempt.unknown(); persist(); closed = true }
     private fun safe(value: Any?): String = (value as? String)?.takeIf { Regex("[A-Za-z0-9_-]{1,64}").matches(it) } ?: "response_unrecognized"
-    private fun evaluate(action: String, values: List<Any>, callback: (Boolean) -> Unit) {
+    private fun evaluate(action: String, values: List<Any>, callback: (Boolean?) -> Unit) {
         val args = values.joinToString(",") { StrictJson.encode(it) }
         val view = host.view
         if (view == null) { callback(false); return }
-        view.evaluateJavascript("window.__elonBinanceCreateV1?.$action($args)") { if (!closed) callback(it == "true") }
+        view.evaluateJavascript("(()=>{const a=window.__elonBinanceCreateV1;return typeof a?.$action==='function'?a.$action($args):false})()") {
+            if (!closed) callback(binanceDispatchStarted(it))
+        }
     }
 }

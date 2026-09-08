@@ -7,13 +7,16 @@
   const INFO = '/bapi/accounts/v1/private/account/get-user-base-info';
   const COEF = '/bapi/futures/v1/public/future/common/grid/coef';
   const DETAIL = '/bapi/futures/v1/private/future/grid/query-grid-detail';
+  const UPDATE = '/bapi/futures/v1/private/future/grid/update-grid';
+  const CLOSE = '/bapi/futures/v1/private/future/grid/close-grid';
   const fetch = window.fetch;
   let context = null, contextAt = 0, prepared = null, sequence = 0, activeSend = null;
   const consumed = new Set();
   const validId = v => typeof v === 'string' && /^[0-9]{1,20}$/.test(v);
   const scalarId = v => validId(v) ? v : Number.isSafeInteger(v) && v >= 0 ? String(v) : null;
   const safeCode = v => ['response_unrecognized','account_unverified','account_changed','configuration_unavailable',
-    'session_context_expired','configuration_changed','detail_unverified','cancelled_before_send'].includes(v) ? v : 'network_unavailable';
+    'session_context_expired','configuration_changed','detail_unverified','cancelled_before_send',
+    'settings_changed','settings_unavailable','not_working','no_change','close_mode_changed'].includes(v) ? v : 'network_unavailable';
   const businessCode = v => typeof v === 'string' && (/^[0-9]{1,12}$/.test(v) || v === 'symbolInTwap') ? v : 'business_rejected';
   function keys(v, expected) {
     return v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).sort().join(',') === expected.sort().join(',');
@@ -33,7 +36,7 @@
     return /^doc_[a-z0-9_]{3,80}$/.test(token) && /^[a-f0-9]{32}$/.test(id) && /^[a-f0-9]{64}$/.test(account);
   }
   function emit(p, kind, values = {}) {
-    window.ElonBinanceCreate?.postMessage(JSON.stringify({schema:'yilong.binance_create_event.v1',
+    window.ElonBinanceCreate?.postMessage(JSON.stringify({schema:p.mode === 'manage' ? 'yilong.binance_manage_event.v1' : 'yilong.binance_create_event.v1',
       token:p.token, attempt:p.id, kind, ...values}));
   }
   function capture(url, method, headers) {
@@ -101,7 +104,7 @@
   }
   window.__elonBinanceCreateV1 = Object.freeze({
     prepare(token,id,account,payload) {
-      if(!scope(token,id,account) || !validPayload(payload) || consumed.has(id) || consumed.size >= 16 || !context) return false;
+      if(!scope(token,id,account) || !validPayload(payload) || consumed.has(id) || consumed.size >= 16 || !context || activeSend) return false;
       const p = {token,id,account,payload:JSON.parse(JSON.stringify(payload)),seq:++sequence,expires:0};
       prepared = null;
       (async () => {
@@ -117,7 +120,7 @@
     cancel() { sequence++; prepared = null; if(activeSend) activeSend.cancelled = true; },
     submit(token,id) {
       const p = prepared;
-      if(!p || p.token !== token || p.id !== id || consumed.has(id) || Date.now() >= p.expires) return false;
+      if(!p || p.mode || p.token !== token || p.id !== id || consumed.has(id) || Date.now() >= p.expires) return false;
       consumed.add(id); prepared = null; sequence++;
       activeSend = p;
       (async () => {
@@ -157,6 +160,70 @@
           emit(p,'detail',{strategy_id:strategyId,provider_status:d.strategyStatus});
         } catch(e) { emit(p,'detail_failed',{code:safeCode(e?.message)}); }
       })();
+      return true;
+    }
+  });
+  // Management shares the observed request context, one prepared slot and consumed IDs with creation.
+  // Only exact, already observed contracts are supported; no update-then-close chain exists.
+  function manageId(id) { return validId(id) && /^[1-9][0-9]*$/.test(id) && Number.isSafeInteger(Number(id)); }
+  async function managementSnapshot(p,h) {
+    const uid = await identity(p.account,h);
+    const v = await request(DETAIL+'?strategyId='+encodeURIComponent(p.strategy),h), d = v.data;
+    await identity(p.account,h);
+    if(v.code !== '000000' || v.success !== true || scalarId(d?.strategyId) !== p.strategy ||
+      (d.rootUserId != null && scalarId(d.rootUserId) !== uid) ||
+      typeof d.symbol !== 'string' || !/^[A-Z0-9]{1,24}USDT$/.test(d.symbol) ||
+      typeof d.strategyStatus !== 'string' || !/^[A-Z][A-Z0-9_]{0,63}$/.test(d.strategyStatus)) throw Error('detail_unverified');
+    const flags=['cps','cos','sharing','trailingStopLowerLimit','trailingStopUpperLimit'];
+    if(flags.some(k=>typeof d[k] !== 'boolean')) throw Error('settings_unavailable');
+    return {strategy_id:p.strategy,symbol:d.symbol,provider_status:d.strategyStatus,
+      ...Object.fromEntries(flags.map(k=>[k,d[k]]))};
+  }
+  window.__elonBinanceManageV1 = Object.freeze({
+    inspect(token,id,account,strategy) {
+      if(!scope(token,id,account) || !manageId(strategy) || !context || activeSend) return false;
+      const p={mode:'manage',token,id,account,strategy,seq:++sequence}; prepared=null;
+      (async()=>{try {
+        const snapshot=await managementSnapshot(p,headers());
+        if(p.seq===sequence) emit(p,'detail',{snapshot});
+      }catch(e){if(p.seq===sequence) emit(p,'read_failed',{code:safeCode(e?.message)});}})();
+      return true;
+    },
+    prepare(token,id,account,strategy,action,cps) {
+      if(!scope(token,id,account) || !manageId(strategy) || !['settings','close'].includes(action) ||
+        typeof cps !== 'boolean' || !context || activeSend || consumed.has(id) || consumed.size>=16) return false;
+      const p={mode:'manage',token,id,account,strategy,action,cps,seq:++sequence}; prepared=null;
+      (async()=>{try {
+        const snapshot=await managementSnapshot(p,headers());
+        if(snapshot.provider_status!=='WORKING') throw Error('not_working');
+        if(action==='settings' && snapshot.cps===cps) throw Error('no_change');
+        if(action==='close' && snapshot.cps!==cps) throw Error('close_mode_changed');
+        if(p.seq!==sequence) return;
+        p.snapshot=snapshot;p.expires=Date.now()+60000;prepared=p;
+        emit(p,'prepared',{snapshot,action,cps});
+      }catch(e){if(p.seq===sequence) emit(p,'prepare_failed',{code:safeCode(e?.message)});}})();
+      return true;
+    },
+    cancel() { window.__elonBinanceCreateV1.cancel(); },
+    submit(token,id) {
+      const p=prepared;
+      if(!p || p.mode!=='manage' || p.token!==token || p.id!==id || consumed.has(id) || activeSend || Date.now()>=p.expires) return false;
+      consumed.add(id);prepared=null;sequence++;activeSend=p;
+      (async()=>{let dispatched=false;try {
+        const h=headers(), latest=await managementSnapshot(p,h);
+        if(JSON.stringify(latest)!==JSON.stringify(p.snapshot)) throw Error('settings_changed');
+        if(p.cancelled) throw Error('cancelled_before_send');
+        const body=p.action==='close' ? {strategyId:Number(p.strategy)} : {strategyId:Number(p.strategy),
+          symbol:latest.symbol,cps:p.cps,sharing:latest.sharing,
+          trailingStopLowerLimit:latest.trailingStopLowerLimit,trailingStopUpperLimit:latest.trailingStopUpperLimit};
+        dispatched=true;
+        const v=await request(p.action==='close'?CLOSE:UPDATE,h,body),d=v.data;
+        if(v.success===false && typeof v.code==='string' && v.code!=='000000') {emit(p,'rejected',{code:businessCode(v.code)});return;}
+        if(v.code!=='000000' || v.success!==true || scalarId(d?.strategyId)!==p.strategy ||
+          d.updateStatus!=='SUCCESS' || typeof d.strategyStatus!=='string' || !/^[A-Z][A-Z0-9_]{0,63}$/.test(d.strategyStatus)) throw Error('response_unrecognized');
+        emit(p,'accepted',{strategy_id:p.strategy,provider_status:d.strategyStatus});
+      }catch(e){emit(p,dispatched?'unknown':'not_sent',{code:safeCode(e?.message)});}
+      finally{if(activeSend===p)activeSend=null;}})();
       return true;
     }
   });
