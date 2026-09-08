@@ -4,7 +4,8 @@
 
 - Capability: `android_chatgpt_private_composer_tools_state_v1`.
 - Status: implemented and shipped in APK 1561; device acceptance failed before
-  selection. Not `completed`. The cache-context correction below is a follow-up.
+  selection. Not `completed`. The cache-context follow-up is installed in 1563;
+  its device acceptance awaits unlock. See [delivery evidence](reports/chatgpt-runtime-tools-20260908.md).
 - Provider contract version: 2, using the shared versioned runtime bindings.
 - Production wiring: native Tools -> existing composer adapter -> official live
   tool signal. Search and Create Image use this path when its guards pass.
@@ -84,8 +85,10 @@ Logs: `runtime-tools-1561-device-20260908-20260908-111851-875` (initial failure)
 `runtime-tools-1561-ledger-20260908-20260908-113116-629` (public assets), and
 `runtime-tools-1561-terminal-20260908-20260908-113427-566` (terminal failure).
 Follow-up Node contracts: 234 passed, zero failures/cancellations/skips in
-`runtime-tools-context-tests-20260908-20260908-114241-699`. Native compilation and
-device verification of that follow-up are recorded separately.
+`runtime-tools-context-tests-20260908-20260908-114241-699`. Release compilation and
+7 selected Kotlin tests passed. APK 1563 is installed; its first check failed at
+activity binding before any tool action, and its next readiness check found the
+phone locked. The specific capture-stage cause is still unobserved.
 
 This is an in-page private runtime state bridge, **not** an independent Android
 HTTP sender. WebView is still needed for identity, that live state and official
