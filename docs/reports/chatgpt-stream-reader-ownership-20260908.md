@@ -43,6 +43,16 @@ without a device measurement. Adapter target is 305.
 - `stream-reader-owner-verified-20260908`: 56 Node runner cases pass, with zero
   failures, cancellations or skips. Source-size and whitespace guards pass.
   This is targeted coverage, not a full Android or device pass.
-- Release results are recorded after the publisher completes.
+- Release v1.1.1569 (1569), adapter 305, published from `6cb2245ba`.
+  `stream-reader-release-20260908` passed in 459.8 seconds; Gradle reported
+  `BUILD SUCCESSFUL in 6m 53s`. APK SHA-256:
+  `745e339dd993f9797834f59701f41cf046441a6411b1608690626212172cd597`.
+  Publisher reported `APK_ADB_DEPLOY_STATUS=updated`; an independent package
+  readback confirmed versionName 1.1.1569 and versionCode 1569 on the trusted
+  Xiaomi. No Cookie or application-data clearing was performed.
+- Post-install readiness returned `user_action_required` / `unlock_device`.
+  No synthetic message, stop command or microphone operation was issued while
+  the phone was locked. The next acceptance remains the production stop receipt,
+  retained partial reply and successful subsequent send from the linked report.
 - Installation and offline success do not close the pending production stop
   receipt, partial-text continuity and subsequent-send acceptance gate.
