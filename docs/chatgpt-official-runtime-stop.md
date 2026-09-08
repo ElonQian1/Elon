@@ -2,11 +2,11 @@
 
 Capability: `android_chatgpt_official_runtime_stop_generation_v1`.
 Status: source implemented and offline verified, not device accepted or
-completed. Stop runtime v6 and page probe v16 are installed in APK 1574.
-The guest device run still reports `request_unavailable` and uses DOM fallback;
-the owner diagnostic was rejected by a missing native mode gate before the
-follow-up could run. APK 1570 remains the latest complete follow-up failure.
-The source correction to that diagnostic gate is described below.
+completed. Latest source is stop runtime v7. Installed APK 1575 includes stop
+v6, page probe v16 and the corrected native diagnostic gate. Its guest device
+run reports a cached streaming tree with an invalid request shape, uses DOM
+fallback, and still fails follow-up isolation. The source correction to request
+shape validation is described below; it is not yet device accepted.
 Earlier adapter 304 added
 disabled-composer lookup and partial-reply retention; see
 [the earlier correction](reports/chatgpt-stop-interruption-20260908.md). This is a
@@ -76,6 +76,41 @@ Navigation, changed identity or an already claimed duplicate cannot click a
 different stop button. The complete official-page route remains available.
 
 ## Verification and remaining work
+
+### Composite official request IDs, 2026-09-08
+
+APK 1575 (source `72be1524bc62bcac486ec53cca375875e1b2439b`, SHA-256
+`10dac1fb35784d30fdc73a809d4ce666f96b9f72c1553ae9cdf00aa4b214e18b`)
+was published and installed with `-r`. The native owner diagnostic now works.
+The complete guest run reports `cached=true`, `tree=true`, `mode=streaming`,
+`request=invalid` and `generation=false`. Stopping preserves the partial answer
+(139 characters before, 199 after), but uses DOM fallback. Follow-up produces
+one combined user row and one replacement assistant row in both native and
+web projections. Official and native drafts are empty throughout, excluding a
+leftover editor draft as the source of concatenation. The original empty view
+and awake setting were restored. Evidence:
+`stopped-turn-device-1575-20260908-191321-479`.
+
+The current public composer `8b34dbc2-nhot65scqrg20d6p.js` has SHA-256
+`36644eb82aac9c399bce384c18140f8c878dd780c8f787440b80f27971729733`.
+Both ordinary submission and resume build a request ID from the `request-`
+prefix, the opaque client-thread key, and a counter. The composer imports that
+counter as `Jte`; shared export `fN` resolves to `o$e`, which increments `b$e`.
+The shared source hash is recorded in `chatgpt-private-runtime-bindings.md`.
+The former message-ID character/length restriction is not this request contract.
+
+Runtime v7 accepts that composite form up to 512 characters and rejects control
+characters or a missing numeric suffix. Previously accepted simple IDs remain
+supported. Server, message and turn-ID validation is unchanged. The exact live
+request is still pinned through context, subscription and invocation; replacing
+it cannot stop a successor. Only observed official cleanup permits the next send.
+The request remains inside the page and is neither logged nor copied into an
+independent HTTP request. This narrow compatibility fix still needs a device run.
+
+Four composite dispatch cases and successor coverage failed against v6. The
+focused stop/ownership/diagnostic suite passes 129 cases with no skips after the
+change, including control-character, size and non-protocol rejection. Evidence:
+`stop-composite-request-green-20260908-192051-494`.
 
 ### Grouped release, 2026-09-08
 

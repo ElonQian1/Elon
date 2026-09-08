@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const old = root.__elonChatGptPrivateStopRuntime;
@@ -18,6 +18,10 @@
   let modules, loading, active = null, code = 'not_observed';
   let diagnosticToken, lastDiagnostic;
   const validId = value => typeof value === 'string' && /^[a-z0-9_-]{1,128}$/i.test(value);
+  // Official request IDs interpolate an opaque client-thread key and counter;
+  // the thread component is not restricted to message/server ID characters.
+  const validRequestId = value => validId(value) || typeof value === 'string' && value.length <= 512 &&
+    !/[\u0000-\u001f\u007f]/.test(value) && /^request-.+-[0-9]{1,16}$/.test(value);
   const emptyDiagnostic = () => ({ cached: false, request: 'missing', tree: false,
     generation: false, mode: 'unknown' });
 
@@ -49,7 +53,7 @@
     const status = shared.Fx?.(binding.conversation);
     const scope = requestId == null ? generation(shared, binding, tree, status) : null;
     if (report) lastDiagnostic = { cached: true, request: requestId == null ? 'missing' :
-      validId(requestId) ? 'valid' : 'invalid', tree: !!tree, generation: !!scope,
+      validRequestId(requestId) ? 'valid' : 'invalid', tree: !!tree, generation: !!scope,
       mode: typeof shared.Fx !== 'function' ? 'unknown' : status == null ? 'idle' :
         ({ 3: 'streaming', 4: 'unread', 5: 'voice', 6: 'voice', 7: 'voice' })[status.value] || 'unknown' };
     return { ...binding, requestId, generation: scope };
@@ -141,7 +145,7 @@
         code = 'voice_active';
         return { handled: true, completion: Promise.resolve({ status: 'rejected', code }) };
       }
-      if (!validId(binding.requestId) && !(binding.requestId == null &&
+      if (!validRequestId(binding.requestId) && !(binding.requestId == null &&
           binding.generation?.status?.value === 3)) return decline('request_unavailable');
       if (!Object.values(URLS).every(url => page.__elonChatGptPrivateRuntimeBindings
             ? page.__elonChatGptPrivateRuntimeBindings.observed(url) :
@@ -243,5 +247,5 @@
     return owner.transaction;
   }
 
-  return Object.freeze({ version: 6, stop, state, diagnostics });
+  return Object.freeze({ version: 7, stop, state, diagnostics });
 });
