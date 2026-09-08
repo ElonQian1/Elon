@@ -464,15 +464,15 @@
         },
         {
           "path": "docs/reports/android-binance-host-context-v1-20260908.md",
-          "content_hash": "b7d3fe2d7483efb9ba269dfa5b89653ca7cdbe47530e85fddd83b79df8b996fd",
+          "content_hash": "137c5568cfa5c56e843570c6d2ff97f20ee35410ce5579b63a21858bc3526aad",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d4e2e9b0a5b315299c95119a4f3dd387ca01784e",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "1425b6f559249970b4f9a5b5ae1a3868a9c0107b",
-            "state": "untracked"
+            "head_commit": "8d300d0edd701eb1414404c3ba17839c407fd422",
+            "head_blob_oid": "1425b6f559249970b4f9a5b5ae1a3868a9c0107b",
+            "worktree_blob_oid": "f95cec460b2ab28331c0b5c1997dd80965b5c447",
+            "state": "tracked_modified"
           }
         },
         {
@@ -548,7 +548,7 @@
         "expires_at_ms": 1788850222988
       },
       "created_at_ms": 1788829139503,
-      "updated_at_ms": 1788843049916
+      "updated_at_ms": 1788844625711
     },
     {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -23205,16 +23205,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_64242c662b6c4b38b7d95006d2fdf102",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "metadata_updated",
-      "actor": "codex-sui-ci",
-      "reason": "真实可复现构建发现旧 build evidence 在 Move test 后取样，实际绑定了 test_mode 字节码；扩展范围以修正两个 fixture 和权威说明，并增加生产构建先于测试冻结的回归。",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1788647341135
-    },
-    {
       "id": "feature_event_fd07f4dec5424da799416079ec7b16bc",
       "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
       "action": "transitioned",
@@ -25203,6 +25193,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788843049916
+    },
+    {
+      "id": "feature_event_6b6b7d0d66e54cc38b3cee9c36ae95b3",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-host",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788844625711
     }
   ]
 }
