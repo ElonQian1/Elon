@@ -163,3 +163,10 @@ test('method override headers cannot be inherited by fixed read endpoints', asyn
   await h.window.fetch(LIST,{method:'POST',headers:{'x-http-method-override':'POST'}}); await tick();
   assert.equal(h.events.at(-1).kind,'unavailable'); assert.equal(h.calls.length,1);
 });
+
+test('identity URLs with account selectors cannot replace the current account proof', async () => {
+  const h=harness(); await h.list([row()]); const before=h.events.length;
+  h.queue.push(response({userId:'43',subUser:true,parentUser:false}));
+  await h.window.fetch(INFO+'?userId=43'); await tick();
+  assert.equal(h.events.length,before); assert.equal(h.events.at(-1).account,'42');
+});

@@ -110,7 +110,7 @@
       if (u.pathname === '/bapi/futures/v1/private/future/grid/query-open-grids' && method === 'GET') {
         diagnostic?.request('legacy_list'); return null;
       }
-      if (u.pathname === IDENTITY && method === 'GET') {
+      if (u.pathname === IDENTITY && !u.search && method === 'GET') {
         diagnostic?.request('identity');
         latestIdentity = ++identitySequence; return {kind: 'identity', seq: latestIdentity};
       }
