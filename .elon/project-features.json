@@ -14332,6 +14332,19 @@
             "worktree_blob_oid": "caca787cd2be0d55b4d5b669faddf7747d3a7dd0",
             "state": "tracked_modified"
           }
+        },
+        {
+          "path": "docs/reports/private-grid-phone-acceptance-20260908.md",
+          "content_hash": "e214c44a7ca93b025a709ef1c70a007c0a6197eac99df5c1f3f7570f8d6809dd",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ff7d5b91bcd80a4c413495114a23c64c86aa2d1c",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "40185a8d9f198e9eb131e3ca4fa72920fa9a7379",
+            "state": "untracked"
+          }
         }
       ],
       "claim": {
@@ -14341,7 +14354,7 @@
         "expires_at_ms": 1788868196393
       },
       "created_at_ms": 1788767191531,
-      "updated_at_ms": 1788825632996
+      "updated_at_ms": 1788827163625
     },
     {
       "id": "project-feature-registry-adoption-v1",
@@ -22954,16 +22967,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_283dca21724448ea8391db84562fdc3d",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "transitioned",
-      "actor": "codex-account-asset-access",
-      "reason": "独立目录和主装配边界明确；保留原发布树及旧入口，现有代码验证继续。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788609184434
-    },
-    {
       "id": "feature_event_ca34cc6a4ee24f939264ca28cd78e31a",
       "feature_id": "unified-account-asset-access-v1",
       "action": "claimed",
@@ -24952,6 +24955,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788825632996
+    },
+    {
+      "id": "feature_event_5471a0b43694490098c6f371a3721201",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788827163625
     }
   ]
 }
