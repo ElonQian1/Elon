@@ -239,8 +239,10 @@ the newly published normal package, then cover the remaining native browser cont
   mutations/associations retain their separate pending acceptance status.
 
 Ordinary file rename, soft deletion and [composer association](chatgpt-private-library-attachment.md)
-are also packaged in 1581; the [native mutation owner](chatgpt-private-library-mutations.md)
-still needs live acceptance.
+are also packaged; ordinary native rename/soft-delete now passed in 1589 and
+single existing-library attachment passed in 1588. See the
+[1589 report](reports/chatgpt-library-mutations-1589.md), including the current
+next-page read failure. Do not repeat completed ordinary-file checks.
 Independent-library external mounted-file download, saved-entity/artifact previews,
 folder mutations and moving files are not implemented by this browser. Such
 rows remain visible where their shape is recognized, without a false Download

@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
     [ValidateSet('inspect','inspect_entry','features','library','browse','query','clear_query','refresh','more',
-        'file','attach','remove_staged','rename','set_fixture_name','confirm_rename','upload_fixture_copy',
+        'file','attach','remove_staged','rename','set_fixture_name','confirm_rename','upload_fixture_copy','select_upload_copy',
         'trash','confirm_fixture_trash','close_mutation','close_detail','back')]
     [string]$Step = 'inspect',
     [string]$Handle = '',

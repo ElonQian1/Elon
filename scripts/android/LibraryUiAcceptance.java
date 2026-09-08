@@ -29,6 +29,16 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         assertTrue("semantic_control_disabled", node.isEnabled());
         android.view.accessibility.AccessibilityNodeInfo info = accessibilityNode(node);
         try {
+            for (int depth = 0; !info.isClickable() && depth < 4; depth++) {
+                android.view.accessibility.AccessibilityNodeInfo parent = info.getParent();
+                if (parent == null) break;
+                if (!APP.contentEquals(parent.getPackageName() == null ? "" : parent.getPackageName())) {
+                    parent.recycle();
+                    break;
+                }
+                info.recycle();
+                info = parent;
+            }
             assertTrue("semantic_click_failed", info.performAction(
                 android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK));
         } finally { info.recycle(); }
@@ -113,6 +123,8 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
                 try { assertTrue("fixture_long_click_failed", preview.performAction(
                     android.view.accessibility.AccessibilityNodeInfo.ACTION_LONG_CLICK)); }
                 finally { preview.recycle(); }
+                // Android PopupMenu exposes its label separately from the clickable row.
+            case "select_upload_copy":
                 click(text("\u91cd\u65b0\u4e0a\u4f20\u4e00\u4efd"));
                 assertTrue("upload_copy_not_selected", description(
                     "\u91cd\u65b0\u4e0a\u4f20\u4e00\u4efd\uff1aelon-chatgpt-attachment-fixture-v1.txt").waitForExists(8000));
@@ -167,6 +179,8 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         result.put("rename_input_visible", description("web-chat-library-rename-input").exists());
         result.put("mutation_confirm_visible", description("web-chat-library-mutation-confirm").exists());
         result.put("mutation_status_visible", description("web-chat-library-mutation-status").exists());
+        result.put("upload_copy_menu_visible", text("\u91cd\u65b0\u4e0a\u4f20\u4e00\u4efd").exists());
+        result.put("local_fixture_visible", description("elon-chatgpt-attachment-fixture-v1.txt").exists());
         if (step.equals("inspect_entry")) {
             android.view.accessibility.AccessibilityNodeInfo node = accessibilityNode(
                 description("web-chat-library-entry:" + handle));

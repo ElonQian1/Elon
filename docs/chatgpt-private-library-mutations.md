@@ -4,8 +4,10 @@
 
 Capability `android_chatgpt_private_library_file_mutations_v1` implements ordinary
 owned-library file rename and move-to-recently-deleted in the production native
-file browser. Published/installed in 1.1.1581; catalogue projection is device
-verified, but live mutations and rendered browser acceptance remain pending.
+file browser. Ordinary text-file rename and soft-delete are **completed, enabled
+and device verified** in normal Release 1.1.1589 through the native UI, with
+directory readback and original fixture/chat restoration. See
+[the current acceptance report](reports/chatgpt-library-mutations-1589.md).
 It does not implement permanent deletion, batch deletion, restoration, folder
 creation/rename/move, project-file mutations or external-provider mutations.
 
@@ -104,8 +106,8 @@ passes request-bound native root/folder/cache/search reads. It does not establis
 mutation success; the rendered-menu handoff remains unconfirmed. See the browser's
 current evidence rather than treating account selection as a continuing blocker.
 
-In the installed grouped APK, rename one isolated fixture and restore its
-name; soft-delete only a dedicated disposable fixture after explicit confirmation.
-Verify official-library state, the terminal native receipt, original conversation,
-draft and voice continuity. No live mutation or user-file deletion has been performed
-by this implementation batch.
+The ordinary-file acceptance above is now complete: one isolated fixture was
+renamed and restored; only an explicitly confirmed disposable copy was soft-deleted.
+No user file or permanent deletion was involved. Voice was not exercised during
+this file-only round. Reuse the completed scope; do not repeat it without a new
+regression. Folder and special-source operations remain outside this capability.

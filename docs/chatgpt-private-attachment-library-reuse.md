@@ -106,6 +106,14 @@ Existing browser login and original conversation/draft state must be preserved.
 
 ## Explicit upload-copy choice
 
+Current acceptance: **completed for one ordinary text-file copy** on normal
+Release 1.1.1589. Native long-press choice, private upload, exactly one send and
+actual file-content reply passed; the independent disposable copy was subsequently
+renamed and soft-deleted, preserving the original file and restoring the chat.
+See [the scoped receipt](reports/chatgpt-library-mutations-1589.md).
+This does not establish a successful hash-reuse hit, other scopes or a heat benefit.
+The source-only verification below is historical, not a reason to repeat this case.
+
 The current native source adds a pre-send choice, rather than reproducing the
 website's post-reuse toast. The inspected composer asset's `VGt` upload-anyway
 callback invokes the same uploader with `checkForReusableLibraryFile: false`
@@ -157,6 +165,6 @@ consumer compilation, popup rendering and real request/byte/reply acceptance
 remain for the grouped APK. No phone, browser session, microphone, release or
 thermal benchmark was used in this source-only extension.
 
-Remaining work includes unsupported file categories and grouped live
-gate/association/copy-choice acceptance. Do not rediscover the endpoint or
+Remaining work includes unsupported file categories, real reuse-gate/hit
+acceptance and additional copy scopes. Do not rediscover the endpoint or
 reimplement these modules while those checks wait.
