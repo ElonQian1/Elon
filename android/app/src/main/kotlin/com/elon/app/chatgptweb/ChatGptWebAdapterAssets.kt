@@ -31,6 +31,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_adapter_composer_option_policy.js",
         "chatgpt_web_adapter_composer_submenu.js",
         "chatgpt_web_adapter_composer_tool_state_policy.js",
+        "chatgpt_web_private_composer_tool_context.js",
         "chatgpt_web_adapter_composer_tool_selection.js",
         "chatgpt_web_adapter_action_target_policy.js",
         "chatgpt_web_adapter_composer_dismiss_policy.js",

@@ -41,6 +41,18 @@ test('every consumer export preserves its original function or store identity', 
   assert.equal(current.loads.length, 3);
 });
 
+test('tool aliases never call the new focus helper or initializer under old names', async () => {
+  const read = () => ({ activeSystemHintType: 'search' }), write = () => true;
+  const unrelated = () => { throw Error('wrong runtime alias'); };
+  const f = fixture({ loadRuntime: () => ({ Yg: read, n_: write, Ng: unrelated, Bg: unrelated }) });
+  f.observed.add(CDN + files.composer);
+  const module = await f.api.load('composer');
+  assert.equal(module.Ng, read); assert.equal(module.Bg, write);
+  assert.equal(f.api.tools().owner, 'Kgn');
+  f.page.__elonChatGptDocumentToken = 'doc_old'; f.observed.clear(); f.observed.add(old.composer);
+  assert.equal(f.api.tools().owner, 'Whn');
+});
+
 test('old cached website still uses its original singleton and aliases', async () => {
   const getter = () => true, f = fixture({ loadRuntime: () => ({ H3: getter }) });
   f.observed.clear(); f.observed.add(old.shared);

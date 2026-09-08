@@ -86,58 +86,12 @@
       { hint: 'search', semantic: 'web_search', label: '网页搜索' },
       { hint: 'picture_v2', semantic: 'image_generation', label: '创建图片' }
     ];
-    let namespace, loading, cooldown = 0, serial = 0, catalog = null, pending = null, receipt = null;
-
-    function identity() {
-      const headers = page.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.();
-      const normalized = {};
-      for (const [key, value] of Object.entries(headers || {})) normalized[key.toLowerCase()] = value;
-      if (!/^Bearer\s+\S{8,65536}$/.test(normalized.authorization || '')) return null;
-      return JSON.stringify(['authorization', 'chatgpt-account-id', 'oai-device-id'].map(key => normalized[key] || ''));
-    }
+    let namespace, namespaceDocument, namespaceToken, loading, cooldown = 0, serial = 0, catalog = null, pending = null, receipt = null;
 
     function capture() {
-      const url = new URL(page.location.href);
-      const conversationId = /^(?:\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.exec(url.pathname)?.[1] || null;
-      const project = /^\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?\/project$/i.test(url.pathname);
-      const temporary = url.search === '?temporary-chat=true';
-      if (url.origin !== 'https://chatgpt.com' || url.username || url.password || url.hash ||
-          url.search && !temporary || url.pathname.startsWith('/g/') && temporary ||
-          url.pathname !== '/' && !conversationId && !project) return null;
-      const token = page.__elonChatGptDocumentToken, account = identity();
-      if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '') || !account) return null;
-      const node = page.document.querySelector('#composer-plus-btn');
-      if (!node?.isConnected) return null;
-      const key = Object.keys(node).find(name => name.startsWith('__reactFiber$'));
-      const candidates = new Map();
-      // Follow only the committed composer ancestors, never a stale alternate or hooks.
-      for (const start of [node[key], node[key]?.alternate]) {
-        const ancestors = [];
-        for (let fiber = start; fiber && ancestors.length < 90; fiber = fiber.return) ancestors.push(fiber);
-        const top = ancestors.at(-1);
-        if (!top || top.return || top.stateNode?.current !== top) continue;
-        for (const fiber of ancestors) {
-          const props = fiber.memoizedProps;
-          if (!props?.conversation || !props.composerController ||
-              typeof props.composerDisabled !== 'boolean' ||
-              typeof props.selectModelId !== 'function' || typeof props.clearModelSelection !== 'function' ||
-              !Array.isArray(props.availableSystemHints)) continue;
-          const controller = props.composerController, conversation = props.conversation;
-          const model = props.currentModelId ?? props.currentModelConfig?.id;
-          if (controller.conversation !== conversation || typeof conversation.serverId$ !== 'function' ||
-              (conversation.serverId$() || null) !== conversationId ||
-              props.isTemporaryChat !== temporary || props.composerDisabled ||
-              props.composerToolAvailability && props.composerToolAvailability !== 'default' ||
-              props.loginModalGate?.shouldGateToLoginModal ||
-              typeof model !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(model)) return null;
-          const hints = TOOLS.map(tool => props.availableSystemHints.filter(h => h?.systemHint === tool.hint));
-          if (hints.some(matches => matches.length !== 1 || matches[0].isLoggedOutUpsell ||
-              matches[0].isConnector || matches[0].isDangerous || matches[0].hideFromInitialSelection)) return null;
-          if (candidates.has(controller) && candidates.get(controller).model !== model) return null;
-          candidates.set(controller, { controller, conversation, model, href: url.href, token, account });
-        }
-      }
-      return candidates.size === 1 ? candidates.values().next().value : null;
+      const context = page.__elonChatGptPrivateComposerToolContext ||
+        (typeof module === 'object' && module.exports ? require('./chatgpt_web_private_composer_tool_context') : null);
+      return context?.capture(page, TOOLS) || null;
     }
 
     function current(binding) {
@@ -157,21 +111,27 @@
     }
 
     function loaded() {
+      if (page.__elonChatGptPrivateRuntimeBindings) return page.__elonChatGptPrivateRuntimeBindings.observed(RUNTIME_URL);
       return page.performance?.getEntriesByName?.(RUNTIME_URL, 'resource')?.length > 0 ||
         !!page.document.querySelector('link[rel="modulepreload"][href="' + RUNTIME_URL + '"]');
     }
 
     function load() {
+      if (namespaceDocument !== page.document || namespaceToken !== page.__elonChatGptDocumentToken) namespace = null;
       if (namespace) return Promise.resolve();
       if (loading) return loading;
-      const importer = options.loadRuntime || (url => import(url));
+      const bindings = page.__elonChatGptPrivateRuntimeBindings;
+      const importer = options.loadRuntime || (url => bindings ? bindings.load(url) : import(url));
+      const document = page.document, token = page.__elonChatGptDocumentToken;
       let timer;
-      loading = Promise.race([
-        Promise.resolve().then(() => importer(RUNTIME_URL)),
+      const imported = Promise.resolve().then(() => importer(RUNTIME_URL));
+      loading = (bindings && !options.loadRuntime ? imported : Promise.race([
+        imported,
         new Promise((_, reject) => { timer = page.setTimeout(() => reject(new Error('runtime_timeout')), 1500); })
-      ]).then(value => {
+      ])).then(value => {
+        if (document !== page.document || token !== page.__elonChatGptDocumentToken) throw new Error('runtime_context_changed');
         if (typeof value?.Ng !== 'function' || typeof value?.Bg !== 'function') throw new Error('runtime_unknown');
-        namespace = value;
+        namespace = value; namespaceDocument = document; namespaceToken = token;
       }).catch(() => { cooldown = Date.now() + 10000; }).finally(() => {
         page.clearTimeout(timer);
         loading = null;
@@ -186,8 +146,8 @@
       previous.result('list_composer_tools', false, '菜单请求已被新的操作替代。');
     }
 
-    function entries(value) {
-      return TOOLS.map(tool => Object.freeze({ id: PREFIX + serial + '_' + tool.semantic,
+    function entries(value, binding) {
+      return TOOLS.filter(tool => binding.allowed.split(',').includes(tool.hint)).map(tool => Object.freeze({ id: PREFIX + serial + '_' + tool.semantic,
         label: tool.label, semantic: tool.semantic, selected: value.activeSystemHintType === tool.hint,
         kind: 'toggle', opensSubmenu: false }));
     }
@@ -198,6 +158,7 @@
       receipt = null;
       let binding;
       try {
+        if (namespaceDocument !== page.document || namespaceToken !== page.__elonChatGptDocumentToken) namespace = null;
         binding = capture();
         if (!binding || !loaded() || !namespace && Date.now() < cooldown ||
             page.document.querySelector('#composer-plus-btn')?.getAttribute('aria-expanded') === 'true') return false;
@@ -212,10 +173,10 @@
         try { value = state(binding); } catch (_) { /* Unknown runtime stays on the existing path. */ }
         if (!value) return fallback();
         serial += 1;
-        const list = entries(value);
+        const list = entries(value, binding);
         catalog = { binding, list, active: value.activeSystemHintType, emitOptions };
         emitOptions(list);
-        result('list_composer_tools', true, '');
+        result('list_composer_tools', true, 'official_tool_runtime_v1:accepted');
       }
       if (namespace) complete();
       else void load().then(complete);
@@ -247,12 +208,12 @@
         if (ok) {
           receipt = { id, binding: owned.binding, desired };
           serial += 1;
-          catalog = { ...owned, active: desired, list: entries({ activeSystemHintType: desired }) };
+          catalog = { ...owned, active: desired, list: entries({ activeSystemHintType: desired }, owned.binding) };
           owned.emitOptions(catalog.list);
         }
       } catch (_) { /* A possibly applied mutation must not be replayed through DOM. */ }
       if (!ok) { catalog = null; receipt = null; }
-      result('select_composer_tool', ok, ok ? '' : '工具状态未能确认，请重新打开工具选择。');
+      result('select_composer_tool', ok, ok ? 'official_tool_runtime_v1:accepted' : '工具状态未能确认，请重新打开工具选择。');
       scheduleSnapshot();
       return true;
     }
@@ -265,7 +226,7 @@
       return owned;
     }
 
-    return Object.freeze({ version: 1, requestPrivateOptions, selectPrivate, dismissPrivateOptions });
+    return Object.freeze({ version: 2, requestPrivateOptions, selectPrivate, dismissPrivateOptions });
   }
 
   let privateRuntime;

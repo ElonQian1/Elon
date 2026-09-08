@@ -9,7 +9,7 @@ const assets = path.join(__dirname, '../android/app/src/main/assets');
 const { createPrivateRuntime } = require(path.join(assets, 'chatgpt_web_adapter_composer_tool_selection.js'));
 const RUNTIME = 'https://chatgpt.com/cdn/assets/8b34dbc2-kjj15hg4y6iyx13p.js';
 const CID = '00000000-0000-0000-0000-000000000001';
-const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+const flush = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
 
 function fixture(options = {}) {
   const calls = [], events = [], results = [], timers = new Set();
@@ -18,10 +18,22 @@ function fixture(options = {}) {
   const props = { conversation, composerController: controller, composerDisabled: false,
     selectModelId() {}, clearModelSelection() {}, isTemporaryChat: false,
     currentModelId: 'fixture-model', availableSystemHints: [{ systemHint: 'search' }, { systemHint: 'picture_v2' }] };
+  const shared = { getSharedProps: () => ({ ...props, isNewThread: true }), subscribeToSharedProps() {} };
+  const files = { files$: () => [], readyFiles$: () => [], hasUploadInProgress$: () => false };
+  const menu = { conversation, clearModelSelection: props.clearModelSelection,
+    availableSystemHints: props.availableSystemHints, resolveSystemHintBehavior: () => undefined,
+    isConsumerLockdownModeEnabled: false, isLoading: false };
+  const memo = Array(265);
+  memo[56] = props.availableSystemHints;
+  memo[63] = memo[64] = memo[65] = false;
+  memo[199] = { props: { children: [{ props: menu }] } };
   const top = { stateNode: {} };
   top.stateNode.current = top;
-  const ancestor = { memoizedProps: props, return: top };
-  const host = { return: ancestor };
+  const ancestor = { type: { name: options.current ? 'Kgn' : 'Whn' }, memoizedProps: props,
+    updateQueue: { memoCache: { data: [memo] } }, return: top };
+  const host = { return: ancestor, dependencies: { firstContext: { memoizedValue: shared,
+    next: { memoizedValue: files } } } };
+  top.child = ancestor; ancestor.child = host;
   const node = { isConnected: true, __reactFiber$fixture: host,
     getAttribute: name => name === 'aria-expanded' ? String(expanded) : null };
   let signal = { locked: false, activeSystemHintType: null,
@@ -39,20 +51,34 @@ function fixture(options = {}) {
   const page = { location: { href: 'https://chatgpt.com/c/' + CID },
     __elonChatGptDocumentToken: 'doc_fixture_1',
     __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({ Authorization: account }) },
-    performance: { getEntriesByName(url, type) { assert.equal(url, RUNTIME); assert.equal(type, 'resource'); return loaded ? [{}] : []; } },
-    document: { querySelector: selector => selector === '#composer-plus-btn' ? node : null },
+    performance: { getEntriesByName(url) { return loaded && [RUNTIME,
+      'https://chatgpt.com/cdn/assets/4813494d-hrplraurzfyvxb10.js'].includes(url) ? [{}] : []; } },
+    document: { querySelector: selector => ['#composer-plus-btn', '#prompt-textarea'].includes(selector) ? node : null },
     setTimeout(fn) { timers.add(fn); return fn; }, clearTimeout(fn) { timers.delete(fn); } };
   let imports = 0, fallbacks = 0, snapshots = 0;
-  const runtime = createPrivateRuntime(page, { loadRuntime: async url => {
-    assert.equal(url, RUNTIME); imports++;
-    return options.loadRuntime ? options.loadRuntime(namespace) : namespace;
-  } });
+  Object.defineProperty(page.location, 'origin', { get: () => new URL(page.location.href).origin });
+  const guest = { authStatus: 'logged_out', session: null };
+  const sharedRuntime = { R5: () => ({ authStatus: guest.authStatus }), F5: () => guest.session };
+  if (options.current) {
+    const bridge = require('./fixtures/chatgpt-runtime-bindings').attach(page, { composer: namespace, shared: sharedRuntime });
+    page.performance.getEntriesByName = url => loaded && bridge.observed.has(url) ? [{}] : [];
+  } else {
+    page.__elonChatGptPrivateRuntimeBindings = require(path.join(assets, 'chatgpt_web_private_runtime_bindings')).create(page, {
+      loadRuntime: async url => {
+        if (url.includes('4813494d-')) return sharedRuntime;
+        assert.equal(url, RUNTIME); imports++;
+        return options.loadRuntime ? options.loadRuntime(namespace) : namespace;
+      }
+    });
+  }
+  page.__elonChatGptPrivateTextRuntimeSubmit = require(path.join(assets, 'chatgpt_web_private_text_runtime_submit')).create(page);
+  const runtime = createPrivateRuntime(page);
   const result = (...value) => results.push(value);
   const emit = list => events.push(list);
   const list = () => runtime.requestPrivateOptions(emit, result, () => { fallbacks++; });
   const pick = id => runtime.selectPrivate(id, result, () => { snapshots++; });
   const choice = semantic => events.at(-1).find(item => item.semantic === semantic);
-  return { page, node, host, top, ancestor, props, controller, conversation, namespace,
+  return { page, node, host, top, ancestor, props, controller, conversation, namespace, menu, memo, guest,
     runtime, calls, events, results, timers, result, list, pick, choice,
     get state() { return signal; }, set state(value) { signal = value; },
     set loaded(value) { loaded = value; }, set account(value) { account = value; },
@@ -122,12 +148,13 @@ for (const [name, mutate] of Object.entries({
   'disabled composer': f => { f.props.composerDisabled = true; },
   'files only': f => { f.props.composerToolAvailability = 'files_only'; },
   'login gate': f => { f.props.loginModalGate = { shouldGateToLoginModal: true }; },
-  'logged-out upsell': f => { f.props.availableSystemHints[0].isLoggedOutUpsell = true; },
-  'hidden tool': f => { f.props.availableSystemHints[0].hideFromInitialSelection = true; },
+  'all logged-out upsell': f => { f.props.availableSystemHints.forEach(h => { h.isLoggedOutUpsell = true; }); },
+  'all hidden tools': f => { f.props.availableSystemHints.forEach(h => { h.hideFromInitialSelection = true; }); },
   'duplicate tool': f => { f.props.availableSystemHints.push({ systemHint: 'search' }); },
   'wrong conversation': f => { f.conversation.serverId$ = () => null; },
   'ambiguous controller': f => {
-    f.host.return = { memoizedProps: { ...f.props, composerController: { conversation: f.conversation } }, return: f.ancestor };
+    const duplicate = { ...f.ancestor, child: f.host, return: f.ancestor };
+    f.host.return = duplicate; f.ancestor.child = duplicate;
   },
   'menu already open': f => { f.expanded = true; }
 })) {
@@ -146,6 +173,87 @@ test('committed alternate is accepted instead of obsolete host props', async () 
   f.node.__reactFiber$fixture = { return: { memoizedProps: { ...f.props, composerDisabled: true }, return: oldTop }, alternate: f.host };
   assert.equal(f.list(), true); await flush();
   assert.equal(f.results.at(-1)[1], true);
+});
+
+test('production assembly loads tool context before its consumer', () => {
+  const catalog = fs.readFileSync(path.join(assets, '../kotlin/com/elon/app/chatgptweb/ChatGptWebAdapterAssets.kt'), 'utf8');
+  assert.ok(catalog.indexOf('chatgpt_web_private_composer_tool_context.js') < catalog.indexOf('chatgpt_web_adapter_composer_tool_selection.js'));
+});
+
+for (const current of [false, true]) {
+  test('guest search uses the current official store with image upsell excluded: ' + current, async () => {
+    const f = fixture({ current });
+    f.page.location.href = 'https://chatgpt.com/';
+    f.page.__elonChatGptPrivateTransport = null;
+    f.props.availableSystemHints[1].isLoggedOutUpsell = true;
+    await f.page.__elonChatGptPrivateRuntimeBindings.load('shared');
+    // A guest conversation can receive a server ID while staying on the homepage.
+    assert.equal(f.conversation.serverId$(), CID);
+    assert.equal(f.list(), true); await flush();
+    assert.deepEqual(f.events.at(-1).map(item => item.semantic), ['web_search']);
+    f.pick(f.choice('web_search').id);
+    assert.equal(f.results.at(-1)[1], true);
+    assert.equal(f.state.activeSystemHintType, 'search');
+    const count = f.calls.length;
+    f.list(); await flush();
+    assert.equal(f.calls.length, count);
+    f.pick(f.choice('web_search').id);
+    assert.equal(f.state.activeSystemHintType, null);
+    assert.equal(f.fallbacks, 0);
+    assert.equal(f.timers.size, 0);
+  });
+}
+
+test('one unavailable hint does not remove the other eligible tool', async () => {
+  const f = fixture(); f.menu.availableSystemHints = [f.props.availableSystemHints[0]];
+  assert.equal(f.list(), true); await flush();
+  assert.deepEqual(f.events.at(-1).map(item => item.semantic), ['web_search']);
+  f.pick(f.choice('web_search').id); assert.equal(f.results.at(-1)[1], true);
+});
+
+for (const [name, mutate] of Object.entries({
+  'filtered out': f => { f.menu.availableSystemHints = []; },
+  'lockdown': f => { f.menu.isConsumerLockdownModeEnabled = true; },
+  'loading': f => { f.menu.isLoading = true; },
+  'wrong owner version': f => { f.ancestor.type = { name: 'Unknown' }; },
+  'missing compiled state': f => { delete f.ancestor.updateQueue; },
+  'uncommitted eligibility': f => { f.memo[56] = []; },
+  'voice active': f => { f.memo[65] = true; },
+  'at tagging disabled': f => { f.memo[63] = true; },
+  'local action': f => { f.menu.resolveSystemHintBehavior = () => ({ kind: 'local_action', select() { throw Error('never execute'); } }); }
+})) {
+  test('actual official menu restriction is retained: ' + name, async () => {
+    const f = fixture(); mutate(f);
+    assert.equal(f.list(), false); await flush();
+    assert.equal(f.calls.length, 0); assert.equal(f.results.length, 0);
+  });
+}
+
+test('guest login change invalidates an already issued search handle', async () => {
+  const f = fixture(); f.page.location.href = 'https://chatgpt.com/';
+  f.page.__elonChatGptPrivateTransport = null;
+  await f.page.__elonChatGptPrivateRuntimeBindings.load('shared');
+  f.list(); await flush(); const id = f.choice('web_search').id;
+  f.guest.authStatus = 'logged_in'; f.guest.session = {};
+  f.pick(id); assert.equal(f.results.at(-1)[1], false); assert.equal(f.calls.length, 0);
+});
+
+test('guest request credentials do not remove the positive guest route proof', async () => {
+  const f = fixture({ current: true }); f.page.location.href = 'https://chatgpt.com/';
+  await f.page.__elonChatGptPrivateRuntimeBindings.load('shared');
+  f.list(); await flush(); f.pick(f.choice('web_search').id);
+  assert.equal(f.results.at(-1)[1], true);
+  f.guest.authStatus = 'logged_in'; f.guest.session = {};
+  assert.equal(f.list(), false);
+});
+
+test('a new document invalidates handles and uses a newly resolved module', async () => {
+  const f = fixture(); f.list(); await flush();
+  const id = f.choice('web_search').id;
+  f.page.document = { ...f.page.document }; f.page.__elonChatGptDocumentToken = 'doc_new_document';
+  f.pick(id); assert.equal(f.calls.length, 0); assert.equal(f.results.at(-1)[1], false);
+  f.list(); await flush(); f.pick(f.choice('web_search').id);
+  assert.equal(f.results.at(-1)[1], true); assert.equal(f.imports, 2);
 });
 
 for (const route of ['/', '/?temporary-chat=true', '/g/g-p-' + 'a'.repeat(32) + '-fixture/project']) {
@@ -205,12 +313,13 @@ test('context change during module load cannot fall back into the next conversat
 
 for (const mode of ['throw', 'ignore', 'mutate then throw']) {
   test('setter ' + mode + ' cannot report success or trigger DOM replay', async () => {
-    const f = fixture(); f.list(); await flush();
+    const f = fixture();
     const original = f.namespace.Bg;
     f.namespace.Bg = (...args) => {
       if (mode === 'mutate then throw') original(...args);
       if (mode !== 'ignore') throw new Error('fixture');
     };
+    f.list(); await flush();
     f.pick(f.choice('web_search').id);
     assert.equal(f.results.at(-1)[1], false);
     assert.equal(f.fallbacks, 0);

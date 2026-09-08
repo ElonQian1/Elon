@@ -27,6 +27,13 @@ do not establish a real-device new-conversation acceptance result.
 
 ## Confirmed regression
 
+Version 5 adds the previously missed composer tool consumer. Old `Ng`/`Bg`
+(`JL`/`BL`) map to current `Yg`/`n_` (`OR`/`yR`), not the reused aliases that now
+focus the editor or initialize a module. It also identifies the exact compiled
+menu owner (`Whn` / `Kgn`) for eligibility capture. See
+[tool-state evidence and scope](chatgpt-private-composer-tools.md). Existing
+text, model, voice, sharing and attachment export mappings are unchanged.
+
 The installed APK 1545 public-script inventory observed
 `c2675c8c-kconnwitb9zzv81k.js`. Its public static module imports identify the
 September 7 shared, conversation and composer bundles below. Existing private
