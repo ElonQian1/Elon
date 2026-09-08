@@ -3,7 +3,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const bindings = require('../android/app/src/main/assets/chatgpt_web_private_runtime_bindings');
 const { attach, CDN, expectedExports: prior } = require('./fixtures/chatgpt-runtime-bindings');
-const profile = require('./fixtures/chatgpt-runtime-bindings-sep9');
+const profiles = [require('./fixtures/chatgpt-runtime-bindings-sep9'), require('./fixtures/chatgpt-runtime-bindings-sep9b')];
+
+for (const profile of profiles) test.describe(profile.id, () => {
 
 function fixture(modules = {}) {
   const page = { location: { origin: 'https://chatgpt.com' }, document: { querySelector: () => null },
@@ -21,7 +23,7 @@ test('Sep 9 maps every existing consumer contract to the same page-owned identit
     for (const key of Object.keys(prior[role])) assert.equal(value[key], modules[role][key]);
     assert.equal(f.api.peek(role), value);
   }
-  assert.equal(f.api.state().profile_id, 'web_20260909');
+  assert.equal(f.api.state().profile_id, profile.id);
   assert.equal(f.loads.length, 3);
   f.observed.clear();
   assert.equal((await f.api.load('shared')).H3, modules.shared.H3);
@@ -39,7 +41,7 @@ test('Sep 9 anchor proves the inspected dependencies after timing eviction', asy
 test('Sep 9 never accepts unrelated reused auth, tool or stop-state aliases', async () => {
   const f = fixture(), auth = () => true, status = () => ({ value: 3 });
   f.page.__elonChatGptPrivateRuntimeBindings = bindings.create(f.page, { loadRuntime: async () => ({
-    L8: auth, zS: status, H3: 'wrong auth', c6: 'wrong role', Lx: 'wrong status',
+    [profile.expectedExports.shared.H3]: auth, zS: status, H3: 'wrong auth', c6: 'wrong role', Lx: 'wrong status',
     _k: 'other store', cs: 'other store', ls: 'other store', yk: 'other store', yu: 'other store'
   }) });
   const value = await f.page.__elonChatGptPrivateRuntimeBindings.load('shared');
@@ -49,7 +51,7 @@ test('Sep 9 never accepts unrelated reused auth, tool or stop-state aliases', as
 
 test('compiled tool and temporary owners stay paired with their exact current build', () => {
   const f = fixture();
-  assert.equal(f.api.tools().owner, 'V_n');
+  assert.equal(f.api.tools().owner, profile.toolOwner);
   assert.deepEqual(f.api.temporary(), profile.temporary);
   assert.equal(Object.isFrozen(f.api.tools()), true);
   f.observed.add(CDN + '8b34dbc2-nhot65scqrg20d6p.js');
@@ -99,4 +101,5 @@ test('real stop and subsequent submit owners work through Sep 9 bindings without
   assert.equal(f.loads.length, 0, 'no legacy bypass importer');
   assert.deepEqual(new Set(bridge.loads), new Set([CDN + profile.files.shared, CDN + profile.files.conversation]));
   assert.equal(f.timers.size, 0); assert.equal(f.listeners.size, 0);
+});
 });

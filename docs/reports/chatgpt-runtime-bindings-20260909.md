@@ -1,6 +1,6 @@
 # September 9 runtime contract update
 
-Capability: `android_chatgpt_private_runtime_bindings_v1`, resolver version 6.
+Capability: `android_chatgpt_private_runtime_bindings_v1`, resolver versions 6/7.
 Scope: restore existing verified runtime consumers after a public website build
 change. This is not a new transport or completion of stop/follow-up continuity.
 
@@ -61,3 +61,37 @@ The stop/follow-up MCP harness now dispatches each state-changing action once.
 An uncertain transport result is never automatically replayed as a second send,
 stop, or new-chat action. Its 15 focused evidence/dispatch tests passed before
 the runtime update; the common MCP helper owned elsewhere is unchanged.
+
+## Installed 1590 and the second observed build
+
+Release `1.1.1590`, source `cd320208b768b693cad9d9662d3ee8ed9433a7d9`, passed
+the normal publisher and unattended replacement installation. Local APK and
+online manifest SHA-256 both equal
+`fd969c2dddbb5142c1ecffc38bc18d6a73837fccfff90562d3c4f75d9697d7eb`.
+Evidence: `runtime-bindings-sep9-release-20260909-062330-912` (458 seconds).
+
+The next production acceptance again stopped at `send_receipt` with
+`runtime_not_observed`, before dispatching any stop or follow-up. A fresh on-page
+inventory now showed `c2675c8c-lz0unwv5yke95cwv.js`, a different official build.
+This demonstrates the first admitted Sep 9 profile was insufficient for the
+reopened page; it does not prove a login failure or a broken audio path. The
+one synthetic send finished, then the original blank view was restored. A
+subsequent settled snapshot was authenticated/ready with zero messages/draft.
+Evidence: `stopped-followup-device-1590-20260909-063148-582`.
+
+Version 7 adds `web_20260909_b` without replacing the first profile. Its actual
+anchor imports and public source hashes are:
+
+| Role | File | SHA-256 |
+|---|---|---|
+| Anchor | `c2675c8c-lz0unwv5yke95cwv.js` | `0508bf7d70f5269217002af761c50533c61c451ebfc1ce8ea94c7d66f1e20555` |
+| Shared | `4813494d-bgyv5408fxme7xxv.js` | `72ed87dd6d8a5241abac73d9c720f8e92bf87bbee7980331fcf042fea64d14ca` |
+| Conversation | `conversation-small-hg48c5uox88r7a00.js` | `7bfb494a2d582faba39c835c20feced3d1c81805835f7e3d97aa9ce0c713060a` |
+| Composer | `8b34dbc2-cj4kfo18e1ldvw16.js` | `c24245fc260253db68ae531c586174a3eeff95e694b7c8a0e76eb77eae5fe906` |
+
+The same AST procedure produced 50 unique candidates. Official stop `Nln`
+reads `Id(c)` (import `zS`), active request `Mle` (import `Xu`) and enum `ml`
+(import `met`), resolving the remaining store and enum identities explicitly.
+Composer owners `DJt`/`H_n` retain the same inspected 30/265-slot contracts.
+Both Sep 9 profiles execute the same independent identity and consumer tests;
+no uncertain message was replayed, and the full continuity gate remains open.

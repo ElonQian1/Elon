@@ -17,4 +17,4 @@ const expectedExports = {
 };
 const anchor = 'c2675c8c-k2kd9yafbfvx5mjw.js';
 const temporary = { owner: 'SJt', action: '()=>{ym.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(dB.reset(c),a_()&&vp.delete(n),!o&&!vp(n)&&bJt(s),u(CJt,{replace:!0})):vx(l,{params:o?void 0:new URLSearchParams({[I_]:`true`})})}' };
-module.exports = { files, expectedExports, anchor, temporary };
+module.exports = { files, expectedExports, anchor, temporary, id: 'web_20260909', toolOwner: 'V_n' };
