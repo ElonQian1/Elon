@@ -3,10 +3,11 @@
 ## Status and scope
 
 - Capability: `android_chatgpt_private_composer_tools_state_v1`.
-- Status: implemented and shipped in APK 1561; device acceptance failed before
-  selection. Not `completed`. The cache-context follow-up is installed in 1563;
-  its unlocked device check identified `composer_detached` before selection.
-  See [delivery evidence](reports/chatgpt-runtime-tools-20260908.md).
+- Status: implemented and production-default; `guest_search_toggle_v1` completed
+  on APK 1565 / adapter 302. Search on/off returned private runtime acceptance
+  without document reload. Image/account-scope acceptance is still pending, so
+  the combined capability is not fully completed. See
+  [delivery evidence](reports/chatgpt-runtime-tools-20260908.md).
 - Provider contract version: 2, using the shared versioned runtime bindings.
 - Production wiring: native Tools -> existing composer adapter -> official live
   tool signal. Search and Create Image use this path when its guards pass.
@@ -99,6 +100,17 @@ committed owner, document and eligibility checks are unchanged. This is an ancho
 compatibility correction; its live pass still requires a new installed adapter.
 The six focused Node suites passed all 238 cases after this correction, including
 test-id-only anchors, expanded menus and detached/foreign-owner rejection.
+
+APK 1565, source `1b2676914`, subsequently passed the native production MCP check:
+Search on took 165 ms and off 180 ms, each with
+`official_tool_runtime_v1:accepted`, unchanged document generation and zero
+messages. The original disabled selection and conversation home were restored;
+a separate UI-state read confirmed `conversation_home` and an empty draft.
+This isolates the missing id-only anchor as the observed 1563 blocker. It does
+not prove that the earlier compiler-cache correction was needed on this phone.
+The Search case is completed and must not be reimplemented or retested without
+new regression evidence. No image generation, paid/account restriction, visual
+frame, cold-menu latency or resource A/B acceptance is implied by this case.
 
 This is an in-page private runtime state bridge, **not** an independent Android
 HTTP sender. WebView is still needed for identity, that live state and official
