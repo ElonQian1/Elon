@@ -3,9 +3,12 @@
 param(
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
-    [ValidateSet('inspect','inspect_entry','features','library','browse','query','file','attach','remove_staged','close_detail','back')]
+    [ValidateSet('inspect','inspect_entry','features','library','browse','query','clear_query','refresh','more',
+        'file','attach','remove_staged','rename','set_fixture_name','confirm_rename','upload_fixture_copy',
+        'trash','confirm_fixture_trash','close_mutation','close_detail','back')]
     [string]$Step = 'inspect',
     [string]$Handle = '',
+    [string]$FixtureName = '',
     [string]$SdkRoot = 'D:/Android/sdk',
     [string]$JavaHome = 'C:/Program Files/Microsoft/jdk-21.0.11.10-hotspot'
 )
@@ -15,6 +18,12 @@ $runtime = New-ChatGptWebSmokeRuntime -Adb (Join-Path $SdkRoot 'platform-tools/a
     -DeviceSerial $DeviceSerial -ExpectedHardwareSerial $ExpectedHardwareSerial
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 if ($Step -eq 'file' -and $Handle -notmatch '^[a-zA-Z0-9_-]{1,160}$') { throw 'Invalid library handle.' }
+if ($Step -eq 'set_fixture_name' -and $FixtureName -notmatch '^elon[-_][a-z0-9_.-]{1,150}$') {
+    throw 'Only a bounded ELON fixture name is accepted.'
+}
+if ($Step -eq 'confirm_fixture_trash' -and $FixtureName -cnotmatch '^ELON-library-disposable-[a-f0-9]{12}\.txt$') {
+    throw 'Only the dedicated disposable fixture may be soft-deleted.'
+}
 $root = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $PSScriptRoot 'android/LibraryUiAcceptance.java'
 $platform = Join-Path $SdkRoot 'platforms/android-35'
@@ -49,6 +58,7 @@ try {
     $arguments = @('shell','uiautomator','runtest',$remote,'-s','-c','com.elon.acceptance.LibraryUiAcceptance',
         '-e','step',$Step)
     if ($Handle) { $arguments += @('-e','handle',$Handle) }
+    if ($Step -in @('set_fixture_name','confirm_fixture_trash')) { $arguments += @('-e','fixtureName',$FixtureName) }
     $raw = Invoke-ChatGptWebSmokeAdb -Runtime $runtime -Arguments $arguments `
         -TimeoutSec 40 -Label 'run semantic library UI action'
     # Android's legacy runner can exit zero for assertion failures.

@@ -28,6 +28,67 @@ test('attachment selections expose only verified ordinary rows and expire after 
 
 const folder = (id = 'directory-synthetic', name = 'Folder') => ({ kind: 'directory', id, name });
 const file = (id = 'libfile_synthetic') => ({ kind: 'file', id, name: 'fixture.txt', mime_type: 'text/plain', file_size_bytes: 7 });
+
+test('search index lag cannot undo an acknowledged rename verified by a directory read', async () => {
+  const f = fixture();
+  await f.list({ query: 'fixture' });
+  f.service.selectMutation(f.events.at(-1).items[1].handle).settle(true, 'rename', 'renamed.txt');
+  f.setNext({ items: [{ ...file(), name: 'renamed.txt' }] });
+  await f.list({ operation: 'refresh' });
+  f.setNext({ items: [Object.freeze(file())] });
+  await f.list({ query: 'fixture', operation: 'refresh' });
+  const row = f.events.at(-1).items[0];
+  assert.equal(row.name, 'renamed.txt');
+  assert.equal(f.service.selectMutation(row.handle).source.name, 'renamed.txt');
+  assert.equal(f.calls.length, 3, 'no extra reads or DOM polling for name reconciliation');
+});
+
+test('rename round trips and repeated renames tolerate older search generations', async () => {
+  const f = fixture();
+  f.setNext({ items: [file()] });
+  await f.list({ query: 'fixture' });
+  for (const name of ['second.txt', 'third.txt', 'fixture.txt']) {
+    f.service.selectMutation(f.events.at(-1).items[0].handle).settle(true, 'rename', name);
+    await f.list({ query: 'fixture', operation: 'refresh' });
+    assert.equal(f.events.at(-1).items[0].name, name);
+  }
+  f.setNext({ items: [{ ...file(), name: 'second.txt' }] });
+  await f.list({ query: 'fixture', operation: 'refresh' });
+  assert.equal(f.events.at(-1).items[0].name, 'fixture.txt');
+});
+
+test('authoritative directory changes and different remote names supersede the rename hint', async () => {
+  for (const query of ['', 'fixture']) {
+    const f = fixture();
+    await f.list();
+    f.service.selectMutation(f.events.at(-1).items[1].handle).settle(true, 'rename', 'renamed.txt');
+    const authoritative = query ? 'elsewhere.txt' : 'fixture.txt';
+    f.setNext({ items: [{ ...file(), name: authoritative }] });
+    await f.list({ query, operation: 'refresh' });
+    assert.equal(f.events.at(-1).items[0].name, authoritative);
+    f.setNext({ items: [file()] });
+    await f.list({ query: 'fixture', operation: 'refresh' });
+    assert.equal(f.events.at(-1).items[0].name, 'fixture.txt');
+  }
+});
+
+test('failed writes, changed accounts and expired rename hints cannot rewrite search results', async (t) => {
+  for (const boundary of ['failure', 'account', 'expiry']) {
+    const f = fixture();
+    await f.list();
+    f.service.selectMutation(f.events.at(-1).items[1].handle).settle(boundary !== 'failure', 'rename', 'renamed.txt');
+    if (boundary === 'account') f.setAuth('Bearer synthetic-another-account');
+    if (boundary === 'expiry') {
+      const now = Date.now();
+      t.mock.method(Date, 'now', () => now + 600001);
+    }
+    f.setNext({ items: [file()] });
+    await f.list({ query: 'fixture', operation: 'refresh' });
+    assert.equal(f.events.at(-1).items[0].name, 'fixture.txt');
+    t.mock.restoreAll();
+  }
+});
+
 function fixture() {
   const calls = [], events = [], results = [];
   let auth = 'Bearer synthetic-library-catalog', next = { items: [folder(), file()], cursor: null }, sequence = 0;

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 5, create: factory });
+  const exported = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateLibraryCatalog?.version || 0) < exported.version) {
@@ -13,7 +13,7 @@
   const HANDLE = /^library_[a-f0-9]{32}$/;
   const REQUEST = /^mcp_[a-z0-9]{1,32}$/;
   const TTL = 60000, MAX_ITEMS = 500, MAX_PAGES = 8;
-  const pages = new Map(), directories = new Map();
+  const pages = new Map(), directories = new Map(), renamed = new Map();
   let identityKey = '', active = null, disposed = false, failures = 0, retryAt = 0;
 
   function identity(raw = root.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.()) {
@@ -29,6 +29,7 @@
     active = null;
     pages.clear();
     directories.clear();
+    renamed.clear();
     failures = 0;
     retryAt = 0;
   }
@@ -45,6 +46,28 @@
   function handle() {
     return 'library_' + Array.from(root.crypto.getRandomValues(new Uint8Array(16)),
       value => value.toString(16).padStart(2, '0')).join('');
+  }
+
+  function rememberRename(source, name) {
+    const previous = renamed.get(source.id);
+    const oldNames = new Set([...(previous?.oldNames || []), source.name]);
+    oldNames.delete(name);
+    while (oldNames.size > 16) oldNames.delete(oldNames.values().next().value);
+    renamed.delete(source.id);
+    renamed.set(source.id, { name, oldNames, expiresAt: Date.now() + 10 * 60000 });
+    while (renamed.size > 128) renamed.delete(renamed.keys().next().value);
+  }
+
+  function reconcileName(source, query) {
+    const known = renamed.get(source?.id);
+    if (!known) return source;
+    if (Date.now() >= known.expiresAt || source.name !== known.name &&
+        (!query || !known.oldNames.has(source.name))) {
+      renamed.delete(source.id);
+      return source;
+    }
+    // Search indexing can lag a successful rename. Directory reads remain authoritative.
+    return query && known.oldNames.has(source.name) ? { ...source, name: known.name } : source;
   }
 
   function owned(job) {
@@ -100,7 +123,8 @@
     }
     const items = [...(previous?.items || [])], seen = new Set(items.map(item => item.source.id));
     let partial = previous?.partial || false;
-    for (const source of payload.items) {
+    for (const raw of payload.items) {
+      const source = reconcileName(raw, job.query);
       const name = label(source?.name);
       if (!source || !opaque(source.id) || !name || !['file', 'directory'].includes(source.kind) ||
           source.parent_directory_id != null && !opaque(source.parent_directory_id) ||
@@ -228,6 +252,8 @@
       fresh: () => current() && Array.from(pages.values()).some(page => Date.now() - page.savedAt < TTL && page.items.includes(item)),
       settle(confirmed, operation, name) {
       if (!current()) return;
+      if (confirmed && operation === 'rename') rememberRename(item.source, name);
+      if (confirmed && operation === 'trash') renamed.delete(item.source.id);
       for (const page of pages.values()) {
         if (confirmed && operation === 'trash') page.items = page.items.filter(row => row.source.id !== item.source.id);
         if (confirmed && operation === 'rename') page.items = page.items.map(row => row.source.id !== item.source.id ? row :
@@ -241,5 +267,5 @@
     const selection = selectMutation(fileHandle);
     return selection ? { source: selection.source, current: selection.fresh } : null;
   }
-  return Object.freeze({ version: 5, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead });
+  return Object.freeze({ version: 6, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead });
 });

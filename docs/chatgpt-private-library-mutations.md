@@ -61,6 +61,32 @@ The browser retains `web-chat-library-browser` and existing file selectors.
 
 ## Verification
 
+### Search Index Lag (2026-09-09)
+
+Native rename on normal Release 1.1.1588 returned an acknowledged write. A fresh
+request-bound `nodes?q=ELON` read still returned the old fixture name, while a
+separate `nodes` directory read returned the renamed fixture. This is search
+index lag, not proof that the PATCH failed. Immediate optimistic UI inspection
+and even a refreshed search page are insufficient persistence evidence.
+
+The current public asset `conversation-small-fka464yvjn19vebr.js`, SHA-256
+`1c130659c30fda891471cc9c4a8a5c491b595a1ca219516f0f90b0304b9b3c6f`, retains the
+same PATCH/body contract (`zSr.rename`) and NDJSON soft-delete (`jSr`). No
+alternative endpoint was introduced.
+
+Catalogue module 6 retains at most 128 recent acknowledged rename hints, with
+16 previous names per file and a ten-minute lifetime. Only search results with
+one of those previous names are reconciled. Unfiltered directory responses and
+different remote names take precedence; identity changes clear the hints.
+This adds no fetch, polling or DOM access, and does not claim to reindex search
+results. Native UI acceptance must verify the exact field value and read the
+file's directory independently; restore names before completing the test.
+
+The four related Node suites passed 58 tests
+(`library-rename-search-checks-20260909-052400-132`), including search lag, rename
+round trips, remote changes, expiry and account isolation. The external semantic
+UI runner also compiled and ran on the phone without replacing the APK.
+
 Targeted JavaScript coverage includes official paths/bodies, cache reconciliation,
 NDJSON completion/error/malformed frames, duplicate dispatch, concurrent writes,
 confirmation/name validation, unsupported kinds, identity/navigation changes,
