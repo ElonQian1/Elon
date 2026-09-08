@@ -271,6 +271,12 @@ The offline implementation itself did not operate the absent phone.
 
 ## Protocol gaps
 
+[Bounded segmented image pointers](chatgpt-private-image-download.md#bounded-segmented-pointers-2026-09-08)
+now extend both existing download and gallery owners in source (parser 2,
+download 13, gallery 3). 161 related offline cases pass; grouped build and real
+preview/saved-file acceptance remain pending. Reuse this implementation;
+remaining pointer gaps mean other scopes or forms outside its bounded contract.
+
 [Official-runtime generation stop](chatgpt-official-runtime-stop.md) is installed
 and its stop request passed on APK 1576. It reuses the sender's committed context
 and blocks a second writer while stopping. The unresolved gap is the subsequent

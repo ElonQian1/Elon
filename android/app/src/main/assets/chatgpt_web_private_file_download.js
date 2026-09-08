@@ -2,7 +2,7 @@
   'use strict';
   const pointer = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
-  const exported = Object.freeze({ version: 12, create: root => factory(root, pointer) });
+  const exported = Object.freeze({ version: 13, create: root => factory(root, pointer) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -313,5 +313,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 12, register, start, cancel, dispose });
+  return Object.freeze({ version: 13, register, start, cancel, dispose });
 });

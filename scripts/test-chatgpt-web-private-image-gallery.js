@@ -154,6 +154,21 @@ test('different pointer variants never alias one cached thumbnail', async () => 
   assert.deepEqual(h.calls.slice(1).map(c => c.url.searchParams.get('variant')), ['one', 'two']);
 });
 
+test('segmented gallery pointers resolve as encoded IDs without conflating cached images', async () => {
+  const ids = ['file-1/container/image.png#preview', 'file-1/other/image.png#preview'];
+  const h = harness([{ items: ids.map(id => ({ ...row(1), asset_pointer: 'sediment://' + id })), cursor: null }]);
+  assert.equal((await h.run()).ok, true);
+  const handles = h.snapshots().at(-1).handles;
+  assert.equal(new Set(handles).size, 2);
+  assert.deepEqual(h.calls.slice(1).map(c => c.url.pathname),
+    ids.map(id => '/backend-api/files/download/' + encodeURIComponent(id.replaceAll('#', '*'))));
+  assert.ok(h.calls.slice(1).every(c => c.url.searchParams.get('conversation_id') === 'conversation-1'));
+  h.calls.length = 0;
+  assert.equal((await h.run('open', handles)).ok, true);
+  assert.equal(h.calls.length, 0);
+  assert.doesNotMatch(JSON.stringify(h.events), /container|other\/image|conversation-1|file-1/);
+});
+
 test('preview registration snapshots the selected pointer before asynchronous resolution', async () => {
   const item = { ...row(1), asset_pointer: 'file-service://file-1?variant=selected' };
   const h = harness([{ items: [item], cursor: null }]);
@@ -204,11 +219,11 @@ test('gallery upgrade retires one older instance without stacking requests', () 
   const source = fs.readFileSync(require.resolve('../android/app/src/main/assets/chatgpt_web_private_image_gallery.js'), 'utf8');
   let disposed = 0;
   const root = { location: { origin: 'https://chatgpt.com' },
-    __elonChatGptPrivateImageGallery: { version: 1, dispose: () => disposed++ },
+    __elonChatGptPrivateImageGallery: { version: 2, dispose: () => disposed++ },
     __elonChatGptPrivateImagePointer: require('../android/app/src/main/assets/chatgpt_web_private_image_pointer.js') };
   vm.runInNewContext(source, { window: root });
   const instance = root.__elonChatGptPrivateImageGallery;
-  assert.equal(instance.version, 2);
+  assert.equal(instance.version, 3);
   assert.equal(disposed, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateImageGallery, instance);

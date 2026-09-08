@@ -174,3 +174,9 @@ for this source batch. The phone's foreground belonged to a separate grid task
 and was left untouched. Grouped acceptance still needs an actual generated
 image, plus a parameterized pointer when available, with preview bytes and warm
 reopen verified from the production Images UI. Do not mark `completed` yet.
+
+Gallery v3 also consumes the [bounded segmented-pointer extension](chatgpt-private-image-download.md#bounded-segmented-pointers-2026-09-08).
+It encodes the full ID through the same preview resolver and preserves distinct
+cache handles and no-request warm reopen. Parser 2 and download 13 share the
+same implementation; 161 related offline cases pass. This extension is
+source-only for grouped delivery, with real preview acceptance still pending.

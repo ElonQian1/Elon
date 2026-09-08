@@ -51,8 +51,9 @@ native download service uses the response metadata.
 Duplicate matching attachments, truncated or malformed metadata, conflicting
 projects, extra context scopes and non-image MIME metadata are rejected. Version
 4 additionally accepts matching metadata for [imported connector copies](chatgpt-private-connector-file-download.md).
-Shared/mounted library and connector-only references, path-bearing pointers
-and arbitrary URLs remain unsupported. Scope-like fields directly inside image
+Shared/mounted library and connector-only references and arbitrary URLs remain
+unsupported by this image resolver. Bounded segmented pointers are implemented
+below. Scope-like fields directly inside image
 parts are also rejected rather than silently ignored. `library_download_id` and
 attachment-level context scopes now reject broad file-download registration too.
 
@@ -82,7 +83,8 @@ added to native receipts or persisted conversation projections.
 
 Bounds are 4096 pointer characters, 32 query pairs, 64-character parameter names
 and 1024-character values. Simple ID segments with bounded `#` suffixes are
-supported; path-bearing IDs, malformed encoding and control characters are not.
+supported. That checkpoint rejected path-bearing IDs; the bounded extension
+below supersedes that restriction. Malformed encoding and controls stay rejected.
 Parameters that override project, conversation, post, context, inline/download
 intent or credential fields are rejected rather than silently changing their
 meaning. Remaining opaque parameters are forwarded as supplied by the selected
@@ -123,3 +125,44 @@ conversation and one project/library-linked image. Select Download from the
 production file detail, verify the actual saved bytes and MIME/open behavior,
 and preserve the original draft, voice state and selected conversation. Do not
 repeat protocol discovery or claim the queue receipt as transfer completion.
+
+## Bounded segmented pointers, 2026-09-08
+
+Case `android_chatgpt_private_conversation_image_download_v1:segmented_pointer`
+is implemented and offline verified, not device accepted or `completed`.
+Delivery is source-only for the next grouped APK. Shared pointer parser 2,
+file-download owner 13 and gallery owner 3 retain the existing native consumers.
+The global adapter stays 306: unrelated worktrees own older version-only edits.
+A future grouped installation starts with these assets; reinjection of the full
+module sequence is tested separately and does not replace identity/audio owners.
+
+The retained official shared asset `4813494d-o593jrji51wy4azk.js` was rehashed:
+SHA-256 `48563cd22f0dafe6c0b89220348fa3add81ff3abb82a62ed9d68a04d569cc375`.
+`UTt` only strips the pointer scheme. `kEt` preserves the entire ID before the
+query, replaces `#` with `*`, and passes it as `file_id` to the existing
+`/files/download/{file_id}` route. The request client's `xhe` substitutes that
+whole parameter with `encodeURIComponent`, including slashes. No additional
+endpoint, file ID reconstruction or segment-specific scope is inferred.
+
+The parser now admits up to 16 bounded ASCII segments (160 characters each),
+with filename dots permitted after the first segment. Leading/trailing/doubled
+slashes, dot segments, percent escapes in IDs, backslashes, controls and other
+URL syntax remain rejected. Existing query and suffix bounds still apply.
+This is a deliberately bounded subset of opaque identifiers, not evidence that
+every syntactically accepted ID exists or is authorized by the server.
+
+Metadata and library lookup keep the exact original ID including query/suffix;
+download authorization keeps the normalized ID encoded as one path parameter.
+The selected conversation/project, response file ID and account remain checked.
+Gallery variants keep distinct handles and warm reopen adds no requests. Neither
+raw IDs nor signed URLs are exposed in native index/receipt events.
+
+Four new positive cases failed against the preceding parser. After the change,
+161 related Node cases pass with zero failures/skips/cancellations, including
+download/gallery integration, cache reuse, metadata immutability, scope/account
+rejection and once-only upgrade of captured dependencies. Logs:
+`image-segment-red-20260908-204615-600` and
+`image-segment-related-20260908-204851-926`.
+All pointer examples and network responses are synthetic. No live segmented
+pointer, authorization response or saved image was observed. Phone ADB was
+unavailable; real download/preview acceptance remains in the grouped checklist.

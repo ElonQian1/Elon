@@ -157,6 +157,56 @@ test('parameterized image metadata matches the complete official pointer, not a 
   assert.equal(f.queued.length, 1);
 });
 
+test('segmented image IDs use one encoded parameter through library and scoped authorization', async () => {
+  const rawId = ID + '/container/original.v2.webp#part?variant=selected';
+  const normalized = ID + '/container/original.v2.webp*part';
+  for (const scheme of ['file-service', 'sediment']) {
+    const f = fixture(scheme + '://' + rawId);
+    f.message.metadata.attachments = [
+      { id: ID, name: 'wrong.png', library_file_id: 'wrong' },
+      { id: rawId, name: 'selected.webp', mime_type: 'image/webp', library_file_id: LIBRARY },
+    ];
+    f.payload.gizmo_id = PROJECT;
+    f.root.fetch = async (url, init) => {
+      f.calls.push({ url: new URL(url), init });
+      return Response.json(new URL(url).pathname.endsWith('/simple')
+        ? { file_id: rawId, is_library_file: true, library_file_id: LIBRARY, is_project: true, gizmo_id: PROJECT }
+        : { status: 'success', file_id: normalized, download_url: SIGNED });
+    };
+    const selected = f.register().find(row => row.kind === 'image');
+    assert.equal(selected.name, 'selected.webp');
+    assert.match(selected.downloadHandle || '', /^download_[a-f0-9]{32}$/);
+    const descriptor = f.descriptor([selected]);
+    f.image.asset_pointer = scheme + '://file-other/other';
+    await f.run(descriptor);
+    assert.equal(f.calls.length, 2);
+    assert.equal(f.calls[0].url.pathname, '/backend-api/files/' + encodeURIComponent(rawId) + '/simple');
+    assert.equal(f.calls[1].url.pathname, '/backend-api/files/download/' + encodeURIComponent(normalized));
+    assert.equal(f.calls[1].url.searchParams.get('gizmo_id'), PROJECT);
+    assert.equal(f.calls[1].url.searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+    assert.equal(f.calls[1].url.searchParams.get('variant'), 'selected');
+    assert.equal(f.queued.length, 1);
+    assert.equal(f.receipts[0][2], 'download_queued');
+    assert.ok(!JSON.stringify([selected, f.queued, f.receipts]).includes(rawId));
+  }
+});
+
+test('segmented image authorization rejects a different ID and cannot cross an account switch', async () => {
+  for (const changedAccount of [false, true]) {
+    const id = ID + '/container/image.png', f = fixture('sediment://' + id);
+    f.root.fetch = async (url, init) => {
+      f.calls.push({ url: new URL(url), init });
+      if (changedAccount) f.setAccount('Bearer synthetic-another-account');
+      return Response.json({ status: 'success', file_id: changedAccount ? id : ID, download_url: SIGNED });
+    };
+    assert.ok(f.register()[0].downloadHandle);
+    await f.run();
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.queued.length, 0);
+    assert.equal(f.receipts[0][1], false);
+  }
+});
+
 test('pointer parameters cannot replace context or introduce malformed and unbounded query data', () => {
   for (const query of [
     'gizmo_id=other', 'conversation_id=other', 'check_context_scopes_for_conversation_id=other',
@@ -190,7 +240,7 @@ test('parameterized project images retain scope and do not accept another file a
 test('unknown pointers and shared or connector metadata cannot get an ordinary image download handle', () => {
   for (const pointer of ['https://other.test/image', 'data:image/png;base64,AA', 'file-service://../file',
     'sediment://' + ID + '?gizmo_id=other', 'sediment://' + ID + '#page=1',
-    'sediment://' + ID + '/child', 'sediment://' + ID + '\n',
+    'sediment://' + ID + '/../child', 'sediment://' + ID + '\n',
     'sediment://' + ID + '?variant=synthetic\n', 'sediment://', ['sediment://' + ID]]) {
     const f = fixture(pointer);
     assert.equal(f.register()[0].downloadHandle, undefined);
