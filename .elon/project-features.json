@@ -320,15 +320,15 @@
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/android-binance-host-read-v1.md",
-        "content_hash": "64e12b4bad2727f9e5125ed1436241766bd377f11ac43614757dd078fc088386",
+        "content_hash": "3a3749a2178b1152b28453a801257428b75faafc41d644bbcb4d554e92ecd322",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "de01e0323055297a1978bb83d0d161522de0b689",
-          "head_blob_oid": "",
-          "worktree_blob_oid": "e628befc1835b4f4f0868dad2d17dad9038a69f7",
-          "state": "untracked"
+          "head_commit": "653a0e99a497f8679382fe3894fd5896f11c7ed8",
+          "head_blob_oid": "e628befc1835b4f4f0868dad2d17dad9038a69f7",
+          "worktree_blob_oid": "f27803f50955bc3356b93e632743907060356abc",
+          "state": "tracked_modified"
         }
       },
       "knowledge_node_id": "",
@@ -344,81 +344,15 @@
         "调用者、账号、过期和撤销隔离",
         "Win 研究与 Android 验收分开，无交易接口"
       ],
-      "implementation_evidence": [
-        {
-          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostProvider.kt",
-          "content_hash": "3bbc69dff301c192816979d815b5f8c5424d1d72fd180b493363375c8ec98ee9",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "de01e0323055297a1978bb83d0d161522de0b689",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "506ad5b2bd7046c88293e92651c113e98ae5cb33",
-            "state": "index_only"
-          }
-        },
-        {
-          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostRuntime.kt",
-          "content_hash": "fba7bf49dc05fb7c276e3488604726615b419a3689dc75cb2cd6d2480d1e96c7",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "de01e0323055297a1978bb83d0d161522de0b689",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "f4eabde3315e08876fc66d38470af5430503b113",
-            "state": "index_only"
-          }
-        },
-        {
-          "path": "android/app/src/test/kotlin/com/elon/app/grid/host/BinanceHostStateTest.kt",
-          "content_hash": "c92a0f00704f856ce96d5cc66a5612e7079dd36680947d475aea080a7c826937",
-          "locator": "",
-          "evidence_kind": "test",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "de01e0323055297a1978bb83d0d161522de0b689",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "d284915092b9f256229358148cacd59823385c3c",
-            "state": "index_only"
-          }
-        },
-        {
-          "path": "docs/reports/android-binance-host-read-v1-20260908.md",
-          "content_hash": "5c584568f581cb790fa91189de690fac228be28a45e1e18c7d6384285cdc63d3",
-          "locator": "实测与离线验证",
-          "evidence_kind": "document",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ee145704cad8e2c20218f0a03ae0a6e760d10f08",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "d4a995a1698ad1dfaf8624a96916981b422c12ff",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "scripts/test-binance-grid-read-adapter.cjs",
-          "content_hash": "d618aa0b4b33a52d755b16cf90ef29d8f663ef68990a616d0fdacf2d8a733a65",
-          "locator": "",
-          "evidence_kind": "test",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "de01e0323055297a1978bb83d0d161522de0b689",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "08bec6a825f2ece7d6bd49d7670486b20db65f20",
-            "state": "index_only"
-          }
-        }
-      ],
+      "implementation_evidence": [],
       "claim": {
-        "claim_id": "claim_fb2874fd6ed944dcbd5a551fd23af75f",
+        "claim_id": "claim_e6fa500f96a7481ebc9de681621823d2",
         "agent_id": "codex-binance-host",
-        "claimed_at_ms": 1788829162163,
-        "expires_at_ms": 1788843562163
+        "claimed_at_ms": 1788836103793,
+        "expires_at_ms": 1788850503793
       },
       "created_at_ms": 1788829139503,
-      "updated_at_ms": 1788832595800
+      "updated_at_ms": 1788836103815
     },
     {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -23075,66 +23009,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_ab7529649d7d4506801fa03eca1dd834",
-      "feature_id": "team-assets-public-preview-v1",
-      "action": "transitioned",
-      "actor": "codex-team-assets",
-      "reason": "独立精确公开路由接入，量化团队汇总模块并行实现",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788616523231
-    },
-    {
-      "id": "feature_event_1553af5a7ab54abbb2db5b2d78659109",
-      "feature_id": "team-assets-public-preview-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-team-assets",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788618083006
-    },
-    {
-      "id": "feature_event_415c9df3fd784564864a7cb22669fcbc",
-      "feature_id": "team-assets-public-preview-v1",
-      "action": "transitioned",
-      "actor": "codex-team-assets",
-      "reason": "精确公开汇总转发已实现，10项本地测试通过；生产发布与真实同步待验收",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788618083152
-    },
-    {
-      "id": "feature_event_0fe5a4c9ea1545eab292c14484ea6a69",
-      "feature_id": "esk-platform-sui-address-binding-v2",
-      "action": "registered",
-      "actor": "codex-root",
-      "reason": "非快进变基后以主线注册表为基准重新登记已审阅 V2，避免手工合并注册表",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1788642559294
-    },
-    {
-      "id": "feature_event_1b4e74e8715c4fa3888cfd6e7762c848",
-      "feature_id": "esk-platform-sui-address-binding-v2",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "变基后重新核对需求正文、上游账号授权边界与无链上无资金范围",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788642573651
-    },
-    {
-      "id": "feature_event_7de9046bab4f43e3a6238db0e8211500",
-      "feature_id": "esk-platform-sui-address-binding-v2",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "依赖均完成且变基后合并范围清晰，可执行冲突影响验证",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788642586245
-    },
-    {
       "id": "feature_event_549d90d2c7c54485b91faf5be80d6dfb",
       "feature_id": "esk-platform-sui-address-binding-v2",
       "action": "claimed",
@@ -25073,6 +24947,66 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788832595800
+    },
+    {
+      "id": "feature_event_6a47e586fec5466086bd8ffa8bdce9eb",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "claim_released",
+      "actor": "codex-binance-host",
+      "reason": "按用户确定的主子账户分工重新绑定完善后的需求，随即继续认领。",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788836102944
+    },
+    {
+      "id": "feature_event_973cbcd5a60e4e278cc555bfa743f490",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-binance-host",
+      "reason": "加入用户确定的账号分工，明确身份校验、详情代次与撤销确认；保持只读范围。",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788836103730
+    },
+    {
+      "id": "feature_event_3f34fc7c5e0f47ffad4fd6f1784f3658",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-host",
+      "reason": "用户已授权继续完善本模块，范围保持本人只读。",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788836103754
+    },
+    {
+      "id": "feature_event_cee635ade02641a6ae0353d98df8a205",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-host",
+      "reason": "用户已授权继续完善本模块，范围保持本人只读。",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788836103774
+    },
+    {
+      "id": "feature_event_f5693c0ac6aa4a3da033bbeb220d195c",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "claimed",
+      "actor": "codex-binance-host",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788836103793
+    },
+    {
+      "id": "feature_event_acb0f50a119a44faa6d6caae27354d85",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-host",
+      "reason": "身份隔离与会话恢复已通过离线验证，继续构建和手机验收。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788836103815
     }
   ]
 }
