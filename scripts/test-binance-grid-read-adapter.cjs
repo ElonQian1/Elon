@@ -26,8 +26,11 @@ function harness() {
   const h = harness(); h.queue.push({text: good([row])});
   await h.window.fetch(LIST, {method: 'POST'}); await tick();
   assert.equal(h.events.length, 0);
-  h.window.__elonBinanceReadV1.bind('doc_test_123');
+  assert.equal(h.window.__elonBinanceReadV1.bind('invalid'), undefined);
+  assert.equal(h.window.__elonBinanceReadV1.bind('doc_test_123'), true);
   assert.equal(h.events[0].rows.length, 1);
+  assert.equal(h.window.__elonBinanceReadV1.bind('doc_test_123'), true);
+  assert.equal(h.events.length, 1); // Commit-visible plus page-finished binding must not replay buffered data.
   assert.equal(h.events[0].rows[0].profit, '-0.15');
   assert.ok(!JSON.stringify(h.events).includes('fixture-secret'));
   assert.ok(!JSON.stringify(h.events).includes('not-projected'));
@@ -47,5 +50,5 @@ function harness() {
   assert.equal(h.events.at(-1).kind, 'list');
   h.queue.push({text: JSON.stringify({code: '000000', success: false, data: [row]})});
   await h.window.fetch(LIST, {method: 'POST'}); await tick(); assert.equal(h.events.at(-1).kind, 'unavailable');
-  console.log('Binance read adapter: 17 assertions passed (synthetic only; no network or orders).');
+  console.log('Binance read adapter: 19 assertions passed (synthetic only; no network or orders).');
 })().catch(error => { console.error(error); process.exitCode = 1; });

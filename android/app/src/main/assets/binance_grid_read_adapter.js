@@ -147,6 +147,7 @@
       if (!/^doc_[a-z0-9_]{3,80}$/.test(value)) return;
       token = value;
       if (current) { const pending = current; current = null; emit(pending); }
+      return true;
     },
     detail(value) {
       if (!token || !known.has(value) || !/^[0-9]{1,20}$/.test(value)) return false;

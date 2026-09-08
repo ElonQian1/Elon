@@ -44,6 +44,8 @@ internal fun createBinanceHostWebView(context: Context, runtime: BinanceHostRunt
         webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = !binanceHostNavigation(request.url.toString())
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) = runtime.pageStarted(url)
+            // Bind once the document is visible; slow third-party resources must not hold buffered observations.
+            override fun onPageCommitVisible(view: WebView, url: String) = runtime.pageReady(url, finished = false)
             override fun onPageFinished(view: WebView, url: String) { CookieManager.getInstance().flush(); runtime.pageReady(url) }
             override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: android.net.http.SslError) {
                 handler.cancel(); runtime.fail("币安连接证书验证失败")

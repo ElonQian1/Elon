@@ -11,6 +11,14 @@ internal fun mcpBinanceHostStatus(context: Context): JSONObject = runCatching {
             .put("schema", "yilong.binance_host_status.v1")
             .put("source", "android_webview")
             .put("host_present", host.view != null)
+            .put("page_phase", host.pagePhase)
+            .put("page_progress", host.view?.progress ?: 0)
+            .put("adapter_bound", host.adapterBound)
+            .put("page_origin", when {
+                host.view?.url?.startsWith("${BinanceHostRuntime.ORIGIN}/") == true -> "binance"
+                host.view?.url?.startsWith("https://accounts.binance.com/") == true -> "binance_login"
+                else -> "none_or_other"
+            })
             .put("main_session_current", host.live())
             .put("list_verified", host.live() && host.state.fresh())
             .put("row_count", if (host.live() && host.state.fresh()) host.state.count else 0)

@@ -19,6 +19,8 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     val document = WebBridgeDocumentSession()
     var view: WebView? = null; private set
     var status = "请先连接币安"; private set
+    var pagePhase = "not_started"; private set
+    var adapterBound = false; private set
     var onChanged: (() -> Unit)? = null
     private var captured: EskPlatformSession? = null
     private val sessions = EskPlatformSessionStore(context) { handler.post { invalidate("主账号已变化，请重新连接") } }
@@ -55,13 +57,17 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     fun pageStarted(url: String) {
         document.beginPage()
         state.unavailable()
+        pagePhase = "loading"; adapterBound = false
         status = if (url.startsWith("https://accounts.binance.com/")) "请在币安官方页面登录或验证" else "正在等待币安网格响应"
         onChanged?.invoke()
     }
-    fun pageReady(url: String) {
+    fun pageReady(url: String, finished: Boolean = true) {
         if (!live() || !url.startsWith("$ORIGIN/")) return
+        pagePhase = if (finished) "finished" else "visible"
         val token = document.ensurePage().documentToken
-        view?.evaluateJavascript("window.__elonBinanceReadV1?.bind(${StrictJson.encode(token)})", null)
+        view?.evaluateJavascript("window.__elonBinanceReadV1?.bind(${StrictJson.encode(token)})") { value ->
+            if (value == "true" && live() && document.snapshot().documentToken == token) adapterBound = true
+        }
     }
     fun observed(raw: String) {
         if (!live()) return invalidate("登录或授权已失效")
@@ -97,6 +103,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     fun fail(message: String) { state.unavailable(); status = message; onChanged?.invoke() }
     fun invalidate(message: String) {
         captured = null; state.unavailable(); handler.removeCallbacks(expiry)
+        pagePhase = "closed"; adapterBound = false
         view?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); it.stopLoading(); it.destroy() }
         view = null; status = message; onChanged?.invoke()
     }
