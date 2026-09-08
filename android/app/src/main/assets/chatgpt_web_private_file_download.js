@@ -2,7 +2,7 @@
   'use strict';
   const pointer = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
-  const exported = Object.freeze({ version: 13, create: root => factory(root, pointer) });
+  const exported = Object.freeze({ version: 14, create: root => factory(root, pointer) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -181,6 +181,28 @@
       identity() === job.entry.account && (Boolean(job.entry.sharedLibraryFileId) || job.byteTransfer || job.entry.expiresAt > Date.now());
   }
 
+  function registerLibraryFile(file) {
+    const account = identity(), token = root.__elonChatGptDocumentToken;
+    if (disposed || !account || !/^doc_[a-z0-9_]{3,80}$/.test(token || '') ||
+        !root.elonChatGptFileDownload || file?.kind !== 'file' || !LIBRARY.test(file.id || '') ||
+        typeof file.name !== 'string' || !file.name.trim() || /[\x00-\x1f\x7f]/.test(file.name) ||
+        file.name.length > 1024 || file.external_account != null || file.cloud_doc_url != null ||
+        file.library_artifact_type != null || file.saved_entity != null || file.trashed_at != null) return '';
+    const name = file.name.trim().slice(0, 180);
+    for (const [key, entry] of entries) {
+      if (entry.expiresAt <= Date.now()) entries.delete(key);
+      else if (entry.path === '/library' && entry.sharedLibraryFileId === file.id && entry.name === name &&
+          entry.token === token && entry.account === account) return key;
+    }
+    const bytes = root.crypto.getRandomValues(new Uint8Array(16));
+    const handle = 'download_' + Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+    // The node's library ID goes to the existing library binary route, never to a fabricated conversation.
+    entries.set(handle, { path: '/library', sharedLibraryFileId: file.id, name,
+      mediaType: file.mime_type || '', account, token, expiresAt: Date.now() + 120000 });
+    while (entries.size > 800) entries.delete(entries.keys().next().value);
+    return handle;
+  }
+
   function downloadUrl(value) {
     try {
       const url = new URL(value);
@@ -313,5 +335,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 13, register, start, cancel, dispose });
+  return Object.freeze({ version: 14, register, registerLibraryFile, start, cancel, dispose });
 });

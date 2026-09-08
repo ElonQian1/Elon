@@ -394,7 +394,7 @@ test('installed bridges upgrade once and load mounted modules without replacing 
     }
     assert.equal(window.__elonChatGptPrivateHistoryProjection.version, 6);
     assert.equal(window.__elonChatGptPrivateLibraryDownload.version, 7);
-    assert.equal(window.__elonChatGptPrivateFileDownload.version, 12);
+    assert.equal(window.__elonChatGptPrivateFileDownload.version, download.version);
     assert.equal(retired, 1);
     assert.equal(window.__elonChatGptPrivateAuthContext, identity);
     assert.equal(window.__elonChatGptPrivateRealtimeVoice, audio);
