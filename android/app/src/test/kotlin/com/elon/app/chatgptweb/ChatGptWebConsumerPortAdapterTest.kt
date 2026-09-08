@@ -13,6 +13,29 @@ import org.junit.Test
 
 class ChatGptWebConsumerPortAdapterTest {
     @Test
+    fun projectsComposerAttachmentsAndUsesExistingRemovalCommand() {
+        var observed = ChatGptWebObservedState.Snapshot.EMPTY.copy(pageGeneration = 1, adapterGeneration = 1)
+        val requests = mutableListOf<JSONObject>()
+        val port = ChatGptWebConsumerPortAdapter(
+            snapshot = { snapshot(false, false).copy(attachments = listOf(
+                ChatGptWebAttachment("private_attachment_mcp_fixture", "fixture.txt", "ready", true),
+            )) },
+            uiManifest = { null }, observedState = { observed },
+            executeControl = { requests += it; JSONObject().put("ok", true) },
+        )
+        val item = port.state().attachments.single()
+        assertEquals("fixture.txt", item.name)
+        assertEquals("ready", item.state)
+        assertTrue(item.removable)
+        assertTrue(requests.isEmpty())
+        port.removeComposerAttachment(item.id)
+        assertEquals("chatgpt_remove_attachment", requests.single().getString("action"))
+        assertEquals(item.id, requests.single().getString("attachment_id"))
+        observed = observed.copy(pageGeneration = 2)
+        assertTrue(port.state().attachments.isEmpty())
+    }
+
+    @Test
     fun exposesTypedComposerStateWithoutReadingMcpJson() {
         val observed = ChatGptWebObservedState.Snapshot.EMPTY.copy(
             pageGeneration = 3,

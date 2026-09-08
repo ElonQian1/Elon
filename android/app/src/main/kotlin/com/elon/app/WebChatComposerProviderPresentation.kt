@@ -13,6 +13,7 @@ internal object WebChatComposerProviderPresentation {
         showWorkModelSelector: () -> Unit,
     ) {
         views.activeWebToolChip.render(null, clearQuickAction)
+        views.webAttachmentStrip.hide()
         views.modelButtonShell.tag = null
         views.modelButtonShell.layoutParams = views.modelButtonShell.layoutParams.apply {
             width = modelWidth

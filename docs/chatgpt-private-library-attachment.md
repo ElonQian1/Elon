@@ -1,8 +1,10 @@
 # Library files in the current composer
 
 Capability: `android_chatgpt_private_library_attachment_v1`.
-Status: implemented, offline verified and published/installed in 1.1.1581;
-live composer association and explicit-send acceptance remain pending.
+Status: association implemented and published; native-menu association returned
+`library_attachment_associated` with one ready attachment on normal 1.1.1584.
+The missing production composer card is being corrected; explicit-send and
+attachment metadata persistence acceptance remain pending.
 This extends the [native library browser](chatgpt-private-library-browser.md).
 It is not a second uploader, an independent message POST, or a new speech path.
 
@@ -66,11 +68,26 @@ link. Its 11 failures were reproduced with the unchanged HEAD composer/sender.
 The fixture now models the committed branch required by the existing production
 owner resolver; production branch validation was not relaxed.
 
-Device verification must still establish that the
-current official runtime accepts the reference, that a selected file appears in
-the production composer and reaches the intended conversation after explicit
-send. The user has signed in. The 1579 catalog object-event defect is fixed in
-1581: request-bound native reads are verified and nine root rows advertise
-attachment handles. This does not verify association itself. The rendered native
-menu/browser handoff remains unconfirmed; see the [browser evidence](chatgpt-private-library-browser.md).
-No user library files were renamed or deleted.
+### 1584 Native Association And UI Gap
+
+On 2026-09-09, clicking the real native file menu's attach action returned the
+exact successful receipt and one ready attachment. The library automatically
+closed; current conversation, draft and message count remained unchanged.
+Log: `library-native-association-1584-20260909-032240-607`.
+
+This was not a full composer-UI pass: `WebChatConsumerState` omitted the official
+snapshot's attachments, and the production input only mounted local-file
+previews. The file reference therefore had no native card/removal control.
+The new typed attachment projection and `WebChatComposerAttachmentStrip` reuse
+the existing pending-attachment host and `chatgpt_remove_attachment` command.
+They perform no upload, message send or navigation. Cards await observed removal,
+bind actions to the current page/provider and stop bounded observation on detach.
+Work-mode local previews keep their existing owner.
+
+Subsequent 1584 snapshots reduced this staged reference to a generic `附件 1`
+DOM-derived entry. The private ID/name retention cause is not established by the
+association receipt. Do not mark private send-lease/metadata preservation proven
+until a real explicit-send sample confirms it. The sole test reference was
+removed through the existing command afterward, restoring an empty composer
+without changing its draft or conversation. No user library files were renamed
+or deleted. See the [browser evidence](chatgpt-private-library-browser.md).

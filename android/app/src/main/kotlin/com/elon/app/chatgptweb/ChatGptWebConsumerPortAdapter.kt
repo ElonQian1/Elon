@@ -22,6 +22,8 @@ internal class ChatGptWebConsumerPortAdapter(
     override fun libraryFiles() = observedState().let { it.libraryFiles.takeIf { _ -> it.adapterCurrent } }
     override fun attachLibraryFile(handle: String) =
         execute(JSONObject().put("action", "chatgpt_attach_library_file").put("file_handle", handle).put("confirmed", true))
+    override fun removeComposerAttachment(id: String) =
+        execute(JSONObject().put("action", "chatgpt_remove_attachment").put("attachment_id", id))
     override fun mutateLibraryFile(handle: String, operation: String, name: String, confirmed: Boolean) =
         execute(JSONObject().put("action", "chatgpt_mutate_library_file").put("file_handle", handle)
             .put("operation", operation).put("name", name).put("confirmed", confirmed))
@@ -123,6 +125,9 @@ internal class ChatGptWebConsumerPortAdapter(
             privateReadAloudReady = current?.privateReadAloudReady == true,
             privateReadAloudState = current?.privateReadAloudState ?: "idle",
             privateReadAloudContextId = current?.privateReadAloudContextId.orEmpty(),
+            attachments = current?.attachments.orEmpty().map {
+                com.elon.app.WebChatComposerAttachment(it.id, it.name, it.state, it.removable)
+            },
         )
     }
 

@@ -685,6 +685,7 @@ internal class MainSocialAiChatFeature(
                 ),
             )
             inputComposerViews()?.let { views ->
+                views.webAttachmentStrip.render(controller.consumerPort(), consumerState)
                 productionComposerTools.selectedQuickAction(provider)?.let {
                     activeQuickComposerAction = it
                 }
@@ -708,7 +709,6 @@ internal class MainSocialAiChatFeature(
         } else if (consumerStatusBannerDelegate.isInitialized()) consumerStatusBanner.hide()
         refreshInputComposerVisual()
     }
-
     private fun showComposerOperationFeedback(feedback: WebChatConsumerComposerFeedback) {
         if (!isChatModeActive() || providerId() != feedback.providerId) return
         val epoch = ++composerOperationFeedbackEpoch

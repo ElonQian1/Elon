@@ -4,6 +4,19 @@ const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
 
+test('production composer displays official staged attachments and reuses canonical removal', () => {
+  const read = name => fs.readFileSync(path.join(__dirname, '../android/app/src/main/kotlin/com/elon/app/', name), 'utf8');
+  const strip = read('WebChatComposerAttachmentStrip.kt');
+  assert.match(read('MainInputComposerSetup.kt'), /WebChatComposerAttachmentStrip\(pendingAttachmentHost\)/);
+  assert.match(read('MainSocialAiChatFeature.kt'), /webAttachmentStrip\.render\(controller\.consumerPort\(\), consumerState\)/);
+  assert.match(read('WebChatComposerProviderPresentation.kt'), /webAttachmentStrip\.hide\(\)/);
+  assert.match(read('chatgptweb/ChatGptWebConsumerPortAdapter.kt'), /current\?\.attachments\.orEmpty\(\)\.map/);
+  assert.match(strip, /port\.removeComposerAttachment\(item\.id\)/);
+  assert.match(strip, /state\.pageUrl != expectedPage/);
+  assert.match(strip, /state\.attachments\.none \{ it\.id == item\.id \}/);
+  assert.doesNotMatch(strip, /evaluateJavascript|loadUrl|setDraft|sendText|uploadFile|requestLibraryFiles/);
+});
+
 test('native attach waits for the exact receipt and returns without navigating or sending text', () => {
   const read = name => fs.readFileSync(path.join(__dirname, '../android/app/src/main/kotlin/com/elon/app/', name), 'utf8');
   const ui = read('WebChatLibraryAttachmentAction.kt');

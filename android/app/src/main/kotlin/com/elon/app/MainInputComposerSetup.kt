@@ -47,6 +47,7 @@ internal data class MainInputComposerViews(
     val toggleLocalVoiceMode: () -> Unit,
 ) {
     var attachmentPreparation: WebChatAttachmentPreparationPort? = null
+    val webAttachmentStrip = WebChatComposerAttachmentStrip(pendingAttachmentHost)
 }
 
 internal class MainInputComposerSetup(
