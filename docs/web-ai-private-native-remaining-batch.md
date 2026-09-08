@@ -22,6 +22,8 @@ reused; source-only or installation status does not satisfy the acceptance gate.
 
 ## Current batch
 
+Current owner corrections and guest-stop coverage: [2026-09-08 batch](reports/chatgpt-runtime-owners-20260908.md). Offline passed; production acceptance remains separate.
+
 Latest grouped delivery: `1542` compiled and passed 1,007 Android tests, was
 published and installed, and confirmed one production private text-file upload
 with actual file-content reply. `1543` includes the file-index freshness fix;

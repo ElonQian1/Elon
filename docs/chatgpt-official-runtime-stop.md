@@ -2,7 +2,8 @@
 
 Capability: `android_chatgpt_official_runtime_stop_generation_v1`.
 Status: source implemented and offline verified, not device accepted or
-completed. Adapter 291 includes it in the next grouped ChatGPT APK. This is a
+completed. Adapter 303 includes stop runtime v3 with verified guest identity;
+see [the current owner batch](reports/chatgpt-runtime-owners-20260908.md). This is a
 same-origin official-runtime bridge, not an independent Android HTTP transport.
 Do not reimplement the source integration while device acceptance is pending.
 

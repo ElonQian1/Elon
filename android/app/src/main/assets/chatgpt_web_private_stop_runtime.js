@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const old = root.__elonChatGptPrivateStopRuntime;
@@ -18,12 +18,12 @@
   let modules, loading, active = null;
 
   function capture(node) {
-    return page.__elonChatGptPrivateTextRuntimeSubmit?.captureConversation?.(node);
+    return page.__elonChatGptPrivateTextRuntimeSubmit?.captureConversation?.(node, true);
   }
 
   function current(binding) {
     const now = capture(binding.node);
-    return now && ['token', 'account', 'href', 'shared', 'files', 'conversation', 'controller'].every(key =>
+    return now && ['token', 'account', 'guestProof', 'href', 'shared', 'files', 'conversation', 'controller'].every(key =>
       now[key] === binding[key]) ? now : null;
   }
 
@@ -175,5 +175,5 @@
     return owner.transaction;
   }
 
-  return Object.freeze({ version: 2, stop, state });
+  return Object.freeze({ version: 3, stop, state });
 });
