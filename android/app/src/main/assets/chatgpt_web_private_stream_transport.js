@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 15) return;
+  if (existing && Number(existing.version) >= 16) return;
   if (existing && typeof existing.dispose === 'function') {
     try { existing.dispose(); }
     catch (_) { /* A stale transport must not block the upgraded observer. */ }
@@ -583,7 +583,9 @@
       sse.push(decoder.decode());
       sse.finish();
     } catch (_) {
-      if (observedGeneration === conversationGeneration) session.reset();
+      // Aborting the official request also rejects its cloned reader. Keep
+      // received text for the same turn while the official snapshot catches up.
+      if (!disposed && observedGeneration === conversationGeneration && !session.finish()) session.reset();
       report('error');
       notify();
     } finally {
@@ -619,7 +621,7 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 15,
+    version: 16,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,
