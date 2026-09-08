@@ -92,7 +92,32 @@ a later request. No DOM click, credential copying or new HTTP endpoint is added.
 `stop-current-request-red` failed 10 of 11 new cases against v4;
 `stop-current-request-tests` passes 73 focused cases (including the 11 new
 cases), with no skips. This proves the stale-property source gap, not that it
-is the sole device root cause. Device proof for v5 is still pending.
+is the device root cause.
+
+APK 1570 / adapter 306, source `5fa473e27`, was built, published and installed
+without clearing data. Its SHA-256 is
+`bee2ee9d5b66190df34c2e8d1ec97e9d9a76c75ee093ae06d1c62339a7811acf`.
+The v5 device rerun still reports `request_unavailable` and uses DOM fallback.
+The partial answer survived stopping (229 characters before, 274 after), but
+the next native send again produced two rows instead of four: a combined user
+row and a replacement assistant row. All four stop/follow-up assertions failed;
+the harness now exits nonzero on assertion failure. This correction did not
+resolve the live failure and must not be marked completed.
+
+Current public-source evidence offers a narrower next investigation: the
+versioned conversation export `hHt` resolves to `BM`, which defaults its request
+argument from the tree but can also stop a streaming conversation without an
+active request entry. It conditionally uses the official conversation-stop
+path. Our runtime rejects a missing request before reaching that function.
+This is a compatibility hypothesis, not proof of the phone's active route.
+Do not simply remove the request guard: any alternative owner must still pin
+the same generation before asynchronous work, exclude voice, and observe
+completion. A subsequent MCP protocol-shape diagnostic was stopped by the
+foreground guard before capture or sending; no endpoint/status evidence was
+obtained from that attempt. The app was not brought back over the user's screen.
+
+New logs: `stopped-turn-device-1570` (failed acceptance) and
+`stopped-turn-protocol-1570` (foreground guard, not a protocol result).
 The device logs are `two-turn-device-1569-followup` and
 `stopped-turn-device-1569`; they contain only synthetic structural results.
 The temporary awake setting was restored. The earlier remote test screenshot
