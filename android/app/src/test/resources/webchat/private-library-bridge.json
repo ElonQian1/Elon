@@ -1,0 +1,28 @@
+{
+  "schema": "yilong.ai.ui.v1",
+  "adapterVersion": 306,
+  "documentToken": "doc_synthetic_library",
+  "providerId": "chatgpt",
+  "source": "official_web",
+  "conversationId": "/c/synthetic",
+  "event": {
+    "type": "library_files_snapshot",
+    "version": 1,
+    "requestId": "mcp_library",
+    "directoryHandle": "",
+    "query": "",
+    "breadcrumbs": [],
+    "items": [{
+      "handle": "library_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "file",
+      "name": "fixture.txt",
+      "mediaType": "text/plain",
+      "sizeBytes": 7,
+      "downloadHandle": "",
+      "canAttach": false
+    }],
+    "hasMore": false,
+    "partial": false,
+    "stale": false
+  }
+}

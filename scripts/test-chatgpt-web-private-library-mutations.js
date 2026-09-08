@@ -31,7 +31,7 @@ async function fixture(overrides = {}) {
   const service = root.__elonChatGptPrivateLibraryCatalog = catalog.create(root);
   const writer = root.__elonChatGptPrivateLibraryMutations = mutations.create(root);
   const list = (value = {}) => service.list({ requestId: 'mcp_list' + ++sequence, value: JSON.stringify(value) },
-    (_, value) => events.push(value), (...value) => receipts.push(value));
+    value => events.push(value), (...value) => receipts.push(value));
   await list();
   const command = (operation = 'rename', options = {}) => ({ requestId: 'mcp_write' + ++sequence, selected: true,
     value: JSON.stringify({ operation, fileHandle: events[0].items[0].handle, name: 'renamed.txt' }), ...options });

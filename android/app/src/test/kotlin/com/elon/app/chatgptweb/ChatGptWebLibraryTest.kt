@@ -11,6 +11,32 @@ import org.junit.Test
 import java.lang.reflect.Proxy
 
 class ChatGptWebLibraryTest {
+    private fun bridgeFixture() = JSONObject(requireNotNull(javaClass.classLoader?.getResourceAsStream(
+        "webchat/private-library-bridge.json",
+    )).bufferedReader().use { it.readText() })
+
+    @Test fun realAdapterWireEnvelopeReachesNativeLibraryStateBeforeReceipt() {
+        val state = ChatGptWebObservedState(nowMs = { 1000L })
+        val pending = state.beginCommand(ChatGptWebLibraryProtocol.ACTION)
+        val frame = bridgeFixture()
+        frame.getJSONObject("event").put("requestId", pending.id)
+        val message = requireNotNull(ChatGptWebProtocol.parseMessage(frame.toString(), 306))
+        assertEquals("doc_synthetic_library", message.documentToken)
+        assertTrue(message.event is ChatGptWebEvent.LibraryFiles)
+        state.accept(message.event)
+        state.accept(ChatGptWebEvent.CommandResult(ChatGptWebLibraryProtocol.ACTION, true, "library_ready", pending.id))
+        assertEquals("fixture.txt", state.snapshot().libraryFiles?.items?.single()?.name)
+        assertEquals(pending.id, state.snapshot().libraryFiles?.requestId)
+    }
+
+    @Test fun rejectsTheOldStringEventAndKeepsActualEmptyLibraryDistinct() {
+        val frame = bridgeFixture()
+        assertNull(ChatGptWebProtocol.parse(JSONObject(frame.toString()).put("event", "library_files_snapshot").toString()))
+        frame.getJSONObject("event").put("items", JSONArray())
+        val event = ChatGptWebProtocol.parse(frame.toString()) as ChatGptWebEvent.LibraryFiles
+        assertTrue(event.value.items.isEmpty())
+    }
+
     private val handle = "library_" + "a".repeat(32)
     private val download = "download_" + "b".repeat(32)
     private fun payload(id: String = "mcp_test") = JSONObject().put("version", 1).put("requestId", id)

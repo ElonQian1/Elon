@@ -4,7 +4,8 @@
 
 Capability `android_chatgpt_private_library_file_mutations_v1` implements ordinary
 owned-library file rename and move-to-recently-deleted in the production native
-file browser. Published/installed in 1.1.1579; device acceptance is pending sign-in.
+file browser. Published/installed in 1.1.1579; device acceptance awaits the
+[catalog bridge correction](chatgpt-private-library-browser.md), not sign-in.
 It does not implement permanent deletion, batch deletion, restoration, folder
 creation/rename/move, project-file mutations or external-provider mutations.
 

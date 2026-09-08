@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 4, create: factory });
+  const exported = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateLibraryCatalog?.version || 0) < exported.version) {
@@ -88,7 +88,7 @@
       const canAttach = !!attachments?.descriptor(source);
       return { ...item, downloadHandle, canAttach, ...root.__elonChatGptPrivateLibraryMutations?.capabilities?.(source) };
     });
-    emit('library_files_snapshot', { version: 1, requestId: job.requestId,
+    emit({ type: 'library_files_snapshot', version: 1, requestId: job.requestId,
       directoryHandle: job.directoryHandle, query: job.query, breadcrumbs: job.breadcrumbs,
       items, hasMore: Boolean(page.cursor) && !page.capped, partial: page.partial || page.capped, stale });
   }
@@ -241,5 +241,5 @@
     const selection = selectMutation(fileHandle);
     return selection ? { source: selection.source, current: selection.fresh } : null;
   }
-  return Object.freeze({ version: 4, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead });
+  return Object.freeze({ version: 5, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead });
 });

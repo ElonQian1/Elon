@@ -69,5 +69,6 @@ owner resolver; production branch validation was not relaxed.
 Device verification must still establish that the
 current official runtime accepts the reference, that a selected file appears in
 the production composer and reaches the intended conversation after explicit
-send. The installed production composer is ready, but the official page currently
-asks for account selection/sign-in. No user library files were renamed or deleted.
+send. The user has signed in; 1579 acceptance instead exposed the catalog's
+object-event bridge defect, fixed for the next APK in the [browser owner](chatgpt-private-library-browser.md).
+No user library files were renamed or deleted.

@@ -5,9 +5,9 @@
 - Capability: `android_chatgpt_private_library_browser_v1`.
 - Code: implemented for root/folder browsing, explicit search, cursor pagination,
   refresh and ordinary library-file download; published/installed in 1.1.1579.
-- Verification: targeted offline protocol/native tests; device acceptance deferred.
-- Catalog v4 cold-identity preparation is a subsequent source patch for the next
-  grouped APK, not part of the installed 1579 catalog v3.
+- Verification: targeted offline tests; 1579 live acceptance found a bridge regression.
+- Catalog v5 fixes object-event publication and includes v4 cold-identity preparation;
+  both patches await the next grouped APK, not the installed 1579 catalog v3.
 - This is the independent library, not the current conversation's attachment index.
   No conversation ID is fabricated to authorize a library download.
 
@@ -74,14 +74,26 @@ Validated on 2026-09-08:
   passed. APK 1.1.1579 was installed via `adb install -r`, preserving app data.
   Source: `20c08c8b9`; release log `library-batch-release-20260908-232230-150`.
   APK SHA-256: `8119319905b2af85a1c8024cf85638331b34fb42cfb51fc0e2f5c7437b1861a9`.
-- Production chat/composer readiness was verified after installation. The library
-  command returned `library_identity_not_ready`; a bounded official-page inspection
-  showed an account-selection/sign-in prompt. No live catalog/mutation/attachment
-  acceptance is claimed. The page is awaiting the user's sign-in, not a cookie reset.
+- Initial production inspection reached account selection. The user subsequently
+  confirmed sign-in on 2026-09-09; do not repeat the old sign-in prerequisite.
 - The follow-up catalog v4 patch passed 55 focused Node cases, including real shared
   auth-owner integration, cancellation, supersession, context changes and combined
   time budgets; log `library-cold-identity-final-20260908-235543-816`. This fixes an
   independently verified cold-cache gap; it does not claim to sign in a logged-out account.
+
+2026-09-09 regression: foreground 1579 returned `library_ready`, but native
+`library_files` was null. This is missing projection, not evidence of an empty
+account. The catalog called `emit(type, value)` while the real adapter expects
+`emitEvent({type, ...value})`. Its two unit-test fixtures copied the same wrong
+callback and missed the failure. Catalog v5 uses the existing single-object
+contract without changing the protocol parser or unrelated adapters. Three tests
+running the actual catalog, directory dispatcher and full adapter failed before
+the fix and passed afterward; 46 related Node cases pass. The shared synthetic
+`webchat/private-library-bridge.json` also exercises the full Android envelope
+parser and pending native-state owner. Release compilation and all 12 library
+JVM tests passed (`library-bridge-jvm-20260909-002514-316`); the related Node
+batch including attachment reuse passed (`library-bridge-node-20260909-003154-663`).
+Device confirmation awaits the grouped APK.
 
 Run one production-UI root/folder/back/search/pagination sample and one ordinary
 saved-byte download after the grouped APK is installed. Verify the original conversation,

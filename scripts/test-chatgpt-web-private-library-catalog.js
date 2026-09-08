@@ -45,7 +45,7 @@ function fixture() {
   root.__elonChatGptPrivateFileDownload = download.create(root);
   const service = catalog.create(root);
   const list = (value = {}, requestId = 'mcp_' + ++sequence) => service.list({ value: JSON.stringify(value), requestId },
-    (type, value) => events.push({ type, ...value }), (...value) => results.push(value));
+    value => events.push(value), (...value) => results.push(value));
   return { root, calls, events, results, service, list, setNext: value => { next = value; },
     setAuth: value => { auth = value; } };
 }
