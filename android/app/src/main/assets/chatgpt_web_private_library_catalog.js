@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateLibraryCatalog?.version || 0) < exported.version) {
@@ -59,7 +59,7 @@
     const items = page.items.map(({ source, ...item }) => {
       const downloadHandle = item.kind === 'file'
         ? root.__elonChatGptPrivateFileDownload?.registerLibraryFile?.(source) || '' : '';
-      return { ...item, downloadHandle };
+      return { ...item, downloadHandle, ...root.__elonChatGptPrivateLibraryMutations?.capabilities?.(source) };
     });
     emit('library_files_snapshot', { version: 1, requestId: job.requestId,
       directoryHandle: job.directoryHandle, query: job.query, breadcrumbs: job.breadcrumbs,
@@ -121,6 +121,7 @@
     }
     const directory = directoryHandle ? directories.get(directoryHandle) : { id: null, breadcrumbs: [] };
     if (!directory) return respond(ACTION, false, 'library_selection_expired');
+    if (root.__elonChatGptPrivateLibraryMutations?.busy?.()) return respond(ACTION, false, 'library_mutation_busy');
     active?.controller.abort();
     const job = { requestId: command.requestId, identity: account, href: root.location.href,
       directoryHandle, directoryId: directory.id, query: query.trim(), breadcrumbs: directory.breadcrumbs, controller: new root.AbortController() };
@@ -178,5 +179,27 @@
     return true;
   }
   function dispose() { disposed = true; reset(); }
-  return Object.freeze({ version: 1, list, cancel, dispose });
+  function selectMutation(fileHandle) {
+    const account = identity(), href = root.location.href;
+    if (disposed || !account || account !== identityKey || root.location.origin !== 'https://chatgpt.com') return null;
+    let item;
+    for (const page of pages.values()) {
+      if (Date.now() - page.savedAt >= TTL) continue;
+      item = page.items.find(row => row.handle === fileHandle);
+      if (item) break;
+    }
+    if (!item || item.kind !== 'file') return null;
+    const current = () => !disposed && identity() === account && identityKey === account && root.location.href === href;
+    return { source: { ...item.source }, current, settle(confirmed, operation, name) {
+      if (!current()) return;
+      for (const page of pages.values()) {
+        if (confirmed && operation === 'trash') page.items = page.items.filter(row => row.source.id !== item.source.id);
+        if (confirmed && operation === 'rename') page.items = page.items.map(row => row.source.id !== item.source.id ? row :
+          { ...row, name, source: { ...row.source, name } });
+        page.savedAt = 0;
+      }
+    } };
+  }
+  function cancelActiveRead() { active?.controller.abort(); active = null; }
+  return Object.freeze({ version: 2, list, cancel, dispose, selectMutation, cancelActiveRead });
 });

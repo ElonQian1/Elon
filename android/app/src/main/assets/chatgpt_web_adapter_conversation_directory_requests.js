@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 4) return;
+  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 6) return;
 
   const PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const CONVERSATION_PATH = /^\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})$/;
@@ -132,6 +132,10 @@
         const downloads = window.__elonChatGptPrivateFileDownload;
         if (!downloads) respond(action, false, 'download_not_ready');
         else downloads.start(command.value, respond);
+      } else if (action === 'mutate_library_file') {
+        const mutations = window.__elonChatGptPrivateLibraryMutations;
+        if (!mutations) respond(action, false, 'library_mutation_unavailable');
+        else mutations.handle(command, respond);
       } else if (action === 'list_library_files') {
         const library = window.__elonChatGptPrivateLibraryCatalog;
         if (!library) respond(action, false, 'library_not_ready');
@@ -150,5 +154,5 @@
     return Object.freeze({ cancel, emitSnapshot, handleCommand, installListener, probeMembership, requestList });
   }
 
-  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 5, create });
+  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 6, create });
 })();
