@@ -27,6 +27,11 @@ class BinanceGridManageActivity : Activity() {
     private var corrupt=false
     private var creationPending=false
     private var resolvedRecord=false
+    private var resumed=false
+    private val readEndpoint=object:BinanceManageReadEndpoint {
+        override fun readFacts()=debugFacts()
+        override fun readCommand(request:BinanceManageReadRequest)=debugCommand(request)
+    }
     private lateinit var form:BinanceManageForm
     private lateinit var status:TextView
     private lateinit var summary:TextView
@@ -52,7 +57,7 @@ class BinanceGridManageActivity : Activity() {
         form=BinanceManageForm(this){if(ready && !state.unresolved){session?.cancel();confirm.isChecked=false;render()}}
         content.addView(form.root)
         read=button("读取当前策略／查询本次结果","binance-manage-read") {
-            act{confirm.isChecked=false;session?.read(if(state.unresolved)state.id else form.id() ?: error("请选择策略"))}
+            act{readCurrent()}
         };content.addView(read)
         prepare=button("检查本次管理操作","binance-manage-prepare") {
             act{confirm.isChecked=false;session?.prepare(form.id() ?: error("请选择策略"),form.action(),form.cps())}
@@ -77,7 +82,7 @@ class BinanceGridManageActivity : Activity() {
         content.addView(label("区间、格数、追加保证金和止盈止损请在官网操作。结束状态不证明挂单已撤销、仓位归零或资金结清。",14f))
         root.addView(ScrollView(this).apply{isSaveEnabled=false;addView(content)},LinearLayout.LayoutParams(-1,0,1f))
         root.addView(button("返回量化应用","binance-manage-return"){returnResult()})
-        setContentView(root);ready=true
+        setContentView(root);ready=true;BinanceManageReadBridge.bind(readEndpoint)
         runCatching{BinanceHostRuntime.onMain(this){runtime->
             host=runtime
             if(runtime.begin()) {
@@ -90,6 +95,39 @@ class BinanceGridManageActivity : Activity() {
     }
     private fun persist():Boolean = if(resolvedRecord)true else if(state.unresolved)journal.save(state.journal()) else if(!corrupt)journal.save(null) else false
     private fun act(action:()->Unit) {runCatching(action).onFailure{status.text=it.message ?: "操作未完成"}}
+    private fun readGate():BinanceManageReadGate {
+        val current=host?.live()==true && host?.state?.fresh()==true
+        return BinanceManageReadGate(current,if(current)host?.state?.count ?: 0 else 0,
+            form.id()!=null,state.unresolved,host?.state?.account==state.account,corrupt || creationPending,
+            session?.busy!=false,state.status=="prepared")
+    }
+    private fun readCurrent() {
+        require(readGate().readEnabled){"请等待列表核验并选择已有策略；空列表没有可查询的策略详情。"}
+        confirm.isChecked=false;session?.read(if(state.unresolved)state.id else form.id() ?: error("请选择策略"))
+    }
+    private fun debugFacts():Map<String,Any?> {
+        val gate=readGate();val trace=session?.readTrace
+        return mapOf("page_open" to ready,"page_resumed" to (resumed && hasWindowFocus()),
+            "list_state" to gate.listState,"row_count" to gate.count,"strategy_selected" to gate.selected,
+            "read_enabled" to gate.readEnabled,"prepare_enabled" to gate.prepareEnabled,
+            "operation_phase" to state.status,"unresolved" to state.unresolved,"busy" to gate.busy,
+            "read_sequence" to (trace?.sequence ?: 0L),"read_outcome" to (trace?.outcome ?: "idle"),
+            "read_reason" to (trace?.reason ?: "none"),
+            "detail_current" to (session?.detailCurrent(if(state.unresolved)state.id else form.id())==true))
+    }
+    private fun debugCommand(request:BinanceManageReadRequest):String {
+        if(!ready || !resumed || !hasWindowFocus())return "page_not_foreground"
+        render()
+        if(!readGate().permits(request.action))return "read_action_unavailable"
+        return runCatching {
+            when(request.action) {
+                "select"->if(form.selectIndex(request.index ?: -1)){render();"selected"}else "index_unavailable"
+                "read"->{readCurrent();"read_started"}
+                "reload"->{session?.cancel();confirm.isChecked=false;host?.view?.reload();"reload_started"}
+                else->"unsupported_action"
+            }
+        }.getOrDefault("read_action_unavailable")
+    }
     private fun render() {
         if(!ready)return
         val h=host
@@ -98,9 +136,10 @@ class BinanceGridManageActivity : Activity() {
         val kind=when(h?.state?.accountKind){"sub"->"币安子账户";"primary"->"币安主账户";else->"账号未确认"}
         status.text="$kind${h?.state?.account?.takeLast(6)?.let{" · 本机标记 $it"} ?: ""}\n${h?.status ?: "官网未连接"}\n${session?.message ?: "请确认登录"}"
         form.root.visibility=if(blocked)View.GONE else View.VISIBLE
-        form.refresh(h?.state?.managementChoices().orEmpty())
-        read.isEnabled=!corrupt && !creationPending && session?.busy==false && h?.state?.fresh()==true && (!state.unresolved || same)
-        prepare.isEnabled=!blocked && session?.busy==false && h?.state?.fresh()==true
+        form.refresh(h?.state?.managementChoices().orEmpty(),h?.live()==true && h.state.fresh())
+        val gate=readGate()
+        read.isEnabled=gate.readEnabled
+        prepare.isEnabled=gate.prepareEnabled
         confirm.visibility=if(state.status=="prepared" && !blocked)View.VISIBLE else View.GONE
         submit.visibility=confirm.visibility;submit.isEnabled=confirm.isChecked && !blocked && session?.canSubmit()==true
         val s=state.snapshot?.takeIf{state.unresolved || it.id==form.id()}
@@ -108,6 +147,9 @@ class BinanceGridManageActivity : Activity() {
             creationPending->"存在未核对的创建记录，请先返回创建页核对并结束本机记录。"
             corrupt->"本机管理记录无法恢复，请先在官网核对，系统不会重发。"
             state.unresolved && !same->"请登录原账号后查询本次记录；不会在另一账号重新执行。"
+            !state.unresolved && gate.listState=="empty"->"当前账号本次列表暂无网格。连接和账号核验已成功，读取详情需要先有策略。新建后可重新加载列表。"
+            !state.unresolved && gate.listState=="unverified"->"正在等待账号与网格列表核验；这不代表账号没有网格。"
+            !state.unresolved && form.id()==null->"已读取 ${gate.count} 条网格，请先选择策略，再读取详情。"
             else->buildString {
                 if(state.unresolved)append("本次${if(state.action=="close")"结束" else "设置修改"}：${state.status}\n策略编号：${state.id}\n币安状态：${state.providerStatus.ifEmpty{"未知"}}\n")
                 if(s!=null)append("${s.symbol} · ${s.id}\n当前状态：${s.status}\n终止时：${mode(s.cps)}\n取消合约委托：${if(s.cos)"是，请核对作用范围" else "否，请自行核对委托"}\n")
@@ -132,14 +174,15 @@ class BinanceGridManageActivity : Activity() {
             .putExtra("status",result).putExtra("action",state.action).putExtra("strategy_id",if(same)state.id else "").putExtra("provider_status",if(same)state.providerStatus else ""))
         finish()
     }
-    override fun onPause(){if(ready && state.status!="submitting"){session?.cancel();confirm.isChecked=false};super.onPause()}
+    override fun onResume(){super.onResume();resumed=true}
+    override fun onPause(){resumed=false;if(ready && state.status!="submitting"){session?.cancel();confirm.isChecked=false};super.onPause()}
     override fun onSaveInstanceState(outState:Bundle){super.onSaveInstanceState(outState);outState.clear()}
     @Deprecated("Deprecated in Java") override fun onBackPressed()=returnResult()
     override fun dispatchTouchEvent(event:MotionEvent):Boolean {
         if(event.flags and (MotionEvent.FLAG_WINDOW_IS_OBSCURED or MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED)!=0)return true
         return super.dispatchTouchEvent(event)
     }
-    override fun onDestroy(){if(ownsSlot){session?.close();host?.let{it.onChanged=null;it.onCreateObservation=null;it.view?.let{v->(v.parent as? ViewGroup)?.removeView(v)}};BinanceCreateSlot.shared.release(this)};super.onDestroy()}
+    override fun onDestroy(){if(ownsSlot){session?.close();BinanceManageReadBridge.unbind(readEndpoint);host?.let{it.onChanged=null;it.onCreateObservation=null;it.view?.let{v->(v.parent as? ViewGroup)?.removeView(v)}};BinanceCreateSlot.shared.release(this)};super.onDestroy()}
     private fun mode(value:Boolean)=if(value)"按市价平仓" else "保留仓位，需要自行处理"
     private fun label(value:String,size:Float)=TextView(this).apply{text=value;textSize=size;isSaveEnabled=false;setPadding(0,8,0,8)}
     private fun button(value:String,id:String,action:()->Unit)=Button(this).apply{text=value;contentDescription=id;isSaveEnabled=false;filterTouchesWhenObscured=true;setOnClickListener{action()}}

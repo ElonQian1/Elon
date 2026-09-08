@@ -9,6 +9,7 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
     private val persist: () -> Boolean, private val changed: () -> Unit) {
     var message="先选择策略并读取当前设置。"; private set
     var busy=false; private set
+    val readTrace=BinanceManageReadTrace()
     private var closed=false
     private var ticket=""
     private var token=""
@@ -16,7 +17,10 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
     private var target=""
     private var pendingAction=""
     private var pendingCps=false
+    fun detailCurrent(id:String?)=readTrace.outcome=="verified" && host.live() && host.state.fresh() &&
+        host.state.account==account && host.document.snapshot().documentToken==token && state.snapshot?.id==id
     fun cancel() {
+        readTrace.cancel()
         ticket="";busy=false;state.cancel()
         host.view?.evaluateJavascript("window.__elonBinanceManageV1?.cancel()",null)
     }
@@ -28,7 +32,7 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
         busy=true
     }
     fun read(id: String) {
-        begin(id);message="正在读取当前策略；不会发送交易。";changed()
+        begin(id);readTrace.start();message="正在读取当前策略；不会发送交易。";changed()
         execute("inspect",listOf(token,ticket,account,id),false)
     }
     fun prepare(id: String, action: String, cps: Boolean) {
@@ -62,11 +66,13 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
         }}
         host.handler.postDelayed({if(!closed && ticket==expected && busy) {
             if(writing) {state.unknown();persist()} else cancel()
+            if(!writing && action=="inspect")readTrace.finish("timeout")
             busy=false;message=if(writing || state.unresolved) "结果查询超时，此前操作仍须到官网核对；不会自动补发。" else "读取超时，未提交操作。"
             changed()
         }},if(writing) 90_000 else 70_000)
     }
     private fun failedToStart(writing: Boolean) {
+        if(!writing && readTrace.outcome=="pending")readTrace.finish("unavailable")
         if(writing) {state.outcome("not_sent");persist()};busy=false
         message=if(state.unresolved) "结果查询尚未就绪，此前操作仍须核对；不会重发。" else "官网连接未就绪，未提交操作。";changed()
     }
@@ -88,6 +94,7 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
                         host.handler.postDelayed({if(!closed) changed()},60_000)
                     } else {
                         state.observe(account,snapshot);persist()
+                        readTrace.finish("verified")
                         message=if(state.unresolved && state.effectObserved()) "详情已观察到目标设置或结束状态；仓位、挂单和资金仍须官网核对。" else "已读取当前详情；不代表操作完成或仓位已归零。"
                     }
                 }
@@ -102,13 +109,14 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
                 }
                 "prepare_failed","read_failed" -> {
                     require(v.keys==base+"code")
+                    if(v["kind"]=="read_failed")readTrace.finish("failed",v["code"] as? String ?: "verification_failed")
                     message=when(v["code"]) {"no_change"->"所选设置没有变化。";"close_mode_changed"->"当前终止处理与选择不同，请先单独修改设置，再重新检查结束。";
                         "not_working"->"策略不是运行状态，请使用官网核对。";"settings_unavailable"->"详情缺少可验证设置，请使用官网。";else->"账号或详情核验未通过，未提交操作。"}
                 }
                 else -> return
             }
             busy=false;changed()
-        }.onFailure {state.unknown();persist();busy=false;message="回执未能验证，请在官网核对；不会自动重试。";changed()}
+        }.onFailure {if(readTrace.outcome=="pending")readTrace.finish("failed","malformed_reply");state.unknown();persist();busy=false;message="回执未能验证，请在官网核对；不会自动重试。";changed()}
     }
     fun close() {cancel();state.unknown();persist();closed=true}
 }
