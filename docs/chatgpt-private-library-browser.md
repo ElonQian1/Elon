@@ -7,7 +7,8 @@
   refresh and ordinary library-file download; published/installed in 1.1.1581.
 - Verification: native catalogue and pagination data passed through 1582;
   ordinary saved-byte download passed in normal release 1.1.1584 with module 8.
-  Rendered browser controls and additional file scopes remain pending.
+  Native entry, search and ordinary-file action menu passed on normal 1584.
+  Folder/back rendered interaction and additional file scopes remain pending.
 - Catalog v5 fixes object-event publication and includes v4 cold-identity preparation;
   both patches are installed in 1581, replacing the defective 1579 catalog v3.
 - This is the independent library, not the current conversation's attachment index.
@@ -64,6 +65,26 @@ MCP commands: `chatgpt_list_library_files`, `chatgpt_cancel_library_files`,
 `chatgpt_download_library_file`; `library_files` contains native rows/opaque handles,
 not server IDs or pagination tokens. Final command receipts, not dispatch acceptance,
 determine completion.
+
+The preset library entry uses `web-chat-feature:library`. After official feature
+sync it can instead use `chatgpt-feature:{opaque-id}:{label}`; the observed label
+on 1584 was `资料库`. Acceptance must resolve the current entry, not confuse a
+missing preset-only selector with a failed feature. The external
+`scripts/invoke-library-ui-acceptance.ps1` resolves both, then invokes native
+accessibility actions. It does not inject coordinates, install a test APK,
+enable WebView debugging, or export the accessibility tree. Its SDK/runner
+dependency remains test-only; an unsupported runner is a test failure.
+
+### 1584 Native Menu Acceptance
+
+On 2026-09-09, normal 1584 opened the production sidebar feature menu and the
+native library. Search, back and refresh controls were present. An explicit
+synthetic-file search and its ordinary-file menu exposed attach, download,
+rename and soft-delete actions. No file mutation was invoked. Conversation and
+draft were unchanged. Logs: `library-native-open-1584-20260909-032107-735` and
+`library-native-menu-1584-20260909-032140-744`.
+Earlier attempts used only the preset selector and failed, despite the synced
+entry being visible. Their failures are not app-library or authentication failures.
 
 ## Remaining Acceptance And Gaps
 
