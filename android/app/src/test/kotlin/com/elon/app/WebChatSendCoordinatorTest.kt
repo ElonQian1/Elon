@@ -36,6 +36,54 @@ class WebChatSendCoordinatorTest {
     }
 
     @Test
+    fun readinessLostDuringPendingRenderDoesNotStrandTheReservation() {
+        val fixture = Fixture()
+
+        val result = fixture.coordinator.dispatch("hello", null) {
+            fixture.optimisticRenders += 1
+            fixture.transport.ready = false
+        }
+
+        assertEquals(WebChatSendCoordinator.DispatchOutcome.REJECTED, result.outcome)
+        assertEquals("hello", result.prompt)
+        assertNull(fixture.coordinator.prompt())
+        assertEquals(WebChatPendingSendState.Phase.IDLE, fixture.coordinator.phase())
+        assertTrue(fixture.transport.prompts.isEmpty())
+        assertFalse(fixture.scheduler.hasTask())
+
+        fixture.transport.ready = true
+        val retry = fixture.coordinator.dispatch("hello", null) {}
+        assertEquals(WebChatSendCoordinator.DispatchOutcome.DISPATCHED, retry.outcome)
+        assertEquals(listOf("hello"), fixture.transport.prompts)
+    }
+
+    @Test
+    fun deferredReservationRejectedBeforeDispatchCanBeRetriedExplicitly() {
+        val fixture = Fixture()
+        val reserved = fixture.coordinator.reserve("attachment prompt", null)
+        fixture.transport.ready = false
+
+        val result = fixture.coordinator.dispatchReserved(requireNotNull(reserved.commandId))
+
+        assertEquals(WebChatSendCoordinator.DispatchOutcome.REJECTED, result.outcome)
+        assertEquals(reserved.commandId, result.commandId)
+        assertEquals("attachment prompt", result.prompt)
+        assertNull(fixture.coordinator.prompt())
+        assertTrue(fixture.transport.prompts.isEmpty())
+        assertFalse(fixture.scheduler.hasTask())
+        assertNull(fixture.coordinator.cancelReserved(requireNotNull(reserved.commandId)))
+
+        fixture.transport.ready = true
+        val retry = fixture.coordinator.dispatch("attachment prompt", null) {}
+        assertEquals(WebChatSendCoordinator.DispatchOutcome.DISPATCHED, retry.outcome)
+        assertEquals(listOf("attachment prompt"), fixture.transport.prompts)
+        val duplicate = fixture.coordinator.dispatchReserved(requireNotNull(retry.commandId))
+        assertEquals(WebChatSendCoordinator.DispatchOutcome.BUSY, duplicate.outcome)
+        assertEquals("attachment prompt", fixture.coordinator.prompt())
+        assertTrue(fixture.scheduler.hasTask())
+    }
+
+    @Test
     fun acceptedOfficialDispatchIsSingleFlightAndSchedulesConfirmation() {
         val fixture = Fixture()
 

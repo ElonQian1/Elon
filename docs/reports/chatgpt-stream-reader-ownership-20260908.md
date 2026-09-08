@@ -2,6 +2,9 @@
 
 ## Scope
 
+The [subsequent device run](chatgpt-send-reservation-device-20260908.md) confirms
+the narrow stopped-text retention case, but not private stop or next-turn integrity.
+
 This extends the [stop interruption correction](chatgpt-stop-interruption-20260908.md).
 It does not replace the sender, stop runtime, WebView identity or voice transport.
 The handset was locked during this offline batch; no message or microphone

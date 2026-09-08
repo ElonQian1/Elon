@@ -147,7 +147,12 @@ internal class WebChatSendCoordinator(
         val command = ledger.current()?.takeIf {
             it.id == commandId && it.acceptance == WebChatSendAcceptance.DISPATCHING
         } ?: return DispatchResult(DispatchOutcome.BUSY)
-        if (!transport.isReady()) return DispatchResult(DispatchOutcome.NOT_READY)
+        if (!transport.isReady()) {
+            // Rendering or a deferred upload can lose readiness after reservation.
+            // No transport call has happened, so release only this unsent command.
+            val failedPrompt = cancelReserved(command.id)
+            return DispatchResult(DispatchOutcome.REJECTED, failedPrompt, command.id)
+        }
         val dispatchResult = runCatching { transport.dispatch(command) }
             .getOrDefault(WebChatTransportDispatchResult.REJECTED)
         if (dispatchResult == WebChatTransportDispatchResult.REJECTED) {
