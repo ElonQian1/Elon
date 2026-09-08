@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 11, create: factory });
+  const exported = Object.freeze({ version: 12, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -117,8 +117,7 @@
     const props = context.shared.getSharedProps();
     const conversation = props?.conversation, controller = props?.composerController;
     if (!conversation || !controller || controller.conversation !== conversation) return unavailable('conversation_owner_unavailable');
-    if (typeof conversation.serverId$ !== 'function' ||
-        (conversation.serverId$() || null) !== currentRoute.conversationId) return unavailable('conversation_route_mismatch');
+    if (!matchesRoute(conversation, currentRoute, account)) return unavailable('conversation_route_mismatch');
     if (typeof props.isNewThread !== 'boolean') return unavailable('composer_mode_unsupported');
     if (props.structuredInputMessageId != null) return unavailable('structured_input_active');
     // The official composer always creates this capability host, even with no
@@ -129,16 +128,44 @@
         typeof host.canOpen$ !== 'function' || typeof host.tryOpen$ !== 'function' ||
         props.structuredInputMessageId !== null)) return unavailable('structured_host_unrecognized');
     return { ...context, ...currentRoute, token, account, node, conversation, controller,
-      requestId: props.currentRequestId, structuredHost: host, newThread: props.isNewThread };
+      serverId: conversation.serverId$() || null, requestId: props.currentRequestId,
+      structuredHost: host, newThread: props.isNewThread };
   }
 
-  function capture(node, previousAttachment) {
+  function matchesRoute(conversation, currentRoute, account) {
+    if (typeof conversation.serverId$ !== 'function') return false;
+    const serverId = conversation.serverId$() || null;
+    if (serverId !== null && (typeof serverId !== 'string' || !new RegExp('^' + UUID + '$', 'i').test(serverId))) return false;
+    if (serverId === currentRoute.conversationId) return true;
+    // The confirmed logged-out homepage can keep the same official conversation
+    // after it receives a server ID, without navigating to /c/<id>.
+    return typeof account === 'object' && account !== null &&
+      currentRoute.href === 'https://chatgpt.com/' && currentRoute.conversationId === null;
+  }
+
+  function draftEditor(binding) {
+    const bindings = page.__elonChatGptPrivateRuntimeBindings;
+    if (!bindings?.observed('composer')) return null;
+    const runtime = bindings.peek('composer');
+    if (!runtime) { bindings.load('composer').catch(() => {}); return null; }
+    if (typeof runtime.t_ !== 'function' || typeof runtime.Qg !== 'function' || typeof runtime.VS !== 'function') return null;
+    const view = runtime.t_(binding.controller), read = runtime.Qg(binding.controller);
+    if (view?.dom !== binding.node || view.isDestroyed || typeof read !== 'function' ||
+        typeof view.state?.doc?.toJSON !== 'function') return null;
+    const doc = view.state.doc.toJSON();
+    if (doc.type !== 'doc' || !Array.isArray(doc.content) || doc.content.length > 1000 ||
+        !doc.content.every(p => p.type === 'paragraph' && !p.marks?.length &&
+          (!p.content || p.content.every(t => t.type === 'text' && !t.marks?.length)))) return null;
+    return { view, read, replace: runtime.VS };
+  }
+
+  function capture(node, previousAttachment, draftMode = false) {
     const binding = captureConversation(node, true);
     if (!binding) return null;
     const context = binding, props = context.shared.getSharedProps();
     if (typeof props.submitComposer !== 'function') return unavailable('submit_owner_unavailable');
     if (props.isDisabled !== false) return unavailable('composer_disabled');
-    if (props.isComposerSubmissionReady !== true) return unavailable('submission_not_ready');
+    if (typeof props.isComposerSubmissionReady !== 'boolean') return unavailable('submission_not_ready');
     if (props.isConsumerLockdownModeLoadingForConversation !== false ||
         typeof props.shouldBlockConsumerLockdownModeActionsForConversation !== 'boolean') return unavailable('lockdown_not_ready');
     const pending = context.files.files$(), ready = context.files.readyFiles$();
@@ -152,8 +179,12 @@
           attachment.readyFiles.length < 1 || attachment.readyFiles.length > 9 ||
           pending.length !== attachment.readyFiles.length || ready.length !== pending.length) return unavailable('attachment_lease_invalid');
     } else if (pending.length || ready.length) return unavailable('attachment_not_owned');
+    const useDraft = draftMode || !props.isComposerSubmissionReady;
+    const editor = useDraft && !attachment ? draftEditor(binding) : null;
+    if (useDraft && (!editor || attachment)) return unavailable('submission_not_ready');
     captureCode = 'ready';
-    return { ...binding, leaf: props.currentLeafId, submit: props.submitComposer, attachment };
+    return { ...binding, leaf: props.currentLeafId, submit: props.submitComposer, attachment,
+      draftView: editor?.view || null, readEditor: editor?.read || null, replaceEditor: editor?.replace || null };
   }
 
   function sameOwner(binding) {
@@ -164,12 +195,13 @@
         currentRoute.temporary === binding.temporary &&
         context.files === binding.files && props?.conversation === binding.conversation &&
         props.composerController === binding.controller &&
-        (binding.conversation.serverId$() || null) === currentRoute.conversationId;
+        (!binding.serverId || binding.conversation.serverId$() === binding.serverId) &&
+        matchesRoute(binding.conversation, currentRoute, binding.account);
     } catch (_) { return false; }
   }
 
   function current(binding) {
-    const next = capture(binding.node, binding.attachment);
+    const next = capture(binding.node, binding.attachment, !!binding.draftView);
     return next && Object.keys(binding).every(key => binding[key] === next[key]);
   }
 
@@ -182,7 +214,7 @@
     const value = command?.prompt, expected = command?.expectedDraft;
     if (typeof value !== 'string' || !value.trim() || value.length > 20000 ||
         typeof expected !== 'string' || !/^mcp_[a-z0-9]{1,32}$/.test(command.requestId || '')) return { handled: false, code: 'invalid_command' };
-    let binding;
+    let binding, draftMutationAttempted = false;
     try {
       captureCode = 'context_unavailable';
       binding = capture(command.composer);
@@ -192,7 +224,23 @@
       if (!current(binding)) return { handled: false, code: 'context_changed' };
       command.beforeSubmit?.();
       if (!current(binding) || command.readDraft() !== expected) return { handled: false, code: 'context_changed' };
-    } catch (_) { return { handled: false, code: 'context_unavailable' }; }
+      if (binding.draftView) {
+        if (binding.readEditor() !== expected) return { handled: false, code: 'draft_mismatch' };
+        // Use the official editor transaction, without focusing it or waiting for
+        // a DOM button. submitComposer still owns all current-draft constraints.
+        if (expected !== value) {
+          draftMutationAttempted = true;
+          binding.replaceEditor(binding.draftView, value, { scrollIntoView: false });
+        }
+        if (!current(binding) || binding.readEditor() !== value || command.readDraft() !== value) {
+          return { handled: true, completion: Promise.resolve({ status: 'rejected', code: 'draft_handoff' }) };
+        }
+      }
+    } catch (_) {
+      return draftMutationAttempted
+        ? { handled: true, completion: Promise.resolve({ status: 'rejected', code: 'draft_handoff' }) }
+        : { handled: false, code: 'context_unavailable' };
+    }
 
     const owned = { binding, requestId: command.requestId };
     active = owned;
@@ -201,7 +249,7 @@
       // Official submitComposer owns readiness, fresh request preparation and React updates.
       const action = binding.attachment
         ? { kind: 'prepared_action', text: value, readyFiles: binding.attachment.readyFiles }
-        : { kind: 'text_action', text: value };
+        : binding.draftView ? { kind: 'current_draft' } : { kind: 'text_action', text: value };
       receipt = binding.submit(new page.Event('submit'), action,
         { requireDispatchAcceptance: true });
     } catch (_) {
@@ -227,7 +275,7 @@
         owned.retain = false;
       }
       // Explicit actions do not reset the editor. Only clear our unchanged draft.
-      if (expected && command.readDraft() === expected) command.clearDraft?.();
+      if (!binding.draftView && expected && command.readDraft() === expected) command.clearDraft?.();
       return { status: 'accepted', code: 'accepted' };
     }).catch(() => ({ status: 'unknown', code: 'completion_failed' })).finally(() => {
       page.clearTimeout(timer);
@@ -240,7 +288,11 @@
   }
 
   try {
-    if (page.__elonChatGptPrivateTextTransactionsEnabled === true && route()) identity(true);
+    if (page.__elonChatGptPrivateTextTransactionsEnabled === true && route()) {
+      identity(true);
+      const bindings = page.__elonChatGptPrivateRuntimeBindings;
+      if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
+    }
   } catch (_) {}
-  return Object.freeze({ version: 11, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 12, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

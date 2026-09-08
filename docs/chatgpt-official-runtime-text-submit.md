@@ -6,14 +6,59 @@ official page-runtime bridge, **not an independent Android HTTP/private POST
 transport**. Reuse the existing bridge; do not reimplement it while resolving
 the current production readiness failure.
 
-Latest installed checkpoint: APK 1552 / adapter 298 includes runtime submit 11
-and bindings 3. One native production send received its exact test reply, but
-the receipt remained `private_fallback:template_unavailable` and
-`runtime_fallback:submission_not_ready`. The prior `composer_mode_unsupported`
-gate no longer blocked that attempt. This is basic-chat success through DOM,
-not acceptance of independent private POST or runtime submission. The private
-stream reached `completed` while native UI stayed generating; stop later
-reported no active generation. See [1552 evidence and next gate](reports/chatgpt-runtime-release-1552.md).
+Latest installed checkpoint: APK 1554 / adapter 299 includes runtime submit 11
+and bindings 3. Two consecutive production native sends received exact test
+replies and settled, but both still used DOM fallback: `submission_not_ready`
+and then `conversation_route_mismatch`. The added generation-state reader has
+not been independently observed on the device; settled workflows do not prove
+which reader ran. See [1554 evidence](reports/chatgpt-runtime-release-1554.md).
+
+## Current draft and guest ownership
+
+Submit 12 / bindings 4 is implemented with targeted offline evidence, pending
+the grouped Release and production acceptance. It reuses the official runtime
+writer rather than adding another HTTP sender. Known ready explicit text and
+native attachment submissions are unchanged.
+
+The retained September 7 composer source distinguishes explicit-action
+readiness (`rc`) from `current_draft` eligibility (`So && tc`). Its shared props
+expose `rc` as `isComposerSubmissionReady`; using that Boolean for both actions
+over-restricts ordinary draft submission. The official transaction separately
+checks composer constraints, mode, input validity and dispatch acceptance. We
+do not modify any eligibility field or construct missing model/tool metadata.
+
+When explicit-action readiness is false, the bridge may use the current-draft
+contract only with the exact mounted official editor and no attachments. The
+versioned facade maps these public exports, verified against both retained assets:
+
+| Contract | September 6 symbol/export | September 7 symbol/export |
+|---|---|---|
+| Controller-owned editor | `CL` / `t_` | `XL` / `__` |
+| Editor plain-text getter | `QVt` / `Qg` | `_Ht` / `m_` |
+| Replace plain editor text | `AN` / `VS` | `mP` / `rC` |
+
+Only plain paragraph/text drafts qualify. The existing editor must belong to
+the captured composer DOM and controller; no new controller/editor is created.
+The official replacement transaction does not focus the editor and receives
+`scrollIntoView: false`. A matching draft is not replaced. Document, identity,
+thread, selected leaf, file store and draft are checked again before submitting
+`current_draft` exactly once with `requireDispatchAcceptance`. The website owns
+draft reset, proof creation and state updates. A failed local handoff, rejection
+or ambiguous invocation is not replayed through another writer.
+
+The positive logged-out homepage can retain the same official conversation
+after its server ID is allocated without changing the root URL. The bridge
+allows this case only on the exact root URL with the existing double guest
+proof and committed conversation/controller ownership. Non-UUID server IDs,
+authenticated root mismatches, projects, temporary routes and other conversation
+URLs still reject. An already assigned server ID cannot change during dispatch;
+new-thread allocation still requires the same official object. The public shared
+source `P$e` assigns `serverId$` and remaps its store to the same object.
+
+The official composer module is warmed once through the existing bounded,
+single-flight document cache. An unknown/cold module remains unavailable without
+queuing a send. These source checks do not by themselves prove runtime acceptance
+or a measured latency/thermal improvement.
 
 ## Resident structured-input host
 

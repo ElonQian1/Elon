@@ -21,7 +21,7 @@ test('production loads the shared committed-owner resolver before runtime consum
   assert.ok(resolver < catalog.indexOf('"chatgpt_web_private_new_conversation.js"'));
 });
 
-function fixture(guest) {
+function fixture(guest, editor = false) {
   const calls = [], timers = new Map();
   let serial = 0, settle, draft = '', serverId = id, credentials = 'Bearer synthetic-only', loaded = true;
   let response = () => ({ accepted: true, completion: new Promise(resolve => { settle = resolve; }) });
@@ -48,19 +48,32 @@ function fixture(guest) {
     Event: class { constructor(type) { this.type = type; } preventDefault() {} },
     setTimeout(fn) { timers.set(++serial, fn); return serial; }, clearTimeout(key) { timers.delete(key); } };
   let bridge;
+  const edits = [], readEditor = () => draft;
+  const view = { dom: node, isDestroyed: false, state: { doc: { toJSON: () => ({
+    type: 'doc', content: [{ type: 'paragraph', content: draft ? [{ type: 'text', text: draft }] : [] }]
+  }) } } };
   if (guest) {
     page.__elonChatGptPrivateTransport = null;
     page.location.href = 'https://chatgpt.com/'; serverId = null; props.isNewThread = true;
-    bridge = require('./fixtures/chatgpt-runtime-bindings').attach(page, { shared: {
+  }
+  if (guest || editor) {
+    bridge = require('./fixtures/chatgpt-runtime-bindings').attach(page, { shared: guest ? {
       R5: () => { if (guest.throws) throw Error('synthetic bootstrap unavailable'); return { authStatus: guest.authStatus }; },
       F5: guest.missingGetter ? undefined : () => guest.session
-    } });
+    } : {}, composer: editor ? {
+      t_: owner => { assert.equal(owner, controller); return view; },
+      Qg: owner => { assert.equal(owner, controller); return readEditor; },
+      VS: (target, value, options) => {
+        assert.equal(target, view); assert.deepEqual(options, { scrollIntoView: false });
+        edits.push(value); draft = value;
+      }
+    } : {} });
   }
   page.__elonChatGptPrivateTextRuntimeSubmit = moduleApi.create(page);
   const command = { requestId: 'mcp_test', prompt: 'synthetic prompt', expectedDraft: '', composer: node,
     readDraft: () => draft, clearDraft: () => { draft = ''; }, beforeSubmit() {} };
   return { calls, props, shared, fileStore, fiber, top, node, page, command, controller,
-    api: page.__elonChatGptPrivateTextRuntimeSubmit, timers, bridge, guest,
+    api: page.__elonChatGptPrivateTextRuntimeSubmit, timers, bridge, guest, view, edits,
     setDraft(value) { draft = value; }, draft: () => draft,
     setServer(value) { serverId = value; }, setIdentity(value) { credentials = value; },
     setLoaded(value) { loaded = value; }, response(value) { response = value; },
@@ -152,13 +165,13 @@ test('a replaced host or newly active structured input invalidates the captured 
 
 test('confirmed guest uses the official text transaction without an authorization header', async () => {
   const f = fixture({ authStatus: 'logged_out', session: null }); await flush();
-  assert.equal(f.bridge.loads.length, 1, 'one asynchronous module warmup');
+  assert.equal(f.bridge.loads.length, 2, 'identity and composer modules are warmed once');
   assert.equal(f.api.captureConversation(f.node), null, 'other runtime actions retain their authenticated contract');
   for (let i = 0; i < 2; i++) {
     const result = f.api.submit(f.command); assert.equal(result.handled, true);
     f.settle(true); assert.equal((await result.completion).status, 'accepted');
   }
-  assert.equal(f.calls.length, 2); assert.equal(f.bridge.loads.length, 1);
+  assert.equal(f.calls.length, 2); assert.equal(f.bridge.loads.length, 2);
   assert.equal(f.timers.size, 0);
 });
 
@@ -181,7 +194,90 @@ test('legacy website guest uses its own verified bootstrap and session exports',
   const api = moduleApi.create(f.page); await flush();
   const result = api.submit(f.command); assert.equal(result.handled, true);
   f.settle(true); assert.equal((await result.completion).status, 'accepted');
-  assert.deepEqual(loads, [sharedUrl]);
+  assert.deepEqual(loads, [sharedUrl, runtimeUrl]);
+});
+
+test('guest homepage retains its official owner after server ID assignment and on the next send', async () => {
+  const f = fixture({ authStatus: 'logged_out', session: null }); await flush();
+  const first = f.api.submit(f.command);
+  f.setServer(id); f.settle(true);
+  assert.equal((await first.completion).status, 'accepted');
+  const second = f.api.submit(f.command);
+  assert.equal(second.handled, true); f.settle(true);
+  assert.equal((await second.completion).status, 'accepted');
+  assert.equal(f.page.location.href, 'https://chatgpt.com/'); assert.equal(f.calls.length, 2);
+});
+
+test('guest root allowance never authorizes another server ID during an existing send', async () => {
+  const f = fixture({ authStatus: 'logged_out', session: null }); await flush();
+  f.setServer(id);
+  const result = f.api.submit(f.command);
+  f.setServer('99999999-2222-3333-4444-555555555555'); f.settle(true);
+  assert.equal((await result.completion).code, 'context_changed');
+});
+
+for (const state of ['invalid_server', 'authenticated_home', 'guest_project', 'guest_temporary', 'guest_other_route']) {
+  test('homepage ownership exception remains narrow: ' + state, async () => {
+    const f = fixture({ authStatus: 'logged_out', session: null }); await flush(); f.setServer(id);
+    if (state === 'invalid_server') f.setServer('not-a-server-id');
+    if (state === 'authenticated_home') f.page.__elonChatGptPrivateTransport = {
+      copySameOriginRequestHeaders: () => ({ Authorization: 'Bearer synthetic' })
+    };
+    if (state === 'guest_project') f.page.location.href = 'https://chatgpt.com/g/g-p-' + 'a'.repeat(32) + '/project';
+    if (state === 'guest_temporary') f.page.location.href += '?temporary-chat=true';
+    if (state === 'guest_other_route') f.page.location.href += 'c/99999999-2222-3333-4444-555555555555';
+    assert.equal(f.api.submit(f.command).code, 'conversation_route_mismatch');
+    assert.equal(f.calls.length, 0);
+  });
+}
+
+for (const guest of [false, true]) {
+  test('official current draft works independently of explicit-action readiness: guest=' + guest, async () => {
+    const f = fixture(guest ? { authStatus: 'logged_out', session: null } : null, true); await flush();
+    f.props.isComposerSubmissionReady = false;
+    const result = f.api.submit(f.command);
+    assert.equal(result.handled, true); assert.deepEqual(f.edits, [f.command.prompt]);
+    assert.deepEqual(f.calls[0][1], { kind: 'current_draft' });
+    assert.equal(f.props.isComposerSubmissionReady, false, 'never forge official readiness');
+    f.setDraft(''); f.settle(true);
+    assert.equal((await result.completion).status, 'accepted');
+    assert.equal(f.timers.size, 0);
+  });
+}
+
+test('current draft preserves a new user edit and does not duplicate an already matching draft', async () => {
+  const f = fixture(null, true); await flush(); f.props.isComposerSubmissionReady = false;
+  f.setDraft(f.command.prompt); f.command.expectedDraft = f.command.prompt;
+  const result = f.api.submit(f.command);
+  assert.equal(f.edits.length, 0); f.setDraft('next user draft'); f.settle(true);
+  assert.equal((await result.completion).status, 'accepted'); assert.equal(f.draft(), 'next user draft');
+});
+
+for (const fault of ['unmounted_editor', 'destroyed_editor', 'rich_input', 'unknown_ready', 'owner_changed', 'draft_changed']) {
+  test('runtime draft handoff rejects before any mutation: ' + fault, async () => {
+    const f = fixture(null, true); await flush(); f.props.isComposerSubmissionReady = false;
+    if (fault === 'unmounted_editor') f.view.dom = {};
+    if (fault === 'destroyed_editor') f.view.isDestroyed = true;
+    if (fault === 'rich_input') f.view.state.doc.toJSON = () => ({ type: 'doc', content: [{
+      type: 'paragraph', content: [{ type: 'inline_selection_pill' }]
+    }] });
+    if (fault === 'unknown_ready') f.props.isComposerSubmissionReady = undefined;
+    if (fault === 'owner_changed') f.command.beforeSubmit = () => { f.props.currentLeafId = 'changed'; };
+    if (fault === 'draft_changed') f.command.beforeSubmit = () => f.setDraft('edited by user');
+    assert.equal(f.api.submit(f.command).handled, false);
+    assert.equal(f.edits.length, 0); assert.equal(f.calls.length, 0);
+  });
+}
+
+test('official current-draft rejection and uncertain dispatch never retry a second writer', async () => {
+  for (const throws of [false, true]) {
+    const f = fixture(null, true); await flush(); f.props.isComposerSubmissionReady = false;
+    f.response(() => { if (throws) throw Error('uncertain'); return { accepted: false }; });
+    const result = f.api.submit(f.command); assert.equal(result.handled, true);
+    assert.equal((await result.completion).status, throws ? 'unknown' : 'rejected');
+    assert.equal(f.calls.length, 1);
+    if (throws) assert.equal((await f.api.submit(f.command).completion).code, 'busy');
+  }
 });
 
 test('empty or invalid captured headers cannot stand in for authenticated identity', () => {
