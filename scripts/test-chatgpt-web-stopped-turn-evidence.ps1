@@ -53,4 +53,28 @@ $script:native.social_chat.interaction_mode = 'work'
 Assert-RejectedNativeRead 'native_surface_changed'
 $script:foreground = $false
 Assert-RejectedNativeRead 'foreground_changed'
-Write-Output 'STOPPED_TURN_EVIDENCE_TESTS=passed:11'
+$action = $ast.Find({ param($n)
+    $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Act'
+}, $true)
+Invoke-Expression $action.Extent.Text
+function Invoke-ChatGptWebSmokeAction { throw 'unsafe_shared_write_retry' }
+function Invoke-StopTestMcp {
+    param($Adb, $DeviceSerial, $Tool, $Arguments, [switch]$NoBootstrap, $HealthTimeoutSec, $RequestTimeoutSec, $AdbTimeoutSec)
+    $script:dispatches++
+    if ($Tool -ne 'ui_control' -or -not $NoBootstrap -or ($Arguments | ConvertFrom-Json).action -ne 'send_input') {
+        throw 'wrong_write_contract'
+    }
+    if ($script:mode -eq 'timeout') { throw 'transport_result_unknown' }
+    return @{ result = @{ isError = $script:mode -eq 'error'; structuredContent = @{ control_ok = $script:mode -eq 'ok' } } }
+}
+$runtime = @{ invoke_mcp = 'Invoke-StopTestMcp'; adb = 'synthetic'; device_serial = 'synthetic' }
+foreach ($script:mode in @('ok', 'timeout', 'error', 'rejected')) {
+    $script:dispatches = 0
+    $failure = ''
+    try { Act 'send_input' | Out-Null } catch { $failure = $_.Exception.Message }
+    $expected = switch ($script:mode) {
+        'ok' { '' }; 'timeout' { 'transport_result_unknown' }; 'error' { 'action_result_unconfirmed' }; 'rejected' { 'action_not_accepted' }
+    }
+    if ($failure -cne $expected -or $script:dispatches -ne 1) { throw 'write_replayed_or_result_misclassified' }
+}
+Write-Output 'STOPPED_TURN_EVIDENCE_TESTS=passed:15'

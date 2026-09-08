@@ -40,7 +40,15 @@ function Wait-Native([string]$Stage, [scriptblock]$Predicate) {
 }
 
 function Act([string]$Action, [hashtable]$Arguments = @{}) {
-    $result = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action $Action -Arguments $Arguments
+    $payload = @{} + $Arguments
+    $payload.action = $Action
+    # An uncertain response must not replay send, stop or new-conversation writes.
+    $responses = @(& $runtime.invoke_mcp -Adb $runtime.adb -DeviceSerial $runtime.device_serial `
+        -Tool ui_control -Arguments ($payload | ConvertTo-Json -Depth 10 -Compress) -NoBootstrap `
+        -HealthTimeoutSec 5 -RequestTimeoutSec 30 -AdbTimeoutSec 8)
+    $response = $responses | Select-Object -Last 1
+    if ($response.result.isError -or $null -eq $response.result.structuredContent) { throw 'action_result_unconfirmed' }
+    $result = $response.result.structuredContent
     if ($result.control_ok -ne $true) { throw 'action_not_accepted' }
     return $result
 }
