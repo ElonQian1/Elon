@@ -115,6 +115,74 @@ assert.equal(context.window.__elonChatGptStreamingPolicy.readState(
 ).active, true, 'an official stop control remains authoritative over a premature private completion');
 policy.reset();
 
+policy.begin(regenerated, { allowSameTurn: true });
+let runtimeReads = 0;
+assert.equal(context.window.__elonChatGptStreamingPolicy.readState(
+  policy,
+  { lastAssistantObservation: () => observation('assistant-2', '', false, true) },
+  { querySelector: () => ({}) },
+  null,
+  () => true,
+  { privateStreamState: 'completed', readRuntimeGeneration: () => {
+    runtimeReads++;
+    return { active: false, code: 'completed_current_turn' };
+  } }
+).active, false, 'the current completed runtime turn releases stale DOM markers and empty placeholders');
+assert.equal(runtimeReads, 1);
+
+for (const result of [null, { active: null }, { active: true }, { active: false, code: 'unknown' }]) {
+  policy.begin(regenerated, { allowSameTurn: true });
+  assert.equal(context.window.__elonChatGptStreamingPolicy.readState(
+    policy, { lastAssistantObservation: () => regenerated },
+    { querySelector: () => ({}) }, null, () => true,
+    { privateStreamState: 'completed', readRuntimeGeneration: () => result }
+  ).active, true, 'unconfirmed or active runtime state cannot clear a DOM-active turn');
+  policy.reset();
+}
+policy.begin(regenerated, { allowSameTurn: true });
+assert.equal(context.window.__elonChatGptStreamingPolicy.readState(
+  policy, { lastAssistantObservation: () => regenerated },
+  { querySelector: () => ({}) }, null, () => true,
+  { privateStreamState: 'completed', readRuntimeGeneration: () => { throw Error('unavailable'); } }
+).active, true, 'failed runtime reads retain the existing state');
+policy.reset();
+context.window.__elonChatGptStreamingPolicy.readState(
+  policy, { lastAssistantObservation: () => regenerated },
+  { querySelector: () => null }, null, () => false,
+  { privateStreamState: 'completed', readRuntimeGeneration: () => { runtimeReads++; } }
+);
+context.window.__elonChatGptStreamingPolicy.readState(
+  policy, { lastAssistantObservation: () => regenerated },
+  { querySelector: () => ({}) }, null, () => true,
+  { privateStreamState: 'streaming', readRuntimeGeneration: () => { runtimeReads++; } }
+);
+assert.equal(runtimeReads, 1, 'normal streaming and settled DOM never require a runtime tree read');
+policy.reset();
+
+{
+  const entry = fs.readFileSync(path.join(__dirname,
+    '../android/app/src/main/assets/chatgpt_web_adapter.js'), 'utf8');
+  const start = entry.indexOf('  function readStreamingState(');
+  const end = entry.indexOf('  function invalidatePrivateTextContext(', start);
+  assert.ok(start >= 0 && end > start);
+  const composer = {}, stream = { state: 'completed', id: 'current-assistant' };
+  let calls = 0;
+  const scope = {
+    window: { __elonChatGptRuntimeGenerationState: { read: (node, current) => {
+      assert.equal(node, composer); assert.equal(current, stream); calls++;
+      return { active: false, code: 'completed_current_turn' };
+    } } },
+    findComposer: () => composer, streamingPolicy: policy,
+    streamingPolicyModule: context.window.__elonChatGptStreamingPolicy,
+    messageAdapter: { lastAssistantObservation: () => observation('current-assistant', '', false, true) },
+    document: { querySelector: () => ({}) }, isVisible: () => true
+  };
+  vm.runInNewContext(entry.slice(start, end), scope);
+  assert.equal(scope.readStreamingState(stream).active, false);
+  assert.equal(calls, 1);
+  assert.match(entry, /\(\) => readStreamingState\(privateStream\)/);
+}
+
 policy.begin(observation('assistant-2', '完成', true));
 now += 30001;
 assert.equal(

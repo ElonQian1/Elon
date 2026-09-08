@@ -170,6 +170,13 @@
   function readState(policy, messageAdapter, document, composer, visible, options) {
     const observation = messageObservation(messageAdapter);
     const active = officialActive(document, composer, visible);
+    if (policy && options?.privateStreamState === 'completed' &&
+        (active === true || observation.pending === true)) {
+      try {
+        const runtime = options.readRuntimeGeneration?.();
+        if (runtime?.active === false && runtime.code === 'completed_current_turn') return policy.reset();
+      } catch (_) { /* Unknown runtime state does not invalidate an active DOM turn. */ }
+    }
     if (policy && options && options.privateStreamState === 'completed' &&
         active !== true && observation.pending !== true) {
       return policy.reset();

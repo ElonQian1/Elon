@@ -220,15 +220,13 @@
     }) || null;
   }
 
-  function readStreamingState(privateStreamState) {
+  function readStreamingState(privateStream) {
+    const composer = findComposer();
     return streamingPolicyModule
       ? streamingPolicyModule.readState(
-        streamingPolicy,
-        messageAdapter,
-        document,
-        findComposer(),
-        isVisible,
-        { privateStreamState: String(privateStreamState || 'idle') }
+        streamingPolicy, messageAdapter, document, composer, isVisible,
+        { privateStreamState: String(privateStream?.state || 'idle'), readRuntimeGeneration: () =>
+          window.__elonChatGptRuntimeGenerationState?.read(composer, privateStream) }
       )
       : { active: false, assistantKey: '' };
   }
@@ -285,7 +283,7 @@
     ) ? String(privateStream.state) : 'idle';
     const streamingState = optional(
       { active: false, assistantKey: '' },
-      () => readStreamingState(privateStreamState)
+      () => readStreamingState(privateStream)
     );
     const streaming = access.blocked !== true &&
       (streamingState.active || !!(privateStream && privateStream.state === 'streaming'));
