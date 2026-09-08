@@ -38,6 +38,10 @@ data clearing or independent proxy changes were performed.
 - No further foreground takeover was attempted after that interruption. The
   test context remains available; restoration of the blank conversation is not
   claimed. The stay-awake lease was restored to its original value, 7.
+- The handset subsequently went offline. One bounded reconnect timed out;
+  device cleanup is deferred. Remove only this run's capture at
+  `/data/local/tmp/elon-stop-accept.png` on reconnection. No screenshot content
+  was included in repository evidence. Do not remove any user media.
 
 ## Source correction
 
@@ -64,6 +68,7 @@ their existing single-flight and reconciliation protections; no replay is added.
   checked the suite XML rather than trusting only the batch exit code.
 - This source correction is not installed in APK 1569. It is queued with the
   previous SharePoint download source batch for grouped release and acceptance.
+  Correction and initial evidence were pushed in `0fbe1a7ff`.
 - Next: confirm real foreground; verify send readiness-loss recovery, private
   stop request ownership, and separate follow-up turns. Preserve accepted voice,
   dictation, read-aloud, Search and prefetch implementations without retesting
