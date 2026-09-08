@@ -1,19 +1,22 @@
 # Official runtime message submission
 
 Capability: `android_chatgpt_official_runtime_text_submit_v1`.
-Status: implemented and installed; first guest send live-accepted in APK 1558,
-continuing guest runtime sends not yet accepted. It is an
+Status: implemented and installed; fresh and continuing guest plain-text sends
+are device verified in APK 1559. This scoped workflow is completed and reused
+unless there is new regression evidence. It is an
 official page-runtime bridge, **not an independent Android HTTP/private POST
 transport**. Reuse the existing bridge; do not reimplement it while resolving
-the current production readiness failure.
+the remaining scope and cold/new-conversation preparation gaps.
 
-Latest installed checkpoint: APK 1558 / adapter 299, runtime submit 14,
-bindings 4 and orchestrator 7. One native guest send returned
-`official_runtime_v1:accepted`, exactly one reply and settled native state in
-5,544 ms. The next send still used DOM fallback (`conversation_route_mismatch`)
-but returned exactly one reply and settled in 11,280 ms. The private writer is
-not replayed after invocation. This is scoped first-send acceptance, not proof
-that all continuing sends or the independent HTTP writer work.
+Latest installed checkpoint: APK 1559 / adapter 299, runtime submit 15,
+bindings 4 and orchestrator 7. Two consecutive production native guest sends
+returned `official_runtime_v1:accepted`, exactly one matching reply each and
+settled native state. Neither used DOM/private fallback. Complete replies were
+first observed at 4,502 ms and 2,484 ms; both workflows settled by about 4.6 s.
+These are polled observation times, not network first-token measurements.
+The preceding new-conversation preparation exceeded a 35-second readiness
+deadline before any send; it later became ready without repeating creation.
+That preparation gap remains open. See [1558/1559 evidence](reports/chatgpt-runtime-send-20260908.md).
 
 ## Current draft and guest ownership
 
@@ -54,7 +57,9 @@ guest-proof module when credentials already exist; ordinary authenticated
 conversation capture adds no module loading. The new synthetic regression
 failed before the change; 282 integrated cases pass after it. This is a proven
 source gap matching the observed root-route rejection, not a live inspection
-of the credential or server ID. Continuing-send acceptance remains pending.
+of the credential or server ID. The subsequent APK 1559 sample accepted the
+continuing runtime send; authenticated/project/tool/attachment variants and
+independent Android HTTP POST are not promoted by this guest-text evidence.
 
 The bridge reuses the official runtime
 writer rather than adding another HTTP sender. Known ready explicit text and
