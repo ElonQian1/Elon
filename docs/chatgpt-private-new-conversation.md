@@ -2,7 +2,8 @@
 
 Capability: `android_chatgpt_runtime_new_conversation_v1`.
 Implementation: implemented. Offline verification: passed. Device acceptance:
-pending. This is page-owned runtime navigation, not an independent private HTTP
+hot guest new-chat passed on APK 1559; cold/modal cases remain pending.
+This is page-owned runtime navigation, not an independent private HTTP
 reset or permission to discard guest history without confirmation.
 
 ## Evidence and integration
@@ -82,6 +83,16 @@ It calls the website's own router/close callbacks, not a DOM click or guessed PO
 
 ## Verification and remaining work
 
+September 8 live checkpoint: one production `start_new_web_chat_conversation`
+request on APK 1559 returned `runtime_new_chat:ready`, with four existing fixed
+test messages becoming zero and a ready composer observed after 1,898 ms.
+Document generation stayed at 2; no forced reload or second request occurred.
+No modal was approved. Home and the awake lease were restored. Log:
+`runtime-new-chat-1559-observe-20260908-20260908-103540-023`.
+This verifies hot registered-action navigation only; the earlier cold preparation
+timeout and native guest-consent path remain unaccepted. Do not repeat the hot
+test without regression evidence. The older checkpoints below are historical.
+
 The initial 26-case run passed 24 and failed both production wiring checks.
 Four additional red cases exposed readiness-loss duplicate dispatch, false
 success at the old saved route, unaccepted-mode settlement and a synchronous
@@ -128,7 +139,7 @@ friend-chat UI, not a test page. No APK was assembled or published for these
 source-only increments. A bounded read-only check found the pinned Xiaomi online,
 asleep and keyguard showing; no conversation or microphone was operated.
 
-These are offline evidence, not an observed guest-data deletion or live protocol
-acceptance. Group the source changes into the next APK. Registered action/modal
-availability, rendered native consent, actual empty-chat settlement and the direct
-send route still need production acceptance. The overall Goal remains active.
+The hot navigation checkpoint above supersedes only the older pending ordinary
+empty-chat settlement. Rendered native consent, cold recovery and other contexts
+still need acceptance. The guest text runtime now has its own accepted evidence
+in `reports/chatgpt-runtime-send-20260908.md`. The overall Goal remains active.
