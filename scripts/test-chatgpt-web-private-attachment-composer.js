@@ -147,6 +147,7 @@ function pdfFixture(temporary = false) {
   const top = { stateNode: {} };
   top.stateNode.current = top;
   f.fiber.return = { memoizedProps: props, return: top };
+  top.child = f.fiber.return; f.fiber.return.child = f.fiber;
   return { ...f, props };
 }
 
@@ -172,8 +173,9 @@ test('missing, invalid or ambiguous PDF model binding stays unknown before readi
   for (const mutate of [f => { f.fiber.return = null; }, f => { f.props.currentModelId = '\u6781\u9ad8'; },
     f => { f.props.onCreateNewCompletion = null; }, f => { f.props.conversation = null; },
     f => { f.fiber.return.return.stateNode.current = {}; },
-    f => { f.fiber.return.return = { memoizedProps: { ...f.props, currentModelId: 'other-model' },
-      return: f.fiber.return.return }; }]) {
+    f => { const parent = f.fiber.return, top = parent.return;
+      parent.return = { memoizedProps: { ...f.props, currentModelId: 'other-model' }, child: parent, return: top };
+      top.child = parent.return; }]) {
     const f = pdfFixture();
     mutate(f);
     const p = pipeline(f, { options: { source: { read: () => assert.fail('no PDF bytes before model binding') } } });
@@ -189,7 +191,9 @@ test('PDF model binding ignores stale React props and follows only a confirmed c
   const previous = f.fiber.return.return;
   const current = { stateNode: previous.stateNode };
   previous.stateNode.current = current;
-  f.fiber.alternate = { return: { memoizedProps: { ...f.props, currentModelId: 'committed-model' }, return: current } };
+  f.fiber.alternate = { memoizedProps: f.fiber.memoizedProps, dependencies: f.fiber.dependencies,
+    return: { memoizedProps: { ...f.props, currentModelId: 'committed-model' }, return: current } };
+  current.child = f.fiber.alternate.return; current.child.child = f.fiber.alternate;
   const p = pipeline(f);
   await p.start();
   assert.equal(p.receipts[0][1], true);
@@ -420,7 +424,8 @@ test('cancel and timeout release pending metadata ownership without waiting for 
 
 test('ambiguous or missing official store is unknown, not fake readiness', () => {
   const f = fixture();
-  f.fiber.return = { memoizedProps: { value: { ...f.store } } };
+  f.fiber.return = { memoizedProps: { value: { ...f.store } }, return: f.top, child: f.fiber };
+  f.top.child = f.fiber.return;
   assert.equal(f.composer.available(), false);
   f.fiber.return = null;
   f.input.isConnected = false;

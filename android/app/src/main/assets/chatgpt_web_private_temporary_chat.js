@@ -1,11 +1,13 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateTemporaryChat = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
   'use strict';
   options = options || {};
+  const ownerPath = page.__elonChatGptCommittedOwnerPath ||
+    (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path') : null);
   const SHARED = 'https://chatgpt.com/cdn/assets/4813494d-hrplraurzfyvxb10.js';
   const COMPOSER = 'https://chatgpt.com/cdn/assets/8b34dbc2-kjj15hg4y6iyx13p.js';
   const REACT = 'https://chatgpt.com/cdn/assets/2340486e-dyt4epctwx2pn2sj.js';
@@ -34,38 +36,31 @@
       ? page.__elonChatGptPrivateRuntimeBindings.temporary() : { owner: 'AKt', action: ACTION };
     if (!spec) return null;
     const key = Object.keys(node).find(key => key.startsWith('__reactFiber$'));
-    const matches = [];
-    for (const start of [node[key], node[key]?.alternate]) {
-      const chain = [];
-      for (let fiber = start; fiber && chain.length < 90; fiber = fiber.return) chain.push(fiber);
-      const root = chain.at(-1);
-      if (!root || root.return || root.stateNode?.current !== root) continue;
-      const index = chain.findIndex(fiber => fiber.type?.name === spec.owner &&
-        typeof fiber.memoizedProps?.clientThreadId === 'string');
-      if (index < 0) continue;
-      const id = chain[index].memoizedProps.clientThreadId;
-      if (!/^[a-zA-Z0-9_-]{1,160}$/.test(id)) continue;
-      // The inspected owner's single useMemoCache(30) records isNew/temp inputs.
-      // Checking these prevents a committed but stale empty-chat callback from rewriting a saved chat.
-      const data = chain[index].updateQueue?.memoCache?.data;
-      const memo = Array.isArray(data) && data.length === 1 ? data[0] : null;
-      if (!Array.isArray(memo) || memo.length !== 30 || memo[0] !== id ||
-          typeof memo[3] !== 'boolean' || typeof memo[4] !== 'boolean' ||
-          typeof memo[7] !== 'function' || Function.prototype.toString.call(memo[7]) !== spec.action ||
-          memo[19] !== memo[7] || memo[20] !== (memo[4] && !memo[3]) || memo[21] !== memo[4]) continue;
-      const conversations = new Set(chain.map(fiber => fiber.memoizedProps?.conversation)
-        .filter(conversation => conversation?.id === id && typeof conversation.serverId$ === 'function'));
-      const callbacks = chain.slice(0, index).map(fiber => fiber.memoizedProps?.onClick)
-        .filter(action => typeof action === 'function');
-      const actions = new Set(callbacks.filter(action => Function.prototype.toString.call(action) === spec.action));
-      if (conversations.size !== 1 || actions.size > 1 || callbacks.length && !actions.size ||
-          actions.size && !actions.has(memo[7]) || !actions.size && !memo[20]) continue;
-      matches.push({ id, conversation: conversations.values().next().value,
-        capturedIsNew: memo[3], capturedSelected: memo[4],
-        action: memo[20] || node.disabled === true || node.getAttribute('aria-disabled') === 'true'
-          ? null : actions.values().next().value });
-    }
-    return matches.length === 1 ? matches[0] : null;
+    const chain = ownerPath?.resolve(node[key])?.ancestors || [];
+    const index = chain.findIndex(fiber => fiber.type?.name === spec.owner &&
+      typeof fiber.memoizedProps?.clientThreadId === 'string');
+    if (index < 0) return null;
+    const id = chain[index].memoizedProps.clientThreadId;
+    if (!/^[a-zA-Z0-9_-]{1,160}$/.test(id)) return null;
+    // The inspected owner's single useMemoCache(30) records isNew/temp inputs.
+    // Checking these prevents a committed but stale empty-chat callback from rewriting a saved chat.
+    const data = chain[index].updateQueue?.memoCache?.data;
+    const memo = Array.isArray(data) && data.length === 1 ? data[0] : null;
+    if (!Array.isArray(memo) || memo.length !== 30 || memo[0] !== id ||
+        typeof memo[3] !== 'boolean' || typeof memo[4] !== 'boolean' ||
+        typeof memo[7] !== 'function' || Function.prototype.toString.call(memo[7]) !== spec.action ||
+        memo[19] !== memo[7] || memo[20] !== (memo[4] && !memo[3]) || memo[21] !== memo[4]) return null;
+    const conversations = new Set(chain.map(fiber => fiber.memoizedProps?.conversation)
+      .filter(conversation => conversation?.id === id && typeof conversation.serverId$ === 'function'));
+    const callbacks = chain.slice(0, index).map(fiber => fiber.memoizedProps?.onClick)
+      .filter(action => typeof action === 'function');
+    const actions = new Set(callbacks.filter(action => Function.prototype.toString.call(action) === spec.action));
+    if (conversations.size !== 1 || actions.size > 1 || callbacks.length && !actions.size ||
+        actions.size && !actions.has(memo[7]) || !actions.size && !memo[20]) return null;
+    return { id, conversation: conversations.values().next().value,
+      capturedIsNew: memo[3], capturedSelected: memo[4],
+      action: memo[20] || node.disabled === true || node.getAttribute('aria-disabled') === 'true'
+        ? null : actions.values().next().value };
   }
 
   function capture(node) {

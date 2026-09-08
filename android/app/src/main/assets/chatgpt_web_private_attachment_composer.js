@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 16, create: factory });
+  const exported = Object.freeze({ version: 17, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -10,11 +10,17 @@
   const confirmed = new WeakSet();
   const projects = new WeakMap();
   const project = root.__elonChatGptPrivateAttachmentProject?.create(root);
+  const ownerPath = root.__elonChatGptCommittedOwnerPath ||
+    (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path') : null);
+
+  function inputAncestors() {
+    const input = root.document.querySelector('#upload-files');
+    if (!input?.isConnected) return [];
+    const key = Object.keys(input).find(name => name.startsWith('__reactFiber$'));
+    return ownerPath?.resolve(input[key])?.ancestors || [];
+  }
 
   function storeFromInput() {
-    const input = root.document.querySelector('#upload-files');
-    if (!input?.isConnected) return null;
-    const key = Object.keys(input).find(name => name.startsWith('__reactFiber$'));
     const stores = new Set();
     function accept(value) {
       if (typeof value?.files$ === 'function' && typeof value.files$.set === 'function' &&
@@ -23,7 +29,7 @@
       }
     }
     // The observed official FilePickerContext uses a callable signal, not React setState.
-    for (let fiber = input[key], depth = 0; fiber && depth < 90; fiber = fiber.return, depth++) {
+    for (const fiber of inputAncestors()) {
       accept(fiber.memoizedProps?.value);
       let dependency = fiber.dependencies?.firstContext;
       for (let count = 0; dependency && count < 30; dependency = dependency.next, count++) {
@@ -48,28 +54,17 @@
   }
 
   function composerPolicy() {
-    const input = root.document.querySelector('#upload-files');
-    if (!input?.isConnected) return null;
-    const key = Object.keys(input).find(name => name.startsWith('__reactFiber$'));
     const candidates = new Map();
-    // The host node can still reference React's previous alternate. Accept only
-    // a branch that reaches its root's current pointer, never work-in-progress props.
-    for (const start of [input[key], input[key]?.alternate]) {
-      const ancestors = [];
-      for (let fiber = start; fiber && ancestors.length < 90; fiber = fiber.return) ancestors.push(fiber);
-      const top = ancestors.at(-1);
-      if (!top || top.return || top.stateNode?.current !== top) continue;
-      for (const fiber of ancestors) {
-        const props = fiber.memoizedProps;
-        if (!props?.conversation || typeof props.conversation !== 'object' ||
-            typeof props.onCreateNewCompletion !== 'function') continue;
-        // Official file-drop handler receives currentModelId ?? currentModelConfig.id.
-        const slug = props.currentModelId ?? props.currentModelConfig?.id;
-        if (typeof slug !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(slug)) return null;
-        const policy = { modelSlug: slug,
-          libraryEnabled: props.entrySurface === 'chat_composer' && props.isLibraryEnabled === true };
-        candidates.set(JSON.stringify(policy), policy);
-      }
+    for (const fiber of inputAncestors()) {
+      const props = fiber.memoizedProps;
+      if (!props?.conversation || typeof props.conversation !== 'object' ||
+          typeof props.onCreateNewCompletion !== 'function') continue;
+      // Official file-drop handler receives currentModelId ?? currentModelConfig.id.
+      const slug = props.currentModelId ?? props.currentModelConfig?.id;
+      if (typeof slug !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(slug)) return null;
+      const policy = { modelSlug: slug,
+        libraryEnabled: props.entrySurface === 'chat_composer' && props.isLibraryEnabled === true };
+      candidates.set(JSON.stringify(policy), policy);
     }
     return candidates.size === 1 ? candidates.values().next().value : null;
   }

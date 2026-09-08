@@ -78,6 +78,8 @@ function fixture(options = {}) {
         click: () => effects.push('dom-click'), getBoundingClientRect: () => ({ left: 0, top: 0, width: 40, height: 40 }) };
     }
     state.node.__reactFiber$fixture = { return: button };
+    root.child = conversationFiber; conversationFiber.child = owner;
+    owner.child = button; button.child = state.node.__reactFiber$fixture;
     state.root = root; state.owner = owner; state.button = button;
   }
   render();
@@ -108,6 +110,23 @@ function fixture(options = {}) {
     get fallbacks() { return fallbacks; }, get snapshots() { return snapshots; },
     set observed(value) { observed = value; }, set account(value) { account = value; } };
 }
+
+test('temporary chat rejects an orphaned callback even when its return pointer reaches the current root', async () => {
+  const f = fixture(); f.state.root.child = null;
+  assert.equal(f.select(true), false); await flush();
+  assert.deepEqual(f.effects, []); assert.equal(f.imports, 0);
+});
+
+test('temporary chat follows reused children to the current owner without the old disabled props', async () => {
+  const f = fixture(), old = f.state.owner, parent = old.return;
+  const current = { ...old, alternate: old, child: f.state.button };
+  old.alternate = current; parent.child = current;
+  old.updateQueue = { memoCache: { data: [] } };
+  assert.equal(f.select(true), true); await flush();
+  assert.equal(f.results.at(-1)[1], true); assert.equal(f.state.privacy, true);
+  assert.equal(f.effects.filter(item => item === 'official-action').length, 1);
+  assert.equal(f.effects.includes('dom-click'), false); assert.equal(f.fallbacks, 0);
+});
 
 test('empty chat uses the official transaction, preserves cleanup and reuses the warm runtime', async () => {
   const f = fixture();

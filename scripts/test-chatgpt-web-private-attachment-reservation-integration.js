@@ -28,6 +28,7 @@ function fixture(options = {}) {
     currentModelId: 'synthetic-model' } };
   top.stateNode.current = top;
   const input = { isConnected: true, __reactFiber$test: { memoizedProps: { value: store }, return: top } };
+  top.child = input.__reactFiber$test;
   const selectedFile = options.file || file();
   const root = { location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' + (options.temporary ? '?temporary-chat=true' : '') },
     document: { querySelector: selector => selector === '#upload-files' ? input : null },

@@ -1,12 +1,14 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateModelContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
   'use strict';
   const SLUG = /^[a-z0-9][a-z0-9._-]{0,127}$/i;
   const MODEL_ID = /^[a-z0-9][a-z0-9._:/-]{0,255}$/i;
+  const ownerPath = page.__elonChatGptCommittedOwnerPath ||
+    (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path') : null);
   const URLS = Object.freeze({
     shared: 'https://chatgpt.com/cdn/assets/4813494d-hrplraurzfyvxb10.js',
     conversation: 'https://chatgpt.com/cdn/assets/conversation-small-hiw4wce20lu6te81.js',
@@ -25,19 +27,13 @@
     if (!node?.isConnected) return null;
     const key = Object.keys(node).find(name => name.startsWith('__reactFiber$'));
     const candidates = new Set();
-    for (const start of [node[key], node[key]?.alternate]) {
-      const chain = [];
-      for (let fiber = start; fiber && chain.length < 90; fiber = fiber.return) chain.push(fiber);
-      const top = chain.at(-1);
-      if (!top || top.return || top.stateNode?.current !== top) continue;
-      for (const fiber of chain) {
-        const props = fiber.memoizedProps;
-        const menu = props?.dropdownContent?.props;
-        if (!menu?.composerIntelligencePickerState || !menu.conversation ||
-            !(menu.modelsData?.models instanceof Map)) continue;
-        if (props.ariaDisabled !== false || typeof props.dropdownOpen !== 'boolean') return null;
-        candidates.add(menu);
-      }
+    for (const fiber of ownerPath?.resolve(node[key])?.ancestors || []) {
+      const props = fiber.memoizedProps;
+      const menu = props?.dropdownContent?.props;
+      if (!menu?.composerIntelligencePickerState || !menu.conversation ||
+          !(menu.modelsData?.models instanceof Map)) continue;
+      if (props.ariaDisabled !== false || typeof props.dropdownOpen !== 'boolean') return null;
+      candidates.add(menu);
     }
     return candidates.size === 1 ? candidates.values().next().value : null;
   }

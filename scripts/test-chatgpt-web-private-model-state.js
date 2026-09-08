@@ -84,7 +84,8 @@ test('mismatched route, unsupported contexts and ambiguous live pickers stay on 
     f => { f.page.location.href += '?model=fixture'; },
     f => { f.page.location.href = 'https://chatgpt.com/g/g-fixture'; },
     f => { f.page.location.href = 'https://chatgpt.com/g/g-p-' + 'a'.repeat(32) + '/project?temporary-chat=true'; },
-    f => { f.ancestor.return = { memoizedProps: { ...f.props, dropdownContent: { props: { ...f.menu } } }, return: f.top }; }
+    f => { f.ancestor.return = { memoizedProps: { ...f.props, dropdownContent: { props: { ...f.menu } } },
+      child: f.ancestor, return: f.top }; f.top.child = f.ancestor.return; }
   ]) {
     const f = fixture(); mutate(f);
     assert.equal(f.request(), false); assert.equal(f.imports, 0); assert.equal(f.writes.length, 0);

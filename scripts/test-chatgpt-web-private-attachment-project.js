@@ -28,6 +28,7 @@ function fixture(options = {}) {
   const input = { isConnected: true, __reactFiber$fixture: { memoizedProps: { value: store },
     return: { memoizedProps: { conversation: {}, onCreateNewCompletion() {}, currentModelId: 'synthetic-project-model' },
       return: committedRoot } } };
+  committedRoot.child = input.__reactFiber$fixture.return; committedRoot.child.child = input.__reactFiber$fixture;
   const headers = () => ({ authorization: account, 'chatgpt-account-id': 'synthetic-account' });
   const payload = { gizmo: { id: PROJECT, current_user_permission: { can_write: true }, use_injest_path: false } };
   const thread = { isLoading: false, is_do_not_remember: false, projectId: PROJECT, leaf: LEAF };

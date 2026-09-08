@@ -28,6 +28,7 @@ function fixture(options = {}) {
   const props = { ariaDisabled: false, dropdownOpen: false, dropdownContent: { props: menu } };
   const top = { stateNode: {} }; top.stateNode.current = top;
   const ancestor = { memoizedProps: props, return: top }, host = { return: ancestor };
+  top.child = ancestor; ancestor.child = host;
   const node = { isConnected: true, __reactFiber$fixture: host,
     getAttribute: name => name === 'aria-expanded' ? String(props.dropdownOpen) : null,
     getBoundingClientRect: () => ({ width: 80, height: 40, left: 0, top: 0 }) };

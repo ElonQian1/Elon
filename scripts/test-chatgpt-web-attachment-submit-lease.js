@@ -15,6 +15,7 @@ function fixture({ temporary = false, image = false, reused = false } = {}) {
     entrySurface: 'chat_composer', isLibraryEnabled: true, value: store };
   const top = { stateNode: {} }; top.stateNode.current = top;
   const input = { isConnected: true, __reactFiber$fixture: { memoizedProps: props, return: top } };
+  top.child = input.__reactFiber$fixture;
   const root = { location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' + (temporary ? '?temporary-chat=true' : '') },
     document: { querySelector: key => key === '#upload-files' ? input : {} },
     __elonChatGptDocumentToken: 'doc_submit_lease',

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateRegenerateContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -13,16 +13,13 @@
   const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
   const SLUG = /^[a-z0-9][a-z0-9._-]{0,127}$/i;
   const models = page.__elonChatGptPrivateModelContract?.create(page);
+  const ownerPath = page.__elonChatGptCommittedOwnerPath ||
+    (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path') : null);
 
   function ancestors(node) {
+    if (!node?.isConnected) return [];
     const key = Object.keys(node).find(name => name.startsWith('__reactFiber$'));
-    for (const start of [node[key], node[key]?.alternate]) {
-      const chain = [];
-      for (let fiber = start; fiber && chain.length < 90; fiber = fiber.return) chain.push(fiber);
-      const root = chain.at(-1);
-      if (root && !root.return && root.stateNode?.current === root) return chain;
-    }
-    return [];
+    return ownerPath?.resolve(node[key])?.ancestors || [];
   }
 
   function retryMenu(turn) {

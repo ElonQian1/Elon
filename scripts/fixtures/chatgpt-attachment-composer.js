@@ -10,6 +10,8 @@ module.exports = function fixture() {
   const store = { files$, readyFiles$: () => values.filter(item => item.status === 'ready'),
     hasUploadInProgress$: () => values.some(item => item.status === 'uploading') };
   const fiber = { memoizedProps: { value: store }, dependencies: { firstContext: { memoizedValue: store } } };
+  const top = { stateNode: {}, child: fiber };
+  top.stateNode.current = top; fiber.return = top;
   const input = { isConnected: true, __reactFiber$synthetic: fiber };
   const headers = () => ({ Authorization: account, 'chatgpt-account-id': 'synthetic-workspace' });
   const root = {
@@ -30,6 +32,6 @@ module.exports = function fixture() {
   const result = binding => ({ ok: true, stage: 'processed', associated: false, binding,
     fileId: 'file-synthetic', fileName: file.name, fileSize: file.size, mimeType: file.type,
     isTemporaryChat: binding.isTemporaryChat, metadata: { fileTokenSize: 5 } });
-  return { root, composer, store, input, fiber, file, descriptor, result,
+  return { root, composer, store, input, fiber, top, file, descriptor, result,
     setAccount: next => { account = next; }, setModel: next => { model = next; } };
 };

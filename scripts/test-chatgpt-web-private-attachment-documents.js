@@ -25,6 +25,7 @@ function fixture(spec, { temporary = false, existing = false, incomplete = false
   top.stateNode.current = top;
   const input = { isConnected: true, __reactFiber$synthetic: { memoizedProps: { value: store },
     return: { memoizedProps: { conversation: {}, onCreateNewCompletion() {}, currentModelId: 'synthetic-model' }, return: top } } };
+  top.child = input.__reactFiber$synthetic.return; top.child.child = input.__reactFiber$synthetic;
   const headers = () => ({ authorization: 'Bearer synthetic-page-token', 'chatgpt-account-id': 'synthetic-account' });
   const root = { location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' +
       (existing ? 'c/' + CONVERSATION : '') + (temporary ? '?temporary-chat=true' : '') },

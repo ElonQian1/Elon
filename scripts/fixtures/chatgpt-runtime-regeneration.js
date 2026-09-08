@@ -32,6 +32,9 @@ function fixture(options = {}) {
   const turn = { isConnected: true, querySelectorAll: () => [button] };
   const modelFiber = { memoizedProps: { dropdownContent: element(modelMenu), ariaDisabled: false, dropdownOpen: false }, return: root };
   const modelButton = { isConnected: true, __reactFiber$test: { return: modelFiber } };
+  root.child = ownerFiber; ownerFiber.sibling = modelFiber;
+  ownerFiber.child = menuRoot; menuRoot.child = button.__reactFiber$test;
+  modelFiber.child = modelButton.__reactFiber$test;
   const page = {
     location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/c/' + cid, pathname: '/c/' + cid },
     __elonChatGptDocumentToken: 'doc_regenerate_test', __elonChatGptPrivateTextTransactionsEnabled: true,

@@ -12,6 +12,7 @@ function fixture(options = {}) {
     entrySurface: 'chat_composer', ...options.props };
   const top = { memoizedProps: props, stateNode: {} }; top.stateNode.current = top;
   const leaf = { memoizedProps: { value: store }, return: top };
+  top.child = leaf;
   const input = { isConnected: true, __reactFiber$test: leaf };
   const root = { location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' + (options.temporary ? '?temporary-chat=true' : '') },
     document: { querySelector: selector => selector === '#upload-files' ? input : {} },
@@ -69,7 +70,7 @@ test('library policy changes invalidate an in-flight upload owner', () => {
 test('stale React alternate cannot opt into library storage', () => {
   const f = fixture({ props: { isLibraryEnabled: false } });
   const stale = { memoizedProps: { ...f.props, isLibraryEnabled: true }, stateNode: f.top.stateNode };
-  f.input.__reactFiber$test = { return: stale, alternate: { return: f.top } };
+  f.input.__reactFiber$test = { return: stale, alternate: f.top.child };
   const composer = composerModule.create(f.root, { resolveStore: () => f.store });
   assert.equal(composer.uploadContext(composer.capture(), f.file).storeInLibrary, false);
 });
