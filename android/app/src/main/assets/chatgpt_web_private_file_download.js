@@ -1,13 +1,15 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 12, create: factory });
+  const pointer = typeof module === 'object' && module.exports
+    ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
+  const exported = Object.freeze({ version: 12, create: root => factory(root, pointer) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
     root.__elonChatGptPrivateFileDownload?.dispose?.();
-    root.__elonChatGptPrivateFileDownload = factory(root);
+    root.__elonChatGptPrivateFileDownload = factory(root, pointer);
   }
-})(typeof window === 'object' ? window : null, function (root) {
+})(typeof window === 'object' ? window : null, function (root, pointerParser) {
   'use strict';
   const entries = new Map();
   const PATH = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([A-Za-z0-9_-]{1,160})$/i;
@@ -15,9 +17,6 @@
   const LIBRARY = /^libfile[_-][A-Za-z0-9_-]{1,152}$/;
   const HANDLE = /^download_[a-f0-9]{32}$/;
   const ACTION = 'download_conversation_file';
-  const RESERVED_QUERY = new Set(['gizmo_id', 'project_id', 'conversation_id', 'post_id',
-    'check_context_scopes_for_conversation_id', 'context_scopes', 'download_intent', 'inline',
-    'authorization', 'cookie', 'access_token']);
   let active = null;
   let disposed = false;
 
@@ -37,26 +36,6 @@
       ? 'check_context_scopes_for_conversation_id' : 'conversation_id', entry.conversationId);
     url.searchParams.set('download_intent', 'true');
     return url.href;
-  }
-
-  function imagePointer(value) {
-    if (typeof value !== 'string' || value.length > 4096 || /[\x00-\x1f\x7f]/.test(value)) return null;
-    const match = /^(?:file-service|sediment):\/\/([^?]+)(?:\?(.*))?$/.exec(value);
-    if (!match || !/^[A-Za-z0-9_-]{1,160}(?:#[A-Za-z0-9_-]{1,160}){0,4}$/.test(match[1])) return null;
-    const query = new Map();
-    try {
-      // Official TTt preserves the suffix; dEt splits its query, uses the last
-      // duplicate value, and maps '#' in the file ID to '*', not a URL fragment.
-      decodeURIComponent(match[2] || '');
-      let count = 0;
-      for (const [key, value] of new URLSearchParams(match[2] || '')) {
-        if (++count > 32 || !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(key) ||
-            RESERVED_QUERY.has(key.toLowerCase()) || value.length > 1024 || /[\x00-\x1f\x7f]/.test(value)) return null;
-        query.set(key, value);
-      }
-    } catch (_) { return null; }
-    return { id: value.slice(value.indexOf('://') + 3), downloadFileId: match[1].replaceAll('#', '*'),
-      downloadQuery: Object.freeze(Array.from(query, entry => Object.freeze(entry))) };
   }
 
   function connectorCopy(file) {
@@ -87,7 +66,7 @@
     const image = source.image;
     if (image?.content_type !== 'image_asset_pointer' || typeof image.asset_pointer !== 'string' ||
         source.attachmentsUnconfirmed || !Array.isArray(source.attachments)) return null;
-    const pointer = imagePointer(image.asset_pointer);
+    const pointer = pointerParser?.parse(image.asset_pointer);
     if (!pointer || ['gizmo_id', 'project_id', 'library_file_id', 'shared_library_file_id',
       'library_download_id', 'context_scopes', 'source_url', 'context_connector', 'connector_id',
       'context_connector_info'].some(key => image[key] != null)) return null;
