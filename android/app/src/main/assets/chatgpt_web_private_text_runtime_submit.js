@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 15, create: factory });
+  const exported = Object.freeze({ version: 16, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -139,6 +139,20 @@
     const serverId = conversation.serverId$() || null;
     if (serverId !== null && (typeof serverId !== 'string' || !new RegExp('^' + UUID + '$', 'i').test(serverId))) return false;
     if (serverId === currentRoute.conversationId) return true;
+    if (currentRoute.href === 'https://chatgpt.com/?temporary-chat=true' && serverId !== null) {
+      const bindings = page.__elonChatGptPrivateRuntimeBindings;
+      const shared = bindings?.observed('shared') ? bindings.peek('shared') : null;
+      if (!shared) {
+        bindings?.load('shared').catch(() => {});
+        return false;
+      }
+      // Temporary threads can acquire a server ID without a /c/ navigation.
+      // The URL alone is insufficient: require the current official thread's privacy.
+      const thread = typeof conversation.id === 'string' && shared.XM?.(conversation.id);
+      return thread?.is_do_not_remember === true && shared.cX?.() === true &&
+        shared.HM?.getIsNewConversation?.(thread) === false && shared.uo?.(conversation) === false &&
+        typeof shared.HM?.getGizmoId === 'function' && shared.HM.getGizmoId(thread) == null;
+    }
     // The confirmed logged-out homepage can keep the same official conversation
     // after it receives a server ID, without navigating to /c/<id>.
     return guestProof !== null &&
@@ -309,5 +323,5 @@
       if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
     }
   } catch (_) {}
-  return Object.freeze({ version: 15, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 16, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

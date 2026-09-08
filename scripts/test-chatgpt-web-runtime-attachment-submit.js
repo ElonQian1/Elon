@@ -18,10 +18,11 @@ function fixture({ temporary = false, image = false, reused = false, count = 1 }
   let values = [], serverId = null, identity = 'Bearer synthetic-only', draft = '', settle;
   let response = () => ({ accepted: true, completion: new Promise(resolve => { settle = resolve; }) });
   const calls = [], events = [], timers = new Map(), counts = { prepared: 0, click: 0, relay: 0, draftWrites: 0 };
+  const privacy = { selected: temporary, remembered: !temporary, project: null, work: false };
   const files$ = () => values;
   files$.set = next => { values = next; };
   const store = { files$, readyFiles$: () => values.filter(item => item.status === 'ready'), hasUploadInProgress$: () => false };
-  const conversation = { serverId$: () => serverId };
+  const conversation = { id: 'client-fixture', serverId$: () => serverId };
   const props = { conversation, composerController: { conversation }, currentLeafId: 'synthetic-leaf',
     isNewThread: true, isDisabled: false, isComposerSubmissionReady: true,
     isConsumerLockdownModeLoadingForConversation: false, shouldBlockConsumerLockdownModeActionsForConversation: false,
@@ -35,7 +36,7 @@ function fixture({ temporary = false, image = false, reused = false, count = 1 }
   top.child = fiber;
   const node = { isConnected: true, __reactFiber$fixture: fiber };
   const page = { location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' + (temporary ? '?temporary-chat=true' : '') },
-    document: { querySelector: () => node, querySelectorAll: () => [] },
+    document: { querySelector: selector => selector.startsWith('link[') ? null : node, querySelectorAll: () => [] },
     __elonChatGptDocumentToken: 'doc_attachment_submit', __elonChatGptPrivateTextTransactionsEnabled: true,
     __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({ Authorization: identity }) },
     __elonChatGptPrivateAttachmentProtocol: protocol,
@@ -44,6 +45,11 @@ function fixture({ temporary = false, image = false, reused = false, count = 1 }
     setTimeout(fn) { const key = Symbol(); timers.set(key, fn); return key; }, clearTimeout: key => timers.delete(key),
     __elonChatGptPrivateStreamTransport: { prepareSend() { counts.prepared++; } },
     __elonChatGptPrivateTextTransactionRelay: { dispatch() { counts.relay++; return { dispatched: false }; } } };
+  if (temporary) require('./fixtures/chatgpt-runtime-bindings').attach(page, { shared: {
+    XM: selected => selected === conversation.id ? { is_do_not_remember: !privacy.remembered } : null,
+    cX: () => privacy.selected, uo: () => privacy.work,
+    HM: { getIsNewConversation: () => props.isNewThread, getGizmoId: () => privacy.project },
+  } });
   const composer = composerModule.create(page), binding = composer.capture();
   const file = new File(['synthetic upload'], image ? 'fixture.png' : 'fixture.txt', { type: image ? 'image/png' : 'text/plain' });
   const result = { ok: true, associated: false, binding,
@@ -70,13 +76,38 @@ function fixture({ temporary = false, image = false, reused = false, count = 1 }
   const command = { composer: node, prompt: 'synthetic attachment question', expectedDraft: '', requestId: 'mcp_attachment',
     requireNativeAttachment: true, readDraft: () => draft, clearDraft: () => { draft = ''; } };
   const respond = (action, ok, detail) => events.push({ action, ok, detail }); respond.requestId = command.requestId;
-  return { page, store, props, node, fiber, top, file, attached, composer, calls, events, counts, command,
+  return { page, store, props, node, fiber, top, file, attached, composer, calls, events, counts, command, privacy,
     api: page.__elonChatGptPrivateTextRuntimeSubmit,
     send: (allow = false) => send.sendPrompt(command.prompt, command.expectedDraft, respond, allow),
     settle: value => settle(value), response: value => { response = value; },
     timeout: () => { for (const fn of [...timers.values()]) fn(); },
     setIdentity: value => { identity = value; }, setDraft: value => { draft = value; }, draft: () => draft,
+    persistAtHome() { serverId = id; props.isNewThread = false; },
     navigate() { serverId = id; page.location.href = 'https://chatgpt.com/c/' + id + (temporary ? '?temporary-chat=true' : ''); } };
+}
+
+test('temporary attachment acknowledgement survives server ID assignment without a route change', async () => {
+  const f = fixture({ temporary: true });
+  await f.page.__elonChatGptPrivateRuntimeBindings.load('shared');
+  f.send(); f.persistAtHome(); f.settle(true); await flush();
+  assert.equal(f.events[0].detail, 'official_runtime_v1:accepted');
+  assert.equal(f.store.files$().length, 0);
+  assert.equal(f.api.state().pending, false);
+  assert.equal(f.calls.length, 1);
+  assert.ok(f.api.captureConversation(f.node));
+});
+
+for (const change of ['remembered', 'selected', 'project', 'work', 'newThread']) {
+  test('temporary homepage requires live privacy and ordinary-thread proof: ' + change, async () => {
+    const f = fixture({ temporary: true });
+    await f.page.__elonChatGptPrivateRuntimeBindings.load('shared');
+    f.persistAtHome();
+    if (change === 'newThread') f.props.isNewThread = true;
+    else f.privacy[change] = change === 'selected' ? false : change === 'project' ? 'g-project' : true;
+    assert.equal(f.api.captureConversation(f.node), null);
+    assert.equal(f.api.submit(f.command).handled, false);
+    assert.equal(f.calls.length, 0);
+  });
 }
 
 for (const count of [2, 9]) {

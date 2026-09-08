@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateTemporaryChat = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -72,8 +72,13 @@
           !account || !/^doc_[a-z0-9_]{3,80}$/.test(token || '') ||
           !observed(SHARED) || !observed(COMPOSER) || !observed(REACT)) return null;
       const current = owner(node);
-      if (!current || (current.conversation.serverId$() || null) !== cid) return null;
-      return { ...current, node, token, account, href: url.href, pathname: url.pathname, selected: !!url.search };
+      if (!current) return null;
+      const serverId = current.conversation.serverId$() || null;
+      const persistedHome = cid === null && url.search === '?temporary-chat=true' &&
+        typeof serverId === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(serverId);
+      if (serverId !== cid && !persistedHome) return null;
+      return { ...current, node, token, account, href: url.href, pathname: url.pathname,
+        selected: !!url.search, persistedHome };
     } catch (_) { return null; }
   }
 
@@ -106,6 +111,7 @@
         selected !== binding.selected) return null;
     const isNew = runtime.HM.getIsNewConversation(thread);
     if (typeof isNew !== 'boolean') return null;
+    if (binding.persistedHome && (isNew || thread.is_do_not_remember !== true)) return null;
     return { ...binding, isNew, current: binding.capturedIsNew === isNew && binding.capturedSelected === selected,
       privacy: thread.is_do_not_remember || binding.conversation.config?.startDoNotRemember === true };
   }
@@ -234,5 +240,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 2, observe, setSelected });
+  return Object.freeze({ version: 4, observe, setSelected });
 });

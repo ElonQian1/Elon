@@ -166,6 +166,30 @@ test('readonly existing temporary chat is observed correctly and is not converte
   f.select(true); assert.equal(f.results.at(-1)[1], true); assert.equal(f.effects.length, 0);
 });
 
+test('persisted temporary homepage retains its read-only privacy indicator', async () => {
+  const f = fixture({ newChat: false, selected: true });
+  assert.equal(f.runtime.version, runtimeModule.version);
+  f.runtime.observe(f.state.node); await flush();
+  f.page.location.href = 'https://chatgpt.com/?temporary-chat=true';
+  assert.deepEqual(f.runtime.observe(f.state.node), { selected: true, stateSettable: false });
+  f.select(false); await flush();
+  assert.equal(f.results.at(-1)[1], false);
+  assert.deepEqual(f.effects, []);
+});
+
+for (const change of ['privacy', 'newChat', 'normalRoute']) {
+  test('persisted homepage indicator rejects contradictory temporary proof: ' + change, async () => {
+    const f = fixture({ newChat: false, selected: true });
+    f.runtime.observe(f.state.node); await flush();
+    f.page.location.href = 'https://chatgpt.com/?temporary-chat=true';
+    if (change === 'privacy') f.state.privacy = false;
+    if (change === 'newChat') f.state.newChat = true;
+    if (change === 'normalRoute') f.page.location.href = 'https://chatgpt.com/';
+    assert.equal(f.runtime.observe(f.state.node), null);
+    assert.deepEqual(f.effects, []);
+  });
+}
+
 test('stale native selected state cannot toggle twice', async () => {
   const f = fixture(); f.select(true); await flush();
   f.select(true); assert.equal(f.results.at(-1)[1], true);
