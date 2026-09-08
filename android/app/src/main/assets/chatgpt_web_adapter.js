@@ -87,6 +87,7 @@
   const conversationDirectoryRequests = conversationDirectoryRequestsModule &&
     typeof conversationDirectoryRequestsModule.create === 'function'
     ? conversationDirectoryRequestsModule.create({
+      attachmentChanged: () => { invalidatePrivateTextContext(); scheduleSnapshot(true); },
       conversationAdapter,
       privateDirectory: privateConversationDirectory,
       privateTransport,

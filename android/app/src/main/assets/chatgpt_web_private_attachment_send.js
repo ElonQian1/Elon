@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 17, create: factory });
+  const exported = Object.freeze({ version: 18, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -15,11 +15,13 @@
   const image = options.image || root.__elonChatGptPrivateAttachmentImage?.create(root);
   const createTransport = options.createTransport || (config => root.__elonChatGptPrivateAttachmentTransport.create(root, config));
   let active = null;
+  const library = root.__elonChatGptPrivateLibraryAttachment?.create(root, { composer, busy: () => !!active });
   const selections = root.__elonChatGptPrivateAttachmentSelection?.create(root, {
-    composer, createTransport, busy: () => !!active,
+    composer, createTransport, busy: () => !!active || library?.busy() === true,
   });
 
   function suspend() {
+    library?.cancel();
     if (!active) return;
     active.controller.abort();
     active.transport?.cancel();
@@ -28,7 +30,7 @@
   function cancel() { selections?.cancel(); suspend(); }
 
   async function start(raw, respond, changed, fallback) {
-    if (active) return respond('request_attachment_upload', false, '附件上传尚未结束。');
+    if (active || library?.busy()) return respond('request_attachment_upload', false, '附件上传尚未结束。');
     let descriptor;
     try { descriptor = JSON.parse(raw); } catch (_) {}
     const batch = descriptor?.version === 2;
@@ -140,7 +142,11 @@
     return true;
   }
 
-  return Object.freeze({ version: 17, start, cancel, suspend, remove,
+  return Object.freeze({ version: 18, start, cancel, suspend, remove,
+    attachLibrary: (command, respond, changed) => {
+      selections?.cancel();
+      return library ? library.attach(command, respond, changed) : respond('attach_library_file', false, 'library_not_ready');
+    },
     prepareSubmit: store => composer?.prepareSubmit?.(store) || null,
     beginSelection: raw => selections?.begin(raw) === true, cancelSelection: id => selections?.cancel(id),
     merge: dom => composer?.merge(dom) || dom });

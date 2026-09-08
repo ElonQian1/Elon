@@ -23,6 +23,7 @@ function fixture(options = {}) {
     entrySurface: 'chat_composer', isLibraryEnabled: options.libraryEnabled !== false };
   const top = { stateNode: {}, memoizedProps: props }; top.stateNode.current = top;
   const input = { isConnected: true, __reactFiber$test: { memoizedProps: { value: store }, return: top } };
+  top.child = input.__reactFiber$test;
   const root = { location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/' + (options.temporary ? '?temporary-chat=true' : '') },
     document: { querySelector: selector => selector === '#upload-files' ? input : null },
     performance: { getEntriesByName: () => [{}], now: () => performance.now() },

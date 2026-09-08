@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateLibraryCatalog?.version || 0) < exported.version) {
@@ -55,11 +55,13 @@
 
   function snapshot(job, page, stale, emit) {
     if (!current(job)) return;
+    const attachments = root.__elonChatGptPrivateLibraryAttachment?.create(root);
     // IDs, pagination tokens and credential material remain inside this page owner.
     const items = page.items.map(({ source, ...item }) => {
       const downloadHandle = item.kind === 'file'
         ? root.__elonChatGptPrivateFileDownload?.registerLibraryFile?.(source) || '' : '';
-      return { ...item, downloadHandle, ...root.__elonChatGptPrivateLibraryMutations?.capabilities?.(source) };
+      const canAttach = !!attachments?.descriptor(source);
+      return { ...item, downloadHandle, canAttach, ...root.__elonChatGptPrivateLibraryMutations?.capabilities?.(source) };
     });
     emit('library_files_snapshot', { version: 1, requestId: job.requestId,
       directoryHandle: job.directoryHandle, query: job.query, breadcrumbs: job.breadcrumbs,
@@ -190,7 +192,9 @@
     }
     if (!item || item.kind !== 'file') return null;
     const current = () => !disposed && identity() === account && identityKey === account && root.location.href === href;
-    return { source: { ...item.source }, current, settle(confirmed, operation, name) {
+    return { source: { ...item.source }, current,
+      fresh: () => current() && Array.from(pages.values()).some(page => Date.now() - page.savedAt < TTL && page.items.includes(item)),
+      settle(confirmed, operation, name) {
       if (!current()) return;
       for (const page of pages.values()) {
         if (confirmed && operation === 'trash') page.items = page.items.filter(row => row.source.id !== item.source.id);
@@ -201,5 +205,9 @@
     } };
   }
   function cancelActiveRead() { active?.controller.abort(); active = null; }
-  return Object.freeze({ version: 2, list, cancel, dispose, selectMutation, cancelActiveRead });
+  function selectAttachment(fileHandle) {
+    const selection = selectMutation(fileHandle);
+    return selection ? { source: selection.source, current: selection.fresh } : null;
+  }
+  return Object.freeze({ version: 3, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead });
 });

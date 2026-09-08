@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 17, create: factory });
+  const exported = Object.freeze({ version: 18, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -105,7 +105,7 @@
     return binding;
   }
 
-  async function prepare(binding, signal, descriptor, refreshScope = false) {
+  async function prepare(binding, signal, descriptor, refreshScope = false, allowProject = true) {
     if (!current(binding) || signal?.aborted) throw new Error('composer_changed');
     if (root.__elonChatGptPrivateAttachmentProtocol?.isPdf(descriptor) && !binding.modelSlug) return null;
     if (refreshScope && binding.conversationId) { confirmed.delete(binding); projects.delete(binding); }
@@ -132,6 +132,7 @@
       }
       if (context?.conversationId !== binding.conversationId) throw new Error('composer_context_unavailable');
       if (context?.projectId) {
+        if (!allowProject) return false;
         if (!project || binding.isTemporaryChat || binding.projectId && binding.projectId !== context.projectId) return null;
         const thread = await project.captureThread(binding, context.projectId, signal);
         if (!Array.isArray(context.nodeIds) || !context.nodeIds.includes(thread.leafId)) return null;
@@ -251,6 +252,18 @@
     if (!Array.isArray(completed) || !completed.length || completed.length > 9 ||
         new Set(completed.map(item => item.leaseId)).size !== completed.length) throw new Error('association_invalid');
     const items = completed.map(item => readyAttachment(binding, item.file, item.result, item.leaseId));
+    return publish(binding, items);
+  }
+
+  function associateLibrary(binding, item) {
+    if (!current(binding) || !confirmed.has(binding) || !binding.libraryEnabled || binding.isTemporaryChat ||
+        binding.projectId || projects.has(binding) || item?.attached?.source !== 'library') {
+      throw new Error('library_attachment_scope_unconfirmed');
+    }
+    return publish(binding, [item]);
+  }
+
+  function publish(binding, items) {
     const store = binding.store;
     if (!current(binding) || store.files$().length !== 0 || store.hasUploadInProgress$()) throw new Error('composer_changed');
     const attached = items.map(item => item.attached);
@@ -353,5 +366,5 @@
     } catch (_) { return null; }
   }
 
-  return Object.freeze({ version: 16, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, merge, remove, prepareSubmit });
+  return Object.freeze({ version: 18, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, associateLibrary, merge, remove, prepareSubmit });
 });

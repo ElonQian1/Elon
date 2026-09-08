@@ -5,6 +5,27 @@ const { webcrypto } = require('node:crypto');
 const catalog = require('../android/app/src/main/assets/chatgpt_web_private_library_catalog.js');
 const download = require('../android/app/src/main/assets/chatgpt_web_private_file_download.js');
 
+test('attachment selections expose only verified ordinary rows and expire after a refresh or mutation', async () => {
+  const f = fixture();
+  f.root.__elonChatGptPrivateLibraryAttachment = require('../android/app/src/main/assets/chatgpt_web_private_library_attachment');
+  f.root.__elonChatGptPrivateAttachmentProtocol = require('../android/app/src/main/assets/chatgpt_web_private_attachment_protocol');
+  f.setNext({ items: [{ ...file(), file_id: 'file-synthetic' }, { ...file('libfile_cloud'), external_account: {} }] });
+  await f.list();
+  const [ordinary, cloud] = f.events[0].items;
+  assert.equal(ordinary.canAttach, true);
+  assert.equal(cloud.canAttach, false);
+  const selection = f.service.selectAttachment(ordinary.handle);
+  assert.equal(selection.current(), true);
+  f.service.selectMutation(ordinary.handle).settle(true, 'rename', 'renamed.txt');
+  assert.equal(selection.current(), false);
+  assert.equal(f.service.selectAttachment(ordinary.handle), null);
+  await f.list({ operation: 'refresh' });
+  const fresh = f.service.selectAttachment(f.events.at(-1).items[0].handle);
+  assert.equal(fresh.current(), true);
+  await f.list({ operation: 'refresh' });
+  assert.equal(fresh.current(), false);
+});
+
 const folder = (id = 'directory-synthetic', name = 'Folder') => ({ kind: 'directory', id, name });
 const file = (id = 'libfile_synthetic') => ({ kind: 'file', id, name: 'fixture.txt', mime_type: 'text/plain', file_size_bytes: 7 });
 function fixture() {
