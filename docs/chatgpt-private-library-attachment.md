@@ -1,7 +1,8 @@
 # Library files in the current composer
 
 Capability: `android_chatgpt_private_library_attachment_v1`.
-Status: implemented and offline verified; device acceptance pending.
+Status: implemented, offline verified and published/installed in 1.1.1579;
+device acceptance pending account sign-in.
 This extends the [native library browser](chatgpt-private-library-browser.md).
 It is not a second uploader, an independent message POST, or a new speech path.
 
@@ -57,14 +58,16 @@ send-lease consumption, native display/removal, duplicate command ownership,
 selection refresh/mutation invalidation, unsupported variants, conversation and
 identity changes, and the typed native command/receipt wiring.
 The related Node suites passed 102 cases. Release source/test compilation and
-12 focused Android JVM tests also passed; this is not an installed-APK result.
+12 focused Android JVM tests also passed. Grouped APK 1.1.1579 was subsequently
+published and installed without clearing app data; see the browser's release receipt.
 
 The older library-upload integration fixture lacked the committed root's child
 link. Its 11 failures were reproduced with the unchanged HEAD composer/sender.
 The fixture now models the committed branch required by the existing production
 owner resolver; production branch validation was not relaxed.
 
-Grouped Android build and device verification must still establish that the
+Device verification must still establish that the
 current official runtime accepts the reference, that a selected file appears in
 the production composer and reaches the intended conversation after explicit
-send. No user library files were renamed or deleted for this source verification.
+send. The installed production composer is ready, but the official page currently
+asks for account selection/sign-in. No user library files were renamed or deleted.

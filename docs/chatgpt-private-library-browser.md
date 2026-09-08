@@ -4,8 +4,10 @@
 
 - Capability: `android_chatgpt_private_library_browser_v1`.
 - Code: implemented for root/folder browsing, explicit search, cursor pagination,
-  refresh and ordinary library-file download. Source-only for the grouped APK.
+  refresh and ordinary library-file download; published/installed in 1.1.1579.
 - Verification: targeted offline protocol/native tests; device acceptance deferred.
+- Catalog v4 cold-identity preparation is a subsequent source patch for the next
+  grouped APK, not part of the installed 1579 catalog v3.
 - This is the independent library, not the current conversation's attachment index.
   No conversation ID is fabricated to authorize a library download.
 
@@ -38,6 +40,11 @@ Public source and synthetic fixtures are protocol evidence, not live API accepta
   visibly partial, never a claimed complete empty library.
 - Identity/document changes clear page caches. Late results after cancellation,
   account change, navigation or replacement cannot update the native catalogue.
+- Catalog v4 joins the existing identity owner's single-flight acquisition when
+  cached headers are absent. Warm reads do not reacquire. Its local wait is at most
+  seven seconds, without cancelling other identity consumers. Identity preparation
+  and catalog HTTP share a 14-second deadline below the native 16-second watcher.
+  Missing identity is not an empty library or evidence of an unsupported feature.
 - The native `WebChatLibraryBrowser` uses a recycled list and a bounded foreground
   receipt watcher. It has no permanent refresh loop. It shows a preset entry in
   the production feature menu even before the official sidebar is observed.
@@ -63,18 +70,27 @@ Validated on 2026-09-08:
 - 162 related JavaScript tests passed, including the catalogue and native-entry
   wiring contracts; log `library-js-final-20260908-220836-653`.
 - 101 production adapter assets and their concatenated bundle parsed successfully.
-- Android Debug source/test compilation and 20 targeted JVM tests passed;
-  log `library-native-final-20260908-220334-323`. No APK was assembled or released.
-- Xiaomi wireless ADB reconnected, but the device remained locked on 1.1.1576.
-  This source-only capability is not installed or device-accepted there.
+- Grouped Release source compilation, 12 focused JVM tests and APK publication
+  passed. APK 1.1.1579 was installed via `adb install -r`, preserving app data.
+  Source: `20c08c8b9`; release log `library-batch-release-20260908-232230-150`.
+  APK SHA-256: `8119319905b2af85a1c8024cf85638331b34fb42cfb51fc0e2f5c7437b1861a9`.
+- Production chat/composer readiness was verified after installation. The library
+  command returned `library_identity_not_ready`; a bounded official-page inspection
+  showed an account-selection/sign-in prompt. No live catalog/mutation/attachment
+  acceptance is claimed. The page is awaiting the user's sign-in, not a cookie reset.
+- The follow-up catalog v4 patch passed 55 focused Node cases, including real shared
+  auth-owner integration, cancellation, supersession, context changes and combined
+  time budgets; log `library-cold-identity-final-20260908-235543-816`. This fixes an
+  independently verified cold-cache gap; it does not claim to sign in a logged-out account.
 
 Run one production-UI root/folder/back/search/pagination sample and one ordinary
 saved-byte download after the grouped APK is installed. Verify the original conversation,
 draft and any active voice session remain unchanged. Do not infer an actual speed
 or temperature improvement from cache fixtures alone.
 
-Ordinary file rename and soft deletion now have a source-only
-[native mutation owner](chatgpt-private-library-mutations.md), pending grouped acceptance.
+Ordinary file rename, soft deletion and [composer association](chatgpt-private-library-attachment.md)
+are also packaged in 1579; the [native mutation owner](chatgpt-private-library-mutations.md)
+still needs live acceptance.
 Independent-library external mounted-file download, saved-entity/artifact previews,
 folder mutations and moving files are not implemented by this browser. Such
 rows remain visible where their shape is recognized, without a false Download

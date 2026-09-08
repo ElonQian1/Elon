@@ -264,3 +264,152 @@ test('closed library owner cannot produce more snapshots or reads', async () => 
   assert.equal(f.events.length, 1);
   assert.equal(f.results.at(-1)[1], false);
 });
+
+function coldIdentity(f) {
+  f.setAuth('');
+  let resolve, attempts = 0;
+  const waiting = new Promise(done => { resolve = done; });
+  f.root.__elonChatGptPrivateTransport.acquireSameOriginRequestHeaders = () => { attempts++; return waiting; };
+  return { resolve: (headers = { Authorization: 'Bearer synthetic-warmed-account' }) => {
+    f.setAuth(headers?.Authorization || '');
+    resolve(headers);
+  }, attempts: () => attempts };
+}
+
+test('cold library reads wait for the shared identity owner; warm cache never reacquires or rereads', async () => {
+  const f = fixture(), auth = coldIdentity(f);
+  const pending = f.list();
+  assert.equal(f.results.length, 0);
+  assert.equal(f.calls.length, 0);
+  auth.resolve();
+  await pending;
+  assert.equal(f.results.at(-1)[2], 'library_ready');
+  await f.list();
+  assert.equal(f.results.at(-1)[2], 'library_cached');
+  assert.equal(auth.attempts(), 1);
+  assert.equal(f.calls.length, 1);
+});
+
+test('closing during identity preparation cancels immediately and ignores later readiness', async () => {
+  for (const close of [f => f.service.cancel('mcp_cold'), f => f.service.cancelActiveRead(), f => f.service.dispose()]) {
+    const f = fixture(), auth = coldIdentity(f);
+    const pending = f.list({}, 'mcp_cold');
+    assert.equal(f.service.cancel('mcp_other'), false);
+    close(f);
+    await pending;
+    assert.equal(f.results.at(-1)[2], 'library_cancelled');
+    auth.resolve();
+    await Promise.resolve();
+    assert.equal(f.calls.length, 0);
+    assert.equal(f.events.length, 0);
+  }
+});
+
+test('superseded cold reads share preparation but only the newest selection can publish', async () => {
+  const f = fixture(), auth = coldIdentity(f);
+  const first = f.list({ query: 'old' });
+  const second = f.list({ query: 'new' });
+  await first;
+  assert.equal(f.results.at(-1)[2], 'library_cancelled');
+  auth.resolve();
+  await second;
+  assert.equal(f.events.length, 1);
+  assert.equal(f.events[0].query, 'new');
+  assert.equal(f.calls.length, 1);
+});
+
+test('identity preparation cannot cross navigation, document, transport or account changes', async () => {
+  for (const change of [f => { f.root.location.href = 'https://chatgpt.com/c/other'; },
+    f => { f.root.__elonChatGptDocumentToken = 'doc_replaced_catalog'; },
+    f => { f.root.__elonChatGptPrivateTransport = { ...f.root.__elonChatGptPrivateTransport }; },
+    f => f.setAuth('Bearer synthetic-different-account')]) {
+    const f = fixture(), auth = coldIdentity(f);
+    const pending = f.list();
+    auth.resolve();
+    change(f);
+    await pending;
+    assert.equal(f.results.at(-1)[2], 'library_cancelled');
+    assert.equal(f.calls.length, 0);
+    assert.equal(f.events.length, 0);
+  }
+});
+
+test('missing, rejected or timed-out identity never becomes an empty successful library', async () => {
+  for (const outcome of ['missing', 'rejected', 'timeout']) {
+    const f = fixture(), auth = coldIdentity(f);
+    let timeout;
+    f.root.setTimeout = (callback, ms) => { assert.equal(ms, 7000); timeout = callback; return 1; };
+    f.root.clearTimeout = () => {};
+    if (outcome === 'rejected') f.root.__elonChatGptPrivateTransport.acquireSameOriginRequestHeaders = async () => {
+      throw new Error('auth_cooldown');
+    };
+    const pending = f.list();
+    if (outcome === 'missing') auth.resolve(null);
+    if (outcome === 'timeout') timeout();
+    await pending;
+    assert.equal(f.results.at(-1)[2], 'library_identity_not_ready');
+    auth.resolve();
+    await Promise.resolve();
+    assert.equal(f.events.length, 0);
+    assert.equal(f.calls.length, 0);
+  }
+});
+
+test('a mutation that starts during identity preparation prevents a conflicting catalog refresh', async () => {
+  const f = fixture(), auth = coldIdentity(f);
+  const pending = f.list();
+  f.root.__elonChatGptPrivateLibraryMutations = { busy: () => true };
+  auth.resolve();
+  await pending;
+  assert.equal(f.results.at(-1)[2], 'library_mutation_busy');
+  assert.equal(f.calls.length, 0);
+});
+
+test('identity wait and catalog read share a deadline shorter than the native receipt watcher', async t => {
+  let now = Date.now();
+  t.mock.method(Date, 'now', () => now);
+  const f = fixture(), auth = coldIdentity(f);
+  const pending = f.list();
+  now += 6500;
+  auth.resolve();
+  await pending;
+  assert.equal(f.calls[0].budget.timeoutMs, 7500);
+
+  const expired = fixture(), late = coldIdentity(expired);
+  const waiting = expired.list();
+  now += 14001;
+  late.resolve();
+  await waiting;
+  assert.equal(expired.calls.length, 0);
+  assert.equal(expired.events.length, 0);
+  assert.equal(expired.results.at(-1)[2], 'library_read_failed');
+});
+
+test('the existing auth owner shares one session read across superseded cold library requests', async () => {
+  const f = fixture();
+  const read = f.root.__elonChatGptPrivateJsonRequest.request;
+  let sessionReads = 0, complete;
+  f.root.fetch = () => {};
+  f.root.__elonChatGptPrivateAuthContextEnabled = true;
+  f.root.__elonChatGptPrivateJsonRequest.request = async (root, url, init, budget) => {
+    if (url !== '/api/auth/session') return read(root, url, init, budget);
+    sessionReads++;
+    assert.equal(init.credentials, 'include');
+    assert.equal(budget.timeoutMs, 5000);
+    return new Promise(done => { complete = done; });
+  };
+  const auth = require('../android/app/src/main/assets/chatgpt_web_private_auth_context').create(f.root);
+  f.root.__elonChatGptPrivateTransport = {
+    copySameOriginRequestHeaders: auth.copyRequestHeaders,
+    acquireSameOriginRequestHeaders: auth.acquireRequestHeaders,
+  };
+  const old = f.list({ query: 'old' });
+  const fresh = f.list({ query: 'current' });
+  complete({ payload: { accessToken: 'synthetic-session-access-token' } });
+  await Promise.all([old, fresh]);
+  await f.list({ query: 'current' });
+  assert.equal(sessionReads, 1);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.results.at(-1)[2], 'library_cached');
+  assert.ok(f.events.every(event => event.query === 'current'));
+});

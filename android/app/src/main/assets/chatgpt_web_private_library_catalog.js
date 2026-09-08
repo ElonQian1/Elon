@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 3, create: factory });
+  const exported = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateLibraryCatalog?.version || 0) < exported.version) {
@@ -16,8 +16,7 @@
   const pages = new Map(), directories = new Map();
   let identityKey = '', active = null, disposed = false, failures = 0, retryAt = 0;
 
-  function identity() {
-    const raw = root.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.();
+  function identity(raw = root.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.()) {
     const headers = Object.fromEntries(Object.entries(raw || {}).map(([k, v]) => [k.toLowerCase(), v]));
     if (!/^Bearer\s+\S{8,65536}$/.test(headers.authorization || '') ||
         !/^doc_[a-z0-9_]{3,80}$/.test(root.__elonChatGptDocumentToken || '')) return '';
@@ -48,9 +47,35 @@
       value => value.toString(16).padStart(2, '0')).join('');
   }
 
-  function current(job) {
+  function owned(job) {
     return !disposed && active === job && !job.controller.signal.aborted &&
-      identity() === job.identity && root.location.href === job.href;
+      root.location.origin === 'https://chatgpt.com' && root.location.href === job.href &&
+      root.__elonChatGptDocumentToken === job.token && root.__elonChatGptPrivateTransport === job.transport;
+  }
+
+  function current(job) { return owned(job) && identity() === job.identity; }
+
+  async function prepareIdentity(job) {
+    let timer, abort;
+    try {
+      // Join the shared identity owner; closing this browser must not abort other consumers' identity reads.
+      const headers = await Promise.race([
+        job.transport?.acquireSameOriginRequestHeaders?.(),
+        new Promise((_, reject) => {
+          abort = () => reject(new Error('library_cancelled'));
+          job.controller.signal.addEventListener('abort', abort, { once: true });
+          timer = root.setTimeout(() => reject(new Error('library_identity_not_ready')), 7000);
+        }),
+      ]);
+      if (!owned(job)) throw new Error('library_cancelled');
+      job.identity = identity(headers);
+      if (!job.identity) throw new Error('library_identity_not_ready');
+      if (!current(job)) throw new Error('library_cancelled');
+      identityKey = job.identity;
+    } finally {
+      root.clearTimeout(timer);
+      if (abort) job.controller.signal.removeEventListener('abort', abort);
+    }
   }
 
   function snapshot(job, page, stale, emit) {
@@ -118,29 +143,33 @@
     }
     const account = identity();
     if (account !== identityKey) { reset(); identityKey = account; }
-    if (disposed || root.location.origin !== 'https://chatgpt.com' || !account) {
+    if (disposed || root.location.origin !== 'https://chatgpt.com' ||
+        !/^doc_[a-z0-9_]{3,80}$/.test(root.__elonChatGptDocumentToken || '')) {
       return respond(ACTION, false, 'library_identity_not_ready');
     }
-    const directory = directoryHandle ? directories.get(directoryHandle) : { id: null, breadcrumbs: [] };
-    if (!directory) return respond(ACTION, false, 'library_selection_expired');
     if (root.__elonChatGptPrivateLibraryMutations?.busy?.()) return respond(ACTION, false, 'library_mutation_busy');
     active?.controller.abort();
     const job = { requestId: command.requestId, identity: account, href: root.location.href,
-      directoryHandle, directoryId: directory.id, query: query.trim(), breadcrumbs: directory.breadcrumbs, controller: new root.AbortController() };
+      token: root.__elonChatGptDocumentToken, transport: root.__elonChatGptPrivateTransport,
+      directoryHandle, query: query.trim(), deadline: Date.now() + 14000, controller: new root.AbortController() };
     active = job;
-    const key = JSON.stringify([directory.id, job.query]), cached = pages.get(key);
-    const more = operation === 'next';
-    if (cached && !more) {
-      const stale = operation === 'refresh' || Date.now() - cached.savedAt >= TTL;
-      snapshot(job, cached, stale, emit);
-      if (!stale) { active = null; return respond(ACTION, true, 'library_cached'); }
-    }
-    if (more && (!cached || !cached.cursor || cached.capped)) {
-      active = null;
-      return respond(ACTION, false, 'library_page_expired');
-    }
-    if (Date.now() < retryAt) { active = null; return respond(ACTION, false, 'library_retry_later'); }
     try {
+      if (!account) await prepareIdentity(job);
+      if (!current(job)) return respond(ACTION, false, 'library_cancelled');
+      if (root.__elonChatGptPrivateLibraryMutations?.busy?.()) return respond(ACTION, false, 'library_mutation_busy');
+      const directory = directoryHandle ? directories.get(directoryHandle) : { id: null, breadcrumbs: [] };
+      if (!directory) return respond(ACTION, false, 'library_selection_expired');
+      job.directoryId = directory.id;
+      job.breadcrumbs = directory.breadcrumbs;
+      const key = JSON.stringify([directory.id, job.query]), cached = pages.get(key);
+      const more = operation === 'next';
+      if (cached && !more) {
+        const stale = operation === 'refresh' || Date.now() - cached.savedAt >= TTL;
+        snapshot(job, cached, stale, emit);
+        if (!stale) return respond(ACTION, true, 'library_cached');
+      }
+      if (more && (!cached || !cached.cursor || cached.capped)) return respond(ACTION, false, 'library_page_expired');
+      if (Date.now() < retryAt) return respond(ACTION, false, 'library_retry_later');
       const url = new URL('/backend-api/files/library/nodes', root.location.origin);
       if (directory.id != null) url.searchParams.set('parent_directory_id', directory.id);
       if (more) url.searchParams.set('cursor', cached.cursor);
@@ -148,10 +177,12 @@
       url.searchParams.set('hydrate_folder_thumbnails', 'true');
       url.searchParams.set('include_folder_counts', 'true');
       url.searchParams.set('include_saved_entities', 'true');
+      const remaining = job.deadline - Date.now();
+      if (remaining <= 0) throw new Error('timeout');
       const result = await root.__elonChatGptPrivateJsonRequest.request(root, url.href, {
         method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
         headers: root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders(), signal: job.controller.signal,
-      }, { timeoutMs: 10000, maxBytes: 2 * 1024 * 1024 });
+      }, { timeoutMs: Math.min(10000, remaining), maxBytes: 2 * 1024 * 1024 });
       if (!current(job)) return respond(ACTION, false, 'library_cancelled');
       const page = normalize(job, result.payload, more ? cached : null);
       pages.delete(key);
@@ -162,7 +193,8 @@
       snapshot(job, page, false, emit);
       respond(ACTION, true, page.partial || page.capped ? 'library_partial' : 'library_ready');
     } catch (error) {
-      if (!current(job)) return respond(ACTION, false, 'library_cancelled');
+      if (!owned(job) || job.identity && !current(job)) return respond(ACTION, false, 'library_cancelled');
+      if (!job.identity) return respond(ACTION, false, 'library_identity_not_ready');
       failures += 1;
       if (failures >= 3) retryAt = Date.now() + 30000;
       const code = error?.message === 'http_401' ? 'library_identity_not_ready' :
@@ -209,5 +241,5 @@
     const selection = selectMutation(fileHandle);
     return selection ? { source: selection.source, current: selection.fresh } : null;
   }
-  return Object.freeze({ version: 3, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead });
+  return Object.freeze({ version: 4, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead });
 });
