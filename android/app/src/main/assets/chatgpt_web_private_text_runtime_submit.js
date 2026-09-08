@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 14, create: factory });
+  const exported = Object.freeze({ version: 15, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -34,23 +34,24 @@
     return { href: url.href, conversationId, temporary: url.search === '?temporary-chat=true' };
   }
 
+  function guestIdentity(warm = false) {
+    const bindings = page.__elonChatGptPrivateRuntimeBindings;
+    if (typeof bindings?.peek !== 'function' || !bindings.observed('shared')) return null;
+    const shared = bindings.peek('shared');
+    if (!shared) {
+      // Warm the shared cache without holding or replaying a user command.
+      if (warm) bindings.load('shared').catch(() => {});
+      return null;
+    }
+    // Request credentials can exist on the logged-out homepage as well.
+    // Only the official bootstrap and live session establish guest mode.
+    return typeof shared.R5 === 'function' && typeof shared.F5 === 'function' &&
+      shared.R5()?.authStatus === 'logged_out' && shared.F5() === null ? shared : null;
+  }
+
   function identity(allowGuest = false) {
     const headers = page.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.();
-    if (!headers || typeof headers !== 'object') {
-      if (!allowGuest) return null;
-      const bindings = page.__elonChatGptPrivateRuntimeBindings;
-      if (typeof bindings?.peek !== 'function' || !bindings.observed('shared')) return null;
-      const shared = bindings.peek('shared');
-      if (!shared) {
-        // Warm the shared cache without holding or replaying a user command.
-        bindings.load('shared').catch(() => {});
-        return null;
-      }
-      // Exact public getters: bootstrap must say logged_out and the live session
-      // must still be null. Missing headers alone are not a guest identity.
-      return typeof shared.R5 === 'function' && typeof shared.F5 === 'function' &&
-        shared.R5()?.authStatus === 'logged_out' && shared.F5() === null ? shared : null;
-    }
+    if (!headers || typeof headers !== 'object') return allowGuest ? guestIdentity(true) : null;
     const values = {};
     for (const [key, value] of Object.entries(headers)) values[key.toLowerCase()] = value;
     if (typeof values.authorization !== 'string' || !/^Bearer \S+$/i.test(values.authorization)) return null;
@@ -117,7 +118,8 @@
     const props = context.shared.getSharedProps();
     const conversation = props?.conversation, controller = props?.composerController;
     if (!conversation || !controller || controller.conversation !== conversation) return unavailable('conversation_owner_unavailable');
-    if (!matchesRoute(conversation, currentRoute, account)) return unavailable('conversation_route_mismatch');
+    const guestProof = allowGuest ? guestIdentity() : null;
+    if (!matchesRoute(conversation, currentRoute, guestProof)) return unavailable('conversation_route_mismatch');
     if (typeof props.isNewThread !== 'boolean') return unavailable('composer_mode_unsupported');
     if (props.structuredInputMessageId != null) return unavailable('structured_input_active');
     // The official composer always creates this capability host, even with no
@@ -127,19 +129,19 @@
         Object.keys(host).sort().join(',') !== 'canOpen$,tryOpen$' ||
         typeof host.canOpen$ !== 'function' || typeof host.tryOpen$ !== 'function' ||
         props.structuredInputMessageId !== null)) return unavailable('structured_host_unrecognized');
-    return { ...context, ...currentRoute, token, account, node, conversation, controller,
+    return { ...context, ...currentRoute, token, account, guestProof, node, conversation, controller,
       serverId: conversation.serverId$() || null, requestId: props.currentRequestId,
       structuredHost: host, newThread: props.isNewThread };
   }
 
-  function matchesRoute(conversation, currentRoute, account) {
+  function matchesRoute(conversation, currentRoute, guestProof) {
     if (typeof conversation.serverId$ !== 'function') return false;
     const serverId = conversation.serverId$() || null;
     if (serverId !== null && (typeof serverId !== 'string' || !new RegExp('^' + UUID + '$', 'i').test(serverId))) return false;
     if (serverId === currentRoute.conversationId) return true;
     // The confirmed logged-out homepage can keep the same official conversation
     // after it receives a server ID, without navigating to /c/<id>.
-    return typeof account === 'object' && account !== null &&
+    return guestProof !== null &&
       currentRoute.href === 'https://chatgpt.com/' && currentRoute.conversationId === null;
   }
 
@@ -192,11 +194,12 @@
       const currentRoute = route(), context = stores(binding.node), props = context?.shared.getSharedProps();
       return binding.node.isConnected && page.__elonChatGptDocumentToken === binding.token &&
         identity(true) === binding.account && currentRoute && context?.shared === binding.shared &&
+        (!binding.guestProof || guestIdentity() === binding.guestProof) &&
         currentRoute.temporary === binding.temporary &&
         context.files === binding.files && props?.conversation === binding.conversation &&
         props.composerController === binding.controller &&
         (!binding.serverId || binding.conversation.serverId$() === binding.serverId) &&
-        matchesRoute(binding.conversation, currentRoute, binding.account);
+        matchesRoute(binding.conversation, currentRoute, binding.guestProof);
     } catch (_) { return false; }
   }
 
@@ -301,9 +304,10 @@
   try {
     if (page.__elonChatGptPrivateTextTransactionsEnabled === true && route()) {
       identity(true);
+      if (route().href === 'https://chatgpt.com/') guestIdentity(true);
       const bindings = page.__elonChatGptPrivateRuntimeBindings;
       if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
     }
   } catch (_) {}
-  return Object.freeze({ version: 14, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 15, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

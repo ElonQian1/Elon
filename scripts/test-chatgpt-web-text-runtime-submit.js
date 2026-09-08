@@ -208,6 +208,34 @@ test('guest homepage retains its official owner after server ID assignment and o
   assert.equal(f.page.location.href, 'https://chatgpt.com/'); assert.equal(f.calls.length, 2);
 });
 
+test('guest request credentials do not turn its continuing homepage into an authenticated route', async () => {
+  const f = fixture({ authStatus: 'logged_out', session: null }); await flush();
+  const first = f.api.submit(f.command);
+  f.setServer(id);
+  f.page.__elonChatGptPrivateTransport = {
+    copySameOriginRequestHeaders: () => ({ Authorization: 'Bearer synthetic-guest' })
+  };
+  f.settle(true);
+  assert.equal((await first.completion).status, 'accepted');
+  assert.equal(f.api.captureConversation(f.node), null, 'other consumers do not opt into guest homepage ownership');
+  const second = f.api.submit(f.command);
+  assert.equal(second.handled, true); assert.equal(f.calls.length, 2);
+  f.settle(true); assert.equal((await second.completion).status, 'accepted');
+});
+
+for (const change of ['credentials', 'session']) {
+  test('credential-bearing guest still revalidates ' + change + ' before dispatch', async () => {
+    const f = fixture({ authStatus: 'logged_out', session: null }); await flush(); f.setServer(id);
+    let credentials = 'Bearer synthetic-guest';
+    f.page.__elonChatGptPrivateTransport = { copySameOriginRequestHeaders: () => ({ Authorization: credentials }) };
+    f.command.beforeSubmit = () => {
+      if (change === 'credentials') credentials = 'Bearer synthetic-replacement';
+      else f.guest.session = {};
+    };
+    assert.equal(f.api.submit(f.command).code, 'context_changed'); assert.equal(f.calls.length, 0);
+  });
+}
+
 test('guest root allowance never authorizes another server ID during an existing send', async () => {
   const f = fixture({ authStatus: 'logged_out', session: null }); await flush();
   f.setServer(id);
@@ -220,9 +248,10 @@ for (const state of ['invalid_server', 'authenticated_home', 'guest_project', 'g
   test('homepage ownership exception remains narrow: ' + state, async () => {
     const f = fixture({ authStatus: 'logged_out', session: null }); await flush(); f.setServer(id);
     if (state === 'invalid_server') f.setServer('not-a-server-id');
-    if (state === 'authenticated_home') f.page.__elonChatGptPrivateTransport = {
-      copySameOriginRequestHeaders: () => ({ Authorization: 'Bearer synthetic' })
-    };
+    if (state === 'authenticated_home') {
+      f.guest.authStatus = 'logged_in'; f.guest.session = {};
+      f.page.__elonChatGptPrivateTransport = { copySameOriginRequestHeaders: () => ({ Authorization: 'Bearer synthetic' }) };
+    }
     if (state === 'guest_project') f.page.location.href = 'https://chatgpt.com/g/g-p-' + 'a'.repeat(32) + '/project';
     if (state === 'guest_temporary') f.page.location.href += '?temporary-chat=true';
     if (state === 'guest_other_route') f.page.location.href += 'c/99999999-2222-3333-4444-555555555555';

@@ -1,17 +1,19 @@
 # Official runtime message submission
 
 Capability: `android_chatgpt_official_runtime_text_submit_v1`.
-Status: implemented and installed, not live-accepted or completed. It is an
+Status: implemented and installed; first guest send live-accepted in APK 1558,
+continuing guest runtime sends not yet accepted. It is an
 official page-runtime bridge, **not an independent Android HTTP/private POST
 transport**. Reuse the existing bridge; do not reimplement it while resolving
 the current production readiness failure.
 
-Latest installed checkpoint: APK 1554 / adapter 299 includes runtime submit 11
-and bindings 3. Two consecutive production native sends received exact test
-replies and settled, but both still used DOM fallback: `submission_not_ready`
-and then `conversation_route_mismatch`. The added generation-state reader has
-not been independently observed on the device; settled workflows do not prove
-which reader ran. See [1554 evidence](reports/chatgpt-runtime-release-1554.md).
+Latest installed checkpoint: APK 1558 / adapter 299, runtime submit 14,
+bindings 4 and orchestrator 7. One native guest send returned
+`official_runtime_v1:accepted`, exactly one reply and settled native state in
+5,544 ms. The next send still used DOM fallback (`conversation_route_mismatch`)
+but returned exactly one reply and settled in 11,280 ms. The private writer is
+not replayed after invocation. This is scoped first-send acceptance, not proof
+that all continuing sends or the independent HTTP writer work.
 
 ## Current draft and guest ownership
 
@@ -38,7 +40,21 @@ local text cleanup failures cannot invalidate an already confirmed dispatch.
 Attachments retain their stricter original ownership/consumption contract.
 An unconfirmed completion has a fixed false/void/shape reason rather than being
 masked by the page-context check; no raw result is emitted. This extension
-awaits its grouped Release acceptance.
+passed its first-send production acceptance in APK 1558.
+
+Submit 15 keeps request-credential identity separate from positive guest-mode
+proof. Previously, a captured Bearer value made the root-route check treat a
+still logged-out homepage as authenticated. The exact cached bootstrap getter
+must say `logged_out` and the live session getter must return null before the
+guest root allowance applies, whether or not request credentials exist. The
+credential fingerprint remains bound and rechecked before dispatch; a login or
+credential replacement still prevents sending. Other runtime consumers do not
+opt into this guest exception. Only homepage initialization warms a missing
+guest-proof module when credentials already exist; ordinary authenticated
+conversation capture adds no module loading. The new synthetic regression
+failed before the change; 282 integrated cases pass after it. This is a proven
+source gap matching the observed root-route rejection, not a live inspection
+of the credential or server ID. Continuing-send acceptance remains pending.
 
 The bridge reuses the official runtime
 writer rather than adding another HTTP sender. Known ready explicit text and
