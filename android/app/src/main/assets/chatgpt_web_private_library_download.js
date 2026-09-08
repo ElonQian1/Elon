@@ -221,7 +221,9 @@
       if (!response.ok || response.status !== 200 || !response.body?.getReader) throw new Error('download_prepare_failed');
       if (response.url !== url) {
         if (content) throw new Error('download_source_unsupported');
-        validateSignedUrl(response.url);
+        // The official library anchor also redirects to same-origin estuary
+        // content. Reuse its existing strict validator before accepting CDN URLs.
+        if (!contentUrl(response.url)) validateSignedUrl(response.url);
       }
       const mime = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
       const attachment = /^attachment(?:;|$)/i.test(response.headers.get('content-disposition') || '');
@@ -267,5 +269,5 @@
       try { reader?.releaseLock(); } catch (_) {}
     }
   }
-  return Object.freeze({ version: 7, target, sharedReference, mountedTarget, materialize, contentUrl, run, runContent });
+  return Object.freeze({ version: 8, target, sharedReference, mountedTarget, materialize, contentUrl, run, runContent });
 });

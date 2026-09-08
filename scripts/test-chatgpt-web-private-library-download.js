@@ -348,6 +348,37 @@ for (const options of [{ noLength: true }, { data: new Uint8Array() },
   });
 }
 
+test('official library redirects reuse the strict same-origin content validator and existing byte owner', async () => {
+  for (const path of ['/backend-api/estuary/content', '/api/estuary/content']) {
+    const f = fixture({ finalUrl: 'https://chatgpt.com' + path + '?id=file-synthetic&sig=synthetic' });
+    await f.run(f.register()[0]);
+    assert.equal(f.calls.length, 1, 'consume the returned body without a second GET');
+    assert.equal(f.calls[0].init.headers, undefined);
+    assert.equal(f.calls[0].init.credentials, 'same-origin');
+    assert.deepEqual(Buffer.concat(f.stored), Buffer.from(f.data));
+    assert.deepEqual(f.receipts, [['download_conversation_file', true, 'download_saved']]);
+    assert.doesNotMatch(JSON.stringify({ packets: f.packets, receipts: f.receipts }), /https:|sig=|file-synthetic/);
+  }
+});
+
+test('library redirects cannot broaden the content origin, route or login/body policy', async () => {
+  for (const finalUrl of ['https://chatgpt.com.evil.test/backend-api/estuary/content',
+    'https://user:pass@chatgpt.com/backend-api/estuary/content',
+    'https://chatgpt.com:8443/backend-api/estuary/content',
+    'https://chatgpt.com/backend-api/estuary/content#fragment',
+    'https://chatgpt.com/backend-api/estuary/content2', 'https://chatgpt.com/auth/login']) {
+    const f = fixture({ finalUrl }); await f.run(f.register()[0]);
+    assert.equal(f.receipts.at(-1)[2], 'download_source_unsupported');
+    assert.equal(f.packets.some(p => p.byteOperation), false);
+  }
+  for (const mime of ['text/html', 'application/json']) {
+    const f = fixture({ finalUrl: 'https://chatgpt.com/backend-api/estuary/content?id=file-synthetic', mime });
+    await f.run(f.register()[0]);
+    assert.equal(f.receipts.at(-1)[2], 'download_content_invalid');
+    assert.equal(f.packets.some(p => p.byteOperation), false);
+  }
+});
+
 for (const fields of [{ source: 'connector' }, { library_file_id: 'not-a-library-id' },
   { id: 'file-ordinary' }, { id: '' }, { mounted_library_file_id: 'external' },
   { shared_library_file_id: LIBRARY }, { preview_file: { id: 'file-other' } },

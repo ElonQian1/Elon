@@ -5,8 +5,9 @@
 - Capability: `android_chatgpt_private_library_browser_v1`.
 - Code: implemented for root/folder browsing, explicit search, cursor pagination,
   refresh and ordinary library-file download; published/installed in 1.1.1581.
-- Verification: offline tests and native catalogue reads passed on 1581;
-  rendered browser, pagination and saved-byte download acceptance remain pending.
+- Verification: native catalogue and pagination data passed through 1582;
+  ordinary saved-byte download passed with module 8 in diagnostic 1583.
+  Rendered browser controls and the final normal-package download remain pending.
 - Catalog v5 fixes object-event publication and includes v4 cold-identity preparation;
   both patches are installed in 1581, replacing the defective 1579 catalog v3.
 - This is the independent library, not the current conversation's attachment index.
@@ -149,10 +150,45 @@ storage. The final download source/redirect must be observed before changing
 the allowlist; no unchecked origin was admitted. Conversation URL, draft,
 streaming and dictation state were preserved; no microphone or mutation was used.
 
-Next: fix the observed binary-source compatibility gap, then accept the rendered
-browser root/folder/back/search/More controls and saved-byte download. Sign-in is
-not a current prerequisite. Native data projection is verified; rendered UI and
-binary storage are not. Do not repeat successful catalogue research.
+The binary-source failure is now diagnosed and fixed below. Rendered browser
+root/folder/back/search/More controls remain pending; do not repeat successful
+catalogue protocol or pagination research. Sign-in is not a current prerequisite.
+
+### 1583 Library Download Redirect Fix
+
+On 2026-09-09 the current production package was 1.1.1583, source `c54c063c1`.
+A same-signed local diagnostic build enabled the existing research flag without
+clearing data. An initial 1582 diagnostic install was safely rejected as a version
+downgrade; the matching 1583 package was then used. No older business source was
+installed over a newer source revision.
+
+The owned app WebView network observer saw the actual request chain:
+`GET /api/library/files/{id}/download` returned 302 to
+`https://chatgpt.com/backend-api/estuary/content?...`, which returned 200,
+`text/plain`. The old module rejected this successful same-origin response with
+`download_source_unsupported`, before writing bytes. URLs, query values and
+credentials were not exported. Log: `library-download-source-probe-20260909-024231-661`.
+
+Module 8 accepts this route through the existing strict content-source validator;
+it does not accept arbitrary same-origin paths or change direct-content requests'
+no-redirect policy. The same body goes to the existing one-use native byte owner.
+Login/HTML, unexpected JSON, hostile origin, userinfo, alternate port, fragment
+and lookalike path cases remain rejected. The three focused suites passed 84
+cases: `library-redirect-regression-20260909-024343-637`.
+
+The updated asset was loaded into the diagnostic WebView after its normal adapter
+attachment (opening the native surface reattaches the packaged asset). The native
+download handler returned `download_saved`, with 78 received bytes; the resulting
+78-byte test file was independently found in public Downloads at the receipt's
+time. Conversation URL, draft and authenticated state were preserved. No message,
+file mutation, microphone or second download GET was used for this successful case.
+Log: `library-download-fix-device-20260909-024525-670`.
+
+This is real byte-storage evidence for the patched asset, not yet evidence that
+the normal release package includes the fix or that the library dialog was
+visually accepted. The unmodified normal 1583 APK was restored and the temporary
+debug port removed before release work. The next grouped acceptance should use
+the newly published normal package, then cover the remaining native browser controls.
 
 Ordinary file rename, soft deletion and [composer association](chatgpt-private-library-attachment.md)
 are also packaged in 1581; the [native mutation owner](chatgpt-private-library-mutations.md)

@@ -1,13 +1,14 @@
 # Shared-library attachment downloads
 
 Capability candidate: `android_chatgpt_private_shared_library_download_v1`.
-Status: **implemented, offline JS verified; authenticated library download
-failed device acceptance in APK 1.1.1582**. This is not a `completed` capability.
-Current source: file-download module 14 and library-download module 7. The
-existing adapter asset list is reused unchanged. On 2026-09-09 an existing
-synthetic file failed with `download_source_unsupported` before byte storage.
-Sign-in is no longer a prerequisite; final-source/redirect compatibility is the
-next diagnostic target. See [current evidence](chatgpt-private-library-browser.md#1582-foreground-and-download-evidence).
+Status: **implemented; ordinary library saved-byte acceptance passed with module
+8 in a local diagnostic APK 1.1.1583**. The production-package and additional
+shared/mounted scopes remain separate acceptance cases, not a blanket `completed` claim.
+Current source: file-download module 14 and library-download module 8. The
+existing adapter asset list is reused unchanged. The observed 302 to same-origin
+estuary content had been incorrectly rejected; module 8 reuses the established
+content-source validator. Sign-in is not a prerequisite to repeat.
+See [current evidence](chatgpt-private-library-browser.md#1583-library-download-redirect-fix).
 The [1549 release evidence](reports/chatgpt-runtime-release-1549.md) is historical.
 
 ## Official source evidence
@@ -43,10 +44,12 @@ in force. Opaque handles snapshot the target; mutable history cannot retarget it
 
 The identity WebView fetches the binary route with same-origin cookies. No
 Cookie or bearer header is copied to Android HTTP. Final response URLs must be
-the requested route or an already-allowed signed CDN URL. HTML/login responses,
+the requested route, the strictly validated same-origin estuary content route,
+or an already-allowed signed CDN URL. HTML/login responses,
 unexpected JSON, truncated bodies and oversize files fail explicitly. The real
-route's redirect and CORS compatibility must still be checked in the browser or
-phone WebView; there is no bypass or alternate guessed request on failure.
+library-to-estuary 302/200 transfer has been observed in the phone WebView;
+other redirect/CORS variants remain unverified. There is no bypass or alternate
+guessed request on failure, and the returned body is consumed without a second GET.
 
 Bytes pass through the existing one-use native lease in ordered 48 KiB packets,
 with one packet awaiting acknowledgement. A single I/O worker decodes and writes

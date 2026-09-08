@@ -393,7 +393,7 @@ test('installed bridges upgrade once and load mounted modules without replacing 
       vm.runInNewContext(fs.readFileSync(path.join(assets, filename), 'utf8'), context);
     }
     assert.equal(window.__elonChatGptPrivateHistoryProjection.version, 6);
-    assert.equal(window.__elonChatGptPrivateLibraryDownload.version, 7);
+    assert.equal(window.__elonChatGptPrivateLibraryDownload.version, 8);
     assert.equal(window.__elonChatGptPrivateFileDownload.version, download.version);
     assert.equal(retired, 1);
     assert.equal(window.__elonChatGptPrivateAuthContext, identity);
