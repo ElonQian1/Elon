@@ -38,6 +38,15 @@ acceptance_status: pending
 
 原创建13项、管理9项、只读会话18项、诊断5项及旧适配器19条断言通过。原生最终44项通过，
 含新增9项空列表、选择、恢复、参数白名单、只读排他和读取结果测试；最终日志
-binance-read-debug-final-test，耗时412.1秒。正式APK发布/安装身份及真机只读详情证据取得后补记。
+binance-read-debug-final-test，耗时412.1秒。最终只读连接状态的接线由正式Release编译检查覆盖。
+
+主APK 1.1.1577（1577）已正式发布，源码871485d06b185766204d130a5fa02e379d433db2，
+本地产物与服务器SHA-256均为142d222caf81babde5d00e09cd49a4c4e24d3c55fce08a4b641d2a7595bfac7c。
+正式发布日志binance-read-debug-publish，552.7秒。
+
+安装前手机无线ADB变为offline，原端口不可连接且没有USB设备。本轮安装没有成功，
+不能声称1.1.1577已在手机运行；最后取得的手机版本为1.1.1576。已请求用户接回USB，
+设备恢复后应按status/reload/select/read/status执行真实详情验收，确认read_outcome=verified
+且detail_current=true。本轮新增工具的真实详情验收仍为deferred，不以列表已有1条代替。
 量化APK源码未改，沿用上一批已安装版本。真实修改/结束仍由用户本人验收；本批工具
 没有执行金融操作。Win、Chrome及登录资料保持原状。
