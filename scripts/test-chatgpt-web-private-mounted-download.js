@@ -11,6 +11,10 @@ const library = require('../android/app/src/main/assets/chatgpt_web_private_libr
 const request = require('../android/app/src/main/assets/chatgpt_web_private_json_request.js');
 const PROJECT = 'g-p-' + 'a'.repeat(32);
 const MOUNTED = 'external-gdrive:file:synthetic_file';
+const SHAREPOINT_PREFIX = 'external-sharepoint:file:v1:item:';
+const sharepointId = (drive = 'b!synthetic-drive', item = 'synthetic-item') =>
+  SHAREPOINT_PREFIX + Buffer.from(drive).toString('base64url') + ':' + Buffer.from(item).toString('base64url');
+const SHAREPOINT = sharepointId();
 const MATERIALIZE = '/backend-api/files/library/mounted/materialize';
 const CONTENT = '/backend-api/estuary/content?id=file-materialized&sig=synthetic';
 
@@ -108,7 +112,7 @@ test('mounted bounds, old-message indexing and hidden/alternative branch rules a
 });
 
 for (const id of [MOUNTED, 'external-gdrive:account:synthetic_account:file:synthetic_file',
-  'external-box:file:12345', 'external-dropbox:file:id:synthetic']) {
+  'external-box:file:12345', 'external-dropbox:file:id:synthetic', SHAREPOINT]) {
   test('confirmed mounted file materializes once then reuses native saved bytes: ' + id.split(':')[0], async () => {
     for (const project of [false, true]) {
       const f = fixture({ id, project });
@@ -143,6 +147,54 @@ test('a library attachment with a mounted identity uses the same transaction and
   await f.run(f.register()[0]);
   assert.equal(f.receipts.at(-1)[2], 'download_saved');
   assert.equal(JSON.parse(f.calls[0].init.body).mime_type, 'text/plain');
+});
+
+test('SharePoint attachment provider is bound to the selected file, not a mutable history descriptor', async () => {
+  const f = fixture({ attachment: true, id: SHAREPOINT });
+  f.attachment.library_provider = 'sharepoint';
+  const row = f.register()[0];
+  assert.match(row.downloadHandle, /^download_/);
+  f.attachment.mounted_library_file_id = sharepointId('other-drive', 'other-item');
+  await f.run(row);
+  assert.equal(f.receipts.at(-1)[2], 'download_saved');
+  assert.equal(JSON.parse(f.calls[0].init.body).file_id, SHAREPOINT);
+  assert.equal(JSON.parse(f.calls[0].init.body).mime_type, 'text/plain');
+  assert.doesNotMatch(JSON.stringify(f.packets), /external-sharepoint|synthetic-drive/);
+});
+
+test('SharePoint uses canonical bounded base64url file components and rejects containers and foreign scopes', () => {
+  for (const id of [SHAREPOINT, sharepointId('a'.repeat(512), 'b'.repeat(512)),
+    sharepointId('b!valid._~:-', 'valid-item')]) {
+    assert.equal(library.mountedTarget({ mounted_library_file_id: id, name: 'fixture.txt' }, true)?.mountedFileId, id);
+  }
+  for (const id of ['external-sharepoint:root', 'external-sharepoint:folder:v1:drive:abc',
+    SHAREPOINT.replace(':v1:', ':v2:'), SHAREPOINT.replace(':item:', ':drive:'),
+    SHAREPOINT + ':extra', SHAREPOINT + '=', SHAREPOINT + '?download=1',
+    SHAREPOINT_PREFIX + 'YQ:YR', SHAREPOINT_PREFIX + ':YQ',
+    sharepointId('a'.repeat(513)), sharepointId('bad/drive'), sharepointId('bad\\drive'),
+    sharepointId('bad\ndrive'), sharepointId('https://example.com'), sharepointId('\u4e2d\u6587'),
+    SHAREPOINT.replace('external-sharepoint:', 'external-sharepoint:account:other:')]) {
+    const f = fixture({ id });
+    assert.equal(f.register()[0]?.downloadHandle, undefined, id);
+    assert.equal(f.calls.length, 0);
+  }
+  for (const patch of [{ library_provider: 'google_drive' }, { id: 'file-ordinary' },
+    { context_connector_info: {} }, { preview_file: { file_id: 'file-other' } }]) {
+    const f = fixture({ attachment: true, id: SHAREPOINT }); Object.assign(f.attachment, patch);
+    assert.equal(f.register()[0]?.downloadHandle, undefined);
+  }
+});
+
+test('SharePoint materialization denial is terminal for its consumed selection without another writer', async () => {
+  const f = fixture({ id: SHAREPOINT, status: 403 }), row = f.register()[0];
+  assert.match(row.downloadHandle, /^download_/);
+  await f.run(row);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.receipts.at(-1)[1], false);
+  assert.equal(f.saved, false);
+  await f.run(row);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.receipts.at(-1)[2], 'download_selection_expired');
 });
 
 test('unrecognized mounted descriptors never become ordinary downloads or arbitrary external requests', () => {
@@ -341,7 +393,7 @@ test('installed bridges upgrade once and load mounted modules without replacing 
       vm.runInNewContext(fs.readFileSync(path.join(assets, filename), 'utf8'), context);
     }
     assert.equal(window.__elonChatGptPrivateHistoryProjection.version, 6);
-    assert.equal(window.__elonChatGptPrivateLibraryDownload.version, 6);
+    assert.equal(window.__elonChatGptPrivateLibraryDownload.version, 7);
     assert.equal(window.__elonChatGptPrivateFileDownload.version, 12);
     assert.equal(retired, 1);
     assert.equal(window.__elonChatGptPrivateAuthContext, identity);

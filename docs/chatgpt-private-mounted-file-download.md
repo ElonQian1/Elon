@@ -2,10 +2,11 @@
 
 Capability candidate: `android_chatgpt_private_mounted_file_download_v1`.
 Implementation: scoped provider-file materialization and existing native download.
-Verification: 185 related Node cases and 13 pure Kotlin/JUnit cases passed;
-full Android integration and real account/device pending.
-Delivery: source candidate for the next grouped APK, not `completed` or installed.
-Adapter version: 297; file/history/library modules 12/6/6.
+Verification: prior export checks passed 185 Node and 13 pure Kotlin/JUnit cases;
+the SharePoint extension below passes 111 focused Node cases. Real account/device
+acceptance remains pending.
+Delivery: SharePoint is source-only for grouped build, not `completed` or installed.
+Adapter target: 306; file/history/library modules 12/6/7.
 
 This extends the [existing library download owner](chatgpt-private-shared-library-download.md).
 It does not create a second file picker, progress UI, byte-transfer worker,
@@ -65,8 +66,8 @@ or an instruction to replay a request. Cookies and request headers stay in-page.
 
 ## Remaining work and acceptance
 
-- This batch covers concrete Drive/Box/Dropbox files and matching history
-  metadata. Standalone browsing, SharePoint, other providers, citation-graph-only
+- This batch covers concrete Drive/Box/Dropbox/SharePoint files and matching history
+  metadata. Standalone browsing, other providers, citation-graph-only
   references and mounted files represented only by a separate preview remain gaps.
 - Drive Docs/Sheets/Slides exports and validated resolved name/MIME handoff are
   now implemented below. Other provider-native formats remain unimplemented.
@@ -132,3 +133,32 @@ The shared sanitizer's existing callers keep their original default behavior.
 The gateway integration test checks source wiring; it does not compile/run the
 Android gateway. This batch did not assemble, publish or install an APK, access
 an authenticated provider file, or measure performance/thermal improvements.
+
+## SharePoint files
+
+Library module 7 extends the existing mounted-file transaction, with no new
+endpoint, native downloader, UI, background loop or identity owner. The retained
+shared/conversation assets above were hash-checked again on 2026-09-08.
+Shared `BQ`/`Ajt` validates `external-sharepoint:file:v1:item:` followed by two
+canonical base64url components. Each decodes to 1-512 allowed ASCII identifier
+characters; padding, noncanonical trailing bits, URLs, folders, roots, account
+prefixes and unknown ID versions do not qualify. Shared `Njt` binds the provider
+to `sharepoint`. Conversation `a1n` imports `gc` from shared export `kc` (`zQ`)
+and uses the same `qR` materialization path for these concrete mounted files.
+
+Production history metadata and library attachments now retain an immutable
+SharePoint target in the existing opaque selection. The same-origin POST keeps
+`index_for_retrieval: false`, then the returned ordinary file goes through current
+conversation/project authorization and the existing native byte-transfer owner.
+Provider conflicts, copied-file IDs and alternate previews remain rejected.
+Denied or ambiguous materialization consumes the selection without retry,
+alternate writer or DOM fallback. Native packets contain no provider identifier.
+
+Four new cases failed on module 6 (`sharepoint-download-red-20260908`). The final
+111-case run (`sharepoint-download-tests-20260908`) passed with zero failures,
+cancellations or skips, covering selected-file mutation, canonical/bounded IDs,
+scope conflicts, permission denial and existing download regressions. All HTTP
+and native-save responses in these checks are fixtures, not real provider access.
+The phone remains locked. This addition is not in installed APK 1569 and awaits
+the next grouped build plus one authorized SharePoint file saved-byte acceptance.
+No microphone, Cookie, login or proxy state was changed.

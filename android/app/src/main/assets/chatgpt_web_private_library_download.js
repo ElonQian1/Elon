@@ -42,17 +42,34 @@
     return { sharedLibraryFileId: file.library_file_id };
   }
 
+  function sharePointFile(id) {
+    const prefix = 'external-sharepoint:file:v1:item:';
+    if (!id.startsWith(prefix)) return false;
+    const parts = id.slice(prefix.length).split(':');
+    // BQ/Ajt: two canonical base64url components, not URLs or container IDs.
+    return parts.length === 2 && parts.every(part => {
+      if (!/^[A-Za-z0-9_-]{1,683}$/.test(part)) return false;
+      try {
+        const encoded = part.replace(/-/g, '+').replace(/_/g, '/');
+        const decoded = atob(encoded + '='.repeat((4 - encoded.length % 4) % 4));
+        return /^[A-Za-z0-9._!~:-]{1,512}$/.test(decoded) &&
+          btoa(decoded).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') === part;
+      } catch (_) { return false; }
+    });
+  }
+
   function mountedTarget(file, reference = false) {
     if (!file || typeof file !== 'object' || Array.isArray(file) ||
         typeof file.mounted_library_file_id !== 'string' ||
         typeof file.name !== 'string' || !file.name.trim() || file.name.length > 1024 ||
         /[\x00-\x1f\x7f]/.test(file.name)) return null;
     const id = file.mounted_library_file_id;
-    // Pjt/zQ admit concrete provider file identities, not source URLs or folders.
+    // Pjt and BQ admit concrete provider files; a1n/zQ materializes their IDs.
+    const sharePoint = sharePointFile(id);
     const match = /^external-(gdrive|box|dropbox):(?:account:([A-Za-z0-9_-]{1,512}):)?file:(\S{1,512})$/.exec(id);
-    if (!match || match[2] && match[1] !== 'gdrive') return null;
-    const provider = { gdrive: 'google_drive', box: 'box', dropbox: 'dropbox' }[match[1]];
-    if (!(match[1] === 'gdrive' ? /^[A-Za-z0-9_-]{5,512}$/.test(match[3]) :
+    if (!sharePoint && (!match || match[2] && match[1] !== 'gdrive')) return null;
+    const provider = sharePoint ? 'sharepoint' : { gdrive: 'google_drive', box: 'box', dropbox: 'dropbox' }[match[1]];
+    if (!sharePoint && !(match[1] === 'gdrive' ? /^[A-Za-z0-9_-]{5,512}$/.test(match[3]) :
       match[1] === 'box' ? /^[1-9][0-9]*$/.test(match[3]) :
         match[3].length <= 256 && /^id:[A-Za-z0-9_:-]+$/.test(match[3]))) return null;
     if (reference) {
@@ -250,5 +267,5 @@
       try { reader?.releaseLock(); } catch (_) {}
     }
   }
-  return Object.freeze({ version: 6, target, sharedReference, mountedTarget, materialize, contentUrl, run, runContent });
+  return Object.freeze({ version: 7, target, sharedReference, mountedTarget, materialize, contentUrl, run, runContent });
 });
