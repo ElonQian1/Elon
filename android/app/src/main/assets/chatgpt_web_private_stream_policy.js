@@ -36,6 +36,13 @@
     const message = envelope.message || envelope.data && envelope.data.message;
     if (!message || typeof message !== 'object' ||
         !message.author || message.author.role !== 'assistant') return null;
+    // A protocol assistant frame can be analysis or a tool call, not a public
+    // answer. Keep those out of the answer stream and its completion identity.
+    if (message.channel != null && message.channel !== 'final' ||
+        message.recipient != null && message.recipient !== 'all' ||
+        message.metadata?.is_visually_hidden_from_conversation === true ||
+        message.metadata?.is_visually_hidden_reasoning_group === true ||
+        message.metadata?.debug_internal_only === true) return null;
     return { envelope, message };
   }
 

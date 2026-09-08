@@ -1,12 +1,13 @@
 # Official runtime generation stop
 
 Capability: `android_chatgpt_official_runtime_stop_generation_v1`.
-Status: source implemented and offline verified, not device accepted or
-completed. Latest source is stop runtime v7. Installed APK 1575 includes stop
-v6, page probe v16 and the corrected native diagnostic gate. Its guest device
-run reports a cached streaming tree with an invalid request shape, uses DOM
-fallback, and still fails follow-up isolation. The source correction to request
-shape validation is described below; it is not yet device accepted.
+Status: stop runtime v7 is published in APK 1576 and its ordinary guest stop
+operation is device verified (`official_runtime_v1:stop_observed`, partial text
+retained). The full capability is not completed: follow-up still combines the
+two synthetic prompts and replaces the partial answer. Do not repeat request-ID
+research; that guard is now proven compatible. See the
+[1576 evidence and stream-visibility correction](reports/chatgpt-stop-followup-1576.md)
+for the remaining boundary. A runtime stop receipt does not prove turn continuity.
 Earlier adapter 304 added
 disabled-composer lookup and partial-reply retention; see
 [the earlier correction](reports/chatgpt-stop-interruption-20260908.md). This is a
@@ -105,7 +106,8 @@ supported. Server, message and turn-ID validation is unchanged. The exact live
 request is still pinned through context, subscription and invocation; replacing
 it cannot stop a successor. Only observed official cleanup permits the next send.
 The request remains inside the page and is neither logged nor copied into an
-independent HTTP request. This narrow compatibility fix still needs a device run.
+independent HTTP request. APK 1576 has now verified this narrow compatibility
+fix on-device; follow-up isolation remains failed, as recorded above.
 
 Four composite dispatch cases and successor coverage failed against v6. The
 focused stop/ownership/diagnostic suite passes 129 cases with no skips after the
