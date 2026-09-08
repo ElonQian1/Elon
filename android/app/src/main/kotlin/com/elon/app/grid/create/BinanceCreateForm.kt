@@ -5,9 +5,11 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.widget.*
+import com.elon.app.grid.ui.BinanceGridAppearance
 
 /** UI strings are mapped to typed choices; the immutable draft owns validation and request semantics. */
 internal class BinanceCreateForm(private val activity: Activity, private val edited: () -> Unit) {
+    private val ui = BinanceGridAppearance(activity)
     val root = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; isSaveEnabled = false }
     private val readers = linkedMapOf<String, () -> String>()
     private var initialized = false
@@ -27,7 +29,7 @@ internal class BinanceCreateForm(private val activity: Activity, private val edi
     }
     fun draft() = BinanceGridDraft.parse(readers.mapValues { it.value() })
     private fun text(key: String, title: String, hintText: String, initial: String = "") {
-        root.addView(TextView(activity).apply { text = title; textSize = 15f })
+        root.addView(ui.label(title, 15f))
         val field = EditText(activity).apply {
             hint = hintText; setText(initial); isSingleLine = true; isSaveEnabled = false
             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
@@ -41,13 +43,14 @@ internal class BinanceCreateForm(private val activity: Activity, private val edi
                 override fun afterTextChanged(s: Editable?) {}
             })
         }
-        readers[key] = { field.text.toString() }; root.addView(field)
+        readers[key] = { field.text.toString() }; root.addView(ui.field(field))
     }
     private fun choice(key: String, title: String, options: List<Pair<String, String>>) {
-        root.addView(TextView(activity).apply { text = title; textSize = 15f })
+        root.addView(ui.label(title, 15f))
         val field = Spinner(activity).apply {
             isSaveEnabled = false; contentDescription = "binance-create-$key"
-            adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item, listOf("请选择") + options.map { it.first })
+            adapter = ui.choices(listOf("请选择") + options.map { it.first })
+            backgroundTintList = android.content.res.ColorStateList.valueOf(ui.muted)
             onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) { if (initialized) edited() }
                 override fun onNothingSelected(parent: AdapterView<*>?) { if (initialized) edited() }

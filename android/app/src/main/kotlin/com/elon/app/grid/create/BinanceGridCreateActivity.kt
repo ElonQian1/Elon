@@ -12,9 +12,11 @@ import android.view.WindowManager
 import android.widget.*
 import com.elon.app.grid.host.BinanceHostCaller
 import com.elon.app.grid.host.BinanceHostRuntime
+import com.elon.app.grid.ui.BinanceGridAppearance
 
 /** The only native create submission entry: authenticated caller, visible final confirmation, one attempt. */
 class BinanceGridCreateActivity : Activity() {
+    private val ui by lazy { BinanceGridAppearance(this) }
     private var host: BinanceHostRuntime? = null
     private var session: BinanceCreateSession? = null
     private val attempt = BinanceCreateAttempt(SystemClock::elapsedRealtime)
@@ -45,10 +47,25 @@ class BinanceGridCreateActivity : Activity() {
         ownsSlot = true
         runCatching { journal.read()?.let(attempt::restore) }.onFailure { recoveryBlocked = true }
         managementPending = runCatching { BinanceCreateJournal(this,"binance-manage-attempt-v1.json").read() != null }.getOrDefault(true)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20,20,20,12) }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(ui.dp(18),ui.dp(12),ui.dp(18),ui.dp(8))
+            setBackgroundColor(ui.background)
+        }
         root.addView(label("创建本人币安 U 本位网格",21f))
-        status = label("正在连接本人币安",15f); root.addView(status)
+        status = label("正在连接本人币安",15f).apply { contentDescription = "binance-create-status" }; root.addView(status)
         val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; isSaveEnabled = false }
+        content.addView(button("重新加载官网／确认登录", "binance-create-reload") {
+            if (attempt.status == "submitting") return@button
+            session?.cancelPreparation(); confirmed.isChecked = false
+            official.visibility = View.VISIBLE; attachHost(reload = true)
+        })
+        content.addView(button("查看／收起币安官网", "binance-create-official") {
+            official.visibility = if (official.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            if (official.visibility == View.VISIBLE && host?.view == null) attachHost()
+        })
+        official = FrameLayout(this).apply { visibility = View.GONE; setBackgroundColor(ui.surface) }
+        content.addView(official, LinearLayout.LayoutParams(-1, ui.dp(520)))
+        content.addView(label("填写网格参数", 19f))
         form = BinanceCreateForm(this) { if (ready && !attempt.unresolved) { session?.cancelPreparation(); confirmed.isChecked = false; render() } }
         content.addView(form.root)
         check = button("检查参数与当前账号", "binance-create-prepare") {
@@ -59,6 +76,7 @@ class BinanceGridCreateActivity : Activity() {
         confirmed = CheckBox(this).apply {
             text = "我已核对本次账号和全部参数，使用本人资金进行真实测试；本次未设置止损。"
             isSaveEnabled = false; filterTouchesWhenObscured = true
+            setTextColor(ui.text); buttonTintList = android.content.res.ColorStateList.valueOf(ui.accent)
             contentDescription = "binance-create-confirm-parameters"
             setOnCheckedChangeListener { _, _ -> if (ready) render() }
         }; content.addView(confirmed)
@@ -70,32 +88,22 @@ class BinanceGridCreateActivity : Activity() {
             runCatching { session?.detail() ?: error("连接未就绪") }.onFailure { status.text = it.message ?: "读取未完成" }
         }; content.addView(detail)
         resolved = button("我已在官网核对，结束本次记录", "binance-create-resolve") { acknowledge() }; content.addView(resolved)
-        content.addView(button("查看／收起币安官网", "binance-create-official") {
-            official.visibility = if (official.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-            if (official.visibility == View.VISIBLE && host?.view == null) attachHost()
-        })
-        official = FrameLayout(this).apply { visibility = View.GONE }
-        content.addView(official, LinearLayout.LayoutParams(-1,(resources.displayMetrics.density*520).toInt()))
-        content.addView(button("重新加载官网并确认登录", "binance-create-reload") {
-            if (attempt.status == "submitting") return@button
-            session?.cancelPreparation(); confirmed.isChecked = false
-            official.visibility = View.VISIBLE; attachHost()
-            host?.view?.loadUrl(BinanceHostRuntime.ENTRY)
-        })
         root.addView(ScrollView(this).apply { isSaveEnabled = false; addView(content) },LinearLayout.LayoutParams(-1,0,1f))
         root.addView(button("返回量化应用", "binance-create-return") { returnResult() })
         setContentView(root); ready = true; attachHost(); render()
     }
-    private fun attachHost() {
+    private fun attachHost(reload: Boolean = false) {
         runCatching {
             BinanceHostRuntime.onMain(this) { runtime ->
                 host = runtime
-                if (!runtime.begin()) return@onMain
+                val previous = runtime.view
                 runtime.onChanged = ::render
+                if (!runtime.begin()) return@onMain
                 if (session == null) session = BinanceCreateSession(runtime,attempt,::persist,::render)
                 runtime.onCreateObservation = { session?.observed(it) }
                 runtime.view?.let { view ->
                     (view.parent as? ViewGroup)?.removeView(view); official.addView(view,FrameLayout.LayoutParams(-1,-1))
+                    if (reload && view === previous) view.loadUrl(BinanceHostRuntime.ENTRY)
                 }
             }
         }.onFailure { status.text = "官网连接暂不可用，请更新系统 WebView 后重试。" }
@@ -162,14 +170,13 @@ class BinanceGridCreateActivity : Activity() {
     override fun onDestroy() {
         if (ownsSlot) {
             session?.close()
-            host?.let { it.onChanged = null; it.onCreateObservation = null; it.view?.let { view -> (view.parent as? ViewGroup)?.removeView(view) } }
+            host?.let { it.onChanged = null; it.onCreateObservation = null; it.view?.let { view -> if (view.parent === official) official.removeView(view) } }
             slot.release(this); ownsSlot = false
         }
         super.onDestroy()
     }
-    private fun label(value: String, size: Float) = TextView(this).apply { text = value; textSize = size; isSaveEnabled = false; setPadding(0,8,0,8) }
-    private fun button(value: String, id: String, action: () -> Unit) = Button(this).apply {
-        text = value; contentDescription = id; isSaveEnabled = false; filterTouchesWhenObscured = true; setOnClickListener { action() }
-    }
+    private fun label(value: String, size: Float) = ui.label(value, size)
+    private fun button(value: String, id: String, action: () -> Unit) = ui.button(value, id,
+        primary = id == "binance-create-reload" || id == "binance-create-prepare", action = action)
     companion object { private val slot = BinanceCreateSlot.shared }
 }
