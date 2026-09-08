@@ -2,6 +2,7 @@ package com.elon.app.grid.manage
 
 import org.junit.Assert.*
 import org.junit.Test
+import com.elon.app.grid.create.BinanceCreateSlot
 
 class BinanceManageReadTest {
     private fun gate(current:Boolean=true,count:Int=1,selected:Boolean=true,unresolved:Boolean=false,
@@ -47,5 +48,25 @@ class BinanceManageReadTest {
         trace.start();trace.cancel();assertEquals(2L,trace.sequence);assertEquals("cancelled",trace.outcome)
         trace.start();trace.finish("failed","settings_unavailable");assertEquals("settings_unavailable",trace.reason)
         trace.start();trace.finish("failed","credential-or-private-content");assertEquals("verification_failed",trace.reason)
+    }
+    @Test fun readOnlyLeaseDoesNotDisplaceManualController() {
+        val slot=BinanceCreateSlot();val manual=Any();val reader=Any()
+        assertTrue(slot.acquire(manual));assertFalse(slot.acquire(reader))
+        slot.release(reader);assertFalse(slot.acquire(reader))
+        slot.release(manual);assertTrue(slot.acquire(reader));assertFalse(slot.acquire(manual))
+        slot.release(reader);assertTrue(slot.acquire(manual))
+    }
+    @Test fun closedReadPagePreservesHistoryWithoutClaimingCurrentDetails() {
+        val endpoint=object:BinanceManageReadEndpoint {
+            override fun readFacts()=mapOf("page_open" to true,"detail_current" to true,"read_outcome" to "verified")
+            override fun readCommand(request:BinanceManageReadRequest)="unused"
+        }
+        BinanceManageReadBridge.bind(endpoint)
+        try {assertEquals(true,BinanceManageReadBridge.facts()["detail_current"])}
+        finally {BinanceManageReadBridge.unbind(endpoint)}
+        assertEquals("verified",BinanceManageReadBridge.facts()["read_outcome"])
+        assertEquals(false,BinanceManageReadBridge.facts()["page_open"])
+        assertEquals(false,BinanceManageReadBridge.facts()["detail_current"])
+        assertEquals("no_active_page",BinanceManageReadBridge.execute(BinanceManageReadRequest("read"))["result"])
     }
 }

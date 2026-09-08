@@ -3,6 +3,7 @@ package com.elon.app.mcp
 import android.content.Context
 import com.elon.app.grid.host.BinanceHostRuntime
 import com.elon.app.grid.manage.BinanceManageReadBridge
+import com.elon.app.grid.manage.BinanceHostReadDebug
 import org.json.JSONObject
 
 /** Bounded diagnostics only: no account IDs, strategy IDs, amounts, grants or website content. */
@@ -33,7 +34,8 @@ internal fun mcpBinanceHostStatus(context: Context): JSONObject = runCatching {
             .put("observed_at_ms", host.state.observed)
             .put("coverage", "observed_response_only")
             .put("user_create_entry_available", true)
-            .put("create_confirmation_open", host.onCreateObservation != null && BinanceManageReadBridge.facts()["page_open"] != true)
+            .put("create_confirmation_open", host.onCreateObservation != null && BinanceManageReadBridge.facts()["page_open"] != true && !BinanceHostReadDebug.active(host))
+            .put("read_debug_active", BinanceHostReadDebug.active(host))
             .put("manage_page", JSONObject(BinanceManageReadBridge.facts()))
             .put("mcp_trading_enabled", false)
             .put("trading_enabled", false))

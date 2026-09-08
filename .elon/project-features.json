@@ -842,10 +842,23 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "80b65b40f09ffeee4e6000aab0946e92dd593f24",
-            "head_blob_oid": "c8097195b247278876a7fd7ae226751936fedfea",
+            "head_commit": "a2359d4aef03a8e85c97a34737ca77b16831cd52",
+            "head_blob_oid": "b2ff12d08313a57d301724e03d658b03f9757718",
             "worktree_blob_oid": "b2ff12d08313a57d301724e03d658b03f9757718",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceHostReadDebug.kt",
+          "content_hash": "4109de99c0200390b7a43d4ae065f90ad8f593d220812e89fe1d1bf92b01f78c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "a2359d4aef03a8e85c97a34737ca77b16831cd52",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "55b5397f056641a2e54a1377e9a584f7436aedfd",
+            "state": "untracked"
           }
         },
         {
@@ -855,10 +868,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "80b65b40f09ffeee4e6000aab0946e92dd593f24",
-            "head_blob_oid": "b59fc9777fbf9dbf5318a5f00e8cbbcefa13d5bb",
+            "head_commit": "a2359d4aef03a8e85c97a34737ca77b16831cd52",
+            "head_blob_oid": "3faf568e24764e5dd4dbf0ed9791155d860614d7",
             "worktree_blob_oid": "3faf568e24764e5dd4dbf0ed9791155d860614d7",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -868,10 +881,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "80b65b40f09ffeee4e6000aab0946e92dd593f24",
-            "head_blob_oid": "",
+            "head_commit": "a2359d4aef03a8e85c97a34737ca77b16831cd52",
+            "head_blob_oid": "d5bf7ab1c068bd2105ee42a663f641895ad47937",
             "worktree_blob_oid": "d5bf7ab1c068bd2105ee42a663f641895ad47937",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -881,10 +894,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "80b65b40f09ffeee4e6000aab0946e92dd593f24",
-            "head_blob_oid": "",
+            "head_commit": "a2359d4aef03a8e85c97a34737ca77b16831cd52",
+            "head_blob_oid": "420bd076247de9353f99b65498caf24cc29c913c",
             "worktree_blob_oid": "420bd076247de9353f99b65498caf24cc29c913c",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -894,62 +907,62 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "80b65b40f09ffeee4e6000aab0946e92dd593f24",
-            "head_blob_oid": "8074d1e5a80e99757161170f2ffc9d78231709d8",
+            "head_commit": "a2359d4aef03a8e85c97a34737ca77b16831cd52",
+            "head_blob_oid": "904864f99500c784dd6a956ce48a3e3d9e369331",
             "worktree_blob_oid": "904864f99500c784dd6a956ce48a3e3d9e369331",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/mcp/McpBinanceHostStatus.kt",
-          "content_hash": "aaaefca571389289e37d6fc7c79aa4f0cb5d14c9e857573927d4c5eed5be17cb",
+          "content_hash": "421e8d4d5ad3a21d2981bbc12ed926f2034b87b5b075780582dc9ccc8c431959",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "80b65b40f09ffeee4e6000aab0946e92dd593f24",
-            "head_blob_oid": "50b510c29df58d846ffa56a2a941654048c1bb73",
-            "worktree_blob_oid": "33df18c0e2943271c41909acd8ac73d784cf526d",
+            "head_commit": "a2359d4aef03a8e85c97a34737ca77b16831cd52",
+            "head_blob_oid": "33df18c0e2943271c41909acd8ac73d784cf526d",
+            "worktree_blob_oid": "9f6e8ac4d4ca724094ff85674221227b61dd80b0",
             "state": "tracked_modified"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/mcp/McpBinanceManageRead.kt",
-          "content_hash": "0eaefdac99ce30427cfd55c07f5e25ba64adecc80bc137546a7ae3e216cd9c3c",
+          "content_hash": "85765de22fc0a3b808493d688fbfad7dc978529a37b4ccd2c92be1b671f1db2d",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "80b65b40f09ffeee4e6000aab0946e92dd593f24",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "a1602d3f566c3a6f63a1b3f802a0f81507bf479b",
-            "state": "untracked"
+            "head_commit": "a2359d4aef03a8e85c97a34737ca77b16831cd52",
+            "head_blob_oid": "a1602d3f566c3a6f63a1b3f802a0f81507bf479b",
+            "worktree_blob_oid": "d4f10daec693f9036223abc77741ae02cdd42fe3",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/grid/manage/BinanceManageReadTest.kt",
-          "content_hash": "99ebd87dcf8b7fa9df8341878d2c2a496cfadf19817c1a7bea4bacdf6bede640",
+          "content_hash": "97b44342f9afafcce2622bac72e689f2630554ced67e768a08e2aba6ddee18e6",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "80b65b40f09ffeee4e6000aab0946e92dd593f24",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "0ef82081118bc7d8658f09ac08e18d9e92665fd6",
-            "state": "untracked"
+            "head_commit": "a2359d4aef03a8e85c97a34737ca77b16831cd52",
+            "head_blob_oid": "0ef82081118bc7d8658f09ac08e18d9e92665fd6",
+            "worktree_blob_oid": "03e804e7e497aba2923888727571b8a164421f19",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "docs/reports/android-binance-grid-read-debug-v1-20260908.md",
-          "content_hash": "a165672b42cc7a757f4d9f1d9f651dd5bcbf0e1f13cf5b2d7d818290ce367e70",
+          "content_hash": "7d0b58211743a2713f2680560ce12485e1968f448dd66309e103084ac40f5d3e",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "80b65b40f09ffeee4e6000aab0946e92dd593f24",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "59efc9c25ab09dd8302f8c65449818881c034409",
-            "state": "untracked"
+            "head_commit": "a2359d4aef03a8e85c97a34737ca77b16831cd52",
+            "head_blob_oid": "59efc9c25ab09dd8302f8c65449818881c034409",
+            "worktree_blob_oid": "8224ab99d30378214d17726808b3c380843eaf9d",
+            "state": "tracked_modified"
           }
         },
         {
@@ -959,15 +972,15 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "80b65b40f09ffeee4e6000aab0946e92dd593f24",
-            "head_blob_oid": "d3dc00c608bbbffa1174c2bb378c1a265c185e9c",
+            "head_commit": "a2359d4aef03a8e85c97a34737ca77b16831cd52",
+            "head_blob_oid": "20b75bc762fc3baf99f135e4d3647676159e234e",
             "worktree_blob_oid": "20b75bc762fc3baf99f135e4d3647676159e234e",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1788867245484,
-      "updated_at_ms": 1788868041626
+      "updated_at_ms": 1788868965400
     },
     {
       "id": "android-binance-host-read-v1",
@@ -23862,56 +23875,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_19eac737df7e4b38a70e483197621a5c",
-      "feature_id": "esk-sui-genesis-foundation-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "All eight current evidence files are rebound; production bytecode is frozen before tests and chain state remains local_verified.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788648559022
-    },
-    {
-      "id": "feature_event_63f71f0f722f4b5eb1a6ce8ebc4dec83",
-      "feature_id": "esk-sui-genesis-foundation-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Current Node foundation guard passed and the fixed Sui CLI run passed currency 3/3 with corrected production digest.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788648559639
-    },
-    {
-      "id": "feature_event_488ee339f4784d1ca7ba8ad92b26ef48",
-      "feature_id": "esk-sui-genesis-foundation-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Restore the repository foundation capability after audited evidence correction; this is not a Sui network release.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788648560260
-    },
-    {
-      "id": "feature_event_5b995ace07614625a3ca24eba0629c60",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Temporarily retire the prior test-mode bytecode evidence snapshot.",
-      "from_status": "verified",
-      "to_status": "retired",
-      "at_ms": 1788648576526
-    },
-    {
-      "id": "feature_event_7c1f8ff7f47647dcb797f129c230a1c7",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Reopen V1 in place for canonical test receipts and corrected production bytecode evidence.",
-      "from_status": "retired",
-      "to_status": "proposed",
-      "at_ms": 1788648577101
-    },
-    {
       "id": "feature_event_1b2b9695eac74ebc8d41f316f4ce78ff",
       "feature_id": "esk-sui-allocation-vesting-v1",
       "action": "requirement_rebound",
@@ -25860,6 +25823,56 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1788868043816
+    },
+    {
+      "id": "feature_event_cd38307fdc7943de9c70b7c272aca618",
+      "feature_id": "android-binance-grid-read-debug-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-read-debug",
+      "reason": "补齐管理页关闭后的独立只读连接恢复，避免安装更新后依赖人工导航。",
+      "from_status": "implemented",
+      "to_status": "ready",
+      "at_ms": 1788868302068
+    },
+    {
+      "id": "feature_event_c1c2fb08a7054a3e8185d8945f3c65ac",
+      "feature_id": "android-binance-grid-read-debug-v1",
+      "action": "claimed",
+      "actor": "codex-binance-read-debug",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788868302121
+    },
+    {
+      "id": "feature_event_e31643201bca440c89f13a4e8066e174",
+      "feature_id": "android-binance-grid-read-debug-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-read-debug",
+      "reason": "新增BinanceHostReadDebug约100行，MCP分发约4行；新增只读排他/恢复测试，重跑42项回归。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788868302180
+    },
+    {
+      "id": "feature_event_65ea81c169d440c683f051b5bc148a28",
+      "feature_id": "android-binance-grid-read-debug-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-read-debug",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788868965280
+    },
+    {
+      "id": "feature_event_b06e9f32bdd146b6a7b932fcec67d33d",
+      "feature_id": "android-binance-grid-read-debug-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-read-debug",
+      "reason": "最终44项原生及全部JS回归通过，页面关闭后的独立只读恢复已编码；正式发布与真机验收继续。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788868965400
     }
   ]
 }
