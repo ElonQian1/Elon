@@ -22,7 +22,7 @@ reused; source-only or installation status does not satisfy the acceptance gate.
 
 ## Current batch
 
-Current owner corrections and guest-stop coverage: [2026-09-08 batch](reports/chatgpt-runtime-owners-20260908.md). Offline passed; production acceptance remains separate.
+Current owner corrections and guest-stop coverage: [APK 1567 batch](reports/chatgpt-runtime-owners-20260908.md). Built/published/installed; guest stop used fallback and its immediate partial text was absent. Private-stop acceptance remains open.
 
 Latest grouped delivery: `1542` compiled and passed 1,007 Android tests, was
 published and installed, and confirmed one production private text-file upload
