@@ -1,14 +1,14 @@
 # Shared-library attachment downloads
 
 Capability candidate: `android_chatgpt_private_shared_library_download_v1`.
-Status: **implemented; ordinary library saved-byte acceptance passed with module
-8 in a local diagnostic APK 1.1.1583**. The production-package and additional
-shared/mounted scopes remain separate acceptance cases, not a blanket `completed` claim.
+Status: **implemented; ordinary library saved-byte acceptance passed in normal
+Release 1.1.1584 with module 8**. Additional shared/mounted scopes and rendered UI
+remain separate acceptance cases, not a blanket `completed` claim.
 Current source: file-download module 14 and library-download module 8. The
 existing adapter asset list is reused unchanged. The observed 302 to same-origin
 estuary content had been incorrectly rejected; module 8 reuses the established
 content-source validator. Sign-in is not a prerequisite to repeat.
-See [current evidence](chatgpt-private-library-browser.md#1583-library-download-redirect-fix).
+See [current evidence](chatgpt-private-library-browser.md#1584-normal-release-acceptance).
 The [1549 release evidence](reports/chatgpt-runtime-release-1549.md) is historical.
 
 ## Official source evidence

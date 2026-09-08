@@ -6,8 +6,8 @@
 - Code: implemented for root/folder browsing, explicit search, cursor pagination,
   refresh and ordinary library-file download; published/installed in 1.1.1581.
 - Verification: native catalogue and pagination data passed through 1582;
-  ordinary saved-byte download passed with module 8 in diagnostic 1583.
-  Rendered browser controls and the final normal-package download remain pending.
+  ordinary saved-byte download passed in normal release 1.1.1584 with module 8.
+  Rendered browser controls and additional file scopes remain pending.
 - Catalog v5 fixes object-event publication and includes v4 cold-identity preparation;
   both patches are installed in 1581, replacing the defective 1579 catalog v3.
 - This is the independent library, not the current conversation's attachment index.
@@ -189,6 +189,22 @@ the normal release package includes the fix or that the library dialog was
 visually accepted. The unmodified normal 1583 APK was restored and the temporary
 debug port removed before release work. The next grouped acceptance should use
 the newly published normal package, then cover the remaining native browser controls.
+
+### 1584 Normal Release Acceptance
+
+- Published and installed normal Release 1.1.1584 (1584), source `2a05ae2c6`;
+  release log `library-redirect-release-20260909-025006-718`.
+- Published and installed APK SHA-256 both equal
+  `cd009347105c49b386ae55cf0494caa6413cbc820075987bd8285ba2dcf51c05`.
+  The owned app WebView debug socket is absent; no runtime asset injection was used.
+- One production-handler download passed with `download_saved`, native `saved`,
+  78 received bytes matching the selected fixture size. Conversation URL, draft and
+  authenticated state were preserved. The acceptance script fails unless these
+  conditions hold: `library-download-1584-acceptance-20260909-025858-908`.
+- The ordinary library redirect/storage defect is fixed, device verified and
+  released. Reuse this capability; do not repeat protocol research without a new
+  regression. Native dialog controls, shared/mounted scope variants and library
+  mutations/associations retain their separate pending acceptance status.
 
 Ordinary file rename, soft deletion and [composer association](chatgpt-private-library-attachment.md)
 are also packaged in 1581; the [native mutation owner](chatgpt-private-library-mutations.md)
