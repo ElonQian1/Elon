@@ -12,7 +12,10 @@ class BinanceHostStateTest {
         "id" to id, "account" to account, "symbol" to "NEARUSDT", "status" to "WORKING",
         "direction" to "LONG", "spacing" to "ARITH", "lower" to "1.2", "upper" to "2.4",
         "count" to "12", "leverage" to "2", "profit" to "-0.15", "created" to "1788790000000")
-    private fun list(vararg rows: Map<String, Any?>) = StrictJson.encode(mapOf("kind" to "list", "rows" to rows.toList()))
+    private fun list(vararg rows: Map<String, Any?>, account: String = "42", kind: String = "primary") =
+        StrictJson.encode(mapOf("kind" to "list", "account" to account, "account_kind" to kind, "rows" to rows.toList()))
+    private fun detail(row: Map<String, Any?>, account: String = "42") =
+        StrictJson.encode(mapOf("kind" to "detail", "account" to account, "account_kind" to "primary", "row" to row))
     private fun rejected(action: () -> Unit) { try { action(); fail("accepted invalid input") } catch (_: RuntimeException) {} }
 
     @Test fun validReadExcludesAccountAndCarriesLocalSource() {
@@ -29,16 +32,17 @@ class BinanceHostStateTest {
     }
     @Test fun accountChangeInvalidatesOldGrant() {
         val state = state(); state.accept(list(row())); val grant = state.grant()
-        state.accept(list(row(account = "43"))); assertFalse(state.authorized(grant)); assertTrue(state.fresh())
+        state.accept(list(row(account = "43"), account = "43")); assertFalse(state.authorized(grant)); assertTrue(state.fresh())
     }
     @Test fun sameAccountListRefreshKeepsGrant() {
         val state = state(); state.accept(list(row())); val grant = state.grant()
         state.accept(list(row("124"))); assertTrue(state.authorized(grant)); assertFalse(state.contains("123"))
     }
-    @Test fun missingMixedAndEmptyAccountResponsesAreRejected() {
-        rejected { state().accept(list()) }
+    @Test fun missingMixedAndUnverifiedAccountResponsesAreRejected() {
+        rejected { state().accept("{\"kind\":\"list\",\"rows\":[]}") }
         rejected { state().accept(list(row(account = null))) }
         rejected { state().accept(list(row(), row("124", "43"))) }
+        rejected { state().accept(list(row(), account = "43", kind = "sub")) }
     }
     @Test fun duplicateAndInvalidPriceResponsesAreRejected() {
         rejected { state().accept(list(row(), row())) }
@@ -47,7 +51,7 @@ class BinanceHostStateTest {
     }
     @Test fun detailMustMatchObservedGridAndDoesNotRefreshListAge() {
         val state = state(); state.accept(list(row())); val grant = state.grant()
-        state.accept(StrictJson.encode(mapOf("kind" to "detail", "row" to row(account = null))))
+        state.accept(detail(row(account = null)))
         assertTrue(state.reply(grant).contains("\"detail\":true"))
         clock += 300_000
         assertFalse(state.fresh()); assertTrue(state.reply(grant).contains("\"rows\":[]"))
@@ -55,6 +59,32 @@ class BinanceHostStateTest {
     @Test fun invalidationDropsAllPrivateState() {
         val state = state(); state.accept(list(row())); val grant = state.grant()
         state.unavailable(); assertFalse(state.authorized(grant)); assertEquals(0, state.count)
+        assertNull(state.account)
+    }
+    @Test fun verifiedEmptySubaccountDoesNotInheritPrimaryRowsOrGrant() {
+        val state = state(); state.accept(list(row())); val grant = state.grant()
+        state.accept(list(account = "43", kind = "sub"))
+        assertFalse(state.authorized(grant)); assertTrue(state.fresh()); assertEquals(0, state.count)
+        assertEquals("sub", state.accountKind); assertTrue(state.reply(state.grant()).contains("\"rows\":[]"))
+    }
+    @Test fun malformedResponseClearsPreviouslyGrantedDataInsideStateBoundary() {
+        val state = state(); state.accept(list(row())); val grant = state.grant()
+        rejected { state.accept(list(row(), account = "43")) }
+        assertFalse(state.authorized(grant)); assertFalse(state.fresh()); assertEquals(0, state.count)
+    }
+    @Test fun observedIdentitySwitchClearsDataEvenWithoutAnotherGridResponse() {
+        val state = state(); state.accept(list(row())); val grant = state.grant()
+        state.accept("{\"kind\":\"identity\",\"account\":\"43\",\"account_kind\":\"sub\"}")
+        assertFalse(state.authorized(grant)); assertFalse(state.fresh()); assertEquals(0, state.count)
+        assertEquals("sub", state.accountKind)
+    }
+    @Test fun detailRequiresCurrentAccountProofAndCountsOnlyCurrentRows() {
+        val state = state(); state.accept(list(row())); val grant = state.grant()
+        assertEquals(0, state.detailCount); assertEquals(1, state.activeGrantCount)
+        state.accept(detail(row(account = null))); assertEquals(1, state.detailCount)
+        rejected { state.accept(detail(row(account = null), account = "43")) }
+        assertEquals(0, state.detailCount); assertEquals(0, state.activeGrantCount)
+        assertFalse(state.authorized(grant))
     }
     @Test fun navigationOnlyAllowsExactOfficialHttpsHosts() {
         assertTrue(binanceHostNavigation("https://www.binance.com/zh-CN/trading-bots"))

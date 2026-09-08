@@ -8,6 +8,7 @@ import java.security.SecureRandom
 /** Thread confinement is supplied by the host's main looper. No website credentials here. */
 internal class BinanceHostState(private val elapsed: () -> Long, private val epoch: () -> Long) {
     var account: String? = null; private set
+    var accountKind = "unknown"; private set
     var generation = 0L; private set
     var observed = 0L; private set
     var observedElapsed = 0L; private set
@@ -15,21 +16,38 @@ internal class BinanceHostState(private val elapsed: () -> Long, private val epo
     private var rows = linkedMapOf<String, Map<String, Any?>>()
     private val grants = mutableMapOf<String, Long>()
     val count get() = rows.size
+    val detailCount get() = rows.values.count { it["detail"] == true }
+    val activeGrantCount get() = grants.values.count { it > elapsed() }
 
-    fun unavailable() { ready = false; rows.clear(); grants.clear(); generation++ }
+    fun unavailable() { ready = false; account = null; accountKind = "unknown"; rows.clear(); grants.clear(); generation++ }
     fun accept(raw: String) {
+        try { acceptVerified(raw) } catch (failure: RuntimeException) { unavailable(); throw failure }
+    }
+    private fun identity(event: Map<String, Any?>): Pair<String, String> {
+        val id = event["account"] as? String ?: error("ACCOUNT_UNVERIFIED")
+        require(Regex("[0-9]{1,20}").matches(id))
+        val kind = event["account_kind"] as? String ?: error("ACCOUNT_KIND_MISSING")
+        require(kind in setOf("primary", "sub", "unknown"))
+        return digest(id) to kind
+    }
+    private fun bind(identity: Pair<String, String>) {
+        if (account != identity.first || accountKind != identity.second) unavailable()
+        account = identity.first; accountKind = identity.second
+    }
+    private fun acceptVerified(raw: String) {
         val event = StrictJson.parse(raw)
         when (event["kind"]) {
+            "identity" -> bind(identity(event))
             "list" -> {
                 val list = event["rows"] as? List<*> ?: error("LIST_INVALID")
                 require(list.size <= 500)
                 val decoded = list.map(::decode)
                 val identities = decoded.map { it["account"] as? String ?: error("ACCOUNT_UNVERIFIED") }.toSet()
-                // An empty observed page does not independently identify its Binance account.
-                require(identities.size == 1 && decoded.map { it["id"] }.toSet().size == decoded.size)
-                val nextAccount = digest(identities.single())
-                if (account != null && account != nextAccount) grants.clear()
-                account = nextAccount
+                // Account proof is from the observed authenticated base-info GET, including an empty list.
+                // Do not equate a parent account with its child: every nonempty row must match the exact UID.
+                val verified = identity(event)
+                require(identities.all { digest(it) == verified.first } && decoded.map { it["id"] }.toSet().size == decoded.size)
+                bind(verified)
                 rows = linkedMapOf<String, Map<String, Any?>>().apply {
                     decoded.forEach { put(it["id"] as String, it.filterKeys { key -> key != "account" } + ("detail" to false)) }
                 }
@@ -37,6 +55,7 @@ internal class BinanceHostState(private val elapsed: () -> Long, private val epo
             }
             "detail" -> {
                 require(fresh())
+                val proof = identity(event); require(proof.first == account && proof.second == accountKind)
                 val row = decode(event["row"])
                 val old = rows[row["id"]] ?: error("UNKNOWN_GRID")
                 require(old["symbol"] == row["symbol"])

@@ -14,9 +14,11 @@ function harness() {
   const events = [], calls = [], queue = [];
   class Xhr { open() {} send() {} addEventListener(name, callback) { this.callback = callback; } }
   const window = {ElonBinanceRead: {postMessage: raw => events.push(JSON.parse(raw))},
-    fetch: (url, init) => { calls.push({url, init}); const value = queue.shift(); return Promise.resolve({status: value?.status ?? 200, clone: () => ({text: () => Promise.resolve(value?.text ?? '{}')})}); }};
+    fetch: (url, init) => { calls.push({url, init}); const value = String(url).includes('/get-user-base-info')
+      ? {text: good({userId: '42', subUser: false, parentUser: true})} : queue.shift();
+      return Promise.resolve({status: value?.status ?? 200, clone: () => ({text: () => Promise.resolve(value?.text ?? '{}')})}); }};
   window.top = window;
-  const context = vm.createContext({window, location: {origin: 'https://www.binance.com', href: 'https://www.binance.com/zh-CN/trading-bots/futures/grid/NEARUSDT'}, URL, XMLHttpRequest: Xhr, WeakMap, Set});
+  const context = vm.createContext({window, location: {origin: 'https://www.binance.com', href: 'https://www.binance.com/zh-CN/trading-bots/futures/grid/NEARUSDT'}, URL, XMLHttpRequest: Xhr, WeakMap, Set, AbortController, setTimeout, clearTimeout});
   vm.runInContext(code, context);
   return {window, events, calls, queue, Xhr};
 }
@@ -32,8 +34,8 @@ function harness() {
   assert.equal(h.window.__elonBinanceReadV1.detail('999'), false);
   h.queue.push({text: good(row)});
   assert.equal(h.window.__elonBinanceReadV1.detail('123'), true); await tick();
-  assert.equal(h.calls.at(-1).url, DETAIL + '?strategyId=123');
-  assert.equal(h.calls.at(-1).init.method, 'GET');
+  assert.equal(h.calls.filter(c => c.url.startsWith(DETAIL)).at(-1).url, DETAIL + '?strategyId=123');
+  assert.equal(h.calls.filter(c => c.url.startsWith(DETAIL)).at(-1).init.method, 'GET');
   assert.equal(h.events.at(-1).kind, 'detail');
   h.queue.push({text: good([row, row])}); await h.window.fetch(LIST, {method: 'POST'}); await tick();
   assert.equal(h.events.at(-1).kind, 'unavailable');
@@ -41,7 +43,7 @@ function harness() {
   const count = h.events.length;
   h.queue.push({text: good([row])}); await h.window.fetch('https://example.com' + LIST, {method: 'POST'}); await tick();
   assert.equal(h.events.length, count);
-  const x = new h.Xhr(); x.open('POST', LIST); x.send(); x.status = 200; x.responseText = good([row]); x.callback();
+  const x = new h.Xhr(); x.open('POST', LIST); x.send(); x.status = 200; x.responseText = good([row]); x.callback(); await tick();
   assert.equal(h.events.at(-1).kind, 'list');
   h.queue.push({text: JSON.stringify({code: '000000', success: false, data: [row]})});
   await h.window.fetch(LIST, {method: 'POST'}); await tick(); assert.equal(h.events.at(-1).kind, 'unavailable');
