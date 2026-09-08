@@ -526,6 +526,7 @@ function Open-WebChatNativeChatSurface {
         throw "Unable to select $providerName in the native chat surface."
     }
 
+    $foregroundProbe = ${function:Test-WebChatNativeChatSurfaceForeground}
     return Wait-ChatGptWebSmokeState -Runtime $Runtime -TimeoutSec $TimeoutSec -MainState `
         -Description "ready $providerName native chat surface" -Predicate {
             param($state)
@@ -533,7 +534,8 @@ function Open-WebChatNativeChatSurface {
                 [string]$state.social_chat.interaction_mode -eq "chat" -and
                 [string]$state.social_chat.web_chat_provider_id -eq $ProviderId -and
                 [string]$state.social_chat.web_chat_state -eq "ready" -and
-                $state.social_chat.web_chat_composer_ready -eq $true
+                $state.social_chat.web_chat_composer_ready -eq $true -and
+                (& $foregroundProbe -Runtime $Runtime)
         }.GetNewClosure()
 }
 

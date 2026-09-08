@@ -120,10 +120,39 @@ That final Node batch contains 54 passing cases.
   Render-only log `library-bridge-native-render-20260909-010416-153` also failed.
   Do not label either whole smoke run successful merely because its read steps passed.
 
-Next acceptance: establish the foreground native surface/selector binding, then
-sample browser root/folder/back/search/pagination and one saved-byte download.
-Verify the original conversation, draft and voice state. Sign-in is not a current
-prerequisite. Native data projection is verified; rendered UI acceptance is not.
+### 1582 Foreground And Download Evidence
+
+On 2026-09-09, APK 1.1.1582 still uses adapter 306. A background MCP `ready`
+snapshot coexisted with `com.elon.quant/.grids.host.HostedGridActivity` as the
+actual foreground. A background catalogue attempt timed out; after bringing the
+production native chat forward, its read succeeded. This does not establish
+the cause of every earlier selector mismatch or timeout.
+
+`Open-WebChatNativeChatSurface` now verifies the resumed native Activity as well
+as the provider/composer snapshot. The APK MCP helper explicitly bypasses the
+Windows proxy for loopback HTTP and refuses redirects, preserving the response
+body deadline. Local proxy-trap, UTF-8, redirect, timeout and foreground tests
+pass in PowerShell 5.1 and 7. These are host-script fixes, not an APK update.
+
+Foreground handler acceptance (`library-foreground-read-20260909-015735-978`):
+the root contained 21 items and the next read contained 41. Earlier rows were
+retained, handles were unique and `has_more=true` remained explicit. Read times
+were 2360/2309 ms, not rendering timings. Pagination data projection is verified;
+the native More button and rendered browser are not yet accepted.
+
+An existing small synthetic text fixture was selected without changing its
+contents. Download failed before any saved bytes, with
+`download_source_unsupported`; a focused diagnostic reproduced it in
+`library-download-failure-20260909-020110-577`. The native state was `failed`,
+received bytes zero. Do not count dispatch or a download handle as successful
+storage. The final download source/redirect must be observed before changing
+the allowlist; no unchecked origin was admitted. Conversation URL, draft,
+streaming and dictation state were preserved; no microphone or mutation was used.
+
+Next: fix the observed binary-source compatibility gap, then accept the rendered
+browser root/folder/back/search/More controls and saved-byte download. Sign-in is
+not a current prerequisite. Native data projection is verified; rendered UI and
+binary storage are not. Do not repeat successful catalogue research.
 
 Ordinary file rename, soft deletion and [composer association](chatgpt-private-library-attachment.md)
 are also packaged in 1581; the [native mutation owner](chatgpt-private-library-mutations.md)

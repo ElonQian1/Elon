@@ -37,6 +37,43 @@ function Invoke-Adb {
         Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
 }
 
+function Invoke-ApkMcpLoopbackJson {
+    param(
+        [Parameter(Mandatory = $true)][ValidateRange(1, 65535)][int]$Port,
+        [Parameter(Mandatory = $true)][ValidateSet('/health', '/mcp')][string]$Path,
+        [ValidateSet('Get', 'Post')][string]$Method = 'Get',
+        [string]$Body = '',
+        [ValidateRange(1, 3600)][int]$TimeoutSec = 6
+    )
+
+    Add-Type -AssemblyName System.Net.Http
+    $handler = [System.Net.Http.HttpClientHandler]::new()
+    $handler.UseProxy = $false
+    $handler.AllowAutoRedirect = $false
+    $client = [System.Net.Http.HttpClient]::new($handler)
+    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSec)
+    $request = [System.Net.Http.HttpRequestMessage]::new(
+        [System.Net.Http.HttpMethod]::new($Method), "http://127.0.0.1:$Port$Path")
+    $response = $null
+    try {
+        if ($Method -eq 'Post') {
+            $request.Content = [System.Net.Http.StringContent]::new(
+                $Body, [System.Text.Encoding]::UTF8, 'application/json')
+        }
+        # ResponseContentRead keeps headers and body inside the same deadline.
+        $response = $client.SendAsync($request).GetAwaiter().GetResult()
+        if (-not $response.IsSuccessStatusCode) {
+            throw "APK MCP loopback HTTP status $([int]$response.StatusCode)."
+        }
+        $text = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+        return $text | ConvertFrom-Json
+    } finally {
+        if ($null -ne $response) { $response.Dispose() }
+        $request.Dispose()
+        $client.Dispose()
+    }
+}
+
 function Start-ApkMcpDebug {
     $serviceOutput = Invoke-Adb shell am start-foreground-service `
         -a com.elon.app.mcp.START_KEEPALIVE `
@@ -58,7 +95,7 @@ function Wait-ApkMcpHealth {
     $lastError = $null
     do {
         try {
-            return Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2
+            return Invoke-ApkMcpLoopbackJson -Port $Port -Path /health -TimeoutSec 2
         } catch {
             $lastError = $_.Exception.Message
             Start-Sleep -Milliseconds ([Math]::Max(50, $HealthPollMs))
@@ -70,7 +107,7 @@ function Wait-ApkMcpHealth {
         $retryDeadline = [DateTimeOffset]::UtcNow.AddSeconds(3)
         do {
             try {
-                return Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2
+                return Invoke-ApkMcpLoopbackJson -Port $Port -Path /health -TimeoutSec 2
             } catch {
                 $lastError = $_.Exception.Message
                 Start-Sleep -Milliseconds ([Math]::Max(50, $HealthPollMs))
@@ -83,7 +120,7 @@ function Wait-ApkMcpHealth {
 
 function Get-ApkMcpHealthIfAvailable {
     try {
-        return Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 1
+        return Invoke-ApkMcpLoopbackJson -Port $Port -Path /health -TimeoutSec 1
     } catch {
         return $null
     }
@@ -160,9 +197,9 @@ $request = [ordered]@{
 }
 
 $body = $request | ConvertTo-Json -Depth 30 -Compress
-Invoke-RestMethod `
+Invoke-ApkMcpLoopbackJson `
+    -Port $Port `
     -Method Post `
-    -Uri "http://127.0.0.1:$Port/mcp" `
-    -ContentType "application/json" `
+    -Path /mcp `
     -Body $body `
     -TimeoutSec $effectiveRequestTimeoutSec
