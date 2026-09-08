@@ -489,6 +489,19 @@
       ],
       "implementation_evidence": [
         {
+          "path": "android/app/src/main/assets/binance_grid_reports_adapter.js",
+          "content_hash": "0b4093c3ce798756f32173b6792878d894c856cae4440afefe68899646b376a7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9625bed65cb6d2c002cb9ea8370e7202e38ffd21",
+            "head_blob_oid": "369c68ba7ef5e31a1275821ffa7c5d090eccf345",
+            "worktree_blob_oid": "48828e8d4e55a602d9bba57ba01a07601c1da38b",
+            "state": "tracked_modified"
+          }
+        },
+        {
           "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateOptions.kt",
           "content_hash": "825f56ca9cf65f1200c33d440043c73ab80ad2d5123645eb118e8a5cfb6ddf9c",
           "locator": "",
@@ -555,15 +568,15 @@
         },
         {
           "path": "scripts/test-binance-grid-reports.cjs",
-          "content_hash": "452961b005b1c325cc3a84e79e57607445eff5832427fc042a416f586b7c80e9",
+          "content_hash": "45677004527e4c74cf3656bd009d1d207a8aeac3311694d896d328fbace1b531",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "96180a80f16c315ebe1e354a03b7e55145f5aa63",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "3732013c15e698011f28e7b9e3dd7d0819dca7f2",
-            "state": "untracked"
+            "head_commit": "9625bed65cb6d2c002cb9ea8370e7202e38ffd21",
+            "head_blob_oid": "3732013c15e698011f28e7b9e3dd7d0819dca7f2",
+            "worktree_blob_oid": "f34f9fd49eb46e8b62e6d76a1f5b25b0a7db3bf2",
+            "state": "tracked_modified"
           }
         }
       ],
@@ -574,7 +587,7 @@
         "expires_at_ms": 1788907713055
       },
       "created_at_ms": 1788893289640,
-      "updated_at_ms": 1788897821352
+      "updated_at_ms": 1788898036484
     },
     {
       "id": "android-binance-grid-create-v1",
@@ -24266,16 +24279,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_aa6069813fe441e49176c80e1145a406",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "claim_released",
-      "actor": "codex-sui-ci",
-      "reason": "Requirement intentionally clarified fixed Windows 2025 runner and official archive install-candidate semantics; release before rebinding and renewed review.",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788652064291
-    },
-    {
       "id": "feature_event_a09db99099614ce8b059c6e0ef7dbd5a",
       "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
       "action": "requirement_rebound",
@@ -26264,6 +26267,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788897821352
+    },
+    {
+      "id": "feature_event_c451f36c7ce849a59e2e89cf840e235d",
+      "feature_id": "android-binance-grid-core-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-core",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788898036484
     }
   ]
 }

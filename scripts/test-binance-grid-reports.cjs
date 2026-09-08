@@ -69,3 +69,11 @@ test('account change or reset discards late report data',async()=>{
 test('business errors never become a successful empty history',async()=>{
   const h=fixture();h.data.push({success:false,data:{grids:[],total:0}});h.reports.query(h.q());await tick();assert.equal(h.events[0].status,'error');
 });
+test('history pagination keeps one time window and resets it with account context',async()=>{
+  const h=fixture();assert.equal(h.reports.query(h.q('history',{page:2})),false);
+  h.data.push({data:{grids:[],total:40}});h.reports.query(h.q());await tick();
+  h.data.push({data:{grids:[],total:40}});h.reports.query(h.q('history',{page:2,request:'b'.repeat(32)}));await tick();
+  const first=JSON.parse(h.calls[0].init.body), second=JSON.parse(h.calls[1].init.body);
+  assert.equal(first.startTime,second.startTime);assert.equal(first.endTime,second.endTime);assert.equal(second.page,2);
+  h.reports.reset();assert.equal(h.reports.query(h.q('history',{page:2})),false);
+});

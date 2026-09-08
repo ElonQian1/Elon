@@ -17,6 +17,7 @@
     const enumeration = /^[A-Z][A-Z0-9_]{0,63}$/;
     let serial = 0;
     const histories = new Map();
+    const historyWindows = new Map();
     function scalar(v, pattern, required = false) {
       if (v == null && !required) return null;
       const text = typeof v === 'string' ? v : Number.isSafeInteger(v) ? String(v) : '';
@@ -67,12 +68,13 @@
       if (!q || Object.keys(q).sort().join(',') !== 'days,id,kind,page,request,symbol') return false;
       if (!/^[0-9a-f]{32}$/.test(q.request) || !['history','orders','matches','positions'].includes(q.kind)) return false;
       if (!Number.isInteger(q.page) || q.page < 1 || q.page > 1000 || ![7,30,90].includes(q.days)) return false;
-      if (q.kind === 'history') return q.id === '' && (q.symbol === '' || /^[A-Z0-9]{1,24}USDT$/.test(q.symbol));
+      if (q.kind === 'history') return q.id === '' && (q.symbol === '' || /^[A-Z0-9]{1,24}USDT$/.test(q.symbol)) &&
+        (q.page === 1 || historyWindows.has(q.days + ':' + q.symbol));
       return /^[0-9]{1,20}$/.test(q.id) && /^[A-Z0-9]{1,24}USDT$/.test(q.symbol) &&
         (port.known(q.id) || histories.get(q.id) === q.symbol) && (q.kind === 'matches' || q.page === 1);
     }
     return Object.freeze({
-      reset() { serial++; histories.clear(); },
+      reset() { serial++; histories.clear(); historyWindows.clear(); },
       query(q) {
         const captured = port.context();
         if (!valid(q) || !captured) return false;
@@ -85,7 +87,13 @@
           if (!before || before.account !== context.account || !still()) throw Error('account_changed');
           let rows, total, coverage = 'page';
           if (q.kind === 'history') {
-            const endTime = Date.now(), startTime = endTime - q.days * 86400000;
+            const windowKey = q.days + ':' + q.symbol;
+            if(q.page === 1) {
+              if(historyWindows.size >= 32) historyWindows.clear();
+              historyWindows.set(windowKey, Date.now());
+            }
+            const endTime = historyWindows.get(windowKey), startTime = endTime - q.days * 86400000;
+            if(!Number.isSafeInteger(endTime)) throw Error('restart_pagination');
             const response = await request('history', {page:q.page,rows:20,startTime,endTime,...q.symbol?{symbol:q.symbol}:{}}, context);
             const rawRows = array(object(response.data).grids, 20);
             if (rawRows.some(v => v.rootUserId != null && scalar(v.rootUserId, integer, true) !== before.account)) throw Error('account_changed');
