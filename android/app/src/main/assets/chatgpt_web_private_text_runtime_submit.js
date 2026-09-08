@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 12, create: factory });
+  const exported = Object.freeze({ version: 13, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -265,7 +265,14 @@
     }
     let timer;
     const settled = Promise.resolve(receipt.completion).then(accepted => {
-      if (!sameOwner(binding)) return { status: 'unknown', code: 'context_changed' };
+      const currentContext = sameOwner(binding);
+      // A current-draft transaction owns its reset and confirms this specific
+      // dispatch. Editor replacement cannot revoke that acknowledgement. Do not
+      // apply its UI effects to a new context; Android also matches requestId.
+      if (binding.draftView && accepted === true) {
+        return { status: 'accepted', code: 'accepted', current: currentContext };
+      }
+      if (!currentContext) return { status: 'unknown', code: 'context_changed' };
       if (accepted !== true) return { status: 'unknown', code: 'dispatch_not_confirmed' };
       // prepared_action does not reset ready files. Never let a failed local
       // cleanup accidentally include the accepted attachment in another send.
@@ -294,5 +301,5 @@
       if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
     }
   } catch (_) {}
-  return Object.freeze({ version: 12, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 13, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

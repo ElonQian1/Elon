@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptTextTransactionOrchestrator;
-  if (existing && Number(existing.version) >= 6) return;
+  if (existing && Number(existing.version) >= 7) return;
 
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
@@ -151,7 +151,7 @@
       options.scheduleSnapshot(true);
       Promise.resolve(transaction.completion).then(receipt => {
         const accepted = receipt?.status === 'accepted';
-        if (accepted && options.streamingPolicy) options.streamingPolicy.begin(assistantBeforeSend);
+        if (accepted && receipt.current !== false && options.streamingPolicy) options.streamingPolicy.begin(assistantBeforeSend);
         respond('send_prompt', accepted, 'official_runtime_v1:' +
           (accepted ? 'accepted' : receipt?.status === 'rejected' ? 'rejected:not_ready'
             : 'unknown:' + safeCode(receipt?.code, 'unknown')));
@@ -329,5 +329,5 @@
     return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, stopPrivate, stopGeneration });
   }
 
-  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 6, create });
+  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 7, create });
 })();

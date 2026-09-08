@@ -253,6 +253,48 @@ test('current draft preserves a new user edit and does not duplicate an already 
   assert.equal((await result.completion).status, 'accepted'); assert.equal(f.draft(), 'next user draft');
 });
 
+for (const change of ['editor_reset', 'controller_reset', 'guest_login', 'navigation']) {
+  test('confirmed draft receipt survives UI lifecycle without mutating its successor: ' + change, async () => {
+    const f = fixture({ authStatus: 'logged_out', session: null }, true); await flush();
+    f.props.isComposerSubmissionReady = false;
+    const result = f.api.submit(f.command);
+    if (change === 'editor_reset') f.node.isConnected = false;
+    if (change === 'controller_reset') f.props.composerController = { conversation: f.controller.conversation };
+    if (change === 'guest_login') f.guest.session = {};
+    if (change === 'navigation') f.page.location.href = 'https://chatgpt.com/c/99999999-2222-3333-4444-555555555555';
+    f.setDraft('new context draft'); f.settle(true);
+    assert.deepEqual(await result.completion, { status: 'accepted', code: 'accepted', current: false });
+    assert.equal(f.draft(), 'new context draft'); assert.equal(f.edits.length, 1); assert.equal(f.calls.length, 1);
+    assert.equal(f.api.state().pending, false);
+  });
+}
+
+test('changed UI cannot turn unconfirmed current-draft completion into success', async () => {
+  for (const value of [false, undefined, null, { accepted: true }]) {
+    const f = fixture(null, true); await flush(); f.props.isComposerSubmissionReady = false;
+    const result = f.api.submit(f.command); f.node.isConnected = false; f.settle(value);
+    assert.equal((await result.completion).status, 'unknown'); assert.equal(f.calls.length, 1);
+  }
+});
+
+test('runtime draft acceptance updates the receipt but never starts streaming in a successor page', async () => {
+  const f = fixture(null, true); await flush(); f.props.isComposerSubmissionReady = false;
+  let streamingStarts = 0, domWrites = 0;
+  const events = [];
+  vm.runInNewContext(orchestrator, { window: f.page });
+  const api = f.page.__elonChatGptTextTransactionOrchestrator.create({
+    findComposer: () => f.node, composerValue: f.command.readDraft,
+    setComposerValue: () => { domWrites++; throw Error('unexpected DOM mutation'); },
+    comparableText: value => value, scheduleSnapshot() {},
+    streamingPolicy: { begin() { streamingStarts++; } }
+  });
+  const respond = (action, ok, detail) => events.push({ action, ok, detail }); respond.requestId = 'mcp_test';
+  api.sendPrompt(f.command.prompt, '', respond, true);
+  f.node.isConnected = false; f.settle(true); await flush();
+  assert.deepEqual(events, [{ action: 'send_prompt', ok: true, detail: 'official_runtime_v1:accepted' }]);
+  assert.equal(streamingStarts, 0); assert.equal(domWrites, 0); assert.equal(f.calls.length, 1);
+});
+
 for (const fault of ['unmounted_editor', 'destroyed_editor', 'rich_input', 'unknown_ready', 'owner_changed', 'draft_changed']) {
   test('runtime draft handoff rejects before any mutation: ' + fault, async () => {
     const f = fixture(null, true); await flush(); f.props.isComposerSubmissionReady = false;

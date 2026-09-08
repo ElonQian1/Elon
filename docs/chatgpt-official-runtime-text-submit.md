@@ -15,8 +15,23 @@ which reader ran. See [1554 evidence](reports/chatgpt-runtime-release-1554.md).
 
 ## Current draft and guest ownership
 
-Submit 12 / bindings 4 is implemented with targeted offline evidence, pending
-the grouped Release and production acceptance. It reuses the official runtime
+APK 1555 contains submit 12 / bindings 4. Its first production current-draft
+send reached the runtime without DOM fallback and later showed exactly one
+complete test reply with native streaming false. However, the receipt reported
+`unknown:context_changed`. The subsequent read-only check confirms delivery,
+not which individual post-submit ownership check changed.
+
+Submit 13 separates confirmed dispatch from editor/UI cleanup for current-draft
+transactions. Only the official completion resolving exactly `true`, under
+`requireDispatchAcceptance`, acknowledges the captured command. A reset editor
+cannot revoke that result. A changed current context sets `current: false`:
+the orchestrator does not start synthetic streaming in the successor page,
+and the runtime never clears its draft. Android matches the original request ID
+against its send ledger. False/malformed/failed completions remain unconfirmed;
+explicit text and attachment cleanup retain their stricter original contract.
+This extension awaits its grouped Release acceptance.
+
+The bridge reuses the official runtime
 writer rather than adding another HTTP sender. Known ready explicit text and
 native attachment submissions are unchanged.
 
