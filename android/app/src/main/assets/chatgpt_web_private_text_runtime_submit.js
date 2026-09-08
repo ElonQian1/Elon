@@ -148,15 +148,15 @@
     if (!bindings?.observed('composer')) return null;
     const runtime = bindings.peek('composer');
     if (!runtime) { bindings.load('composer').catch(() => {}); return null; }
-    if (typeof runtime.t_ !== 'function' || typeof runtime.Qg !== 'function' || typeof runtime.VS !== 'function') return null;
-    const view = runtime.t_(binding.controller), read = runtime.Qg(binding.controller);
-    if (view?.dom !== binding.node || view.isDestroyed || typeof read !== 'function' ||
+    if (typeof runtime.t_ !== 'function' || typeof runtime.AS !== 'function' || typeof runtime.VS !== 'function') return null;
+    const view = runtime.t_(binding.controller);
+    if (view?.dom !== binding.node || view.isDestroyed ||
         typeof view.state?.doc?.toJSON !== 'function') return null;
     const doc = view.state.doc.toJSON();
     if (doc.type !== 'doc' || !Array.isArray(doc.content) || doc.content.length > 1000 ||
         !doc.content.every(p => p.type === 'paragraph' && !p.marks?.length &&
           (!p.content || p.content.every(t => t.type === 'text' && !t.marks?.length)))) return null;
-    return { view, read, replace: runtime.VS };
+    return { view, read: runtime.AS, replace: runtime.VS };
   }
 
   function capture(node, previousAttachment, draftMode = false) {
@@ -225,14 +225,14 @@
       command.beforeSubmit?.();
       if (!current(binding) || command.readDraft() !== expected) return { handled: false, code: 'context_changed' };
       if (binding.draftView) {
-        if (binding.readEditor() !== expected) return { handled: false, code: 'draft_mismatch' };
+        if (binding.readEditor(binding.draftView.state.doc)?.content !== expected) return { handled: false, code: 'draft_mismatch' };
         // Use the official editor transaction, without focusing it or waiting for
         // a DOM button. submitComposer still owns all current-draft constraints.
         if (expected !== value) {
           draftMutationAttempted = true;
           binding.replaceEditor(binding.draftView, value, { scrollIntoView: false });
         }
-        if (!current(binding) || binding.readEditor() !== value || command.readDraft() !== value) {
+        if (!current(binding) || binding.readEditor(binding.draftView.state.doc)?.content !== value || command.readDraft() !== value) {
           return { handled: true, completion: Promise.resolve({ status: 'rejected', code: 'draft_handoff' }) };
         }
       }

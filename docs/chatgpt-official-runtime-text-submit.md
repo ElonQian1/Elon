@@ -34,7 +34,7 @@ versioned facade maps these public exports, verified against both retained asset
 | Contract | September 6 symbol/export | September 7 symbol/export |
 |---|---|---|
 | Controller-owned editor | `CL` / `t_` | `XL` / `__` |
-| Editor plain-text getter | `QVt` / `Qg` | `_Ht` / `m_` |
+| Current document text | `kN` / `AS` | `pP` / `KS` |
 | Replace plain editor text | `AN` / `VS` | `mP` / `rC` |
 
 Only plain paragraph/text drafts qualify. The existing editor must belong to
@@ -45,6 +45,11 @@ thread, selected leaf, file store and draft are checked again before submitting
 `current_draft` exactly once with `requireDispatchAcceptance`. The website owns
 draft reset, proof creation and state updates. A failed local handoff, rejection
 or ambiguous invocation is not replayed through another writer.
+
+Draft comparison reads the current `view.state.doc` through the official pure
+text converter. The UI subscription getter is intentionally not used: its editor
+change notifications are delayed, so immediately rereading that computed value
+could reject a transaction that has already updated the editor document.
 
 The positive logged-out homepage can retain the same official conversation
 after its server ID is allocated without changing the root URL. The bridge

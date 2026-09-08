@@ -48,7 +48,7 @@ function fixture(guest, editor = false) {
     Event: class { constructor(type) { this.type = type; } preventDefault() {} },
     setTimeout(fn) { timers.set(++serial, fn); return serial; }, clearTimeout(key) { timers.delete(key); } };
   let bridge;
-  const edits = [], readEditor = () => draft;
+  const edits = [];
   const view = { dom: node, isDestroyed: false, state: { doc: { toJSON: () => ({
     type: 'doc', content: [{ type: 'paragraph', content: draft ? [{ type: 'text', text: draft }] : [] }]
   }) } } };
@@ -62,7 +62,7 @@ function fixture(guest, editor = false) {
       F5: guest.missingGetter ? undefined : () => guest.session
     } : {}, composer: editor ? {
       t_: owner => { assert.equal(owner, controller); return view; },
-      Qg: owner => { assert.equal(owner, controller); return readEditor; },
+      AS: doc => { assert.equal(doc, view.state.doc); return { content: draft }; },
       VS: (target, value, options) => {
         assert.equal(target, view); assert.deepEqual(options, { scrollIntoView: false });
         edits.push(value); draft = value;

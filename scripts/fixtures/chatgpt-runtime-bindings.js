@@ -15,7 +15,7 @@ const expectedExports = {
     vRt: 'QRt', p8t: 'q8t', l0: 'E0', M1t: 'f0t', Rdn: 'Ofn', Rrn: 'Oin',
     win: 'man', Ein: 'gan', ay: 'Sy', iy: 'xy', ry: 'by', Jrn: 'Rin', Hrn: 'Min',
     f8t: 'K8t', c0: 'T0', FVt: 'hHt', u1t: 'W1t', l1t: 'U1t', iin: 'Jin' },
-  composer: { Ih: 'Qh', t_: '__', Qg: 'm_', VS: 'rC' }
+  composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC' }
 };
 
 function attach(page, modules) {
