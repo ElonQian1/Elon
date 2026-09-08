@@ -6,6 +6,39 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ChatGptWebPrivateProtocolEvidenceTest {
+    private fun stopOwner() = JSONObject().put("schema", "elon.stop_runtime_owner.v1")
+        .put("cached", true).put("request", "missing").put("tree", true)
+        .put("generation", false).put("mode", "streaming")
+
+    @Test fun stopOwnerModeAndTypedShapeReachTheNativeLedger() {
+        assertTrue("stop_runtime_owner" in ChatGptWebPrivateProtocolEvidence.MODES)
+        for (request in listOf("missing", "valid", "invalid")) {
+            for (mode in listOf("unknown", "idle", "streaming", "unread", "voice")) {
+                val value = stopOwner().put("request", request).put("mode", mode)
+                val result = JSONObject(detail(value))
+                assertEquals(value.toString(), result.toString())
+            }
+        }
+        val event = ChatGptWebProtocol.parse(JSONObject().put("type", "command_result")
+            .put("action", "private_protocol_probe").put("requestId", "mcp_a9")
+            .put("ok", true).put("detail", stopOwner().toString()).toString()) as ChatGptWebEvent.CommandResult
+        assertEquals(stopOwner().toString(), event.detail)
+        assertEquals("mcp_a9", event.requestId)
+    }
+
+    @Test fun stopOwnerRejectsCoercionMissingFieldsAndPrivateValues() {
+        val invalid = mutableListOf(
+            stopOwner().put("requestId", "secret"), stopOwner().put("text", "private"),
+            stopOwner().put("mode", "secret"), stopOwner().put("request", "secret"),
+            stopOwner().put("mode", JSONObject()), stopOwner().put("schema", "unknown"),
+        )
+        for (key in listOf("cached", "tree", "generation")) {
+            for (value in listOf("true", 1, JSONObject.NULL)) invalid.add(stopOwner().put(key, value))
+            invalid.add(stopOwner().apply { remove(key) })
+        }
+        invalid.forEach { assertEquals("invalid_protocol_evidence", detail(it)) }
+    }
+
     @Test fun stopContextAllowsOnlyKnownStagesWithoutRequestOrConversationData() {
         assertTrue("stop_runtime_context" in ChatGptWebPrivateProtocolEvidence.MODES)
         for (code in listOf("not_observed", "composer_unavailable", "invoked", "stop_observed", "timeout")) {

@@ -2,10 +2,23 @@
 capability_id: android_chatgpt_private_generated_image_gallery_v1
 implementation_status: implemented
 verification_status: offline_pending_device
-delivery_status: source_only
+delivery_status: published
 ---
 
 # Private generated-image gallery
+
+Latest grouped release: `1.1.1574` (code 1574), source
+`8c1b974862e73896903c723eb1d4eaebe9063a54`, includes gallery v2 and the shared
+pointer parser v1. Release build and server verification passed. APK SHA-256:
+`341cbf0cdb108632ce3a24846bab741977b870bb3ded00544fb5033fd4f3fa8c`.
+All 100 packaged adapter assets match source. Evidence stem:
+`web-chat-stop-gallery-grouped-release-20260908-182738-650`.
+Autodeploy initially stayed disabled while another app held the phone screen.
+After the user's renewed request to continue, 1574 was installed with `adb
+install -r` and production native chat was ready through MCP. The current page
+is a guest session, not an authenticated image library. Gallery device
+acceptance is still pending; no account preview, latency or thermal improvement
+is claimed, and no login or data clearing was performed.
 
 ## Scope
 
@@ -79,9 +92,10 @@ the private-gallery protocol (6), existing WebChat protocol (26) and image-cache
 (1) suites passed, with no failure, error or skip. The first compile attempt was
 stopped by the wrapper's 180-second silent-output watchdog, not a source error;
 the bounded retry allowed 600 seconds of silent compilation and finished in
-316 seconds. All 79 page-adapter assets also parse successfully. APK packaging and
-device acceptance remain pending; no live gallery, latency or thermal success
-is claimed by these offline tests. Do not mark this capability completed yet.
+316 seconds. All 79 page-adapter assets also parse successfully. That initial
+source batch did not package an APK; subsequent delivery is recorded above and
+below. Device acceptance remains pending; no live gallery, latency or thermal
+success is claimed by these offline tests. Do not mark this capability completed yet.
 
 Next acceptance uses the production social-chat Images action: verify the first
 page against the account library, next/back ordering, warm reopen, preview/viewer,

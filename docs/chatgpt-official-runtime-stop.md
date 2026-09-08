@@ -2,8 +2,12 @@
 
 Capability: `android_chatgpt_official_runtime_stop_generation_v1`.
 Status: source implemented and offline verified, not device accepted or
-completed. Latest source: stop runtime v6 and probe v16; the installed APK 1570
-contains v5 and still fails stop/follow-up acceptance. Earlier adapter 304 added
+completed. Stop runtime v6 and page probe v16 are installed in APK 1574.
+The guest device run still reports `request_unavailable` and uses DOM fallback;
+the owner diagnostic was rejected by a missing native mode gate before the
+follow-up could run. APK 1570 remains the latest complete follow-up failure.
+The source correction to that diagnostic gate is described below.
+Earlier adapter 304 added
 disabled-composer lookup and partial-reply retention; see
 [the earlier correction](reports/chatgpt-stop-interruption-20260908.md). This is a
 same-origin official-runtime bridge, not an independent Android HTTP transport.
@@ -72,6 +76,44 @@ Navigation, changed identity or an already claimed duplicate cannot click a
 different stop button. The complete official-page route remains available.
 
 ## Verification and remaining work
+
+### Grouped release, 2026-09-08
+
+Release `1.1.1574` (code 1574), source
+`8c1b974862e73896903c723eb1d4eaebe9063a54`, compiled and published successfully.
+APK SHA-256:
+`341cbf0cdb108632ce3a24846bab741977b870bb3ded00544fb5033fd4f3fa8c`.
+The server version receipt agrees, and all 100 ordered adapter assets inside
+the APK match their source files, including stop v6 and probe v16. Build log:
+`web-chat-stop-gallery-grouped-release-20260908-182738-650`.
+
+Publication initially skipped autodeploy while a separate app held the screen.
+After the user explicitly asked to continue, `adb install -r` installed 1574 and
+MCP opened the production social-chat surface. The app retained its guest session;
+no data or identity was cleared. A synthetic long reply used
+`official_runtime_v1:accepted`. Stopping preserved 252 characters (422 after
+settlement), but its empty detail and `request_unavailable` diagnostic identify
+DOM fallback, not the required runtime stop. The next owner probe failed with
+`invalid_probe_mode`, so the harness did not send a follow-up. It restored the
+empty original view and awake setting. Evidence:
+`stopped-turn-device-1574-20260908-184536-042`.
+
+### Native owner-diagnostic gate
+
+Page probe v16 already implements `stop_runtime_owner`, but native
+`ChatGptWebPrivateProtocolEvidence.MODES` omitted it and its receipt validator
+did not accept `elon.stop_runtime_owner.v1`. Source now connects both boundaries.
+Only the exact schema, three Boolean fields and fixed request/mode enums pass;
+unknown fields, identifiers, text and type coercions remain rejected. This adds
+no live capture, network request, stop invocation or credential access.
+
+A new cross-layer gate test fails against the preceding native source. The
+focused page/stop suite then passes 73 cases without skips. Release compilation
+and the focused native protocol suites also pass; evidence stem:
+`stop-owner-native-gate-android-tests-20260908-185142-334`. Native tests cover
+the complete command-result parser as well as typed-shape rejection. This is a
+diagnostic wiring correction, not evidence that the stop regression is fixed.
+The next device run must obtain the owner shape and complete the follow-up case.
 
 ### Conversation-owned stop, source batch 2026-09-08
 

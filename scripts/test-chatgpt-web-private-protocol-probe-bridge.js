@@ -52,6 +52,14 @@ function fixture(options = {}) {
 
 const tick = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
 
+test('native gate admits the stop owner mode used by the page probe', () => {
+  const native = fs.readFileSync(path.join(__dirname,
+    '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPrivateProtocolEvidence.kt'), 'utf8');
+  const modes = native.match(/val MODES = setOf\(([\s\S]*?)\)/)?.[1] || '';
+  assert.match(modes, /"stop_runtime_owner"/);
+  assert.match(native, /"elon\.stop_runtime_owner\.v1"/);
+});
+
 test('runtime asset inventory is on demand and does not enable capture or extra requests', () => {
   const f = fixture({ window: { performance: { getEntriesByType: () => [
     { name: 'https://chatgpt.com/cdn/assets/shared-abc123.js' },

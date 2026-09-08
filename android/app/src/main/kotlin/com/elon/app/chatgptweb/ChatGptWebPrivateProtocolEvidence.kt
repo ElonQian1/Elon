@@ -5,7 +5,8 @@ import org.json.JSONObject
 
 /** Validates structural diagnostics before they enter the native command ledger. */
 internal object ChatGptWebPrivateProtocolEvidence {
-    val MODES = setOf("start", "read", "stop", "clear", "runtime_assets", "composer_tool_context", "stop_runtime_context")
+    val MODES = setOf("start", "read", "stop", "clear", "runtime_assets", "composer_tool_context",
+        "stop_runtime_context", "stop_runtime_owner")
     private val stopContextCodes = setOf("not_observed", "disabled", "invalid_command", "composer_unavailable",
         "context_unavailable", "request_unavailable", "runtime_not_observed", "preparing", "invoked",
         "document_changed", "context_changed", "request_changed", "runtime_unavailable", "voice_active",
@@ -39,6 +40,14 @@ internal object ChatGptWebPrivateProtocolEvidence {
         val value = JSONObject(raw)
         if (value.opt("schema") == ChatGptWebPrivateRuntimeAssets.SCHEMA) {
             return ChatGptWebPrivateRuntimeAssets.sanitize(value)
+        }
+        if (value.opt("schema") == "elon.stop_runtime_owner.v1") {
+            require(value.keys().asSequence().toSet() ==
+                setOf("schema", "cached", "request", "tree", "generation", "mode"))
+            for (key in listOf("cached", "tree", "generation")) require(value.opt(key) is Boolean)
+            require(value.opt("request") in setOf("missing", "valid", "invalid"))
+            require(value.opt("mode") in setOf("unknown", "idle", "streaming", "unread", "voice"))
+            return value.toString()
         }
         require(value.keys().asSequence().toSet() == rootKeys)
         require(value.opt("schema") == SCHEMA && value.opt("active") is Boolean)
