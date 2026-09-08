@@ -761,14 +761,14 @@
         },
         {
           "path": "docs/reports/android-binance-grid-manage-v1-20260908.md",
-          "content_hash": "6b863bd5ac26cf0a8030823bceba56e734eeaa8d3d82814377b772eed119d947",
+          "content_hash": "0e0554ec7af097f5194a90f19ebb9058be96e4484d82f8faeda868ebdce2f354",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "30cdb857d08006bf1f6a7a0a498584014e2341c8",
-            "head_blob_oid": "6ca8c187bcb92ae98a754d047ec97364ae42f3dd",
-            "worktree_blob_oid": "275a33142187b60f1da1418330245d1dffdc9ee1",
+            "head_commit": "36d729d8f2beb688ed29d99440e2c4e606207695",
+            "head_blob_oid": "275a33142187b60f1da1418330245d1dffdc9ee1",
+            "worktree_blob_oid": "cf9e671bd607984f8892d888458b6f95c08c61f3",
             "state": "tracked_modified"
           }
         },
@@ -800,13 +800,13 @@
         }
       ],
       "created_at_ms": 1788860425100,
-      "updated_at_ms": 1788868043396
+      "updated_at_ms": 1788879974224
     },
     {
       "id": "android-binance-grid-read-debug-v1",
       "title": "币安网格管理页只读调试",
       "summary": "空列表与选择门禁，固定MCP只读查询、结构化读取结果，真实子账户验收。",
-      "status": "implemented",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/android-binance-grid-read-debug-v1.md",
@@ -954,14 +954,14 @@
         },
         {
           "path": "docs/reports/android-binance-grid-read-debug-v1-20260908.md",
-          "content_hash": "e1dea55b9f2f3fb309446eb3ce80f8fea99654df511bdf741adf62f3bb529c18",
+          "content_hash": "559ee8a032ad8962ce9e4a9359cf853627d1911979de5639f4d2e66df5e2cfc8",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "871485d06b185766204d130a5fa02e379d433db2",
-            "head_blob_oid": "8224ab99d30378214d17726808b3c380843eaf9d",
-            "worktree_blob_oid": "0b27ea3c2a9e3c4b75cd66bd4a36f8732ad94239",
+            "head_commit": "36d729d8f2beb688ed29d99440e2c4e606207695",
+            "head_blob_oid": "0b27ea3c2a9e3c4b75cd66bd4a36f8732ad94239",
+            "worktree_blob_oid": "a137ee2485772bd499e0e006acd93e9891fd6c7d",
             "state": "tracked_modified"
           }
         },
@@ -980,7 +980,7 @@
         }
       ],
       "created_at_ms": 1788867245484,
-      "updated_at_ms": 1788869940595
+      "updated_at_ms": 1788880049013
     },
     {
       "id": "android-binance-host-read-v1",
@@ -23875,46 +23875,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_0870b5fe226b4e05b329f61909e93d27",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Reviewed evidence correction preserves six-bucket, vesting, and local-only semantics.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788648578549
-    },
-    {
-      "id": "feature_event_400f2b86ac6c4a2796730ce889b578d7",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Genesis dependency is current and released; all corrected acceptance inputs are available.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788648579148
-    },
-    {
-      "id": "feature_event_4306b6423f2248d6a9d8553079cf41ef",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "claimed",
-      "actor": "codex-sui-ci",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788648579780
-    },
-    {
-      "id": "feature_event_a954e946fc8146a3bebe68395376f0a1",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Refresh the complete sixteen-file allocation and vesting evidence set.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788648600728
-    },
-    {
       "id": "feature_event_b9e094045d4d4abf8db2c46a7cd3771d",
       "feature_id": "esk-sui-allocation-vesting-v1",
       "action": "evidence_recorded",
@@ -25873,6 +25833,46 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1788869940596
+    },
+    {
+      "id": "feature_event_cfdb12c71b3642ff9918d623b9826335",
+      "feature_id": "android-binance-grid-read-debug-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-read-debug",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788879968726
+    },
+    {
+      "id": "feature_event_2414dff6bfd2459b944983fcbc2b8375",
+      "feature_id": "android-binance-grid-manage-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-manage",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788879974224
+    },
+    {
+      "id": "feature_event_52af55349c964a9e9a8d50aa7073e4f0",
+      "feature_id": "android-binance-grid-read-debug-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-read-debug",
+      "reason": "正式1.1.1577无线安装哈希已核验；同一手机子账户1个网格，后台与原生管理页真实详情verified且detail_current；量化授权、列表、详情与未提交返回通过。原44项原生及JS回归证据保持当前；真实交易不属于只读验收。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788880020806
+    },
+    {
+      "id": "feature_event_65d057d201464f4aa03fa5b8d305879a",
+      "feature_id": "android-binance-grid-read-debug-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-read-debug",
+      "reason": "既有官方发布1.1.1577已无线安装并核验base.apk原签名工件哈希；只读工具和双APK真实验收完成。源码871485d06b185766204d130a5fa02e379d433db2，本批仅补设备证据。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788880049013
     }
   ]
 }

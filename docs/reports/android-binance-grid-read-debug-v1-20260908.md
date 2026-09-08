@@ -1,8 +1,8 @@
 ---
 version_status: current
 reviewed_at: 2026-09-08
-implementation_status: partial
-acceptance_status: pending
+implementation_status: implemented
+acceptance_status: device_verified
 ---
 
 # 管理页只读调试与空列表验收
@@ -34,7 +34,7 @@ acceptance_status: pending
   选择当前账户已有策略。读取复用原检查器，取得共享槽后才临时绑定回调，完成/失败/
   超时释放，正在进行的原生创建或管理操作优先。没有本机交易记录写入或隐式准备。
 
-## 验证与待补
+## 验证
 
 原创建13项、管理9项、只读会话18项、诊断5项及旧适配器19条断言通过。原生最终44项通过，
 含新增9项空列表、选择、恢复、参数白名单、只读排他和读取结果测试；最终日志
@@ -44,9 +44,38 @@ binance-read-debug-final-test，耗时412.1秒。最终只读连接状态的接�
 本地产物与服务器SHA-256均为142d222caf81babde5d00e09cd49a4c4e24d3c55fce08a4b641d2a7595bfac7c。
 正式发布日志binance-read-debug-publish，552.7秒。
 
-安装前手机无线ADB变为offline，原端口不可连接且没有USB设备。本轮安装没有成功，
-不能声称1.1.1577已在手机运行；最后取得的手机版本为1.1.1576。已请求用户接回USB，
-设备恢复后应按status/reload/select/read/status执行真实详情验收，确认read_outcome=verified
-且detail_current=true。本轮新增工具的真实详情验收仍为deferred，不以列表已有1条代替。
-量化APK源码未改，沿用上一批已安装版本。真实修改/结束仍由用户本人验收；本批工具
-没有执行金融操作。Win、Chrome及登录资料保持原状。
+首次安装因手机无线ADB离线而延期。2026-09-08晚用户接回USB后，确认两种连接对应同一
+设备，恢复无线ADB并通过无线安装1.1.1577。实际安装base.apk的SHA-256与上述正式工件
+一致；量化0.5.0（5）的已装包也再次核验，仍为上一批b0cf03541caa源码候选，SHA-256为
+9ae75ea7313f04c2bf3984857c1316ca457e602698bb6b625284c3c376d2129a。
+
+## 同一手机的真实验收
+
+| 路径 | 观察结果 |
+|---|---|
+| 不打开管理页 | status/reload/select索引0/read/status完成，surface=host_read_only、row_count=1、read_outcome=verified、detail_current=true；完成后busy=false |
+| 量化到管理页 | 量化管理入口可见并正常打开主APK管理页，page_open/page_resumed=true；未选择时读取与准备均禁用，选择当前列表索引0后读取可用 |
+| 管理页MCP读取 | read_sequence=1、read_outcome=verified、detail_current=true、operation_phase=idle、unresolved=false；没有准备或提交交易 |
+| 返回量化 | 固定返回按钮正常返回，量化明确显示“本次未提交管理操作” |
+| 量化授权与列表 | 原生15分钟只读授权返回量化，来源显示1个网格，列表可见且来源新鲜 |
+| 量化真实详情 | 点击首个网格，主端detail_count=1；量化显示“已包含币安详情响应”，方向、价格区间、网格数量、杠杆、间距、每格数量6类参数可见；不将可见字段个数解释为每个值均有上游数据 |
+| 失效与恢复 | 验收期间旧列表超过5分钟后清除陈旧记录；重新加载官网后重新授权，恢复1个网格并取得详情。首次后台刷新未取得新鲜列表，前台官方重新加载后成功，未清除登录资料 |
+
+上述观察均来自同一手机子账户：main_session_current=true、account_kind=sub，最终
+list_verified=true、row_count=1、detail_count=1、active_grant_count=1。授权按原15分钟
+合同到期。Win账号不是本批证据来源。
+
+主端MCP负责读取回执；仅页面导航使用此前已获准的固定动作语义探针，本次安装成功，
+验收后已卸载并确认包不存在。未导出界面层级、网站凭据、账号/策略ID或资产金额。
+本批没有运行时代码修改，不重复构建；保留原44项原生和各脚本验证身份，不冒称本轮重跑。
+
+结构化证据包括device-installed.json、device-read-result.json、device-manage-read-result.json、
+device-return-manage.json、device-quant-final-approve-hosted.json、device-quant-detail-verified.json
+及device-host-final.json，保存于本机同名功能工件目录。最后一次完整核验为北京时间23:04。
+
+## 仍未覆盖
+
+真实创建、修改设置、结束和挂单/仓位/资金核对仍由用户本人测试；用户自建网格不证明
+它经过本项目创建接口。量化商店上传尚未完成，范围、格数等官网回退能力保持原状态。
+无真实金融操作、Win/Chrome重启或登录资料清除。新MCP只读详情与双APK导航验收通过，
+不等于整个实盘交易模块完成。
