@@ -5,7 +5,11 @@ import org.json.JSONObject
 
 /** Validates structural diagnostics before they enter the native command ledger. */
 internal object ChatGptWebPrivateProtocolEvidence {
-    val MODES = setOf("start", "read", "stop", "clear", "runtime_assets")
+    val MODES = setOf("start", "read", "stop", "clear", "runtime_assets", "composer_tool_context")
+    private val toolContextCodes = setOf("not_observed", "ready", "capture_error", "runtime_unavailable",
+        "conversation_unavailable", "composer_detached", "owner_unavailable", "props_mismatch",
+        "model_unavailable", "cache_unavailable", "eligibility_unavailable", "menu_unavailable",
+        "hints_ambiguous", "tool_unavailable")
     private const val ACTION = "private_protocol_probe"
     private const val SCHEMA = "elon.private_protocol_probe.v1"
     private val kinds = setOf("json", "multipart", "stream", "other", "unknown")
@@ -20,6 +24,7 @@ internal object ChatGptWebPrivateProtocolEvidence {
         if (action == "share_conversation") return ChatGptWebConversationShareReceipt.detail(raw)
         if (action != ACTION) return raw.take(160)
         if (raw == "protocol_probe_unavailable") return raw
+        if (raw.startsWith("composer_tool_context:") && raw.substringAfter(':') in toolContextCodes) return raw
         return runCatching { sanitize(raw) }.getOrNull() ?: "invalid_protocol_evidence"
     }
 

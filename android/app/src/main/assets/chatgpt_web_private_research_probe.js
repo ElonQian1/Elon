@@ -4,7 +4,27 @@
   const legacyEnabled = window.__elonChatGptPrivateResearchEnabled === true;
   if (location.origin !== 'https://chatgpt.com') return;
   const existingProbe = window.__elonChatGptPrivateResearchProbe;
-  if (existingProbe && Number(existingProbe.version) >= 13) return;
+  function toolContextDetail() {
+    const code = window.__elonChatGptPrivateComposerToolContext?.state?.(window);
+    const codes = ['not_observed', 'ready', 'capture_error', 'runtime_unavailable', 'conversation_unavailable',
+      'composer_detached', 'owner_unavailable', 'props_mismatch', 'model_unavailable', 'cache_unavailable',
+      'eligibility_unavailable', 'menu_unavailable', 'hints_ambiguous', 'tool_unavailable'];
+    return 'composer_tool_context:' + (codes.includes(code) ? code : 'not_observed');
+  }
+  if (existingProbe && Number(existingProbe.version) >= 13) {
+    if (Number(existingProbe.version) === 13) {
+      // Upgrade only the command surface; keep the existing network observers.
+      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 14,
+        handle(action, command, respond) {
+          if (action !== 'private_protocol_probe' || command.value !== 'composer_tool_context') {
+            return existingProbe.handle(action, command, respond);
+          }
+          respond(action, true, toolContextDetail()); return true;
+        }
+      });
+    }
+    return;
+  }
 
   const nativeBridge = window.elonChatGptNative;
   const adapterVersion = Number(window.__elonChatGptAdapterTargetVersion || 0);
@@ -494,13 +514,15 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 13,
+    version: 14,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
       if (action !== 'private_protocol_probe') return false;
       const mode = String(command.value || '');
-      const detail = mode === 'runtime_assets'
-        ? window.__elonChatGptPrivateProtocolEvidence?.runtimeAssets(window) : evidence?.command(mode);
+      let detail;
+      if (mode === 'runtime_assets') detail = window.__elonChatGptPrivateProtocolEvidence?.runtimeAssets(window);
+      else if (mode === 'composer_tool_context') detail = toolContextDetail();
+      else detail = evidence?.command(mode);
       respond(action, typeof detail === 'string', detail || 'protocol_probe_unavailable');
       return true;
     },

@@ -64,6 +64,34 @@ test('runtime asset inventory is on demand and does not enable capture or extra 
   assert.deepEqual(f.requests, []);
 });
 
+test('tool context diagnostics expose only known codes without running a capture', () => {
+  const f = fixture({ window: { __elonChatGptPrivateComposerToolContext: {
+    state: () => 'model_unavailable', capture: () => assert.fail('read must not capture'),
+  } } });
+  assert.equal(f.command('composer_tool_context').detail, 'composer_tool_context:model_unavailable');
+  f.window.__elonChatGptPrivateComposerToolContext.state = () => 'private raw value';
+  assert.equal(f.command('composer_tool_context').detail, 'composer_tool_context:not_observed');
+  assert.equal(f.read().active, false);
+  assert.deepEqual(f.events, []);
+  assert.deepEqual(f.requests, []);
+});
+
+test('version 13 command upgrade preserves existing observers and other commands', () => {
+  const f = fixture();
+  const fetch = f.window.fetch, send = f.window.XMLHttpRequest.prototype.send;
+  const existing = f.probe;
+  f.window.__elonChatGptPrivateResearchProbe = { ...existing, version: 13 };
+  vm.runInNewContext(source, f.context);
+  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 14);
+  assert.equal(f.window.fetch, fetch);
+  assert.equal(f.window.XMLHttpRequest.prototype.send, send);
+  const answers = [];
+  f.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe', { value: 'composer_tool_context' }, (...args) => answers.push(args));
+  assert.equal(answers[0][2], 'composer_tool_context:not_observed');
+  f.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe', { value: 'read' }, (...args) => answers.push(args));
+  assert.equal(JSON.parse(answers[1][2]).active, false);
+});
+
 test('production observer stays dormant, preserves promise identity and emits no legacy telemetry', async () => {
   const original = Promise.resolve(new Response('untouched'));
   const f = fixture({ fetch: () => original });

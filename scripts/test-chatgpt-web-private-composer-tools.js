@@ -10,6 +10,7 @@ const { createPrivateRuntime } = require(path.join(assets, 'chatgpt_web_adapter_
 const RUNTIME = 'https://chatgpt.com/cdn/assets/8b34dbc2-kjj15hg4y6iyx13p.js';
 const CID = '00000000-0000-0000-0000-000000000001';
 const flush = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
+const toolContext = require(path.join(assets, 'chatgpt_web_private_composer_tool_context.js'));
 
 function fixture(options = {}) {
   const calls = [], events = [], results = [], timers = new Set();
@@ -209,6 +210,39 @@ test('one unavailable hint does not remove the other eligible tool', async () =>
   assert.equal(f.list(), true); await flush();
   assert.deepEqual(f.events.at(-1).map(item => item.semantic), ['web_search']);
   f.pick(f.choice('web_search').id); assert.equal(f.results.at(-1)[1], true);
+});
+
+test('nested compiled hook caches do not hide the unique tool menu cache', async () => {
+  const f = fixture({ current: true });
+  f.ancestor.updateQueue.memoCache.data = [Array(12), f.memo, Array(7)];
+  assert.equal(f.list(), true); await flush();
+  assert.equal(toolContext.state(f.page), 'ready');
+  f.pick(f.choice('web_search').id);
+  assert.equal(f.state.activeSystemHintType, 'search');
+  assert.equal(f.fallbacks, 0);
+});
+
+for (const duplicate of [true, false]) {
+  test('ambiguous or excessive compiled caches cannot enable a tool: ' + duplicate, () => {
+    const f = fixture();
+    f.ancestor.updateQueue.memoCache.data = duplicate ? [f.memo, [...f.memo]] : [f.memo, ...Array(64).fill([])];
+    assert.equal(f.list(), false);
+    assert.equal(toolContext.state(f.page), 'cache_unavailable');
+    assert.equal(f.calls.length, 0);
+  });
+}
+
+test('tool capture diagnostics are read-only and reset across documents', () => {
+  const f = fixture();
+  assert.equal(toolContext.state(f.page), 'not_observed');
+  f.props.currentModelId = null;
+  assert.equal(f.list(), false);
+  assert.equal(toolContext.state(f.page), 'model_unavailable');
+  assert.equal(f.imports, 0);
+  assert.equal(f.calls.length, 0);
+  f.page.__elonChatGptDocumentToken = 'doc_next_1';
+  assert.equal(toolContext.state(f.page), 'not_observed');
+  assert.doesNotMatch(toolContext.state(f.page), /Bearer|fixture|00000000/);
 });
 
 for (const [name, mutate] of Object.entries({

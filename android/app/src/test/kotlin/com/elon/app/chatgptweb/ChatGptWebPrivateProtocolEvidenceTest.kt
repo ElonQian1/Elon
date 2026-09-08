@@ -66,4 +66,16 @@ class ChatGptWebPrivateProtocolEvidenceTest {
         assertTrue(parse(root().toString()).detail.length > 160)
         assertEquals("invalid_protocol_evidence", parse("raw secret").detail)
     }
+
+    @Test fun toolContextAllowsOnlyBoundedDiagnosticCodes() {
+        assertTrue("composer_tool_context" in ChatGptWebPrivateProtocolEvidence.MODES)
+        for (code in listOf("not_observed", "ready", "cache_unavailable", "model_unavailable")) {
+            val value = "composer_tool_context:$code"
+            assertEquals(value, ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", value))
+        }
+        for (raw in listOf("composer_tool_context:private data", "composer_tool_context:ready:extra",
+            "composer_tool_context:ready\n")) {
+            assertEquals("invalid_protocol_evidence", ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", raw))
+        }
+    }
 }

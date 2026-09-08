@@ -3,7 +3,8 @@
 ## Status and scope
 
 - Capability: `android_chatgpt_private_composer_tools_state_v1`.
-- Status: implemented, source-only candidate; not `completed` or device accepted.
+- Status: implemented and shipped in APK 1561; device acceptance failed before
+  selection. Not `completed`. The cache-context correction below is a follow-up.
 - Provider contract version: 2, using the shared versioned runtime bindings.
 - Production wiring: native Tools -> existing composer adapter -> official live
   tool signal. Search and Create Image use this path when its guards pass.
@@ -44,13 +45,47 @@ export names on this build are unrelated: `Ng` focuses the editor and `Bg` is
 an initializer. Bindings v5 maps the exact roles; importing the old URL directly
 or keeping its aliases would not update the live tool state.
 
-The known owners `Whn` / `Kgn` each have one compiled 265-slot cache. Slot 56
+The known owners `Whn` / `Kgn` have a compiled 265-slot menu cache. Slot 56
 binds the input hints; 63/64/65 reflect disabled tagging, files-only and voice.
 Slots 90 and 199 retain the normal tool menu elements with their filtered hints,
 lockdown/loading flags and pure `resolveSystemHintBehavior` callback. The new
 context module reads only those bounded committed elements. Hidden, local-action,
 upsell, duplicate and disabled hints never become native hint writes. This
 supports one eligible tool independently, without opening the portal first.
+
+The follow-up context v2 no longer assumes this is the only compiled cache on
+the owner: it permits other-sized nested-hook caches but requires exactly one
+265-slot candidate, at most 64 total caches, and the same eligibility/identity
+checks. Duplicate matching shapes still reject. This corrects an overrestrictive
+assumption; it is not yet proven to explain the phone failure.
+
+Read-only MCP `chatgpt_private_protocol_probe` mode `composer_tool_context` returns
+only the last allowlisted capture-stage code. It does not recapture, import,
+request a menu or activate protocol recording. The native validator rejects raw
+values and unknown codes. Website-version inventory remains a separate mode.
+
+## September 8 device checkpoint
+
+APK 1561 (adapter 300), source `805ed8d07`, was published and replacement-installed
+on the trusted Xiaomi. Release build passed. The first tool test stopped before
+any selection because it did not observe a private catalog. The final request-ID
+check confirms a real failure: `list_composer_tools` failed after about 4 seconds
+on the existing DOM menu path. No tool toggle, send, microphone, login or data
+clear occurred. The production home view and awake lease were restored.
+
+The public runtime inventory matches the inspected September 7 shared,
+conversation and composer assets. Unknown website version is therefore not the
+cause observed here. Specific context rejection is not exposed in adapter 300;
+the follow-up diagnostic closes that evidence gap without guessing a mutation.
+Use `chatgpt_web_mcp.command_requests` keyed by `request_id` for terminal results;
+the social message status intentionally excludes private protocol probes.
+
+Logs: `runtime-tools-1561-device-20260908-20260908-111851-875` (initial failure),
+`runtime-tools-1561-ledger-20260908-20260908-113116-629` (public assets), and
+`runtime-tools-1561-terminal-20260908-20260908-113427-566` (terminal failure).
+Follow-up Node contracts: 234 passed, zero failures/cancellations/skips in
+`runtime-tools-context-tests-20260908-20260908-114241-699`. Native compilation and
+device verification of that follow-up are recorded separately.
 
 This is an in-page private runtime state bridge, **not** an independent Android
 HTTP sender. WebView is still needed for identity, that live state and official
