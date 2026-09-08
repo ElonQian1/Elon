@@ -7,7 +7,8 @@
   refresh and ordinary library-file download; published/installed in 1.1.1581.
 - Verification: native catalogue and pagination data passed through 1582;
   ordinary saved-byte download passed in normal release 1.1.1584 with module 8.
-  Native entry, search and ordinary-file action menu passed on normal 1584.
+  Native entry/search/file menu passed through 1588, including semantic file-row
+  activation and [ordinary attachment send](chatgpt-private-library-attachment.md).
   Folder/back rendered interaction and additional file scopes remain pending.
 - Catalog v5 fixes object-event publication and includes v4 cold-identity preparation;
   both patches are installed in 1581, replacing the defective 1579 catalog v3.

@@ -1,10 +1,11 @@
 # Library files in the current composer
 
 Capability: `android_chatgpt_private_library_attachment_v1`.
-Status: association implemented and published; native-menu association returned
-`library_attachment_associated` with one ready attachment on normal 1.1.1584.
-Production card display/removal passed on normal 1.1.1586. The private-ID/name
-protocol correction is under verification; explicit-send acceptance remains pending.
+Status: completed and production-enabled for the ordinary single-file scope.
+Normal 1.1.1588 passed native selection, private ID/name preservation, one composer
+card, removal, explicit message send and server-side conversation-file association.
+Do not repeat those cases without current regression evidence; unconfirmed
+variants below retain their own acceptance boundary.
 This extends the [native library browser](chatgpt-private-library-browser.md).
 It is not a second uploader, an independent message POST, or a new speech path.
 
@@ -85,9 +86,9 @@ bind actions to the current page/provider and stop bounded observation on detach
 Work-mode local previews keep their existing owner.
 
 Subsequent 1584 snapshots reduced this staged reference to a generic `附件 1`
-DOM-derived entry. The private ID/name retention cause is not established by the
-association receipt. Do not mark private send-lease/metadata preservation proven
-until a real explicit-send sample confirms it. The sole test reference was
+DOM-derived entry. That association receipt alone did not establish the private
+ID/name retention cause or prove private send-lease/metadata preservation.
+The later 1588 acceptance below closes that ordinary-file gap. The test reference was
 removed through the existing command afterward, restoring an empty composer
 without changing its draft or conversation. No user library files were renamed
 or deleted. See the [browser evidence](chatgpt-private-library-browser.md).
@@ -113,3 +114,34 @@ after a transient disconnected input even if the same ready store later returns
 (`1 -> 0 -> 0` projected entries, official ready entries `1`). That is not proof
 of the live generic-label cause: parser rejection already explains lost private
 IDs. This batch does not relax identity/store ownership to address that probe.
+
+### 1588 Production Acceptance
+
+On 2026-09-09, normal Release 1.1.1588 (1588), source
+`9cf9388f77de6b6b22305045034c0b7800d4bdcb`, was published and installed using the
+ordinary replacement update. The local APK and online manifest SHA-256 both equal
+`2b0ce969710e1e608e04c2230cd15bcf3886872ac7ec61102b98c0445d81cb22`.
+Research/debug transport remained disabled. Cookies and app data were retained.
+
+- `private-attachment-projection-checks-20260909-042622-099`: 49 focused Node
+  tests and 30 Android protocol JVM tests passed. The JVM result was checked
+  from JUnit XML with zero failures/errors/skips, not inferred from wrapper exit.
+- `library-private-ui-final-20260909-043735-439`: actual native library/file-row
+  selection and attach produced one ready card with the exact filename and
+  private ID. The native removal button returned a successful canonical receipt;
+  the card disappeared and conversation, draft and message count were preserved.
+- `library-native-send-1588-20260909-044630-530`: in an isolated ordinary chat,
+  the same native file menu attached the existing 78-byte fixture. MCP then invoked
+  the production input's `set_input_text` and `send_input` handlers exactly once,
+  not an official-page send control. One matching user message and an assistant
+  response appeared, staged attachments were consumed, and the private
+  conversation-file index confirmed the exact fixture in the new conversation.
+  Send dispatch through response/file-index verification took 11.4 seconds;
+  this is a single functional sample, not a first-token latency benchmark.
+
+The original blank native conversation page was restored with its draft and
+message count unchanged. Only the isolated test chat was created. The existing
+library file was not renamed, deleted, downloaded again or uploaded again.
+The assistant's response alone is not treated as proof of file association;
+the server file-index readback supplies that independent check. Project,
+temporary, cloud, multi-file and mixed-file variants remain outside this pass.
