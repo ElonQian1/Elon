@@ -761,15 +761,15 @@
         },
         {
           "path": "docs/reports/android-binance-grid-manage-v1-20260908.md",
-          "content_hash": "dce65ad2706079c2cfb45779435e32947aeb9d9d0dcfb88c1a6087d03eaa32d8",
+          "content_hash": "6b863bd5ac26cf0a8030823bceba56e734eeaa8d3d82814377b772eed119d947",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "64bf6769fbd07e7d41cc747775515e594160daa7",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "6ca8c187bcb92ae98a754d047ec97364ae42f3dd",
-            "state": "untracked"
+            "head_commit": "30cdb857d08006bf1f6a7a0a498584014e2341c8",
+            "head_blob_oid": "6ca8c187bcb92ae98a754d047ec97364ae42f3dd",
+            "worktree_blob_oid": "275a33142187b60f1da1418330245d1dffdc9ee1",
+            "state": "tracked_modified"
           }
         },
         {
@@ -800,7 +800,7 @@
         }
       ],
       "created_at_ms": 1788860425100,
-      "updated_at_ms": 1788861887151
+      "updated_at_ms": 1788864111981
     },
     {
       "id": "android-binance-host-read-v1",
@@ -23695,16 +23695,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_009dac60c8c442c9bd0a138aead57bec",
-      "feature_id": "esk-sui-genesis-foundation-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Temporarily retire the prior evidence snapshot after discovering it captured test-mode bytecode as production.",
-      "from_status": "released",
-      "to_status": "retired",
-      "at_ms": 1788648508705
-    },
-    {
       "id": "feature_event_ba9666dca4264f25bdaa347a4b41e436",
       "feature_id": "esk-sui-genesis-foundation-v1",
       "action": "transitioned",
@@ -25693,6 +25683,16 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1788861931729
+    },
+    {
+      "id": "feature_event_eab93ff5c4994fac8bd62a305c402c6f",
+      "feature_id": "android-binance-grid-manage-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-manage",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788864111981
     }
   ]
 }
