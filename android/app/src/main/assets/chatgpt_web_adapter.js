@@ -129,6 +129,7 @@
 
   function findComposer() {
     const selectors = [
+      '#prompt-textarea',
       '[data-testid="prompt-textarea"]',
       'form [contenteditable="true"]',
       'form textarea',

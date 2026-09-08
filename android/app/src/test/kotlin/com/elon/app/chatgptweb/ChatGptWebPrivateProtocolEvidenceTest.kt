@@ -6,6 +6,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ChatGptWebPrivateProtocolEvidenceTest {
+    @Test fun stopContextAllowsOnlyKnownStagesWithoutRequestOrConversationData() {
+        assertTrue("stop_runtime_context" in ChatGptWebPrivateProtocolEvidence.MODES)
+        for (code in listOf("not_observed", "composer_unavailable", "invoked", "stop_observed", "timeout")) {
+            val value = "stop_runtime_context:$code"
+            assertEquals(value, ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", value))
+        }
+        for (raw in listOf("stop_runtime_context:secret", "stop_runtime_context:invoked:request-id")) {
+            assertEquals("invalid_protocol_evidence", ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", raw))
+        }
+    }
+
     private fun record() = JSONObject().put("id", 1).put("method", "POST")
         .put("path", "/backend-api/files/{id}").put("transport", "fetch").put("status", 201)
         .put("requestKind", "json").put("responseKind", "json")

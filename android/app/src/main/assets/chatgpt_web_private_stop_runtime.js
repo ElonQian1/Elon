@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const old = root.__elonChatGptPrivateStopRuntime;
@@ -15,7 +15,12 @@
     shared: 'https://chatgpt.com/cdn/assets/4813494d-hrplraurzfyvxb10.js',
     conversation: 'https://chatgpt.com/cdn/assets/conversation-small-hiw4wce20lu6te81.js'
   });
-  let modules, loading, active = null;
+  let modules, loading, active = null, code = 'not_observed';
+
+  function decline(reason) {
+    code = reason;
+    return { handled: false };
+  }
 
   function capture(node) {
     return page.__elonChatGptPrivateTextRuntimeSubmit?.captureConversation?.(node, true);
@@ -58,7 +63,7 @@
     page.clearTimeout(owner.deadline); page.clearTimeout(owner.retry);
     for (const unsubscribe of owner.subscriptions) { try { unsubscribe(); } catch (_) {} }
     owner.subscriptions = [];
-    if (active === owner) active = null;
+    if (active === owner) { active = null; code = receipt.code; }
     owner.resolve(receipt);
   }
 
@@ -66,7 +71,7 @@
     if (active && page.__elonChatGptDocumentToken !== active.binding.token) {
       release(active, { status: 'unknown', code: 'document_changed' });
     }
-    return { pending: active !== null };
+    return { pending: active !== null, code };
   }
 
   function observation(binding) {
@@ -76,18 +81,20 @@
   }
 
   function stop(command) {
-    if (page.__elonChatGptPrivateTextTransactionsEnabled !== true ||
-        !/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || '')) return { handled: false };
+    if (page.__elonChatGptPrivateTextTransactionsEnabled !== true) return decline('disabled');
+    if (!/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || '')) return decline('invalid_command');
     if (state().pending) return active.transaction;
     let binding;
     try {
+      if (!command.composer?.isConnected) return decline('composer_unavailable');
       binding = capture(command.composer);
-      if (!binding || !/^[a-z0-9_-]{1,128}$/i.test(binding.requestId || '') ||
-          !Object.values(URLS).every(url => page.__elonChatGptPrivateRuntimeBindings
+      if (!binding) return decline('context_unavailable');
+      if (!/^[a-z0-9_-]{1,128}$/i.test(binding.requestId || '')) return decline('request_unavailable');
+      if (!Object.values(URLS).every(url => page.__elonChatGptPrivateRuntimeBindings
             ? page.__elonChatGptPrivateRuntimeBindings.observed(url) :
             page.performance?.getEntriesByName?.(url, 'resource')?.length > 0 ||
-            page.document.querySelector('link[rel="modulepreload"][href="' + url + '"]'))) return { handled: false };
-    } catch (_) { return { handled: false }; }
+            page.document.querySelector('link[rel="modulepreload"][href="' + url + '"]'))) return decline('runtime_not_observed');
+    } catch (_) { return decline('context_unavailable'); }
     let resolve;
     const completion = new Promise(done => { resolve = done; });
     const owner = { binding, completion, resolve, subscriptions: [], invoked: false, settled: false, retries: 0 };
@@ -98,6 +105,7 @@
       return true;
     } };
     active = owner;
+    code = 'preparing';
 
     function unavailable(code) {
       let same = false;
@@ -151,16 +159,19 @@
             typeof final.active !== 'boolean') return unavailable('context_changed');
         owner.deadline = page.setTimeout(() => {
           owner.expired = true;
+          code = 'timeout';
           const receipt = { status: 'unknown', code: 'timeout' };
           if (owner.settled) release(owner, receipt);
           else owner.resolve(receipt); // Never release an in-flight stop into another writer.
         }, options.timeoutMs || 15000);
         owner.invoked = true;
+        code = 'invoked';
         // Pinned official FVt owns stop_conversation, fresh conduit state,
         // request abortion and tree cleanup. No copied proof or guessed POST.
         const receipt = modules.conversation.FVt(binding.conversation.id, binding.requestId,
           { clientInitiated: true, clientStopReason: 'user_stop_mouse' });
         if (typeof receipt?.then !== 'function') {
+          code = 'invalid_receipt';
           owner.resolve({ status: 'unknown', code: 'invalid_receipt' });
           return;
         }
@@ -169,11 +180,12 @@
         });
       } catch (_) {
         if (!owner.invoked) return unavailable('context_unavailable');
+        code = 'invocation_failed';
         owner.resolve({ status: 'unknown', code: 'invocation_failed' });
       }
     }).catch(() => unavailable('runtime_unavailable'));
     return owner.transaction;
   }
 
-  return Object.freeze({ version: 3, stop, state });
+  return Object.freeze({ version: 4, stop, state });
 });

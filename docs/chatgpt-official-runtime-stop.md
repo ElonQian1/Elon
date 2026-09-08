@@ -2,8 +2,8 @@
 
 Capability: `android_chatgpt_official_runtime_stop_generation_v1`.
 Status: source implemented and offline verified, not device accepted or
-completed. Adapter 303 includes stop runtime v3 with verified guest identity;
-see [the current owner batch](reports/chatgpt-runtime-owners-20260908.md). This is a
+completed. Adapter 304 adds disabled-composer lookup, stop-stage diagnostics and
+partial-reply retention; see [the current correction](reports/chatgpt-stop-interruption-20260908.md). This is a
 same-origin official-runtime bridge, not an independent Android HTTP transport.
 Do not reimplement the source integration while device acceptance is pending.
 
@@ -79,7 +79,10 @@ identity/route changes, all realtime states, load timeout, post-write timeout,
 late settlement, bounded checks and one-use fallback claims. The actual Android
 asset bundle also parses with the new module before its orchestrator.
 
-No APK was built or installed for this source batch. In the grouped production
+The initial source batch had no APK. APK 1567 was subsequently installed but
+used DOM fallback and lost the partial reply in its immediate snapshot. The
+current correction's delivery and device status are in the linked report.
+In the grouped production
 UI acceptance, stop one long text response, preserve its partial answer, send
 again, regenerate then stop, and confirm an active voice conversation is not
 closed by a text-stop command. Verify official-request provenance and observed

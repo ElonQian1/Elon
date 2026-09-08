@@ -11,11 +11,22 @@
       'eligibility_unavailable', 'menu_unavailable', 'hints_ambiguous', 'tool_unavailable'];
     return 'composer_tool_context:' + (codes.includes(code) ? code : 'not_observed');
   }
+  function stopContextDetail() {
+    const code = window.__elonChatGptPrivateStopRuntime?.state?.().code;
+    const codes = ['not_observed', 'disabled', 'invalid_command', 'composer_unavailable', 'context_unavailable',
+      'request_unavailable', 'runtime_not_observed', 'preparing', 'invoked', 'document_changed',
+      'context_changed', 'request_changed', 'runtime_unavailable', 'voice_active', 'generation_not_ready',
+      'already_stopped', 'stop_observed', 'timeout', 'stop_failed', 'invalid_receipt', 'invocation_failed'];
+    return 'stop_runtime_context:' + (codes.includes(code) ? code : 'not_observed');
+  }
   if (existingProbe && Number(existingProbe.version) >= 13) {
-    if (Number(existingProbe.version) === 13) {
+    if (Number(existingProbe.version) < 15) {
       // Upgrade only the command surface; keep the existing network observers.
-      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 14,
+      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 15,
         handle(action, command, respond) {
+          if (action === 'private_protocol_probe' && command.value === 'stop_runtime_context') {
+            respond(action, true, stopContextDetail()); return true;
+          }
           if (action !== 'private_protocol_probe' || command.value !== 'composer_tool_context') {
             return existingProbe.handle(action, command, respond);
           }
@@ -514,7 +525,7 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 14,
+    version: 15,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
       if (action !== 'private_protocol_probe') return false;
@@ -522,6 +533,7 @@
       let detail;
       if (mode === 'runtime_assets') detail = window.__elonChatGptPrivateProtocolEvidence?.runtimeAssets(window);
       else if (mode === 'composer_tool_context') detail = toolContextDetail();
+      else if (mode === 'stop_runtime_context') detail = stopContextDetail();
       else detail = evidence?.command(mode);
       respond(action, typeof detail === 'string', detail || 'protocol_probe_unavailable');
       return true;
