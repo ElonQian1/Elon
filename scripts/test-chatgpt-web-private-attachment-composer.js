@@ -36,6 +36,27 @@ test('ready file association uses the official callable store and deduplicates n
   assert.equal(f.store.files$().length, 0);
 });
 
+test('complete private ownership replaces generic DOM badges without duplicating an attachment', () => {
+  const f = fixture(), binding = f.composer.capture();
+  f.composer.associate(binding, f.file, f.result(binding), f.descriptor.leaseId);
+  const items = f.composer.merge([{ id: 'attachment_1', name: 'Attachment 1', state: 'ready' }]);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].id, 'private_attachment_' + f.descriptor.leaseId);
+  assert.equal(items[0].name, f.file.name);
+});
+
+test('partial private ownership keeps unrelated official attachments visible', () => {
+  const f = fixture(), binding = f.composer.capture();
+  f.composer.associate(binding, f.file, f.result(binding), f.descriptor.leaseId);
+  const external = { tempId: 'external', status: 'uploading' };
+  f.store.files$.set([...f.store.files$(), external]);
+  const dom = { id: 'attachment_other', name: 'other.txt', state: 'uploading' };
+  const items = f.composer.merge([dom]);
+  assert.equal(items.length, 2);
+  assert.deepEqual(items[0], dom);
+  assert.equal(f.store.files$().includes(external), true);
+});
+
 test('context selection rejects unconfirmed scopes, invalid ids and occupied composers', () => {
   for (const path of ['/c/existing', '/g/g-p-example/project', '/?temporary-chat=false', '/?model=unknown',
     '/?temporary-chat=true&model=unknown', '/?temporary-chat=true&temporary-chat=false', '/?temporary-chat=true#other']) {
@@ -115,10 +136,10 @@ test('versioned reinjection cancels only the older owner and retains the current
     '../android/app/src/main/assets/chatgpt_web_private_attachment_send.js'), 'utf8');
   let cancelled = 0;
   const root = { location: { origin: 'https://chatgpt.com' },
-    __elonChatGptPrivateAttachmentSend: { version: 17, cancel: () => { cancelled++; } } };
+    __elonChatGptPrivateAttachmentSend: { version: 18, cancel: () => { cancelled++; } } };
   vm.runInNewContext(source, { window: root });
   const current = root.__elonChatGptPrivateAttachmentSend;
-  assert.equal(current.version, 18);
+  assert.equal(current.version, 19);
   assert.equal(cancelled, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateAttachmentSend, current);

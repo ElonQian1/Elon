@@ -93,6 +93,8 @@ folder/file action with current-provider/handle checks; the outer listener is
 removed to avoid duplicate dispatch. The external `inspect_entry` step reports
 only node flags/bounds. Log: `library-native-menu-1585-20260909-035524-240`.
 The 1585 failure did not attempt an attachment association or file mutation.
+Normal 1586 then passed the same semantic file-row action and native action menu:
+`library-native-menu-1586-20260909-041110-544`. No coordinate injection was used.
 
 ## Remaining Acceptance And Gaps
 

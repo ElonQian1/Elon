@@ -328,10 +328,10 @@ internal object ChatGptWebProtocol {
         return buildList {
             for (index in 0 until minOf(values.length(), MAX_ATTACHMENTS)) {
                 val item = values.optJSONObject(index) ?: continue
-                val id = item.optString("id").take(MAX_ATTACHMENT_ID_LENGTH)
+                val id = item.optString("id")
                 val name = item.optString("name").trim().take(MAX_ATTACHMENT_NAME_LENGTH)
                 val state = item.optString("state").takeIf { it in ATTACHMENT_STATES } ?: "ready"
-                if (!ATTACHMENT_ID.matches(id) || name.isBlank()) continue
+                if (id.length > MAX_ATTACHMENT_ID_LENGTH || !ATTACHMENT_ID.matches(id) || name.isBlank()) continue
                 add(
                     ChatGptWebAttachment(
                         id = id,
@@ -724,7 +724,7 @@ internal object ChatGptWebProtocol {
     private const val MAX_UI_MANIFEST_VERSION = 8
     private val CAPABILITY_ID = Regex("[a-z][a-z0-9_]{0,47}")
     private val OPTION_ID = Regex("[a-z][a-z0-9_]{1,63}")
-    private val ATTACHMENT_ID = Regex("attachment_[a-z0-9]{1,48}")
+    private val ATTACHMENT_ID = Regex("attachment_[a-z0-9]{1,48}|private_attachment_(?:mcp_[a-z0-9]{1,32}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})")
     private val FEATURE_ID = Regex("feature_[a-z0-9]{1,48}")
     private val UI_CONTROL_ID = Regex("control_[a-z0-9_]{1,63}")
     private val UI_CONTEXT_ID = Regex("[A-Za-z0-9_.:-]{1,160}")

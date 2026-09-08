@@ -3,8 +3,8 @@
 Capability: `android_chatgpt_private_library_attachment_v1`.
 Status: association implemented and published; native-menu association returned
 `library_attachment_associated` with one ready attachment on normal 1.1.1584.
-The missing production composer card is being corrected; explicit-send and
-attachment metadata persistence acceptance remain pending.
+Production card display/removal passed on normal 1.1.1586. The private-ID/name
+protocol correction is under verification; explicit-send acceptance remains pending.
 This extends the [native library browser](chatgpt-private-library-browser.md).
 It is not a second uploader, an independent message POST, or a new speech path.
 
@@ -91,3 +91,25 @@ until a real explicit-send sample confirms it. The sole test reference was
 removed through the existing command afterward, restoring an empty composer
 without changing its draft or conversation. No user library files were renamed
 or deleted. See the [browser evidence](chatgpt-private-library-browser.md).
+
+### 1586 Composer UI And Private-ID Filter
+
+Normal 1586 passed actual native file-row click, attach, card display and card
+removal. Attachment count returned to zero and conversation/draft/messages were
+preserved. Names and private IDs were still missing. Logs:
+`library-native-menu-1586-20260909-041110-544` and
+`library-composer-ui-1586-20260909-041206-952`.
+
+The Android snapshot parser still accepted only `attachment_[a-z0-9]{1,48}`;
+it rejected both already-produced `private_attachment_<UUID>` upload IDs and
+`private_attachment_mcp_<request>` library IDs. The parser now accepts these
+exact bounded forms and rejects oversized IDs without truncation. Composer/send
+module 19 uses the verified file store as the display source when every stored
+file is privately owned; generic DOM badges cannot create duplicate cards.
+Mixed ownership retains unrelated official entries and the existing send guards.
+
+A separate synthetic probe showed `attachedNow()` discards its private owner
+after a transient disconnected input even if the same ready store later returns
+(`1 -> 0 -> 0` projected entries, official ready entries `1`). That is not proof
+of the live generic-label cause: parser rejection already explains lost private
+IDs. This batch does not relax identity/store ownership to address that probe.

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 18, create: factory });
+  const exported = Object.freeze({ version: 19, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -300,9 +300,14 @@
     try {
       const value = attachedNow();
       if (!value) return dom;
+      const native = value.items.map(item => ({ id: item.id, name: item.attached.file.name, state: 'ready', removable: true }));
+      const files = value.binding.store.files$();
+      // Complete store ownership is authoritative even when DOM badges have only placeholder labels.
+      if (Array.isArray(files) && files.length === value.items.length &&
+          files.every(file => value.items.some(item => item.attached === file)) &&
+          value.binding.store.hasUploadInProgress$() === false) return native;
       const names = value.items.map(item => item.attached.file.name);
-      return [...dom.filter(item => !names.some(name => String(item.name || '').includes(name))),
-        ...value.items.map(item => ({ id: item.id, name: item.attached.file.name, state: 'ready', removable: true }))];
+      return [...dom.filter(item => !names.some(name => String(item.name || '').includes(name))), ...native];
     } catch (_) { return dom; }
   }
 
