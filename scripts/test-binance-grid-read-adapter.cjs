@@ -12,13 +12,13 @@ const good = data => JSON.stringify({code: '000000', success: true, data});
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function harness() {
   const events = [], calls = [], queue = [];
-  class Xhr { open() {} send() {} addEventListener(name, callback) { this.callback = callback; } }
+  class Xhr { open() {} send() {} setRequestHeader() {} addEventListener(name, callback) { this.callback = callback; } }
   const window = {ElonBinanceRead: {postMessage: raw => events.push(JSON.parse(raw))},
     fetch: (url, init) => { calls.push({url, init}); const value = String(url).includes('/get-user-base-info')
       ? {text: good({userId: '42', subUser: false, parentUser: true})} : queue.shift();
       return Promise.resolve({status: value?.status ?? 200, clone: () => ({text: () => Promise.resolve(value?.text ?? '{}')})}); }};
   window.top = window;
-  const context = vm.createContext({window, location: {origin: 'https://www.binance.com', href: 'https://www.binance.com/zh-CN/trading-bots/futures/grid/NEARUSDT'}, URL, XMLHttpRequest: Xhr, WeakMap, Set, AbortController, setTimeout, clearTimeout});
+  const context = vm.createContext({window, location: {origin: 'https://www.binance.com', href: 'https://www.binance.com/zh-CN/trading-bots/futures/grid/NEARUSDT'}, URL, Headers, XMLHttpRequest: Xhr, WeakMap, Set, AbortController, setTimeout, clearTimeout});
   vm.runInContext(code, context);
   return {window, events, calls, queue, Xhr};
 }

@@ -9,6 +9,7 @@
   const MAX = 1024 * 1024;
   let token = '', sequence = 0, latestList = 0, listFloor = 0, listEpoch = 0, current = null;
   let identitySequence = 0, latestIdentity = 0, account = null;
+  let detailHeaders = null;
   const known = new Set();
   const details = new Map();
   const originalFetch = window.fetch;
@@ -56,7 +57,7 @@
   function fail(t, error) {
     if (!relevant(t)) return;
     diagnostic?.failure(t.kind, error?.message);
-    known.clear(); details.clear(); account = null; listEpoch++; listFloor = latestList + 1;
+    known.clear(); details.clear(); detailHeaders = null; account = null; listEpoch++; listFloor = latestList + 1;
     emit({kind: 'unavailable'});
   }
   function body(status, text) {
@@ -70,18 +71,28 @@
     if (!data || typeof data.subUser !== 'boolean' || (data.subUser && data.parentUser === true)) throw new Error('identity_unverified');
     const next = {account: id(data.userId), account_kind: data.subUser ? 'sub' : data.parentUser === true ? 'primary' : 'unknown'};
     if (account?.account !== next.account || account?.account_kind !== next.account_kind) {
-      known.clear(); details.clear(); listEpoch++;
+      known.clear(); details.clear(); detailHeaders = null; listEpoch++;
     }
     account = next;
     emit({kind: 'identity', ...next});
     return next;
   }
-  async function proveIdentity() {
+  function requestHeaders(input, init) {
+    try {
+      const headers = new Headers(init?.headers === undefined ? input?.headers : init.headers);
+      // Never turn a fixed read into a method-override request.
+      if (['x-http-method-override', 'x-method-override', 'x-http-method'].some(key => headers.has(key))) return null;
+      return headers;
+    } catch (_) { return null; }
+  }
+  async function proveIdentity(headers) {
+    if (!headers) throw new Error('identity_unverified');
     const seq = ++identitySequence; latestIdentity = seq;
     const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 10_000);
     try {
       diagnostic?.request('identity');
-      const response = await originalFetch.call(window, IDENTITY, {method: 'GET', credentials: 'same-origin', signal: controller.signal});
+      const response = await originalFetch.call(window, IDENTITY, {method: 'GET', headers,
+        credentials: 'same-origin', redirect: 'error', cache: 'no-store', signal: controller.signal});
       diagnostic?.response('identity', response.status);
       const text = await response.clone().text();
       if (seq !== latestIdentity) return null;
@@ -125,15 +136,16 @@
         if (!Array.isArray(data) || data.length > 500) throw new Error('list_invalid');
         const rows = data.map(row);
         if (new Set(rows.map(x => x.id)).size !== rows.length) throw new Error('duplicate');
-        const proof = await proveIdentity();
+        const proof = await proveIdentity(t.headers);
         if (!proof || !relevant(t)) return;
         if (rows.some(x => x.account !== proof.account)) throw new Error('account_mismatch');
         listEpoch++; details.clear(); known.clear(); rows.forEach(x => known.add(x.id));
+        detailHeaders = t.headers;
         emit({kind: 'list', ...proof, rows, coverage: 'observed_response_only'});
       } else {
         const value = row(data);
         if (value.id !== t.id) throw new Error('detail_mismatch');
-        const proof = await proveIdentity();
+        const proof = await proveIdentity(t.headers);
         if (!proof || !relevant(t)) return;
         if (value.account != null && value.account !== proof.account) throw new Error('account_mismatch');
         emit({kind: 'detail', ...proof, row: value});
@@ -143,6 +155,8 @@
     const url = typeof input === 'string' || input instanceof URL ? String(input) : input?.url;
     const method = String(init?.method || input?.method || 'GET').toUpperCase();
     const t = target(url, method);
+    // Retain only this observed request's context inside the page; never send it through the bridge.
+    if (t) t.headers = requestHeaders(input, init);
     return originalFetch.apply(this, arguments).then(response => {
       if (t) response.clone().text().then(text => consume(t, response.status, text)).catch(error => fail(t, error));
       return response;
@@ -150,13 +164,20 @@
   };
   const originalOpen = XMLHttpRequest.prototype.open;
   const originalSend = XMLHttpRequest.prototype.send;
+  const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
   const targets = new WeakMap();
   XMLHttpRequest.prototype.open = function(method, url) {
-    targets.set(this, {method: String(method).toUpperCase(), url: String(url)});
+    targets.set(this, {method: String(method).toUpperCase(), url: String(url), headers: new Headers()});
     return originalOpen.apply(this, arguments);
+  };
+  XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+    const result = originalSetRequestHeader.apply(this, arguments);
+    targets.get(this)?.headers.append(name, value);
+    return result;
   };
   XMLHttpRequest.prototype.send = function() {
     const data = targets.get(this), t = data && target(data.url, data.method);
+    if (t) t.headers = requestHeaders(null, data);
     if (t) this.addEventListener('loadend', () => {
       try { consume(t, this.status, this.responseType === 'json' ? JSON.stringify(this.response) : this.responseText).catch(error => fail(t, error)); }
       catch (error) { fail(t, error); }
@@ -171,8 +192,9 @@
       return true;
     },
     detail(value) {
-      if (!token || !known.has(value) || !/^[0-9]{1,20}$/.test(value)) return false;
-      window.fetch(DETAIL + '?strategyId=' + encodeURIComponent(value), {method: 'GET', credentials: 'same-origin'}).catch(() => {});
+      if (!token || !detailHeaders || !known.has(value) || !/^[0-9]{1,20}$/.test(value)) return false;
+      window.fetch(DETAIL + '?strategyId=' + encodeURIComponent(value), {method: 'GET', headers: detailHeaders,
+        credentials: 'same-origin', redirect: 'error', cache: 'no-store'}).catch(() => {});
       return true;
     }
   });

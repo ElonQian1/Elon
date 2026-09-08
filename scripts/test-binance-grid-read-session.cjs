@@ -19,18 +19,21 @@ function delayed() {
   return {promise, resolve, reject};
 }
 function harness(bind = true) {
-  const events = [], calls = [], queue = [], identities = [];
+  const events = [], calls = [], queue = [], identities = [], auth = {required: null};
   const account = {userId: '42', subUser: false, parentUser: true, email: 'fixture-private@example.test'};
-  class Xhr { open() {} send() {} addEventListener(_, callback) { this.callback = callback; } }
+  class Xhr { open() {} send() {} setRequestHeader() {} addEventListener(_, callback) { this.callback = callback; } }
   const window = {ElonBinanceRead: {postMessage: raw => events.push(JSON.parse(raw))}, fetch: (url, init) => {
     calls.push({url, init});
+    if (url === INFO && auth.required && new Headers(init?.headers).get('x-fixture-auth') !== auth.required) {
+      return Promise.resolve({status:401, clone:() => ({text:async () => '{}'})});
+    }
     return Promise.resolve(url === INFO ? (identities.shift() || response(account)) : queue.shift());
   }};
   window.top = window;
-  vm.runInNewContext(code, {window, location: {origin: 'https://www.binance.com', href: 'https://www.binance.com/'}, URL, XMLHttpRequest: Xhr, AbortController, setTimeout, clearTimeout});
+  vm.runInNewContext(code, {window, location: {origin: 'https://www.binance.com', href: 'https://www.binance.com/'}, URL, Headers, XMLHttpRequest: Xhr, AbortController, setTimeout, clearTimeout});
   if (bind) window.__elonBinanceReadV1.bind('doc_test_123');
   const list = async data => { queue.push(response(data)); await window.fetch(LIST, {method: 'POST'}); await tick(); };
-  return {window, events, calls, queue, identities, account, list, Xhr};
+  return {window, events, calls, queue, identities, account, list, Xhr, auth};
 }
 test('empty list uses authenticated subaccount proof and emits no unrelated identity fields', async () => {
   const h = harness(); Object.assign(h.account, {userId: '43', subUser: true, parentUser: false});
@@ -112,4 +115,51 @@ test('account switch before native binding must discard the pending old-account 
   await h.window.fetch(INFO); await tick(); h.window.__elonBinanceReadV1.bind('doc_test_123');
   assert.equal(h.events.length,1); assert.equal(h.events[0].kind,'identity');
   assert.equal(h.events[0].account,'43'); assert.equal(h.window.__elonBinanceReadV1.detail('123'),false);
+});
+
+test('identity and detail retain the observed list request context only inside the page', async () => {
+  const h = harness(); h.auth.required = 'fixture-private-session';
+  const headers = new Headers({'x-fixture-auth':h.auth.required});
+  h.queue.push(response([row()])); await h.window.fetch(LIST, {method:'POST', headers});
+  headers.set('x-fixture-auth','later-unrelated-session'); await tick();
+  assert.equal(h.events.at(-1).kind,'list');
+  h.queue.push(response(row())); assert.equal(h.window.__elonBinanceReadV1.detail('123'),true); await tick();
+  assert.equal(h.events.at(-1).kind,'detail');
+  for (const call of h.calls.filter(c => c.url !== LIST)) {
+    assert.equal(call.init.headers.get('x-fixture-auth'),h.auth.required);
+    assert.equal(call.init.redirect,'error'); assert.equal(call.init.cache,'no-store');
+  }
+  assert.ok(!JSON.stringify(h.events).includes('fixture-private-session'));
+  assert.ok(!JSON.stringify(h.events).includes('x-fixture-auth'));
+});
+
+test('Request headers are inherited but explicit init headers take precedence', async () => {
+  const h = harness(); h.auth.required = 'fixture-init'; h.queue.push(response([row()]));
+  const request = new Request('https://www.binance.com'+LIST,{method:'POST',headers:{'x-fixture-auth':'fixture-request'}});
+  await h.window.fetch(request,{headers:{'x-fixture-auth':h.auth.required}}); await tick();
+  assert.equal(h.events.at(-1).kind,'list');
+  h.auth.required = 'fixture-request'; h.queue.push(response([row()]));
+  await h.window.fetch(request); await tick(); assert.equal(h.events.at(-1).kind,'list');
+});
+
+test('XHR list context is copied at send and does not leak through the native event', async () => {
+  const h = harness(); h.auth.required = 'fixture-xhr';
+  const xhr = new h.Xhr(); xhr.open('POST',LIST); xhr.setRequestHeader('x-fixture-auth',h.auth.required);
+  xhr.send(); xhr.status=200; xhr.responseText=JSON.stringify({code:'000000',success:true,data:[row()]});
+  xhr.callback(); await tick(); assert.equal(h.events.at(-1).kind,'list');
+  assert.ok(!JSON.stringify(h.events).includes('fixture-xhr'));
+});
+
+test('401 under an expired observed context revokes the known detail capability', async () => {
+  const h = harness(); h.auth.required='fixture-valid'; h.queue.push(response([row()]));
+  await h.window.fetch(LIST,{method:'POST',headers:{'x-fixture-auth':h.auth.required}}); await tick();
+  assert.equal(h.events.at(-1).kind,'list'); h.auth.required='fixture-expired';
+  h.queue.push(response(row())); h.window.__elonBinanceReadV1.detail('123'); await tick();
+  assert.equal(h.events.at(-1).kind,'unavailable'); assert.equal(h.window.__elonBinanceReadV1.detail('123'),false);
+});
+
+test('method override headers cannot be inherited by fixed read endpoints', async () => {
+  const h=harness(); h.queue.push(response([row()]));
+  await h.window.fetch(LIST,{method:'POST',headers:{'x-http-method-override':'POST'}}); await tick();
+  assert.equal(h.events.at(-1).kind,'unavailable'); assert.equal(h.calls.length,1);
 });

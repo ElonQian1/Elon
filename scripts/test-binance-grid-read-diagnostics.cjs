@@ -17,10 +17,10 @@ function harness() {
       return Promise.resolve({status:200,clone:() => ({text:async () => JSON.stringify({code:'000000',success:true,data})})});
     }};
   window.top = window;
-  class Xhr {open() {} send() {} addEventListener() {}}
+  class Xhr {open() {} send() {} setRequestHeader() {} addEventListener() {}}
   const context = vm.createContext({window,document:doc,location:{origin:'https://www.binance.com',
     href:'https://www.binance.com/zh-CN/trading-bots/futures/grid/NEARUSDT',pathname:'/zh-CN/trading-bots/futures/grid/NEARUSDT'},
-    URL,XMLHttpRequest:Xhr,AbortController,setTimeout,clearTimeout});
+    URL,Headers,XMLHttpRequest:Xhr,AbortController,setTimeout,clearTimeout});
   vm.runInContext(asset('binance_grid_read_diagnostics.js'), context);
   return {window, doc, events, requests, callbacks, context, inspect:() => {
     window.__elonBinanceDiagnosticsV1.inspect('doc_test_123'); return events.at(-1);

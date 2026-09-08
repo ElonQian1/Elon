@@ -347,14 +347,14 @@
       "implementation_evidence": [
         {
           "path": "android/app/src/main/assets/binance_grid_read_adapter.js",
-          "content_hash": "f863dfba561110bb52872b4fc3066314f84a02c6f5e6f6956eee383d5ad40935",
+          "content_hash": "d93189c8142f40b8b52569805e17d6c9b455207bc7793af944c99d7d76c5cc0d",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "eefd19c1ce9daa178a3142f0f6e71e2ea401468d",
-            "head_blob_oid": "c8e81c3f21ac802c36589f13560664869bd57ffc",
-            "worktree_blob_oid": "674df80ace319b1b178a7cda5fda81f2799b552b",
+            "head_commit": "66728d21dc2b3dc57d854e755d9c96030096a559",
+            "head_blob_oid": "674df80ace319b1b178a7cda5fda81f2799b552b",
+            "worktree_blob_oid": "4be1763d697e6eda4895b999f84ef18743348f92",
             "state": "tracked_modified"
           }
         },
@@ -490,40 +490,40 @@
         },
         {
           "path": "scripts/test-binance-grid-read-adapter.cjs",
-          "content_hash": "25fc1cce053ff05fc1f50dd5837bc7b5a61e4d1a2fbf8216c88556a1a5b988e7",
+          "content_hash": "91fd2af7f535f30b4b6121467c07f134ba081b5a46a2d02d2fb1ada15e79b509",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84fa0325e7d6000924a04766f66ebdc96aeda609",
+            "head_commit": "66728d21dc2b3dc57d854e755d9c96030096a559",
             "head_blob_oid": "2a5e1ee7aa543ae813f52e500f3e9edcf85769a4",
-            "worktree_blob_oid": "2a5e1ee7aa543ae813f52e500f3e9edcf85769a4",
-            "state": "tracked_clean"
+            "worktree_blob_oid": "59c958bfca3565163205d8f8afa42abb5ae2f62d",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "scripts/test-binance-grid-read-diagnostics.cjs",
-          "content_hash": "a7ef366c37cf4461dde5559519452e9e52af4f127708e98aab167aa7cbf4a486",
+          "content_hash": "0b62aafa952afa50d8e68fdf6df00f675aaac90cdff6c6eaba5e305f85a35dfa",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "eefd19c1ce9daa178a3142f0f6e71e2ea401468d",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "1fd1d6960d510751d28ff9879cb5540ea8371284",
-            "state": "index_only"
+            "head_commit": "66728d21dc2b3dc57d854e755d9c96030096a559",
+            "head_blob_oid": "1fd1d6960d510751d28ff9879cb5540ea8371284",
+            "worktree_blob_oid": "847d4b78cb5fe9cb41d543913b41e011c79b77fc",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "scripts/test-binance-grid-read-session.cjs",
-          "content_hash": "3d53fe06ca67b8b21f94da4cfe2c8c0efddc8c23fbd7f9b3f3c70e1689381452",
+          "content_hash": "daf474fa4b4e534a3bdd382f467ba44a9939175ccb82faa989cbbce22b85a064",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "eefd19c1ce9daa178a3142f0f6e71e2ea401468d",
-            "head_blob_oid": "ec349f636188a9c50e11f35b4028f7b7d80d73db",
-            "worktree_blob_oid": "3ae9dc5097da2de1700f9ee639005fcb0c6df3d4",
+            "head_commit": "66728d21dc2b3dc57d854e755d9c96030096a559",
+            "head_blob_oid": "3ae9dc5097da2de1700f9ee639005fcb0c6df3d4",
+            "worktree_blob_oid": "5e2b557a55618a70b242815bc623f1cd7652690f",
             "state": "tracked_modified"
           }
         }
@@ -535,7 +535,7 @@
         "expires_at_ms": 1788850503793
       },
       "created_at_ms": 1788829139503,
-      "updated_at_ms": 1788840212012
+      "updated_at_ms": 1788841770647
     },
     {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -23192,16 +23192,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_69a9427cb7d2438a8e747a462d593cda",
-      "feature_id": "esk-platform-sui-address-binding-v2",
-      "action": "transitioned",
-      "actor": "codex-root",
-      "reason": "重构后同一源码快照 a96e99e0 上 harness 17/17（ec19e95d）与 elon-server 14/14（3349125b）通过；V1 58/58、规模和文档门禁通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788644121962
-    },
-    {
       "id": "feature_event_138bcf8ff3cf48309c2b13efca35df54",
       "feature_id": "esk-platform-sui-address-binding-v2",
       "action": "transitioned",
@@ -25190,6 +25180,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788840212012
+    },
+    {
+      "id": "feature_event_42d5b0d14b504505ba625b0cb228c15b",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-host",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788841770647
     }
   ]
 }
