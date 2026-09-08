@@ -14,13 +14,24 @@ class BinanceHostProvider : ContentProvider() {
         if (!BinanceHostCaller.ipc(owner)) throw SecurityException("CALLER_REJECTED")
         return runCatching {
             require(arg == null && extras != null)
-            val keys = if (method == "detail") setOf("grant", "id") else setOf("grant")
+            if (method in setOf("resume_v2", "disconnect_v2")) {
+                require(extras.isEmpty)
+                return@runCatching BinanceHostRuntime.onMain(owner) { runtime ->
+                    if (method == "resume_v2") runtime.resume()
+                    else { runtime.disconnect(); Bundle().apply { putString("status", "revoked") } }
+                }
+            }
+            val keys = when(method) { "detail" -> setOf("grant", "id"); "report_request_v1" -> setOf("grant", "query"); "report_read_v1" -> setOf("grant", "request"); else -> setOf("grant") }
             require(extras.keySet() == keys)
             val token = extras.getString("grant") ?: error("GRANT_MISSING")
             require(Regex("[0-9a-f]{64}").matches(token))
             BinanceHostRuntime.onMain(owner) { runtime ->
                 when (method) {
+                    "report_request_v1" -> { runtime.reportRequest(token, extras.getString("query") ?: error("QUERY_MISSING")); Bundle().apply { putString("status", "pending") } }
+                    "report_read_v1" -> Bundle().apply { putString("result", runtime.reportRead(token, extras.getString("request") ?: error("REQUEST_MISSING"))) }
                     "read" -> Bundle().apply { putString("result", runtime.read(token)) }
+                    "read_v2" -> Bundle().apply { putString("result", runtime.readContinuous(token)) }
+                    "refresh" -> { runtime.refresh(token); Bundle().apply { putString("status", "pending") } }
                     "detail" -> {
                         runtime.detail(token, extras.getString("id") ?: error("GRID_MISSING"))
                         Bundle().apply { putString("status", "pending") }

@@ -33,7 +33,7 @@ class BinanceGridCreateTest {
         assertThrows(IllegalArgumentException::class.java) { BinanceGridDraft.parse(values + ("upper" to values.getValue("lower"))) }
     }
     @Test fun undefinedOptionsAndExtraFieldsCannotReachTransport() {
-        listOf("direction" to "NEUTRAL", "autoInit" to "yes", "leverage" to "1.5", "count" to "1", "symbol" to "../NEARUSDT").forEach {
+        listOf("direction" to "BOTH", "autoInit" to "yes", "leverage" to "1.5", "count" to "1", "symbol" to "../NEARUSDT").forEach {
             assertThrows(IllegalArgumentException::class.java) { BinanceGridDraft.parse(draft().input + it) }
         }
         assertThrows(IllegalArgumentException::class.java) { BinanceGridDraft.parse(draft().input + ("url" to "https://example.test")) }

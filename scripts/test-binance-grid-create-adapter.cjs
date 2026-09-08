@@ -49,6 +49,17 @@ function harness() {
   const prepare=async(body=payload())=>{await observe(); assert.equal(api.prepare('doc_test_123','a'.repeat(32),hash,body),true); await tick();};
   return {window,api,observe,prepare,calls,events,account,behavior,Xhr};
 }
+test('neutral and trailing payloads preserve the official conditional fields', async () => {
+  const h=harness(), p=payload(); p.direction='NEUTRAL'; delete p.autoInitPos;
+  Object.assign(p,{trailingUp:true,trailingDown:false,orderCurrency:'QUOTE',trailingStopLowerLimit:true,trailingStopUpperLimit:false,
+    triggerPrice:'1.1',triggerType:'MARK_PRICE',stopLowerLimit:'0.8',stopTriggerType:'MARK_PRICE',tpslCps:true,autoAddMargin:false});
+  await h.prepare(p);
+  assert.equal(h.api.submit('doc_test_123','a'.repeat(32)),true); await tick();
+  const body=JSON.parse(h.calls.find(c=>c.url===CREATE).init.body);
+  assert.equal(body.direction,'NEUTRAL'); assert.equal(body.orderCurrency,'QUOTE');
+  assert.ok(!Object.hasOwn(body,'autoInitPos')); assert.ok(!Object.hasOwn(body,'slideWindow'));
+  assert.equal(body.stopLowerLimit,'0.8'); assert.equal(body.tpslCps,true);
+});
 test('prepare performs only fixed reads and never exports observed headers',async()=>{
   const h=harness();await h.prepare();assert.equal(h.events.at(-1).kind,'prepared');
   assert.equal(h.calls.filter(c=>c.url===CREATE).length,0);

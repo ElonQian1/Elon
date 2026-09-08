@@ -10,9 +10,18 @@
   let token = '', sequence = 0, latestList = 0, listFloor = 0, listEpoch = 0, current = null;
   let identitySequence = 0, latestIdentity = 0, account = null;
   let detailHeaders = null;
+  let listContext = null, refreshing = false;
   const known = new Set();
   const details = new Map();
   const originalFetch = window.fetch;
+  const reports = window.__elonBinanceReportsFactoryV1?.({
+    fetch: (url, init) => originalFetch.call(window, url, init),
+    known: value => known.has(value),
+    context: () => detailHeaders && account ? {headers: detailHeaders, ...account} : null,
+    prove: headers => proveIdentity(headers),
+    emit: event => { if (token) window.ElonBinanceRead?.postMessage(JSON.stringify({...event, token})); }
+  });
+  delete window.__elonBinanceReportsFactoryV1;
   const diagnostic = window.__elonBinanceDiagnosticsV1;
   function scalar(value, pattern) {
     const text = typeof value === 'string' ? value : Number.isSafeInteger(value) ? String(value) : '';
@@ -21,6 +30,24 @@
   }
   const id = value => scalar(value, /^[0-9]{1,20}$/);
   const optional = (value, pattern) => value == null ? null : scalar(value, pattern);
+  function metrics(value) {
+    const decimal = /^-?(0|[1-9][0-9]{0,29})(\.[0-9]{1,20})?$/;
+    const mapping = {initialNotional:'gridInitialValue',investment:'strategyAmount',matchedPnl:'matchedPnl',
+      fundingFee:'fundingFee',fee:'fee',adjustmentAmount:'totalAdjustmentAmount',perGridQty:'perGridQty',
+      perGridQuoteQty:'perGridQuoteQty',triggerPrice:'triggerPrice',stopUpper:'stopUpperLimit',stopLower:'stopLowerLimit',
+      stopTpPnl:'stopTpPnl',stopSlPnl:'stopSlPnl',trailingUpPrice:'trailingUpLimitPrice',trailingDownPrice:'trailingDownLimitPrice'};
+    const result = {};
+    for (const [key, source] of Object.entries(mapping)) result[key] = optional(value[source], decimal);
+    for (const [key, source] of Object.entries({closeOnStop:'cps',autoAddMargin:'autoAddMargin',trailingUp:'trailingUp',trailingDown:'trailingDown'})) {
+      if (value[source] != null && typeof value[source] !== 'boolean') throw new Error('invalid_flag');
+      result[key] = value[source] ?? null;
+    }
+    result.matchedCount = optional(value.matchedCount, /^(0|[1-9][0-9]{0,15})$/);
+    result.ended = optional(value.endTime, /^(0|[1-9][0-9]{0,15})$/);
+    result.marginType = optional(value.marginType, /^(CROSSED|ISOLATED)$/);
+    result.orderCurrency = optional(value.orderCurrency, /^(BASE|QUOTE)$/);
+    return result;
+  }
   function row(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid_row');
     return {
@@ -35,7 +62,8 @@
       count: optional(value.gridCount, /^[1-9][0-9]{0,5}$/),
       leverage: optional(value.initialLeverage, /^[1-9][0-9]{0,3}$/),
       profit: optional(value.gridProfit, /^-?(0|[1-9][0-9]{0,29})(\.[0-9]{1,20})?$/),
-      created: optional(value.createTime, /^[1-9][0-9]{0,15}$/)
+      created: optional(value.createTime ?? (value.bookTime > 0 ? value.bookTime : null), /^[1-9][0-9]{0,15}$/),
+      metrics: metrics(value)
     };
   }
   function emit(event) {
@@ -57,7 +85,7 @@
   function fail(t, error) {
     if (!relevant(t)) return;
     diagnostic?.failure(t.kind, error?.message);
-    known.clear(); details.clear(); detailHeaders = null; account = null; listEpoch++; listFloor = latestList + 1;
+    known.clear(); details.clear(); reports?.reset(); detailHeaders = null; listContext = null; account = null; listEpoch++; listFloor = latestList + 1;
     emit({kind: 'unavailable'});
   }
   function body(status, text) {
@@ -71,7 +99,7 @@
     if (!data || typeof data.subUser !== 'boolean' || (data.subUser && data.parentUser === true)) throw new Error('identity_unverified');
     const next = {account: id(data.userId), account_kind: data.subUser ? 'sub' : data.parentUser === true ? 'primary' : 'unknown'};
     if (account?.account !== next.account || account?.account_kind !== next.account_kind) {
-      known.clear(); details.clear(); detailHeaders = null; listEpoch++;
+      known.clear(); details.clear(); reports?.reset(); detailHeaders = null; listContext = null; listEpoch++;
     }
     account = next;
     emit({kind: 'identity', ...next});
@@ -141,6 +169,8 @@
         if (rows.some(x => x.account !== proof.account)) throw new Error('account_mismatch');
         listEpoch++; details.clear(); known.clear(); rows.forEach(x => known.add(x.id));
         detailHeaders = t.headers;
+        // Replay only a body actually observed on this exact read endpoint. It never leaves the page.
+        if (t.capturedBody) listContext = {headers: t.headers, body: t.requestBody, account: proof.account};
         emit({kind: 'list', ...proof, rows, coverage: 'observed_response_only'});
       } else {
         const value = row(data);
@@ -157,6 +187,7 @@
     const t = target(url, method);
     // Retain only this observed request's context inside the page; never send it through the bridge.
     if (t) t.headers = requestHeaders(input, init);
+    if (t?.kind === 'list' && (typeof input === 'string' || input instanceof URL)) captureBody(t, init?.body);
     return originalFetch.apply(this, arguments).then(response => {
       if (t) response.clone().text().then(text => consume(t, response.status, text)).catch(error => fail(t, error));
       return response;
@@ -178,17 +209,38 @@
   XMLHttpRequest.prototype.send = function() {
     const data = targets.get(this), t = data && target(data.url, data.method);
     if (t) t.headers = requestHeaders(null, data);
+    if (t?.kind === 'list') captureBody(t, arguments[0]);
     if (t) this.addEventListener('loadend', () => {
       try { consume(t, this.status, this.responseType === 'json' ? JSON.stringify(this.response) : this.responseText).catch(error => fail(t, error)); }
       catch (error) { fail(t, error); }
     }, {once: true});
     return originalSend.apply(this, arguments);
   };
+  function captureBody(t, value) {
+    if (value == null) { t.capturedBody = true; t.requestBody = undefined; return; }
+    if (typeof value !== 'string' || value.length > 4096) return;
+    try {
+      const parsed = JSON.parse(value);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+      t.capturedBody = true; t.requestBody = value;
+    } catch (_) { /* Unknown encoding cannot be replayed. */ }
+  }
   window.__elonBinanceReadV1 = Object.freeze({
+    report(query) { return !!token && reports?.query(query) === true; },
     bind(value) {
       if (!/^doc_[a-z0-9_]{3,80}$/.test(value)) return;
       token = value;
       if (current) { const pending = current; current = null; emit(pending); }
+      return true;
+    },
+    refresh() {
+      if (!token || !listContext || listContext.account !== account?.account) return false;
+      if (refreshing) return true;
+      refreshing = true;
+      const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 15000);
+      window.fetch(LIST, {method:'POST', headers:listContext.headers, body:listContext.body,
+        credentials:'same-origin',redirect:'error',cache:'no-store',signal:controller.signal})
+        .catch(() => {}).finally(() => { clearTimeout(timer); refreshing = false; });
       return true;
     },
     detail(value) {

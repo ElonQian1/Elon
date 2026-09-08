@@ -21,6 +21,7 @@ class BinanceHostConnectActivity : Activity() {
     private var host: BinanceHostRuntime? = null
     private var nonce = ""
     private var finished = false
+    private var continuous = false
     private lateinit var status: TextView
     private lateinit var authorize: Button
     private lateinit var official: FrameLayout
@@ -31,7 +32,10 @@ class BinanceHostConnectActivity : Activity() {
         setResult(RESULT_CANCELED)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         if (savedInstanceState != null || !BinanceHostCaller.activity(this)) return finish()
-        if (intent.data != null || intent.clipData != null || intent.selector != null || intent.extras?.keySet() != setOf("nonce")) return finish()
+        if (intent.data != null || intent.clipData != null || intent.selector != null) return finish()
+        if (intent.extras?.keySet() !in listOf(setOf("nonce"), setOf("nonce", "purpose"))) return finish()
+        continuous = intent.hasExtra("purpose")
+        if (continuous && intent.getStringExtra("purpose") != "continuous_grid_read_v2") return finish()
         nonce = intent.getStringExtra("nonce")?.takeIf { Regex("[0-9a-f]{64}").matches(it) } ?: return finish()
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setBackgroundColor(ui.background)
@@ -42,8 +46,8 @@ class BinanceHostConnectActivity : Activity() {
         status = ui.label("正在连接本人币安…", 16f).apply { contentDescription = "binance-host-status" }
         content.addView(status)
         content.addView(ui.label("这是读取授权页。授权后返回量化查看本人网格列表与详情。\n创建网格请返回量化，点击“创建网格（本人确认）”。", 14f))
-        content.addView(ui.label("本次只读授权有效 15 分钟，可随时撤销；不包含创建、修改或结束网格权限。币安网页登录资料保留在主应用。", 13f).apply { setTextColor(ui.muted) })
-        authorize = ui.button("授权量化读取 15 分钟", "binance-host-approve", primary = true) { approve() }.apply { isEnabled = false }
+        content.addView(ui.label(if (continuous) "同意后可持续查看当前币安账户的网格，重新打开量化会自动恢复。你可随时断开；更换账户需要重新确认。此授权仅用于读取，不包含交易权限。" else "本次只读授权有效 15 分钟，可随时撤销。更新量化应用后可启用持续连接。", 13f).apply { setTextColor(ui.muted) })
+        authorize = ui.button(if (continuous) "同意并保持只读连接" else "授权量化读取 15 分钟", "binance-host-approve", primary = true) { approve() }.apply { isEnabled = false }
         content.addView(authorize)
         content.addView(ui.button("重新加载币安网格", "binance-host-reload") { attachHost(reload = true) })
         toggle = ui.button("查看币安官网／确认登录", "binance-host-official") {
@@ -87,9 +91,9 @@ class BinanceHostConnectActivity : Activity() {
     private fun approve() {
         if (finished || !hasWindowFocus() || !BinanceHostCaller.activity(this)) return
         val runtime = host ?: return
-        val token = runCatching { runtime.grant() }.getOrNull() ?: return render()
+        val token = runCatching { runtime.grant(continuous) }.getOrNull() ?: return render()
         CookieManager.getInstance().flush()
-        setResult(RESULT_OK, Intent().putExtra("nonce", nonce).putExtra("grant", token).putExtra("schema", "yilong.binance_host_grant.v1"))
+        setResult(RESULT_OK, Intent().putExtra("nonce", nonce).putExtra("grant", token).putExtra("schema", if (continuous) "yilong.binance_host_grant.v2" else "yilong.binance_host_grant.v1"))
         finished = true; finish()
     }
     override fun onResume() { super.onResume(); if (::status.isInitialized) render() }

@@ -30,6 +30,25 @@ class BinanceHostStateTest {
         state.revoke(first); assertFalse(state.authorized(first)); assertTrue(state.authorized(second))
         clock += 900_000; assertFalse(state.authorized(second)); rejected { state.reply(second) }
     }
+    @Test fun continuousTicketsRenewButLegacyExpiredAndRevokedTicketsCannot() {
+        val s = state(); s.accept(list(row()))
+        val legacy = s.grant(); val continuous = s.grant(true)
+        rejected { s.renew(legacy) }
+        clock += 800_000; s.renew(continuous)
+        clock += 100_001; assertFalse(s.authorized(legacy)); assertTrue(s.authorized(continuous))
+        s.revoke(continuous); rejected { s.renew(continuous) }
+        val expired = s.apply { accept(list(row())) }.grant(true)
+        clock += 900_000; rejected { s.renew(expired) }
+    }
+    @Test fun enrichedDetailKeepsListMetricsAndLegacyWireUnchanged() {
+        val s = state(); s.accept(list(row() + ("metrics" to mapOf("matchedPnl" to "1.23", "fee" to "0.01"))))
+        val token = s.grant(true)
+        s.accept(detail(row(account = null) + ("metrics" to mapOf("matchedPnl" to null, "closeOnStop" to true))))
+        assertFalse(s.reply(token).contains("metrics"))
+        val raw = s.reply(token, true)
+        assertTrue(raw.contains("yilong.binance_host_read.v2"))
+        assertTrue(raw.contains("\"matchedPnl\":\"1.23\"")); assertTrue(raw.contains("\"closeOnStop\":true"))
+    }
     @Test fun accountChangeInvalidatesOldGrant() {
         val state = state(); state.accept(list(row())); val grant = state.grant()
         state.accept(list(row(account = "43"), account = "43")); assertFalse(state.authorized(grant)); assertTrue(state.fresh())

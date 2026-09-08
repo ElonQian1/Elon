@@ -59,9 +59,10 @@ class BinanceGridCreateActivity : Activity() {
             session?.cancelPreparation(); confirmed.isChecked = false
             official.visibility = View.VISIBLE; attachHost(reload = true)
         })
-        content.addView(button("查看／收起币安官网", "binance-create-official") {
-            official.visibility = if (official.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-            if (official.visibility == View.VISIBLE && host?.view == null) attachHost()
+        content.addView(button("全屏币安官网与高级功能", "binance-create-official") {
+            if (attempt.status == "submitting") return@button
+            session?.cancelPreparation(); confirmed.isChecked = false
+            com.elon.app.grid.ui.showBinanceOfficialPanel(this, host)
         })
         official = FrameLayout(this).apply { visibility = View.GONE; setBackgroundColor(ui.surface) }
         content.addView(official, LinearLayout.LayoutParams(-1, ui.dp(520)))
@@ -70,11 +71,11 @@ class BinanceGridCreateActivity : Activity() {
         content.addView(form.root)
         check = button("检查参数与当前账号", "binance-create-prepare") {
             confirmed.isChecked = false
-            runCatching { session?.prepare(form.draft()) ?: error("官网连接尚未就绪") }.onFailure { status.text = it.message ?: "检查未完成" }
+            runCatching { session?.prepare(form.checkedDraft()) ?: error("官网连接尚未就绪") }.onFailure { status.text = it.message ?: "检查未完成" }
         }; content.addView(check)
         summary = label("",16f); content.addView(summary)
         confirmed = CheckBox(this).apply {
-            text = "我已核对本次账号和全部参数，使用本人资金进行真实测试；本次未设置止损。"
+            text = "我已核对本次账号、保证金、杠杆、触发保护和仓位处理，确认由本人提交真实创建。"
             isSaveEnabled = false; filterTouchesWhenObscured = true
             setTextColor(ui.text); buttonTintList = android.content.res.ColorStateList.valueOf(ui.accent)
             contentDescription = "binance-create-confirm-parameters"
@@ -160,6 +161,7 @@ class BinanceGridCreateActivity : Activity() {
     }
     @Deprecated("Deprecated in Java") override fun onBackPressed() = returnResult()
     override fun onResume() { super.onResume(); if (ready) render() }
+    override fun onUserInteraction() { super.onUserInteraction(); host?.keepAlive() }
     override fun onPause() { if (ready && attempt.status != "submitting") { session?.cancelPreparation(); confirmed.isChecked = false }; super.onPause() }
     override fun onNewIntent(intent: Intent?) { super.onNewIntent(intent); returnResult() }
     override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); outState.clear() }
@@ -168,6 +170,7 @@ class BinanceGridCreateActivity : Activity() {
         return super.dispatchTouchEvent(event)
     }
     override fun onDestroy() {
+        if (::form.isInitialized) form.close()
         if (ownsSlot) {
             session?.close()
             host?.let { it.onChanged = null; it.onCreateObservation = null; it.view?.let { view -> if (view.parent === official) official.removeView(view) } }

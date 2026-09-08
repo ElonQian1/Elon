@@ -22,15 +22,39 @@
     return v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).sort().join(',') === expected.sort().join(',');
   }
   function validPayload(p) {
-    if (!keys(p, ['symbol','direction','marginType','gridType','gridLowerLimit','gridUpperLimit','gridInitialValue',
-      'leverage','gridCount','cos','cps','autoInitPos','orderCurrency'])) return false;
+    const required = ['symbol','direction','marginType','gridType','gridLowerLimit','gridUpperLimit','gridInitialValue',
+      'leverage','gridCount','cos','cps','orderCurrency'];
+    const extra = ['autoInitPos','autoAddMargin','triggerPrice','triggerType','stopLowerLimit','stopUpperLimit','stopTpPnl','stopSlPnl','stopTriggerType','tpslCps',
+      'trailingUp','trailingDown','trailingUpLimitPrice','trailingDownLimitPrice','trailingStopUpperLimit','trailingStopLowerLimit'];
+    if (!p || typeof p !== 'object' || Array.isArray(p) || !required.every(k => Object.hasOwn(p,k)) ||
+      Object.keys(p).some(k => !required.includes(k) && !extra.includes(k))) return false;
     const decimal = v => typeof v === 'string' && /^(0|[1-9][0-9]{0,29})(\.[0-9]{1,20})?$/.test(v) && /[1-9]/.test(v);
+    for (const key of ['triggerPrice','stopLowerLimit','stopUpperLimit','stopTpPnl','stopSlPnl','trailingUpLimitPrice','trailingDownLimitPrice']) {
+      if (key in p && !decimal(p[key])) return false;
+    }
+    for (const key of ['autoAddMargin','tpslCps','trailingUp','trailingDown','trailingStopUpperLimit','trailingStopLowerLimit']) {
+      if (key in p && typeof p[key] !== 'boolean') return false;
+    }
+    if (('triggerPrice' in p) !== ('triggerType' in p)) return false;
+    if ('triggerType' in p && !['MARK_PRICE','CONTRACT_PRICE'].includes(p.triggerType)) return false;
+    const priceStop = 'stopLowerLimit' in p || 'stopUpperLimit' in p;
+    const amountStop = 'stopTpPnl' in p || 'stopSlPnl' in p;
+    if(priceStop && amountStop) return false;
+    const stop = priceStop || amountStop;
+    if (stop !== ('stopTriggerType' in p) || (stop && !['MARK_PRICE','CONTRACT_PRICE'].includes(p.stopTriggerType))) return false;
+    if ('tpslCps' in p && !stop) return false;
+    const trailing = p.trailingUp === true || p.trailingDown === true;
+    if (trailing && (typeof p.trailingUp !== 'boolean' || typeof p.trailingDown !== 'boolean' ||
+      typeof p.trailingStopUpperLimit !== 'boolean' || typeof p.trailingStopLowerLimit !== 'boolean')) return false;
+    if (('trailingUpLimitPrice' in p && !p.trailingUp) || ('trailingDownLimitPrice' in p && !p.trailingDown)) return false;
     return typeof p.symbol === 'string' && /^[A-Z0-9]{1,24}USDT$/.test(p.symbol) &&
-      ['LONG','SHORT'].includes(p.direction) && ['ISOLATED','CROSSED'].includes(p.marginType) &&
+      ['LONG','SHORT','NEUTRAL'].includes(p.direction) && ['ISOLATED','CROSSED'].includes(p.marginType) &&
       ['ARITH','GEO'].includes(p.gridType) && ['gridLowerLimit','gridUpperLimit','gridInitialValue'].every(k => decimal(p[k])) &&
       Number.isInteger(p.leverage) && p.leverage >= 1 && p.leverage <= 125 &&
       Number.isInteger(p.gridCount) && p.gridCount >= 2 && p.gridCount <= 10000 &&
-      p.cos === true && typeof p.cps === 'boolean' && typeof p.autoInitPos === 'boolean' && p.orderCurrency === 'BASE';
+      p.cos === true && typeof p.cps === 'boolean' &&
+      (p.direction === 'NEUTRAL' ? !('autoInitPos' in p) : typeof p.autoInitPos === 'boolean') &&
+      p.orderCurrency === (trailing ? 'QUOTE' : 'BASE');
   }
   function scope(token, id, account) {
     return /^doc_[a-z0-9_]{3,80}$/.test(token) && /^[a-f0-9]{32}$/.test(id) && /^[a-f0-9]{64}$/.test(account);
@@ -131,7 +155,8 @@
           // Identity is the last network check immediately before dispatch, after the potentially slow config read.
           await identity(p.account,h);
           if(p.cancelled) throw Error('cancelled_before_send');
-          const body = {...p.payload,clientStrategyId:p.client,slideWindow:p.payload.gridCount > p.count};
+          const body = {...p.payload,clientStrategyId:p.client,
+            ...(!p.payload.trailingUp && !p.payload.trailingDown ? {slideWindow:p.payload.gridCount > p.count} : {})};
           dispatched = true;
           const v = await request(CREATE,h,body);
           if(v.success === false && typeof v.code === 'string' && v.code !== '000000') {

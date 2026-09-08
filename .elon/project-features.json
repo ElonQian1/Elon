@@ -456,6 +456,127 @@
       "updated_at_ms": 1788890532656
     },
     {
+      "id": "android-binance-grid-core-v2",
+      "title": "本人U本位网格核心功能V2",
+      "summary": "持续只读连接、丰富网格读取与原生管理体验；主APK托管会话，量化APK授权调用。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/android-binance-grid-core-v2.md",
+        "content_hash": "4171dce887349d67c4dcf0690cb2c15524f8a93605186bab699009cb59c5ac5e",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "96180a80f16c315ebe1e354a03b7e55145f5aa63",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "38373608877374f8559ee08b04f49c9ddd5bd092",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex-grid-core",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_read_adapter.js",
+        "android/app/src/main/kotlin/com/elon/app/grid"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "持续同意与短票据续发保持账号隔离和主动撤销",
+        "策略读取、创建管理与官网后备按能力矩阵独立验收",
+        "发布版本与设备验收绑定同一提交，真实交易由用户测试"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateOptions.kt",
+          "content_hash": "825f56ca9cf65f1200c33d440043c73ab80ad2d5123645eb118e8a5cfb6ddf9c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "96180a80f16c315ebe1e354a03b7e55145f5aa63",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ecc394e8b94b486b6357c89a9f4652234f676ee5",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceGridReports.kt",
+          "content_hash": "458ceb696827f89b106357ce8e464d22a5bb39b6d8b6a9e8f9dd29b51e566620",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "96180a80f16c315ebe1e354a03b7e55145f5aa63",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "26c3c46766dc037511743508ae9f4d72bea624d2",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostConsent.kt",
+          "content_hash": "9c9d979f31d7714935629699321833baa825f6fd09735d4384cbfa42dd8ef42c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "96180a80f16c315ebe1e354a03b7e55145f5aa63",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "30ad2ae8d2f2521131ede0f2b3044f7cf53d3234",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/host/BinanceGridReportsTest.kt",
+          "content_hash": "ffc390f4615cbd3a818754fc07bebd6aad526437f79502f66c53f13f444ea967",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "96180a80f16c315ebe1e354a03b7e55145f5aa63",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "698771900276aafe7599d533fb4e36f5ca51f561",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/reports/binance-grid-core-source-20260909.md",
+          "content_hash": "84a7e890b9712072501293596a9736e4d534cf554378e842e5389dee48019536",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "96180a80f16c315ebe1e354a03b7e55145f5aa63",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4f5159faf431396b3cb772e141901cf7abfc0fff",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-reports.cjs",
+          "content_hash": "452961b005b1c325cc3a84e79e57607445eff5832427fc042a416f586b7c80e9",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "96180a80f16c315ebe1e354a03b7e55145f5aa63",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3732013c15e698011f28e7b9e3dd7d0819dca7f2",
+            "state": "untracked"
+          }
+        }
+      ],
+      "claim": {
+        "claim_id": "claim_fb292ab1b0a74d47bb91ac1eec5118ba",
+        "agent_id": "codex-grid-core",
+        "claimed_at_ms": 1788893313055,
+        "expires_at_ms": 1788907713055
+      },
+      "created_at_ms": 1788893289640,
+      "updated_at_ms": 1788897821352
+    },
+    {
       "id": "android-binance-grid-create-v1",
       "title": "本人币安网格人工创建",
       "summary": "量化发起、主 APK 固定会话确认、单次创建、未知结果恢复与详情查询；真实下单仅本人操作。",
@@ -24145,56 +24266,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_cffec95c6c584ac78bab78311315183b",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-registry-ci-refresh",
-      "reason": "重录当前六项完整证据并运行专项回归。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788651271583
-    },
-    {
-      "id": "feature_event_f443eb6036914591866bdca06fee9a64",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-registry-ci-refresh",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788651302809
-    },
-    {
-      "id": "feature_event_b6f700e178574fc199d6d3169144ae80",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-registry-ci-refresh",
-      "reason": "六项当前证据已全量重绑，CI 与本地注册表入口保持一致。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788651315186
-    },
-    {
-      "id": "feature_event_d43cf25cf8484c85a8b054498fba3cc3",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-registry-ci-refresh",
-      "reason": "专项 PROJECT_FEATURE_REGISTRY_ADOPTION 与 CI quality guard 均已通过。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788651315386
-    },
-    {
-      "id": "feature_event_fbb52e0082994e3f9450021386900564",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-registry-ci-refresh",
-      "reason": "注册表采用功能的当前实现证据已恢复，无需求漂移；released 仅表示仓库治理功能。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788651315585
-    },
-    {
       "id": "feature_event_aa6069813fe441e49176c80e1145a406",
       "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
       "action": "claim_released",
@@ -26143,6 +26214,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1788890532656
+    },
+    {
+      "id": "feature_event_282e26a7527b4776a595b0fa08b5a319",
+      "feature_id": "android-binance-grid-core-v2",
+      "action": "registered",
+      "actor": "codex-grid-core",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788893289640
+    },
+    {
+      "id": "feature_event_e1211fab462e444aaf4373634d442d69",
+      "feature_id": "android-binance-grid-core-v2",
+      "action": "claimed",
+      "actor": "codex-grid-core",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788893313056
+    },
+    {
+      "id": "feature_event_fa895c413a514bac802e177a85cf75a7",
+      "feature_id": "android-binance-grid-core-v2",
+      "action": "transitioned",
+      "actor": "codex-grid-core",
+      "reason": "已核对官方能力与当前源码，开始V2持续只读与丰富投影纵向实现",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788893756743
+    },
+    {
+      "id": "feature_event_a778fd4ebf234eaf970004a2f27508f5",
+      "feature_id": "android-binance-grid-core-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-core",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788897535104
+    },
+    {
+      "id": "feature_event_dfb0cea3309348c392e7305cd4a8ef07",
+      "feature_id": "android-binance-grid-core-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-core",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788897821352
     }
   ]
 }

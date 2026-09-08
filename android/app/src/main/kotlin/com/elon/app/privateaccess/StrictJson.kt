@@ -4,9 +4,10 @@ package com.elon.app.privateaccess
 internal object StrictJson {
     class Number(val text: String)
 
-    fun parse(raw: String, maxBytes: Int = 262144): Map<String, Any?> {
+    fun parse(raw: String, maxBytes: Int = 262144, maxArrayItems: Int = 500, maxNodes: Int = 50000): Map<String, Any?> {
+        require(maxArrayItems in 1..10000 && maxNodes in 1..500000)
         require(raw.toByteArray(Charsets.UTF_8).size <= maxBytes)
-        val parser = Parser(raw)
+        val parser = Parser(raw, maxArrayItems, maxNodes)
         val result = parser.value(0)
         parser.space()
         require(parser.done())
@@ -32,14 +33,14 @@ internal object StrictJson {
         else -> error("PRIVATE_JSON_INVALID")
     }
 
-    private class Parser(val raw: String) {
+    private class Parser(val raw: String, val maxArrayItems: Int, val maxNodes: Int) {
         var at = 0
         var nodes = 0
         fun done() = at == raw.length
         fun space() { while (at < raw.length && raw[at] in " \r\n\t") at++ }
         fun take(c: Char): Boolean { space(); if (at < raw.length && raw[at] == c) { at++; return true }; return false }
         fun value(depth: Int): Any? {
-            require(depth <= 14 && ++nodes <= 50000)
+            require(depth <= 14 && ++nodes <= maxNodes)
             space(); require(at < raw.length)
             return when (raw[at]) {
                 '{' -> {
@@ -55,7 +56,7 @@ internal object StrictJson {
                 '[' -> {
                     at++; val result = mutableListOf<Any?>()
                     if (!take(']')) do {
-                        require(result.size < 500); result.add(value(depth + 1))
+                        require(result.size < maxArrayItems); result.add(value(depth + 1))
                         if (take(']')) break
                         require(take(','))
                     } while (true)

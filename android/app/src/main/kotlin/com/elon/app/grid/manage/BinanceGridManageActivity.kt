@@ -75,8 +75,11 @@ class BinanceGridManageActivity : Activity() {
             if(hasWindowFocus() && BinanceHostCaller.activity(this) && confirm.isChecked && !corrupt && !creationPending) act{session?.submit()}
         };content.addView(submit)
         resolve=button("已在官网核对，结束本机记录","binance-manage-resolve"){acknowledge()};content.addView(resolve)
-        content.addView(button("查看／收起币安官网","binance-manage-official"){
-            official.visibility=if(official.visibility==View.VISIBLE)View.GONE else View.VISIBLE
+        content.addView(button("全屏币安官网与高级功能","binance-manage-official"){
+            if(state.status!="submitting") {
+                session?.cancel();confirm.isChecked=false
+                com.elon.app.grid.ui.showBinanceOfficialPanel(this,host)
+            }
         })
         official=FrameLayout(this).apply{visibility=View.GONE};content.addView(official,LinearLayout.LayoutParams(-1,(resources.displayMetrics.density*520).toInt()))
         content.addView(label("区间、格数、追加保证金和止盈止损请在官网操作。结束状态不证明挂单已撤销、仓位归零或资金结清。",14f))
@@ -182,6 +185,7 @@ class BinanceGridManageActivity : Activity() {
         finish()
     }
     override fun onResume(){super.onResume();resumed=true}
+    override fun onUserInteraction(){super.onUserInteraction();host?.keepAlive()}
     override fun onPause(){resumed=false;if(ready && state.status!="submitting"){session?.cancel();confirm.isChecked=false};super.onPause()}
     override fun onSaveInstanceState(outState:Bundle){super.onSaveInstanceState(outState);outState.clear()}
     @Deprecated("Deprecated in Java") override fun onBackPressed()=returnResult()

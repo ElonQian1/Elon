@@ -42,6 +42,29 @@ test('empty list uses authenticated subaccount proof and emits no unrelated iden
   assert.equal(h.events.at(-1).account_kind, 'sub'); assert.equal(h.events.at(-1).rows.length, 0);
   assert.ok(!JSON.stringify(h.events).includes('fixture-private'));
 });
+test('refresh reuses only the observed body on the fixed readonly path', async () => {
+  const h = harness();
+  assert.equal(h.window.__elonBinanceReadV1.refresh(), false);
+  h.queue.push(response([row()]));
+  await h.window.fetch(LIST, {method:'POST',body:'{"page":1}',headers:{'x-fixture-auth':'fixture-local'}}); await tick();
+  h.queue.push(response([row('42','2.3')]));
+  assert.equal(h.window.__elonBinanceReadV1.refresh(), true); await tick();
+  const replay = h.calls.filter(c => c.url === LIST).at(-1);
+  assert.equal(replay.init.method, 'POST'); assert.equal(replay.init.body, '{"page":1}');
+  assert.equal(h.events.at(-1).rows[0].profit, '2.3');
+  assert.ok(!JSON.stringify(h.events).includes('fixture-local'));
+  Object.assign(h.account, {userId:'43',subUser:true,parentUser:false});
+  await h.window.fetch(INFO); await tick();
+  assert.equal(h.window.__elonBinanceReadV1.refresh(), false);
+});
+test('rich metrics retain exact decimals and missing values without inventing profit', async () => {
+  const h = harness();
+  await h.list([{...row(),bookTime:1788790000000,matchedPnl:'1.234567890123456789',fundingFee:'-0.1',perGridQty:'12.5',cps:false}]);
+  const value=h.events.at(-1).rows[0];
+  assert.equal(value.metrics.matchedPnl, '1.234567890123456789');
+  assert.equal(value.metrics.closeOnStop, false); assert.equal(value.metrics.investment, null);
+  assert.equal(value.created,'1788790000000'); assert.equal(value.profit,'1.2');
+});
 test('parent-owned rows cannot be bound to a child UID', async () => {
   const h = harness(); Object.assign(h.account, {userId: '43', subUser: true, parentUser: false});
   await h.list([row('42')]); assert.equal(h.events.at(-1).kind, 'unavailable');

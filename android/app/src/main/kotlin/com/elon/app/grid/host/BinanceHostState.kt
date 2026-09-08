@@ -15,11 +15,12 @@ internal class BinanceHostState(private val elapsed: () -> Long, private val epo
     var ready = false; private set
     private var rows = linkedMapOf<String, Map<String, Any?>>()
     private val grants = mutableMapOf<String, Long>()
+    private val renewable = mutableSetOf<String>()
     val count get() = rows.size
     val detailCount get() = rows.values.count { it["detail"] == true }
     val activeGrantCount get() = grants.values.count { it > elapsed() }
 
-    fun unavailable() { ready = false; account = null; accountKind = "unknown"; rows.clear(); grants.clear(); generation++ }
+    fun unavailable() { ready = false; account = null; accountKind = "unknown"; rows.clear(); grants.clear(); renewable.clear(); generation++ }
     fun accept(raw: String) {
         try { acceptVerified(raw) } catch (failure: RuntimeException) { unavailable(); throw failure }
     }
@@ -61,38 +62,47 @@ internal class BinanceHostState(private val elapsed: () -> Long, private val epo
                 require(old["symbol"] == row["symbol"])
                 val identity = row["account"] as? String
                 require(identity == null || digest(identity) == account)
-                rows[row["id"] as String] = row.filterKeys { it != "account" } + ("detail" to true)
+                val metrics = BinanceGridMetrics.decode(old["metrics"]) + BinanceGridMetrics.decode(row["metrics"]).filterValues { it != null }
+                rows[row["id"] as String] = old + row.filterKeys { it != "account" && it != "metrics" }.filterValues { it != null } +
+                    mapOf("detail" to true, "metrics" to metrics)
                 generation++
             }
             else -> unavailable()
         }
     }
     fun fresh() = ready && elapsed() - observedElapsed in 0 until 300_000
-    fun grant(): String {
+    fun grant(continuous: Boolean = false): String {
         require(fresh() && account != null)
         grants.entries.removeAll { it.value <= elapsed() }
+        renewable.retainAll(grants.keys)
         require(grants.size < 8)
         val token = ByteArray(32).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
         grants[token] = Math.addExact(elapsed(), 900_000)
+        if (continuous) renewable.add(token)
         return token
     }
     fun remaining(token: String) = ((grants[token] ?: 0L) - elapsed()).coerceAtLeast(0)
     fun authorized(token: String) = Regex("[0-9a-f]{64}").matches(token) && remaining(token) > 0
-    fun revoke(token: String) { grants.remove(token) }
+    fun revoke(token: String) { grants.remove(token); renewable.remove(token) }
+    fun renew(token: String) {
+        require(authorized(token) && token in renewable)
+        grants[token] = Math.addExact(elapsed(), 900_000)
+    }
     fun contains(id: String) = fresh() && rows.containsKey(id)
     fun managementChoices(): List<Pair<String,String>> = if (!fresh()) emptyList() else rows.values.map {
         (it["id"] as String) to "${it["symbol"]} · ${it["status"]} · ${it["id"]}"
     }
-    fun reply(token: String): String {
+    fun reply(token: String, v2: Boolean = false): String {
         require(authorized(token))
-        return StrictJson.encode(mapOf("schema" to "yilong.binance_host_read.v1", "source" to "android_webview",
+        return StrictJson.encode(mapOf("schema" to if (v2) "yilong.binance_host_read.v2" else "yilong.binance_host_read.v1", "source" to "android_webview",
             "remaining_ms" to remaining(token), "generation" to generation, "observed_at_ms" to observed,
             "status" to if (fresh()) "fresh" else "stale", "coverage" to "observed_response_only",
-            "rows" to if (fresh()) rows.values.toList() else emptyList<Any>()))
+            "rows" to if (fresh()) rows.values.map { if (v2) it + ("metrics" to BinanceGridMetrics.decode(it["metrics"])) else it.filterKeys { key -> key != "metrics" } } else emptyList<Any>()))
     }
     private fun decode(value: Any?): Map<String, Any?> {
         @Suppress("UNCHECKED_CAST") val row = value as? Map<String, Any?> ?: error("ROW_INVALID")
-        require(row.keys == setOf("id", "account", "symbol", "status", "direction", "spacing", "lower", "upper", "count", "leverage", "profit", "created"))
+        require(row.keys - "metrics" == setOf("id", "account", "symbol", "status", "direction", "spacing", "lower", "upper", "count", "leverage", "profit", "created"))
+        BinanceGridMetrics.decode(row["metrics"])
         fun text(key: String, pattern: String, nullable: Boolean = false): String? {
             val field = row[key]
             if (nullable && field == null) return null
