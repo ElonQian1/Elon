@@ -11,7 +11,7 @@ internal enum class WebChatProductionFeatureCompletionDecision {
 }
 
 internal object WebChatProductionFeatureCompletionPolicy {
-    fun requiresOfficialCompletion(kind: String): Boolean = kind.trim().lowercase() != "images"
+    fun requiresOfficialCompletion(kind: String): Boolean = kind.trim().lowercase() !in setOf("images", "library")
 
     fun evaluate(
         feature: WebChatProductionFeature,

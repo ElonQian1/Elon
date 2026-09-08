@@ -60,6 +60,12 @@ internal data class WebChatConsumerCommandResult(
 
 internal interface WebChatConsumerPort {
     fun state(): WebChatConsumerState
+    fun libraryFiles(): WebChatLibrarySnapshot? = null
+    fun requestLibraryFiles(directory: String, query: String, operation: String): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "unsupported_consumer_command")
+    fun cancelLibraryFiles(requestId: String): WebChatConsumerCommandResult = WebChatConsumerCommandResult(false)
+    fun downloadLibraryFile(handle: String, downloadHandle: String): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "unsupported_consumer_command")
     fun conversationFiles(path: String): WebChatConversationFileIndex? = null
     fun requestConversationFiles(path: String): WebChatConsumerCommandResult =
         WebChatConsumerCommandResult(false, "unsupported_consumer_command")

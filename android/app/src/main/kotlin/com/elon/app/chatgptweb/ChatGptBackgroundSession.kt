@@ -696,7 +696,7 @@ internal class ChatGptBackgroundSession(
             }
             is ChatGptWebEvent.ImageAsset -> imageSession.acceptAsset(event.value)
             is ChatGptWebEvent.ImageGallerySnapshot -> imageSession.acceptGallery(event.value)
-            is ChatGptWebEvent.ConversationFiles -> Unit
+            is ChatGptWebEvent.ConversationFiles, is ChatGptWebEvent.LibraryFiles -> Unit
             is ChatGptWebEvent.AdapterReady,
             is ChatGptWebEvent.FeatureNavigation -> Unit
             is ChatGptWebEvent.WebTouchRequest -> touchRequestHandler.handle(event)

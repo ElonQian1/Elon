@@ -71,6 +71,10 @@ internal object WebChatProductionBuiltInCatalog {
 
     private val CHATGPT_FEATURES = listOf(
         WebChatConsumerFeature(
+            id = "preset:chatgpt:library", label = "文件库", kind = "library",
+            selected = false, requiresUserConfirmation = false, nativeSelector = "web-chat-feature:library",
+        ),
+        WebChatConsumerFeature(
             id = stableFeatureId("图像", "images", "/images", 0),
             label = "图像",
             kind = "images",

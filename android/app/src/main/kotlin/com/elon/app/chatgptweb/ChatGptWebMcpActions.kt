@@ -63,6 +63,7 @@ internal class ChatGptWebMcpActions(
             .put("last_command", ChatGptWebCommandReceipts.lastResultJson(observed))
             .put("last_attachment_upload", ChatGptWebCommandReceipts.recentResultJson(observed, "request_attachment_upload"))
             .put("conversation_files", ChatGptWebMcpSnapshotJson.conversationFiles(observed, current?.url))
+            .put("library_files", ChatGptWebLibraryProtocol.json(observed.libraryFiles.takeIf { observed.adapterCurrent }))
             .put("file_download", commands.fileDownloadState()?.let { download ->
                 JSONObject().put("request_id", download.requestId).put("state", download.stage.wireName)
                     .put("received_bytes", download.receivedBytes).put("total_bytes", download.totalBytes)
@@ -100,6 +101,8 @@ internal class ChatGptWebMcpActions(
             dispatchRequest(beginCommand(expectedAction), block)
         }
         when (action) {
+            in ChatGptWebLibraryCommands.actions -> ChatGptWebLibraryCommands.control(
+                args, observedAtDispatch, commands, ::dispatch)?.let { return error(action, it) }
             "chatgpt_cancel_file_download" -> {
                 val id = args.optString("download_request_id")
                 if (id.isBlank() || id.length > 160 || !commands.cancelFileDownload(id)) {

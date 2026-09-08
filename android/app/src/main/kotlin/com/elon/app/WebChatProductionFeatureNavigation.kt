@@ -58,6 +58,7 @@ internal class WebChatProductionFeatureNavigationCoordinator(
     private var activeDialog: AlertDialog? = null
     private var activeSheet: WebChatActionSheetHandle? = null
     private var featureById = emptyMap<String, WebChatProductionFeature>()
+    private val library = WebChatLibraryBrowser(activity, host, consumerPort)
 
     fun show(provider: WebChatProviderIdentity) {
         cancelPending()
@@ -93,6 +94,7 @@ internal class WebChatProductionFeatureNavigationCoordinator(
     }
 
     fun cancelPending() {
+        library.dismiss()
         requestEpoch += 1
         activeSheet?.dismiss()
         activeSheet = null
@@ -128,7 +130,11 @@ internal class WebChatProductionFeatureNavigationCoordinator(
         providerId: WebChatProviderId,
         state: WebChatConsumerState,
     ): List<WebChatProductionFeature> = WebChatProductionFeatureParser.parse(
-        interactionCache.features(providerId, state.features),
+        interactionCache.features(providerId, state.features).let { known ->
+            if (providerId == WebChatProviderId.CHATGPT_WEB && known.none { it.kind == "library" }) {
+                known + WebChatProductionBuiltInCatalog.features(providerId).filter { it.kind == "library" }
+            } else known
+        },
     )
 
     private fun observation(
@@ -212,6 +218,11 @@ internal class WebChatProductionFeatureNavigationCoordinator(
         port: WebChatConsumerPort,
         feature: WebChatProductionFeature,
     ) {
+        if (provider.id == WebChatProviderId.CHATGPT_WEB && feature.kind == "library" && library.show()) {
+            requestEpoch += 1
+            activeSheet?.dismiss()
+            return
+        }
         if (openNativeFeature(feature)) {
             activeSheet?.dismiss()
             return

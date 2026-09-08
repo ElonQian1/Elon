@@ -369,6 +369,16 @@ internal class ChatGptWebPageAdapter(
         action = "list_conversation_files", value = path, requestId = requestId,
     )
 
+    fun listLibraryFiles(request: JSONObject, requestId: String) =
+        runCommand("list_library_files", value = request.toString(), requestId = requestId)
+    fun cancelLibraryFiles(target: String, requestId: String) =
+        runCommand("cancel_library_files", value = target, requestId = requestId)
+    fun downloadLibraryFile(file: com.elon.app.WebChatLibraryEntry, requestId: String) {
+        val descriptor = nativeDownloads.prepareLibrary(file, requestId)
+        if (descriptor == null) onEvent(ChatGptWebEvent.CommandResult("download_library_file", false, "download_not_ready", requestId))
+        else runCommand("download_library_file", value = descriptor, requestId = requestId)
+    }
+
     fun probeConversationProject(path: String, projectId: String): Boolean {
         val normalizedPath = ChatGptWebConversationPath.normalize(path) ?: return false
         val normalizedProjectId = ChatGptWebConversationPath.canonicalProjectId(projectId)

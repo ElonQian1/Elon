@@ -66,20 +66,26 @@ internal class ChatGptWebFileDownloadGateway(
         installed = true
     }
 
-    fun prepare(path: String, file: WebChatConversationFile, requestId: String): String? {
+    fun prepare(path: String, file: WebChatConversationFile, requestId: String): String? =
+        prepare(path, file.name, file.mediaType, file.downloadHandle, requestId)
+
+    fun prepareLibrary(file: com.elon.app.WebChatLibraryEntry, requestId: String): String? =
+        prepare("/library", file.name, file.mediaType, file.downloadHandle, requestId)
+
+    private fun prepare(path: String, name: String, mediaType: String, handle: String, requestId: String): String? {
         val state = document()
         val href = webView.url ?: return null
         val uri = Uri.parse(href)
         if (!installed || disposed || session.snapshot()?.active == true || requestId.isBlank() || !state.adapterCurrent || uri.scheme != "https" ||
-            uri.host != "chatgpt.com" || uri.port != -1 || !ChatGptWebFileDownloadPolicy.HANDLE.matches(file.downloadHandle)) return null
+            uri.host != "chatgpt.com" || uri.port != -1 || !ChatGptWebFileDownloadPolicy.HANDLE.matches(handle)) return null
         val lease = leases.begin(state.documentToken, state.pageGeneration, href,
-            file.name, file.mediaType, SystemClock.elapsedRealtime()) ?: return null
+            name, mediaType, SystemClock.elapsedRealtime()) ?: return null
         check(session.begin(lease.id, requestId))
         return JSONObject().put("version", 1).put("leaseId", lease.id)
             .put("byteTransferVersion", 1)
             .put("resolvedFileVersion", ChatGptWebFileDownloadMetadata.VERSION)
             .put("documentToken", lease.token).put("href", href).put("path", path)
-            .put("name", file.name).put("downloadHandle", file.downloadHandle).toString()
+            .put("name", name).put("downloadHandle", handle).toString()
     }
 
     private fun consumeResolved(id: String, value: JSONObject, state: WebBridgeDocumentSession.Snapshot): ChatGptWebFileDownloadLease.Value? {
