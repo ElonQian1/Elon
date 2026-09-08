@@ -31,6 +31,9 @@ internal fun mcpBinanceHostStatus(context: Context): JSONObject = runCatching {
             .put("generation", host.state.generation)
             .put("observed_at_ms", host.state.observed)
             .put("coverage", "observed_response_only")
+            .put("user_create_entry_available", true)
+            .put("create_confirmation_open", host.onCreateObservation != null)
+            .put("mcp_trading_enabled", false)
             .put("trading_enabled", false))
     }
 }.getOrElse { toolResult("Binance host did not respond.", JSONObject().put("error", "HOST_UNAVAILABLE"), isError = true) }

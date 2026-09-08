@@ -23,6 +23,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     var pagePhase = "not_started"; private set
     var adapterBound = false; private set
     var onChanged: (() -> Unit)? = null
+    var onCreateObservation: ((String) -> Unit)? = null
     private var captured: EskPlatformSession? = null
     private val sessions = EskPlatformSessionStore(context) { handler.post { invalidate("主账号已变化，请重新连接") } }
     private val preferences = context.getSharedPreferences("binance_host_owner_v1", Context.MODE_PRIVATE)

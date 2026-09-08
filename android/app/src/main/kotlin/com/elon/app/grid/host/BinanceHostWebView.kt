@@ -39,8 +39,13 @@ internal fun createBinanceHostWebView(context: Context, runtime: BinanceHostRunt
                 message.data?.takeIf { it.length <= 262144 }?.let(runtime::observed)
             }
         }
+        WebViewCompat.addWebMessageListener(this, "ElonBinanceCreate", setOf(BinanceHostRuntime.ORIGIN)) { _, message, origin, mainFrame, _ ->
+            if (mainFrame && origin.toString().trimEnd('/') == BinanceHostRuntime.ORIGIN) {
+                message.data?.takeIf { it.length <= 4096 }?.let { runtime.onCreateObservation?.invoke(it) }
+            }
+        }
         WebViewCompat.addDocumentStartJavaScript(this,
-            listOf("binance_grid_read_diagnostics.js", "binance_grid_read_adapter.js").joinToString("\n") { asset ->
+            listOf("binance_grid_read_diagnostics.js", "binance_grid_read_adapter.js", "binance_grid_create_adapter.js").joinToString("\n") { asset ->
                 context.assets.open(asset).bufferedReader().use { it.readText() }
             }, setOf(BinanceHostRuntime.ORIGIN))
         webViewClient = object : WebViewClient() {

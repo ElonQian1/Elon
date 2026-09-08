@@ -66,6 +66,9 @@
         android:theme="@style/Theme.ElonApp"
         android:usesCleartextTraffic="true">
 
+        <activity android:name=".grid.create.BinanceGridCreateActivity"
+            android:exported="true" android:excludeFromRecents="true"
+            android:allowTaskReparenting="false" />
         <activity android:name=".grid.host.BinanceHostConnectActivity"
             android:exported="true" android:excludeFromRecents="true"
             android:allowTaskReparenting="false" />
