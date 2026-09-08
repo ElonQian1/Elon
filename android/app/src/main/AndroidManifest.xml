@@ -66,6 +66,13 @@
         android:theme="@style/Theme.ElonApp"
         android:usesCleartextTraffic="true">
 
+        <activity android:name=".grid.host.BinanceHostConnectActivity"
+            android:exported="true" android:excludeFromRecents="true"
+            android:allowTaskReparenting="false" />
+        <provider android:name=".grid.host.BinanceHostProvider"
+            android:authorities="${applicationId}.binance-host"
+            android:exported="true" android:grantUriPermissions="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

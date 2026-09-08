@@ -25,6 +25,9 @@ internal fun mcpToolsListResult(): JSONObject {
     return JSONObject().put(
         "tools",
         JSONArray()
+            .put(tool(name = "binance_host_status", title = "Binance Host Status",
+                description = "Return bounded Android Binance session and grid coverage status without private records or credentials.",
+                properties = JSONObject(), required = JSONArray()))
             .put(
                 tool(
                     name = "phone_status",

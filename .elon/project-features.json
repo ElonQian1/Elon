@@ -313,6 +313,101 @@
       "updated_at_ms": 1786762799336
     },
     {
+      "id": "android-binance-host-read-v1",
+      "title": "主 APK 托管币安网格只读会话",
+      "summary": "主 APK 官方 WebView 持有本人币安登录，量化 APK 经同机限时授权读取；Win 负责研究，保留旧云快照。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/android-binance-host-read-v1.md",
+        "content_hash": "64e12b4bad2727f9e5125ed1436241766bd377f11ac43614757dd078fc088386",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "de01e0323055297a1978bb83d0d161522de0b689",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "e628befc1835b4f4f0868dad2d17dad9038a69f7",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex-binance-host",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_read_adapter.js",
+        "android/app/src/main/kotlin/com/elon/app/grid/host"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "手机官方会话读取本人列表及详情，量化原生界面展示",
+        "调用者、账号、过期和撤销隔离",
+        "Win 研究与 Android 验收分开，无交易接口"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostProvider.kt",
+          "content_hash": "3bbc69dff301c192816979d815b5f8c5424d1d72fd180b493363375c8ec98ee9",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de01e0323055297a1978bb83d0d161522de0b689",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "506ad5b2bd7046c88293e92651c113e98ae5cb33",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostRuntime.kt",
+          "content_hash": "fba7bf49dc05fb7c276e3488604726615b419a3689dc75cb2cd6d2480d1e96c7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de01e0323055297a1978bb83d0d161522de0b689",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f4eabde3315e08876fc66d38470af5430503b113",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/host/BinanceHostStateTest.kt",
+          "content_hash": "c92a0f00704f856ce96d5cc66a5612e7079dd36680947d475aea080a7c826937",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de01e0323055297a1978bb83d0d161522de0b689",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d284915092b9f256229358148cacd59823385c3c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-read-adapter.cjs",
+          "content_hash": "d618aa0b4b33a52d755b16cf90ef29d8f663ef68990a616d0fdacf2d8a733a65",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "de01e0323055297a1978bb83d0d161522de0b689",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "08bec6a825f2ece7d6bd49d7670486b20db65f20",
+            "state": "index_only"
+          }
+        }
+      ],
+      "claim": {
+        "claim_id": "claim_fb2874fd6ed944dcbd5a551fd23af75f",
+        "agent_id": "codex-binance-host",
+        "claimed_at_ms": 1788829162163,
+        "expires_at_ms": 1788843562163
+      },
+      "created_at_ms": 1788829139503,
+      "updated_at_ms": 1788831010372
+    },
+    {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "title": "A2 Map/Lock dynamic quotient authority V1",
       "summary": "Freeze the typed exact-partition contract that maps every verified Map/Lock static included leaf into one auditable dynamic execution class, derives Qmap/Qlock mechanically, and requires one process-isolated Windows record per frozen class without opening production effects.",
@@ -22967,46 +23062,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_ca34cc6a4ee24f939264ca28cd78e31a",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "claimed",
-      "actor": "codex-account-asset-access",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788609185088
-    },
-    {
-      "id": "feature_event_ba60b0e889e04ce187570918e9135b92",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "transitioned",
-      "actor": "codex-account-asset-access",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788609204764
-    },
-    {
-      "id": "feature_event_a3d3e5b826e249cf90fa63e4d50b87a3",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-account-asset-access",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788610260540
-    },
-    {
-      "id": "feature_event_e5756196c745433383b561fffbae31a7",
-      "feature_id": "team-assets-public-preview-v1",
-      "action": "registered",
-      "actor": "codex-team-assets",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788616522579
-    },
-    {
       "id": "feature_event_02740d8c23d948298a0da8acbff2d8d4",
       "feature_id": "team-assets-public-preview-v1",
       "action": "claimed",
@@ -24965,6 +25020,46 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788827163625
+    },
+    {
+      "id": "feature_event_428514641d864d238a1f706e80c990e8",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "registered",
+      "actor": "codex-binance-host",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788829139503
+    },
+    {
+      "id": "feature_event_f8e78ec199024e37a9eacac0ea0bfdd0",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "claimed",
+      "actor": "codex-binance-host",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788829162163
+    },
+    {
+      "id": "feature_event_cf2cee497ab148e69fcd57437a16ff89",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-host",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788829538981
+    },
+    {
+      "id": "feature_event_9bb6d642099c42d1b9215b43a06e2ff2",
+      "feature_id": "android-binance-host-read-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-host",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788831010372
     }
   ]
 }
