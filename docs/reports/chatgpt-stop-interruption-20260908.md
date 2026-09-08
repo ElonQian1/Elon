@@ -7,6 +7,9 @@ The preceding APK 1567 / adapter 303 acceptance used the DOM stop fallback
 That is a failed private-stop acceptance, not a completed capability.
 See [the device sequence](chatgpt-runtime-owners-20260908.md).
 
+The [reader ownership follow-up](chatgpt-stream-reader-ownership-20260908.md)
+additionally covers superseded same-generation streams and disposal races.
+
 This batch targets those two failures. Source implementation and offline tests
 are complete. Android build and device results are recorded below separately.
 No microphone, proxy, login, Cookie or application-data changes are involved.

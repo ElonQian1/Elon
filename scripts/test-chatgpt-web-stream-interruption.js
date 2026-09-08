@@ -6,9 +6,9 @@ const path = require('node:path');
 const vm = require('node:vm');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
-function fixture() {
+function fixture(fetchResponse) {
   const reads = [], outcomes = [];
-  let released = 0, calls = 0;
+  let released = 0, calls = 0, cancelled = 0;
   const page = {
     __elonChatGptPrivateStreamObserverEnabled: true,
     __elonChatGptPrivateResearchProbe: {
@@ -16,9 +16,11 @@ function fixture() {
     },
     fetch: async () => {
       calls++;
+      if (fetchResponse) return fetchResponse();
       return { ok: true, status: 200, headers: { get: () => 'text/event-stream' },
         clone: () => ({ body: { getReader: () => ({
           read: () => new Promise((resolve, reject) => reads.push({ resolve, reject })),
+          cancel: () => { cancelled++; return Promise.resolve(); },
           releaseLock: () => { released++; }
         }) } }) };
     }
@@ -31,11 +33,12 @@ function fixture() {
   ), 'utf8'), sandbox);
   const api = page.__elonChatGptPrivateStreamTransport;
   return { api, page, location, reads, outcomes, calls: () => calls, released: () => released,
-    async start() { await page.fetch('https://chatgpt.com/backend-api/f/conversation', { method: 'POST' }); },
-    async frame(text, messageId = 'reply-one', conversationId = 'thread-one') {
+    cancelled: () => cancelled,
+    async start() { return page.fetch('https://chatgpt.com/backend-api/f/conversation', { method: 'POST' }); },
+    async frame(text, messageId = 'reply-one', conversationId = 'thread-one', index = 0) {
       const payload = { conversation_id: conversationId, message: { id: messageId,
         author: { role: 'assistant' }, status: 'in_progress', content: { parts: [text] } } };
-      reads.shift().resolve({ done: false, value: new TextEncoder().encode('data: ' + JSON.stringify(payload) + '\n\n') });
+      reads.splice(index, 1)[0].resolve({ done: false, value: new TextEncoder().encode('data: ' + JSON.stringify(payload) + '\n\n') });
       await tick();
     },
     async fail(name = 'AbortError', index = 0) {
@@ -99,4 +102,63 @@ test('official final text still replaces the retained partial instead of duplica
     content: [{ type: 'markdown', text: 'Partial answer from the official page' }] }], f.location.pathname);
   assert.equal(merged.length, 1);
   assert.equal(merged[0].content[0].text, 'Partial answer from the official page');
+});
+
+for (const lateEvent of ['error', 'end', 'chunk']) test('superseded same-conversation reader ignores late ' + lateEvent, async () => {
+  const f = fixture(); await f.start(); await f.frame('Old partial');
+  await f.start(); await f.frame('New partial', 'reply-two', 'thread-one', 1);
+  if (lateEvent === 'error') await f.fail();
+  else if (lateEvent === 'chunk') await f.frame('Old continuation');
+  else { f.reads.shift().resolve({ done: true }); await tick(); }
+  assert.equal(f.api.current(f.location.pathname).text, 'New partial');
+  assert.equal(f.api.current(f.location.pathname).state, 'streaming');
+  assert.deepEqual(f.outcomes, ['first', 'first'], 'retired readers cannot publish a current outcome');
+  assert.equal(f.cancelled(), 1, 'only the old observer clone is cancelled');
+  assert.equal(f.calls(), 2, 'the observer never starts another fetch');
+  await f.fail();
+});
+
+for (const boundary of ['prepareSend', 'reset', 'dispose']) test(boundary + ' retires pending clone before a late chunk arrives', async () => {
+  const f = fixture(); await f.start(); await f.frame('Old partial');
+  f.api[boundary]();
+  await f.frame('Late continuation');
+  assert.equal(f.api.current(f.location.pathname), null);
+  assert.equal(f.cancelled(), 1);
+  assert.equal(f.released(), 1);
+  assert.deepEqual(f.outcomes, ['first']);
+});
+
+test('disposing while official fetch is pending never acquires a late observer reader', async () => {
+  const f = fixture(); const pending = f.start();
+  f.api.dispose(); await pending; await tick();
+  assert.equal(f.released(), 0, 'a disposed observer must not acquire another reader');
+  assert.equal(f.calls(), 1);
+  assert.equal(f.api.current(f.location.pathname), null);
+});
+
+test('retiring a real cloned response does not cancel or consume the official response', async () => {
+  let controller, upstreamCancelled = 0;
+  const body = new ReadableStream({
+    start(value) { controller = value; },
+    cancel() { upstreamCancelled++; }
+  });
+  const response = new Response(body, { headers: { 'content-type': 'text/event-stream' } });
+  const f = fixture(() => response);
+  const original = await f.start();
+  const nativeReader = original.body.getReader();
+  const first = new TextEncoder().encode('data: {"conversation_id":"thread-one","message":{"id":"reply-one","author":{"role":"assistant"},"content":{"parts":["Before stop"]}}}\n\n');
+  controller.enqueue(first);
+  assert.deepEqual((await nativeReader.read()).value, first);
+  for (let attempt = 0; attempt < 20 && !f.api.current(f.location.pathname); attempt++) await tick();
+  assert.equal(f.api.current(f.location.pathname).text, 'Before stop');
+  f.api.dispose();
+  const after = new TextEncoder().encode('data: [DONE]\n\n');
+  controller.enqueue(after); controller.close();
+  assert.deepEqual((await nativeReader.read()).value, after);
+  assert.equal((await nativeReader.read()).done, true);
+  await tick();
+  assert.equal(upstreamCancelled, 0);
+  assert.equal(original, response);
+  assert.equal(f.api.current(f.location.pathname), null);
+  nativeReader.releaseLock();
 });

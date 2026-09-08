@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 16) return;
+  if (existing && Number(existing.version) >= 17) return;
   if (existing && typeof existing.dispose === 'function') {
     try { existing.dispose(); }
     catch (_) { /* A stale transport must not block the upgraded observer. */ }
@@ -33,8 +33,18 @@
   let accessSignal = null;
   let privateUser = null;
   let conversationGeneration = 0;
+  let activeReader = null;
   let blockedConversationId = '';
   const ACCESS_SIGNAL_TTL_MS = 2 * 60 * 1000;
+
+  function retireReader() {
+    const reader = activeReader;
+    activeReader = null;
+    if (!reader || typeof reader.cancel !== 'function') return;
+    // Cancel only our cloned branch; never await the official consumer's EOF.
+    try { Promise.resolve(reader.cancel()).catch(function () {}); }
+    catch (_) { /* Owner checks still reject already queued chunks. */ }
+  }
 
   function notify() {
     const textTransactionRelay = window.__elonChatGptPrivateTextTransactionRelay;
@@ -73,6 +83,7 @@
     const active = session.current(location.pathname);
     blockedConversationId = String(active && active.conversationId || '').slice(0, 180);
     conversationGeneration += 1;
+    retireReader();
     observedWidgets.clear();
     socketFrames = 0;
     socketFirstReported = false;
@@ -85,6 +96,7 @@
   function prepareSend() {
     blockedConversationId = '';
     conversationGeneration += 1;
+    retireReader();
     observedWidgets.clear();
     socketFrames = 0;
     socketFirstReported = false;
@@ -521,7 +533,7 @@
   }
 
   function observeTappedFetch(event) {
-    if (!event || !event.response) return;
+    if (disposed || !event || !event.response) return;
     let url;
     try { url = new URL(String(event.url || ''), location.href); }
     catch (_) { return; }
@@ -547,11 +559,14 @@
       ? clone.body.getReader()
       : null;
     if (!reader) return;
+    retireReader();
+    activeReader = reader;
+    const isCurrent = () => !disposed && observedGeneration === conversationGeneration && activeReader === reader;
     session.begin();
     const decoder = new TextDecoder();
     const sse = policy.createSseDecoder(
       (payload) => {
-        if (observedGeneration !== conversationGeneration) return;
+        if (!isCurrent()) return;
         if (isStaleConversationPayload(payload)) {
           recordShape('conversation_boundary/stale_rejected');
           return;
@@ -567,28 +582,32 @@
         notify();
       },
       () => {
-        if (observedGeneration !== conversationGeneration) return;
+        if (!isCurrent()) return;
         const completed = session.finish();
         report(completed ? 'success' : 'empty');
         if (completed) notify();
       }
     );
     try {
-      while (!disposed) {
-        if (observedGeneration !== conversationGeneration) break;
+      while (isCurrent()) {
         const value = await reader.read();
-        if (value.done) break;
+        if (!isCurrent() || value.done) break;
         sse.push(decoder.decode(value.value, { stream: true }));
       }
-      sse.push(decoder.decode());
-      sse.finish();
+      if (isCurrent()) {
+        sse.push(decoder.decode());
+        sse.finish();
+      }
     } catch (_) {
       // Aborting the official request also rejects its cloned reader. Keep
       // received text for the same turn while the official snapshot catches up.
-      if (!disposed && observedGeneration === conversationGeneration && !session.finish()) session.reset();
-      report('error');
-      notify();
+      if (isCurrent()) {
+        if (!session.finish()) session.reset();
+        report('error');
+        notify();
+      }
     } finally {
+      if (activeReader === reader) activeReader = null;
       try { reader.releaseLock(); }
       catch (_) { /* The stream may already be closed. */ }
     }
@@ -603,6 +622,7 @@
     catch (_) { return originalFetch.apply(this, args); }
     const method = init.method || input && input.method || 'GET';
     return Promise.resolve(originalFetch.apply(this, args)).then((response) => {
+      if (disposed) return response;
       if (!fetchUnsubscribe) {
         observeAccessResponse(method, url, response);
         if (isOfficialConversationStream(method, url, response)) observe(response);
@@ -621,7 +641,7 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 16,
+    version: 17,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,
@@ -639,6 +659,7 @@
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      retireReader();
       listeners.clear();
       observedWidgets.clear();
       if (typeof fetchUnsubscribe === 'function') fetchUnsubscribe();
