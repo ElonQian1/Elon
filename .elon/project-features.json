@@ -1224,7 +1224,7 @@
       "id": "android-binance-manage-reconnect-v1",
       "title": "币安管理页过期恢复",
       "summary": "恢复过期后已销毁的官方WebView与Host会话，共用原生/MCP重连路径，连接优先布局和样式。",
-      "status": "implemented",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/android-binance-manage-reconnect-v1.md",
@@ -1319,15 +1319,15 @@
         },
         {
           "path": "docs/reports/android-binance-manage-reconnect-v1-20260909.md",
-          "content_hash": "e93c16633499d224aa2e17e7b7379eba0f2007837d73ee73f7914e6296ca2d38",
+          "content_hash": "f2bae4271201825ce8b9c172fd18c2c7664e9bac356353c8c8358b2f121b98a1",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "20c08c8b976593bbc6c7ee120beb409a13ea8e04",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "716a5a7c5b52a3a84e880a8ca4c5db6117dba05f",
-            "state": "untracked"
+            "head_commit": "a5ba933e5d34bb36d20b1dc145f034b2f39b520f",
+            "head_blob_oid": "716a5a7c5b52a3a84e880a8ca4c5db6117dba05f",
+            "worktree_blob_oid": "0b09fadae5006e5472b6b35f7e0acbbe9701537e",
+            "state": "tracked_modified"
           }
         },
         {
@@ -1345,7 +1345,7 @@
         }
       ],
       "created_at_ms": 1788883029995,
-      "updated_at_ms": 1788884149598
+      "updated_at_ms": 1788885567487
     },
     {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -24002,36 +24002,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_663de9703fcb455f8440ab54034100e0",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "需求范围、依赖、验收标准和实现路径已明确，可重新认领验证。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788650688887
-    },
-    {
-      "id": "feature_event_bc588b51d0c74b378df4259ac45a4ca6",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "claimed",
-      "actor": "codex-sui-ci",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788650697338
-    },
-    {
-      "id": "feature_event_7a0c7887246b4cea9a51c5f0c6c8e953",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "固定双归档安装、隔离 Move 构建与本地真实验证已进入最终证据和远端 CI 收尾。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788650707555
-    },
-    {
       "id": "feature_event_e046e225c156465da3426438bcf0920a",
       "feature_id": "project-feature-registry-adoption-v1",
       "action": "transitioned",
@@ -26000,6 +25970,36 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1788884149598
+    },
+    {
+      "id": "feature_event_0ae58589a48240ef9950e503d5a8792a",
+      "feature_id": "android-binance-manage-reconnect-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-usability",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788885452703
+    },
+    {
+      "id": "feature_event_f15f23e3369a4a48b0ed8a10264893c9",
+      "feature_id": "android-binance-manage-reconnect-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-usability",
+      "reason": "49 native regressions passed; installed official 1580, management reload and detail read verified on phone; automatic visual gate remains deferred.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788885564820
+    },
+    {
+      "id": "feature_event_070db9c3641c41a1becfa15828c2c26b",
+      "feature_id": "android-binance-manage-reconnect-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-usability",
+      "reason": "Official 1.1.1580 published and installed; online APK fingerprint matches, read-only workflow verified. No trade submitted.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788885567487
     }
   ]
 }
