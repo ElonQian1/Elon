@@ -44,11 +44,20 @@ No eligibility or post-invocation retry guard is weakened.
   old production selector. `stop-composer-tests-20260908-verified`: 70 Node
   runner cases pass, including existing guest/request/voice guards and new
   diagnostic tests. These two suites overlap and are not 115 unique tests.
-- Native diagnostic validator `testReleaseUnitTest` passes; the logged batch
-  `stop-diagnostic-native-tests-20260908` completed in 326.6 seconds.
-- Release build/publication: pending.
+- Native diagnostic validator `testReleaseUnitTest`: six tests, zero failures,
+  errors or skipped cases. `stop-diagnostic-native-tests-20260908` completed in
+  326.6 seconds.
+- Release v1.1.1568 (1568), adapter 304, source `8c67e086e` includes stream
+  correction `411bab5b6`. Build passed in 7m12s; the full
+  `stop-correction-release-20260908` publish/install batch took 474.7 seconds.
+  APK SHA-256: `733a67dd5e7806bea1d1b06b53a8aaade80a90267a49d3adf3d72617d76bb476`.
+  Publisher reported `APK_ADB_DEPLOY_STATUS=updated`; independent package
+  readback confirmed versionName 1.1.1568 and versionCode 1568 on the trusted
+  Xiaomi. Cookie and application data were preserved.
 - Device: trusted Xiaomi remains online, but readiness returned
-  `unlock_device`. No stop test was replayed while it was locked.
+  `unlock_device` before and after installation. No stop test was replayed while
+  it was locked. The private stop and partial-retention device gates remain
+  deferred, not passed; APK installation does not satisfy them.
 
 ## Next acceptance
 
