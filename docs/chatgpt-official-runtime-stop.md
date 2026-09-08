@@ -1,18 +1,21 @@
 # Official runtime generation stop
 
 Capability: `android_chatgpt_official_runtime_stop_generation_v1`.
-Status: stop runtime v7 is published in APK 1576 and its ordinary guest stop
-operation is device verified (`official_runtime_v1:stop_observed`, partial text
-retained). The full capability is not completed: follow-up still combines the
-two synthetic prompts and replaces the partial answer. Do not repeat request-ID
-research; that guard is now proven compatible. See the
-[1576 evidence and stream-visibility correction](reports/chatgpt-stop-followup-1576.md)
-for the remaining boundary. A runtime stop receipt does not prove turn continuity.
+Status: ordinary authenticated native stop/follow-up acceptance is **completed**
+on normal APK 1591. Both sends and stop used the official runtime; the 229-character
+partial reply and four separate ordered rows were retained, then original state
+was restored. Reuse this scope, do not repeat it without a regression. See the
+[1591 build and acceptance evidence](reports/chatgpt-runtime-bindings-20260909.md).
+The prior ordinary guest stop operation passed on APK 1576, but its subsequent
+projection continuity failure has not been retaken after the visibility filter
+and runtime updates. Preserve that guest boundary and the user's current login.
+See [the historical guest evidence](reports/chatgpt-stop-followup-1576.md).
+A runtime stop receipt alone does not prove turn continuity.
 Earlier adapter 304 added
 disabled-composer lookup and partial-reply retention; see
 [the earlier correction](reports/chatgpt-stop-interruption-20260908.md). This is a
 same-origin official-runtime bridge, not an independent Android HTTP transport.
-Do not reimplement the source integration while device acceptance is pending.
+Do not reimplement the accepted source integration for the remaining guest check.
 
 ## Scope and evidence
 

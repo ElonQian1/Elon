@@ -95,3 +95,37 @@ reads `Id(c)` (import `zS`), active request `Mle` (import `Xu`) and enum `ml`
 Composer owners `DJt`/`H_n` retain the same inspected 30/265-slot contracts.
 Both Sep 9 profiles execute the same independent identity and consumer tests;
 no uncertain message was replayed, and the full continuity gate remains open.
+
+## Normal 1591 authenticated acceptance
+
+Release `1.1.1591`, source `b609e779b07f8ce318ca575d19fd6022c8e43dc4`, passed
+the normal publisher and unattended replacement installation on the trusted
+Xiaomi. Local APK and online manifest SHA-256 agree:
+`f43d1d0d16b99f00cc45ba06a923bcabd2207b3b0469ae5414ca17ee6bec6aa1`.
+Build evidence: `runtime-bindings-sep9b-release-20260909-064116-993` (438.1 s).
+Both Sep 9 profiles and dependent consumers pass 431 Node cases, no skips.
+
+The 96-entry public asset inventory was truncated and omitted all known role
+filenames on this reopened page. A local admission check using that incomplete
+inventory was inconclusive, not evidence of an unsupported build. The actual
+official composer-tool context subsequently reported `ready`, with no selection
+write. Future diagnostics must not equate bounded inventory absence with a
+runtime failure.
+
+Acceptance scope `ordinary_authenticated_native_stop_followup`: **completed**.
+Reuse this accepted path unless there is new regression evidence. The unchanged
+native consumer flow completed in 30.7 seconds:
+
+- Both sends were acknowledged as `official_runtime_v1:accepted`.
+- Mid-public-answer stop returned `official_runtime_v1:stop_observed`.
+- All 229 characters observed before stopping were retained after the follow-up.
+- Exactly four ordered native rows remained: user, assistant, user, assistant.
+- Both prompts stayed separate; the final follow-up answer matched its marker.
+- Native/official drafts were empty; original blank chat and awake lease restored.
+- No microphone, system TTS substitution, private-content output, login clearing
+  or independent proxy modification was involved.
+
+Evidence: `stopped-followup-device-1591-20260909-065407-624`. This establishes the
+current authenticated production UI path, not the cause of every earlier guest
+projection failure. The previous guest continuity case remains unretaken; do
+not clear the user's login to recreate it, or report all private features done.

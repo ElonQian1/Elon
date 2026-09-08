@@ -22,23 +22,22 @@ reused; source-only or installation status does not satisfy the acceptance gate.
 
 ## Current batch
 
-[Normal Release 1589](reports/chatgpt-library-mutations-1589.md) is installed:
+[Normal Release 1589 evidence](reports/chatgpt-library-mutations-1589.md):
 ordinary native library rename/soft-delete, explicit one-text-file upload-copy
 with private upload and file-content reply, and rename/search reconciliation
 passed. Originals and the blank chat/draft were restored. These scopes are
 completed and reused. A current next-page read failed; pagination remains a
 specific open check, not a reason to repeat successful mutations or uploads.
 
-Current stop checkpoint: [APK 1576](reports/chatgpt-stop-followup-1576.md) accepts
-the official composite request ID, stops through the official runtime and retains
-the immediate partial answer. Follow-up still merges the native/web projections;
-full stop/follow-up acceptance is **failed**, not complete. The independent
-public-answer stream filter is published in APK 1578; its phone acceptance is
-deferred because the trusted device was offline during this release.
-Use `scripts/smoke-chatgpt-web-stopped-followup.ps1` for that next acceptance: it
-waits for a requested public-answer prefix, checks two separate ordered turns,
-and reports restoration independently. It does not inspect or mutate the
-official conversation tree and cannot prove tree loss from projection counts.
+Current installed build: [normal APK 1591](reports/chatgpt-runtime-bindings-20260909.md).
+Ordinary authenticated native stop/follow-up is **completed**: both sends and
+stop used the official runtime, all 229 observed partial characters survived,
+and four ordered separate rows remained. Original blank chat/drafts were restored.
+Reuse this scope without repeating acceptance unless there is new regression.
+The older [APK 1576 guest continuity failure](reports/chatgpt-stop-followup-1576.md)
+has not been retaken; do not clear login to recreate it or infer its root cause
+from the authenticated pass. The unchanged native harness checks a requested
+public-answer prefix, separate turns and restoration without mutating the tree.
 
 Latest grouped delivery: `1542` compiled and passed 1,007 Android tests, was
 published and installed, and confirmed one production private text-file upload
@@ -285,10 +284,10 @@ download 13, gallery 3). 161 related offline cases pass; grouped build and real
 preview/saved-file acceptance remain pending. Reuse this implementation;
 remaining pointer gaps mean other scopes or forms outside its bounded contract.
 
-[Official-runtime generation stop](chatgpt-official-runtime-stop.md) is installed
-and its stop request passed on APK 1576. It reuses the sender's committed context
-and blocks a second writer while stopping. The unresolved gap is the subsequent
-turn's history continuity, not lack of a stop implementation. It is not
+[Official-runtime generation stop](chatgpt-official-runtime-stop.md) and ordinary
+authenticated follow-up continuity passed on APK 1591. It reuses the sender's
+committed context and blocks a second writer while stopping. The previous guest
+continuity failure still needs its own safe acceptance scope. This is not
 independent Android HTTP dispatch. Older source-only cells below are historical
 checkpoints; the grouped delivery section controls their build/install status.
 
