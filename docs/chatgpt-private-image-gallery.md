@@ -43,8 +43,8 @@ credentials and reject redirects. The inspected official shared module has SHA-2
 `89c95d937bac1191e91d5ceb4872eb0c328d39a98ce05399093a663f18921aa0`.
 
 This contract is based on current official source, not a successful current
-account API request. Pointer query parameters, shared/library/connector scopes
-and unrecognized pointer shapes remain partial, never guessed.
+account API request. Bounded pointer parameters are now implemented below;
+shared/library/connector scopes and unrecognized shapes remain partial.
 
 ## Ownership and limits
 
@@ -123,3 +123,40 @@ tests, with zero failures, cancellations or skips. Evidence stem:
 demonstrated rejected same-origin previews, then hit its 120-second timeout due
 to a test waiting for a fetch that the old policy never starts. That test now
 also observes early completion, so policy rejection fails promptly.
+
+## Shared pointer parser, 2026-09-08
+
+Gallery module v2 reuses the existing conversation-download pointer parser,
+now extracted into `chatgpt_web_private_image_pointer.js`. It does not introduce
+another resolver, downloader, WebView, polling loop or credential store.
+The extraction alone passed 46 focused tests without changing download behavior.
+
+The retained current shared asset `4813494d-o593jrji51wy4azk.js` has SHA-256
+`48563cd22f0dafe6c0b89220348fa3add81ff3abb82a62ed9d68a04d569cc375`.
+Its `kEt` resolver still splits pointer queries with `URLSearchParams`, takes
+the last repeated value and replaces `#` in the file ID with `*`. The current
+conversation asset SHA-256 is
+`7973d518b083f0f3e23905a279ed019378481bdbdd10fc0196afe9fc7b3b7d35`;
+`cNt` retains the existing recent-image route, cursor and 120-second cache.
+These public bytes were hash-checked, not an authenticated preview transaction.
+
+The gallery now accepts the same bounded ID/query forms as conversation image
+downloads. Immutable selected parameters feed the existing preview resolver;
+conversation ID, inline preview and non-download intent cannot be overridden.
+The complete pointer participates in cache identity, so variants cannot reuse
+each other's thumbnail. Native events still contain only opaque image handles.
+Explicit project, post, library or connector metadata is rejected until its
+resolver is implemented, rather than silently dropping that scope. A partial
+page keeps other successful images. v2 reinjection disposes v1 once and does not
+stack requests. Account, document, route and cancellation guards are unchanged.
+
+Four new cases failed against v1, including ignored explicit metadata scope.
+The final related run passed 178 Node cases with no skips or cancellations,
+including the real exporter, scoped downloads and history projection. The
+ordered 100-asset Android script bundle parses successfully. Evidence stem:
+`image-gallery-pointer-final-20260908-181510-021`.
+HTTP and image bytes in these tests are synthetic. No APK was built or installed
+for this source batch. The phone's foreground belonged to a separate grid task
+and was left untouched. Grouped acceptance still needs an actual generated
+image, plus a parameterized pointer when available, with preview bytes and warm
+reopen verified from the production Images UI. Do not mark `completed` yet.

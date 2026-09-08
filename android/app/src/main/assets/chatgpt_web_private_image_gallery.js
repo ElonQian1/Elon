@@ -1,16 +1,23 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const pointer = typeof module === 'object' && module.exports
+    ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
+  const exported = Object.freeze({ version: 2, create: root => factory(root, pointer) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
-  if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateImageGallery) {
-    root.__elonChatGptPrivateImageGallery = factory(root);
+  if (root?.location?.origin === 'https://chatgpt.com' &&
+      Number(root.__elonChatGptPrivateImageGallery?.version || 0) < exported.version) {
+    root.__elonChatGptPrivateImageGallery?.dispose?.();
+    root.__elonChatGptPrivateImageGallery = factory(root, pointer);
   }
-})(typeof window === 'object' ? window : null, function (root) {
+})(typeof window === 'object' ? window : null, function (root, pointerParser) {
   'use strict';
   const ACTION = 'sync_private_image_gallery';
   const CANCEL = 'cancel_private_image_gallery';
   const HANDLE = /^image_[a-f0-9]{16}$/;
   const ID = /^[A-Za-z0-9_-]{1,160}$/;
+  const UNRESOLVED_SCOPE = new Set(['gizmo_id', 'project_id', 'post_id', 'library_file_id',
+    'shared_library_file_id', 'library_download_id', 'context_scopes', 'source_url',
+    'context_connector', 'connector_id', 'context_connector_info', 'shared']);
   const TTL_MS = 120000;
   const pages = new Map();
   let cursors = [null], pageIndex = 0, cacheIdentity = '', cacheTime = 0;
@@ -101,10 +108,13 @@
   }
 
   function imageTarget(item) {
-    const pointer = /^(?:file-service|sediment):\/\/([A-Za-z0-9_-]{1,160})$/.exec(item.asset_pointer || '');
-    if (!pointer || item.conversation_id != null && !ID.test(item.conversation_id)) return null;
-    // Shared/library pointer parameters require their own inspected scope resolver.
-    return { fileId: pointer[1], conversationId: item.conversation_id ?? null };
+    const pointer = pointerParser?.parse(item.asset_pointer);
+    if (!pointer || item.conversation_id != null &&
+        (typeof item.conversation_id !== 'string' || !ID.test(item.conversation_id)) ||
+        [...UNRESOLVED_SCOPE].some(key => item[key] != null) ||
+        pointer.downloadQuery.some(([key]) => UNRESOLVED_SCOPE.has(key.toLowerCase()))) return null;
+    return { fileId: pointer.id, downloadFileId: pointer.downloadFileId,
+      downloadQuery: pointer.downloadQuery, conversationId: item.conversation_id ?? null };
   }
 
   function register(job, page) {
@@ -115,7 +125,8 @@
       if (!target) { unavailable++; continue; }
       const stable = JSON.stringify([job.account, target.fileId, target.conversationId]);
       const handle = job.assets.registerPrivate(stable, async signal => {
-        const url = new URL('/backend-api/files/download/' + encodeURIComponent(target.fileId), root.location.origin);
+        const url = new URL('/backend-api/files/download/' + encodeURIComponent(target.downloadFileId), root.location.origin);
+        for (const [key, value] of target.downloadQuery) url.searchParams.set(key, value);
         if (target.conversationId) url.searchParams.set('conversation_id', target.conversationId);
         url.searchParams.set('inline', 'true');
         url.searchParams.set('download_intent', 'false');
@@ -232,5 +243,5 @@
   }
 
   function dispose() { cancel(); disposed = true; clearCache(); cacheIdentity = ''; }
-  return Object.freeze({ version: 1, request, handle, cancel, dispose });
+  return Object.freeze({ version: 2, request, handle, cancel, dispose });
 });

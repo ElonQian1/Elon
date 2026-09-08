@@ -126,6 +126,95 @@ test('unrecognized pointer scopes are partial rather than fabricated empty galle
   assert.equal(last.handles.length, 1);
 });
 
+test('parameterized gallery previews retain the official query and warm cache', async () => {
+  const item = { ...row(1), asset_pointer: 'sediment://file-1#preview?variant=first&label=A+B&variant=last' };
+  const h = harness([{ items: [item], cursor: null }]);
+  assert.equal((await h.run()).ok, true);
+  const image = h.calls[1].url;
+  assert.equal(image.pathname, '/backend-api/files/download/file-1*preview');
+  assert.equal(image.searchParams.get('variant'), 'last');
+  assert.equal(image.searchParams.get('label'), 'A B');
+  assert.equal(image.searchParams.get('conversation_id'), 'conversation-1');
+  assert.equal(image.searchParams.get('inline'), 'true');
+  assert.equal(image.searchParams.get('download_intent'), 'false');
+  const handles = h.snapshots().at(-1).handles;
+  h.calls.length = 0;
+  assert.equal((await h.run('open', handles)).ok, true);
+  assert.equal(h.calls.length, 0);
+  assert.doesNotMatch(JSON.stringify(h.events), /variant|label|file-1|conversation-1/);
+});
+
+test('different pointer variants never alias one cached thumbnail', async () => {
+  const h = harness([{ items: [
+    { ...row(1), asset_pointer: 'file-service://file-1?variant=one' },
+    { ...row(1), asset_pointer: 'file-service://file-1?variant=two' },
+  ], cursor: null }]);
+  assert.equal((await h.run()).ok, true);
+  assert.equal(new Set(h.snapshots().at(-1).handles).size, 2);
+  assert.deepEqual(h.calls.slice(1).map(c => c.url.searchParams.get('variant')), ['one', 'two']);
+});
+
+test('preview registration snapshots the selected pointer before asynchronous resolution', async () => {
+  const item = { ...row(1), asset_pointer: 'file-service://file-1?variant=selected' };
+  const h = harness([{ items: [item], cursor: null }]);
+  const register = h.root.__elonChatGptImageAssets.registerPrivate;
+  h.root.__elonChatGptImageAssets.registerPrivate = (...args) => {
+    item.asset_pointer = 'sediment://file-other?variant=changed';
+    item.conversation_id = 'conversation-other';
+    return register(...args);
+  };
+  assert.equal((await h.run()).ok, true);
+  assert.equal(h.calls[1].url.pathname, '/backend-api/files/download/file-1');
+  assert.equal(h.calls[1].url.searchParams.get('variant'), 'selected');
+  assert.equal(h.calls[1].url.searchParams.get('conversation_id'), 'conversation-1');
+});
+
+test('gallery rejects non-string conversation identities rather than coercing scope', async () => {
+  for (const conversation_id of [123, true, {}, '']) {
+    const h = harness([{ items: [{ ...row(1), conversation_id }], cursor: null }]);
+    assert.equal((await h.run()).ok, false);
+    assert.equal(h.exports.length, 0);
+  }
+});
+
+test('gallery never drops explicit unresolved project, library or connector scope', async () => {
+  for (const key of ['gizmo_id', 'project_id', 'post_id', 'library_file_id', 'shared_library_file_id',
+    'library_download_id', 'context_scopes', 'source_url', 'context_connector', 'connector_id', 'context_connector_info']) {
+    const h = harness([{ items: [{ ...row(1), [key]: 'unresolved' }], cursor: null }]);
+    assert.equal((await h.run()).ok, false, key);
+    assert.equal(h.snapshots().at(-1).state, 'partial');
+    assert.equal(h.exports.length, 0);
+    assert.equal(h.calls.length, 1);
+  }
+});
+
+test('gallery query parameters cannot change scope, credentials or download intent', async () => {
+  for (const query of ['conversation_id=other', 'inline=false', 'download_intent=true', 'authorization=other',
+    'library_file_id=other', 'shared_library_file_id=other', 'shared=unknown', 'source_url=https%3A%2F%2Fexample.com',
+    'label=%', 'label=%00', 'variant=' + 'a'.repeat(1025)]) {
+    const h = harness([{ items: [{ ...row(1), asset_pointer: 'file-service://file-1?' + query }], cursor: null }]);
+    assert.equal((await h.run()).ok, false, query.slice(0, 40));
+    assert.equal(h.calls.length, 1);
+    assert.equal(h.exports.length, 0);
+  }
+});
+
+test('gallery upgrade retires one older instance without stacking requests', () => {
+  const fs = require('node:fs'), vm = require('node:vm');
+  const source = fs.readFileSync(require.resolve('../android/app/src/main/assets/chatgpt_web_private_image_gallery.js'), 'utf8');
+  let disposed = 0;
+  const root = { location: { origin: 'https://chatgpt.com' },
+    __elonChatGptPrivateImageGallery: { version: 1, dispose: () => disposed++ },
+    __elonChatGptPrivateImagePointer: require('../android/app/src/main/assets/chatgpt_web_private_image_pointer.js') };
+  vm.runInNewContext(source, { window: root });
+  const instance = root.__elonChatGptPrivateImageGallery;
+  assert.equal(instance.version, 2);
+  assert.equal(disposed, 1);
+  vm.runInNewContext(source, { window: root });
+  assert.equal(root.__elonChatGptPrivateImageGallery, instance);
+  assert.equal(disposed, 1);
+});
+
 test('account switch invalidates catalog, opaque handles and native cache claims', async () => {
   const h = harness();
   await h.run();
