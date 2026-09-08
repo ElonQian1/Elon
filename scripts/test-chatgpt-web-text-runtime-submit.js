@@ -90,7 +90,7 @@ test('official text action dispatches once without filling or clicking the websi
   assert.deepEqual(intent, { kind: 'text_action', text: f.command.prompt });
   assert.deepEqual(options, { requireDispatchAcceptance: true });
   f.settle(true);
-  assert.deepEqual(await result.completion, { status: 'accepted', code: 'accepted' });
+  assert.deepEqual(await result.completion, { status: 'accepted', code: 'accepted', current: true });
   assert.equal(f.api.state().pending, false);
   assert.equal(f.timers.size, 0);
 });
@@ -213,7 +213,7 @@ test('guest root allowance never authorizes another server ID during an existing
   f.setServer(id);
   const result = f.api.submit(f.command);
   f.setServer('99999999-2222-3333-4444-555555555555'); f.settle(true);
-  assert.equal((await result.completion).code, 'context_changed');
+  assert.deepEqual(await result.completion, { status: 'accepted', code: 'accepted', current: false });
 });
 
 for (const state of ['invalid_server', 'authenticated_home', 'guest_project', 'guest_temporary', 'guest_other_route']) {
@@ -363,7 +363,8 @@ for (const [name, change] of Object.entries({
     const f = fixture({ authStatus: 'logged_out', session: null }); await flush();
     f.setDraft(f.command.prompt); f.command.expectedDraft = f.command.prompt;
     const result = f.api.submit(f.command); assert.equal(result.handled, true);
-    change(f); f.settle(true); assert.equal((await result.completion).code, 'context_changed');
+    change(f); f.settle(true);
+    assert.deepEqual(await result.completion, { status: 'accepted', code: 'accepted', current: false });
     assert.equal(f.draft(), f.command.prompt); assert.equal(f.calls.length, 1);
     await flush();
   });
@@ -383,6 +384,22 @@ test('matching draft is cleared only after accepted official dispatch', async ()
   assert.equal(f.draft(), f.command.prompt);
   f.settle(true); await result.completion;
   assert.equal(f.draft(), '');
+});
+
+test('a local explicit-draft cleanup exception cannot revoke a confirmed send', async () => {
+  const f = fixture(); f.setDraft(f.command.prompt); f.command.expectedDraft = f.command.prompt;
+  f.command.clearDraft = () => { throw Error('local cleanup failed'); };
+  const result = f.api.submit(f.command); f.settle(true);
+  assert.equal((await result.completion).status, 'accepted');
+  assert.equal(f.calls.length, 1); assert.equal(f.draft(), f.command.prompt);
+});
+
+test('unconfirmed completions expose only a fixed result class, never runtime values', async () => {
+  for (const [value, code] of [[false, 'false'], [undefined, 'void'], [null, 'void'],
+    [{ private: 'must-not-emit' }, 'shape'], ['must-not-emit', 'shape']]) {
+    const f = fixture(), result = f.api.submit(f.command); f.node.isConnected = false; f.settle(value);
+    assert.deepEqual(await result.completion, { status: 'unknown', code: 'dispatch_unconfirmed_' + code });
+  }
 });
 
 test('edits made while dispatching are preserved', async () => {
@@ -538,11 +555,11 @@ test('current-tree removal between capture and dispatch preserves the native dra
   assert.equal(f.calls.length, 0); assert.equal(f.draft(), f.command.prompt);
 });
 
-test('current-tree removal after dispatch cannot acknowledge or clear the draft', async () => {
+test('current-tree removal does not revoke confirmed dispatch or clear another draft', async () => {
   const f = fixture(); f.setDraft(f.command.prompt); f.command.expectedDraft = f.command.prompt;
   const result = f.api.submit(f.command);
   f.top.child = null; f.settle(true);
-  assert.equal((await result.completion).code, 'context_changed');
+  assert.deepEqual(await result.completion, { status: 'accepted', code: 'accepted', current: false });
   assert.equal(f.calls.length, 1); assert.equal(f.draft(), f.command.prompt);
 });
 
@@ -626,7 +643,7 @@ for (const [name, change] of Object.entries({
   test(name + ' change during submission does not clear the new context', async () => {
     const f = fixture(); f.setDraft(f.command.prompt); f.command.expectedDraft = f.command.prompt;
     const result = f.api.submit(f.command); change(f); f.settle(true);
-    assert.equal((await result.completion).code, 'context_changed');
+    assert.deepEqual(await result.completion, { status: 'accepted', code: 'accepted', current: false });
     assert.equal(f.draft(), f.command.prompt);
   });
 }

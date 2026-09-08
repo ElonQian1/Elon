@@ -15,21 +15,30 @@ which reader ran. See [1554 evidence](reports/chatgpt-runtime-release-1554.md).
 
 ## Current draft and guest ownership
 
-APK 1555 contains submit 12 / bindings 4. Its first production current-draft
+APK 1555 contains submit 12 / bindings 4. Its first production
 send reached the runtime without DOM fallback and later showed exactly one
 complete test reply with native streaming false. However, the receipt reported
 `unknown:context_changed`. The subsequent read-only check confirms delivery,
 not which individual post-submit ownership check changed.
 
-Submit 13 separates confirmed dispatch from editor/UI cleanup for current-draft
+APK 1556 contains submit 13, whose first send still reported
+`unknown:context_changed`. The chosen action kind and resolved completion value
+were not included in the receipt, so neither this sample nor 1555 proves that
+the current-draft branch ran. Its test runner completed cleanup, not functional
+acceptance; no second message was sent automatically.
+
+Submit 14 separates confirmed dispatch from editor/UI cleanup for both pure-text
 transactions. Only the official completion resolving exactly `true`, under
 `requireDispatchAcceptance`, acknowledges the captured command. A reset editor
 cannot revoke that result. A changed current context sets `current: false`:
 the orchestrator does not start synthetic streaming in the successor page,
 and the runtime never clears its draft. Android matches the original request ID
 against its send ledger. False/malformed/failed completions remain unconfirmed;
-explicit text and attachment cleanup retain their stricter original contract.
-This extension awaits its grouped Release acceptance.
+local text cleanup failures cannot invalidate an already confirmed dispatch.
+Attachments retain their stricter original ownership/consumption contract.
+An unconfirmed completion has a fixed false/void/shape reason rather than being
+masked by the page-context check; no raw result is emitted. This extension
+awaits its grouped Release acceptance.
 
 The bridge reuses the official runtime
 writer rather than adding another HTTP sender. Known ready explicit text and

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 13, create: factory });
+  const exported = Object.freeze({ version: 14, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -266,14 +266,18 @@
     let timer;
     const settled = Promise.resolve(receipt.completion).then(accepted => {
       const currentContext = sameOwner(binding);
-      // A current-draft transaction owns its reset and confirms this specific
-      // dispatch. Editor replacement cannot revoke that acknowledgement. Do not
-      // apply its UI effects to a new context; Android also matches requestId.
-      if (binding.draftView && accepted === true) {
+      // Dispatch acknowledgement belongs to the captured command, not the
+      // editor lifetime. Local cleanup must never revoke a confirmed send.
+      if (!binding.attachment && accepted === true) {
+        if (currentContext && !binding.draftView && expected) {
+          try { if (command.readDraft() === expected) command.clearDraft?.(); } catch (_) {}
+        }
         return { status: 'accepted', code: 'accepted', current: currentContext };
       }
-      if (!currentContext) return { status: 'unknown', code: 'context_changed' };
-      if (accepted !== true) return { status: 'unknown', code: 'dispatch_not_confirmed' };
+      if (binding.attachment && !currentContext) return { status: 'unknown', code: 'context_changed' };
+      if (accepted !== true) return { status: 'unknown', code: binding.attachment ? 'dispatch_not_confirmed'
+        : accepted === false ? 'dispatch_unconfirmed_false'
+        : accepted == null ? 'dispatch_unconfirmed_void' : 'dispatch_unconfirmed_shape' };
       // prepared_action does not reset ready files. Never let a failed local
       // cleanup accidentally include the accepted attachment in another send.
       if (binding.attachment) {
@@ -301,5 +305,5 @@
       if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
     }
   } catch (_) {}
-  return Object.freeze({ version: 13, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 14, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });
