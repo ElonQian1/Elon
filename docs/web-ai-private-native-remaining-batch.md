@@ -22,7 +22,15 @@ reused; source-only or installation status does not satisfy the acceptance gate.
 
 ## Current batch
 
-Current stop correction: [adapter 304 batch](reports/chatgpt-stop-interruption-20260908.md) retains interrupted reply text, locates disabled composers and adds bounded diagnostics. The preceding APK 1567 used fallback and lost its immediate partial reply; private-stop acceptance remains open.
+Current stop checkpoint: [APK 1576](reports/chatgpt-stop-followup-1576.md) accepts
+the official composite request ID, stops through the official runtime and retains
+the immediate partial answer. Follow-up still merges the native/web projections;
+full stop/follow-up acceptance is **failed**, not complete. The independent
+public-answer stream filter is source-tested and queued for the next grouped APK.
+Use `scripts/smoke-chatgpt-web-stopped-followup.ps1` for that next acceptance: it
+waits for a requested public-answer prefix, checks two separate ordered turns,
+and reports restoration independently. It does not inspect or mutate the
+official conversation tree and cannot prove tree loss from projection counts.
 
 Latest grouped delivery: `1542` compiled and passed 1,007 Android tests, was
 published and installed, and confirmed one production private text-file upload
@@ -262,12 +270,12 @@ The offline implementation itself did not operate the absent phone.
 
 ## Protocol gaps
 
-Adapter 291 adds [official-runtime generation stop](chatgpt-official-runtime-stop.md)
-to the grouped ChatGPT acceptance candidate. It reuses the sender's committed
-conversation context, invokes the official stop lifecycle without DOM-button
-polling, and prevents another native send/regenerate while stop is in flight.
-The combined 158-case Node run passes; current-runtime access and production UI
-stopping still await the grouped APK. It is not independent Android HTTP dispatch.
+[Official-runtime generation stop](chatgpt-official-runtime-stop.md) is installed
+and its stop request passed on APK 1576. It reuses the sender's committed context
+and blocks a second writer while stopping. The unresolved gap is the subsequent
+turn's history continuity, not lack of a stop implementation. It is not
+independent Android HTTP dispatch. Older source-only cells below are historical
+checkpoints; the grouped delivery section controls their build/install status.
 
 | Area | Existing usable path | Actual remaining private work |
 |---|---|---|
