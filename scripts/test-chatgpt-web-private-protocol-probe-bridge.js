@@ -82,7 +82,7 @@ test('version 13 command upgrade preserves existing observers and other commands
   const existing = f.probe;
   f.window.__elonChatGptPrivateResearchProbe = { ...existing, version: 13 };
   vm.runInNewContext(source, f.context);
-  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 14);
+  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 16);
   assert.equal(f.window.fetch, fetch);
   assert.equal(f.window.XMLHttpRequest.prototype.send, send);
   const answers = [];
@@ -90,6 +90,38 @@ test('version 13 command upgrade preserves existing observers and other commands
   assert.equal(answers[0][2], 'composer_tool_context:not_observed');
   f.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe', { value: 'read' }, (...args) => answers.push(args));
   assert.equal(JSON.parse(answers[1][2]).active, false);
+});
+
+for (const previousVersion of [null, 15]) test('stop owner shape is read-only; previous=' + previousVersion, () => {
+  const f = fixture({ window: { __elonChatGptPrivateStopRuntime: {
+    diagnostics: () => ({ cached: true, request: 'missing', tree: true,
+      generation: true, mode: 'streaming', token: 'secret', text: 'private text' }),
+    stop: () => assert.fail('diagnostics must not stop a request'),
+  } } });
+  const fetch = f.window.fetch, send = f.window.XMLHttpRequest.prototype.send;
+  if (previousVersion) {
+    f.window.__elonChatGptPrivateResearchProbe = { ...f.probe, version: previousVersion };
+    vm.runInNewContext(source, f.context);
+  }
+  let result;
+  f.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe', { value: 'stop_runtime_owner' },
+    (_, ok, detail) => { assert.equal(ok, true); result = JSON.parse(detail); });
+  assert.deepEqual(result, { schema: 'elon.stop_runtime_owner.v1', cached: true,
+    request: 'missing', tree: true, generation: true, mode: 'streaming' });
+  assert.equal(f.window.fetch, fetch); assert.equal(f.window.XMLHttpRequest.prototype.send, send);
+  assert.equal(f.read().active, false); assert.deepEqual(f.events, []); assert.deepEqual(f.requests, []);
+});
+
+test('stop owner diagnostics reject raw values and tolerate unavailable runtime', () => {
+  const f = fixture({ window: { __elonChatGptPrivateStopRuntime: {
+    diagnostics: () => ({ cached: 'secret', request: 'secret', tree: 'secret',
+      generation: 'secret', mode: 'secret', requestId: 'secret' })
+  } } });
+  const expected = { schema: 'elon.stop_runtime_owner.v1', cached: false,
+    request: 'missing', tree: false, generation: false, mode: 'unknown' };
+  assert.deepEqual(JSON.parse(f.command('stop_runtime_owner').detail), expected);
+  f.window.__elonChatGptPrivateStopRuntime.diagnostics = () => { throw Error('secret'); };
+  assert.deepEqual(JSON.parse(f.command('stop_runtime_owner').detail), expected);
 });
 
 test('production observer stays dormant, preserves promise identity and emits no legacy telemetry', async () => {

@@ -19,11 +19,22 @@
       'already_stopped', 'stop_observed', 'timeout', 'stop_failed', 'invalid_receipt', 'invocation_failed'];
     return 'stop_runtime_context:' + (codes.includes(code) ? code : 'not_observed');
   }
+  function stopOwnerDetail() {
+    let value;
+    try { value = window.__elonChatGptPrivateStopRuntime?.diagnostics?.(); } catch (_) {}
+    return JSON.stringify({ schema: 'elon.stop_runtime_owner.v1', cached: value?.cached === true,
+      request: ['missing', 'valid', 'invalid'].includes(value?.request) ? value.request : 'missing',
+      tree: value?.tree === true, generation: value?.generation === true,
+      mode: ['idle', 'streaming', 'unread', 'voice'].includes(value?.mode) ? value.mode : 'unknown' });
+  }
   if (existingProbe && Number(existingProbe.version) >= 13) {
-    if (Number(existingProbe.version) < 15) {
+    if (Number(existingProbe.version) < 16) {
       // Upgrade only the command surface; keep the existing network observers.
-      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 15,
+      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 16,
         handle(action, command, respond) {
+          if (action === 'private_protocol_probe' && command.value === 'stop_runtime_owner') {
+            respond(action, true, stopOwnerDetail()); return true;
+          }
           if (action === 'private_protocol_probe' && command.value === 'stop_runtime_context') {
             respond(action, true, stopContextDetail()); return true;
           }
@@ -525,7 +536,7 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 15,
+    version: 16,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
       if (action !== 'private_protocol_probe') return false;
@@ -534,6 +545,7 @@
       if (mode === 'runtime_assets') detail = window.__elonChatGptPrivateProtocolEvidence?.runtimeAssets(window);
       else if (mode === 'composer_tool_context') detail = toolContextDetail();
       else if (mode === 'stop_runtime_context') detail = stopContextDetail();
+      else if (mode === 'stop_runtime_owner') detail = stopOwnerDetail();
       else detail = evidence?.command(mode);
       respond(action, typeof detail === 'string', detail || 'protocol_probe_unavailable');
       return true;

@@ -2,8 +2,10 @@
 
 Capability: `android_chatgpt_official_runtime_stop_generation_v1`.
 Status: source implemented and offline verified, not device accepted or
-completed. Adapter 304 adds disabled-composer lookup, stop-stage diagnostics and
-partial-reply retention; see [the current correction](reports/chatgpt-stop-interruption-20260908.md). This is a
+completed. Latest source: stop runtime v6 and probe v16; the installed APK 1570
+contains v5 and still fails stop/follow-up acceptance. Earlier adapter 304 added
+disabled-composer lookup and partial-reply retention; see
+[the earlier correction](reports/chatgpt-stop-interruption-20260908.md). This is a
 same-origin official-runtime bridge, not an independent Android HTTP transport.
 Do not reimplement the source integration while device acceptance is pending.
 
@@ -70,6 +72,55 @@ Navigation, changed identity or an already claimed duplicate cannot click a
 different stop button. The complete official-page route remains available.
 
 ## Verification and remaining work
+
+### Conversation-owned stop, source batch 2026-09-08
+
+Runtime v6 supports the current official stop overload when a streaming server
+conversation has no request ID. It requires the already cached shared module,
+a server-backed conversation, a valid current turn and leaf, and the exact
+streaming status object. It rejects a tree already being interrupted. The
+turn, leaf and status identity are pinned before loading or subscribing and
+checked immediately before calling the same versioned `FVt` export with its
+default request argument. No additional endpoint or credential transport is
+introduced. A new request, turn, leaf or status generation cannot inherit the
+old stop; all three realtime modes are rejected without a DOM fallback.
+
+The underlying source is the inspected 2026-09-07 conversation bundle listed
+in `chatgpt-private-runtime-bindings.md`: export `hHt` resolves to async `BM`.
+Its streaming-conversation branch can run without active-request membership.
+The existing shared exports provide `HM.getCurrentLeafId`,
+`HM.getConversationLastTurn`, and the stored `Fx` async-status object. The
+implementation reuses those exports rather than adding new minified aliases.
+
+Stopping remains pending after the official promise resolves while generation
+is still streaming. Only idle/completed-unread cleanup of the same turn and
+leaf releases normal send/regenerate controls. Timeout, identity changes and
+uncertain results do not replay the stop. The original request-owned path and
+one-use pre-invocation fallback claim are retained.
+
+MCP `chatgpt_private_protocol_probe` with mode `stop_runtime_owner` now returns
+only cached-runtime, request-shape, tree-presence, generation-bound and mode
+fields from the last capture. Reading it performs no live capture, imports,
+network requests or stop action. It contains no conversation/request IDs,
+credentials or text, and resets its visible shape after document replacement.
+Probe reinjection upgrades existing observers without stacking them.
+
+The new request-less tests failed against v5 before implementation. The final
+focused suite passes 139 cases, without skips, across request/conversation
+ownership, guest behavior, runtime bindings, diagnostics and native command
+wiring. The ordered 99-asset Android script bundle parses successfully.
+This is source/offline evidence only: no new Android build or installation was
+performed for this source batch, per the grouped-release workflow. The phone
+was unlocked but in a separate grid-creation activity; only readiness and
+foreground metadata were read. That activity was not interrupted.
+
+Next grouped device check: from the production native chat, stop a synthetic
+long reply, record both stop receipt and `stop_runtime_owner`, and send a short
+follow-up. Require `official_runtime_v1:stop_observed`, preservation of the
+partial reply, two separate user/assistant turns, and no draft loss. If it
+fails, use the recorded owner shape to distinguish missing cache, missing tree,
+missing turn/leaf, invalid request format and non-streaming official state.
+The APK 1570 failure below remains authoritative until that check passes.
 
 ### Current-request correction, 2026-09-08
 
