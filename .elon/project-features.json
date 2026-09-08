@@ -1221,6 +1221,133 @@
       "updated_at_ms": 1788844625711
     },
     {
+      "id": "android-binance-manage-reconnect-v1",
+      "title": "币安管理页过期恢复",
+      "summary": "恢复过期后已销毁的官方WebView与Host会话，共用原生/MCP重连路径，连接优先布局和样式。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/android-binance-manage-reconnect-v1.md",
+        "content_hash": "8ad4d8ed067b52950c087d85fb37393474227e13b7c60cffddb4f3e7244f482e",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "20c08c8b976593bbc6c7ee120beb409a13ea8e04",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "da2169a681b09a478e55fdea2f7703d7ff2f701a",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex-grid-usability",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/grid/manage"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "过期网页消失后可重新begin并绑定，失败不虚报开始",
+        "提交中不重连，重连不清除待核对记录或提交交易",
+        "恢复入口可见，回归和正式APK只读验收分别记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceGridManageActivity.kt",
+          "content_hash": "603ee0b5f8aa1b2740b70497064eb48d3d27175abfe31fd6c0068a5611a50b63",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20c08c8b976593bbc6c7ee120beb409a13ea8e04",
+            "head_blob_oid": "b2ff12d08313a57d301724e03d658b03f9757718",
+            "worktree_blob_oid": "dd258f8bd7bc481b0a8641c848b6e13e576678d7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageAppearance.kt",
+          "content_hash": "3b226b35ecfca9cb57ad0f39e9d64ad21de030131f773731f862a170b332d189",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20c08c8b976593bbc6c7ee120beb409a13ea8e04",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "73be5997ef029acfba84a7a72156cb995f5b22ae",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageForm.kt",
+          "content_hash": "32847aa9402819757fd2098eb24243fe882c6adb2082835597ab31c44d52a210",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20c08c8b976593bbc6c7ee120beb409a13ea8e04",
+            "head_blob_oid": "3faf568e24764e5dd4dbf0ed9791155d860614d7",
+            "worktree_blob_oid": "3b7457da1e943e2ba79a882497582b7766e58b44",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageReconnect.kt",
+          "content_hash": "c50dafb3aa75cdfaccd95f4f9dc600b55afa74b37a3276efd1d95feeb84b6703",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20c08c8b976593bbc6c7ee120beb409a13ea8e04",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f72f6a71b88152ee796dd96e81ae39b0444f24ef",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/manage/BinanceManageReconnectTest.kt",
+          "content_hash": "d1184d051332da163e063e93afccdee55e67a56169ebdf4b9f46f54956b170ad",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20c08c8b976593bbc6c7ee120beb409a13ea8e04",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "86b89a60a4ed2fd39b61978d67c4c22a148225eb",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/reports/android-binance-manage-reconnect-v1-20260909.md",
+          "content_hash": "e93c16633499d224aa2e17e7b7379eba0f2007837d73ee73f7914e6296ca2d38",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20c08c8b976593bbc6c7ee120beb409a13ea8e04",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "716a5a7c5b52a3a84e880a8ca4c5db6117dba05f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-create.ps1",
+          "content_hash": "ab556f89f8d5bc4db62d5e6ae4500e403fcfa9500bccc7df0ccfe52926f65ac5",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "20c08c8b976593bbc6c7ee120beb409a13ea8e04",
+            "head_blob_oid": "20b75bc762fc3baf99f135e4d3647676159e234e",
+            "worktree_blob_oid": "dbe1a717b9a590ba0f74ce457b18337774bca3f6",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788883029995,
+      "updated_at_ms": 1788884149598
+    },
+    {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "title": "A2 Map/Lock dynamic quotient authority V1",
       "summary": "Freeze the typed exact-partition contract that maps every verified Map/Lock static included leaf into one auditable dynamic execution class, derives Qmap/Qlock mechanically, and requires one process-isolated Windows record per frozen class without opening production effects.",
@@ -23875,56 +24002,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b9e094045d4d4abf8db2c46a7cd3771d",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-sui-ci",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788648605375
-    },
-    {
-      "id": "feature_event_0202d60ec8b247a2873d925eb1559f99",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "All sixteen current files are rebound with canonical receipt and production bytecode evidence.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788648616213
-    },
-    {
-      "id": "feature_event_251ad41234a64bbb8fab230a619520b9",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Allocation guard passed and fixed Sui CLI validation passed currency 3/3 plus participation 13/13; no chain publication occurred.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788648616838
-    },
-    {
-      "id": "feature_event_8f7f045889cb49ac9c3a1070d4d5aab4",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-sui-ci",
-      "reason": "安全复审后改为固定哈希官方源码归档、本地临时依赖与严格证据白名单；重新绑定当前已评审需求。",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1788650676374
-    },
-    {
-      "id": "feature_event_fc404afc6f7740b288a381b484a16c06",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "已复核固定源码归档、本地依赖、证据白名单及零链操作边界。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788650688682
-    },
-    {
       "id": "feature_event_663de9703fcb455f8440ab54034100e0",
       "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
       "action": "transitioned",
@@ -25873,6 +25950,56 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788880049013
+    },
+    {
+      "id": "feature_event_a8e88381fb624c3996cfa415b82310cf",
+      "feature_id": "android-binance-manage-reconnect-v1",
+      "action": "registered",
+      "actor": "codex-grid-usability",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788883029996
+    },
+    {
+      "id": "feature_event_a0ca87ef894c4b85ad7dde7489aae003",
+      "feature_id": "android-binance-manage-reconnect-v1",
+      "action": "claimed",
+      "actor": "codex-grid-usability",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788883030078
+    },
+    {
+      "id": "feature_event_37f29a9edf404abaabc951850022bb60",
+      "feature_id": "android-binance-manage-reconnect-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-usability",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788883030160
+    },
+    {
+      "id": "feature_event_dabb827a4d3b494aab9142c9d2a24b19",
+      "feature_id": "android-binance-manage-reconnect-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-usability",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788884149545
+    },
+    {
+      "id": "feature_event_b0a70cfc5f7c4533a71e192547154a0e",
+      "feature_id": "android-binance-manage-reconnect-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-usability",
+      "reason": "49 native regressions and existing JS suite passed; official phone acceptance pending.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788884149598
     }
   ]
 }

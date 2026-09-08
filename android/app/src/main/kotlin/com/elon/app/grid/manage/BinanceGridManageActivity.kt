@@ -28,6 +28,7 @@ class BinanceGridManageActivity : Activity() {
     private var creationPending=false
     private var resolvedRecord=false
     private var resumed=false
+    private val appearance by lazy{BinanceManageAppearance(this)}
     private val readEndpoint=object:BinanceManageReadEndpoint {
         override fun readFacts()=debugFacts()
         override fun readCommand(request:BinanceManageReadRequest)=debugCommand(request)
@@ -50,9 +51,10 @@ class BinanceGridManageActivity : Activity() {
         ownsSlot=true
         runCatching{journal.read()?.let(state::restore)}.onFailure{corrupt=true}
         creationPending=runCatching{BinanceCreateJournal(this).read()!=null}.getOrDefault(true)
-        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(20,20,20,12)}
+        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(appearance.dp(16),appearance.dp(12),appearance.dp(16),appearance.dp(10));setBackgroundColor(appearance.background)}
         root.addView(label("管理本人币安 U 本位网格",21f))
         status=label("正在读取本人账号",15f);root.addView(status)
+        root.addView(button("重新连接币安／更新列表","binance-manage-reload"){act{reconnect()}})
         val content=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;isSaveEnabled=false}
         form=BinanceManageForm(this){if(ready && !state.unresolved){session?.cancel();confirm.isChecked=false;render()}}
         content.addView(form.root)
@@ -66,6 +68,7 @@ class BinanceGridManageActivity : Activity() {
         confirm=CheckBox(this).apply {
             text="我已核对本账号、策略编号及仓位处理；本次由我提交真实操作。"
             isSaveEnabled=false;filterTouchesWhenObscured=true;contentDescription="binance-manage-confirm"
+            setTextColor(appearance.text)
             setOnCheckedChangeListener{_,_->if(ready)render()}
         };content.addView(confirm)
         submit=button("确认执行本次操作","binance-manage-submit") {
@@ -76,22 +79,26 @@ class BinanceGridManageActivity : Activity() {
             official.visibility=if(official.visibility==View.VISIBLE)View.GONE else View.VISIBLE
         })
         official=FrameLayout(this).apply{visibility=View.GONE};content.addView(official,LinearLayout.LayoutParams(-1,(resources.displayMetrics.density*520).toInt()))
-        content.addView(button("重新加载官网并确认登录","binance-manage-reload"){
-            if(state.status!="submitting") {session?.cancel();confirm.isChecked=false;official.visibility=View.VISIBLE;host?.view?.loadUrl(BinanceHostRuntime.ENTRY)}
-        })
         content.addView(label("区间、格数、追加保证金和止盈止损请在官网操作。结束状态不证明挂单已撤销、仓位归零或资金结清。",14f))
         root.addView(ScrollView(this).apply{isSaveEnabled=false;addView(content)},LinearLayout.LayoutParams(-1,0,1f))
         root.addView(button("返回量化应用","binance-manage-return"){returnResult()})
         setContentView(root);ready=true;BinanceManageReadBridge.bind(readEndpoint)
-        runCatching{BinanceHostRuntime.onMain(this){runtime->
-            host=runtime
-            if(runtime.begin()) {
-                session=BinanceManageSession(runtime,state,::persist,::render)
-                runtime.onCreateObservation={session?.observed(it)};runtime.onChanged=::render
-                runtime.view?.let{view->(view.parent as? ViewGroup)?.removeView(view);official.addView(view,FrameLayout.LayoutParams(-1,-1))}
-            }
-        }}.onFailure{status.text="官网连接未就绪，请检查系统WebView。"}
+        runCatching{connectPage(false)}.onFailure{status.text="官网连接未就绪，请检查系统WebView。"}
         render()
+    }
+    private fun connectPage(refresh:Boolean):Boolean=BinanceHostRuntime.onMain(this){runtime->
+        host=runtime
+        reconnectBinanceManagePage(state.status=="submitting",{session?.cancel();confirm.isChecked=false},
+            {runtime.view},{runtime.begin()},{view->
+                if(session==null)session=BinanceManageSession(runtime,state,::persist,::render)
+                runtime.onCreateObservation={session?.observed(it)};runtime.onChanged=::render
+                if(view.parent!==official){(view.parent as? ViewGroup)?.removeView(view);official.removeAllViews();official.addView(view,FrameLayout.LayoutParams(-1,-1))}
+            },{view->if(refresh)view.loadUrl(BinanceHostRuntime.ENTRY)})
+    }
+    private fun reconnect():Boolean {
+        val connected=connectPage(true)
+        if(connected)official.visibility=View.VISIBLE
+        render();return connected
     }
     private fun persist():Boolean = if(resolvedRecord)true else if(state.unresolved)journal.save(state.journal()) else if(!corrupt)journal.save(null) else false
     private fun act(action:()->Unit) {runCatching(action).onFailure{status.text=it.message ?: "操作未完成"}}
@@ -123,7 +130,7 @@ class BinanceGridManageActivity : Activity() {
             when(request.action) {
                 "select"->if(form.selectIndex(request.index ?: -1)){render();"selected"}else "index_unavailable"
                 "read"->{readCurrent();"read_started"}
-                "reload"->{session?.cancel();confirm.isChecked=false;host?.view?.reload();"reload_started"}
+                "reload"->if(reconnect())"reload_started" else "reload_unavailable"
                 else->"unsupported_action"
             }
         }.getOrDefault("read_action_unavailable")
@@ -184,6 +191,6 @@ class BinanceGridManageActivity : Activity() {
     }
     override fun onDestroy(){if(ownsSlot){session?.close();BinanceManageReadBridge.unbind(readEndpoint);host?.let{it.onChanged=null;it.onCreateObservation=null;it.view?.let{v->(v.parent as? ViewGroup)?.removeView(v)}};BinanceCreateSlot.shared.release(this)};super.onDestroy()}
     private fun mode(value:Boolean)=if(value)"按市价平仓" else "保留仓位，需要自行处理"
-    private fun label(value:String,size:Float)=TextView(this).apply{text=value;textSize=size;isSaveEnabled=false;setPadding(0,8,0,8)}
-    private fun button(value:String,id:String,action:()->Unit)=Button(this).apply{text=value;contentDescription=id;isSaveEnabled=false;filterTouchesWhenObscured=true;setOnClickListener{action()}}
+    private fun label(value:String,size:Float)=appearance.label(value,size)
+    private fun button(value:String,id:String,action:()->Unit)=appearance.button(value,id,action)
 }
