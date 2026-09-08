@@ -40,7 +40,9 @@ internal fun createBinanceHostWebView(context: Context, runtime: BinanceHostRunt
             }
         }
         WebViewCompat.addDocumentStartJavaScript(this,
-            context.assets.open("binance_grid_read_adapter.js").bufferedReader().use { it.readText() }, setOf(BinanceHostRuntime.ORIGIN))
+            listOf("binance_grid_read_diagnostics.js", "binance_grid_read_adapter.js").joinToString("\n") { asset ->
+                context.assets.open(asset).bufferedReader().use { it.readText() }
+            }, setOf(BinanceHostRuntime.ORIGIN))
         webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = !binanceHostNavigation(request.url.toString())
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) = runtime.pageStarted(url)

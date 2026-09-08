@@ -7,6 +7,7 @@ import org.json.JSONObject
 /** Bounded diagnostics only: no account IDs, strategy IDs, amounts, grants or website content. */
 internal fun mcpBinanceHostStatus(context: Context): JSONObject = runCatching {
     BinanceHostRuntime.onMain(context) { host ->
+        host.inspectPage()
         toolResult("Binance Android host status.", JSONObject()
             .put("schema", "yilong.binance_host_status.v1")
             .put("source", "android_webview")
@@ -14,6 +15,8 @@ internal fun mcpBinanceHostStatus(context: Context): JSONObject = runCatching {
             .put("page_phase", host.pagePhase)
             .put("page_progress", host.view?.progress ?: 0)
             .put("adapter_bound", host.adapterBound)
+            .put("page_diagnostics", JSONObject(host.diagnostics.facts))
+            .put("diagnostics_observed_at_ms", host.diagnostics.observedAt)
             .put("page_origin", when {
                 host.view?.url?.startsWith("${BinanceHostRuntime.ORIGIN}/") == true -> "binance"
                 host.view?.url?.startsWith("https://accounts.binance.com/") == true -> "binance_login"

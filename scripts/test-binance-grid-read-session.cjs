@@ -18,7 +18,7 @@ function delayed() {
   const promise = new Promise((a, b) => { resolve = a; reject = b; });
   return {promise, resolve, reject};
 }
-function harness() {
+function harness(bind = true) {
   const events = [], calls = [], queue = [], identities = [];
   const account = {userId: '42', subUser: false, parentUser: true, email: 'fixture-private@example.test'};
   class Xhr { open() {} send() {} addEventListener(_, callback) { this.callback = callback; } }
@@ -28,7 +28,7 @@ function harness() {
   }};
   window.top = window;
   vm.runInNewContext(code, {window, location: {origin: 'https://www.binance.com', href: 'https://www.binance.com/'}, URL, XMLHttpRequest: Xhr, AbortController, setTimeout, clearTimeout});
-  window.__elonBinanceReadV1.bind('doc_test_123');
+  if (bind) window.__elonBinanceReadV1.bind('doc_test_123');
   const list = async data => { queue.push(response(data)); await window.fetch(LIST, {method: 'POST'}); await tick(); };
   return {window, events, calls, queue, identities, account, list, Xhr};
 }
@@ -98,4 +98,18 @@ test('only a known detail and exact read-only identity GET can be issued by the 
     assert.ok(call.url === INFO || call.url === DETAIL + '?strategyId=123');
     assert.equal(call.init.method, 'GET'); assert.equal(call.init.credentials, 'same-origin');
   }
+});
+test('same-account identity response before native binding must preserve the pending list', async () => {
+  const h = harness(false); await h.list([row()]);
+  await h.window.fetch(INFO); await tick(); assert.equal(h.events.length,0);
+  h.window.__elonBinanceReadV1.bind('doc_test_123');
+  assert.equal(h.events.length,1); assert.equal(h.events[0].kind,'list');
+  assert.equal(h.events[0].rows.length,1);
+});
+test('account switch before native binding must discard the pending old-account list', async () => {
+  const h = harness(false); await h.list([row()]);
+  Object.assign(h.account,{userId:'43',subUser:true,parentUser:false});
+  await h.window.fetch(INFO); await tick(); h.window.__elonBinanceReadV1.bind('doc_test_123');
+  assert.equal(h.events.length,1); assert.equal(h.events[0].kind,'identity');
+  assert.equal(h.events[0].account,'43'); assert.equal(h.window.__elonBinanceReadV1.detail('123'),false);
 });

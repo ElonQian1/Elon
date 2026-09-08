@@ -12,6 +12,7 @@
   const known = new Set();
   const details = new Map();
   const originalFetch = window.fetch;
+  const diagnostic = window.__elonBinanceDiagnosticsV1;
   function scalar(value, pattern) {
     const text = typeof value === 'string' ? value : Number.isSafeInteger(value) ? String(value) : '';
     if (!pattern.test(text)) throw new Error('invalid_field');
@@ -37,7 +38,13 @@
     };
   }
   function emit(event) {
-    if (!token) { if (event.kind !== 'detail') current = event; return; }
+    if (!token) {
+      // An identity refresh is not a newer list. Keep the verified pending list for this exact account.
+      const samePendingList = event.kind === 'identity' && current?.kind === 'list' &&
+        current.account === event.account && current.account_kind === event.account_kind;
+      if (event.kind !== 'detail' && !samePendingList) current = event;
+      return;
+    }
     window.ElonBinanceRead?.postMessage(JSON.stringify({schema: 'yilong.binance_observation.v1', token, ...event}));
   }
   function relevant(t) {
@@ -46,8 +53,9 @@
     if (t.kind === 'list') return t.seq === latestList && t.seq >= listFloor;
     return t.epoch === listEpoch && t.account === account?.account && known.has(t.id) && details.get(t.id) === t.seq;
   }
-  function fail(t) {
+  function fail(t, error) {
     if (!relevant(t)) return;
+    diagnostic?.failure(t.kind, error?.message);
     known.clear(); details.clear(); account = null; listEpoch++; listFloor = latestList + 1;
     emit({kind: 'unavailable'});
   }
@@ -72,24 +80,36 @@
     const seq = ++identitySequence; latestIdentity = seq;
     const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 10_000);
     try {
+      diagnostic?.request('identity');
       const response = await originalFetch.call(window, IDENTITY, {method: 'GET', credentials: 'same-origin', signal: controller.signal});
+      diagnostic?.response('identity', response.status);
       const text = await response.clone().text();
       if (seq !== latestIdentity) return null;
       return applyIdentity(seq, body(response.status, text));
+    } catch (error) {
+      if (['response_failed', 'business_failed'].includes(error?.message)) throw new Error('identity_' + error.message);
+      throw error;
     } finally { clearTimeout(timeout); }
   }
   function target(url, method) {
     try {
       const u = new URL(url, location.href);
       if (u.origin !== location.origin) return null;
+      // Known from source research, but its response contract is not accepted as v2 evidence.
+      if (u.pathname === '/bapi/futures/v1/private/future/grid/query-open-grids' && method === 'GET') {
+        diagnostic?.request('legacy_list'); return null;
+      }
       if (u.pathname === IDENTITY && method === 'GET') {
+        diagnostic?.request('identity');
         latestIdentity = ++identitySequence; return {kind: 'identity', seq: latestIdentity};
       }
       if (u.pathname === LIST && method === 'POST') {
+        diagnostic?.request('list');
         latestList = ++sequence; return {kind: 'list', seq: latestList};
       }
       if (u.pathname === DETAIL && method === 'GET') {
         const key = id(u.searchParams.get('strategyId')), seq = ++sequence;
+        diagnostic?.request('detail');
         details.set(key, seq);
         return {kind: 'detail', id: key, seq, epoch: listEpoch, account: account?.account};
       }
@@ -97,6 +117,7 @@
     return null;
   }
   async function consume(t, status, text) {
+    diagnostic?.response(t.kind, status);
     if (!relevant(t)) return;
       const data = body(status, text);
       if (t.kind === 'identity') { applyIdentity(t.seq, data); return; }
@@ -123,9 +144,9 @@
     const method = String(init?.method || input?.method || 'GET').toUpperCase();
     const t = target(url, method);
     return originalFetch.apply(this, arguments).then(response => {
-      if (t) response.clone().text().then(text => consume(t, response.status, text)).catch(() => fail(t));
+      if (t) response.clone().text().then(text => consume(t, response.status, text)).catch(error => fail(t, error));
       return response;
-    }, error => { fail(t); throw error; });
+    }, error => { fail(t, error); throw error; });
   };
   const originalOpen = XMLHttpRequest.prototype.open;
   const originalSend = XMLHttpRequest.prototype.send;
@@ -137,8 +158,8 @@
   XMLHttpRequest.prototype.send = function() {
     const data = targets.get(this), t = data && target(data.url, data.method);
     if (t) this.addEventListener('loadend', () => {
-      try { consume(t, this.status, this.responseType === 'json' ? JSON.stringify(this.response) : this.responseText).catch(() => fail(t)); }
-      catch (_) { fail(t); }
+      try { consume(t, this.status, this.responseType === 'json' ? JSON.stringify(this.response) : this.responseText).catch(error => fail(t, error)); }
+      catch (error) { fail(t, error); }
     }, {once: true});
     return originalSend.apply(this, arguments);
   };

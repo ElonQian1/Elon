@@ -17,6 +17,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     val handler = Handler(Looper.getMainLooper())
     val state = BinanceHostState(SystemClock::elapsedRealtime, System::currentTimeMillis)
     val document = WebBridgeDocumentSession()
+    val diagnostics = BinanceHostDiagnostics()
     var view: WebView? = null; private set
     var status = "请先连接币安"; private set
     var pagePhase = "not_started"; private set
@@ -57,6 +58,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     fun pageStarted(url: String) {
         document.beginPage()
         state.unavailable()
+        diagnostics.clear()
         pagePhase = "loading"; adapterBound = false
         status = if (url.startsWith("https://accounts.binance.com/")) "请在币安官方页面登录或验证" else "正在等待币安网格响应"
         onChanged?.invoke()
@@ -66,12 +68,23 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         pagePhase = if (finished) "finished" else "visible"
         val token = document.ensurePage().documentToken
         view?.evaluateJavascript("window.__elonBinanceReadV1?.bind(${StrictJson.encode(token)})") { value ->
-            if (value == "true" && live() && document.snapshot().documentToken == token) adapterBound = true
+            if (value == "true" && live() && document.snapshot().documentToken == token) {
+                adapterBound = true; inspectPage()
+            }
         }
+    }
+    fun inspectPage() {
+        if (!live() || !adapterBound) return
+        val token = document.snapshot().documentToken
+        view?.evaluateJavascript("window.__elonBinanceDiagnosticsV1?.inspect(${StrictJson.encode(token)})", null)
     }
     fun observed(raw: String) {
         if (!live()) return invalidate("登录或授权已失效")
         val event = runCatching { StrictJson.parse(raw) }.getOrNull() ?: return fail("响应格式暂不支持")
+        if (event["schema"] == "yilong.binance_diagnostic.v1") {
+            if (document.accept(event["token"] as? String ?: "") != null) diagnostics.accept(event)
+            return
+        }
         if (event["schema"] != "yilong.binance_observation.v1" || document.accept(event["token"] as? String ?: "") == null) return
         runCatching { state.accept(raw) }.onFailure { fail("未取得可验证的本人网格响应，请在官网打开网格列表") }
             .onSuccess {
@@ -103,6 +116,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     fun fail(message: String) { state.unavailable(); status = message; onChanged?.invoke() }
     fun invalidate(message: String) {
         captured = null; state.unavailable(); handler.removeCallbacks(expiry)
+        diagnostics.clear()
         pagePhase = "closed"; adapterBound = false
         view?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); it.stopLoading(); it.destroy() }
         view = null; status = message; onChanged?.invoke()
