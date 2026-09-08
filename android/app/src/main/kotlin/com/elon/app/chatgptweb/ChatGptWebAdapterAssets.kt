@@ -91,6 +91,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_private_stream_policy.js",
         "chatgpt_web_private_stream_transport.js",
         "chatgpt_web_private_send_observer.js", "chatgpt_web_private_text_runtime_submit.js",
+        "chatgpt_web_runtime_generation_state.js",
         "chatgpt_web_private_regenerate_contract.js", "chatgpt_web_private_regenerate_runtime.js",
         "chatgpt_web_private_stop_runtime.js", "chatgpt_web_text_transaction_orchestrator.js",
         "chatgpt_web_attachment_transport_observer.js",
