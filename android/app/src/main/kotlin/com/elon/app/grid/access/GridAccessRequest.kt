@@ -13,6 +13,7 @@ internal class GridAccessRequest private constructor(val state: String, val chal
         "confirmation" to "授权量化只读我的币安网格"))
 
     fun validateResult(raw: String, now: Long): Boolean = runCatching {
+        require(now >= 0)
         val value = StrictJson.parse(raw, 4096)
         value.exact("schema", "code", "state", "client_id", "redirect_uri", "code_expires_at", "grant_id", "expires_at", "scopes")
         require(value.text("schema") == "yilong.asset_access.authorization_code.v1")
@@ -22,7 +23,9 @@ internal class GridAccessRequest private constructor(val state: String, val chal
         require(Regex("aag_[0-9a-f]{32}").matches(value.text("grant_id")))
         val expires = Instant.parse(value.text("expires_at")).toEpochMilli()
         val codeExpires = Instant.parse(value.text("code_expires_at")).toEpochMilli()
-        require(codeExpires > now && codeExpires <= now + 120_000 && codeExpires <= expires && expires <= now + 900_000)
+        // Small device/server skew is allowed only on future bounds, never on expiration.
+        require(codeExpires > now && codeExpires - now <= 125_000 &&
+            codeExpires <= expires && expires - now <= 905_000)
         true
     }.getOrDefault(false)
     override fun toString() = "GridAccessRequest(private)"

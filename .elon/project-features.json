@@ -14308,339 +14308,40 @@
       ],
       "implementation_evidence": [
         {
-          "path": "android/app/asset-access.gradle",
-          "content_hash": "7595cf556b169b95d7c8179cd475816934145e63a6181719dce799d57b9f49da",
-          "locator": "",
-          "evidence_kind": "configuration",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "331d0e97f4105457c2169e947e50c296d5842e39",
-            "head_blob_oid": "93402f3f44e04bfe965fa5759a01a7345a29ea59",
-            "worktree_blob_oid": "e747795dcb32dd084de29a234d0ad8e91125179b",
-            "state": "tracked_modified"
-          }
-        },
-        {
-          "path": "android/app/src/main/kotlin/com/elon/app/grid/access/GridAccessConsentActivity.kt",
-          "content_hash": "9079f2da3693b9883a30e057c0f347cffd0e30d98d723402fef4faea4505cde6",
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/access/GridAccessRequest.kt",
+          "content_hash": "652ae4c0552d4bf2ea83af31df35c95eb1653bc9544bb953c9973b133cf18b2e",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "bafe558b91772b1bbaca431ac9087197d108628b",
-            "state": "untracked"
+            "head_commit": "2bdd2595e6a33128af159826829dc9b815961f36",
+            "head_blob_oid": "8a786726668e7ff803587e295957a457ee5318e9",
+            "worktree_blob_oid": "c5e270054e396d354b0b69cd61f847c4009b97e6",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/grid/access/GridAccessRequestTest.kt",
-          "content_hash": "3c365bfc9bb0fd7f35a571996f98f3ebf41277423950532983bd49f9d0a687c0",
+          "content_hash": "6f2a3ae826202335bbbba34bdad729138f8a4fb71ea445351002b160084b0588",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "5d78f3fff27f1be68c38271523bc6c8851df6691",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "android/gradle.properties",
-          "content_hash": "0cfc592023a0f340b13a74ae3ec61b31007092e501d19311b7c49026d4790ca1",
-          "locator": "",
-          "evidence_kind": "configuration",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "331d0e97f4105457c2169e947e50c296d5842e39",
-            "head_blob_oid": "78a112faa29df71140d25be3c31240c2876b7a76",
-            "worktree_blob_oid": "17abba48ddb2a1926c11d8a3508eebfc6111d697",
+            "head_commit": "2bdd2595e6a33128af159826829dc9b815961f36",
+            "head_blob_oid": "5d78f3fff27f1be68c38271523bc6c8851df6691",
+            "worktree_blob_oid": "caca787cd2be0d55b4d5b669faddf7747d3a7dd0",
             "state": "tracked_modified"
-          }
-        },
-        {
-          "path": "desktop-shell/src-tauri/src/browser_research/model.rs",
-          "content_hash": "09681b779b5379360094d622809eba5c695981b511af923a4298d6aaa6ec3d37",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
-            "head_blob_oid": "a8e2eb5067ab042efa688a3d154b35d82269cf07",
-            "worktree_blob_oid": "a8528e63e97947ac228e4bea857ad3aae31e6ba2",
-            "state": "tracked_modified"
-          }
-        },
-        {
-          "path": "docs/account-https-ingress.md",
-          "content_hash": "4335d80b2776f39958c60e58580887029302c23d0697ef170bd0b0e3eef27180",
-          "locator": "",
-          "evidence_kind": "document",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "23a76f34370576f1c7dd124dc4fed053b8598a5a",
-            "head_blob_oid": "7797edeb920230ba348a7bf2658d923d99577524",
-            "worktree_blob_oid": "16591a9956ba415964b29b3cf9ea2ff3ea25d495",
-            "state": "tracked_modified"
-          }
-        },
-        {
-          "path": "docs/reports/binance-grid-runtime-contract-20260907.json",
-          "content_hash": "6f036a899e7e085164ee279f3bf8cacfd2eb3c27808d8882d601fd6f346331e9",
-          "locator": "",
-          "evidence_kind": "document",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "8dd6e1df9a8e8382dd9e2a03f02412db9111a505",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "0ca8eb7a3e8b28303e52c5884cefe0ce52a19b23",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "docs/reports/binance-grid-runtime-contract-20260907.md",
-          "content_hash": "c8dcfda86853b04a3cab4b99a9c759836a44c95ea3cd79f4ea054a67320b0148",
-          "locator": "",
-          "evidence_kind": "document",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "8dd6e1df9a8e8382dd9e2a03f02412db9111a505",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "5b698a1ab610befbb34a7d1472f42c26e22a5993",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "docs/reports/private-grid-read-bridge-v1-20260907.md",
-          "content_hash": "d0d6e56d8924797e02c537df7057345520633c320bf10a85c5d4dba1a396d0df",
-          "locator": "",
-          "evidence_kind": "document",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "8dd6e1df9a8e8382dd9e2a03f02412db9111a505",
-            "head_blob_oid": "a054400b02d0c2583ea9880cf2a8f60e977a385e",
-            "worktree_blob_oid": "cabe80f0faf89a3ec9908ee11e44297ef8962a7b",
-            "state": "tracked_modified"
-          }
-        },
-        {
-          "path": "scripts/account_https_target.py",
-          "content_hash": "fa374f97a7fd5acfac24263a5cde7452f55128b4a22936797c8b1ecde9a2cabd",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a7d3201234069e4a1f3ec599ecc72fbcb8fed2e8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "58c2a50a2193e22f0fca705b563acc717aa47e69",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "scripts/configure-account-acme.sh",
-          "content_hash": "4eebb48f74c05a21021664c53b2ed53cace38f6f23fa35891c65507d915a93ca",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "23a76f34370576f1c7dd124dc4fed053b8598a5a",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "8875ad8c12a3a940ab9849527869d6f130be3be9",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "scripts/configure-account-https.sh",
-          "content_hash": "b0081fe3ecceb81956a468fdec2d1f2a23e2d4c02e598615f97f66fdf8c408e3",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a7d3201234069e4a1f3ec599ecc72fbcb8fed2e8",
-            "head_blob_oid": "8bb3c7dd8bb530790b91cd17aa6816318f9c722d",
-            "worktree_blob_oid": "74b4d862655f75a2d7573db910e5c2acb34642fa",
-            "state": "tracked_modified"
-          }
-        },
-        {
-          "path": "scripts/install-account-acme.sh",
-          "content_hash": "b73f8af76df6f138ee34865ac24994838ba59ad417d7f812ac939691d9a11b83",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "23a76f34370576f1c7dd124dc4fed053b8598a5a",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "4f84db49699a6cef53ee7a3b2839d826b221ba49",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "scripts/test-account-acme.sh",
-          "content_hash": "20a5b578dc62a0f70457973928aaebc5c4f80473eacdb30612bbcd589a675b0a",
-          "locator": "",
-          "evidence_kind": "test",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "23a76f34370576f1c7dd124dc4fed053b8598a5a",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "f86de85dfc207f5e412ff77a8519e896c4f0d768",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "scripts/test-account-https-config.sh",
-          "content_hash": "822bffa4475bf53a07a89887440cfece3c81f51e293f5554bd5639e028277541",
-          "locator": "",
-          "evidence_kind": "test",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a7d3201234069e4a1f3ec599ecc72fbcb8fed2e8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "87dbd3b7de9b13a67a3758734323a82ad2761929",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "scripts/test_account_https_target.py",
-          "content_hash": "c56e3f5894224784ec083f0e940b91fcaffa226b96cfa06ab93ed58d18678ad7",
-          "locator": "",
-          "evidence_kind": "test",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "a7d3201234069e4a1f3ec599ecc72fbcb8fed2e8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "4e498628acd4302c91a5f7b6766cfd7035eff34e",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/account_security/https/policy.rs",
-          "content_hash": "bc6c2c2937e0beeac49b6f1fdd606326e1cc51ca3275b2ed6256d8d36822273b",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
-            "head_blob_oid": "54f4fab589bd5d2569081c50b8f97a8c2b7bb32d",
-            "worktree_blob_oid": "2bb1f7ad18fd95fc533d0c2e2dd961759c14ca41",
-            "state": "tracked_modified"
-          }
-        },
-        {
-          "path": "server/src/node_agent_private_read_projection.rs",
-          "content_hash": "9441ef1402dca91502396b40bd34aace8df69315f10056cd750162e99a946428",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "1914bbe8d201415ca3a9c2b9e8ff52ee37a46334",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/node_agent_private_read_projection/sync.rs",
-          "content_hash": "bf1587a451eb73319c6ab94882b70355e20d13d22bf13e93b5949e5073ff48bb",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "5248123ce86eaace37d3a9dd0d007e37c8d54d58",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/private_read_projection.rs",
-          "content_hash": "90adf738ac4fcf32c54bfb506297daaa12c0e18f0726c81c6cd8d0263d96d64e",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "c01d3bbf978cb014b032e912ce0eee62e069ecf9",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/private_read_projection/storage.rs",
-          "content_hash": "742e68face307e8748104f1035bda009a4910e6559b9ea8f84457df4e110e717",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "e9c4829042509649741b135d4eb47144d6ac6af2",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/private_read_projection/tests.rs",
-          "content_hash": "9b7ec4226452882846e4fa544ea6fe106b49f256d0c81002542b56e91da7942c",
-          "locator": "",
-          "evidence_kind": "test",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "c20cdd2c278873e3bd23b5d856ecabda04e0a854",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/private_read_projection_api.rs",
-          "content_hash": "c207e3cd9213b93376287dd3022eb55805182bf92716bb2c6a0e7d558f494cde",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "dbb97b20022ed07c34946ce220be4f87b58a2d87",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/src/store/node_credentials/grid_projection.rs",
-          "content_hash": "50847a09eaabd8a5e3d19e335e3f79e2d672591441269a679ffc487043885e2e",
-          "locator": "",
-          "evidence_kind": "source",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "15fd7c143953638d01abae48abb966e980319dfb",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "server/tests/private-read-projection-harness/fixtures/android-grid-read-wire.json",
-          "content_hash": "4f824a24984280f7f8675639b6caa97640492e66c2cbcb3524b86711bacf6a1b",
-          "locator": "",
-          "evidence_kind": "test",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ed2f7fcb82ed8433079f2d2dcea8dbd6589dfaea",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "1e795eaae32fbb043af665392ccd9711b40198b5",
-            "state": "untracked"
           }
         }
       ],
       "claim": {
-        "claim_id": "claim_2b431b27f6d94ff7838c3ca4601c229e",
+        "claim_id": "claim_3c7d8e5766ed42df8c7c27080953821d",
         "agent_id": "codex-grid-read",
-        "claimed_at_ms": 1788767242049,
-        "expires_at_ms": 1788810442049
+        "claimed_at_ms": 1788824996393,
+        "expires_at_ms": 1788868196393
       },
       "created_at_ms": 1788767191531,
-      "updated_at_ms": 1788797008392
+      "updated_at_ms": 1788825632996
     },
     {
       "id": "project-feature-registry-adoption-v1",
@@ -23253,46 +22954,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a338cbac26144b49a5d8ef44dd6e4666",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "claim_released",
-      "actor": "codex-account-asset-access",
-      "reason": "有意澄清服务器会话结束与既有本机退出的区别，先释放认领再重新评审绑定。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788609180406
-    },
-    {
-      "id": "feature_event_730b834c568940bca6abebdbe8e039e5",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-account-asset-access",
-      "reason": "只读及服务器撤销标准不变，显式记录共享主APK本地退出不等于服务器撤销；不提前宣称换号验收。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788609182125
-    },
-    {
-      "id": "feature_event_71db3a8f08b84e1198ecef27ced51760",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "metadata_updated",
-      "actor": "codex-account-asset-access",
-      "reason": "补充本批独立授权模块的装配、真实测试、主原生同意页与独立TLS配置路径；不接管旧入口。",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1788609182697
-    },
-    {
-      "id": "feature_event_e8463b0b079f4480af27299d45603093",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "transitioned",
-      "actor": "codex-account-asset-access",
-      "reason": "已复核明确授权、只读、账号隔离、服务器会话约束与分工；HTTPS和旧共享退出/入口迁移分报。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788609183588
-    },
-    {
       "id": "feature_event_283dca21724448ea8391db84562fdc3d",
       "feature_id": "unified-account-asset-access-v1",
       "action": "transitioned",
@@ -25251,6 +24912,46 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788799975004
+    },
+    {
+      "id": "feature_event_5302ef51cabc407ba96031b25ad7a1fe",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "claim_released",
+      "actor": "codex-grid-read",
+      "reason": "Continue real-device read acceptance; replace expired task claim",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1788824983557
+    },
+    {
+      "id": "feature_event_46f0a05a9f844314b99cd534dee82823",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "claimed",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788824996613
+    },
+    {
+      "id": "feature_event_994a537e78e14dcdba1f88ad0dbd7d56",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-read",
+      "reason": "Reproduced phone authorization rejection; add bounded clock skew acceptance and real-device evidence",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788825064438
+    },
+    {
+      "id": "feature_event_d34812c897954d3fa43b7af4c19a8504",
+      "feature_id": "private-grid-read-bridge-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-read",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788825632996
     }
   ]
 }

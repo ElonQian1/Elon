@@ -43,4 +43,12 @@ class GridAccessRequestTest {
         assertNull(GridAccessRequest.parse(raw))
         assertNull(GridAccessRequest.parse(StrictJson.encode(input().apply { this["code_challenge"] = "=".repeat(43) })))
     }
+    @Test fun smallDeviceClockSkewDoesNotRejectFreshServerAuthorization() {
+        val request = GridAccessRequest.parse(StrictJson.encode(input()))!!
+        val raw = StrictJson.encode(approval())
+        assertTrue(request.validateResult(raw, now - 1_000))
+        assertTrue(request.validateResult(raw, now - 5_000))
+        assertFalse(request.validateResult(raw, now - 5_001))
+        assertFalse(request.validateResult(raw, now + 120_000))
+    }
 }
