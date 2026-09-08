@@ -22,9 +22,9 @@ $secondPrompt = 'Reply only with TURN-TWO-OK.'
 
 function Read-Native {
     if (-not (Test-WebChatNativeChatSurfaceForeground -Runtime $runtime)) { throw 'foreground_changed' }
-    $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool 'ui_state' -MainState
+    $state = Get-ChatGptWebNativeChatState -Runtime $runtime
     if ($state.social_chat.web_chat_provider_id -ne 'chatgpt_web' -or
-        $state.surface -ne 'social_ai') { throw 'native_surface_changed' }
+        $state.social_chat.interaction_mode -ne 'chat') { throw 'native_surface_changed' }
     return $state
 }
 

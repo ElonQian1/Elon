@@ -85,3 +85,34 @@ than another one-change build. No device acceptance is claimed for that filter.
 Next acceptance must start from the actual final-answer stream and separately
 establish official-tree and native projection continuity. Do not replay already
 confirmed stop requests or mark the full capability completed from stop alone.
+
+## Grouped filter delivery, APK 1578
+
+APK `1.1.1578` / code `1578`, source
+`4dcb4b658004f86150ea5ce8dd28c88c2d43d3b6`, includes the public-answer filter.
+The standard Release build and publication passed in 455.2 seconds. Local APK
+and live version endpoint SHA-256 agree:
+`1089caf313b667241e6921a3fc37fad094c77590096f1bec48ed8ed53e86a227`.
+Evidence: `public-answer-filter-release-20260908-202020-354`.
+
+The trusted Xiaomi ADB transport was offline, one bounded reconnect timed out,
+and the post-release device list was empty. No replacement install or device
+acceptance was performed. The last confirmed installed version from this task
+remains 1576; the latest actual phone version is unknown while disconnected.
+The 1576 continuity failure remains open. Publishing the independent filter
+does not prove that it resolves that failure.
+
+The durable `smoke-chatgpt-web-stopped-followup.ps1` uses native input/send and
+typed stop receipts, requires a recognizable public-answer prefix before stop,
+and checks ordered distinct user/assistant turns with the original partial
+answer retained. It refuses existing drafts, streaming work and unrestorable
+guest history. Foreground/provider/work-mode changes abort the test. Cleanup
+cannot overwrite the primary failure or navigate away from unresolved work.
+
+Its first source-only native guard incorrectly checked `surface` rather than
+the main snapshot's `active_surface`. A synthetic production-shape check failed;
+the corrected guard reuses `Get-ChatGptWebNativeChatState`. All 11 evidence and
+surface checks now pass, including merged/lost/unfinished/empty turns and
+foreign foreground/provider/mode. This harness correction is not APK runtime
+code and does not require another package. No repeat of the unchanged 34-case
+stream regression or already accepted private capabilities was performed.

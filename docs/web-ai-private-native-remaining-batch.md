@@ -26,7 +26,8 @@ Current stop checkpoint: [APK 1576](reports/chatgpt-stop-followup-1576.md) accep
 the official composite request ID, stops through the official runtime and retains
 the immediate partial answer. Follow-up still merges the native/web projections;
 full stop/follow-up acceptance is **failed**, not complete. The independent
-public-answer stream filter is source-tested and queued for the next grouped APK.
+public-answer stream filter is published in APK 1578; its phone acceptance is
+deferred because the trusted device was offline during this release.
 Use `scripts/smoke-chatgpt-web-stopped-followup.ps1` for that next acceptance: it
 waits for a requested public-answer prefix, checks two separate ordered turns,
 and reports restoration independently. It does not inspect or mutate the

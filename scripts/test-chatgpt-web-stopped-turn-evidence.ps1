@@ -19,7 +19,38 @@ if ($merged.passed -or $merged.prompts_separate -or $merged.stopped_reply_retain
 $state.social_chat.messages = @()
 if ((Get-ChatGptStoppedTurnEvidence -State $state @argsForCase).passed) { throw 'empty projection accepted' }
 $tokens = $null; $errors = $null
-[Management.Automation.Language.Parser]::ParseFile(
-    (Join-Path $PSScriptRoot 'smoke-chatgpt-web-stopped-followup.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
+$ast = [Management.Automation.Language.Parser]::ParseFile(
+    (Join-Path $PSScriptRoot 'smoke-chatgpt-web-stopped-followup.ps1'), [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw 'smoke script syntax failed' }
-Write-Output 'STOPPED_TURN_EVIDENCE_TESTS=passed:6'
+
+. (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
+$definition = $ast.Find({ param($n)
+    $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Read-Native'
+}, $true)
+Invoke-Expression $definition.Extent.Text
+$runtime = @{}
+$script:foreground = $true
+$script:native = @{ active_surface = 'social_ai'; social_chat = @{
+    web_chat_provider_id = 'chatgpt_web'; interaction_mode = 'chat'
+} }
+function Test-WebChatNativeChatSurfaceForeground { param($Runtime) return $script:foreground }
+function Invoke-ChatGptWebSmokeMcp { param($Runtime, $Tool, [switch]$MainState) return $script:native }
+function Assert-RejectedNativeRead([string]$Expected) {
+    try { Read-Native | Out-Null } catch {
+        if ($_.Exception.Message -ceq $Expected) { return }
+        throw
+    }
+    throw 'unsafe native state accepted'
+}
+Read-Native | Out-Null
+$script:native.active_surface = 'main'
+Assert-RejectedNativeRead 'The native social AI chat surface is not active.'
+$script:native.active_surface = 'social_ai'
+$script:native.social_chat.web_chat_provider_id = 'google_web'
+Assert-RejectedNativeRead 'native_surface_changed'
+$script:native.social_chat.web_chat_provider_id = 'chatgpt_web'
+$script:native.social_chat.interaction_mode = 'work'
+Assert-RejectedNativeRead 'native_surface_changed'
+$script:foreground = $false
+Assert-RejectedNativeRead 'foreground_changed'
+Write-Output 'STOPPED_TURN_EVIDENCE_TESTS=passed:11'
