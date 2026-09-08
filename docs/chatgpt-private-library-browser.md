@@ -4,10 +4,11 @@
 
 - Capability: `android_chatgpt_private_library_browser_v1`.
 - Code: implemented for root/folder browsing, explicit search, cursor pagination,
-  refresh and ordinary library-file download; published/installed in 1.1.1579.
-- Verification: targeted offline tests; 1579 live acceptance found a bridge regression.
+  refresh and ordinary library-file download; published/installed in 1.1.1581.
+- Verification: offline tests and native catalogue reads passed on 1581;
+  rendered browser, pagination and saved-byte download acceptance remain pending.
 - Catalog v5 fixes object-event publication and includes v4 cold-identity preparation;
-  both patches await the next grouped APK, not the installed 1579 catalog v3.
+  both patches are installed in 1581, replacing the defective 1579 catalog v3.
 - This is the independent library, not the current conversation's attachment index.
   No conversation ID is fabricated to authorize a library download.
 
@@ -93,15 +94,39 @@ the fix and passed afterward; 46 related Node cases pass. The shared synthetic
 parser and pending native-state owner. Release compilation and all 12 library
 JVM tests passed (`library-bridge-jvm-20260909-002514-316`); the related Node
 batch including attachment reuse passed (`library-bridge-node-20260909-003154-663`).
-Device confirmation awaits the grouped APK.
+That final Node batch contains 54 passing cases.
 
-Run one production-UI root/folder/back/search/pagination sample and one ordinary
-saved-byte download after the grouped APK is installed. Verify the original conversation,
-draft and any active voice session remain unchanged. Do not infer an actual speed
-or temperature improvement from cache fixtures alone.
+### 1581 Device Evidence
+
+- Release 1.1.1581 (code 1581), adapter 306, source `9bb66d9f3`, published and
+  installed without clearing app data. Release log:
+  `library-bridge-release-verified-jdk-20260909-003837-971`.
+  APK SHA-256: `012dc0e76ee49778bba2cb3eeacab458cb29cd14b128694b43bbdface6772332`.
+- Semantic production-handler reads now publish a non-null `library_files` snapshot
+  bound to the exact request ID. The root first page contained 21 items, including
+  one folder; `has_more=true`, so 21 is not a total-account count. Its folder read
+  contained four items. A deliberately nonmatching synthetic search produced an
+  actual empty items array, distinguishable from the old missing-event defect.
+- Root reads and return-to-root reads also produced `library_cached`; observed MCP
+  request durations were 109-1259 ms for cached reads and 1186-2362 ms for the
+  sampled live reads. These are handler observations, not rendering benchmarks or
+  proof of a thermal improvement. Log: `library-bridge-device-20260909-004854-701`.
+- Nine root rows advertised download and attachment handles; these are capability
+  descriptors, not completed binary downloads or composer associations. No file
+  mutation, attachment association, message send or microphone operation was used.
+- The subsequent rendered-menu step did not reach `web-chat-library-browser`.
+  Accessibility and MCP surface observations diverged, including a different native
+  screen; neither a login failure nor the cause of that divergence is established.
+  Render-only log `library-bridge-native-render-20260909-010416-153` also failed.
+  Do not label either whole smoke run successful merely because its read steps passed.
+
+Next acceptance: establish the foreground native surface/selector binding, then
+sample browser root/folder/back/search/pagination and one saved-byte download.
+Verify the original conversation, draft and voice state. Sign-in is not a current
+prerequisite. Native data projection is verified; rendered UI acceptance is not.
 
 Ordinary file rename, soft deletion and [composer association](chatgpt-private-library-attachment.md)
-are also packaged in 1579; the [native mutation owner](chatgpt-private-library-mutations.md)
+are also packaged in 1581; the [native mutation owner](chatgpt-private-library-mutations.md)
 still needs live acceptance.
 Independent-library external mounted-file download, saved-entity/artifact previews,
 folder mutations and moving files are not implemented by this browser. Such

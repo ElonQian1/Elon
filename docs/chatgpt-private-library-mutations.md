@@ -4,8 +4,8 @@
 
 Capability `android_chatgpt_private_library_file_mutations_v1` implements ordinary
 owned-library file rename and move-to-recently-deleted in the production native
-file browser. Published/installed in 1.1.1579; device acceptance awaits the
-[catalog bridge correction](chatgpt-private-library-browser.md), not sign-in.
+file browser. Published/installed in 1.1.1581; catalogue projection is device
+verified, but live mutations and rendered browser acceptance remain pending.
 It does not implement permanent deletion, batch deletion, restoration, folder
 creation/rename/move, project-file mutations or external-provider mutations.
 
@@ -73,9 +73,12 @@ checks passed (`library-mutations-related-20260908-223102-966`). Android Debug
 compilation and 16 targeted JVM tests passed
 (`library-mutations-native-20260908-222818-220`). Subsequent grouped Release 1.1.1579
 was published and installed; see the [browser receipt](chatgpt-private-library-browser.md).
-The phone's official account-selection prompt prevents live mutation acceptance.
+The user subsequently signed in. Release 1.1.1581 fixes the catalogue bridge and
+passes request-bound native root/folder/cache/search reads. It does not establish
+mutation success; the rendered-menu handoff remains unconfirmed. See the browser's
+current evidence rather than treating account selection as a continuing blocker.
 
-After the grouped APK is installed, rename one isolated fixture and restore its
+In the installed grouped APK, rename one isolated fixture and restore its
 name; soft-delete only a dedicated disposable fixture after explicit confirmation.
 Verify official-library state, the terminal native receipt, original conversation,
 draft and voice continuity. No live mutation or user-file deletion has been performed

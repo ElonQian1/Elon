@@ -1,8 +1,8 @@
 # Library files in the current composer
 
 Capability: `android_chatgpt_private_library_attachment_v1`.
-Status: implemented, offline verified and published/installed in 1.1.1579;
-device acceptance pending account sign-in.
+Status: implemented, offline verified and published/installed in 1.1.1581;
+live composer association and explicit-send acceptance remain pending.
 This extends the [native library browser](chatgpt-private-library-browser.md).
 It is not a second uploader, an independent message POST, or a new speech path.
 
@@ -69,6 +69,8 @@ owner resolver; production branch validation was not relaxed.
 Device verification must still establish that the
 current official runtime accepts the reference, that a selected file appears in
 the production composer and reaches the intended conversation after explicit
-send. The user has signed in; 1579 acceptance instead exposed the catalog's
-object-event bridge defect, fixed for the next APK in the [browser owner](chatgpt-private-library-browser.md).
+send. The user has signed in. The 1579 catalog object-event defect is fixed in
+1581: request-bound native reads are verified and nine root rows advertise
+attachment handles. This does not verify association itself. The rendered native
+menu/browser handoff remains unconfirmed; see the [browser evidence](chatgpt-private-library-browser.md).
 No user library files were renamed or deleted.
