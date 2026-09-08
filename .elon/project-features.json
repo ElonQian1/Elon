@@ -555,15 +555,15 @@
         },
         {
           "path": "docs/reports/binance-grid-core-source-20260909.md",
-          "content_hash": "84a7e890b9712072501293596a9736e4d534cf554378e842e5389dee48019536",
+          "content_hash": "4e669ffff9e3cd2e45eb26e5716f2526bb4dcec076d5fbbb34b3533c06163dfe",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "96180a80f16c315ebe1e354a03b7e55145f5aa63",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "4f5159faf431396b3cb772e141901cf7abfc0fff",
-            "state": "untracked"
+            "head_commit": "7fa8521aa80107695f7f3f6a33bf76a64ac05695",
+            "head_blob_oid": "4f5159faf431396b3cb772e141901cf7abfc0fff",
+            "worktree_blob_oid": "6d3523b80621db132f07a991ea58d1f695b2621f",
+            "state": "tracked_modified"
           }
         },
         {
@@ -587,7 +587,7 @@
         "expires_at_ms": 1788907713055
       },
       "created_at_ms": 1788893289640,
-      "updated_at_ms": 1788898036484
+      "updated_at_ms": 1788900196861
     },
     {
       "id": "android-binance-grid-create-v1",
@@ -24279,16 +24279,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a09db99099614ce8b059c6e0ef7dbd5a",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-sui-ci",
-      "reason": "Reviewed requirement now fixes the official source archive contract, Windows 2025 runner, containment boundaries, and production-bytecode evidence semantics.",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788652076515
-    },
-    {
       "id": "feature_event_228d84ef04b9444c976b873483c85682",
       "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
       "action": "transitioned",
@@ -26277,6 +26267,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788898036484
+    },
+    {
+      "id": "feature_event_08e83cfa91934af1a6ba80cbf4748ac4",
+      "feature_id": "android-binance-grid-core-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-core",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788900196861
     }
   ]
 }
