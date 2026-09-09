@@ -1,8 +1,6 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const mutationModule = require('../android/app/src/main/assets/chatgpt_web_private_conversation_mutation.js');
-const jsonRequest = require('../android/app/src/main/assets/chatgpt_web_private_json_request.js');
 
 const { fixture, response, deferred } = require('./fixtures/chatgpt-conversation-mutation.js');
 
@@ -251,18 +249,7 @@ async function serverFailureIsNotRetriedOrOptimisticallyApplied() {
 
 async function missingAuthorizationNeverAttemptsAWrite() {
   const test = fixture(async () => { throw new Error('fetch must not run'); });
-  test.transport = mutationModule.create({
-    __elonChatGptPrivateJsonRequest: jsonRequest,
-    location: { origin: 'https://chatgpt.com' },
-    AbortController,
-    setTimeout,
-    clearTimeout,
-    fetch: async () => { throw new Error('fetch must not run'); }
-  }, {
-    enabled: true,
-    privateTransport: { acquireSameOriginRequestHeaders: async () => ({}) },
-    directory: null
-  });
+  delete test.headers.Authorization;
   const result = await test.transport.setPinned('/c/conversation-123', true);
   assert.strictEqual(result.ok, false);
   assert.strictEqual(result.code, 'mutation_auth_unavailable');

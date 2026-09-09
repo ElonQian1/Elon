@@ -45,6 +45,19 @@ class ChatGptWebOperationReadinessTest {
         }
     }
 
+    @Test fun accountMutationsDoNotWaitForComposerButRetainDocumentAndLoginAdmission() {
+        listOf("chatgpt_set_conversation_pinned", "chatgpt_set_conversation_archived",
+            "chatgpt_rename_conversation", "chatgpt_move_conversation_to_project").forEach { action ->
+            assertEquals(ChatGptWebOperationReadiness.Requirement.ACCOUNT_MUTATION,
+                ChatGptWebOperationReadiness.requirement(action))
+            assertNull(action, rejection(action))
+            assertNull(action, rejection(action, page.copy(authenticated = false)))
+            assertEquals("adapter_generation_not_ready", rejection(action, current = false))
+            assertEquals("login_required", rejection(action, page.copy(loginRequired = true)))
+            assertEquals("unsupported_page", rejection(action, page.copy(url = "https://example.com/")))
+        }
+    }
+
     @Test fun privateReadersCanAcquireIdentityBeforeTheUiReportsAuthentication() {
         assertNull(rejection("chatgpt_list_library_files", page.copy(authenticated = false)))
         assertNull(rejection("chatgpt_list_conversations", page.copy(authenticated = false)))

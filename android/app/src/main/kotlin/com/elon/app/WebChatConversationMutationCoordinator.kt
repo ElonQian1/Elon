@@ -71,6 +71,8 @@ internal object WebChatConversationMutationPolicy {
         detail == "delete_selection_expired" -> "这条会话的列表状态已经变化，请刷新后确认。"
         detail?.startsWith("delete_") == true -> "尚未确认删除结果，没有自动重试。请刷新列表核对。"
         detail == "mutation_auth_unavailable" -> "网页身份正在恢复，官网尚未确认这次操作。"
+        detail == "mutation_context_changed" -> "账号或页面已变化，请核对这次操作结果，没有自动重试。"
+        detail == "mutation_context_unavailable" -> "网页身份尚未就绪，这次操作没有发送。"
         detail == "mutation_busy" -> "另一项会话操作仍在进行，官网尚未确认这次操作。"
         detail == "mutation_circuit_open" -> "直接通道正在短暂恢复，官网尚未确认这次操作。"
         detail == "mutation_timeout" -> "网络响应超时，官网尚未确认这次操作。"

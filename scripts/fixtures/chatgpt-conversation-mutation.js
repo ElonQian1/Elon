@@ -31,6 +31,7 @@ function fixture(fetchImpl, enabled = true, rootOverrides = {}, directoryOverrid
     copySameOriginRequestHeaders: () => ({ ...headers }),
     acquireSameOriginRequestHeaders: async () => ({ ...headers }),
   };
+  root.__elonChatGptPrivateTransport = privateTransport;
   const directory = Object.assign({
     acceptPinnedState: (id, pinned) => { accepted.push({ id, pinned }); return true; },
     acceptTitleState: (id, title) => { accepted.push({ id, title }); return true; },

@@ -126,6 +126,42 @@ class ChatGptWebReadinessDispatchTest {
         assertTrue(h.calls.isEmpty())
     }
 
+    @Test fun confirmedNativeSidebarMutationsDispatchWithoutComposerReadiness() {
+        val h = Harness()
+        assertTrue(h.consumer.setConversationPinned(path, true, userConfirmed = true).accepted)
+        assertTrue(h.consumer.setConversationArchived(path, true, userConfirmed = true).accepted)
+        assertTrue(h.consumer.renameConversation(path, "Fixture renamed", userConfirmed = true).accepted)
+        assertTrue(h.consumer.moveConversationToProject(path, "Fixture", "g-p-fixture",
+            userConfirmed = true).accepted)
+        assertEquals(listOf("set_conversation_pinned", "set_conversation_archived",
+            "rename_conversation", "move_conversation_to_project"), h.calls)
+        assertEquals(4, h.receipts)
+    }
+
+    @Test fun relaxedMutationAdmissionStillRequiresConfirmationAndValidTargets() {
+        val h = Harness()
+        assertFalse(h.consumer.setConversationPinned(path, true, userConfirmed = false).accepted)
+        assertFalse(h.consumer.setConversationArchived(path, true, userConfirmed = false).accepted)
+        assertFalse(h.consumer.renameConversation(path, "Fixture", userConfirmed = false).accepted)
+        assertFalse(h.consumer.moveConversationToProject(path, "Fixture", "g-p-fixture",
+            userConfirmed = false).accepted)
+        assertFalse(h.consumer.renameConversation("https://example.com/c/fixture", "Fixture", true).accepted)
+        assertFalse(h.consumer.renameConversation(path, "", true).accepted)
+        assertFalse(h.consumer.moveConversationToProject(path, "Fixture", "bad project", true).accepted)
+        assertEquals("missing_pinned", h.control("chatgpt_set_conversation_pinned") {
+            it.put("conversation_path", path).put("user_confirmed", true).put("pinned", "true")
+        }.getString("error"))
+        assertEquals(0, h.receipts)
+        assertTrue(h.calls.isEmpty())
+    }
+
+    @Test fun staleDocumentCannotSendConfirmedNativeSidebarMutations() {
+        val h = Harness(current = false)
+        assertFalse(h.consumer.renameConversation(path, "Fixture", true).accepted)
+        assertEquals(0, h.receipts)
+        assertTrue(h.calls.isEmpty())
+    }
+
     @Test fun currentContextCanBeReadButOldContextIsNotMistakenForTheCurrentConversation() {
         val h = Harness()
         assertTrue(h.control("chatgpt_get_context").getBoolean("control_ok"))

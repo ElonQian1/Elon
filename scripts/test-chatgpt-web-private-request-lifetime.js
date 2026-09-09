@@ -180,11 +180,16 @@ test('mutation reconciliation timeout releases busy state and never replays PATC
     methods.push(init.method);
     return init.method === 'PATCH' ? json({}) : body.response;
   });
+  const privateTransport = {
+      copySameOriginRequestHeaders: () => ({ Authorization: 'Bearer synthetic-auth' }),
+      acquireSameOriginRequestHeaders: async () => ({ Authorization: 'Bearer synthetic-auth' }),
+  };
+  value.root.__elonChatGptPrivateTransport = privateTransport;
   const mutation = mutationModule.create(value.root, {
-    enabled: true,
-    privateTransport: { acquireSameOriginRequestHeaders: async () => ({ Authorization: 'Bearer synthetic-auth' }) },
+    enabled: true, privateTransport,
     directory: { acceptTitleState: (id, title) => accepted.push({ id, title }) },
   });
+  value.root.__elonChatGptDocumentToken = 'doc_mutation_fixture';
   const pending = mutation.rename('/c/fixture-conversation', 'Fixture title');
   await flush();
   assert.deepEqual(methods, ['PATCH', 'GET']);

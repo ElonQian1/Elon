@@ -1,7 +1,7 @@
 (function (root, factory) {
   'use strict';
 
-  const exported = Object.freeze({ version: 7, create: factory });
+  const exported = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (!root || !root.location || root.location.origin !== 'https://chatgpt.com') return;
   const current = root.__elonChatGptPrivateConversationMutation;
@@ -14,7 +14,7 @@
 })(typeof window === 'object' ? window : globalThis, function (root, dependencies) {
   'use strict';
 
-  const VERSION = 7;
+  const VERSION = 8;
   const WRITE_TIMEOUT_MS = 9000;
   const RECONCILE_TIMEOUT_MS = 4000;
   const UNCERTAIN_RECONCILE_WINDOW_MS = 16000;
@@ -41,6 +41,7 @@
   let active = null;
   let failures = 0;
   let cooldownUntil = 0;
+  let cooldownContext = null;
   let lastOutcome = 'none';
   let lastLatencyMs = 0;
 
@@ -79,6 +80,7 @@
   }
 
   function state() {
+    expireContextState();
     return Object.freeze({
       version: VERSION,
       enabled,
@@ -106,6 +108,32 @@
     return Object.keys(headers).some((name) =>
       String(name).toLowerCase() === 'authorization' && /^Bearer\s+\S{8,65536}$/.test(headers[name])
     );
+  }
+
+  function identity(headers) {
+    const values = {};
+    for (const [name, value] of Object.entries(headers || {})) values[name.toLowerCase()] = String(value);
+    return authorizationPresent(values) ? JSON.stringify([
+      values.authorization, values['chatgpt-account-id'] || '', values['oai-device-id'] || ''
+    ]) : null;
+  }
+
+  function current(context) {
+    try {
+      return Boolean(context && root.location.origin === 'https://chatgpt.com' &&
+        root.__elonChatGptPrivateTransport === privateTransport &&
+        root.__elonChatGptDocumentToken === context.document &&
+        identity(privateTransport.copySameOriginRequestHeaders?.()) === context.account);
+    } catch (_) { return false; }
+  }
+
+  function expireContextState() {
+    if (!cooldownContext || current(cooldownContext)) return;
+    failures = 0;
+    cooldownUntil = 0;
+    cooldownContext = null;
+    lastOutcome = 'context_changed';
+    lastLatencyMs = 0;
   }
 
   async function acquireHeaders() {
@@ -229,7 +257,8 @@
     catch (_) { return false; }
   }
 
-  async function readJson(url, headers, timeoutMs, transportLabel) {
+  async function readJson(url, headers, timeoutMs, transportLabel, context) {
+    if (!current(context)) return null;
     let response;
     try {
       response = await fetchWithTimeout(url, {
@@ -242,12 +271,12 @@
     } catch (_) {
       return null;
     }
-    return response && response.ok ? response.payload : null;
+    return current(context) && response && response.ok ? response.payload : null;
   }
 
-  async function reconcilePinned(conversationId, expectedPinned, headers, timeoutMs) {
+  async function reconcilePinned(conversationId, expectedPinned, headers, timeoutMs, context) {
     const payload = await readJson(
-      '/backend-api/pins', headers, timeoutMs, 'conversation_pin_reconcile_v1'
+      '/backend-api/pins', headers, timeoutMs, 'conversation_pin_reconcile_v1', context
     );
     if (!payload) return Object.freeze({ confirmed: false, known: false });
     const observed = pinStateFromPayload(payload, conversationId);
@@ -260,13 +289,14 @@
     });
   }
 
-  async function reconcileConversation(conversationId, mutation, headers, timeoutMs) {
+  async function reconcileConversation(conversationId, mutation, headers, timeoutMs, context) {
     const payload = await readJson(
       '/backend-api/conversations/' + encodeURIComponent(conversationId),
       headers,
       timeoutMs,
-      'conversation_metadata_reconcile_v1'
+      'conversation_metadata_reconcile_v1', context
     );
+    if (!current(context)) return Object.freeze({ confirmed: false, known: false });
     const observed = payload ? conversationStateFromPayload(payload) : Object.freeze({
       titleKnown: false,
       title: '',
@@ -291,6 +321,7 @@
           typeof directory.snapshot === 'function') {
         try {
           const refreshed = await directory.refreshProject(mutation.projectId);
+          if (!current(context)) return Object.freeze({ confirmed: false, known: false });
           const snapshot = refreshed ? directory.snapshot() : null;
           const row = snapshot && Array.isArray(snapshot.conversations)
             ? snapshot.conversations.find((value) => value && value.id === conversationId &&
@@ -310,26 +341,28 @@
     return Object.freeze({ confirmed, known: observed.archivedKnown });
   }
 
-  function reconcileMutation(conversationId, mutation, headers, timeoutMs) {
+  function reconcileMutation(conversationId, mutation, headers, timeoutMs, context) {
     return mutation.kind === 'pin'
-      ? reconcilePinned(conversationId, mutation.pinned, headers, timeoutMs)
-      : reconcileConversation(conversationId, mutation, headers, timeoutMs);
+      ? reconcilePinned(conversationId, mutation.pinned, headers, timeoutMs, context)
+      : reconcileConversation(conversationId, mutation, headers, timeoutMs, context);
   }
 
-  async function reconcileUncertainWrite(conversationId, mutation, headers) {
+  async function reconcileUncertainWrite(conversationId, mutation, headers, context) {
     const deadline = now() + UNCERTAIN_RECONCILE_WINDOW_MS;
     let known = false;
     for (const delayMs of UNCERTAIN_RECONCILE_BACKOFF_MS) {
+      if (!current(context)) break;
       const beforeDelay = deadline - now();
       if (beforeDelay <= 0) break;
       await sleep(Math.min(delayMs, beforeDelay));
+      if (!current(context)) break;
       const remaining = deadline - now();
       if (remaining <= 0) break;
       const observed = await reconcileMutation(
         conversationId,
         mutation,
         headers,
-        Math.min(RECONCILE_TIMEOUT_MS, remaining)
+        Math.min(RECONCILE_TIMEOUT_MS, remaining), context
       );
       known = known || observed.known;
       if (observed.confirmed) return Object.freeze({ confirmed: true, known: true });
@@ -337,16 +370,19 @@
     return Object.freeze({ confirmed: false, known });
   }
 
-  function recordFailure(outcome) {
+  function recordFailure(outcome, context) {
+    if (!current(context)) return;
     failures = Math.min(10, failures + 1);
     const longCooldown = failures >= MAX_FAILURES || outcome === 'auth';
     cooldownUntil = now() + (longCooldown ? CIRCUIT_COOLDOWN_MS : RETRY_COOLDOWN_MS);
+    cooldownContext = context;
     lastOutcome = outcome;
   }
 
   function recordSuccess(latencyMs) {
     failures = 0;
     cooldownUntil = 0;
+    cooldownContext = null;
     lastOutcome = 'success';
     lastLatencyMs = Math.max(0, Math.min(30000, Number(latencyMs) || 0));
   }
@@ -376,14 +412,18 @@
     return acceptArchivedState(target.id, mutation.archived, null);
   }
 
-  async function executeMutation(target, mutation) {
+  async function executeMutation(target, mutation, context) {
     let headers;
     try {
       headers = await acquireHeaders();
     } catch (error) {
-      recordFailure('auth');
+      if (!current(context)) return rejected('mutation_context_changed', false);
+      recordFailure('auth', context);
       return rejected(failureCode(error), false);
     }
+    // Cold identity is acquired by the shared owner, never inferred from composer DOM.
+    if (!context.account) context.account = identity(headers);
+    if (!current(context) || identity(headers) !== context.account) return rejected('mutation_context_changed', false);
     const startedAt = now();
     try {
       await fetchWithTimeout(
@@ -399,6 +439,7 @@
         WRITE_TIMEOUT_MS
       );
     } catch (error) {
+      if (!current(context)) return rejected('mutation_context_changed', true);
       const http = String(error && error.message || '').match(/^http_(\d+)$/);
       if (http) {
         const status = Number(http[1]);
@@ -408,12 +449,13 @@
             authContext.invalidate('conversation_mutation_rejected');
           }
         }
-        recordFailure(status === 401 || status === 403 ? 'auth' : 'http');
+        recordFailure(status === 401 || status === 403 ? 'auth' : 'http', context);
         return rejected('mutation_http_' + status, true);
       }
       const code = failureCode(error);
       if (code === 'mutation_timeout' || code === 'mutation_network_failure') {
-        const reconciliation = await reconcileUncertainWrite(target.id, mutation, headers);
+        const reconciliation = await reconcileUncertainWrite(target.id, mutation, headers, context);
+        if (!current(context)) return rejected('mutation_context_changed', true);
         if (reconciliation.confirmed) {
           recordSuccess(now() - startedAt);
           return Object.freeze({
@@ -425,17 +467,19 @@
             reconciled: true
           });
         }
-        recordFailure(code === 'mutation_timeout' ? 'timeout' : 'network');
+        recordFailure(code === 'mutation_timeout' ? 'timeout' : 'network', context);
         return rejected(code, true, reconciliation.known);
       }
-      recordFailure(code === 'mutation_auth_unavailable' ? 'auth' : 'network');
+      recordFailure(code === 'mutation_auth_unavailable' ? 'auth' : 'network', context);
       return rejected(code, true);
     }
+    if (!current(context)) return rejected('mutation_context_changed', true);
     recordSuccess(now() - startedAt);
     acknowledgeMutation(target, mutation);
     const reconciliation = await reconcileMutation(
-      target.id, mutation, headers, RECONCILE_TIMEOUT_MS
+      target.id, mutation, headers, RECONCILE_TIMEOUT_MS, context
     );
+    if (!current(context)) return rejected('mutation_context_changed', true);
     return Object.freeze({
       ok: true,
       code: reconciliation.confirmed ? 'mutation_confirmed' : 'mutation_server_acknowledged',
@@ -448,12 +492,20 @@
     const target = targetFromPath(rawPath);
     if (!target || !mutation) return Promise.resolve(rejected('invalid_mutation', false));
     if (!supported()) return Promise.resolve(rejected('mutation_unavailable', false));
+    let account;
+    try { account = identity(privateTransport.copySameOriginRequestHeaders?.()); }
+    catch (_) { return Promise.resolve(rejected('mutation_auth_unavailable', false)); }
+    const context = { document: root.__elonChatGptDocumentToken, account };
+    if (!/^doc_[a-z0-9_]{3,80}$/.test(context.document || '') || !current(context)) {
+      return Promise.resolve(rejected('mutation_context_unavailable', false));
+    }
+    expireContextState();
     if (active) return Promise.resolve(rejected('mutation_busy', false));
     if (root.__elonChatGptPrivateConversationDelete?.busy?.() || root.__elonChatGptPrivateConversationShare?.busy?.()) {
       return Promise.resolve(rejected('mutation_busy', false));
     }
     if (cooldownUntil > now()) return Promise.resolve(rejected('mutation_circuit_open', false));
-    const request = executeMutation(target, mutation).finally(() => {
+    const request = executeMutation(target, mutation, context).finally(() => {
       if (active === request) active = null;
     });
     active = request;

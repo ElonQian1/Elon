@@ -2,7 +2,7 @@ package com.elon.app.chatgptweb
 
 /** Admission only: individual commands still validate context, handles and confirmations. */
 internal object ChatGptWebOperationReadiness {
-    enum class Requirement { LOCAL, CACHED_DIRECTORY, DOCUMENT, DIRECTORY_READ, ACCOUNT_READ, COMPOSER }
+    enum class Requirement { LOCAL, CACHED_DIRECTORY, DOCUMENT, DIRECTORY_READ, ACCOUNT_READ, ACCOUNT_MUTATION, COMPOSER }
 
     private val groups = mapOf(
         Requirement.LOCAL to setOf(
@@ -22,15 +22,18 @@ internal object ChatGptWebOperationReadiness {
             "chatgpt_list_conversation_files", "chatgpt_list_library_files",
             "chatgpt_download_conversation_file", "chatgpt_download_library_file",
         ),
+        Requirement.ACCOUNT_MUTATION to setOf(
+            "chatgpt_set_conversation_pinned", "chatgpt_set_conversation_archived",
+            "chatgpt_rename_conversation", "chatgpt_move_conversation_to_project",
+        ),
         // These still use the official composer/runtime transaction. Do not relax them implicitly.
         Requirement.COMPOSER to setOf(
             "set_input_text", "chatgpt_set_page_input_text", "send_input", "chatgpt_send_page_input",
             "chatgpt_invoke_control", "chatgpt_set_control_text", "chatgpt_set_control_selected",
             "chatgpt_select_control_choice", "chatgpt_set_control_slider", "chatgpt_set_control_expanded",
             "chatgpt_new_conversation", "chatgpt_verify_private_stream_watchdog", "chatgpt_regenerate_response",
-            "chatgpt_toggle_private_read_aloud", "chatgpt_set_conversation_pinned",
-            "chatgpt_set_conversation_archived", "chatgpt_delete_conversation", "chatgpt_share_conversation",
-            "chatgpt_rename_conversation", "chatgpt_move_conversation_to_project", "chatgpt_start_dictation",
+            "chatgpt_toggle_private_read_aloud", "chatgpt_delete_conversation", "chatgpt_share_conversation",
+            "chatgpt_start_dictation",
             "chatgpt_prepare_realtime_voice", "chatgpt_start_realtime_voice", "chatgpt_cancel_dictation",
             "chatgpt_submit_dictation", "chatgpt_remove_attachment", "chatgpt_reveal_project_choice",
             "chatgpt_select_composer_option", "chatgpt_select_feature", "chatgpt_record_verification_cases",
@@ -58,7 +61,7 @@ internal object ChatGptWebOperationReadiness {
         if (ChatGptWebAccessPolicy.requiresLogin(snapshot) ||
             ChatGptWebNavigationPolicy.isAuthenticationPage(snapshot.url)) return "login_required"
         if (!ChatGptWebNavigationPolicy.supportsEnhancedMode(snapshot.url)) return "unsupported_page"
-        // Private readers acquire and validate their own bounded, account-bound request context.
+        // Private requests validate their own account-bound context; mutations also retain confirmation checks.
         // A DOM-derived authenticated flag is not that context and must not block acquisition.
         return null
     }
