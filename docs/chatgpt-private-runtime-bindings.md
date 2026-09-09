@@ -2,8 +2,9 @@
 
 ## Status
 
-Versions 6 and 7 add two observed September 9 builds while retaining both earlier
-profiles. See [source mappings and verification boundary](reports/chatgpt-runtime-bindings-20260909.md).
+Version 8 adds the observed September 10 build while retaining all four earlier
+profiles. See [current source evidence and verification boundary](reports/chatgpt-runtime-bindings-20260910.md)
+and the [September 9 acceptance](reports/chatgpt-runtime-bindings-20260909.md).
 It repairs build admission, not proof that every consuming feature has passed
 new device acceptance.
 

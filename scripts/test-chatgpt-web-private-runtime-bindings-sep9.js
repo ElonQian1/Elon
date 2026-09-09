@@ -3,7 +3,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const bindings = require('../android/app/src/main/assets/chatgpt_web_private_runtime_bindings');
 const { attach, CDN, expectedExports: prior } = require('./fixtures/chatgpt-runtime-bindings');
-const profiles = [require('./fixtures/chatgpt-runtime-bindings-sep9'), require('./fixtures/chatgpt-runtime-bindings-sep9b')];
+const profiles = [require('./fixtures/chatgpt-runtime-bindings-sep9'), require('./fixtures/chatgpt-runtime-bindings-sep9b'),
+  require('./fixtures/chatgpt-runtime-bindings-sep10')];
 
 for (const profile of profiles) test.describe(profile.id, () => {
 
@@ -41,7 +42,8 @@ test('Sep 9 anchor proves the inspected dependencies after timing eviction', asy
 test('Sep 9 never accepts unrelated reused auth, tool or stop-state aliases', async () => {
   const f = fixture(), auth = () => true, status = () => ({ value: 3 });
   f.page.__elonChatGptPrivateRuntimeBindings = bindings.create(f.page, { loadRuntime: async () => ({
-    [profile.expectedExports.shared.H3]: auth, zS: status, H3: 'wrong auth', c6: 'wrong role', Lx: 'wrong status',
+    [profile.expectedExports.shared.H3]: auth, [profile.expectedExports.shared.Fx]: status,
+    H3: 'wrong auth', c6: 'wrong role', Lx: 'wrong status',
     _k: 'other store', cs: 'other store', ls: 'other store', yk: 'other store', yu: 'other store'
   }) });
   const value = await f.page.__elonChatGptPrivateRuntimeBindings.load('shared');
