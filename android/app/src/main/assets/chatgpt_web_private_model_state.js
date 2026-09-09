@@ -1,6 +1,11 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const states = new WeakMap();
+  const api = Object.freeze({ version: 4, create(page, options) {
+    const instance = factory(page, options);
+    states.set(page, instance.state);
+    return instance;
+  }, state: page => states.get(page)?.() || 'not_observed' });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateModelState = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -11,6 +16,8 @@
   const PREFIX = 'private_model_';
   const PAGE_SIZE = 20;
   let modules, loading, cooldown = 0, serial = 0, owned = null, pending = null, receipt = null, mutation = null;
+  let code = 'not_observed', diagnosticToken;
+  const state = () => diagnosticToken === page.__elonChatGptDocumentToken ? code : 'not_observed';
 
   function load() {
     if (modules) return Promise.resolve();
@@ -25,7 +32,11 @@
       const candidate = Object.fromEntries(entries);
       if (!contract.validate(candidate)) throw new Error('model_runtime_unknown');
       modules = candidate;
-    }).catch(() => { cooldown = Date.now() + 10000; }).finally(() => {
+    }).catch(error => {
+      code = ['model_runtime_timeout', 'model_runtime_unknown'].includes(error?.message)
+        ? error.message.slice(6) : 'runtime_unavailable';
+      cooldown = Date.now() + 10000;
+    }).finally(() => {
       page.clearTimeout(timer); loading = null;
     });
     return loading;
@@ -99,27 +110,37 @@
 
   function request(getTrigger, emit, result, fallback) {
     cancel(); owned = null; receipt = null;
+    diagnosticToken = page.__elonChatGptDocumentToken;
     let binding;
     try {
       binding = contract.capture(getTrigger);
-      if (!binding || !modules && Date.now() < cooldown || getTrigger()?.getAttribute('aria-expanded') === 'true' ||
-          !Object.values(contract.urls).every(url => page.__elonChatGptPrivateRuntimeBindings
+      if (!binding) { code = contract.state?.() || 'capture_error'; return false; }
+      if (!modules && Date.now() < cooldown) { code = 'cooldown'; return false; }
+      if (getTrigger()?.getAttribute('aria-expanded') === 'true') { code = 'menu_open'; return false; }
+      if (!Object.values(contract.urls).every(url => page.__elonChatGptPrivateRuntimeBindings
             ? page.__elonChatGptPrivateRuntimeBindings.observed(url) :
             page.performance?.getEntriesByName?.(url, 'resource')?.length > 0 ||
-            page.document.querySelector('link[rel="modulepreload"][href="' + url + '"]'))) return false;
-    } catch (_) { return false; }
+            page.document.querySelector('link[rel="modulepreload"][href="' + url + '"]'))) {
+        code = 'runtime_not_observed'; return false;
+      }
+    } catch (_) { code = 'capture_error'; return false; }
+    code = 'loading';
     const request = { result }; pending = request;
     function complete() {
       if (pending !== request) return;
       pending = null;
-      if (!contract.current(binding)) return result('list_model_options', false, '会话已经变化，请重新选择模型。');
+      if (!contract.current(binding)) {
+        code = 'context_changed'; return result('list_model_options', false, '会话已经变化，请重新选择模型。');
+      }
+      if (!modules) return fallback();
       let value, view = 'presets';
       try {
         value = contract.catalog(binding, modules);
         if (!value) { value = contract.advancedCatalog(binding, modules); view = 'advanced'; }
       } catch (_) { /* Unknown is not unavailable. */ }
-      if (!value) return fallback();
+      if (!value) { code = 'catalog_unavailable'; return fallback(); }
       emitCatalog(binding, value, emit, view);
+      code = 'ready';
       result('list_model_options', true, '');
     }
     if (modules) complete(); else void load().then(complete);
@@ -181,5 +202,5 @@
     return handled;
   }
 
-  return Object.freeze({ version: 3, request, select, dismiss });
+  return Object.freeze({ version: 4, state, request, select, dismiss });
 });

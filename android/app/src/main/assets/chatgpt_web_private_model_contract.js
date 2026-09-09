@@ -1,12 +1,14 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateModelContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
   'use strict';
   const SLUG = /^[a-z0-9][a-z0-9._-]{0,127}$/i;
   const MODEL_ID = /^[a-z0-9][a-z0-9._:/-]{0,255}$/i;
+  let code = 'not_observed';
+  const fail = value => { code = value; return null; };
   const ownerPath = page.__elonChatGptCommittedOwnerPath ||
     (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path') : null);
   const URLS = Object.freeze({
@@ -24,18 +26,21 @@
   }
 
   function picker(node) {
-    if (!node?.isConnected) return null;
+    if (!node?.isConnected) return fail('trigger_detached');
     const key = Object.keys(node).find(name => name.startsWith('__reactFiber$'));
+    const ancestors = ownerPath?.resolve(node[key])?.ancestors || [];
+    if (!ancestors.length) return fail('owner_unavailable');
     const candidates = new Set();
-    for (const fiber of ownerPath?.resolve(node[key])?.ancestors || []) {
+    for (const fiber of ancestors) {
       const props = fiber.memoizedProps;
       const menu = props?.dropdownContent?.props;
       if (!menu?.composerIntelligencePickerState || !menu.conversation ||
           !(menu.modelsData?.models instanceof Map)) continue;
-      if (props.ariaDisabled !== false || typeof props.dropdownOpen !== 'boolean') return null;
+      if (props.ariaDisabled !== false || typeof props.dropdownOpen !== 'boolean') return fail('picker_disabled');
       candidates.add(menu);
     }
-    return candidates.size === 1 ? candidates.values().next().value : null;
+    return candidates.size === 1 ? candidates.values().next().value :
+      fail(candidates.size ? 'picker_ambiguous' : 'picker_missing');
   }
 
   function capture(getTrigger) {
@@ -44,10 +49,15 @@
     const project = /^\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?\/project$/i.test(url.pathname);
     if (url.origin !== 'https://chatgpt.com' || url.username || url.password || url.hash ||
         url.search && url.search !== '?temporary-chat=true' || url.search && url.pathname.startsWith('/g/') ||
-        url.pathname !== '/' && !cid && !project) return null;
-    const token = page.__elonChatGptDocumentToken, account = identity(), menu = picker(getTrigger());
-    if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '') || !account || !menu ||
-        typeof menu.conversation.serverId$ !== 'function' || (menu.conversation.serverId$() || null) !== cid) return null;
+        url.pathname !== '/' && !cid && !project) return fail('route_unsupported');
+    const token = page.__elonChatGptDocumentToken, account = identity();
+    if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '')) return fail('document_unavailable');
+    if (!account) return fail('identity_unavailable');
+    const menu = picker(getTrigger());
+    if (!menu) return null;
+    if (typeof menu.conversation.serverId$ !== 'function' ||
+        (menu.conversation.serverId$() || null) !== cid) return fail('conversation_mismatch');
+    code = 'bound';
     return { getTrigger, href: url.href, token, account, conversation: menu.conversation, menu };
   }
 
@@ -340,6 +350,6 @@
     return advancedState(after);
   }
 
-  return Object.freeze({ version: 5, urls: URLS, capture, current, validate, catalog, read, matches, apply,
+  return Object.freeze({ version: 6, state: () => code, urls: URLS, capture, current, validate, catalog, read, matches, apply,
     readAdvanced, advancedCatalog, applyAdvanced, matchesAdvanced });
 });

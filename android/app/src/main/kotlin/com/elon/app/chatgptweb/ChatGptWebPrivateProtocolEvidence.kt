@@ -6,7 +6,12 @@ import org.json.JSONObject
 /** Validates structural diagnostics before they enter the native command ledger. */
 internal object ChatGptWebPrivateProtocolEvidence {
     val MODES = setOf("start", "read", "stop", "clear", "runtime_assets", "composer_tool_context",
-        "stop_runtime_context", "stop_runtime_owner", "directory_refresh")
+        "stop_runtime_context", "stop_runtime_owner", "directory_refresh", "model_runtime_context")
+    private val modelContextCodes = setOf("not_observed", "route_unsupported", "document_unavailable", "identity_unavailable",
+        "trigger_detached", "owner_unavailable", "picker_missing", "picker_disabled", "picker_ambiguous",
+        "conversation_mismatch", "capture_error", "cooldown", "menu_open", "runtime_not_observed",
+        "loading", "runtime_timeout", "runtime_unknown", "runtime_unavailable", "context_changed",
+        "catalog_unavailable", "ready")
     private val stopContextCodes = setOf("not_observed", "disabled", "invalid_command", "composer_unavailable",
         "context_unavailable", "request_unavailable", "runtime_not_observed", "preparing", "invoked",
         "document_changed", "context_changed", "request_changed", "runtime_unavailable", "voice_active",
@@ -30,6 +35,7 @@ internal object ChatGptWebPrivateProtocolEvidence {
         if (action == "share_conversation") return ChatGptWebConversationShareReceipt.detail(raw)
         if (action != ACTION) return raw.take(160)
         if (raw == "protocol_probe_unavailable") return raw
+        if (raw.startsWith("model_runtime_context:") && raw.substringAfter(':') in modelContextCodes) return raw
         if (raw.startsWith("composer_tool_context:") && raw.substringAfter(':') in toolContextCodes) return raw
         if (raw.startsWith("stop_runtime_context:") && raw.substringAfter(':') in stopContextCodes) return raw
         return runCatching { sanitize(raw) }.getOrNull() ?: "invalid_protocol_evidence"

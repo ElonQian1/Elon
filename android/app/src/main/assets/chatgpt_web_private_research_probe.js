@@ -4,6 +4,16 @@
   const legacyEnabled = window.__elonChatGptPrivateResearchEnabled === true;
   if (location.origin !== 'https://chatgpt.com') return;
   const existingProbe = window.__elonChatGptPrivateResearchProbe;
+  function modelContextDetail() {
+    let code;
+    try { code = window.__elonChatGptPrivateModelState?.state?.(window); } catch (_) {}
+    const codes = ['not_observed', 'route_unsupported', 'document_unavailable', 'identity_unavailable',
+      'trigger_detached', 'owner_unavailable', 'picker_missing', 'picker_disabled', 'picker_ambiguous',
+      'conversation_mismatch', 'capture_error', 'cooldown', 'menu_open', 'runtime_not_observed',
+      'loading', 'runtime_timeout', 'runtime_unknown', 'runtime_unavailable', 'context_changed',
+      'catalog_unavailable', 'ready'];
+    return 'model_runtime_context:' + (codes.includes(code) ? code : 'not_observed');
+  }
   function toolContextDetail() {
     const code = window.__elonChatGptPrivateComposerToolContext?.state?.(window);
     const codes = ['not_observed', 'ready', 'capture_error', 'runtime_unavailable', 'conversation_unavailable',
@@ -32,10 +42,13 @@
       { schema: 'elon.directory_refresh.v1', observed: false, durationMs: 0, identityMs: 0, reads: [] });
   }
   if (existingProbe && Number(existingProbe.version) >= 13) {
-    if (Number(existingProbe.version) < 17) {
+    if (Number(existingProbe.version) < 18) {
       // Upgrade only the command surface; keep the existing network observers.
-      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 17,
+      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 18,
         handle(action, command, respond) {
+          if (action === 'private_protocol_probe' && command.value === 'model_runtime_context') {
+            respond(action, true, modelContextDetail()); return true;
+          }
           if (action === 'private_protocol_probe' && command.value === 'directory_refresh') {
             respond(action, true, directoryDetail()); return true;
           }
@@ -543,13 +556,14 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 17,
+    version: 18,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
       if (action !== 'private_protocol_probe') return false;
       const mode = String(command.value || '');
       let detail;
       if (mode === 'runtime_assets') detail = window.__elonChatGptPrivateProtocolEvidence?.runtimeAssets(window);
+      else if (mode === 'model_runtime_context') detail = modelContextDetail();
       else if (mode === 'directory_refresh') detail = directoryDetail();
       else if (mode === 'composer_tool_context') detail = toolContextDetail();
       else if (mode === 'stop_runtime_context') detail = stopContextDetail();

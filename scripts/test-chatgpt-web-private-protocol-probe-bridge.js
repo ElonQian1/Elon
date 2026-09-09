@@ -90,6 +90,38 @@ test('runtime asset inventory is on demand and does not enable capture or extra 
   assert.deepEqual(f.requests, []);
 });
 
+test('model diagnostics use the same closed vocabulary in page and native receiver', () => {
+  const native = fs.readFileSync(path.join(__dirname,
+    '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPrivateProtocolEvidence.kt'), 'utf8');
+  const codes = [...native.match(/modelContextCodes = setOf\(([\s\S]*?)\)/)[1].matchAll(/"([a-z_]+)"/g)].map(m => m[1]);
+  for (const previous of [null, 17]) {
+    const f = fixture({ window: { __elonChatGptPrivateModelState: { state: () => 'ready' } } });
+    const fetch = f.window.fetch;
+    if (previous) {
+      f.window.__elonChatGptPrivateResearchProbe = { ...f.probe, version: previous };
+      vm.runInNewContext(source, f.context);
+    }
+    const read = () => {
+      let result;
+      f.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe', { value: 'model_runtime_context' },
+        (_, ok, detail) => { assert.equal(ok, true); result = detail; });
+      return result;
+    };
+    for (const code of codes) {
+      f.window.__elonChatGptPrivateModelState.state = () => code;
+      assert.equal(read(), 'model_runtime_context:' + code);
+    }
+    f.window.__elonChatGptPrivateModelState.state = () => 'secret raw context';
+    assert.equal(read(), 'model_runtime_context:not_observed');
+    f.window.__elonChatGptPrivateModelState.state = () => { throw Error('secret'); };
+    assert.equal(read(), 'model_runtime_context:not_observed');
+    assert.equal(f.window.fetch, fetch);
+    assert.deepEqual(f.events, []); assert.deepEqual(f.requests, []);
+    assert.equal(f.read().active, false);
+  }
+  assert.match(native.match(/val MODES = setOf\(([\s\S]*?)\)/)[1], /"model_runtime_context"/);
+});
+
 test('tool context diagnostics expose only known codes without running a capture', () => {
   const f = fixture({ window: { __elonChatGptPrivateComposerToolContext: {
     state: () => 'model_unavailable', capture: () => assert.fail('read must not capture'),
@@ -108,7 +140,7 @@ test('version 13 command upgrade preserves existing observers and other commands
   const existing = f.probe;
   f.window.__elonChatGptPrivateResearchProbe = { ...existing, version: 13 };
   vm.runInNewContext(source, f.context);
-  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 17);
+  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 18);
   assert.equal(f.window.fetch, fetch);
   assert.equal(f.window.XMLHttpRequest.prototype.send, send);
   const answers = [];

@@ -1,5 +1,21 @@
 # ChatGPT private model selection state
 
+## September 10 diagnosis
+
+Normal 1623's native model request returned legacy `model_` handles, not
+`private_model_` handles. This is DOM fallback evidence, not private selection
+acceptance. No preference was changed during that check.
+
+Contract v6 and model owner v4 retain the same selection guards and expose a
+passive, document-bound stage through `model_runtime_context`. The page and
+native ledger accept only fixed codes; reading a stage does not capture React
+state, import modules, enable network observation or export context values.
+Public asset inventory v3 still caps output at 96 but retains late runtime-role
+filenames, including competing build anchors. Truncation remains explicit.
+The prior inventory omitted all role filenames on this phone, so absence there
+cannot establish an unsupported build. 208 focused Node cases passed; grouped
+Android and device evidence remain pending at this source checkpoint.
+
 ## Status and scope
 
 - Capability: `android_chatgpt_private_model_preset_state_v1`.

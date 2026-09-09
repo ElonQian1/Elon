@@ -6,6 +6,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ChatGptWebPrivateProtocolEvidenceTest {
+    @Test fun modelContextAllowsKnownStagesAndRejectsUnboundedValues() {
+        assertTrue("model_runtime_context" in ChatGptWebPrivateProtocolEvidence.MODES)
+        for (code in listOf("not_observed", "identity_unavailable", "picker_missing", "owner_unavailable",
+            "runtime_not_observed", "runtime_unknown", "catalog_unavailable", "ready")) {
+            val raw = "model_runtime_context:$code"
+            assertEquals(raw, ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", raw))
+        }
+        for (raw in listOf("model_runtime_context:secret", "model_runtime_context:ready:secret")) {
+            assertEquals("invalid_protocol_evidence", ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", raw))
+        }
+    }
+
     private fun stopOwner() = JSONObject().put("schema", "elon.stop_runtime_owner.v1")
         .put("cached", true).put("request", "missing").put("tree", true)
         .put("generation", false).put("mode", "streaming")
