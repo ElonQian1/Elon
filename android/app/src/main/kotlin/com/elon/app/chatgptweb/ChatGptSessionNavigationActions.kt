@@ -18,6 +18,7 @@ internal class ChatGptSessionNavigationActions(
     private val cancelNewConversationRecovery: () -> Unit,
     private val scheduleNewConversationRecovery: () -> Unit,
     private val conversationNavigation: ChatGptConversationNavigationCoordinator,
+    private val documentNavigationReady: () -> Boolean = { false },
 ) {
     private val conversationOpenQueue = ChatGptConversationOpenQueue()
     private var pendingNewConversation = false
@@ -81,6 +82,8 @@ internal class ChatGptSessionNavigationActions(
 
     fun onSessionReady() = onBridgeReady()
 
+    fun onDocumentReady() = dispatchDeferredConversationOpen()
+
     fun clearDeferred() {
         conversationOpenQueue.clear()
         pendingNewConversation = false
@@ -99,7 +102,7 @@ internal class ChatGptSessionNavigationActions(
 
     private fun canDispatch(): Boolean =
         !conversationNavigation.hasPending() &&
-            (sessionReady() || sessionCanDefer() && bridgeReady())
+            (sessionReady() || sessionCanDefer() && bridgeReady() || documentNavigationReady())
 
     private fun dispatchConversationOpen(
         path: String,

@@ -87,7 +87,7 @@ internal class ChatGptBackgroundSession(
     private val conversationRefresh = ChatGptConversationRefreshRuntime(
         directory = conversationDirectory,
         pageAdapter = { pageAdapter },
-        isReady = { state == State.READY },
+        isReady = { ChatGptWebAccessPolicy.canReadDirectory(latestSnapshot, observedMcpState.snapshot().adapterCurrent) },
         onIndexChanged = { onConversationIndexChanged(conversationIndex()) },
         scheduleRefresh = { task, delayMs -> conversationRefreshHandler.postDelayed(task, delayMs) },
         cancelRefresh = conversationRefreshHandler::removeCallbacks,
@@ -234,6 +234,7 @@ internal class ChatGptBackgroundSession(
             conversationRefresh::yieldToUserNavigation,
             newConversationRecovery::cancel, newConversationRecovery::schedule,
             conversationNavigation,
+            { ChatGptWebAccessPolicy.canNavigate(latestSnapshot, observedMcpState.snapshot().adapterCurrent) },
         )
     }
 
@@ -630,6 +631,7 @@ internal class ChatGptBackgroundSession(
                 imageAssets.observe(snapshot)
                 onSnapshot(snapshot)
                 if (state == State.READY) navigationActions.onSessionReady()
+                else navigationActions.onDocumentReady()
             }
             is ChatGptWebEvent.ComposerControls -> {
                 composerOptionInteraction.release()

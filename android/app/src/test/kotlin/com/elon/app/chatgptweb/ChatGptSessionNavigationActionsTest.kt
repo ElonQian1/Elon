@@ -11,9 +11,12 @@ class ChatGptSessionNavigationActionsTest {
     private var ready = false
     private var loading = true
     private var bridgeReady = false
+    private var documentNavigationReady = false
+    private var commandAvailable = true
     private var current: ChatGptWebSnapshot? = snapshot("old", "/c/old")
     private val presented = mutableListOf<ChatGptWebSnapshot>()
     private val opened = mutableListOf<String>()
+    private val openedProjects = mutableListOf<String>()
     private var loadingTransitions = 0
     private var initializationCount = 0
     private var newConversationCommands = 0
@@ -22,13 +25,13 @@ class ChatGptSessionNavigationActionsTest {
         sessionReady = { ready },
         sessionCanDefer = { loading },
         bridgeReady = { bridgeReady },
-        commandAvailable = { true },
+        commandAvailable = { commandAvailable },
         startNewConversationCommand = { newConversationCommands += 1 },
         openConversationCommand = { path ->
             opened += path
             "open-${opened.size}"
         },
-        openProjectCommand = { true },
+        openProjectCommand = { openedProjects += it; true },
         latestSnapshot = { current },
         presentSnapshot = { value -> current = value; presented += value },
         updateLoading = { loadingTransitions += 1 },
@@ -37,6 +40,7 @@ class ChatGptSessionNavigationActionsTest {
         cancelNewConversationRecovery = {},
         scheduleNewConversationRecovery = {},
         conversationNavigation = navigation,
+        documentNavigationReady = { documentNavigationReady },
     )
 
     @Test
@@ -108,6 +112,87 @@ class ChatGptSessionNavigationActionsTest {
         assertEquals(0, initializationCount)
         assertEquals(0, navigationPriorities)
         assertEquals(0, newConversationCommands)
+    }
+
+    @Test
+    fun aFailedComposerDoesNotBlockOpeningAnExistingConversation() {
+        loading = false
+        documentNavigationReady = true
+        repository.values["/c/target"] = snapshot("cached", "/c/target")
+
+        assertTrue(actions.openConversation("/c/target"))
+
+        assertEquals(listOf("cached"), presented.last().messages.map { it.content })
+        assertEquals(listOf("/c/target"), opened)
+        assertEquals(1, loadingTransitions)
+        assertEquals(0, newConversationCommands)
+    }
+
+    @Test
+    fun aFailedComposerDoesNotBlockOpeningAnotherProject() {
+        loading = false
+        documentNavigationReady = true
+
+        assertTrue(actions.openProject("/g/g-p-target/project"))
+
+        assertEquals(listOf("/g/g-p-target/project"), openedProjects)
+        assertTrue(presented.isEmpty())
+        assertEquals(0, newConversationCommands)
+    }
+
+    @Test
+    fun deferredNavigationUsesTheCurrentDocumentWithoutWaitingForAComposer() {
+        assertTrue(actions.openConversation("/c/target"))
+        documentNavigationReady = true
+
+        actions.onDocumentReady()
+        actions.onDocumentReady()
+
+        assertEquals(listOf("/c/target"), opened)
+        assertEquals(1, loadingTransitions)
+        assertEquals(0, newConversationCommands)
+    }
+
+    @Test
+    fun navigationReadinessCannotReleaseAPendingNewConversation() {
+        assertTrue(actions.startNewConversation())
+        documentNavigationReady = true
+
+        actions.onDocumentReady()
+        actions.onBridgeReady()
+
+        assertEquals(0, newConversationCommands)
+        assertEquals(0, loadingTransitions)
+        assertTrue(opened.isEmpty())
+        bridgeReady = true
+        actions.onBridgeReady()
+        assertEquals(1, newConversationCommands)
+    }
+
+    @Test
+    fun navigationStillRejectsMissingAdaptersAndConcurrentOrInvalidTargets() {
+        loading = false
+        documentNavigationReady = true
+        commandAvailable = false
+        assertFalse(actions.openProject("/g/g-p-target/project"))
+        assertFalse(actions.openConversation("/c/target"))
+        commandAvailable = true
+        assertFalse(actions.openProject("https://other.example/g/g-p-target/project"))
+        assertFalse(actions.openConversation("https://other.example/c/target"))
+        assertTrue(actions.openConversation("/c/target"))
+        assertFalse(actions.openProject("/g/g-p-target/project"))
+        assertFalse(actions.openConversation("/c/other"))
+        assertEquals(listOf("/c/target"), opened)
+        assertTrue(openedProjects.isEmpty())
+    }
+
+    @Test
+    fun aFailedPageWithNoCurrentDocumentCannotNavigate() {
+        loading = false
+        assertFalse(actions.openConversation("/c/target"))
+        assertFalse(actions.openProject("/g/g-p-target/project"))
+        assertTrue(opened.isEmpty())
+        assertTrue(openedProjects.isEmpty())
     }
 
     @Test

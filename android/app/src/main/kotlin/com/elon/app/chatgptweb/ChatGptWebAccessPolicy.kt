@@ -6,4 +6,13 @@ internal object ChatGptWebAccessPolicy {
 
     fun canChat(snapshot: ChatGptWebSnapshot): Boolean =
         snapshot.composerReady && !requiresLogin(snapshot) && snapshot.accessReason != "rate_limited"
+
+    fun canNavigate(snapshot: ChatGptWebSnapshot?, adapterCurrent: Boolean): Boolean =
+        adapterCurrent && snapshot != null && !requiresLogin(snapshot) &&
+            ChatGptWebNavigationPolicy.supportsEnhancedMode(snapshot.url) &&
+            !ChatGptWebNavigationPolicy.isAuthenticationPage(snapshot.url)
+
+    fun canReadDirectory(snapshot: ChatGptWebSnapshot?, adapterCurrent: Boolean): Boolean =
+        canNavigate(snapshot, adapterCurrent) && snapshot != null &&
+            (snapshot.authenticated || canChat(snapshot))
 }

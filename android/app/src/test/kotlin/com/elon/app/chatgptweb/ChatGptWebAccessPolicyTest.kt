@@ -49,6 +49,59 @@ class ChatGptWebAccessPolicyTest {
         )
     }
 
+    @Test
+    fun projectWithoutAComposerCanReadItsDirectoryAndNavigateButCannotSend() {
+        val project = snapshot(authenticated = true, composerReady = false, pageKind = "feature")
+            .copy(url = "https://chatgpt.com/g/g-p-project/project")
+
+        assertTrue(ChatGptWebAccessPolicy.canNavigate(project, adapterCurrent = true))
+        assertTrue(ChatGptWebAccessPolicy.canReadDirectory(project, adapterCurrent = true))
+        assertFalse(ChatGptWebAccessPolicy.canChat(project))
+    }
+
+    @Test
+    fun anAuthenticatedRateLimitDoesNotRemoveDirectoryOrNavigationAccess() {
+        val limited = snapshot(true, false, accessReason = "rate_limited")
+        assertTrue(ChatGptWebAccessPolicy.canNavigate(limited, true))
+        assertTrue(ChatGptWebAccessPolicy.canReadDirectory(limited, true))
+        assertFalse(ChatGptWebAccessPolicy.canChat(limited))
+    }
+
+    @Test
+    fun aStaleDocumentCannotUseCachedAuthenticationForDirectoryOrNavigation() {
+        val previous = snapshot(true, true)
+        assertFalse(ChatGptWebAccessPolicy.canNavigate(previous, false))
+        assertFalse(ChatGptWebAccessPolicy.canReadDirectory(previous, false))
+        assertFalse(ChatGptWebAccessPolicy.canNavigate(null, true))
+        assertFalse(ChatGptWebAccessPolicy.canReadDirectory(null, true))
+    }
+
+    @Test
+    fun loginEvidenceAndNonChatGptOriginsStillBlockDocumentOperations() {
+        val previous = snapshot(true, false)
+        val unavailable = listOf(
+            previous.copy(loginRequired = true),
+            previous.copy(accessReason = "login_required"),
+            previous.copy(pageKind = "auth"),
+            previous.copy(url = "https://chatgpt.com/auth/login"),
+            previous.copy(url = "https://chatgpt.com.evil.example/c/target"),
+            previous.copy(url = "http://chatgpt.com/"),
+            previous.copy(url = "https://chatgpt.com:8443/"),
+        )
+        unavailable.forEach { value ->
+            assertFalse(ChatGptWebAccessPolicy.canNavigate(value, true))
+            assertFalse(ChatGptWebAccessPolicy.canReadDirectory(value, true))
+        }
+    }
+
+    @Test
+    fun guestNavigationDoesNotPretendAnAccountDirectoryIsAvailable() {
+        val guest = snapshot(false, false)
+        assertTrue(ChatGptWebAccessPolicy.canNavigate(guest, true))
+        assertFalse(ChatGptWebAccessPolicy.canReadDirectory(guest, true))
+        assertTrue(ChatGptWebAccessPolicy.canReadDirectory(guest.copy(composerReady = true), true))
+    }
+
     private fun snapshot(
         authenticated: Boolean,
         composerReady: Boolean,
