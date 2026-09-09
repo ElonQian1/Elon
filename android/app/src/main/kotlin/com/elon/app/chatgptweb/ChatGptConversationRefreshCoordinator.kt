@@ -58,6 +58,17 @@ internal class ChatGptConversationRefreshCoordinator(
         if (!dispatchQueuedRefresh()) scheduleNextRetry()
     }
 
+    fun onPartial() {
+        if (consumeSuppressedCompletion()) {
+            dispatchQueuedRefresh()
+            return
+        }
+        inFlight = false
+        retryIndex = 0
+        cancelScheduledRetry()
+        if (!dispatchQueuedRefresh()) scheduleDispatch(250L)
+    }
+
     fun yieldToUserNavigation() {
         refreshAgain = false
         retryIndex = 0
@@ -87,6 +98,10 @@ internal class ChatGptConversationRefreshCoordinator(
     private fun scheduleNextRetry() {
         cancelScheduledRetry()
         val delayMs = retryDelaysMs.getOrNull(retryIndex++) ?: return
+        scheduleDispatch(delayMs)
+    }
+
+    private fun scheduleDispatch(delayMs: Long) {
         lateinit var retry: Runnable
         retry = Runnable {
             if (scheduledRetry !== retry) return@Runnable

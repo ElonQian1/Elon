@@ -70,6 +70,8 @@ internal class ChatGptWebSideMenuView(
     }
 
     fun render() {
+        val scrollKey = listOf(selectedTab, selectedDate, selectedProjectId, searchQuery)
+        val previousScrollY = root.findViewWithTag<ScrollView>(scrollKey)?.scrollY ?: 0
         root.removeAllViews()
         root.addView(topTabs())
         if (searchVisible) root.addView(searchField())
@@ -87,7 +89,10 @@ internal class ChatGptWebSideMenuView(
             ))
         }
         root.addView(WebChatSideMenuStateViews.status(activity, index(), selectedDate, dp))
-        root.addView(contentScroll(), LinearLayout.LayoutParams(
+        root.addView(contentScroll().apply {
+            tag = scrollKey
+            post { scrollTo(0, previousScrollY) }
+        }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             0,
             1f,

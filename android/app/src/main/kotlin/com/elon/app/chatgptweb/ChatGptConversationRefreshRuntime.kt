@@ -16,6 +16,7 @@ internal class ChatGptConversationRefreshRuntime(
         cancel = cancelRefresh,
     )
     private val session = ChatGptConversationRefreshSession(coordinator)
+    private val owner = ChatGptConversationRefreshOwner()
     private val composerInterlock = ChatGptComposerRefreshInterlock(
         suspendRefresh = {
             suspend(
@@ -24,7 +25,7 @@ internal class ChatGptConversationRefreshRuntime(
             )
         },
         resumeRefresh = {
-            if (directory.needsOfficialRefresh()) session.request(null)
+            if (directory.needsOfficialRefresh()) session.requestDefaultIfMissing()
             session.resume(ChatGptConversationRefreshSuspension.COMPOSER_OPTIONS)
         },
         schedule = scheduleComposerRelease,
@@ -48,9 +49,24 @@ internal class ChatGptConversationRefreshRuntime(
 
     fun yieldToUserNavigation() = session.yieldToUserNavigation()
 
-    fun onSucceeded() = session.onSucceeded()
+    fun onSnapshot(event: ChatGptWebEvent.ConversationList) {
+        if (owner.isStaleNative(event.requestId)) return
+        val owned = owner.matches(event)
+        val continueRefresh = owned && session.canContinueRefresh(event.continueRefresh, event.collection.steps)
+        directory.accept(event.copy(continueRefresh = continueRefresh), settleRefresh = owned)
+        if (owned) {
+            owner.clear()
+            session.onSucceeded(continueRefresh, event.collection.steps)
+        }
+    }
 
-    fun onFailed() = session.onFailed()
+    fun onFailed(event: ChatGptWebEvent.CommandResult) {
+        if (!owner.matches(event.requestId)) return
+        owner.clear()
+        directory.failRefresh()
+        onIndexChanged()
+        session.onFailed()
+    }
 
     fun refreshOnReady(
         postVoiceRefresh: Boolean,
@@ -65,6 +81,7 @@ internal class ChatGptConversationRefreshRuntime(
     )
 
     fun reset() {
+        owner.clear()
         composerInterlock.abandon()
         session.reset()
     }
@@ -75,6 +92,7 @@ internal class ChatGptConversationRefreshRuntime(
     ) {
         val refreshWasBusy = coordinator.isBusy
         session.suspend(owner, preserveInterruptedRefresh) {
+            this.owner.clear()
             if (refreshWasBusy) {
                 directory.failRefresh()
                 onIndexChanged()
@@ -88,10 +106,12 @@ internal class ChatGptConversationRefreshRuntime(
         if (!isReady()) return false
         val request = session.beginDispatch() ?: return false
         val refresh = directory.beginRefresh(request.projectId)
+        session.bindDispatchedScope(refresh.scopeProjectId)
         onIndexChanged()
         adapter.listConversations(
             projectHints = refresh.projectHints,
             scopeProjectId = refresh.scopeProjectId,
+            requestId = owner.begin(refresh.scopeProjectId),
         )
         return true
     }

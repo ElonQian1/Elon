@@ -665,9 +665,7 @@ internal class ChatGptBackgroundSession(
                         }
                     }
                     if (event.action == "list_conversations") {
-                        conversationDirectory.failRefresh()
-                        onConversationIndexChanged(conversationIndex())
-                        conversationRefresh.onFailed()
+                        conversationRefresh.onFailed(event)
                     }
                     onStateChanged(
                         state,
@@ -680,8 +678,7 @@ internal class ChatGptBackgroundSession(
                 navigationActions.showAfterDeletion(deletionCaches.accept(event.deletedConversationIds, latestSnapshot)) {
                     webView?.loadUrl(ChatGptWebNavigationPolicy.START_URL)
                 }
-                conversationRefresh.onSucceeded()
-                conversationDirectory.accept(event)
+                conversationRefresh.onSnapshot(event)
                 conversationDirectory.save(conversationHistoryStore)
                 onConversationIndexChanged(conversationIndex())
             }

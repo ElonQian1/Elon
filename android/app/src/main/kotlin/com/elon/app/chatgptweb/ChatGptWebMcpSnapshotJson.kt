@@ -53,7 +53,7 @@ internal object ChatGptWebMcpSnapshotJson {
             .put("ok", observed.result.ok)
             .put("code", observed.result.detail.takeIf { it.matches(Regex("directory_[a-z_]{1,60}")) }.orEmpty())
             .put("observed_at_ms", observed.observedAtMs)
-            .put("source", if (observed.result.requestId == null) "native" else "mcp")
+            .put("source", if (observed.result.requestId == null || ChatGptConversationRefreshOwner.isNative(observed.result.requestId)) "native" else "mcp")
     }
 
     fun conversationFiles(value: ChatGptWebObservedState.Snapshot, url: String?, nowMs: Long = System.currentTimeMillis()): Any {

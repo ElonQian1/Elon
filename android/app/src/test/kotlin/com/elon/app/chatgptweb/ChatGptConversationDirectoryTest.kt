@@ -6,6 +6,35 @@ import org.junit.Test
 
 class ChatGptConversationDirectoryTest {
     @Test
+    fun passiveSnapshotCannotClearInflightProjectOwnershipOrItsLoadingState() {
+        val directory = ChatGptConversationDirectory(null)
+        directory.beginRefresh("g-p-one")
+        directory.accept(ChatGptWebEvent.ConversationList(
+            conversations = listOf(conversation("retained", "g-p-one")),
+            scopeProjectId = "g-p-one",
+        ), settleRefresh = false)
+        assertEquals("loading", directory.index().projectCollections.getValue("g-p-one").officialLoadState)
+        directory.failRefresh()
+        assertEquals("failed", directory.index().projectCollections.getValue("g-p-one").officialLoadState)
+        assertEquals("idle", directory.index().collection.officialLoadState)
+    }
+
+    @Test
+    fun continuedBatchKeepsRowsVisibleWhileTheNextBatchIsPending() {
+        val directory = ChatGptConversationDirectory(null)
+        directory.beginRefresh()
+        directory.accept(ChatGptWebEvent.ConversationList(
+            conversations = listOf(conversation("cached", null)), continueRefresh = true,
+        ))
+        assertEquals(listOf("cached"), directory.index().conversations.map { it.id })
+        assertEquals("loading", directory.index().collection.officialLoadState)
+        directory.beginRefresh()
+        directory.accept(ChatGptWebEvent.ConversationList(emptyList()))
+        assertEquals("ready", directory.index().collection.officialLoadState)
+        assertEquals(1, directory.index().conversations.size)
+    }
+
+    @Test
     fun restoresProjectRowsBeforeAnOfficialRefreshStarts() {
         val projectId = "g-p-invest"
         val directory = ChatGptConversationDirectory(

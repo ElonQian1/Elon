@@ -72,6 +72,10 @@ performed. This is semantic UI acceptance, not a screenshot visual review.
 
 ## Remaining work
 
+The [owned-continuation follow-up](chatgpt-directory-owned-continuation-20260909.md)
+addresses the successful-partial scheduling gap described below; older-history
+load-more remains separate and incomplete.
+
 The resumable retry and structural diagnostic are implemented and device-verified.
 Do not repeat these implementations. Full-account pagination is **not complete**:
 older history beyond the configured ordinary-history bound is not fetched here.

@@ -16,6 +16,7 @@ internal class ChatGptConversationDirectory(
     private var projectCollections = restoredProjectCollections(restored)
     private var navigationProjectId: String? = null
     private var activeRefreshProjectId: String? = null
+    private var refreshActive = false
 
     fun index(): ChatGptWebConversationIndexState = ChatGptWebConversationIndexState(
         conversations = conversations,
@@ -42,6 +43,7 @@ internal class ChatGptConversationDirectory(
         val scopeProjectId = ChatGptWebConversationPath.canonicalProjectId(requestedProjectId)
             ?: navigationProjectId
         activeRefreshProjectId = scopeProjectId
+        refreshActive = true
         if (scopeProjectId == null) {
             collection = collection.loading(conversations.isNotEmpty())
         } else {
@@ -96,9 +98,10 @@ internal class ChatGptConversationDirectory(
             if (navigationProjectId == scopeProjectId) navigationProjectId = null
         }
         activeRefreshProjectId = null
+        refreshActive = false
     }
 
-    fun accept(event: ChatGptWebEvent.ConversationList) {
+    fun accept(event: ChatGptWebEvent.ConversationList, settleRefresh: Boolean = true) {
         deleted.remember(event.deletedConversationIds)
         val scopeProjectId = event.scopeProjectId
         conversations = if (scopeProjectId == null) {
@@ -122,10 +125,13 @@ internal class ChatGptConversationDirectory(
             previous = projects,
             observed = event.projects,
         )
+        val pendingScope = refreshActive && activeRefreshProjectId == scopeProjectId
         val acceptedCollection = event.collection.copy(
             source = ChatGptWebConversationCollection.acceptedOfficialSource(event.collection.source),
             stale = false,
-            officialLoadState = ChatGptWebConversationCollection.LOAD_READY,
+            officialLoadState = if (pendingScope && !settleRefresh || settleRefresh && event.continueRefresh) {
+                ChatGptWebConversationCollection.LOAD_LOADING
+            } else ChatGptWebConversationCollection.LOAD_READY,
             cachedAtMs = nowMs(),
         )
         if (scopeProjectId == null) {
@@ -134,9 +140,12 @@ internal class ChatGptConversationDirectory(
             projectCollections = projectCollections + (scopeProjectId to acceptedCollection.copy(
                 observedCount = conversations.count { it.projectId == scopeProjectId },
             ))
-            if (navigationProjectId == scopeProjectId) navigationProjectId = null
+            if (settleRefresh && navigationProjectId == scopeProjectId) navigationProjectId = null
         }
-        if (activeRefreshProjectId == scopeProjectId) activeRefreshProjectId = null
+        if (settleRefresh && pendingScope) {
+            activeRefreshProjectId = null
+            refreshActive = false
+        }
     }
 
     fun save(store: ChatGptConversationHistoryStore) {
@@ -156,6 +165,7 @@ internal class ChatGptConversationDirectory(
         projectCollections = emptyMap()
         navigationProjectId = null
         activeRefreshProjectId = null
+        refreshActive = false
     }
 
     private fun updateProjectCollection(

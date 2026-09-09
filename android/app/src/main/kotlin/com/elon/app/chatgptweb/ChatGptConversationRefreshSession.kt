@@ -18,16 +18,30 @@ internal enum class ChatGptConversationRefreshSuspension {
 
 internal class ChatGptConversationRefreshSession(
     private val coordinator: ChatGptConversationRefreshCoordinator,
+    private val nowMs: () -> Long = { System.nanoTime() / 1_000_000 },
 ) {
     private var pendingProjectId: String? = null
     private var pendingRefresh = false
+    private var lastDispatch: ChatGptConversationRefreshDispatch? = null
+    private var cycleStartedAtMs = 0L
+    private var lastSteps = 0
+    private var continuationCount = 0
     private val suspensions = mutableSetOf<ChatGptConversationRefreshSuspension>()
 
     private val suspended: Boolean
         get() = suspensions.isNotEmpty()
 
-    fun onSucceeded() {
-        if (!suspended) coordinator.onSucceeded()
+    fun onSucceeded(continueRefresh: Boolean = false, observedSteps: Int = 0) {
+        if (suspended) return
+        val canContinue = canContinueRefresh(continueRefresh, observedSteps)
+        lastSteps = observedSteps
+        if (canContinue) {
+            continuationCount += 1
+            coordinator.onPartial()
+        } else {
+            lastDispatch = null
+            coordinator.onSucceeded()
+        }
     }
 
     fun onFailed() {
@@ -45,12 +59,29 @@ internal class ChatGptConversationRefreshSession(
         return coordinator.requestAfterCurrent()
     }
 
+    fun requestDefaultIfMissing() {
+        if (!pendingRefresh && lastDispatch == null) request(null)
+    }
+
     fun beginDispatch(): ChatGptConversationRefreshDispatch? {
         if (suspended) return null
-        pendingRefresh = false
-        return ChatGptConversationRefreshDispatch(pendingProjectId).also {
-            pendingProjectId = null
+        if (pendingRefresh || lastDispatch == null) {
+            lastDispatch = ChatGptConversationRefreshDispatch(pendingProjectId)
+            cycleStartedAtMs = nowMs()
+            lastSteps = 0
+            continuationCount = 0
         }
+        pendingRefresh = false
+        pendingProjectId = null
+        return lastDispatch
+    }
+
+    fun canContinueRefresh(requested: Boolean, observedSteps: Int): Boolean =
+        !suspended && !pendingRefresh && lastDispatch != null && requested &&
+            observedSteps > lastSteps && continuationCount < 10 && nowMs() - cycleStartedAtMs < 60_000
+
+    fun bindDispatchedScope(projectId: String?) {
+        lastDispatch = lastDispatch?.copy(projectId = projectId)
     }
 
     fun suspend(
@@ -59,12 +90,16 @@ internal class ChatGptConversationRefreshSession(
         onSuspended: () -> Unit,
     ) {
         if (!suspensions.add(owner)) return
-        if (preserveInterruptedRefresh && coordinator.isBusy) pendingRefresh = true
+        if (preserveInterruptedRefresh && coordinator.isBusy && !pendingRefresh) {
+            pendingRefresh = true
+            pendingProjectId = lastDispatch?.projectId
+        }
         if (!preserveInterruptedRefresh) {
             pendingRefresh = false
             pendingProjectId = null
         }
         if (suspensions.size > 1) return
+        lastDispatch = null
         coordinator.reset()
         onSuspended()
     }
@@ -76,12 +111,15 @@ internal class ChatGptConversationRefreshSession(
 
     fun yieldToUserNavigation() {
         pendingProjectId = null
+        pendingRefresh = false
+        lastDispatch = null
         coordinator.yieldToUserNavigation()
     }
 
     fun reset() {
         pendingProjectId = null
         pendingRefresh = false
+        lastDispatch = null
         suspensions.clear()
         coordinator.reset()
     }
