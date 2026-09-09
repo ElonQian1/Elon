@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 17, create: factory });
+  const exported = Object.freeze({ version: 18, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -203,9 +203,15 @@
       draftView: editor?.view || null, readEditor: editor?.read || null, replaceEditor: editor?.replace || null };
   }
 
-  function sameOwner(binding) {
+  function sameOwner(binding, acknowledged = false) {
     try {
       const currentRoute = route(), context = stores(binding.node), props = context?.shared.getSharedProps();
+      // A confirmed first dispatch can publish its server ID before the router
+      // commits /c/<id>. This is only the captured ordinary homepage owner,
+      // never permission to capture another command during that transition.
+      const homeHandoff = acknowledged && binding.newThread && !binding.temporary && binding.serverId === null &&
+        binding.href === 'https://chatgpt.com/' && currentRoute?.href === binding.href &&
+        new RegExp('^' + UUID + '$', 'i').test(binding.conversation.serverId$() || '');
       // A committed provider wrapper can be replaced after first dispatch;
       // the actual conversation, controller and file store must still be ours.
       return binding.node.isConnected && page.__elonChatGptDocumentToken === binding.token &&
@@ -215,7 +221,7 @@
         context.files === binding.files && props?.conversation === binding.conversation &&
         props.composerController === binding.controller &&
         (!binding.serverId || binding.conversation.serverId$() === binding.serverId) &&
-        matchesRoute(binding.conversation, currentRoute, binding.guestProof);
+        (matchesRoute(binding.conversation, currentRoute, binding.guestProof) || homeHandoff);
     } catch (_) { return false; }
   }
 
@@ -284,7 +290,7 @@
     }
     let timer;
     const settled = Promise.resolve(receipt.completion).then(accepted => {
-      const currentContext = sameOwner(binding);
+      const currentContext = sameOwner(binding, accepted === true);
       // Dispatch acknowledgement belongs to the captured command, not the
       // editor lifetime. Local cleanup must never revoke a confirmed send.
       if (!binding.attachment && accepted === true) {
@@ -325,5 +331,5 @@
       if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
     }
   } catch (_) {}
-  return Object.freeze({ version: 17, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 18, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

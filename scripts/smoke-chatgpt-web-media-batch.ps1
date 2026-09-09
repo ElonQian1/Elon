@@ -55,6 +55,10 @@ try {
     if ($origin.social_chat.web_chat_provider_id -ne 'chatgpt_web' -or
         $origin.social_chat.interaction_mode -ne 'chat' -or $web.authenticated -ne $true -or
         $web.composer_ready -ne $true) { throw 'surface_not_ready' }
+    $page = [uri]$web.conversation.url
+    if ($page.Scheme -ne 'https' -or $page.Host -ne 'chatgpt.com' -or $page.AbsolutePath -ne '/') {
+        throw 'ordinary_new_chat_required'
+    }
     $temporary = $web.ui_manifest.controls | Where-Object semantic -eq 'temporary_chat' | Select-Object -First 1
     if ($null -eq $temporary -or $temporary.selected -ne $false) { throw 'ordinary_chat_required' }
     if (@($origin.social_chat.messages).Count -gt 0 -or $origin.input.text -or $web.streaming -or $web.dictation_active -or

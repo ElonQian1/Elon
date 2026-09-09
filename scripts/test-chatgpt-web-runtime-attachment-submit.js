@@ -116,6 +116,34 @@ test('a replaced provider before dispatch still invalidates captured input', () 
   assert.equal(f.calls.length, 0);
 });
 
+for (const count of [1, 3, 9]) {
+  test('confirmed ordinary first send cleans owned files before the router catches up: ' + count, async () => {
+    const f = fixture({ count });
+    f.send(); f.persistAtHome(); f.rebindShared(); f.settle(true); await flush();
+    assert.equal(f.events[0].detail, 'official_runtime_v1:accepted');
+    assert.equal(f.store.files$().length, 0);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.api.state().pending, false);
+    // The transient URL is not a valid owner for capturing another send.
+    assert.equal(f.api.captureConversation(f.node), null);
+  });
+}
+
+test('ordinary homepage handoff requires an acknowledgement and cannot follow another route', async () => {
+  for (const changed of ['unconfirmed', 'route', 'identity', 'files']) {
+    const f = fixture({ count: 3 });
+    f.send(); f.persistAtHome();
+    if (changed === 'route') f.page.location.href = 'https://chatgpt.com/c/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    if (changed === 'identity') f.setIdentity('Bearer another-account');
+    if (changed === 'files') f.fiber.dependencies.firstContext.next.memoizedValue = { ...f.store };
+    f.settle(changed !== 'unconfirmed'); await flush();
+    assert.equal(f.events[0].detail, 'official_runtime_v1:unknown:context_changed');
+    assert.equal(f.store.files$().length, 3);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.counts.relay, 0);
+  }
+});
+
 for (const change of ['committed', 'selected', 'project', 'work', 'newThread']) {
   test('temporary homepage requires live privacy and ordinary-thread proof: ' + change, async () => {
     const f = fixture({ temporary: true });
