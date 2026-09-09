@@ -7,7 +7,8 @@
 - Implementation: existing private uploader, project permission and origin
   binding, native pending-file/send owners are reused unchanged.
 - Verification: scope/receipt/restore harness contracts passed; real project
-  attachment send is **deferred**, not completed.
+  attachment send is **deferred**, not completed. A subsequent device window
+  reached the project URL but stopped before upload at composer readiness.
 - Delivery: current phone independently read back normal `1.1.1599` (code
   `1599`). It includes the normal 1598 ACK/cleanup correction. This batch changes
   only acceptance scripts and records, so it does not require another APK build.
@@ -29,6 +30,38 @@ Before the planned project navigation, foreground changed again. The guard
 stopped the operation with `foreground_changed` **before project navigation,
 upload or send**. Do not classify this as an attachment protocol failure or ask
 for another login. Do not repeatedly steal foreground from the other workflow.
+
+### Subsequent Window: Project Readiness
+
+One later authorized return confirmed the empty production ChatGPT composer:
+authenticated/ready, zero messages/draft/pending files, not streaming. The native
+`open_web_chat_project` action accepted an observed directory path. Readback
+matched that exact project homepage without a query; no old conversation was
+opened and no attachment was staged or sent.
+
+The 30-second readiness window did not pass. Subsequent structural readback had
+`authenticated=true`, `login_required=false`, `adapter_current=true`,
+`page_generation=4`, `page_kind=feature`, `composer_ready=false` and
+`bridge_state=connecting`. Native state then became `error` with the built-in
+automatic-recovery-exhausted message. This is a page/composer-readiness failure,
+not evidence of absent project capability, upload failure or expired login.
+
+A single diagnostic presentation request was accepted, but the captured screen
+already belonged to another application, so it provides **no official-page
+diagnostic evidence**. Later resumed-activity readback confirmed that other app;
+the attempted presentation restoration returned `main_activity_not_bound`.
+Do not claim restored native presentation. No further foreground navigation was
+attempted. The task-only ADB debug forward and handset capture were removed;
+the normal APK exposes no WebView debug socket. No private request or credential
+was exported. Readiness cause remains unproven: source inspection shows the
+recovery timeout requires a ready composer, but does not establish whether the
+observed page was blocked, unavailable, stalled or affected by backgrounding.
+
+At the next uncontended device window, restore native presentation first, inspect
+the same project readiness boundary using existing MCP state, and obtain actual
+official-page evidence only if needed. Do not repeat upload or build steps:
+neither ran in this window. Do not enable debug access in the normal APK merely
+to diagnose this one case. The user has been asked to pause other phone testing.
 
 ## Existing Harness Extension
 
