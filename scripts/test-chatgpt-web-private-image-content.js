@@ -12,6 +12,7 @@ const deferred = () => { let resolve; const promise = new Promise(r => { resolve
 
 function harness(t, options = {}) {
   const calls = [], events = [], canvases = [], timers = new Set();
+  const emit = event => { events.push(event); options.onEvent?.(event); };
   let closed = 0, account = 'synthetic-account-one', current = true, id = 0;
   const root = { location: { origin, href: origin + '/c/synthetic' },
     __elonChatGptDocumentToken: 'doc_synthetic', AbortController,
@@ -56,7 +57,7 @@ function harness(t, options = {}) {
       return api.request(handle, event => events.push(event));
     },
     run: (cachedHandles = []) => gallery.request({ requestId: 'mcp_gallery' + ++id,
-      value: JSON.stringify({ operation: 'open', cachedHandles }) }, event => events.push(event)),
+      value: JSON.stringify({ operation: 'open', cachedHandles }) }, emit),
     preview: handle => new Promise(resolve => {
       const handled = gallery.handle('request_image_asset', { value: handle },
         (_, ok, code) => resolve({ ok, code }), event => events.push(event));
@@ -147,6 +148,39 @@ test('expired on-demand full URL retries once and only exposes the final result'
   assert.equal(h.events.filter(e => e.type === 'image_asset').length, 1);
   assert.equal(h.events[0].state, 'ready');
   assert.equal(h.timers.size, 0);
+});
+
+test('grid and selected full preview share the complete expired-URL recovery', async t => {
+  for (const previewFirst of [false, true]) {
+    const started = deferred(), response = deferred();
+    let selected;
+    const h = harness(t, { source: '/backend-api/estuary/content?id=fresh',
+      itemFields: { url: contentPath },
+      onEvent: event => {
+        if (previewFirst && event.type === 'image_gallery_snapshot' && event.handles?.length && !selected) {
+          selected = h.preview(event.previewHandles[0]);
+        }
+      },
+      fetch: async url => {
+        if (url === origin + contentPath) { started.resolve(); return response.promise; }
+        return { ok: true, url, headers: { get: () => 'image/png' },
+          blob: async () => ({ type: 'image/png', size: 128 }) };
+      },
+    });
+    const batch = h.run();
+    await started.promise;
+    const page = h.events.filter(e => e.type === 'image_gallery_snapshot').at(-1);
+    selected ??= h.preview(page.previewHandles[0]);
+    response.resolve({ ok: false, status: 403 });
+    assert.equal((await selected).ok, true, 'preview must wait for the complete recovery');
+    assert.equal((await batch).ok, true);
+    assert.deepEqual(h.calls.map(c => c.kind), ['json', 'bytes', 'json', 'bytes']);
+    const imageEvents = h.events.filter(e => e.type === 'image_asset');
+    assert.equal(imageEvents.length, 1, 'no premature failure or duplicate native image');
+    assert.equal(imageEvents[0].state, 'ready');
+    assert.equal(imageEvents[0].requestId, page.requestId);
+    assert.equal(h.timers.size, 0);
+  }
 });
 
 test('duplicate full previews coalesce and closing the gallery suppresses late results', async t => {

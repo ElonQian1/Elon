@@ -10,8 +10,9 @@ delivery_status: published
 Latest real acceptance: `1.1.1618` exercises gallery v6 direct catalog image URLs,
 native pagination while previews are loading, native preview and cached-page
 return. The new page 3 still reached the 35-second deadline and ended partial;
-cold-load completion is not fixed. Next evaluate separate small grid images and
-on-demand full previews, not longer waits. See
+cold-load completion is not fixed. Separate small grid images and on-demand
+full previews are now implemented in v8 with coalesced expiry recovery; their
+device acceptance is pending. See [thumbnail follow-up](reports/chatgpt-gallery-thumbnails.md) and
 [current evidence](reports/chatgpt-gallery-catalog-source.md).
 The accepted v5 subpages and owner-resume correction remain in place; reuse the
 [1617 catalog/paging/resume evidence](reports/chatgpt-image-gallery-1616.md).

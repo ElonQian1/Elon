@@ -2,7 +2,7 @@
   'use strict';
   const pointer = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
-  const exported = Object.freeze({ version: 7, create: root => factory(root, pointer) });
+  const exported = Object.freeze({ version: 8, create: root => factory(root, pointer) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       (Number(root.__elonChatGptPrivateImageGallery?.version || 0) < exported.version ||
@@ -61,6 +61,7 @@
     job.controller.abort();
     for (const handle of job.pending) job.assets?.cancel?.(handle, job.assetListener);
     job.pending.clear();
+    job.transfers.clear();
   }
 
   function stop(job) {
@@ -200,8 +201,13 @@
         check(job);
         const handle = missing[next++];
         job.pending.add(handle);
-        const result = await exportHandle(job, handle, job.assetListener, () => current(job));
-        job.pending.delete(handle);
+        // Share the whole recovery, not only its first possibly expired byte request.
+        const transfer = job.previews.get(handle)?.promise ||
+          exportHandle(job, handle, job.assetListener, () => current(job));
+        job.transfers.set(handle, transfer);
+        let result;
+        try { result = await transfer; }
+        finally { job.pending.delete(handle); job.transfers.delete(handle); }
         check(job);
         if (!result?.ok) failed++;
       }
@@ -285,10 +291,13 @@
     cancel();
     const job = { id: command.requestId, operation: args.operation, cached: new Set(args.cachedHandles),
       href: root.location.href, token: root.__elonChatGptDocumentToken, account: null, stage: 'identity',
-      controller: new root.AbortController(), pending: new Set(), previews: new Map(), fallbacks: new Map(), emit: emitEvent,
+      controller: new root.AbortController(), pending: new Set(), previews: new Map(),
+      transfers: new Map(), fallbacks: new Map(), emit: emitEvent,
       assets: root.__elonChatGptImageAssets };
     job.assetListener = event => {
-      if (current(job)) emitEvent({ ...event, source: 'private_image_gallery_v1', requestId: job.id });
+      if (current(job) && event.state === 'ready') {
+        emitEvent({ ...event, source: 'private_image_gallery_v1', requestId: job.id });
+      }
     };
     active = job;
     owner = job;
@@ -308,7 +317,8 @@
         };
         // Only the final failure is visible; an expired full-image URL may be resolved once.
         const listener = event => { if (event.state === 'ready') send(event); };
-        const promise = exportHandle(job, handle, listener, () => owned(job)).catch(() => ({ ok: false })).then(result => {
+        const transfer = job.transfers.get(handle) || exportHandle(job, handle, listener, () => owned(job));
+        const promise = transfer.catch(() => ({ ok: false })).then(result => {
           if (!result?.ok) send({ type: 'image_asset', handle, state: 'failed', error: 'fetch_failed' });
           return result;
         }).finally(() => job.previews.delete(handle));
@@ -326,5 +336,5 @@
   }
 
   function dispose() { cancel(); disposed = true; clearCache(); cacheIdentity = ''; }
-  return Object.freeze({ version: 7, get disposed() { return disposed; }, request, handle, cancel, dispose });
+  return Object.freeze({ version: 8, get disposed() { return disposed; }, request, handle, cancel, dispose });
 });
