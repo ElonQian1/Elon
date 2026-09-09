@@ -74,8 +74,11 @@ file suite was aligned with the already released v13; behavior checks remain.
 
 Logs: `membership-read-admission-baseline-20260909-235155-298` and
 `membership-read-admission-final-20260909-235329-827`.
-Implementation/verification: **source verified, grouped APK acceptance pending**.
+Implementation/verification: **source verified, grouped APK installed; targeted
+expired-freshness device query remains pending**. Transport v25 was included in
+the normally published and automatically installed 1616 and 1617 grouped APKs;
+see [release evidence](chatgpt-image-gallery-1616.md).
 Do not repeat the accepted three-file send. Next install should verify one
 explicit read of the existing synthetic conversation after freshness expires.
-Keep Google last. This small source correction is queued for the next grouped
-APK rather than a separate rebuild; the installed 1.1.1614 still uses v24.
+Keep Google last. Do not repeat the accepted three-file send or publish another
+APK just for this read-only follow-up.

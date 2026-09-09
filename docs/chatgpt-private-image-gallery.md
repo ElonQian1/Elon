@@ -1,16 +1,18 @@
 ---
 capability_id: android_chatgpt_private_generated_image_gallery_v1
 implementation_status: implemented
-verification_status: device_failed_source_corrected
+verification_status: device_verified_partial
 delivery_status: published
 ---
 
 # Private generated-image gallery
 
-Latest real acceptance: `1.1.1616` reached the authenticated native Images page
-but rejected an official catalog batch larger than the requested 25 items. A
-second failure followed host pause/resume reuse of a disposed gallery. Both are
-corrected in gallery v5 source; real preview acceptance is still pending.
+Latest real acceptance: `1.1.1617` verified gallery v5 catalog/native subpages,
+preview opening, previous-page cache and reopening after host pause. It fixes
+1616's whole-page rejection of batches larger than 25 and disposed-owner reuse.
+First cold thumbnail sync still reached the total deadline and was partial;
+reopening completed, and the second page also completed. Optimize that remaining
+cold-load behavior without repeating the accepted catalog/paging implementation.
 See [current evidence and correction](reports/chatgpt-image-gallery-1616.md).
 
 Earlier grouped release: `1.1.1574` (code 1574), source
@@ -61,8 +63,8 @@ Estuary content routes described below. Preview bytes use no cross-origin
 credentials and reject redirects. The inspected official shared module has SHA-256
 `89c95d937bac1191e91d5ceb4872eb0c328d39a98ce05399093a663f18921aa0`.
 
-The catalog request now has authenticated HTTP 200 evidence, but native preview
-acceptance remains pending. Bounded pointer parameters are implemented below;
+The catalog has authenticated HTTP 200 and native preview/paging evidence on
+1617. Cold preview completion remains partial. Pointer parameters are implemented below;
 shared/library/connector scopes and unrecognized shapes remain partial.
 
 ## Ownership and limits
