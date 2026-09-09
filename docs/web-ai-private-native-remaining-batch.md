@@ -48,7 +48,7 @@ post-send membership timing defect and source fix are recorded in
 | Text submit/stream/stop/follow-up | Official runtime path verified, reused | This is not independent Android HTTP POST; other contexts and regeneration need evidence |
 | Project attachments | Native new-project TXT/PNG/PDF upload, send and actual content reading verified on 1614 | Explicit membership query rejected when background freshness expires; fix passes offline tests, grouped install/idle-query acceptance pending |
 | Model/effort/tool combinations and latest cursor image gallery | Gallery v6 catalog/paging/viewer/cache accepted on 1618; v8 thumbnail/full-preview separation and coalesced expiry recovery published in 1620, 52 Node + 7 JVM checks pass | Phone offline; install existing 1620 for cold-thumbnail acceptance. Native-menu/runtime cases remain; [delivery](reports/chatgpt-gallery-thumbnails.md) |
-| Other mounted providers and citation-only cloud references | Incomplete | Do not invent a transport for an uncaptured source |
+| Explicit file citations / remaining cloud references | Concrete ChatGPT file-ID citations now reuse native index/download in source; 114 offline runner cases pass, grouped build/device acceptance pending | [Boundary and source evidence](chatgpt-private-file-citations.md). Other mounted providers, URL-only cloud and PCA citation graphs remain incomplete |
 | Google private sender | Deferred by user priority | Start only after the remaining ChatGPT acceptance gate |
 
 Current code correction separates current-document navigation/private directory

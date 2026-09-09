@@ -1,9 +1,11 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 6, create: factory });
+  const citation = typeof module === 'object' && module.exports
+    ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
+  const exported = Object.freeze({ version: 7, create: dependencies => factory(dependencies, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateHistoryProjection = exported;
-})(typeof window === 'object' ? window : null, function (dependencies) {
+})(typeof window === 'object' ? window : null, function (dependencies, citation) {
   'use strict';
 
   const MAX_MESSAGES = 80;
@@ -133,6 +135,13 @@
       if (withSource) value.mountedLibraryReference = reference;
       parts.push(value);
     });
+    const existing = [attachments, shared].flatMap(files => Array.isArray(files) ? files.slice(0, MAX_PARTS) : []);
+    for (const { reference, file } of citation?.references(message.metadata, existing, MAX_PARTS) || []) {
+      const value = { type: 'file', text: file.name, kind: 'file' };
+      if (file.mime_type) value.mediaType = file.mime_type;
+      if (withSource) value.fileCitationReference = reference;
+      parts.push(value);
+    }
     return bounded ? parts.slice(0, MAX_PARTS - 1) : parts;
   }
 
@@ -191,6 +200,9 @@
       if (Array.isArray(rawShared) && rawShared.length > MAX_PARTS) truncated = true;
       const rawMounted = message.metadata && message.metadata.mounted_library_file_references;
       if (Array.isArray(rawMounted) && rawMounted.length > MAX_PARTS) truncated = true;
+      const rawCitations = message.metadata && message.metadata.content_references;
+      if (citation?.eligible(message.metadata) && Array.isArray(rawCitations) &&
+          rawCitations.length > MAX_PARTS) truncated = true;
       const rawParts = message.content && message.content.parts;
       if (Array.isArray(rawParts) && rawParts.length > MAX_PARTS) truncated = true;
       parts.forEach((part, index) => {
@@ -227,6 +239,8 @@
     if (part?.sharedLibraryReference) return { sharedLibraryReference: part.sharedLibraryReference,
       name: part.text, projectId: normalized.gizmo_id || normalized.project_id || '' };
     if (part?.mountedLibraryReference) return { mountedLibraryReference: part.mountedLibraryReference,
+      name: part.text, projectId: normalized.gizmo_id || normalized.project_id || '' };
+    if (part?.fileCitationReference) return { fileCitationReference: part.fileCitationReference,
       name: part.text, projectId: normalized.gizmo_id || normalized.project_id || '' };
     return part?.source ? { attachment: part.source, name: part.text,
       projectId: normalized.gizmo_id || normalized.project_id || '' } : null;

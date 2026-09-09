@@ -69,6 +69,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_realtime_data_channel_research.js",
         "chatgpt_web_realtime_voice_research.js",
         "chatgpt_web_private_transport_policy.js",
+        "chatgpt_web_private_file_citation.js",
         "chatgpt_web_private_history_projection.js",
         "chatgpt_web_private_transport.js",
         "chatgpt_web_private_library_download.js", "chatgpt_web_private_file_download.js",

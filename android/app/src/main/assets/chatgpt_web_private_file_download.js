@@ -2,14 +2,16 @@
   'use strict';
   const pointer = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
-  const exported = Object.freeze({ version: 14, create: root => factory(root, pointer) });
+  const citation = typeof module === 'object' && module.exports
+    ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
+  const exported = Object.freeze({ version: 15, create: root => factory(root, pointer, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
     root.__elonChatGptPrivateFileDownload?.dispose?.();
-    root.__elonChatGptPrivateFileDownload = factory(root, pointer);
+    root.__elonChatGptPrivateFileDownload = factory(root, pointer, citation);
   }
-})(typeof window === 'object' ? window : null, function (root, pointerParser) {
+})(typeof window === 'object' ? window : null, function (root, pointerParser, citationParser) {
   'use strict';
   const entries = new Map();
   const PATH = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([A-Za-z0-9_-]{1,160})$/i;
@@ -82,10 +84,13 @@
     const image = source?.image != null;
     const shared = source?.sharedLibraryReference != null;
     const mountedReference = source?.mountedLibraryReference != null;
+    const fileCitation = source?.fileCitationReference != null;
+    if (fileCitation && (image || shared || mountedReference || source.attachment != null)) return null;
     if (mountedReference && (image || shared || source.attachment != null)) return null;
     if (shared && (image || source.attachment != null)) return null;
     const file = image ? imageFile(source) : shared ? source.sharedLibraryReference :
-      mountedReference ? source.mountedLibraryReference : source?.attachment;
+      mountedReference ? source.mountedLibraryReference : fileCitation
+        ? citationParser?.target(source.fileCitationReference) : source?.attachment;
     const mounted = !image && !shared && root.__elonChatGptPrivateLibraryDownload?.mountedTarget?.(file, mountedReference);
     if (mountedReference && !mounted) return null;
     const libraryReference = !image && (shared
@@ -335,5 +340,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 14, register, registerLibraryFile, start, cancel, dispose });
+  return Object.freeze({ version: 15, register, registerLibraryFile, start, cancel, dispose });
 });
