@@ -52,6 +52,24 @@ function fixture(options = {}) {
 
 const tick = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
 
+test('directory diagnostics use the existing read-only probe without network capture', () => {
+  const f = fixture();
+  assert.deepEqual(JSON.parse(f.command('directory_refresh').detail), {
+    schema: 'elon.directory_refresh.v1', observed: false, durationMs: 0, identityMs: 0, reads: [],
+  });
+  const value = { schema: 'elon.directory_refresh.v1', observed: true, durationMs: 100, identityMs: 10, reads: [] };
+  f.window.__elonChatGptPrivateConversationDirectory = { refreshDiagnostics: () => value };
+  assert.deepEqual(JSON.parse(f.command('directory_refresh').detail), value);
+  assert.equal(f.requests.length, 0);
+  assert.equal(f.read().active, false);
+  f.window.__elonChatGptPrivateResearchProbe = { ...f.probe, version: 16 };
+  vm.runInNewContext(source, f.context);
+  let upgraded;
+  f.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe', { value: 'directory_refresh' },
+    (_, ok, detail) => { assert.equal(ok, true); upgraded = JSON.parse(detail); });
+  assert.deepEqual(upgraded, value);
+});
+
 test('native gate admits the stop owner mode used by the page probe', () => {
   const native = fs.readFileSync(path.join(__dirname,
     '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPrivateProtocolEvidence.kt'), 'utf8');
@@ -90,7 +108,7 @@ test('version 13 command upgrade preserves existing observers and other commands
   const existing = f.probe;
   f.window.__elonChatGptPrivateResearchProbe = { ...existing, version: 13 };
   vm.runInNewContext(source, f.context);
-  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 16);
+  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 17);
   assert.equal(f.window.fetch, fetch);
   assert.equal(f.window.XMLHttpRequest.prototype.send, send);
   const answers = [];

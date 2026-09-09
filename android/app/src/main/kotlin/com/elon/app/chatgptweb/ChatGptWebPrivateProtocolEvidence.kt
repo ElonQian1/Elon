@@ -6,7 +6,7 @@ import org.json.JSONObject
 /** Validates structural diagnostics before they enter the native command ledger. */
 internal object ChatGptWebPrivateProtocolEvidence {
     val MODES = setOf("start", "read", "stop", "clear", "runtime_assets", "composer_tool_context",
-        "stop_runtime_context", "stop_runtime_owner")
+        "stop_runtime_context", "stop_runtime_owner", "directory_refresh")
     private val stopContextCodes = setOf("not_observed", "disabled", "invalid_command", "composer_unavailable",
         "context_unavailable", "request_unavailable", "runtime_not_observed", "preparing", "invoked",
         "document_changed", "context_changed", "request_changed", "runtime_unavailable", "voice_active",
@@ -38,6 +38,9 @@ internal object ChatGptWebPrivateProtocolEvidence {
     private fun sanitize(raw: String): String {
         require(raw.length <= 12000)
         val value = JSONObject(raw)
+        if (value.opt("schema") == ChatGptWebDirectoryDiagnostic.SCHEMA) {
+            return ChatGptWebDirectoryDiagnostic.sanitize(value)
+        }
         if (value.opt("schema") == ChatGptWebPrivateRuntimeAssets.SCHEMA) {
             return ChatGptWebPrivateRuntimeAssets.sanitize(value)
         }
