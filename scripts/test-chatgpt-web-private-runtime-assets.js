@@ -46,6 +46,18 @@ test('bounded deduplicated snapshot explicitly reports incomplete inventory', ()
   assert.ok(JSON.stringify(result).length < 12000);
 });
 
+test('late runtime roles survive inventory overflow without raising the bound', () => {
+  const roles = ['c2675c8c-build1.js', '4813494d-build1.js',
+    'conversation-small-build1.js', '8b34dbc2-build1.js', '2340486e-build1.js',
+    'c2675c8c-build2.js'];
+  const p = page(Array.from({ length: 200 }, (_, n) => `/cdn/assets/chunk-${n}.js`),
+    roles.map(name => ({ href: '/cdn/assets/' + name })));
+  const result = JSON.parse(snapshot(p));
+  assert.equal(result.assets.length, 96);
+  assert.equal(result.truncated, true);
+  for (const name of roles) assert.ok(result.assets.includes(name), name);
+});
+
 test('wrong origin is rejected and partial observation never implies unavailable capability', () => {
   assert.equal(snapshot({ location: { origin: 'https://other.test' } }), null);
   const p = page([], [{ src: '/cdn/assets/known.js' }]);

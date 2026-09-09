@@ -3,6 +3,7 @@
   function runtimeAssets(page) {
     if (page.location?.origin !== 'https://chatgpt.com') return null;
     const names = new Set();
+    const runtimeRole = name => /^(?:c2675c8c|4813494d|8b34dbc2|2340486e|conversation-small)-/.test(name);
     let truncated = false;
     const accept = (raw) => {
       if (typeof raw !== 'string' || raw.length > 240 || /[\s\\]/.test(raw)) return;
@@ -13,7 +14,12 @@
         if (!url.pathname.startsWith(prefix)) return;
         const name = url.pathname.slice(prefix.length);
         if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,95}\.js$/.test(name) || names.has(name)) return;
-        if (names.size >= 96) { truncated = true; return; }
+        if (names.size >= 96) {
+          truncated = true;
+          const replace = runtimeRole(name) && Array.from(names).find(value => !runtimeRole(value));
+          if (!replace) return;
+          names.delete(replace);
+        }
         names.add(name);
       } catch (_) {}
     };
@@ -28,7 +34,7 @@
     } catch (_) { truncated = true; }
     return JSON.stringify({ schema: 'elon.private_runtime_assets.v1', assets: Array.from(names).sort(), truncated });
   }
-  const exported = Object.freeze({ version: 2, create: factory, runtimeAssets });
+  const exported = Object.freeze({ version: 3, create: factory, runtimeAssets });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateProtocolEvidence = exported;
 })(typeof window === 'object' ? window : null, function (root, safePath) {
