@@ -177,6 +177,29 @@ test('persisted temporary homepage retains its read-only privacy indicator', asy
   assert.deepEqual(f.effects, []);
 });
 
+test('readonly temporary indicator accepts tooltip callbacks but never invokes them', async () => {
+  const f = fixture({ newChat: false, selected: true });
+  f.state.privacy = false;
+  f.page.location.href = 'https://chatgpt.com/?temporary-chat=true';
+  f.state.button.memoizedProps.onClick = () => f.effects.push('tooltip-click');
+  f.runtime.observe(f.state.node); await flush();
+  assert.deepEqual(f.runtime.observe(f.state.node), { selected: true, stateSettable: false });
+  assert.equal(f.runtime.ownsSelectedConversation(f.state.conversation), true);
+  f.select(false); await flush();
+  assert.equal(f.results.at(-1)[1], false);
+  assert.equal(f.fallbacks, 0);
+  assert.deepEqual(f.effects, []);
+});
+
+test('readonly indicator rejects a retained privacy action instead of exposing a stale toggle', async () => {
+  const f = fixture({ newChat: false, selected: true });
+  f.state.button.memoizedProps.onClick = f.state.owner.updateQueue.memoCache.data[0][7];
+  f.runtime.observe(f.state.node); await flush();
+  assert.equal(f.runtime.observe(f.state.node), null);
+  assert.equal(f.runtime.ownsSelectedConversation(f.state.conversation), false);
+  assert.deepEqual(f.effects, []);
+});
+
 test('official temporary selection is independent of legacy thread privacy metadata', async () => {
   const f = fixture({ metadataUnchanged: true });
   f.select(true); await flush();

@@ -154,3 +154,32 @@ infer privacy from the label. Do not repeat the completed ordinary library scope
 The publication manifest and device both independently confirmed 1593 afterward;
 the native chat was no longer foreground at that final read and was not reopened.
 Only the MCP forward remained, with the temporary CDP forward removed.
+
+## Read-only indicator root cause
+
+`temporary-indicator-live-trace-1593-20260909-084410-650` reproduced the state
+projection failure with one synthetic text turn in a same-version local research
+build. Before and after the turn the official route signal, exact temporary
+homepage and committed 30-slot control memo all agreed on selected mode. The
+control changed from mutable/new to read-only/existing as expected.
+
+Before the turn, six ancestor callbacks included two references to the exact
+privacy transaction. Afterward, the transaction references disappeared but four
+tooltip/presentation callbacks remained. v5 incorrectly required a recognized
+privacy action whenever any callback existed, even on the read-only indicator.
+It rejected this valid owner; the wrapper fell back to the generic label and
+reported `selected=false, stateSettable=true` in the native header manifest.
+The send was accepted and the two-row test chat was restored.
+
+Temporary state v6 separates these contracts: mutable controls still require
+exactly one recognized action identity matching the committed memo. Read-only
+controls require no privacy action, while allowing unrelated presentation
+handlers that are never invoked. Live route, account, document, conversation and
+committed memo validation are unchanged. A retained privacy action on a read-only
+control is rejected as contradictory rather than exposed as a stale toggle.
+
+Both new regression cases failed before the correction; all 231 related cases
+passed afterward (`temporary-readonly-regression-after-20260909-084548-971`).
+The local research package was replaced with hash-verified normal 1593, the CDP
+forward removed, and authenticated/ready empty native chat verified. Full normal
+candidate acceptance is still required before closing temporary attachment scope.

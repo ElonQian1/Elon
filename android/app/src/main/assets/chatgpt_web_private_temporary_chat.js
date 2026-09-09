@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateTemporaryChat = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -55,8 +55,10 @@
     const callbacks = chain.slice(0, index).map(fiber => fiber.memoizedProps?.onClick)
       .filter(action => typeof action === 'function');
     const actions = new Set(callbacks.filter(action => Function.prototype.toString.call(action) === spec.action));
-    if (conversations.size !== 1 || actions.size > 1 || callbacks.length && !actions.size ||
-        actions.size && !actions.has(memo[7]) || !actions.size && !memo[20]) return null;
+    // Read-only indicators retain tooltip handlers, but no privacy action.
+    // Only a mutable control must expose the exact captured transaction.
+    if (conversations.size !== 1 || (memo[20]
+      ? actions.size !== 0 : actions.size !== 1 || !actions.has(memo[7]))) return null;
     return { id, conversation: conversations.values().next().value,
       capturedIsNew: memo[3], capturedSelected: memo[4],
       action: memo[20] || node.disabled === true || node.getAttribute('aria-disabled') === 'true'
@@ -248,5 +250,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 5, observe, setSelected, ownsSelectedConversation });
+  return Object.freeze({ version: 6, observe, setSelected, ownsSelectedConversation });
 });
