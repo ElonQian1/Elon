@@ -7,7 +7,8 @@ const hash=createHash('sha256').update('42').digest('hex'),token='doc_manage_123
 const tick=async()=>{for(let i=0;i<20;i++)await new Promise(r=>setImmediate(r));};
 function fixture(){
   const calls=[],events=[],account={userId:'42',subUser:false,parentUser:true};
-  const detail={strategyId:123,rootUserId:'42',symbol:'NEARUSDT',strategyStatus:'WORKING',cps:false,cos:true,sharing:true,trailingStopLowerLimit:false,trailingStopUpperLimit:true};
+  const detail={strategyId:123,rootUserId:'42',symbol:'NEARUSDT',strategyStatus:'WORKING',cps:false,cos:true,sharing:true,trailingStopLowerLimit:false,trailingStopUpperLimit:true,
+    gridInitialValue:'600',initialLeverage:3,totalAdjustmentAmount:'-0.25'};
   const behavior={fail:'',detailReads:0,switchAfterDetail:false};
   const response=(data,success=true,code='000000',status=200)=>({status,clone:()=>({text:async()=>JSON.stringify({data,success,code})})});
   class Xhr{open(){}send(){}setRequestHeader(){}}
@@ -16,10 +17,11 @@ function fixture(){
       calls.push({url,init});
       if(url===INFO)return response(account);
       if(url.startsWith(prefix+'query-grid-detail')){behavior.detailReads++;if(behavior.switchAfterDetail)account.userId='43';return response(detail);}
-      if(url===prefix+'update-grid' || url===prefix+'close-grid'){
+      if(url===prefix+'update-grid' || url===prefix+'close-grid' || url===prefix+'update-grid-investment'){
         if(behavior.fail==='network')throw Error('SECRET_CANARY');
         if(behavior.fail==='http')return response({},false,'999',500);
         if(behavior.fail==='business')return response({},false,'123456');
+        if(url.endsWith('update-grid-investment'))return response(behavior.fail==='false_data'?false:null);
         return response({strategyId:behavior.fail==='mismatch'?999:123,strategyStatus:url.endsWith('close-grid')?'CANCELED':'WORKING',updateStatus:'SUCCESS'});
       }
       return response([]);
@@ -28,13 +30,46 @@ function fixture(){
   const api=window.__elonBinanceManageV1,create=window.__elonBinanceCreateV1;
   const observe=()=>window.fetch(LIST,{method:'POST',headers:{'x-canary':'SECRET_CANARY'}});
   const prepare=async(action='settings',cps=true,id=attempt)=>{await observe();assert.equal(api.prepare(token,id,hash,'123',action,cps),true);await tick();};
-  const writes=()=>calls.filter(c=>c.url===prefix+'update-grid'||c.url===prefix+'close-grid');
+  const writes=()=>calls.filter(c=>c.url===prefix+'update-grid'||c.url===prefix+'close-grid'||c.url===prefix+'update-grid-investment');
   return{api,create,observe,prepare,events,calls,detail,account,behavior,writes};
 }
 test('inspection and preparation are fixed reads without credentials in receipt',async()=>{
   const h=fixture();await h.observe();h.api.inspect(token,attempt,hash,'123');await tick();assert.equal(h.events.at(-1).kind,'detail');
   await h.prepare();assert.equal(h.events.at(-1).kind,'prepared');assert.equal(h.writes().length,0);
   assert.ok(!JSON.stringify(h.events).includes('SECRET_CANARY'));
+});
+test('investment uses the V2 entry and sends only explicit margin delta once',async()=>{
+  const h=fixture();await h.observe();
+  assert.equal(h.api.prepare(token,attempt,hash,'123','investment',false),false);
+  assert.equal(h.api.prepareInvestment(token,attempt,hash,'123','20.125'),true);await tick();
+  assert.equal(h.events.at(-1).kind,'prepared');assert.equal(h.events.at(-1).investment_delta,'20.125');assert.equal(h.writes().length,0);
+  assert.equal(h.api.submit(token,attempt),true);assert.equal(h.api.submit(token,attempt),false);await tick();
+  assert.deepEqual(JSON.parse(h.writes()[0].init.body),{strategyId:123,symbol:'NEARUSDT',investmentDelta:'20.125'});
+  assert.equal(h.writes().length,1);assert.equal(h.events.at(-1).kind,'accepted');assert.equal(h.events.at(-1).provider_status,'');
+});
+test('investment rejects invalid precision and never invents missing funding values',async()=>{
+  const h=fixture();await h.observe();
+  for(const delta of ['0','-1','1e3','2000.00000001','0.000000001','01',' 1',1,{},null])assert.equal(h.api.prepareInvestment(token,attempt,hash,'123',delta),false);
+  delete h.detail.totalAdjustmentAmount;
+  assert.equal(h.api.prepareInvestment(token,attempt,hash,'123','20'),true);await tick();
+  assert.equal(h.events.at(-1).code,'investment_unavailable');assert.equal(h.api.submit(token,attempt),false);
+});
+test('investment compares funding and account again before dispatch',async()=>{
+  for(const field of ['gridInitialValue','initialLeverage','totalAdjustmentAmount']){
+    const h=fixture();await h.observe();h.api.prepareInvestment(token,attempt,hash,'123','20');await tick();
+    h.detail[field]=field==='initialLeverage'?4:'1';h.api.submit(token,attempt);await tick();
+    assert.equal(h.events.at(-1).kind,'not_sent');assert.equal(h.writes().length,0);
+  }
+  const h=fixture();await h.observe();h.api.prepareInvestment(token,attempt,hash,'123','20');await tick();
+  h.behavior.switchAfterDetail=true;h.api.submit(token,attempt);await tick();assert.equal(h.writes().length,0);
+});
+test('investment ambiguous failures remain unresolved without a second write',async()=>{
+  for(const fail of ['network','http','false_data','business']){
+    const h=fixture();await h.observe();h.api.prepareInvestment(token,attempt,hash,'123','20');await tick();
+    h.behavior.fail=fail;h.api.submit(token,attempt);await tick();
+    assert.equal(h.events.at(-1).kind,fail==='business'?'rejected':'unknown');assert.equal(h.writes().length,1);
+    assert.equal(h.api.submit(token,attempt),false);
+  }
 });
 test('settings preserves the four other typed fields and is single-use',async()=>{
   const h=fixture();await h.prepare();assert.equal(h.api.submit(token,attempt),true);assert.equal(h.api.submit(token,attempt),false);await tick();
