@@ -47,7 +47,9 @@ class ChatGptWebOperationReadinessTest {
 
     @Test fun accountMutationsDoNotWaitForComposerButRetainDocumentAndLoginAdmission() {
         listOf("chatgpt_set_conversation_pinned", "chatgpt_set_conversation_archived",
-            "chatgpt_rename_conversation", "chatgpt_move_conversation_to_project").forEach { action ->
+            "chatgpt_rename_conversation", "chatgpt_move_conversation_to_project",
+            "chatgpt_delete_conversation", "chatgpt_share_conversation",
+            "chatgpt_mutate_library_file").forEach { action ->
             assertEquals(ChatGptWebOperationReadiness.Requirement.ACCOUNT_MUTATION,
                 ChatGptWebOperationReadiness.requirement(action))
             assertNull(action, rejection(action))

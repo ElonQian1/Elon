@@ -15,6 +15,8 @@ class ChatGptWebReadinessDispatchTest {
     private val path = "/c/12345678-1234-1234-1234-123456789012"
     private val handle = "library_" + "a".repeat(32)
     private val download = "download_" + "b".repeat(32)
+    private val shareId = "22345678-1234-1234-1234-123456789012"
+    private val shareTicket = "sl_" + "c".repeat(32) + "_fixture"
 
     private inner class Harness(current: Boolean = true) {
         var snapshot: ChatGptWebSnapshot? = page
@@ -34,6 +36,14 @@ class ChatGptWebReadinessDispatchTest {
             override fun cancelLibraryFiles(target: String, requestId: String) { calls += "cancel_library" }
             override fun listConversationFiles(path: String, requestId: String) { calls += "files" }
             override fun downloadLibraryFile(file: com.elon.app.WebChatLibraryEntry, requestId: String) { calls += "download" }
+            override fun deleteConversation(path: String, requestId: String) { calls += "delete" }
+            override fun shareConversation(path: String, requestId: String) { calls += "share" }
+            override fun manageConversationShares(request: JSONObject, requestId: String) {
+                calls += "shares_" + request.getString("operation")
+            }
+            override fun mutateLibraryFile(request: JSONObject, requestId: String) {
+                calls += "library_" + request.getString("operation")
+            }
         }
         val actions = ChatGptWebMcpActions(
             snapshot = { snapshot }, uiManifest = { null }, observedState = { observed },
@@ -48,6 +58,15 @@ class ChatGptWebReadinessDispatchTest {
         val consumer = ChatGptWebConsumerPortAdapter({ snapshot }, { null }, { observed }, actions::control)
         fun control(action: String, configure: (JSONObject) -> Unit = {}): JSONObject =
             actions.control(JSONObject().put("action", action).also(configure))
+
+        fun libraryFixture(writable: Boolean = true) {
+            observed = observed.copy(libraryFiles = com.elon.app.WebChatLibrarySnapshot(
+                requestId = "mcp_files", directoryHandle = "", query = "", breadcrumbs = emptyList(),
+                items = listOf(com.elon.app.WebChatLibraryEntry(handle, "file", "fixture.txt", "text/plain", 7L,
+                    canRename = writable, canTrash = writable)),
+                hasMore = false, partial = false, stale = false,
+            ))
+        }
     }
 
     @Test fun staleDocumentStillReturnsCachedConversationsButNotClickablePageHandles() {
@@ -158,6 +177,77 @@ class ChatGptWebReadinessDispatchTest {
     @Test fun staleDocumentCannotSendConfirmedNativeSidebarMutations() {
         val h = Harness(current = false)
         assertFalse(h.consumer.renameConversation(path, "Fixture", true).accepted)
+        assertEquals(0, h.receipts)
+        assertTrue(h.calls.isEmpty())
+    }
+
+    @Test fun privateAccountOwnersReceiveNativeActionsWhileTheComposerIsUnavailable() {
+        val h = Harness()
+        h.libraryFixture()
+        assertTrue(h.consumer.manageConversationShares(path, null, null, false).accepted)
+        assertTrue(h.consumer.manageConversationShares(path, shareId, shareTicket, true).accepted)
+        assertTrue(h.consumer.deleteConversation(path, true).accepted)
+        assertTrue(h.consumer.mutateLibraryFile(handle, "rename", "renamed.txt", true).accepted)
+        assertTrue(h.consumer.mutateLibraryFile(handle, "trash", "", true).accepted)
+        assertEquals(listOf("shares_list", "shares_revoke", "delete", "library_rename", "library_trash"), h.calls)
+        assertEquals(5, h.receipts)
+    }
+
+    @Test fun accountActionsStillRequireConfirmationAndObservedSelections() {
+        val h = Harness()
+        h.libraryFixture()
+        assertFalse(h.consumer.deleteConversation(path, false).accepted)
+        assertFalse(h.consumer.deleteConversation("/c/$shareId", true).accepted)
+        assertFalse(h.consumer.manageConversationShares(path, shareId, shareTicket, false).accepted)
+        assertFalse(h.consumer.manageConversationShares(path, shareId, null, true).accepted)
+        assertFalse(h.consumer.manageConversationShares(path, "invalid", shareTicket, true).accepted)
+        assertFalse(h.consumer.mutateLibraryFile(handle, "rename", "renamed.txt", false).accepted)
+        assertFalse(h.consumer.mutateLibraryFile(handle, "trash", "", false).accepted)
+        assertFalse(h.consumer.mutateLibraryFile("library_" + "d".repeat(32), "trash", "", true).accepted)
+        assertFalse(h.consumer.mutateLibraryFile(handle, "rename", "../fixture.txt", true).accepted)
+        h.libraryFixture(writable = false)
+        assertFalse(h.consumer.mutateLibraryFile(handle, "rename", "renamed.txt", true).accepted)
+        assertFalse(h.consumer.mutateLibraryFile(handle, "trash", "", true).accepted)
+        assertEquals(0, h.receipts)
+        assertTrue(h.calls.isEmpty())
+    }
+
+    @Test fun accountActionsCannotUseAStaleAdapterOrAnExplicitlyInvalidLoginOrigin() {
+        val cases = listOf(false to page, true to page.copy(loginRequired = true),
+            true to page.copy(url = "https://example.com/"), true to page.copy(url = "https://chatgpt.com/auth/login"))
+        cases.forEach { (current, snapshot) ->
+            val h = Harness(current)
+            h.snapshot = snapshot
+            h.libraryFixture()
+            assertFalse(h.consumer.deleteConversation(path, true).accepted)
+            assertFalse(h.consumer.manageConversationShares(path, null, null, false).accepted)
+            assertFalse(h.consumer.manageConversationShares(path, shareId, shareTicket, true).accepted)
+            assertFalse(h.consumer.mutateLibraryFile(handle, "rename", "renamed.txt", true).accepted)
+            assertFalse(h.consumer.mutateLibraryFile(handle, "trash", "", true).accepted)
+            assertEquals(0, h.receipts)
+            assertTrue(h.calls.isEmpty())
+        }
+    }
+
+    @Test fun creatingAShareStillRequiresTheCurrentNonStreamingConversation() {
+        val h = Harness()
+        assertFalse(h.consumer.shareConversation(path, true).accepted)
+        h.snapshot = page.copy(url = "https://chatgpt.com$path", streaming = true)
+        assertFalse(h.consumer.shareConversation(path, true).accepted)
+        h.snapshot = h.snapshot?.copy(streaming = false)
+        assertFalse(h.consumer.shareConversation(path, false).accepted)
+        assertEquals(0, h.receipts)
+        // The private share contract owns the remaining current-chat runtime checks.
+        assertTrue(h.consumer.shareConversation(path, true).accepted)
+        assertEquals(listOf("share"), h.calls)
+    }
+
+    @Test fun aMissingIndependentSnapshotDoesNotInventAConversationOrShareContext() {
+        val h = Harness()
+        h.snapshot = null
+        assertFalse(h.consumer.deleteConversation(path, true).accepted)
+        assertFalse(h.consumer.shareConversation(path, true).accepted)
+        assertFalse(h.consumer.manageConversationShares(path, null, null, false).accepted)
         assertEquals(0, h.receipts)
         assertTrue(h.calls.isEmpty())
     }

@@ -205,9 +205,15 @@ test('real bounded response reader handles chunked NDJSON and rejects HTTP autho
 
 test('directory dispatcher upgrades an older registered version and preserves same-version instances', () => {
   const source = fs.readFileSync(require.resolve('../android/app/src/main/assets/chatgpt_web_adapter_conversation_directory_requests.js'), 'utf8');
-  const window = { __elonChatGptConversationDirectoryRequests: { version: 6 } };
+  const window = {};
   vm.runInNewContext(source, { window });
-  assert.equal(window.__elonChatGptConversationDirectoryRequests.version, 7);
+  const version = window.__elonChatGptConversationDirectoryRequests.version;
+  assert.ok(Number.isInteger(version) && version > 1);
+  const outdated = { version: version - 1 };
+  window.__elonChatGptConversationDirectoryRequests = outdated;
+  vm.runInNewContext(source, { window });
+  assert.notEqual(window.__elonChatGptConversationDirectoryRequests, outdated);
+  assert.equal(window.__elonChatGptConversationDirectoryRequests.version, version);
   const instance = window.__elonChatGptConversationDirectoryRequests;
   vm.runInNewContext(source, { window });
   assert.equal(window.__elonChatGptConversationDirectoryRequests, instance);

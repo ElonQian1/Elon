@@ -25,6 +25,8 @@ internal object ChatGptWebOperationReadiness {
         Requirement.ACCOUNT_MUTATION to setOf(
             "chatgpt_set_conversation_pinned", "chatgpt_set_conversation_archived",
             "chatgpt_rename_conversation", "chatgpt_move_conversation_to_project",
+            // Their owners still protect current-chat drafts and share bindings before writes.
+            "chatgpt_delete_conversation", "chatgpt_share_conversation", "chatgpt_mutate_library_file",
         ),
         // These still use the official composer/runtime transaction. Do not relax them implicitly.
         Requirement.COMPOSER to setOf(
@@ -32,12 +34,12 @@ internal object ChatGptWebOperationReadiness {
             "chatgpt_invoke_control", "chatgpt_set_control_text", "chatgpt_set_control_selected",
             "chatgpt_select_control_choice", "chatgpt_set_control_slider", "chatgpt_set_control_expanded",
             "chatgpt_new_conversation", "chatgpt_verify_private_stream_watchdog", "chatgpt_regenerate_response",
-            "chatgpt_toggle_private_read_aloud", "chatgpt_delete_conversation", "chatgpt_share_conversation",
+            "chatgpt_toggle_private_read_aloud",
             "chatgpt_start_dictation",
             "chatgpt_prepare_realtime_voice", "chatgpt_start_realtime_voice", "chatgpt_cancel_dictation",
             "chatgpt_submit_dictation", "chatgpt_remove_attachment", "chatgpt_reveal_project_choice",
             "chatgpt_select_composer_option", "chatgpt_select_feature", "chatgpt_record_verification_cases",
-            "chatgpt_mutate_library_file", "chatgpt_attach_library_file",
+            "chatgpt_attach_library_file",
         ),
     )
 
@@ -51,7 +53,7 @@ internal object ChatGptWebOperationReadiness {
     ): String? {
         val required = requirement(action) ?: return "unsupported_action"
         if (required == Requirement.LOCAL || required == Requirement.CACHED_DIRECTORY) return null
-        // Preserve the existing admission for writes, including its error contract.
+        // Preserve the existing admission for composer transactions, including its error contract.
         if (required == Requirement.COMPOSER && !bridgeReady) return "bridge_not_ready"
         if (!adapterCurrent) return "adapter_generation_not_ready"
         if (required == Requirement.COMPOSER) return null
