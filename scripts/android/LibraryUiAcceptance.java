@@ -35,7 +35,7 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
     private UiObject galleryFeature() throws Exception {
         UiObject preset = description("web-chat-feature:images");
         UiObject observed = new UiObject(new UiSelector().packageName(APP).descriptionMatches(
-            "chatgpt-feature:[a-zA-Z0-9_]+:(\u56fe\u50cf|\u56fe\u7247)"));
+            "chatgpt-feature:[a-zA-Z0-9_]+:(\u56fe\u50cf|\u56fe\u7247)(\u5df2\u66f4\u65b0)?"));
         long deadline = android.os.SystemClock.elapsedRealtime() + 8000;
         do {
             if (preset.exists()) return preset;
@@ -60,6 +60,8 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         switch (step) {
             case "gallery":
                 click(description("web-chat-feature-navigation:chatgpt_web"));
+                // Resume an already-open feature sheet without toggling the drawer again.
+            case "gallery_select":
                 click(galleryFeature());
                 assertTrue("gallery_not_visible", description("\u540c\u6b65\u56fe\u50cf").waitForExists(8000));
                 break;
