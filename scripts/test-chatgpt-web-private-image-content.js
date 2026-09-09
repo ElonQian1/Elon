@@ -22,7 +22,7 @@ function harness(t, options = {}) {
       calls.push({ kind: 'json', url, init });
       if (new URL(url).pathname.endsWith('/image_gen')) {
         return { payload: { items: [{ id: 'generation-fixture', asset_pointer: 'file-service://file-fixture',
-          conversation_id: 'conversation-fixture' }], cursor: null } };
+          conversation_id: 'conversation-fixture', ...options.itemFields }], cursor: null } };
       }
       return { payload: { status: 'success', download_url: options.source || contentPath } };
     } },
@@ -146,4 +146,60 @@ test('real gallery, resolver and exporter compose without DOM, and warm reopen m
   assert.equal(h.root.location.href, origin + '/c/synthetic');
   assert.equal(h.timers.size, 0);
   assert.doesNotMatch(JSON.stringify(h.events), /Bearer|synthetic-account|file-fixture|conversation-fixture|sig=synthetic/);
+});
+
+test('catalog image URLs skip resolver reads while preserving preview size and cache identity', async t => {
+  for (const url of [contentPath, 'https://files.oaiusercontent.com/image?sig=synthetic']) {
+    const h = harness(t, { itemFields: { url, encodings: { thumbnail: { path: '/unverified-thumbnail' } } } });
+    assert.equal((await h.run()).ok, true);
+    assert.deepEqual(h.calls.map(call => call.kind), ['json', 'bytes']);
+    assert.equal(h.bytes()[0].url, new URL(url, origin).href);
+    assert.equal(h.events.find(event => event.type === 'image_asset' && event.state === 'ready').width, 1024);
+    const handles = h.events.filter(event => event.type === 'image_gallery_snapshot').at(-1).handles;
+    h.calls.length = 0;
+    assert.equal((await h.run(handles)).ok, true);
+    assert.equal(h.calls.length, 0);
+    assert.doesNotMatch(JSON.stringify(h.events), /sig=|https:|Bearer|thumbnail/);
+  }
+});
+
+test('expired catalog image URL uses one existing private resolver without duplicating images', async t => {
+  const direct = 'https://files.oaiusercontent.com/image?sig=expired';
+  const h = harness(t, { itemFields: { url: direct }, fetch: async url => url === direct
+    ? { ok: false, status: 403 } : { ok: true, url, headers: { get: () => '' },
+      blob: async () => ({ type: 'image/png', size: 128 }) } });
+  assert.equal((await h.run()).ok, true);
+  assert.deepEqual(h.calls.map(call => call.kind), ['json', 'bytes', 'json', 'bytes']);
+  assert.equal(h.events.filter(event => event.type === 'image_asset' && event.state === 'ready').length, 1);
+  assert.equal(h.events.filter(event => event.type === 'image_gallery_snapshot').at(-1).handles.length, 1);
+  assert.equal(h.timers.size, 0);
+});
+
+test('invalid catalog URL stays on the private resolver and never fetches arbitrary targets', async t => {
+  for (const url of ['https://untrusted.test/image', 'https://user:secret@files.oaiusercontent.com/image',
+    'https://files.oaiusercontent.com:444/image', origin + '/backend-api/conversation',
+    '//files.oaiusercontent.com/image', 'https://files.oaiusercontent.com/image#fragment']) {
+    const h = harness(t, { itemFields: { url } });
+    assert.equal((await h.run()).ok, true);
+    assert.deepEqual(h.calls.map(call => call.kind), ['json', 'json', 'bytes']);
+    assert.ok(h.bytes().every(call => call.url === origin + contentPath));
+  }
+});
+
+test('catalog URL recovery is bounded and cancelled owners cannot start a resolver read', async t => {
+  const direct = 'https://files.oaiusercontent.com/image?sig=expired';
+  const failed = harness(t, { itemFields: { url: direct }, fetch: async () => ({ ok: false, status: 403 }) });
+  assert.equal((await failed.run()).ok, false);
+  assert.deepEqual(failed.calls.map(call => call.kind), ['json', 'bytes', 'json', 'bytes']);
+  const response = deferred(), started = deferred();
+  const h = harness(t, { itemFields: { url: direct }, fetch: async () => {
+    started.resolve(); return response.promise;
+  } });
+  const pending = h.run();
+  await started.promise;
+  h.invalidate();
+  response.resolve({ ok: false, status: 403 });
+  assert.equal((await pending).ok, false);
+  assert.deepEqual(h.calls.map(call => call.kind), ['json', 'bytes']);
+  assert.equal(h.events.some(event => event.state === 'ready'), false);
 });

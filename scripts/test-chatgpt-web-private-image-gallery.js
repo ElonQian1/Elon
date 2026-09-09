@@ -122,6 +122,36 @@ test('oversized official batches use native subpages without losing items or ser
   assert.equal(h.catalogCalls().length, 2);
 });
 
+test('next page supersedes unfinished previews without accepting late old-page events', async () => {
+  const h = harness([{ items: [row(1)], cursor: '1' }, { items: [row(2)], cursor: null }]);
+  const started = deferred(), pending = deferred();
+  const original = h.root.__elonChatGptImageAssets.request;
+  let first = true;
+  h.root.__elonChatGptImageAssets.request = async (...args) => {
+    if (first) {
+      first = false;
+      started.resolve();
+      await pending.promise;
+    }
+    return original(...args);
+  };
+  const old = h.run();
+  await started.promise;
+  const firstPage = h.snapshots().at(-1);
+  assert.equal(firstPage.state, 'loading');
+  assert.equal(firstPage.hasNext, true);
+  assert.equal((await h.run('next')).ok, true);
+  const secondPage = h.snapshots().at(-1), count = h.events.length;
+  assert.equal(secondPage.pageIndex, 1);
+  assert.equal(secondPage.state, 'ready');
+  assert.deepEqual(h.cancelled, firstPage.handles);
+  pending.resolve();
+  assert.equal((await old).ok, false);
+  assert.equal(h.events.length, count);
+  assert.deepEqual(h.snapshots().at(-1), secondPage);
+  assert.equal(h.timers.size, 0);
+});
+
 test('expired native subpage refetches its server batch and preserves its offset', async () => {
   const h = harness([{ items: Array.from({ length: 51 }, (_, i) => row(i)), cursor: null }]);
   await h.run();
@@ -284,7 +314,7 @@ test('gallery upgrade retires one older instance without stacking requests', () 
     __elonChatGptPrivateImagePointer: require('../android/app/src/main/assets/chatgpt_web_private_image_pointer.js') };
   vm.runInNewContext(source, { window: root });
   const instance = root.__elonChatGptPrivateImageGallery;
-  assert.equal(instance.version, 5);
+  assert.equal(instance.version, 6);
   assert.equal(disposed, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateImageGallery, instance);
@@ -430,5 +460,8 @@ test('production integration keeps gallery receipts separate and removes the ext
   assert.match(controller, /state.requestId != activeRequestId/);
   assert.match(controller, /asset.galleryRequestId == activeRequestId/);
   assert.match(controller, /pageSnapshot\?\.handles.orEmpty\(\).forEachIndexed/);
+  assert.match(controller, /val catalogReady = activeRequestId != null && page\?\.handles != null && page.requestId == activeRequestId/);
+  assert.match(controller, /nextPage\?\.isEnabled = catalogReady && page\?\.hasNext == true/);
+  assert.match(controller, /previousPage\?\.isEnabled = catalogReady && page\?\.hasPrevious == true/);
   assert.match(read('ChatGptWebImageSession.kt', true), /if \(asset.galleryRequestId == null\) assets.accept\(asset\)/);
 });

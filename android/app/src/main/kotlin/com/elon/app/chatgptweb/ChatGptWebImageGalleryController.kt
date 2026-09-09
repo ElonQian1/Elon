@@ -240,9 +240,10 @@ internal class ChatGptWebImageGalleryController(
         val page = pageSnapshot
         val visibleHandles = page?.handles.orEmpty().toSet()
         val cached = store.handles().count(visibleHandles::contains)
-        val loading = syncState == ChatGptWebImageGallerySnapshot.STATE_LOADING
-        previousPage?.isEnabled = !loading && page?.hasPrevious == true
-        nextPage?.isEnabled = !loading && page?.hasNext == true
+        // Paging needs the current catalog cursor, not every preview download.
+        val catalogReady = activeRequestId != null && page?.handles != null && page.requestId == activeRequestId
+        previousPage?.isEnabled = catalogReady && page?.hasPrevious == true
+        nextPage?.isEnabled = catalogReady && page?.hasNext == true
         previousPage?.alpha = if (previousPage?.isEnabled == true) 1f else 0.35f
         nextPage?.alpha = if (nextPage?.isEnabled == true) 1f else 0.35f
         pageLabel?.text = page?.let { "第 ${it.pageIndex + 1} 页" }.orEmpty()

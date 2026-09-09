@@ -2,7 +2,7 @@
   'use strict';
   const pointer = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
-  const exported = Object.freeze({ version: 5, create: root => factory(root, pointer) });
+  const exported = Object.freeze({ version: 6, create: root => factory(root, pointer) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       (Number(root.__elonChatGptPrivateImageGallery?.version || 0) < exported.version ||
@@ -139,7 +139,10 @@
       const target = imageTarget(item);
       if (!target) { unavailable++; continue; }
       const stable = JSON.stringify([job.account, target.fileId, target.conversationId]);
+      const direct = root.__elonChatGptPrivateContentSource?.previewUrl?.(item.url);
+      let useDirect = !!direct;
       const handle = job.assets.registerPrivate(stable, async signal => {
+        if (useDirect) return direct;
         const url = new URL('/backend-api/files/download/' + encodeURIComponent(target.downloadFileId), root.location.origin);
         for (const [key, value] of target.downloadQuery) url.searchParams.set(key, value);
         if (target.conversationId) url.searchParams.set('conversation_id', target.conversationId);
@@ -152,6 +155,7 @@
         return payload.download_url;
       }, () => current(job));
       if (!HANDLE.test(handle)) { unavailable++; continue; }
+      if (direct) job.fallbacks.set(handle, () => { useDirect = false; });
       if (!seen.has(handle)) { seen.add(handle); handles.push(handle); }
     }
     return { ...page, handles, unavailable };
@@ -165,7 +169,15 @@
         check(job);
         const handle = missing[next++];
         job.pending.add(handle);
-        const result = await job.assets.request(handle, job.assetListener);
+        let result = await job.assets.request(handle, job.assetListener);
+        check(job);
+        if (!result?.ok && job.fallbacks.has(handle)) {
+          // Catalog links can expire; re-resolve this read once under the same
+          // owner/deadline, without reloading the page or changing cache identity.
+          job.fallbacks.get(handle)();
+          job.fallbacks.delete(handle);
+          result = await job.assets.request(handle, job.assetListener);
+        }
         job.pending.delete(handle);
         check(job);
         if (!result?.ok) failed++;
@@ -250,7 +262,7 @@
     cancel();
     const job = { id: command.requestId, operation: args.operation, cached: new Set(args.cachedHandles),
       href: root.location.href, token: root.__elonChatGptDocumentToken, account: null, stage: 'identity',
-      controller: new root.AbortController(), pending: new Set(), emit: emitEvent,
+      controller: new root.AbortController(), pending: new Set(), fallbacks: new Map(), emit: emitEvent,
       assets: root.__elonChatGptImageAssets };
     job.assetListener = event => {
       if (current(job)) emitEvent({ ...event, source: 'private_image_gallery_v1', requestId: job.id });
@@ -269,5 +281,5 @@
   }
 
   function dispose() { cancel(); disposed = true; clearCache(); cacheIdentity = ''; }
-  return Object.freeze({ version: 5, get disposed() { return disposed; }, request, handle, cancel, dispose });
+  return Object.freeze({ version: 6, get disposed() { return disposed; }, request, handle, cancel, dispose });
 });
