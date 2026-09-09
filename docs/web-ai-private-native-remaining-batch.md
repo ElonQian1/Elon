@@ -24,19 +24,20 @@ reused; source-only or installation status does not satisfy the acceptance gate.
 ## Current Status Map
 
 This summary supersedes older delivery labels below; it does not broaden a
-passed scope. Normal `1.1.1603` was hash-verified and replacement-installed on
-September 9. Cache and private file-library reads passed with no ready composer;
-global directory refresh exposed a remaining DOM dependency. Follow-up source
-removes that dependency for the private first page and separates four account
-mutations from composer admission. New code is not yet included in installed
-1603. See [scope and evidence](reports/chatgpt-private-admission-acceptance-20260909.md).
+passed scope. Bounded ordinary/project directory continuation is now completed,
+default-enabled and device-verified on normal 1611, adapter 311; see
+[owned continuation](reports/chatgpt-directory-owned-continuation-20260909.md).
+Installed normal 1612 additionally passed the actual native file-library Download
+button and saved-byte checks for TXT/PNG/PDF without a ready composer; see
+[rendered download acceptance](reports/chatgpt-library-download-ui-20260909.md).
+Full-account older-history load-more and the project composer failure remain open.
 
 | User workflow | Current result | Remaining boundary |
 |---|---|---|
 | Conversation/project cache, native audio/subtitles, private dictation/read-aloud | Previously device-verified, reused | Do not repeat without regression evidence; identity WebView remains intentional |
 | Pin, rename, archive, move conversation to a project | Device-verified, reused | Other account/permission variants are not implied |
 | Ordinary new-chat text + PNG + PDF attachments | Completed on 1598 | Project/temporary/other-format variants remain separate |
-| File library navigation, ordinary saved download, single library attachment, rename/soft-delete/upload-copy | Completed narrow scopes through 1591 | Special download sources, folder writes, other attachment scopes |
+| File library navigation, saved download, single library attachment, rename/soft-delete/upload-copy | Earlier scopes through 1591 reused; native TXT/PNG/PDF Download buttons and saved bytes passed on 1612 | Large-transfer/cancel/crash cases, special sources, folder writes and other attachment scopes |
 | Personal full sharing/list/revoke and current-conversation delete | Completed on 1547 | Other share scopes and remaining rendered confirmation/menu cases |
 | Text submit/stream/stop/follow-up | Official runtime path verified, reused | This is not independent Android HTTP POST; other contexts and regeneration need evidence |
 | Project attachments | Code and harness implemented | Actual project page has no ready composer; no project upload/send accepted yet |

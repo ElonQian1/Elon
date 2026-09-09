@@ -2,8 +2,9 @@
 
 Capability candidate: `android_chatgpt_private_shared_library_download_v1`.
 Status: **implemented; ordinary library saved-byte acceptance passed in normal
-Release 1.1.1584 with module 8**. Additional shared/mounted scopes and rendered UI
-remain separate acceptance cases, not a blanket `completed` claim.
+Release 1.1.1584 with module 8**. The personal-library rendered TXT/PNG/PDF download
+scope additionally passed on [normal 1612](reports/chatgpt-library-download-ui-20260909.md).
+Additional shared/mounted scopes remain separate, not a blanket `completed` claim.
 Current source: file-download module 14 and library-download module 8. The
 existing adapter asset list is reused unchanged. The observed 302 to same-origin
 estuary content had been incorrectly rejected; module 8 reuses the established
@@ -104,9 +105,10 @@ control or complete page snapshot is polled for each progress update.
   Actual Android storage acceptance is pending. Process-death byte-range resume,
   persistent download history and old unjournaled artifacts remain unsupported;
   cleanup is not a resume or a restored completion receipt.
-- Native progress/cancel controls are implemented in source but await grouped
-  Android compilation and production UI acceptance, including notifications
-  disabled. They are not a live UI pass yet.
+- Native controls are compiled into normal releases. Rendered small-file Download,
+  saved status and Close passed on 1612. In-flight progress/cancellation and
+  notifications-disabled behavior remain unaccepted; do not infer them from a
+  transfer that completed before its first status inspection.
 
 ## Metadata-only shared references
 
