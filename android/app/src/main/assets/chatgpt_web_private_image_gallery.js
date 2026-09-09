@@ -2,7 +2,7 @@
   'use strict';
   const pointer = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
-  const exported = Object.freeze({ version: 3, create: root => factory(root, pointer) });
+  const exported = Object.freeze({ version: 4, create: root => factory(root, pointer) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateImageGallery?.version || 0) < exported.version) {
@@ -19,6 +19,10 @@
     'shared_library_file_id', 'library_download_id', 'context_scopes', 'source_url',
     'context_connector', 'connector_id', 'context_connector_info', 'shared']);
   const TTL_MS = 120000;
+  const FAILURE_CODES = new Set(['identity_timeout', 'identity_unavailable', 'transport_unavailable',
+    'page_unavailable', 'catalog_items_invalid', 'catalog_page_limit', 'catalog_item_invalid',
+    'catalog_cursor_invalid', 'catalog_cursor_cycle', 'catalog_empty_continuation',
+    'timeout', 'cancelled', 'response_too_large', 'response_body_unavailable', 'invalid_json']);
   const pages = new Map();
   let cursors = [null], pageIndex = 0, cacheIdentity = '', cacheTime = 0;
   let active = null, disposed = false;
@@ -97,14 +101,22 @@
   }
 
   function parsePage(payload, cursor) {
-    if (!payload || !Array.isArray(payload.items) || payload.items.length > 25 ||
-        payload.items.some(item => !item || typeof item !== 'object' || Array.isArray(item)) ||
-        payload.cursor != null && (typeof payload.cursor !== 'string' || !payload.cursor ||
-          payload.cursor.length > 2048 || /[\u0000-\u001f\u007f]/.test(payload.cursor)) ||
-        payload.cursor != null && (payload.cursor === cursor || !payload.items.length)) {
-      throw new Error('catalog_unrecognized');
+    if (!payload || !Array.isArray(payload.items)) throw new Error('catalog_items_invalid');
+    if (payload.items.length > 25) throw new Error('catalog_page_limit');
+    if (payload.items.some(item => !item || typeof item !== 'object' || Array.isArray(item))) {
+      throw new Error('catalog_item_invalid');
     }
+    if (payload.cursor != null && (typeof payload.cursor !== 'string' || !payload.cursor ||
+        payload.cursor.length > 2048 || /[\u0000-\u001f\u007f]/.test(payload.cursor))) throw new Error('catalog_cursor_invalid');
+    if (payload.cursor != null && payload.cursor === cursor) throw new Error('catalog_cursor_cycle');
+    if (payload.cursor != null && !payload.items.length) throw new Error('catalog_empty_continuation');
     return { items: payload.items, cursor: payload.cursor ?? null };
+  }
+
+  function failureCode(job, error) {
+    const code = typeof error?.message === 'string' ? error.message : '';
+    const safe = FAILURE_CODES.has(code) || /^http_(?:0|[1-5][0-9]{2})$/.test(code) ? code : 'unexpected';
+    return 'private_image_gallery_unavailable:' + job.stage + ':' + safe;
   }
 
   function imageTarget(item) {
@@ -166,6 +178,7 @@
       if (!job.assets?.registerPrivate || !root.__elonChatGptPrivateJsonRequest?.request) {
         throw new Error('transport_unavailable');
       }
+      job.stage = 'catalog';
       const scope = JSON.stringify([job.account, job.token]);
       if (cacheIdentity !== scope || job.operation === 'refresh') {
         clearCache(); cacheIdentity = scope;
@@ -192,16 +205,18 @@
       cursors.length = job.index + 1;
       if (page.cursor !== null) cursors.push(page.cursor);
       pageIndex = job.index;
+      job.stage = 'register';
       page = register(job, page);
       job.page = page;
       emit(job, 'loading', page);
+      job.stage = 'previews';
       const failed = await exportPage(job, page);
       check(job);
       emit(job, failed ? 'partial' : 'ready', page);
       return { ok: failed === 0, code: failed ? 'image_preview_partial' : 'private_image_gallery_ready' };
-    } catch (_) {
+    } catch (error) {
       emit(job, job.page ? 'partial' : 'failed', job.page);
-      return { ok: false, code: current(job) ? 'private_image_gallery_unavailable' : 'gallery_cancelled' };
+      return { ok: false, code: current(job) ? failureCode(job, error) : 'gallery_cancelled' };
     } finally {
       release(job);
       if (active === job) active = null;
@@ -223,7 +238,7 @@
     }
     cancel();
     const job = { id: command.requestId, operation: args.operation, cached: new Set(args.cachedHandles),
-      href: root.location.href, token: root.__elonChatGptDocumentToken, account: null,
+      href: root.location.href, token: root.__elonChatGptDocumentToken, account: null, stage: 'identity',
       controller: new root.AbortController(), pending: new Set(), emit: emitEvent,
       assets: root.__elonChatGptImageAssets };
     job.assetListener = event => {
@@ -243,5 +258,5 @@
   }
 
   function dispose() { cancel(); disposed = true; clearCache(); cacheIdentity = ''; }
-  return Object.freeze({ version: 3, request, handle, cancel, dispose });
+  return Object.freeze({ version: 4, request, handle, cancel, dispose });
 });

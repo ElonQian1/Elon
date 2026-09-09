@@ -86,8 +86,8 @@ test('reinjection replaces captured old parsers once and preserves unrelated ses
   const file = root.__elonChatGptPrivateFileDownload, gallery = root.__elonChatGptPrivateImageGallery;
   assert.equal(root.__elonChatGptPrivateImagePointer.version, 2);
   assert.ok(root.__elonChatGptPrivateImagePointer.parse('sediment://file-one/container/image.png'));
-  assert.equal(file.version, 13);
-  assert.equal(gallery.version, 3);
+  assert.equal(file.version, 14);
+  assert.equal(gallery.version, 4);
   assert.deepEqual([fileDisposed, galleryDisposed], [1, 1]);
   for (const source of scripts) vm.runInContext(source, context);
   assert.equal(root.__elonChatGptPrivateFileDownload, file);

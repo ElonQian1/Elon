@@ -6,7 +6,9 @@ param(
     [ValidateSet('inspect','inspect_entry','features','library','browse','query','clear_query','refresh','more',
         'file','attach','remove_staged','rename','set_fixture_name','confirm_rename','upload_fixture_copy','select_upload_copy',
         'trash','confirm_fixture_trash','close_mutation','close_detail','back',
-        'download','wait_download','close_download','query_fixture')]
+        'download','wait_download','close_download','query_fixture',
+        'gallery','gallery_wait','gallery_inspect','gallery_next','gallery_previous',
+        'gallery_preview','gallery_close_preview','gallery_close')]
     [string]$Step = 'inspect',
     [string]$Handle = '',
     [string]$FixtureName = '',

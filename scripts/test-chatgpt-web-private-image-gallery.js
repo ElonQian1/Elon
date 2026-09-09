@@ -116,6 +116,32 @@ test('a valid terminal empty catalog is ready, malformed or unknown payload is n
   }
 });
 
+test('gallery failures retain safe admission and catalog evidence, not response content', async () => {
+  for (const [payload, reason] of [
+    [{}, 'catalog_items_invalid'],
+    [{ items: [null] }, 'catalog_item_invalid'],
+    [{ items: Array(26).fill(row(1)) }, 'catalog_page_limit'],
+    [{ items: [row(1)], cursor: '' }, 'catalog_cursor_invalid'],
+    [{ items: [], cursor: 'private-cursor' }, 'catalog_empty_continuation'],
+  ]) {
+    const h = harness([payload]);
+    assert.equal((await h.run()).code, 'private_image_gallery_unavailable:catalog:' + reason);
+    assert.equal(h.exports.length, 0);
+    assert.equal(h.timers.size, 0);
+  }
+  for (const [message, expected] of [['http_401', 'http_401'], ['timeout', 'timeout'],
+    ['https://private.invalid?token=secret', 'unexpected']]) {
+    const h = harness([() => { throw new Error(message); }]);
+    const result = await h.run();
+    assert.equal(result.code, 'private_image_gallery_unavailable:catalog:' + expected);
+    assert.doesNotMatch(JSON.stringify([result, h.events]), /secret|private\.invalid/);
+  }
+  const noIdentity = harness();
+  noIdentity.root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders = () => null;
+  assert.equal((await noIdentity.run()).code,
+    'private_image_gallery_unavailable:identity:identity_unavailable');
+});
+
 test('unrecognized pointer scopes are partial rather than fabricated empty gallery', async () => {
   const h = harness([{ items: [row(1), { ...row(2), asset_pointer: 'file-service://file-2?shared=unknown' }], cursor: null }]);
   assert.equal((await h.run()).ok, false);
@@ -223,7 +249,7 @@ test('gallery upgrade retires one older instance without stacking requests', () 
     __elonChatGptPrivateImagePointer: require('../android/app/src/main/assets/chatgpt_web_private_image_pointer.js') };
   vm.runInNewContext(source, { window: root });
   const instance = root.__elonChatGptPrivateImageGallery;
-  assert.equal(instance.version, 3);
+  assert.equal(instance.version, 4);
   assert.equal(disposed, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateImageGallery, instance);

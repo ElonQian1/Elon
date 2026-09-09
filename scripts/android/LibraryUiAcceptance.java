@@ -32,6 +32,93 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         return preset;
     }
 
+    private UiObject galleryFeature() throws Exception {
+        UiObject preset = description("web-chat-feature:images");
+        UiObject observed = new UiObject(new UiSelector().packageName(APP).descriptionMatches(
+            "chatgpt-feature:[a-zA-Z0-9_]+:(\u56fe\u50cf|\u56fe\u7247)"));
+        long deadline = android.os.SystemClock.elapsedRealtime() + 8000;
+        do {
+            if (preset.exists()) return preset;
+            if (observed.exists()) return observed;
+            Thread.sleep(100);
+        } while (android.os.SystemClock.elapsedRealtime() < deadline);
+        fail("gallery_feature_missing");
+        return preset;
+    }
+
+    private boolean galleryVisible() {
+        return description("\u540c\u6b65\u56fe\u50cf").exists() &&
+            description("\u8fd4\u56de\u804a\u5929").exists();
+    }
+
+    private boolean galleryLoading() {
+        return new UiObject(new UiSelector().packageName(APP).textMatches(
+            ".*(\u6b63\u5728\u540c\u6b65\u56fe\u50cf|\u6b63\u5728\u540e\u53f0\u540c\u6b65).*" )).exists();
+    }
+
+    private void galleryStep(String step) throws Exception {
+        switch (step) {
+            case "gallery":
+                click(description("web-chat-feature-navigation:chatgpt_web"));
+                click(galleryFeature());
+                assertTrue("gallery_not_visible", description("\u540c\u6b65\u56fe\u50cf").waitForExists(8000));
+                break;
+            case "gallery_wait":
+                assertTrue("gallery_not_visible", galleryVisible());
+                long deadline = android.os.SystemClock.elapsedRealtime() + 25000;
+                while (galleryLoading() && android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(250);
+                break;
+            case "gallery_next":
+                assertTrue("gallery_not_visible", galleryVisible());
+                click(description("\u4e0b\u4e00\u9875"));
+                break;
+            case "gallery_previous":
+                assertTrue("gallery_not_visible", galleryVisible());
+                click(description("\u4e0a\u4e00\u9875"));
+                break;
+            case "gallery_preview":
+                assertTrue("gallery_not_visible", galleryVisible());
+                click(description("\u56fe\u50cf 1"));
+                assertTrue("image_viewer_not_visible", text("\u00d7").waitForExists(5000));
+                break;
+            case "gallery_close_preview":
+                click(text("\u00d7"));
+                assertTrue("gallery_not_restored", description("\u540c\u6b65\u56fe\u50cf").waitForExists(5000));
+                break;
+            case "gallery_close":
+                click(description("\u8fd4\u56de\u804a\u5929"));
+                assertTrue("gallery_not_closed", description("\u540c\u6b65\u56fe\u50cf").waitUntilGone(5000));
+                break;
+            case "gallery_inspect":
+                break;
+            default:
+                fail("unsupported_gallery_step");
+        }
+    }
+
+    private JSONObject galleryResult(String step) throws Exception {
+        JSONObject result = new JSONObject().put("step", step);
+        result.put("gallery_visible", galleryVisible());
+        result.put("loading", galleryLoading());
+        result.put("ready", new UiObject(new UiSelector().packageName(APP).textMatches(
+            "\u672c\u9875 [0-9]+ \u5f20\u56fe\u7247")).exists());
+        result.put("empty", text("\u8fd8\u6ca1\u6709\u521b\u5efa\u7684\u56fe\u7247").exists());
+        result.put("partial", new UiObject(new UiSelector().packageName(APP).textMatches(
+            "\u5df2\u52a0\u8f7d [0-9]+ \u5f20\u56fe\u7247.*")).exists());
+        result.put("failed", new UiObject(new UiSelector().packageName(APP).textMatches(
+            ".*\u540c\u6b65\u5931\u8d25.*")).exists());
+        UiObject page = new UiObject(new UiSelector().packageName(APP).textMatches("\u7b2c [0-9]+ \u9875"));
+        result.put("page", page.exists() ? Integer.parseInt(page.getText().replaceAll("[^0-9]", "")) : 0);
+        int count = 0;
+        for (int i = 1; i <= 25; i++) if (description("\u56fe\u50cf " + i).exists()) count++;
+        result.put("visible_images", count);
+        UiObject next = description("\u4e0b\u4e00\u9875"), previous = description("\u4e0a\u4e00\u9875");
+        result.put("next_enabled", next.exists() && next.isEnabled());
+        result.put("previous_enabled", previous.exists() && previous.isEnabled());
+        result.put("viewer_visible", text("\u00d7").exists() && description("\u56fe\u50cf 1").exists());
+        return result;
+    }
+
     private void click(UiObject node) throws Exception {
         assertTrue("semantic_control_missing", node.waitForExists(8000));
         assertTrue("semantic_control_disabled", node.isEnabled());
@@ -74,6 +161,13 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
         String step = getParams().getString("step", "inspect");
         String handle = getParams().getString("handle", "");
+        if (step.startsWith("gallery")) {
+            galleryStep(step);
+            android.os.Bundle report = new android.os.Bundle();
+            report.putString("stream", "LIBRARY_UI_RESULT=" + galleryResult(step).toString() + "\n");
+            getAutomationSupport().sendStatus(0, report);
+            return;
+        }
         switch (step) {
             case "browse":
                 click(description("web-chat-feature-navigation:chatgpt_web"));
