@@ -529,15 +529,15 @@
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceGridManageActivity.kt",
-          "content_hash": "88b01cd3d01444a614ddf130a66e6277207392ea7879c7db6f2a3495e85e1fba",
+          "content_hash": "b30618471e6d79a3f16aa8f2d32dc11218a6e21271394bbbd284798f17fc4b59",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d605cfb5ae4c8fcb58a3e73b56013ad7006367cd",
-            "head_blob_oid": "f3a87552a156b81457d13ccbc1a1eeb5419554b4",
-            "worktree_blob_oid": "b95b00a124660f855fbb3195c07a951e92a166b0",
-            "state": "tracked_modified"
+            "head_commit": "11f981c11d2e789a77e6675c7544a66bfef7945f",
+            "head_blob_oid": "a0144b0080e46b2724d3050535df29ee58c49634",
+            "worktree_blob_oid": "a0144b0080e46b2724d3050535df29ee58c49634",
+            "state": "tracked_clean"
           }
         },
         {
@@ -620,15 +620,15 @@
         },
         {
           "path": "docs/reports/binance-grid-range-v3-20260909.md",
-          "content_hash": "f4288bff3d45945a9f163295acbf8caa35b60c9f0b05be75c0a6b929bdc044d1",
+          "content_hash": "70e534eda80bd51e961369170406460b06b662e5732fa26110200e2578a26fc0",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "3fb679faa0d8640b367a39800aacf27c3cd4c5a8",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "6754d02268e111a36f2a6d27f9f449a75ede1271",
-            "state": "untracked"
+            "head_commit": "11f981c11d2e789a77e6675c7544a66bfef7945f",
+            "head_blob_oid": "6754d02268e111a36f2a6d27f9f449a75ede1271",
+            "worktree_blob_oid": "c090fff1896c381bbaac553adfa26214c9deb763",
+            "state": "tracked_modified"
           }
         },
         {
@@ -665,7 +665,7 @@
         "expires_at_ms": 1788950781883
       },
       "created_at_ms": 1788893289640,
-      "updated_at_ms": 1788936035500
+      "updated_at_ms": 1788936942396
     },
     {
       "id": "android-binance-grid-create-v1",
@@ -24357,26 +24357,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_0da2077c175a4cce8e2a347222f6b6ec",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Begin explicit review cycle for the updated CI configuration evidence.",
-      "from_status": "retired",
-      "to_status": "proposed",
-      "at_ms": 1788652143519
-    },
-    {
-      "id": "feature_event_e7f1b6a74403459290e77823580ffb0e",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Reviewed the existing adoption requirement and confirmed the Sui CI addition remains within the same guarded CI evidence scope.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788652152905
-    },
-    {
       "id": "feature_event_add47c575261491fafb388d380125af7",
       "feature_id": "project-feature-registry-adoption-v1",
       "action": "transitioned",
@@ -26355,6 +26335,26 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788936035500
+    },
+    {
+      "id": "feature_event_ff33e5bb4b594be8bcc03afb43ef70d3",
+      "feature_id": "android-binance-grid-core-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-core",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788936853648
+    },
+    {
+      "id": "feature_event_199fd8d27f344f548c4cfc1a03970da3",
+      "feature_id": "android-binance-grid-core-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-core",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788936942396
     }
   ]
 }
