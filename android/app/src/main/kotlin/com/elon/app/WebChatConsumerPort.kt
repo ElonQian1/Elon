@@ -62,6 +62,9 @@ internal data class WebChatConsumerCommandResult(
 internal interface WebChatConsumerPort {
     fun state(): WebChatConsumerState
     fun libraryFiles(): WebChatLibrarySnapshot? = null
+    fun directoryPage(): com.elon.app.chatgptweb.ChatGptWebDirectoryPage? = null
+    fun browseDirectoryPage(scope: String, handle: String): WebChatConsumerCommandResult = WebChatConsumerCommandResult(false)
+    fun cancelDirectoryPage(requestId: String): WebChatConsumerCommandResult = WebChatConsumerCommandResult(false)
     fun attachLibraryFile(handle: String): WebChatConsumerCommandResult = WebChatConsumerCommandResult(false)
     fun removeComposerAttachment(id: String): WebChatConsumerCommandResult = WebChatConsumerCommandResult(false)
     fun mutateLibraryFile(handle: String, operation: String, name: String, confirmed: Boolean): WebChatConsumerCommandResult =

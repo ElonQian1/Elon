@@ -1,6 +1,7 @@
 package com.elon.app.chatgptweb
 
 internal sealed interface ChatGptWebEvent {
+    data class DirectoryPage(val value: ChatGptWebDirectoryPage) : ChatGptWebEvent
     data class AdapterReady(
         val capabilities: ChatGptWebCapabilities,
     ) : ChatGptWebEvent

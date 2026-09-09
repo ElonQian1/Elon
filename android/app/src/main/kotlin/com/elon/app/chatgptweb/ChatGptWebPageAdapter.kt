@@ -373,6 +373,10 @@ internal class ChatGptWebPageAdapter(
 
     fun listLibraryFiles(request: JSONObject, requestId: String) =
         runCommand("list_library_files", value = request.toString(), requestId = requestId)
+    fun browseDirectoryPage(request: JSONObject, requestId: String) =
+        runCommand("browse_directory_page", value = request.toString(), requestId = requestId)
+    fun cancelDirectoryPage(target: String, requestId: String) =
+        runCommand("cancel_directory_page", value = target, requestId = requestId)
     fun mutateLibraryFile(request: JSONObject, requestId: String) =
         runCommand("mutate_library_file", value = request.toString(), selected = true, requestId = requestId)
 
@@ -701,7 +705,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 311
+        internal const val ADAPTER_VERSION = 312
 
         private val ADAPTER_ASSETS = ChatGptWebAdapterAssets.names
         private const val BRIDGE_OBJECT = "elonChatGptNative"

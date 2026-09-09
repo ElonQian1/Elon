@@ -31,6 +31,7 @@ class ChatGptWebOperationReadinessTest {
 
     @Test fun authenticatedReadsIgnoreComposerAndChatRateLimit() {
         listOf("chatgpt_list_conversations", "chatgpt_list_library_files", "chatgpt_list_conversation_files",
+            "chatgpt_browse_directory_page",
             "chatgpt_download_library_file", "chatgpt_download_conversation_file").forEach {
             assertNull(it, rejection(it))
             assertNull(it, rejection(it, page.copy(accessReason = "rate_limited")))

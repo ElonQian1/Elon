@@ -37,6 +37,7 @@ internal class ChatGptWebSideMenuCoordinator(
     private val remoteConversationActionsAvailable: () -> Boolean,
     private val openRemoteConversationActions: (ChatGptWebConversation) -> Unit,
     private val active: () -> Boolean,
+    private val consumerPort: () -> com.elon.app.WebChatConsumerPort? = { null },
 ) {
     private lateinit var view: ChatGptWebSideMenuView
 
@@ -63,6 +64,7 @@ internal class ChatGptWebSideMenuCoordinator(
             closeThen = closeThen,
             dp = dp,
             selectableForeground = selectableForeground,
+            consumerPort = consumerPort,
         )
         panel.addView(view, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -104,6 +106,7 @@ internal class ChatGptWebSideMenuCoordinator(
     }
 
     fun hide() {
+        view.stopBrowsing()
         view.visibility = View.GONE
     }
 }

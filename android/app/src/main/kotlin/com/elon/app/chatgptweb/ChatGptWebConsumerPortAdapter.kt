@@ -20,6 +20,11 @@ internal class ChatGptWebConsumerPortAdapter(
     private val readFileDownload: () -> com.elon.app.WebChatFileDownloadState? = { null },
 ) : WebChatConsumerPort {
     override fun libraryFiles() = observedState().let { it.libraryFiles.takeIf { _ -> it.adapterCurrent } }
+    override fun directoryPage() = observedState().let { it.directoryPage.takeIf { _ -> it.adapterCurrent } }
+    override fun browseDirectoryPage(scope: String, handle: String) =
+        execute(JSONObject().put("action", "chatgpt_browse_directory_page").put("scope", scope).put("page_handle", handle))
+    override fun cancelDirectoryPage(requestId: String) =
+        execute(JSONObject().put("action", "chatgpt_cancel_directory_page").put("directory_request_id", requestId))
     override fun attachLibraryFile(handle: String) =
         execute(JSONObject().put("action", "chatgpt_attach_library_file").put("file_handle", handle).put("confirmed", true))
     override fun removeComposerAttachment(id: String) =

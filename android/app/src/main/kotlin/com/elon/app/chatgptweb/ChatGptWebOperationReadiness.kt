@@ -16,10 +16,12 @@ internal object ChatGptWebOperationReadiness {
             "chatgpt_list_composer_options", "chatgpt_dismiss_composer_options",
             "chatgpt_list_features", "chatgpt_dismiss_features", "chatgpt_cancel_library_files",
             "chatgpt_private_protocol_probe", "chatgpt_stop_generation",
+            "chatgpt_cancel_directory_page",
         ),
         Requirement.DIRECTORY_READ to setOf("chatgpt_list_conversations"),
         Requirement.ACCOUNT_READ to setOf(
             "chatgpt_list_conversation_files", "chatgpt_list_library_files",
+            "chatgpt_browse_directory_page",
             "chatgpt_download_conversation_file", "chatgpt_download_library_file",
         ),
         Requirement.ACCOUNT_MUTATION to setOf(

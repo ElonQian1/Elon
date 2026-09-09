@@ -97,6 +97,8 @@ internal class ChatGptWebMcpActions(
             dispatchRequest(beginCommand(expectedAction), block)
         }
         when (action) {
+            in ChatGptWebDirectoryPageCommands.actions -> ChatGptWebDirectoryPageCommands.control(
+                args, commands, ::dispatch)?.let { return error(action, it) }
             in ChatGptWebLibraryCommands.actions -> ChatGptWebLibraryCommands.control(
                 args, observedAtDispatch, commands, ::dispatch)?.let { return error(action, it) }
             "chatgpt_cancel_file_download" -> {

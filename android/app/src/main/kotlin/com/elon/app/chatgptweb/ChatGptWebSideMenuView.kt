@@ -38,7 +38,10 @@ internal class ChatGptWebSideMenuView(
     private val closeThen: (() -> Unit) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?,
+    private val consumerPort: () -> com.elon.app.WebChatConsumerPort? = { null },
 ) : FrameLayout(activity) {
+    private var browser: ChatGptWebDirectoryBrowserView? = null
+    fun stopBrowsing() { browser?.stop(); browser = null }
     private val root = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(22), dp(36), dp(18), dp(18))
@@ -70,6 +73,8 @@ internal class ChatGptWebSideMenuView(
     }
 
     fun render() {
+        if (browser?.current() == true) return
+        stopBrowsing()
         val scrollKey = listOf(selectedTab, selectedDate, selectedProjectId, searchQuery)
         val previousScrollY = root.findViewWithTag<ScrollView>(scrollKey)?.scrollY ?: 0
         root.removeAllViews()
@@ -80,8 +85,7 @@ internal class ChatGptWebSideMenuView(
                 context = activity,
                 selectedDate = selectedDate,
                 onDateSelected = { date ->
-                    selectedDate = date
-                    render()
+                    selectDate(date)
                 },
                 dp = dp,
                 selectableForeground = selectableForeground,
@@ -97,7 +101,24 @@ internal class ChatGptWebSideMenuView(
             0,
             1f,
         ))
+        if (providerId() == "chatgpt_web") root.addView(footerAction(
+            if (selectedTab == ChatGptWebSideMenuTab.DATE) "查看全部会话" else "查看全部${if (selectedProjectId == null) "项目" else "项目会话"}",
+            "web-chat-directory-browse",
+        ) { openBrowser() }, LinearLayout.LayoutParams(-1, dp(48)))
         root.addView(footer())
+    }
+
+    private fun openBrowser() {
+        val scope = if (selectedTab == ChatGptWebSideMenuTab.DATE) "conversations" else selectedProjectId ?: "projects"
+        val name = selectedProject()?.title ?: if (scope == "projects") "项目" else "未归入项目"
+        val content = ChatGptWebDirectoryBrowserView(activity, consumerPort,
+            onReturn = { stopBrowsing(); render() },
+            onConversation = { path -> stopBrowsing(); closeThen { openConversation(path) } }, dp = dp)
+        browser = content
+        val position = root.childCount - 3
+        root.removeViews(position, 2)
+        root.addView(content, position, LinearLayout.LayoutParams(-1, 0, 1f))
+        post { content.open(scope, name) }
     }
 
     fun refresh() {
@@ -108,7 +129,9 @@ internal class ChatGptWebSideMenuView(
     fun state() = ChatGptWebSideMenuState(selectedTab, selectedDate, selectedProjectId)
 
     fun selectTab(tab: ChatGptWebSideMenuTab) {
-        if (selectedTab == tab && (tab != ChatGptWebSideMenuTab.PROJECTS || selectedProjectId == null)) return
+        val wasBrowsing = browser != null
+        stopBrowsing()
+        if (!wasBrowsing && selectedTab == tab && (tab != ChatGptWebSideMenuTab.PROJECTS || selectedProjectId == null)) return
         selectedTab = tab
         selectedProjectId = null
         searchQuery = ""
@@ -116,7 +139,9 @@ internal class ChatGptWebSideMenuView(
     }
 
     fun selectDate(date: LocalDate) {
-        if (selectedTab == ChatGptWebSideMenuTab.DATE && selectedDate == date) return
+        val wasBrowsing = browser != null
+        stopBrowsing()
+        if (!wasBrowsing && selectedTab == ChatGptWebSideMenuTab.DATE && selectedDate == date) return
         selectedTab = ChatGptWebSideMenuTab.DATE
         selectedDate = date
         selectedProjectId = null
@@ -126,6 +151,7 @@ internal class ChatGptWebSideMenuView(
 
     fun selectProject(projectId: String): Boolean {
         val project = index().projects.firstOrNull { it.id == projectId } ?: return false
+        stopBrowsing()
         enterProject(project)
         return true
     }
@@ -139,10 +165,7 @@ internal class ChatGptWebSideMenuView(
             selectedTab == ChatGptWebSideMenuTab.DATE,
             ChatGptNativeNavigationSelector.DATE_TAB,
         ) {
-            selectedTab = ChatGptWebSideMenuTab.DATE
-            selectedProjectId = null
-            searchQuery = ""
-            render()
+            selectTab(ChatGptWebSideMenuTab.DATE)
         }, LinearLayout.LayoutParams(dp(92), LinearLayout.LayoutParams.MATCH_PARENT))
         addView(tabText(
             if (localProjectActions() == null) {
@@ -153,13 +176,11 @@ internal class ChatGptWebSideMenuView(
             selectedTab == ChatGptWebSideMenuTab.PROJECTS,
             ChatGptNativeNavigationSelector.PROJECTS_TAB,
         ) {
-            selectedTab = ChatGptWebSideMenuTab.PROJECTS
-            selectedProjectId = null
-            searchQuery = ""
-            render()
+            selectTab(ChatGptWebSideMenuTab.PROJECTS)
         }, LinearLayout.LayoutParams(dp(58), LinearLayout.LayoutParams.MATCH_PARENT))
         addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
         addView(iconButton(R.drawable.social_sidebar_search, "搜索${providerName()}会话") {
+            stopBrowsing()
             searchVisible = !searchVisible
             if (!searchVisible) searchQuery = ""
             render()
@@ -507,6 +528,7 @@ internal class ChatGptWebSideMenuView(
     )
 
     private fun requestIndexRefresh() {
+        browser?.let { it.refresh(); return }
         val projectId = selectedProjectId
         markRefreshRequested(projectId, System.currentTimeMillis())
         refreshIndex(projectId)

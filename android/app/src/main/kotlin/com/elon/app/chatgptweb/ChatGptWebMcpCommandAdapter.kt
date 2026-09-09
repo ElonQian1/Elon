@@ -51,6 +51,8 @@ internal class ChatGptWebMcpCommandAdapter(
     override fun listConversationFiles(path: String, requestId: String) =
         pageAdapter.listConversationFiles(path, requestId)
     override fun listLibraryFiles(request: org.json.JSONObject, requestId: String) = pageAdapter.listLibraryFiles(request, requestId)
+    override fun browseDirectoryPage(request: org.json.JSONObject, requestId: String) = pageAdapter.browseDirectoryPage(request, requestId)
+    override fun cancelDirectoryPage(target: String, requestId: String) = pageAdapter.cancelDirectoryPage(target, requestId)
     override fun mutateLibraryFile(request: org.json.JSONObject, requestId: String) = pageAdapter.mutateLibraryFile(request, requestId)
     override fun attachLibraryFile(handle: String, requestId: String) = pageAdapter.attachLibraryFile(handle, requestId)
     override fun cancelLibraryFiles(target: String, requestId: String) = pageAdapter.cancelLibraryFiles(target, requestId)

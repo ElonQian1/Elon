@@ -437,6 +437,7 @@ internal class MainSocialAiChatFeature(
             remoteConversationActionsAvailable = { providerId() == WebChatProviderId.CHATGPT_WEB },
             openRemoteConversationActions = productionConversationActions::show,
             active = { isChatModeActive() && webChatNavigationAvailable() },
+            consumerPort = ::activeConsumerPortOrNull,
         )
         onWebChatNavigationChanged = coordinator::onIndexChanged
         return coordinator

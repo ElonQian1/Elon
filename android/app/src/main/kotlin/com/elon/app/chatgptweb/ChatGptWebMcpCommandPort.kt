@@ -38,6 +38,8 @@ internal interface ChatGptWebMcpCommandPort {
     fun listConversations(requestId: String)
     fun listConversationFiles(path: String, requestId: String) = Unit
     fun listLibraryFiles(request: org.json.JSONObject, requestId: String) = Unit
+    fun browseDirectoryPage(request: org.json.JSONObject, requestId: String) = Unit
+    fun cancelDirectoryPage(target: String, requestId: String) = Unit
     fun mutateLibraryFile(request: org.json.JSONObject, requestId: String) = Unit
     fun attachLibraryFile(handle: String, requestId: String) = Unit
     fun cancelLibraryFiles(target: String, requestId: String) = Unit
