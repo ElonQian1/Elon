@@ -2,10 +2,36 @@
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
 Status: source implemented and offline verified; not device verified or completed.
-Adapter 286 wires this candidate into the existing production
+The original adapter 286 batch wired this candidate into the existing production
 `chatgpt_regenerate_response` command. It is an official-runtime bridge, not an
 independent Android HTTP generation transport. Do not recreate it while waiting
 for the grouped ChatGPT APK acceptance.
+
+## Current source correction
+
+Contract/runtime v4 extends the existing command to the source-observed
+`finished_partial_completion` terminal status, while retaining the committed
+official `canRegenerateResponse`, model restrictions, same-parent/leaf and
+single-writer checks. In-progress and unknown statuses remain inadmissible.
+This is not a new sender or a claim of real-device interrupted-turn acceptance.
+
+The retained September 7 conversation asset has SHA-256
+`7973d518b083f0f3e23905a279ed019378481bdbdd10fc0196afe9fc7b3b7d35`.
+Its `v3i` retry predicate excludes active/new/unauthorized and special turns,
+without requiring successful completion; its terminal-turn classification
+recognizes `finished_partial_completion`, and its error classifier permits
+retry for `finish_details` interrupted by `server_error`. These are inspected
+source contracts, not an assertion about a newly observed live response.
+
+The pre-submit hook is now revalidated before resetting the private stream.
+Previously a changed model or rate limit was rejected only after clearing the
+existing reply. Reset still has its subsequent reentry check because it notifies
+listeners synchronously; this does not claim every possible refresh is blank-free.
+Seven new regression checks failed against the unchanged v3 implementation.
+The corrected regeneration and production-wiring suites pass 45 cases, including
+the real private stream parser/merge consumer retaining the previous reply on
+hook rejection. The next grouped APK must verify the native retry button on a
+completed and an interrupted turn; no new phone result is claimed here.
 
 ## Actual contract
 
@@ -21,7 +47,7 @@ native bridge neither reconstructs that POST nor replays captured proof headers.
 It does not call React hooks outside a render, open a menu, fill an editor or send
 the original prompt as a new user message.
 
-The bridge admits only a completed text assistant turn, a known server
+The bridge admits only a terminal text assistant turn (successful or partial), a known server
 conversation, one committed retry-menu context, the same current model-picker
 conversation and an allowed retry model. It reuses the existing model contract
 and the official availability predicate, including live rate-limit restrictions.
@@ -81,7 +107,8 @@ The missing-node exception case first failed against the new runtime's initial
 implementation, then passed after retaining its bounded confirmation retry.
 
 Grouped APK build/install, production retry/first-word display, real closed-portal
-binding, project/temporary cases, account restrictions and latency/resource
-acceptance remain pending. Recent browser navigation timed out; no successful
+binding, project/temporary cases and account restrictions remain pending.
+Thermal/resource optimization is deferred until functional acceptance. Browser
+navigation timed out during the original source batch; no successful
 authenticated regeneration was observed in this source batch. Preserve that
 distinction in the capability matrix and release notes.

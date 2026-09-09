@@ -7,7 +7,8 @@ const contract = require('../android/app/src/main/assets/chatgpt_web_private_reg
 const { fixture, id, flush } = require('./fixtures/chatgpt-runtime-regeneration.js');
 
 test('regeneration has a versioned official-runtime transaction', () => {
-  assert.equal(runtime.version, 3);
+  assert.equal(runtime.version, 4);
+  assert.equal(contract.version, 4);
   assert.equal(typeof runtime.create, 'function');
 });
 
@@ -29,6 +30,25 @@ test('closed portal callback is called once without menu opening and waits for a
   assert.equal(f.timers.size, 0);
 });
 
+for (const reason of ['user_stop', 'server_error']) {
+  test('an officially retryable partial completion retains its original parent: ' + reason, async () => {
+    const f = fixture();
+    f.message.status = 'finished_partial_completion';
+    if (reason === 'server_error') {
+      f.message.metadata = { finish_details: { type: 'interrupted', reason } };
+    }
+    assert.equal(f.api.available(f.turn, f.command.getModelTrigger), true);
+    const result = f.api.regenerate(f.command);
+    await flush();
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.tree.leaf, f.message.id, 'no synthetic user turn or replacement branch');
+    f.publish();
+    assert.equal((await result.completion).status, 'accepted');
+    assert.equal(f.tree.nodes.get(id(5)).parent, f.parent);
+    assert.equal(f.calls.length, 1);
+  });
+}
+
 for (const [name, change] of Object.entries({
   disabled: f => { f.page.__elonChatGptPrivateTextTransactionsEnabled = false; },
   detached: f => { f.turn.isConnected = false; },
@@ -37,6 +57,7 @@ for (const [name, change] of Object.entries({
   upsell: f => { f.menu.retryOption.shouldShowUpsell = true; },
   image: f => { f.menu.hasImageGenMessage = true; },
   incomplete_message: f => { f.message.status = 'in_progress'; },
+  unknown_message_status: f => { f.message.status = 'unknown_synthetic_status'; },
   unknown_module: f => { f.page.performance.getEntriesByName = () => []; },
   unknown_account: f => { f.page.__elonChatGptPrivateTransport.copySameOriginRequestHeaders = () => ({}); },
   another_conversation: f => { f.menu.conversation = {}; },
@@ -88,6 +109,7 @@ test('pre-submit reentrancy cannot switch targets or bypass the final state chec
   f.command.beforeSubmit = () => { f.menu.retryOption.value = 'changed-model'; };
   assert.equal((await f.api.regenerate(f.command).completion).status, 'rejected');
   assert.equal(f.calls.length, 0);
+  assert.equal(f.prepared(), 0, 'a rejected pre-submit hook must retain the prior stream');
 });
 
 test('rate-limit changes in the pre-submit hook are rechecked before invocation', async () => {
@@ -95,6 +117,30 @@ test('rate-limit changes in the pre-submit hook are rechecked before invocation'
   f.command.beforeSubmit = () => { f.modelMenu.modelSwitcherDenialsBySlug['synthetic-model'] = true; };
   assert.equal((await f.api.regenerate(f.command).completion).status, 'rejected');
   assert.equal(f.calls.length, 0);
+  assert.equal(f.prepared(), 0, 'a rejected rate-limit check must retain the prior stream');
+});
+
+test('stream reset notifications still cannot retarget the captured callback', async () => {
+  const f = fixture(), stream = f.page.__elonChatGptPrivateStreamTransport;
+  const prepare = stream.prepareSend;
+  stream.prepareSend = () => { prepare(); f.menu.retryOption.value = 'changed-by-stream-listener'; };
+  assert.equal((await f.api.regenerate(f.command).completion).status, 'rejected');
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.api.state().pending, false);
+});
+
+test('partial completion still obeys official eligibility and model restrictions', async () => {
+  const denied = fixture(); denied.message.status = 'finished_partial_completion';
+  denied.menu.canRegenerateResponse = false;
+  assert.equal(denied.api.regenerate(denied.command).handled, false);
+  assert.equal(denied.calls.length, 0);
+  const limited = fixture(); limited.message.status = 'finished_partial_completion';
+  limited.modelMenu.modelSwitcherDenialsBySlug['synthetic-model'] = true;
+  const result = limited.api.regenerate(limited.command);
+  assert.equal(result.handled, true);
+  assert.equal((await result.completion).status, 'rejected');
+  assert.equal(limited.calls.length, 0);
+  assert.equal(limited.prepared(), 0);
 });
 
 test('runtime import timeout only permits fallback while the original binding still matches', async () => {

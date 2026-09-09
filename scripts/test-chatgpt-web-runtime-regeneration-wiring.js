@@ -22,11 +22,29 @@ function production(options) {
     findComposer: () => ({}), composerValue: () => 'untouched synthetic draft',
     setComposerValue() { throw Error('regeneration must never replace a draft'); }, comparableText: x => x,
     scheduleSnapshot() {}, messageAdapter: { lastAssistantTurn: () => f.turn },
-    streamingPolicy: {}, streamingPolicyModule: { begin: () => { begin++; } }
+    streamingPolicy: {}, streamingPolicyModule: { begin: () => { begin++; options?.beforeBegin?.(f); } }
   });
   const respond = (action, ok, detail) => events.push({ action, ok, detail }); respond.requestId = 'mcp_retry';
   return { ...f, events, run: () => api.regenerateResponse(respond, () => { fallback++; }),
     counts: () => ({ fallback, relay, begin }) };
+}
+
+function retainedReply(f) {
+  const sockets = new Set();
+  f.page.__elonChatGptPrivateStreamObserverEnabled = true;
+  f.page.__elonChatGptPrivateSocketTap = {
+    subscribe(fn) { sockets.add(fn); return () => sockets.delete(fn); }
+  };
+  f.page.fetch = async () => { throw Error('this contract check must not issue a request'); };
+  const context = vm.createContext({ window: f.page, location: f.page.location, URL, TextDecoder });
+  for (const name of ['chatgpt_web_private_stream_policy', 'chatgpt_web_private_stream_transport']) {
+    vm.runInContext(source(name), context);
+  }
+  const payload = JSON.stringify({ conversation_id: id(1), message: f.message });
+  for (const emit of sockets) emit(payload);
+  const stream = f.page.__elonChatGptPrivateStreamTransport;
+  assert.equal(stream.current(f.page.location.pathname)?.text, 'synthetic original');
+  return stream;
 }
 
 test('the actual orchestrator routes regeneration to runtime and preserves the existing draft', async () => {
@@ -60,6 +78,23 @@ test('changed conversation during preparation does not invoke fallback in the ne
   assert.equal(f.calls.length, 0); assert.equal(f.counts().fallback, 0);
   assert.match(f.events[0].detail, /regenerate_rejected:context_changed$/);
 });
+
+for (const [name, beforeBegin] of Object.entries({
+  model: f => { f.menu.retryOption.value = 'changed-model'; },
+  rate_limit: f => { f.modelMenu.modelSwitcherDenialsBySlug['synthetic-model'] = true; }
+})) {
+  test('production ' + name + ' rejection preserves the real stream consumer snapshot', async () => {
+    const f = production({ beforeBegin }), stream = retainedReply(f);
+    const before = JSON.stringify(stream.mergeMessages([], f.page.location.pathname));
+    f.run(); await flush();
+    assert.equal(f.calls.length, 0);
+    assert.equal(f.counts().fallback, 0);
+    assert.match(f.events[0].detail, /regenerate_rejected:context_changed$/);
+    assert.equal(stream.current(f.page.location.pathname)?.text, 'synthetic original');
+    assert.equal(JSON.stringify(stream.mergeMessages([], f.page.location.pathname)), before);
+    stream.dispose();
+  });
+}
 
 test('the production adapter delegates the same native regeneration command without preemptive stream clearing', () => {
   const adapter = source('chatgpt_web_adapter');

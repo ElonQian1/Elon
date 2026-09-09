@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateRegenerateContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -66,7 +66,8 @@
     if (!model || !UUID.test(cid || '') || !menu || menu.conversation !== model.conversation ||
         menu.canRegenerateResponse !== true || menu.hasImageGenMessage !== false ||
         message?.author?.role !== 'assistant' || message?.content?.content_type !== 'text' ||
-        message.status !== 'finished_successfully' || message.metadata?.image_gen_async ||
+        !['finished_successfully', 'finished_partial_completion'].includes(message.status) ||
+        message.metadata?.image_gen_async ||
         !UUID.test(message.id || '') || !SLUG.test(option?.value || '') ||
         option.shouldShowUpsell === true || option.disabled === true) return null;
     return { turn, getModelTrigger, model, conversation: menu.conversation, menu,

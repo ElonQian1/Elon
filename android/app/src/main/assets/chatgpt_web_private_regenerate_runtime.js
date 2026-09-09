@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const old = root.__elonChatGptPrivateRegenerateRuntime;
@@ -105,9 +105,13 @@
       try {
         const prepared = contract.prepare(binding, modules);
         if (!prepared) return unavailable('context_changed');
-        stream.prepareSend();
         command.beforeSubmit?.();
-        const final = contract.prepare(prepared, modules);
+        // A rejected hook must not erase the previously visible private reply.
+        const checked = contract.prepare(prepared, modules);
+        if (!checked || checked.parentId !== prepared.parentId) return unavailable('context_changed');
+        stream.prepareSend();
+        // Reset notifies stream listeners synchronously; retain its reentry guard.
+        const final = contract.prepare(checked, modules);
         if (!final || final.parentId !== prepared.parentId) return unavailable('context_changed');
         owner.binding = final;
         owner.unsubscribe = stream.subscribe(observe);
@@ -126,5 +130,5 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 3, regenerate, available, state });
+  return Object.freeze({ version: 4, regenerate, available, state });
 });
