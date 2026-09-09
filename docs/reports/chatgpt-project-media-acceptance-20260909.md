@@ -1,0 +1,78 @@
+# Project mixed-media acceptance
+
+## Current Status
+
+- Capability: `android_chatgpt_private_new_project_attachment_upload_v1`.
+- Scope: new project conversation, fixed text/PNG/PDF bundle.
+- Implementation: existing private uploader, project permission and origin
+  binding, native pending-file/send owners are reused unchanged.
+- Verification: scope/receipt/restore harness contracts passed; real project
+  attachment send is **deferred**, not completed.
+- Delivery: current phone independently read back normal `1.1.1599` (code
+  `1599`). It includes the normal 1598 ACK/cleanup correction. This batch changes
+  only acceptance scripts and records, so it does not require another APK build.
+
+The preceding goal turn made verified progress: ordinary new-chat mixed media
+passed on normal 1598, with one accepted native send and all three content reads.
+Do not repeat that scope; [retained evidence](chatgpt-media-batch-1596.md).
+
+## Device Window
+
+The authorized Xiaomi was online and unlocked. Initial foreground was another
+application. One authorized return to the production native chat confirmed an
+authenticated, ready, empty ordinary conversation and five cached projects.
+The bounded refreshed native directory still exposed five projects and no
+obviously dedicated acceptance project. No titles or conversation text were
+emitted. No project was created and no existing conversation was modified.
+
+Before the planned project navigation, foreground changed again. The guard
+stopped the operation with `foreground_changed` **before project navigation,
+upload or send**. Do not classify this as an attachment protocol failure or ask
+for another login. Do not repeatedly steal foreground from the other workflow.
+
+## Existing Harness Extension
+
+`scripts/smoke-chatgpt-web-media-batch.ps1` now accepts `-Scope project_new`;
+the default remains `ordinary_new` for explicit regression use. It requires the
+already selected, empty project composer. It never selects an arbitrary project
+or overwrites an existing chat/draft by itself.
+
+- Require HTTPS `chatgpt.com`, default port, no userinfo/query/fragment, and an
+  exact canonical project homepage path with optional observed slug.
+- Reuse fixed native text/PNG/PDF staging, local removal/restaging, one send,
+  actual content assertions and private upload/official-runtime send receipts.
+- After the reply, request the existing read-only, fresh private conversation
+  membership reconciliation against the captured project. Only a successful
+  `probe_conversation_project` receipt observed after this request is accepted.
+- Reject a changed conversation. The two official path forms for the same
+  conversation may normalize without becoming a false context-change error;
+  a different project prefix remains invalid.
+- Restore the same project homepage, empty native/official draft and pending
+  state, plus the previous awake setting. Stop on foreground change, active
+  streaming/upload or a user-modified draft. No server file deletion occurs.
+
+The contract tests cover ordinary/project scope parsing, foreign origins/ports,
+userinfo, query/fragment, existing-conversation rejection, stale/failed membership
+receipts, same-conversation aliases and foreign project paths. Existing checks
+still reject answer-bearing prompts, multiple sends and unsafe cleanup actions.
+These are offline harness checks, not real project-upload acceptance.
+
+## Next Device Action
+
+1. Use current production native controls to open an explicitly selected project
+   homepage with no messages/draft/pending files. Keep original conversations
+   untouched; use a separate new test conversation.
+2. Run the existing logged command runner with this script and
+   `-Scope project_new`, the current ADB transport and pinned hardware identity.
+3. Accept only private upload + accepted send + all three content reads + fresh
+   project-membership success + restored state. Inspect any failing layer once;
+   do not rebuild or repeat previously completed ordinary/voice cases.
+4. Record this narrow scope only after that actual pass. Synthetic remote files
+   or the new conversation may remain. Project-file collection placement,
+   read-only membership, existing project branches, ingest-image flags and other
+   formats/sizes need their own current evidence; this harness does not prove
+   those merely from a successful reply or conversation membership.
+
+Google remains after the remaining ChatGPT acceptance gate. The full Goal stays
+active. Cookie, login, proxy core, existing voice/subtitles and application data
+were not changed in this batch.

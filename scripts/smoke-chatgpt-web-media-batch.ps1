@@ -3,14 +3,15 @@
 param(
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
-    [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe'
+    [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe',
+    [ValidateSet('ordinary_new', 'project_new')][string]$Scope = 'ordinary_new'
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-evidence.ps1')
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1
-$report = [ordered]@{ schema = 'elon.chatgpt.media_batch.v1'; passed = $false
+$report = [ordered]@{ schema = 'elon.chatgpt.media_batch.v1'; scope = $Scope; passed = $false
     stage = 'prepare'; restored = $false; awake_restored = $false; private_content_emitted = $false }
 $changed = $false
 $fixtureId = 'fixed_media_batch_v1'
@@ -48,6 +49,50 @@ function Check-Reply([string]$Text) {
     }
 }
 
+function Get-MediaProjectId([uri]$Page, [string]$RequestedScope) {
+    if (-not $Page.IsAbsoluteUri -or $Page.Scheme -ne 'https' -or $Page.Host -ne 'chatgpt.com' -or
+        -not $Page.IsDefaultPort -or $Page.UserInfo -or $Page.Query -or $Page.Fragment) { throw 'unsupported_chat_scope' }
+    if ($RequestedScope -eq 'ordinary_new') {
+        if ($Page.AbsolutePath -ne '/') { throw 'ordinary_new_chat_required' }
+        return ''
+    }
+    if ($Page.AbsolutePath -notmatch '^/g/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?/project$') {
+        throw 'new_project_chat_required'
+    }
+    return $Matches[1]
+}
+
+function Test-FreshProjectReceipt($Receipt, [long]$Since) {
+    return $Receipt.action -eq 'probe_conversation_project' -and $Receipt.ok -eq $true -and
+        [long]$Receipt.observed_at_ms -ge $Since
+}
+
+function Get-MediaConversationId([string]$Path, [string]$ProjectId) {
+    if ($Path -notmatch '^(/g/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?)?/c/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$') {
+        return ''
+    }
+    $prefix = $Matches[1]; $id = $Matches[2]
+    if ($prefix -and $prefix -notmatch ('^/g/' + [regex]::Escape($ProjectId) + '(?:-|$)')) { return '' }
+    return $id
+}
+
+function Confirm-ProjectMembership([string]$ProjectId, [string]$Path) {
+    $id = Get-MediaConversationId $Path $ProjectId
+    if (-not $id) { throw 'project_conversation_path_unconfirmed' }
+    $since = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    Act 'refresh_web_chat_conversations' @{ project_id=$ProjectId; conversation_path=$Path } | Out-Null
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds(20)
+    do {
+        $s = Native; $web = Web
+        if ((Get-MediaConversationId ([string]$s.social_chat.web_chat_conversation_path) $ProjectId) -cne $id) {
+            throw 'conversation_changed'
+        }
+        if (Test-FreshProjectReceipt $web.last_project_membership_probe $since) { return $true }
+        Start-Sleep -Seconds 1
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    return $false
+}
+
 try {
     Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
     if ((Get-ChatGptWebSmokeUserReadiness -Runtime $runtime).ready -ne $true) { throw 'device_locked' }
@@ -56,11 +101,10 @@ try {
         $origin.social_chat.interaction_mode -ne 'chat' -or $web.authenticated -ne $true -or
         $web.composer_ready -ne $true) { throw 'surface_not_ready' }
     $page = [uri]$web.conversation.url
-    if ($page.Scheme -ne 'https' -or $page.Host -ne 'chatgpt.com' -or $page.AbsolutePath -ne '/') {
-        throw 'ordinary_new_chat_required'
-    }
+    $projectId = Get-MediaProjectId $page $Scope
+    $originalPath = $page.AbsolutePath
     $temporary = $web.ui_manifest.controls | Where-Object semantic -eq 'temporary_chat' | Select-Object -First 1
-    if ($null -eq $temporary -or $temporary.selected -ne $false) { throw 'ordinary_chat_required' }
+    if (-not $projectId -and ($null -eq $temporary -or $temporary.selected -ne $false)) { throw 'ordinary_chat_required' }
     if (@($origin.social_chat.messages).Count -gt 0 -or $origin.input.text -or $web.streaming -or $web.dictation_active -or
         [int]$web.input.official_draft_length -gt 0 -or [int]$origin.social_chat.web_chat_pending_attachment_count -gt 0 -or
         [int]$origin.chatgpt_web_acceptance_attachment.composer_pending_count -gt 0) { throw 'blank_idle_chat_required' }
@@ -121,6 +165,11 @@ try {
         -not $facts.image_read -or $report.user_rows -ne 1 -or $s.social_chat.web_chat_streaming -or $s.input.text) {
         throw 'mixed_media_reply_unconfirmed'
     }
+    if ($projectId) {
+        $report.stage = 'project_membership'
+        $report.project_membership = Confirm-ProjectMembership $projectId ([string]$s.social_chat.web_chat_conversation_path)
+        if (-not $report.project_membership) { throw 'project_membership_unconfirmed' }
+    }
     $report.passed = $true; $report.stage = 'complete'
 } catch {
     $report.error = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $_.Exception.Message
@@ -137,12 +186,14 @@ try {
             }
             if ($s.input.text -ceq $prompt) { Act 'set_input_text' @{text=''} | Out-Null }
             # Only local pinned bytes are removed. Never delete a user's Library records.
-            Act 'start_new_web_chat_conversation' | Out-Null
+            if ($projectId) { Act 'open_web_chat_project' @{project_path=$originalPath} | Out-Null }
+            else { Act 'start_new_web_chat_conversation' | Out-Null }
             $deadline = [DateTimeOffset]::UtcNow.AddSeconds(20)
             do {
                 $s = Native; $web = Web
                 $report.restored = @($s.social_chat.messages).Count -eq 0 -and -not $s.input.text -and
                     [int]$web.input.official_draft_length -eq 0 -and -not $web.streaming -and $web.composer_ready -eq $true -and
+                    ([uri]$web.conversation.url).AbsolutePath -ceq $originalPath -and
                     $s.chatgpt_web_acceptance_attachment.fixture_staged -eq $false -and
                     [int]$s.chatgpt_web_acceptance_attachment.composer_pending_count -eq 0
                 if ($report.restored) { break }

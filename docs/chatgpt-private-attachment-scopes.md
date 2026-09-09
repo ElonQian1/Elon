@@ -78,8 +78,10 @@ the result to the new context. The existing draft and text sender are not replac
 ## Project checkpoint
 
 Capability: `android_chatgpt_private_new_project_attachment_upload_v1`.
-Status: **implemented, offline verified, grouped Android/device acceptance pending**.
+Status: **implemented, bundled through normal 1599, project device acceptance pending**.
 It is deliberately not a completed capability or a claim about every project scope.
+The [current project media harness and device checkpoint](reports/chatgpt-project-media-acceptance-20260909.md)
+reuse the normal 1598 uploader/ACK correction; no project write ran before foreground changed.
 
 Project attachments cannot safely be enabled by changing `isProjectThread` alone:
 
