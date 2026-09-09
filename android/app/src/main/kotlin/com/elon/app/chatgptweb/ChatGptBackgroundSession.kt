@@ -291,7 +291,7 @@ internal class ChatGptBackgroundSession(
     fun requestConversationIndex(projectId: String? = null): Boolean = conversationRefresh.request(projectId)
 
     fun probeConversationProject(path: String, projectId: String): Boolean {
-        if (state != State.READY) return false
+        if (!ChatGptWebAccessPolicy.canReadDirectory(latestSnapshot, observedMcpState.snapshot().adapterCurrent)) return false
         return pageAdapter?.probeConversationProject(path, projectId) == true
     }
 
@@ -323,7 +323,7 @@ internal class ChatGptBackgroundSession(
     fun pendingAttachmentCount(): Int = sendOwner.pendingAttachmentCount()
 
     fun requestModelOptions(): Boolean =
-        state == State.READY && requestComposerOptions("model")
+        ChatGptWebAccessPolicy.canNavigate(latestSnapshot, observedMcpState.snapshot().adapterCurrent) && requestComposerOptions("model")
 
     fun dismissComposerOptions() = dismissComposerOptionsRequest(null)
 

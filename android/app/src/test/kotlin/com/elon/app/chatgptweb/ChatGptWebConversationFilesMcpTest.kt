@@ -37,14 +37,19 @@ class ChatGptWebConversationFilesMcpTest {
                 assertEquals("download_" + "a".repeat(32), file.downloadHandle)
             }
         }
+        val authenticatedPage = ChatGptWebSnapshot(
+            title = "Fixture", url = "https://chatgpt.com/", draft = "unsent draft", messages = emptyList(),
+            authenticated = true, composerReady = false, streaming = false, currentModel = "auto",
+            attachments = emptyList(), dictationActive = false, capabilities = ChatGptWebCapabilities.EMPTY,
+        )
         val actions = ChatGptWebMcpActions(
-            snapshot = { null }, uiManifest = { null }, observedState = state::snapshot,
+            snapshot = { authenticatedPage }, uiManifest = { null }, observedState = state::snapshot,
             beginCommand = state::beginCommand, beginConversationFilesCommand = state::beginConversationFilesCommand,
-            bridgeState = { ChatGptWebPageAdapter.State.READY }, mode = { ChatGptWebPresentationMode.NATIVE },
+            bridgeState = { ChatGptWebPageAdapter.State.CONNECTING }, mode = { ChatGptWebPresentationMode.NATIVE },
             inputText = { "unsent draft" }, setInputText = { fail("must not change draft") },
             commands = commands, refresh = { fail("must not reload") }, selectMode = {}, revealMessage = { _, _, _ -> false },
         )
-        val consumer = ChatGptWebConsumerPortAdapter({ null }, { null }, state::snapshot, actions::control)
+        val consumer = ChatGptWebConsumerPortAdapter({ authenticatedPage }, { null }, state::snapshot, actions::control)
         val result = consumer.requestConversationFiles("/g/g-p-demo/c/fixture")
         assertTrue(result.accepted)
         assertEquals("/g/g-p-demo/c/fixture", calledPath)

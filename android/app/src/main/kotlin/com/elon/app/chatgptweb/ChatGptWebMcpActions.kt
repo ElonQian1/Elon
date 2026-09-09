@@ -81,13 +81,9 @@ internal class ChatGptWebMcpActions(
         val action = args.optString("action", "state").trim().lowercase()
         val observedAtDispatch = observedState()
         val refreshFromPageGeneration = observedAtDispatch.pageGeneration
-        if (action !in LOCAL_ACTIONS) {
-            if (bridgeState() != ChatGptWebPageAdapter.State.READY) {
-                return error(action, "bridge_not_ready")
-            }
-            if (!observedAtDispatch.adapterCurrent) {
-                return error(action, "adapter_generation_not_ready")
-            }
+        ChatGptWebOperationReadiness.rejection(action, snapshot(), observedAtDispatch.adapterCurrent,
+            bridgeState() == ChatGptWebPageAdapter.State.READY)?.let {
+            return error(action, it).put("readiness_requirement", ChatGptWebOperationReadiness.requirement(action)?.name)
         }
         var commandRequest: ChatGptWebObservedState.CommandRequest? = null
         fun dispatchRequest(
@@ -569,13 +565,14 @@ internal class ChatGptWebMcpActions(
         return JSONObject()
             .put("control_ok", true)
             .put("action", "chatgpt_get_conversations")
+            .put("adapter_current", observed.adapterCurrent)
             .put("query", query)
             .put("cached_at_ms", observed.updatedAtMs)
             .put("source_count", observed.conversations.size)
             .put("project_count", observed.projects.size)
             .put("projects", ChatGptWebProjectJson.encode(observed.projects))
             .put("source", observed.conversationCollection.source)
-            .put("stale", observed.conversationCollection.stale)
+            .put("stale", observed.conversationCollection.stale || !observed.adapterCurrent)
             .put("collection", ChatGptWebConversationCollectionJson.encode(observed.conversationCollection))
             .put("match_count", matches.size)
             .put("offset", page.offset)
@@ -592,16 +589,17 @@ internal class ChatGptWebMcpActions(
     private fun navigationPage(args: JSONObject): JSONObject {
         val observed = observedState()
         val section = args.optString("section").trim().lowercase()
-        val optionSections = observed.composerSections
+        val optionSections = observed.composerSections.takeIf { observed.adapterCurrent }.orEmpty()
             .filterKeys { section.isBlank() || it == section }
         return JSONObject()
             .put("control_ok", true)
             .put("action", "chatgpt_get_navigation")
+            .put("adapter_current", observed.adapterCurrent)
             .put("schema", NAVIGATION_SCHEMA)
             .put("native_selector_schema", ChatGptNativeNavigationSelector.SCHEMA)
             .put("cached_at_ms", observed.updatedAtMs)
             .put("features", JSONArray().apply {
-                observed.features.forEach { feature ->
+                observed.features.takeIf { observed.adapterCurrent }.orEmpty().forEach { feature ->
                     put(ChatGptWebProductCapabilityCatalog.navigationJson(feature))
                 }
             })
@@ -769,13 +767,5 @@ internal class ChatGptWebMcpActions(
         const val NAVIGATION_SCHEMA = "elon.chatgpt_web.navigation.v2"
         val CONTROL_ID = Regex("control_[a-z0-9_]{1,63}")
         val COMPOSER_SECTIONS = setOf("model", "tools")
-        val LOCAL_ACTIONS = setOf(
-            "chatgpt_cancel_file_download",
-            "state",
-            "open_chatgpt_web",
-            "chatgpt_refresh",
-            "chatgpt_get_capability_matrix",
-            "chatgpt_select_view",
-        )
     }
 }

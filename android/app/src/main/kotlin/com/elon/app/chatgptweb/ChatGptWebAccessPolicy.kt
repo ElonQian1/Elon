@@ -12,7 +12,7 @@ internal object ChatGptWebAccessPolicy {
             ChatGptWebNavigationPolicy.supportsEnhancedMode(snapshot.url) &&
             !ChatGptWebNavigationPolicy.isAuthenticationPage(snapshot.url)
 
+    // Admission to the reader; its private transport owns credential acquisition and validation.
     fun canReadDirectory(snapshot: ChatGptWebSnapshot?, adapterCurrent: Boolean): Boolean =
-        canNavigate(snapshot, adapterCurrent) && snapshot != null &&
-            (snapshot.authenticated || canChat(snapshot))
+        adapterCurrent && (snapshot == null || canNavigate(snapshot, adapterCurrent))
 }

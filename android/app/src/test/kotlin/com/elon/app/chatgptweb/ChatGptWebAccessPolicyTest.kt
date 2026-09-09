@@ -73,7 +73,8 @@ class ChatGptWebAccessPolicyTest {
         assertFalse(ChatGptWebAccessPolicy.canNavigate(previous, false))
         assertFalse(ChatGptWebAccessPolicy.canReadDirectory(previous, false))
         assertFalse(ChatGptWebAccessPolicy.canNavigate(null, true))
-        assertFalse(ChatGptWebAccessPolicy.canReadDirectory(null, true))
+        assertTrue(ChatGptWebAccessPolicy.canReadDirectory(null, true))
+        assertFalse(ChatGptWebAccessPolicy.canReadDirectory(null, false))
     }
 
     @Test
@@ -95,10 +96,11 @@ class ChatGptWebAccessPolicyTest {
     }
 
     @Test
-    fun guestNavigationDoesNotPretendAnAccountDirectoryIsAvailable() {
+    fun anUnknownUiIdentityCanEnterTheReaderWithoutPretendingToBeAuthenticated() {
         val guest = snapshot(false, false)
         assertTrue(ChatGptWebAccessPolicy.canNavigate(guest, true))
-        assertFalse(ChatGptWebAccessPolicy.canReadDirectory(guest, true))
+        assertTrue(ChatGptWebAccessPolicy.canReadDirectory(guest, true))
+        assertFalse(guest.authenticated)
         assertTrue(ChatGptWebAccessPolicy.canReadDirectory(guest.copy(composerReady = true), true))
     }
 
