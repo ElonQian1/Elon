@@ -24,6 +24,11 @@ class BinanceGridMarketTest {
             try { rule.validate(BinanceGridDraft.parse(draft + change)); fail("incorrect contract or price tick accepted") } catch (_: IllegalArgumentException) {}
         }
     }
+    @Test fun catalogUsesExchangeClassificationWithoutBreakingLegacyMissingTags() {
+        val tagged = symbol().replace("\"filters\":", "\"underlyingSubType\":[\"STORAGE\",\"AI\"],\"filters\":")
+        assertEquals(listOf("STORAGE", "AI"), BinanceGridMarket.parseRules("{\"symbols\":[$tagged]}").single().categories)
+        assertTrue(BinanceGridMarket.parseRules("{\"symbols\":[${symbol()}]}").single().categories.isEmpty())
+    }
     @Test fun quoteRequiresExpectedContractFreshTimeAndPositivePrices() {
         fun quote(symbol: String = "NEARUSDT", time: Long = 1000000, mark: String = "1.234") =
             """{"symbol":"$symbol","markPrice":"$mark","indexPrice":"1.23","lastFundingRate":"-0.00001","time":$time}"""

@@ -10,7 +10,7 @@ import java.math.RoundingMode
 import java.util.concurrent.Executors
 
 internal class BinanceCreateMarketPanel(activity: Activity, private val symbol: () -> String,
-    private val symbolsLoaded: (List<String>) -> Unit) {
+    private val catalogFailed: () -> Unit = {}, private val symbolsLoaded: (List<BinanceGridRule>) -> Unit) {
     private val ui = BinanceGridAppearance(activity)
     val root = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; isSaveEnabled = false }
     private val text = ui.label("正在读取合约与行情…", 14f).apply { contentDescription = "binance-create-market" }
@@ -18,8 +18,8 @@ internal class BinanceCreateMarketPanel(activity: Activity, private val symbol: 
     private val worker = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
     private val market = BinanceGridMarket()
-    private var epoch = 0
-    private var closed = false
+    @Volatile private var epoch = 0
+    @Volatile private var closed = false
     private var rule: BinanceGridRule? = null
     private var quote: BinanceGridQuote? = null
     init {
@@ -35,6 +35,11 @@ internal class BinanceCreateMarketPanel(activity: Activity, private val symbol: 
         text.text = "正在读取 $selected 的公开行情…"
         worker.execute {
             val rulesResult = runCatching { market.rules() }
+            handler.post {
+                // Public catalog is independent of the selected symbol; don't discard it while switching coins.
+                if (!closed) rulesResult.fold(symbolsLoaded, { if (id == epoch) catalogFailed() })
+            }
+            if (closed || id != epoch) return@execute
             val result = runCatching {
                 val rules = rulesResult.getOrThrow()
                 val chosen = rules.find { it.symbol == selected } ?: error("请从可交易的 U 本位永续合约中选择")
@@ -42,7 +47,6 @@ internal class BinanceCreateMarketPanel(activity: Activity, private val symbol: 
             }
             handler.post {
                 if (closed || id != epoch) return@post
-                rulesResult.getOrNull()?.let { symbolsLoaded(it.map { item -> item.symbol }) }
                 result.fold({ (item, quoteResult) ->
                     rule = item
                     val value = quoteResult.getOrNull()

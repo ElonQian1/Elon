@@ -3278,6 +3278,148 @@
       "updated_at_ms": 1788726050592
     },
     {
+      "id": "binance-grid-symbol-picker-v1",
+      "title": "合约网格搜索分类选币",
+      "summary": "主APK托管选币页，复用公开合约与24小时行情，提供搜索、分类、自选、最近、排序和换币清理",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/binance-grid-symbol-picker-v1.md",
+        "content_hash": "9440f854b3ca206be47ea4a218378c8545887c9e020803513806e890c2ac3a7f",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "84db27046f4c321b4d438d138afcd1bdd8759b67",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "71dd3ebd252893246fb4a9c9754723af4837d3aa",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex-grid-picker",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/grid/create",
+        "android/app/src/test/kotlin/com/elon/app/grid/create"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "只显示验证后的USDT永续合约与来源分类",
+        "搜索排序收藏及缺失过期行情有测试",
+        "换币废弃价格与旧准备结果，不提交交易",
+        "正式包发布与可选页面验收分别记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateForm.kt",
+          "content_hash": "35476e04251f2801bc7f7b6c9ba9999161143f67d40c08556e9822577dd1dbd9",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "84db27046f4c321b4d438d138afcd1bdd8759b67",
+            "head_blob_oid": "996a66b9c4577fae7aa24f9cfd78b49860410c6c",
+            "worktree_blob_oid": "a3d32d3ac112c9eefbba789efd1f1b905d856578",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateMarketPanel.kt",
+          "content_hash": "cc28d459511362e1da3402172d1db4cdde525dffa4ce01dc5b54624efb11fca7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "84db27046f4c321b4d438d138afcd1bdd8759b67",
+            "head_blob_oid": "0db8a2243eafbbd58e21f0cee73e696d1d07e509",
+            "worktree_blob_oid": "461fcfb1f5cb9619b64507ca26b3164ec6bf3319",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceSymbolCatalog.kt",
+          "content_hash": "d6c24bfdf66f12996d198722bc630b45df7588967fce950e3ea75e69abdaa2c7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "84db27046f4c321b4d438d138afcd1bdd8759b67",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b078408298636c4a168058f3818f88dcf4cd0391",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceSymbolPicker.kt",
+          "content_hash": "5be5ea57f3679be47693f1524da67c8f8557601c57e6cf796e50731bedcd1b87",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "84db27046f4c321b4d438d138afcd1bdd8759b67",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3abc7ae47bbb68a34ef5e9644cda51329a12c705",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceSymbolTicker.kt",
+          "content_hash": "28f4786bf74436ea417a62294c5751d9e4e3cd7f4d41a734283c6ca4a7787048",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "84db27046f4c321b4d438d138afcd1bdd8759b67",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "507267f89719e6e9281b110a8a862d9b64b1c9ad",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/create/BinanceGridMarketTest.kt",
+          "content_hash": "d1267e271a4bd870255f043a2c804a5a745013cb5bb47a7f053d335c89261cf6",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "84db27046f4c321b4d438d138afcd1bdd8759b67",
+            "head_blob_oid": "14a1d7fba7bc88b76f195a8a272c1271f40ee931",
+            "worktree_blob_oid": "775e6719ea2ec5887b72f2011e61a8f7be2229a9",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/create/BinanceSymbolCatalogTest.kt",
+          "content_hash": "7f4e12c4df069eb3424d4ae292725326fe11f5737f9382472868f05330cae5ff",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "84db27046f4c321b4d438d138afcd1bdd8759b67",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "be3a7d8166ef1bef8a6be0a31489605cc99190a4",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "docs/reports/binance-grid-symbol-picker-20260909.md",
+          "content_hash": "bfbf550ba98b7f42e128aa37628bc85de2096e353038d01df513be32a531b895",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "84db27046f4c321b4d438d138afcd1bdd8759b67",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ce93d478c55ef537e8a0d9d81d3e48f6d568d7bd",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1788954666910,
+      "updated_at_ms": 1788956127643
+    },
+    {
       "id": "compute-attempt-final-usage-fence-verification-v1",
       "title": "Attempt 最终声明用量栅栏动态验收 V1",
       "summary": "动态验证 V226 在终态候选处原子封口 Provider 声明用量流，并阻止下游消费过时流头。",
@@ -24512,56 +24654,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_d321a463058e4478a2451c07ea466937",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-sui-ci",
-      "reason": "Bind the reviewed requirement text that correctly identifies the fixed codeload archive, 187-file content digest, and no-live-Git boundary.",
-      "from_status": "proposed",
-      "to_status": "proposed",
-      "at_ms": 1788652570098
-    },
-    {
-      "id": "feature_event_27bbdefdd0ab49f4ab3bc87d3f47ec24",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Reviewed the corrected validation wording; economic semantics, Move sources, tests, and no-chain boundary are unchanged.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788652584364
-    },
-    {
-      "id": "feature_event_b1e97555bd9342b4a49f9836f0f31ac7",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "The corrected requirement is accepted and its released genesis dependency remains complete.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788652592918
-    },
-    {
-      "id": "feature_event_180b279a27404c7bb9cdf5198dc57ecc",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "claimed",
-      "actor": "codex-sui-ci",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788652600739
-    },
-    {
-      "id": "feature_event_9b9dc2904bce43688f733c934591a849",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Refreshing allocation evidence after correcting only the validation-record provenance wording.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788652610881
-    },
-    {
       "id": "feature_event_aec2bcb16d0449b18521f7be31d1f01c",
       "feature_id": "esk-sui-allocation-vesting-v1",
       "action": "evidence_recorded",
@@ -26510,6 +26602,56 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1788953369678
+    },
+    {
+      "id": "feature_event_87145e1bb0774615bac7896a4f72f7fc",
+      "feature_id": "binance-grid-symbol-picker-v1",
+      "action": "registered",
+      "actor": "codex-grid-picker",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788954666913
+    },
+    {
+      "id": "feature_event_003ca2167c7844a39bb7d44fc666349a",
+      "feature_id": "binance-grid-symbol-picker-v1",
+      "action": "claimed",
+      "actor": "codex-grid-picker",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788954667032
+    },
+    {
+      "id": "feature_event_951349c724a34484bf7387ea7ba71966",
+      "feature_id": "binance-grid-symbol-picker-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-picker",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788955074134
+    },
+    {
+      "id": "feature_event_4a39f0c18edd4aa18c0236cfeb611a4e",
+      "feature_id": "binance-grid-symbol-picker-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-picker",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788956127441
+    },
+    {
+      "id": "feature_event_30631245807d4dac9b6d5d4f8caf7d29",
+      "feature_id": "binance-grid-symbol-picker-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-picker",
+      "reason": "Native picker, source-driven category and ticker model integrated; final 24 Release tests and compile passed; live data and visual acceptance remain separate.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788956127643
     }
   ]
 }

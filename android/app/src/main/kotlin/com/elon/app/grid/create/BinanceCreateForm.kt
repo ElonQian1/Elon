@@ -15,11 +15,17 @@ internal class BinanceCreateForm(private val activity: Activity, private val edi
     private var target = root
     private val inputs = mutableMapOf<String, EditText>()
     private lateinit var market: BinanceCreateMarketPanel
+    private val picker = BinanceSymbolPicker(activity, { if (::market.isInitialized) market.load() }) { value ->
+        inputs["symbol"]?.setText(value); market.load()
+    }
+    private var previousSymbol = "NEARUSDT"
     private var initialized = false
     init {
         text("symbol", "合约", "例如 NEARUSDT", "NEARUSDT")
-        market = BinanceCreateMarketPanel(activity, { readers["symbol"]?.invoke().orEmpty() }) { names ->
-            (inputs["symbol"] as? AutoCompleteTextView)?.setAdapter(ui.choices(names))
+        root.addView(ui.button("选择合约 · 搜索 / 分类 / 自选", "binance-create-symbol-picker") { picker.show(readers["symbol"]?.invoke().orEmpty()) })
+        market = BinanceCreateMarketPanel(activity, { readers["symbol"]?.invoke().orEmpty() }, { picker.failed() }) { rules ->
+            picker.catalog(rules)
+            (inputs["symbol"] as? AutoCompleteTextView)?.setAdapter(ui.choices(rules.map { it.symbol }))
         }
         root.addView(market.root)
         (inputs["symbol"] as? AutoCompleteTextView)?.setOnItemClickListener { _, _, _, _ -> market.load() }
@@ -58,7 +64,7 @@ internal class BinanceCreateForm(private val activity: Activity, private val edi
     }
     fun draft() = BinanceGridDraft.parse(readers.mapValues { it.value() })
     fun checkedDraft() = draft().also { market.validate(it) }
-    fun close() { if (::market.isInitialized) market.close() }
+    fun close() { picker.close(); if (::market.isInitialized) market.close() }
     private fun text(key: String, title: String, hintText: String, initial: String = "") {
         target.addView(ui.label(title, 15f))
         val field = (if (key == "symbol") AutoCompleteTextView(activity).apply { threshold = 1 } else EditText(activity)).apply {
@@ -71,7 +77,14 @@ internal class BinanceCreateForm(private val activity: Activity, private val edi
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                    if (initialized) { edited(); market.preview(readers.mapValues { it.value() }) }
+                    if (initialized) {
+                        if (key == "symbol") {
+                            val next = s.toString().uppercase(java.util.Locale.ROOT)
+                            val reset = BinanceSymbolCatalog.resetOnChange(previousSymbol, next); previousSymbol = next
+                            reset.forEach { inputs[it]?.setText("") }
+                        }
+                        edited(); market.preview(readers.mapValues { it.value() })
+                    }
                 }
                 override fun afterTextChanged(s: Editable?) {}
             })
