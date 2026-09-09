@@ -288,7 +288,7 @@ test('share modules parse in the same concatenated asset scope and are registere
     .map(file => fs.readFileSync(path.join(assets, file), 'utf8')).join('\n');
   const f = fixture();
   vm.runInNewContext(source, { window: f.page, URL, setTimeout, clearTimeout });
-  assert.equal(f.page.__elonChatGptPrivateConversationShare.version, 4);
+  assert.equal(f.page.__elonChatGptPrivateConversationShare.version, 5);
   assert.equal(typeof f.page.__elonChatGptPrivateConversationShare.start, 'function');
   const owned = f.page.__elonChatGptPrivateConversationShare;
   vm.runInNewContext(source, { window: f.page, URL, setTimeout, clearTimeout });

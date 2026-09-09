@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateSharedLinks = api;
 })(typeof window === 'object' ? window : null, function (page, contract, options) {
@@ -82,8 +82,33 @@
     let attempted = false;
     try {
       const id = typeof input?.path === 'string' && input.path.startsWith('/c/') ? input.path.slice(3) : '';
-      if (!UUID.test(id) || !['list', 'revoke'].includes(input?.operation)) throw new Error('share_invalid_selection');
+      const accountList = input?.operation === 'list_account';
+      if (!accountList && (!UUID.test(id) || !['list', 'revoke'].includes(input?.operation))) {
+        throw new Error('share_invalid_selection');
+      }
       const binding = bind();
+      if (accountList) {
+        const offset = input.offset === undefined ? 0 : input.offset;
+        if (input.path !== undefined || input.id !== undefined || !Number.isSafeInteger(offset) ||
+            offset < 0 || offset > 900 || offset % 100 !== 0) throw new Error('share_invalid_selection');
+        let result;
+        if (input.ticket !== undefined) {
+          if (!cached || input.ticket !== cached.ticket || !current(cached.binding) ||
+              now() - cached.at < 0 || now() - cached.at > 120000) throw new Error('share_selection_expired');
+          result = cached;
+        } else {
+          if (offset !== 0) throw new Error('share_selection_expired');
+          result = await read(binding);
+        }
+        // This pages the already-returned collection, not an invented HTTP cursor.
+        const personal = result.items.filter(row => !row.workspace);
+        if (offset > 0 && offset >= personal.length) throw new Error('share_invalid_selection');
+        return { ok: true, attempted: false, data: { schema: 'elon.account_shares.v1',
+          ticket: result.ticket, offset, nextOffset: offset + 100 < personal.length ? offset + 100 : null,
+          complete: result.complete && personal.length === result.items.length,
+          items: personal.slice(offset, offset + 100).map(({ id, conversationId, createdAt }) =>
+            ({ id, path: '/c/' + conversationId, createdAt })) } };
+      }
       if (input.operation === 'list') {
         const result = await read(binding), scoped = result.items.filter(row => row.conversationId === id);
         const matching = scoped.filter(row => !row.workspace);
@@ -117,5 +142,5 @@
     }
   }
 
-  return Object.freeze({ version: 2, run, invalidate: () => { cached = null; } });
+  return Object.freeze({ version: 3, run, invalidate: () => { cached = null; } });
 });

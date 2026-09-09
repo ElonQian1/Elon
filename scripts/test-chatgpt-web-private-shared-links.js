@@ -204,5 +204,81 @@ test('uncertain publication invalidates the old empty list and allows read-only 
   assert.equal((await api.start(PATH, true, () => f.snapshot)).code, 'share_result_unconfirmed');
   assert.equal((await list()).data.items[0].id, SID);
   assert.equal(reads, 2);
+  assert.equal((await api.start({ operation: 'list_account' }, false)).data.items[0].id, SID);
+  assert.equal(reads, 2);
   assert.equal((await api.start(PATH, true, () => f.snapshot)).code, 'share_cooldown');
+});
+
+test('account list is a read-only projection of the same authenticated collection without runtime or DOM', async () => {
+  const f = setup(); f.setLoaded(false); f.snapshot.composerReady = false;
+  f.setRows([{ id: SID, conversation_id: NEXT, title: 'Never export this title', create_time: null },
+    { id: NEXT, conversation_id: CID, create_time: null }]);
+  const result = await f.command({ operation: 'list_account' });
+  assert.equal(result.ok, true);
+  assert.equal(result.data.schema, 'elon.account_shares.v1');
+  assert.equal(result.data.offset, 0); assert.equal(result.data.nextOffset, null);
+  assert.equal(result.data.complete, true);
+  assert.deepEqual(result.data.items, [{ id: SID, path: '/c/' + NEXT, createdAt: null },
+    { id: NEXT, path: PATH, createdAt: null }]);
+  assert.equal(result.detail.includes('Never export'), false);
+  assert.deepEqual(f.requests.map(r => [r.url, r.init.method]), [[LIST, 'GET']]);
+  assert.equal((await f.list()).ok, true); assert.equal(f.requests.length, 1);
+});
+
+test('account pages traverse one fixed snapshot without guessing server pagination parameters', async () => {
+  const f = setup();
+  f.setRows(Array.from({ length: 205 }, (_, i) => ({
+    id: 'aaaaaaaa-aaaa-4aaa-8aaa-' + i.toString(16).padStart(12, '0'), conversation_id: CID, create_time: null,
+  })));
+  const first = (await f.command({ operation: 'list_account' })).data;
+  assert.ok(first); assert.equal(first.items.length, 100); assert.equal(first.nextOffset, 100);
+  f.advance(60001);
+  const second = (await f.command({ operation: 'list_account', offset: 100, ticket: first.ticket })).data;
+  assert.equal(second.items.length, 100); assert.equal(second.nextOffset, 200);
+  const third = (await f.command({ operation: 'list_account', offset: 200, ticket: first.ticket })).data;
+  assert.equal(third.items.length, 5); assert.equal(third.nextOffset, null);
+  const previous = (await f.command({ operation: 'list_account', offset: 0, ticket: first.ticket })).data;
+  assert.deepEqual(previous, first); assert.equal(f.requests.length, 1);
+  assert.equal(new Set([...first.items, ...second.items, ...third.items].map(row => row.id)).size, 205);
+  for (const page of [first, second, third]) assert.ok(JSON.stringify(page).length <= 18000);
+  f.advance(60000);
+  assert.equal((await f.command({ operation: 'list_account', offset: 100, ticket: first.ticket })).detail,
+    'share_selection_expired');
+  assert.equal(f.requests.length, 1);
+});
+
+test('account selection revokes only its server-bound source conversation and leaves current route untouched', async () => {
+  const f = setup(); f.setRows([{ id: SID, conversation_id: NEXT, create_time: null }]);
+  const before = f.page.location.href;
+  const list = (await f.command({ operation: 'list_account' })).data;
+  assert.ok(list);
+  assert.equal((await f.command({ operation: 'revoke', path: PATH, id: SID, ticket: list.ticket }, true)).ok, false);
+  const row = list.items[0];
+  const result = await f.command({ operation: 'revoke', path: row.path, id: row.id, ticket: list.ticket }, true);
+  assert.equal(result.detail, 'share_link_revoked'); assert.equal(f.page.location.href, before);
+  assert.deepEqual(f.requests.map(r => r.init.method), ['GET', 'DELETE', 'GET']);
+});
+
+test('account list excludes workspace links and cannot claim a complete personal-only result', async () => {
+  const f = setup(); f.setRows([{ id: SID, conversation_id: CID, workspace_id: 'workspace', create_time: null }]);
+  const result = await f.command({ operation: 'list_account' });
+  assert.equal(result.ok, true); assert.equal(result.data.complete, false);
+  assert.deepEqual(result.data.items, []);
+  assert.equal((await f.revoke(result.data)).ok, false);
+  f.advance(60001); f.setRows([]); f.setTotal(20);
+  assert.equal((await f.command({ operation: 'list_account' })).data.complete, false);
+});
+
+test('account pagination rejects invented, stale and cross-document selections before network access', async () => {
+  const f = setup();
+  for (const value of [{ offset: 100 }, { offset: -1 }, { offset: 1 }, { offset: 1000 },
+    { offset: '0' }, { offset: 1.2 }, { path: PATH }, { ticket: 'sl_forged' }]) {
+    assert.equal((await f.command({ operation: 'list_account', ...value })).ok, false);
+  }
+  assert.equal(f.requests.length, 0);
+  const first = (await f.command({ operation: 'list_account' })).data;
+  assert.ok(first);
+  f.page.__elonChatGptDocumentToken = 'doc_changed';
+  assert.equal((await f.command({ operation: 'list_account', offset: 0, ticket: first.ticket })).ok, false);
+  assert.equal(f.requests.length, 1);
 });

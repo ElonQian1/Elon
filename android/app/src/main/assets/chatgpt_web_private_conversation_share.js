@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateConversationShare) {
     root.__elonChatGptPrivateConversationShare = factory(root);
@@ -71,14 +71,15 @@
 
   function start(path, confirmed, readSnapshot) {
     const managed = path && typeof path === 'object' ? path : null;
-    if (confirmed !== true && managed?.operation !== 'list') return Promise.resolve(outcome(false, 'user_confirmation_required', false));
+    const readOnly = ['list', 'list_account'].includes(managed?.operation);
+    if (confirmed !== true && !readOnly) return Promise.resolve(outcome(false, 'user_confirmation_required', false));
     if (page.__elonChatGptPrivateConversationMutationsEnabled !== true || !transport ||
         !page.__elonChatGptPrivateJsonRequest?.request) return Promise.resolve(outcome(false, 'share_context_unavailable', false));
     if (active || page.__elonChatGptPrivateConversationDelete?.busy?.() ||
         page.__elonChatGptPrivateConversationMutation?.state?.().state === 'busy') {
       return Promise.resolve(outcome(false, 'share_busy', false));
     }
-    if (Date.now() < cooldown && managed?.operation !== 'list') return Promise.resolve(outcome(false, 'share_cooldown', false));
+    if (Date.now() < cooldown && !readOnly) return Promise.resolve(outcome(false, 'share_cooldown', false));
     const job = { path, readSnapshot, management: managed, confirmed }; active = job;
     return execute(job).then(result => {
       if (!result.ok && result.attempted) cooldown = Date.now() + 45000;
@@ -100,5 +101,5 @@
     }).catch(() => respond(action, false, 'share_result_unconfirmed'));
     return true;
   }
-  return Object.freeze({ version: 4, start, handle, busy: () => active !== null });
+  return Object.freeze({ version: 5, start, handle, busy: () => active !== null });
 });
