@@ -15,6 +15,31 @@
     const decimal = /^-?(0|[1-9][0-9]{0,29})(\.[0-9]{1,20})?$/;
     const integer = /^(0|[1-9][0-9]{0,19})$/;
     const enumeration = /^[A-Z][A-Z0-9_]{0,63}$/;
+    // Keep numeric JSON tokens exact before the built-in parser can round them.
+    // Strings and booleans retain their original JSON meaning; no eval or reviver coercion.
+    function parseResponse(raw) {
+      JSON.parse(raw); // Validate original grammar before token wrapping; discard rounded values.
+      const tokens = /"(?:\\[\s\S]|[^"\\])*"|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/gy;
+      const parts=[]; let at=0;
+      while(at<raw.length) {
+        const ch=raw[at];
+        if(ch==='"' || ch==='-' || /[0-9]/.test(ch)) {
+          tokens.lastIndex=at;const match=tokens.exec(raw);
+          if(!match)throw Error('response_failed');
+          parts.push(ch==='"' ? match[0] : JSON.stringify(match[0]));at=tokens.lastIndex;
+        } else {parts.push(ch);at++;}
+      }
+      return JSON.parse(parts.join(''));
+    }
+    function plainDecimal(value) {
+      if(typeof value!=='string' || !/[eE]/.test(value))return value;
+      const m=/^(-?)(0|[1-9][0-9]*)(?:\.([0-9]+))?[eE]([+-]?[0-9]+)$/.exec(value);
+      if(!m || m[4].length>4)return null;
+      const exponent=Number(m[4]);if(Math.abs(exponent)>100)return null;
+      const digits=m[2]+(m[3] || ''),point=m[2].length+exponent;
+      const body=point<=0 ? '0.'+'0'.repeat(-point)+digits : point>=digits.length ? digits+'0'.repeat(point-digits.length) : digits.slice(0,point)+'.'+digits.slice(point);
+      return m[1]+body.replace(/^0+(?=[0-9])/,'');
+    }
     let serial = 0;
     const histories = new Map();
     const historyWindows = new Map();
@@ -27,7 +52,7 @@
       }
       return text;
     }
-    const dec = v => scalar(v, decimal);
+    const dec = v => scalar(plainDecimal(v), decimal);
     const num = v => scalar(v, integer);
     const en = v => scalar(v, enumeration);
     function array(value, max = 500) { if (!Array.isArray(value) || value.length > max) throw Error('unsupported_list'); return value; }
@@ -65,7 +90,7 @@
       const text = await response.text();
       context.http = response.status;
       if (response.status !== 200 || text.length > 1048576) throw Error('response_failed');
-      const body = JSON.parse(text);
+      const body = parseResponse(text);
       context.business = typeof body.code === 'string' && /^[0-9]{6}$/.test(body.code) ? body.code : 'unknown';
       if (body.success !== true || body.code !== '000000') throw Error('business_failed');
       context.stage = 'parse_' + key;

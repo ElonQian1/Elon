@@ -16,7 +16,7 @@ function fixture() {
     fetch:async (url, init) => {
       calls.push({url,init}); const reply = data.shift();
       if(reply instanceof Error) throw reply;
-      return {status:200,text:async()=>JSON.stringify({code:'000000',success:true,...reply})};
+      return {status:200,text:async()=>typeof reply==='string' ? reply : JSON.stringify({code:'000000',success:true,...reply})};
     }});
   const q = (kind='history', overrides={}) => ({request:'a'.repeat(32),kind,id:kind==='history'?'':'123',symbol:kind==='history'?'':'NEARUSDT',page:1,days:30,...overrides});
   return {events,calls,data,account,known,reports,q,diagnostics,setProof:f=>{prove=f;}};
@@ -82,7 +82,7 @@ test('optional upstream display drift keeps the verified page and preserves unkn
   const h=fixture();h.data.push({data:{...grid,slideWindow:true}},{data:{bidItems:[{price:1.25,qty:'2',status:{newField:true},insertTime:''}],askItems:[]}});
   h.reports.query(h.q('orders'));await tick();
   const e=h.events.at(-1);assert.equal(e.status,'ready');assert.equal(e.rows.length,1);
-  assert.equal(e.rows[0].price,null);assert.equal(e.rows[0].status,null);assert.equal(e.rows[0].time,null);
+  assert.equal(e.rows[0].price,'1.25');assert.equal(e.rows[0].status,null);assert.equal(e.rows[0].time,null);
   assert.equal(e.rows[0].quantity,'2');assert.equal(h.diagnostics.at(-1).outcome,'ready');
 });
 test('unscoped source rows cannot be mistaken for a verified empty strategy',async()=>{
@@ -101,4 +101,20 @@ test('business failure records endpoint and bounded code without a fake empty su
   h.reports.query(h.q('positions'));await tick();assert.equal(h.events.at(-1).status,'error');
   assert.deepEqual(JSON.parse(JSON.stringify(h.diagnostics.at(-1))),{kind:'positions',stage:'positions',outcome:'failed',error:'business_failed',http:200,business:'123456'});
   assert.ok(!JSON.stringify(h.diagnostics).includes('private-canary'));
+});
+
+test('numeric position quantities retain raw precision and scientific decimals without floating point',async()=>{
+  const h=fixture();h.data.push({data:grid},'{"code":"000000","success":true,"data":{"99":[{"symbol":"NEARUSDT","positionSide":"BOTH","positionAmount":1.1234567890123456789,"entryPrice":2.345678901234567891,"isolatedWallet":1e-8,"isolated":true}]}}');
+  h.reports.query(h.q('positions'));await tick();const e=h.events.at(-1);
+  assert.equal(e.status,'ready');assert.equal(e.rows[0].quantity,'1.1234567890123456789');
+  assert.equal(e.rows[0].entry,'2.345678901234567891');assert.equal(e.rows[0].isolatedWallet,'0.00000001');
+  assert.equal(e.rows[0].isolated,true);
+});
+test('JSON string escapes remain intact and invalid numeric syntax is rejected',async()=>{
+  const h=fixture();h.data.push('{"code":"000000","success":true,"note":"x \\" 123 \\\\ ","data":{"grids":[],"total":0}}');
+  h.reports.query(h.q());await tick();assert.equal(h.events.at(-1).status,'ready');
+  for(const invalid of ['{"grids":[],"total":01}', '{1:2,"grids":[],"total":0}']) {
+    const bad=fixture();bad.data.push('{"code":"000000","success":true,"data":'+invalid+'}');
+    bad.reports.query(bad.q());await tick();assert.equal(bad.events.at(-1).status,'error');
+  }
 });

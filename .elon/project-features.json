@@ -1751,14 +1751,14 @@
         },
         {
           "path": "android/app/src/main/assets/binance_grid_reports_adapter.js",
-          "content_hash": "4caf0bfbb4cda596a15803caf216df9457b2e1f8d08e5c4bf6224ebce964eda0",
+          "content_hash": "7c93779279e8f9b72cc1efaa71d017aea966674398c7e19b1306a00b3f99d804",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d385425f557fde6e1c2dc4fce3c82ddf968c4e89",
-            "head_blob_oid": "48828e8d4e55a602d9bba57ba01a07601c1da38b",
-            "worktree_blob_oid": "43a40a85765709b4945a0a3c64568c2fdc11ae99",
+            "head_commit": "dc563a0451531f46c8d9177a8017e754826bd060",
+            "head_blob_oid": "43a40a85765709b4945a0a3c64568c2fdc11ae99",
+            "worktree_blob_oid": "0d565f9f3a8e8ec6d3b9897238af0d3edc0580cb",
             "state": "tracked_modified"
           }
         },
@@ -1802,6 +1802,19 @@
           }
         },
         {
+          "path": "docs/reports/binance-report-recovery-20260909.md",
+          "content_hash": "115929e89d4de448717e67bfc823bd8a12c1bf3d4f8a081c4b4ad83d81f6257c",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "dc563a0451531f46c8d9177a8017e754826bd060",
+            "head_blob_oid": "daf506105faf83fd092c1df8bbb518ab7a14634b",
+            "worktree_blob_oid": "b417d33fcd668912b188338b3c39067ffe7ed6ca",
+            "state": "tracked_modified"
+          }
+        },
+        {
           "path": "scripts/test-binance-grid-read-diagnostics.cjs",
           "content_hash": "91b66a163f823a99e717a8992cece0b5dcd0c049cd8842c5197ef04685d4d2f9",
           "locator": "",
@@ -1816,20 +1829,20 @@
         },
         {
           "path": "scripts/test-binance-grid-reports.cjs",
-          "content_hash": "9ad91b99bc174cdadc8ad3299c223327c610868dedae3aaf70a2d2bd81863c03",
+          "content_hash": "76272d8cae8728fe68afeb2be902707139f238a7b17163c8767f13caca06b71d",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d385425f557fde6e1c2dc4fce3c82ddf968c4e89",
-            "head_blob_oid": "f34f9fd49eb46e8b62e6d76a1f5b25b0a7db3bf2",
-            "worktree_blob_oid": "6c8b17ec1d358f94cc27ad94fcfc25fa1dfeba9f",
+            "head_commit": "dc563a0451531f46c8d9177a8017e754826bd060",
+            "head_blob_oid": "6c8b17ec1d358f94cc27ad94fcfc25fa1dfeba9f",
+            "worktree_blob_oid": "a1a8680a7c3b2e043f5d27935661f538a6eca4e4",
             "state": "tracked_modified"
           }
         }
       ],
       "created_at_ms": 1788949182282,
-      "updated_at_ms": 1788950266993
+      "updated_at_ms": 1788952373152
     },
     {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -24486,16 +24499,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b3e8b66d7aa645c0b6dfb913b7f0a9e4",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Registry adoption test and CI quality-gate guard pass against the refreshed evidence.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788652236658
-    },
-    {
       "id": "feature_event_0e3b7217f43c42d88b560ab71d0f3f39",
       "feature_id": "project-feature-registry-adoption-v1",
       "action": "transitioned",
@@ -26484,6 +26487,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1788950266993
+    },
+    {
+      "id": "feature_event_fbccb04b092145b7bf49e3f253e357c7",
+      "feature_id": "android-binance-report-recovery-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-report-recovery",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788952373153
     }
   ]
 }
