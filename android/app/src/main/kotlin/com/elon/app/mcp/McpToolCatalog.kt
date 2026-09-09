@@ -228,7 +228,7 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("wait_for_target_bind_ms", intProperty("How long cross-surface ChatGPT actions wait for the target native or official Activity controller, 0-15000. Defaults to 8000."))
                         .put("mode", stringProperty("Interaction mode for set_social_ai_interaction_mode: work or chat."))
                         .put("provider_id", stringProperty("Web chat provider for select_web_chat_provider: chatgpt_web or google_web."))
-                        .put("fixture_id", stringProperty("Pinned harmless fixture id for stage/remove_chatgpt_web_acceptance_attachment. Currently fixed_ascii_text_v1."))
+                        .put("fixture_id", stringProperty("Pinned harmless fixture id for stage/remove_chatgpt_web_acceptance_attachment: fixed_ascii_text_v1 or fixed_media_batch_v1. Discover via supported_fixture_ids."))
                         .put("main_thread_timeout_ms", intProperty("How long native MCP waits for the APK main thread, 1000-60000. Defaults to 15000.")),
                     required = JSONArray().put("action")
                 )

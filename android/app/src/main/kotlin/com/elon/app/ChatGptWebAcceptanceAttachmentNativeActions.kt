@@ -1,11 +1,12 @@
 package com.elon.app
 
 import org.json.JSONObject
+import org.json.JSONArray
 
 internal class ChatGptWebAcceptanceAttachmentNativeActions(
     private val isChatModeActive: () -> Boolean,
     private val webChatState: () -> String,
-    private val stageFixture: () -> ChatGptWebAcceptanceFixtureStageResult,
+    private val stageFixture: (String) -> ChatGptWebAcceptanceFixtureStageResult,
     private val removeFixture: () -> Boolean,
     private val pendingCount: () -> Int,
     private val fixtureStaged: () -> Boolean,
@@ -16,6 +17,7 @@ internal class ChatGptWebAcceptanceAttachmentNativeActions(
         return JSONObject()
             .put("schema", "elon.chatgpt_web.native_attachment_fixture.v1")
             .put("fixture_id", ChatGptWebAcceptanceAttachmentFixture.ID)
+            .put("supported_fixture_ids", JSONArray(ChatGptWebAcceptanceAttachmentFixture.supportedIds.toList()))
             .put("fixture_staged", fixtureStaged())
             .put("composer_pending_count", pendingCount())
             .put("local_only", phase !in setOf("uploading", "sending"))
@@ -30,17 +32,22 @@ internal class ChatGptWebAcceptanceAttachmentNativeActions(
     }
 
     private fun stage(args: JSONObject): JSONObject {
-        if (args.optString("fixture_id") != ChatGptWebAcceptanceAttachmentFixture.ID) {
+        val id = args.optString("fixture_id")
+        if (!ChatGptWebAcceptanceAttachmentFixture.supports(id)) {
             return failure(STAGE_ACTION, "invalid_fixture_id")
         }
         if (!isChatModeActive()) return failure(STAGE_ACTION, "chatgpt_web_ai_not_active")
         if (webChatState() != "ready") return failure(STAGE_ACTION, "chatgpt_web_ai_not_ready")
-        return when (val result = stageFixture()) {
+        if (attachmentSendPhase() in setOf("uploading", "sending")) {
+            return failure(STAGE_ACTION, "attachment_send_in_progress")
+        }
+        return when (val result = stageFixture(id)) {
             ChatGptWebAcceptanceFixtureStageResult.STAGED,
             ChatGptWebAcceptanceFixtureStageResult.ALREADY_STAGED -> stateJson()
                 .put("control_ok", true)
                 .put("action", STAGE_ACTION)
                 .put("stage_result", result.wireValue)
+                .put("fixture_id", id)
             ChatGptWebAcceptanceFixtureStageResult.PENDING_ATTACHMENTS_PRESENT ->
                 failure(STAGE_ACTION, result.wireValue)
             ChatGptWebAcceptanceFixtureStageResult.FAILED -> failure(STAGE_ACTION, result.wireValue)
@@ -48,7 +55,7 @@ internal class ChatGptWebAcceptanceAttachmentNativeActions(
     }
 
     private fun remove(args: JSONObject): JSONObject {
-        if (args.optString("fixture_id") != ChatGptWebAcceptanceAttachmentFixture.ID) {
+        if (!ChatGptWebAcceptanceAttachmentFixture.supports(args.optString("fixture_id"))) {
             return failure(REMOVE_ACTION, "invalid_fixture_id")
         }
         if (attachmentSendPhase() in setOf("uploading", "sending")) {

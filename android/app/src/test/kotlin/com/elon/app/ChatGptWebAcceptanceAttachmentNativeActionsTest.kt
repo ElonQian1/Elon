@@ -8,6 +8,30 @@ import org.junit.Test
 
 class ChatGptWebAcceptanceAttachmentNativeActionsTest {
     @Test
+    fun passesOnlyTheSelectedPinnedMediaBundleToTheExistingStageOwner() {
+        var selected = ""
+        val actions = actions(stage = { id -> selected = id; ChatGptWebAcceptanceFixtureStageResult.STAGED })
+        val result = actions.control(ChatGptWebAcceptanceAttachmentNativeActions.STAGE_ACTION,
+            JSONObject().put("fixture_id", ChatGptWebAcceptanceAttachmentFixture.MEDIA_BATCH_ID))!!
+        assertTrue(result.getBoolean("control_ok"))
+        assertEquals(ChatGptWebAcceptanceAttachmentFixture.MEDIA_BATCH_ID, selected)
+        assertEquals(selected, result.getString("fixture_id"))
+        assertEquals(2, result.getJSONArray("supported_fixture_ids").length())
+    }
+
+    @Test
+    fun neverOverwritesMediaWhileTheSendOwnsItsBytes() {
+        var called = false
+        val result = actions(attachmentSendPhase = "uploading", stage = {
+            called = true; ChatGptWebAcceptanceFixtureStageResult.STAGED
+        }).control(ChatGptWebAcceptanceAttachmentNativeActions.STAGE_ACTION,
+            JSONObject().put("fixture_id", ChatGptWebAcceptanceAttachmentFixture.MEDIA_BATCH_ID))!!
+        assertFalse(called)
+        assertFalse(result.getBoolean("control_ok"))
+        assertEquals("attachment_send_in_progress", result.getString("error"))
+    }
+
+    @Test
     fun stagesOnlyThePinnedFixtureInReadyChatMode() {
         var staged = false
         val actions = actions(
@@ -87,7 +111,7 @@ class ChatGptWebAcceptanceAttachmentNativeActionsTest {
     private fun actions(
         isChatActive: Boolean = true,
         webState: String = "ready",
-        stage: () -> ChatGptWebAcceptanceFixtureStageResult = {
+        stage: (String) -> ChatGptWebAcceptanceFixtureStageResult = {
             ChatGptWebAcceptanceFixtureStageResult.STAGED
         },
         remove: () -> Boolean = { false },

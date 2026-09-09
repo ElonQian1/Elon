@@ -77,7 +77,7 @@ internal class MainPendingAttachmentActions(
             }
         }
         refreshPendingAttachmentPreview()
-        Toast.makeText(activity, "已添加 ${accepted.size} 张图片", Toast.LENGTH_SHORT).show()
+        Toast.makeText(activity, "已添加 ${accepted.size} 个附件", Toast.LENGTH_SHORT).show()
     }
 
     fun clearPendingAttachments(deleteFiles: Boolean = true) {
@@ -90,17 +90,19 @@ internal class MainPendingAttachmentActions(
         refreshPendingAttachmentPreview()
     }
 
-    fun stageChatGptWebAcceptanceFixture(): ChatGptWebAcceptanceFixtureStageResult {
-        if (pendingAttachments.any { ChatGptWebAcceptanceAttachmentFixture.matches(activity.cacheDir, it) }) {
+    fun stageChatGptWebAcceptanceFixture(
+        fixtureId: String = ChatGptWebAcceptanceAttachmentFixture.ID,
+    ): ChatGptWebAcceptanceFixtureStageResult {
+        if (ChatGptWebAcceptanceAttachmentFixture.matchesSelection(activity.cacheDir, pendingAttachments, fixtureId)) {
             return ChatGptWebAcceptanceFixtureStageResult.ALREADY_STAGED
         }
         if (pendingAttachments.isNotEmpty()) {
             return ChatGptWebAcceptanceFixtureStageResult.PENDING_ATTACHMENTS_PRESENT
         }
-        val attachment = runCatching {
-            ChatGptWebAcceptanceAttachmentFixture.prepare(activity.cacheDir)
+        val attachments = runCatching {
+            ChatGptWebAcceptanceAttachmentFixture.prepareBatch(activity.cacheDir, fixtureId)
         }.getOrNull() ?: return ChatGptWebAcceptanceFixtureStageResult.FAILED
-        addPreparedAttachment(attachment)
+        if (attachments.size == 1) addPreparedAttachment(attachments.single()) else addPreparedAttachments(attachments)
         return ChatGptWebAcceptanceFixtureStageResult.STAGED
     }
 
