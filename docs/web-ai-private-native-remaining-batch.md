@@ -1,6 +1,6 @@
 # Remaining private-native batch
 
-Current implementation audit: 2026-09-09. This is a work list, not a declaration
+Current implementation audit: 2026-09-10. This is a work list, not a declaration
 that every private protocol has been reproduced. Reuse completed capabilities in
 [the capability matrix](web-ai-private-transport-capability-matrix.md).
 Operation admission and remaining composer dependencies: [readiness policy](chatgpt-operation-readiness.md).
@@ -49,11 +49,11 @@ post-send membership timing defect and source fix are recorded in
 | Pin, rename, archive, move conversation to a project | Device-verified, reused | Other account/permission variants are not implied |
 | Ordinary new-chat text + PNG + PDF attachments | Completed on 1598 | Project/temporary/other-format variants remain separate |
 | File library navigation, saved download, single library attachment, rename/soft-delete/upload-copy | Earlier scopes through 1591 reused; native TXT/PNG/PDF Download buttons and saved bytes passed on 1612 | Large-transfer/cancel/crash cases, special sources, folder writes and other attachment scopes |
-| Personal full sharing/list/revoke and current-conversation delete | Completed on 1547 | Other share scopes and remaining rendered confirmation/menu cases |
+| Personal full sharing/list/revoke and current-conversation delete | Scoped personal cases completed on 1547; account-wide personal-link list, cached snapshot pages and exact cross-conversation selection added in source | Grouped install/native account-list acceptance pending; workspace/Canvas/post/bulk and server pagination remain separate; [contract](chatgpt-private-shared-links.md) |
 | Text submit/stream/stop/follow-up | Official runtime path verified, reused | This is not independent Android HTTP POST; other contexts and regeneration need evidence |
 | Project attachments | Native new-project TXT/PNG/PDF upload, send and actual content reading verified on 1614 | Explicit membership query rejected when background freshness expires; fix passes offline tests, grouped install/idle-query acceptance pending |
 | Model/effort/tool combinations and latest cursor image gallery | Installed 1620 passed native gallery entry, new page 4 ready, viewer and return; v8 passes 52 Node + 7 JVM checks | Native-menu/runtime cases remain. Thumbnail efficiency/thermal work is deferred, not a functional gate; [evidence](reports/chatgpt-gallery-thumbnails.md#usb-acceptance-on-1620) |
-| Explicit file citations / remaining cloud references | Concrete ChatGPT file-ID citations now reuse native index/download in source; 114 offline runner cases pass, grouped build/device acceptance pending | [Boundary and source evidence](chatgpt-private-file-citations.md). Other mounted providers, URL-only cloud and PCA citation graphs remain incomplete |
+| Explicit file citations / remaining cloud references | Concrete and grouped/cite-map ChatGPT file-ID citations now reuse native index/download in source; 129 offline runner cases pass, grouped build/device acceptance pending | [Boundary and source evidence](chatgpt-private-file-citations.md). Other mounted providers, URL-only cloud and PCA citation graphs remain incomplete |
 | Google private sender | Deferred by user priority | Start only after the remaining ChatGPT acceptance gate |
 
 Current code correction separates current-document navigation/private directory
