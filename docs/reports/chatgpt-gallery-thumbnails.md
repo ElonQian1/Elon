@@ -57,6 +57,21 @@ The first grouped v7 release, `1.1.1619` / source `faedfc7dd`, built and publish
 successfully. Its SHA-256 is
 `10b0cbc6d815f476d0d5f99445c6e27cf248d1f68954472cae160ad6f81bbd43`.
 Automatic installation failed because the wireless phone was offline; this was
-not a compile or publish failure. The v8 correction and real-device acceptance
-are pending. Do not claim cold-page completion, reduced latency or reduced heat
-from offline tests.
+not a compile or publish failure.
+
+The v8 correction is published as `1.1.1620` / source `91df1aa7a`. Normal Release
+build and lint completed; remote APK hash and size matched. Evidence stem:
+`gallery-transfer-release-20260910-021941-176`. APK SHA-256:
+`1a374d725089e4f794b598a1c9f3d6065005a4d6be8f7b46940323e46326b9e3`.
+The packaged gallery asset matches the tested source (SHA-256
+`3ec8da4a36443382f2fddc386d623967ed246d45f6bf065c1238cabb00a902db`).
+
+The final ADB inventory has no connected devices. Installation was explicitly
+deferred through a process-local disabled target configuration, not the user's
+global ADB settings. No repeat bootstrap, microphone, upload, conversation write,
+Cookie clearing or proxy modification occurred. The last installed/accepted
+version remains 1618; neither 1619 nor 1620 has device evidence. Resume with the
+published 1620 artifact and one uncached native gallery page plus on-demand full
+preview and return, preserving the previous conversation/draft. Do not rebuild
+or repeat protocol discovery just because the handset reconnects. Cold-page
+completion, latency and heat improvements remain unverified.

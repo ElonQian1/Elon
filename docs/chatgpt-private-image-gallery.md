@@ -7,6 +7,12 @@ delivery_status: published
 
 # Private generated-image gallery
 
+Latest published: `1.1.1620`, source `91df1aa7a`, gallery v8. Thumbnail-first
+loading, on-demand full previews and shared expiry recovery pass 52 Node and
+7 JVM checks plus normal Release/lint and packaged-source verification. Device
+installation/acceptance is deferred because the handset disconnected; use the
+existing artifact on reconnection. See [delivery evidence](reports/chatgpt-gallery-thumbnails.md).
+
 Latest real acceptance: `1.1.1618` exercises gallery v6 direct catalog image URLs,
 native pagination while previews are loading, native preview and cached-page
 return. The new page 3 still reached the 35-second deadline and ended partial;
