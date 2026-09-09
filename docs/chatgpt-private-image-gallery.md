@@ -9,17 +9,18 @@ delivery_status: published
 
 Latest published: `1.1.1620`, source `91df1aa7a`, gallery v8. Thumbnail-first
 loading, on-demand full previews and shared expiry recovery pass 52 Node and
-7 JVM checks plus normal Release/lint and packaged-source verification. Device
-installation/acceptance is deferred because the handset disconnected; use the
-existing artifact on reconnection. See [delivery evidence](reports/chatgpt-gallery-thumbnails.md).
+7 JVM checks plus normal Release/lint and packaged-source verification. The same
+artifact is now installed and production-tested over USB. See
+[delivery and acceptance](reports/chatgpt-gallery-thumbnails.md#usb-acceptance-on-1620).
 
-Latest real acceptance: `1.1.1618` exercises gallery v6 direct catalog image URLs,
-native pagination while previews are loading, native preview and cached-page
-return. The new page 3 still reached the 35-second deadline and ended partial;
-cold-load completion is not fixed. Separate small grid images and on-demand
-full previews are now implemented in v8 with coalesced expiry recovery; their
-device acceptance is pending. See [thumbnail follow-up](reports/chatgpt-gallery-thumbnails.md) and
-[current evidence](reports/chatgpt-gallery-catalog-source.md).
+Latest real acceptance: `1.1.1620` opened the native gallery, loaded the previously
+unopened page 4 to ready without partial/failure, opened its native viewer and
+returned to the same page and then native chat. The preview click had no new
+network records, so distinct thumbnail/full-image transfers remain unverified;
+cache reuse is not proof that thumbnail mode was exercised. No latency/thermal
+improvement is claimed; thermal/battery work is deferred until private-API
+functions are complete and is not this functional gate. Earlier 1618 had a partial cold page 3; keep its
+[evidence](reports/chatgpt-gallery-catalog-source.md) as a separate sample.
 The accepted v5 subpages and owner-resume correction remain in place; reuse the
 [1617 catalog/paging/resume evidence](reports/chatgpt-image-gallery-1616.md).
 

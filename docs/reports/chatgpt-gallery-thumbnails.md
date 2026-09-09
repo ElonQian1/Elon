@@ -66,12 +66,54 @@ build and lint completed; remote APK hash and size matched. Evidence stem:
 The packaged gallery asset matches the tested source (SHA-256
 `3ec8da4a36443382f2fddc386d623967ed246d45f6bf065c1238cabb00a902db`).
 
-The final ADB inventory has no connected devices. Installation was explicitly
+The release-time ADB inventory had no connected devices. Installation was explicitly
 deferred through a process-local disabled target configuration, not the user's
 global ADB settings. No repeat bootstrap, microphone, upload, conversation write,
-Cookie clearing or proxy modification occurred. The last installed/accepted
-version remains 1618; neither 1619 nor 1620 has device evidence. Resume with the
-published 1620 artifact and one uncached native gallery page plus on-demand full
-preview and return, preserving the previous conversation/draft. Do not rebuild
-or repeat protocol discovery just because the handset reconnects. Cold-page
-completion, latency and heat improvements remain unverified.
+Cookie clearing or proxy modification occurred. Device acceptance at that point
+remained on 1618. The following USB acceptance supersedes that installation gap.
+
+## USB acceptance on 1620
+
+On 2026-09-10, reused the published artifact above with an exact SHA-256 match;
+replacement installation and production MCP version readback both passed.
+No rebuild was needed. The Xiaomi USB transport was healthy; wireless TCP could
+not connect because the phone and PC were on different, non-reachable subnets.
+
+- The native feature sheet contained `图片已更新`. The existing external UI
+  runner initially reported `gallery_feature_missing` because it only matched
+  `图片`/`图像`. One filtered accessibility inspection confirmed the actual
+  consumer control. The runner now admits this observed badge suffix and can
+  resume selection from the already-open sheet; no product selector is bypassed.
+- The real native Images entry opened the gallery, pages 1 and 2 became ready,
+  and pagination reached page 4, not previously opened in the earlier acceptance.
+  That page reached the native ready state with 15 visible image tiles, without
+  a partial/failure state. This is one successful cold-page sample, not a
+  repeated timing benchmark or proof that every page/connection is fast.
+- Bounded protocol capture recorded the image catalog GET 200 and ten content
+  GET 200 responses. It held 12 records and dropped 15, so those are observed
+  records, not total network-request counts. Only field shapes were inspected.
+- Selecting image 1 opened the native full viewer. Closing it restored ready
+  page 4; closing the gallery returned to native `social_ai` with authenticated,
+  ready composer, empty native/official drafts and no streaming/dictation.
+  The conversation had two loaded rows at final observation versus zero early
+  after installation; exact pre-install conversation identity was not captured,
+  so this does not prove same-conversation restoration across installation.
+- A fresh capture around the preview click had zero records. The existing
+  full-image cache path worked, but distinct thumbnail/full on-demand network
+  transfers were not demonstrated. Do not call that narrower scope accepted or
+  infer reduced bytes, latency, heat or battery usage from this pass.
+
+Evidence stems: `gallery-1620-usb-install-20260910-032417-760`,
+`gallery-open-1620-20260910-032545-952` (initial runner mismatch),
+`gallery-select-1620-20260910-033006-803`,
+`gallery-page1-wait-1620-20260910-033027-476`,
+`gallery-page2-1620-20260910-033110-468`,
+`gallery-cold-page4-1620-20260910-033213-923`,
+`gallery-cold-page4-wait-1620-20260910-033236-241`, and
+`gallery-full-preview-1620-20260910-033337-022`. Subsequent semantic/MCP readbacks
+confirmed the two returns and stopped capture. No send, upload, generation,
+microphone, Cookie clearing, app-data clearing or proxy change was performed.
+Reuse the accepted private gallery/viewer/paging path. Per the latest user
+priority, defer distinct-thumbnail efficiency and thermal/battery investigation
+until remaining private-API functions are complete; these performance questions
+must not hold up the functional batch or cause another gallery-only APK build.
