@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 16, create: factory });
+  const exported = Object.freeze({ version: 17, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -147,9 +147,9 @@
         return false;
       }
       // Temporary threads can acquire a server ID without a /c/ navigation.
-      // The URL alone is insufficient: require the current official thread's privacy.
+      // The URL alone is insufficient: require the committed official control.
       const thread = typeof conversation.id === 'string' && shared.XM?.(conversation.id);
-      return thread?.is_do_not_remember === true && shared.cX?.() === true &&
+      return !!thread && page.__elonChatGptTemporaryChat?.ownsSelectedConversation?.(conversation) === true && shared.cX?.() === true &&
         shared.HM?.getIsNewConversation?.(thread) === false && shared.uo?.(conversation) === false &&
         typeof shared.HM?.getGizmoId === 'function' && shared.HM.getGizmoId(thread) == null;
     }
@@ -206,8 +206,10 @@
   function sameOwner(binding) {
     try {
       const currentRoute = route(), context = stores(binding.node), props = context?.shared.getSharedProps();
+      // A committed provider wrapper can be replaced after first dispatch;
+      // the actual conversation, controller and file store must still be ours.
       return binding.node.isConnected && page.__elonChatGptDocumentToken === binding.token &&
-        identity(true) === binding.account && currentRoute && context?.shared === binding.shared &&
+        identity(true) === binding.account && !!currentRoute && !!context &&
         (!binding.guestProof || guestIdentity() === binding.guestProof) &&
         currentRoute.temporary === binding.temporary &&
         context.files === binding.files && props?.conversation === binding.conversation &&
@@ -323,5 +325,5 @@
       if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
     }
   } catch (_) {}
-  return Object.freeze({ version: 16, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 17, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

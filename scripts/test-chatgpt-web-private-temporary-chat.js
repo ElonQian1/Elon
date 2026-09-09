@@ -37,8 +37,8 @@ function fixture(options = {}) {
       if (state.mode === 'ignore') return;
       const url = new URL(page.location.href); url.search = selected ? '?temporary-chat=true' : '';
       page.location.href = url.href; state.selected = selected;
-      if (state.mode === 'normal' || state.mode === 'throw-after-success') state.privacy = selected;
-      render();
+      if (!options.metadataUnchanged && (state.mode === 'normal' || state.mode === 'throw-after-success')) state.privacy = selected;
+      if (state.mode !== 'deferred' && state.mode !== 'throw-after-route') render();
       if (state.mode.startsWith('throw')) throw new Error('synthetic-handler-failure');
     };
     const personalize = () => state.personalized;
@@ -177,12 +177,36 @@ test('persisted temporary homepage retains its read-only privacy indicator', asy
   assert.deepEqual(f.effects, []);
 });
 
-for (const change of ['privacy', 'newChat', 'normalRoute']) {
+test('official temporary selection is independent of legacy thread privacy metadata', async () => {
+  const f = fixture({ metadataUnchanged: true });
+  f.select(true); await flush();
+  assert.equal(f.results.at(-1)[1], true);
+  assert.equal(f.state.privacy, false);
+  assert.deepEqual(f.runtime.observe(f.state.node), { selected: true, stateSettable: true });
+  assert.equal(f.runtime.ownsSelectedConversation(f.state.conversation), true);
+  assert.equal(f.runtime.ownsSelectedConversation({ ...f.state.conversation }), false);
+  f.select(false); await flush();
+  assert.equal(f.runtime.ownsSelectedConversation(f.state.conversation), false);
+});
+
+test('persisted temporary homepage uses committed official selection with false legacy metadata', async () => {
+  const f = fixture({ newChat: false, selected: true });
+  f.state.privacy = false;
+  f.page.location.href = 'https://chatgpt.com/?temporary-chat=true';
+  f.runtime.observe(f.state.node); await flush();
+  assert.deepEqual(f.runtime.observe(f.state.node), { selected: true, stateSettable: false });
+  assert.equal(f.runtime.ownsSelectedConversation(f.state.conversation), true);
+  f.state.node.isConnected = false;
+  assert.equal(f.runtime.ownsSelectedConversation(f.state.conversation), false);
+});
+
+for (const change of ['selected', 'signal', 'newChat', 'normalRoute']) {
   test('persisted homepage indicator rejects contradictory temporary proof: ' + change, async () => {
     const f = fixture({ newChat: false, selected: true });
     f.runtime.observe(f.state.node); await flush();
     f.page.location.href = 'https://chatgpt.com/?temporary-chat=true';
-    if (change === 'privacy') f.state.privacy = false;
+    if (change === 'selected') { f.state.selected = false; f.render(); }
+    if (change === 'signal') f.modules.cX = () => false;
     if (change === 'newChat') f.state.newChat = true;
     if (change === 'normalRoute') f.page.location.href = 'https://chatgpt.com/';
     assert.equal(f.runtime.observe(f.state.node), null);
@@ -196,12 +220,12 @@ test('stale native selected state cannot toggle twice', async () => {
   assert.equal(f.effects.filter(item => item === 'official-action').length, 1);
 });
 
-test('route change is not success until official thread privacy also agrees', async () => {
+test('route change is not success until the official control commits matching state', async () => {
   const f = fixture({ mode: 'deferred' }); f.select(true); await flush();
   assert.equal(f.results.length, 0);
   assert.deepEqual(f.runtime.observe(f.state.node), { selected: false, stateSettable: false });
   f.select(true); assert.equal(f.results.length, 0);
-  f.state.privacy = true; f.advance(100);
+  f.render(); f.advance(100);
   assert.equal(f.results.length, 2); assert.ok(f.results.every(row => row[1]));
   assert.equal(f.effects.filter(item => item === 'official-action').length, 1);
   assert.equal(f.timers.size, 0);
@@ -210,7 +234,7 @@ test('route change is not success until official thread privacy also agrees', as
 test('opposite intent during a transition cannot silently undo it', async () => {
   const f = fixture({ mode: 'deferred' }); f.select(true); await flush();
   f.select(false); assert.equal(f.results.at(-1)[1], false);
-  f.state.privacy = true; f.advance(100); assert.equal(f.results.at(-1)[1], true);
+  f.render(); f.advance(100); assert.equal(f.results.at(-1)[1], true);
   assert.equal(f.effects.filter(item => item === 'official-action').length, 1);
 });
 
@@ -220,7 +244,7 @@ for (const mode of ['ignore', 'deferred', 'throw-after-route']) test(mode + ' ti
   assert.equal(f.effects.filter(item => item === 'official-action').length, 1);
   assert.equal(f.runtime.observe(f.state.node)?.selected, false);
   if (mode !== 'ignore') {
-    f.state.privacy = true;
+    f.render();
     assert.deepEqual(f.runtime.observe(f.state.node), { selected: true, stateSettable: true });
   }
 });
@@ -254,8 +278,8 @@ test('navigation and account change after dispatch cancel bounded observation', 
   }
 });
 
-test('known runtime waits for initialized privacy instead of toggling stale DOM state', async () => {
-  const f = fixture(); f.state.privacy = true; f.select(true); await flush();
+test('known runtime waits for initialized thread metadata instead of toggling stale DOM state', async () => {
+  const f = fixture(); f.state.privacy = undefined; f.select(true); await flush();
   assert.equal(f.effects.length, 0); assert.equal(f.fallbacks, 0);
   f.advance(1600); assert.equal(f.results.at(-1)[1], false); assert.equal(f.effects.length, 0);
 });
@@ -361,6 +385,8 @@ test('production temporary adapter uses runtime selection and authoritative stat
   assert.equal(f.results.at(-1)[1], true);
   const descriptor = adapter.describe(pagePolicy, { signal: 'Temporary chat', node: f.state.node });
   assert.equal(descriptor.selected, true);
+  assert.equal(adapter.ownsSelectedConversation(f.state.conversation), true);
+  assert.equal(adapter.ownsSelectedConversation({ ...f.state.conversation }), false);
   assert.equal(f.effects.includes('dom-click'), false); assert.equal(f.effects.includes('touch'), false);
   assert.doesNotMatch(JSON.stringify([f.results, descriptor]), /Bearer|00000000|client-created|headers|token/);
   const layout = fs.readFileSync(path.join(assets, 'chatgpt_web_adapter_layout.js'), 'utf8');

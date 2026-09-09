@@ -18,7 +18,7 @@ function fixture({ temporary = false, image = false, reused = false, count = 1 }
   let values = [], serverId = null, identity = 'Bearer synthetic-only', draft = '', settle;
   let response = () => ({ accepted: true, completion: new Promise(resolve => { settle = resolve; }) });
   const calls = [], events = [], timers = new Map(), counts = { prepared: 0, click: 0, relay: 0, draftWrites: 0 };
-  const privacy = { selected: temporary, remembered: !temporary, project: null, work: false };
+  const privacy = { selected: temporary, remembered: !temporary, project: null, work: false, committed: true };
   const files$ = () => values;
   files$.set = next => { values = next; };
   const store = { files$, readyFiles$: () => values.filter(item => item.status === 'ready'), hasUploadInProgress$: () => false };
@@ -40,6 +40,8 @@ function fixture({ temporary = false, image = false, reused = false, count = 1 }
     __elonChatGptDocumentToken: 'doc_attachment_submit', __elonChatGptPrivateTextTransactionsEnabled: true,
     __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({ Authorization: identity }) },
     __elonChatGptPrivateAttachmentProtocol: protocol,
+    __elonChatGptTemporaryChat: { ownsSelectedConversation: candidate =>
+      candidate === conversation && privacy.selected && privacy.committed },
     __elonChatGptComposer: { currentModel: () => 'synthetic-model' },
     performance: { getEntriesByName: () => [{}] }, Event: class { constructor(type) { this.type = type; } },
     setTimeout(fn) { const key = Symbol(); timers.set(key, fn); return key; }, clearTimeout: key => timers.delete(key),
@@ -83,6 +85,7 @@ function fixture({ temporary = false, image = false, reused = false, count = 1 }
     timeout: () => { for (const fn of [...timers.values()]) fn(); },
     setIdentity: value => { identity = value; }, setDraft: value => { draft = value; }, draft: () => draft,
     persistAtHome() { serverId = id; props.isNewThread = false; },
+    rebindShared() { fiber.dependencies.firstContext.memoizedValue = { store: { ...shared } }; },
     navigate() { serverId = id; page.location.href = 'https://chatgpt.com/c/' + id + (temporary ? '?temporary-chat=true' : ''); } };
 }
 
@@ -97,13 +100,29 @@ test('temporary attachment acknowledgement survives server ID assignment without
   assert.ok(f.api.captureConversation(f.node));
 });
 
-for (const change of ['remembered', 'selected', 'project', 'work', 'newThread']) {
+test('temporary acknowledgement tolerates a rebound provider, not a changed conversation or file owner', async () => {
+  const f = fixture({ temporary: true });
+  await f.page.__elonChatGptPrivateRuntimeBindings.load('shared');
+  f.privacy.remembered = true;
+  f.send(); f.persistAtHome(); f.rebindShared(); f.settle(true); await flush();
+  assert.equal(f.events[0].detail, 'official_runtime_v1:accepted');
+  assert.equal(f.store.files$().length, 0);
+  assert.equal(f.calls.length, 1);
+});
+
+test('a replaced provider before dispatch still invalidates captured input', () => {
+  const f = fixture(); f.command.beforeSubmit = () => f.rebindShared();
+  assert.equal(f.api.submit(f.command).handled, false);
+  assert.equal(f.calls.length, 0);
+});
+
+for (const change of ['committed', 'selected', 'project', 'work', 'newThread']) {
   test('temporary homepage requires live privacy and ordinary-thread proof: ' + change, async () => {
     const f = fixture({ temporary: true });
     await f.page.__elonChatGptPrivateRuntimeBindings.load('shared');
     f.persistAtHome();
     if (change === 'newThread') f.props.isNewThread = true;
-    else f.privacy[change] = change === 'selected' ? false : change === 'project' ? 'g-project' : true;
+    else f.privacy[change] = ['selected', 'committed'].includes(change) ? false : change === 'project' ? 'g-project' : true;
     assert.equal(f.api.captureConversation(f.node), null);
     assert.equal(f.api.submit(f.command).handled, false);
     assert.equal(f.calls.length, 0);
@@ -166,6 +185,8 @@ for (const [name, change] of Object.entries({
   identity: f => f.setIdentity('Bearer another-account'),
   document: f => { f.page.__elonChatGptDocumentToken = 'doc_other'; },
   conversation: f => { f.props.conversation = { serverId$: () => null }; },
+  controller: f => { f.props.composerController = { conversation: f.props.conversation }; },
+  files: f => { f.fiber.dependencies.firstContext.next.memoizedValue = { ...f.store }; },
   detached: f => { f.node.isConnected = false; },
 })) {
   test(name + ' replacement cannot consume a former context attachment', async () => {

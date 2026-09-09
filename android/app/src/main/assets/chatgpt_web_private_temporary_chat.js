@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateTemporaryChat = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -15,7 +15,7 @@
   // Invoke that transaction, not a guessed route setter or a replayed DOM click.
   const ACTION = '()=>{cg.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(gB.reset(c),qg()&&$p.delete(n),!o&&!$p(n)&&OKt(s),u(jKt,{replace:!0})):oD(l,{params:o?void 0:new URLSearchParams({[zm]:`true`})})}';
   const now = options.now || (() => Date.now());
-  let runtime, loading, cooldown = 0, pending = null, uncertain = null;
+  let runtime, loading, cooldown = 0, pending = null, uncertain = null, observedNode = null;
 
   function identity() {
     const raw = page.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.();
@@ -111,9 +111,9 @@
         selected !== binding.selected) return null;
     const isNew = runtime.HM.getIsNewConversation(thread);
     if (typeof isNew !== 'boolean') return null;
-    if (binding.persistedHome && (isNew || thread.is_do_not_remember !== true)) return null;
-    return { ...binding, isNew, current: binding.capturedIsNew === isNew && binding.capturedSelected === selected,
-      privacy: thread.is_do_not_remember || binding.conversation.config?.startDoNotRemember === true };
+    if (binding.persistedHome && (isNew || binding.capturedIsNew || !binding.capturedSelected)) return null;
+    // The official control reads the router signal, not legacy thread metadata.
+    return { ...binding, isNew, current: binding.capturedIsNew === isNew && binding.capturedSelected === selected };
   }
 
   function sameSession(binding) {
@@ -142,7 +142,7 @@
   }
 
   function confirmed(operation, after) {
-    return after && sameSession(after) && after.selected === operation.desired && after.privacy === operation.desired &&
+    return after && after.current && sameSession(after) && after.selected === operation.desired &&
       (operation.initial.isNew
         ? after.conversation === operation.before.conversation && after.id === operation.before.id
         : after.isNew && after.pathname === '/' && after.id !== operation.before.id);
@@ -179,6 +179,7 @@
     try {
       const binding = capture(node);
       if (!binding) return null;
+      observedNode = node;
       if (!runtime) { void load(); return null; }
       const transition = pending || uncertain;
       const state = live(binding);
@@ -187,9 +188,16 @@
           if (!pending) uncertain = null;
         } else return { selected: transition.before.selected, stateSettable: false };
       }
-      return state && state.privacy === state.selected
+      return state
         ? { selected: state.selected, stateSettable: state.current && !!state.action } : null;
     } catch (_) { return null; }
+  }
+
+  function ownsSelectedConversation(conversation) {
+    try {
+      const state = live(capture(observedNode));
+      return !!state && state.current && state.selected && state.conversation === conversation;
+    } catch (_) { return false; }
   }
 
   function setSelected(values, fallback) {
@@ -220,7 +228,7 @@
         }
         fallback(); return;
       }
-      if (!initial || !initial.current || initial.privacy !== initial.selected) {
+      if (!initial || !initial.current) {
         operation.prepareDeadline ??= now() + 1500;
         if (now() >= operation.prepareDeadline) return finish(operation, false, '临时聊天状态仍在同步，请稍后重试。');
         operation.timer = page.setTimeout(apply, 100);
@@ -240,5 +248,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 4, observe, setSelected });
+  return Object.freeze({ version: 5, observe, setSelected, ownsSelectedConversation });
 });

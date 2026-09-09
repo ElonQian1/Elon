@@ -87,5 +87,6 @@
     return true;
   }
 
-  return Object.freeze({ describe, setSelected });
+  return Object.freeze({ describe, setSelected, ownsSelectedConversation: conversation =>
+    privateState()?.ownsSelectedConversation?.(conversation) === true });
 });
