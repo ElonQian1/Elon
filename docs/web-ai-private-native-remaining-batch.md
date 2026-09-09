@@ -31,6 +31,11 @@ Installed normal 1612 additionally passed the actual native file-library Downloa
 button and saved-byte checks for TXT/PNG/PDF without a ready composer; see
 [rendered download acceptance](reports/chatgpt-library-download-ui-20260909.md).
 Full-account older-history load-more and the project composer failure remain open.
+An isolated [full-page reader](chatgpt-private-directory-browser.md) is now
+offline verified beyond the recent-cache limits. It is not yet a production
+sidebar feature: canonical mapping, owned native paging, UI integration and
+grouped Release/device acceptance remain required. Do not reimplement its
+transport or count the synthetic pass as full-account phone acceptance.
 
 | User workflow | Current result | Remaining boundary |
 |---|---|---|
