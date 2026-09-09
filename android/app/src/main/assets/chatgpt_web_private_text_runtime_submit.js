@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 18, create: factory });
+  const exported = Object.freeze({ version: 19, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -230,8 +230,15 @@
     return next && Object.keys(binding).every(key => binding[key] === next[key]);
   }
 
+  function retireAcceptedFiles(owned) {
+    try { owned.retain = !owned.binding.attachment.consumeAccepted(); } catch (_) { owned.retain = true; }
+    return !owned.retain;
+  }
+
   function submit(command) {
     if (page.__elonChatGptPrivateTextTransactionsEnabled !== true) return { handled: false, code: 'disabled' };
+    // Retry only local retirement on a later user action, never the network send.
+    if (active?.retain && retireAcceptedFiles(active)) active = null;
     if (active || page.__elonChatGptPrivateRegenerateRuntime?.state?.().pending ||
         page.__elonChatGptPrivateStopRuntime?.state?.().pending) {
       return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'busy' }) };
@@ -291,28 +298,20 @@
     let timer;
     const settled = Promise.resolve(receipt.completion).then(accepted => {
       const currentContext = sameOwner(binding, accepted === true);
-      // Dispatch acknowledgement belongs to the captured command, not the
-      // editor lifetime. Local cleanup must never revoke a confirmed send.
-      if (!binding.attachment && accepted === true) {
-        if (currentContext && !binding.draftView && expected) {
-          try { if (command.readDraft() === expected) command.clearDraft?.(); } catch (_) {}
-        }
-        return { status: 'accepted', code: 'accepted', current: currentContext };
-      }
-      if (binding.attachment && !currentContext) return { status: 'unknown', code: 'context_changed' };
       if (accepted !== true) return { status: 'unknown', code: binding.attachment ? 'dispatch_not_confirmed'
         : accepted === false ? 'dispatch_unconfirmed_false'
         : accepted == null ? 'dispatch_unconfirmed_void' : 'dispatch_unconfirmed_shape' };
-      // prepared_action does not reset ready files. Never let a failed local
-      // cleanup accidentally include the accepted attachment in another send.
+      // ACK belongs to the captured dispatch, not the current editor. Retire
+      // its exact files independently; failed local cleanup blocks replay only.
       if (binding.attachment) {
         owned.retain = true;
-        if (!binding.attachment.consumeAccepted()) return { status: 'unknown', code: 'attachment_cleanup_unconfirmed' };
-        owned.retain = false;
+        retireAcceptedFiles(owned);
       }
-      // Explicit actions do not reset the editor. Only clear our unchanged draft.
-      if (!binding.draftView && expected && command.readDraft() === expected) command.clearDraft?.();
-      return { status: 'accepted', code: 'accepted' };
+      if (currentContext && !binding.draftView && expected) {
+        try { if (command.readDraft() === expected) command.clearDraft?.(); } catch (_) {}
+      }
+      return { status: 'accepted', code: 'accepted', current: currentContext,
+        ...(binding.attachment ? { cleanup: owned.retain ? 'pending' : 'completed' } : {}) };
     }).catch(() => ({ status: 'unknown', code: 'completion_failed' })).finally(() => {
       page.clearTimeout(timer);
       if (active === owned && !owned.retain) active = null;
@@ -331,5 +330,5 @@
       if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
     }
   } catch (_) {}
-  return Object.freeze({ version: 18, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 19, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

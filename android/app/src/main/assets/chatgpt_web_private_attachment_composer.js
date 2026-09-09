@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 19, create: factory });
+  const exported = Object.freeze({ version: 20, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -328,6 +328,7 @@
       const value = attachedNow();
       if (!value || store !== value.binding.store || !current(value.binding)) return null;
       const { binding } = value, attached = value.items.map(item => item.attached);
+      const readFiles = store.files$, setFiles = readFiles.set;
       const files = attached.map(item => item.file);
       const fingerprint = () => JSON.stringify(attached.map(item => ({ ...item, file: undefined })));
       const metadata = fingerprint();
@@ -352,15 +353,17 @@
       }
       function consumeAccepted() {
         try {
-          // The caller must first confirm official dispatch and conversation ownership.
-          // New-thread navigation can already have cleared the display-only owner.
-          if (consumed || root.__elonChatGptDocumentToken !== binding.token ||
-              identity() !== binding.account || resolveStore() !== store || !unchanged()) return false;
-          const files = store.files$();
+          if (consumed) return true;
+          // Only after official ACK: retire exact submitted entries from the
+          // captured store, even when React has already mounted another editor.
+          if (store.files$ !== readFiles) return false;
+          const files = readFiles.call(store);
           if (!Array.isArray(files)) return false;
           if (files.some(item => attached.includes(item))) {
-            store.files$.set(files.filter(item => !attached.includes(item)));
-            if (store.files$().some(item => attached.includes(item))) return false;
+            if (readFiles.set !== setFiles || !unchanged()) return false;
+            setFiles.call(readFiles, files.filter(item => !attached.includes(item)));
+            const remaining = readFiles.call(store);
+            if (!Array.isArray(remaining) || remaining.some(item => attached.includes(item))) return false;
           }
           consumed = true;
           if (owned === value) owned = null;
@@ -371,5 +374,5 @@
     } catch (_) { return null; }
   }
 
-  return Object.freeze({ version: 18, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, associateLibrary, merge, remove, prepareSubmit });
+  return Object.freeze({ version: 20, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, associateLibrary, merge, remove, prepareSubmit });
 });

@@ -87,6 +87,18 @@ try {
     do {
         $s = Native
         $upload = $s.chatgpt_web_mcp.last_attachment_upload
+        $sendDetail = [string]$s.social_chat.web_chat_last_send_command.detail
+        if ($sendDetail.StartsWith('official_runtime_v1:unknown:') -and -not $report.first_unconfirmed) {
+            $pageUri = $null
+            $validUrl = [uri]::TryCreate([string]$s.chatgpt_web_mcp.conversation.url, [UriKind]::Absolute, [ref]$pageUri)
+            $report.first_unconfirmed = [ordered]@{
+                receipt = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $sendDetail
+                route_home = $validUrl -and $pageUri.AbsolutePath -eq '/'
+                provider_ready = $s.chatgpt_web_mcp.composer_ready
+                provider_messages = $s.chatgpt_web_mcp.conversation.message_count
+                provider_streaming = $s.chatgpt_web_mcp.streaming
+            }
+        }
         if ($s.social_chat.web_chat_attachment_phase -eq 'failed') {
             $report.upload_receipt = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $upload.detail
             throw 'attachment_failed'
@@ -103,6 +115,7 @@ try {
     $report.text_read = $facts.text_read; $report.pdf_read = $facts.pdf_read; $report.image_read = $facts.image_read
     $report.user_rows = @($s.social_chat.messages | Where-Object role -eq 'user').Count
     $report.attachment_phase = $s.social_chat.web_chat_attachment_phase
+    $report.send_receipt = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $s.social_chat.web_chat_last_send_command.detail
     $report.private_send = $s.social_chat.web_chat_last_send_command.detail -eq 'official_runtime_v1:accepted'
     if (-not $report.private_upload -or -not $report.private_send -or -not $facts.text_read -or -not $facts.pdf_read -or
         -not $facts.image_read -or $report.user_rows -ne 1 -or $s.social_chat.web_chat_streaming -or $s.input.text) {

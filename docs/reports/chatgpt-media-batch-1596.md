@@ -11,9 +11,9 @@ Its metadata and paths are fixed; callers cannot select arbitrary phone files.
 Capability checkpoints, not whole-capability completion:
 
 - `android_chatgpt_private_image_attachment_upload_v1`: private batch upload
-  and association observed; model image-reading acceptance remains pending.
+  and model image-reading confirmed on 1597; native receipt correction pending.
 - `android_chatgpt_private_pdf_attachment_upload_v1`: private batch upload
-  and association observed; model PDF-reading acceptance remains pending.
+  and model PDF-reading confirmed on 1597; native receipt correction pending.
 - `android_chatgpt_private_attachment_upload_transport_v1`, scope
   `ordinary_new_mixed_text_png_pdf`: upload/store association passed, final
   native send/reply failed confirmation. This scope is **not completed**.
@@ -90,6 +90,31 @@ live failure. A corrected normal APK still needs one real mixed-media reply
 before any of these scopes is marked completed. Phone focus moved to another
 application during diagnosis; further navigation was left to the next available
 device window.
+
+## Normal 1597 And Dispatch Ownership
+
+Normal Release `1.1.1597`, source `d605cfb5a`, was published and replacement
+installed without clearing data. APK SHA-256:
+`f62eb00c8e83c07a5f216ac5b04922a5b8b45d1b44e07352485bc2b884da4c09`.
+`native-media-batch-1597-20260909-104634-991` confirmed all three attachment
+answers in one native user turn, private association, local removal and restored
+state (`text_read=true pdf_read=true image_read=true`, 45,372 ms). However,
+`private_send=false` still reflected `official_runtime_v1:unknown:context_changed`.
+The first such receipt had `route_home=false`, provider ready, two provider
+messages and an active stream. The narrow v18 homepage fix was insufficient.
+
+Runtime submit v19 separates official dispatch ACK from editor lifetime. After
+ACK, composer v20 retires exact submitted objects from their captured store;
+it never resolves the new editor's store for cleanup. Strict pre-dispatch
+document/account/conversation/file checks remain. Post-ACK rerender or navigation
+cannot revoke success or clear a new context draft. Failed local retirement
+retains the no-replay latch; a later user action can retry only local retirement,
+not upload or generation. Entry metadata and getter/setter identity changes fail
+closed, and later files are preserved. No polling or extra network request was
+added. The sender version advances to rebuild its captured composer dependency.
+
+This is a receipt/cleanup correction to the verified transfer, not a new upload
+implementation. Real-device confirmation of the corrected receipt is pending.
 
 ## Remaining Acceptance
 

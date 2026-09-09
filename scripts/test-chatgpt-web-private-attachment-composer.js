@@ -136,10 +136,10 @@ test('versioned reinjection cancels only the older owner and retains the current
     '../android/app/src/main/assets/chatgpt_web_private_attachment_send.js'), 'utf8');
   let cancelled = 0;
   const root = { location: { origin: 'https://chatgpt.com' },
-    __elonChatGptPrivateAttachmentSend: { version: 18, cancel: () => { cancelled++; } } };
+    __elonChatGptPrivateAttachmentSend: { version: sendModule.version - 1, cancel: () => { cancelled++; } } };
   vm.runInNewContext(source, { window: root });
   const current = root.__elonChatGptPrivateAttachmentSend;
-  assert.equal(current.version, 19);
+  assert.equal(current.version, sendModule.version);
   assert.equal(cancelled, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateAttachmentSend, current);

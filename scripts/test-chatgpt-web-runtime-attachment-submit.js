@@ -129,7 +129,7 @@ for (const count of [1, 3, 9]) {
   });
 }
 
-test('ordinary homepage handoff requires an acknowledgement and cannot follow another route', async () => {
+test('only official ACK permits captured file retirement, independently of the current route', async () => {
   for (const changed of ['unconfirmed', 'route', 'identity', 'files']) {
     const f = fixture({ count: 3 });
     f.send(); f.persistAtHome();
@@ -137,8 +137,9 @@ test('ordinary homepage handoff requires an acknowledgement and cannot follow an
     if (changed === 'identity') f.setIdentity('Bearer another-account');
     if (changed === 'files') f.fiber.dependencies.firstContext.next.memoizedValue = { ...f.store };
     f.settle(changed !== 'unconfirmed'); await flush();
-    assert.equal(f.events[0].detail, 'official_runtime_v1:unknown:context_changed');
-    assert.equal(f.store.files$().length, 3);
+    assert.equal(f.events[0].detail, changed === 'unconfirmed'
+      ? 'official_runtime_v1:unknown:dispatch_not_confirmed' : 'official_runtime_v1:accepted');
+    assert.equal(f.store.files$().length, changed === 'unconfirmed' ? 3 : 0);
     assert.equal(f.calls.length, 1);
     assert.equal(f.counts.relay, 0);
   }
@@ -217,11 +218,13 @@ for (const [name, change] of Object.entries({
   files: f => { f.fiber.dependencies.firstContext.next.memoizedValue = { ...f.store }; },
   detached: f => { f.node.isConnected = false; },
 })) {
-  test(name + ' replacement cannot consume a former context attachment', async () => {
-    const f = fixture(); f.send(); change(f); f.settle(true); await flush();
-    assert.equal(f.events[0].ok, false);
-    assert.equal(f.events[0].detail, 'official_runtime_v1:unknown:context_changed');
-    assert.equal(f.store.files$()[0], f.attached);
+  test(name + ' replacement cannot revoke ACK or clear the current draft', async () => {
+    const f = fixture(); f.command.expectedDraft = f.command.prompt; f.setDraft(f.command.prompt);
+    const result = f.api.submit(f.command); change(f); f.settle(true);
+    assert.deepEqual(await result.completion, { status: 'accepted', code: 'accepted', current: false, cleanup: 'completed' });
+    assert.equal(f.store.files$().length, 0);
+    assert.equal(f.draft(), f.command.prompt);
+    assert.equal(f.api.state().pending, false);
     assert.equal(f.counts.relay, 0);
   });
 }
@@ -266,15 +269,54 @@ test('a user removing the submitted file during dispatch is not a cleanup error'
 
 test('failed ready-store cleanup cannot resubmit an already accepted attachment', async () => {
   const f = fixture(); f.send();
+  const originalSetter = f.store.files$.set;
   f.store.files$.set = () => { throw Error('synthetic store failure'); };
   f.settle(true); await flush();
-  assert.equal(f.events[0].detail, 'official_runtime_v1:unknown:attachment_cleanup_unconfirmed');
+  assert.equal(f.events[0].detail, 'official_runtime_v1:accepted');
   assert.equal(f.api.state().pending, true);
   assert.equal(f.store.files$()[0], f.attached);
   f.send(); await flush();
   assert.equal(f.events[1].detail, 'official_runtime_v1:unknown:busy');
   assert.equal(f.calls.length, 1);
   assert.equal(f.counts.relay, 0);
+  // Restoring the setter lets the next action retire files, without replaying.
+  f.store.files$.set = originalSetter;
+  assert.equal(f.api.submit(f.command).handled, false);
+  assert.equal(f.api.state().pending, false);
+  assert.equal(f.store.files$().length, 0);
+  assert.equal(f.calls.length, 1);
+});
+
+test('ACK cleans only the captured store, never a replacement editor file store', async () => {
+  const f = fixture(), result = f.api.submit(f.command), later = { ...f.attached };
+  const replacement = { ...f.store, files$: () => [later], readyFiles$: () => [later] };
+  replacement.files$.set = () => { throw Error('must not mutate current editor'); };
+  f.fiber.dependencies.firstContext.next.memoizedValue = replacement;
+  f.node.isConnected = false; f.settle(true);
+  assert.equal((await result.completion).status, 'accepted');
+  assert.equal(f.store.files$().length, 0);
+  assert.deepEqual(replacement.files$(), [later]);
+});
+
+test('post-ACK metadata changes keep replay blocked until the selected entry is removed', async () => {
+  const f = fixture(), result = f.api.submit(f.command);
+  f.attached.fileSpec.size++; f.settle(true);
+  assert.equal((await result.completion).cleanup, 'pending');
+  assert.equal(f.api.state().pending, true);
+  assert.equal((await f.api.submit(f.command).completion).code, 'busy');
+  f.store.files$.set([]);
+  assert.equal(f.api.submit(f.command).handled, false);
+  assert.equal(f.api.state().pending, false);
+  assert.equal(f.calls.length, 1);
+});
+
+test('a local attachment draft cleanup exception cannot revoke dispatch ACK', async () => {
+  const f = fixture(); f.command.expectedDraft = f.command.prompt; f.setDraft(f.command.prompt);
+  f.command.clearDraft = () => { throw Error('local editor replaced'); };
+  const result = f.api.submit(f.command); f.settle(true);
+  assert.equal((await result.completion).status, 'accepted');
+  assert.equal(f.store.files$().length, 0);
+  assert.equal(f.api.state().pending, false);
 });
 
 for (const [name, response, status] of [

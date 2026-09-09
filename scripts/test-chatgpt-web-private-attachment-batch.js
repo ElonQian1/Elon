@@ -74,7 +74,7 @@ for (const count of [2, 9]) {
     assert.ok(submit.readyFiles.every(item => Object.isFrozen(item) && Object.isFrozen(item.fileSpec)));
     assert.equal(submit.consumeAccepted(), true);
     assert.deepEqual(f.store.files$(), []);
-    assert.equal(submit.consumeAccepted(), false);
+    assert.equal(submit.consumeAccepted(), true, 'local retirement is idempotent');
   });
 }
 
