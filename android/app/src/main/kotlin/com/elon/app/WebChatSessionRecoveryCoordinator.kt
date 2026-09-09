@@ -10,7 +10,7 @@ internal class WebChatSessionRecoveryCoordinator(
     private val cancel: (Runnable) -> Unit,
     private val retry: () -> Boolean,
     private val repair: () -> Boolean = { false },
-    private val onExhausted: () -> Unit,
+    private val onExhausted: (WebChatSessionRecoveryFailure) -> Unit,
     retryDelaysMs: List<Long> = DEFAULT_RETRY_DELAYS_MS,
     private val navigationStallTimeoutMs: Long = DEFAULT_NAVIGATION_STALL_TIMEOUT_MS,
     private val bridgeReadinessTimeoutMs: Long = DEFAULT_BRIDGE_READINESS_TIMEOUT_MS,
@@ -24,6 +24,7 @@ internal class WebChatSessionRecoveryCoordinator(
     private var repairAttempted = false
     private var lastNavigationProgress = -1
     private var phase = Phase.IDLE
+    private var lastFailure: WebChatSessionRecoveryFailure? = null
     private var retryTask: Runnable? = null
     private var readinessTask: Runnable? = null
 
@@ -48,6 +49,7 @@ internal class WebChatSessionRecoveryCoordinator(
 
     fun onNavigationStarted() {
         if (!active) return
+        lastFailure = null
         phase = Phase.NAVIGATING
         lastNavigationProgress = -1
         cancelRetry()
@@ -77,8 +79,13 @@ internal class WebChatSessionRecoveryCoordinator(
         resetBudget()
     }
 
-    fun onFailure() {
+    fun onPageFailure(detail: String) = onFailure(
+        WebChatSessionRecoveryFailure(WebChatSessionRecoveryFailure.Kind.PAGE_ERROR, detail),
+    )
+
+    fun onFailure(failure: WebChatSessionRecoveryFailure? = null) {
         if (!active || exhausted) return
+        if (failure != null) lastFailure = failure
         cancelReadiness()
         if (phase == Phase.WAITING_BRIDGE && !repairAttempted) {
             repairAttempted = true
@@ -126,18 +133,32 @@ internal class WebChatSessionRecoveryCoordinator(
         retryIndex += 1
         phase = Phase.NAVIGATING
         lastNavigationProgress = -1
+        lastFailure = null
         val dispatched = retry()
-        if (dispatched) resetReadinessWatchdog(navigationStallTimeoutMs) else scheduleRetry()
+        if (dispatched) {
+            resetReadinessWatchdog(navigationStallTimeoutMs)
+        } else {
+            lastFailure = WebChatSessionRecoveryFailure(WebChatSessionRecoveryFailure.Kind.RETRY_NOT_STARTED)
+            scheduleRetry()
+        }
         return dispatched
     }
 
     private fun resetReadinessWatchdog(delayMs: Long) {
         cancelReadiness()
+        val timeoutKind = if (phase == Phase.WAITING_BRIDGE) {
+            WebChatSessionRecoveryFailure.Kind.BRIDGE_TIMEOUT
+        } else {
+            WebChatSessionRecoveryFailure.Kind.NAVIGATION_TIMEOUT
+        }
         lateinit var task: Runnable
         task = Runnable {
             if (readinessTask !== task) return@Runnable
             readinessTask = null
-            onFailure()
+            // WebView may finish an error document after reporting its actual HTTP/TLS error.
+            val failure = lastFailure?.takeIf { it.kind == WebChatSessionRecoveryFailure.Kind.PAGE_ERROR }
+                ?: WebChatSessionRecoveryFailure(timeoutKind)
+            onFailure(failure)
         }
         readinessTask = task
         schedule(task, delayMs)
@@ -149,13 +170,14 @@ internal class WebChatSessionRecoveryCoordinator(
         repairAttempted = false
         lastNavigationProgress = -1
         phase = Phase.IDLE
+        lastFailure = null
     }
 
     private fun exhaust() {
         if (exhausted) return
         exhausted = true
         cancelPending()
-        onExhausted()
+        onExhausted(lastFailure ?: WebChatSessionRecoveryFailure(WebChatSessionRecoveryFailure.Kind.UNKNOWN))
     }
 
     private fun cancelPending() {

@@ -161,7 +161,7 @@ class WebChatSessionRecoveryCoordinatorTest {
         cancel = scheduler::cancel,
         retry = retry,
         repair = repair,
-        onExhausted = onExhausted,
+        onExhausted = { onExhausted() },
         retryDelaysMs = listOf(2_000L),
         navigationStallTimeoutMs = 30_000L,
         bridgeReadinessTimeoutMs = 10_000L,

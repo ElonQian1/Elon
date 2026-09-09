@@ -117,7 +117,7 @@ internal class ChatGptBackgroundSession(
         cancel = recoveryHandler::removeCallbacks,
         retry = ::reloadRestorablePage,
         repair = { repairChatGptCurrentDocument(webView, pageAdapter, webExecution::interactionRequested) },
-        onExhausted = { updateState(State.ERROR, "网页 AI 自动重连多次失败，请检查网络后重试") },
+        onExhausted = { failure -> updateState(State.ERROR, failure.userMessage()) },
     )
     private var webView: WebView? = null
     private var pageAdapter: ChatGptWebPageAdapter? = null
@@ -502,7 +502,7 @@ internal class ChatGptBackgroundSession(
             onPageError = { detail ->
                 navigationActions.clearDeferred()
                 updateState(State.ERROR, detail)
-                if (ChatGptWebNavigationPolicy.supportsEnhancedMode(view.url)) recovery.onFailure() else recovery.onTerminal()
+                if (ChatGptWebNavigationPolicy.supportsEnhancedMode(view.url)) recovery.onPageFailure(detail) else recovery.onTerminal()
             },
             rewriteAllowedMainFrameUrl = { null },
             onResourceRequest = { request ->

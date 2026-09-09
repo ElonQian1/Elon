@@ -63,6 +63,41 @@ official-page evidence only if needed. Do not repeat upload or build steps:
 neither ran in this window. Do not enable debug access in the normal APK merely
 to diagnose this one case. The user has been asked to pause other phone testing.
 
+## Resumed Investigation And Recovery Classification
+
+The September 9 resumed window reconnected the pinned Xiaomi through wireless
+ADB. Native presentation was observed with authentication retained, current
+adapter, the same project homepage and no ready composer. Foreground subsequently
+changed to other applications again; no attachment was staged or sent and no
+microphone was opened. A later package read returned `1.1.1600` (code `1600`),
+superseding the earlier installed-version observation, not the earlier acceptance
+evidence. Do not attribute this source change to that installed APK.
+
+The app's read-only network probe returned a validated Wi-Fi/VPN network, a
+successful ChatGPT TCP connection in 118 ms and homepage HTTP 200 in 1096 ms.
+This is a connectivity sample, not an authenticated project-page probe. It
+neither diagnoses the actual project page nor proves that its composer works.
+
+Source inspection confirmed a separate reporting defect: every exhausted
+recovery path emitted the same network/reconnection message. The recovery
+coordinator now distinguishes navigation timeout, loaded-document/bridge
+readiness timeout, an explicitly observed page error, a retry that could not
+start, and unknown failure. ChatGPT renders that reason; a received page error
+survives a subsequent error-document finish. A new navigation, successful
+recovery or manual retry clears prior failure provenance. Existing retry limits,
+delays, pause cancellation and send ownership remain unchanged. No readiness is
+fabricated and no project capability is inferred from a missing composer.
+
+Only two recovery callback lines change in `ChatGptBackgroundSession`; unrelated
+uncommitted background-lease and new-conversation ownership changes in other
+worktrees are not included. Google presentation and its private-protocol work
+remain untouched. Release main/test compilation and all 14 focused JVM cases
+passed (seven existing recovery cases plus seven failure-provenance cases).
+Logged run: `webchat-recovery-causes-tests-20260909-140844-269`, 309.2 seconds,
+no timeout or stall. Per the requested grouped delivery workflow, this fix is
+source-verified and queued for the next combined APK, not yet installed. The
+actual project-page readiness cause and project-media acceptance remain open.
+
 ## Existing Harness Extension
 
 `scripts/smoke-chatgpt-web-media-batch.ps1` now accepts `-Scope project_new`;
