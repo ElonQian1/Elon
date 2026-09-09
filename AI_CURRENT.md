@@ -8,16 +8,13 @@ reviewed_at: 2026-09-05
 
 ## 当前产品主链
 
-- 币安记录主APK1.1.1609与量化0.6.9已覆盖安装；真实62条委托、20/60条成交、1条持仓及数量/均价显示通过。高精度JSON数字不再丢失，固定MCP诊断可定位记录失败。[证据与剩余边界](docs/reports/binance-report-recovery-20260909.md)。
-
-- 币安1.1.1601已安装；[区间V3与验收限制](docs/reports/binance-grid-range-v3-20260909.md)。
+- 币安1.1.1609与量化0.6.9已安装，真实委托/成交/持仓及数量、均价通过。[证据与缺口](docs/reports/binance-report-recovery-20260909.md)。
 
 - Android Web AI 默认使用已验证的同源私有传输、预设和有界缓存，失败回退官网且不导出凭证或重放写请求。近期真机验收：附件进度 `v1.1.1491`、原生项目选择器 `v1.1.1493`、私有朗读 `v1.1.1498`、会话置顶/重命名/归档 `v1.1.1506`（adapter `244`，正式发布 `v1.1.1510`）、私有项目迁移 `v1.1.1514`（adapter `245`，恰好一次移入和一次移回且恢复原项目），以及图片生成状态 `v1.1.1518`（adapter `247`，单次生产发送、原生图片结构、状态恢复与验收登记通过）。私有项目迁移已取代正常路径的 DOM 激活，旧官网菜单仅作兼容修复兜底；这些能力默认不等待官网 DOM，证据见 `docs/web-ai-private-transport-capability-matrix.md`，无当前回归不得重复实现。
 - Android ChatGPT 已完成并默认启用 `android_chatgpt_conversation_project_directory_cache_v1` 与 `android_chatgpt_webview_proxy_prepare_fail_open_v1`：目录约 0.3 秒从有界缓存恢复；代理回调超过 750ms 会一次性放行，正式版 `v1.1.1240 (1250)` 冷启动约 2.2 秒、后台返回约 1.9 秒恢复可输入。两项均已真机验收且不再重复研究，详见 `docs/chatgpt-conversation-project-directory-cache.md`、`docs/chatgpt-webview-proxy-prepare-recovery.md`。
 - 多 PC Rust 缓存平台已具备可安装工具与 Skill、脱敏 Fleet 观测，以及不上传路径、绑定精确摘要并由目标节点复扫加锁的远程 GC 审批。远程只覆盖机器级普通/老化策略；项目级治理与高风险操作仍在本机。生产 TLS、节点发布升级和真实多 PC 验收未完成，边界见 `docs/rust-cache-fleet-operations.md`。
 - 已实现：用户通过 Android APK 或 PC 工作台描述需求，AI CLI/API 代理在真实 Git 工作区开发、验证、构建和发布应用。
 - 已实现：项目、频道、多人/多 AI 协作、Windows 节点执行、上下文编译、项目文档治理与版本恢复等基础能力。
-- 量化手机子账户空列表、撤销和重连已验，详情待验。[证据](docs/reports/android-binance-host-context-v1-20260908.md)
 - 已实现并完成编译/假数据验收：一龙统一账号已覆盖 Google OIDC 的 Win、Android 与移动 Web 登录/主动绑定，以及 PBKDF2 密码、一次性离线恢复码、可撤销设备会话、脱敏安全事件、导出清单、注销预检和联合登录请求幂等/限流审计；认证存储能力会显式拒绝宣称默认进程内后端具备多副本安全。Win 节点 AI Provider 控制面具备显式登录状态机、原子 journal/备份恢复、Codex/Gemini 假故障矩阵、脱敏诊断和 Codex 保险箱逐操作同意/精确重放合同；ChatGPT Web/Gemini Web 仅保留不可启用的类型化授权生命周期，CLI 登录和浏览器 Cookie 均不可复用。真实 Google/OAuth、真实 Codex/Gemini/Claude/Copilot 账号、邮件/短信恢复、账号最终注销、内部 Web Chat、真机/Renderer、线上部署与安装包发布仍未验收。权威边界见 `docs/unified-account-and-ai-provider-architecture.md`。
 - 已实现并完成编译/静态验收：Android APK 个人页和移动 PWA 个人页均提供可发现的“账号与安全”入口，先展示脱敏的一龙账号，再显示 Google 已绑定、未绑定或暂未配置状态；绑定继续使用 Android Credential Manager / Google Identity Services 官方流程，不保存 Google token，也不按邮箱自动合并。当前生产公开能力返回 Google `configured: false`，真实账号绑定仍须先配置 Google Cloud OAuth client、Android 包名/SHA 指纹和 Web Authorized JavaScript origins；本批模拟器视觉验收因本机缺少 emulator 延后。
 - 已实现并通过 PC 生产构建、用户浏览器契约、31 个适配器脚本语法检查和 Tauri 定向 Rust 测试：Win Tauri `/user-browser` 支持按一龙账号与厂商隔离的本地 WebView2 Profile；owner 目录使用 SHA-256 截断指纹并兼容迁移旧 64 位目录，超长完成态聊天会裁剪最旧消息并保留最近上下文，不再整份放弃持久化。统一 `ProviderAdapter` 显式管理厂商初始化、动作白名单、事件净化和页面命令。ChatGPT Win 端已按 APK 相同顺序加载完整 31 模块适配器，并以版本 125 和每页文档令牌绑定命令；版本 125 为生产首页加入动作级等待期限、会话目录快速回显/后台完整同步、部分目录缓存合并、置顶识别和同一会话消息窗口续接。Rust 回归直接对照 Android 清单和版本，防止两端再次静默漂移。Google Win 端直接复用 APK 的版本 1 `google_web_adapter.js`，删除桌面重复分叉。页面完成加载后会幂等重连并请求快照，统一 UI 可承接可见问题、回答、引用、草稿与受限网页动作，凭证不导出。“账号与本机会话中心”明确拆分一龙账号、Google 作为一龙登录方式、厂商官方网页登录三层状态；云端账号资料短暂不可用时可从已登录本机节点恢复同一 owner，owner 冲突失败关闭。Google 账号登录固定交给系统浏览器且不共享 Cookie；ChatGPT/Google 从一龙输入框真实发送并接收回答、Google 地区/账号开放状态、真实页面 DOM 和登录仍待用户账号环境统一验收。详见 `docs/user-browser-module-integration.md`。
