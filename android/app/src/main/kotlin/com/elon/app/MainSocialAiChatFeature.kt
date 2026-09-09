@@ -687,9 +687,7 @@ internal class MainSocialAiChatFeature(
             )
             inputComposerViews()?.let { views ->
                 views.webAttachmentStrip.render(controller.consumerPort(), consumerState)
-                productionComposerTools.selectedQuickAction(provider)?.let {
-                    activeQuickComposerAction = it
-                }
+                activeQuickComposerAction = productionComposerTools.selectedQuickAction(provider, activeQuickComposerAction)
                 views.attachmentButton.visibility = if (state.attachmentVisible) View.VISIBLE else View.GONE
                 views.webToolsButton.visibility = if (productionComposerTools.quickActions(provider).isEmpty()) {
                     View.GONE

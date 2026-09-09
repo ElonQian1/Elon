@@ -73,6 +73,47 @@ class WebChatProductionQuickComposerActionsTest {
         )
     }
 
+    @Test fun confirmedDisabledCatalogClearsAnOldSelectedChip() {
+        val tools = WebChatProductionComposerToolParser.parse(listOf(
+            option("image", "Image", "image_generation"),
+            option("search", "Search", "web_search"),
+        ))
+        assertNull(WebChatProductionQuickComposerActionResolver.selection(
+            tools, WebChatProductionQuickComposerAction.IMAGE_GENERATION,
+        ))
+        assertNull(WebChatProductionQuickComposerActionResolver.selection(
+            tools, WebChatProductionQuickComposerAction.WEB_SEARCH,
+        ))
+    }
+
+    @Test fun missingCatalogKeepsLastObservedChoiceInsteadOfAssumingDisabled() {
+        assertEquals(WebChatProductionQuickComposerAction.IMAGE_GENERATION,
+            WebChatProductionQuickComposerActionResolver.selection(
+                emptyList(), WebChatProductionQuickComposerAction.IMAGE_GENERATION,
+            ))
+        assertNull(WebChatProductionQuickComposerActionResolver.selection(emptyList(), null))
+    }
+
+    @Test fun aNewSelectedToolReplacesThePreviouslyDisplayedTool() {
+        val tools = WebChatProductionComposerToolParser.parse(listOf(
+            option("image", "Image", "image_generation"),
+            option("search", "Search", "web_search").copy(selected = true),
+        ))
+        assertEquals(WebChatProductionQuickComposerAction.WEB_SEARCH,
+            WebChatProductionQuickComposerActionResolver.selection(
+                tools, WebChatProductionQuickComposerAction.IMAGE_GENERATION,
+            ))
+    }
+
+    @Test fun aCatalogWithOnlyOtherToolsDoesNotKeepAnUnavailableQuickSelection() {
+        val tools = WebChatProductionComposerToolParser.parse(listOf(
+            option("upload", "Photos", "attachment_photos").copy(selected = true),
+        ))
+        assertNull(WebChatProductionQuickComposerActionResolver.selection(
+            tools, WebChatProductionQuickComposerAction.IMAGE_GENERATION,
+        ))
+    }
+
     private fun option(id: String, label: String, semantic: String) = WebChatConsumerOption(
         id = id,
         label = label,

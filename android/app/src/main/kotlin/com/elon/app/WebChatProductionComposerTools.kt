@@ -132,15 +132,16 @@ internal class WebChatProductionComposerToolsCoordinator(
             ))
         }
 
-    fun selectedQuickAction(provider: WebChatProviderIdentity): WebChatProductionQuickComposerAction? {
+    fun selectedQuickAction(
+        provider: WebChatProviderIdentity,
+        previousWhenUnknown: WebChatProductionQuickComposerAction? = null,
+    ): WebChatProductionQuickComposerAction? {
         if (activeProvider() != provider.id) return null
-        return consumerPort()
+        val tools = consumerPort()
             ?.let(::observedToolOptions)
             ?.let(WebChatProductionComposerToolParser::parse)
-            ?.asSequence()
-            ?.filter(WebChatProductionComposerTool::selected)
-            ?.mapNotNull(WebChatProductionQuickComposerActionResolver::actionFor)
-            ?.firstOrNull()
+            .orEmpty()
+        return WebChatProductionQuickComposerActionResolver.selection(tools, previousWhenUnknown)
     }
 
     fun selectQuickAction(

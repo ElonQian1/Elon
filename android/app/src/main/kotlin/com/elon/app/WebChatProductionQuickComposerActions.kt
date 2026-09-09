@@ -18,6 +18,18 @@ internal object WebChatProductionQuickComposerActionCatalog {
 }
 
 internal object WebChatProductionQuickComposerActionResolver {
+    fun selection(
+        tools: List<WebChatProductionComposerTool>,
+        previousWhenUnknown: WebChatProductionQuickComposerAction?,
+    ): WebChatProductionQuickComposerAction? = if (tools.isEmpty()) {
+        previousWhenUnknown
+    } else {
+        tools.asSequence()
+            .filter(WebChatProductionComposerTool::selected)
+            .mapNotNull(::actionFor)
+            .firstOrNull()
+    }
+
     fun find(
         action: WebChatProductionQuickComposerAction,
         tools: List<WebChatProductionComposerTool>,
