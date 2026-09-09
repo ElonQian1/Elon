@@ -1,8 +1,8 @@
 # Private directory pagination, September 9
 
 Capability: `android_chatgpt_private_directory_pagination_v1`.
-Code: implemented. Deterministic tests: verified. New device acceptance: pending.
-Base: `3f9b73ba60f975ac6d13f20eb0d767331fd0832d`. Adapter: 307.
+Code: implemented. Deterministic tests: verified. Device acceptance: partial.
+Base: `3f9b73ba60f975ac6d13f20eb0d767331fd0832d`. Adapter: 308.
 
 ## Evidence And Scope
 
@@ -49,7 +49,10 @@ of missing provider capabilities or an input-box requirement.
   Each HTTP read has a four-second maximum and a one-MiB response limit.
 - Repeated cursors and duplicate-only pages stop. Missing pagination metadata
   means partial, never a complete empty list. Useful validated partial pages merge
-  into the cache while the request still reports its failure.
+  into the adapter cache while the request still reports its failure. Failed partial
+  reads do not emit a native completion snapshot: this would clear refresh ownership
+  before the failure receipt and incorrectly mark a project failure as global.
+  The previous native list remains visible until a settled successful snapshot.
 - Passive project parsing no longer descends into embedded `conversations`, which
   could otherwise confuse a conversation title with its containing project title.
 - Global cache completeness remains false: owned project metadata and ordinary
@@ -69,5 +72,29 @@ Release production/test Kotlin compilation and 48 JVM cases in five directory,
 collection and operation-readiness suites passed (255.1 seconds), command
 `directory-paging-android-20260909`. The final Node rerun after title validation
 also passed, `directory-paging-final-node-20260909`.
-APK publication and device results will be recorded after the grouped build.
-There is no claim here of measured phone latency or completion of the broader Goal.
+## Initial Device Acceptance
+
+APK 1.1.1604, source `d385425f557fde6e1c2dc4fce3c82ddf968c4e89`, was
+published and installed with `install -r`; its local and online SHA-256 both equal
+`09ea8f680b439096a7edc4f37c9f3ef1dacb9ffdcbb78b232aade6f4cf416894`.
+On Xiaomi 14 Pro, production `social_ai` / `chatgpt_web`, adapter 307, authenticated
+true and composer-ready false:
+
+- Two explicitly requested global reads returned `directory_timeout` after 5641 ms
+  and 9102 ms. Validated partial rows were retained. A later background result had
+  six completed page reads; a subsequent explicit read succeeded as
+  `directory_partial` after 12241 ms. This is evidence of bounded paging, not a
+  complete-account or low-network-latency pass.
+- The cache exposed 19 project entries after private refresh, up from five restored
+  entries. Project selection kept the production sidebar open and selected the
+  requested ID; its read returned `directory_ready` without a composer.
+- The sidebar was restored to date mode and closed. The conversation path and
+  zero-length input remained unchanged. No send, microphone, account mutation,
+  Cookie reset or proxy change was performed. The structural protocol probe was stopped.
+- Inspection of the failed-partial path found the native scope-settlement ordering
+  issue described above. Adapter 308 suppresses failed completion snapshots; a
+  focused global/project regression verifies the failure receipt and later recovery.
+
+The follow-up release and device result are recorded below when available.
+The broader Goal remains active; current network latency and full-account coverage
+must not be represented as solved by this batch.

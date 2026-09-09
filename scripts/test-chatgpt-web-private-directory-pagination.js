@@ -174,3 +174,31 @@ test('native dispatcher emits a complete empty project snapshot and never falls 
   assert.equal(events.length, 1);
   assert.equal(replies[1][1], false);
 });
+
+for (const projectScopeId of ['', 'g-p-fixture']) {
+  test(`failed partial ${projectScopeId ? 'project' : 'global'} read does not settle native refresh ownership`, async () => {
+    const f = fixture(), events = [], replies = [];
+    let result = { ok: false, partial: true, code: 'directory_timeout', pages: 1 };
+    const refresh = async () => result;
+    vm.runInNewContext(fs.readFileSync(path.join(assets, 'chatgpt_web_adapter_conversation_directory_requests.js'), 'utf8'),
+      { window: f.root });
+    const controller = f.root.__elonChatGptConversationDirectoryRequests.create({
+      conversationAdapter: { requestList: () => assert.fail('Unexpected DOM fallback') },
+      privateDirectory: { refresh, refreshScope: refresh, snapshot: () => ({
+        conversations: [{ id: 'retained', title: 'Fixture', projectId: projectScopeId }], projects: [],
+      }) },
+      optional: (_, fn) => fn(), emitEvent: value => events.push(value),
+    });
+    controller.requestList({ projectScopeId }, (...args) => replies.push(args));
+    await flush();
+    assert.equal(events.length, 0, 'failure receipt must still belong to the refreshing scope');
+    assert.deepEqual(replies[0], ['list_conversations', false, 'directory_timeout']);
+    result = { ok: true, complete: false, code: 'directory_partial', pages: 2 };
+    controller.requestList({ projectScopeId }, (...args) => replies.push(args));
+    await flush();
+    assert.equal(events.length, 1, 'successful bounded refresh may publish retained cached rows');
+    assert.equal(events[0].conversations[0].id, 'retained');
+    assert.equal(events[0].collection.complete, false);
+    assert.equal(replies[1][1], true);
+  });
+}

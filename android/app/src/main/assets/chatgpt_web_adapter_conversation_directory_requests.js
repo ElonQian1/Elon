@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 9) return;
+  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 10) return;
 
   const PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const CONVERSATION_PATH = /^\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})$/;
@@ -87,7 +87,8 @@
       if (!privateDisabled && PROJECT_ID.test(projectId) && typeof privateDirectory?.refreshScope === 'function') {
         Promise.resolve().then(() => privateDirectory.refreshScope(projectId)).then((result) => {
           if (!current()) return;
-          if (result?.ok || result?.partial) emitSnapshot(projectId, result.complete === true, result);
+          // Failed partial pages stay cached; a native snapshot would settle the refresh scope before its failure receipt.
+          if (result?.ok) emitSnapshot(projectId, result.complete === true, result);
           respond('list_conversations', result?.ok === true, result?.code || 'directory_refresh_failed');
         }).catch(() => { if (current()) respond('list_conversations', false, 'directory_refresh_failed'); });
         return;
@@ -95,7 +96,7 @@
       if (!projectId && !privateDisabled && typeof privateDirectory?.refresh === 'function') {
         Promise.resolve().then(() => privateDirectory.refresh()).then((result) => {
           if (!current()) return;
-          if (result?.ok || result?.partial) emitSnapshot(null, false, result);
+          if (result?.ok) emitSnapshot(null, false, result);
           respond('list_conversations', result?.ok === true, result?.code || 'directory_refresh_failed');
         }).catch(() => {
           if (current()) respond('list_conversations', false, 'directory_refresh_failed');
@@ -181,5 +182,5 @@
     return Object.freeze({ cancel, emitSnapshot, handleCommand, installListener, probeMembership, requestList });
   }
 
-  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 9, create });
+  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 10, create });
 })();
