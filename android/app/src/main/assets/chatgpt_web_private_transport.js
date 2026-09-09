@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 24) ||
+  if ((existingTransport && Number(existingTransport.version) >= 25) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -322,6 +322,12 @@
     return policy.canAttempt(Boolean(copiedRequestHeaders()) || canAcquire);
   }
 
+  function explicitAccountReadReady() {
+    const canAcquire = authContext && typeof authContext.canAcquire === 'function' && authContext.canAcquire();
+    return prefetchEnabled && policy.snapshot().cooldownRemainingMs === 0 &&
+      Boolean(copiedRequestHeaders() || canAcquire);
+  }
+
   function failureKind(error) {
     const message = String(error && error.message || 'network');
     if (message === 'timeout') return 'timeout';
@@ -428,7 +434,7 @@
   function probeConversationProject(path, expectedProjectId, onSettled) {
     const target = conversationTarget(path);
     const expected = cleanText(expectedProjectId, 180);
-    if (!target || !SAFE_PROJECT_ID.test(expected) || !conversationPrefetchReady() ||
+    if (!target || !SAFE_PROJECT_ID.test(expected) || !explicitAccountReadReady() ||
         !privateConversationDirectory ||
         typeof privateConversationDirectory.acceptConversationMembership !== 'function') return false;
     const key = target.id + ':' + expected;
@@ -469,11 +475,8 @@
     if (!target || !/^mcp_[a-z0-9]{1,32}$/.test(String(requestId || ''))) {
       return respond(action, false, 'invalid_file_request');
     }
-    // An explicit file read must not wait for another official history request.
-    // Keep identity, opt-in and failure cooldown separate from prefetch freshness.
-    const canAcquire = authContext && typeof authContext.canAcquire === 'function' && authContext.canAcquire();
-    if (!prefetchEnabled || policy.snapshot().cooldownRemainingMs > 0 ||
-        !(copiedRequestHeaders() || canAcquire)) return respond(action, false, 'files_not_ready');
+    // Explicit account reads do not depend on a recent background history response.
+    if (!explicitAccountReadReady()) return respond(action, false, 'files_not_ready');
     try {
       const result = await fetchConversation(target.id);
       const projection = window.__elonChatGptPrivateHistoryProjection;
@@ -537,7 +540,7 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 24,
+    version: 25,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,

@@ -210,7 +210,7 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
     const window = { __elonChatGptConversationDirectoryRequests: { create: () => ({}) } };
     vm.runInNewContext(fs.readFileSync(path.join(assets,
       'chatgpt_web_adapter_conversation_directory_requests.js'), 'utf8'), { window });
-    assert.equal(window.__elonChatGptConversationDirectoryRequests.version, 4);
+    assert.equal(window.__elonChatGptConversationDirectoryRequests.version, 13);
     assert.equal(typeof window.__elonChatGptConversationDirectoryRequests.create({}).handleCommand, 'function');
     const current = window.__elonChatGptConversationDirectoryRequests;
     vm.runInNewContext(fs.readFileSync(path.join(assets,

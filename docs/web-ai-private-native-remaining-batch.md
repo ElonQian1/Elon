@@ -30,12 +30,13 @@ default-enabled and device-verified on normal 1611, adapter 311; see
 Installed normal 1612 additionally passed the actual native file-library Download
 button and saved-byte checks for TXT/PNG/PDF without a ready composer; see
 [rendered download acceptance](reports/chatgpt-library-download-ui-20260909.md).
-Full-account older-history load-more and the project composer failure remain open.
-An isolated [full-page reader](chatgpt-private-directory-browser.md) is now
-offline verified beyond the recent-cache limits. It is not yet a production
-sidebar feature: canonical mapping, owned native paging, UI integration and
-grouped Release/device acceptance remain required. Do not reimplement its
-transport or count the synthetic pass as full-account phone acceptance.
+[Explicit full-page browsing](chatgpt-private-directory-browser.md) is completed
+and production-verified on 1614: next/previous, project folder/back and existing
+conversation navigation. Large-account overflow remains synthetic coverage,
+not a claim that the whole live account was traversed. Project TXT/PNG/PDF
+upload, native send and actual file-content replies now passed on 1614; the
+post-send membership timing defect and source fix are recorded in
+[project-media follow-up](reports/chatgpt-project-media-1614.md).
 
 | User workflow | Current result | Remaining boundary |
 |---|---|---|
@@ -45,7 +46,7 @@ transport or count the synthetic pass as full-account phone acceptance.
 | File library navigation, saved download, single library attachment, rename/soft-delete/upload-copy | Earlier scopes through 1591 reused; native TXT/PNG/PDF Download buttons and saved bytes passed on 1612 | Large-transfer/cancel/crash cases, special sources, folder writes and other attachment scopes |
 | Personal full sharing/list/revoke and current-conversation delete | Completed on 1547 | Other share scopes and remaining rendered confirmation/menu cases |
 | Text submit/stream/stop/follow-up | Official runtime path verified, reused | This is not independent Android HTTP POST; other contexts and regeneration need evidence |
-| Project attachments | Code and harness implemented | Actual project page has no ready composer; no project upload/send accepted yet |
+| Project attachments | Native new-project TXT/PNG/PDF upload, send and actual content reading verified on 1614 | Explicit membership query rejected when background freshness expires; fix passes offline tests, grouped install/idle-query acceptance pending |
 | Model/effort/tool combinations and latest cursor image gallery | Implemented candidates | Remaining real native-menu/runtime and gallery acceptance |
 | Other mounted providers and citation-only cloud references | Incomplete | Do not invent a transport for an uncaptured source |
 | Google private sender | Deferred by user priority | Start only after the remaining ChatGPT acceptance gate |

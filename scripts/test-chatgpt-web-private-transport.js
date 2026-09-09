@@ -30,7 +30,8 @@ function createContext(
   prefetchEnabled = true,
   storage = new MemoryStorage(),
   directoryRows = [],
-  authContext = null
+  authContext = null,
+  clock = Date
 ) {
   const timers = new Set();
   const outcomes = [];
@@ -79,7 +80,7 @@ function createContext(
     location,
     URL,
     AbortController,
-    Date,
+    Date: clock,
     Number,
     String,
     Array,
@@ -137,7 +138,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 24);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 25);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -149,7 +150,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 24);
+  assert.equal(transport.version, 25);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
@@ -344,6 +345,71 @@ const detailPayload = {
   assert.equal(linearSnapshots.length, 1);
   assert.equal(linearSnapshots[0].messages.length, 2);
   assert.equal(failed.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
+
+  const explicitMembershipPayload = { ...detailPayload, gizmo_id: 'g-p-destination' };
+  const coldMembershipReads = [];
+  let coldAcquires = 0;
+  const coldMembership = createContext(async (url, options) => {
+    coldMembershipReads.push({ url, options });
+    return jsonResponse(explicitMembershipPayload);
+  }, false, true, new MemoryStorage(), [], {
+    canAcquire: () => true,
+    acquireRequestHeaders: async () => { coldAcquires++; return { Authorization: 'synthetic-identity' }; }
+  });
+  const explicitReader = coldMembership.window.__elonChatGptPrivateTransport;
+  assert.equal(explicitReader.conversationPrefetchReady(), false);
+  const coldMatches = [];
+  assert.equal(explicitReader.probeConversationProject('/c/new-project-chat', 'g-p-destination',
+    matched => coldMatches.push(matched)), true, 'explicit membership can acquire identity without a prior official read');
+  assert.equal(explicitReader.probeConversationProject('/c/new-project-chat', 'g-p-destination',
+    matched => coldMatches.push(matched)), true);
+  await flush();
+  assert.deepEqual(coldMatches, [true, true]);
+  assert.equal(coldAcquires, 1, 'duplicate membership queries retain one identity acquisition');
+  assert.equal(coldMembershipReads.length, 1, 'duplicate queries retain one fresh read');
+  assert.equal(coldMembershipReads[0].options.method, 'GET');
+  assert.equal(coldMembershipReads[0].options.cache, 'no-store');
+  assert.equal(coldMembershipReads[0].options.body, undefined);
+  assert.equal(explicitReader.conversationPrefetchReady(), false, 'explicit reads do not manufacture fresh official observations');
+
+  let membershipNow = Date.now();
+  class MembershipClock extends Date { static now() { return membershipNow; } }
+  const staleReads = [];
+  let membershipStatus = 200;
+  const staleMembership = createContext(async (url, options) => {
+    staleReads.push({ url, options });
+    return membershipStatus === 200 ? jsonResponse(explicitMembershipPayload) :
+      { ok: false, status: membershipStatus, text: async () => '{}' };
+  }, false, true, new MemoryStorage(), [], null, MembershipClock);
+  await staleMembership.window.fetch('/backend-api/conversations/observed', {
+    headers: { Authorization: 'synthetic-observed-identity' }
+  });
+  membershipNow += 120001;
+  const staleReader = staleMembership.window.__elonChatGptPrivateTransport;
+  assert.equal(staleReader.conversationPrefetchReady(), false);
+  const staleMatches = [];
+  assert.equal(staleReader.probeConversationProject('/c/new-project-chat', 'g-p-destination',
+    matched => staleMatches.push(matched)), true, 'expired background freshness does not block explicit membership');
+  await flush();
+  assert.deepEqual(staleMatches, [true]);
+  assert.equal(staleReads.length, 2);
+  assert.equal(staleReader.conversationPrefetchReady(), false);
+  membershipStatus = 401;
+  assert.equal(staleReader.probeConversationProject('/c/new-project-chat', 'g-p-destination',
+    matched => staleMatches.push(matched)), true);
+  await flush();
+  assert.deepEqual(staleMatches, [true, false]);
+  assert.equal(staleReader.health().lastOutcome, 'auth');
+  assert.equal(staleReader.probeConversationProject('/c/new-project-chat', 'g-p-destination',
+    () => assert.fail('cooldown must not dispatch')), false);
+  assert.equal(staleReads.length, 3, 'failed explicit read is not replayed');
+  assert.equal(detail.window.__elonChatGptPrivateTransport.probeConversationProject('/c/valid', 'invalid',
+    () => assert.fail('invalid project must not dispatch')), false);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.probeConversationProject('/c/valid', 'g-p-destination',
+    () => assert.fail('disabled private reader must not dispatch')), false);
+  const missingIdentity = createContext(() => assert.fail('missing identity must not fetch'), false, true);
+  assert.equal(missingIdentity.window.__elonChatGptPrivateTransport.probeConversationProject('/c/valid', 'g-p-destination',
+    () => assert.fail('missing identity must not dispatch')), false);
 
   const membershipPayload = Object.assign({}, detailPayload, { gizmo_id: 'g-p-destination' });
   const membershipResults = [];
