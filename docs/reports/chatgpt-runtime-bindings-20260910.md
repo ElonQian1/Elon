@@ -78,3 +78,45 @@ accepted on the phone. APK 1624 proves the diagnostic observation, not the new
 private model selection. Model/effort mutation, tools and temporary-chat owners
 still require their own production acceptance. No latency, heat or power gain
 is inferred from these fixture tests.
+
+## Normal 1625 device result
+
+Release `1.1.1625`, source `b73d79195`, passed the normal publisher, Release/lint
+and unattended replacement installation on the Xiaomi. The local APK and remote
+download agree on SHA-256
+`c6109cb195daf1a142264968683e0b0efdb8c0d34facb7d057bff42044d45c7c`.
+Build log: `runtime-sep10-release-20260910-065432-476` (432.8 seconds).
+
+The authenticated production page now returns six `private_model_*` handles
+with `model_runtime_context:ready`. This contrasts with the legacy handles
+observed before the source fixes. The first production native popup displayed
+the level slider and Advanced entry, and its Advanced page displayed version
+choices. Read evidence: `model-admission-device-20260910-070157-536`;
+native-popup evidence: `model-native-popup-1625-20260910-070231-780`.
+
+The real native option was selected using Accessibility ACTION_CLICK: latest
+version to `GPT-5.6 Sol`. A fresh private catalog marked that version selected
+and the model summary changed to its versioned label. Selecting latest again
+restored its selected flag. Android Back closed the popup and the production
+model button reopened it. The final fresh root catalog confirmed the original
+extra-high preset and a ready diagnostic, with the popup closed. No messages,
+microphone use, new conversation, data clearing or independent proxy changes
+were involved. Evidence: `model-native-version-select-encoded-1625-20260910-070700-304`
+and `model-native-restored-1625-20260910-070954-909`.
+
+Completed slice: current-build private model catalog, native popup/Advanced,
+version selection with live readback and restoration. This is not verification
+of server preference persistence, a subsequent send, every model, tier changes
+or slider-drag submission. Those remain separate acceptance work. The Kotlin
+diagnostic source compiled in Release, but its dedicated JVM test was not run
+in this batch. Offline counts are 204 focused and 519 adjacent consumer cases.
+
+The external UI harness initially expected the legacy model selector. The current
+production port instead exposes `chatgpt-composer-option:model:<id>:<label>`.
+Its first corrected attempt then failed before dispatch because a label with
+spaces became multiple Android-shell words. The harness now accepts only bounded
+model selectors and carries the selector as UTF-8 base64 across ADB. Three focused
+tests and the actual native selection pass. A later reopen attempt was made while
+the popup was still open; closing it first fixed that test precondition. These
+harness failures are not private transaction failures and triggered no duplicate
+model mutation. No third APK build was needed.

@@ -106,6 +106,8 @@ WebView 身份与官网运行时按操作提供依赖；不是每次命令都重
 | 音频接通不代表有字幕；公开 Realtime 示例的 `oai-events` 不等于网页通道标签 | 使用网页实际 channel、text/binary 帧和 delta/final 协议；字幕按 item/response 去重 | [原生字幕](chatgpt-realtime-voice-native-transcript-stream.md) |
 | 当前 native 图库入口变为“图片已更新”，旧脚本报找不到功能 | 优先稳定 semantic ID；派生文案有变化时修测试定位，不削弱业务断言 | [1620 图库验收](reports/chatgpt-gallery-thumbnails.md#usb-acceptance-on-1620) |
 | 打开缓存预览成功，却没有新网络记录 | 只证明预览可用，不声称验证了独立缩略图传输或流量改善 | [1620 图库验收](reports/chatgpt-gallery-thumbnails.md#usb-acceptance-on-1620) |
+| 有界资源清单截断，漏掉全部运行时角色；模块重注入又丢掉诊断注册表 | 保留角色证据且不放大清单；同页面单例诊断与消费者保持同一生命周期，不把“未观察”当“不支持” | [1625 运行时修复](reports/chatgpt-runtime-bindings-20260910.md) |
+| 原生测试仍用旧控件标识；新标识中的空格又被 Android shell 拆分 | 从当前生产 port 取得语义标识；跨 ADB 参数编码，在设备端仍校验操作范围，点击前确认弹窗状态 | [1625 模型验收](reports/chatgpt-runtime-bindings-20260910.md#normal-1625-device-result) |
 
 文件下载必须证明实际落盘字节；列表有 URL 不算下载完成。附件已上传不算会话已引用。
 UI 已关闭不算媒体已停止，音频完整不算字幕完整；分别检查终止状态与原生最终内容。

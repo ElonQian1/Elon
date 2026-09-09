@@ -16,11 +16,13 @@ $ErrorActionPreference = 'Stop'
 $runtime = New-ChatGptWebSmokeRuntime -Adb (Join-Path $SdkRoot 'platform-tools/adb.exe') `
     -DeviceSerial $DeviceSerial -ExpectedHardwareSerial $ExpectedHardwareSerial
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
-if ($Step -eq 'select_model' -and $Selector -notmatch '^(web-chat-model-(?:option|parent|preset):|chatgpt-option:model:)[A-Za-z0-9_.:-]{1,140}$') {
+$legacyModelSelector = '^(web-chat-model-(?:option|parent|preset):|chatgpt-option:model:)[A-Za-z0-9_.:-]{1,140}$'
+$productionModelSelector = '^chatgpt-composer-option:model:[A-Za-z0-9_.-]{1,96}:[^\r\n]{1,120}$'
+if ($Step -eq 'select_model' -and $Selector -cnotmatch $legacyModelSelector -and $Selector -cnotmatch $productionModelSelector) {
     throw 'Only a visible native model option selector may be selected.'
 }
 $parameters = @{}
-if ($Selector) { $parameters.selector = $Selector }
+if ($Selector) { $parameters.selector_b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Selector)) }
 Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass ConversationUiAcceptance -Step $Step `
     -Parameters $parameters -ResultPrefix CONVERSATION_UI_RESULT -SdkRoot $SdkRoot -JavaHome $JavaHome |
     ConvertTo-Json -Compress

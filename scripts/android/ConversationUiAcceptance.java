@@ -48,9 +48,12 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                 break;
             case "model_advanced": click(description("web-chat-model-advanced")); break;
             case "select_model":
-                String selector = getParams().getString("selector", "");
+                String selector = new String(android.util.Base64.decode(
+                    getParams().getString("selector_b64", ""), android.util.Base64.DEFAULT),
+                    java.nio.charset.StandardCharsets.UTF_8);
                 assertTrue("invalid_model_selector", selector.matches(
-                    "(web-chat-model-(option|parent|preset):|chatgpt-option:model:)[A-Za-z0-9_.:-]{1,140}"));
+                    "(web-chat-model-(option|parent|preset):|chatgpt-option:model:)[A-Za-z0-9_.:-]{1,140}") || selector.matches(
+                    "^chatgpt-composer-option:model:[A-Za-z0-9_.-]{1,96}:[^\\r\\n]{1,120}$"));
                 click(description(selector)); break;
             case "tools": click(description("web-chat-composer-tools:chatgpt_web")); break;
             case "image": click(description("web-chat-composer-tool:chatgpt_web:image_generation")); break;
