@@ -70,6 +70,28 @@ test('parent-owned rows cannot be bound to a child UID', async () => {
   await h.list([row('42')]); assert.equal(h.events.at(-1).kind, 'unavailable');
   assert.equal(h.window.__elonBinanceReadV1.detail('123'), false);
 });
+
+test('unsupported optional detail fields do not erase an authenticated grid', async () => {
+  const h=harness(); await h.list([row()]);
+  h.queue.push(response({...row(),stopTpPnl:'',stopLowerLimit:'NaN',marginType:'NEW_MARGIN_MODE',
+    orderCurrency:'',fundingFee:0.123456789,autoAddMargin:0,gridLowerLimit:'',initialLeverage:''}));
+  assert.equal(h.window.__elonBinanceReadV1.detail('123'),true);await tick();
+  const event=h.events.at(-1);
+  assert.equal(event.kind,'detail');assert.equal(event.row.id,'123');assert.equal(event.row.profit,'1.2');
+  for(const key of ['stopTpPnl','stopLower','marginType','orderCurrency','fundingFee','autoAddMargin'])
+    assert.equal(event.row.metrics[key],null,key);
+  assert.equal(event.row.lower,null);assert.equal(event.row.leverage,null);
+  assert.ok(!h.events.some(e=>e.kind==='unavailable'));
+});
+
+test('optional display tolerance never accepts a malformed required identity or symbol', async () => {
+  for(const extra of [{strategyId:'1.23'},{rootUserId:'42.0'},{symbol:'NEARUSDT/other'},{strategyStatus:''}]) {
+    const h=harness();await h.list([row()]);
+    h.queue.push(response({...row(),...extra,stopTpPnl:''}));
+    h.window.__elonBinanceReadV1.detail('123');await tick();
+    assert.equal(h.events.at(-1).kind,'unavailable');
+  }
+});
 test('a late failed list cannot clear a newer successful response', async () => {
   const h = harness(), pending = delayed(); h.queue.push(pending.promise);
   const old = h.window.fetch(LIST, {method: 'POST'}).catch(() => {});

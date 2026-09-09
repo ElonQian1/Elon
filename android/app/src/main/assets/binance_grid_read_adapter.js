@@ -29,7 +29,16 @@
     return text;
   }
   const id = value => scalar(value, /^[0-9]{1,20}$/);
-  const optional = (value, pattern) => value == null ? null : scalar(value, pattern);
+  // Optional display fields evolve independently of account proof. Do not coerce
+  // unknown values, or discard a verified strategy because a new metric is unsupported.
+  const optional = (value, pattern) => {
+    if (value == null) return null;
+    try { return scalar(value, pattern); } catch (_) { return null; }
+  };
+  const positive = value => {
+    const text = optional(value, /^(0|[1-9][0-9]{0,29})(\.[0-9]{1,20})?$/);
+    return text != null && /[1-9]/.test(text) ? text : null;
+  };
   function metrics(value) {
     const decimal = /^-?(0|[1-9][0-9]{0,29})(\.[0-9]{1,20})?$/;
     const mapping = {initialNotional:'gridInitialValue',investment:'strategyAmount',matchedPnl:'matchedPnl',
@@ -39,8 +48,7 @@
     const result = {};
     for (const [key, source] of Object.entries(mapping)) result[key] = optional(value[source], decimal);
     for (const [key, source] of Object.entries({closeOnStop:'cps',autoAddMargin:'autoAddMargin',trailingUp:'trailingUp',trailingDown:'trailingDown'})) {
-      if (value[source] != null && typeof value[source] !== 'boolean') throw new Error('invalid_flag');
-      result[key] = value[source] ?? null;
+      result[key] = typeof value[source] === 'boolean' ? value[source] : null;
     }
     result.matchedCount = optional(value.matchedCount, /^(0|[1-9][0-9]{0,15})$/);
     result.ended = optional(value.endTime, /^(0|[1-9][0-9]{0,15})$/);
@@ -57,8 +65,8 @@
       status: scalar(value.strategyStatus, /^[A-Z][A-Z0-9_]{0,63}$/),
       direction: optional(value.direction, /^(LONG|SHORT|NEUTRAL)$/),
       spacing: optional(value.gridType, /^(ARITH|GEO)$/),
-      lower: optional(value.gridLowerLimit, /^(0|[1-9][0-9]{0,29})(\.[0-9]{1,20})?$/),
-      upper: optional(value.gridUpperLimit, /^(0|[1-9][0-9]{0,29})(\.[0-9]{1,20})?$/),
+      lower: positive(value.gridLowerLimit),
+      upper: positive(value.gridUpperLimit),
       count: optional(value.gridCount, /^[1-9][0-9]{0,5}$/),
       leverage: optional(value.initialLeverage, /^[1-9][0-9]{0,3}$/),
       profit: optional(value.gridProfit, /^-?(0|[1-9][0-9]{0,29})(\.[0-9]{1,20})?$/),
