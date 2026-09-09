@@ -7,6 +7,8 @@ Operation admission and remaining composer dependencies: [readiness policy](chat
 
 ## Workflow
 
+Use the [private integration playbook](web-ai-private-integration-playbook.md) for evidence acquisition, known pitfalls, scoped completion and Google reuse; it is not a second capability register.
+
 Implement coherent modules with targeted checks and separate commits. Do not
 publish an APK for every small correction. Use one grouped install/acceptance
 round after the candidate batch is ready. Existing proven native audio,

@@ -63,14 +63,14 @@ Do not generate code merely to make a verification gap disappear. Do not call a 
 
 Implement the flow in this order:
 
-1. Read only public, user-visible DOM state from the official page.
-2. Convert page state through a versioned adapter into a versioned semantic manifest.
-3. Convert the manifest into canonical native models.
+1. Choose the evidence-backed provider path authorized for this task: visible DOM, page-local private request, official runtime command, or native media transport.
+2. Convert its state through the existing versioned adapter/transport into the canonical versioned protocol; retain the semantic manifest for page controls.
+3. Convert the canonical protocol into native models, using the semantic manifest where page controls are involved.
 4. Render native UI with stable `contentDescription`, test tags, and semantic control IDs.
 5. Dispatch MCP/ADB actions through canonical commands and return structured receipts.
-6. Fall back to the official WebView for unknown, sensitive, or newly changed functionality.
+6. Keep the official WebView entry available for unresolved functionality. Do not silently replay a dispatched write through another path when its result is unknown.
 
-Keep the adapter limited to transformation and interaction with visible page controls. Do not reverse-engineer private credentials or make the native UI depend on undocumented private APIs.
+For explicitly authorized private integrations, follow the [private integration playbook](../../../docs/web-ai-private-integration-playbook.md). Reuse completed transports, keep operation-specific identity and ownership checks, and distinguish private HTTP, official runtime commands, passive observation and native media in completion evidence. Do not infer provider authorization from this Skill, bypass account protections, export credentials, or substitute guessed contracts. Keep DOM transformation separate from transport and do not require composer readiness for unrelated private reads.
 
 Version the page adapter and protocol together. Prefer roles, labels, state attributes, and explicit test hooks over fragile class-name or positional selectors. Represent unknown rich output structurally when possible; otherwise expose an explicit official-page fallback and never silently discard it.
 
