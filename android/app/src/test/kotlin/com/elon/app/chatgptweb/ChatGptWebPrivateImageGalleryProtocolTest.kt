@@ -19,6 +19,7 @@ class ChatGptWebPrivateImageGalleryProtocolTest {
         val parsed = ChatGptWebImageAssetProtocol.parseGallery(page())!!
         assertEquals("mcp_gallery1", parsed.requestId)
         assertEquals(listOf("image_0123456789abcdef"), parsed.handles)
+        assertEquals(parsed.handles, parsed.previewHandles)
         assertTrue(parsed.hasNext)
         assertFalse(parsed.hasPrevious)
     }
@@ -63,5 +64,19 @@ class ChatGptWebPrivateImageGalleryProtocolTest {
         assertNull(ChatGptWebImageAssetProtocol.parseAsset(asset))
         asset.remove("source")
         assertNull(ChatGptWebImageAssetProtocol.parseAsset(asset)!!.galleryRequestId)
+    }
+
+    @Test fun separateFullPreviewHandlesPreserveOrderAndRejectMalformedPairs() {
+        val full = "image_fedcba9876543210"
+        val value = page().put("previewHandles", JSONArray().put(full))
+        val parsed = ChatGptWebImageAssetProtocol.parseGallery(value)!!
+        assertEquals(listOf(full), parsed.previewHandles)
+        assertEquals(listOf("image_0123456789abcdef"), parsed.handles)
+        for (handles in listOf(JSONArray(), JSONArray().put("https://example.test/private"),
+            JSONArray().put(full).put(full), JSONArray().put(JSONObject.NULL))) {
+            assertNull(ChatGptWebImageAssetProtocol.parseGallery(page().put("previewHandles", handles)))
+        }
+        value.remove("handles")
+        assertNull(ChatGptWebImageAssetProtocol.parseGallery(value.put("state", "loading")))
     }
 }

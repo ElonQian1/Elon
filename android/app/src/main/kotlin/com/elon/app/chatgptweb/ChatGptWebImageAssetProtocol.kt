@@ -34,6 +34,7 @@ internal data class ChatGptWebImageGallerySnapshot(
     val hasPrevious: Boolean = false,
     val hasNext: Boolean = false,
     val unavailableCount: Int = 0,
+    val previewHandles: List<String>? = handles,
 ) {
     companion object {
         const val STATE_LOADING = "loading"
@@ -86,6 +87,13 @@ internal object ChatGptWebImageAssetProtocol {
                 }.also { if (it.distinct().size != it.size) return null }
             } else null
             if (state in setOf("ready", "partial") && handles == null) return null
+            val previews = if (event.has("previewHandles")) {
+                val array = event.optJSONArray("previewHandles") ?: return null
+                if (handles == null || array.length() != handles.size) return null
+                (0 until array.length()).map { index ->
+                    (array.opt(index) as? String)?.takeIf(HANDLE::matches) ?: return null
+                }.also { if (it.distinct().size != it.size) return null }
+            } else handles
             val count = event.opt("observedCount") as? Int ?: return null
             if (count !in 0..25 || handles != null && handles.size > count) return null
             val page = if (handles != null) event.opt("pageIndex") as? Int ?: return null else 0
@@ -94,7 +102,7 @@ internal object ChatGptWebImageAssetProtocol {
             val unavailable = if (handles != null) event.opt("unavailableCount") as? Int ?: return null else 0
             if (page !in 0..255 || unavailable !in 0..count || previous != (page > 0) ||
                 state == "ready" && unavailable > 0) return null
-            return ChatGptWebImageGallerySnapshot(state, count, requestId, handles, page, previous, next, unavailable)
+            return ChatGptWebImageGallerySnapshot(state, count, requestId, handles, page, previous, next, unavailable, previews)
         }
         return ChatGptWebImageGallerySnapshot(
             state = state,
