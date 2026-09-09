@@ -75,6 +75,9 @@
         <activity android:name=".grid.manage.BinanceGridManageV2Activity"
             android:exported="true" android:excludeFromRecents="true"
             android:allowTaskReparenting="false" />
+        <activity android:name=".grid.manage.BinanceGridManageV3Activity"
+            android:exported="true" android:excludeFromRecents="true"
+            android:allowTaskReparenting="false" />
         <activity android:name=".grid.create.BinanceGridCreateActivity"
             android:exported="true" android:excludeFromRecents="true"
             android:allowTaskReparenting="false" />

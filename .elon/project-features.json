@@ -490,15 +490,28 @@
       "implementation_evidence": [
         {
           "path": "android/app/src/main/assets/binance_grid_create_adapter.js",
-          "content_hash": "72dbcd989fc9dd1281000149300699bb9eb2e67a60d380e75960410fa418bb86",
+          "content_hash": "64f9a0a7043c24f976a48d0858877f7e479cc44af82d282dbf72b9c791b32944",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d605cfb5ae4c8fcb58a3e73b56013ad7006367cd",
-            "head_blob_oid": "1f1df611dc4947a528f3c7ed54ddb56175aa1d67",
-            "worktree_blob_oid": "d3b15a45b00f873b1e2c88abf937cd01cf65d461",
+            "head_commit": "3fb679faa0d8640b367a39800aacf27c3cd4c5a8",
+            "head_blob_oid": "d3b15a45b00f873b1e2c88abf937cd01cf65d461",
+            "worktree_blob_oid": "dd71acc43f1c0be8f9edc237a46160c672f5efb6",
             "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/binance_grid_range_contract.js",
+          "content_hash": "d440ae69c62d12e9ef58242fc960e22a1330592773e2b67b8364c3fe7f5ae178",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "3fb679faa0d8640b367a39800aacf27c3cd4c5a8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "64d6353fb32b032fd75299447a95aabbff2585a6",
+            "state": "untracked"
           }
         },
         {
@@ -541,6 +554,32 @@
           }
         },
         {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageState.kt",
+          "content_hash": "2d59cc6ec851dabf228c8de82f1d034d92a06048253b02cb6db7648e8086f28f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "3fb679faa0d8640b367a39800aacf27c3cd4c5a8",
+            "head_blob_oid": "772e9d1596724b7096b420dc670f8f47520260df",
+            "worktree_blob_oid": "87b84491087de45f6448a87e73ad7a0cb4554783",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceRange.kt",
+          "content_hash": "136c8bb8a5d1e654ef60eaf0d602d4aa75e13b8d926a5d3c91b1f99d4cdf9077",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "3fb679faa0d8640b367a39800aacf27c3cd4c5a8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5b4d895d78aefc2ddc428273366d2fa8355828a0",
+            "state": "untracked"
+          }
+        },
+        {
           "path": "android/app/src/test/kotlin/com/elon/app/grid/manage/BinanceInvestmentTest.kt",
           "content_hash": "d76d67c29e7486b0fd6d3bf451791e447200922bdebe55ebb4102125e81448be",
           "locator": "",
@@ -550,6 +589,19 @@
             "head_commit": "d605cfb5ae4c8fcb58a3e73b56013ad7006367cd",
             "head_blob_oid": "",
             "worktree_blob_oid": "1dfcdc7bae35c6f6bc2272cb015ed5153d75158f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/manage/BinanceRangeTest.kt",
+          "content_hash": "15c585378b9218dcbf5d292e00be7349f2f2a8a3202c8b9df86b33792ebd9bfc",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "3fb679faa0d8640b367a39800aacf27c3cd4c5a8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6af49dcbb0ec1407f4a541bdfabac9b52849749e",
             "state": "untracked"
           }
         },
@@ -567,15 +619,28 @@
           }
         },
         {
+          "path": "docs/reports/binance-grid-range-v3-20260909.md",
+          "content_hash": "f4288bff3d45945a9f163295acbf8caa35b60c9f0b05be75c0a6b929bdc044d1",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "3fb679faa0d8640b367a39800aacf27c3cd4c5a8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6754d02268e111a36f2a6d27f9f449a75ede1271",
+            "state": "untracked"
+          }
+        },
+        {
           "path": "scripts/test-binance-grid-manage-adapter.cjs",
-          "content_hash": "2a32f2c4341b3aa428fa6ec9afe3c7c0733cc5b232946dabce6ab6e1e45c461f",
+          "content_hash": "670265ac7f3162f6f3d8a384f17e394f87800153313e5cb7778894cba7a66848",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d605cfb5ae4c8fcb58a3e73b56013ad7006367cd",
-            "head_blob_oid": "1b912e7710e780fa44123afaedd54b1932f4d72f",
-            "worktree_blob_oid": "4b27694d544dfe4e87b22ee4365dcc125fe02814",
+            "head_commit": "3fb679faa0d8640b367a39800aacf27c3cd4c5a8",
+            "head_blob_oid": "4b27694d544dfe4e87b22ee4365dcc125fe02814",
+            "worktree_blob_oid": "fda2425c26d5ffb607dbccd3bae727be8f27fb0f",
             "state": "tracked_modified"
           }
         },
@@ -600,7 +665,7 @@
         "expires_at_ms": 1788950781883
       },
       "created_at_ms": 1788893289640,
-      "updated_at_ms": 1788925501253
+      "updated_at_ms": 1788936035500
     },
     {
       "id": "android-binance-grid-create-v1",
@@ -24292,16 +24357,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b342175a9cd44b45bb47427f5ea26462",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Reopen the released governance feature because the newly reviewed Sui CI job intentionally changed its bound CI configuration evidence.",
-      "from_status": "released",
-      "to_status": "retired",
-      "at_ms": 1788652135017
-    },
-    {
       "id": "feature_event_0da2077c175a4cce8e2a347222f6b6ec",
       "feature_id": "project-feature-registry-adoption-v1",
       "action": "transitioned",
@@ -26290,6 +26345,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788925501253
+    },
+    {
+      "id": "feature_event_3ae55fcbf701460e8f0e60156b9560b9",
+      "feature_id": "android-binance-grid-core-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-core",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788936035500
     }
   ]
 }

@@ -18,6 +18,7 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
     private var pendingAction=""
     private var pendingCps=false
     private var pendingInvestment=""
+    private var pendingRange:BinanceRangeDraft?=null
     fun detailCurrent(id:String?)=readTrace.outcome=="verified" && host.live() && host.state.fresh() &&
         host.state.account==account && host.document.snapshot().documentToken==token && state.snapshot?.id==id
     fun cancel() {
@@ -36,13 +37,16 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
         begin(id);readTrace.start();message="正在读取当前策略；不会发送交易。";changed()
         execute("inspect",listOf(token,ticket,account,id),false)
     }
-    fun prepare(id: String, action: String, cps: Boolean, investmentDelta:String="") {
-        require(!state.unresolved && action in setOf("settings","close","investment")) { "请先核对并结束上次本机记录。" }
+    fun prepare(id: String, action: String, cps: Boolean, investmentDelta:String="",rangeDraft:BinanceRangeDraft?=null) {
+        require(!state.unresolved && action in setOf("settings","close","investment","range")) { "请先核对并结束上次本机记录。" }
+        require((action=="range")==(rangeDraft!=null))
         val amount=if(action=="investment")BinanceInvestment.amount(investmentDelta) else "".also{require(investmentDelta.isEmpty())}
         begin(id);pendingAction=action;pendingCps=cps
         pendingInvestment=amount
+        pendingRange=rangeDraft
         message="正在核对账号和当前设置，尚未提交。";changed()
-        if(action=="investment")execute("prepareInvestment",listOf(token,ticket,account,id,amount),false)
+        if(action=="range")execute("prepareRange",listOf(token,ticket,account,id,rangeDraft!!.payload()),false)
+        else if(action=="investment")execute("prepareInvestment",listOf(token,ticket,account,id,amount),false)
         else execute("prepare",listOf(token,ticket,account,id,action,cps),false)
     }
     fun canSubmit() = !busy && host.live() && host.state.fresh() && host.state.contains(state.id) &&
@@ -89,14 +93,16 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
             when(v["kind"]) {
                 "prepared","detail" -> {
                     val investing=v["kind"]=="prepared" && pendingAction=="investment"
+                    val ranging=v["kind"]=="prepared" && pendingAction=="range"
                     require(v.keys==base+(if(v["kind"]=="prepared") setOf("snapshot","action","cps") else setOf("snapshot"))+
-                        (if(investing)setOf("investment_delta") else emptySet()))
+                        (if(investing)setOf("investment_delta") else emptySet())+(if(ranging)setOf("range_draft") else emptySet()))
                     require(host.live() && host.state.account==account)
                     val snapshot=BinanceManageSnapshot.parse(v["snapshot"]);require(snapshot.id==target)
                     if(v["kind"]=="prepared") {
-                        require(host.state.contains(target) && v["action"]==pendingAction && v["cps"]==if(investing)snapshot.cps else pendingCps)
+                        require(host.state.contains(target) && v["action"]==pendingAction && v["cps"]==if(investing || ranging)snapshot.cps else pendingCps)
                         require(!investing || v["investment_delta"]==pendingInvestment)
-                        state.prepare(account,token,pendingAction,if(investing)snapshot.cps else pendingCps,snapshot,pendingInvestment)
+                        require(!ranging || BinanceRangeDraft.parse(v["range_draft"])==pendingRange)
+                        state.prepare(account,token,pendingAction,if(investing || ranging)snapshot.cps else pendingCps,snapshot,pendingInvestment,pendingRange)
                         message="检查完成，尚未提交。请核对下方本次操作摘要。"
                         host.handler.postDelayed({if(!closed) changed()},60_000)
                     } else {
@@ -119,6 +125,7 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
                     if(v["kind"]=="read_failed")readTrace.finish("failed",v["code"] as? String ?: "verification_failed")
                     message=when(v["code"]) {"no_change"->"所选设置没有变化。";"close_mode_changed"->"当前终止处理与选择不同，请先单独修改设置，再重新检查结束。";
                         "not_working"->"策略不是运行状态，请使用官网核对。";"settings_unavailable"->"详情缺少可验证设置，请使用官网。";
+                        "range_unavailable"->"当前仅支持参数完整的普通非追踪网格；收益金额止盈止损或未识别参数请在官网修改。";
                         "investment_unavailable"->"官网尚未返回完整投入详情，请在官网追加并核对结果。";else->"账号或详情核验未通过，未提交操作。"}
                 }
                 else -> return

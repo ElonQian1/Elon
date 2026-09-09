@@ -10,6 +10,7 @@
   const UPDATE = '/bapi/futures/v1/private/future/grid/update-grid';
   const CLOSE = '/bapi/futures/v1/private/future/grid/close-grid';
   const INVEST = '/bapi/futures/v1/private/future/grid/update-grid-investment';
+  const RANGE = '/bapi/futures/v1/private/future/grid/update-grid-range';
   const fetch = window.fetch;
   let context = null, contextAt = 0, prepared = null, sequence = 0, activeSend = null;
   const consumed = new Set();
@@ -17,7 +18,7 @@
   const scalarId = v => validId(v) ? v : Number.isSafeInteger(v) && v >= 0 ? String(v) : null;
   const safeCode = v => ['response_unrecognized','account_unverified','account_changed','configuration_unavailable',
     'session_context_expired','configuration_changed','detail_unverified','cancelled_before_send',
-    'settings_changed','settings_unavailable','not_working','no_change','close_mode_changed','investment_unavailable'].includes(v) ? v : 'network_unavailable';
+    'settings_changed','settings_unavailable','not_working','no_change','close_mode_changed','investment_unavailable','range_unavailable'].includes(v) ? v : 'network_unavailable';
   const businessCode = v => typeof v === 'string' && (/^[0-9]{1,12}$/.test(v) || v === 'symbolInTwap') ? v : 'business_rejected';
   function keys(v, expected) {
     return v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).sort().join(',') === expected.sort().join(',');
@@ -217,7 +218,7 @@
     const flags=['cps','cos','sharing','trailingStopLowerLimit','trailingStopUpperLimit'];
     if(flags.some(k=>typeof d[k] !== 'boolean')) throw Error('settings_unavailable');
     return {strategy_id:p.strategy,symbol:d.symbol,provider_status:d.strategyStatus,
-      ...Object.fromEntries(flags.map(k=>[k,d[k]])),investment:fundingSnapshot(d)};
+      ...Object.fromEntries(flags.map(k=>[k,d[k]])),investment:fundingSnapshot(d),range:window.__elonBinanceRangeV1?.snapshot(d) || null};
   }
   window.__elonBinanceManageV1 = Object.freeze({
     inspect(token,id,account,strategy) {
@@ -258,6 +259,21 @@
       }catch(e){if(p.seq===sequence)emit(p,'prepare_failed',{code:safeCode(e?.message)});}})();
       return true;
     },
+    prepareRange(token,id,account,strategy,input) {
+      const contract=window.__elonBinanceRangeV1,rangeDraft=contract?.draft(input);
+      if(!scope(token,id,account) || !manageId(strategy) || !rangeDraft || !context || activeSend || consumed.has(id) || consumed.size>=16)return false;
+      const p={mode:'manage',token,id,account,strategy,action:'range',rangeDraft,seq:++sequence};prepared=null;
+      (async()=>{try {
+        const snapshot=await managementSnapshot(p,headers());
+        if(snapshot.provider_status!=='WORKING')throw Error('not_working');
+        if(!snapshot.range || !snapshot.investment)throw Error('range_unavailable');
+        if(!contract.changed(snapshot.range,rangeDraft))throw Error('no_change');
+        if(p.seq!==sequence)return;
+        p.cps=snapshot.cps;p.snapshot=snapshot;p.expires=Date.now()+60000;prepared=p;
+        emit(p,'prepared',{snapshot,action:p.action,cps:p.cps,range_draft:rangeDraft});
+      }catch(e){if(p.seq===sequence)emit(p,'prepare_failed',{code:safeCode(e?.message)});}})();
+      return true;
+    },
     cancel() { window.__elonBinanceCreateV1.cancel(); },
     submit(token,id) {
       const p=prepared;
@@ -267,14 +283,15 @@
         const h=headers(), latest=await managementSnapshot(p,h);
         if(JSON.stringify(latest)!==JSON.stringify(p.snapshot)) throw Error('settings_changed');
         if(p.cancelled) throw Error('cancelled_before_send');
-        const body=p.action==='investment'?{strategyId:Number(p.strategy),symbol:latest.symbol,investmentDelta:p.investmentDelta}:
+        const body=p.action==='range'?window.__elonBinanceRangeV1.body(p.strategy,latest.symbol,latest.range,p.rangeDraft):
+          p.action==='investment'?{strategyId:Number(p.strategy),symbol:latest.symbol,investmentDelta:p.investmentDelta}:
           p.action==='close' ? {strategyId:Number(p.strategy)} : {strategyId:Number(p.strategy),
           symbol:latest.symbol,cps:p.cps,sharing:latest.sharing,
           trailingStopLowerLimit:latest.trailingStopLowerLimit,trailingStopUpperLimit:latest.trailingStopUpperLimit};
         dispatched=true;
-        const v=await request(p.action==='investment'?INVEST:p.action==='close'?CLOSE:UPDATE,h,body),d=v.data;
+        const v=await request(p.action==='range'?RANGE:p.action==='investment'?INVEST:p.action==='close'?CLOSE:UPDATE,h,body),d=v.data;
         if(v.success===false && typeof v.code==='string' && v.code!=='000000') {emit(p,'rejected',{code:businessCode(v.code)});return;}
-        if(p.action==='investment') {
+        if(p.action==='investment' || p.action==='range') {
           if(v.code!=='000000' || v.success!==true || d===false)throw Error('response_unrecognized');
           emit(p,'accepted',{strategy_id:p.strategy,provider_status:''});return;
         }

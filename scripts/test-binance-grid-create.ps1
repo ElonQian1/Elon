@@ -13,12 +13,14 @@ try {
         --tests com.elon.app.grid.manage.BinanceManageStateTest `
         --tests com.elon.app.grid.manage.BinanceManageReadTest `
         --tests com.elon.app.grid.manage.BinanceManageReconnectTest `
+        --tests com.elon.app.grid.manage.BinanceInvestmentTest `
+        --tests com.elon.app.grid.manage.BinanceRangeTest `
         --tests com.elon.app.grid.host.BinanceHostStateTest `
         --tests com.elon.app.grid.host.BinanceHostDiagnosticsTest
     if ($LASTEXITCODE -ne 0) { throw 'Binance native compilation or tests failed' }
 } finally { $env:GRADLE_EXIT_CONSOLE = $previous }
 $count = 0
-foreach ($suite in @('com.elon.app.grid.create.BinanceGridCreateTest','com.elon.app.grid.manage.BinanceManageStateTest','com.elon.app.grid.manage.BinanceManageReadTest','com.elon.app.grid.manage.BinanceManageReconnectTest','com.elon.app.grid.host.BinanceHostStateTest','com.elon.app.grid.host.BinanceHostDiagnosticsTest')) {
+foreach ($suite in @('com.elon.app.grid.create.BinanceGridCreateTest','com.elon.app.grid.manage.BinanceManageStateTest','com.elon.app.grid.manage.BinanceManageReadTest','com.elon.app.grid.manage.BinanceManageReconnectTest','com.elon.app.grid.manage.BinanceInvestmentTest','com.elon.app.grid.manage.BinanceRangeTest','com.elon.app.grid.host.BinanceHostStateTest','com.elon.app.grid.host.BinanceHostDiagnosticsTest')) {
     $path = Join-Path $root "android/app/build/test-results/testDebugUnitTest/TEST-$suite.xml"
     if (!(Test-Path -LiteralPath $path)) { throw 'Binance JUnit result missing' }
     [xml]$xml = Get-Content -LiteralPath $path -Raw
