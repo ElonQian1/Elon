@@ -41,7 +41,7 @@ assert(adapterSource.includes('conversationDirectoryRequests.handleCommand(comma
 assert(directoryRequestsSource.includes("action === 'probe_conversation_project'"));
 assert(directoryRequestsSource.includes("source: 'official_private'"));
 assert(directoryRequestsSource.includes("scopeProjectId: projectId || null"));
-assert(directoryRequestsSource.includes('emitSnapshot(projectId, true)'));
+assert.match(directoryRequestsSource, /emitSnapshot\(projectId, true, \{ ok: true/);
 assert(directoryRequestsSource.includes('const complete = Boolean(projectId && scopedComplete === true)'));
 assert(directoryRequestsSource.includes("value.conversations.filter((item) => item && item.projectId === projectId)"));
 assert(source.includes('replaceProjectConversations(projectId, text)'));

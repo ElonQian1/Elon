@@ -201,4 +201,28 @@ for (const projectScopeId of ['', 'g-p-fixture']) {
     assert.equal(events[0].collection.complete, false);
     assert.equal(replies[1][1], true);
   });
+
+  test(`unchanged ${projectScopeId ? 'project' : 'global'} snapshots still finish every requested refresh`, async () => {
+    const f = fixture(), events = [], replies = [];
+    const refresh = async () => ({ ok: true, code: 'directory_ready', complete: Boolean(projectScopeId), pages: 1 });
+    vm.runInNewContext(fs.readFileSync(path.join(assets, 'chatgpt_web_adapter_conversation_directory_requests.js'), 'utf8'),
+      { window: f.root });
+    const controller = f.root.__elonChatGptConversationDirectoryRequests.create({
+      conversationAdapter: { requestList: () => assert.fail('Unexpected DOM fallback') },
+      privateDirectory: { refresh, refreshScope: refresh, snapshot: () => ({
+        conversations: [{ id: 'unchanged', title: 'Fixture', projectId: projectScopeId }], projects: [],
+      }) },
+      optional: (_, fn) => fn(), emitEvent: value => events.push(value),
+    });
+    controller.emitSnapshot(projectScopeId);
+    controller.emitSnapshot(projectScopeId);
+    assert.equal(events.length, 1, 'passive identical snapshots remain deduplicated');
+    for (let n = 0; n < 2; n += 1) {
+      controller.requestList({ projectScopeId }, (...args) => replies.push(args));
+      await flush();
+      assert.equal(events.length, n + 2, 'native completion cannot depend on changed rows');
+      assert.equal(replies[n][1], true);
+    }
+    assert.equal(JSON.stringify(events[1]), JSON.stringify(events[2]));
+  });
 }

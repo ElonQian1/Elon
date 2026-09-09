@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 10) return;
+  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 11) return;
 
   const PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const CONVERSATION_PATH = /^\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})$/;
@@ -42,7 +42,8 @@
         complete,
         outcome: outcome ? { code: outcome.code, truncated: outcome.truncated, pages: outcome.pages } : null
       });
-      if (fingerprint === lastSnapshots.get(scopeKey)) return;
+      // Requested snapshots also settle the native refresh; deduplicate only passive updates.
+      if (!outcome && fingerprint === lastSnapshots.get(scopeKey)) return;
       lastSnapshots.set(scopeKey, fingerprint);
       emitEvent({
         type: 'conversation_snapshot',
@@ -111,7 +112,7 @@
       Promise.resolve(privateDirectory.refreshProject(projectId)).then((refreshed) => {
         if (!current()) return;
         if (!refreshed) return fallback();
-        emitSnapshot(projectId, true);
+        emitSnapshot(projectId, true, { ok: true, code: 'directory_ready', pages: 1 });
         respond('list_conversations', true, '');
       }).catch(fallback);
     }
@@ -182,5 +183,5 @@
     return Object.freeze({ cancel, emitSnapshot, handleCommand, installListener, probeMembership, requestList });
   }
 
-  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 10, create });
+  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 11, create });
 })();

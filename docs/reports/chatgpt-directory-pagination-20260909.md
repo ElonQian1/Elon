@@ -2,7 +2,7 @@
 
 Capability: `android_chatgpt_private_directory_pagination_v1`.
 Code: implemented. Deterministic tests: verified. Device acceptance: partial.
-Base: `3f9b73ba60f975ac6d13f20eb0d767331fd0832d`. Adapter: 308.
+Base: `3f9b73ba60f975ac6d13f20eb0d767331fd0832d`. Adapter: 309.
 
 ## Evidence And Scope
 
@@ -60,6 +60,10 @@ of missing provider capabilities or an input-box requirement.
   shared projects. Bounded truncation is exposed, not described as all history.
 - Explicit disabling of private reads retains the legacy path. A transient
   identity/network failure in an enabled private read does not launch a DOM scan.
+- Passive snapshots remain deduplicated, but every successful requested refresh
+  emits its snapshot even when rows and paging metadata are unchanged. The native
+  refresh coordinator settles on that event; omitting it left the coordinator busy
+  and later project refreshes queued indefinitely.
 
 ## Verification
 
@@ -87,13 +91,20 @@ true and composer-ready false:
   complete-account or low-network-latency pass.
 - The cache exposed 19 project entries after private refresh, up from five restored
   entries. Project selection kept the production sidebar open and selected the
-  requested ID; its read returned `directory_ready` without a composer.
+  requested ID. A `directory_ready` receipt was observed, but the native action
+  lacks a request ID; it is not sufficient proof of that project's final contents.
 - The sidebar was restored to date mode and closed. The conversation path and
   zero-length input remained unchanged. No send, microphone, account mutation,
   Cookie reset or proxy change was performed. The structural protocol probe was stopped.
 - Inspection of the failed-partial path found the native scope-settlement ordering
   issue described above. Adapter 308 suppresses failed completion snapshots; a
   focused global/project regression verifies the failure receipt and later recovery.
+- A later cached nonempty-project request did not expose a matching completion
+  within the bounded 16-second observation. Code inspection independently found
+  unchanged snapshots suppressing the native coordinator's completion signal.
+  Adapter 309 fixes this without disabling passive-update deduplication. Final
+  acceptance must use the native refresh action alone, not interleave raw MCP
+  directory commands with the coordinator's own requests.
 
 The follow-up release and device result are recorded below when available.
 The broader Goal remains active; current network latency and full-account coverage
