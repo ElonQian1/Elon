@@ -2,10 +2,11 @@
   'use strict';
   const pointer = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
-  const exported = Object.freeze({ version: 4, create: root => factory(root, pointer) });
+  const exported = Object.freeze({ version: 5, create: root => factory(root, pointer) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
-      Number(root.__elonChatGptPrivateImageGallery?.version || 0) < exported.version) {
+      (Number(root.__elonChatGptPrivateImageGallery?.version || 0) < exported.version ||
+       root.__elonChatGptPrivateImageGallery?.disposed === true)) {
     root.__elonChatGptPrivateImageGallery?.dispose?.();
     root.__elonChatGptPrivateImageGallery = factory(root, pointer);
   }
@@ -19,12 +20,14 @@
     'shared_library_file_id', 'library_download_id', 'context_scopes', 'source_url',
     'context_connector', 'connector_id', 'context_connector_info', 'shared']);
   const TTL_MS = 120000;
+  const PAGE_SIZE = 25;
+  const MAX_CATALOG_ITEMS = 256;
   const FAILURE_CODES = new Set(['identity_timeout', 'identity_unavailable', 'transport_unavailable',
     'page_unavailable', 'catalog_items_invalid', 'catalog_page_limit', 'catalog_item_invalid',
     'catalog_cursor_invalid', 'catalog_cursor_cycle', 'catalog_empty_continuation',
     'timeout', 'cancelled', 'response_too_large', 'response_body_unavailable', 'invalid_json']);
   const pages = new Map();
-  let cursors = [null], pageIndex = 0, cacheIdentity = '', cacheTime = 0;
+  let cursors = [{ cursor: null, offset: 0 }], pageIndex = 0, cacheIdentity = '', cacheTime = 0;
   let active = null, disposed = false;
 
   function identity(headers) {
@@ -65,7 +68,7 @@
     release(job);
   }
 
-  function clearCache() { pages.clear(); cursors = [null]; pageIndex = 0; cacheTime = 0; }
+  function clearCache() { pages.clear(); cursors = [{ cursor: null, offset: 0 }]; pageIndex = 0; cacheTime = 0; }
 
   async function headersFor(job) {
     const transport = root.__elonChatGptPrivateTransport;
@@ -102,7 +105,7 @@
 
   function parsePage(payload, cursor) {
     if (!payload || !Array.isArray(payload.items)) throw new Error('catalog_items_invalid');
-    if (payload.items.length > 25) throw new Error('catalog_page_limit');
+    if (payload.items.length > MAX_CATALOG_ITEMS) throw new Error('catalog_page_limit');
     if (payload.items.some(item => !item || typeof item !== 'object' || Array.isArray(item))) {
       throw new Error('catalog_item_invalid');
     }
@@ -188,20 +191,28 @@
       }
       job.index = job.operation === 'next' ? pageIndex + 1 : job.operation === 'previous' ? pageIndex - 1 : pageIndex;
       if (job.index < 0 || job.index >= cursors.length || job.index >= 256) throw new Error('page_unavailable');
-      let page = pages.get(job.index);
-      if (!page) {
+      const position = cursors[job.index];
+      let batch = pages.get(position.cursor);
+      if (!batch) {
         const url = new URL('/backend-api/my/recent/image_gen', root.location.origin);
-        url.searchParams.set('limit', '25');
-        if (cursors[job.index] !== null) url.searchParams.set('after', cursors[job.index]);
-        page = parsePage(await read(job, url.href), cursors[job.index]);
-        if (page.cursor !== null && cursors.slice(0, job.index + 1).includes(page.cursor)) {
-          throw new Error('catalog_cursor_cycle');
-        }
-        pages.set(job.index, page);
+        url.searchParams.set('limit', String(PAGE_SIZE));
+        if (position.cursor !== null) url.searchParams.set('after', position.cursor);
+        batch = parsePage(await read(job, url.href), position.cursor);
+        pages.set(position.cursor, batch);
         while (pages.size > 3) pages.delete(pages.keys().next().value);
         if (!cacheTime) cacheTime = Date.now();
       }
       check(job);
+      if (position.offset > 0 && position.offset >= batch.items.length) throw new Error('page_unavailable');
+      const end = position.offset + PAGE_SIZE;
+      // The server may return more than requested. Native pages remain bounded,
+      // and advance the server cursor only after every item in this batch.
+      const next = end < batch.items.length ? { cursor: position.cursor, offset: end }
+        : batch.cursor !== null ? { cursor: batch.cursor, offset: 0 } : null;
+      if (next?.offset === 0 && cursors.slice(0, job.index + 1).some(p => p.cursor === next.cursor)) {
+        throw new Error('catalog_cursor_cycle');
+      }
+      let page = { items: batch.items.slice(position.offset, end), cursor: next };
       cursors.length = job.index + 1;
       if (page.cursor !== null) cursors.push(page.cursor);
       pageIndex = job.index;
@@ -258,5 +269,5 @@
   }
 
   function dispose() { cancel(); disposed = true; clearCache(); cacheIdentity = ''; }
-  return Object.freeze({ version: 4, request, handle, cancel, dispose });
+  return Object.freeze({ version: 5, get disposed() { return disposed; }, request, handle, cancel, dispose });
 });

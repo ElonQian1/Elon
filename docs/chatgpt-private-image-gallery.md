@@ -1,13 +1,19 @@
 ---
 capability_id: android_chatgpt_private_generated_image_gallery_v1
 implementation_status: implemented
-verification_status: offline_pending_device
+verification_status: device_failed_source_corrected
 delivery_status: published
 ---
 
 # Private generated-image gallery
 
-Latest grouped release: `1.1.1574` (code 1574), source
+Latest real acceptance: `1.1.1616` reached the authenticated native Images page
+but rejected an official catalog batch larger than the requested 25 items. A
+second failure followed host pause/resume reuse of a disposed gallery. Both are
+corrected in gallery v5 source; real preview acceptance is still pending.
+See [current evidence and correction](reports/chatgpt-image-gallery-1616.md).
+
+Earlier grouped release: `1.1.1574` (code 1574), source
 `8c1b974862e73896903c723eb1d4eaebe9063a54`, includes gallery v2 and the shared
 pointer parser v1. Release build and server verification passed. APK SHA-256:
 `341cbf0cdb108632ce3a24846bab741977b870bb3ded00544fb5033fd4f3fa8c`.
@@ -55,8 +61,8 @@ Estuary content routes described below. Preview bytes use no cross-origin
 credentials and reject redirects. The inspected official shared module has SHA-256
 `89c95d937bac1191e91d5ceb4872eb0c328d39a98ce05399093a663f18921aa0`.
 
-This contract is based on current official source, not a successful current
-account API request. Bounded pointer parameters are now implemented below;
+The catalog request now has authenticated HTTP 200 evidence, but native preview
+acceptance remains pending. Bounded pointer parameters are implemented below;
 shared/library/connector scopes and unrecognized shapes remain partial.
 
 ## Ownership and limits
@@ -66,7 +72,9 @@ shared/library/connector scopes and unrecognized shapes remain partial.
 - Account, document and current URL fence every read and preview result. Closing
   the gallery or disposing the adapter cancels its work. Stale request IDs cannot
   update a reopened dialog. Gallery assets do not enter conversation-image retries.
-- The catalog cache holds three 25-item pages for two minutes. Up to 256 cursor
+- The catalog cache holds three server batches (at most 256 items each, 512 KiB
+  per response) for two minutes. Native pages contain at most 25 items; larger
+  responses retain a local offset until their server cursor advances. Up to 256 cursor
   positions are retained per document/account. Expiry revalidates page payloads
   without losing the cursor; refresh resets the catalog. Account changes clear it.
 - Native image cache bounds stay at 80 files / 64 MiB. Reopening a warm page with

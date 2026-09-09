@@ -102,13 +102,48 @@ test('cursor paging preserves order and previous page cache', async () => {
   assert.equal(h.catalogCalls().length, 2);
 });
 
+test('oversized official batches use native subpages without losing items or server cursors', async () => {
+  const h = harness([{ items: Array.from({ length: 61 }, (_, i) => row(i)), cursor: '1' },
+    { items: [row(61)], cursor: null }]);
+  const all = [], snapshots = [];
+  for (const operation of ['open', 'next', 'next', 'next']) {
+    assert.equal((await h.run(operation)).ok, true);
+    snapshots.push(h.snapshots().at(-1));
+    all.push(...h.snapshots().at(-1).handles);
+  }
+  assert.deepEqual(snapshots.map(s => s.observedCount), [25, 25, 11, 1]);
+  assert.deepEqual(snapshots.map(s => s.pageIndex), [0, 1, 2, 3]);
+  assert.deepEqual(snapshots.map(s => s.hasNext), [true, true, true, false]);
+  assert.equal(new Set(all).size, 62);
+  assert.equal(h.catalogCalls().length, 2, 'subpages share the same bounded server batch');
+  assert.equal(h.catalogCalls()[1].url.searchParams.get('after'), '1');
+  assert.equal((await h.run('previous', all)).ok, true);
+  assert.deepEqual(h.snapshots().at(-1).handles, snapshots[2].handles);
+  assert.equal(h.catalogCalls().length, 2);
+});
+
+test('expired native subpage refetches its server batch and preserves its offset', async () => {
+  const h = harness([{ items: Array.from({ length: 51 }, (_, i) => row(i)), cursor: null }]);
+  await h.run();
+  await h.run('next');
+  const second = h.snapshots().at(-1).handles, originalNow = Date.now;
+  const future = originalNow() + 120001;
+  try {
+    Date.now = () => future;
+    assert.equal((await h.run('open', second)).ok, true);
+    assert.deepEqual(h.snapshots().at(-1).handles, second);
+    assert.equal(h.snapshots().at(-1).pageIndex, 1);
+    assert.equal(h.catalogCalls().at(-1).url.searchParams.get('after'), null);
+  } finally { Date.now = originalNow; }
+});
+
 test('a valid terminal empty catalog is ready, malformed or unknown payload is not empty success', async () => {
   const empty = harness([{ items: [], cursor: null }]);
   assert.equal((await empty.run()).ok, true);
   assert.equal(empty.snapshots().at(-1).observedCount, 0);
   assert.equal(empty.snapshots().at(-1).state, 'ready');
   for (const payload of [{}, { items: null }, { items: [null] }, { items: [], cursor: 'next' },
-    { items: [row(1)], cursor: 42 }, { items: Array(26).fill(row(1)) }]) {
+    { items: [row(1)], cursor: 42 }, { items: Array(257).fill(row(1)) }]) {
     const h = harness([payload]);
     assert.equal((await h.run()).ok, false);
     assert.equal(h.snapshots().at(-1).state, 'failed');
@@ -120,7 +155,7 @@ test('gallery failures retain safe admission and catalog evidence, not response 
   for (const [payload, reason] of [
     [{}, 'catalog_items_invalid'],
     [{ items: [null] }, 'catalog_item_invalid'],
-    [{ items: Array(26).fill(row(1)) }, 'catalog_page_limit'],
+    [{ items: Array(257).fill(row(1)) }, 'catalog_page_limit'],
     [{ items: [row(1)], cursor: '' }, 'catalog_cursor_invalid'],
     [{ items: [], cursor: 'private-cursor' }, 'catalog_empty_continuation'],
   ]) {
@@ -249,7 +284,7 @@ test('gallery upgrade retires one older instance without stacking requests', () 
     __elonChatGptPrivateImagePointer: require('../android/app/src/main/assets/chatgpt_web_private_image_pointer.js') };
   vm.runInNewContext(source, { window: root });
   const instance = root.__elonChatGptPrivateImageGallery;
-  assert.equal(instance.version, 4);
+  assert.equal(instance.version, 5);
   assert.equal(disposed, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateImageGallery, instance);
@@ -350,6 +385,34 @@ test('bounded deadline and disposal cancel active reads without late events', as
     assert.equal(h.events.length, count);
     assert.equal(h.timers.size, 0);
   }
+});
+
+test('same-version reinjection replaces a disposed gallery after background resume', async () => {
+  const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
+  const source = fs.readFileSync(path.join(__dirname,
+    '../android/app/src/main/assets/chatgpt_web_private_image_gallery.js'), 'utf8');
+  const pending = deferred(), h = harness([() => pending.promise]);
+  h.root.__elonChatGptPrivateImagePointer = require(
+    '../android/app/src/main/assets/chatgpt_web_private_image_pointer.js');
+  const context = vm.createContext({ window: h.root, URL, URLSearchParams });
+  vm.runInContext(source, context);
+  const before = h.root.__elonChatGptPrivateImageGallery;
+  const command = { requestId: 'mcp_resume', value: JSON.stringify({ operation: 'open', cachedHandles: [] }) };
+  const result = before.request(command, event => h.events.push(event));
+  await Promise.resolve(); await Promise.resolve();
+  before.dispose();
+  const eventCount = h.events.length;
+  pending.resolve({ items: [row(1)], cursor: null });
+  assert.equal((await result).ok, false);
+  assert.equal(h.events.length, eventCount, 'suspended callback cannot paint into the new UI');
+  vm.runInContext(source, context);
+  const after = h.root.__elonChatGptPrivateImageGallery;
+  assert.notEqual(after, before, 'same module version must not reuse a disposed owner');
+  assert.equal((await after.request(command, event => h.events.push(event))).ok, true);
+  assert.equal(h.snapshots().at(-1).state, 'ready');
+  vm.runInContext(source, context);
+  assert.equal(h.root.__elonChatGptPrivateImageGallery, after, 'healthy reinjection retains the cache');
+  assert.equal(h.timers.size, 0);
 });
 
 test('production integration keeps gallery receipts separate and removes the extra WebView path', () => {
