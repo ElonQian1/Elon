@@ -1,5 +1,9 @@
 # Private directory pagination, September 9
 
+Later checkpoint: [1610 continuation and bounded retry acceptance](chatgpt-directory-continuation-20260909.md).
+It supersedes the timeout/continuation status below, but not the remaining
+full-account pagination and resource-measurement gaps.
+
 Capability: `android_chatgpt_private_directory_pagination_v1`.
 Code: implemented. Deterministic tests: verified. Device acceptance: partial.
 Base: `3f9b73ba60f975ac6d13f20eb0d767331fd0832d`. Adapter: 309.
