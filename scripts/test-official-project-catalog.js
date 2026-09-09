@@ -57,7 +57,12 @@ assert.equal(
 )
 assert.equal(quantProject.landing.downloads.web.status, 'available')
 assert.equal(quantProject.landing.downloads.web.url, 'http://43.139.149.158:8080/quant/')
+assert.equal(quantProject.landing.downloads.windows.status, 'partial')
+assert.equal(quantProject.landing.windows_webview.schema, 'yilong.windows_webview_launch.v1')
+assert.equal(quantProject.landing.windows_webview.provider_id, 'binance')
+assert.equal(Object.hasOwn(quantProject.landing.windows_webview, 'url'), false)
 assert.equal(quantProject.landing.downloads.android.status, 'planned')
+assert.match(previewDialogSource, /WindowsExchangeWebviewLaunch/)
 for (const retiredField of ['url', 'version', 'version_code', 'source_git_sha', 'sha256', 'size_label']) {
   assert.equal(
     Object.hasOwn(quantProject.landing.downloads.android, retiredField),

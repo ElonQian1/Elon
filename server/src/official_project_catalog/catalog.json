@@ -132,8 +132,8 @@
           },
           "windows": {
             "label": "Windows 桌面端",
-            "status": "planned",
-            "note": "后续复用一龙 Tauri 2 桌面技术栈"
+            "status": "partial",
+            "note": "一龙 Win 客户端已提供 Binance 官方合约网格 WebView；量化原生 Windows 功能继续分阶段接入"
           },
           "android": {
             "label": "Android 客户端",
@@ -171,6 +171,12 @@
           "schema": "yilong.quant.paper_launch.v1",
           "label": "进入 Paper 模拟持仓",
           "description": "由一龙账号签发五分钟短期授权，并在页面声明能力时附带同用户、同授权、同有效期的 ESK 只读投影；固定公钥密钥环支持安全轮换，用户可撤销当前授权，未配置 Web 地址或可信密钥时保持不可用。"
+        },
+        "windows_webview": {
+          "schema": "yilong.windows_webview_launch.v1",
+          "provider_id": "binance",
+          "label": "打开 Binance 合约网格",
+          "description": "在一龙 Win 客户端的独立官方网页窗口中登录、查看和操作；网页登录数据按当前一龙身份保存在本机 WebView2 Profile。"
         },
         "resources": [
           { "label": "GitHub 源码", "url": "https://github.com/ElonQian1/yilong-quant" },

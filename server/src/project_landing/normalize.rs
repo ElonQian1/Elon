@@ -5,6 +5,7 @@ use super::normalize_helpers::*;
 use super::{MANIFEST_PATHS, MAX_ITEMS, MAX_LONG_TEXT, MAX_SHORT_TEXT, MAX_URL, MAX_VARIANTS};
 
 const QUANT_PAPER_LAUNCH_SCHEMA: &str = "yilong.quant.paper_launch.v1";
+const WINDOWS_WEBVIEW_LAUNCH_SCHEMA: &str = "yilong.windows_webview_launch.v1";
 
 pub(super) fn normalize_manifest(value: Value) -> Option<Map<String, Value>> {
     let object = value.as_object()?;
@@ -87,6 +88,9 @@ pub(super) fn normalize_manifest(value: Value) -> Option<Map<String, Value>> {
     if let Some(paper_launch) = normalize_quant_paper_launch(object.get("paper_launch")) {
         output.insert("paper_launch".to_string(), paper_launch);
     }
+    if let Some(windows_webview) = normalize_windows_webview(object.get("windows_webview")) {
+        output.insert("windows_webview".to_string(), windows_webview);
+    }
 
     insert_text_array(
         &mut output,
@@ -164,6 +168,35 @@ fn normalize_quant_paper_launch(value: Option<&Value>) -> Option<Value> {
     output.insert("simulated".to_string(), Value::Bool(true));
     output.insert("funds_moved".to_string(), Value::Bool(false));
     output.insert("target_is_guaranteed".to_string(), Value::Bool(false));
+    insert_string(
+        &mut output,
+        "label",
+        first_string(source, &["label", "title"], MAX_SHORT_TEXT),
+    );
+    insert_string(
+        &mut output,
+        "description",
+        first_string(source, &["description", "summary"], MAX_LONG_TEXT),
+    );
+    Some(Value::Object(output))
+}
+
+fn normalize_windows_webview(value: Option<&Value>) -> Option<Value> {
+    let source = value?.as_object()?;
+    if source.get("schema")?.as_str()? != WINDOWS_WEBVIEW_LAUNCH_SCHEMA
+        || source.get("provider_id")?.as_str()? != "binance"
+    {
+        return None;
+    }
+    let mut output = Map::new();
+    output.insert(
+        "schema".to_string(),
+        Value::String(WINDOWS_WEBVIEW_LAUNCH_SCHEMA.to_string()),
+    );
+    output.insert(
+        "provider_id".to_string(),
+        Value::String("binance".to_string()),
+    );
     insert_string(
         &mut output,
         "label",

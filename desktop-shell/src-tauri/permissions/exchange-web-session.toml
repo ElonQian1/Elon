@@ -1,0 +1,7 @@
+[[permission]]
+identifier = "exchange-web-session"
+description = "允许一龙 PC 主窗口列出并打开白名单交易所的本地 WebView2 会话。"
+commands.allow = [
+  "list_exchange_web_providers",
+  "open_exchange_web_session",
+]

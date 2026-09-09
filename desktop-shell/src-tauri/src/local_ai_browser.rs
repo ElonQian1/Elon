@@ -19,6 +19,8 @@ mod chatgpt_cached_conversation_navigation;
 mod conversation_directory;
 #[path = "local_ai_browser/embedded_view.rs"]
 pub(crate) mod embedded_view;
+#[path = "local_ai_browser/exchange_webview.rs"]
+pub(crate) mod exchange_webview;
 #[path = "local_ai_browser/google_ai_mode.rs"]
 mod google_ai_mode;
 #[path = "local_ai_browser/google_ai_mode_adapter_bootstrap.rs"]
@@ -31,10 +33,12 @@ mod guest_identity;
 mod owner_profile;
 #[path = "local_ai_browser/private_response_authorization.rs"]
 mod private_response_authorization;
-#[path = "local_ai_browser/provider_contract.rs"]
-mod provider_contract;
 #[path = "local_ai_browser/provider_adapter.rs"]
 mod provider_adapter;
+#[path = "local_ai_browser/provider_catalog.rs"]
+mod provider_catalog;
+#[path = "local_ai_browser/provider_contract.rs"]
+mod provider_contract;
 #[path = "local_ai_browser/research_capture.rs"]
 pub(crate) mod research_capture;
 #[path = "local_ai_browser/semantic_context.rs"]
@@ -57,15 +61,19 @@ use std::{fs, process::Command};
 
 use tauri::{
     webview::{NewWindowResponse, PageLoadEvent, WebviewBuilder},
-    AppHandle, LogicalPosition, LogicalSize, Manager, State, Url, Webview, WebviewUrl, Window,
-    WindowBuilder, WindowEvent,
+    AppHandle, LogicalPosition, LogicalSize, Manager, PhysicalPosition, State, Url, Webview,
+    WebviewUrl, Window, WindowBuilder, WindowEvent,
 };
 
 pub use guest_identity::LocalAiGuestOwnerIdentity;
 use owner_profile::resolve as resolve_owner_fingerprint;
-pub use provider_contract::{ClearLocalAiWebSession, LocalAiWebProvider, LocalAiWebSession};
-use provider_contract::DESKTOP_RUNTIME_VERSION;
 use provider_adapter::ProviderAdapter;
+use provider_catalog::{
+    provider, provider_for_kind, provider_for_window_label, providers_for_kind, ProviderDefinition,
+    ProviderKind, CHATGPT, GOOGLE_AI_MODE,
+};
+use provider_contract::DESKTOP_RUNTIME_VERSION;
+pub use provider_contract::{ClearLocalAiWebSession, LocalAiWebProvider, LocalAiWebSession};
 use session_identity::{
     ensure_runtime_session, lock_webview_creation, profile_directory, window_label,
 };
@@ -89,63 +97,12 @@ pub fn resolve_local_ai_guest_owner_identity(
     guest_identity::resolve(app, legacy_owner_key)
 }
 
-#[derive(Clone, Copy)]
-struct ProviderDefinition {
-    id: &'static str,
-    display_name: &'static str,
-    start_url: &'static str,
-    start_host: &'static str,
-    login_mode: &'static str,
-    renderer_status: &'static str,
-    adapter: Option<ProviderAdapter>,
-    allowed_hosts: &'static [&'static str],
-    allowed_domain_suffixes: &'static [&'static str],
-    allowed_identity_hosts: &'static [&'static str],
-    blocked_identity_hosts: &'static [&'static str],
-}
-
-const CHATGPT: ProviderDefinition = ProviderDefinition {
-    id: "chatgpt",
-    display_name: "ChatGPT",
-    start_url: "https://chatgpt.com/",
-    start_host: "chatgpt.com",
-    login_mode: "manual_web",
-    renderer_status: "active",
-    adapter: Some(ProviderAdapter::ChatGpt),
-    allowed_hosts: &[],
-    allowed_domain_suffixes: &["chatgpt.com", "openai.com"],
-    allowed_identity_hosts: &[
-        "accounts.google.com",
-        "appleid.apple.com",
-        "login.live.com",
-        "account.live.com",
-        "login.microsoft.com",
-        "login.microsoftonline.com",
-        "login.windows.net",
-    ],
-    blocked_identity_hosts: &[],
-};
-
-const GOOGLE_AI_MODE: ProviderDefinition = ProviderDefinition {
-    id: "google-ai-mode",
-    display_name: "Google AI 模式",
-    start_url: "https://www.google.com/aimode",
-    start_host: "google.com/aimode",
-    login_mode: "guest_web_system_login",
-    renderer_status: "active",
-    adapter: Some(ProviderAdapter::GoogleWeb),
-    allowed_hosts: &["google.com", "www.google.com"],
-    allowed_domain_suffixes: &[],
-    allowed_identity_hosts: &[],
-    blocked_identity_hosts: &["accounts.google.com"],
-};
-
-const PROVIDERS: &[ProviderDefinition] = &[GOOGLE_AI_MODE, CHATGPT];
-
 #[tauri::command]
 pub fn list_local_ai_web_providers(webview: Webview) -> Result<Vec<LocalAiWebProvider>, String> {
     ensure_provider_list_webview(&webview)?;
-    Ok(PROVIDERS.iter().map(provider_summary).collect())
+    Ok(providers_for_kind(ProviderKind::AiAssistant)
+        .map(provider_summary)
+        .collect())
 }
 
 #[tauri::command]
@@ -157,9 +114,27 @@ pub async fn open_local_ai_web_session(
     owner_key: String,
     show_window: Option<bool>,
 ) -> Result<LocalAiWebSession, String> {
-    let provider = provider(&provider_id)?;
+    let provider = provider_for_kind(&provider_id, ProviderKind::AiAssistant)?;
+    open_web_session(
+        app,
+        webview,
+        runtime,
+        provider,
+        owner_key,
+        show_window.unwrap_or(true),
+    )
+    .await
+}
+
+async fn open_web_session(
+    app: AppHandle,
+    webview: Webview,
+    runtime: State<'_, LocalAiBrowserRuntime>,
+    provider: &'static ProviderDefinition,
+    owner_key: String,
+    show_window: bool,
+) -> Result<LocalAiWebSession, String> {
     let owner_fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
-    let show_window = show_window.unwrap_or(true);
     ensure_session_webview(&webview, provider, &owner_fingerprint)?;
     let window_label = window_label(provider, &owner_fingerprint);
     ensure_runtime_session(
@@ -315,7 +290,17 @@ pub async fn open_local_ai_web_session(
 
     let destroyed_app = app.clone();
     popout.on_window_event(move |event| {
-        if matches!(event, WindowEvent::Destroyed)
+        let resized = match event {
+            WindowEvent::Resized(size) => Some(*size),
+            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => Some(*new_inner_size),
+            _ => None,
+        };
+        if let Some(size) = resized {
+            if let Some(page) = destroyed_app.get_webview(&window_state_label) {
+                let _ = page.set_position(PhysicalPosition::new(0, 0));
+                let _ = page.set_size(size);
+            }
+        } else if matches!(event, WindowEvent::Destroyed)
             && destroyed_app.get_webview(&window_state_label).is_none()
         {
             window_state.mark_window_status(&window_state_label, "closed");
@@ -522,14 +507,16 @@ pub fn publish_local_ai_web_event(
         .filter(|provider| provider.adapter.is_some())
         .ok_or_else(|| "可见语义事件只允许已登记的本地 AI 会话窗口发送。".to_string())?;
     let event = provider.adapter.unwrap().sanitize_event(&payload)?;
-    if !runtime.accept_adapter_document_event(
-        label,
-        &event.kind,
-        event.document_token.as_deref(),
-    ) {
+    if !runtime.accept_adapter_document_event(label, &event.kind, event.document_token.as_deref()) {
         return Ok(());
     }
-    if research_capture::record_sanitized_adapter_observation(&app, provider, label, &event.kind, &event.payload) {
+    if research_capture::record_sanitized_adapter_observation(
+        &app,
+        provider,
+        label,
+        &event.kind,
+        &event.payload,
+    ) {
         return Ok(());
     }
     runtime.record_adapter_event_with_context_and_url(
@@ -621,19 +608,6 @@ fn ensure_session_webview(
     } else {
         Err("当前一龙窗口不能控制这个本地 AI 会话。".to_string())
     }
-}
-
-fn provider(provider_id: &str) -> Result<&'static ProviderDefinition, String> {
-    PROVIDERS
-        .iter()
-        .find(|provider| provider.id == provider_id.trim())
-        .ok_or_else(|| format!("不支持的本地 AI 网页厂商：{provider_id}"))
-}
-
-fn provider_for_window_label(label: &str) -> Option<&'static ProviderDefinition> {
-    PROVIDERS
-        .iter()
-        .find(|provider| label.starts_with(&format!("{LOCAL_AI_WINDOW_PREFIX}{}-", provider.id)))
 }
 
 fn parse_start_url(provider: &ProviderDefinition) -> Result<Url, String> {

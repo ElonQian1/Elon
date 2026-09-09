@@ -5,6 +5,7 @@ const path = require('node:path')
 const root = path.resolve(__dirname, '..', '..')
 const rust = [
   read('desktop-shell/src-tauri/src/local_ai_browser.rs'),
+  read('desktop-shell/src-tauri/src/local_ai_browser/provider_catalog.rs'),
   read('desktop-shell/src-tauri/src/local_ai_browser/provider_contract.rs'),
   read('desktop-shell/src-tauri/src/local_ai_browser/session_control.rs'),
 ].join('\n')

@@ -3,7 +3,9 @@ fn main() {
         tauri_build::AppManifest::new().commands(&[
             "run_browser_research",
             "list_local_ai_web_providers",
+            "list_exchange_web_providers",
             "open_local_ai_web_session",
+            "open_exchange_web_session",
             "present_local_ai_web_session_embedded",
             "hide_local_ai_web_session_embedded",
             "get_local_ai_web_session_state",

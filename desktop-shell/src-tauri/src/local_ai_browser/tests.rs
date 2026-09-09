@@ -1,3 +1,4 @@
+use super::provider_catalog::BINANCE;
 use super::*;
 
 fn url(value: &str) -> Url {
@@ -20,6 +21,40 @@ fn bootstrap_and_vendor_navigation_are_allowed() {
         &CHATGPT,
         &url("https://accounts.google.com/o/oauth2/v2/auth")
     ));
+}
+
+#[test]
+fn binance_exchange_navigation_is_fixed_to_official_login_and_trading_hosts() {
+    assert!(allows_navigation(
+        &BINANCE,
+        &url("https://www.binance.com/zh-CN/trading-bots/futures/grid/NEARUSDT")
+    ));
+    assert!(allows_navigation(
+        &BINANCE,
+        &url("https://accounts.binance.com/zh-CN/login")
+    ));
+    for blocked in [
+        "https://www.binance.com.evil.test/",
+        "https://fapi.binance.com/fapi/v1/exchangeInfo",
+        "http://www.binance.com/",
+        "https://user@www.binance.com/",
+        "https://www.binance.com:444/",
+    ] {
+        assert!(!allows_navigation(&BINANCE, &url(blocked)), "{blocked}");
+    }
+}
+
+#[test]
+fn ai_and_exchange_provider_catalogs_stay_separate() {
+    let ai_ids = providers_for_kind(ProviderKind::AiAssistant)
+        .map(|provider| provider.id)
+        .collect::<Vec<_>>();
+    let exchange_ids = providers_for_kind(ProviderKind::Exchange)
+        .map(|provider| provider.id)
+        .collect::<Vec<_>>();
+    assert_eq!(ai_ids, vec!["google-ai-mode", "chatgpt"]);
+    assert_eq!(exchange_ids, vec!["binance"]);
+    assert!(BINANCE.adapter.is_none());
 }
 
 #[test]
@@ -136,9 +171,7 @@ fn cached_provider_conversation_is_restored_without_restoring_auth_or_unrelated_
     assert_eq!(
         restorable_start_url(
             &GOOGLE_AI_MODE,
-            Some(
-                "https://www.google.com/search?q=private&udm=50&csuir=thread_1234567890",
-            ),
+            Some("https://www.google.com/search?q=private&udm=50&csuir=thread_1234567890",),
         )
         .unwrap()
         .as_str(),

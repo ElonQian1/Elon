@@ -24,6 +24,8 @@ pub(crate) struct OfficialProjectPublicPreview {
     pub(crate) downloads: Vec<OfficialProjectPublicDownload>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) paper_launch: Option<OfficialProjectPublicPaperLaunch>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) windows_webview: Option<OfficialProjectPublicWindowsWebview>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -45,6 +47,16 @@ pub(crate) struct OfficialProjectPublicPaperLaunch {
     pub(crate) simulated: bool,
     pub(crate) funds_moved: bool,
     pub(crate) target_is_guaranteed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct OfficialProjectPublicWindowsWebview {
+    pub(crate) schema: String,
+    pub(crate) provider_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -111,6 +123,9 @@ pub(crate) fn public_preview(project_id: &str) -> Result<Option<OfficialProjectP
                 }
             })
         });
+    let windows_webview = (project.id == "yilong-quant")
+        .then(|| public_windows_webview(object.get("windows_webview")))
+        .flatten();
 
     Ok(Some(OfficialProjectPublicPreview {
         schema: PUBLIC_PREVIEW_SCHEMA.to_string(),
@@ -126,7 +141,23 @@ pub(crate) fn public_preview(project_id: &str) -> Result<Option<OfficialProjectP
         system_requirements: text_list(object.get("system_requirements")),
         downloads,
         paper_launch,
+        windows_webview,
     }))
+}
+
+fn public_windows_webview(value: Option<&Value>) -> Option<OfficialProjectPublicWindowsWebview> {
+    let object = value?.as_object()?;
+    let schema = object.get("schema")?.as_str()?;
+    let provider_id = object.get("provider_id")?.as_str()?;
+    if schema != "yilong.windows_webview_launch.v1" || provider_id != "binance" {
+        return None;
+    }
+    Some(OfficialProjectPublicWindowsWebview {
+        schema: schema.to_string(),
+        provider_id: provider_id.to_string(),
+        label: text(object.get("label")),
+        description: text(object.get("description")),
+    })
 }
 
 fn public_download(value: &Value) -> Option<OfficialProjectPublicDownload> {

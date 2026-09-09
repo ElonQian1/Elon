@@ -312,7 +312,7 @@ mod tests {
     }
 
     #[test]
-    fn official_public_preview_is_allowlisted_and_quant_stays_paper_only() {
+    fn official_public_preview_is_allowlisted_and_quant_exposes_fixed_windows_webview() {
         let preview = public_preview("yilong-quant")
             .unwrap()
             .expect("一龙量化交易必须提供加入前公开预览");
@@ -322,7 +322,7 @@ mod tests {
         assert!(preview
             .downloads
             .iter()
-            .all(|download| download.status == "planned"));
+            .any(|download| download.platform == "windows" && download.status == "partial"));
         let launch = preview
             .paper_launch
             .as_ref()
@@ -331,6 +331,12 @@ mod tests {
         assert!(launch.simulated);
         assert!(!launch.funds_moved);
         assert!(!launch.target_is_guaranteed);
+        let windows_webview = preview
+            .windows_webview
+            .as_ref()
+            .expect("量化预览必须提供固定 Win 官网入口");
+        assert_eq!(windows_webview.schema, "yilong.windows_webview_launch.v1");
+        assert_eq!(windows_webview.provider_id, "binance");
 
         let serialized = serde_json::to_value(preview).unwrap();
         let serialized = serde_json::to_string(&serialized).unwrap();
@@ -340,6 +346,8 @@ mod tests {
             "\"resources\":",
             "\"participant\":",
             "\"grant\":",
+            "\"url\":",
+            "\"owner_key\":",
         ] {
             assert!(
                 !serialized.contains(forbidden),

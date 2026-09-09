@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Clock3, Info, Loader2, RefreshCw, ShieldCheck, X } from 'lucide-react'
 import { api } from '../../api/client'
+import WindowsExchangeWebviewLaunch, {
+  type WindowsWebviewLaunchContract,
+} from '../exchange-webview/WindowsExchangeWebviewLaunch'
 import type { PlazaProject } from './ProjectPlazaView'
 import styles from './OfficialProjectPreviewDialog.module.css'
 
@@ -36,6 +39,7 @@ interface OfficialProjectPreview {
   system_requirements: string[]
   downloads: OfficialProjectPreviewDownload[]
   paper_launch?: OfficialProjectPaperPreview
+  windows_webview?: WindowsWebviewLaunchContract
 }
 
 interface Props {
@@ -55,7 +59,8 @@ export default function OfficialProjectPreviewDialog({ project, onClose }: Props
       const result = await api.get<{ preview: OfficialProjectPreview }>(
         `/api/store/projects/${encodeURIComponent(project.id)}/preview`,
       )
-      if (result.preview?.schema !== 'yilong.official_project_preview.v1') {
+      if (result.preview?.schema !== 'yilong.official_project_preview.v1'
+        || result.preview.project_id !== project.id) {
         throw new Error('项目详情格式暂不受支持')
       }
       setPreview(result.preview)
@@ -142,6 +147,10 @@ export default function OfficialProjectPreviewDialog({ project, onClose }: Props
                     </small>
                   </div>
                 </section>
+              )}
+
+              {preview.windows_webview?.schema === 'yilong.windows_webview_launch.v1' && (
+                <WindowsExchangeWebviewLaunch launch={preview.windows_webview} />
               )}
 
               <PreviewList title="当前能力" items={preview.highlights} />

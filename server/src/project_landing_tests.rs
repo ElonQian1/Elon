@@ -172,6 +172,40 @@ fn normalizes_only_the_fixed_quant_paper_launch_contract() {
     assert!(unknown.get("paper_launch").is_none());
 }
 
+#[test]
+fn normalizes_only_the_fixed_windows_webview_launch_contract() {
+    let snapshot = normalize_landing_snapshot(&json!({
+        "title": "Quant",
+        "windows_webview": {
+            "schema": "yilong.windows_webview_launch.v1",
+            "provider_id": "binance",
+            "label": "打开币安合约网格",
+            "description": "在独立官网窗口中操作",
+            "url": "https://attacker.example/steal",
+            "owner_key": "private-owner"
+        }
+    }))
+    .unwrap();
+
+    assert_eq!(
+        snapshot["windows_webview"]["schema"],
+        "yilong.windows_webview_launch.v1"
+    );
+    assert_eq!(snapshot["windows_webview"]["provider_id"], "binance");
+    assert!(snapshot["windows_webview"].get("url").is_none());
+    assert!(snapshot["windows_webview"].get("owner_key").is_none());
+
+    let unknown = normalize_landing_snapshot(&json!({
+        "title": "Other",
+        "windows_webview": {
+            "schema": "yilong.windows_webview_launch.v1",
+            "provider_id": "unknown-exchange"
+        }
+    }))
+    .unwrap();
+    assert!(unknown.get("windows_webview").is_none());
+}
+
 fn temp_workspace(label: &str) -> PathBuf {
     let id = SystemTime::now()
         .duration_since(UNIX_EPOCH)
