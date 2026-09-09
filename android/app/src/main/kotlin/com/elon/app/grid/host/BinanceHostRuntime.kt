@@ -54,6 +54,16 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         if (!live()) return false
         deadline = SystemClock.elapsedRealtime() + 900000; armExpiry(); return true
     }
+    /** Restore the internal document without requiring a product Activity or minting a read grant. */
+    fun recoverConnection() {
+        if (!live() && !begin()) return
+        if (state.fresh() || !adapterBound) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastResumeRefresh > 10_000) {
+            lastResumeRefresh = now
+            view?.evaluateJavascript("window.__elonBinanceReadV1?.refresh()", null)
+        }
+    }
     private fun owner() = captured?.userId?.let(BinanceHostState::digest)
     fun grant(continuous: Boolean = false): String {
         require(live())

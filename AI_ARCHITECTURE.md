@@ -26,6 +26,10 @@ Android APK / Web UI
 7. 业务提交进入目标项目 Git 历史，再由后端或 APK 发布脚本按需构建、上传、部署和验证。
 8. 运行结果、用户验收和失败原因沉淀为 Context 和 Taste 数据。
 
+## 量化界面与主 APK 会话边界
+
+量化产品 UI 归量化 APK；主 APK 托管登录和受授权业务接口，不以跳转主创建页代替接口实现。现有主创建/管理页仅兼容，先读[已接受 V2 约束](docs/requirements/android-exchange-session-host-v2.md)，不能据旧交付继续扩建主项目量化 UI。新服务和界面迁移尚未实现。
+
 ## ESK 与量化经济边界
 
 ```text

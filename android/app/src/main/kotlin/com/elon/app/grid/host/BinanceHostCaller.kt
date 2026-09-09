@@ -20,7 +20,8 @@ internal object BinanceHostCaller {
     fun activity(activity: Activity): Boolean = runCatching {
         val caller = activity.callingActivity ?: return false
         require(activity.packageName == "com.elon.app" && activity.callingPackage == OfficialQuantApkPolicy.PACKAGE_NAME)
-        require(caller.packageName == activity.callingPackage && caller.className == ACTIVITY)
+        val nativeLogin = activity is BinanceHostConnectActivity && caller.className == "com.elon.quant.grids.create.NativeGridCreateActivity"
+        require(caller.packageName == activity.callingPackage && (caller.className == ACTIVITY || nativeLogin))
         val info = activity.packageManager.getApplicationInfo(caller.packageName, 0)
         trusted(activity, info.uid)
     }.getOrDefault(false)

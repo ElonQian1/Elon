@@ -14,6 +14,11 @@ class BinanceHostProvider : ContentProvider() {
         if (!BinanceHostCaller.ipc(owner)) throw SecurityException("CALLER_REJECTED")
         return runCatching {
             require(arg == null && extras != null)
+            if (method in com.elon.app.grid.create.BinanceCreateCommands.methods) {
+                return@runCatching BinanceHostRuntime.onMain(owner) { runtime ->
+                    com.elon.app.grid.create.BinanceCreateCommands.dispatch(owner, runtime, method, extras)
+                }
+            }
             if (method in setOf("resume_v2", "disconnect_v2")) {
                 require(extras.isEmpty)
                 return@runCatching BinanceHostRuntime.onMain(owner) { runtime ->

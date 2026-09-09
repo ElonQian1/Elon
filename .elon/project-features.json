@@ -1858,6 +1858,86 @@
       "updated_at_ms": 1788953369678
     },
     {
+      "id": "android-exchange-session-host-v2",
+      "title": "量化 UI 与主 APK 会话服务长期边界",
+      "summary": "量化持有选币和交易 UI，主 APK 独立提供登录、恢复及受授权业务接口；停止扩建旧主创建页，合同和迁移尚未实现。",
+      "status": "ready",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/android-exchange-session-host-v2.md",
+        "content_hash": "d12de5eb8bc426be6bd8c0c2da6ccc11ca522ada956e42b7efdc1634e1580c02",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "5f486bdf338c626a61399cc9d983d100b170cfbd",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "4e4dedd0994f70124176681f4b5de9b66a0e014d",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "android-session-host",
+      "tags": [
+        "android",
+        "architecture",
+        "session-host"
+      ],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_create_adapter.js",
+        "android/app/src/main/kotlin/com/elon/app/grid"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "正常量化创建和管理不依赖主产品 Activity",
+        "独立会话恢复、版本化命令及结果合同双端验证",
+        "主项目不新增量化产品 UI，未知交易不盲目重发"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateCommands.kt",
+          "content_hash": "117526565f21fa66b31b621a7398078206a719ad12a198a677c5e04c626f84c5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5f486bdf338c626a61399cc9d983d100b170cfbd",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6f7fed4839949c388217f6e8cc0e146a8992b07a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/create/BinanceCreatePermitTest.kt",
+          "content_hash": "f16cded6fd069edd480a67a6f47c06fb5fccb16c80bb186fd4416a13ac1ac82a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5f486bdf338c626a61399cc9d983d100b170cfbd",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "15c407c8214e7182bcc67624c19016bfc311231b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/reports/android-native-grid-create-v2-20260910.md",
+          "content_hash": "828d918a90b0f6dea1171924dfba72e8095792a59c4b4b4d9f4706ec0503262b",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5f486bdf338c626a61399cc9d983d100b170cfbd",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ce2c4505381914638d1f151b53a7bea851a54630",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1788957938151,
+      "updated_at_ms": 1788970329959
+    },
+    {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "title": "A2 Map/Lock dynamic quotient authority V1",
       "summary": "Freeze the typed exact-partition contract that maps every verified Map/Lock static included leaf into one auditable dynamic execution class, derives Qmap/Qlock mechanically, and requires one process-isolated Windows record per frozen class without opening production effects.",
@@ -24654,66 +24734,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_c4f286c37ead414d916621ae7a6eaf00",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "All 16 source, configuration, document, and test evidence bindings are current after the provenance correction.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788652815653
-    },
-    {
-      "id": "feature_event_21fbd7fdcdf14616a21fc341e063f8f8",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Allocation contract tests and the fixed-toolchain 13/13 plus currency 3/3 validation pass with current evidence.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788652826128
-    },
-    {
-      "id": "feature_event_0e3c51d99ac743ac9202fc54f9ec5b4f",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-sui-ci",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788653532761
-    },
-    {
-      "id": "feature_event_3d38c6c411d942398cc00326f647bf1f",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Fixed toolchain, archive verifier, isolated Move validation, exact CI guard, and remote checkout correction are implemented with 16 current evidence bindings.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788653544554
-    },
-    {
-      "id": "feature_event_ff8a14f4f0d54bafa9d315615deddb4a",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Local fixed-toolchain validation passed 3/3 and 13/13, independent security review found no P0-P2, and remote ESK Sui Move job 101398354380 passed on windows-2025.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788653555151
-    },
-    {
-      "id": "feature_event_96e801733fea43dbb6237ab3bba3bd26",
-      "feature_id": "esk-sui-reproducible-toolchain-ci-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Implementation is on origin/main and the dedicated remote ESK Sui Move job passed; publication remains explicitly not performed.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788653597653
-    },
-    {
       "id": "feature_event_b943b9368b6243a1ba949320d85ccba1",
       "feature_id": "project-feature-registry-adoption-v1",
       "action": "transitioned",
@@ -26652,6 +26672,66 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1788957062311
+    },
+    {
+      "id": "feature_event_fabb0e9f46fa4b1d9cdb5590c52f1746",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "registered",
+      "actor": "codex-ui-boundary",
+      "reason": "",
+      "from_status": "",
+      "to_status": "accepted",
+      "at_ms": 1788957938152
+    },
+    {
+      "id": "feature_event_653dcb151a07445a84413e55510ad2d6",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "transitioned",
+      "actor": "codex-ui-boundary",
+      "reason": "用户要求继续完成长期原生创建链路",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788967752005
+    },
+    {
+      "id": "feature_event_78c77231d6fb437084a9401bd9a71796",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "claimed",
+      "actor": "codex-ui-boundary",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788967752047
+    },
+    {
+      "id": "feature_event_5f18b5283ae0444e9784b95a2e185a77",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "transitioned",
+      "actor": "codex-ui-boundary",
+      "reason": "Implementing native create service slice; complete UI ownership migration remains in progress.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788970007366
+    },
+    {
+      "id": "feature_event_4a634fc5ac254a72ae73453c1ae0d1aa",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-ui-boundary",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788970329908
+    },
+    {
+      "id": "feature_event_b6104df72cb641108bd1986110ee9365",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "claim_released",
+      "actor": "codex-ui-boundary",
+      "reason": "Creation slice implemented and tested; full management migration and device acceptance remain. Release ownership for next bounded slice.",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1788970329959
     }
   ]
 }

@@ -29,6 +29,7 @@
 | 非简单功能/重构/迁移/生产修复 | `.agents/skills/deliver-feature-end-to-end/SKILL.md`，再叠加领域 Skill |
 | Android APK 发布 | Git/发布手册的发布入口；环境异常再读 `docs/android-setup.md` |
 | Android WebView/MCP/ADB | `.agents/skills/android-webview-feature-delivery/SKILL.md` |
+| 量化/币安 | 先读 `docs/requirements/android-exchange-session-host-v2.md` |
 | APP 低风险视觉微调 | `docs/app-ui-fast-lane.md` |
 | Stitch/Figma 导出、APP 复杂 UI/按图还原 | `docs/stitch-design-import.md`（导入）、`docs/Design.md`、`docs/APP 颜色规范.md`；双端再读 `.github/instructions/apk-web-ui-sync.instructions.md` |
 | APP 版本记忆 | `docs/app-version-memory.md` |
