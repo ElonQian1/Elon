@@ -122,9 +122,13 @@
         throw new Error('directory_cursor_stalled');
       }
       // A caller must use the existing canonical directory mapper. Never bridge raw provider rows.
-      const items = normalize(job.scope, decoded.items);
-      if (!Array.isArray(items) || items.length !== decoded.items.length || items.some((item, index) =>
-        !item || item.id !== decoded.items[index].id || typeof item.title !== 'string' || !item.title.trim())) {
+      const mapped = normalize(job.scope, decoded.items);
+      const items = Array.isArray(mapped) ? mapped : mapped?.items;
+      const omitted = Array.isArray(mapped?.omittedIds) ? mapped.omittedIds : [];
+      const expected = decoded.items.filter(item => !omitted.includes(item.id));
+      if (new Set(omitted).size !== omitted.length || omitted.some(id => !decoded.items.some(item => item.id === id)) ||
+        !Array.isArray(items) || items.length !== expected.length || items.some((item, index) =>
+        !item || item.id !== expected[index].id || typeof item.title !== 'string' || !item.title.trim())) {
         throw new Error('directory_response_invalid');
       }
       if (!owned(job) || !same(job.context, context())) return failure('directory_context_changed');
@@ -175,9 +179,9 @@
     return job.promise;
   }
 
-  function cancel() {
+  function cancel(clear = true) {
     active?.controller.abort(); active = null;
-    tickets.clear();
+    if (clear) tickets.clear();
   }
 
   return Object.freeze({ read, cancel });

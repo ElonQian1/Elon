@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptPrivateConversationDirectory;
-  if (existing && Number(existing.version) >= 14) return;
+  if (existing && Number(existing.version) >= 15) return;
   if (location.origin !== 'https://chatgpt.com') return;
 
   const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
@@ -19,6 +19,7 @@
   let listener = null;
   let revision = 0;
   let globalRefresh = null;
+  let directoryBrowser = null;
   const MAX_CONVERSATIONS = 200;
   const MAX_PROJECTS = 40;
   const MAX_RESPONSE_BYTES = 1024 * 1024;
@@ -428,18 +429,38 @@
   }
 
   window.__elonChatGptPrivateConversationDirectory = Object.freeze({
-    version: 14,
+    version: 15,
+    browsePage: (scope, handle) => {
+      if (!directoryBrowser && window.__elonChatGptPrivateDirectoryBrowser) {
+        directoryBrowser = window.__elonChatGptPrivateDirectoryBrowser.create(window, originalFetch, (scope, items) => {
+          if (scope === 'projects') return items.map(item => collectProjects(item)[0]);
+          const omittedIds = items.filter(item => deletedConversationIds.has(item.id) ||
+            removedConversationIds.has(item.id)).map(item => item.id);
+          return { omittedIds, items: items.filter(item => !omittedIds.includes(item.id))
+            .map((item, order) => conversationFrom(item, scope === 'conversations' ? null : scope, order)) };
+        });
+      }
+      return directoryBrowser?.read(scope, handle) || Promise.resolve({ ok: false, code: 'directory_reader_unavailable' });
+    },
+    cancelBrowse: () => directoryBrowser?.cancel(false),
     snapshot,
     refresh: () => refreshScope(),
     refreshScope,
     refreshDiagnostics: () => globalRefresh?.diagnostics(),
     cancelRefresh: () => globalRefresh?.cancel(),
     refreshProject,
-    acceptConversationMembership,
-    acceptPinnedState,
-    acceptTitleState,
-    acceptArchivedState,
-    acceptDeletedState,
+    acceptConversationMembership: invalidateBrowserAfter(acceptConversationMembership),
+    acceptPinnedState: invalidateBrowserAfter(acceptPinnedState),
+    acceptTitleState: invalidateBrowserAfter(acceptTitleState),
+    acceptArchivedState: invalidateBrowserAfter(acceptArchivedState),
+    acceptDeletedState: invalidateBrowserAfter(acceptDeletedState),
     setListener: (value) => { listener = typeof value === 'function' ? value : null; }
   });
+  function invalidateBrowserAfter(action) {
+    return (...args) => {
+      const accepted = action(...args);
+      if (accepted) directoryBrowser?.cancel();
+      return accepted;
+    };
+  }
 })();

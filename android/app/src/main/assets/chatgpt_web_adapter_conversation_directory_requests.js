@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 12) return;
+  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 13) return;
 
   const PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const CONVERSATION_PATH = /^\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})$/;
@@ -11,6 +11,7 @@
     const privateDirectory = dependencies.privateDirectory;
     const privateTransport = dependencies.privateTransport;
     const emitEvent = dependencies.emitEvent;
+    const browser = window.__elonChatGptDirectoryPageRequests?.create(privateDirectory, emitEvent);
     const optional = dependencies.optional;
     const lastSnapshots = new Map();
     let generation = 0;
@@ -145,6 +146,7 @@
     }
 
     function handleCommand(command, respond) {
+      if (browser?.handle(command, respond)) return true;
       const action = command.action;
       if (action === 'cancel_conversation_directory') {
         cancel();
@@ -187,5 +189,5 @@
     return Object.freeze({ cancel, emitSnapshot, handleCommand, installListener, probeMembership, requestList });
   }
 
-  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 12, create });
+  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 13, create });
 })();
