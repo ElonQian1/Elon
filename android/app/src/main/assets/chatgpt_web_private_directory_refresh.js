@@ -1,25 +1,29 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 4, create: factory });
+  const exported = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateDirectoryRefresh = exported;
 })(typeof window === 'object' ? window : null, function (root, accept, fetch) {
   'use strict';
   const active = new Map();
   const now = () => root.performance?.now?.() ?? Date.now();
-  let continuation = null;
+  const continuations = new Map();
   let lastDiagnostic = null;
 
   function sameContext(value, job) {
     return value && value.document === job.document && value.transport === job.transport && value.account === job.account;
   }
 
-  function globalCycle(job) {
-    if (!sameContext(continuation, job) || now() - continuation.started >= 60000) {
-      continuation = { document: job.document, transport: job.transport, account: job.account,
-        started: now(), reads: new Map() };
+  function cycleFor(job) {
+    continuations.forEach((value, scope) => {
+      if (!sameContext(value, job) || now() - value.started >= 60000) continuations.delete(scope);
+    });
+    if (!continuations.has(job.scope)) {
+      if (continuations.size >= 8) continuations.delete(continuations.keys().next().value);
+      continuations.set(job.scope, { document: job.document, transport: job.transport, account: job.account,
+        started: now(), reads: new Map() });
     }
-    return continuation;
+    return continuations.get(job.scope);
   }
 
   function identity(raw) {
@@ -38,7 +42,7 @@
     catch (_) { return false; }
   }
 
-  function cancel() { continuation = null; active.forEach(job => job.controller.abort()); }
+  function cancel() { continuations.clear(); active.forEach(job => job.controller.abort()); }
 
   async function readPages(job, scope, headers) {
     const protocol = root.__elonChatGptPrivateDirectoryPages;
@@ -89,6 +93,7 @@
       if (!accept({ family, projectId, replace: Boolean(projectId && state.complete) },
           JSON.stringify({ items: Array.from(items.values()) }), false)) throw new Error('directory_response_invalid');
       result = { ok: true, complete: state.complete, truncated: state.truncated, pages: state.pages,
+        continueRefresh: !state.finished,
         code: state.complete ? 'directory_ready' : 'directory_partial' };
       return result;
     } catch (error) {
@@ -134,20 +139,25 @@
       job.account = account;
       if (!account) return { ok: false, code: 'directory_identity_not_ready' };
       if (!current(job)) return { ok: false, code: 'directory_context_changed' };
-      if (job.scope !== 'global') return await readPages(job, job.scope, headers);
-      job.cycle = globalCycle(job);
+      job.cycle = cycleFor(job);
+      if (job.scope !== 'global') {
+        const result = await readPages(job, job.scope, headers);
+        if (current(job) && job.cycle.reads.get(job.scope)?.finished) continuations.delete(job.scope);
+        return result;
+      }
       const [conversations, projects] = await Promise.all([
         readPages(job, 'conversations', headers), readPages(job, 'projects', headers),
       ]);
       if (!current(job)) return { ok: false, code: 'directory_context_changed' };
-      if (continuation === job.cycle && [...job.cycle.reads.values()].length === 2 &&
-          [...job.cycle.reads.values()].every(read => read.finished)) continuation = null;
+      if (continuations.get(job.scope) === job.cycle && [...job.cycle.reads.values()].length === 2 &&
+          [...job.cycle.reads.values()].every(read => read.finished)) continuations.delete(job.scope);
       const ok = conversations.ok && projects.ok;
       return { ok, partial: conversations.ok || conversations.partial || projects.ok || projects.partial,
         code: ok ? (conversations.complete && projects.complete ? 'directory_ready' : 'directory_partial') :
           (!conversations.ok ? conversations.code : projects.code),
         // The global cache includes separately fetched project contents and must never be replaced wholesale.
         complete: false, conversationsComplete: conversations.complete, projectsComplete: projects.complete,
+        continueRefresh: ok && (conversations.continueRefresh || projects.continueRefresh) === true,
         truncated: conversations.truncated || projects.truncated, pages: conversations.pages + projects.pages };
     } catch (error) {
       if (!owned(job) || job.account && !current(job)) return { ok: false, code: 'directory_cancelled' };

@@ -129,6 +129,8 @@ internal sealed interface ChatGptWebEvent {
         val scopeProjectId: String? = null,
         val removedConversationIds: Set<String> = emptySet(),
         val deletedConversationIds: Set<String> = emptySet(),
+        val requestId: String? = null,
+        val continueRefresh: Boolean = false,
     ) : ChatGptWebEvent
 
     data class ComposerControls(
@@ -210,6 +212,8 @@ internal object ChatGptWebProtocol {
                             event, "removedConversationIds",
                         ),
                         deletedConversationIds = ChatGptWebConversationRemovalParser.parse(event, "deletedConversationIds"),
+                        requestId = event.optString("requestId").take(MAX_REQUEST_ID_LENGTH).takeIf(REQUEST_ID::matches),
+                        continueRefresh = event.optBoolean("continueRefresh", false),
                     )
                 }
                 "composer_controls_snapshot" -> parseComposerControls(event)

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 11) return;
+  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 12) return;
 
   const PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const CONVERSATION_PATH = /^\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})$/;
@@ -15,7 +15,7 @@
     const lastSnapshots = new Map();
     let generation = 0;
 
-    function emitSnapshot(requestedProjectId, scopedComplete, outcome) {
+    function emitSnapshot(requestedProjectId, scopedComplete, outcome, requestId) {
       if (!privateDirectory || typeof privateDirectory.snapshot !== 'function') return;
       const value = optional(null, () => privateDirectory.snapshot());
       if (!value || !Array.isArray(value.conversations) || !Array.isArray(value.projects) ||
@@ -47,6 +47,8 @@
       lastSnapshots.set(scopeKey, fingerprint);
       emitEvent({
         type: 'conversation_snapshot',
+        requestId: requestId || null,
+        continueRefresh: outcome?.continueRefresh === true,
         conversations,
         projects: value.projects,
         removedConversationIds,
@@ -81,7 +83,9 @@
       const projectId = String(command && command.projectScopeId || '').trim();
       const current = () => requestGeneration === generation;
       const fallback = () => {
-        if (current()) conversationAdapter.requestList(command, emitEvent, respond);
+        if (current()) conversationAdapter.requestList(command, event => {
+          if (current()) emitEvent(event.type === 'conversation_snapshot' ? { ...event, requestId: command.requestId } : event);
+        }, (...args) => { if (current()) respond(...args); });
       };
       const privateDisabled = window.__elonChatGptPrivateConversationPrefetchEnabled === false &&
         window.__elonChatGptPrivateResearchEnabled !== true;
@@ -89,7 +93,7 @@
         Promise.resolve().then(() => privateDirectory.refreshScope(projectId)).then((result) => {
           if (!current()) return;
           // Failed partial pages stay cached; a native snapshot would settle the refresh scope before its failure receipt.
-          if (result?.ok) emitSnapshot(projectId, result.complete === true, result);
+          if (result?.ok) emitSnapshot(projectId, result.complete === true, result, command.requestId);
           respond('list_conversations', result?.ok === true, result?.code || 'directory_refresh_failed');
         }).catch(() => { if (current()) respond('list_conversations', false, 'directory_refresh_failed'); });
         return;
@@ -97,7 +101,7 @@
       if (!projectId && !privateDisabled && typeof privateDirectory?.refresh === 'function') {
         Promise.resolve().then(() => privateDirectory.refresh()).then((result) => {
           if (!current()) return;
-          if (result?.ok) emitSnapshot(null, false, result);
+          if (result?.ok) emitSnapshot(null, false, result, command.requestId);
           respond('list_conversations', result?.ok === true, result?.code || 'directory_refresh_failed');
         }).catch(() => {
           if (current()) respond('list_conversations', false, 'directory_refresh_failed');
@@ -112,7 +116,7 @@
       Promise.resolve(privateDirectory.refreshProject(projectId)).then((refreshed) => {
         if (!current()) return;
         if (!refreshed) return fallback();
-        emitSnapshot(projectId, true, { ok: true, code: 'directory_ready', pages: 1 });
+        emitSnapshot(projectId, true, { ok: true, code: 'directory_ready', pages: 1 }, command.requestId);
         respond('list_conversations', true, '');
       }).catch(fallback);
     }
@@ -183,5 +187,5 @@
     return Object.freeze({ cancel, emitSnapshot, handleCommand, installListener, probeMembership, requestList });
   }
 
-  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 11, create });
+  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 12, create });
 })();

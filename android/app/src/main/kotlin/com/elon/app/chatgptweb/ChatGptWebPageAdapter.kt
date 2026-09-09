@@ -355,10 +355,12 @@ internal class ChatGptWebPageAdapter(
     fun listConversations(
         projectHints: List<ChatGptWebProject> = emptyList(),
         scopeProjectId: String? = null,
+        requestId: String? = null,
     ) = runCommand(
         action = "list_conversations",
         projectHints = projectHints,
         projectScopeId = scopeProjectId,
+        requestId = requestId,
     )
 
     fun listConversations(requestId: String) = runCommand("list_conversations", requestId = requestId)
@@ -699,7 +701,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 310
+        internal const val ADAPTER_VERSION = 311
 
         private val ADAPTER_ASSETS = ChatGptWebAdapterAssets.names
         private const val BRIDGE_OBJECT = "elonChatGptNative"
