@@ -66,7 +66,7 @@ internal class ChatGptWebMcpCommandAdapter(
     override fun deleteConversation(path: String, requestId: String) = deleteConversationAction(path, requestId)
     override fun shareConversation(path: String, requestId: String) = pageAdapter.shareConversation(path, requestId)
     override fun manageConversationShares(request: org.json.JSONObject, requestId: String) =
-        pageAdapter.shareConversation(request.getString("path"), requestId, request)
+        pageAdapter.shareConversation(path = "", requestId = requestId, management = request)
     override fun renameConversation(path: String, title: String, requestId: String) =
         pageAdapter.renameConversation(path, title, requestId)
     override fun moveConversationToProject(

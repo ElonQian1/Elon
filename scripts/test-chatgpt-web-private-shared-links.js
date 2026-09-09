@@ -8,6 +8,20 @@ let management;
 try { management = require('../android/app/src/main/assets/chatgpt_web_private_shared_links.js'); } catch (_) {}
 const LIST = '/backend-api/shared_conversations?order=created';
 
+test('native share management forwards the complete request without requiring a conversation path', async () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const adapter = fs.readFileSync(path.join(__dirname,
+    '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMcpCommandAdapter.kt'), 'utf8');
+  const body = adapter.split('override fun manageConversationShares(')[1].split('override fun ')[0];
+  assert.doesNotMatch(body, /request\.(?:get|opt)String\("path"\)/);
+  assert.match(body, /shareConversation\(path = "", requestId = requestId, management = request\)/);
+  const f = setup();
+  const result = await f.command({ operation: 'list_account', offset: 0 });
+  assert.equal(result.ok, true);
+  assert.equal(result.data.schema, 'elon.account_shares.v1');
+  assert.equal(f.requests[0].url, LIST);
+});
+
 function setup() {
   const f = fixture();
   let now = 1000, rows = [{ id: SID, conversation_id: CID, title: 'Not exported',
