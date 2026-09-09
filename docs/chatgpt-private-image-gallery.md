@@ -7,13 +7,14 @@ delivery_status: published
 
 # Private generated-image gallery
 
-Latest real acceptance: `1.1.1617` verified gallery v5 catalog/native subpages,
-preview opening, previous-page cache and reopening after host pause. It fixes
-1616's whole-page rejection of batches larger than 25 and disposed-owner reuse.
-First cold thumbnail sync still reached the total deadline and was partial;
-reopening completed, and the second page also completed. Optimize that remaining
-cold-load behavior without repeating the accepted catalog/paging implementation.
-See [current evidence and correction](reports/chatgpt-image-gallery-1616.md).
+Latest real acceptance: `1.1.1618` exercises gallery v6 direct catalog image URLs,
+native pagination while previews are loading, native preview and cached-page
+return. The new page 3 still reached the 35-second deadline and ended partial;
+cold-load completion is not fixed. Next evaluate separate small grid images and
+on-demand full previews, not longer waits. See
+[current evidence](reports/chatgpt-gallery-catalog-source.md).
+The accepted v5 subpages and owner-resume correction remain in place; reuse the
+[1617 catalog/paging/resume evidence](reports/chatgpt-image-gallery-1616.md).
 
 Earlier grouped release: `1.1.1574` (code 1574), source
 `8c1b974862e73896903c723eb1d4eaebe9063a54`, includes gallery v2 and the shared

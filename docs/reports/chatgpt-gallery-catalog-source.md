@@ -37,5 +37,47 @@ fallback, invalid URL rejection, bounded failure and account changes. A pending
 preview supersession case confirms next-page results cannot be overwritten by
 the abandoned page. Warm cache reuse remains covered.
 
-Android build and phone acceptance of this batch are pending. No measured
-latency, cold-page completion or thermal improvement is claimed yet.
+## Normal APK and production acceptance
+
+Published and automatically installed `1.1.1618` on the authorized Xiaomi,
+source `97241e245`, adapter 312. APK SHA-256:
+`5d70b5cad87d69f9f39f7abe667e838ed1b367af7892dcd0705835f50e4998ed`.
+Release/build/server verification/install log:
+`gallery-catalog-paging-release-20260910-012735-946` (465.8 seconds).
+
+- The native production Images entry completed with
+  `private_image_gallery_ready`; cached page 2 was ready at the first observation
+  after its page action. No official gallery page was opened.
+- Page 3 had not been loaded in the prior acceptance. After its catalog arrived,
+  the native semantic state was `loading=true`, `page=3`, and both navigation
+  buttons were enabled. Before the current catalog arrived, navigation remained
+  disabled and retained the old page label, as intended.
+- The bounded protocol capture included the catalog GET 200, a string
+  `items[].url` field and ten direct `/backend-api/estuary/content` GET 200
+  responses, with no file-download resolver among those captured requests.
+  It held 12 records and dropped 11, including unrelated website telemetry;
+  this is direct-path evidence, not an exact total request count. Capture was
+  stopped afterward, and no signed URL, request credential or image content was
+  exported into the evidence.
+- Page 3 still hit the 35-second overall deadline and ended partial with
+  `gallery_cancelled`. The semantic wait runner itself passed, but the sync did
+  not. Cold-page completion therefore remains open.
+- A loaded image opened in the native viewer. Closing it returned to the same
+  partial page 3; returning to cached page 2 completed with a ready receipt.
+- The gallery was closed and the original project homepage restored. Final
+  structured state confirmed native `social_ai`, closed sidebar, authenticated
+  and ready composer, zero messages, empty draft, no dictation or streaming.
+  No upload, send, image generation, microphone, login or data clearing occurred.
+
+UI logs: `gallery-open-1618-20260910-013615-397` and
+`gallery-cold-page3-1618-20260910-013745-589`; subsequent bounded semantic/MCP
+readbacks confirmed preview, cache return and restoration.
+
+## Remaining optimization
+
+The catalog URL fast path and pagination admission are implemented, published
+and exercised; reuse them. They remove a redundant resolver stage but do not
+prove lower total latency or heat. The grid still obtains bounded full preview
+bytes for every item. Next evaluate distinct official thumbnail sources for the
+grid and on-demand full preview loading, without sacrificing viewer quality or
+merely extending the deadline. Do not mark gallery cold loading completed.
