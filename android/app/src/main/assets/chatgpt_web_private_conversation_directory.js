@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptPrivateConversationDirectory;
-  if (existing && Number(existing.version) >= 13) return;
+  if (existing && Number(existing.version) >= 14) return;
   if (location.origin !== 'https://chatgpt.com') return;
 
   const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
@@ -428,7 +428,7 @@
   }
 
   window.__elonChatGptPrivateConversationDirectory = Object.freeze({
-    version: 13,
+    version: 14,
     snapshot,
     refresh: () => refreshScope(),
     refreshScope,

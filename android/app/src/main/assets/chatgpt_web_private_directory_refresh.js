@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 3, create: factory });
+  const exported = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateDirectoryRefresh = exported;
 })(typeof window === 'object' ? window : null, function (root, accept, fetch) {
@@ -62,10 +62,11 @@
         }, protocol.path(page), { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers,
           signal: job.controller.signal }, {
           // Admission is batch-bounded; an admitted page still gets its full request deadline.
-          timeoutMs: 4000,
+          timeoutMs: state.retryTimeoutMs || 4000,
           maxBytes: 1024 * 1024, mode: 'text',
         });
         lastRequestMs = now() - requestStarted;
+        state.retryTimeoutMs = 4000;
         if (!current(job)) throw new Error('directory_context_changed');
         const decoded = protocol.decode(page, response.text);
         visited.add(page.token);
@@ -97,6 +98,8 @@
           JSON.stringify({ items: Array.from(items.values()) }), false);
       }
       const code = String(error?.message || '');
+      // A slow read gets a bounded retry, without restarting other pages or increasing UI wait.
+      state.retryTimeoutMs = code === 'timeout' ? 8000 : 4000;
       // Retain only a retryable read, never a bad cursor/schema or a different identity.
       if (!current(job) || !(code === 'timeout' || /^http_(429|5\d\d)$/.test(code))) job.cycle?.reads.delete(scope);
       result = { ok: false, partial: items.size > 0 && current(job), complete: false, pages: state.pages,

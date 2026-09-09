@@ -6,6 +6,25 @@ const row = offset => ({ id: 'row-' + offset, title: 'Synthetic fixture' });
 const offsetOf = url => Number(new URL(url, 'https://chatgpt.com').searchParams.get('offset'));
 const history = offset => response({ items: [row(offset)], offset, limit: 28, total: 84 });
 
+test('only a timed-out global page gets a longer retry, reset after a successful page', async () => {
+  let fail = true;
+  const f = fixture(async url => {
+    if (url.includes('/snorlax/')) return response(emptyPage(url));
+    if (fail && offsetOf(url) === 28) return new Promise(() => {});
+    return history(offsetOf(url));
+  });
+  const deadlines = [];
+  f.root.setTimeout = (fn, ms) => { deadlines.push(ms); return setTimeout(fn, ms === 4000 ? 10 : ms); };
+  assert.equal((await f.controller.refresh()).code, 'directory_timeout');
+  assert.equal((await f.controller.refresh()).code, 'directory_timeout');
+  assert.equal(deadlines.at(-1), 8000, 'the second attempt remains bounded');
+  fail = false;
+  deadlines.length = 0;
+  assert.equal((await f.controller.refresh()).code, 'directory_ready');
+  assert.deepEqual(deadlines, [7000, 8000, 4000]);
+  assert.deepEqual(f.calls.filter(c => !c.url.includes('/snorlax/')).map(c => offsetOf(c.url)), [0, 28, 28, 28, 56]);
+});
+
 test('retry resumes the failed ordinary page and reuses the completed project catalog', async () => {
   let fail = true;
   const f = fixture(async url => {
