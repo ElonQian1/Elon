@@ -32,7 +32,7 @@ completed scopes. Normal 1595 new temporary single-text attachment passed privat
 upload/send, actual file reply, selected/read-only state and unchanged library
 fixture count, with restoration. This narrow scope is completed; variants remain pending.
 
-Current installed build: [normal APK 1595](reports/chatgpt-library-scopes-1591.md).
+Current installed build: [normal APK 1598](reports/chatgpt-media-batch-1596.md). Ordinary new-chat mixed text/PNG/PDF private upload, accepted native send, actual three-file reading and restoration are **completed**; reuse this scope. Other format/context variants remain pending.
 Ordinary authenticated native stop/follow-up is **completed**: both sends and
 stop used the official runtime, all 229 observed partial characters survived,
 and four ordered separate rows remained. Original blank chat/drafts were restored.
@@ -99,12 +99,11 @@ remain code gaps; reuse this implementation.
 
 Latest source extension: [private multi-attachment batches](chatgpt-private-attachment-batch.md)
 now join up to nine native selections to one prepared-action message, reusing
-existing per-file upload owners. 305 focused Node cases, 32 Kotlin/JUnit tests
-and SDK partial compilation passed. Full Android compilation subsequently passed
-in 1542; multiple-file production acceptance remains pending. The confirmed
-private route in this round used one text fixture, not a multi-file selection.
-This extends the historical single-file entries below; it does not upgrade
-their device-verification claims.
+existing per-file upload owners. Earlier 305 Node/32 Kotlin checks and grouped
+build passed. Normal 1598 subsequently passed one real three-file native send
+and all file-content reads after separating official ACK from editor cleanup;
+228 targeted regression cases passed. [Evidence](reports/chatgpt-media-batch-1596.md).
+This completes ordinary new-chat text/PNG/PDF, not other context/format variants.
 
 | Work | Code | Verification | Delivery |
 |---|---|---|---|
@@ -116,11 +115,11 @@ their device-verification claims.
 | Bounded request-shape capture through native MCP, reusing the page observer | Implemented diagnostic only | Node/Android checks passed; actual reservation JSON and conversation SSE capture observed | Published/installed 1540; telemetry-budget follow-up is source-only |
 | Reservation responses cannot prematurely release attachment sends | Implemented regression correction | Node red-to-green, 12 Android tracker tests passed; 1541 production reply read the actual file content | Published/installed 1541; no early-send symptom in the single fixture test |
 | Private file create/blob upload/process transaction | Implemented transport and native byte/store integration for one plain-text file in an empty ordinary new-chat or existing-chat composer, with confirmed conversation scope | One earlier 78-byte private upload processed; grouped checks passed; 1541 production file-content acceptance passed, but private-association provenance was not retained | Published/installed 1541; integrated private-route confirmation pending; [scope and contract](chatgpt-private-attachment-upload.md) |
-| Private static-image attachment upload | Native normalized JPEG/PNG/WebP handoff, bounded image preparation, multimodal private upload and ready-store dimensions implemented | Included in 96 Node cases and grouped Release build; actual image-reading acceptance pending | Published/installed 1541; [image contract and acceptance](chatgpt-private-image-upload.md) |
+| Private static-image attachment upload | Native JPEG/PNG/WebP handoff, bounded preparation, multimodal upload and dimensions implemented | Normal 1598 ordinary mixed batch passed private upload, accepted native send and actual PNG reading | PNG scope completed; other formats/contexts pending; [contract](chatgpt-private-image-upload.md) |
 | Private temporary-chat attachments | New/existing scope, non-library processing and exact text/image association implemented | Normal 1595 new temporary single-text private upload/send, reply, read-only selection and bounded library inventory passed | New single-text scope completed; existing/image/PDF variants pending; [contract](chatgpt-private-attachment-scopes.md) |
 | Private new-project attachments | Fresh permission read, scoped text/non-ingest-image upload and library-file ready-store metadata implemented for new project chats | Included in 96 Node cases and grouped Release build; project/library acceptance pending | Published/installed 1541; read-only/ingest-image extensions are source-only below; [exact scope](chatgpt-private-attachment-scopes.md#project-checkpoint) |
 | Private existing-project attachments | Fresh membership plus official selected-branch binding; scoped text/non-ingest-image processing and ready-store origins implemented | Included in 96 Node cases and grouped Release build; actual module access and project upload pending | Published/installed 1541; [branch contract](chatgpt-private-attachment-scopes.md#existing-project-branches) |
-| Private PDF attachments | Existing native byte lease, model-bound create request and ordinary/temporary/writable-project association extended to PDF | 96 Node cases and 33 grouped Android tests passed, including PDF MIME/size policy; actual PDF acceptance pending | Published/installed 1541; [protocol and scope](chatgpt-private-pdf-upload.md) |
+| Private PDF attachments | Existing byte lease, model-bound create and ordinary/temporary/project association extended to PDF | Normal 1598 ordinary mixed batch passed private upload, accepted native send and actual PDF reading | Ordinary scope completed; temporary/project variants pending; [contract](chatgpt-private-pdf-upload.md) |
 | Attachment cancellation without UI-thread I/O | Immediate byte-lease revocation, off-thread file cleanup and stale-read exclusion implemented | All 6 native reader tests passed, including blocked-read/EOF cancellation; grouped Android 33/33 passed | Published/installed 1541; live slow-read cancellation not exercised |
 | Private conversation file download authorization and native transfer | Implemented scoped private GET, expiring selections and production Download action | Official current source contract, targeted JS, Release compilation and Android checks passed; device transfer pending | Published/installed 1541; [scope and contract](chatgpt-private-file-download.md) |
 | Project/library-linked conversation attachment downloads | Existing native Download action now resolves confirmed project scope and library file metadata before private authorization | 48 focused Node cases passed with synthetic HTTP; actual saved bytes and live scope acceptance pending | Published/installed 1541; [scope extension](chatgpt-private-file-download.md#project-and-library-extension) |

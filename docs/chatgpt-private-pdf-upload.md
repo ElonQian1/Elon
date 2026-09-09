@@ -1,8 +1,10 @@
 # ChatGPT private PDF attachment upload
 
 Capability scope: `android_chatgpt_private_pdf_attachment_upload_v1`.
-Status: **implemented, compiled and published in 1541; focused Node/Android
-checks passed; PDF production-device acceptance pending**. Reuse this extension of
+Status: **ordinary new-chat PDF scope completed on normal 1598**: private mixed
+upload, accepted native receipt and actual PDF content reading passed;
+[device evidence](reports/chatgpt-media-batch-1596.md). Temporary/project PDF
+variants remain pending. Reuse this extension of
 [the existing upload transaction](chatgpt-private-attachment-upload.md); do not
 build another uploader. It does not complete the whole attachment capability.
 
@@ -23,8 +25,8 @@ The public official asset inspected on 2026-09-06 is
   images, not PDF. A writable project PDF keeps `use_case=gizmo`, project file
   metadata and the existing selected-branch origin contract.
 
-These are current public-source observations, not a real PDF upload trace.
-The earlier successful 78-byte text upload does not establish PDF acceptance.
+These are public-source protocol observations. The ordinary PDF device case is
+now separately confirmed on 1598; the earlier 78-byte text case was not PDF proof.
 
 ## Implementation
 

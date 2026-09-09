@@ -2,9 +2,11 @@
 
 Capability: `android_chatgpt_private_image_attachment_upload_v1`.
 
-Status: **implemented, offline verified, grouped Android and device acceptance
-pending**. Adapter 270 is a source candidate, not a published APK. The earlier
-78-byte text upload does not prove a real image upload or model image reading.
+Status: **ordinary new-chat PNG scope completed on normal 1598**: private
+text/PNG/PDF batch upload, native accepted receipt and actual image reading
+passed. Reuse this default path; [device evidence](reports/chatgpt-media-batch-1596.md).
+Other formats, large-image preparation and project/temporary variants remain
+unverified on device. Adapter 270 below is the original source checkpoint.
 
 ## Evidence and protocol
 

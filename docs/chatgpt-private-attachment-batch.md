@@ -1,9 +1,12 @@
 # Private native attachment batches
 
 Extension of `android_chatgpt_private_attachment_upload_transport_v1` and
-`android_chatgpt_official_runtime_text_submit_v1`, reviewed 2026-09-07.
-Status: source implemented, focused tests and SDK partial compilation passed;
-grouped Android build and production-device acceptance pending. Not completed.
+`android_chatgpt_official_runtime_text_submit_v1`, reviewed 2026-09-09.
+Status: **ordinary_new_mixed_text_png_pdf completed on normal 1598**. Private
+association, one native accepted send, all three content reads and restoration
+passed. [Current device evidence](reports/chatgpt-media-batch-1596.md). Reuse this
+default path; existing/project/temporary mixed and other format/size scopes
+remain unverified. Earlier source/test checkpoints below remain historical.
 
 ## Scope and ownership
 
@@ -20,19 +23,24 @@ library and selected-branch contracts.
   executor. Each file remains at most 8 MiB; all leases share a 120-second
   lifetime. Cancellation immediately revokes every reader and closes them off
   the UI thread. No file path or credential is accepted from page JavaScript.
-- Sender 17 validates the whole envelope and confirms every scope before byte
+- The sender validates the whole envelope and confirms every scope before byte
   reads or uploads. It runs existing per-file create/byte/process transactions
   sequentially, preserving image preparation, reuse, reservation and privacy
   behavior. A mixed project batch rechecks support for each file category.
 - Every file keeps its own explicit upload-copy choice. A batch cancels the
   singleton picker-prewarm selection; eligible individual uploads can use their
   own reservation. Explicit-copy files cannot reuse or claim a reservation.
-- Composer 16 publishes all ready objects in one store update only after all
+- The composer publishes all ready objects in one store update only after all
   files complete. Intermediate processing never releases the native send owner.
   Removing one selected ready file preserves the other owned entries.
-- Runtime submit 4 carries the exact ordered, frozen ready-file metadata and
+- The runtime carries the exact ordered, frozen ready-file metadata and
   original File references in one official `prepared_action`. Acceptance clears
   only those submitted objects; later drafts and unrelated files survive.
+
+Runtime v19/composer v20 separate confirmed dispatch from editor cleanup. A
+post-dispatch rerender cannot change ACK to failure. Exact captured-store files
+are retired locally; a cleanup failure retains no-replay ownership, with only
+local retirement retried on a later action. No network write is retried for it.
 
 Failure or cancellation after a private write never sends a partial batch,
 replays the text, or switches to DOM upload automatically. Already processed

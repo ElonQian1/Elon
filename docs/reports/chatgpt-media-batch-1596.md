@@ -8,15 +8,16 @@ The authenticated local MCP fixture now offers a pinned text/PNG/PDF bundle,
 staged in the production native composer's existing pending-attachment list.
 Its metadata and paths are fixed; callers cannot select arbitrary phone files.
 
-Capability checkpoints, not whole-capability completion:
+Completed scope: `ordinary_new_mixed_text_png_pdf` on normal 1598.
+This does not complete every variant of the following capabilities:
 
 - `android_chatgpt_private_image_attachment_upload_v1`: private batch upload
-  and model image-reading confirmed on 1597; native receipt correction pending.
+  and model PNG-reading with accepted native receipt completed in this scope.
 - `android_chatgpt_private_pdf_attachment_upload_v1`: private batch upload
-  and model PDF-reading confirmed on 1597; native receipt correction pending.
+  and model PDF-reading with accepted native receipt completed in this scope.
 - `android_chatgpt_private_attachment_upload_transport_v1`, scope
-  `ordinary_new_mixed_text_png_pdf`: upload/store association passed, final
-  native send/reply failed confirmation. This scope is **not completed**.
+  `ordinary_new_mixed_text_png_pdf`: **completed**, default production path;
+  reuse without repeat research unless a current regression is reported.
 
 ## Normal 1596
 
@@ -114,13 +115,40 @@ closed, and later files are preserved. No polling or extra network request was
 added. The sender version advances to rebuild its captured composer dependency.
 
 This is a receipt/cleanup correction to the verified transfer, not a new upload
-implementation. Real-device confirmation of the corrected receipt is pending.
+implementation. Corrected real-device confirmation follows.
+
+## Normal 1598 Completed Scope
+
+- Source: `d9c615783`; normal Release `1.1.1598`, 40,013,330 bytes.
+- APK SHA-256:
+  `dbbf6668b0bced21e4a4b15ac7f4f258711aa46d3af2ec4149923b7273fd19ff`.
+- `attachment-dispatch-ack-check-20260909-110223-975`: all 228 targeted Node
+  cases passed; the native PowerShell smoke contract and source-size gate passed.
+- `publish-attachment-dispatch-ack-20260909-110432-162`: Release build,
+  publication and Xiaomi unattended replacement install passed. Login retained.
+- `native-media-batch-1598-20260909-111332-131`: one production native send
+  passed in the existing authenticated session, with no DOM chooser/send fallback.
+
+```text
+private_upload=true private_send=true
+send_receipt=official_runtime_v1:accepted
+text_read=true pdf_read=true image_read=true
+user_rows=1 attachment_phase=completed
+local_remove=true no_early_upload_receipt=true
+elapsed_ms=56567 restored=true awake_restored=true
+```
+
+The answer contained both fixed document markers and the correct image facts,
+none supplied in the prompt. Native staging/removal, processed-file association,
+one prepared-action dispatch, result readback and blank-chat restoration passed.
+Only the exact owned local fixtures/draft were removed; synthetic remote artifacts
+may remain. This is a correctness/receipt fix, not a measured latency or heat win.
 
 ## Remaining Acceptance
 
-Reuse `scripts/smoke-chatgpt-web-media-batch.ps1` for the corrected normal APK.
-Do not rerun confirmed voice, dictation, ordinary single-text, library-file or
-temporary single-text cases. The mixed fixture checks the production native
+The ordinary mixed-media scope is completed; do not rerun it or confirmed voice,
+dictation, ordinary single-text, library-file or temporary single-text cases
+without a current regression. The mixed fixture checks the production native
 handler/preview state and private transfer, not rendered camera or SAF selection.
 JPEG/WebP variants, large-file re-encoding, existing/project/temporary mixed
 contexts, account upload quotas and temperature are separate, unclaimed scopes.
