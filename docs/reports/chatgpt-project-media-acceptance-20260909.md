@@ -9,9 +9,10 @@
 - Verification: scope/receipt/restore harness contracts passed; real project
   attachment send is **deferred**, not completed. A subsequent device window
   reached the project URL but stopped before upload at composer readiness.
-- Delivery: current phone independently read back normal `1.1.1599` (code
-  `1599`). It includes the normal 1598 ACK/cleanup correction. This batch changes
-  only acceptance scripts and records, so it does not require another APK build.
+- Delivery: latest independent package read is normal `1.1.1600` (code `1600`),
+  superseding the initial 1599 observation. The harness-only checkpoint needed
+  no APK. Subsequent recovery/readiness source corrections below are queued for
+  grouped delivery and must not be attributed to that installed build.
 
 The preceding goal turn made verified progress: ordinary new-chat mixed media
 passed on normal 1598, with one accepted native send and all three content reads.
@@ -97,6 +98,56 @@ Logged run: `webchat-recovery-causes-tests-20260909-140844-269`, 309.2 seconds,
 no timeout or stall. Per the requested grouped delivery workflow, this fix is
 source-verified and queued for the next combined APK, not yet installed. The
 actual project-page readiness cause and project-media acceptance remain open.
+
+## Actual Official-Page Evidence And Document Readiness
+
+A later bounded diagnostic switched to `ChatGptWebOfficialActivity`, verified
+that exact activity, and captured the selected project. The actual page showed
+only a white background and a Retry button, with no composer. This is evidence
+from the app's separate official fallback WebView, not acceptance of the resident
+identity WebView or the native production UI. A bounded Chromium log read did not
+expose a diagnostic error. The reason for this official Retry page remains open;
+do not classify it as expired login, missing projects or an upload failure.
+
+The ad-hoc diagnostic initially used the strict MainActivity foreground guard
+after intentionally opening the official activity. That rejection was expected
+for native acceptance, not evidence of a foreign app taking foreground. Keep the
+strict native guard unchanged. After checking the exact official activity, one
+Back action and explicit native-view selection restored the production native
+chat, same project and empty draft. Readback confirmed native presentation,
+foreground=true, composer_ready=false and bridge_state=connecting. No send,
+upload, microphone, Cookie/data clearing or proxy change was performed.
+
+Source inspection found a separate recoverability defect: directory refresh
+required session READY, and navigation required a ready composer bridge even
+when the current document adapter was already valid. The read request could be
+accepted merely as a delayed retry, without actually dispatching a directory
+request. A broken project composer could therefore also block cached-conversation
+navigation and refreshing the existing private directory.
+
+The existing access policy now distinguishes document operations from sending:
+current-generation, same-origin, non-login documents allow navigation; private
+directory reads also require an authenticated snapshot, or the existing ready
+guest-composer path. Missing/stale adapters, foreign origins and explicit login
+evidence are still rejected. Existing-conversation/project navigation reuses the
+same path validation, cached preview, command owner and single-flight guard.
+Deferred existing-conversation opens can dispatch on a current document snapshot
+without falsely marking the composer/session READY. New-chat confirmation,
+message/attachment submission, voice and permissions remain unchanged.
+
+Targeted tests cover the failed-composer read/navigation boundary, stale adapter,
+login/origin restrictions, guest behavior, cached preview, once-only deferred
+navigation, missing command owners, invalid/concurrent paths, and preservation
+of new-conversation gates. These source changes do not prove that the selected
+project's actual Retry page is fixed or that project attachment upload works.
+
+Release main/test compilation and all 37 focused JVM cases passed: 16 directory
+refresh coordinator cases, 11 navigation cases and 10 access-policy cases, with
+zero failures/errors. Logged run:
+`webchat-document-navigation-tests-20260909-20260909-145059-771`, 301.5 seconds.
+Source-size and document-modularity guards passed. This correction and the prior
+recovery failure classification are intended for one grouped acceptance APK;
+device acceptance is not yet claimed. The task-only handset capture was removed.
 
 ## Existing Harness Extension
 

@@ -20,7 +20,31 @@ Google protocol work. Google receives its equivalent implementation and
 acceptance only after this ChatGPT gate passes. Completed capabilities stay
 reused; source-only or installation status does not satisfy the acceptance gate.
 
-## Current batch
+## Current Status Map
+
+This summary supersedes older delivery labels below; it does not broaden a
+passed scope. Installed version was last independently observed as normal
+`1.1.1600` on September 9. Installation is not acceptance of every bundled path.
+
+| User workflow | Current result | Remaining boundary |
+|---|---|---|
+| Conversation/project cache, native audio/subtitles, private dictation/read-aloud | Previously device-verified, reused | Do not repeat without regression evidence; identity WebView remains intentional |
+| Pin, rename, archive, move conversation to a project | Device-verified, reused | Other account/permission variants are not implied |
+| Ordinary new-chat text + PNG + PDF attachments | Completed on 1598 | Project/temporary/other-format variants remain separate |
+| File library navigation, ordinary saved download, single library attachment, rename/soft-delete/upload-copy | Completed narrow scopes through 1591 | Special download sources, folder writes, other attachment scopes |
+| Personal full sharing/list/revoke and current-conversation delete | Completed on 1547 | Other share scopes and remaining rendered confirmation/menu cases |
+| Text submit/stream/stop/follow-up | Official runtime path verified, reused | This is not independent Android HTTP POST; other contexts and regeneration need evidence |
+| Project attachments | Code and harness implemented | Actual project page has no ready composer; no project upload/send accepted yet |
+| Model/effort/tool combinations and latest cursor image gallery | Implemented candidates | Remaining real native-menu/runtime and gallery acceptance |
+| Other mounted providers and citation-only cloud references | Incomplete | Do not invent a transport for an uncaptured source |
+| Google private sender | Deferred by user priority | Start only after the remaining ChatGPT acceptance gate |
+
+Current code correction separates current-document navigation/private directory
+access from composer readiness. Sending, attachment submission and new-chat
+confirmation keep their existing gates. Current investigation and delivery
+evidence are in [the project readiness report](reports/chatgpt-project-media-acceptance-20260909.md).
+
+## Recent Accepted Scopes
 
 [Normal Release 1589 evidence](reports/chatgpt-library-mutations-1589.md):
 ordinary native library rename/soft-delete, explicit one-text-file upload-copy
@@ -32,7 +56,7 @@ completed scopes. Normal 1595 new temporary single-text attachment passed privat
 upload/send, actual file reply, selected/read-only state and unchanged library
 fixture count, with restoration. This narrow scope is completed; variants remain pending.
 
-Current installed build: [normal APK 1598](reports/chatgpt-media-batch-1596.md). Ordinary new-chat mixed text/PNG/PDF private upload, accepted native send, actual three-file reading and restoration are **completed**; reuse this scope. Other format/context variants remain pending.
+Latest mixed-media acceptance: [normal APK 1598](reports/chatgpt-media-batch-1596.md). Ordinary new-chat mixed text/PNG/PDF private upload, accepted native send, actual three-file reading and restoration are **completed**; reuse this scope. Other format/context variants remain pending.
 Ordinary authenticated native stop/follow-up is **completed**: both sends and
 stop used the official runtime, all 229 observed partial characters survived,
 and four ordered separate rows remained. Original blank chat/drafts were restored.
@@ -42,7 +66,12 @@ has not been retaken; do not clear login to recreate it or infer its root cause
 from the authenticated pass. The unchanged native harness checks a requested
 public-answer prefix, separate turns and restoration without mutating the tree.
 
-Latest grouped delivery: `1542` compiled and passed 1,007 Android tests, was
+## Historical Delivery Checkpoints
+
+These paragraphs preserve what was proven at each earlier build. They are not
+the current installed version or a reason to repeat subsequently completed work.
+
+Grouped delivery `1542` compiled and passed 1,007 Android tests, was
 published and installed, and confirmed one production private text-file upload
 with actual file-content reply. `1543` includes the file-index freshness fix;
 the production private index returned the same fixture in 716 ms. Its download
@@ -59,7 +88,7 @@ The source candidates below are bundled through `54a89232e`; older delivery
 cells are historical checkpoints, not current source-only blockers. Bundling
 does not upgrade any pending protocol or rendered-UI acceptance claim.
 
-Latest correction delivery: APK 1545 includes same-origin generated-image preview
+Correction delivery APK 1545 includes same-origin generated-image preview
 v4, shared-link management v2 and on-demand public-script inventory through
 existing MCP diagnostics. Related Node suites, six focused Android tests and the
 Release build passed. Wireless replacement installation was verified. The real
@@ -67,7 +96,7 @@ private share-list read returned a complete empty result in 1,436 ms; inventory
 also worked. Gallery UI and public-share creation/revocation remain pending.
 No normal-user polling, account changes or independent proxy changes were added.
 
-Current delivery: `1.1.1547` with [versioned website runtime bindings](chatgpt-private-runtime-bindings.md)
+Delivery `1.1.1547` with [versioned website runtime bindings](chatgpt-private-runtime-bindings.md)
 replace stale module selection across sharing, deletion, model state, text,
 regeneration, stop, temporary chat and attachment scope/reuse. The September 7
 website changed both filenames and export aliases. New/old-build and consumer
@@ -76,9 +105,9 @@ Personal share/create/list/revoke and current-conversation deletion passed using
 one synthetic fixture through production handlers. The native reply arrived via
 the existing `template_unavailable` fallback, with an extra thinking-status bubble;
 direct sending is not accepted. [1547 evidence](reports/chatgpt-runtime-release-1547.md)
-is the current checkpoint; other acceptance gaps below remain.
+records that historical checkpoint; subsequent text-send acceptance is above.
 
-Latest grouped delivery: [APK 1552](reports/chatgpt-runtime-release-1552.md)
+Grouped delivery [APK 1552](reports/chatgpt-runtime-release-1552.md)
 contains the resolver/backoff, [new-chat confirmation](chatgpt-private-new-conversation.md),
 mounted-file changes below and the resident-composer-host correction. Release
 compilation, publication and replacement installation passed. One native text
