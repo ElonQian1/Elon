@@ -183,3 +183,40 @@ passed afterward (`temporary-readonly-regression-after-20260909-084548-971`).
 The local research package was replaced with hash-verified normal 1593, the CDP
 forward removed, and authenticated/ready empty native chat verified. Full normal
 candidate acceptance is still required before closing temporary attachment scope.
+
+## Normal 1594 failure and complete owner capture
+
+Normal `1.1.1594` from `073c6f585` was published and installed; APK SHA-256
+`15502c5b5133e7d181f7b15a3cb9f0ccb2544787b3b60d78d4d025a2ab943a3e`.
+`temporary-attachment-normal-1594-20260909-085817-460` again confirmed private
+upload, one user row, actual file reply and `official_runtime_v1:accepted`, but
+failed post-reply selection. v6 fixed the read-only callback condition, not every
+earlier capture condition. No aggregate pass or persistence claim was made.
+
+The same-version research build exposed both earlier mismatches on a blank page:
+the official client ID has the form `WEB:<uuid>`, and the committed owner has
+memo-cache lengths `[30, 2]`, not just `[30]`. Account, document, observed asset
+profile, owner commitment, exact action identity and conversation identity were
+all valid. v6 rejected the ID before reaching the cache/callback checks. The
+second cache belongs to a nested hook; the owner's first 30 slots still match
+the inspected schema exactly.
+
+Temporary v7 accepts the observed prefixed UUID and the additional two-slot
+cache while retaining all first-cache, action, ownership, route and read-only
+checks. Unknown namespaces, malformed IDs, extra or unknown cache shapes remain
+rejected. The new positive cases failed before the change; 236 related tests
+passed afterward (`temporary-owner-shape-after-20260909-091826-008`).
+
+`temporary-candidate-state-proof-20260909-092338-943` loaded only an isolated
+candidate observer into the research page. It correctly reported selected/mutable
+before the synthetic turn and selected/read-only after it, while the unchanged
+production wrapper still reported the old false state. A separate candidate
+transaction confirmed on/off through the exact official callback without DOM
+clicking and restored the normal blank route. These prove candidate capture and
+transaction behavior, not final native UI acceptance. WebView rejected CDP live
+editing (`setScriptSource functionality no longer available`); no official source
+was changed. The research build was replaced with hash-verified normal 1594 and
+the temporary CDP forward removed before delivery.
+
+The native attachment acceptance now waits for both selected and read-only state
+after the reply. It must pass on the normal release before this scope is closed.

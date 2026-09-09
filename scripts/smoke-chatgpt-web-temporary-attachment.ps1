@@ -44,15 +44,16 @@ function Library {
     }
     return @($page.items | Where-Object { $_.name -ceq $fixtureName }).Count
 }
-function Wait-Mode([bool]$Selected) {
+function Wait-Mode([bool]$Selected, [Nullable[bool]]$StateSettable = $null) {
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds(30)
     do {
         $s = Web
         $control = $s.ui_manifest.controls | Where-Object semantic -eq 'temporary_chat' | Select-Object -First 1
-        if ($null -ne $control -and $control.selected -eq $Selected -and $s.composer_ready -eq $true) { return $control }
+        if ($null -ne $control -and $control.selected -eq $Selected -and $s.composer_ready -eq $true -and
+            ($null -eq $StateSettable -or $control.state_settable -eq $StateSettable)) { return $control }
         Start-Sleep -Milliseconds 600
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
-    $report.mode_observation = [ordered]@{ selected = $control.selected; controls_present = $null -ne $control
+    $report.mode_observation = [ordered]@{ selected = $control.selected; state_settable = $control.state_settable; controls_present = $null -ne $control
         composer_ready = $s.composer_ready; route_home = ([uri]$s.conversation.url).AbsolutePath -eq '/' }
     throw 'temporary_mode_not_confirmed'
 }
@@ -113,8 +114,11 @@ try {
     $report.attachment_phase = $s.social_chat.web_chat_attachment_phase
     $report.send_receipt = $s.social_chat.web_chat_last_send_command.detail
     $report.private_send = $report.send_receipt -eq 'official_runtime_v1:accepted'
-    Wait-Mode $true | Out-Null
+    $postMode = Wait-Mode $true $false
+    $report.temporary_selected = $postMode.selected
+    $report.temporary_readonly = $postMode.state_settable -eq $false
     if (-not $report.private_upload -or -not $report.private_send -or -not $report.file_reply -or $report.user_rows -ne 1 -or
+        -not $report.temporary_readonly -or
         $s.social_chat.web_chat_streaming -or $s.input.text) { throw 'temporary_attachment_unconfirmed' }
     $report.stage = 'library_after'
     $report.library_after_count = Library

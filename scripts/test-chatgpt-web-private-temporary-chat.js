@@ -28,7 +28,8 @@ function fixture(options = {}) {
   function render(newConversation = false) {
     if (newConversation || !state.conversation) {
       if (state.node) state.node.isConnected = false;
-      const id = state.newChat ? 'client-created-fixture-' + (newConversation ? '2' : '1') : CID;
+      const id = options.webClientId ? 'WEB:' + CID :
+        state.newChat ? 'client-created-fixture-' + (newConversation ? '2' : '1') : CID;
       const serverId = state.newChat ? null : CID;
       state.conversation = { id, serverId$: () => serverId, config: {} };
     }
@@ -71,7 +72,8 @@ function fixture(options = {}) {
     const memo = Array(30);
     memo[0] = id; memo[3] = state.newChat; memo[4] = state.selected; memo[7] = action;
     memo[19] = action; memo[20] = state.selected && !state.newChat; memo[21] = state.selected;
-    owner.updateQueue = { memoCache: { data: [memo], index: 1 } };
+    const data = options.hookMemoCache ? [memo, [null, null]] : [memo];
+    owner.updateQueue = { memoCache: { data, index: data.length } };
     const button = { memoizedProps: { onClick: state.selected && !state.newChat ? undefined : action }, return: owner };
     if (!state.node || !state.node.isConnected) {
       state.node = { isConnected: true, disabled: false, getAttribute: () => null,
@@ -175,6 +177,29 @@ test('persisted temporary homepage retains its read-only privacy indicator', asy
   f.select(false); await flush();
   assert.equal(f.results.at(-1)[1], false);
   assert.deepEqual(f.effects, []);
+});
+
+for (const shape of [{ webClientId: true }, { hookMemoCache: true }, { webClientId: true, hookMemoCache: true }]) {
+  test('inspected website client/cache shape retains the private transaction: ' + JSON.stringify(shape), async () => {
+    const f = fixture(shape);
+    assert.equal(f.select(true), true); await flush();
+    assert.equal(f.results.at(-1)[1], true);
+    assert.deepEqual(f.runtime.observe(f.state.node), { selected: true, stateSettable: true });
+    assert.equal(f.runtime.ownsSelectedConversation(f.state.conversation), true);
+    assert.equal(f.effects.filter(item => item === 'official-action').length, 1);
+    assert.equal(f.fallbacks, 0);
+  });
+}
+
+test('website-prefixed persisted temporary chat with nested hook cache remains read-only', async () => {
+  const f = fixture({ webClientId: true, hookMemoCache: true, newChat: false, selected: true });
+  f.page.location.href = 'https://chatgpt.com/?temporary-chat=true'; f.state.privacy = false;
+  f.state.button.memoizedProps.onClick = () => f.effects.push('tooltip-click');
+  f.runtime.observe(f.state.node); await flush();
+  assert.deepEqual(f.runtime.observe(f.state.node), { selected: true, stateSettable: false });
+  assert.equal(f.runtime.ownsSelectedConversation(f.state.conversation), true);
+  f.select(false); await flush();
+  assert.equal(f.results.at(-1)[1], false); assert.deepEqual(f.effects, []);
 });
 
 test('readonly temporary indicator accepts tooltip callbacks but never invokes them', async () => {
@@ -338,6 +363,8 @@ test('unknown compiler cache schema or mismatched closure cannot claim a private
   for (const mutate of [
     f => { f.state.owner.updateQueue = {}; },
     f => { f.state.owner.updateQueue.memoCache.data.push(Array(30)); },
+    f => { f.state.owner.updateQueue.memoCache.data.push([null]); },
+    f => { f.state.owner.updateQueue.memoCache.data.push([null, null], [null, null]); },
     f => { f.state.owner.updateQueue.memoCache.data[0].push(null); },
     f => { f.state.owner.updateQueue.memoCache.data[0][0] = 'other'; },
     f => { f.state.owner.updateQueue.memoCache.data[0][3] = undefined; },
@@ -350,6 +377,15 @@ test('unknown compiler cache schema or mismatched closure cannot claim a private
   ]) {
     const f = fixture(); mutate(f);
     assert.equal(f.select(true), false); assert.equal(f.imports, 0); assert.equal(f.effects.length, 0);
+  }
+});
+
+test('unknown client namespaces and malformed prefixed ids cannot own a private transaction', () => {
+  for (const id of ['OTHER:' + CID, 'WEB:invalid', 'WEB:' + CID + ':extra', 'WEB:' + CID + '\n']) {
+    const f = fixture();
+    f.state.conversation.id = f.state.owner.memoizedProps.clientThreadId = id;
+    f.state.owner.updateQueue.memoCache.data[0][0] = id;
+    assert.equal(f.select(true), false); assert.equal(f.imports, 0); assert.deepEqual(f.effects, []);
   }
 });
 

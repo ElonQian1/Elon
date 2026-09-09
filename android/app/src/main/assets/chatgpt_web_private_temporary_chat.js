@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateTemporaryChat = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -41,11 +41,14 @@
       typeof fiber.memoizedProps?.clientThreadId === 'string');
     if (index < 0) return null;
     const id = chain[index].memoizedProps.clientThreadId;
-    if (!/^[a-zA-Z0-9_-]{1,160}$/.test(id)) return null;
-    // The inspected owner's single useMemoCache(30) records isNew/temp inputs.
+    if (!/^[a-zA-Z0-9_-]{1,160}$/.test(id) &&
+        !/^WEB:[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)) return null;
+    // The owner records isNew/temp inputs in its first useMemoCache(30).
+    // The current build also allocates a separate two-slot cache inside a hook.
     // Checking these prevents a committed but stale empty-chat callback from rewriting a saved chat.
     const data = chain[index].updateQueue?.memoCache?.data;
-    const memo = Array.isArray(data) && data.length === 1 ? data[0] : null;
+    const memo = Array.isArray(data) && (data.length === 1 ||
+      data.length === 2 && Array.isArray(data[1]) && data[1].length === 2) ? data[0] : null;
     if (!Array.isArray(memo) || memo.length !== 30 || memo[0] !== id ||
         typeof memo[3] !== 'boolean' || typeof memo[4] !== 'boolean' ||
         typeof memo[7] !== 'function' || Function.prototype.toString.call(memo[7]) !== spec.action ||
@@ -250,5 +253,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 6, observe, setSelected, ownsSelectedConversation });
+  return Object.freeze({ version: 7, observe, setSelected, ownsSelectedConversation });
 });
