@@ -11,10 +11,19 @@ internal object ChatGptWebConversationMutationMcpAction {
         dispatchCommand: (String, (String) -> Unit) -> Unit,
     ): String? {
         val path = ChatGptWebConversationPath.normalize(args.optString("conversation_path"))
-            ?: return "invalid_conversation_path"
         if (args.optString("action") == "chatgpt_share_conversation" && args.has("operation")) {
-            val request = ChatGptWebSharedLinks.request(path, args.optString("operation"),
-                args.optString("share_id"), args.optString("selection_ticket")) ?: return "share_invalid_selection"
+            val request = if (args.optString("operation") == "list_account") {
+                if (args.has("conversation_path") || args.has("share_id")) return "share_invalid_selection"
+                val offset = if (args.has("page_offset")) args.opt("page_offset") as? Int
+                    ?: return "share_invalid_selection" else 0
+                val selection = if (args.has("selection_ticket")) args.opt("selection_ticket") as? String
+                    ?: return "share_invalid_selection" else null
+                ChatGptWebSharedLinks.accountRequest(offset, selection)
+            } else {
+                if (path == null) return "invalid_conversation_path"
+                ChatGptWebSharedLinks.request(path, args.optString("operation"),
+                    args.optString("share_id"), args.optString("selection_ticket"))
+            } ?: return "share_invalid_selection"
             if (request.getString("operation") == "revoke" && !args.optBoolean("user_confirmed", false)) {
                 return "user_confirmation_required"
             }
@@ -25,6 +34,7 @@ internal object ChatGptWebConversationMutationMcpAction {
             dispatchCommand("share_conversation") { requestId -> commands.manageConversationShares(request, requestId) }
             return null
         }
+        if (path == null) return "invalid_conversation_path"
         if (!args.optBoolean("user_confirmed", false)) return "user_confirmation_required"
         when (args.optString("action")) {
             "chatgpt_share_conversation" -> {

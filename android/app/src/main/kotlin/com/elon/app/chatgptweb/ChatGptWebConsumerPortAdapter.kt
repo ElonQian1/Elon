@@ -227,6 +227,10 @@ internal class ChatGptWebConsumerPortAdapter(
         .put("operation", if (shareId == null) "list" else "revoke").put("conversation_path", conversationPath)
         .put("share_id", shareId).put("selection_ticket", selectionTicket).put("user_confirmed", userConfirmed))
 
+    override fun manageAccountShares(offset: Int, selectionTicket: String?): WebChatConsumerCommandResult =
+        execute(JSONObject().put("action", "chatgpt_share_conversation").put("operation", "list_account")
+            .put("page_offset", offset).put("selection_ticket", selectionTicket))
+
     override fun renameConversation(
         conversationPath: String,
         title: String,

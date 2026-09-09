@@ -125,6 +125,8 @@ internal interface WebChatConsumerPort {
         selectionTicket: String? = null,
         userConfirmed: Boolean = false,
     ): WebChatConsumerCommandResult = WebChatConsumerCommandResult(false, "unsupported_consumer_command")
+    fun manageAccountShares(offset: Int = 0, selectionTicket: String? = null): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "unsupported_consumer_command")
     fun moveConversationToProject(
         conversationPath: String,
         conversationTitle: String,

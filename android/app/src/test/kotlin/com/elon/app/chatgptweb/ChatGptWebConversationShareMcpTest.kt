@@ -8,6 +8,34 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ChatGptWebConversationShareMcpTest {
+    @Test fun accountManagementRejectsInvalidScopeAndPageBeforeDispatch() {
+        val snapshot = ChatGptWebSnapshot(
+            title = "Fixture", url = "https://chatgpt.com/", draft = "unsent",
+            messages = emptyList(), authenticated = true, composerReady = false, streaming = false,
+            currentModel = "", attachments = emptyList(), dictationActive = false,
+            capabilities = ChatGptWebCapabilities.EMPTY,
+        )
+        val commands = ChatGptWebMcpTestCommandPort()
+        var dispatches = 0
+        fun request() = JSONObject().put("action", "chatgpt_share_conversation").put("operation", "list_account")
+        fun dispatch(args: JSONObject, page: ChatGptWebSnapshot? = snapshot) =
+            ChatGptWebConversationMutationMcpAction.dispatch(args, commands, page) { _, _ -> dispatches += 1 }
+        assertNull(dispatch(request()))
+        assertEquals(1, dispatches)
+        for (offset in listOf<Any>(-100, 1, 1000, "100", 100.0, JSONObject.NULL)) {
+            assertEquals("share_invalid_selection", dispatch(request().put("page_offset", offset)))
+        }
+        assertEquals("share_invalid_selection", dispatch(request().put("page_offset", 100)))
+        assertEquals("share_invalid_selection", dispatch(request().put("selection_ticket", JSONObject.NULL)))
+        assertEquals("share_invalid_selection", dispatch(request().put("conversation_path", "/c/fixture")))
+        assertEquals("share_invalid_selection", dispatch(request().put("share_id", "all")))
+        for (url in listOf("https://example.com/", "http://chatgpt.com/", "https://chatgpt.com:8443/", "https://user@chatgpt.com/")) {
+            assertEquals("share_context_unavailable", dispatch(request(), snapshot.copy(url = url)))
+        }
+        assertEquals("share_context_unavailable", dispatch(request(), null))
+        assertEquals(1, dispatches)
+    }
+
     @Test fun managementUsesTrackedReadAndConfirmedRevokeWithoutNavigatingOrPublishing() {
         val id = "44444444-4444-4444-8444-444444444444"
         val path = "/c/$id"
@@ -15,7 +43,7 @@ class ChatGptWebConversationShareMcpTest {
         state.updateDocument(WebBridgeDocumentSession.Snapshot(1, 1, "doc_share_test"))
         val snapshot = ChatGptWebSnapshot(
             title = "Fixture", url = "https://chatgpt.com/", draft = "preserve",
-            messages = emptyList(), authenticated = true, composerReady = true, streaming = false,
+            messages = emptyList(), authenticated = true, composerReady = false, streaming = false,
             currentModel = "", attachments = emptyList(), dictationActive = false,
             capabilities = ChatGptWebCapabilities.EMPTY,
         )
@@ -42,6 +70,14 @@ class ChatGptWebConversationShareMcpTest {
         assertFalse(consumer.manageConversationShares(path, "all", ticket, true).accepted)
         assertTrue(consumer.manageConversationShares(path, id, ticket, true).accepted)
         assertEquals(listOf("list", "revoke"), sent.map { it.getString("operation") })
+        assertTrue(consumer.manageAccountShares().accepted)
+        assertEquals("list_account", sent.last().getString("operation"))
+        assertFalse(sent.last().has("path"))
+        assertTrue(consumer.manageAccountShares(100, ticket).accepted)
+        assertEquals(100, sent.last().getInt("offset"))
+        assertEquals(ticket, sent.last().getString("ticket"))
+        assertFalse(consumer.manageAccountShares(100).accepted)
+        assertFalse(consumer.manageAccountShares(1, ticket).accepted)
         assertTrue(state.snapshot().commandRequests.all { it.expectedAction == "share_conversation" })
     }
 

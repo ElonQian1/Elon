@@ -51,6 +51,9 @@ internal class WebChatProductionConversationActionsCoordinator(
     private var activeSheet: WebChatActionSheetHandle? = null
     private val sharing = WebChatConversationShareCoordinator(
         activity, host, activeProvider, consumerPort, openConversationTracked, ::showPageActionsFor,
+        conversationTitle = { path -> conversationIndex().conversations.firstOrNull {
+            ChatGptWebConversationPath.identity(it.path) == ChatGptWebConversationPath.identity(path)
+        }?.title },
     )
     private val files = WebChatConversationFilesCoordinator(
         activity, host, consumerPort, ::openFilesConversation, ::showPageActionsFor,

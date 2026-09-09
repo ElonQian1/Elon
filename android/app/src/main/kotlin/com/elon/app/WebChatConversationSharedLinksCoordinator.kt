@@ -19,12 +19,15 @@ internal class WebChatConversationSharedLinksCoordinator(
     private val activeProvider: () -> WebChatProviderId?,
     private val consumerPort: () -> WebChatConsumerPort?,
     private val openOfficial: (ChatGptWebConversation) -> Unit,
+    private val conversationTitle: (String) -> String? = { null },
 ) {
     private var epoch = 0
     private var dialog: AlertDialog? = null
+    private var accountWide = false
 
-    fun show(conversation: ChatGptWebConversation) {
+    fun show(conversation: ChatGptWebConversation, allConversations: Boolean = false) {
         cancel()
+        accountWide = allConversations
         load(conversation)
     }
 
@@ -38,44 +41,63 @@ internal class WebChatConversationSharedLinksCoordinator(
     private fun active() = activeProvider() == WebChatProviderId.CHATGPT_WEB &&
         !activity.isFinishing && !activity.isDestroyed
 
-    private fun load(conversation: ChatGptWebConversation) {
+    private fun load(conversation: ChatGptWebConversation, offset: Int = 0, selection: String? = null) {
         if (!active()) return
         val path = ChatGptWebSharedLinks.path(conversation.path) ?: return failure(conversation, "share_invalid_selection")
-        val result = consumerPort()?.manageConversationShares(path)
-            ?: return failure(conversation, "share_list_unavailable")
-        track(AlertDialog.Builder(activity).setTitle("公开分享链接").setMessage("正在读取")
+        val port = consumerPort() ?: return failure(conversation, "share_list_unavailable")
+        val result = if (accountWide) port.manageAccountShares(offset, selection) else port.manageConversationShares(path)
+        track(AlertDialog.Builder(activity).setTitle(if (accountWide) "全部公开分享链接" else "公开分享链接").setMessage("正在读取")
             .setNegativeButton("关闭", null).create())
         await(conversation, result, epoch, 0, revoking = false) { detail ->
+            if (accountWide) {
+                val page = ChatGptWebSharedLinks.parseAccount(detail)?.takeIf {
+                    it.offset == offset && (selection == null || it.ticket == selection)
+                } ?: return@await failure(conversation, "share_list_unconfirmed")
+                showLinks(conversation, ChatGptWebSharedLinks.Index(path, page.ticket, page.complete, page.items), page)
+                return@await
+            }
             val index = ChatGptWebSharedLinks.parse(detail)?.takeIf { it.path == path }
                 ?: return@await failure(conversation, "share_list_unconfirmed")
             showLinks(conversation, index)
         }
     }
 
-    private fun showLinks(conversation: ChatGptWebConversation, index: ChatGptWebSharedLinks.Index) {
+    private fun showLinks(
+        conversation: ChatGptWebConversation, index: ChatGptWebSharedLinks.Index,
+        page: ChatGptWebSharedLinks.AccountIndex? = null,
+    ) {
         if (!active()) return
+        val title = if (page == null) "公开分享链接" else "全部公开分享链接"
         val builder = AlertDialog.Builder(activity)
-            .setTitle(if (index.complete) "公开分享链接" else "公开分享链接（部分）")
+            .setTitle(title + if (index.complete) "" else "（部分）")
             .setNeutralButton("官网查看") { _, _ -> openOfficial(conversation) }
             .setNegativeButton("关闭", null)
         if (index.items.isEmpty()) {
-            builder.setMessage(if (index.complete) "这个会话没有公开分享链接。"
-                else "官网返回的部分列表中没有找到本会话链接，尚不能确认完整结果。")
+            builder.setMessage(if (!index.complete) "官网返回的列表不完整，尚不能确认所有分享链接。"
+                else if (page == null) "这个会话没有公开分享链接。" else "这个账号没有公开分享链接。")
         } else {
             val labels = index.items.mapIndexed { position, link ->
                 val date = link.createdAt?.let { runCatching {
                     DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date.from(Instant.parse(it)))
                 }.getOrNull() }
-                "分享链接 ${position + 1}" + (date?.let { " · $it" } ?: "")
+                val name = if (page == null) null else link.path?.let(conversationTitle)?.takeIf(String::isNotBlank)
+                (name ?: "分享链接 ${(page?.offset ?: 0) + position + 1}") + (date?.let { " · $it" } ?: "")
             }.toTypedArray()
-            builder.setItems(labels) { _, position -> showLink(conversation, index, index.items[position]) }
+            builder.setItems(labels) { _, position -> showLink(conversation, index, index.items[position], page) }
+        }
+        page?.nextOffset?.let { next -> builder.setPositiveButton("下一页") { _, _ -> load(conversation, next, page.ticket) } }
+        if (page != null && page.offset > 0) {
+            builder.setNeutralButton("上一页") { _, _ -> load(conversation, page.offset - 100, page.ticket) }
         }
         track(builder.create())
-        dialog?.listView?.contentDescription = "web-chat-share-links-list"
+        dialog?.listView?.contentDescription = if (page == null) "web-chat-share-links-list" else "web-chat-account-share-links-list"
+        if (page?.nextOffset != null) dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.contentDescription = "web-chat-account-shares-next"
+        if (page != null && page.offset > 0) dialog?.getButton(AlertDialog.BUTTON_NEUTRAL)?.contentDescription = "web-chat-account-shares-previous"
     }
 
     private fun showLink(
         conversation: ChatGptWebConversation, index: ChatGptWebSharedLinks.Index, link: ChatGptWebSharedLinks.Link,
+        page: ChatGptWebSharedLinks.AccountIndex? = null,
     ) {
         track(AlertDialog.Builder(activity).setTitle("公开分享链接").setMessage(link.url)
             .setPositiveButton("复制链接") { _, _ ->
@@ -83,19 +105,20 @@ internal class WebChatConversationSharedLinksCoordinator(
                 clipboard?.setPrimaryClip(ClipData.newPlainText("会话分享链接", link.url))
                 if (clipboard != null) Toast.makeText(activity, "链接已复制", Toast.LENGTH_SHORT).show()
             }
-            .setNeutralButton("取消分享") { _, _ -> confirmRevoke(conversation, index, link) }
-            .setNegativeButton("返回列表") { _, _ -> showLinks(conversation, index) }.create())
+            .setNeutralButton("取消分享") { _, _ -> confirmRevoke(conversation, index, link, page) }
+            .setNegativeButton("返回列表") { _, _ -> showLinks(conversation, index, page) }.create())
         dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.contentDescription = "web-chat-existing-share-copy"
         dialog?.getButton(AlertDialog.BUTTON_NEUTRAL)?.contentDescription = "web-chat-share-revoke"
     }
 
     private fun confirmRevoke(
         conversation: ChatGptWebConversation, index: ChatGptWebSharedLinks.Index, link: ChatGptWebSharedLinks.Link,
+        page: ChatGptWebSharedLinks.AccountIndex? = null,
     ) {
         track(AlertDialog.Builder(activity).setTitle("取消这条公开分享？")
             .setMessage("取消后，这条链接将无法查看。原会话不会删除，其他人已保存的副本不受影响。\n\n${link.url}")
             .setPositiveButton("取消分享") { _, _ -> revoke(conversation, index, link) }
-            .setNegativeButton("保留链接") { _, _ -> showLink(conversation, index, link) }.create())
+            .setNegativeButton("保留链接") { _, _ -> showLink(conversation, index, link, page) }.create())
         dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.contentDescription = "web-chat-share-revoke-confirm"
     }
 
@@ -103,7 +126,7 @@ internal class WebChatConversationSharedLinksCoordinator(
         conversation: ChatGptWebConversation, index: ChatGptWebSharedLinks.Index, link: ChatGptWebSharedLinks.Link,
     ) {
         if (!active()) return
-        val result = consumerPort()?.manageConversationShares(index.path, link.id, index.ticket, userConfirmed = true)
+        val result = consumerPort()?.manageConversationShares(link.path ?: index.path, link.id, index.ticket, userConfirmed = true)
             ?: return failure(conversation, "share_list_unavailable")
         track(AlertDialog.Builder(activity).setTitle("取消分享").setMessage("正在确认结果")
             .setNegativeButton("关闭", null).create())
