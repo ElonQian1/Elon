@@ -16,6 +16,10 @@ and rendered-menu acceptance remain pending. See the
 [grouped acceptance evidence](reports/chatgpt-grouped-release-20260907.md).
 The [request lifetime repair](chatgpt-private-request-lifetime.md) bounds private response
 consumption and prevents timed-out project reads from replacing newer results.
+The [directory paging acceptance](reports/chatgpt-directory-pagination-20260909.md)
+records 1606 native cache display and repeated composer-independent project reads.
+Global private paging still has a real timeout acceptance gap; do not repeat the
+verified cache implementation or claim full-account paging is fully accepted.
 
 ## Production defaults
 

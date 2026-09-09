@@ -106,6 +106,41 @@ true and composer-ready false:
   acceptance must use the native refresh action alone, not interleave raw MCP
   directory commands with the coordinator's own requests.
 
-The follow-up release and device result are recorded below when available.
-The broader Goal remains active; current network latency and full-account coverage
-must not be represented as solved by this batch.
+## Final Release And Native Acceptance
+
+Final release: **1.1.1606**, adapter **309**, source
+`3a02cfb0c0a471b4ed061ed4866b923d1a92aa63`. The local and online APK hashes match:
+`4ad308aa387155033fb83f3495dd68687768f2329e88d02ed125f6d0dd58686a`
+(40,036,705 bytes). Release build/publication passed in 345.6 seconds;
+`install -r` succeeded on the same Xiaomi. The intermediate 1605 package was
+published but was not used as the final phone acceptance package.
+
+The final Node suite passed 51 cases. Production/test Kotlin compilation and
+26 JVM tests passed in four suites, including directory receipt JSON, refresh
+coordination, directory state and document-generation isolation. Native MCP now
+exposes `navigation.last_directory_refresh` from the existing per-action receipt
+cache. It contains only result, allowlisted code, time and native/MCP source;
+unrelated skin commands cannot hide it, and replaced documents cannot reuse it.
+
+Final device cases used the production native actions only, with no interleaved
+raw `chatgpt_list_conversations` command:
+
+| Case | Observed result |
+|---|---|
+| Open cached native sidebar | 367 ms including MCP overhead; 200 cached conversations and 19 projects, drawer open |
+| Native global refresh | Accepted with composer-ready false; fresh native `directory_timeout` receipt after 12,594 ms including polling; previous native cache retained |
+| Select a cached nonempty project | Requested project selected and drawer remained open |
+| First native project refresh | Fresh native `directory_ready` receipt in 903 ms including polling |
+| Repeat same native project refresh | Another fresh native `directory_ready` receipt in 1,004 ms including polling; no stuck coordinator |
+| Restore | Date section selected, drawer closed; original conversation path and empty input unchanged |
+
+Both project results left the global cache timestamp unchanged, confirming
+scoped rather than replacement global snapshots. Authentication was true and
+composer-ready false during both successful project reads. No message, microphone,
+file, account write, Cookie reset or proxy action occurred. UI evidence is semantic
+production state, not a screenshot-based visual review.
+
+Reuse the verified cache display, composer-independent project reads and repeated
+refresh completion. The broader Goal remains active. The global read timeout is
+still an actual acceptance gap: this batch does not prove stable full-account
+paging, cold network latency, or a specific underlying network fault.
