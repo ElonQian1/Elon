@@ -1865,15 +1865,15 @@
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/android-exchange-session-host-v2.md",
-        "content_hash": "d12de5eb8bc426be6bd8c0c2da6ccc11ca522ada956e42b7efdc1634e1580c02",
+        "content_hash": "971eef0d8d9e77551b3bbbe64d0d0fe3bd0181d3092911bad0a766af161a684b",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "5f486bdf338c626a61399cc9d983d100b170cfbd",
-          "head_blob_oid": "",
-          "worktree_blob_oid": "4e4dedd0994f70124176681f4b5de9b66a0e014d",
-          "state": "untracked"
+          "head_commit": "ae6aa0fda2162cf2ff99b571436d8fd7b3691223",
+          "head_blob_oid": "4e4dedd0994f70124176681f4b5de9b66a0e014d",
+          "worktree_blob_oid": "ef0f998b64c264e3f43f93281b48b3bd45080c3b",
+          "state": "tracked_modified"
         }
       },
       "knowledge_node_id": "",
@@ -1895,47 +1895,60 @@
       ],
       "implementation_evidence": [
         {
-          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateCommands.kt",
-          "content_hash": "117526565f21fa66b31b621a7398078206a719ad12a198a677c5e04c626f84c5",
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageCommandDraft.kt",
+          "content_hash": "2f2fcd1c27682813ab6f842dec593e1eecc47e89df3f6f74d01c03774a409767",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5f486bdf338c626a61399cc9d983d100b170cfbd",
+            "head_commit": "ae6aa0fda2162cf2ff99b571436d8fd7b3691223",
             "head_blob_oid": "",
-            "worktree_blob_oid": "6f7fed4839949c388217f6e8cc0e146a8992b07a",
+            "worktree_blob_oid": "8ae02d1d1d112e98269235cf1c406546395b9e69",
             "state": "untracked"
           }
         },
         {
-          "path": "android/app/src/test/kotlin/com/elon/app/grid/create/BinanceCreatePermitTest.kt",
-          "content_hash": "f16cded6fd069edd480a67a6f47c06fb5fccb16c80bb186fd4416a13ac1ac82a",
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageCommands.kt",
+          "content_hash": "d73fd61c60c4f9f1188eb873e974a8719398712e0ef3b46e18500135568f20e7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ae6aa0fda2162cf2ff99b571436d8fd7b3691223",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "73778a0cc5531d7cfae3c7abaa7f2691b2e7a862",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/manage/BinanceManageCommandDraftTest.kt",
+          "content_hash": "a1cdb6a926e75bfeb2fffff485a3ebb9ffe06e91492a000c0d5ce4e7857b3c9b",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5f486bdf338c626a61399cc9d983d100b170cfbd",
+            "head_commit": "ae6aa0fda2162cf2ff99b571436d8fd7b3691223",
             "head_blob_oid": "",
-            "worktree_blob_oid": "15c407c8214e7182bcc67624c19016bfc311231b",
+            "worktree_blob_oid": "d5498f0b0b9d98278252af75188b5d9956ee7161",
             "state": "untracked"
           }
         },
         {
-          "path": "docs/reports/android-native-grid-create-v2-20260910.md",
-          "content_hash": "828d918a90b0f6dea1171924dfba72e8095792a59c4b4b4d9f4706ec0503262b",
+          "path": "docs/android-binance-native-manage-v2-delivery.md",
+          "content_hash": "1b6fb549da7bb3b4a3a4dfd13ff203f97a28cd00d3e02a6c7be3381c76959f54",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5f486bdf338c626a61399cc9d983d100b170cfbd",
+            "head_commit": "ae6aa0fda2162cf2ff99b571436d8fd7b3691223",
             "head_blob_oid": "",
-            "worktree_blob_oid": "ce2c4505381914638d1f151b53a7bea851a54630",
+            "worktree_blob_oid": "aa66fbcc50d61c5c431eeb6839a024aecbd03099",
             "state": "untracked"
           }
         }
       ],
       "created_at_ms": 1788957938151,
-      "updated_at_ms": 1788970329959
+      "updated_at_ms": 1788983543981
     },
     {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -24734,106 +24747,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b943b9368b6243a1ba949320d85ccba1",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Reopen after the intentional Sui CI long-path checkout step changed the bound workflow evidence.",
-      "from_status": "released",
-      "to_status": "retired",
-      "at_ms": 1788653637015
-    },
-    {
-      "id": "feature_event_d337f060bdff40099766298ff7199d05",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Begin explicit review of the refreshed CI evidence.",
-      "from_status": "retired",
-      "to_status": "proposed",
-      "at_ms": 1788653637256
-    },
-    {
-      "id": "feature_event_201e9d7c689a420bac8e20545cbea62b",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "The existing adoption requirement remains valid and the added CI step is within its guarded workflow evidence.",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788653637735
-    },
-    {
-      "id": "feature_event_d60280584bf24b188f5bd7da292e31ee",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Current requirement and governance implementation are ready for evidence refresh.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788653638481
-    },
-    {
-      "id": "feature_event_2f148f50049e4e5b96f3f2b98ffe37db",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "claimed",
-      "actor": "codex-sui-ci",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788653639122
-    },
-    {
-      "id": "feature_event_dc88dd325fd84963ba66911a5a62aefd",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Refreshing six evidence bindings after the intentional workflow update.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788653639325
-    },
-    {
-      "id": "feature_event_a93657d567e44dd0a2a490bb27f58f5d",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-sui-ci",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788653641059
-    },
-    {
-      "id": "feature_event_2f24f1049f1e4bcdb2af4f1f721ab70b",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "All six current governance evidence bindings are recorded after the final workflow update.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788653665250
-    },
-    {
-      "id": "feature_event_9b918709621a43d1b2186060f7102fa7",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Registry adoption test and CI quality-gate guard pass against the refreshed evidence.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788653665785
-    },
-    {
-      "id": "feature_event_297fa153b5e04c02b229cb2a404d2153",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "The refreshed governance evidence is complete and current.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788653665983
-    },
-    {
       "id": "feature_event_56243ccef0ce4d7a9817646d624ba715",
       "feature_id": "esk-early-support-policy-foundation-v1",
       "action": "registered",
@@ -26732,6 +26645,106 @@
       "from_status": "in_progress",
       "to_status": "ready",
       "at_ms": 1788970329959
+    },
+    {
+      "id": "feature_event_4b8eeac49adc4f758766c7f714be5137",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "claimed",
+      "actor": "codex-native-manage-v2",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788981663959
+    },
+    {
+      "id": "feature_event_0e814697d0d64dfe825487782301d79a",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "transitioned",
+      "actor": "codex-native-manage-v2",
+      "reason": "Continue typed native management service with consent and one-use permit.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788981664057
+    },
+    {
+      "id": "feature_event_df0a226398484706ad76cd2bca46bbd9",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "claim_released",
+      "actor": "codex-native-manage-v2",
+      "reason": "按注册表约束临时释放以校正需求历史状态，随后重新认领当前管理切片",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1788983339526
+    },
+    {
+      "id": "feature_event_a171e86bc83d461f80f7685730803eec",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "requirement_rebound",
+      "actor": "codex-native-manage-v2",
+      "reason": "关联当前创建和管理合同，保留真实验收缺口",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1788983340876
+    },
+    {
+      "id": "feature_event_001548fd9bfb469ab63506e78aee8658",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "transitioned",
+      "actor": "codex-native-manage-v2",
+      "reason": "用户已接受长期架构并授权继续；本次仅校正进展，不扩展权限",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1788983383272
+    },
+    {
+      "id": "feature_event_50a58a6e662c4d30acbe6cc1d66c4fdb",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "transitioned",
+      "actor": "codex-native-manage-v2",
+      "reason": "用户已接受长期架构并授权继续；本次仅校正进展，不扩展权限",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1788983383322
+    },
+    {
+      "id": "feature_event_8ff933014e6f4778b3d101bc83ea5615",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "claimed",
+      "actor": "codex-native-manage-v2",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788983383365
+    },
+    {
+      "id": "feature_event_562748190d3c4e8482009036986e53df",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "transitioned",
+      "actor": "codex-native-manage-v2",
+      "reason": "继续原生管理切片验证和交付",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788983383444
+    },
+    {
+      "id": "feature_event_1b806bada52b4c508e0250f253ea2b3d",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "evidence_recorded",
+      "actor": "codex-native-manage-v2",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788983543903
+    },
+    {
+      "id": "feature_event_b3beae04c90340af84bfb1de2c8718c1",
+      "feature_id": "android-exchange-session-host-v2",
+      "action": "claim_released",
+      "actor": "codex-native-manage-v2",
+      "reason": "四项原生管理切片源码/离线测试已完成；双包安装、冷启动、真实准备/交易及止盈止损独立编辑待续，完整V2不标为released",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1788983543981
     }
   ]
 }

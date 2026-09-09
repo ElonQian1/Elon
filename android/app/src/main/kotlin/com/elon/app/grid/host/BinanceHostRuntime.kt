@@ -65,6 +65,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         }
     }
     private fun owner() = captured?.userId?.let(BinanceHostState::digest)
+    fun readConsentCurrent() = live() && state.fresh() && consent.permits(owner(),state.account,state.accountKind)
     fun grant(continuous: Boolean = false): String {
         require(live())
         require(state.fresh())

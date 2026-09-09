@@ -1,8 +1,8 @@
 ---
 version_status: current
-reviewed_at: 2026-09-09
+reviewed_at: 2026-09-10
 decision_status: accepted
-implementation_status: planned
+implementation_status: in_progress
 owner: android-session-host
 ---
 
@@ -16,9 +16,11 @@ owner: android-session-host
 
 产品和完整验收真源为[量化网格 UI 与会话服务 V2](https://github.com/ElonQian1/yilong-quant/blob/main/docs/requirements/grid-native-ui-session-host-v2.md)。本文件只定义主项目职责，不复制量化产品规则。
 
-## 当前缺口
+## 基线与当前进展
 
-`BinanceGridCreateActivity` 持有表单及提交入口；`BinanceCreateSession` 经 WebView 内 `binance_grid_create_adapter.js` 请求固定私有接口。现有跨 APK Provider 主要提供读取，尚无已交付 V2 创建/修改/结束命令。跳页是现有耦合，不是私有 API 的固有限制。1.1.1612选币仍属待迁移实现，不能声称量化已拥有独立原生创建流程。
+决定前 `BinanceGridCreateActivity` 持有表单及提交入口；`BinanceCreateSession` 经 WebView 内适配器请求固定私有接口。跳页是旧耦合，不是私有 API 的固有限制。创建切片已提供 V2 固定会话命令；本批复用既有 BinanceManageSession、状态机和适配器，增加修改终止设置、结束、追加投入及区间修改的管理命令。量化拥有新表单和最终确认，主项目不新增产品 UI。独立止盈止损编辑和完整真实验收仍有缺口。
+
+精确合同与兼容向量由量化[原生管理 V2 合同](https://github.com/ElonQian1/yilong-quant/blob/main/docs/contracts/binance-native-manage-v2.md)维护；主端 BinanceManageCommandDraftTest 与量化 NativeManageReplyTest 分别验证输入及投影边界。源码、构建、发布、安装和真实账户验证应分别报告。
 
 ## 主项目范围
 
@@ -51,4 +53,4 @@ owner: android-session-host
 3. 原参数和真实读取能力不回退，凭据不跨 IPC；主项目不新增量化选币/策略管理产品 UI。
 4. 合同测试、主包构建、量化集成、真实只读和用户交易分别取证；内部 WebView 就绪或主 Activity 可提交不等于新架构已打通。
 
-本批仅接受长期需求，服务解耦及新合同未实现，已有能力按原路径保留；不宣称迁移或新 APK 已完成。
+当前为分批实现，不代表整个 V2 已验收。旧 Activity 保留已安装客户端兼容与在途恢复；量化新默认入口使用原生 UI 和固定会话命令，不静默回退旧主页面。

@@ -133,5 +133,5 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
             busy=false;changed()
         }.onFailure {if(readTrace.outcome=="pending")readTrace.finish("failed","malformed_reply");state.unknown();persist();busy=false;message="回执未能验证，请在官网核对；不会自动重试。";changed()}
     }
-    fun close() {cancel();state.unknown();persist();closed=true}
+    fun close(persistState: Boolean = true) {cancel();state.unknown();if(persistState)persist();closed=true}
 }
