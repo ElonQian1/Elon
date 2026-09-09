@@ -24,7 +24,9 @@ reused; source-only or installation status does not satisfy the acceptance gate.
 
 This summary supersedes older delivery labels below; it does not broaden a
 passed scope. Installed version was last independently observed as normal
-`1.1.1600` on September 9. Installation is not acceptance of every bundled path.
+`1.1.1601` on September 9. Installation is not acceptance of every bundled path.
+The combined recovery/readiness correction is published as `1.1.1602`, not yet
+installed or accepted in this task's production-device window.
 
 | User workflow | Current result | Remaining boundary |
 |---|---|---|

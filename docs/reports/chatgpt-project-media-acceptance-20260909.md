@@ -9,10 +9,10 @@
 - Verification: scope/receipt/restore harness contracts passed; real project
   attachment send is **deferred**, not completed. A subsequent device window
   reached the project URL but stopped before upload at composer readiness.
-- Delivery: latest independent package read is normal `1.1.1600` (code `1600`),
-  superseding the initial 1599 observation. The harness-only checkpoint needed
-  no APK. Subsequent recovery/readiness source corrections below are queued for
-  grouped delivery and must not be attributed to that installed build.
+- Delivery: latest independent package read is normal `1.1.1601` (code `1601`),
+  superseding the initial 1599/1600 observations. The harness-only checkpoint
+  needed no APK. Subsequent recovery/readiness corrections are published together
+  as `1.1.1602` below, not installed or device-accepted by this task.
 
 The preceding goal turn made verified progress: ordinary new-chat mixed media
 passed on normal 1598, with one accepted native send and all three content reads.
@@ -149,6 +149,26 @@ Source-size and document-modularity guards passed. This correction and the prior
 recovery failure classification are intended for one grouped acceptance APK;
 device acceptance is not yet claimed. The task-only handset capture was removed.
 
+## Grouped Release 1602
+
+The recovery failure classification and document-operation readiness correction
+are published together as normal `1.1.1602` (code `1602`), source
+`d525d8926835ab50984ea913b1982a2a7af3e22f`; code correction commit `2df5b628a`.
+The publishing script passed in 461.1 seconds. Independent online metadata
+readback matched the source and local APK SHA-256:
+`4b6b6b55dd19b90ca1962723553d9662acbe84250696615a08f82a0536854736`.
+Gradle version edits were restored; no version-number commit was created.
+
+During packaging the phone foreground was a separate UI-tuner package, not
+`com.elon.app`. Production MCP state did not provide a usable chat snapshot. The
+task did not navigate or send against that test package. Automatic installation
+was disabled only for this publishing invocation through a task-local config;
+the user's global ADB settings were not changed. Final production package
+readback is 1601. Replacement installation and the focused production UI checks
+are deferred to an uncontended device window, not counted as passed. The APK
+publisher's optional broad worktree cleanup warned about a missing `Branch`
+property; task cleanup remains owned by the required finish command.
+
 ## Existing Harness Extension
 
 `scripts/smoke-chatgpt-web-media-batch.ps1` now accepts `-Scope project_new`;
@@ -178,7 +198,11 @@ These are offline harness checks, not real project-upload acceptance.
 
 ## Next Device Action
 
-1. Use current production native controls to open an explicitly selected project
+1. Install the published combined correction with replacement installation only;
+   preserve Cookie and app data. Check production-native directory refresh and
+   existing conversation/project navigation while the composer is unready; do
+   not use the separate UI-tuner or official fallback activity as native proof.
+   Then use production native controls to open an explicitly selected project
    homepage with no messages/draft/pending files. Keep original conversations
    untouched; use a separate new test conversation.
 2. Run the existing logged command runner with this script and
@@ -192,6 +216,6 @@ These are offline harness checks, not real project-upload acceptance.
    formats/sizes need their own current evidence; this harness does not prove
    those merely from a successful reply or conversation membership.
 
-Google remains after the remaining ChatGPT acceptance gate. The full Goal stays
-active. Cookie, login, proxy core, existing voice/subtitles and application data
+Google remains after the remaining ChatGPT acceptance gate. The full Goal is not
+complete. Cookie, login, proxy core, existing voice/subtitles and application data
 were not changed in this batch.
