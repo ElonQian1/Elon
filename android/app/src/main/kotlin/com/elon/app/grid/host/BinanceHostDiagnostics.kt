@@ -12,7 +12,8 @@ internal class BinanceHostDiagnostics {
             "detail_requests", "detail_responses", "legacy_list_requests", "script_errors", "script_load_errors", "script_count")
         val fixed = setOf("schema", "token", "last_failure", "failure_kind", "last_http_status", "route",
             "ready_state", "body_text_length", "login_control", "running_control")
-        require(event.keys == counts + fixed && event["schema"] == "yilong.binance_diagnostic.v1")
+        require((event.keys == counts + fixed || event.keys == counts + fixed + "report") && event["schema"] == "yilong.binance_diagnostic.v1")
+        if (event.containsKey("report")) require(BinanceReportDiagnostics.valid(event["report"]))
         fun bounded(key: String, maximum: Long): Long {
             val value = event[key]
             val result = when (value) {
@@ -39,6 +40,7 @@ internal class BinanceHostDiagnostics {
                 in counts -> bounded(key, 10000)
                 "last_http_status" -> bounded(key, 599)
                 "body_text_length" -> bounded(key, 1000000)
+                "report" -> BinanceReportDiagnostics.project(value)
                 else -> value
             }
         }

@@ -21,7 +21,10 @@
     function scalar(v, pattern, required = false) {
       if (v == null && !required) return null;
       const text = typeof v === 'string' ? v : Number.isSafeInteger(v) ? String(v) : '';
-      if (!pattern.test(text)) throw Error('unsupported_field');
+      if (!pattern.test(text)) {
+        if (!required) return null;
+        throw Error('unsupported_field');
+      }
       return text;
     }
     const dec = v => scalar(v, decimal);
@@ -52,6 +55,7 @@
           fee: dec(d.feeAmount), feeAsset: en(d.feeAsset)}))};
     }
     async function request(key, params, context) {
+      context.stage = key; context.http = 0; context.business = 'none';
       const [method, path] = routes[key];
       const url = path + (method === 'GET' ? '?strategyId=' + encodeURIComponent(params.strategyId) : '');
       const headers = new Headers(context.headers);
@@ -59,9 +63,12 @@
       const response = await port.fetch(url, {method, headers, credentials: 'same-origin', redirect: 'error',
         cache: 'no-store', signal: context.signal, ...(method === 'POST' ? {body: JSON.stringify(params)} : {})});
       const text = await response.text();
+      context.http = response.status;
       if (response.status !== 200 || text.length > 1048576) throw Error('response_failed');
       const body = JSON.parse(text);
+      context.business = typeof body.code === 'string' && /^[0-9]{6}$/.test(body.code) ? body.code : 'unknown';
       if (body.success !== true || body.code !== '000000') throw Error('business_failed');
+      context.stage = 'parse_' + key;
       return body;
     }
     function valid(q) {
@@ -80,7 +87,10 @@
         if (!valid(q) || !captured) return false;
         const mine = ++serial;
         const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 25000);
-        const context = {...captured, signal: controller.signal};
+        const context = {...captured, signal: controller.signal, stage:'identity_before', http:0, business:'none'};
+        const diagnostic = (outcome, error='none') => window.__elonBinanceDiagnosticsV1?.report({
+          kind:q.kind, stage:context.stage, outcome, error, http:context.http, business:context.business});
+        diagnostic('loading');
         const still = () => mine === serial && port.context()?.account === context.account;
         (async () => {
           const before = await port.prove(context.headers);
@@ -112,7 +122,7 @@
                 rows = [...array(data.bidItems).map(v => order(v, 'BUY', true)), ...array(data.askItems).map(v => order(v, 'SELL', true))];
               } else {
                 const data = array((await request('orders', {}, context)).data, 10000);
-                rows = data.filter(v => scalar(v.strategyId, integer, true) === q.id).map(v => {
+                rows = data.filter(v => scalar(object(v).strategyId, integer, true) === q.id).map(v => {
                   if (v.symbol !== q.symbol) throw Error('scope_changed');
                   return order(v, null, false);
                 });
@@ -132,6 +142,7 @@
             }
           }
           if (!Number.isSafeInteger(total) || total < rows.length || total > 10000000) throw Error('unsupported_total');
+          context.stage = 'identity_after';
           const after = await port.prove(context.headers);
           if (!after || after.account !== before.account || after.account_kind !== before.account_kind || !still()) throw Error('account_changed');
           if (q.kind === 'history') {
@@ -140,7 +151,9 @@
           }
           port.emit({schema:'yilong.binance_report_observation.v1',request:q.request,kind:q.kind,
             account:after.account,account_kind:after.account_kind,status:'ready',page:q.page,total,coverage,rows});
-        })().catch(() => {
+          diagnostic('ready');
+        })().catch(error => {
+          if (still()) diagnostic('failed', error?.message);
           if (still()) port.emit({schema:'yilong.binance_report_observation.v1',request:q.request,kind:q.kind,
             account:context.account,account_kind:beforeKind(context),status:'error',page:q.page,total:0,coverage:'unavailable',rows:[]});
         }).finally(() => clearTimeout(timer));

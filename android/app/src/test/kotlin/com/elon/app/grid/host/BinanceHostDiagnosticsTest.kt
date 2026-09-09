@@ -39,4 +39,17 @@ class BinanceHostDiagnosticsTest {
         val state = BinanceHostDiagnostics(); assertTrue(state.accept(event()))
         state.clear(); assertTrue(state.facts.isEmpty()); assertEquals(0L, state.observedAt)
     }
+    @Test fun reportFactsAreBoundedAndNestedNumbersAreProjected() {
+        val report = mapOf("kind" to "orders", "stage" to "parse_orders", "outcome" to "failed",
+            "error" to "unsupported_field", "http" to 200L, "business" to "000000")
+        val state = BinanceHostDiagnostics()
+        assertTrue(state.accept(StrictJson.parse(StrictJson.encode(event() + ("report" to report)))))
+        assertEquals(200L, (state.facts["report"] as Map<*, *>)["http"])
+        listOf(report + ("message" to "private-canary"), report + ("stage" to "private-canary"),
+            report + ("http" to 600L), report + ("business" to "private-canary"),
+            report + ("http" to StrictJson.Number("2e2"))).forEach {
+            assertFalse(state.accept(event() + ("report" to it)))
+            assertTrue(state.facts.isEmpty())
+        }
+    }
 }

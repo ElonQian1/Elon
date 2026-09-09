@@ -66,6 +66,15 @@ test('counts are capped and diagnostic reinstallation is idempotent', () => {
   assert.equal(h.window.__elonBinanceDiagnosticsV1,d);
   assert.equal(h.inspect().list_requests,10000); assert.equal(h.inspect().last_http_status,0);
 });
+
+test('report diagnostics retain fixed failure facts but discard arbitrary values',()=>{
+  const h=harness(), d=h.window.__elonBinanceDiagnosticsV1;
+  d.report({kind:'orders',stage:'parse_windowOrders',outcome:'failed',error:'unsupported_field',http:200,business:'000000'});
+  assert.equal(h.inspect().report.stage,'parse_windowOrders');
+  d.report({kind:'private-canary',stage:'https://private-canary',outcome:'private-canary',error:'cookie=private-canary',http:999,business:'private-canary'});
+  const r=h.inspect().report;assert.equal(r.kind,'none');assert.equal(r.http,0);assert.equal(r.error,'transport_or_parse_failed');
+  assert.ok(!JSON.stringify(r).includes('canary'));
+});
 test('legacy list discovery is visible but does not turn into verified v2 rows', async () => {
   const h = harness(); vm.runInContext(asset('binance_grid_read_adapter.js'),h.context);
   h.window.__elonBinanceReadV1.bind('doc_test_123');

@@ -1703,6 +1703,135 @@
       "updated_at_ms": 1788885567487
     },
     {
+      "id": "android-binance-report-recovery-v1",
+      "title": "币安记录读取兼容与诊断",
+      "summary": "修复可选展示字段使记录整页失败，提供有界只读请求诊断，严格保留账户和策略隔离。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/android-binance-report-recovery-v1.md",
+        "content_hash": "9aa741f071cec1f5ba26c8188db82a916e4aa42e44aca9afbcbc2aef879fd327",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "d385425f557fde6e1c2dc4fce3c82ddf968c4e89",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "b65626bf442435a602ff28400b6f73b00df7d2e8",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex-report-recovery",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_read_diagnostics.js",
+        "android/app/src/main/assets/binance_grid_reports_adapter.js",
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostDiagnostics.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "可选展示字段失败不能破坏已验证范围，必填身份仍严格拒绝",
+        "诊断只含阶段与固定代码，不泄漏原始记录或凭据",
+        "离线回归与正式APK回读分开记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/binance_grid_read_diagnostics.js",
+          "content_hash": "0de881961a68749194ec8af9788716fd0ddc539859ef9c8a41f7eea0de1497e1",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d385425f557fde6e1c2dc4fce3c82ddf968c4e89",
+            "head_blob_oid": "b7c56089f966e4db3200e233ff618f00c002ec00",
+            "worktree_blob_oid": "a30d77a54c1fdc656695c869050f63471b7b527f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/binance_grid_reports_adapter.js",
+          "content_hash": "4caf0bfbb4cda596a15803caf216df9457b2e1f8d08e5c4bf6224ebce964eda0",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d385425f557fde6e1c2dc4fce3c82ddf968c4e89",
+            "head_blob_oid": "48828e8d4e55a602d9bba57ba01a07601c1da38b",
+            "worktree_blob_oid": "43a40a85765709b4945a0a3c64568c2fdc11ae99",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostDiagnostics.kt",
+          "content_hash": "476ceb11c7f4475ed0cb513db68b1a5b74620cd4f93467d4a277f7731ced2a8c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d385425f557fde6e1c2dc4fce3c82ddf968c4e89",
+            "head_blob_oid": "ca68f8ca5170a8513a6b56b3c2ddb7f56fe2ce03",
+            "worktree_blob_oid": "7f8abea77d94484ed8fdb9f1d2356a5c7799917f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceReportDiagnostics.kt",
+          "content_hash": "386e12ace741c696cc3a167f7bb00f1ee309e41813c9a18f88260d7a7ab139b5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d385425f557fde6e1c2dc4fce3c82ddf968c4e89",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ee721ac6d05de215ffd4e0e945ee75743e33e0a6",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/host/BinanceHostDiagnosticsTest.kt",
+          "content_hash": "60034dbd62d1b89312721a1509d799f3b422ad1c7acb8f665962ec865250363e",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d385425f557fde6e1c2dc4fce3c82ddf968c4e89",
+            "head_blob_oid": "0f43d7f8ef228808da4f502af464560bae053b57",
+            "worktree_blob_oid": "d1f8db12f9b2f2fdc3c897515b184a9b643fcfde",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-read-diagnostics.cjs",
+          "content_hash": "91b66a163f823a99e717a8992cece0b5dcd0c049cd8842c5197ef04685d4d2f9",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d385425f557fde6e1c2dc4fce3c82ddf968c4e89",
+            "head_blob_oid": "847d4b78cb5fe9cb41d543913b41e011c79b77fc",
+            "worktree_blob_oid": "766007e8563baba874b6b82ab8709df58fc3f221",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-reports.cjs",
+          "content_hash": "9ad91b99bc174cdadc8ad3299c223327c610868dedae3aaf70a2d2bd81863c03",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d385425f557fde6e1c2dc4fce3c82ddf968c4e89",
+            "head_blob_oid": "f34f9fd49eb46e8b62e6d76a1f5b25b0a7db3bf2",
+            "worktree_blob_oid": "6c8b17ec1d358f94cc27ad94fcfc25fa1dfeba9f",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1788949182282,
+      "updated_at_ms": 1788950266993
+    },
+    {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "title": "A2 Map/Lock dynamic quotient authority V1",
       "summary": "Freeze the typed exact-partition contract that maps every verified Map/Lock static included leaf into one auditable dynamic execution class, derives Qmap/Qlock mechanically, and requires one process-isolated Windows record per frozen class without opening production effects.",
@@ -24357,56 +24486,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_add47c575261491fafb388d380125af7",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Current requirement and governance implementation remain valid; only the bound CI configuration evidence needs refresh.",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788652164543
-    },
-    {
-      "id": "feature_event_5f6cfd59b2f8453bae88c5a45470426a",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "claimed",
-      "actor": "codex-sui-ci",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788652173246
-    },
-    {
-      "id": "feature_event_4aced934dedd48c4b6fc1174657685fb",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Refreshing the six governed implementation evidence bindings after the intentional CI update.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788652183077
-    },
-    {
-      "id": "feature_event_230ebd4023ee42b2932a18be7a7c8709",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-sui-ci",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788652196377
-    },
-    {
-      "id": "feature_event_22cc957884ec45ad9ad7fd4fe562e5ec",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "All six current implementation evidence bindings are recorded after the CI update.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788652221393
-    },
-    {
       "id": "feature_event_b3e8b66d7aa645c0b6dfb913b7f0a9e4",
       "feature_id": "project-feature-registry-adoption-v1",
       "action": "transitioned",
@@ -26355,6 +26434,56 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1788936942396
+    },
+    {
+      "id": "feature_event_7a3cbdd550144d9781d06131f7abf471",
+      "feature_id": "android-binance-report-recovery-v1",
+      "action": "registered",
+      "actor": "codex-report-recovery",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1788949182294
+    },
+    {
+      "id": "feature_event_fd9243bc746042bb91c1e237960523df",
+      "feature_id": "android-binance-report-recovery-v1",
+      "action": "claimed",
+      "actor": "codex-report-recovery",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1788949199920
+    },
+    {
+      "id": "feature_event_800e974f1dd14cf1ab12ce96a2e0a354",
+      "feature_id": "android-binance-report-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-report-recovery",
+      "reason": "量化真机记录读取失败复现后补读取兼容和诊断",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1788949200085
+    },
+    {
+      "id": "feature_event_e04b9d2c104b4676a978f817df4c8a79",
+      "feature_id": "android-binance-report-recovery-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-report-recovery",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1788950266769
+    },
+    {
+      "id": "feature_event_35ebb0a838fc40939ce979d1d87397ca",
+      "feature_id": "android-binance-report-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-report-recovery",
+      "reason": "21项Node套件及8项Android定向测试通过；真机委托和持仓失败仍待新诊断定位",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1788950266993
     }
   ]
 }

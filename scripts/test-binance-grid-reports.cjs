@@ -6,10 +6,10 @@ const assert = require('node:assert/strict');
 const code = fs.readFileSync(path.join(__dirname, '../android/app/src/main/assets/binance_grid_reports_adapter.js'), 'utf8');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 function fixture() {
-  const events = [], calls = [], data = [];
+  const events = [], calls = [], data = [], diagnostics = [];
   const account = {account:'42', account_kind:'sub', headers:new Headers({'x-fixture-secret':'local-only'})};
   const known = new Set(['123']);
-  const window = {}; window.top = window;
+  const window = {__elonBinanceDiagnosticsV1:{report:value=>diagnostics.push(value)}}; window.top = window;
   vm.runInNewContext(code, {window,location:{origin:'https://www.binance.com'},Headers,AbortController,setTimeout,clearTimeout});
   let prove = async () => ({account:account.account,account_kind:account.account_kind});
   const reports = window.__elonBinanceReportsFactoryV1({context:()=>account,known:id=>known.has(id),prove:headers=>prove(headers),emit:event=>events.push(event),
@@ -19,7 +19,7 @@ function fixture() {
       return {status:200,text:async()=>JSON.stringify({code:'000000',success:true,...reply})};
     }});
   const q = (kind='history', overrides={}) => ({request:'a'.repeat(32),kind,id:kind==='history'?'':'123',symbol:kind==='history'?'':'NEARUSDT',page:1,days:30,...overrides});
-  return {events,calls,data,account,known,reports,q,setProof:f=>{prove=f;}};
+  return {events,calls,data,account,known,reports,q,diagnostics,setProof:f=>{prove=f;}};
 }
 const grid = {strategyId:'123',symbol:'NEARUSDT',rootUserId:'42',strategyUserId:'99',strategyStatus:'WORKING'};
 test('history uses the actual v2 POST and never forwards credential or unrelated fields', async()=>{
@@ -76,4 +76,29 @@ test('history pagination keeps one time window and resets it with account contex
   const first=JSON.parse(h.calls[0].init.body), second=JSON.parse(h.calls[1].init.body);
   assert.equal(first.startTime,second.startTime);assert.equal(first.endTime,second.endTime);assert.equal(second.page,2);
   h.reports.reset();assert.equal(h.reports.query(h.q('history',{page:2})),false);
+});
+
+test('optional upstream display drift keeps the verified page and preserves unknowns',async()=>{
+  const h=fixture();h.data.push({data:{...grid,slideWindow:true}},{data:{bidItems:[{price:1.25,qty:'2',status:{newField:true},insertTime:''}],askItems:[]}});
+  h.reports.query(h.q('orders'));await tick();
+  const e=h.events.at(-1);assert.equal(e.status,'ready');assert.equal(e.rows.length,1);
+  assert.equal(e.rows[0].price,null);assert.equal(e.rows[0].status,null);assert.equal(e.rows[0].time,null);
+  assert.equal(e.rows[0].quantity,'2');assert.equal(h.diagnostics.at(-1).outcome,'ready');
+});
+test('unscoped source rows cannot be mistaken for a verified empty strategy',async()=>{
+  const h=fixture();h.data.push({data:grid},{data:[{symbol:'BTCUSDT',side:'BUY'},
+    {strategyId:'123',symbol:'NEARUSDT',side:'SELL',origQty:'3'}]});
+  h.reports.query(h.q('orders'));await tick();assert.equal(h.events.at(-1).status,'error');assert.equal(h.events.at(-1).rows.length,0);
+});
+test('required side still rejects malformed records and exposes only fixed parse stage',async()=>{
+  const h=fixture();h.data.push({data:grid},{data:[{strategyId:'123',symbol:'NEARUSDT',side:'private-canary'}]});
+  h.reports.query(h.q('orders'));await tick();assert.equal(h.events.at(-1).status,'error');
+  assert.equal(h.diagnostics.at(-1).stage,'parse_orders');assert.equal(h.diagnostics.at(-1).error,'unsupported_field');
+  assert.ok(!JSON.stringify(h.diagnostics).includes('private-canary'));
+});
+test('business failure records endpoint and bounded code without a fake empty success',async()=>{
+  const h=fixture();h.data.push({data:grid},{success:false,code:'123456',message:'private-canary'});
+  h.reports.query(h.q('positions'));await tick();assert.equal(h.events.at(-1).status,'error');
+  assert.deepEqual(JSON.parse(JSON.stringify(h.diagnostics.at(-1))),{kind:'positions',stage:'positions',outcome:'failed',error:'business_failed',http:200,business:'123456'});
+  assert.ok(!JSON.stringify(h.diagnostics).includes('private-canary'));
 });

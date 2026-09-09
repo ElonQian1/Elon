@@ -7,6 +7,12 @@
   const errors = new Set(['invalid_field', 'invalid_row', 'response_failed', 'business_failed', 'identity_unverified',
     'list_invalid', 'duplicate', 'account_mismatch', 'detail_mismatch', 'identity_response_failed', 'identity_business_failed']);
   let lastFailure = 'none', lastKind = 'none', lastStatus = 0;
+  const reportKinds = new Set(['none','history','orders','matches','positions']);
+  const reportStages = new Set(['idle','identity_before','identity_after',
+    ...['history','detail','windowOrders','orders','matches','positions'].flatMap(key => [key,'parse_'+key])]);
+  const reportErrors = new Set(['none','unsupported_field','unsupported_list','unsupported_object','response_failed',
+    'business_failed','account_changed','scope_changed','restart_pagination','unsupported_total']);
+  let report = {kind:'none',stage:'idle',outcome:'idle',error:'none',http:0,business:'none'};
   const bump = key => { if (Object.prototype.hasOwnProperty.call(counts, key)) counts[key] = Math.min(10000, counts[key] + 1); };
   window.addEventListener('error', event => {
     bump(event.target?.tagName === 'SCRIPT' ? 'script_load_errors' : 'script_errors');
@@ -16,6 +22,14 @@
       .some(node => node.getClientRects().length > 0 && pattern.test((node.textContent || '').trim()));
   }
   window.__elonBinanceDiagnosticsV1 = Object.freeze({
+    report(value) {
+      report = {kind:reportKinds.has(value?.kind) ? value.kind : 'none',
+        stage:reportStages.has(value?.stage) ? value.stage : 'idle',
+        outcome:['idle','loading','ready','failed'].includes(value?.outcome) ? value.outcome : 'failed',
+        error:reportErrors.has(value?.error) ? value.error : 'transport_or_parse_failed',
+        http:Number.isInteger(value?.http) && value.http >= 0 && value.http <= 599 ? value.http : 0,
+        business:typeof value?.business === 'string' && /^(none|unknown|[0-9]{6})$/.test(value.business) ? value.business : 'unknown'};
+    },
     request(kind) { bump(kind + '_requests'); },
     response(kind, status) { bump(kind + '_responses'); lastStatus = Number.isInteger(status) && status >= 0 && status <= 599 ? status : 0; },
     failure(kind, code) { lastKind = ['list','identity','detail'].includes(kind) ? kind : 'none'; lastFailure = errors.has(code) ? code : 'transport_or_parse_failed'; },
@@ -24,7 +38,7 @@
       const route = location.pathname.startsWith('/zh-CN/trading-bots/futures/grid/') ? 'grid' :
         /\/(login|register)(\/|$)/.test(location.pathname) ? 'login' : 'other';
       const facts = {schema:'yilong.binance_diagnostic.v1', token, ...counts, last_failure:lastFailure,
-        failure_kind:lastKind, last_http_status:lastStatus, route,
+        failure_kind:lastKind, last_http_status:lastStatus, report, route,
         ready_state:['loading','interactive','complete'].includes(document.readyState) ? document.readyState : 'unknown',
         script_count:Math.min(10000, document.scripts.length),
         body_text_length:Math.min(1000000, (document.body?.textContent || '').length),
