@@ -75,7 +75,51 @@ the final related attachment, temporary-state, submit and September 9 binding
 batch passed **221/221**. Both acceptance scripts pass PowerShell parsing.
 Log: `temporary-home-regression-final-20260909-073204-334`.
 
-Delivery and fixed-device acceptance are pending. Project attachment and other
-unverified scopes are not completed by this correction. Proven audio, subtitles,
+## Normal 1592 retest
+
+The candidate was published and installed as normal `1.1.1592`, source
+`b01005610e7516d40548e55ad10928865a7ce58f`, APK SHA-256
+`5ceb100bb0d36880651515d36b3a6bbae0fd545960186ccdf47396b79af50e28`.
+Release log: `publish-temporary-home-fix-20260909-073609-333` (458.3 seconds).
+
+`temporary-attachment-1592-20260909-074508-965` reproduced the failure: private
+upload, actual file-content reply and exactly one user row passed, but the send
+receipt still reported `context_changed`. The post-send control existed with
+`selected=false` and a ready homepage composer. The blank normal chat, local
+fixture and awake lease were restored. No uncertain request was replayed.
+
+The first source gap and unit regression were **not sufficient to resolve the
+live failure**. Do not claim this temporary scope completed or infer retention.
+Project attachment and other unverified scopes are not completed. Proven audio, subtitles,
 dictation, read-aloud and authenticated stop/follow-up are unchanged. Google stays
 after the remaining ChatGPT acceptance gate.
+
+## Actual runtime correction
+
+Same-version local research APK and a separate synthetic text turn established
+the real state transitions (`temporary-runtime-trace-1592-20260909-075905-493`):
+
+- Temporary query and official selected signal stayed true, with no extra query.
+- Server ID changed from absent to UUID; official is-new changed to false.
+- The current temporary button's committed memo agreed and became read-only.
+- Legacy `thread.is_do_not_remember` remained false before and after the turn.
+- The composer shared-provider wrapper changed. Conversation, controller, file
+  store, editor and document were unchanged. No account or user content was logged.
+
+Submit v17 permits this post-acknowledgement provider replacement only while
+the real owners still match. Pre-dispatch capture continues to reject a replaced
+provider. Temporary v5 confirms the exact official router signal against the
+committed control's memo, rather than incorrectly equating it with legacy thread
+metadata. The same cached private control supplies the submit ownership proof;
+there is no second DOM scan or independent temporary-state implementation.
+
+The delayed-render fixtures now model actual control commit separately from
+legacy metadata. Related tests passed 229/229, including detached controls,
+foreign conversations/controllers/file stores, pre-send replacement and no replay.
+Log: `temporary-live-shape-final-20260909-080512-192`.
+
+An attempted module-only hot replacement retained the old layout's captured
+adapter reference and is not valid whole-candidate acceptance. The local research
+APK was replaced with hash-verified normal 1592; blank chat/draft restored and
+the private debug forward removed. Full normal-candidate delivery/acceptance
+remains the next gate.
