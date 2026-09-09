@@ -3,6 +3,7 @@
 Current implementation audit: 2026-09-09. This is a work list, not a declaration
 that every private protocol has been reproduced. Reuse completed capabilities in
 [the capability matrix](web-ai-private-transport-capability-matrix.md).
+Operation admission and remaining composer dependencies: [readiness policy](chatgpt-operation-readiness.md).
 
 ## Workflow
 
