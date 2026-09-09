@@ -6,7 +6,8 @@ import org.junit.Test
 class WebChatProductionCapabilityEvidenceTest {
     @Test
     fun missingIdentityAndExpiredDocumentAreRecoveryNotUnsupportedOrFailed() {
-        for (error in listOf("identity_not_ready", "library_identity_not_ready", "adapter_generation_not_ready")) {
+        for (error in listOf("identity_not_ready", "library_identity_not_ready", "directory_identity_not_ready",
+            "adapter_generation_not_ready")) {
             assertEquals(WebChatProductionObservationState.SESSION_RECOVERING,
                 WebChatProductionCapabilityEvidencePolicy.resolve(WebChatProductionCapabilityEvidence(
                     declaredSupported = true, adapterCurrent = true, observedCount = 0,

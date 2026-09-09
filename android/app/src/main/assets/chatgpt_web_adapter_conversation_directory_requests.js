@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 7) return;
+  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 8) return;
 
   const PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const CONVERSATION_PATH = /^\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})$/;
@@ -67,6 +67,7 @@
 
     function cancel() {
       generation += 1;
+      privateDirectory?.cancelRefresh?.();
       if (conversationAdapter && typeof conversationAdapter.cancelDirectoryWork === 'function') {
         conversationAdapter.cancelDirectoryWork();
       }
@@ -79,6 +80,18 @@
       const fallback = () => {
         if (current()) conversationAdapter.requestList(command, emitEvent, respond);
       };
+      const privateDisabled = window.__elonChatGptPrivateConversationPrefetchEnabled === false &&
+        window.__elonChatGptPrivateResearchEnabled !== true;
+      if (!projectId && !privateDisabled && typeof privateDirectory?.refresh === 'function') {
+        Promise.resolve().then(() => privateDirectory.refresh()).then((result) => {
+          if (!current()) return;
+          if (result?.ok === true) emitSnapshot(null);
+          respond('list_conversations', result?.ok === true, result?.code || 'directory_refresh_failed');
+        }).catch(() => {
+          if (current()) respond('list_conversations', false, 'directory_refresh_failed');
+        });
+        return;
+      }
       if (!PROJECT_ID.test(projectId) || !privateDirectory ||
           typeof privateDirectory.refreshProject !== 'function') {
         fallback();
@@ -158,5 +171,5 @@
     return Object.freeze({ cancel, emitSnapshot, handleCommand, installListener, probeMembership, requestList });
   }
 
-  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 7, create });
+  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 8, create });
 })();

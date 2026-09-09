@@ -10,6 +10,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_new_chat_confirmation.js",
         "chatgpt_web_private_new_conversation.js",
         "chatgpt_web_adapter_authentication_policy.js",
+        "chatgpt_web_private_directory_refresh.js",
         "chatgpt_web_private_conversation_directory.js",
         "chatgpt_web_adapter_conversation_directory_requests.js",
         "chatgpt_web_adapter_project_policy.js",

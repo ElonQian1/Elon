@@ -87,6 +87,7 @@ internal object WebChatProductionCapabilityEvidencePolicy {
         "adapter_generation_not_ready",
         "identity_not_ready",
         "library_identity_not_ready",
+        "directory_identity_not_ready",
         "snapshot_unavailable",
     )
     private val EXPLICIT_UNSUPPORTED_ERRORS = setOf(

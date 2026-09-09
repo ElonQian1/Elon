@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptPrivateConversationDirectory;
-  if (existing && Number(existing.version) >= 10) return;
+  if (existing && Number(existing.version) >= 11) return;
   if (location.origin !== 'https://chatgpt.com') return;
 
   const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
@@ -19,6 +19,7 @@
   const deletedConversationIds = new Set();
   let listener = null;
   let revision = 0;
+  let globalRefresh = null;
   const MAX_CONVERSATIONS = 200;
   const MAX_PROJECTS = 40;
   const MAX_RESPONSE_BYTES = 1024 * 1024;
@@ -410,6 +411,13 @@
     return request;
   }
 
+  function refresh() {
+    if (!globalRefresh && window.__elonChatGptPrivateDirectoryRefresh) {
+      globalRefresh = window.__elonChatGptPrivateDirectoryRefresh.create(window, accept, originalFetch);
+    }
+    return globalRefresh?.refresh() || Promise.resolve({ ok: false, code: 'directory_identity_not_ready' });
+  }
+
   function snapshot() {
     const currentPath = location.pathname;
     const projectRows = Array.from(projects.values()).map((row) => Object.assign({}, row, {
@@ -435,8 +443,10 @@
   }
 
   window.__elonChatGptPrivateConversationDirectory = Object.freeze({
-    version: 10,
+    version: 11,
     snapshot,
+    refresh,
+    cancelRefresh: () => globalRefresh?.cancel(),
     refreshProject,
     acceptConversationMembership,
     acceptPinnedState,

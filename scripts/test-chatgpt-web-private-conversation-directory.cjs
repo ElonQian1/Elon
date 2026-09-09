@@ -21,6 +21,8 @@ const source = fs.readFileSync(assetPath, 'utf8');
 const adapterSource = fs.readFileSync(adapterPath, 'utf8');
 const directoryRequestsSource = fs.readFileSync(directoryRequestsPath, 'utf8');
 const pageAdapterSource = fs.readFileSync(pageAdapterPath, 'utf8');
+const adapterAssetsSource = fs.readFileSync(path.join(root,
+  'android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAdapterAssets.kt'), 'utf8');
 
 assert(!/document\.cookie|\.headers\b|\.body\b/i.test(source));
 assert(source.includes("url.origin !== location.origin"));
@@ -47,8 +49,8 @@ assert(source.includes('replaceProjectConversations(projectId, text)'));
 assert.match(pageAdapterSource, /internal const val ADAPTER_VERSION = \d+/);
 assert(pageAdapterSource.includes('addDocumentStartJavaScript'));
 assert(
-  pageAdapterSource.indexOf('chatgpt_web_private_conversation_directory.js') <
-    pageAdapterSource.indexOf('chatgpt_web_adapter.js')
+  adapterAssetsSource.indexOf('chatgpt_web_private_conversation_directory.js') <
+    adapterAssetsSource.indexOf('chatgpt_web_adapter.js')
 );
 
 const responses = new Map([
@@ -138,6 +140,13 @@ const location = {
   pathname: '/g/g-p-health123/c/project-chat-12345'
 };
 const window = {
+  location,
+  __elonChatGptDocumentToken: 'doc_directory_fixture',
+  __elonChatGptPrivateDirectoryRefresh: require('../android/app/src/main/assets/chatgpt_web_private_directory_refresh.js'),
+  __elonChatGptPrivateTransport: {
+    copySameOriginRequestHeaders: () => ({ Authorization: 'Bearer synthetic-directory-auth' }),
+    acquireSameOriginRequestHeaders: async () => ({ Authorization: 'Bearer synthetic-directory-auth' }),
+  },
   __elonChatGptPrivateJsonRequest: require('../android/app/src/main/assets/chatgpt_web_private_json_request.js'),
   AbortController,
   fetch: originalFetch,
@@ -170,7 +179,7 @@ async function flush() {
 (async () => {
   const directory = window.__elonChatGptPrivateConversationDirectory;
   assert(directory);
-  assert.strictEqual(directory.version, 10);
+  assert.strictEqual(directory.version, 11);
   let notifications = 0;
   directory.setListener(() => { notifications += 1; });
 
@@ -180,6 +189,12 @@ async function flush() {
   await flush();
 
   const snapshot = directory.snapshot();
+  const beforeGlobalRefresh = fetchCalls.length;
+  assert.strictEqual((await directory.refresh()).ok, true);
+  assert.strictEqual(fetchCalls.length, beforeGlobalRefresh + 1);
+  assert.strictEqual(fetchCalls.at(-1).input, '/backend-api/conversations?offset=0&limit=28');
+  assert.strictEqual(directory.snapshot().complete, false);
+  assert(directory.snapshot().conversations.some(row => row.id === 'project-chat-12345'));
   assert.strictEqual(snapshot.complete, false);
   assert.strictEqual(snapshot.projects.length, 1);
   assert.strictEqual(snapshot.projects[0].title, '家庭健康');
@@ -195,7 +210,7 @@ async function flush() {
   assert.strictEqual(project.active, true);
   assert.strictEqual(project.pinned, null);
   assert(notifications >= 3);
-  assert.strictEqual(fetchCalls.length, 3);
+  assert.strictEqual(fetchCalls.length, 4);
   assert.strictEqual(cloneCount, 3);
 
   const notificationsBeforeMembership = notifications;
