@@ -215,7 +215,7 @@
       '[aria-label*="模型选择"]'
     ];
     for (const selector of directSelectors) {
-      const node = scope.querySelector(selector) || document.querySelector(selector);
+      const node = scope.querySelector(selector);
       if (isActionable(node) || isVisible(node)) return node;
     }
     const layout = window.__elonChatGptLayout;
@@ -227,7 +227,7 @@
       const label = nodeLabel(button);
       return isActionable(button) && !isComposerAction(button) && label.length > 0 && label.length <= 80;
     });
-    return candidates.find((button) => button.getAttribute('aria-haspopup') === 'menu') ||
+    const local = candidates.find((button) => button.getAttribute('aria-haspopup') === 'menu') ||
       candidates.find((button) =>
         modelLabelPolicy && typeof modelLabelPolicy.isModelLabel === 'function'
           ? modelLabelPolicy.isModelLabel(nodeLabel(button))
@@ -235,8 +235,13 @@
             nodeLabel(button)
           )
       ) ||
-      (candidates.length === 1 ? candidates[0] : null) ||
-      null;
+      (candidates.length === 1 ? candidates[0] : null);
+    if (local) return local;
+    for (const selector of directSelectors) {
+      const node = document.querySelector(selector);
+      if (isActionable(node) || isVisible(node)) return node;
+    }
+    return null;
   }
 
   function findPromptInput() {

@@ -1,7 +1,8 @@
 (function (root, factory) {
   'use strict';
+  if (Number(root?.__elonChatGptPrivateModelState?.version) >= 5) return;
   const states = new WeakMap();
-  const api = Object.freeze({ version: 4, create(page, options) {
+  const api = Object.freeze({ version: 5, create(page, options) {
     const instance = factory(page, options);
     states.set(page, instance.state);
     return instance;
@@ -202,5 +203,5 @@
     return handled;
   }
 
-  return Object.freeze({ version: 4, state, request, select, dismiss });
+  return Object.freeze({ version: 5, state, request, select, dismiss });
 });
