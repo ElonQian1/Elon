@@ -38,6 +38,28 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
         return text("\u5168\u90e8\u516c\u5f00\u5206\u4eab\u94fe\u63a5").exists() ||
             text("\u5168\u90e8\u516c\u5f00\u5206\u4eab\u94fe\u63a5\uff08\u90e8\u5206\uff09").exists();
     }
+    private void setModelLevel() throws Exception {
+        UiObject slider = description("web-chat-model-level-slider");
+        assertTrue("model_level_slider_missing", slider.waitForExists(5000));
+        assertTrue("model_level_slider_disabled", slider.isEnabled());
+        int level = Integer.parseInt(getParams().getString("level", "-1"));
+        assertTrue("invalid_model_level", level >= 0 && level <= 5);
+        java.lang.reflect.Method method = UiObject.class.getDeclaredMethod("findAccessibilityNodeInfo", long.class);
+        method.setAccessible(true);
+        AccessibilityNodeInfo info = (AccessibilityNodeInfo) method.invoke(slider, 5000L);
+        assertNotNull("model_level_node_missing", info);
+        try {
+            assertEquals("model_level_owner_mismatch", APP, String.valueOf(info.getPackageName()));
+            assertEquals("model_level_class_mismatch", "android.widget.SeekBar", String.valueOf(info.getClassName()));
+            AccessibilityNodeInfo.RangeInfo range = info.getRangeInfo();
+            assertNotNull("model_level_range_missing", range);
+            assertTrue("model_level_out_of_range", level >= range.getMin() && level <= range.getMax());
+            android.os.Bundle arguments = new android.os.Bundle();
+            arguments.putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, level);
+            assertTrue("model_level_action_failed", info.performAction(
+                AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.getId(), arguments));
+        } finally { info.recycle(); }
+    }
     public void testStep() throws Exception {
         assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
         String step = getParams().getString("step", "inspect");
@@ -47,6 +69,7 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                 assertTrue("model_menu_missing", description("web-chat-model-control").waitForExists(5000));
                 break;
             case "model_advanced": click(description("web-chat-model-advanced")); break;
+            case "model_level": setModelLevel(); break;
             case "select_model":
                 String selector = new String(android.util.Base64.decode(
                     getParams().getString("selector_b64", ""), android.util.Base64.DEFAULT),
@@ -58,6 +81,10 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             case "tools": click(description("web-chat-composer-tools:chatgpt_web")); break;
             case "image": click(description("web-chat-composer-tool:chatgpt_web:image_generation")); break;
             case "search": click(description("web-chat-composer-tool:chatgpt_web:web_search")); break;
+            case "clear_image": click(description("\u5173\u95ed\u521b\u5efa\u56fe\u7247")); break;
+            case "clear_search": click(description("\u5173\u95ed\u7f51\u9875\u641c\u7d22")); break;
+            case "header": click(description("web-chat-page-actions:chatgpt_web")); break;
+            case "temporary": click(description("chatgpt-native:temporary-chat:\u4e34\u65f6\u804a\u5929")); break;
             case "conversation_actions":
                 click(new UiObject(new UiSelector().packageName(APP).descriptionStartsWith("chatgpt-conversation-actions:")));
                 assertTrue("conversation_actions_missing", description("web-chat-conversation-action-share").waitForExists(5000));
@@ -92,6 +119,8 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             .put("model_preset", description("web-chat-model-preset:auto").exists())
             .put("image_option", description("web-chat-composer-tool:chatgpt_web:image_generation").exists())
             .put("search_option", description("web-chat-composer-tool:chatgpt_web:web_search").exists())
+            .put("image_active", description("\u5df2\u542f\u7528\u521b\u5efa\u56fe\u7247").exists())
+            .put("search_active", description("\u5df2\u542f\u7528\u7f51\u9875\u641c\u7d22").exists())
             .put("share_menu", description("web-chat-conversation-share-options").exists())
             .put("account_share_page", accountTitle())
             .put("account_share_rows", description("web-chat-account-share-links-list").exists())

@@ -32,3 +32,25 @@ for (const [index, expression] of expressions.entries()) {
     assert.equal(pattern.test('chatgpt-conversation:private_model_1_0:High'), false);
   });
 }
+
+test('model levels use a bounded native accessibility action, never a coordinate drag', () => {
+  assert.match(ps, /\[ValidateRange\(0, 5\)\]\[int\]\$Level/);
+  assert.match(ps, /if \(\$Step -eq 'model_level'\) \{ \$parameters\.level = \$Level \}/);
+  assert.match(java, /case "model_level": setModelLevel\(\); break/);
+  assert.match(java, /description\("web-chat-model-level-slider"\)/);
+  assert.match(java, /"model_level_owner_mismatch", APP/);
+  assert.match(java, /"model_level_class_mismatch", "android\.widget\.SeekBar"/);
+  assert.match(java, /level >= range\.getMin\(\) && level <= range\.getMax\(\)/);
+  assert.match(java, /arguments\.putFloat\(AccessibilityNodeInfo\.ACTION_ARGUMENT_PROGRESS_VALUE, level\)/);
+  assert.match(java, /AccessibilityNodeInfo\.AccessibilityAction\.ACTION_SET_PROGRESS\.getId\(\), arguments/);
+  assert.doesNotMatch(java, /\.swipe\(|\.dragTo\(|\.click\(\s*\d/);
+});
+
+test('the production slider handles non-touch user progress without submitting programmatic refreshes', () => {
+  const renderer = fs.readFileSync(path.join(__dirname,
+    '../android/app/src/main/kotlin/com/elon/app/WebChatModelControlPopup.kt'), 'utf8');
+  assert.match(renderer, /WebChatModelLevelSubmission\(levels\.size\)/);
+  assert.match(renderer, /submission\.progress\(value, fromUser\)\?\.let \{ onOptionSelected\(levels\[it\]\) \}/);
+  assert.match(renderer, /onStartTrackingTouch\(bar: SeekBar\?\) = submission\.startTouch\(\)/);
+  assert.match(renderer, /submission\.stopTouch\(progress\)\?\.let \{ onOptionSelected\(levels\[it\]\) \}/);
+});

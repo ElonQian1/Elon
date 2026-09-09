@@ -146,6 +146,7 @@ internal class WebChatModelControlPopupRenderer(
 
     private fun levelSlider(presentation: WebChatModelControlPresentation): View {
         val levels = presentation.levels
+        val submission = WebChatModelLevelSubmission(levels.size)
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(8), dp(2), dp(8), dp(6))
@@ -176,12 +177,13 @@ internal class WebChatModelControlPopupRenderer(
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             stateDescription = WebChatModelControlPolicy.compactLabel(selected.label)
                         }
+                        submission.progress(value, fromUser)?.let { onOptionSelected(levels[it]) }
                     }
 
-                    override fun onStartTrackingTouch(bar: SeekBar?) = Unit
+                    override fun onStartTrackingTouch(bar: SeekBar?) = submission.startTouch()
 
                     override fun onStopTrackingTouch(bar: SeekBar?) {
-                        levels.getOrNull(progress)?.let(onOptionSelected)
+                        submission.stopTouch(progress)?.let { onOptionSelected(levels[it]) }
                     }
                 })
             })
