@@ -14,8 +14,10 @@ import android.widget.GridLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.elon.app.ChatAttachment
@@ -29,6 +31,7 @@ internal class ChatGptWebImageGalleryController(
     private val store: ChatGptWebImageAssetStore,
     private val requestPage: (String, String, Set<String>) -> Boolean,
     private val cancelPage: (String) -> Unit,
+    private val requestPreview: (String) -> Boolean,
 ) {
     private var dialog: Dialog? = null
     private var statusView: TextView? = null
@@ -40,6 +43,8 @@ internal class ChatGptWebImageGalleryController(
     private var nextPage: ImageButton? = null
     private var pageLabel: TextView? = null
     private var syncState = ChatGptWebImageGallerySnapshot.STATE_LOADING
+    private var pendingPreview: Pair<String, Int>? = null
+    private val previewTimeout = Runnable { failPreview() }
     private val syncTimeout = Runnable {
         activeRequestId?.let(cancelPage)
         activeRequestId = null
@@ -198,6 +203,8 @@ internal class ChatGptWebImageGalleryController(
     }
 
     private fun cancelSync() {
+        pendingPreview = null
+        host.removeCallbacks(previewTimeout)
         activeRequestId?.let(cancelPage)
         activeRequestId = null
         host.removeCallbacks(syncTimeout)
@@ -232,8 +239,50 @@ internal class ChatGptWebImageGalleryController(
     }
 
     fun accept(asset: ChatGptWebImageAsset) {
-        if (dialog != null && asset.galleryRequestId == activeRequestId && asset.ready &&
-            asset.handle in pageSnapshot?.handles.orEmpty()) store.save(asset) {}
+        if (dialog == null || asset.galleryRequestId != activeRequestId ||
+            asset.handle !in pageSnapshot?.handles.orEmpty() + pageSnapshot?.previewHandles.orEmpty()) return
+        if (!asset.ready) {
+            if (pendingPreview?.first == asset.handle) failPreview()
+            return
+        }
+        val owner = activeRequestId
+        store.save(asset) { saved ->
+            activity.runOnUiThread {
+                if (activeRequestId != owner || pendingPreview?.first != asset.handle) return@runOnUiThread
+                if (!saved) failPreview() else {
+                    val index = pendingPreview!!.second
+                    pendingPreview = null
+                    host.removeCallbacks(previewTimeout)
+                    openPreview(index, asset.handle)
+                    renderEntries()
+                }
+            }
+        }
+    }
+
+    private fun failPreview() {
+        if (pendingPreview == null) return
+        pendingPreview = null
+        host.removeCallbacks(previewTimeout)
+        renderEntries()
+        Toast.makeText(activity, "大图暂未加载，请重试", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun openPreview(index: Int, handle: String) {
+        if (dialog == null || handle !in pageSnapshot?.previewHandles.orEmpty()) return
+        val entry = store.entries().firstOrNull { it.handle == handle }
+        if (entry == null) {
+            if (pendingPreview != null) return
+            pendingPreview = handle to index
+            if (!requestPreview(handle)) { failPreview(); return }
+            host.postDelayed(previewTimeout, 30_000L)
+            renderEntries()
+            return
+        }
+        ChatImageViewer.show(activity, ChatAttachment(
+            kind = "image", displayName = "图像 ${index + 1}", mimeType = "image/jpeg",
+            localPath = entry.localPath, imageWidth = entry.width, imageHeight = entry.height,
+        ))
     }
 
     private fun renderStatus() {
@@ -273,26 +322,14 @@ internal class ChatGptWebImageGalleryController(
         target.removeAllViews()
         pageSnapshot?.handles.orEmpty().forEachIndexed { index, handle ->
             val entry = entries[handle]
+            val fullHandle = pageSnapshot?.previewHandles?.getOrNull(index) ?: handle
             val image = ImageView(activity).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 setBackgroundColor(ContextCompat.getColor(context, R.color.elon_surface_card))
                 setImageResource(R.drawable.ic_attach_photos)
                 contentDescription = "图像 ${index + 1}"
                 tag = entry?.localPath
-                setOnClickListener {
-                    if (entry == null) return@setOnClickListener
-                    ChatImageViewer.show(
-                        activity,
-                        ChatAttachment(
-                            kind = "image",
-                            displayName = "图像 ${index + 1}",
-                            mimeType = "image/jpeg",
-                            localPath = entry.localPath,
-                            imageWidth = entry.width,
-                            imageHeight = entry.height,
-                        ),
-                    )
-                }
+                setOnClickListener { openPreview(index, fullHandle) }
             }
             if (entry != null) ChatImagePreviewLoader.loadSampled(
                 activity,
@@ -303,7 +340,14 @@ internal class ChatGptWebImageGalleryController(
                     if (image.tag == entry.localPath) image.setImageBitmap(bitmap)
                 }
             }
-            target.addView(image, GridLayout.LayoutParams().apply {
+            val tile = FrameLayout(activity).apply {
+                addView(image, FrameLayout.LayoutParams(-1, -1))
+                if (pendingPreview?.first == fullHandle) addView(ProgressBar(activity).apply {
+                    contentDescription = "正在加载大图"
+                    isClickable = false
+                }, FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER))
+            }
+            target.addView(tile, GridLayout.LayoutParams().apply {
                 width = 0
                 height = dp(132)
                 columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)

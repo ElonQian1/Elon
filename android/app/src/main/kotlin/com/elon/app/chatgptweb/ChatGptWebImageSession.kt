@@ -30,6 +30,7 @@ internal class ChatGptWebImageSession(
         ChatGptWebImageGalleryController(activity, host, store,
             requestPage = { id, operation, handles -> pageAdapter()?.syncImageGallery(id, operation, handles) == true },
             cancelPage = { id -> pageAdapter()?.cancelImageGallery(id) },
+            requestPreview = { handle -> pageAdapter()?.let { it.requestImageAsset(handle); true } ?: false },
         )
     }
     private val gallery by galleryDelegate

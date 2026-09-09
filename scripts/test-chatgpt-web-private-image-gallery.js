@@ -314,7 +314,7 @@ test('gallery upgrade retires one older instance without stacking requests', () 
     __elonChatGptPrivateImagePointer: require('../android/app/src/main/assets/chatgpt_web_private_image_pointer.js') };
   vm.runInNewContext(source, { window: root });
   const instance = root.__elonChatGptPrivateImageGallery;
-  assert.equal(instance.version, 6);
+  assert.equal(instance.version, 7);
   assert.equal(disposed, 1);
   vm.runInNewContext(source, { window: root });
   assert.equal(root.__elonChatGptPrivateImageGallery, instance);
@@ -372,6 +372,31 @@ test('individual preview failure does not discard the page or successful preview
   assert.equal(h.snapshots().at(-1).state, 'partial');
   assert.equal(h.snapshots().at(-1).handles.length, 2);
   assert.equal(h.events.filter(e => e.type === 'image_asset').length, 1);
+});
+
+test('catalog deadline stops its batch but leaves on-demand preview ownership until close', async () => {
+  const h = harness(), started = deferred(), pending = deferred();
+  const original = h.root.__elonChatGptImageAssets.request;
+  let first = true;
+  h.root.__elonChatGptImageAssets.request = async (...args) => {
+    if (first) { first = false; started.resolve(); await pending.promise; }
+    return original(...args);
+  };
+  const batch = h.run();
+  await started.promise;
+  const page = h.snapshots().at(-1);
+  [...h.timers.values()].find(timer => timer.ms === 35000).fn();
+  assert.equal(h.snapshots().at(-1).state, 'partial');
+  const result = await new Promise(resolve => {
+    assert.equal(h.api.handle('request_image_asset', { value: page.previewHandles[0] },
+      (_, ok) => resolve(ok), event => h.events.push(event)), true);
+  });
+  assert.equal(result, true);
+  h.api.cancel(page.requestId);
+  assert.equal(h.registry.get(page.previewHandles[0]).current(), false);
+  pending.resolve();
+  assert.equal((await batch).ok, false);
+  assert.equal(h.timers.size, 0);
 });
 
 test('repeated cursor is rejected and cannot loop on the same page', async () => {
@@ -458,10 +483,13 @@ test('production integration keeps gallery receipts separate and removes the ext
   const controller = read('ChatGptWebImageGalleryController.kt', true);
   assert.doesNotMatch(controller, /ChatGptWebImageGallerySync\(/);
   assert.match(controller, /state.requestId != activeRequestId/);
-  assert.match(controller, /asset.galleryRequestId == activeRequestId/);
+  assert.match(controller, /asset.galleryRequestId != activeRequestId/);
   assert.match(controller, /pageSnapshot\?\.handles.orEmpty\(\).forEachIndexed/);
   assert.match(controller, /val catalogReady = activeRequestId != null && page\?\.handles != null && page.requestId == activeRequestId/);
   assert.match(controller, /nextPage\?\.isEnabled = catalogReady && page\?\.hasNext == true/);
   assert.match(controller, /previousPage\?\.isEnabled = catalogReady && page\?\.hasPrevious == true/);
+  assert.match(controller, /setOnClickListener \{ openPreview\(index, fullHandle\) \}/);
+  assert.match(controller, /pendingPreview = null[\s\S]*?host.removeCallbacks\(previewTimeout\)/);
+  assert.match(controller, /activeRequestId != owner \|\| pendingPreview\?\.first != asset.handle/);
   assert.match(read('ChatGptWebImageSession.kt', true), /if \(asset.galleryRequestId == null\) assets.accept\(asset\)/);
 });

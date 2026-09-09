@@ -57,6 +57,11 @@ function harness(t, options = {}) {
     },
     run: (cachedHandles = []) => gallery.request({ requestId: 'mcp_gallery' + ++id,
       value: JSON.stringify({ operation: 'open', cachedHandles }) }, event => events.push(event)),
+    preview: handle => new Promise(resolve => {
+      const handled = gallery.handle('request_image_asset', { value: handle },
+        (_, ok, code) => resolve({ ok, code }), event => events.push(event));
+      if (!handled) resolve({ ok: false, code: 'not_gallery_handle' });
+    }),
   };
 }
 
@@ -78,6 +83,99 @@ test('real private preview exports both authorized same-origin content routes', 
   assert.equal(h.timers.size, 0);
   assert.ok(h.canvases.every(canvas => canvas.width === 0 && canvas.height === 0));
   assert.doesNotMatch(JSON.stringify(h.events), /estuary|sig=|synthetic|https:/);
+});
+
+test('gallery loads a separate thumbnail and resolves the full image only when selected', async t => {
+  const thumbnail = '/backend-api/estuary/content?id=thumbnail-fixture';
+  const h = harness(t, { itemFields: { url: contentPath, encodings: { thumbnail: { path: thumbnail } } } });
+  assert.equal((await h.run()).ok, true);
+  const page = h.events.filter(e => e.type === 'image_gallery_snapshot').at(-1);
+  assert.notEqual(page.handles[0], page.previewHandles[0]);
+  assert.deepEqual(h.bytes().map(c => c.url), [origin + thumbnail]);
+  assert.equal((await h.preview(page.previewHandles[0])).ok, true, 'page completion does not expire its preview lease');
+  assert.deepEqual(h.bytes().map(c => c.url), [origin + thumbnail, origin + contentPath]);
+  const full = h.events.filter(e => e.type === 'image_asset').at(-1);
+  assert.equal(full.handle, page.previewHandles[0]);
+  assert.equal(full.requestId, page.requestId);
+  assert.equal(full.width, 1024);
+  assert.doesNotMatch(JSON.stringify(h.events), /https:|sig=|synthetic-account|file-fixture/);
+  h.calls.length = 0;
+  await h.run([page.handles[0]]);
+  assert.equal(h.bytes().length, 0, 'thumbnail cache reopen does not fetch the full image');
+  await h.run([page.previewHandles[0]]);
+  assert.equal(h.bytes().length, 0, 'existing full preview cache can also serve the grid');
+  const warm = h.events.filter(e => e.type === 'image_gallery_snapshot').at(-1);
+  assert.deepEqual(warm.handles, warm.previewHandles);
+});
+
+test('unknown or invalid thumbnail sources retain the original full-image path', async t => {
+  for (const thumbnail of [null, {}, { path: '' }, { path: 'https://untrusted.test/image' },
+    { path: '/api/other' }, { path: '//chatgpt.com/api/estuary/content' }, { path: contentPath }]) {
+    const h = harness(t, { itemFields: { url: contentPath, encodings: { thumbnail } } });
+    assert.equal((await h.run()).ok, true);
+    const page = h.events.filter(e => e.type === 'image_gallery_snapshot').at(-1);
+    assert.deepEqual(page.handles, page.previewHandles);
+    assert.deepEqual(h.bytes().map(c => c.url), [origin + contentPath]);
+  }
+});
+
+test('partial thumbnail failure still permits its full preview without loading other full images', async t => {
+  const thumbnail = '/backend-api/estuary/content?id=thumbnail-fixture';
+  const h = harness(t, { itemFields: { url: contentPath, encodings: { thumbnail: { path: thumbnail } } },
+    fetch: async url => url === origin + thumbnail ? { ok: false } : {
+      ok: true, url, headers: { get: () => 'image/png' }, blob: async () => ({ type: 'image/png', size: 128 }),
+    } });
+  assert.equal((await h.run()).ok, false);
+  const page = h.events.filter(e => e.type === 'image_gallery_snapshot').at(-1);
+  assert.equal(page.state, 'partial');
+  assert.equal(h.bytes().length, 1);
+  assert.equal((await h.preview(page.previewHandles[0])).ok, true);
+  assert.equal(h.bytes().length, 2);
+});
+
+test('expired on-demand full URL retries once and only exposes the final result', async t => {
+  const h = harness(t, { source: '/backend-api/estuary/content?id=fresh',
+    itemFields: { url: contentPath, encodings: { thumbnail: { path: '/api/estuary/content?id=small' } } },
+    fetch: async url => url === origin + contentPath ? { ok: false } : {
+      ok: true, url, headers: { get: () => 'image/png' }, blob: async () => ({ type: 'image/png', size: 128 }),
+    } });
+  await h.run();
+  const page = h.events.filter(e => e.type === 'image_gallery_snapshot').at(-1);
+  h.events.length = 0;
+  assert.equal((await h.preview(page.previewHandles[0])).ok, true);
+  assert.equal(h.calls.filter(c => c.kind === 'json').length, 2);
+  assert.equal(h.events.filter(e => e.type === 'image_asset').length, 1);
+  assert.equal(h.events[0].state, 'ready');
+  assert.equal(h.timers.size, 0);
+});
+
+test('duplicate full previews coalesce and closing the gallery suppresses late results', async t => {
+  for (const change of ['close', 'account', 'document', 'reopen']) {
+    const started = deferred(), pending = deferred();
+    const h = harness(t, {
+      itemFields: { url: contentPath, encodings: { thumbnail: { path: '/api/estuary/content?id=small' } } },
+      fetch: async url => {
+        if (url === origin + contentPath) { started.resolve(); await pending.promise; }
+        return { ok: true, url, headers: { get: () => 'image/png' },
+          blob: async () => ({ type: 'image/png', size: 128 }) };
+      },
+    });
+    await h.run();
+    const page = h.events.filter(e => e.type === 'image_gallery_snapshot').at(-1);
+    const first = h.preview(page.previewHandles[0]), second = h.preview(page.previewHandles[0]);
+    await started.promise;
+    assert.equal(h.bytes().filter(c => c.url === origin + contentPath).length, 1);
+    if (change === 'close') h.gallery.cancel(page.requestId);
+    if (change === 'account') h.invalidate();
+    if (change === 'document') h.root.__elonChatGptDocumentToken = 'doc_other';
+    if (change === 'reopen') await h.run(page.handles);
+    const count = h.events.length;
+    pending.resolve();
+    assert.equal((await first).ok, false);
+    assert.equal((await second).ok, false);
+    assert.equal(h.events.length, count);
+    assert.equal(h.timers.size, 0);
+  }
 });
 
 test('private previews still reject arbitrary origins, paths, credentials and fragments', async t => {

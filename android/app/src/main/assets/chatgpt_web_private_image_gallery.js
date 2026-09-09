@@ -2,7 +2,7 @@
   'use strict';
   const pointer = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
-  const exported = Object.freeze({ version: 6, create: root => factory(root, pointer) });
+  const exported = Object.freeze({ version: 7, create: root => factory(root, pointer) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       (Number(root.__elonChatGptPrivateImageGallery?.version || 0) < exported.version ||
@@ -28,7 +28,7 @@
     'timeout', 'cancelled', 'response_too_large', 'response_body_unavailable', 'invalid_json']);
   const pages = new Map();
   let cursors = [{ cursor: null, offset: 0 }], pageIndex = 0, cacheIdentity = '', cacheTime = 0;
-  let active = null, disposed = false;
+  let active = null, owner = null, disposed = false;
 
   function identity(headers) {
     const values = {};
@@ -37,12 +37,14 @@
     return JSON.stringify(['authorization', 'chatgpt-account-id', 'oai-device-id'].map(key => values[key] || ''));
   }
 
-  function current(job) {
-    return !disposed && active === job && !job.controller.signal.aborted &&
+  function owned(job) {
+    return !disposed && owner === job &&
       root.location.origin === 'https://chatgpt.com' && root.location.href === job.href &&
       root.__elonChatGptDocumentToken === job.token &&
       (!job.account || identity(root.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.()) === job.account);
   }
+
+  function current(job) { return owned(job) && active === job && !job.controller.signal.aborted; }
 
   function check(job) { if (!current(job)) throw new Error('context_changed'); }
 
@@ -50,7 +52,7 @@
     if (!current(job)) return;
     job.emit({ type: 'image_gallery_snapshot', source: 'private_image_gallery_v1',
       requestId: job.id, state, observedCount: page?.items.length || 0,
-      ...(page ? { handles: page.handles, unavailableCount: page.unavailable,
+      ...(page ? { handles: page.handles, previewHandles: page.previewHandles, unavailableCount: page.unavailable,
         pageIndex: job.index, hasPrevious: job.index > 0, hasNext: page.cursor !== null } : {}) });
   }
 
@@ -61,11 +63,18 @@
     job.pending.clear();
   }
 
-  function cancel(requestId) {
-    if (!active || requestId && active.id !== requestId) return;
-    const job = active;
-    active = null;
+  function stop(job) {
+    if (active === job) active = null;
     release(job);
+  }
+
+  function cancel(requestId) {
+    if (!owner || requestId && owner.id !== requestId) return;
+    const job = owner;
+    owner = null;
+    stop(job);
+    for (const [handle, preview] of job.previews) job.assets?.cancel?.(handle, preview.listener);
+    job.previews.clear();
   }
 
   function clearCache() { pages.clear(); cursors = [{ cursor: null, offset: 0 }]; pageIndex = 0; cacheTime = 0; }
@@ -93,13 +102,14 @@
     return headers;
   }
 
-  async function read(job, url, signal = job.controller.signal) {
-    check(job);
+  async function read(job, url, signal = job.controller.signal, preview = false) {
+    const valid = () => preview ? owned(job) : current(job);
+    if (!valid()) throw new Error('context_changed');
     const result = await root.__elonChatGptPrivateJsonRequest.request(root, url, {
       method: 'GET', credentials: 'include', redirect: 'error', cache: 'no-store',
       headers: job.headers, signal, __elonPrivateTransport: 'image_gallery',
     }, { timeoutMs: 6000, maxBytes: 512 * 1024 });
-    check(job);
+    if (!valid()) throw new Error('context_changed');
     return result.payload;
   }
 
@@ -133,7 +143,7 @@
   }
 
   function register(job, page) {
-    const handles = [], seen = new Set();
+    const handles = [], previewHandles = [], seen = new Set();
     let unavailable = 0;
     for (const item of page.items) {
       const target = imageTarget(item);
@@ -148,17 +158,38 @@
         if (target.conversationId) url.searchParams.set('conversation_id', target.conversationId);
         url.searchParams.set('inline', 'true');
         url.searchParams.set('download_intent', 'false');
-        const payload = await read(job, url.href, signal);
+        const payload = await read(job, url.href, signal, true);
         if (payload?.status !== 'success' || typeof payload.download_url !== 'string') {
           throw new Error('image_not_ready');
         }
         return payload.download_url;
-      }, () => current(job));
+      }, () => owned(job));
       if (!HANDLE.test(handle)) { unavailable++; continue; }
       if (direct) job.fallbacks.set(handle, () => { useDirect = false; });
-      if (!seen.has(handle)) { seen.add(handle); handles.push(handle); }
+      if (seen.has(handle)) continue;
+      seen.add(handle);
+      let gridHandle = handle;
+      const thumbnail = root.__elonChatGptPrivateContentSource?.previewUrl?.(item.encodings?.thumbnail?.path);
+      if (thumbnail && thumbnail !== direct && !job.cached.has(handle)) {
+        const small = job.assets.registerPrivate(JSON.stringify([job.account, target.fileId,
+          target.conversationId, 'thumbnail']), async () => thumbnail, () => current(job));
+        if (HANDLE.test(small)) gridHandle = small;
+      }
+      handles.push(gridHandle);
+      previewHandles.push(handle);
     }
-    return { ...page, handles, unavailable };
+    return { ...page, handles, previewHandles, unavailable };
+  }
+
+  async function exportHandle(job, handle, listener, valid) {
+    let result = await job.assets.request(handle, listener);
+    if (!valid()) return { ok: false };
+    if (!result?.ok && job.fallbacks.has(handle)) {
+      job.fallbacks.get(handle)();
+      job.fallbacks.delete(handle);
+      result = await job.assets.request(handle, listener);
+    }
+    return valid() ? result : { ok: false };
   }
 
   async function exportPage(job, page) {
@@ -169,15 +200,7 @@
         check(job);
         const handle = missing[next++];
         job.pending.add(handle);
-        let result = await job.assets.request(handle, job.assetListener);
-        check(job);
-        if (!result?.ok && job.fallbacks.has(handle)) {
-          // Catalog links can expire; re-resolve this read once under the same
-          // owner/deadline, without reloading the page or changing cache identity.
-          job.fallbacks.get(handle)();
-          job.fallbacks.delete(handle);
-          result = await job.assets.request(handle, job.assetListener);
-        }
+        const result = await exportHandle(job, handle, job.assetListener, () => current(job));
         job.pending.delete(handle);
         check(job);
         if (!result?.ok) failed++;
@@ -262,18 +285,40 @@
     cancel();
     const job = { id: command.requestId, operation: args.operation, cached: new Set(args.cachedHandles),
       href: root.location.href, token: root.__elonChatGptDocumentToken, account: null, stage: 'identity',
-      controller: new root.AbortController(), pending: new Set(), fallbacks: new Map(), emit: emitEvent,
+      controller: new root.AbortController(), pending: new Set(), previews: new Map(), fallbacks: new Map(), emit: emitEvent,
       assets: root.__elonChatGptImageAssets };
     job.assetListener = event => {
       if (current(job)) emitEvent({ ...event, source: 'private_image_gallery_v1', requestId: job.id });
     };
     active = job;
-    job.timer = root.setTimeout(() => { emit(job, job.page ? 'partial' : 'failed', job.page); cancel(job.id); }, 35000);
+    owner = job;
+    job.timer = root.setTimeout(() => { emit(job, job.page ? 'partial' : 'failed', job.page); stop(job); }, 35000);
     emit(job, 'loading');
     return execute(job);
   }
 
   function handle(action, command, respond, emitEvent) {
+    if (action === 'request_image_asset' && owner?.page?.previewHandles.includes(command.value)) {
+      const job = owner, handle = command.value;
+      if (!owned(job)) { respond(action, false, 'gallery_context_changed'); return true; }
+      let preview = job.previews.get(handle);
+      if (!preview) {
+        const send = event => {
+          if (owned(job)) emitEvent({ ...event, source: 'private_image_gallery_v1', requestId: job.id });
+        };
+        // Only the final failure is visible; an expired full-image URL may be resolved once.
+        const listener = event => { if (event.state === 'ready') send(event); };
+        const promise = exportHandle(job, handle, listener, () => owned(job)).catch(() => ({ ok: false })).then(result => {
+          if (!result?.ok) send({ type: 'image_asset', handle, state: 'failed', error: 'fetch_failed' });
+          return result;
+        }).finally(() => job.previews.delete(handle));
+        preview = { listener, promise };
+        job.previews.set(handle, preview);
+      }
+      preview.promise.then(result => respond(action, result?.ok === true,
+        result?.ok ? 'private_image_preview_ready' : 'private_image_preview_failed'));
+      return true;
+    }
     if (action === CANCEL) { cancel(String(command.value || '')); respond(action, true, ''); return true; }
     if (action !== ACTION) return false;
     request(command, emitEvent).then(result => respond(action, result.ok, result.code));
@@ -281,5 +326,5 @@
   }
 
   function dispose() { cancel(); disposed = true; clearCache(); cacheIdentity = ''; }
-  return Object.freeze({ version: 6, get disposed() { return disposed; }, request, handle, cancel, dispose });
+  return Object.freeze({ version: 7, get disposed() { return disposed; }, request, handle, cancel, dispose });
 });

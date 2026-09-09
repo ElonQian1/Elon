@@ -79,7 +79,7 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
             case "gallery_preview":
                 assertTrue("gallery_not_visible", galleryVisible());
                 click(description("\u56fe\u50cf 1"));
-                assertTrue("image_viewer_not_visible", text("\u00d7").waitForExists(5000));
+                assertTrue("image_viewer_not_visible", text("\u00d7").waitForExists(25000));
                 break;
             case "gallery_close_preview":
                 click(text("\u00d7"));
@@ -99,6 +99,7 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
     private JSONObject galleryResult(String step) throws Exception {
         JSONObject result = new JSONObject().put("step", step);
         result.put("gallery_visible", galleryVisible());
+        result.put("preview_loading", description("\u6b63\u5728\u52a0\u8f7d\u5927\u56fe").exists());
         result.put("loading", galleryLoading());
         result.put("ready", new UiObject(new UiSelector().packageName(APP).textMatches(
             "\u672c\u9875 [0-9]+ \u5f20\u56fe\u7247")).exists());
