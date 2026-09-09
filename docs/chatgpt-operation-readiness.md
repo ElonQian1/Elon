@@ -13,7 +13,8 @@ composer readiness is not a global prerequisite for all commands.
 | Current document | Context/controls, existing conversation navigation, model/tool discovery, stop generation, library request cancellation | Current document binding, supported origin, no explicit authentication page; no composer prerequisite |
 | Directory read | Conversation/project directory refresh | Current document; existing private reader acquires identity independently of UI observations |
 | Account read | Library/file lists and private download resolution | Current document; private transport validates account context and exact handles; no composer or UI-authentication-flag prerequisite |
-| Composer transaction | Existing send, draft, attachment commit, mutation and voice commands | Preserve existing bridge/current-generation admission and command-specific validation |
+| Account mutation | Pin, archive, rename and move conversation | Current document; explicit confirmation and target validation; private owner binds account/document throughout PATCH and readback, without composer readiness |
+| Composer transaction | Existing send, draft, attachment commit, share/delete and voice commands | Preserve existing bridge/current-generation admission and command-specific validation |
 
 Unknown actions are rejected. Every published action must belong to exactly one
 reviewed category; a regression test enforces coverage. Opening cached UI does
@@ -52,10 +53,24 @@ controls for operations they have not migrated. Removing an outer wait does not
 invent those bindings or authorize an unknown request.
 
 Send/draft transactions, new-chat confirmation, attachment preparation/commit,
-conversation mutations and voice admission are intentionally unchanged in this
+share/delete and voice admission are intentionally unchanged in this
 batch. They need separate operation-specific evidence before their remaining
 composer/runtime coupling can be removed. Do not convert all commands to READY,
 replay writes, clear cookies, or change the working dictation/voice implementation.
+
+Pin/archive/rename/move use their existing private PATCH owner, not the official
+composer. Their account, credential-owner and document checks remain live across
+credential acquisition, server acknowledgement and read-only reconciliation.
+Changed context never updates a replacement cache or replays a write; failure
+cooldowns do not carry into a different account/document.
+
+Global directory refresh now enters the existing private-directory parser through
+a bounded same-origin first-page GET. It merges the observed first page without
+erasing older pages or project rows and retains `complete=false`; this is not a
+claim of complete private pagination or refreshed project metadata. Missing
+identity and network failures remain recoverable request failures, not missing
+DOM capability. Explicitly disabling the private transport preserves the legacy
+official-directory route; a transient private failure does not silently use it.
 
 ## Verification
 
@@ -65,3 +80,5 @@ explicit login, foreign origin, guest access, cached directory, expired download
 handles, production consumer dispatch, stop/cancel and unchanged write checks.
 Build, release and device acceptance evidence is recorded separately in
 [the batch report](reports/chatgpt-operation-readiness-20260909.md).
+The follow-up phone evidence and remaining refresh boundary are recorded in
+[the acceptance follow-up](reports/chatgpt-private-admission-acceptance-20260909.md).

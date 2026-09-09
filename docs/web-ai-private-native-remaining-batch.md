@@ -24,10 +24,12 @@ reused; source-only or installation status does not satisfy the acceptance gate.
 ## Current Status Map
 
 This summary supersedes older delivery labels below; it does not broaden a
-passed scope. Installed version was last independently observed as normal
-`1.1.1601` on September 9. Installation is not acceptance of every bundled path.
-The combined recovery/readiness correction is published as `1.1.1602`, not yet
-installed or accepted in this task's production-device window.
+passed scope. Normal `1.1.1603` was hash-verified and replacement-installed on
+September 9. Cache and private file-library reads passed with no ready composer;
+global directory refresh exposed a remaining DOM dependency. Follow-up source
+removes that dependency for the private first page and separates four account
+mutations from composer admission. New code is not yet included in installed
+1603. See [scope and evidence](reports/chatgpt-private-admission-acceptance-20260909.md).
 
 | User workflow | Current result | Remaining boundary |
 |---|---|---|
