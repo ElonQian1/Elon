@@ -4,42 +4,24 @@ const test = require('node:test');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
-const assets = path.join(__dirname, '../android/app/src/main/assets');
-const moduleApi = require(path.join(assets, 'chatgpt_web_private_directory_refresh.js'));
-const jsonRequest = require(path.join(assets, 'chatgpt_web_private_json_request.js'));
-const flush = () => new Promise(resolve => setImmediate(resolve));
-const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
-const response = (payload, status = 200) => ({ ok: status === 200, status, text: async () => JSON.stringify(payload) });
-
-function fixture(fetch = async () => response({ items: [] })) {
-  const calls = [], accepted = [];
-  const headers = { Authorization: 'Bearer synthetic-directory-auth', 'chatgpt-account-id': 'fixture-account' };
-  const root = { location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/g/g-p-fixture/project' },
-    __elonChatGptDocumentToken: 'doc_directory_fixture', __elonChatGptPrivateJsonRequest: jsonRequest,
-    AbortController, setTimeout, clearTimeout,
-    __elonChatGptPrivateTransport: {
-      copySameOriginRequestHeaders: () => ({ ...headers }),
-      acquireSameOriginRequestHeaders: async () => ({ ...headers }),
-    },
-  };
-  const controller = moduleApi.create(root, (...args) => { accepted.push(args); return true; },
-    (url, init) => { calls.push({ url, init }); return fetch(url, init); });
-  return { root, calls, accepted, headers, controller };
-}
+const { assets, fixture, response, deferred, flush } = require('./fixtures/chatgpt-directory-refresh');
 
 test('global directory fetch is private, single-flight and independent of the composer', async () => {
   const read = deferred(), f = fixture(() => read.promise);
   const first = f.controller.refresh(), second = f.controller.refresh();
   assert.equal(first, second);
   await flush();
-  assert.equal(f.calls.length, 1);
-  assert.equal(f.calls[0].url, '/backend-api/conversations?offset=0&limit=28');
+  assert.equal(f.calls.length, 2);
+  assert.equal(f.calls[0].url, '/backend-api/conversations?offset=0&limit=28&order=updated&is_archived=false');
   assert.equal(f.calls[0].init.credentials, 'same-origin');
   assert.equal(f.calls[0].init.method, 'GET');
   read.resolve(response({ items: [{ id: 'fixture', title: 'Fixture' }] }));
-  assert.deepEqual(await first, { ok: true, code: 'directory_page_ready', complete: false });
-  assert.equal(f.accepted.length, 1);
-  assert.deepEqual(f.accepted[0][0], { family: 'conversations', projectId: '' });
+  const result = await first;
+  assert.equal(result.ok, true);
+  assert.equal(result.code, 'directory_partial');
+  assert.equal(result.complete, false);
+  assert.equal(f.accepted.length, 2);
+  assert.deepEqual(f.accepted[0][0], { family: 'conversations', projectId: '', replace: false });
 });
 
 test('cold identity is acquired without a DOM login flag', async () => {
@@ -48,7 +30,7 @@ test('cold identity is acquired without a DOM login flag', async () => {
   owner.copySameOriginRequestHeaders = () => ready ? { ...f.headers } : null;
   owner.acquireSameOriginRequestHeaders = async () => { ready = true; return { ...f.headers }; };
   assert.equal((await f.controller.refresh()).ok, true);
-  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls.length, 2);
 });
 
 test('missing runtime identity cannot send an unauthenticated read or report absent capability', async () => {
@@ -99,7 +81,7 @@ test('timeout settles an ignored abort and a subsequent refresh can succeed', as
   await flush();
   assert.equal(f.accepted.length, 0);
   assert.equal((await f.controller.refresh()).ok, true);
-  assert.equal(f.calls.length, 2);
+  assert.equal(f.calls.length, 4);
 });
 
 function requestsFixture(refresh, flags = {}) {

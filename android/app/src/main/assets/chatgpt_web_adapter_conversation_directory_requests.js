@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 8) return;
+  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 9) return;
 
   const PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const CONVERSATION_PATH = /^\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})$/;
@@ -15,11 +15,12 @@
     const lastSnapshots = new Map();
     let generation = 0;
 
-    function emitSnapshot(requestedProjectId, scopedComplete) {
+    function emitSnapshot(requestedProjectId, scopedComplete, outcome) {
       if (!privateDirectory || typeof privateDirectory.snapshot !== 'function') return;
       const value = optional(null, () => privateDirectory.snapshot());
       if (!value || !Array.isArray(value.conversations) || !Array.isArray(value.projects) ||
-          (!value.conversations.length && !value.projects.length && !value.removedConversationIds?.length)) return;
+          (!value.conversations.length && !value.projects.length && !value.removedConversationIds?.length &&
+            scopedComplete !== true && !outcome?.ok)) return;
       const projectId = PROJECT_ID.test(String(requestedProjectId || ''))
         ? String(requestedProjectId)
         : '';
@@ -38,7 +39,8 @@
         projects: value.projects,
         removedConversationIds,
         deletedConversationIds,
-        complete
+        complete,
+        outcome: outcome ? { code: outcome.code, truncated: outcome.truncated, pages: outcome.pages } : null
       });
       if (fingerprint === lastSnapshots.get(scopeKey)) return;
       lastSnapshots.set(scopeKey, fingerprint);
@@ -53,11 +55,11 @@
           scrollerFound: false,
           scrolled: false,
           scrollRestored: true,
-          reachedEnd: false,
-          truncated: conversations.length >= 200,
-          timedOut: false,
+          reachedEnd: complete,
+          truncated: outcome?.truncated === true || conversations.length >= 200 && !complete,
+          timedOut: outcome?.code === 'directory_timeout',
           observedCount: conversations.length,
-          steps: 0,
+          steps: outcome?.pages || 0,
           complete,
           source: 'official_private',
           officialLoadState: 'ready'
@@ -82,17 +84,25 @@
       };
       const privateDisabled = window.__elonChatGptPrivateConversationPrefetchEnabled === false &&
         window.__elonChatGptPrivateResearchEnabled !== true;
+      if (!privateDisabled && PROJECT_ID.test(projectId) && typeof privateDirectory?.refreshScope === 'function') {
+        Promise.resolve().then(() => privateDirectory.refreshScope(projectId)).then((result) => {
+          if (!current()) return;
+          if (result?.ok || result?.partial) emitSnapshot(projectId, result.complete === true, result);
+          respond('list_conversations', result?.ok === true, result?.code || 'directory_refresh_failed');
+        }).catch(() => { if (current()) respond('list_conversations', false, 'directory_refresh_failed'); });
+        return;
+      }
       if (!projectId && !privateDisabled && typeof privateDirectory?.refresh === 'function') {
         Promise.resolve().then(() => privateDirectory.refresh()).then((result) => {
           if (!current()) return;
-          if (result?.ok === true) emitSnapshot(null);
+          if (result?.ok || result?.partial) emitSnapshot(null, false, result);
           respond('list_conversations', result?.ok === true, result?.code || 'directory_refresh_failed');
         }).catch(() => {
           if (current()) respond('list_conversations', false, 'directory_refresh_failed');
         });
         return;
       }
-      if (!PROJECT_ID.test(projectId) || !privateDirectory ||
+      if (privateDisabled || !PROJECT_ID.test(projectId) || !privateDirectory ||
           typeof privateDirectory.refreshProject !== 'function') {
         fallback();
         return;
@@ -171,5 +181,5 @@
     return Object.freeze({ cancel, emitSnapshot, handleCommand, installListener, probeMembership, requestList });
   }
 
-  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 8, create });
+  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 9, create });
 })();

@@ -27,14 +27,13 @@ const adapterAssetsSource = fs.readFileSync(path.join(root,
 assert(!/document\.cookie|\.headers\b|\.body\b/i.test(source));
 assert(source.includes("url.origin !== location.origin"));
 assert(source.includes("method !== 'GET'"));
-assert(source.includes('const PROJECT_REFRESH_TIMEOUT_MS = 4000'));
+assert(source.includes('refreshScope'));
 assert(source.includes('acceptConversationMembership'));
 assert(source.includes('acceptPinnedState'));
 assert(source.includes('acceptTitleState'));
 assert(source.includes('acceptArchivedState'));
 assert(source.includes('removedConversationIds'));
 assert(source.includes('const PIN_OVERRIDE_TTL_MS = 120000'));
-assert(source.includes('timeoutMs: PROJECT_REFRESH_TIMEOUT_MS'));
 assert(directoryRequestsSource.includes('privateDirectory.setListener(() => emitSnapshot(null))'));
 assert(directoryRequestsSource.includes('privateDirectory.refreshProject(projectId)'));
 assert(directoryRequestsSource.includes('conversationAdapter.requestList(command, emitEvent, respond)'));
@@ -142,6 +141,7 @@ const location = {
 const window = {
   location,
   __elonChatGptDocumentToken: 'doc_directory_fixture',
+  __elonChatGptPrivateDirectoryPages: require('../android/app/src/main/assets/chatgpt_web_private_directory_pages.js'),
   __elonChatGptPrivateDirectoryRefresh: require('../android/app/src/main/assets/chatgpt_web_private_directory_refresh.js'),
   __elonChatGptPrivateTransport: {
     copySameOriginRequestHeaders: () => ({ Authorization: 'Bearer synthetic-directory-auth' }),
@@ -179,7 +179,7 @@ async function flush() {
 (async () => {
   const directory = window.__elonChatGptPrivateConversationDirectory;
   assert(directory);
-  assert.strictEqual(directory.version, 11);
+  assert.strictEqual(directory.version, 12);
   let notifications = 0;
   directory.setListener(() => { notifications += 1; });
 
@@ -190,9 +190,15 @@ async function flush() {
 
   const snapshot = directory.snapshot();
   const beforeGlobalRefresh = fetchCalls.length;
+  responses.set('/backend-api/conversations', JSON.stringify({
+    items: [{ id: 'global-chat-12345', title: '普通聊天', is_starred: true }], offset: 0, limit: 28, total: 1
+  }));
+  responses.set('/backend-api/gizmos/snorlax/sidebar', JSON.stringify({
+    items: [{ gizmo: { gizmo: { id: 'g-p-health123', display: { name: '家庭健康' } } }, conversations: null }], cursor: null
+  }));
   assert.strictEqual((await directory.refresh()).ok, true);
-  assert.strictEqual(fetchCalls.length, beforeGlobalRefresh + 1);
-  assert.strictEqual(fetchCalls.at(-1).input, '/backend-api/conversations?offset=0&limit=28');
+  assert.strictEqual(fetchCalls.length, beforeGlobalRefresh + 2);
+  assert(fetchCalls.at(-1).input.startsWith('/backend-api/gizmos/snorlax/sidebar?'));
   assert.strictEqual(directory.snapshot().complete, false);
   assert(directory.snapshot().conversations.some(row => row.id === 'project-chat-12345'));
   assert.strictEqual(snapshot.complete, false);
@@ -210,7 +216,7 @@ async function flush() {
   assert.strictEqual(project.active, true);
   assert.strictEqual(project.pinned, null);
   assert(notifications >= 3);
-  assert.strictEqual(fetchCalls.length, 4);
+  assert.strictEqual(fetchCalls.length, 5);
   assert.strictEqual(cloneCount, 3);
 
   const notificationsBeforeMembership = notifications;
@@ -288,10 +294,10 @@ async function flush() {
   );
 
   responses.set('/backend-api/gizmos/g-p-health123/conversations', JSON.stringify({
-    data: { conversations: [
-      { conversation_id: 'project-chat-12345', title: '健康记录' },
-      { conversation_id: 'moved-chat-12345', title: '移动后的会话' }
-    ] }
+    cursor: null, items: [
+      { id: 'project-chat-12345', title: '健康记录', owner: {} },
+      { id: 'moved-chat-12345', title: '移动后的会话', owner: {} }
+    ]
   }));
   const beforeProjectRefresh = fetchCalls.length;
   const notificationsBeforeProjectRefresh = notifications;
@@ -303,16 +309,16 @@ async function flush() {
   assert.deepStrictEqual(Array.from(refreshResults), [true, true]);
   assert.strictEqual(fetchCalls.length, beforeProjectRefresh + 1);
   const targetedRequest = fetchCalls[fetchCalls.length - 1];
-  assert.strictEqual(targetedRequest.input, '/backend-api/gizmos/g-p-health123/conversations');
+  assert.strictEqual(targetedRequest.input, '/backend-api/gizmos/g-p-health123/conversations?cursor=0');
   assert.strictEqual(targetedRequest.init.method, 'GET');
   assert.strictEqual(targetedRequest.init.credentials, 'same-origin');
   assert.strictEqual(targetedRequest.init.cache, 'no-store');
-  assert.strictEqual(targetedRequest.init.headers, undefined);
+  assert.strictEqual(targetedRequest.init.headers.Authorization, 'Bearer synthetic-directory-auth');
   assert.strictEqual(targetedRequest.init.body, undefined);
   assert.strictEqual(notifications, notificationsBeforeProjectRefresh);
   assert(directory.snapshot().conversations.some((row) => row.id === 'moved-chat-12345'));
   responses.set('/backend-api/gizmos/g-p-health123/conversations', JSON.stringify({
-    data: { conversations: [{ conversation_id: 'replacement-chat-12345', title: '替换后的会话' }] }
+    cursor: null, items: [{ id: 'replacement-chat-12345', title: '替换后的会话', owner: {} }]
   }));
   assert.strictEqual(await directory.refreshProject('g-p-health123'), true);
   const replacedSnapshot = directory.snapshot();

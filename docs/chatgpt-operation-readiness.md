@@ -64,13 +64,16 @@ credential acquisition, server acknowledgement and read-only reconciliation.
 Changed context never updates a replacement cache or replays a write; failure
 cooldowns do not carry into a different account/document.
 
-Global directory refresh now enters the existing private-directory parser through
-a bounded same-origin first-page GET. It merges the observed first page without
-erasing older pages or project rows and retains `complete=false`; this is not a
-claim of complete private pagination or refreshed project metadata. Missing
+Global directory refresh now reads bounded ordinary-history pages and owned
+project metadata through the private identity owner; project reads follow their
+cursor without waiting for the composer. Only a confirmed terminal project page
+can replace that project's cached rows. Global cache completeness remains false
+because separately fetched project histories must be preserved. Missing
 identity and network failures remain recoverable request failures, not missing
 DOM capability. Explicitly disabling the private transport preserves the legacy
 official-directory route; a transient private failure does not silently use it.
+Protocol evidence, limits and verification boundaries are in
+[the pagination report](reports/chatgpt-directory-pagination-20260909.md).
 
 ## Verification
 
