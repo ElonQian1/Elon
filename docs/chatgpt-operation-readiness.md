@@ -120,3 +120,18 @@ The Xiaomi wireless transport was offline and a bounded reconnect timed out.
 No new live mutation was attempted, no conversation or file was deleted, and
 project-page error diagnosis remains deferred. Offline dispatch acceptance is
 not a server acknowledgement or a rendered-UI acceptance result.
+
+Normal Release **1.1.1613 (1613)** is published from
+`98267d022b6981c5da3576adb325b68f2f6ef63e`. The release manifest and local signed
+APK agree on 40,059,473 bytes and SHA-256
+`53ea69ae997b258f08024adaf0fa09a308e9f14ca48ab58406cbf3f5723d6293`.
+The post-release device list remained empty, so installation and the new
+composer-unavailable UI scope are deferred. Earlier accepted mutation scopes
+remain valid historical evidence, not acceptance of this correction.
+
+When the existing phone returns, use only isolated fixtures to check share-list
+access and confirmed library mutations through production UI without a ready
+composer, then restore the original view/draft. Do not repeat completed private
+protocol research, clear login, or delete personal conversations to manufacture
+an acceptance case. Current-chat share/delete runtime protection remains a
+separate boundary; project attachment/send acceptance is still open.
