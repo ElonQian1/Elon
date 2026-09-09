@@ -5,6 +5,22 @@ import org.junit.Test
 
 class WebChatProductionCapabilityEvidenceTest {
     @Test
+    fun missingIdentityAndExpiredDocumentAreRecoveryNotUnsupportedOrFailed() {
+        for (error in listOf("identity_not_ready", "library_identity_not_ready", "adapter_generation_not_ready")) {
+            assertEquals(WebChatProductionObservationState.SESSION_RECOVERING,
+                WebChatProductionCapabilityEvidencePolicy.resolve(WebChatProductionCapabilityEvidence(
+                    declaredSupported = true, adapterCurrent = true, observedCount = 0,
+                    requestAccepted = false, requestError = error,
+                )))
+            assertEquals(WebChatProductionObservationState.AVAILABLE,
+                WebChatProductionCapabilityEvidencePolicy.resolve(WebChatProductionCapabilityEvidence(
+                    declaredSupported = true, adapterCurrent = true, observedCount = 0, cachedCount = 2,
+                    requestAccepted = false, requestError = error,
+                )))
+        }
+    }
+
+    @Test
     fun emptyDomNeverMeansUnsupported() {
         listOf(
             evidence(adapterCurrent = false),

@@ -84,6 +84,9 @@ internal object WebChatProductionCapabilityEvidencePolicy {
     private val SESSION_RECOVERY_ERRORS = setOf(
         "bridge_not_ready",
         "adapter_not_current",
+        "adapter_generation_not_ready",
+        "identity_not_ready",
+        "library_identity_not_ready",
         "snapshot_unavailable",
     )
     private val EXPLICIT_UNSUPPORTED_ERRORS = setOf(
