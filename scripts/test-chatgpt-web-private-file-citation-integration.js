@@ -71,6 +71,57 @@ test('a reply containing only a file citation enters the native index with an op
   assert.equal(f.root.location.href, 'https://chatgpt.com/c/visible');
 });
 
+for (const format of ['grouped', 'cite_map']) test(format + ' file citations reuse scoped native downloads without DOM', async () => {
+  const f = fixture();
+  const item = { ...ref(), type: 'webpage', category: 'files', url: 'https://cloud.example.test/cited' };
+  f.payload.messages[0].metadata.content_references = [format === 'grouped'
+    ? { type: 'grouped_webpages_v2', items: [item] } : { cite_map: { fixture: item } }];
+  const rows = f.rows();
+  assert.equal(rows.length, 1); assert.match(rows[0].downloadHandle, /^download_[a-f0-9]{32}$/);
+  assert.doesNotMatch(JSON.stringify(rows), /file-cited|cloud|https|token/);
+  await f.run(rows[0]);
+  assert.equal(f.calls.length, 1);
+  assert.equal(new URL(f.calls[0].url).pathname, '/backend-api/files/download/file-cited');
+  assert.equal(new URL(f.calls[0].url).searchParams.get('conversation_id'), 'source');
+  assert.equal(f.queued.length, 1); assert.equal(f.receipts.at(-1)[2], 'download_queued');
+  assert.equal(f.root.location.href, 'https://chatgpt.com/c/visible');
+});
+
+test('grouped library citations preserve project metadata checks and existing attachment positions', async () => {
+  const f = fixture();
+  f.payload.messages[0].metadata.attachments = [{ id: 'file-original', name: 'original.txt' }];
+  f.payload.messages[0].metadata.content_references = [{ type: 'grouped_webpages', items: [
+    { ...ref(), type: 'webpage', category: 'files', url: 'https://cloud.example.test/cited', library_file_id: 'libfile_cited' },
+  ] }];
+  const rows = f.rows();
+  assert.deepEqual(rows.map(row => row.id), ['answer:0', 'answer:1']);
+  await f.run(rows[1]);
+  assert.equal(f.calls.length, 2);
+  assert.equal(new URL(f.calls[1].url).searchParams.get('gizmo_id'), PROJECT);
+  assert.equal(new URL(f.calls[1].url).searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+});
+
+test('a refreshed citation group revokes the former download selection when its source is removed', async () => {
+  const f = fixture();
+  const group = { type: 'grouped_webpages', items: [{ ...ref(), category: 'files', url: 'https://cloud.example.test/cited' }] };
+  f.payload.messages[0].metadata.content_references = [group];
+  const rows = f.rows(); assert.equal(rows.length, 1);
+  group.deleted = true; assert.deepEqual(f.rows(), []);
+  await f.run(rows[0]);
+  assert.equal(f.calls.length, 0); assert.equal(f.queued.length, 0);
+  assert.equal(f.receipts.at(-1)[1], false);
+});
+
+test('grouped citation truncation is reflected in both file index and selected source position', () => {
+  const items = Array.from({ length: 21 }, (_, i) => ({ ...ref('file-' + i),
+    type: 'webpage', category: 'files', url: 'https://cloud.example.test/' + i }));
+  const payload = { messages: [message('many', [{ type: 'grouped_webpages', items }])] };
+  const index = projection.files(payload);
+  assert.equal(index.files.length, 20); assert.equal(index.truncated, true);
+  assert.equal(projection.fileSource(payload, 'many:19').fileCitationReference.id, 'file-19');
+  assert.equal(projection.fileSource(payload, 'many:20'), null);
+});
+
 test('library citations verify effective project metadata before authorizing any byte transfer', async () => {
   const f = fixture();
   f.payload.messages[0].metadata.content_references[0].library_file_id = 'libfile_cited';

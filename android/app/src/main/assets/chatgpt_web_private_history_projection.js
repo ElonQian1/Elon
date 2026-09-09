@@ -2,7 +2,7 @@
   'use strict';
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 7, create: dependencies => factory(dependencies, citation) });
+  const exported = Object.freeze({ version: 8, create: dependencies => factory(dependencies, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateHistoryProjection = exported;
 })(typeof window === 'object' ? window : null, function (dependencies, citation) {
@@ -200,9 +200,7 @@
       if (Array.isArray(rawShared) && rawShared.length > MAX_PARTS) truncated = true;
       const rawMounted = message.metadata && message.metadata.mounted_library_file_references;
       if (Array.isArray(rawMounted) && rawMounted.length > MAX_PARTS) truncated = true;
-      const rawCitations = message.metadata && message.metadata.content_references;
-      if (citation?.eligible(message.metadata) && Array.isArray(rawCitations) &&
-          rawCitations.length > MAX_PARTS) truncated = true;
+      if (citation?.scan(message.metadata, MAX_PARTS).truncated) truncated = true;
       const rawParts = message.content && message.content.parts;
       if (Array.isArray(rawParts) && rawParts.length > MAX_PARTS) truncated = true;
       parts.forEach((part, index) => {
