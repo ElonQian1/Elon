@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateModelContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -163,23 +163,26 @@
     if (live.model !== expected.model || live.effort !== expected.effort ||
         live.draftServiceTier !== expected.draftServiceTier) throw new Error('model_selection_changed');
     const item = entry.selection, c = modules.conversation, s = modules.shared, conversation = binding.conversation;
+    const updatePro = item.category.modelLane === s.t4.PRO && item.thinkingEffort != null;
+    const updateDefault = item.modelSlug === live.model && item.thinkingEffort != null && item.thinkingEffort !== live.effort;
+    // Acquire every required writer before changing any preference or conversation store.
+    const proPreference = updatePro ? c.M1t() : null;
+    const defaultPreference = updateDefault ? s.RW() : null;
+    if (updatePro && typeof proPreference?.mutate !== 'function' ||
+        updateDefault && typeof defaultPreference?.mutate !== 'function') throw new Error('model_runtime_unavailable');
+    const confirmed = catalog(binding, modules);
+    if (confirmed?.version !== version || !confirmed.choices.some(choice => choice.key === entry.key) ||
+        confirmed.live.model !== live.model || confirmed.live.effort !== live.effort ||
+        confirmed.live.draftServiceTier !== live.draftServiceTier) throw new Error('model_selection_changed');
     // Mirror fqn's public chat preset action using its existing stores and mutators.
     // Work/service-tier changes and unknown advanced model contracts are not authorized here.
-    if (item.category.modelLane === s.t4.PRO && item.thinkingEffort != null) {
-      const mutation = c.M1t();
-      if (typeof mutation?.mutate !== 'function') throw new Error('model_runtime_unavailable');
-      mutation.mutate({ juices: { [s.t4.PRO]: item.thinkingEffort } });
-    }
+    if (updatePro) proPreference.mutate({ juices: { [s.t4.PRO]: item.thinkingEffort } });
     s.M$(() => {
       if (!current(binding)) throw new Error('model_selection_changed');
       if (item.thinkingEffort != null) live.effortStore.setThinkingEffort(item.thinkingEffort, item.modelSlug);
       if (item.modelSlug === live.model) {
         c.Grn(conversation, item.modelSlug);
-        if (item.thinkingEffort != null && item.thinkingEffort !== live.effort) {
-          const mutation = s.RW();
-          if (typeof mutation?.mutate !== 'function') throw new Error('model_runtime_unavailable');
-          mutation.mutate({ modelSlug: item.modelSlug, thinkingEffort: item.thinkingEffort });
-        }
+        if (updateDefault) defaultPreference.mutate({ modelSlug: item.modelSlug, thinkingEffort: item.thinkingEffort });
       } else modules.composer.Ih({ conversation, currentModelId: live.model, modelId: item.modelSlug,
         ...(item.thinkingEffort == null ? {} : { thinkingEffort: item.thinkingEffort }),
         applyModelSelection: c.Grn, modelPickerSurface: c.Rdn.CHATGPT_MODEL_PICKER_SURFACE_COMPOSER });
@@ -337,6 +340,6 @@
     return advancedState(after);
   }
 
-  return Object.freeze({ version: 3, urls: URLS, capture, current, validate, catalog, read, matches, apply,
+  return Object.freeze({ version: 5, urls: URLS, capture, current, validate, catalog, read, matches, apply,
     readAdvanced, advancedCatalog, applyAdvanced, matchesAdvanced });
 });

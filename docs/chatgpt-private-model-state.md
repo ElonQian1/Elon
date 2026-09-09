@@ -5,10 +5,12 @@
 - Capability: `android_chatgpt_private_model_preset_state_v1`.
 - Extensions: `android_chatgpt_private_model_version_state_v1` and
   `android_chatgpt_private_service_tier_state_v1`.
-- Status: implemented and packaged in 1.1.1548; not `completed` or account-specific
-  device accepted. [Grouped evidence](reports/chatgpt-grouped-native-20260907.md).
-- Contract/controller version: 3, page adapter 294. Production native model selection reuses the current
-  official picker state and its model/effort mutators when the guards pass.
+- Status: baseline implemented and packaged in 1.1.1548; not `completed` or
+  account-specific device accepted. [Grouped evidence](reports/chatgpt-grouped-native-20260907.md).
+- Source contract/controller versions: 5/3. The contract-5 preflight fix is
+  offline verified and awaiting the grouped APK build and device acceptance.
+  Production native model selection reuses the current official picker state
+  and its model/effort mutators when the guards pass.
 - Scope: available normal-chat presets and thinking effort, available model
   versions, restricted-current-model thinking efforts, and the official
   standard/fast response tier when offered for the current selection.
@@ -116,6 +118,8 @@ import path or independently stored model preference is introduced.
 4. Re-read the selected version, model permissions, allowed effort and current
    model/effort before mutation. Version/tier actions also compare conversation
    version and tier, and confirm the resulting state. Work mode is excluded.
+   Preset actions acquire and validate every required preference writer before
+   the first write, then recheck eligibility, identity and expected state.
 5. Use the existing official stores and actions, then read back the actual model
    and effort in the same conversation. Do not report a local label change as
    a successful selection. Unexpected post-write state fails confirmation.
@@ -143,6 +147,8 @@ import path or independently stored model preference is introduced.
   and lifecycle registration only; shared adapter-version edits are untouched.
 - `scripts/test-chatgpt-web-private-model-state.js`: synthetic contract and
   production-adapter tests, with no real accounts or network requests.
+- `scripts/test-chatgpt-web-private-model-preflight.js`: preference acquisition
+  failure, state/identity changes before writes, and post-dispatch uncertainty.
 - Native composer semantics distinguish `model`, `model_version` and
   `service_tier`: only thinking presets form a slider. Version/speed choices
   use their confirmed selected flags; both navigation entries remain visible.
@@ -170,6 +176,25 @@ schemas. The existing fixture was extracted without changing behavior in
 The command log is `restricted-model-integration-20260907-151132-625` in the
 repository Git log directory. The official composer asset hash was rechecked.
 These remain synthetic runtime tests, not a live account or Android build pass.
+
+### Contract-5 preflight correction, 2026-09-10
+
+The previous same-model effort action changed local effort/model stores before
+acquiring the default-preference mutation. An absent, malformed or throwing
+writer therefore reported failure after changing state; a Pro default could
+also already have been dispatched. All required writers are now acquired before
+any write, with one fresh catalog/state check afterward. Unused writers are not
+required and an already selected preset remains a no-write success.
+
+The initial 15-case regression run reproduced 12 failures. After the fix and
+two concurrent-state cases, 127 model tests and 135 adjacent integration tests
+passed, including production composer dispatch and adapter-bundle parsing.
+Logs: `model-preflight-green-20260910-041559-069` and
+`model-preflight-adjacent-20260910-041636-219` in the repository Git log directory.
+This does not make multiple official mutations atomic. A writer that throws
+after dispatch remains unconfirmed: no automatic rollback or DOM replay is
+attempted. Server preference persistence and account-specific production UI
+behavior remain part of grouped acceptance, not an offline success claim.
 
 Grouped device acceptance still needs production native UI selection across
 model/effort presets, restricted current-model efforts when offered, versions
