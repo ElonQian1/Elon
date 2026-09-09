@@ -7,6 +7,13 @@ State v7 accepts the observed `WEB:<uuid>` client identity, `[30, 2]` compiler
 caches and read-only tooltip handlers. The new temporary text-attachment flow
 now passes post-reply selected/read-only native state. Reuse this verified scope.
 
+September 10 source v8 adds receipt attribution without changing the transaction:
+`official_temporary_runtime_v1:accepted` requires confirmed post-callback state;
+`official_temporary_runtime_v1:unchanged` means the desired state was already
+observed and no callback ran. Compatibility activation and failed transitions
+cannot emit these success markers. All 49 temporary-runtime Node cases pass;
+normal-release production toggle attribution still awaits the grouped install.
+
 - Capability: `android_chatgpt_private_temporary_chat_state_v1`.
 - Status: released in normal 1595; post-reply native indicator device verified.
   Direct private on/off passed in a research candidate; normal toggle receipt

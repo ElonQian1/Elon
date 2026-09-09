@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 7, create: factory });
+  const api = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateTemporaryChat = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -159,7 +159,9 @@
     page.clearTimeout(operation.timer);
     uncertain = !ok && operation.started ? operation : null;
     for (const values of operation.listeners) {
-      values.result('set_ui_control_selected', ok, detail || '');
+      values.result('set_ui_control_selected', ok, ok
+        ? 'official_temporary_runtime_v1:' + (operation.started ? 'accepted' : 'unchanged')
+        : detail || '');
       values.emitSnapshot();
     }
   }
@@ -253,5 +255,5 @@
     return true;
   }
 
-  return Object.freeze({ version: 7, observe, setSelected, ownsSelectedConversation });
+  return Object.freeze({ version: 8, observe, setSelected, ownsSelectedConversation });
 });

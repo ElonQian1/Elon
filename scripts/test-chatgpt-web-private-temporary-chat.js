@@ -141,6 +141,29 @@ test('empty chat uses the official transaction, preserves cleanup and reuses the
   assert.equal(f.fallbacks, 0); assert.equal(f.timers.size, 0);
 });
 
+test('private receipts distinguish a confirmed mutation from an already-selected observation', async () => {
+  const f = fixture({ currentBuild: true });
+  f.select(true); await flush();
+  assert.equal(f.results.at(-1)[2], 'official_temporary_runtime_v1:accepted');
+  const writes = f.effects.length;
+  f.select(true);
+  assert.equal(f.results.at(-1)[2], 'official_temporary_runtime_v1:unchanged');
+  assert.equal(f.effects.length, writes);
+  f.select(false);
+  assert.equal(f.results.at(-1)[2], 'official_temporary_runtime_v1:accepted');
+});
+
+test('fallback and failed private transitions never claim a private success receipt', async () => {
+  const fallback = fixture({ loadRuntime: async () => null });
+  fallback.select(true); await flush();
+  assert.equal(fallback.fallbacks, 1);
+  assert.equal(fallback.results.some(row => String(row[2]).startsWith('official_temporary_runtime_v1:')), false);
+  const failed = fixture({ mode: 'ignore' });
+  failed.select(true); await flush(); failed.advance(2500);
+  assert.equal(failed.results.at(-1)[1], false);
+  assert.equal(failed.results.some(row => String(row[2]).startsWith('official_temporary_runtime_v1:')), false);
+});
+
 for (const newChat of [true, false]) test('current website callback retains temporary privacy and cleanup: ' + newChat, async () => {
   const f = fixture({ currentBuild: true, newChat }), original = f.state.conversation;
   assert.equal(f.select(true), true); await flush();
