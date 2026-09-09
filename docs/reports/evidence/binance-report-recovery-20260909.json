@@ -1,0 +1,101 @@
+{
+  "schema": "yilong.quant.report_precision_acceptance.v1",
+  "version": "0.6.9",
+  "source_sha": "86136bbc5b8f322b020ff48014960010be868c63",
+  "status": "passed",
+  "checks": [
+    {
+      "case": "list",
+      "grid": {
+        "source_count": 1,
+        "data_available": true,
+        "fresh": true,
+        "bot_count": 1,
+        "detail_selected": false,
+        "detail_available": false,
+        "profit_summary_available": true,
+        "profit_fields_known": 1,
+        "row_count": 1,
+        "summary_present": true
+      }
+    },
+    {
+      "case": "orders",
+      "report": {
+        "phase": "ready",
+        "kind": "orders",
+        "page": 1,
+        "days": 30,
+        "row_count": 62,
+        "total": 62,
+        "coverage": "open_orders",
+        "summary_available": true,
+        "symbol_filter": "OPENAIUSDT",
+        "row_filter": "all",
+        "visible_rows": 62,
+        "summary_present": true
+      }
+    },
+    {
+      "case": "matches",
+      "report": {
+        "phase": "ready",
+        "kind": "matches",
+        "page": 1,
+        "days": 30,
+        "row_count": 20,
+        "total": 60,
+        "coverage": "page",
+        "summary_available": true,
+        "symbol_filter": "OPENAIUSDT",
+        "row_filter": "all",
+        "visible_rows": 20,
+        "summary_present": true
+      }
+    },
+    {
+      "case": "positions",
+      "report": {
+        "phase": "ready",
+        "kind": "positions",
+        "page": 1,
+        "days": 30,
+        "row_count": 1,
+        "total": 1,
+        "coverage": "strategy_position",
+        "summary_available": true,
+        "symbol_filter": "OPENAIUSDT",
+        "row_filter": "all",
+        "visible_rows": 1,
+        "summary_present": true
+      }
+    }
+  ],
+  "trading_performed": false,
+  "temporary_probe_installed": false,
+  "position_fields": {
+    "labels": 5,
+    "entry_present": true,
+    "row_found": true,
+    "unknown_fields": 0,
+    "quantity_present": true
+  },
+  "host": {
+    "host_present": true,
+    "report": {
+      "kind": "positions",
+      "stage": "identity_after",
+      "outcome": "ready",
+      "error": "none",
+      "http": 200,
+      "business": "000000"
+    },
+    "list_verified": true,
+    "row_count": 1,
+    "main_session_current": true
+  },
+  "main_version": "1.1.1609",
+  "main_source_sha": "aab9208e44cc28e37d4b35f69f15492d55a888ff",
+  "main_apk_sha256": "5c15f4e6372881b2b603066386174e221ab26e1804e94a12fd2ed78991a810d8",
+  "recovery": "opened_main_once_after_upgrade_then_resumed_existing_consent"
+}

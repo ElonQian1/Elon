@@ -1706,7 +1706,7 @@
       "id": "android-binance-report-recovery-v1",
       "title": "币安记录读取兼容与诊断",
       "summary": "修复可选展示字段使记录整页失败，提供有界只读请求诊断，严格保留账户和策略隔离。",
-      "status": "implemented",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/android-binance-report-recovery-v1.md",
@@ -1803,15 +1803,28 @@
         },
         {
           "path": "docs/reports/binance-report-recovery-20260909.md",
-          "content_hash": "115929e89d4de448717e67bfc823bd8a12c1bf3d4f8a081c4b4ad83d81f6257c",
+          "content_hash": "5b4aee885045a4415e8741e0cc833939dfd13ec88ab32d4456bc5e127f16f457",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "dc563a0451531f46c8d9177a8017e754826bd060",
-            "head_blob_oid": "daf506105faf83fd092c1df8bbb518ab7a14634b",
-            "worktree_blob_oid": "b417d33fcd668912b188338b3c39067ffe7ed6ca",
+            "head_commit": "aab9208e44cc28e37d4b35f69f15492d55a888ff",
+            "head_blob_oid": "b417d33fcd668912b188338b3c39067ffe7ed6ca",
+            "worktree_blob_oid": "c06c784b41f14db843bad58430890ac7b1189229",
             "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/reports/evidence/binance-report-recovery-20260909.json",
+          "content_hash": "3b5d13279849f1e4ff107bb8025e465b8acbe5cf17e8fbfa71247be559815d38",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "aab9208e44cc28e37d4b35f69f15492d55a888ff",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2b71ab7f9e053fb6517cb7b7f5737b0f1694d4da",
+            "state": "untracked"
           }
         },
         {
@@ -1842,7 +1855,7 @@
         }
       ],
       "created_at_ms": 1788949182282,
-      "updated_at_ms": 1788952373152
+      "updated_at_ms": 1788953369678
     },
     {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -24499,36 +24512,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_0e3b7217f43c42d88b560ab71d0f3f39",
-      "feature_id": "project-feature-registry-adoption-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "The refreshed governance evidence and dedicated tests are complete; registry adoption is restored to released.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788652245341
-    },
-    {
-      "id": "feature_event_6668c0eb34434f4693782ebc55eff04b",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Explicitly reopen the verified feature to correct its validation-record description from live Git cache to fixed official source archive.",
-      "from_status": "verified",
-      "to_status": "retired",
-      "at_ms": 1788652482725
-    },
-    {
-      "id": "feature_event_bdf5ae3763f2437fac413c4a53dd278b",
-      "feature_id": "esk-sui-allocation-vesting-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-ci",
-      "reason": "Start explicit review of the corrected fixed-source-archive validation record.",
-      "from_status": "retired",
-      "to_status": "proposed",
-      "at_ms": 1788652509186
-    },
-    {
       "id": "feature_event_d321a463058e4478a2451c07ea466937",
       "feature_id": "esk-sui-allocation-vesting-v1",
       "action": "requirement_rebound",
@@ -26497,6 +26480,36 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1788952373153
+    },
+    {
+      "id": "feature_event_804d983eb1dc4fe88596063d1b7a7115",
+      "feature_id": "android-binance-report-recovery-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-report-recovery",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1788953331410
+    },
+    {
+      "id": "feature_event_fcd80f74d86b49d2b287b68bfcfc1204",
+      "feature_id": "android-binance-report-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-report-recovery",
+      "reason": "23 Node tests and 8 Android tests pass; signed 1.1.1609 installed, real orders/matches/positions read and position quantity/entry displayed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1788953333918
+    },
+    {
+      "id": "feature_event_69c70d3b5c4a44fca09eb0be63cd8d02",
+      "feature_id": "android-binance-report-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-report-recovery",
+      "reason": "Official main APK 1.1.1609 published with matching server hash and installed using original signature; real read-only device acceptance passed.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1788953369678
     }
   ]
 }
