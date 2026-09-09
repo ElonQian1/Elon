@@ -2,8 +2,9 @@
 
 Capability: `android_chatgpt_private_conversation_shared_links_v1`.
 Current source: shared-link module 3 and share owner 5 add account-wide personal
-link browsing through the existing production Share menu. It is not installed
-or device-accepted yet. Earlier shared-link module 2 was installed in APK 1545. The production
+link browsing through the existing production Share menu. APK 1622 exposed a
+native forwarding defect during acceptance; corrected **1623** now passes the
+account-list read and native list display below. Earlier shared-link module 2 was installed in APK 1545. The production
 private list returned a complete empty result for the unshared synthetic fixture
 in 1,436 ms, replacing 1544's early `share_scope_unconfirmed` failure (54 ms).
 In `1.1.1547`, case
@@ -11,7 +12,7 @@ In `1.1.1547`, case
 is completed through the production handler: the newly created synthetic link
 appeared in a complete list, its exact selection ticket was consumed, and revoke
 returned confirmed removal. See [device evidence](reports/chatgpt-runtime-release-1547.md).
-Rendered native menu/Copy and other account scopes remain pending; these narrow
+Rendered native row Copy/revoke and other account scopes remain pending; these narrow
 completed cases do not claim every sharing variant is complete.
 
 ## Official contract evidence
@@ -108,6 +109,35 @@ headers and arbitrary URLs cannot enter the command ledger through this result.
 
 ### Account browsing extension, 2026-09-10
 
+- Grouped release **1622** was published and installed with `adb install -r` on
+  the trusted Xiaomi over wireless ADB. The real production model popup, level
+  slider and tool menu entries were found and opened by semantic accessibility
+  actions. This is menu-entry evidence, not model/tool state-commit acceptance.
+- A read-only account-list call reached the production command adapter but
+  failed with `JSONException: No value for path`. The earlier consumer test
+  mocked that adapter and missed its unconditional `request.getString("path")`.
+  Account reads intentionally have no source-conversation path. Fix `5294f9983`
+  forwards the full validated management request unchanged; the unused path
+  argument is empty, not guessed from the current conversation.
+- A regression test failed on the original adapter, then **142 sharing-related
+  Node cases passed** with the correction. Release **1.1.1623**, source
+  `37712ea31`, compiled production Kotlin/Java, published and installed with
+  `adb install -r`. The same tracked read succeeded in **1,393 ms**, returning
+  `elon.account_shares.v1`, 24 personal links, `complete=true`, offset zero and
+  no next page. No new public link was created, revoked or copied.
+- Case `android_chatgpt_private_conversation_shared_links_v1:account_list_ui`
+  is **completed** on 1623: native sidebar conversation actions -> Share ->
+  manage all public links displayed the populated native account list, with no
+  loading/error dialog. Its fresh command receipt took **76 ms**, again 24
+  complete rows; native input remained empty. Next/previous controls on a large
+  account and rendered row Copy/revoke remain separate, unclaimed scopes.
+- The phone subsequently foregrounded another application. The foreground guard
+  stopped the close-list step; no navigation or taps were sent to that other
+  application. Close-button/restoration acceptance is deferred, not passed.
+- External menu acceptance reuses the library test's bounded compile/cache/run
+  helper, requires the trusted device and foreground package, and uses semantic
+  `ACTION_CLICK`. It stops when another app is foreground instead of tapping
+  coordinates. Source: `scripts/invoke-conversation-ui-acceptance.ps1`.
 - Five new account scenarios first failed against the unchanged owner, then
   passed with the extension. All **159 related Node runner cases** pass.
   Coverage includes cross-conversation listing/revocation, 205-row fixed-snapshot
@@ -124,8 +154,8 @@ headers and arbitrary URLs cannot enter the command ledger through this result.
 - Reuses the September 7 official caller evidence above. A fresh public-asset
   fetch in this batch failed with a connection EOF; no new source hash or
   authenticated account response is claimed. No new endpoint was inferred.
-- The new account UI/page controls and a specifically selected cross-conversation
-  fixture revoke still require the grouped install/production acceptance.
+- The account list/display case above is accepted; cached-page controls and a
+  specifically selected cross-conversation fixture revoke remain pending.
 
 ### Earlier scoped delivery checks
 
