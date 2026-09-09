@@ -123,3 +123,34 @@ adapter reference and is not valid whole-candidate acceptance. The local researc
 APK was replaced with hash-verified normal 1592; blank chat/draft restored and
 the private debug forward removed. Full normal-candidate delivery/acceptance
 remains the next gate.
+
+## Normal 1593 retest
+
+Normal `1.1.1593` was published from `58242e23a` and replacement-installed on
+the trusted Xiaomi. APK SHA-256:
+`61db5b443ba20728a64a790a64bfa48653bc255dc820f5a1a7ec49194a02abd0`.
+Release log: `publish-temporary-live-owner-20260909-081153-295` (440 seconds;
+Gradle succeeded in 6m32s). Final related tests: 229/229,
+`temporary-live-owner-final-20260909-081019-095`.
+
+`temporary-attachment-normal-1593-20260909-081942-402` (63.8 seconds) confirmed:
+
+- Private upload: `private_attachment_associated`; attachment phase completed.
+- Exactly one user row and a reply containing the actual synthetic file line.
+- Private send: **`official_runtime_v1:accepted`**. The previous false
+  `context_changed` send acknowledgement is resolved for this scope.
+- Post-reply temporary control still reported `selected=false`, although the
+  control existed and the homepage composer was ready. Aggregate acceptance
+  failed with `temporary_mode_not_confirmed`; do not mark the scope completed.
+- The personal-library after-count was not reached. Neither non-persistence nor
+  backend retention is claimed. The toggle transport remains unattributed.
+- Blank normal chat, local fixture and awake lease were restored; no uncertain
+  send was replayed. No microphone, Cookie or application-data reset was used.
+
+The remaining issue is post-reply temporary-state projection, not upload or send
+acceptance. Next diagnosis must compare the current committed read-only control,
+its private observer and the native manifest; do not weaken ownership guards or
+infer privacy from the label. Do not repeat the completed ordinary library scope.
+The publication manifest and device both independently confirmed 1593 afterward;
+the native chat was no longer foreground at that final read and was not reopened.
+Only the MCP forward remained, with the temporary CDP forward removed.

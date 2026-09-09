@@ -2,12 +2,12 @@
 
 ## Status and scope
 
-Current checkpoint: [1591 temporary attachment](reports/chatgpt-library-scopes-1591.md)
-exposed a persisted-home state gap. State v4 adds guarded privacy observation;
-fixed-device acceptance and toggle-transport attribution remain pending.
+Current checkpoint: [normal 1593](reports/chatgpt-library-scopes-1591.md).
+State v5 uses the official selected signal and committed control, not legacy
+thread privacy equality. Post-reply native selection still fails; not completed.
 
 - Capability: `android_chatgpt_private_temporary_chat_state_v1`.
-- Status: implemented, source-only candidate; not `completed` or device accepted.
+- Status: released in normal 1593; full state acceptance and toggle attribution pending.
 - Contract version: 1. Production native temporary-chat selection invokes the
   inspected official runtime transaction and confirms its resulting state.
 - This is a page-runtime private state bridge, not an independent HTTP privacy
@@ -15,7 +15,7 @@ fixed-device acceptance and toggle-transport attribution remain pending.
 - Ordinary empty/saved chat routes are covered. Project, custom-agent and work
   contexts, guest identity and unknown runtime schemas retain their existing path.
 - Existing native official audio, captions, dictation and read-aloud are unchanged.
-  Google remains last. No APK was built, published or installed for this batch.
+  Google remains last. Historical source details below are the September 7 baseline.
 
 ## Inspected official source
 
@@ -47,9 +47,10 @@ The stored action is never used to bypass the read-only button's missing callbac
 The shared namespace exposes `XM` for an existing thread lookup,
 `HM.getIsNewConversation` for current eligibility, `cX` for the official route-based
 temporary signal, and `uo` for work-mode exclusion. Thread
-`is_do_not_remember` and conversation `config.startDoNotRemember` are the privacy
-inputs also consumed by official send preparation. A URL change alone is not
-accepted as confirmation. The conversation module's `oD` is the inspected
+`is_do_not_remember` is not an authoritative selected-state flag: September 9 live
+temporary chats retained a false legacy value. Confirm the route signal against
+the committed control instead. A URL change alone is not confirmation. The
+conversation module's `oD` is the inspected
 navigation helper already captured by `AKt`, not a separately reconstructed call.
 
 ## Transaction and lifecycle
@@ -68,7 +69,7 @@ navigation helper already captured by `AKt`, not a separately reconstructed call
 4. Invoke the existing official callback once. Keep its attachment cleanup and
    new-chat navigation semantics. Do not synthesize touch/click events, call
    React hooks/render functions, or alter existing conversation privacy directly.
-5. Confirm the desired route signal and effective thread privacy together. An
+5. Confirm the desired route signal and committed control state together. An
    empty-chat toggle must remain in the same client conversation; a saved-chat
    transition must produce a new empty conversation at the home route.
 6. Observe for at most 2.4 seconds after dispatch. Join duplicate same-intent

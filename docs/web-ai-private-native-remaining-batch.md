@@ -28,10 +28,10 @@ with private upload and file-content reply, and rename/search reconciliation
 passed. Originals and the blank chat/draft were restored. These scopes are
 completed and reused. [Normal 1591 navigation acceptance](reports/chatgpt-library-scopes-1591.md)
 subsequently passed native More (21 to 41 rows), folder and back. Reuse these
-completed scopes. Temporary attachment upload/read passed, but its post-send
-state failed; the guarded source correction awaits fixed-device acceptance.
+completed scopes. Normal 1593 temporary upload/read and private send accepted;
+post-reply temporary selection still fails. Full scope remains pending.
 
-Current installed build: [normal APK 1591](reports/chatgpt-runtime-bindings-20260909.md).
+Current installed build: [normal APK 1593](reports/chatgpt-library-scopes-1591.md).
 Ordinary authenticated native stop/follow-up is **completed**: both sends and
 stop used the official runtime, all 229 observed partial characters survived,
 and four ordered separate rows remained. Original blank chat/drafts were restored.
