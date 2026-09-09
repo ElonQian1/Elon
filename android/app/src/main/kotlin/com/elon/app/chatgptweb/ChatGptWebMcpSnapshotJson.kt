@@ -41,9 +41,20 @@ internal object ChatGptWebMcpSnapshotJson {
     fun navigation(value: ChatGptWebObservedState.Snapshot): JSONObject = JSONObject()
         .put("conversation_count", value.conversations.size)
         .put("conversation_collection", ChatGptWebConversationCollectionJson.encode(value.conversationCollection))
+        .put("last_directory_refresh", directoryRefresh(value))
         .put("feature_count", value.features.size)
         .put("composer_sections", JSONArray(value.composerSections.keys.sorted()))
         .put("cached_at_ms", value.updatedAtMs)
+
+    private fun directoryRefresh(value: ChatGptWebObservedState.Snapshot): Any {
+        if (!value.adapterCurrent) return JSONObject.NULL
+        val observed = value.recentCommandResults["list_conversations"] ?: return JSONObject.NULL
+        return JSONObject()
+            .put("ok", observed.result.ok)
+            .put("code", observed.result.detail.takeIf { it.matches(Regex("directory_[a-z_]{1,60}")) }.orEmpty())
+            .put("observed_at_ms", observed.observedAtMs)
+            .put("source", if (observed.result.requestId == null) "native" else "mcp")
+    }
 
     fun conversationFiles(value: ChatGptWebObservedState.Snapshot, url: String?, nowMs: Long = System.currentTimeMillis()): Any {
         if (!value.adapterCurrent) return JSONObject.NULL
