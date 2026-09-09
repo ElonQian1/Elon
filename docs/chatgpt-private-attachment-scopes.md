@@ -2,15 +2,17 @@
 
 Capability: `android_chatgpt_private_temporary_attachment_upload_v1`.
 
-Current checkpoint: [normal 1593](reports/chatgpt-library-scopes-1591.md) privately
-uploaded/read the synthetic file and returned `official_runtime_v1:accepted`.
-Post-reply temporary selection still fails; full scope is not completed and the
-library after-count remains untested. Below is the original implementation checkpoint.
+Current checkpoint: [normal 1595](reports/chatgpt-library-scopes-1591.md).
+Scope `new_temporary_single_plain_text_attachment` is **completed/device_verified**:
+private upload and send, actual file-content reply, one user row, post-reply
+selected/read-only state and unchanged personal-library fixture count all passed.
+Blank chat/drafts/fixture were restored. Reuse this scope without retesting absent
+a current regression. This is not proof of backend retention or every file scope.
 
-Status: **implemented, offline verified, grouped Android and device acceptance
-pending**. Adapter 271 extends the existing private text/static-image upload into
-temporary chats. It is not a released APK, a real temporary-file transaction, or
-proof of backend retention behavior. Adapter 272 adds the separately scoped
+Other temporary scopes: **implemented, offline verified, device acceptance
+pending**. The original adapter 271 extends the existing private text/static-image
+upload into temporary chats. Existing temporary, image/PDF and advanced variants
+are not covered by the narrow 1595 pass. Adapter 272 adds the separately scoped
 new-project candidate below. The subsequent JavaScript-only batch adds existing
 project branch binding; actual runtime access and project upload acceptance
 remain pending, rather than being inferred from public source inspection.

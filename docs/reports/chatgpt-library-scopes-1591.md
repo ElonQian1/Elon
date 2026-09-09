@@ -220,3 +220,31 @@ the temporary CDP forward removed before delivery.
 
 The native attachment acceptance now waits for both selected and read-only state
 after the reply. It must pass on the normal release before this scope is closed.
+
+## Normal 1595 acceptance completed
+
+Normal `1.1.1595` from `eb0a0d1d9` was published and replacement-installed once on
+the trusted Xiaomi. APK SHA-256:
+`c96fb21b83872ae5b3c65fd374b83b61171e7a0b339014afac785b0f74531ada`.
+`publish-temporary-owner-capture-20260909-092822-365` passed in 496.8 seconds;
+Gradle passed in 7m36s. The release manifest and unattended device readback both
+confirmed build 1595. No research package or CDP forward remains.
+
+`temporary-attachment-normal-1595-20260909-093734-262` passed in 34.4 seconds
+through production native input/send and the existing MCP handlers:
+
+- One plain-text test attachment: private upload associated, phase completed.
+- Exactly one user row, with the actual synthetic file line in the reply.
+- Private send acknowledged: `official_runtime_v1:accepted`.
+- Post-reply native manifest: `temporary_selected=true`, `temporary_readonly=true`.
+- Personal-library fixture count remained 1 before and after. This is the bounded
+  inventory check, not evidence of server-side retention policy or deletion.
+- Normal blank chat, native/official drafts, local fixture and awake lease restored.
+- Toggle receipt remains unattributed; no inference of its route from empty detail.
+
+Capability `android_chatgpt_private_temporary_attachment_upload_v1`, scope
+`new_temporary_single_plain_text_attachment`, is **completed/device_verified**.
+Reuse without another acceptance run unless a current regression is reported.
+The post-reply selected/read-only indicator is also device verified. This does
+not complete existing temporary, image/PDF, project or mounted-source variants.
+Those remain on the scoped work list; Google remains after the ChatGPT gate.

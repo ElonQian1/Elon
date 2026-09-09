@@ -2,12 +2,15 @@
 
 ## Status and scope
 
-Current checkpoint: [normal 1593](reports/chatgpt-library-scopes-1591.md).
-State v5 uses the official selected signal and committed control, not legacy
-thread privacy equality. Post-reply native selection still fails; not completed.
+Current checkpoint: [normal 1595](reports/chatgpt-library-scopes-1591.md).
+State v7 accepts the observed `WEB:<uuid>` client identity, `[30, 2]` compiler
+caches and read-only tooltip handlers. The new temporary text-attachment flow
+now passes post-reply selected/read-only native state. Reuse this verified scope.
 
 - Capability: `android_chatgpt_private_temporary_chat_state_v1`.
-- Status: released in normal 1593; full state acceptance and toggle attribution pending.
+- Status: released in normal 1595; post-reply native indicator device verified.
+  Direct private on/off passed in a research candidate; normal toggle receipt
+  attribution and other conversation contexts remain pending.
 - Contract version: 1. Production native temporary-chat selection invokes the
   inspected official runtime transaction and confirms its resulting state.
 - This is a page-runtime private state bridge, not an independent HTTP privacy
@@ -97,13 +100,14 @@ issue a mutation while selection permission is absent.
   cleanup, stale compiler state, read-only, timeout and production wiring checks.
 - Header action and intent queue JUnit tests cover the native read-only state.
 
-The focused Node run passed 97 cases across this bridge, the existing temporary
+The original September 7 Node run passed 97 cases across this bridge, the existing temporary
 adapter, model state and attachment-composer bundle checks. This is fixture-based
 verification, not a live official transaction. Native JUnit tests were added but
-not run in this source batch; Android compilation remains part of grouped testing.
+not run in that source batch. Current related Node tests pass 236/236 and normal
+1595 Release compilation plus the scoped production-phone acceptance pass.
 
-Grouped device acceptance still needs empty-chat on/off, saved-chat to new
-temporary chat, read-only existing temporary state, attachment/tool cleanup and
+Remaining grouped acceptance covers saved-chat to new temporary chat,
+separately reopened temporary conversations, attachment/tool cleanup and
 a message sent immediately before a toggle. Confirm history placement with an
 explicit synthetic send and check unknown-version behavior preserves existing
 functionality. No latency, heat or power improvement is claimed before measurement.
