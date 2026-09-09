@@ -16,7 +16,8 @@ import com.elon.app.grid.host.BinanceHostCaller
 import com.elon.app.grid.host.BinanceHostRuntime
 
 /** Explicit, visible user operation; exported only for the verified official quant caller. */
-class BinanceGridManageActivity : Activity() {
+open class BinanceGridManageActivity : Activity() {
+    protected open val protocolVersion=1
     private val state=BinanceManageState(SystemClock::elapsedRealtime)
     private val journal by lazy {BinanceCreateJournal(this,"binance-manage-attempt-v1.json")}
     private var host:BinanceHostRuntime?=null
@@ -56,17 +57,17 @@ class BinanceGridManageActivity : Activity() {
         status=label("正在读取本人账号",15f);root.addView(status)
         root.addView(button("重新连接币安／更新列表","binance-manage-reload"){act{reconnect()}})
         val content=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;isSaveEnabled=false}
-        form=BinanceManageForm(this){if(ready && !state.unresolved){session?.cancel();confirm.isChecked=false;render()}}
+        form=BinanceManageForm(this,protocolVersion>=2){if(ready && !state.unresolved){session?.cancel();confirm.isChecked=false;render()}}
         content.addView(form.root)
         read=button("读取当前策略／查询本次结果","binance-manage-read") {
             act{readCurrent()}
         };content.addView(read)
         prepare=button("检查本次管理操作","binance-manage-prepare") {
-            act{confirm.isChecked=false;session?.prepare(form.id() ?: error("请选择策略"),form.action(),form.cps())}
+            act{confirm.isChecked=false;session?.prepare(form.id() ?: error("请选择策略"),form.action(),form.cps(),form.investmentDelta())}
         };content.addView(prepare)
         summary=label("",16f);content.addView(summary)
         confirm=CheckBox(this).apply {
-            text="我已核对本账号、策略编号及仓位处理；本次由我提交真实操作。"
+            text="我已核对本账号、策略及下方操作参数；本次由我提交真实操作。"
             isSaveEnabled=false;filterTouchesWhenObscured=true;contentDescription="binance-manage-confirm"
             setTextColor(appearance.text)
             setOnCheckedChangeListener{_,_->if(ready)render()}
@@ -82,7 +83,7 @@ class BinanceGridManageActivity : Activity() {
             }
         })
         official=FrameLayout(this).apply{visibility=View.GONE};content.addView(official,LinearLayout.LayoutParams(-1,(resources.displayMetrics.density*520).toInt()))
-        content.addView(label("区间、格数、追加保证金和止盈止损请在官网操作。结束状态不证明挂单已撤销、仓位归零或资金结清。",14f))
+        content.addView(label("区间、格数、仓位保证金和止盈止损可进入全屏官网操作。结束状态不证明挂单已撤销、仓位归零或资金结清。",14f))
         root.addView(ScrollView(this).apply{isSaveEnabled=false;addView(content)},LinearLayout.LayoutParams(-1,0,1f))
         root.addView(button("返回量化应用","binance-manage-return"){returnResult()})
         setContentView(root);ready=true;BinanceManageReadBridge.bind(readEndpoint)
@@ -161,9 +162,14 @@ class BinanceGridManageActivity : Activity() {
             !state.unresolved && gate.listState=="unverified"->"正在等待账号与网格列表核验；这不代表账号没有网格。"
             !state.unresolved && form.id()==null->"已读取 ${gate.count} 条网格，请先选择策略，再读取详情。"
             else->buildString {
-                if(state.unresolved)append("本次${if(state.action=="close")"结束" else "设置修改"}：${state.status}\n策略编号：${state.id}\n币安状态：${state.providerStatus.ifEmpty{"未知"}}\n")
+                if(state.unresolved)append("本次${actionName()}：${state.status}\n策略编号：${state.id}\n币安状态：${state.providerStatus.ifEmpty{"待查询"}}\n")
                 if(s!=null)append("${s.symbol} · ${s.id}\n当前状态：${s.status}\n终止时：${mode(s.cps)}\n取消合约委托：${if(s.cos)"是，请核对作用范围" else "否，请自行核对委托"}\n")
-                if(state.status=="prepared")append("本次：${if(state.action=="close")"结束网格" else "修改终止处理设置"}\n已确认处理：${mode(state.cps)}\n${if(state.action=="settings")"仅更改终止处理；不立即结束或平仓。分享和跟踪设置保持当前值。" else "按当前已确认设置结束；不会先自动修改设置。"}")
+                if(s?.investment!=null)append("参考累计投入：${s.investment.invested()} USDT\n")
+                if(state.status=="prepared") {
+                    append("\n本次：${actionName()}\n")
+                    if(state.action=="investment")append("追加：${state.investmentDelta} USDT\n追加后参考累计投入：${state.investmentPreview()} USDT\n币安将在提交时检查可用余额和风险限额。追加投入不等于设置亏损上限。")
+                    else append("已确认处理：${mode(state.cps)}\n${if(state.action=="settings")"仅更改终止处理；不立即结束或平仓。分享和跟踪设置保持当前值。" else "按当前已确认设置结束；不会先自动修改设置。"}")
+                }
             }
         }
         resolve.visibility=if(!creationPending && (corrupt || state.unresolved) && state.status!="submitting")View.VISIBLE else View.GONE
@@ -179,9 +185,10 @@ class BinanceGridManageActivity : Activity() {
     private fun returnResult() {
         session?.close()
         val same=host?.live()==true && host?.state?.account==state.account
-        val result=if(corrupt || (!same && state.unresolved))"unknown" else state.status.takeIf{it in setOf("accepted","observed","unknown","rejected")} ?: "not_sent"
-        if(BinanceHostCaller.activity(this))setResult(RESULT_OK,Intent().putExtra("schema","yilong.binance_manage_result.v1").putExtra("nonce",nonce)
-            .putExtra("status",result).putExtra("action",state.action).putExtra("strategy_id",if(same)state.id else "").putExtra("provider_status",if(same)state.providerStatus else ""))
+        val legacyPending=protocolVersion==1 && state.action=="investment"
+        val result=if(corrupt || (!same && state.unresolved) || legacyPending)"unknown" else state.status.takeIf{it in setOf("accepted","observed","unknown","rejected")} ?: "not_sent"
+        if(BinanceHostCaller.activity(this))setResult(RESULT_OK,Intent().putExtra("schema","yilong.binance_manage_result.v$protocolVersion").putExtra("nonce",nonce)
+            .putExtra("status",result).putExtra("action",if(legacyPending)"" else state.action).putExtra("strategy_id",if(same)state.id else "").putExtra("provider_status",if(same)state.providerStatus else ""))
         finish()
     }
     override fun onResume(){super.onResume();resumed=true}
@@ -195,6 +202,7 @@ class BinanceGridManageActivity : Activity() {
     }
     override fun onDestroy(){if(ownsSlot){session?.close();BinanceManageReadBridge.unbind(readEndpoint);host?.let{it.onChanged=null;it.onCreateObservation=null;it.view?.let{v->(v.parent as? ViewGroup)?.removeView(v)}};BinanceCreateSlot.shared.release(this)};super.onDestroy()}
     private fun mode(value:Boolean)=if(value)"按市价平仓" else "保留仓位，需要自行处理"
+    private fun actionName()=when(state.action){"investment"->"追加策略投入";"close"->"结束网格";else->"修改终止处理设置"}
     private fun label(value:String,size:Float)=appearance.label(value,size)
     private fun button(value:String,id:String,action:()->Unit)=appearance.button(value,id,action)
 }
