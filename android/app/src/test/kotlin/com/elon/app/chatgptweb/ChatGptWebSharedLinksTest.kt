@@ -12,6 +12,52 @@ class ChatGptWebSharedLinksTest {
     private fun payload() = JSONObject().put("schema", "elon.conversation_shares.v1")
         .put("path", path).put("ticket", ticket).put("complete", true)
         .put("items", JSONArray().put(JSONObject().put("id", id).put("createdAt", "2026-09-01T10:00:00Z")))
+    private fun accountPayload() = payload().apply {
+        put("schema", "elon.account_shares.v1").put("offset", 0).put("nextOffset", JSONObject.NULL)
+        remove("path")
+        getJSONArray("items").getJSONObject(0).put("path", path)
+    }
+
+    @Test fun accountReceiptRetainsOnlySourceBoundRowsAndDistinctSchema() {
+        val raw = accountPayload().toString()
+        assertEquals(raw, ChatGptWebConversationShareReceipt.detail(raw))
+        val page = requireNotNull(ChatGptWebSharedLinks.parseAccount(raw))
+        assertEquals(path, page.items.single().path)
+        assertEquals("https://chatgpt.com/share/$id", page.items.single().url)
+        assertNull(page.nextOffset)
+        assertNull(ChatGptWebSharedLinks.parse(raw))
+        assertNull(ChatGptWebSharedLinks.parseAccount(payload().toString()))
+    }
+
+    @Test fun accountCursorNeedsAnExistingSelectionAndStrictPageBoundaries() {
+        assertNotNull(ChatGptWebSharedLinks.accountRequest(0, null))
+        assertNotNull(ChatGptWebSharedLinks.accountRequest(100, ticket))
+        assertNotNull(ChatGptWebSharedLinks.accountRequest(0, ticket))
+        for (offset in listOf(-100, 1, 1000)) assertNull(ChatGptWebSharedLinks.accountRequest(offset, ticket))
+        assertNull(ChatGptWebSharedLinks.accountRequest(100, null))
+        assertNull(ChatGptWebSharedLinks.accountRequest(0, "unbound"))
+        val rows = JSONArray()
+        repeat(100) { position -> rows.put(JSONObject().put("id", "aaaaaaaa-aaaa-4aaa-8aaa-%012x".format(position))
+            .put("path", path).put("createdAt", JSONObject.NULL)) }
+        val raw = accountPayload().put("items", rows).put("nextOffset", 100).toString()
+        assertEquals(100, requireNotNull(ChatGptWebSharedLinks.parseAccount(raw)).nextOffset)
+        assertTrue(raw.length <= 18000)
+    }
+
+    @Test fun accountReceiptRejectsForeignPathsMetadataAndInventedPagination() {
+        val invalid = listOf(
+            accountPayload().put("offset", "0"), accountPayload().put("offset", 1),
+            accountPayload().put("offset", 1000), accountPayload().put("nextOffset", 100),
+            accountPayload().put("offset", 100).put("items", JSONArray()),
+            accountPayload().apply { getJSONArray("items").getJSONObject(0).put("path", "https://example.com$path") },
+            accountPayload().apply { getJSONArray("items").getJSONObject(0).put("title", "not a receipt field") },
+            accountPayload().put("workspace_id", "other"),
+        )
+        invalid.forEach {
+            assertNull(ChatGptWebSharedLinks.parseAccount(it.toString()))
+            assertEquals("share_list_unconfirmed", ChatGptWebSharedLinks.detail(it.toString()))
+        }
+    }
 
     @Test fun resultSurvivesTheActualShareReceiptSanitizer() {
         val raw = payload().toString()
