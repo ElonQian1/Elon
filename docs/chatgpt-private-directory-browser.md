@@ -7,9 +7,14 @@ without increasing the size of the recent-history snapshot or dropping part of
 a provider page. This extends, rather than replaces, the completed bounded
 [refresh owner](reports/chatgpt-directory-owned-continuation-20260909.md).
 
-Current status: the page reader, typed native command/event path, and production
-sidebar entry are implemented. Grouped Release Kotlin compilation and 59 native
-tests passed. Device acceptance remains required; this is not a completed capability.
+Capability ID: `android_chatgpt_private_directory_browser_v1`.
+Status: `completed` for bounded, explicit directory paging. Release 1.1.1614 is
+published, installed with `adb install -r`, and verified through the production
+native sidebar. The entry is enabled for ChatGPT; no experimental switch is needed.
+Reuse this implementation unless new regression evidence changes the contract.
+This marker does not complete the broader private-API Goal or certify every
+account/history shape. The feature-registry MCP was unavailable in this session;
+no registry file was edited manually.
 
 ## Reader contract
 
@@ -72,8 +77,9 @@ pagination result. Existing phone was absent from bounded ADB discovery.
    rows; only the current page and at most 24 previous handles are retained by
    native UI. Project selection opens its page in-place, back returns to the
    catalog, and selecting a conversation uses existing production navigation.
-4. Pending: native UI pagination and restoration acceptance in a grouped APK/device
-   round. Offline tests must not be reported as live-account acceptance.
+4. Verified on 1.1.1614: native UI pagination, cached revisit, project folder and
+   conversation navigation, and restoration. See the bounded live evidence below;
+   synthetic large-account coverage remains distinct from device acceptance.
 
 The explicit all-conversations view filters unassigned conversations within each
 provider page. A page containing only project chats may be empty while Next is
@@ -91,3 +97,40 @@ Android evidence: `directory-browser-android-tests-20260909-225313-245`, 59 pass
 tests across page protocol, observed-state isolation, operation admission, and
 the existing protocol parser. The final UI edge-state adjustments are compiled
 again by the grouped release path, not treated as physical-device acceptance.
+
+## Production acceptance, release 1.1.1614
+
+Source: `70c1429ef9d2df563de2c2b86fa9f325dfa9eab1`. Published APK SHA-256:
+`8cd20349b5cb82e3bf32fdd2815d50ac62e97427824485a00aa8ea82f18da79d`.
+Release log: `directory-browser-apk-release-20260909-230215-198`.
+The version manifest matched the installed candidate; adapter version is 312.
+
+- Authenticated with `composer_ready=false` and bridge `connecting`, the native
+  first-directory request still succeeded. Directory reads no longer depend on
+  the text editor being ready. No forced login, message send, or draft edit occurred.
+- Ordinary page one and page two showed distinct native conversation rows;
+  Previous restored the first page's row-ID fingerprint. Request receipts took
+  1402/1561 ms cold and 32 ms for the cached previous page. These are command
+  completion timings, not frame-to-pixel measurements or general latency guarantees.
+- The project catalog rendered ten visible rows. Opening the selected project
+  rendered six conversation rows without closing the sidebar. Opening a row used
+  production conversation navigation, closed the sidebar, and produced five
+  messages with `context_complete=true`; its receipt took 1310 ms.
+- After restoring the original project route, the catalog entry, project folder,
+  and Back path were exercised again. Back restored the catalog without closing
+  the sidebar; the cached receipt took 35 ms.
+- Instantaneous ADB taps sometimes produced no click/command at the footer.
+  Fresh hierarchy inspection plus an 80-ms stationary touchscreen press exercised
+  the same visible entry successfully, including project-to-catalog return.
+  No APK touch-root-cause was established, so no speculative touch patch was made.
+  Record a new regression if normal human taps fail; do not mistake a successful
+  command receipt alone for a successful visible interaction.
+- Final MCP state confirmed the original canonical project route (including the
+  provider's optional slug), closed sidebar, empty draft, authenticated identity,
+  and ready bridge. Cookies/app data were retained. Voice was not started.
+
+This round did not crawl the whole live account or reach a live >200-row boundary.
+Those overflow/cursor cases have synthetic tests, not a real-account claim.
+Resource/heat effects, live account switching, and process-death recovery were not
+measured here. Only explicit current-page requests are added; existing recent
+cache limits and idle behavior remain unchanged.
