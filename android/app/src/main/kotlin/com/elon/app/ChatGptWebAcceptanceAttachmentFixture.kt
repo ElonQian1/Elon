@@ -6,34 +6,77 @@ internal object ChatGptWebAcceptanceAttachmentFixture {
     const val ID = "fixed_ascii_text_v1"
     const val FILE_NAME = "elon-chatgpt-attachment-fixture-v1.txt"
     const val MIME_TYPE = "text/plain"
+    const val MEDIA_BATCH_ID = "fixed_media_batch_v1"
+    const val IMAGE_NAME = "elon-chatgpt-media-fixture-v1.png"
+    const val PDF_NAME = "elon-chatgpt-media-fixture-v1.pdf"
+    val supportedIds = setOf(ID, MEDIA_BATCH_ID)
 
-    fun prepare(cacheDir: File): PendingAttachment {
+    internal data class Spec(val name: String, val mime: String, val label: String)
+    private val text = Spec(FILE_NAME, MIME_TYPE, "测试文档")
+    private val media = listOf(text, Spec(IMAGE_NAME, "image/png", "测试图片"),
+        Spec(PDF_NAME, "application/pdf", "测试PDF"))
+
+    fun supports(id: String): Boolean = id in supportedIds
+    private fun specs(id: String): List<Spec> = when (id) {
+        ID -> listOf(text)
+        MEDIA_BATCH_ID -> media
+        else -> error("Unknown acceptance fixture")
+    }
+
+    fun matchesSelection(cacheDir: File, attachments: List<PendingAttachment>, id: String): Boolean =
+        supports(id) && attachments.size == specs(id).size &&
+            attachments.map { it.fileName }.toSet() == specs(id).map { it.name }.toSet() &&
+            attachments.all { matches(cacheDir, it) }
+
+    fun prepareBatch(
+        cacheDir: File,
+        id: String,
+        writeMedia: (Spec, File) -> Unit = ChatGptWebAcceptanceMediaFixture::write,
+    ): List<PendingAttachment> {
+        val selected = specs(id)
+        val prepared = mutableListOf<PendingAttachment>()
+        try {
+            selected.forEach { spec -> prepared += prepare(cacheDir, spec, writeMedia) }
+            return prepared
+        } catch (error: Exception) {
+            prepared.forEach { it.file.delete() }
+            throw error
+        }
+    }
+
+    fun prepare(cacheDir: File): PendingAttachment = prepare(cacheDir, text) { _, _ ->
+        error("Text fixture does not use a media writer")
+    }
+
+    private fun prepare(cacheDir: File, spec: Spec, writeMedia: (Spec, File) -> Unit): PendingAttachment {
         val directory = fixtureDirectory(cacheDir).apply { mkdirs() }
         require(directory.isDirectory) { "Unable to create acceptance fixture directory" }
-        val target = File(directory, FILE_NAME)
-        val temporary = File(directory, "$FILE_NAME.tmp")
-        runCatching { temporary.delete() }
-        temporary.writeText(CONTENT, Charsets.UTF_8)
-        require(temporary.length() == CONTENT.toByteArray(Charsets.UTF_8).size.toLong()) {
-            "Acceptance fixture length mismatch"
+        val target = File(directory, spec.name)
+        val temporary = File(directory, "${spec.name}.tmp")
+        try {
+            if (spec == text) temporary.writeText(CONTENT, Charsets.UTF_8) else writeMedia(spec, temporary)
+            require(temporary.length() in 1L..262_144L) { "Acceptance fixture size invalid" }
+            if (target.exists()) require(target.delete()) { "Unable to replace acceptance fixture" }
+            require(temporary.renameTo(target)) { "Unable to commit acceptance fixture" }
+        } finally {
+            temporary.delete()
         }
-        if (target.exists()) require(target.delete()) { "Unable to replace acceptance fixture" }
-        require(temporary.renameTo(target)) { "Unable to commit acceptance fixture" }
         return PendingAttachment(
-            kind = "document",
-            displayLabel = "测试文档",
-            displayName = FILE_NAME,
-            fileName = FILE_NAME,
-            mimeType = MIME_TYPE,
+            kind = if (spec.mime == "image/png") "image" else "document",
+            displayLabel = spec.label,
+            displayName = spec.name,
+            fileName = spec.name,
+            mimeType = spec.mime,
             file = target,
+            imageWidth = if (spec.mime == "image/png") 512 else null,
+            imageHeight = if (spec.mime == "image/png") 384 else null,
         )
     }
 
     fun matches(cacheDir: File, attachment: PendingAttachment): Boolean =
-        attachment.fileName == FILE_NAME &&
-            attachment.mimeType == MIME_TYPE &&
+        media.any { it.name == attachment.fileName && it.mime == attachment.mimeType } &&
             runCatching {
-                attachment.file.canonicalFile == File(fixtureDirectory(cacheDir), FILE_NAME).canonicalFile
+                attachment.file.canonicalFile == File(fixtureDirectory(cacheDir), attachment.fileName).canonicalFile
             }.getOrDefault(false)
 
     fun cleanup(cacheDir: File) {
