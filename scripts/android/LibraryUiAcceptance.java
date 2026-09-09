@@ -17,11 +17,19 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         return new UiObject(new UiSelector().packageName(APP).text(value));
     }
 
-    private UiObject libraryFeature() {
+    private UiObject libraryFeature() throws Exception {
         UiObject preset = description("web-chat-feature:library");
-        if (preset.exists()) return preset;
-        return new UiObject(new UiSelector().packageName(APP).descriptionMatches(
+        UiObject observed = new UiObject(new UiSelector().packageName(APP).descriptionMatches(
             "chatgpt-feature:[a-zA-Z0-9_]+:(\u8d44\u6599\u5e93|\u6587\u4ef6\u5e93)"));
+        // The drawer closes asynchronously before the feature sheet is attached.
+        long deadline = android.os.SystemClock.elapsedRealtime() + 8000;
+        do {
+            if (preset.exists()) return preset;
+            if (observed.exists()) return observed;
+            Thread.sleep(100);
+        } while (android.os.SystemClock.elapsedRealtime() < deadline);
+        fail("library_feature_missing");
+        return preset;
     }
 
     private void click(UiObject node) throws Exception {
@@ -84,6 +92,13 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
                 setText(description("web-chat-library-query"), "ELON");
                 click(description("web-chat-library-search"));
                 break;
+            case "query_fixture":
+                String fixture = getParams().getString("fixtureName", "");
+                assertTrue("invalid_fixture_query", fixture.matches(
+                    "elon-chatgpt-(?:attachment|media)-fixture-v1\\.(?:txt|png|pdf)"));
+                setText(description("web-chat-library-query"), fixture);
+                click(description("web-chat-library-search"));
+                break;
             case "clear_query":
                 setText(description("web-chat-library-query"), "");
                 click(description("web-chat-library-search"));
@@ -101,6 +116,28 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
             case "attach":
                 // This only stages a reference. It does not send, rename or delete a file.
                 click(text("\u52a0\u5165\u5f53\u524d\u804a\u5929"));
+                break;
+            case "download":
+                // This invokes the actual consumer button, not the MCP download handler.
+                click(text("\u4e0b\u8f7d"));
+                assertTrue("download_status_missing", description("web-chat-file-download-status").waitForExists(8000));
+                break;
+            case "wait_download":
+                long deadline = android.os.SystemClock.elapsedRealtime() + 25000;
+                while (android.os.SystemClock.elapsedRealtime() < deadline) {
+                    assertTrue("download_status_missing", description("web-chat-file-download-status").exists());
+                    String value = description("web-chat-file-download-status").getText();
+                    if (value.equals("\u5df2\u4fdd\u5b58\u5230\u4e0b\u8f7d\u76ee\u5f55")) break;
+                    assertTrue("download_failed_or_unconfirmed", value.equals("\u6b63\u5728\u51c6\u5907\u4e0b\u8f7d") ||
+                        value.equals("\u6b63\u5728\u4e0b\u8f7d") || value.equals("\u6b63\u5728\u4fdd\u5b58"));
+                    Thread.sleep(500);
+                }
+                assertEquals("download_not_saved", "\u5df2\u4fdd\u5b58\u5230\u4e0b\u8f7d\u76ee\u5f55",
+                    description("web-chat-file-download-status").getText());
+                break;
+            case "close_download":
+                click(description("web-chat-file-download-collapse"));
+                assertTrue("download_dialog_not_closed", description("web-chat-file-download-status").waitUntilGone(5000));
                 break;
             case "rename":
                 click(text("\u91cd\u547d\u540d"));
@@ -168,6 +205,13 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         result.put("back_visible", description("web-chat-library-back").exists());
         result.put("attach_visible", text("\u52a0\u5165\u5f53\u524d\u804a\u5929").exists());
         result.put("download_visible", text("\u4e0b\u8f7d").exists());
+        UiObject downloadStatus = description("web-chat-file-download-status");
+        result.put("download_status_visible", downloadStatus.exists());
+        result.put("download_saved", downloadStatus.exists() && downloadStatus.getText().equals(
+            "\u5df2\u4fdd\u5b58\u5230\u4e0b\u8f7d\u76ee\u5f55"));
+        result.put("download_cancel_visible", description("web-chat-file-download-cancel").exists());
+        result.put("download_progress_visible", description("web-chat-file-download-progress").exists());
+        result.put("download_bytes_visible", description("web-chat-file-download-bytes").exists());
         result.put("rename_visible", text("\u91cd\u547d\u540d").exists());
         result.put("trash_visible", text("\u79fb\u5230\u6700\u8fd1\u5220\u9664").exists());
         result.put("entry_visible", new UiObject(new UiSelector().packageName(APP)

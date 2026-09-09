@@ -5,7 +5,8 @@ param(
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
     [ValidateSet('inspect','inspect_entry','features','library','browse','query','clear_query','refresh','more',
         'file','attach','remove_staged','rename','set_fixture_name','confirm_rename','upload_fixture_copy','select_upload_copy',
-        'trash','confirm_fixture_trash','close_mutation','close_detail','back')]
+        'trash','confirm_fixture_trash','close_mutation','close_detail','back',
+        'download','wait_download','close_download','query_fixture')]
     [string]$Step = 'inspect',
     [string]$Handle = '',
     [string]$FixtureName = '',
@@ -23,6 +24,9 @@ if ($Step -eq 'set_fixture_name' -and $FixtureName -notmatch '^elon[-_][a-z0-9_.
 }
 if ($Step -eq 'confirm_fixture_trash' -and $FixtureName -cnotmatch '^ELON-library-disposable-[a-f0-9]{12}\.txt$') {
     throw 'Only the dedicated disposable fixture may be soft-deleted.'
+}
+if ($Step -eq 'query_fixture' -and $FixtureName -cnotmatch '^elon-chatgpt-(?:attachment|media)-fixture-v1\.(?:txt|png|pdf)$') {
+    throw 'Only a fixed acceptance attachment may be queried.'
 }
 $root = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $PSScriptRoot 'android/LibraryUiAcceptance.java'
@@ -58,12 +62,16 @@ try {
     $arguments = @('shell','uiautomator','runtest',$remote,'-s','-c','com.elon.acceptance.LibraryUiAcceptance',
         '-e','step',$Step)
     if ($Handle) { $arguments += @('-e','handle',$Handle) }
-    if ($Step -in @('set_fixture_name','confirm_fixture_trash')) { $arguments += @('-e','fixtureName',$FixtureName) }
+    if ($Step -in @('set_fixture_name','confirm_fixture_trash','query_fixture')) { $arguments += @('-e','fixtureName',$FixtureName) }
     $raw = Invoke-ChatGptWebSmokeAdb -Runtime $runtime -Arguments $arguments `
         -TimeoutSec 40 -Label 'run semantic library UI action'
     # Android's legacy runner can exit zero for assertion failures.
     if ($raw -notmatch 'OK \(1 test\)' -or $raw -match 'FAILURES!!!|INSTRUMENTATION_FAILED|run aborted|shortMsg=') {
-        $code = [regex]::Match($raw, '(?m)(?:AssertionFailedError|AssertionError): ([a-z_]+)').Groups[1].Value
+        $code = [regex]::Match($raw, '(?m)(?:AssertionFailedError|AssertionError|ComparisonFailure): ([a-z_]+)').Groups[1].Value
+        if (-not $code) {
+            $code = [regex]::Match($raw, '(?m)\b([A-Za-z][A-Za-z0-9_.]*(?:Exception|Error))\b').Groups[1].Value
+        }
+        if (-not $code) { $code = 'runner_failed_without_assertion' }
         throw "Semantic library UI acceptance failed: $code"
     }
     $match = [regex]::Match($raw, 'LIBRARY_UI_RESULT=(\{[^\r\n]+\})')
