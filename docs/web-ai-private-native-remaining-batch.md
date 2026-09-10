@@ -67,6 +67,13 @@ aligns page-operation/native-receipt/UI budgets and prevents late publication.
 202 Node and 8 JVM checks passed; adapter 315 is source-only for the next grouped
 APK, not part of published 1631. Device acceptance remains pending.
 
+[Library append](chatgpt-private-library-append.md) reuses the private attachment
+owner for consecutive Library files and Library files after a local-upload batch,
+with the official count validator, duplicate handling and exact submit cleanup.
+Adapter 316 is implemented for grouped delivery; rendered multi-file acceptance
+and the reverse order (new local picker files after Library references) remain
+unverified/incomplete respectively. It does not broaden the accepted single-file scope.
+
 ## Recent Accepted Scopes
 
 [Normal Release 1589 evidence](reports/chatgpt-library-mutations-1589.md):
