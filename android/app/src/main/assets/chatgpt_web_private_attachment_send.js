@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 24, create: factory });
+  const exported = Object.freeze({ version: 25, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -142,7 +142,7 @@
     return true;
   }
 
-  return Object.freeze({ version: 24, start, cancel, suspend, remove,
+  return Object.freeze({ version: 25, start, cancel, suspend, remove,
     attachLibrary: (command, respond, changed) => {
       selections?.cancel();
       return library ? library.attach(command, respond, changed) : respond('attach_library_file', false, 'library_not_ready');

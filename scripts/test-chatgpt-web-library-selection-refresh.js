@@ -7,8 +7,8 @@ const catalogModule = require('../android/app/src/main/assets/chatgpt_web_privat
 const file = (id = 'libfile_selection', patch = {}) => ({ kind: 'file', id,
   file_id: 'file-selection', name: 'selection.txt', mime_type: 'text/plain', file_size_bytes: 45, ...patch });
 
-async function setup(t, value = {}) {
-  let now = Date.now(), payload = { items: [file()] }, sequence = 0;
+async function setup(t, value = {}, initial = file()) {
+  let now = Date.now(), payload = { items: [initial] }, sequence = 0;
   t.mock.method(Date, 'now', () => now);
   const f = composerFixture(), calls = [], snapshots = [], receipts = [];
   f.root.__elonChatGptPrivateJsonRequest = { async request(root, url, init, budget) {
@@ -69,6 +69,53 @@ test('one selected item does not renew siblings or the whole list', async t => {
   const before = f.calls.length;
   await f.list();
   assert.equal(f.calls.length, before + 1, 'normal stale list refresh remains independent');
+});
+
+test('unchanged structured scope metadata survives a new JSON response and object key order', async t => {
+  const initial = file(undefined, { context_scopes: [{ type: 'conversation', permissions: { read: true, write: false } }],
+    preview_file: { file_id: 'file-preview', dimensions: [12, 34] } });
+  const f = await setup(t, {}, initial);
+  f.advance(61000);
+  const reread = JSON.parse(JSON.stringify(initial));
+  reread.context_scopes[0].permissions = { write: false, read: true };
+  f.setPayload({ items: [reread] });
+  assert.deepEqual(await f.attachSelected(), ['attach_library_file', true, 'library_attachment_associated']);
+  assert.equal(f.calls.length, 2);
+  assert.equal(f.store.readyFiles$().length, 1);
+  assert.equal(f.catalog.selectMutation(f.handle), null);
+});
+
+for (const [name, change] of Object.entries({
+  permission: row => { row.context_scopes[0].permissions.read = false; },
+  missing: row => { delete row.context_scopes[0].permissions.write; },
+  added: row => { row.context_scopes[0].permissions.share = true; },
+  type: row => { row.context_scopes[0].permissions.read = 'true'; },
+  shape: row => { row.context_scopes = { 0: row.context_scopes[0] }; },
+  order: row => { row.preview_file.dimensions.reverse(); },
+  preview: row => { row.preview_file.file_id = 'file-other'; },
+})) test('structured revalidation rejects actual ' + name + ' changes', async t => {
+  const initial = file(undefined, { context_scopes: [{ permissions: { read: true, write: false } }],
+    preview_file: { file_id: 'file-preview', dimensions: [12, 34] } });
+  const f = await setup(t, {}, initial);
+  const reread = JSON.parse(JSON.stringify(initial)); change(reread);
+  f.advance(61000); f.setPayload({ items: [reread] });
+  assert.equal((await f.attachSelected())[1], false);
+  assert.equal(f.store.files$().length, 0);
+});
+
+test('structured revalidation has a depth and work bound', async t => {
+  const initial = file(undefined, { context_scopes: {} });
+  let nested = initial.context_scopes;
+  for (let i = 0; i < 40; i++) nested = nested.next = {};
+  const f = await setup(t, {}, initial);
+  f.advance(61000); f.setPayload({ items: [JSON.parse(JSON.stringify(initial))] });
+  assert.equal((await f.attachSelected())[1], false);
+  assert.equal(f.store.files$().length, 0);
+  const wide = file(undefined, { context_scopes: Array.from({ length: 5000 }, (_, i) => i) });
+  f.setPayload({ items: [wide] }); await f.list({ operation: 'refresh' });
+  const handle = f.snapshots.at(-1).items[0].handle;
+  f.advance(61000); f.setPayload({ items: [JSON.parse(JSON.stringify(wide))] });
+  assert.equal(await f.catalog.selectAttachment(handle).refresh(new AbortController().signal), false);
 });
 
 test('later-page selections retain the actual search and cursor request that observed them', async t => {

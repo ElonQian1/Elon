@@ -94,6 +94,33 @@ test('unknown scopes, disabled library, occupied input and missing confirmation 
   assert.equal(f.responses[0][1], false);
 });
 
+test('scope rejection is not relabelled as an unavailable composer', async () => {
+  for (const change of [
+    f => { f.root.location.href += '?temporary-chat=true'; },
+    f => { f.root.location.href += 'g/g-p-' + 'a'.repeat(32) + '/c/00000000-0000-4000-8000-000000000001'; },
+    f => { f.fiber.memoizedProps.isLibraryEnabled = false; },
+  ]) {
+    const f = setup(); change(f);
+    f.root.fetch = () => { throw Error('unexpected request'); };
+    const before = f.store.files$();
+    await f.attach();
+    assert.deepEqual(f.responses[0], ['attach_library_file', false, 'library_attachment_scope_unconfirmed']);
+    assert.equal(f.store.files$(), before);
+    assert.equal(f.changes.length, 0);
+  }
+});
+
+test('other capture failures retain the closed unavailable code and never leak exceptions', async () => {
+  for (const error of [Error('private page state'), null, { message: 'library_attachment_scope_unconfirmed private' }]) {
+    const f = setup();
+    const library = libraryModule.create(f.root, { composer: { captureLibrary() { throw error; } } });
+    const receipts = [];
+    await library.attach({ selected: true, requestId: 'mcp_closed', value: JSON.stringify({ fileHandle: HANDLE }) },
+      (...receipt) => receipts.push(receipt), () => { throw Error('unexpected publication'); });
+    assert.deepEqual(receipts, [['attach_library_file', false, 'composer_context_unavailable']]);
+  }
+});
+
 test('account, route, model, file metadata or cancellation changes cannot publish a late selection', async () => {
   for (const mutate of [f => f.setAccount('Bearer changed-account-token'), f => { f.root.location.href += '?temporary-chat=true'; },
     f => f.setModel('other'), f => f.expire(), f => f.sender.cancel()]) {

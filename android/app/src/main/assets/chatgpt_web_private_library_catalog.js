@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 7, create: factory });
+  const exported = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateLibraryCatalog?.version || 0) < exported.version) {
@@ -20,6 +20,21 @@
     'library_download_id', 'context_connector_info', 'library_provider'];
   const pages = new Map(), directories = new Map(), renamed = new Map();
   let identityKey = '', active = null, disposed = false, failures = 0, retryAt = 0;
+
+  function sameAttachmentMetadata(left, right) {
+    let remaining = 4096;
+    function equal(a, b, depth) {
+      if (--remaining < 0 || depth > 32) return false;
+      if (Object.is(a, b)) return true;
+      if (!a || !b || typeof a !== 'object' || typeof b !== 'object' ||
+          Array.isArray(a) !== Array.isArray(b)) return false;
+      const keys = Object.keys(a);
+      if (keys.length !== Object.keys(b).length) return false;
+      return keys.every(key => Object.prototype.hasOwnProperty.call(b, key) && equal(a[key], b[key], depth + 1));
+    }
+    // A fresh JSON response has new object identities; compare only attachment-relevant values.
+    return ATTACHMENT_FIELDS.every(key => equal(left[key], right[key], 0));
+  }
 
   function identity(raw = root.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.()) {
     const headers = Object.fromEntries(Object.entries(raw || {}).map(([k, v]) => [k.toLowerCase(), v]));
@@ -299,12 +314,11 @@
         const rows = response.payload?.items;
         if (!Array.isArray(rows) || rows.length > 1000) return false;
         const matches = rows.filter(row => row?.id === item.source.id);
-        if (matches.length !== 1 || !ATTACHMENT_FIELDS.every(key =>
-          Object.is(matches[0][key], item.source[key]))) return false;
+        if (matches.length !== 1 || !sameAttachmentMetadata(matches[0], item.source)) return false;
         item.observedAt = Date.now();
         return true;
       },
     };
   }
-  return Object.freeze({ version: 7, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead });
+  return Object.freeze({ version: 8, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead });
 });

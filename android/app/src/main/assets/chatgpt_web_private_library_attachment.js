@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 6, operationTimeoutMs: 24000, create: factory });
+  const exported = Object.freeze({ version: 7, operationTimeoutMs: 24000, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateLibraryAttachment = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -68,7 +68,11 @@
     const remote = !!mounted?.descriptor(selection.source);
     for (const [handle, time] of consumed) if (Date.now() - time >= 60000) consumed.delete(handle);
     let context;
-    try { context = composer.captureLibrary(); } catch (_) { return respond(action, false, 'composer_context_unavailable'); }
+    try { context = composer.captureLibrary(); } catch (error) {
+      const code = error?.message === 'library_attachment_scope_unconfirmed'
+        ? 'library_attachment_scope_unconfirmed' : 'composer_context_unavailable';
+      return respond(action, false, code);
+    }
     const { binding } = context;
     if (!binding.libraryEnabled || binding.isTemporaryChat || binding.projectId) {
       return respond(action, false, 'library_attachment_scope_unconfirmed');
