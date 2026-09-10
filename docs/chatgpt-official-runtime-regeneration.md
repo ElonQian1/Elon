@@ -1,13 +1,29 @@
 # Official-runtime response regeneration
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
-Status: source implemented and offline verified; not device verified or completed.
+Status: source implemented and offline verified; installed on normal 1629,
+but end-to-end device acceptance is not passed or completed.
 The original adapter 286 batch wired this candidate into the existing production
 `chatgpt_regenerate_response` command. It is an official-runtime bridge, not an
 independent Android HTTP generation transport. Do not recreate it while waiting
 for the grouped ChatGPT APK acceptance.
 
 ## Current source correction
+
+Contract/runtime v5 separates post-dispatch ownership observation from model
+write admission using model contract v7. A known disabled model picker during
+generation no longer invalidates an otherwise owned reply. New mutations still
+require an enabled picker; document/account/conversation, parent and leaf checks
+remain strict. Unknown picker state is not treated as an owned binding.
+
+Normal 1628 reached the production retry button after a completed private-runtime
+initial send, but returned `official_runtime_v1:regenerate_unknown:timeout`.
+Two disabled-picker observation tests reproduced a code defect; all 109 focused
+regeneration/wiring/model tests pass after the correction. This does not prove
+that the defect was the only cause of the live timeout. Normal 1629 is published
+and installed, but its acceptance stopped before retry: the initial send receipt
+passed and the completed-reply predicate timed out. See the
+[September 10 evidence](reports/chatgpt-native-regeneration-20260910.md).
 
 Contract/runtime v4 extends the existing command to the source-observed
 `finished_partial_completion` terminal status, while retaining the committed
@@ -106,8 +122,10 @@ tests compiled and passed; this does not cover the full Android consumer build.
 The missing-node exception case first failed against the new runtime's initial
 implementation, then passed after retaining its bounded confirmation retry.
 
-Grouped APK build/install, production retry/first-word display, real closed-portal
-binding, project/temporary cases and account restrictions remain pending.
+The original source batch's build/install boundary is superseded by the normal
+1629 delivery above. Successful production retry/first-word display, real
+closed-portal confirmation, project/temporary cases and account restrictions
+remain pending.
 Thermal/resource optimization is deferred until functional acceptance. Browser
 navigation timed out during the original source batch; no successful
 authenticated regeneration was observed in this source batch. Preserve that
