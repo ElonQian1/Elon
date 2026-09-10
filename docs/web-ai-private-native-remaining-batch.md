@@ -75,8 +75,9 @@ TXT/PDF selection, two ready cards, one runtime send, both file-content markers,
 cleanup and original-conversation restoration. Reuse this completed ordinary
 scope; reverse-order local uploads and real mounted append remain incomplete.
 [Expired visible selections](chatgpt-private-library-selection-refresh.md) now
-revalidate the selected file without renewing mutation tickets; 163 checks pass,
-grouped Release/device acceptance pending.
+revalidate without renewing mutation tickets. Normal 1636 installed; adapter 320
+adds structural metadata comparison and exact scope errors (174 checks passed).
+The newer fixes await grouped build; device acceptance remains unconfirmed.
 
 ## Recent Accepted Scopes
 

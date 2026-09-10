@@ -69,7 +69,9 @@ The earlier `library_selection_expired` observation followed more than 60 second
 between directory lookup and attach, matching the existing catalog TTL. It is
 separate from the completion race; retrying immediately after a completed refresh
 isolated the race. [Selection refresh](chatgpt-private-library-selection-refresh.md)
-now implements a bounded per-file revalidation; its device acceptance is pending.
+now implements bounded per-file revalidation. Normal 1636 was installed; adapter
+320 additionally fixes structured-metadata comparison and scope-error reporting.
+Selection-refresh device acceptance remains unconfirmed, not completed.
 
 ## Official Evidence
 
