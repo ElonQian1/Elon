@@ -3,10 +3,10 @@
 function Invoke-AndroidSemanticAcceptance {
     param(
         [Parameter(Mandatory)]$Runtime,
-        [Parameter(Mandatory)][ValidateSet('LibraryUiAcceptance','ConversationUiAcceptance')][string]$TestClass,
+        [Parameter(Mandatory)][ValidateSet('LibraryUiAcceptance','ConversationUiAcceptance','AttachmentPickerUiAcceptance')][string]$TestClass,
         [Parameter(Mandatory)][string]$Step,
         [hashtable]$Parameters = @{},
-        [Parameter(Mandatory)][ValidateSet('LIBRARY_UI_RESULT','CONVERSATION_UI_RESULT')][string]$ResultPrefix,
+        [Parameter(Mandatory)][ValidateSet('LIBRARY_UI_RESULT','CONVERSATION_UI_RESULT','ATTACHMENT_PICKER_UI_RESULT')][string]$ResultPrefix,
         [string]$SdkRoot = 'D:/Android/sdk',
         [string]$JavaHome = 'C:/Program Files/Microsoft/jdk-21.0.11.10-hotspot'
     )
