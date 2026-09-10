@@ -3,6 +3,8 @@
 mod access_http_tests;
 #[path = "account_snapshot_http_tests.rs"]
 mod account_snapshot_http_tests;
+#[path = "game_access/http_tests.rs"]
+mod game_access_http_tests;
 #[path = "history_http_tests.rs"]
 mod history_http_tests;
 #[path = "reconciliation_http_tests.rs"]

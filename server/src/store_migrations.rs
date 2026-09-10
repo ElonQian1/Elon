@@ -392,6 +392,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (289, "账号绑定的可撤销只读资产授权", crate::esk_asset::platform::access::migration::migration_v289),
     (290, "ESK 平台认证 Sui 地址一次性绑定", crate::esk_asset::platform::sui_address_binding::migration::migration_v290),
     (291, "节点账号隔离的私人只读投影", crate::store::node_credentials::private_projection::migrate),
+    (292, "第一方游戏账号授权与动作观测", crate::esk_asset::platform::game_access::migration::migration_v292),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

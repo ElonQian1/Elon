@@ -31,6 +31,7 @@ pub(crate) fn routes(public_url: &str) -> Router<Arc<AppState>> {
         })
         .map(|url| url.origin().ascii_serialization());
     access::routes()
+        .merge(crate::esk_asset::platform::game_access::routes())
         .merge(crate::private_read_projection_api::routes())
         .layer(Extension(VerifiedAssetTransport { allowed_origin }))
 }
