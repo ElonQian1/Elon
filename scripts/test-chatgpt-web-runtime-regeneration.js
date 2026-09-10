@@ -7,8 +7,8 @@ const contract = require('../android/app/src/main/assets/chatgpt_web_private_reg
 const { fixture, id, flush } = require('./fixtures/chatgpt-runtime-regeneration.js');
 
 test('regeneration has a versioned official-runtime transaction', () => {
-  assert.equal(runtime.version, 6);
-  assert.equal(contract.version, 6);
+  assert.equal(runtime.version, 7);
+  assert.equal(contract.version, 7);
   assert.equal(typeof runtime.create, 'function');
 });
 
@@ -107,7 +107,8 @@ for (const [reason, change] of Object.entries({
     f.publish();
     assert.equal(f.api.state().pending, true);
     f.runTimer(15000);
-    assert.deepEqual(await result.completion, { status: 'unknown', code: 'timeout' });
+    assert.deepEqual(await result.completion, { status: 'unknown',
+      code: reason === 'parent' ? 'timeout_parent_mismatch' : 'timeout_owner_changed' });
     assert.equal(f.calls.length, 1, 'an unknown result must not invoke a fallback or replay');
   });
 }
@@ -219,7 +220,7 @@ test('unconfirmed tree visibility never starts an idle DOM polling loop', async 
   f.publish({}, false);
   for (let count = 0; count < 30; count++) f.runTimer(100);
   assert.equal(f.runTimer(100), false);
-  f.runTimer(15000); assert.equal((await result.completion).code, 'timeout');
+  f.runTimer(15000); assert.equal((await result.completion).code, 'timeout_leaf_pending');
   f.page.__elonChatGptDocumentToken = 'doc_finished'; f.api.state();
   assert.equal(f.listeners.size, 0); assert.equal(f.timers.size, 0);
 });
@@ -252,7 +253,7 @@ test('a frame that arrives before the official tree commit is confirmed with bou
 test('timeout retains ownership; a late actual reply releases it without a second write', async () => {
   const f = fixture(), result = f.api.regenerate(f.command); await flush();
   assert.equal(f.runTimer(15000), true);
-  assert.equal((await result.completion).code, 'timeout');
+  assert.equal((await result.completion).code, 'timeout_stream_missing');
   assert.equal((await f.api.regenerate(f.command).completion).code, 'busy');
   assert.equal(f.calls.length, 1);
   f.publish(); assert.equal(f.api.state().pending, false);

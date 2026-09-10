@@ -67,7 +67,7 @@ test('the native command receipt does not wait for the model picker to remount',
 
 test('uncertain regeneration cannot replay through a private template or an official menu', async () => {
   const f = production(); f.run(); await flush(); f.runTimer(15000); await flush();
-  assert.equal(f.events[0].ok, false); assert.match(f.events[0].detail, /regenerate_unknown:timeout$/);
+  assert.equal(f.events[0].ok, false); assert.match(f.events[0].detail, /regenerate_unknown:timeout_stream_missing$/);
   f.run(); await flush();
   assert.match(f.events[1].detail, /regenerate_unknown:busy$/);
   assert.equal(f.calls.length, 1);

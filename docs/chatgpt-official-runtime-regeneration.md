@@ -1,8 +1,10 @@
 # Official-runtime response regeneration
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
-Status: source implemented and offline verified. v6 is published and installed
-on normal 1630. End-to-end device acceptance is not passed or completed; see
+Status: source implemented and offline verified. v7 adds closed observation
+reasons and a final readonly deadline check. Normal 1637 still timed out at the
+native retry; end-to-end device acceptance is not passed or completed. See
+the [1637 follow-up](reports/chatgpt-regeneration-observation-1637.md) and
 the [grouped delivery](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).
 The original adapter 286 batch wired this candidate into the existing production
 `chatgpt_regenerate_response` command. It is an official-runtime bridge, not an
@@ -10,6 +12,14 @@ independent Android HTTP generation transport. Do not recreate it while waiting
 for the grouped ChatGPT APK acceptance.
 
 ## Current source correction
+
+Contract/runtime v7 retains the same one-shot callback and ownership checks.
+The existing final timeout now rechecks the captured stream and official tree
+once before reporting failure. A tree commit after the short event-retry budget
+can therefore succeed without another stream event, extra polling or a write.
+Unknown outcomes remain fenced against replay. Closed timeout suffixes distinguish
+missing stream, changed owner, old variant, pending text/tree and wrong parent.
+They contain no message content, IDs, account values or exception strings.
 
 Contract/runtime v6 with model contract v8 removes the remaining post-dispatch
 model-button lookup. A dispatched reply is confirmed against the captured

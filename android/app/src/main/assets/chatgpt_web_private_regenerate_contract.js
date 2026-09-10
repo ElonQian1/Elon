@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateRegenerateContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -106,15 +106,28 @@
     return { ...now, parentId: parent.id, variants: new Set(variants) };
   }
 
-  function observed(binding, modules, stream) {
-    if (!ownerCurrent(binding) || !stream || stream.conversationId !== binding.cid ||
-        !UUID.test(stream.id || '') || binding.variants.has(stream.id) || !stream.text ||
-        !['streaming', 'completed'].includes(stream.state)) return false;
-    const s = modules.shared, tree = s.XM(binding.conversation.id);
-    const parent = s.HM.getParentPromptNode(tree, stream.id), node = s.HM.getNode(tree, stream.id);
-    return s.HM.getCurrentLeafId(tree) === stream.id && node?.message?.author?.role === 'assistant' &&
-      parent?.id === binding.parentId && parent?.message?.author?.role === 'user';
+  function observation(binding, modules, stream) {
+    if (!ownerCurrent(binding)) return 'owner_changed';
+    if (!stream) return 'stream_missing';
+    if (stream.conversationId !== binding.cid) return 'conversation_mismatch';
+    if (!UUID.test(stream.id || '')) return 'message_invalid';
+    if (binding.variants.has(stream.id)) return 'old_variant';
+    if (!stream.text) return 'text_pending';
+    if (!['streaming', 'completed'].includes(stream.state)) return 'state_unknown';
+    try {
+      const s = modules.shared, tree = s.XM(binding.conversation.id);
+      if (s.HM.getCurrentLeafId(tree) !== stream.id) return 'leaf_pending';
+      const node = s.HM.getNode(tree, stream.id);
+      if (node?.message?.author?.role !== 'assistant') return 'node_pending';
+      const parent = s.HM.getParentPromptNode(tree, stream.id);
+      return parent?.id === binding.parentId && parent?.message?.author?.role === 'user'
+        ? 'regenerate_observed' : 'parent_mismatch';
+    } catch (_) { return 'tree_unavailable'; }
   }
 
-  return Object.freeze({ urls: URLS, capture, current, ownerCurrent, validate, prepare, observed });
+  function observed(binding, modules, stream) {
+    return observation(binding, modules, stream) === 'regenerate_observed';
+  }
+
+  return Object.freeze({ urls: URLS, capture, current, ownerCurrent, validate, prepare, observed, observation });
 });

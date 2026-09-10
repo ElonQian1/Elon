@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const old = root.__elonChatGptPrivateRegenerateRuntime;
@@ -67,7 +67,7 @@
     if (!binding) return { handled: false };
     let resolve;
     const completion = new Promise(done => { resolve = done; });
-    const owner = { binding, resolve, invoked: false, retries: 0 }; active = owner;
+    const owner = { binding, resolve, invoked: false, retries: 0, observation: 'stream_missing' }; active = owner;
 
     function unavailable(code) {
       if (owner.invoked) return resolve({ status: 'unknown', code: 'invocation_failed' });
@@ -83,11 +83,8 @@
       page.clearTimeout(owner.retry); owner.retry = null;
       try {
         const value = stream.current(page.location.pathname);
-        if (!contract.ownerCurrent(owner.binding)) return;
-        let confirmed = false;
-        try { confirmed = contract.observed(owner.binding, modules, value); }
-        catch (_) { /* The official tree throws until a streamed node is committed. */ }
-        if (confirmed) {
+        owner.observation = contract.observation(owner.binding, modules, value);
+        if (owner.observation === 'regenerate_observed') {
           release(owner);
           return resolve({ status: 'accepted', code: 'regenerate_observed' });
         }
@@ -97,7 +94,7 @@
             !owner.binding.variants.has(value.id) && owner.retries++ < 20) {
           owner.retry = page.setTimeout(observe, 100);
         }
-      } catch (_) { /* Unknown runtime state is not permission to replay. */ }
+      } catch (_) { owner.observation = 'observation_error'; }
     }
 
     void load().then(() => {
@@ -115,8 +112,12 @@
         if (!final || final.parentId !== prepared.parentId) return unavailable('context_changed');
         owner.binding = final;
         owner.unsubscribe = stream.subscribe(observe);
-        owner.deadline = page.setTimeout(() => resolve({ status: 'unknown', code: 'timeout' }),
-          options.timeoutMs || 15000);
+        owner.deadline = page.setTimeout(() => {
+          // The last stream event can precede the committed tree. Read once more
+          // at the deadline without extending the retry budget or issuing a write.
+          observe();
+          if (active === owner) resolve({ status: 'unknown', code: 'timeout_' + owner.observation });
+        }, options.timeoutMs || 15000);
         owner.invoked = true;
         // CUn's committed callback invokes the official regeneration hook. It
         // retains parent prompt, effort, tool hints, request proof and React state.
@@ -130,5 +131,5 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 6, regenerate, available, state });
+  return Object.freeze({ version: 7, regenerate, available, state });
 });

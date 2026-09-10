@@ -1,0 +1,38 @@
+# Native regeneration observation follow-up
+
+Capability: `android_chatgpt_official_runtime_regeneration_v1`.
+Not completed. This report distinguishes a real failure from a reproduced
+observation defect; neither is a proof that the provider lacks regeneration.
+
+## Normal 1637 device evidence
+
+The existing synthetic probe was admitted on the authenticated native production
+chat surface, adapter 321. It contained one completed user prompt and one
+completed 47-character assistant reply. No initial prompt was resent.
+The rendered native regenerate button dispatched once; its command returned
+`official_runtime_v1:regenerate_unknown:timeout`.
+
+Logged run: `native-regenerate-1637-20260910-183626-849`, terminal failure in
+67.1 seconds. This is an unknown post-dispatch outcome, not evidence that no
+server request ran. No automatic second regeneration was attempted.
+
+## Narrow source correction
+
+Contract/runtime v7, adapter 322, keeps mutation admission, the original parent,
+new assistant identity, selected leaf, account and document checks. It adds no
+POST, request template, DOM activation or automatic fallback after dispatch.
+
+The existing 15-second deadline now makes one final readonly observation. A
+fixture demonstrated v6 reporting unknown even when an owned completed stream's
+tree had committed after its 20 short retries, without another stream event.
+Timeouts otherwise include a closed reason rather than only `timeout`; this
+allows the next phone attempt to distinguish a missing stream from a tree or
+ownership mismatch. Raw exceptions and all private values stay out of receipts.
+
+The new failing suite reproduced the missing reason and late-tree defect before
+the correction. The final 137-case regeneration/model/current-runtime run passed
+without skips or cancellations (`regenerate-observation-final-20260910-185540-996`).
+It covers final deadline readback, closed failure reasons, late success after an
+unknown outcome, replay fencing and production command receipts. The entire live
+failure is not yet attributed to this late-tree race, and regeneration is not
+marked accepted. APK delivery and the next instrumented native attempt are pending.
