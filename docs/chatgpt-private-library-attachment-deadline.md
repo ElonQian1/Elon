@@ -2,10 +2,12 @@
 
 ## Current scope
 
-Code implemented and offline verified; **not in normal 1631**. The next grouped
-Android build and production UI acceptance remain pending. This fixes the native
-Library "attach" lifecycle, not upload speed, provider availability or thermal use.
-The existing mounted preparation and download contracts remain unchanged.
+Code implemented, offline verified and included in normal 1632/1634 Release builds.
+The [1634 report](reports/chatgpt-library-append-1634.md) records installation and
+the separately fixed first-file completion race. Slow mounted-file production
+acceptance remains pending. This fixes the native Library "attach" lifecycle, not
+upload speed, provider availability or thermal use. The existing mounted
+preparation and download contracts remain unchanged.
 
 ## Defect
 
@@ -62,10 +64,11 @@ and its JUnit test with cached Kotlin 2.0.21/Java 21: **8/8** passed. It covers
 old time boundaries, exact late success, nonmatching receipt, terminal failure,
 missing result, bounded observation and timing order. Source-wiring tests check
 the actual UI/command consumers. This is **not a full Android build or an executed
-Activity test**; those remain part of the grouped build/device gate.
+Activity test**; full grouped builds are now recorded above, but slow mounted-file
+Activity acceptance remains pending.
 
 On a connected device with an authorized existing cloud fixture, use production
 Library attach, observe the native card and return, and verify there is no early
-16/20-second error or duplicate write. Reuse normal 1631 for its pending checks
-unless a newer grouped artifact has actually been built and installed. Do not
+16/20-second error or duplicate write. Reuse installed normal 1634 for its pending
+checks unless a newer grouped artifact has actually been built and installed. Do not
 rebuild or repeat already accepted ordinary file cases just to fill this gap.

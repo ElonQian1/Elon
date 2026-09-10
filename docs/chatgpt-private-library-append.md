@@ -13,8 +13,11 @@ Normal Release 1632 (adapter 316) was built, published and installed over wirele
 ADB with login preserved. Production attachment acceptance then exposed a
 completion-notification race, reproduced below. Adapter 317, sender 24 and Library
 attachment 5 fix that race; composer 21 and runtime bindings 9 are unchanged.
-Rendered multi-file attachment/send acceptance remains pending until the fix is
-installed and checked. This is not an independent Android HTTP text sender.
+Normal 1634 is published and installed: the first-file native receipt/card/return
+passed, but a second PDF returned `library_attachment_policy_unconfirmed` through
+production MCP. Multi-file attach/send is **not accepted**. See the
+[1634 device report](reports/chatgpt-library-append-1634.md). This is not an
+independent Android HTTP text sender.
 
 ## Failure And Fix
 
@@ -108,8 +111,8 @@ admission and are not newly certified by this work.
 
 ## Remaining Boundaries
 
-Real native UI attach/send and provider-policy shapes remain to be verified in
-the grouped phone round. Adding new local picker files *after* staged Library
+The second-file provider-policy shape remains unresolved on real 1634; its failed
+append preserves the first file and sends nothing. Adding new local picker files *after* staged Library
 references remains a separate empty-composer upload limitation; this change does
 not silently broaden that contract. Foreign/unowned or uploading file stores,
 project/temporary Library references, live/suggestion cloud references, folder
