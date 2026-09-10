@@ -33,7 +33,10 @@ Previously `available()` required zero files and `capture()` used that gate.
 Every second Library selection therefore failed before its file reference could
 be added. The new `captureLibrary()` uses the existing exact submit lease when
 the entire ready collection belongs to this private owner. Local upload's
-empty-composer admission is unchanged.
+empty-composer admission was unchanged in the accepted 1635 scope. The later
+[reverse-order local append](chatgpt-private-library-local-append.md) reuses this
+collection lease and adds source-backed local-upload quota admission. It is
+offline-verified in adapter 321, not yet device-accepted.
 
 Publication preserves existing File objects, ready metadata and ordering, then
 checks the complete store readback. If publication is not confirmed, only new

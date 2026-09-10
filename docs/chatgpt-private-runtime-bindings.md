@@ -2,6 +2,11 @@
 
 ## Status
 
+Version 10 adds exact September 10 local-upload quota/type helpers for
+[reverse-order Library/local attachment append](chatgpt-private-library-local-append.md).
+Older profiles do not guess these bindings. Their existing consumers are
+unchanged; new mixed-order device acceptance is pending.
+
 Version 8 adds the observed September 10 build while retaining all four earlier
 profiles. See [current source evidence and verification boundary](reports/chatgpt-runtime-bindings-20260910.md)
 and the [September 9 acceptance](reports/chatgpt-runtime-bindings-20260909.md).

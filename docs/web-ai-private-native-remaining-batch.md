@@ -73,7 +73,9 @@ with the official count validator, duplicate handling and exact submit cleanup.
 [Release 1635](reports/chatgpt-library-append-1635.md) accepts consecutive native
 TXT/PDF selection, two ready cards, one runtime send, both file-content markers,
 cleanup and original-conversation restoration. Reuse this completed ordinary
-scope; reverse-order local uploads and real mounted append remain incomplete.
+scope. [Reverse-order local uploads](chatgpt-private-library-local-append.md) are
+implemented with atomic ownership and live official quotas (311 checks), awaiting
+grouped build/device acceptance on adapter 321. Real mounted append remains unverified.
 [Expired visible selections](chatgpt-private-library-selection-refresh.md) now
 revalidate without renewing mutation tickets. Normal 1636 installed; adapter 320
 adds structural metadata comparison and exact scope errors (174 checks passed).
