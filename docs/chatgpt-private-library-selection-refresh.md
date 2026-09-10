@@ -12,10 +12,12 @@ catalog and attachment owner, not the upload transport or file mutation authorit
   value and preserves the closed scope-rejection receipt.
 - Offline verification: 174 related checks pass in
   `library-metadata-scope-related-20260910-171229-781`, with no skips/cancellations.
-- Delivery: normal 1.1.1636 / code 1636 / adapter 319 was published and installed
-  over wireless ADB, preserving login. Adapter 320 awaits the next grouped build.
-- Device verification: not passed. See the bounded attempts below; no completed
-  capability mark has been made for selection refresh.
+- Delivery: normal 1.1.1637 / adapter 321 includes the grouped correction and was
+  published/installed over wireless ADB with login preserved.
+- Device verification: completed for ordinary visible TXT association after a
+  67-second wait with foreground/context checkpoints. The actual Attach button
+  succeeded; the reference was subsequently consumed in one mixed attachment
+  send. See [1637 evidence and exact boundaries](reports/chatgpt-library-local-append-1637.md).
 - Previously accepted ordinary append/send on 1635 remains reusable; this change
   does not claim mounted materialization or reverse-order local picker acceptance.
 
@@ -96,9 +98,8 @@ remove it and restore the prior conversation without sending a message.
   restored the original conversation and verified unchanged native messages;
   no message was sent and the final draft/attachment state was empty.
 
-Next acceptance must bind the ordinary route and exact selected view, retain
-closed failure-stage/context diagnostics, and stop on external interference.
-Do not repeat the 65-second flow without resolving that interference or improving
-the observation. Project/temporary Library association and reverse-order local
-picker uploads remain separate scope gaps; no new endpoint or scope permission
-is inferred from an existing local-upload path.
+The later 1637 acceptance bound the ordinary route and checked the foreground and
+context throughout the wait before using the actual Attach button successfully.
+The interrupted 1636 attempts remain historical failures, not outstanding repeats
+of this now-accepted ordinary scope. Project/temporary and mounted association
+remain separate; no new endpoint or scope permission is inferred from local upload.

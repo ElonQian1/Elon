@@ -3,9 +3,11 @@
 ## Status
 
 Capability: `android_chatgpt_private_library_local_upload_append_v1`.
-Code: implemented. Verification: offline_verified. Completion: not yet accepted
-on a device. Delivery: grouped Android build pending, adapter 321, composer 22,
-sender 26, attachment policy 3 and runtime bindings 10.
+Code: implemented. Verification: device_verified for ordinary Library TXT then
+local TXT through the actual production picker and native send. Completion:
+completed for this scope, default-enabled. Normal Release 1637 / adapter 321,
+composer 22, sender 26, attachment policy 3 and runtime bindings 10 passed;
+see [artifact, receipts and restoration](reports/chatgpt-library-local-append-1637.md).
 
 This is the reverse-order extension of [Library append](chatgpt-private-library-append.md),
 not a new uploader. Ordinary authenticated Library selection followed by one
@@ -93,8 +95,8 @@ partial processing, duplicate reuse, contradictory receipts, atomic readback
 rollback and complete submit-lease invalidation. Existing project, temporary,
 reservation and runtime-submit contracts also passed.
 
-One grouped production-native acceptance must select a synthetic Library fixture,
-add a different local fixture through the production picker, confirm both cards,
-send once and verify both fixture contents. Restore the original conversation,
-draft and attachment state. Then record the actual APK/source/receipt evidence;
-do not reuse 1635's forward-order acceptance as proof of this reverse order.
+Normal 1637 passed that complete reverse-order flow: actual Xiaomi picker, both
+previews, one native send, fresh private upload receipt, both file-content markers,
+one official user/assistant pair and original-conversation restoration. Reuse
+this evidence instead of 1635's forward-order pass. Batch/image/PDF/mounted and
+other account/context variants are not implied and retain their separate gaps.

@@ -74,12 +74,14 @@ with the official count validator, duplicate handling and exact submit cleanup.
 TXT/PDF selection, two ready cards, one runtime send, both file-content markers,
 cleanup and original-conversation restoration. Reuse this completed ordinary
 scope. [Reverse-order local uploads](chatgpt-private-library-local-append.md) are
-implemented with atomic ownership and live official quotas (311 checks), awaiting
-grouped build/device acceptance on adapter 321. Real mounted append remains unverified.
+completed for Library TXT then actual local TXT picker/native send on
+[normal 1637](reports/chatgpt-library-local-append-1637.md), adapter 321, with a
+fresh private upload receipt, both contents read and original state restored.
+Batch/image/PDF and real mounted append remain unverified.
 [Expired visible selections](chatgpt-private-library-selection-refresh.md) now
-revalidate without renewing mutation tickets. Normal 1636 installed; adapter 320
-adds structural metadata comparison and exact scope errors (174 checks passed).
-The newer fixes await grouped build; device acceptance remains unconfirmed.
+revalidate without renewing mutation tickets. The grouped metadata/scope fix
+passed ordinary native TXT association after 67 seconds on 1637; reuse this
+completed scope. Changed/mounted/project variants remain separate.
 
 ## Recent Accepted Scopes
 

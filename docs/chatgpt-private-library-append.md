@@ -146,9 +146,9 @@ page/native diagnostic vocabulary. The fresh 1635 native flow passes; no detaile
 ## Remaining Boundaries
 
 Ordinary consecutive TXT/PDF append/send is accepted on 1635 and should be reused.
-Adding new local picker files *after* staged Library
-references remains a separate empty-composer upload limitation; this change does
-not silently broaden that contract. Foreign/unowned or uploading file stores,
+Adding local picker files *after* Library references now has its own
+[1637 ordinary TXT acceptance](chatgpt-private-library-local-append.md); do not
+reuse the 1635 pass for that reverse order. Foreign/unowned or uploading file stores,
 project/temporary Library references, live/suggestion cloud references, folder
 writes and new provider shapes are not covered. No evidence-backed folder-write
 endpoint was found in the inspected Library sources; none was invented.
