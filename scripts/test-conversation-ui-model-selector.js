@@ -54,3 +54,13 @@ test('the production slider handles non-touch user progress without submitting p
   assert.match(renderer, /onStartTrackingTouch\(bar: SeekBar\?\) = submission\.startTouch\(\)/);
   assert.match(renderer, /submission\.stopTouch\(progress\)\?\.let \{ onOptionSelected\(levels\[it\]\) \}/);
 });
+
+test('reply diagnostics inspect only bounded native view facts without clicking or reading content', () => {
+  const body = java.split('private JSONObject inspectReplyActions')[1].split('private void setModelLevel')[0];
+  assert.match(body, /i < 32/);
+  assert.match(body, /resourceId\(APP \+ ":id\/webChatMessage" \+ kind\)/);
+  assert.match(body, /selector\.equals\(button\.getContentDescription\(\)\)/);
+  assert.doesNotMatch(body, /getText\(|click\(|performAction\(/);
+  assert.match(ps, /\$Step -in @\('regenerate','inspect_reply_actions'\)/);
+  assert.match(ps, /ConvertTo-Json -Depth 6 -Compress/);
+});

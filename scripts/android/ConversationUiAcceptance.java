@@ -5,6 +5,7 @@ import com.android.uiautomator.core.UiObject;
 import com.android.uiautomator.core.UiSelector;
 import com.android.uiautomator.testrunner.UiAutomatorTestCase;
 import org.json.JSONObject;
+import org.json.JSONArray;
 
 /** External production-menu acceptance. Never exports conversation text or publishes links. */
 public final class ConversationUiAcceptance extends UiAutomatorTestCase {
@@ -38,6 +39,37 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
         return text("\u5168\u90e8\u516c\u5f00\u5206\u4eab\u94fe\u63a5").exists() ||
             text("\u5168\u90e8\u516c\u5f00\u5206\u4eab\u94fe\u63a5\uff08\u90e8\u5206\uff09").exists();
     }
+    private String retrySelector() {
+        String selector = new String(android.util.Base64.decode(
+            getParams().getString("selector_b64", ""), android.util.Base64.DEFAULT),
+            java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue("invalid_reply_retry_selector", selector.matches(
+            "^web-chat-message-action:chatgpt_web:[A-Za-z0-9_.:-]{1,160}:regenerate$"));
+        return selector;
+    }
+    private JSONObject inspectReplyActions(String selector) throws Exception {
+        String rowSelector = selector.replace("web-chat-message-action:", "web-chat-message:");
+        rowSelector = rowSelector.substring(0, rowSelector.length() - ":regenerate".length());
+        JSONArray buttons = new JSONArray();
+        for (String kind : new String[] { "Copy", "Regenerate", "More" }) {
+            for (int i = 0; i < 32; i++) {
+                UiObject button = new UiObject(new UiSelector().packageName(APP)
+                    .resourceId(APP + ":id/webChatMessage" + kind).instance(i));
+                if (!button.exists()) break;
+                android.graphics.Rect bounds = button.getVisibleBounds();
+                buttons.put(new JSONObject().put("kind", kind).put("enabled", button.isEnabled())
+                    .put("matches_target", selector.equals(button.getContentDescription()))
+                    .put("bounds", new JSONArray(new int[] {bounds.left, bounds.top, bounds.right, bounds.bottom})));
+            }
+        }
+        UiObject list = new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/chatList"));
+        return new JSONObject().put("expected_button", description(selector).exists())
+            .put("expected_row", description(rowSelector).exists())
+            .put("native_list", list.exists()).put("native_list_children", list.exists() ? list.getChildCount() : -1)
+            .put("native_message_text", new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/messageText")).exists())
+            .put("skin_exit", description("web-chat-skin-exit:chatgpt").exists())
+            .put("buttons", buttons);
+    }
     private void setModelLevel() throws Exception {
         UiObject slider = description("web-chat-model-level-slider");
         assertTrue("model_level_slider_missing", slider.waitForExists(5000));
@@ -63,6 +95,7 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
     public void testStep() throws Exception {
         assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
         String step = getParams().getString("step", "inspect");
+        JSONObject replyActions = null;
         switch (step) {
             case "model":
                 click(modelButton());
@@ -87,12 +120,9 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             case "temporary": click(description("chatgpt-native:temporary-chat:\u4e34\u65f6\u804a\u5929")); break;
             case "retry_session": click(description("web-chat-consumer-retry")); break;
             case "regenerate":
-                String retrySelector = new String(android.util.Base64.decode(
-                    getParams().getString("selector_b64", ""), android.util.Base64.DEFAULT),
-                    java.nio.charset.StandardCharsets.UTF_8);
-                assertTrue("invalid_reply_retry_selector", retrySelector.matches(
-                    "^web-chat-message-action:chatgpt_web:[A-Za-z0-9_.:-]{1,160}:regenerate$"));
-                click(description(retrySelector)); break;
+                click(description(retrySelector())); break;
+            case "inspect_reply_actions":
+                replyActions = inspectReplyActions(retrySelector()); break;
             case "conversation_actions":
                 click(new UiObject(new UiSelector().packageName(APP).descriptionStartsWith("chatgpt-conversation-actions:")));
                 assertTrue("conversation_actions_missing", description("web-chat-conversation-action-share").waitForExists(5000));
@@ -120,6 +150,7 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             default: fail("unsupported_step");
         }
         JSONObject result = new JSONObject().put("step", step)
+            .put("reply_actions", replyActions)
             .put("model_button", modelButton().exists())
             .put("model_menu", description("web-chat-model-control").exists())
             .put("level_slider", description("web-chat-model-level-slider").exists())
