@@ -160,10 +160,70 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         finally { info.recycle(); }
     }
 
+    private java.util.Set<String> savedFiles(java.io.File directory) {
+        java.io.File[] files = directory.listFiles();
+        assertNotNull("download_directory_unreadable", files);
+        assertTrue("download_directory_too_large", files.length <= 2000);
+        java.util.Set<String> result = new java.util.HashSet<>();
+        for (java.io.File file : files) if (file.isFile()) result.add(file.getName());
+        return result;
+    }
+
+    private JSONObject downloadPng() throws Exception {
+        String name = new String(android.util.Base64.decode(getParams().getString("nameBase64", ""),
+            android.util.Base64.DEFAULT), java.nio.charset.StandardCharsets.UTF_8);
+        long expected = Long.parseLong(getParams().getString("expectedBytes", "0"));
+        assertTrue("invalid_png_selection", name.matches("[A-Za-z0-9_. -]{1,120}\\.png") &&
+            expected > 0 && expected <= 524288);
+        assertTrue("selected_file_mismatch", text(name).exists());
+        java.io.File directory = android.os.Environment.getExternalStoragePublicDirectory(
+            android.os.Environment.DIRECTORY_DOWNLOADS);
+        java.util.Set<String> before = savedFiles(directory);
+        click(text("\u4e0b\u8f7d"));
+        assertTrue("download_status_missing", description("web-chat-file-download-status").waitForExists(8000));
+        long deadline = android.os.SystemClock.elapsedRealtime() + 25000;
+        boolean saved = false;
+        while (android.os.SystemClock.elapsedRealtime() < deadline) {
+            String status = description("web-chat-file-download-status").getText();
+            saved = status.equals("\u5df2\u4fdd\u5b58\u5230\u4e0b\u8f7d\u76ee\u5f55");
+            if (saved) break;
+            assertTrue("download_failed_or_unconfirmed", status.equals("\u6b63\u5728\u51c6\u5907\u4e0b\u8f7d") ||
+                status.equals("\u6b63\u5728\u4e0b\u8f7d") || status.equals("\u6b63\u5728\u4fdd\u5b58"));
+            Thread.sleep(250);
+        }
+        assertTrue("download_not_saved", saved);
+        java.util.Set<String> created = savedFiles(directory);
+        created.removeAll(before);
+        assertEquals("saved_file_not_unique", 1, created.size());
+        String stored = created.iterator().next();
+        assertTrue("saved_file_name_mismatch", stored.startsWith("elon-") && stored.endsWith("-" + name));
+        java.io.File file = new java.io.File(directory, stored);
+        assertEquals("saved_file_size_mismatch", expected, file.length());
+        android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        android.graphics.BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+        assertTrue("saved_png_bounds_invalid", "image/png".equals(options.outMimeType) &&
+            options.outWidth > 0 && options.outHeight > 0 && options.outWidth <= 8192 && options.outHeight <= 8192);
+        options.inJustDecodeBounds = false;
+        options.inSampleSize = 8;
+        android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+        assertNotNull("saved_png_decode_failed", bitmap);
+        bitmap.recycle();
+        // Bytes stay on this handset. No image, filename, path or credential is returned.
+        return new JSONObject().put("saved", true).put("bytes", expected).put("png_decoded", true)
+            .put("created_files", 1).put("content_exported", false).put("download_retained", true);
+    }
+
     public void testStep() throws Exception {
         assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
         String step = getParams().getString("step", "inspect");
         String handle = getParams().getString("handle", "");
+        if (step.equals("download_png_verified")) {
+            android.os.Bundle report = new android.os.Bundle();
+            report.putString("stream", "LIBRARY_UI_RESULT=" + downloadPng().toString() + "\n");
+            getAutomationSupport().sendStatus(0, report);
+            return;
+        }
         if (step.startsWith("gallery")) {
             galleryStep(step);
             android.os.Bundle report = new android.os.Bundle();
