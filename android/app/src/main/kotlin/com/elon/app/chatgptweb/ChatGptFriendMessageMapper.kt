@@ -21,6 +21,7 @@ internal object ChatGptFriendMessageMapper {
         timestampFor: (String) -> Long,
     ): List<ChatMessage> {
         val latestAssistantIndex = snapshot.messages.indexOfLast { it.role == "assistant" }
+        val retryAdmitted = ChatGptWebRegenerationAdmission.rejection(snapshot) == null
         val result = snapshot.messages.mapIndexed { index, message ->
             val id = "${provider.id.wireValue}:${message.id}"
             val messageAttachments = attachmentsForMessage(message.id)
@@ -48,11 +49,8 @@ internal object ChatGptFriendMessageMapper {
                 }
                 if (
                     index == latestAssistantIndex &&
-                    message.role == "assistant" &&
-                    message.state == "completed" &&
-                    !snapshot.streaming &&
-                    provider.supports(WebChatProviderCapability.MESSAGE_REGENERATE) &&
-                    snapshot.capabilities.supports(ChatGptWebCapabilityId.MESSAGE_REGENERATE)
+                    retryAdmitted &&
+                    provider.supports(WebChatProviderCapability.MESSAGE_REGENERATE)
                 ) {
                     add(WebChatMessageAction.REGENERATE)
                 }

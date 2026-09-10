@@ -2,9 +2,10 @@
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
 Status: source implemented and offline verified. v8 distinguishes the exact
-ownership component without relaxing admission or replay fencing. Normal 1639
-is installed, but its changed reply used the legacy DOM fallback receipt rather
-than the required runtime receipt. End-to-end runtime acceptance is not passed. See
+ownership component without relaxing write admission or replay fencing. Normal 1640
+is installed and its private model catalog passes. Native retry stopped before
+dispatch at a missing semantic control. The previous 1639 changed reply used the
+legacy DOM receipt, not the runtime receipt. End-to-end runtime acceptance is not passed. See
 the [1637 follow-up](reports/chatgpt-regeneration-observation-1637.md) and
 the [grouped delivery](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).
 The original adapter 286 batch wired this candidate into the existing production
@@ -13,6 +14,34 @@ independent Android HTTP generation transport. Do not recreate it while waiting
 for the grouped ChatGPT APK acceptance.
 
 ## Current source correction
+
+The native mapper and MCP command both used `message_regenerate`, a flag derived
+only from DOM retry/model/overflow buttons, even though execution first uses the
+guarded runtime. Native admission now shares `ChatGptWebRegenerationAdmission`:
+an identified completed latest assistant and no active generation. The provider
+must still declare retry support; Google does not acquire it. Missing composer
+or DOM controls do not suppress the entry. This is permission to attempt the
+existing command, not proof that the website will accept a write. Its live owner,
+parent, model restriction and unknown-result guards are unchanged.
+
+The acceptance script now compares the native message and provider conversation
+with the acknowledged synthetic reply, checks its offered actions, and requires
+successful reveal before a semantic click. It reports `native_retry_not_offered`,
+`native_message_changed` or `native_reveal_failed` before any write, rather than
+discarding reveal errors and waiting for a nonexistent button. Thirteen admission
+cases and 25 reply/orchestration checks pass, including actual smoke execution
+against fake MCP responses and refusal before dispatch. These are not phone passes.
+
+Red run `retry-native-admission-red-20260910-212616-887` compiled the unchanged
+production mapper and failed the two DOM-absence UI assertions. After the shared
+admission correction, the final Release unit run passed 41 tests in six suites,
+with zero failures/errors/skips: `retry-native-admission-final-20260911-001137-716`.
+The existing all-command MCP receipt test now deliberately omits the DOM retry
+capability; it still dispatches the same guarded regeneration command. Separate
+admission tests preserve missing/blank/incomplete/streaming rejection, and the
+mapper preserves Google provider restrictions. The unchanged runtime and
+production-orchestrator guards also passed 79 tests. Grouped APK delivery and
+real retry acceptance are recorded below when performed, not inferred from unit tests.
 
 Regeneration v8 and model contract v9 retain all v7 checks but distinguish route,
 document, authorization, account/workspace, device header, retained conversation

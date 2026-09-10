@@ -250,14 +250,7 @@ internal class ChatGptWebMcpActions(
             )
             "chatgpt_copy_last_response" -> return ChatGptWebCopyAction.execute(snapshot(), copyMessage)
             "chatgpt_regenerate_response" -> {
-                val current = snapshot()
-                if (current?.streaming == true) return error(action, "generation_in_progress")
-                if (
-                    current?.capabilities?.supports(ChatGptWebCapabilityId.MESSAGE_REGENERATE) != true ||
-                    current.messages.lastOrNull { it.role == "assistant" }?.state != "completed"
-                ) {
-                    return error(action, "regenerate_unavailable")
-                }
+                ChatGptWebRegenerationAdmission.rejection(snapshot())?.let { return error(action, it) }
                 dispatch("regenerate_response", commands::regenerateResponse)
             }
             "chatgpt_toggle_private_read_aloud" ->

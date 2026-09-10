@@ -77,12 +77,26 @@ APK size is 40,116,617 bytes; local and remote SHA-256 agree:
 The packaged asset was read back and contains resolver 11 and the new profile.
 Log: `runtime-sep10b-grouped-release-20260910-204951-526`, terminal pass, 601.6s.
 
-Production model acceptance stopped at the locked-device preflight, before any
-catalog request, navigation or retry: `runtime-325-model-admission-20260910-210021-880`.
-The phone's installed version is verified; private catalog, regeneration and
-citation-download acceptance remain deferred, not failed provider calls or
-successful private transactions. Unlock is the next device prerequisite.
-No data/Cookies were cleared, no microphone was opened and no message was sent.
+After unlock, `runtime-325-model-unlocked-20260910-210648-499` passed in 10.3s:
+all six model choices were private handles, the fresh page acknowledgement was
+`model_runtime_context:ready`, and adapter 325 was current. The same result held
+in a second document (generation 3) during the isolated regeneration acceptance.
+This verifies private catalog admission, not every model mutation.
+
+`runtime-325-native-retry-20260910-210723-193` stopped before dispatch with
+`semantic_control_missing`. There was no `regenerate_dispatched` phase or
+conversation POST in the bounded passive capture. The original conversation
+was restored with a fresh page acknowledgement and stay-awake was restored.
+This native-control failure is separate from the earlier runtime ownership
+timeout. Static inspection found DOM capability gates in both the friend-message
+mapper and native command admission. Their correction and remaining acceptance
+are tracked in [the regeneration contract](../chatgpt-official-runtime-regeneration.md).
+
+A subsequent read-only diagnostic stopped before navigation because wireless
+ADB became offline; its single reconnect timed out. Log:
+`runtime-325-retry-inspect-20260910-211949-036`. Citation download and end-to-end
+regeneration remain unverified. No data/Cookies were cleared, no microphone was
+opened and no message was sent in these catalog/inspection cases.
 
 The first launch wrapper rejected shell invocation syntax before starting the
 publisher (0.4s); the corrected explicitly hidden `pwsh -File` invocation above

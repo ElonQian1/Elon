@@ -37,13 +37,13 @@ class ChatGptFriendMessageMapperTest {
         assertEquals(true, result.last().webChatMessage?.renderMarkdown)
         assertEquals(setOf(WebChatMessageAction.COPY), result.first().webChatMessage?.actions)
         assertEquals(
-            setOf(WebChatMessageAction.COPY, WebChatMessageAction.MORE),
+            setOf(WebChatMessageAction.COPY, WebChatMessageAction.REGENERATE, WebChatMessageAction.MORE),
             result.last().webChatMessage?.actions,
         )
     }
 
     @Test
-    fun exposesRegenerateAndContextActionsOnlyWhenProductionAndPageCapabilitiesAgree() {
+    fun exposesRegenerateOnlyOnTheLatestCompletedAssistant() {
         val snapshot = snapshot(
             messages = listOf(
                 ChatGptWebMessage("a-old", "assistant", "旧回答", "completed", emptyList()),
@@ -68,6 +68,55 @@ class ChatGptFriendMessageMapperTest {
             setOf(WebChatMessageAction.COPY, WebChatMessageAction.REGENERATE, WebChatMessageAction.MORE),
             result.last().webChatMessage?.actions,
         )
+    }
+
+    @Test
+    fun keepsNativeRetryWhenThePageHasNotObservedItsDomButton() {
+        val state = snapshot(messages = listOf(
+            ChatGptWebMessage("u1", "user", "synthetic prompt", "completed", emptyList()),
+            ChatGptWebMessage("a1", "assistant", "synthetic reply", "completed", emptyList()),
+        ))
+        assertEquals(ChatGptWebCapabilities.EMPTY, state.capabilities)
+        val result = ChatGptFriendMessageMapper.map(
+            snapshot = state.copy(composerReady = false),
+            provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+            pendingPrompt = null,
+            timestampFor = { 42L },
+        )
+        assertTrue(WebChatMessageAction.REGENERATE in result.last().webChatMessage!!.actions)
+        assertTrue(WebChatMessageAction.REGENERATE !in result.first().webChatMessage!!.actions)
+    }
+
+    @Test
+    fun neverOffersRetryForStreamingIncompleteOrUnidentifiedMessages() {
+        for ((id, status, streaming) in listOf(
+            Triple("a1", "completed", true), Triple("a1", "streaming", false),
+            Triple("a1", "error", false), Triple("", "completed", false),
+        )) {
+            val result = ChatGptFriendMessageMapper.map(
+                snapshot = snapshot(messages = listOf(
+                    ChatGptWebMessage(id, "assistant", "synthetic reply", status, emptyList()),
+                )).copy(streaming = streaming),
+                provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB),
+                pendingPrompt = null,
+                timestampFor = { 42L },
+            )
+            assertTrue(result.none { WebChatMessageAction.REGENERATE in it.webChatMessage?.actions.orEmpty() })
+        }
+    }
+
+    @Test
+    fun doesNotGrantChatGptRetryToGoogleEvenWhenTheSnapshotAdvertisesIt() {
+        val result = ChatGptFriendMessageMapper.map(
+            snapshot = snapshot(
+                messages = listOf(ChatGptWebMessage("a1", "assistant", "synthetic reply", "completed", emptyList())),
+                capabilities = ChatGptWebCapabilities(setOf(ChatGptWebCapabilityId.MESSAGE_REGENERATE)),
+            ),
+            provider = WebChatProviderRegistry.get(WebChatProviderId.GOOGLE_WEB),
+            pendingPrompt = null,
+            timestampFor = { 42L },
+        )
+        assertTrue(result.none { WebChatMessageAction.REGENERATE in it.webChatMessage?.actions.orEmpty() })
     }
 
     @Test

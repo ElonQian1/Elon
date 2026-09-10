@@ -246,7 +246,7 @@ class ChatGptWebMcpActionsTest {
         val dispatched = mutableListOf<Pair<String, String>>()
         val actions = actions(
             dictationActive = true,
-            regenerateSupported = true,
+            regenerateSupported = false,
             includeWritableControl = true,
             includeFormControls = true,
             includeSliderControl = true,
