@@ -68,7 +68,8 @@ after the change. The related run passes 192 cases with no skips/cancellations
 The earlier `library_selection_expired` observation followed more than 60 seconds
 between directory lookup and attach, matching the existing catalog TTL. It is
 separate from the completion race; retrying immediately after a completed refresh
-isolated the race. Cached visible selections outliving that TTL remain a UX gap.
+isolated the race. [Selection refresh](chatgpt-private-library-selection-refresh.md)
+now implements a bounded per-file revalidation; its device acceptance is pending.
 
 ## Official Evidence
 
