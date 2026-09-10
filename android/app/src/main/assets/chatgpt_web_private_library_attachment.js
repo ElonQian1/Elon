@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 4, operationTimeoutMs: 24000, create: factory });
+  const exported = Object.freeze({ version: 5, operationTimeoutMs: 24000, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateLibraryAttachment = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -84,7 +84,7 @@
     const entry = { handle: input.fileHandle, current };
     receipts.set(id, entry);
     while (receipts.size > 64) receipts.delete(receipts.keys().next().value);
-    let timer, onAbort;
+    let timer, onAbort, associated = false;
     const aborted = new Promise(resolve => {
       onAbort = () => resolve([false, 'library_attachment_unconfirmed']);
       job.controller.signal.addEventListener('abort', onAbort, { once: true });
@@ -115,7 +115,7 @@
         } else item = ready(selection.source, id);
         if (!canAssociate() || !admit(file)) return [false, 'library_attachment_context_changed'];
         context.associate(item);
-        changed(true);
+        associated = true;
         return [true, 'library_attachment_associated'];
       } catch (_) {
         return [false, 'library_attachment_unconfirmed'];
@@ -128,7 +128,10 @@
       job.controller.abort();
       if (active === job) active = null;
     });
-    respond(action, ...await entry.result);
+    const result = await entry.result;
+    respond(action, ...result);
+    // Snapshot invalidation cancels attachment work. Notify only after this receipt has settled.
+    if (associated && result[0]) changed(true);
   }
 
   function cancel() { active?.controller.abort(); }

@@ -9,11 +9,12 @@ removal path, native cards and official-runtime submit lease. Concrete mounted
 files reuse the existing private materialization request; ordinary Library
 files retain their backing IDs without download/reupload.
 
-Code is implemented and offline verified. Adapter 316, attachment composer 21,
-sender 23, Library attachment 4 and runtime bindings 9 are prepared for the
-next grouped APK. Published 1631 and currently installed 1630 do not contain this
-change. Production rendered multi-file attachment/send acceptance is pending.
-This is not an independent Android HTTP text sender.
+Normal Release 1632 (adapter 316) was built, published and installed over wireless
+ADB with login preserved. Production attachment acceptance then exposed a
+completion-notification race, reproduced below. Adapter 317, sender 24 and Library
+attachment 5 fix that race; composer 21 and runtime bindings 9 are unchanged.
+Rendered multi-file attachment/send acceptance remains pending until the fix is
+installed and checked. This is not an independent Android HTTP text sender.
 
 ## Failure And Fix
 
@@ -35,6 +36,28 @@ Duplicate ordinary backing/Library IDs and mounted source IDs are no-ops,
 including when at capacity. A cloud item's stale copied `file_id` is not a
 duplicate proof for its current source. Old request receipts never append again.
 Unknown materialization outcomes retain the existing no-replay rule.
+
+### Completion Notification Race
+
+On installed 1632, the first controlled TXT reference appeared as a ready private
+attachment while the command reported `library_attachment_unconfirmed`. The
+production `attachmentChanged` callback invalidates the text context, which calls
+the attachment sender's `cancel()`. Library publication previously invoked that
+callback while its abort race was still pending. The callback therefore won the
+race with a false failure even though the owned file had already been committed.
+
+The completion receipt now settles and releases its abort listener before the
+native snapshot callback runs. The existing context invalidation remains intact;
+pre-commit cancellation still prevents publication. A regression executes that
+cancelling callback after both ordinary selections and mounted materialization.
+It fails on 1632's code (`library-notification-red-20260910-145031-661`) and passes
+after the change. The related run passes 192 cases with no skips/cancellations
+(`library-notification-related-20260910-145207-782`).
+
+The earlier `library_selection_expired` observation followed more than 60 seconds
+between directory lookup and attach, matching the existing catalog TTL. It is
+separate from the completion race; retrying immediately after a completed refresh
+isolated the race. Cached visible selections outliving that TTL remain a UX gap.
 
 ## Official Evidence
 

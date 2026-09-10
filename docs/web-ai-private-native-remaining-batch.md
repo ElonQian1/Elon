@@ -70,9 +70,10 @@ APK, not part of published 1631. Device acceptance remains pending.
 [Library append](chatgpt-private-library-append.md) reuses the private attachment
 owner for consecutive Library files and Library files after a local-upload batch,
 with the official count validator, duplicate handling and exact submit cleanup.
-Adapter 316 is implemented for grouped delivery; rendered multi-file acceptance
-and the reverse order (new local picker files after Library references) remain
-unverified/incomplete respectively. It does not broaden the accepted single-file scope.
+Release 1632 installed adapter 316; device acceptance exposed a snapshot callback
+cancelling its own committed attachment receipt. Adapter 317 fixes that reproduced
+race. Rendered multi-file acceptance and the reverse order (new local picker files
+after Library references) remain unverified/incomplete respectively.
 
 ## Recent Accepted Scopes
 

@@ -3,6 +3,24 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const setup = require('./fixtures/chatgpt-library-append');
 
+test('production snapshot invalidation cannot cancel a committed library receipt', async () => {
+  const f = setup(), receipts = [], notifications = [];
+  for (const [index, patch] of [[1, {}], [2, {}], [3, { id: 'external-gdrive:file:synthetic123' }]]) {
+    await f.sender.attachLibrary({ selected: true, requestId: 'mcp_notify' + index,
+      value: JSON.stringify({ fileHandle: f.source(index, patch) }) },
+    (...receipt) => receipts.push(receipt), () => {
+      // The adapter invalidates the text context by cancelling attachment work.
+      f.sender.cancel();
+      notifications.push(receipts.length);
+    });
+    assert.equal(receipts.length, index);
+    assert.deepEqual(receipts.at(-1), ['attach_library_file', true, 'library_attachment_associated']);
+    assert.equal(f.sender.prepareSubmit(f.store).readyFiles.length, index);
+  }
+  assert.deepEqual(notifications, [1, 2, 3], 'commit receipts precede native snapshot notification');
+  assert.equal(f.requests(), 1);
+});
+
 test('sequential library references share one native list and exact submit lease', async () => {
   const f = setup();
   await f.attach(f.source(1));
