@@ -79,6 +79,21 @@ function Restore-Origin {
     }
 }
 
+function Assert-RetryDocument {
+    param([Parameter(Mandatory = $true)]$Baseline)
+
+    $live = Invoke-ReceiptAction -Action chatgpt_private_protocol_probe -ExpectedAction private_protocol_probe `
+        -Arguments @{mode='model_runtime_context'}
+    if ($live.receipt.status -ne 'succeeded' -or $live.receipt.result.ok -ne $true -or
+        [string]$live.receipt.result.detail -cnotmatch '^model_runtime_context:[a-z_]+$') {
+        throw 'Regenerate acceptance deferred before write: page_ack_unconfirmed.'
+    }
+    $reason = Get-ChatGptRegenerateDocumentContinuity -Baseline $Baseline -Current $live.state
+    if ($reason -ne 'ready') { throw "Regenerate acceptance deferred before write: $reason." }
+    # This proves document continuity, not private-runtime availability or a successful retry.
+    Write-Output "CHATGPT_REGENERATE_PROGRESS phase=live_document_confirmed generation=$($live.state.page_generation)"
+}
+
 function Wait-RegeneratedReply {
     param(
         [Parameter(Mandatory = $true)][string]$RequestId,
@@ -266,6 +281,7 @@ try {
         $priorRetryIds = @($initialReply.command_requests | ForEach-Object { [string]$_.request_id })
         Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action chatgpt_reveal_message `
             -Arguments @{message_id=[string]$initialAssistant.id;target='regenerate'} | Out-Null
+        Assert-RetryDocument -Baseline $initialReply
         $stableId = ([string]$initialAssistant.id -replace '[^A-Za-z0-9_.:-]', '_')
         $stableId = $stableId.Substring(0, [Math]::Min(160, $stableId.Length))
         & (Join-Path $PSScriptRoot 'invoke-conversation-ui-acceptance.ps1') `
@@ -281,6 +297,7 @@ try {
         }) | Select-Object -Last 1).request_id
     } else {
         Assert-ChatGptRegenerateForeground -Runtime $runtime
+        Assert-RetryDocument -Baseline $initialReply
         $regenerate = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
             -Action "chatgpt_regenerate_response"
         $regenerateRequestId = [string]$regenerate.command_receipt.request_id

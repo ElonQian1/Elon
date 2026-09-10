@@ -41,6 +41,10 @@ foreach ($required in @(
     'NativeRetry',
     'RequireOfficialRuntime',
     'Test-ChatGptRegeneratedReplyIdentity -Receipt $lastReceipt',
+    'function Assert-RetryDocument',
+    "-Arguments @{mode='model_runtime_context'}",
+    'Get-ChatGptRegenerateDocumentContinuity -Baseline $Baseline -Current $live.state',
+    'Regenerate acceptance deferred before write:',
     'CHATGPT_REGENERATE_PROTOCOL=',
     'Native regenerate acceptance did not restore the original conversation.',
     'web_chat_last_send_command',
@@ -112,3 +116,53 @@ if (Test-ChatGptRegeneratedReplyIdentity -Receipt $receipt -IdentityChanged $tru
     throw 'A failed command cannot pass from a changed row or text.'
 }
 Write-Output 'CHATGPT_WEB_REGENERATE_IDENTITY_CONTRACT=passed'
+
+$nativeFence=$source.IndexOf('Assert-RetryDocument -Baseline $initialReply')
+$nativeClick=$source.IndexOf('-Step regenerate -Selector')
+$directFence=$source.IndexOf('Assert-RetryDocument -Baseline $initialReply', $nativeFence + 1)
+$directWrite=$source.IndexOf('-Action "chatgpt_regenerate_response"', $directFence)
+if ($nativeFence -lt 0 -or $nativeClick -le $nativeFence -or $directFence -le $nativeClick -or $directWrite -le $directFence) {
+    throw 'Both native and direct retry must acknowledge the current document before any regeneration write.'
+}
+
+function New-RegenerateDocumentFixture {
+    [pscustomobject]@{
+        surface='chatgpt_web'; bridge_state='ready'; adapter_current=$true; adapter_version=323
+        page_generation=2; streaming=$false; input=[pscustomobject]@{text_length=0}
+        conversation=[pscustomobject]@{
+            url='https://chatgpt.com/c/test-fixture'; attachments=@()
+            messages=@(
+                [pscustomobject]@{id='user-row';role='user';state='completed';content='synthetic prompt'},
+                [pscustomobject]@{id='assistant-row';role='assistant';state='completed';content='synthetic reply'}
+            )
+        }
+    }
+}
+$baseline=New-RegenerateDocumentFixture
+$cases=@(
+    @{reason='ready'; change={param($s)}},
+    @{reason='document_changed'; change={param($s) $s.page_generation=3}},
+    @{reason='document_unknown'; change={param($s) $s.page_generation=0}},
+    @{reason='document_unknown'; change={param($s) $s.page_generation='2'}},
+    @{reason='bridge_unavailable'; change={param($s) $s.bridge_state='connecting'}},
+    @{reason='adapter_changed'; change={param($s) $s.adapter_version=322}},
+    @{reason='adapter_changed'; change={param($s) $s.adapter_current=$false}},
+    @{reason='conversation_changed'; change={param($s) $s.conversation.url='https://chatgpt.com/c/other-fixture'}},
+    @{reason='reply_active'; change={param($s) $s.streaming=$true}},
+    @{reason='reply_active'; change={param($s) $s.streaming=$null}},
+    @{reason='draft_present'; change={param($s) $s.input.text_length=1}},
+    @{reason='draft_present'; change={param($s) $s.input.text_length=$null}},
+    @{reason='attachment_present'; change={param($s) $s.conversation.attachments=@([pscustomobject]@{name='fixture.txt'})}},
+    @{reason='turn_changed'; change={param($s) $s.conversation.messages[1].content='changed reply'}},
+    @{reason='turn_changed'; change={param($s) $s.conversation.messages[0].id='other-user-row'}},
+    @{reason='turn_changed'; change={param($s) $s.conversation.messages[1].state='streaming'}},
+    @{reason='turn_changed'; change={param($s) $s.conversation.messages=@()}},
+    @{reason='surface_unavailable'; change={param($s) $s.surface='google_web'}}
+)
+foreach($case in $cases){
+    $current=New-RegenerateDocumentFixture
+    & $case.change $current
+    $reason=Get-ChatGptRegenerateDocumentContinuity -Baseline $baseline -Current $current
+    if($reason -cne $case.reason){throw "Regenerate document admission expected $($case.reason), got $reason."}
+}
+Write-Output "CHATGPT_WEB_REGENERATE_DOCUMENT_CONTRACT=passed cases=$($cases.Count)"

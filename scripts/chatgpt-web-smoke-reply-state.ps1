@@ -23,6 +23,37 @@ function Assert-ChatGptRegenerateForeground {
     }
 }
 
+function Get-ChatGptRegenerateDocumentContinuity {
+    param([AllowNull()]$Baseline, [AllowNull()]$Current)
+
+    if ($Current.surface -ne 'chatgpt_web') { return 'surface_unavailable' }
+    if ($Current.bridge_state -ne 'ready') { return 'bridge_unavailable' }
+    if ($Current.adapter_current -ne $true -or $Current.adapter_version -ne $Baseline.adapter_version) {
+        return 'adapter_changed'
+    }
+    foreach ($state in @($Baseline, $Current)) {
+        if (($state.page_generation -isnot [int] -and $state.page_generation -isnot [long]) -or
+            $state.page_generation -le 0) { return 'document_unknown' }
+    }
+    if ($Current.page_generation -ne $Baseline.page_generation) { return 'document_changed' }
+    if (!$Current.conversation.url -or $Current.conversation.url -cne $Baseline.conversation.url) {
+        return 'conversation_changed'
+    }
+    if ($Current.streaming -isnot [bool] -or $Current.streaming) { return 'reply_active' }
+    if ($null -eq $Current.input.text_length -or $Current.input.text_length -ne 0) { return 'draft_present' }
+    if (@($Current.conversation.attachments).Count) { return 'attachment_present' }
+    $before = @($Baseline.conversation.messages | Where-Object { $_.role -in @('user', 'assistant') })
+    $after = @($Current.conversation.messages | Where-Object { $_.role -in @('user', 'assistant') })
+    if ($before.Count -lt 2 -or $after.Count -ne $before.Count) { return 'turn_changed' }
+    for ($i = 0; $i -lt $before.Count; $i++) {
+        foreach ($field in @('id', 'role', 'state', 'content')) {
+            if ([string]$after[$i].$field -cne [string]$before[$i].$field) { return 'turn_changed' }
+        }
+    }
+    # The caller supplies a fresh page-command acknowledgement, not just cached UI state.
+    return 'ready'
+}
+
 function Get-ChatGptExistingRegenerateProbe {
     param([Parameter(Mandatory = $true)]$State)
     $users = @($State.conversation.messages | Where-Object { $_.role -eq 'user' })
