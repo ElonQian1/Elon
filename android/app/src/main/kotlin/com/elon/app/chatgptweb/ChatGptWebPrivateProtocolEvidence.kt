@@ -6,7 +6,11 @@ import org.json.JSONObject
 /** Validates structural diagnostics before they enter the native command ledger. */
 internal object ChatGptWebPrivateProtocolEvidence {
     val MODES = setOf("start", "read", "stop", "clear", "runtime_assets", "composer_tool_context",
-        "stop_runtime_context", "stop_runtime_owner", "directory_refresh", "model_runtime_context", "document_state")
+        "stop_runtime_context", "stop_runtime_owner", "directory_refresh", "model_runtime_context", "document_state",
+        "library_attachment_policy")
+    private val libraryPolicyCodes = setOf("not_observed", "runtime_unavailable", "validator_unavailable", "document_changed",
+        "runtime_changed", "limits_bypassed", "composer_detached", "owner_unavailable", "store_mismatch",
+        "scope_mismatch", "model_mismatch", "limits_missing", "limits_invalid", "ready", "attachment_limit", "validator_error")
     private val modelContextCodes = setOf("not_observed", "route_unsupported", "document_unavailable", "identity_unavailable",
         "trigger_detached", "owner_unavailable", "picker_missing", "picker_disabled", "picker_ambiguous",
         "conversation_mismatch", "capture_error", "cooldown", "menu_open", "runtime_not_observed",
@@ -37,6 +41,7 @@ internal object ChatGptWebPrivateProtocolEvidence {
         if (raw == "protocol_probe_unavailable") return raw
         if (raw.startsWith("model_runtime_context:") && raw.substringAfter(':') in modelContextCodes) return raw
         if (raw.startsWith("composer_tool_context:") && raw.substringAfter(':') in toolContextCodes) return raw
+        if (raw.startsWith("library_attachment_policy:") && raw.substringAfter(':') in libraryPolicyCodes) return raw
         if (raw.startsWith("stop_runtime_context:") && raw.substringAfter(':') in stopContextCodes) return raw
         return runCatching { sanitize(raw) }.getOrNull() ?: "invalid_protocol_evidence"
     }

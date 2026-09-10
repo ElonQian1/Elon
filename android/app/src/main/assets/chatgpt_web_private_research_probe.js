@@ -21,6 +21,14 @@
       'eligibility_unavailable', 'menu_unavailable', 'hints_ambiguous', 'tool_unavailable'];
     return 'composer_tool_context:' + (codes.includes(code) ? code : 'not_observed');
   }
+  function libraryPolicyDetail() {
+    let code;
+    try { code = window.__elonChatGptPrivateLibraryAttachmentPolicy?.state?.(window); } catch (_) {}
+    const codes = ['not_observed', 'runtime_unavailable', 'validator_unavailable', 'document_changed',
+      'runtime_changed', 'limits_bypassed', 'composer_detached', 'owner_unavailable', 'store_mismatch',
+      'scope_mismatch', 'model_mismatch', 'limits_missing', 'limits_invalid', 'ready', 'attachment_limit', 'validator_error'];
+    return 'library_attachment_policy:' + (codes.includes(code) ? code : 'not_observed');
+  }
   function stopContextDetail() {
     const code = window.__elonChatGptPrivateStopRuntime?.state?.().code;
     const codes = ['not_observed', 'disabled', 'invalid_command', 'composer_unavailable', 'context_unavailable',
@@ -42,10 +50,13 @@
       { schema: 'elon.directory_refresh.v1', observed: false, durationMs: 0, identityMs: 0, reads: [] });
   }
   if (existingProbe && Number(existingProbe.version) >= 13) {
-    if (Number(existingProbe.version) < 19) {
+    if (Number(existingProbe.version) < 20) {
       // Upgrade only the command surface; keep the existing network observers.
-      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 19,
+      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 20,
         handle(action, command, respond) {
+          if (action === 'private_protocol_probe' && command.value === 'library_attachment_policy') {
+            respond(action, true, libraryPolicyDetail()); return true;
+          }
           if (action === 'private_protocol_probe' && command.value === 'document_state') {
             const detail = window.__elonChatGptPrivateProtocolEvidence?.documentState(window);
             respond(action, typeof detail === 'string', detail || 'protocol_probe_unavailable'); return true;
@@ -560,7 +571,7 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 19,
+    version: 20,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
       if (action !== 'private_protocol_probe') return false;
@@ -571,6 +582,7 @@
       else if (mode === 'model_runtime_context') detail = modelContextDetail();
       else if (mode === 'directory_refresh') detail = directoryDetail();
       else if (mode === 'composer_tool_context') detail = toolContextDetail();
+      else if (mode === 'library_attachment_policy') detail = libraryPolicyDetail();
       else if (mode === 'stop_runtime_context') detail = stopContextDetail();
       else if (mode === 'stop_runtime_owner') detail = stopOwnerDetail();
       else detail = evidence?.command(mode);

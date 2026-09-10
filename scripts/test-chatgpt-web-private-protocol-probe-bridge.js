@@ -155,13 +155,43 @@ test('tool context diagnostics expose only known codes without running a capture
   assert.deepEqual(f.requests, []);
 });
 
+test('library policy diagnostics survive reinjection without validation, network or raw values', () => {
+  const native = fs.readFileSync(path.join(__dirname,
+    '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPrivateProtocolEvidence.kt'), 'utf8');
+  const codes = [...native.match(/libraryPolicyCodes = setOf\(([\s\S]*?)\)/)[1].matchAll(/"([a-z_]+)"/g)].map(m => m[1]);
+  assert.match(native.match(/val MODES = setOf\(([\s\S]*?)\)/)[1], /"library_attachment_policy"/);
+  for (const previous of [null, 19]) {
+    const f = fixture(), fetch = f.window.fetch;
+    const policy = { state: () => 'ready', prepare: () => assert.fail('read cannot validate or mutate') };
+    f.window.__elonChatGptPrivateLibraryAttachmentPolicy = policy;
+    if (previous) {
+      f.window.__elonChatGptPrivateResearchProbe = { ...f.probe, version: previous };
+      vm.runInNewContext(source, f.context);
+    }
+    const read = () => {
+      let value;
+      f.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe', { value: 'library_attachment_policy' },
+        (_, ok, detail) => { assert.equal(ok, true); value = detail; });
+      return value;
+    };
+    for (const code of codes) { policy.state = () => code; assert.equal(read(), 'library_attachment_policy:' + code); }
+    policy.state = () => 'secret raw context';
+    assert.equal(read(), 'library_attachment_policy:not_observed');
+    policy.state = () => { throw Error('secret'); };
+    assert.equal(read(), 'library_attachment_policy:not_observed');
+    assert.equal(f.window.fetch, fetch);
+    assert.deepEqual(f.requests, []); assert.deepEqual(f.events, []);
+    assert.equal(f.read().active, false);
+  }
+});
+
 test('version 13 command upgrade preserves existing observers and other commands', () => {
   const f = fixture();
   const fetch = f.window.fetch, send = f.window.XMLHttpRequest.prototype.send;
   const existing = f.probe;
   f.window.__elonChatGptPrivateResearchProbe = { ...existing, version: 13 };
   vm.runInNewContext(source, f.context);
-  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 19);
+  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 20);
   assert.equal(f.window.fetch, fetch);
   assert.equal(f.window.XMLHttpRequest.prototype.send, send);
   const answers = [];
