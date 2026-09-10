@@ -14,7 +14,7 @@ fn tls(f: &Fixture) -> Router {
     crate::node_endpoint_transport::asset_access::test_routes("https://main.example.test")
         .with_state(Arc::clone(&f.state))
 }
-async fn send(
+pub(super) async fn send(
     router: &Router,
     path: &str,
     token: Option<&str>,
@@ -46,7 +46,7 @@ async fn send(
     let bytes = to_bytes(response.into_body(), 32 * 1024).await.unwrap();
     (status, serde_json::from_slice(&bytes).unwrap())
 }
-fn authorize() -> String {
+pub(super) fn authorize() -> String {
     json!({"schema":"esk.game.access.authorize.v1","client_id":"esk-game.web",
         "redirect_uri":"https://game.example.test/api/account/callback","state":"s".repeat(43),
         "code_challenge":"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM","code_challenge_method":"S256",

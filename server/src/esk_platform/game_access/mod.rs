@@ -4,6 +4,7 @@ use axum::{extract::DefaultBodyLimit, middleware, routing::post, Router};
 use std::sync::Arc;
 mod api;
 mod authority;
+pub(crate) mod browser;
 mod issue;
 pub(crate) mod migration;
 mod model;

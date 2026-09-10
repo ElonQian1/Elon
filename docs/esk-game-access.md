@@ -1,6 +1,6 @@
 # 游戏主账号授权 V1
 
-状态：实现与本地验证阶段，默认关闭。此模块为主项目用户授予独立游戏权限，不产生钱包归属、资产、利润、债权或付款授权。浏览器登录界面、游戏 BFF 及真实 HTTPS 环境验收分别交付；不能将接口存在视为用户登录已上线。
+状态：授权核心已发布；浏览器入口与游戏 BFF 已实现并持续验收，运营配置默认关闭。此模块为主项目用户授予独立游戏权限，不产生钱包归属、资产、利润、债权或付款授权。双方的公开 HTTPS 地址、证书和独立服务配置齐备后，才能启用实际用户登录。
 
 ## 所有权与依赖
 
@@ -37,6 +37,18 @@ V292 迁移新增 `game_access_grants`、`game_access_nonces`、`game_access_aud
 响应设 `Cache-Control: no-store`、`Pragma: no-cache`、`Referrer-Policy: no-referrer`。私人接口不启用跨域凭据 CORS。游戏 BFF 服务端通信不发送浏览器 Origin，且总是提供独立服务凭据。
 
 ## 授权、兑换与观测
+
+### 浏览器入口
+
+Rust 原生 TLS 监听器提供 `/pc/game-access?request=<编码的授权请求 JSON>`、`/pc/game-login?next=<编码的本地授权页路径>` 及构建后的 `/pc/assets/`。页面来自正常发布的 `pc-next-dist`，不复制旧 PC HTML。TLS 入口仅增加这些页面和专用登录 API，不开放整个旧版主项目路由，也不修改节点所有者的 `/api/auth/login` 协议。
+
+`POST /api/game-access/v1/login` 的严格正文仅为 `{"account":"已有主账号","password":"密码"}`，最大 4 KiB。要求真实 TLS 和唯一同源 Origin，不接受查询参数。它调用主项目原始密码认证与会话服务，返回原始 `users.id`，不创建游戏专用密码或虚拟用户；不开启 remember-device。不存在、停用和密码错误使用同一错误。按进程限制每账号每分钟 5 次、总计 120 次，并限制 4 个并发密码计算；重启清空临时限流窗口。
+
+界面始终向当前主项目 origin 请求，不沿用本机节点 API 地址覆盖。密码不进入 URL；主会话只存于主项目页面既有账号存储。游戏只取得一次性 code，凭据在 Rust BFF 内存中保存。登录页目前支持已有密码账号；第三方账号注册、找回和密码设置由主项目已有账号流程完成。
+
+授权页展示游戏 origin、权限和期限，用户必须单独勾选并确认。账号或授权请求改变时，先前勾选不再有效。回复必须匹配原请求的 state、回调、权限及有效期；页面不会根据任意 `next` 或返回 URL 外跳。HTTP 预览只用于界面检查，登录与授权按钮不会发送凭据。
+
+页面与 API 返回 no-store/no-referrer；页面禁止被嵌入 frame。运营方需要同时启用原生 TLS 监听器，并将 `PUBLIC_URL` 配为该 HTTPS origin；无需启用节点所有者 bootstrap/session 功能。证书必须被使用者浏览器信任，不以忽略证书错误完成验收。
 
 1. 游戏后端生成浏览器绑定的随机 state、PKCE verifier 和流程 Cookie；短期保存 verifier，发送其 S256 challenge。用户在主项目界面明确同意所列权限。
 2. 主项目界面携带当前主用户 Bearer 会话、同源 Origin，调用 `POST /api/me/game-access/authorize`。
@@ -93,8 +105,9 @@ nonce 冲突与版本冲突返回 409；权限不足 403；无效凭据与失效
 powershell -NoProfile -File scripts/validate-rust.ps1 -- test --manifest-path server/tests/game-access-harness/Cargo.toml
 powershell -NoProfile -File scripts/validate-rust.ps1 -- test --manifest-path server/Cargo.toml --bin elon-server game_access -- --test-threads=1
 node --test sdk/game-access/test/session.test.js
+node --experimental-strip-types --test pc-frontend/scripts/test-game-access.mjs
 ```
 
-独立 harness 执行实际生产领域代码、SQL 和签名，覆盖并发单次兑换、回滚、重开数据库、失效和策略隔离，但不证明完整服务端路由已通过。真实 Store / TLS 路由测试另在 `game_access/http_tests.rs`，最终验证状态以本次执行回执为准。
+独立 harness 执行实际生产领域代码、SQL 和签名，覆盖并发单次兑换、回滚、重开数据库、失效和策略隔离，但不证明完整服务端路由已通过。真实 Store / TLS 路由测试另在 `game_access/http_tests.rs` 与 `browser_tests.rs`；后者验证密码登录返回原用户、授权衔接、页面和静态资源、禁止跨站及普通 HTTP。最终验证状态以本次执行回执为准。
 
 PKCE 字符与 S256 规则依据 [RFC 7636](https://www.rfc-editor.org/rfc/rfc7636.html)；固定回调与授权响应处理依据 [OAuth 安全实践 RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html)。此接口是首方游戏的受限授权协议，未宣称完整 OAuth/OIDC 服务实现。

@@ -6,6 +6,8 @@ import { isLocalWorkbench } from './api/runtime'
 import styles from './App.module.css'
 
 const LoginPage = lazy(() => import('./features/auth/LoginPage'))
+const GameAccessPage = lazy(() => import('./features/game-access/GameAccessPage'))
+const GameLoginPage = lazy(() => import('./features/game-access/GameLoginPage'))
 const ConversationPage = lazy(() => import('./features/conversation/ConversationPage'))
 const ProjectsPage = lazy(() => import('./features/projects/ProjectsPage'))
 const ProjectDetailPage = lazy(() => import('./features/projects/ProjectDetailPage'))
@@ -95,6 +97,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={lazyRoute(<LoginPage />)} />
+      <Route path="/game-access" element={lazyRoute(<GameAccessPage key={window.location.search} />)} />
+      <Route path="/game-login" element={lazyRoute(<GameLoginPage />)} />
       <Route path="/*" element={<Shell />}>
         {/* 首页：一龙 AI 工作台 */}
         <Route index element={<Navigate to={defaultPath} replace />} />
