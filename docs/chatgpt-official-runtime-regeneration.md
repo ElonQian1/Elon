@@ -2,17 +2,52 @@
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
 Status: source implemented and offline verified. v8 distinguishes the exact
-ownership component without relaxing write admission or replay fencing. Normal 1641
-is installed with the native admission correction below. Normal 1640 passed the
-private model catalog, but its native retry stopped before dispatch at a missing
-semantic control. The previous 1639 changed reply used the
-legacy DOM receipt, not the runtime receipt. End-to-end runtime acceptance is not passed. See
+ownership component without relaxing write admission or replay fencing. Normal 1642
+is installed and passed the native retry entry after the transcript reentry fix.
+Its single runtime invocation received a 200 stream, but completion failed with
+`timeout_owner_account`. End-to-end runtime acceptance is not passed. See
 the [1637 follow-up](reports/chatgpt-regeneration-observation-1637.md) and
 the [grouped delivery](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).
 The original adapter 286 batch wired this candidate into the existing production
 `chatgpt_regenerate_response` command. It is an official-runtime bridge, not an
 independent Android HTTP generation transport. Do not recreate it while waiting
 for the grouped ChatGPT APK acceptance.
+
+## Normal 1642 native reentry and remaining owner failure
+
+On 1641 the native model offered retry and message reveal returned success, but
+the visible list had no matching row or reply controls. Opening the social AI
+friend replaced the RecyclerView adapter with the ordinary friend adapter; the
+already-active provider skipped activation and never restored its transcript.
+A reversible work/chat comparison on the same APK and synthetic conversation
+made the actual retry control appear. Readonly evidence:
+`native-retry-1641-layout-20260911-012202-510` and
+`native-retry-1641-rebind-proof-20260911-012556-594`.
+
+Source `d3b97c104f5b6eef1fd1149394e3e580439c4aab` now reattaches the active
+transcript without restarting its session. An already-bound list is a no-op,
+preserving scroll state. Both provider controllers share this presentation fix;
+Google transport is unchanged. Twenty-five Release unit tests and six external
+UI diagnostic contracts pass. The diagnostics read bounded native view facts,
+not conversation text, and do not click controls.
+
+Normal `1.1.1642 (1642)` was published and installed on the trusted Xiaomi;
+adapter 325/resolver 11 are unchanged. APK: 40,116,585 bytes, SHA-256
+`d3419f33956a0e9d1d3dd32f6aee39869052c695768167d0db6a98b29d8b3b00`.
+Release log `webchat-reentry-release-20260911-013930-880` passed in 419.9s.
+Run `native-retry-reentry-1642-20260911-014647-575` confirmed the actual row and
+enabled retry button without a work/chat toggle, then clicked that button once.
+Private model admission passed 6/6 options in both documents. Generation remained
+3 across dispatch/capture. `POST /backend-api/f/conversation` returned 200/stream,
+but the receipt was `official_runtime_v1:regenerate_unknown:timeout_owner_account`.
+No second generation or fallback write was issued; original conversation and
+stay-awake state were restored. UI reentry is accepted; runtime completion is not.
+
+Next investigation is the account component of the captured request identity.
+The transport can initially expose auth-only warm headers and later observed
+conversation headers. This is a source-level hypothesis, not proof that the
+live mismatch was harmless. Establish the identity source/transition before
+changing the account guard; do not ignore it or replay the unknown write.
 
 ## Grouped normal release 1641
 
