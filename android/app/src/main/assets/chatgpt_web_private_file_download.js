@@ -4,7 +4,7 @@
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 18, create: root => factory(root, pointer, citation) });
+  const exported = Object.freeze({ version: 19, create: root => factory(root, pointer, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -138,7 +138,7 @@
     // FileCitationPreviewSheet uses cEt/OX even when the reference omits library identity.
     const url = new URL('/backend-api/files/' + encodeURIComponent(entry.fileId) + '/simple', root.location.origin);
     if (entry.projectId) url.searchParams.set('gizmo_id', entry.projectId);
-    url.searchParams.set('conversation_id', entry.conversationId);
+    if (entry.conversationId) url.searchParams.set('conversation_id', entry.conversationId);
     const result = await request.request(root, url.href, {
       method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
       headers: root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders(), signal: job.controller.signal,
@@ -155,6 +155,8 @@
       throw new Error('download_scope_unconfirmed');
     }
     const isLibrary = info.is_library_file === true;
+    if (entry.catalogProject && (!isLibrary || info.is_project !== true || !PROJECT.test(info.gizmo_id || '') ||
+        entry.projectId && info.gizmo_id !== entry.projectId)) throw new Error('download_scope_unconfirmed');
     const projectId = isLibrary ? (info.is_project === true || PROJECT.test(info.gizmo_id || '')
       ? info.gizmo_id || entry.projectId : null) : entry.projectId;
     if (isLibrary && info.is_project === true && !projectId) throw new Error('download_scope_unconfirmed');
@@ -202,17 +204,29 @@
         typeof file.name !== 'string' || !file.name.trim() || /[\x00-\x1f\x7f]/.test(file.name) ||
         file.name.length > 1024 || file.external_account != null || !mounted && file.cloud_doc_url != null ||
         file.library_artifact_type != null || file.saved_entity != null || file.trashed_at != null) return '';
+    let destination = mounted || { sharedLibraryFileId: file.id };
+    if (!mounted && (file.is_project != null && file.is_project !== false || file.gizmo_id != null ||
+        file.project_id != null || file.context_scopes != null)) {
+      if (file.is_project !== true || !/^file[_-][A-Za-z0-9_-]{1,152}$/.test(file.file_id || '') ||
+          file.gizmo_id != null && !PROJECT.test(file.gizmo_id) ||
+          ['project_id', 'context_scopes', 'preview_file', 'mounted_library_file_id', 'shared_library_file_id',
+            'library_download_id', 'context_connector_info'].some(key => file[key] != null)) return '';
+      // Project nodes retain their backing file and own project scope. DDt/sDt
+      // confirm metadata before EDt; the personal-library anchor cannot serve them.
+      destination = { fileId: file.file_id, libraryFileId: file.id,
+        projectId: file.gizmo_id || null, catalogProject: true };
+    }
     const name = file.name.trim().slice(0, 180);
     for (const [key, entry] of entries) {
       if (entry.expiresAt <= Date.now()) entries.delete(key);
-      else if (entry.path === '/library' && (mounted ? entry.mountedFileId : entry.sharedLibraryFileId) === file.id &&
+      else if (entry.path === '/library' && Object.keys(destination).every(key => entry[key] === destination[key]) &&
           entry.name === name && entry.mediaType === (file.mime_type || '') &&
           entry.token === token && entry.account === account) return key;
     }
     const bytes = root.crypto.getRandomValues(new Uint8Array(16));
     const handle = 'download_' + Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
     // Standalone mounted files reuse materialization; neither route borrows the open chat's scope.
-    entries.set(handle, { path: '/library', ...(mounted || { sharedLibraryFileId: file.id }), name,
+    entries.set(handle, { path: '/library', ...destination, name,
       mediaType: file.mime_type || '', account, token, expiresAt: Date.now() + 120000 });
     while (entries.size > 800) entries.delete(entries.keys().next().value);
     return handle;
@@ -351,5 +365,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 18, register, registerLibraryFile, start, cancel, dispose });
+  return Object.freeze({ version: 19, register, registerLibraryFile, start, cancel, dispose });
 });
