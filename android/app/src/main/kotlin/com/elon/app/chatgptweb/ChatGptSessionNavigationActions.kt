@@ -26,7 +26,7 @@ internal class ChatGptSessionNavigationActions(
 
     fun startNewConversation(): Boolean {
         if (pendingNewConversation || conversationNavigation.hasPending()) return false
-        if (!sessionReady() && !sessionCanDefer()) return false
+        if (!sessionReady() && !sessionCanDefer() && !currentDocumentCanStartNew()) return false
         prioritizeUserNavigation()
         ensureInitialized()
         conversationOpenQueue.clear()
@@ -82,7 +82,10 @@ internal class ChatGptSessionNavigationActions(
 
     fun onSessionReady() = onBridgeReady()
 
-    fun onDocumentReady() = dispatchDeferredConversationOpen()
+    fun onDocumentReady() {
+        dispatchPendingNewConversation()
+        dispatchDeferredConversationOpen()
+    }
 
     fun clearDeferred() {
         conversationOpenQueue.clear()
@@ -134,10 +137,13 @@ internal class ChatGptSessionNavigationActions(
     private fun dispatchPendingNewConversation() {
         if (!pendingNewConversation) return
         if (!commandAvailable()) return
-        if (!sessionReady() && !(sessionCanDefer() && bridgeReady())) return
+        if (!sessionReady() && !(sessionCanDefer() && bridgeReady()) && !currentDocumentCanStartNew()) return
         pendingNewConversation = false
         updateLoading()
         startNewConversationCommand()
         scheduleNewConversationRecovery()
     }
+
+    // The official new-chat transaction owns draft checks and confirms the new composer.
+    private fun currentDocumentCanStartNew(): Boolean = documentNavigationReady() && bridgeReady()
 }

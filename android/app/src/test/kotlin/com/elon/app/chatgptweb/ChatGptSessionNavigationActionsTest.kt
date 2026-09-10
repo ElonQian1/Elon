@@ -115,6 +115,51 @@ class ChatGptSessionNavigationActionsTest {
     }
 
     @Test
+    fun failedComposerCanStartNewThroughTheCurrentDocumentAndBridge() {
+        loading = false
+        documentNavigationReady = true
+        bridgeReady = true
+        current = current?.copy(composerReady = false)
+
+        assertTrue(actions.startNewConversation())
+        actions.onDocumentReady()
+        actions.onBridgeReady()
+
+        assertEquals(1, newConversationCommands)
+        assertEquals(1, loadingTransitions)
+        assertEquals(1, navigationPriorities)
+        assertEquals("home", presented.last().pageKind)
+        assertFalse(actions.startNewConversation())
+    }
+
+    @Test
+    fun deferredNewConversationRecoversWithoutWaitingForTheOldComposer() {
+        assertTrue(actions.startNewConversation())
+        loading = false
+        documentNavigationReady = true
+        bridgeReady = true
+
+        actions.onDocumentReady()
+        actions.onDocumentReady()
+
+        assertEquals(1, newConversationCommands)
+        assertEquals(1, loadingTransitions)
+        assertTrue(opened.isEmpty())
+    }
+
+    @Test
+    fun failedSessionStillNeedsBothCurrentDocumentAndBridgeToStartNew() {
+        loading = false
+        documentNavigationReady = true
+        assertFalse(actions.startNewConversation())
+        bridgeReady = true
+        documentNavigationReady = false
+        assertFalse(actions.startNewConversation())
+        assertEquals(0, newConversationCommands)
+        assertTrue(presented.isEmpty())
+    }
+
+    @Test
     fun aFailedComposerDoesNotBlockOpeningAnExistingConversation() {
         loading = false
         documentNavigationReady = true
