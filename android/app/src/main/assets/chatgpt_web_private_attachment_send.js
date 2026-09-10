@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 25, create: factory });
+  const exported = Object.freeze({ version: 26, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -55,11 +55,17 @@
     };
     if (uploadCopy) selections?.cancel();
     // Compatibility selection is before any private write, never an automatic replay.
-    if (!descriptor || !composer?.available() || !source || !root.__elonChatGptPrivateTransport ||
+    if (!descriptor || !composer || !source || !root.__elonChatGptPrivateTransport ||
         !root.__elonChatGptPrivateAttachmentTransport || batch && typeof composer.associateMany !== 'function') return unavailable();
     if (batch && descriptors.some(file => !root.__elonChatGptPrivateAttachmentProtocol?.isDocument(file) &&
         !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) return unavailable();
     if (descriptors.some(file => /^image\//.test(file?.type) && !image?.available(file))) return unavailable();
+    let append;
+    if (!composer.available()) {
+      try { append = composer.captureUpload?.(); } catch (_) {}
+      if (!append) return unavailable();
+      selections?.cancel();
+    }
     if (batch) selections?.cancel();
     const job = { controller: new root.AbortController(), transport: null, attempted: false };
     active = job;
@@ -81,22 +87,35 @@
         if (abortListener) job.controller.signal.removeEventListener('abort', abortListener);
       }
       if (job.controller.signal.aborted) throw new Error('cancelled');
-      const selected = uploadCopy || batch ? null : selections?.take(descriptor);
+      const selected = uploadCopy || batch || append ? null : selections?.take(descriptor);
       if (selected) { job.controller.abort(); job.controller = selected.controller; job.transport = selected.transport; }
-      const binding = selected?.binding || composer.capture();
+      const binding = append?.binding || selected?.binding || composer.capture();
       if (descriptor.documentToken !== binding.token || descriptor.href !== binding.href) throw new Error('context_changed');
+      const current = () => !job.controller.signal.aborted && composer.current(binding) &&
+        (append ? append.current() : composer.available());
       // One low-frequency guard only while an explicit upload is in flight.
-      timer = root.setInterval(() => { if (!composer.current(binding)) cancel(); }, 500);
+      timer = root.setInterval(() => { if (!current()) cancel(); }, 500);
+      const admit = append ? await root.__elonChatGptPrivateLibraryAttachmentPolicy?.prepareUpload(root, binding) : () => true;
+      const validate = files => {
+        if (!current()) throw new Error('context_changed');
+        if (!admit) throw new Error('attachment_policy_unconfirmed');
+        if (!admit(files)) throw new Error(root.__elonChatGptPrivateLibraryAttachmentPolicy?.state(root) === 'attachment_limit'
+          ? 'attachment_limit' : 'attachment_policy_unconfirmed');
+      };
+      validate(descriptors);
       // Compatibility selection for unknown/unsupported scope precedes byte reads
       // and private writes. Cancelled or stale bindings throw instead of replaying.
       for (const item of descriptors) {
-        if (!await composer.prepare(binding, job.controller.signal, item, !!selected)) return unavailable();
+        if (!await composer.prepare(binding, job.controller.signal, item, !!selected)) {
+          if (append) throw new Error('attachment_scope_unconfirmed');
+          return unavailable();
+        }
       }
       const completed = [];
       for (const item of descriptors) {
-        if (job.controller.signal.aborted || !composer.current(binding) || !composer.available()) throw new Error('context_changed');
+        validate(descriptors);
         job.transport = job.transport || createTransport({ isCurrent: candidate => candidate === binding &&
-          !job.controller.signal.aborted && composer.current(binding) });
+          current() });
         if (!selected && !item.uploadCopy) job.transport.prefetch?.(composer.reservationContext?.(binding, item), binding, job.controller.signal);
         let file = await source.read(item, job.controller.signal);
         let imageDimensions;
@@ -105,7 +124,7 @@
           file = prepared.file;
           imageDimensions = prepared.dimensions;
         }
-        if (job.controller.signal.aborted || !composer.current(binding)) throw new Error('context_changed');
+        validate(descriptors);
         job.attempted = true;
         const context = { ...composer.uploadContext(binding, file, imageDimensions),
           ...(item.uploadCopy ? { checkForReusableLibraryFile: false } : {}) };
@@ -116,12 +135,15 @@
         job.transport.dispose();
         job.transport = null;
       }
-      if (batch) composer.associateMany(binding, completed);
+      validate(completed.map(item => item.file));
+      if (append) append.associateMany(completed);
+      else if (batch) composer.associateMany(binding, completed);
       else composer.associate(binding, completed[0].file, completed[0].result, descriptor.leaseId);
       respond('request_attachment_upload', true, 'private_attachment_associated');
       changed(true);
-    } catch (_) {
-      respond('request_attachment_upload', false, job.attempted
+    } catch (error) {
+      respond('request_attachment_upload', false, error?.message === 'attachment_limit'
+        ? '附件数量或大小已达到当前限制，新增附件未提交，请调整后重试。' : job.attempted
         ? '附件未能确认关联到当前会话，文字尚未自动重发，请检查附件后重试。'
         : '附件连接尚未就绪或会话已变化，请重试。');
     } finally {
@@ -142,7 +164,7 @@
     return true;
   }
 
-  return Object.freeze({ version: 25, start, cancel, suspend, remove,
+  return Object.freeze({ version: 26, start, cancel, suspend, remove,
     attachLibrary: (command, respond, changed) => {
       selections?.cancel();
       return library ? library.attach(command, respond, changed) : respond('attach_library_file', false, 'library_not_ready');

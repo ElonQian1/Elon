@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 21, create: factory });
+  const exported = Object.freeze({ version: 22, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -263,7 +263,7 @@
     return publish(binding, [item]);
   }
 
-  function captureLibrary() {
+  function captureCollection() {
     const value = attachedNow();
     const binding = value?.binding || capture();
     if (!binding.libraryEnabled || binding.isTemporaryChat || binding.projectId || projects.has(binding)) {
@@ -272,6 +272,31 @@
     const lease = value ? prepareSubmit(binding.store) : null;
     if (value && !lease) throw new Error('composer_context_unavailable');
     const unchanged = value ? lease.current : () => current(binding) && available();
+    return { value, binding, unchanged };
+  }
+
+  function captureUpload() {
+    const { value, binding, unchanged } = captureCollection();
+    if (!value) throw new Error('composer_context_unavailable');
+    return Object.freeze({ binding, current: unchanged,
+      associateMany(completed) {
+        if (!unchanged() || !Array.isArray(completed) || !completed.length || completed.length > 9 ||
+            new Set(completed.map(item => item.leaseId)).size !== completed.length) throw new Error('composer_changed');
+        const items = [];
+        for (const entry of completed) {
+          const item = readyAttachment(binding, entry.file, entry.result, entry.leaseId);
+          const duplicate = [...value.items, ...items].find(other => other.attached.fileId === item.attached.fileId);
+          if (duplicate) {
+            if (entry.result.stage !== 'reused' || !item.attached.libraryFileId ||
+                duplicate.attached.libraryFileId !== item.attached.libraryFileId) throw new Error('association_invalid');
+          } else items.push(item);
+        }
+        return items.length ? publish(binding, items, value, unchanged) : { associated: true };
+      } });
+  }
+
+  function captureLibrary() {
+    const { value, binding, unchanged } = captureCollection();
     function contains(source) {
       return unchanged() && (value?.items || []).some(({ attached }) =>
         (/^libfile[_-]/.test(source.id || '') && attached.fileId === source.file_id) || attached.fileId === source.id ||
@@ -404,5 +429,5 @@
     } catch (_) { return null; }
   }
 
-  return Object.freeze({ version: 21, available, capture, captureLibrary, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, associateLibrary, merge, remove, prepareSubmit });
+  return Object.freeze({ version: 22, available, capture, captureLibrary, captureUpload, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, associateLibrary, merge, remove, prepareSubmit });
 });

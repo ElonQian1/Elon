@@ -195,3 +195,27 @@ test('production resolver is assembled before every runtime consumer', () => {
     assert.ok(names.indexOf('chatgpt_web_private_' + name + '.js') > binding, name);
   }
 });
+
+test('September 10 local append quota exports preserve exact official helper identity', async () => {
+  const { files: current } = require('./fixtures/chatgpt-runtime-bindings-sep10');
+  const types = { Multimodal: 1, Interpreter: 2 }, base = () => 10, max = () => 8;
+  const count = () => 2, config = () => 5;
+  const namespaces = { [CDN + current.shared]: { Up: types },
+    [CDN + current.conversation]: { eQt: base, sQt: max, nQt: count, $Zt: config,
+      attachmentBaseLimit: () => { throw Error('unmapped alias'); } } };
+  const f = fixture({ loadRuntime: url => namespaces[url] });
+  f.observed.clear(); f.observed.add(CDN + current.shared); f.observed.add(CDN + current.conversation);
+  assert.equal((await f.api.load('shared')).attachmentUploadType, types);
+  const c = await f.api.load('conversation');
+  assert.equal(c.attachmentBaseLimit, base); assert.equal(c.attachmentMaxUploads, max);
+  assert.equal(c.attachmentPendingCount, count); assert.equal(c.attachmentConfiguredLimit, config);
+  assert.equal(c.eQt, undefined);
+});
+
+test('unverified older build cannot reuse September 10 local append quota aliases', async () => {
+  const f = fixture({ loadRuntime: () => ({ c6: () => true, H3: () => true,
+    Up: { Multimodal: 1, Interpreter: 2 }, attachmentUploadType: { Multimodal: 1, Interpreter: 2 } }) });
+  const s = await f.api.load('shared'); assert.equal(s.attachmentUploadType, undefined);
+  f.observed.clear(); f.observed.add(old.shared); f.page.__elonChatGptDocumentToken = 'doc_legacy';
+  assert.equal((await f.api.load('shared')).attachmentUploadType, undefined);
+});

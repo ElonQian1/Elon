@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 9, create: factory });
+  const api = Object.freeze({ version: 10, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -21,11 +21,13 @@
   const currentExports = {
     shared: { H3: 'c6', R5: 'i7', F5: 't7', mq: 'Pq', wV: 'UV', SV: 'VV', XM: 'mN', HM: 'oN',
       'M$': 'Q$', RW: 'rG', uo: 'uo', t4: 'x4', IX: 'nZ', t6: 'x6', cX: 'OX',
-      Fx: 'Lx', Fl: 'Il', v7: 'R7', $3: 'y6', Ur: 'Ur', zr: 'zr' },
+      Fx: 'Lx', Fl: 'Il', v7: 'R7', $3: 'y6', Ur: 'Ur', zr: 'zr', attachmentUploadType: undefined },
     conversation: { AGt: 'uKt', J5t: 'O7t', Nrn: 'Cin', yRt: '$Rt', Grn: 'Fin',
       vRt: 'QRt', p8t: 'q8t', l0: 'E0', M1t: 'f0t', Rdn: 'Ofn', Rrn: 'Oin',
       win: 'man', Ein: 'gan', ay: 'Sy', iy: 'xy', ry: 'by', Jrn: 'Rin', Hrn: 'Min',
-      f8t: 'K8t', c0: 'T0', FVt: 'hHt', u1t: 'W1t', l1t: 'U1t', iin: 'Jin' },
+      f8t: 'K8t', c0: 'T0', FVt: 'hHt', u1t: 'W1t', l1t: 'U1t', iin: 'Jin',
+      attachmentBaseLimit: undefined, attachmentMaxUploads: undefined,
+      attachmentPendingCount: undefined, attachmentConfiguredLimit: undefined },
     composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC', Ng: 'Yg', Bg: 'n_', fh: 'Oh' }, react: {}
   };
   const september9Exports = {
@@ -50,11 +52,13 @@
   const september10Exports = {
     shared: { H3: 'o5', R5: 'F9', F5: 'M9', mq: 'UG', wV: 'tR', SV: '$L', XM: 'SJ', HM: 'mJ',
       'M$': 'D0', RW: '$B', uo: 'ws', t4: 'Z3', IX: 'LU', t6: 'P8', cX: 'Jq',
-      Fx: 'BS', Fl: '$u', v7: 'het', $3: 'M8', Ur: 'Zi', zr: 'qi' },
+      Fx: 'BS', Fl: '$u', v7: 'het', $3: 'M8', Ur: 'Zi', zr: 'qi', attachmentUploadType: 'Up' },
     conversation: { AGt: 'LKt', J5t: 'V9t', Nrn: 'Ban', yRt: 'Ezt', Grn: 'Qan',
       vRt: 'Tzt', p8t: 'o7t', l0: 'C0', M1t: 'U0t', Rdn: 'xmn', Rrn: 'Gan',
       win: 'jon', Ein: 'Non', ay: 'xy', iy: 'by', ry: 'yy', Jrn: 'ton', Hrn: 'Yan',
-      f8t: 'a7t', c0: 'S0', FVt: 'HHt', u1t: 'x0t', l1t: 'b0t', iin: 'don' },
+      f8t: 'a7t', c0: 'S0', FVt: 'HHt', u1t: 'x0t', l1t: 'b0t', iin: 'don',
+      attachmentBaseLimit: 'eQt', attachmentMaxUploads: 'sQt',
+      attachmentPendingCount: 'nQt', attachmentConfiguredLimit: '$Zt' },
     composer: { Ih: 'ig', t_: 'C_', AS: '$S', VS: 'uC', Ng: 't_', Bg: 'c_', fh: 'Ph' }, react: {}
   };
   const profiles = [
@@ -133,6 +137,8 @@
     const map = currentExports[role];
     const result = Object.create(null);
     for (const name of Object.keys(map)) {
+      // Semantic additions have no legacy alias; enable only an explicitly observed profile mapping.
+      if (map[name] === undefined && !p.exports?.[role]?.[name]) continue;
       const exported = p.exports ? p.exports[role][name] : name;
       if (namespace != null && Object.prototype.hasOwnProperty.call(namespace, exported)) {
         result[name] = namespace[exported];
@@ -197,8 +203,8 @@
 
   function state() {
     const p = profile();
-    return { version: 9, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 10, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 9, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 10, observed, load, peek, temporary, tools, state });
 });
