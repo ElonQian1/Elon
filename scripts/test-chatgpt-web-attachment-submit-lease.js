@@ -51,7 +51,10 @@ for (const config of [{}, { temporary: true }, { image: true }, { reused: true }
     assert.equal(lease.consumeAccepted(), true);
     assert.equal(f.store.files$().length, 0);
     assert.equal(lease.current(), false);
-    assert.equal(lease.consumeAccepted(), false);
+    const later = { status: 'ready', fileId: 'file-later' };
+    f.store.files$.set([later]);
+    assert.equal(lease.consumeAccepted(), true, 'repeated ACK cleanup is idempotent, not another send');
+    assert.deepEqual(f.store.files$(), [later]);
     assert.deepEqual(f.composer.merge([]), []);
   });
 }
@@ -115,11 +118,18 @@ test('accepted cleanup preserves later user files and tolerates a newly allocate
 
 for (const change of [f => f.setIdentity('Bearer another-account'),
   f => { f.root.__elonChatGptDocumentToken = 'doc_another'; }]) {
-  test('accepted cleanup cannot mutate another document or identity', () => {
+  test('post-ACK cleanup stays on the captured store after a document or identity change', () => {
     const f = fixture(), lease = f.sender.prepareSubmit(f.store);
     change(f);
-    assert.equal(lease.consumeAccepted(), false);
-    assert.equal(f.store.files$().length, 1);
+    assert.equal(lease.current(), false, 'the stale lease still cannot authorize a dispatch');
+    assert.equal(f.sender.prepareSubmit(f.store), null);
+    const later = [{ status: 'ready', fileId: 'file-new-editor' }];
+    const files$ = () => later;
+    files$.set = () => { throw new Error('must not modify the replacement editor'); };
+    f.props.value = { files$, readyFiles$: files$, hasUploadInProgress$: () => false };
+    assert.equal(lease.consumeAccepted(), true);
+    assert.equal(f.store.files$().length, 0);
+    assert.equal(f.props.value.files$(), later);
   });
 }
 
