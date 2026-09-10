@@ -1706,7 +1706,7 @@
       "id": "android-binance-read-context-recovery-v1",
       "title": "币安首次列表上下文缺失恢复",
       "summary": "修复量化自动连接等待时主会话忽略 refresh=false 的缺口；仅对闲置后台官网文档执行一次受限重载，保留登录并禁止写入重放。",
-      "status": "in_progress",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/android-exchange-session-host-v2.md",
@@ -1735,15 +1735,75 @@
         "同文档、账号、创建管理互斥保护和纯策略测试通过",
         "正式主包安装后量化读取一条新鲜网格，区分真实自动恢复与策略测试证据"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_47d2290fef5a498db3c8ac37eca8ac35",
-        "agent_id": "codex-binance-read-recovery",
-        "claimed_at_ms": 1789022387834,
-        "expires_at_ms": 1789036787834
-      },
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostRuntime.kt",
+          "content_hash": "eb15cf5a5df4b8039f8fdc786cccd57cfa02255849ce67afcdad4149d3b64361",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed7b5234ca935b93753af592e45f12ee0d3bb284",
+            "head_blob_oid": "2125af06a3d4dae184a03e06a1605b56cd3c2981",
+            "worktree_blob_oid": "2125af06a3d4dae184a03e06a1605b56cd3c2981",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceReadRecovery.kt",
+          "content_hash": "0a91f61eafd04eb30a16b8fcd49a01044807e9ac647abc56bc7b33d3d560850d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed7b5234ca935b93753af592e45f12ee0d3bb284",
+            "head_blob_oid": "62ade8cb7728cbe7dfc69262423caf5189a48240",
+            "worktree_blob_oid": "62ade8cb7728cbe7dfc69262423caf5189a48240",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/mcp/McpBinanceHostStatus.kt",
+          "content_hash": "5879fe2d04491c1cabe08dafc8e2162239c1c44dba6059d8f65da7eeea153d38",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed7b5234ca935b93753af592e45f12ee0d3bb284",
+            "head_blob_oid": "e0f6b25598d7b6e88c2bcf76881528d6c4c8e636",
+            "worktree_blob_oid": "e0f6b25598d7b6e88c2bcf76881528d6c4c8e636",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/host/BinanceReadRecoveryTest.kt",
+          "content_hash": "a6865f45215b79575d827c0bf791fb7e09c65de96bcdf5270e79e1fec437f66a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed7b5234ca935b93753af592e45f12ee0d3bb284",
+            "head_blob_oid": "5ffcaf07b7142ce0f128a5a53408db8db7b49a60",
+            "worktree_blob_oid": "5ffcaf07b7142ce0f128a5a53408db8db7b49a60",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-read-session.cjs",
+          "content_hash": "50857a9cd0e87c091b4080c69588eed7f952fef201027800d611c6919f4346c1",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ed7b5234ca935b93753af592e45f12ee0d3bb284",
+            "head_blob_oid": "135d18cc70827884dd6acfdc92bc4dcb23e67cb3",
+            "worktree_blob_oid": "135d18cc70827884dd6acfdc92bc4dcb23e67cb3",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1789022387759,
-      "updated_at_ms": 1789022491612
+      "updated_at_ms": 1789023488569
     },
     {
       "id": "android-binance-report-recovery-v1",
@@ -24790,46 +24850,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_3c95797b66b74157af1ebc0164c27f27",
-      "feature_id": "esk-early-support-policy-foundation-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-primary",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788663317912
-    },
-    {
-      "id": "feature_event_ead10b1f73214cc0b4ba16dbfb3ab0e0",
-      "feature_id": "esk-early-support-policy-foundation-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-primary",
-      "reason": "Offline draft checker, 34 tests passed and independent review complete; no production or economic authorization",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788663351916
-    },
-    {
-      "id": "feature_event_6c6c766651854532a8efa817de933e1a",
-      "feature_id": "esk-early-support-policy-foundation-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-primary",
-      "reason": "Offline draft checker, 34 tests passed and independent review complete; no production or economic authorization",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788663352122
-    },
-    {
-      "id": "feature_event_5ba91a4bda6b439281318cd76d5ddd13",
-      "feature_id": "esk-sui-testnet-publication-preflight-v1",
-      "action": "registered",
-      "actor": "codex-sui-preflight",
-      "reason": "rebase 冲突采用上游注册表为底，并通过官方工作流恢复已验证的离线 preflight 功能。",
-      "from_status": "",
-      "to_status": "proposed",
-      "at_ms": 1788663760192
-    },
-    {
       "id": "feature_event_8c7b2a3c1cb241118d6d65033813a8cb",
       "feature_id": "esk-sui-testnet-publication-preflight-v1",
       "action": "transitioned",
@@ -26788,6 +26808,46 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1789022491612
+    },
+    {
+      "id": "feature_event_5664c5e552d541dca2eafa9fe0a95f4a",
+      "feature_id": "android-binance-read-context-recovery-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-read-recovery",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789023488367
+    },
+    {
+      "id": "feature_event_b1b731b2a904400892b52ee636f14cf7",
+      "feature_id": "android-binance-read-context-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-read-recovery",
+      "reason": "106 Kotlin tests and readonly JS regression passed; official main APK 1.1.1633 installed; quant 0.7.6 resumed one fresh grid. Auto-reload branch tested by unit tests; no live fault injection.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789023488436
+    },
+    {
+      "id": "feature_event_6f84a1b428ae4652ae80c2a79263605c",
+      "feature_id": "android-binance-read-context-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-read-recovery",
+      "reason": "106 Kotlin tests and readonly JS regression passed; official main APK 1.1.1633 installed; quant 0.7.6 resumed one fresh grid. Auto-reload branch tested by unit tests; no live fault injection.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1789023488508
+    },
+    {
+      "id": "feature_event_d0d4424099e448cdb41be0ffb65682d8",
+      "feature_id": "android-binance-read-context-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-read-recovery",
+      "reason": "106 Kotlin tests and readonly JS regression passed; official main APK 1.1.1633 installed; quant 0.7.6 resumed one fresh grid. Auto-reload branch tested by unit tests; no live fault injection.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1789023488569
     }
   ]
 }
