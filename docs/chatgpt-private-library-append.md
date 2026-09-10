@@ -19,6 +19,12 @@ production MCP. Multi-file attach/send is **not accepted**. See the
 [1634 device report](reports/chatgpt-library-append-1634.md). This is not an
 independent Android HTTP text sender.
 
+Policy 2 / adapter 318 additionally preserve the official composer's explicitly
+undefined quota props. This source-backed correction has passed offline checks;
+it is not yet proof of the exact 1634 device failure. The read-only
+`library_attachment_policy` MCP probe reports a closed reason code from the last
+policy attempt without loading modules, invoking the validator or exposing props.
+
 ## Failure And Fix
 
 Previously `available()` required zero files and `capture()` used that gate.
@@ -92,6 +98,27 @@ the website quota**. Official limits can reject earlier. This batch does not
 reimplement quota arithmetic, bypass count/size rules or create a new token copy.
 Limits apply to the new append path; other upload contexts retain their existing
 admission and are not newly certified by this work.
+
+### Optional Quota Contract
+
+The same September 10 asset constructs both menu props as
+`Ts == null ? undefined : computedLimit` (near byte 2894556). Its validator
+delegates count checks only when the supplied upload limit is non-null (near
+byte 517282). Policy 1 incorrectly demanded numeric values for both props.
+Policy 2 requires the properties to exist on the confirmed owner, accepts either
+undefined or a nonnegative safe integer, and forwards their exact values to the
+official validator. Missing properties, null, strings and invalid numbers still
+fail closed. It does not synthesize unlimited values, skip the validator or
+remove the APK ceiling. An unavailable runtime, mismatched owner/store/scope or
+invalid limit remains an unconfirmed policy, not an absent website feature.
+
+The explicit-undefined regression fails on the previous code
+(`library-policy-optional-red-20260910-153536-214`). After the fix, 174 related
+tests pass without skips (`library-policy-related-20260910-154046-591`), covering
+append ownership, official validation, cancellation, runtime aliases and the
+page/native diagnostic vocabulary. A separate fresh-page device receipt is
+still required to identify whether this or a different boundary caused 1634's
+second-file rejection.
 
 ## Verification
 
