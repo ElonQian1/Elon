@@ -136,6 +136,13 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                 assertTrue("conversation_files_missing", description("web-chat-conversation-files-status").waitForExists(5000));
                 break;
             case "files_refresh": click(description("web-chat-conversation-files-refresh")); break;
+            case "file_row":
+                int fileIndex = Integer.parseInt(getParams().getString("file_index", "-1"));
+                assertTrue("invalid_file_index", fileIndex >= 0 && fileIndex < 160);
+                assertTrue("conversation_files_missing", description("web-chat-conversation-files-status").exists());
+                click(description("web-chat-conversation-file-" + fileIndex));
+                assertTrue("conversation_file_download_missing", text("\u4e0b\u8f7d").waitForExists(5000));
+                break;
             case "files_wait":
                 UiObject status = description("web-chat-conversation-files-status");
                 assertTrue("conversation_files_missing", status.waitForExists(5000));
