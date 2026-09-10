@@ -30,6 +30,25 @@ test('download diagnostics preserve only source categories and fixed route words
   }
 });
 
+test('project content requires explicit paired file identity and retains old preview admission', () => {
+  const scope = { libraryFileId: 'libfile_synthetic', fileId: 'file-synthetic' };
+  const path = '/api/library/files/libfile_synthetic/project-content?file_id=file-synthetic';
+  for (const prefix of ['', 'https://chatgpt.com', 'https://chatgpt.com:443']) {
+    assert.equal(content.projectContentUrl(prefix + path, scope), 'https://chatgpt.com' + path);
+    assert.equal(library.contentUrl(prefix + path, scope), 'https://chatgpt.com' + path);
+    assert.equal(content.contentUrl(prefix + path), null);
+    assert.equal(content.previewUrl(prefix + path), null);
+    assert.equal(library.contentUrl(prefix + path), null);
+  }
+  for (const value of ['https://outside.test' + path, '//chatgpt.com' + path,
+    'https://user@chatgpt.com' + path, 'https://chatgpt.com:8443' + path, path + '#secret',
+    path + '&extra=secret', path + '&file_id=file-synthetic', path + ' ',
+    path.replace('libfile_synthetic', 'libfile_other'), path.replace('file-synthetic', 'file-other'),
+    path.replace('/project-content', '/download')]) {
+    assert.equal(content.projectContentUrl(value, scope), null);
+  }
+});
+
 test('shared content policy retains the released download URL boundary', () => {
   for (const path of ['/api/estuary/content', '/backend-api/estuary/content']) {
     for (const prefix of ['', 'https://chatgpt.com', 'https://chatgpt.com:443']) {

@@ -43,9 +43,9 @@ function fixture(options = {}) {
           library_file_id: source.id, is_project: true, gizmo_id: PROJECT });
       }
       if (path === '/backend-api/files/download/file-synthetic') {
-        return Response.json({ status: 'success', file_id: source.file_id, download_url: CONTENT });
+        return Response.json({ status: 'success', file_id: source.file_id, download_url: options.content || CONTENT });
       }
-      if (url === CONTENT) {
+      if (url === new URL(options.content || CONTENT, 'https://chatgpt.com').href) {
         const response = new Response('synthetic PNG bytes', { headers: { 'content-type': 'image/png' } });
         Object.defineProperty(response, 'url', { value: url });
         return response;
@@ -82,6 +82,32 @@ for (const href of ['https://chatgpt.com/', 'https://chatgpt.com/c/unrelated',
       assert.deepEqual(query, c === f.calls[0] ? { gizmo_id: PROJECT } : { gizmo_id: PROJECT, download_intent: 'true' });
     }
     assert.equal(f.calls.some(c => c.url.includes('/api/library/')), false);
+  });
+}
+
+test('authorized project-content returns saved bytes through the existing native byte owner', async () => {
+  const content = '/api/library/files/libfile_synthetic/project-content?file_id=file-synthetic';
+  const f = fixture({ content });
+  await f.run(f.register());
+  assert.equal(f.saved, true); assert.equal(f.receipts.at(-1)[2], 'download_saved');
+  assert.equal(f.calls.length, 3);
+  assert.equal(f.calls[2].url, 'https://chatgpt.com' + content);
+  assert.equal(f.calls[2].init.credentials, 'same-origin');
+  assert.equal(f.calls[2].init.redirect, 'error');
+  assert.equal(f.calls[2].init.headers, undefined);
+});
+
+for (const suffix of [
+  'libfile_other/project-content?file_id=file-synthetic',
+  'libfile_synthetic/project-content?file_id=file-other',
+  'libfile_synthetic/project-content?file_id=file-synthetic&download=true',
+  'libfile_synthetic/project-content?file_id=file-synthetic&file_id=file-other',
+]) {
+  test('authorized project content rejects mismatched scope without transfer: ' + suffix, async () => {
+    const f = fixture({ content: '/api/library/files/' + suffix });
+    await f.run(f.register());
+    assert.equal(f.saved, false); assert.equal(f.calls.length, 2);
+    assert.equal(f.receipts.at(-1)[2], 'download_source_unsupported');
   });
 }
 

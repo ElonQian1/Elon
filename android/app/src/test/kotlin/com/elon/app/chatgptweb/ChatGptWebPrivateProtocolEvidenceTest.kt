@@ -13,6 +13,8 @@ class ChatGptWebPrivateProtocolEvidenceTest {
             .put("relative", false).put("whitespace", false).put("credentials", false)
             .put("port", false).put("fragment", false)
         assertEquals(source().toString(), detail(source()))
+        val project = source().put("path", "/api/library/files/{id}/project-content")
+        assertEquals(project.toString(), detail(project))
         for (value in listOf(source().put("url", "secret"), source().put("path", "/api/files/private"),
             source().put("path", "/api/content?token=secret"), source().put("origin", "private.test"),
             source().put("observed", "true"), source().apply { remove("port") })) {

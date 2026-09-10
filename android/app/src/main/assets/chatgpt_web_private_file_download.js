@@ -4,7 +4,7 @@
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 20, create: root => factory(root, pointer, citation) });
+  const exported = Object.freeze({ version: 21, create: root => factory(root, pointer, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -173,7 +173,8 @@
     if (!entry.image && !entry.connectorCopy && libraryFileId && !projectId && info.is_project !== true) {
       return { libraryDownloadId: libraryFileId };
     }
-    return { url: authorizationUrl(entry, projectId) };
+    return { url: authorizationUrl(entry, projectId), ...(isLibrary && projectId && libraryFileId
+      ? { projectContentScope: { libraryFileId, fileId: entry.fileId } } : {}) };
   }
 
   function register(path, payload, index) {
@@ -339,13 +340,13 @@
       const binary = root.__elonChatGptPrivateLibraryDownload;
       lastSource = { account: entry.account, token: entry.token, expiresAt: Date.now() + 120000,
         value: root.__elonChatGptPrivateContentSource?.describe?.(payload.download_url) };
-      if (binary?.contentUrl?.(payload.download_url)) {
+      if (binary?.contentUrl?.(payload.download_url, destination.projectContentScope)) {
         // A fresh authorization may return the official same-origin content route,
         // not a signed external URL. Reuse the existing byte owner and save receipt.
         job.byteTransfer = true;
         root.clearTimeout(timer);
         timer = root.setTimeout(() => job.controller.abort(), 120000);
-        const detail = await binary.runContent(root, job, current, payload.download_url);
+        const detail = await binary.runContent(root, job, current, payload.download_url, destination.projectContentScope);
         job.queued = true;
         respond(ACTION, true, detail);
       } else {
@@ -375,5 +376,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 20, register, registerLibraryFile, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 21, register, registerLibraryFile, start, cancel, dispose, sourceDiagnostics });
 });

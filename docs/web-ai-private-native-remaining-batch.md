@@ -43,9 +43,10 @@ upload, native send and actual file-content replies now passed on 1614; the
 post-send membership timing defect and source fix are recorded in
 [project-media follow-up](reports/chatgpt-project-media-1614.md).
 
-Native project-folder Download's 1644 scope error is corrected on 1645: metadata
-and authorization now return 200, but the returned source is still rejected and
-saved-byte acceptance is pending. See [the scoped regression](reports/chatgpt-library-folder-download-1644.md).
+Native project-folder Download's 1644 scope error is corrected. The 1646 source
+diagnostic and official code identified project-content transport; adapter 330
+adds paired-ID validation, with 220 checks passed and device acceptance pending.
+See [the scoped regression](reports/chatgpt-library-folder-download-1644.md).
 
 | User workflow | Current result | Remaining boundary |
 |---|---|---|

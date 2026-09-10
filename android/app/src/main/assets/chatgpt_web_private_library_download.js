@@ -148,8 +148,8 @@
       ? { resolvedFile: Object.freeze({ version: 1, name, mediaType }) } : {}) };
   }
 
-  function contentUrl(value) {
-    return contentSource?.contentUrl(value) || null;
+  function contentUrl(value, projectScope) {
+    return contentSource?.contentUrl(value) || contentSource?.projectContentUrl(value, projectScope) || null;
   }
 
   function run(root, job, current, validateSignedUrl, libraryFileId = job.entry.sharedLibraryFileId) {
@@ -158,8 +158,8 @@
     return transfer(root, job, current, validateSignedUrl, url.href, false);
   }
 
-  function runContent(root, job, current, value) {
-    const url = contentUrl(value);
+  function runContent(root, job, current, value, projectScope) {
+    const url = contentUrl(value, projectScope);
     if (root.location.origin !== 'https://chatgpt.com' || !url) throw new Error('download_source_unsupported');
     return transfer(root, job, current, null, url, true);
   }
@@ -281,5 +281,5 @@
       try { reader?.releaseLock(); } catch (_) {}
     }
   }
-  return Object.freeze({ version: 9, target, sharedReference, mountedTarget, catalogTarget, materialize, contentUrl, run, runContent });
+  return Object.freeze({ version: 10, target, sharedReference, mountedTarget, catalogTarget, materialize, contentUrl, run, runContent });
 });

@@ -107,3 +107,27 @@ the fresh XML contains 10 tests, zero failures/errors. The earlier root task
 matched an unrelated module with no matching tests and is not counted as a pass,
 despite its command wrapper's zero exit code. Corrected download completion still
 requires actual saved bytes; this diagnostic alone is not a fix.
+
+## Project Content Transport
+
+Normal 1646 (adapter 329, source `af17947564d598995879976524be74370c896f2f`)
+was published and replacement-installed. APK SHA-256:
+`fb63775543bc749bd27feec181e7c8c33c59b7bd017dad94c28f1ec11ac2fc92`.
+`native-folder-download-1646-20260911-052531-403` again restored the original
+conversation and awake setting. Its diagnostic identifies a relative same-origin
+`/api/library/files/{id}/{id}` route, without whitespace, credentials, port or
+fragment. No content request or saved-byte success occurred.
+
+The already inventoried shared public asset contains `CDt(libraryId, fileId)`:
+`/api/library/files/{libraryId}/project-content?file_id={fileId}`. `DDt` downloads
+the URL returned by `EDt`; it does not restrict returned sources to estuary or
+external signed URLs. This gives a concrete source-backed candidate, not a guessed
+request. Adapter 330 passes the verified metadata's paired library/file identity
+to the existing content-byte owner and admits that **returned** project-content
+URL only when both IDs match and `file_id` is its sole query parameter. Other
+routes, external origins, extra/duplicate query keys and missing scope remain
+rejected. Ordinary previews do not gain unscoped access to project content.
+
+`project-content-download-20260911-052912-717` passes 220 related Node cases,
+including actual owner/byte integration and rejected scope mismatches without
+another fetch. This does not yet prove the installed phone's saved bytes.

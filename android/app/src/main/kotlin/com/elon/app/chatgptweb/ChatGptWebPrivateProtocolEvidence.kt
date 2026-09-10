@@ -56,7 +56,7 @@ internal object ChatGptWebPrivateProtocolEvidence {
                 require(value.opt(key) is Boolean)
             }
             require(value.opt("origin") in setOf("invalid", "same_origin", "non_https", "oaiusercontent", "azure_blob", "other_https"))
-            require(value.getString("path").let { it.isEmpty() || Regex("(?:/(?:api|backend-api|files|library|download|content|estuary|attachment|attachments|\\{id\\})){1,8}/?").matches(it) })
+            require(value.getString("path").let { it.isEmpty() || Regex("(?:/(?:api|backend-api|files|library|download|content|project-content|estuary|attachment|attachments|\\{id\\})){1,8}/?").matches(it) })
             return value.toString()
         }
         if (value.opt("schema") == "elon.document_state.v1") return documentState(value)

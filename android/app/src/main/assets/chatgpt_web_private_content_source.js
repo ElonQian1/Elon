@@ -24,6 +24,20 @@
     } catch (_) { return null; }
   }
 
+  function projectContentUrl(value, scope) {
+    if (typeof value !== 'string' || value.length > 16384 || /[\\\x00-\x20\x7f]/.test(value) ||
+        !/^(?:https:\/\/chatgpt\.com(?::443)?)?\/api\/library\/files\//.test(value) ||
+        !/^libfile[_-][A-Za-z0-9_-]{1,152}$/.test(scope?.libraryFileId || '') ||
+        !/^file[_-][A-Za-z0-9_-]{1,152}$/.test(scope?.fileId || '')) return null;
+    try {
+      const url = new URL(value, 'https://chatgpt.com');
+      // CDt binds both the library row and concrete file; do not borrow current-chat scope.
+      return url.origin === 'https://chatgpt.com' && !url.username && !url.password && !url.hash &&
+        url.pathname === '/api/library/files/' + scope.libraryFileId + '/project-content' &&
+        [...url.searchParams].length === 1 && url.searchParams.get('file_id') === scope.fileId ? url.href : null;
+    } catch (_) { return null; }
+  }
+
   function describe(value) {
     const result = { schema: 'elon.download_source.v1', observed: true, origin: 'invalid', path: '',
       relative: false, whitespace: false, credentials: false, port: false, fragment: false };
@@ -37,7 +51,7 @@
         /(^|\.)oaiusercontent\.com$/.test(url.hostname) ? 'oaiusercontent' :
         /\.blob\.core\.windows\.net$/.test(url.hostname) ? 'azure_blob' : 'other_https';
       if (result.origin === 'same_origin') {
-        const vocabulary = new Set(['api', 'backend-api', 'files', 'library', 'download', 'content', 'estuary', 'attachment', 'attachments']);
+        const vocabulary = new Set(['api', 'backend-api', 'files', 'library', 'download', 'content', 'project-content', 'estuary', 'attachment', 'attachments']);
         const parts = url.pathname.split('/').filter(Boolean).slice(0, 8);
         result.path = parts.length ? '/' + parts.map(part => vocabulary.has(part) ? part : '{id}').join('/') : '';
       }
@@ -48,5 +62,5 @@
     return result;
   }
 
-  return Object.freeze({ version: 3, contentUrl, previewUrl, describe });
+  return Object.freeze({ version: 4, contentUrl, previewUrl, projectContentUrl, describe });
 });
