@@ -64,6 +64,28 @@ Logs: `runtime-sep10b-green-20260910-204358-367` and
 
 Source comparison and its public assets are retained in the repository's external
 research artifacts. Offline fixtures prove composition and guards, not live
-provider acceptance. Grouped Release/install and private-catalog/regeneration
-acceptance are pending at this checkpoint. Existing verified voice transports
-were neither modified nor repeated. No thermal improvement is claimed.
+provider acceptance. Existing verified voice transports were neither modified
+nor repeated. No thermal improvement is claimed.
+
+## Grouped normal release 1640
+
+Source `c6e5df908` passed Release and lint, publication and unattended `install -r`
+on the trusted Xiaomi as `1.1.1640 (1640)`, adapter 325. It also includes the queued
+[citation resolver correction](../chatgpt-private-file-citations.md).
+APK size is 40,116,617 bytes; local and remote SHA-256 agree:
+`d1d4b56e0e4fe1dbeac079c2d1bb06907df6add99afbc19ee0713f335322f9a8`.
+The packaged asset was read back and contains resolver 11 and the new profile.
+Log: `runtime-sep10b-grouped-release-20260910-204951-526`, terminal pass, 601.6s.
+
+Production model acceptance stopped at the locked-device preflight, before any
+catalog request, navigation or retry: `runtime-325-model-admission-20260910-210021-880`.
+The phone's installed version is verified; private catalog, regeneration and
+citation-download acceptance remain deferred, not failed provider calls or
+successful private transactions. Unlock is the next device prerequisite.
+No data/Cookies were cleared, no microphone was opened and no message was sent.
+
+The first launch wrapper rejected shell invocation syntax before starting the
+publisher (0.4s); the corrected explicitly hidden `pwsh -File` invocation above
+was the only build. Publication also reported an optional LAN firewall warning
+and a worktree-cleanup `Branch`-property warning; neither invalidates the verified
+APK installation. Main/worktree cleanup is handled separately by task finish.

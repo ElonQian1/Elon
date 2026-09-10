@@ -4,10 +4,10 @@
 
 Capability: `android_chatgpt_private_file_citation_download_v1`.
 Status: implemented; current citation v3 / projection v9 / download owner v18
-(adapter 324, source `7b78394da`) passed offline checks and is awaiting the grouped
-Android build/install. The earlier v16 metadata/scope correction is already
-included in installed APK 1639. Real production citation download acceptance
-remains pending. Not marked `completed`.
+(source `7b78394da`) passed offline checks and is included in normal 1640 / adapter
+325 with the earlier metadata/scope correction. Grouped Release/install passed;
+real production citation download acceptance awaits phone unlock. Not marked
+`completed`. [Delivery evidence](reports/chatgpt-runtime-bindings-20260910-b.md#grouped-normal-release-1640).
 
 This extends the existing conversation file index and download owner. It is not
 a new uploader, downloader, background poller or guessed cloud-provider API.
@@ -38,8 +38,8 @@ empty-context cases. The final related suite passes 216 cases with zero failures
 skips or cancellations, including production asset assembly and native download
 packet/ACK fixtures with a throwing DOM getter. Log:
 `citation-resolver-final-20260910-202016-901` (terminal pass, 1.9s).
-These are source/integration fixtures, not actual Android saved bytes. No APK
-was rebuilt for this small batch; group adapter 324 with the remaining changes.
+These are source/integration fixtures, not actual Android saved bytes. This
+small batch was grouped with the runtime correction in normal 1640, not built separately.
 
 ## Verified public source
 
@@ -133,8 +133,8 @@ Coverage includes missing library identity, personal/project resolution,
 metadata HTTP errors, malformed flags/IDs, owner invalidation and no download
 after cancellation. This does not prove other cloud/PCA protocols or real bytes.
 
-Use an existing synthetic conversation with an assistant file citation after the
-grouped adapter 324 install. In production native UI, open Conversation files,
+Use an existing synthetic conversation with an assistant file citation on the
+installed adapter 325. In production native UI, open Conversation files,
 select the citation, download it and verify the save receipt and actual bytes.
 Keep the visible conversation/draft unchanged. Then exercise one library/project
 citation and a grouped/cite-map file if present; do not create private user

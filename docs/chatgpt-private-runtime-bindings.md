@@ -5,8 +5,9 @@
 Version 11 adds the second September 10 build observed on normal APK 1639.
 It retains all earlier profiles and maps 57 consumed contracts from inspected
 public sources. The private model diagnostic had reported `runtime_not_observed`;
-132 focused and 304 adjacent tests now pass. Adapter 325 awaits grouped delivery
-and phone acceptance. See [source evidence and boundary](reports/chatgpt-runtime-bindings-20260910-b.md).
+132 focused and 304 adjacent tests now pass. Normal 1640 / adapter 325 is published
+and installed; production acceptance awaits phone unlock. See
+[source evidence and boundary](reports/chatgpt-runtime-bindings-20260910-b.md).
 
 Version 10 adds exact September 10 local-upload quota/type helpers for
 [reverse-order Library/local attachment append](chatgpt-private-library-local-append.md).
