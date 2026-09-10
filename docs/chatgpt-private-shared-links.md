@@ -12,7 +12,11 @@ In `1.1.1547`, case
 is completed through the production handler: the newly created synthetic link
 appeared in a complete list, its exact selection ticket was consumed, and revoke
 returned confirmed removal. See [device evidence](reports/chatgpt-runtime-release-1547.md).
-Rendered native row Copy/revoke and other account scopes remain pending; these narrow
+Normal **1644** also completes scoped case
+`android_chatgpt_private_conversation_shared_links_v1:account_row_copy_cross_conversation_revoke`:
+native row selection, exact clipboard readback, cross-conversation native revoke,
+complete removal readback and restoration passed. See [1644 evidence](reports/chatgpt-private-acceptance-1644.md#native-shared-link-copy-and-revoke).
+Other account scopes and large-list page controls remain pending; these narrow
 completed cases do not claim every sharing variant is complete.
 
 ## Official contract evidence
