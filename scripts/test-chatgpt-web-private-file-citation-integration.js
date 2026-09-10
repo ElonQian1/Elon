@@ -9,12 +9,14 @@ const download = require('../android/app/src/main/assets/chatgpt_web_private_fil
 const request = require('../android/app/src/main/assets/chatgpt_web_private_json_request.js');
 const projection = projectionModule.create({});
 const PROJECT = 'g-p-0123456789abcdef0123456789abcdef';
+const PROJECT_INFO = { file_id: 'file-cited', library_file_id: 'libfile_cited',
+  is_library_file: true, is_project: true, gizmo_id: PROJECT };
 const ref = (id = 'file-cited') => ({ type: 'file', id, name: 'cited.txt', content_type: 'text/plain',
   cloud_doc_url: 'https://cloud.example.test/attribution?token=synthetic', snippet: 'not a native file field' });
 const message = (id = 'answer', refs = [ref()]) => ({ id, author: { role: 'assistant' },
   content: { parts: ['Answer'] }, metadata: { content_references: refs } });
 
-function fixture() {
+function fixture(info = { file_id: 'file-cited', is_library_file: false }) {
   const calls = [], queued = [], receipts = [];
   let account = 'Bearer synthetic-citation-test';
   const payload = { messages: [message()] };
@@ -35,8 +37,7 @@ function fixture() {
     fetch: async (url, init) => {
       calls.push({ url, init });
       if (new URL(url).pathname.endsWith('/simple')) {
-        return Response.json({ file_id: 'file-cited', library_file_id: 'libfile_cited',
-          is_library_file: true, is_project: true, gizmo_id: PROJECT });
+        return Response.json(info);
       }
       return Response.json({ status: 'success', file_id: 'file-cited',
         download_url: 'https://files.oaiusercontent.com/synthetic-download' });
@@ -60,10 +61,14 @@ test('a reply containing only a file citation enters the native index with an op
   assert.doesNotMatch(JSON.stringify({ rows, messages: projection.project(f.payload) }), /file-cited|https|token|snippet/);
   assert.equal(projection.fileSource(f.payload, rows[0].id).fileCitationReference.id, 'file-cited');
   await f.run(rows[0]);
-  assert.equal(f.calls.length, 1);
-  const url = new URL(f.calls[0].url);
+  assert.equal(f.calls.length, 2);
+  const metadata = new URL(f.calls[0].url);
+  assert.equal(metadata.pathname, '/backend-api/files/file-cited/simple');
+  assert.equal(metadata.searchParams.get('conversation_id'), 'source');
+  const url = new URL(f.calls[1].url);
   assert.equal(url.pathname, '/backend-api/files/download/file-cited');
-  assert.equal(url.searchParams.get('conversation_id'), 'source');
+  assert.equal(url.searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+  assert.equal(url.searchParams.has('conversation_id'), false);
   assert.equal(url.searchParams.get('download_intent'), 'true');
   assert.equal(f.calls[0].init.method, 'GET');
   assert.equal(f.queued.length, 1);
@@ -80,15 +85,15 @@ for (const format of ['grouped', 'cite_map']) test(format + ' file citations reu
   assert.equal(rows.length, 1); assert.match(rows[0].downloadHandle, /^download_[a-f0-9]{32}$/);
   assert.doesNotMatch(JSON.stringify(rows), /file-cited|cloud|https|token/);
   await f.run(rows[0]);
-  assert.equal(f.calls.length, 1);
-  assert.equal(new URL(f.calls[0].url).pathname, '/backend-api/files/download/file-cited');
-  assert.equal(new URL(f.calls[0].url).searchParams.get('conversation_id'), 'source');
+  assert.equal(f.calls.length, 2);
+  assert.equal(new URL(f.calls[1].url).pathname, '/backend-api/files/download/file-cited');
+  assert.equal(new URL(f.calls[1].url).searchParams.get('check_context_scopes_for_conversation_id'), 'source');
   assert.equal(f.queued.length, 1); assert.equal(f.receipts.at(-1)[2], 'download_queued');
   assert.equal(f.root.location.href, 'https://chatgpt.com/c/visible');
 });
 
 test('grouped library citations preserve project metadata checks and existing attachment positions', async () => {
-  const f = fixture();
+  const f = fixture(PROJECT_INFO);
   f.payload.messages[0].metadata.attachments = [{ id: 'file-original', name: 'original.txt' }];
   f.payload.messages[0].metadata.content_references = [{ type: 'grouped_webpages', items: [
     { ...ref(), type: 'webpage', category: 'files', url: 'https://cloud.example.test/cited', library_file_id: 'libfile_cited' },
@@ -123,7 +128,7 @@ test('grouped citation truncation is reflected in both file index and selected s
 });
 
 test('library citations verify effective project metadata before authorizing any byte transfer', async () => {
-  const f = fixture();
+  const f = fixture(PROJECT_INFO);
   f.payload.messages[0].metadata.content_references[0].library_file_id = 'libfile_cited';
   await f.run();
   assert.equal(f.calls.length, 2);
@@ -133,6 +138,109 @@ test('library citations verify effective project metadata before authorizing any
   assert.equal(url.searchParams.get('check_context_scopes_for_conversation_id'), 'source');
   assert.equal(f.queued.length, 1);
 });
+
+test('citation metadata discovers a project library file even when the reference omits library identity', async () => {
+  const f = fixture(PROJECT_INFO);
+  await f.run();
+  assert.equal(f.calls.length, 2);
+  const url = new URL(f.calls[1].url);
+  assert.equal(url.searchParams.get('gizmo_id'), PROJECT);
+  assert.equal(url.searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+  assert.equal(f.queued.length, 1);
+});
+
+test('citation metadata resolves a personal library file through the existing binary owner', async () => {
+  const f = fixture({ ...PROJECT_INFO, is_project: false, gizmo_id: null });
+  const saved = [];
+  f.payload.gizmo_id = PROJECT;
+  f.root.__elonChatGptPrivateLibraryDownload = { async run(_root, job, current, _url, id) {
+    assert.equal(current(job), true);
+    saved.push(id);
+    return 'download_saved';
+  } };
+  await f.run();
+  assert.equal(f.calls.length, 1);
+  assert.equal(new URL(f.calls[0].url).searchParams.get('gizmo_id'), PROJECT);
+  assert.deepEqual(saved, ['libfile_cited']);
+  assert.equal(f.queued.length, 0);
+  assert.deepEqual(f.receipts, [['download_conversation_file', true, 'download_saved']]);
+});
+
+test('non-library citation metadata retains the requested project instead of adopting an unrelated field', async () => {
+  const other = 'g-p-fedcba9876543210fedcba9876543210';
+  const f = fixture({ file_id: 'file-cited', is_library_file: false, is_project: true, gizmo_id: other });
+  f.payload.gizmo_id = PROJECT;
+  await f.run();
+  assert.equal(f.calls.length, 2);
+  assert.equal(new URL(f.calls[1].url).searchParams.get('gizmo_id'), PROJECT);
+  assert.equal(f.queued.length, 1);
+});
+
+for (const status of [403, 404, 500]) {
+  test('citation metadata HTTP ' + status + ' does not fall through to authorization', async () => {
+    const f = fixture();
+    f.root.fetch = async (url, init) => {
+      f.calls.push({ url, init });
+      return new Response('', { status });
+    };
+    await f.run();
+    assert.equal(f.calls.length, 1);
+    assert.equal(new URL(f.calls[0].url).pathname, '/backend-api/files/file-cited/simple');
+    assert.equal(f.queued.length, 0);
+    assert.equal(f.receipts.at(-1)[1], false);
+  });
+}
+
+for (const [name, info] of Object.entries({
+  missing: null, malformed: [], fileMismatch: { ...PROJECT_INFO, file_id: 'file-other' },
+  badLibraryFlag: { ...PROJECT_INFO, is_library_file: 'true' },
+  badProjectFlag: { ...PROJECT_INFO, is_project: 'true' },
+  badProject: { ...PROJECT_INFO, gizmo_id: 'not-a-project' },
+  badLibrary: { ...PROJECT_INFO, library_file_id: 'not-a-library-file' },
+  projectUnknown: { ...PROJECT_INFO, gizmo_id: null },
+})) test('citation metadata ' + name + ' cannot silently authorize an unscoped download', async () => {
+  const f = fixture(info);
+  await f.run();
+  assert.equal(f.calls.length, 1);
+  assert.equal(new URL(f.calls[0].url).pathname, '/backend-api/files/file-cited/simple');
+  assert.equal(f.queued.length, 0);
+  assert.deepEqual(f.receipts, [['download_conversation_file', false, 'download_prepare_failed']]);
+});
+
+for (const scope of ['document', 'account', 'route', 'cancellation']) {
+  test('citation metadata cannot outlive its ' + scope + ' owner', async () => {
+    const f = fixture(), fetch = f.root.fetch;
+    f.root.fetch = async (...args) => {
+      const value = await fetch(...args);
+      if (scope === 'document') f.root.__elonChatGptDocumentToken = 'doc_changed';
+      if (scope === 'account') f.setAccount('Bearer other-synthetic-account');
+      if (scope === 'route') f.root.location.href = 'https://chatgpt.com/c/other';
+      if (scope === 'cancellation') assert.equal(f.api.cancel(), true);
+      return value;
+    };
+    await f.run();
+    assert.equal(f.calls.length, 1);
+    assert.equal(new URL(f.calls[0].url).pathname, '/backend-api/files/file-cited/simple');
+    assert.equal(f.queued.length, 0);
+    assert.deepEqual(f.receipts, [['download_conversation_file', false, 'download_cancelled']]);
+  });
+}
+
+for (const deadline of [6000, 15000]) {
+  test('citation metadata deadline ' + deadline + ' is not reported as user cancellation', async () => {
+    const f = fixture();
+    f.root.setTimeout = (callback, delay) => setTimeout(callback, delay === deadline ? 1 : delay);
+    f.root.fetch = (url, init) => {
+      f.calls.push({ url, init });
+      return new Promise(() => {});
+    };
+    await f.run();
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.calls[0].init.signal.aborted, true);
+    assert.equal(f.queued.length, 0);
+    assert.deepEqual(f.receipts, [['download_conversation_file', false, 'download_prepare_failed']]);
+  });
+}
 
 test('ambiguous library scope and project mismatches never drop into unscoped authorization', async () => {
   const f = fixture();
@@ -211,7 +319,7 @@ test('Android loads the citation module before its owners and reinjection preser
   let retired = 0;
   const transport = {}, window = { location: { origin: 'https://chatgpt.com' },
     __elonChatGptPrivateTransport: transport,
-    __elonChatGptPrivateFileDownload: { version: 14, dispose() { retired++; } } };
+    __elonChatGptPrivateFileDownload: { version: 15, dispose() { retired++; } } };
   const context = vm.createContext({ window, Map, Set, URL });
   for (let i = 0; i < 2; i++) {
     for (const name of ['file_citation', 'history_projection', 'file_download']) {

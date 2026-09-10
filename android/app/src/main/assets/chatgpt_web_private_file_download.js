@@ -4,7 +4,7 @@
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 15, create: root => factory(root, pointer, citation) });
+  const exported = Object.freeze({ version: 16, create: root => factory(root, pointer, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -34,7 +34,7 @@
     const url = new URL('/backend-api/files/download/' + encodeURIComponent(entry.downloadFileId || entry.fileId), root.location.origin);
     for (const [key, value] of entry.downloadQuery || []) url.searchParams.set(key, value);
     if (projectId) url.searchParams.set('gizmo_id', projectId);
-    url.searchParams.set(entry.image || entry.projectId || entry.libraryFileId
+    url.searchParams.set(entry.image || entry.fileCitation || entry.projectId || entry.libraryFileId
       ? 'check_context_scopes_for_conversation_id' : 'conversation_id', entry.conversationId);
     url.searchParams.set('download_intent', 'true');
     return url.href;
@@ -113,6 +113,7 @@
       projectId: projects[0] || null, libraryFileId,
       connectorCopy: file.context_connector_info != null,
       mediaType: typeof file.mime_type === 'string' ? file.mime_type : '',
+      ...(fileCitation ? { fileCitation: true } : {}),
       ...(mounted || {}),
       ...(libraryReference || {}),
       ...(libraryReference || mounted ? { name: file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180), mediaType: file.mime_type || '' } : {}),
@@ -131,8 +132,8 @@
       job.entry = Object.freeze({ ...entry, ...materialized });
       return { url: authorizationUrl(job.entry, entry.projectId), fileId: materialized.fileId };
     }
-    if (!entry.libraryFileId) return { url: authorizationUrl(entry, entry.projectId) };
-    // Official WTt/KTt/DX resolve a library file's effective project before dEt.
+    if (!entry.libraryFileId && !entry.fileCitation) return { url: authorizationUrl(entry, entry.projectId) };
+    // FileCitationPreviewSheet uses cEt/OX even when the reference omits library identity.
     const url = new URL('/backend-api/files/' + encodeURIComponent(entry.fileId) + '/simple', root.location.origin);
     if (entry.projectId) url.searchParams.set('gizmo_id', entry.projectId);
     url.searchParams.set('conversation_id', entry.conversationId);
@@ -142,19 +143,24 @@
     }, { timeoutMs: 6000, maxBytes: 65536 });
     if (!current(job)) throw new Error('download_cancelled');
     const info = result.payload;
-    if (info?.is_library_file !== true || info.library_file_id !== entry.libraryFileId ||
+    if (!info || typeof info !== 'object' || Array.isArray(info) ||
+        info.is_library_file !== undefined && typeof info.is_library_file !== 'boolean' ||
+        entry.libraryFileId && (info.is_library_file !== true || info.library_file_id !== entry.libraryFileId) ||
         info.file_id != null && info.file_id !== entry.fileId ||
+        info.library_file_id != null && (typeof info.library_file_id !== 'string' || !LIBRARY.test(info.library_file_id)) ||
         info.is_project !== undefined && typeof info.is_project !== 'boolean' ||
         info.gizmo_id != null && (typeof info.gizmo_id !== 'string' || !PROJECT.test(info.gizmo_id))) {
       throw new Error('download_scope_unconfirmed');
     }
-    const projectId = info.is_project === true || PROJECT.test(info.gizmo_id || '')
-      ? info.gizmo_id || entry.projectId : null;
-    if (info.is_project === true && !projectId) throw new Error('download_scope_unconfirmed');
+    const isLibrary = info.is_library_file === true;
+    const projectId = isLibrary ? (info.is_project === true || PROJECT.test(info.gizmo_id || '')
+      ? info.gizmo_id || entry.projectId : null) : entry.projectId;
+    if (isLibrary && info.is_project === true && !projectId) throw new Error('download_scope_unconfirmed');
+    const libraryFileId = entry.libraryFileId || (isLibrary ? info.library_file_id : null);
     // Official preview passes libraryDownloadId only after matching personal
     // ownership. Images and connector copies retain their separate resolvers.
-    if (!entry.image && !entry.connectorCopy && !projectId && info.is_project !== true) {
-      return { libraryDownloadId: entry.libraryFileId };
+    if (!entry.image && !entry.connectorCopy && libraryFileId && !projectId && info.is_project !== true) {
+      return { libraryDownloadId: libraryFileId };
     }
     return { url: authorizationUrl(entry, projectId) };
   }
@@ -320,7 +326,7 @@
         respond(ACTION, true, 'download_queued');
       }
     } catch (error) {
-      const reason = String(error?.message || '');
+      const reason = job.cancelled ? 'download_cancelled' : String(error?.message || '');
       const code = ['download_file_not_ready', 'download_source_unsupported', 'download_confirmation_unknown',
         'download_enqueue_failed', 'download_cancelled', 'download_file_unavailable', 'download_storage_failed',
         'download_file_too_large', 'download_content_invalid', 'download_transfer_timeout'].includes(reason) ? reason :
@@ -336,9 +342,10 @@
 
   function cancel(leaseId) {
     if (!active || leaseId != null && leaseId !== active.descriptor.leaseId) return false;
+    active.cancelled = true;
     active.controller.abort();
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 15, register, registerLibraryFile, start, cancel, dispose });
+  return Object.freeze({ version: 16, register, registerLibraryFile, start, cancel, dispose });
 });

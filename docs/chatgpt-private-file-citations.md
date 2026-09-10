@@ -3,12 +3,13 @@
 ## Status and boundary
 
 Capability: `android_chatgpt_private_file_citation_download_v1`.
-Status: implemented; offline protocol/owner checks passed; grouped APK build and
-real production download acceptance pending. Not marked `completed`.
+Status: implemented; offline protocol/owner checks passed. Download owner v15 is
+included in installed APK 1629 (source `2a01aaf6f`); the v16 metadata/scope and
+cancellation correction awaits the next grouped APK build. Real production
+citation download acceptance remains pending. Not marked `completed`.
 
 This extends the existing conversation file index and download owner. It is not
 a new uploader, downloader, background poller or guessed cloud-provider API.
-The existing published 1620 APK does not contain this source batch.
 
 ## Verified public source
 
@@ -29,6 +30,16 @@ project and then requests a preview/download URL. A cloud source URL is
 attribution, not proof of downloadable bytes. These are source observations,
 not a successful real-account request for the new citation path.
 
+The preview imports shared `Pf` (`cEt`) for
+`GET /files/{file_id}/simple`, with `gizmo_id` and `conversation_id`, even when
+the original citation omits a library ID. Shared `Nf` (`OX`) resolves the
+effective project from that metadata: personal library files clear the requested
+project; project library files use their actual project; non-library files keep
+the requested project. Conversation `hbt` (`o1n`) supplies
+`checkContextScopesForConversationId` to URL authorization. These exact symbols
+and the three source hashes were rechecked on 2026-09-10. Our explicit download
+keeps `download_intent=true`, not the preview-only `show_inline` behavior.
+
 ## Native integration
 
 - `chatgpt_web_private_file_citation.js` v2 accepts explicit files and concrete
@@ -47,9 +58,16 @@ not a successful real-account request for the new citation path.
   Selected-branch and hidden-message rules, index size and truncation remain
   controlled by the existing projection. Nested overflow marks the native index
   as truncated too. Raw references stay in the page.
-- Download owner v15 revalidates the raw citation and uses the existing scoped
-  file authorization, library metadata check, expiring selection handle,
-  native transfer and save receipt. Account/document changes invalidate it.
+- Download owner v16 revalidates the raw citation and always resolves its file
+  metadata, not only citations already carrying a library ID. It then uses
+  `check_context_scopes_for_conversation_id` and the effective project for
+  authorization, or the existing personal-library byte owner. Metadata failures
+  do not fall through to an unscoped request. The bounded metadata read, expiring
+  selection handle, native transfer and save receipt are reused; no new cache
+  or download owner is introduced. Account/document/route changes invalidate it.
+- Explicit cancellation survives an aborted JSON request as `download_cancelled`,
+  rather than `download_prepare_failed`. The request timeout and overall prepare
+  deadline remain failures, not user cancellations.
 - No new HTTP route, DOM readiness wait, automatic navigation, write replay,
   Cookie export or proxy change is introduced. The original citation/official
   preview routes remain available for unsupported shapes.
@@ -63,8 +81,8 @@ without authoritative state and protocol evidence.
 ## Verification and next acceptance
 
 `node --test` on file-citation, citation-integration, history projection, file
-download, shared references, mounted download, image download and connector-copy
-tests passes 129 runner cases (the history script additionally checks its 12
+download, library download, shared references, mounted download, image download
+and connector-copy tests passes 203 runner cases (the history script additionally checks its 12
 assertion cases). The changed production asset catalog also compiles as one
 JavaScript bundle. Source checks do not measure network latency or temperature.
 
@@ -76,10 +94,21 @@ ordering, nested truncation and invalidating old handles after a deleted-source
 refresh. The DOM getter throws in these fixtures; HTTP and native receipts are
 synthetic. This is not real-account or installed-APK acceptance.
 
+The v16 metadata/scope correction first failed 17 of 26 focused runner cases on
+v15. The expanded set then found an explicit-cancel receipt defect (200/201);
+after correcting it and adding both timeout boundaries, all 203 cases passed
+with zero skips/cancellations. Evidence:
+`citation-context-related-final-20260910-115215-587` (terminal pass, 1.8 s).
+Coverage includes missing library identity, personal/project resolution,
+metadata HTTP errors, malformed flags/IDs, owner invalidation and no download
+after cancellation. This does not prove other cloud/PCA protocols or real bytes.
+
 Use an existing synthetic conversation with an assistant file citation after
 the next grouped APK build. In production native UI, open Conversation files,
 select the citation, download it and verify the save receipt and actual bytes.
 Keep the visible conversation/draft unchanged. Then exercise one library/project
 citation and a grouped/cite-map file if present; do not create private user
 content merely for a fixture.
-Phone was absent from the bounded ADB inventory for this source batch.
+Wireless ADB was available on 2026-09-10, but the phone was locked/asleep during
+this correction. No account download, Android build or installation was run for
+v16; keep it in the grouped source batch rather than rebuilding per small fix.
