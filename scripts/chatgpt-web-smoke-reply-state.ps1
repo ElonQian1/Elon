@@ -1,5 +1,21 @@
 #requires -Version 5.1
 
+function Test-ChatGptRegeneratedReplyIdentity {
+    param(
+        [AllowNull()]$Receipt,
+        [bool]$IdentityChanged,
+        [bool]$ContentChanged,
+        [bool]$RequireOfficialRuntime
+    )
+    if ($Receipt.expected_web_action -ne 'regenerate_response' -or
+        $Receipt.status -ne 'succeeded' -or $Receipt.result.ok -ne $true) { return $false }
+    $official = $Receipt.result.detail -ceq 'official_runtime_v1:regenerate_observed'
+    if ($RequireOfficialRuntime -and !$official) { return $false }
+    # The runtime proves a new provider variant and its original parent. A
+    # native turn row is a display identity and may survive that replacement.
+    return $IdentityChanged -or ($official -and $ContentChanged)
+}
+
 function Assert-ChatGptRegenerateForeground {
     param([Parameter(Mandatory = $true)]$Runtime)
     if (!(Test-WebChatNativeChatSurfaceForeground -Runtime $Runtime)) {

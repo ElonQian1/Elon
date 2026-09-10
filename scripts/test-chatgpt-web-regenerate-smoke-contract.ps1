@@ -40,6 +40,9 @@ foreach ($required in @(
     'assistant_content_changed',
     'NativeRetry',
     'RequireOfficialRuntime',
+    'Test-ChatGptRegeneratedReplyIdentity -Receipt $lastReceipt',
+    'CHATGPT_REGENERATE_PROTOCOL=',
+    'Native regenerate acceptance did not restore the original conversation.',
     'web_chat_last_send_command',
     'Production regenerate-probe send was not confirmed.',
     '${function:Get-ChatGptRegenerateReplyState}',
@@ -86,3 +89,26 @@ foreach ($forbidden in @(
 }
 
 Write-Output "CHATGPT_WEB_REGENERATE_SMOKE_CONTRACT=passed"
+
+. (Join-Path $PSScriptRoot 'chatgpt-web-smoke-reply-state.ps1')
+$receipt = [pscustomobject]@{ expected_web_action = 'regenerate_response'; status = 'succeeded';
+    result = [pscustomobject]@{ ok = $true; detail = 'official_runtime_v1:regenerate_observed' } }
+if (!(Test-ChatGptRegeneratedReplyIdentity -Receipt $receipt -IdentityChanged $false -ContentChanged $true -RequireOfficialRuntime $true)) {
+    throw 'An owned new variant may reuse the native turn row.'
+}
+if (Test-ChatGptRegeneratedReplyIdentity -Receipt $receipt -IdentityChanged $false -ContentChanged $false -RequireOfficialRuntime $true) {
+    throw 'An unchanged native reply is not a passing UI acceptance.'
+}
+$receipt.result.detail = 'legacy_success'
+if (Test-ChatGptRegeneratedReplyIdentity -Receipt $receipt -IdentityChanged $false -ContentChanged $true -RequireOfficialRuntime $false) {
+    throw 'Without official variant evidence, changed text alone must not validate a reused row.'
+}
+if (Test-ChatGptRegeneratedReplyIdentity -Receipt $receipt -IdentityChanged $true -ContentChanged $true -RequireOfficialRuntime $true) {
+    throw 'A different row does not prove the requested official runtime.'
+}
+$receipt.result.detail = 'official_runtime_v1:regenerate_observed'
+$receipt.status = 'failed'
+if (Test-ChatGptRegeneratedReplyIdentity -Receipt $receipt -IdentityChanged $true -ContentChanged $true -RequireOfficialRuntime $true) {
+    throw 'A failed command cannot pass from a changed row or text.'
+}
+Write-Output 'CHATGPT_WEB_REGENERATE_IDENTITY_CONTRACT=passed'

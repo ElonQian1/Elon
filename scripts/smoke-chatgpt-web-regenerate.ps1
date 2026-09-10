@@ -12,7 +12,8 @@ param(
     [switch]$NativeRetry,
     [switch]$RequireOfficialRuntime,
     [switch]$UseCurrentNativeSurface,
-    [switch]$UseExistingProbe
+    [switch]$UseExistingProbe,
+    [switch]$CaptureProtocol
 )
 
 $ErrorActionPreference = "Stop"
@@ -125,8 +126,9 @@ function Wait-RegeneratedReply {
                 ($streamingObserved -or $identityChanged -or $contentChanged)
             ) {
                 $officialRuntime = [string]$lastReceipt.result.detail -eq 'official_runtime_v1:regenerate_observed'
-                if ($RequireOfficialRuntime -and (!$officialRuntime -or !$identityChanged)) {
-                    throw 'Retry did not confirm the official runtime with a new assistant identity.'
+                if (!(Test-ChatGptRegeneratedReplyIdentity -Receipt $lastReceipt -IdentityChanged $identityChanged `
+                    -ContentChanged $contentChanged -RequireOfficialRuntime ([bool]$RequireOfficialRuntime))) {
+                    throw 'Retry did not confirm a new variant in the requested transport and native UI.'
                 }
                 return [pscustomobject]@{
                     state = $state
@@ -150,6 +152,7 @@ $result = $null
 $originPath = ""
 $originRestored = $false
 $originCaptured = $false
+$protocolCaptureStarted = $false
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
     if ($UseCurrentNativeSurface) {
@@ -175,7 +178,7 @@ try {
     }
     $originPath = [regex]::Match(
         [string]$origin.conversation.url,
-        '/c/[A-Za-z0-9_-]{1,160}'
+        '(?:/g/g-p-[A-Za-z0-9_-]{1,160})?/c/[A-Za-z0-9_-]{1,160}'
     ).Value
     $originCaptured = $true
 
@@ -253,6 +256,11 @@ try {
         Normalize-ChatGptProbeReply ([string]$initialAssistant.content)
     )
 
+    if ($CaptureProtocol) {
+        Invoke-ReceiptAction -Action chatgpt_private_protocol_probe -ExpectedAction private_protocol_probe `
+            -Arguments @{mode='start'} | Out-Null
+        $protocolCaptureStarted = $true
+    }
     if ($NativeRetry) {
         Assert-ChatGptRegenerateForeground -Runtime $runtime
         $priorRetryIds = @($initialReply.command_requests | ForEach-Object { [string]$_.request_id })
@@ -284,9 +292,6 @@ try {
         -PreviousContentDigest $initialDigest -ExpectedConversationUrl ([string]$initialReply.conversation.url) `
         -OriginalUserIds @($initialReply.conversation.messages | Where-Object { $_.role -eq 'user' } | ForEach-Object { [string]$_.id })
 
-    Write-Output "CHATGPT_REGENERATE_PROGRESS phase=restore_origin"
-    Restore-Origin -ConversationPath $originPath
-    $originRestored = $true
     $result = [ordered]@{
         schema = "elon.chatgpt_web.regenerate_acceptance.v1"
         passed = $true
@@ -310,14 +315,33 @@ try {
         cleared_cookies = $false
         cleared_app_data = $false
     }
-    Register-ChatGptWebVerificationCases -Runtime $runtime `
-        -CaseIds @("reversible/regenerate_response") `
-        -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 } finally {
+    if ($protocolCaptureStarted) {
+        try {
+            $capture = Invoke-ReceiptAction -Action chatgpt_private_protocol_probe -ExpectedAction private_protocol_probe `
+                -Arguments @{mode='read'}
+            $evidence = $capture.receipt.result.detail | ConvertFrom-Json
+            if ($evidence.schema -ne 'elon.private_protocol_probe.v1') { throw 'Unexpected protocol evidence.' }
+            Write-Output ('CHATGPT_REGENERATE_PROTOCOL=' + ([ordered]@{
+                schema = $evidence.schema; active = [bool]$evidence.active; dropped = [int]$evidence.dropped
+                page_generation = [int]$capture.state.page_generation
+                records = @($evidence.records | ForEach-Object { [ordered]@{
+                    method = $_.method; path = $_.path; status = $_.status; response_kind = $_.responseKind
+                } })
+            } | ConvertTo-Json -Depth 5 -Compress))
+        } catch { Write-Warning 'Regeneration protocol evidence unavailable; no retry was issued.' }
+        finally {
+            try { Invoke-ReceiptAction -Action chatgpt_private_protocol_probe -ExpectedAction private_protocol_probe `
+                -Arguments @{mode='stop'} | Out-Null }
+            catch { Write-Warning 'Protocol capture stop not confirmed; its bounded expiry remains active.' }
+        }
+    }
     if ($originCaptured -and -not $originRestored) {
         try {
             if (Test-WebChatNativeChatSurfaceForeground -Runtime $runtime) {
+                Write-Output "CHATGPT_REGENERATE_PROGRESS phase=restore_origin"
                 Restore-Origin -ConversationPath $originPath
+                $originRestored = $true
             } else {
                 Write-Warning 'Original ChatGPT view restoration deferred: native_chat_not_foreground.'
             }
@@ -328,5 +352,9 @@ try {
     Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 }
 
+if (!$originRestored) { throw 'Native regenerate acceptance did not restore the original conversation.' }
+Register-ChatGptWebVerificationCases -Runtime $runtime `
+    -CaseIds @("reversible/regenerate_response") `
+    -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
 $result | ConvertTo-Json -Depth 4
 Write-Output "CHATGPT_WEB_REGENERATE_ACCEPTANCE=passed"
