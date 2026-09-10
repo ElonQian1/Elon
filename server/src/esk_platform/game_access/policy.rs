@@ -137,10 +137,16 @@ pub fn valid_challenge(value: &str) -> bool {
         .is_ok_and(|bytes| bytes.len() == 32 && URL_SAFE_NO_PAD.encode(bytes) == value)
 }
 pub fn valid_scopes(scopes: &[String]) -> bool {
-    let order = ["play", "inventory_read", "redeem", "principal_withdraw"];
+    let order = [
+        "play",
+        "inventory_read",
+        "wallet_bind",
+        "redeem",
+        "principal_withdraw",
+    ];
     let mut previous = None;
     !scopes.is_empty()
-        && scopes.len() <= 4
+        && scopes.len() <= 5
         && scopes[0] == "play"
         && scopes.iter().all(|scope| {
             let Some(index) = order.iter().position(|s| s == scope) else {

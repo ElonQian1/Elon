@@ -86,10 +86,16 @@ fn validate_grant(grant: &Grant) -> Result<(), Error> {
     if revision == 0 || revision > u32::MAX.into() || until <= from || until - from > 900_000 {
         return Err(Error::InvalidContract);
     }
-    if grant.scopes.is_empty() || grant.scopes.len() > 4 || grant.scopes[0] != "play" {
+    if grant.scopes.is_empty() || grant.scopes.len() > 5 || grant.scopes[0] != "play" {
         return Err(Error::InvalidContract);
     }
-    let order = ["play", "inventory_read", "redeem", "principal_withdraw"];
+    let order = [
+        "play",
+        "inventory_read",
+        "wallet_bind",
+        "redeem",
+        "principal_withdraw",
+    ];
     let mut previous = None;
     for scope in &grant.scopes {
         let index = order

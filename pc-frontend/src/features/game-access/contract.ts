@@ -12,6 +12,7 @@ const fields = ['schema', 'client_id', 'redirect_uri', 'state', 'code_challenge'
 export const scopeLabels: Record<string, string> = {
   play: '使用主账号进入游戏，并恢复角色和小岛',
   inventory_read: '读取本人游戏装备和回收订单',
+  wallet_bind: '在游戏中确认并签名绑定自己的装备钱包',
   redeem: '申请装备回收报价并接受报价',
   principal_withdraw: '提交本金退出申请',
 }
@@ -42,7 +43,7 @@ export function parseGameRequest(search: string): GameRequest {
   const url = new URL(v.redirect_uri)
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash
     || url.pathname !== '/api/account/callback' || url.href !== v.redirect_uri) throw new Error('游戏回调地址无效。')
-  if (!Array.isArray(v.scopes) || v.scopes.length < 1 || v.scopes.length > 4 || v.scopes[0] !== 'play') throw new Error('游戏权限无效。')
+  if (!Array.isArray(v.scopes) || v.scopes.length < 1 || v.scopes.length > 5 || v.scopes[0] !== 'play') throw new Error('游戏权限无效。')
   let previous = -1
   for (const scope of v.scopes) {
     if (typeof scope !== 'string' || scopeOrder.indexOf(scope) <= previous) throw new Error('游戏权限无效。')

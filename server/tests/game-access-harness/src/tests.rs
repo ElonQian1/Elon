@@ -5,6 +5,59 @@ mod support;
 use support::*;
 
 #[test]
+fn wallet_binding_requires_new_explicit_scope_without_upgrading_old_grants() {
+    let mut c = db();
+    let p = policy();
+    let old = login(&mut c);
+    let mut ch = challenge(&old.access_token, 101);
+    ch.action = protocol::Action::WalletBind {};
+    assert!(
+        observe::observe(&mut c, &p, &service(), &old.access_token, &ch, &|| Ok(
+            AT + 2
+        ))
+        .is_err()
+    );
+    assert_eq!(count(&c, "game_access_nonces"), 0);
+    let mut body = authorize_body();
+    body.scopes = vec!["play".into(), "inventory_read".into(), "wallet_bind".into()];
+    let code = issue::authorize(&mut c, &p, "alice", MASTER, &body, &|| Ok(AT)).unwrap();
+    let token = issue::exchange(
+        &mut c,
+        &p,
+        &service(),
+        &exchange_body(&code),
+        &|| Ok(AT + 1),
+    )
+    .unwrap();
+    assert_eq!(token.scopes, body.scopes);
+    let mut ch = challenge(&token.access_token, 102);
+    ch.action = protocol::Action::WalletBind {};
+    let obs = observe::observe(&mut c, &p, &service(), &token.access_token, &ch, &|| {
+        Ok(AT + 2)
+    })
+    .unwrap();
+    let authority = protocol::Authority {
+        main_issuer: p.issuer.clone(),
+        key_id: p.key_id.clone(),
+        public_key: p.public_key(),
+    };
+    let verified = protocol::verify_observation(&obs, &ch, &authority, (AT + 3) as u64).unwrap();
+    assert!(!verified.wallet_bound && !verified.funds_moved);
+    ch.nonce = format!("{:064x}", 103);
+    ch.action = protocol::Action::Quote {
+        asset_id: "asset-1".into(),
+        policy_id: "policy-1".into(),
+    };
+    assert!(
+        observe::observe(&mut c, &p, &service(), &token.access_token, &ch, &|| Ok(
+            AT + 3
+        ))
+        .is_err()
+    );
+    assert_eq!(count(&c, "game_access_nonces"), 1);
+}
+
+#[test]
 fn main_sdk_fixed_signature_verifies_with_production_rust_protocol() {
     let f: serde_json::Value = serde_json::from_str(include_str!(
         "../../../../sdk/game-access/test/fixtures/session-v1.json"

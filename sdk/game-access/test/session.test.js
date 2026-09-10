@@ -63,6 +63,19 @@ test('inventory permission is not permission to redeem', () => {
   assert.throws(() => check(f), /scope_missing/);
 });
 
+test('wallet binding needs its own permission and never proves wallet control or payment', () => {
+  const denied = signedFixture(o => { o.challenge.action = { kind: 'wallet_bind' }; });
+  assert.throws(() => check(denied), /scope_missing/);
+  const allowed = signedFixture(o => {
+    o.challenge.action = { kind: 'wallet_bind' };
+    o.grant.scopes = ['play', 'inventory_read', 'wallet_bind'];
+  });
+  const result = check(allowed);
+  assert.equal(result.wallet_bound, false);
+  assert.equal(result.funds_moved, false);
+  assert.throws(() => grantValues({ ...allowed.observation.grant, scopes: ['play', 'wallet_bind', 'inventory_read'] }));
+});
+
 test('principal withdrawal requires its own scope and binds its position and request', () => {
   const denied = signedFixture(o => { o.challenge.action = {kind:'principal_withdraw',position_id:'position-1',idempotency_key:'request-1'}; });
   assert.throws(() => check(denied), /scope_missing/);

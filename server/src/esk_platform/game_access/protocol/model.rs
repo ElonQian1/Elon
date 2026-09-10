@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 pub enum Action {
     Authenticate {},
     Inventory {},
+    WalletBind {},
     Order {
         order_id: String,
     },
@@ -26,6 +27,7 @@ impl Action {
         match self {
             Self::Authenticate {} => vec!["authenticate"],
             Self::Inventory {} => vec!["inventory"],
+            Self::WalletBind {} => vec!["wallet_bind"],
             Self::Order { order_id } => vec!["order", order_id],
             Self::Quote {
                 asset_id,
@@ -45,6 +47,7 @@ impl Action {
         match self {
             Self::Authenticate {} => "play",
             Self::Inventory {} | Self::Order { .. } => "inventory_read",
+            Self::WalletBind {} => "wallet_bind",
             Self::Quote { .. } | Self::AcceptQuote { .. } => "redeem",
             Self::PrincipalWithdraw { .. } => "principal_withdraw",
         }

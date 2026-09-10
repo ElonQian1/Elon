@@ -73,7 +73,9 @@ Rust 原生 TLS 监听器提供 `/pc/game-access?request=<编码的授权请求 
 }
 ```
 
-示例中的 state 和 challenge 是说明文字，不能直接提交。scope 必须按 `play`、`inventory_read`、`redeem`、`principal_withdraw` 顺序提供且无重复，必含 `play`。界面默认只申请实际需要的权限；`redeem` 不包含提取本金。
+示例中的 state 和 challenge 是说明文字，不能直接提交。scope 必须按 `play`、`inventory_read`、`wallet_bind`、`redeem`、`principal_withdraw` 顺序提供且无重复，必含 `play`。界面默认只申请实际需要的权限；`redeem` 不包含提取本金。
+
+游戏配置启用钱包时，新的登录请求单独列出 `wallet_bind`，对应签名观测动作 `{"kind":"wallet_bind"}`。`play` 和 `inventory_read` 均不能创建或完成钱包绑定；原有 grant 不会自动扩权，需要重新明确授权。该权限只允许进入游戏钱包证明流程，仍需用户对绑定用途的消息签名；主账号签名观测中的 `wallet_bound` 和 `funds_moved` 始终为 false。尚未升级到此权限版本的服务会拒绝钱包请求，不能降级借用其他 scope。
 
 兑换正文含 `schema=esk.game.access.exchange.v1`、`grant_type=authorization_code`、`client_id`、`redirect_uri`、`state`、`code` 和 `code_verifier`；请求头 `x-esk-game-service` 提供 BFF 凭据。code 最长 120 秒，grant 最长 15 分钟，均不超过原主会话寿命。
 

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseGameRequest, gameLoginReturn, authorizedCallback } from '../src/features/game-access/contract.ts'
+import { parseGameRequest, gameLoginReturn, authorizedCallback, scopeLabels } from '../src/features/game-access/contract.ts'
 import { loginSession, readJson } from '../src/features/game-access/session.ts'
 
 const request = () => ({ schema: 'esk.game.access.authorize.v1', client_id: 'esk-game.web',
@@ -12,6 +12,14 @@ const query = value => `?${new URLSearchParams({ request: JSON.stringify(value) 
 test('valid game request preserves the exact scope, state, PKCE and callback contract', () => {
   assert.deepEqual(parseGameRequest(query(request())), request())
   assert.equal(gameLoginReturn(`/game-access${query(request())}`), `/game-access${query(request())}`)
+})
+
+test('wallet binding is separately displayed and only accepted when explicitly requested', () => {
+  const requested = { ...request(), scopes: ['play', 'inventory_read', 'wallet_bind'] }
+  assert.deepEqual(parseGameRequest(query(requested)), requested)
+  assert.match(scopeLabels.wallet_bind, /确认.*签名.*绑定/)
+  assert.deepEqual(parseGameRequest(query(request())).scopes, ['play', 'inventory_read'])
+  assert.throws(() => parseGameRequest(query({ ...requested, scopes: ['play', 'wallet_bind', 'inventory_read'] })))
 })
 test('login return cannot become an external or arbitrary in-app redirect', () => {
   for (const value of [null, '', '//evil.example', 'https://evil.example', '/account', '/game-access',

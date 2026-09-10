@@ -5,9 +5,10 @@ export const OBSERVATION_DOMAIN = 'esk.game.session.observation.v1';
 export const MAX_GRANT_MS = 900_000n;
 export const MAX_OBSERVATION_AGE_MS = 10_000n;
 export const CLOCK_SKEW_MS = 2_000n;
-const SCOPE_ORDER = ['play', 'inventory_read', 'redeem', 'principal_withdraw'];
+const SCOPE_ORDER = ['play', 'inventory_read', 'wallet_bind', 'redeem', 'principal_withdraw'];
 const ACTIONS = {
   authenticate: [[], 'play'], inventory: [[], 'inventory_read'],
+  wallet_bind: [[], 'wallet_bind'],
   order: [['order_id'], 'inventory_read'], quote: [['asset_id', 'policy_id'], 'redeem'],
   accept_quote: [['quote_id', 'idempotency_key'], 'redeem'],
   principal_withdraw: [['position_id', 'idempotency_key'], 'principal_withdraw'],
@@ -64,7 +65,7 @@ export function grantValues(grant) {
   const from = units(grant.not_before_ms);
   const until = units(grant.expires_at_ms);
   requireCondition(revision > 0n && revision <= 4_294_967_295n && until > from && until - from <= MAX_GRANT_MS);
-  requireCondition(Array.isArray(grant.scopes) && grant.scopes.length >= 1 && grant.scopes.length <= 4 && grant.scopes[0] === 'play');
+  requireCondition(Array.isArray(grant.scopes) && grant.scopes.length >= 1 && grant.scopes.length <= 5 && grant.scopes[0] === 'play');
   let previous = -1;
   for (const scope of grant.scopes) {
     const index = SCOPE_ORDER.indexOf(scope);
