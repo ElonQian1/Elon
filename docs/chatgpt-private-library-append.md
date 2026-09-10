@@ -13,15 +13,17 @@ Normal Release 1632 (adapter 316) was built, published and installed over wirele
 ADB with login preserved. Production attachment acceptance then exposed a
 completion-notification race, reproduced below. Adapter 317, sender 24 and Library
 attachment 5 fix that race; composer 21 and runtime bindings 9 are unchanged.
-Normal 1634 is published and installed: the first-file native receipt/card/return
-passed, but a second PDF returned `library_attachment_policy_unconfirmed` through
-production MCP. Multi-file attach/send is **not accepted**. See the
-[1634 device report](reports/chatgpt-library-append-1634.md). This is not an
-independent Android HTTP text sender.
+Normal 1634 accepted the first-file receipt/card/return but rejected a second
+PDF. Normal **1635 / adapter 318** now passes consecutive TXT/PDF selection from
+the production native Library, two ready cards, one official-runtime send,
+both document markers in the reply and cleanup/restoration. This scope is
+completed; see [1635 acceptance](reports/chatgpt-library-append-1635.md).
+The [1634 report](reports/chatgpt-library-append-1634.md) remains historical
+failure evidence. This is not an independent Android HTTP text sender.
 
 Policy 2 / adapter 318 additionally preserve the official composer's explicitly
-undefined quota props. This source-backed correction has passed offline checks;
-it is not yet proof of the exact 1634 device failure. The read-only
+undefined quota props. This source-backed correction and the new complete flow
+have passed, without claiming proof of the exact 1634 failed guard. The read-only
 `library_attachment_policy` MCP probe reports a closed reason code from the last
 policy attempt without loading modules, invoking the validator or exposing props.
 
@@ -116,9 +118,8 @@ The explicit-undefined regression fails on the previous code
 (`library-policy-optional-red-20260910-153536-214`). After the fix, 174 related
 tests pass without skips (`library-policy-related-20260910-154046-591`), covering
 append ownership, official validation, cancellation, runtime aliases and the
-page/native diagnostic vocabulary. A separate fresh-page device receipt is
-still required to identify whether this or a different boundary caused 1634's
-second-file rejection.
+page/native diagnostic vocabulary. The fresh 1635 native flow passes; no detailed
+1634 policy receipt exists to identify its exact failed boundary retrospectively.
 
 ## Verification
 
@@ -138,8 +139,8 @@ second-file rejection.
 
 ## Remaining Boundaries
 
-The second-file provider-policy shape remains unresolved on real 1634; its failed
-append preserves the first file and sends nothing. Adding new local picker files *after* staged Library
+Ordinary consecutive TXT/PDF append/send is accepted on 1635 and should be reused.
+Adding new local picker files *after* staged Library
 references remains a separate empty-composer upload limitation; this change does
 not silently broaden that contract. Foreign/unowned or uploading file stores,
 project/temporary Library references, live/suggestion cloud references, folder

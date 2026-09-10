@@ -64,16 +64,17 @@ evidence are in [the project readiness report](reports/chatgpt-project-media-acc
 
 The [library attachment deadline correction](chatgpt-private-library-attachment-deadline.md)
 aligns page-operation/native-receipt/UI budgets and prevents late publication.
-202 Node and 8 JVM checks passed; adapter 315 is source-only for the next grouped
-APK, not part of published 1631. Device acceptance remains pending.
+202 Node and 8 JVM checks passed; the correction is included in normal
+1632/1634/1635. Slow mounted-file device acceptance remains pending.
 
 [Library append](chatgpt-private-library-append.md) reuses the private attachment
 owner for consecutive Library files and Library files after a local-upload batch,
 with the official count validator, duplicate handling and exact submit cleanup.
-[Release 1634](reports/chatgpt-library-append-1634.md) installed adapter 317 and
-accepted the first-file receipt fix. A second PDF still returns
-`library_attachment_policy_unconfirmed` through production MCP without sending.
-Multi-file acceptance and reverse-order local uploads remain incomplete.
+[Release 1635](reports/chatgpt-library-append-1635.md) accepts consecutive native
+TXT/PDF selection, two ready cards, one runtime send, both file-content markers,
+cleanup and original-conversation restoration. Reuse this completed ordinary
+scope; reverse-order local uploads, expired visible handles and real mounted
+append remain incomplete.
 
 ## Recent Accepted Scopes
 
