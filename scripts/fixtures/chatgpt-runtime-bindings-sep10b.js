@@ -16,7 +16,7 @@ const expectedExports = {
   composer: { Ih: 'ag', t_: 'w_', AS: 'eC', VS: 'dC', Ng: 'n_', Bg: 'l_' }
 };
 const extraExports = {
-  shared: { attachmentUploadType: 'Up' },
+  shared: { attachmentUploadType: 'Up', conversationStore: 'GJ' },
   conversation: { attachmentBaseLimit: 'dQt', attachmentMaxUploads: 'vQt',
     attachmentPendingCount: 'pQt', attachmentConfiguredLimit: 'uQt' },
   composer: { fh: 'Ph' }

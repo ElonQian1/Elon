@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 9, create: factory });
+  const api = Object.freeze({ version: 10, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateRegenerateContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -134,5 +134,41 @@
     return observation(binding, modules, stream) === 'regenerate_observed';
   }
 
-  return Object.freeze({ urls: URLS, capture, current, ownerCurrent, validate, prepare, observed, observation });
+  function runtimeReply(binding, modules) {
+    if (!ownerCurrent(binding)) return null;
+    try {
+      const s = modules.shared, tree = s.XM(binding.conversation.id);
+      const id = s.HM.getCurrentLeafId(tree);
+      if (!UUID.test(id || '') || binding.variants.has(id)) return null;
+      const message = s.HM.getNode(tree, id)?.message;
+      if (message?.id !== id || message.author?.role !== 'assistant' ||
+          message.channel != null && message.channel !== 'final' ||
+          message.recipient != null && message.recipient !== 'all' ||
+          ['is_visually_hidden_from_conversation', 'is_visually_hidden_reasoning_group', 'debug_internal_only']
+            .some(key => message.metadata?.[key] === true) ||
+          message.content?.content_type !== 'text' ||
+          !['in_progress', 'finished_successfully', 'finished_partial_completion'].includes(message.status)) return null;
+      const parts = message.content.parts;
+      if (!Array.isArray(parts) || !parts.length || parts.length > 128 ||
+          !parts.every(part => typeof part === 'string' && part.length <= 40000)) return null;
+      if (parts.reduce((size, part) => size + part.length, 0) > 40000) return null;
+      const text = parts.join('').trim();
+      return text ? { id, conversationId: binding.cid, text,
+        state: message.status === 'in_progress' ? 'streaming' : 'completed' } : null;
+    } catch (_) { return null; }
+  }
+
+  function subscribe(binding, modules, listener) {
+    try {
+      const s = modules.shared, store = s.conversationStore;
+      if (!ownerCurrent(binding) || typeof store?.getState !== 'function' ||
+          typeof store.subscribe !== 'function' ||
+          s.XM(binding.conversation.id, store.getState()) !== s.XM(binding.conversation.id)) return null;
+      const unsubscribe = store.subscribe(listener);
+      return typeof unsubscribe === 'function' ? unsubscribe : null;
+    } catch (_) { return null; }
+  }
+
+  return Object.freeze({ urls: URLS, capture, current, ownerCurrent, validate, prepare, observed, observation,
+    runtimeReply, subscribe });
 });

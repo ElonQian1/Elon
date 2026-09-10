@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 11, create: factory });
+  const api = Object.freeze({ version: 12, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -21,7 +21,8 @@
   const currentExports = {
     shared: { H3: 'c6', R5: 'i7', F5: 't7', mq: 'Pq', wV: 'UV', SV: 'VV', XM: 'mN', HM: 'oN',
       'M$': 'Q$', RW: 'rG', uo: 'uo', t4: 'x4', IX: 'nZ', t6: 'x6', cX: 'OX',
-      Fx: 'Lx', Fl: 'Il', v7: 'R7', $3: 'y6', Ur: 'Ur', zr: 'zr', attachmentUploadType: undefined },
+      Fx: 'Lx', Fl: 'Il', v7: 'R7', $3: 'y6', Ur: 'Ur', zr: 'zr', attachmentUploadType: undefined,
+      conversationStore: undefined },
     conversation: { AGt: 'uKt', J5t: 'O7t', Nrn: 'Cin', yRt: '$Rt', Grn: 'Fin',
       vRt: 'QRt', p8t: 'q8t', l0: 'E0', M1t: 'f0t', Rdn: 'Ofn', Rrn: 'Oin',
       win: 'man', Ein: 'gan', ay: 'Sy', iy: 'xy', ry: 'by', Jrn: 'Rin', Hrn: 'Min',
@@ -64,7 +65,8 @@
   const september10bExports = {
     shared: { H3: 'y5', R5: 'J9', F5: 'G9', mq: 'QG', wV: 'cR', SV: 'oR', XM: 'jJ', HM: 'CJ',
       'M$': 'I0', RW: 'oV', uo: 'ws', t4: 'u6', IX: 'GU', t6: 'q8', cX: 'rJ',
-      Fx: 'BS', Fl: '$u', v7: 'Oet', $3: 'G8', Ur: 'Zi', zr: 'qi', attachmentUploadType: 'Up' },
+      Fx: 'BS', Fl: '$u', v7: 'Oet', $3: 'G8', Ur: 'Zi', zr: 'qi', attachmentUploadType: 'Up',
+      conversationStore: 'GJ' },
     conversation: { AGt: 'VKt', J5t: '$9t', Nrn: 'Qan', yRt: 'Azt', Grn: 'uon',
       vRt: 'kzt', p8t: 'v7t', l0: 'D0', M1t: 't2t', Rdn: 'Rmn', Rrn: 'ron',
       win: 'Uon', Ein: 'Gon', ay: 'by', iy: 'yy', ry: 'vy', Jrn: 'pon', Hrn: 'son',
@@ -221,8 +223,8 @@
 
   function state() {
     const p = profile();
-    return { version: 11, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 12, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 11, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 12, observed, load, peek, temporary, tools, state });
 });

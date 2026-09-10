@@ -1,11 +1,13 @@
 # Official-runtime response regeneration
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
-Status: source implemented and offline verified. v9 uses the official runtime
-user/account for post-dispatch ownership rather than incidental cached headers. Normal 1642
-is installed and passed the native retry entry after the transcript reentry fix.
-Its single runtime invocation received a 200 stream, but completion failed with
-`timeout_owner_account`. End-to-end runtime acceptance is not passed. See
+Status: source implemented and offline verified. Normal 1643 / adapter 326 is
+installed; its retry passed the corrected runtime identity check but failed at
+`timeout_stream_missing`. Contract/runtime 10 and resolver 12 now also observe
+the official conversation store without a DOM poll or another request. The 314
+related checks pass; adapter 327 delivery and device acceptance are pending.
+End-to-end runtime acceptance is not passed. See the
+[current evidence](reports/chatgpt-regeneration-store-20260911.md),
 the [1637 follow-up](reports/chatgpt-regeneration-observation-1637.md) and
 the [grouped delivery](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).
 The original adapter 286 batch wired this candidate into the existing production
@@ -38,7 +40,26 @@ The finite red run reproduced false rejection of header hydration and false
 acceptance of real runtime identity changes with unchanged cached headers.
 `regenerate-runtime-identity-related-20260911-020930-918` passes 236 cases, including
 17 focused identity checks and the existing model/reply/branch/writer guards.
-Adapter 326 carries the correction; normal release and phone acceptance are pending.
+Adapter 326 shipped in normal 1643. Its one production retry reached
+`timeout_stream_missing`, no longer the earlier account fence. This is not a
+completed retry acceptance; the current report distinguishes the remaining gap.
+
+## Official Store Observation
+
+Contract/runtime 10 retain the passive private stream and additionally read the
+current official tree when that stream has no visible text. The same new-variant,
+selected-leaf, original-parent, user/account, document and conversation checks
+apply. Analysis/tool/internal messages, unknown status/content, empty text and
+oversized parts cannot confirm a reply. Text stays page-local; this is a command
+confirmation path, not a new native transcript transport or independent HTTP.
+
+Resolver 12 exposes the inspected September 10-b `conversationStore` singleton.
+A listener is attached only for the pending retry, with no timer/DOM polling or
+network request. Completion/document replacement releases both subscriptions;
+late matching state can release an unknown-result fence without replay. Older
+profiles or an unavailable store retain the existing stream observer. The
+existing final deadline also reads the owned tree once; its deadline is not
+extended. See the current report for exact source and test evidence.
 
 ## Normal 1642 native reentry and remaining owner failure
 

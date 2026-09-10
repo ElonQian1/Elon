@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 9, create: factory });
+  const api = Object.freeze({ version: 10, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const old = root.__elonChatGptPrivateRegenerateRuntime;
@@ -36,6 +36,7 @@
   function release(owner) {
     page.clearTimeout(owner.deadline); page.clearTimeout(owner.retry);
     owner.unsubscribe?.(); owner.unsubscribe = null;
+    owner.unsubscribeStore?.(); owner.unsubscribeStore = null;
     if (active === owner) active = null;
   }
 
@@ -82,7 +83,10 @@
       if (active !== owner || !owner.invoked) return;
       page.clearTimeout(owner.retry); owner.retry = null;
       try {
-        const value = stream.current(page.location.pathname);
+        const captured = stream.current(page.location.pathname);
+        // The official tree can commit an answer even when the passive SSE tap
+        // has no visible frame. Both sources retain the same parent/owner checks.
+        const value = captured?.text ? captured : contract.runtimeReply(owner.binding, modules) || captured;
         owner.observation = contract.observation(owner.binding, modules, value);
         if (owner.observation === 'regenerate_observed') {
           release(owner);
@@ -112,6 +116,8 @@
         if (!final || final.parentId !== prepared.parentId) return unavailable('context_changed');
         owner.binding = final;
         owner.unsubscribe = stream.subscribe(observe);
+        owner.unsubscribeStore = contract.subscribe(final, modules, observe);
+        if (!contract.ownerCurrent(final)) return unavailable('context_changed');
         owner.deadline = page.setTimeout(() => {
           // The last stream event can precede the committed tree. Read once more
           // at the deadline without extending the retry budget or issuing a write.
@@ -131,5 +137,5 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 9, regenerate, available, state });
+  return Object.freeze({ version: 10, regenerate, available, state });
 });

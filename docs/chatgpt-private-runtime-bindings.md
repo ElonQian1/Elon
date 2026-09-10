@@ -2,6 +2,12 @@
 
 ## Status
 
+Version 12 adds only the inspected September 10-b `conversationStore` export
+`GJ` (`hS`) for bounded, request-owned regeneration observation. Older profiles
+do not guess this mapping. Source/getter/subscription evidence and the 314-case
+related run are in [the regeneration report](reports/chatgpt-regeneration-store-20260911.md).
+Adapter 327 publication and device acceptance remain pending.
+
 Version 11 adds the second September 10 build observed on normal APK 1639.
 It retains all earlier profiles and maps 57 consumed contracts from inspected
 public sources. The private model diagnostic had reported `runtime_not_observed`;
