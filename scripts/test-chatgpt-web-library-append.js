@@ -39,6 +39,50 @@ test('sequential library references share one native list and exact submit lease
   assert.equal(f.requests(), 0, 'ordinary references do not download or upload bytes');
 });
 
+test('explicitly absent official menu limits are passed to the official validator unchanged', async () => {
+  for (const [upload, total] of [[undefined, undefined], [9, undefined]]) {
+    const f = setup(); await f.attach(f.source(1));
+    f.props.maxLibraryAttachmentCount = upload;
+    f.props.maxTotalLibraryAttachmentCount = total;
+    assert.equal((await f.attach(f.source(2)))[1], true);
+    assert.equal(f.validations.at(-1)[3], upload);
+    assert.equal(f.validations.at(-1)[4], total);
+    assert.equal(f.sender.prepareSubmit(f.store).readyFiles.length, 2);
+  }
+});
+
+test('invalid menu limit shapes cannot disable the official policy', async () => {
+  for (const value of [null, -1, 0.5, '9', Infinity, NaN]) {
+    const f = setup(); await f.attach(f.source(1));
+    f.props.maxLibraryAttachmentCount = value;
+    assert.equal((await f.attach(f.source(2)))[2], 'library_attachment_policy_unconfirmed');
+    assert.equal(f.validations.length, 0);
+    assert.equal(f.sender.prepareSubmit(f.store).readyFiles.length, 1);
+  }
+});
+
+test('policy reports the failed boundary, not private props or a generic missing feature', async () => {
+  const changes = {
+    limits_missing: f => { delete f.props.maxLibraryAttachmentCount; },
+    limits_invalid: f => { f.props.maxTotalLibraryAttachmentCount = '9'; },
+    scope_mismatch: f => { f.props.composerDisabled = true; },
+    composer_detached: f => { f.plus.isConnected = false; },
+    owner_unavailable: f => { f.fiber.type = { name: 'unobserved' }; },
+    attachment_limit: f => f.reject(),
+    validator_error: f => { f.namespace.fh.validateChatAttachment = () => { throw Error('private'); }; },
+  };
+  for (const [expected, change] of Object.entries(changes)) {
+    const f = setup(), policy = f.root.__elonChatGptPrivateLibraryAttachmentPolicy;
+    assert.equal(policy.state(f.root), 'not_observed');
+    await f.attach(f.source(1)); change(f);
+    assert.equal((await f.attach(f.source(2)))[1], false);
+    assert.equal(policy.state(f.root), expected);
+    assert.equal(f.store.files$().length, 1);
+    f.root.__elonChatGptDocumentToken = 'doc_next';
+    assert.equal(policy.state(f.root), 'not_observed', 'old document cannot report current policy');
+  }
+});
+
 test('library append retains a staged private local upload and each can be removed independently', async () => {
   const f = setup(), binding = f.composer.capture();
   f.composer.associate(binding, f.file, f.result(binding), 'local');

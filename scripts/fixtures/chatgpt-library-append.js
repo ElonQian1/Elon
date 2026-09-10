@@ -19,7 +19,8 @@ module.exports = function setup() {
   const validations = [], responses = [], changes = [];
   const namespace = { fh: { validateChatAttachment(...args) {
     validations.push(args);
-    return validation && args[5].length < args[4];
+    return validation && (args[3] == null || args[5].length < args[3] &&
+      (args[4] == null || args[5].length < args[4]));
   } } };
   Object.assign(f.root, { File, crypto: require('node:crypto').webcrypto,
     __elonChatGptPrivateLibraryAttachment: require(assets + 'chatgpt_web_private_library_attachment'),
