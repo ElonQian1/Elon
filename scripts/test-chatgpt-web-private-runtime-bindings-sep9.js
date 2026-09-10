@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const bindings = require('../android/app/src/main/assets/chatgpt_web_private_runtime_bindings');
 const { attach, CDN, expectedExports: prior } = require('./fixtures/chatgpt-runtime-bindings');
 const profiles = [require('./fixtures/chatgpt-runtime-bindings-sep9'), require('./fixtures/chatgpt-runtime-bindings-sep9b'),
-  require('./fixtures/chatgpt-runtime-bindings-sep10')];
+  require('./fixtures/chatgpt-runtime-bindings-sep10'), require('./fixtures/chatgpt-runtime-bindings-sep10b')];
 
 for (const profile of profiles) test.describe(profile.id, () => {
 

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 10, create: factory });
+  const api = Object.freeze({ version: 11, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -61,6 +61,18 @@
       attachmentPendingCount: 'nQt', attachmentConfiguredLimit: '$Zt' },
     composer: { Ih: 'ig', t_: 'C_', AS: '$S', VS: 'uC', Ng: 't_', Bg: 'c_', fh: 'Ph' }, react: {}
   };
+  const september10bExports = {
+    shared: { H3: 'y5', R5: 'J9', F5: 'G9', mq: 'QG', wV: 'cR', SV: 'oR', XM: 'jJ', HM: 'CJ',
+      'M$': 'I0', RW: 'oV', uo: 'ws', t4: 'u6', IX: 'GU', t6: 'q8', cX: 'rJ',
+      Fx: 'BS', Fl: '$u', v7: 'Oet', $3: 'G8', Ur: 'Zi', zr: 'qi', attachmentUploadType: 'Up' },
+    conversation: { AGt: 'VKt', J5t: '$9t', Nrn: 'Qan', yRt: 'Azt', Grn: 'uon',
+      vRt: 'kzt', p8t: 'v7t', l0: 'D0', M1t: 't2t', Rdn: 'Rmn', Rrn: 'ron',
+      win: 'Uon', Ein: 'Gon', ay: 'by', iy: 'yy', ry: 'vy', Jrn: 'pon', Hrn: 'son',
+      f8t: '_7t', c0: 'E0', FVt: 'KHt', u1t: 'N0t', l1t: 'M0t', iin: 'Con',
+      attachmentBaseLimit: 'dQt', attachmentMaxUploads: 'vQt',
+      attachmentPendingCount: 'pQt', attachmentConfiguredLimit: 'uQt' },
+    composer: { Ih: 'ag', t_: 'w_', AS: 'eC', VS: 'dC', Ng: 'n_', Bg: 'l_', fh: 'Ph' }, react: {}
+  };
   const profiles = [
     { id: 'web_20260906', anchor: 'c2675c8c-f6cd0ubcb7y7eluj.js', files: legacy,
       tools: { owner: 'Whn' },
@@ -89,7 +101,13 @@
         conversation: 'conversation-small-ng27r04netsz3e4o.js',
         composer: '8b34dbc2-l0q54hwyus1gmzd1.js', react: legacy.react },
       exports: september10Exports, tools: { owner: 'Evn' },
-      temporary: { owner: 'nYt', action: '()=>{ig.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(aB.reset(c),d_()&&dp.delete(n),!o&&!dp(n)&&eYt(s),u(rYt,{replace:!0})):Zj(l,{params:o?void 0:new URLSearchParams({[I_]:`true`})})}' } }
+      temporary: { owner: 'nYt', action: '()=>{ig.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(aB.reset(c),d_()&&dp.delete(n),!o&&!dp(n)&&eYt(s),u(rYt,{replace:!0})):Zj(l,{params:o?void 0:new URLSearchParams({[I_]:`true`})})}' } },
+    { id: 'web_20260910_b', anchor: 'c2675c8c-k523hcgvefxht2ry.js',
+      files: { shared: '4813494d-fgzk5uadh2hlkw93.js',
+        conversation: 'conversation-small-cudd01juo7e4yskq.js',
+        composer: '8b34dbc2-g959q8r0i61e6rlk.js', react: legacy.react },
+      exports: september10bExports, tools: { owner: '$vn' },
+      temporary: { owner: 'fYt', action: '()=>{ml.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(CB.reset(c),Eg()&&Pg.delete(n),!o&&!Pg(n)&&uYt(s),u(pYt,{replace:!0})):Hy(l,{params:o?void 0:new URLSearchParams({[Z_]:`true`})})}' } }
   ];
   const roles = Object.keys(legacy);
   let document, token, selected, error = '';
@@ -203,8 +221,8 @@
 
   function state() {
     const p = profile();
-    return { version: 10, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 11, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 10, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 11, observed, load, peek, temporary, tools, state });
 });
