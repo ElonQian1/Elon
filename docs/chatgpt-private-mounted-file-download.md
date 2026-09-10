@@ -67,7 +67,8 @@ or an instruction to replay a request. Cookies and request headers stay in-page.
 ## Remaining work and acceptance
 
 - This batch covers concrete Drive/Box/Dropbox/SharePoint files and matching history
-  metadata. Standalone browsing, other providers, citation-graph-only
+  metadata. [Standalone catalogue downloads](chatgpt-private-library-mounted-download.md)
+  now reuse this transaction in source, with grouped device acceptance pending. Other providers, citation-graph-only
   references and mounted files represented only by a separate preview remain gaps.
 - Drive Docs/Sheets/Slides exports and validated resolved name/MIME handoff are
   now implemented below. Other provider-native formats remain unimplemented.
