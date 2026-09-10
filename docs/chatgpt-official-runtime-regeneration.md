@@ -2,9 +2,10 @@
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
 Status: source implemented and offline verified. v8 distinguishes the exact
-ownership component without relaxing write admission or replay fencing. Normal 1640
-is installed and its private model catalog passes. Native retry stopped before
-dispatch at a missing semantic control. The previous 1639 changed reply used the
+ownership component without relaxing write admission or replay fencing. Normal 1641
+is installed with the native admission correction below. Normal 1640 passed the
+private model catalog, but its native retry stopped before dispatch at a missing
+semantic control. The previous 1639 changed reply used the
 legacy DOM receipt, not the runtime receipt. End-to-end runtime acceptance is not passed. See
 the [1637 follow-up](reports/chatgpt-regeneration-observation-1637.md) and
 the [grouped delivery](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).
@@ -12,6 +13,24 @@ The original adapter 286 batch wired this candidate into the existing production
 `chatgpt_regenerate_response` command. It is an official-runtime bridge, not an
 independent Android HTTP generation transport. Do not recreate it while waiting
 for the grouped ChatGPT APK acceptance.
+
+## Grouped normal release 1641
+
+Source `2b087cc5282e9cd811f577d7d6da88ff458b054d` passed the normal Release
+publication as `1.1.1641 (1641)`, then unattended replacement installation was
+verified on the trusted Xiaomi. Adapter 325 and resolver 11 are unchanged.
+APK size is 40,116,585 bytes; local APK and live publication metadata SHA-256 agree:
+`71d5d14d56e09221ca38305b7597910df3089f89947d32b9b24b72a26f85c93a`.
+Log: `retry-native-grouped-release-20260911-001904-311`, terminal pass, 440.9s.
+
+The handset reappeared during publication after the initial ADB inventory was
+empty. `native-retry-1641-20260911-002726-085` then stopped at the awake-screen
+precondition, before a navigation, awake lease or regeneration dispatch. A
+subsequent wake/check found the keyguard still showing. Native retry acceptance
+awaits unlock; neither the earlier post-dispatch `timeout_owner_changed` nor
+end-to-end private regeneration is marked fixed or completed by this installation.
+The publisher's optional LAN firewall and cleanup warnings did not prevent the
+verified release/install; task finalization handles repository state separately.
 
 ## Current source correction
 
@@ -40,8 +59,8 @@ The existing all-command MCP receipt test now deliberately omits the DOM retry
 capability; it still dispatches the same guarded regeneration command. Separate
 admission tests preserve missing/blank/incomplete/streaming rejection, and the
 mapper preserves Google provider restrictions. The unchanged runtime and
-production-orchestrator guards also passed 79 tests. Grouped APK delivery and
-real retry acceptance are recorded below when performed, not inferred from unit tests.
+production-orchestrator guards also passed 79 tests. Grouped APK delivery is
+recorded above; real retry acceptance is not inferred from unit tests.
 
 Regeneration v8 and model contract v9 retain all v7 checks but distinguish route,
 document, authorization, account/workspace, device header, retained conversation
