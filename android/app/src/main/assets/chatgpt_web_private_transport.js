@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 25) ||
+  if ((existingTransport && Number(existingTransport.version) >= 26) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -32,6 +32,10 @@
     enabled: prefetchEnabled,
     now: Date.now,
     storage: optionalSessionStorage()
+  });
+  // Background prefetch failures must not disable explicit user reads.
+  const accountReadPolicy = policyModule.create({
+    enabled: prefetchEnabled, now: Date.now, storage: optionalSessionStorage(), scope: 'account_read'
   });
   let acceptedAuthSuccessAt = 0;
 
@@ -113,6 +117,7 @@
       return Promise.resolve(result).then(
         (response) => {
           policy.recordOfficial(Number(response && response.status), Date.now() - startedAt);
+          accountReadPolicy.recordOfficial(Number(response && response.status), Date.now() - startedAt);
           return response;
         },
         (error) => {
@@ -324,7 +329,7 @@
 
   function explicitAccountReadReady() {
     const canAcquire = authContext && typeof authContext.canAcquire === 'function' && authContext.canAcquire();
-    return prefetchEnabled && policy.snapshot().cooldownRemainingMs === 0 &&
+    return prefetchEnabled && accountReadPolicy.snapshot().cooldownRemainingMs === 0 &&
       Boolean(copiedRequestHeaders() || canAcquire);
   }
 
@@ -333,9 +338,21 @@
     if (message === 'timeout') return 'timeout';
     if (message === 'missing_context') return 'context';
     if (/^(?:auth_http_|http_)(401|403)$/.test(message) || /^auth_/.test(message)) return 'auth';
+    if (message === 'http_429') return 'rate_limit';
     if (/^http_/.test(message)) return 'http';
     if (/json|parse/i.test(message)) return 'parse';
     return 'network';
+  }
+
+  function recordReadFailure(error, owner) {
+    // Identity preparation already has its own short retry/cooldown policy.
+    if (['auth_cooldown', 'auth_unavailable', 'missing_context', 'request_unavailable']
+      .includes(String(error && error.message || ''))) return;
+    const kind = failureKind(error);
+    owner.recordFailure(kind);
+    if (kind === 'auth' || kind === 'rate_limit') {
+      (owner === policy ? accountReadPolicy : policy).recordFailure(kind);
+    }
   }
 
   function recordPrivateOutcome(outcome, messageCount, elapsedMs) {
@@ -408,7 +425,7 @@
         emitConversationSnapshot(target, result, emitEvent);
       }).catch((error) => {
         const outcome = failureKind(error);
-        policy.recordFailure(outcome);
+        recordReadFailure(error, policy);
         recordPrivateOutcome(outcome, 0, 0);
       }).finally(() => {
         if (activeConversationRequests.get(target.id) === request) {
@@ -454,11 +471,11 @@
               expected
             );
           }
-          policy.recordSuccess(result.elapsedMs);
+          accountReadPolicy.recordSuccess(result.elapsedMs);
           return matched;
         });
       }).catch((error) => {
-        policy.recordFailure(failureKind(error));
+        recordReadFailure(error, accountReadPolicy);
         return false;
       }).finally(() => {
         if (activeMembershipRequests.get(key) === request) activeMembershipRequests.delete(key);
@@ -476,7 +493,10 @@
       return respond(action, false, 'invalid_file_request');
     }
     // Explicit account reads do not depend on a recent background history response.
-    if (!explicitAccountReadReady()) return respond(action, false, 'files_not_ready');
+    if (!prefetchEnabled) return respond(action, false, 'files_disabled');
+    if (accountReadPolicy.snapshot().cooldownRemainingMs > 0) {
+      return respond(action, false, 'files_read_cooldown');
+    }
     try {
       const result = await fetchConversation(target.id);
       const projection = window.__elonChatGptPrivateHistoryProjection;
@@ -484,20 +504,21 @@
       if (!index) throw new Error('parse_files_unknown');
       let files = index.files;
       try { files = window.__elonChatGptPrivateFileDownload?.register(target.path, result.payload, index) || files; } catch (_) {}
-      policy.recordSuccess(result.elapsedMs);
+      accountReadPolicy.recordSuccess(result.elapsedMs);
       emitEvent({ type: 'conversation_files_snapshot', conversationPath: target.path,
         requestId, files, truncated: index.truncated });
       respond(action, true, 'private_files_ready');
     } catch (error) {
-      policy.recordFailure(failureKind(error));
-      respond(action, false, 'files_read_failed');
+      recordReadFailure(error, accountReadPolicy);
+      respond(action, false, failureKind(error) === 'auth' || failureKind(error) === 'context'
+        ? 'files_identity_unavailable' : 'files_read_failed');
     }
   }
 
   async function readAttachmentContext(path) {
     const target = conversationTarget(path);
     if (!target || !/^(?:\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(target.path) ||
-        target.path !== location.pathname || !prefetchEnabled || policy.snapshot().cooldownRemainingMs > 0) {
+        target.path !== location.pathname || !prefetchEnabled || accountReadPolicy.snapshot().cooldownRemainingMs > 0) {
       throw new Error('attachment_context_unavailable');
     }
     // This explicit user read does not require the background prefetch policy's
@@ -508,10 +529,10 @@
     try {
       result = await fetchConversation(target.id, true);
     } catch (error) {
-      policy.recordFailure(failureKind(error));
+      recordReadFailure(error, accountReadPolicy);
       throw new Error('attachment_context_unavailable');
     }
-    policy.recordSuccess(result.elapsedMs);
+    accountReadPolicy.recordSuccess(result.elapsedMs);
     // A missing scope field is not a network failure and must not trip the
     // already-working conversation reader's circuit breaker.
     const payload = normalizedConversationPayload(result.payload);
@@ -540,7 +561,7 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 25,
+    version: 26,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,
@@ -552,6 +573,7 @@
     readAttachmentContext,
     copySameOriginRequestHeaders,
     acquireSameOriginRequestHeaders,
-    health: policy.snapshot
+    health: policy.snapshot,
+    accountReadHealth: accountReadPolicy.snapshot
   });
 })();

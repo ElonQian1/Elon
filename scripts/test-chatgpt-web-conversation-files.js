@@ -28,7 +28,10 @@ function runtime(fetchImpl, ready = true) {
       canAcquire: () => ready,
       state: () => ({ ready, lastOutcome: 'session_ready', lastSuccessAt: now, lastLatencyMs: 100 }),
       copyRequestHeaders: () => ready ? { Authorization: 'synthetic-fixture' } : null,
-      acquireRequestHeaders: async () => ({ Authorization: 'synthetic-fixture' }),
+      acquireRequestHeaders: async () => {
+        if (!ready) throw new Error('auth_unavailable');
+        return { Authorization: 'synthetic-fixture' };
+      },
       subscribe: () => () => {}, invalidate: () => {},
     },
     fetch: fetchImpl,
@@ -140,7 +143,7 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
       (...a) => receipts.push(a));
     await read(); await read();
     assert.equal(count, 1);
-    assert.deepEqual(receipts.map(r => r[2]), ['files_read_failed', 'files_not_ready']);
+    assert.deepEqual(receipts.map(r => r[2]), ['files_read_failed', 'files_read_cooldown']);
   });
   await test('file read attaches download selection through the private owner without an extra request', async () => {
     const events = []; let count = 0;
@@ -163,7 +166,7 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
     await transport.listConversationFiles('/c/test', 'mcp_x', emit, (...args) => receipts.push(args));
     await transport.listConversationFiles('https://example.com/c/test', 'mcp_x', emit, (...args) => receipts.push(args));
     await transport.listConversationFiles('/c/test', 'bad-request', emit, (...args) => receipts.push(args));
-    assert.deepEqual(receipts.map(r => r[2]), ['files_not_ready', 'invalid_file_request', 'invalid_file_request']);
+    assert.deepEqual(receipts.map(r => r[2]), ['files_identity_unavailable', 'invalid_file_request', 'invalid_file_request']);
   });
   await test('failed or unknown response does not publish an empty success', async () => {
     for (const payload of [null, { error: 'unknown_shape' }]) {

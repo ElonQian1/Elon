@@ -59,4 +59,22 @@ assert.equal(slow.attemptBudgetMs(), 3550);
 slow.recordSuccess(1000);
 assert.equal(slow.attemptBudgetMs(), 3550);
 
+const account = policyModule.create({ enabled: true, now: () => now, storage, scope: 'account_read' });
+assert.equal(account.snapshot().failures, 0);
+account.recordFailure('network');
+assert.equal(policyModule.create({ enabled: true, now: () => now, storage,
+  scope: 'account_read' }).snapshot().lastOutcome, 'network');
+assert.equal(policyModule.create({ enabled: true, now: () => now, storage }).snapshot().lastOutcome, 'timeout');
+for (const status of [401, 403, 429]) {
+  const shared = new MemoryStorage();
+  const background = policyModule.create({ enabled: true, now: () => now, storage: shared });
+  background.recordOfficial(status, 20);
+  const explicit = policyModule.create({ enabled: true, now: () => now, storage: shared, scope: 'account_read' });
+  assert.equal(explicit.snapshot().cooldownRemainingMs, background.snapshot().cooldownRemainingMs);
+  assert.equal(explicit.snapshot().lastOutcome, status === 429 ? 'rate_limit' : 'auth');
+  now += 500;
+  const restoredExplicit = policyModule.create({ enabled: true, now: () => now, storage: shared, scope: 'account_read' });
+  assert.equal(restoredExplicit.snapshot().cooldownRemainingMs, explicit.snapshot().cooldownRemainingMs,
+    'scope migration must not extend protected cooldown on reload');
+}
 console.log('CHATGPT_WEB_PRIVATE_TRANSPORT_POLICY_TESTS=passed');

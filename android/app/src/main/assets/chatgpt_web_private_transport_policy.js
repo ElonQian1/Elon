@@ -8,12 +8,13 @@
 
   const VERSION = 1;
   const STORAGE_KEY = 'elon.chatgpt.private.transport.health.v1';
+  const ACCOUNT_READ_STORAGE_KEY = 'elon.chatgpt.private.account_read.health.v1';
   const MAX_STATE_AGE_MS = 24 * 60 * 60 * 1000;
   const OFFICIAL_FRESH_MS = 2 * 60 * 1000;
   const MAX_COOLDOWN_MS = 10 * 60 * 1000;
   const OUTCOMES = new Set([
     'none', 'success', 'timeout', 'auth', 'context', 'http', 'network', 'parse',
-    'empty', 'official_error'
+    'empty', 'official_error', 'rate_limit'
   ]);
 
   function finite(value, fallback, minimum, maximum) {
@@ -55,10 +56,10 @@
     };
   }
 
-  function read(storage, now) {
+  function read(storage, now, key) {
     if (!storage || typeof storage.getItem !== 'function') return emptyState(now);
     try {
-      return sanitize(JSON.parse(storage.getItem(STORAGE_KEY) || 'null'), now);
+      return sanitize(JSON.parse(storage.getItem(key) || 'null'), now);
     } catch (_) {
       return emptyState(now);
     }
@@ -69,13 +70,21 @@
     const now = typeof config.now === 'function' ? config.now : Date.now;
     const storage = config.storage || null;
     const enabled = config.enabled === true;
-    let state = read(storage, now());
+    const storageKey = config.scope === 'account_read' ? ACCOUNT_READ_STORAGE_KEY : STORAGE_KEY;
+    let state = read(storage, now(), storageKey);
+    if (config.scope === 'account_read') {
+      const shared = read(storage, now(), STORAGE_KEY);
+      if (['auth', 'rate_limit'].includes(shared.lastOutcome) && shared.cooldownUntil > state.cooldownUntil) {
+        state.cooldownUntil = shared.cooldownUntil;
+        state.lastOutcome = shared.lastOutcome;
+      }
+    }
 
     function persist() {
       state.updatedAt = now();
       if (!storage || typeof storage.setItem !== 'function') return;
       try {
-        storage.setItem(STORAGE_KEY, JSON.stringify(state));
+        storage.setItem(storageKey, JSON.stringify(state));
       } catch (_) {
         // Health metadata is optional; private requests never depend on storage.
       }
@@ -94,6 +103,9 @@
       } else if (status === 401 || status === 403) {
         state.lastOutcome = 'auth';
         state.cooldownUntil = Math.max(state.cooldownUntil, current + (5 * 60 * 1000));
+      } else if (status === 429) {
+        state.lastOutcome = 'rate_limit';
+        state.cooldownUntil = Math.max(state.cooldownUntil, current + 60_000);
       } else if (status >= 500) {
         state.lastOutcome = 'official_error';
         state.cooldownUntil = Math.max(state.cooldownUntil, current + 30_000);
@@ -132,7 +144,7 @@
       state.lastOutcome = kind;
       const cooldown = kind === 'auth' || kind === 'context'
         ? 5 * 60 * 1000
-        : kind === 'timeout' ? 60_000
+        : kind === 'timeout' || kind === 'rate_limit' ? 60_000
           : kind === 'parse' || kind === 'empty' ? 30_000
             : state.consecutiveFailures >= 2 ? 30_000 : 10_000;
       state.cooldownUntil = Math.max(state.cooldownUntil, current + cooldown);
@@ -166,5 +178,5 @@
     });
   }
 
-  return Object.freeze({ version: VERSION, storageKey: STORAGE_KEY, create });
+  return Object.freeze({ version: 2, storageKey: STORAGE_KEY, create });
 });

@@ -138,7 +138,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 25);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 26);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -150,7 +150,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 25);
+  assert.equal(transport.version, 26);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
@@ -579,6 +579,77 @@ const detailPayload = {
   scope.window.location.pathname = '/';
   await assert.rejects(reader.readAttachmentContext(attachmentPath), /attachment_context_unavailable/);
   assert.equal(scopeRequests.length, beforeInvalid);
+
+  for (const backgroundFailure of ['timeout', 'network', 'parse', 'empty', 'http']) {
+    const isolatedStorage = new MemoryStorage();
+    const module = require('../android/app/src/main/assets/chatgpt_web_private_transport_policy.js');
+    const background = module.create({ enabled: true, storage: isolatedStorage });
+    background.recordFailure(backgroundFailure);
+    let reads = 0;
+    const isolated = createContext(async () => { reads++; return jsonResponse(ordinaryPayload); },
+      false, true, isolatedStorage, [], { canAcquire: () => true,
+        acquireRequestHeaders: async () => ({ Authorization: 'synthetic-test-identity' }) });
+    const owner = isolated.window.__elonChatGptPrivateTransport;
+    const receipts = [], indices = [];
+    await owner.listConversationFiles(attachmentPath, 'mcp_isolated', value => indices.push(value),
+      (...values) => receipts.push(values));
+    assert.deepEqual(receipts, [['list_conversation_files', true, 'private_files_ready']]);
+    assert.equal(indices.length, 1);
+    assert.equal(reads, 1, 'explicit read dispatches once during background cooldown');
+    assert.equal(owner.health().lastOutcome, backgroundFailure, 'successful user read does not clear background protection');
+    assert.equal(owner.accountReadHealth().lastOutcome, 'success');
+    isolated.window.location.pathname = attachmentPath;
+    assert.equal((await owner.readAttachmentContext(attachmentPath)).ordinary, true);
+    assert.equal(reads, 2, 'attachment scope is still force-read rather than cached');
+  }
+  for (const rejection of [401, 403, 429]) {
+    let reads = 0;
+    const rejected = createContext(async () => {
+      reads++;
+      return { ok: false, status: rejection, text: async () => '{}' };
+    }, false, true, new MemoryStorage(), [], { canAcquire: () => true,
+      acquireRequestHeaders: async () => ({ Authorization: 'synthetic-rejected-identity' }) });
+    const owner = rejected.window.__elonChatGptPrivateTransport;
+    const receipts = [];
+    await owner.listConversationFiles(attachmentPath, 'mcp_rejected', () => assert.fail('no index on rejection'),
+      (...values) => receipts.push(values));
+    const expected = rejection === 429 ? 'rate_limit' : 'auth';
+    assert.equal(owner.health().lastOutcome, expected);
+    assert.equal(owner.accountReadHealth().lastOutcome, expected);
+    await owner.listConversationFiles(attachmentPath, 'mcp_repeated', () => assert.fail('no index on cooldown'),
+      (...values) => receipts.push(values));
+    assert.equal(receipts.at(-1)[2], 'files_read_cooldown');
+    assert.equal(reads, 1, 'auth or rate-limit failures cannot be automatically replayed');
+  }
+  const pendingReceipts = [];
+  let releaseIdentity;
+  const pendingIdentity = createContext(async () => jsonResponse(ordinaryPayload), false, true,
+    new MemoryStorage(), [], { canAcquire: () => false,
+      acquireRequestHeaders: () => new Promise(resolve => { releaseIdentity = resolve; }) });
+  const pendingRead = pendingIdentity.window.__elonChatGptPrivateTransport.listConversationFiles(
+    attachmentPath, 'mcp_pending', () => {}, (...values) => pendingReceipts.push(values));
+  assert.equal(pendingReceipts.length, 0, 'identity acquisition must not produce premature failure');
+  releaseIdentity({ Authorization: 'synthetic-ready-identity' });
+  await pendingRead;
+  assert.equal(pendingReceipts[0][2], 'private_files_ready');
+  let cooling = true;
+  const identityRecovery = createContext(async () => jsonResponse(ordinaryPayload), false, true,
+    new MemoryStorage(), [], { canAcquire: () => !cooling,
+      acquireRequestHeaders: async () => {
+        if (cooling) throw new Error('auth_cooldown');
+        return { Authorization: 'synthetic-recovered-identity' };
+      } });
+  const recoveryReader = identityRecovery.window.__elonChatGptPrivateTransport;
+  const recoveryReceipts = [];
+  const readRecovered = () => recoveryReader.listConversationFiles(attachmentPath, 'mcp_recovery',
+    () => {}, (...args) => recoveryReceipts.push(args));
+  await readRecovered();
+  assert.equal(recoveryReceipts[0][2], 'files_identity_unavailable');
+  assert.equal(recoveryReader.accountReadHealth().cooldownRemainingMs, 0,
+    'short identity preparation cooldown must not turn into a five-minute transport failure');
+  cooling = false;
+  await readRecovered();
+  assert.equal(recoveryReceipts[1][2], 'private_files_ready');
 
   console.log('CHATGPT_WEB_PRIVATE_TRANSPORT_TESTS=passed');
 })().catch((error) => {

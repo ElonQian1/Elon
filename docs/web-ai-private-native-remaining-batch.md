@@ -48,6 +48,10 @@ Native project-folder PNG Download is completed/default-enabled on 1648, adapter
 restored. Reuse this scope; 222 Node and 11 app tests pass. Other sources remain.
 See [the scoped regression](reports/chatgpt-library-folder-download-1644.md).
 
+Follow-up: [explicit account-read isolation](reports/chatgpt-explicit-account-read-20260911.md)
+fixes shared prefetch cooldown blocking attachment/membership reads. Device
+acceptance is tracked there; it does not complete citation or mounted workflows.
+
 | User workflow | Current result | Remaining boundary |
 |---|---|---|
 | Conversation/project cache, native audio/subtitles, private dictation/read-aloud | Previously device-verified, reused | Do not repeat without regression evidence; identity WebView remains intentional |
