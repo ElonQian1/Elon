@@ -11,9 +11,10 @@ and separates content refresh from live interaction state. See the
 completed labels do not mean those remaining private protocols are implemented.
 It also adds a [private conversation attachment index](chatgpt-private-conversation-files.md)
 with a cache-first file sheet. The ordinary text-file upload/association and
-saved-byte download are device verified through `1544`; additional file scopes
-and rendered-menu acceptance remain pending. See the
-[grouped acceptance evidence](reports/chatgpt-grouped-release-20260907.md).
+saved-byte download were verified through `1544`. Native TXT/PNG/PDF library
+downloads passed on `1612`; project-folder PNG download, saved bytes and decode
+passed on `1648`. Reuse these scopes; other sources remain separate. See
+[project download acceptance](reports/chatgpt-library-folder-download-1644.md).
 The [request lifetime repair](chatgpt-private-request-lifetime.md) bounds private response
 consumption and prevents timed-out project reads from replacing newer results.
 The [directory paging acceptance](reports/chatgpt-directory-pagination-20260909.md)

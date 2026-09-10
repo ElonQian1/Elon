@@ -59,8 +59,8 @@ reuses the existing metadata, authorization, native transfer and save owners:
   or attachment/mutation capability is added.
 
 Scoped capability: `android_chatgpt_private_project_catalog_download_v1`.
-Code implemented; offline verified; corrected-build download acceptance failed
-at a later source-classification boundary, as recorded below.
+Completed and default-enabled for the verified native project-catalogue PNG
+download on normal 1648. Earlier failed candidates are retained below as history.
 This does not complete mounted materialization, mounted attachment or citations.
 
 ## Verification
@@ -153,3 +153,35 @@ for compatibility and rejects unbounded or additional fields.
 
 `project-content-binding-20260911-054916-818` passes 222 related Node tests.
 Actual saved-byte acceptance remains required for this scoped capability.
+
+## Normal 1648 Acceptance: Completed
+
+Normal 1.1.1648, adapter 331, source `acfa027d513b09b0f94d5fccb9c0123cd4948b7e`,
+was published and replacement-installed on the trusted Xiaomi. APK SHA-256:
+`4b23c6ff9fb824154da6d2cd1bd86eff6c16dad8290c0c0f3472e0db598f3ea4`.
+Release run `project-content-query-release-20260911-055558-519` passed with
+server publication and unattended device update verified. App test run
+`project-content-binding-native-20260911-054937-796` reported BUILD SUCCESSFUL;
+the fresh XML records 11 tests with zero failures/errors. All 114 unique assembled
+JavaScript assets and the combined bundle parsed successfully.
+
+`native-folder-download-1648-20260911-060345-077` passed the actual production
+sidebar -> Library -> project folder -> file -> Download path:
+
+- Metadata, authorization and `/api/library/files/{id}/project-content` each
+  returned 200, with zero dropped observations and no personal-library request.
+- Native receipt was `download_saved`; 2122 bytes were received and one new PNG
+  was saved and decoded on the phone. No file content was exported to the PC.
+- Binding diagnostic was `matched`, query count **2**. Together with the old
+  one-parameter guard and the now-successful transfer, this confirms that extra
+  server-returned query parameters caused the 1647 rejection. Values stay private.
+- The native action completed in 6991 ms (including semantic helper execution
+  and saved-file checks); this is not a pure network latency measurement.
+- Original conversation, message count, empty draft and awake setting restored;
+  no messages sent, no source files changed, downloaded copy retained.
+
+`android_chatgpt_private_project_catalog_download_v1`: `code_status=implemented`,
+`verification_status=device_verified`, `completed=true`, `default_enabled=true`
+for this scope. Reuse it without further research or expanded samples absent a
+new regression. Mounted materialization/attachment, citation-only references,
+large-transfer cancellation/crash and other content types remain separate cases.

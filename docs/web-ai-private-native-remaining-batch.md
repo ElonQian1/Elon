@@ -43,9 +43,9 @@ upload, native send and actual file-content replies now passed on 1614; the
 post-send membership timing defect and source fix are recorded in
 [project-media follow-up](reports/chatgpt-project-media-1614.md).
 
-Native project-folder Download's 1644 scope error is corrected; 1647 still fails
-source validation before transfer. Adapter 331 retains returned query parameters
-and diagnoses paired-ID guards; 222 checks pass, saved-byte acceptance pending.
+Native project-folder PNG Download is completed/default-enabled on 1648, adapter
+331: actual native action, 2122 saved bytes and PNG decode passed; original state
+restored. Reuse this scope; 222 Node and 11 app tests pass. Other sources remain.
 See [the scoped regression](reports/chatgpt-library-folder-download-1644.md).
 
 | User workflow | Current result | Remaining boundary |
