@@ -35,4 +35,30 @@ without skips or cancellations (`regenerate-observation-final-20260910-185540-99
 It covers final deadline readback, closed failure reasons, late success after an
 unknown outcome, replay fencing and production command receipts. The entire live
 failure is not yet attributed to this late-tree race, and regeneration is not
-marked accepted. APK delivery and the next instrumented native attempt are pending.
+marked accepted.
+
+## Normal 1638 delivery
+
+Source `525c99c49` was built, published and installed as normal `1.1.1638 (1638)`.
+Gradle passed Release/lint in 7m22s; the publisher verified the remote APK hash
+and size, then verified unattended replacement on the whitelisted Xiaomi.
+An independent package-manager read confirmed code/name 1638/1.1.1638.
+APK SHA-256:
+`7f19849b0a3d189d716d8978f0aea832d4add855560c4cdc4daa73e97a9496b3`.
+
+Log `regenerate-observation-322-release-20260910-185805-959` contains
+`BUILD SUCCESSFUL`, `APK_RELEASE_STATUS=published` and
+`APK_ADB_DEPLOY_STATUS=updated`. The outer log reader then threw a Windows
+file-sharing error. Its state file still says running, but its recorded publisher
+PID no longer exists and the actual installation is verified. Do not restart this
+build based on that stale state file. Worktree auto-cleanup also warned about a
+missing Branch property; repository cleanup is checked separately at task finish.
+
+The real original conversation was restored before installation. After update,
+the phone was locked/asleep and the app was on conversation home with no bound
+ChatGPT snapshot. No regeneration was attempted on 1638. A private, uncommitted
+restore checkpoint is retained under Git-local research artifacts; it contains
+only navigation/phase metadata, not message content or credentials. After unlock,
+restore/open the same synthetic probe, capture structural protocol evidence and
+run the existing native retry harness once. Do not resend the initial prompt or
+claim this installation as a passing regeneration case.
