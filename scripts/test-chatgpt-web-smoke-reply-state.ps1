@@ -87,13 +87,16 @@ $definitions=@($ast.EndBlock.Statements | Where-Object {
 $main=@($ast.EndBlock.Statements | Where-Object {
     $_ -is [System.Management.Automation.Language.TryStatementAst]
 }) | Select-Object -Last 1
-foreach ($case in @('reuse', 'background', 'non_probe')) {
+$completion = @($ast.EndBlock.Statements | Where-Object {
+    $_.Extent.StartOffset -gt $main.Extent.EndOffset
+} | ForEach-Object { $_.Extent.Text }) -join "`n"
+foreach ($case in @('reuse', 'background', 'non_probe', 'native_not_offered', 'reveal_failed')) {
     $outcome=& {
-        param($Case, $Definitions, $Main)
+        param($Case, $Definitions, $Main, $Completion)
         . ([scriptblock]::Create($Definitions))
         $state=Sample
         $state | Add-Member -NotePropertyMembers @{
-            input=[pscustomobject]@{text_length=0};authenticated=$true;adapter_version=312
+            input=[pscustomobject]@{text_length=0};authenticated=$true;adapter_version=312;page_generation=1
         }
         $state.conversation | Add-Member -NotePropertyMembers @{
             url='https://chatgpt.com/c/synthetic-probe';attachments=@();message_count=2
@@ -117,6 +120,17 @@ foreach ($case in @('reuse', 'background', 'non_probe')) {
                     [pscustomobject]@{request_id='retry-id';expected_web_action='regenerate_response'
                         status='succeeded';result=[pscustomobject]@{ok=$true;detail='official_runtime_v1:regenerate_observed'}}
                 )
+            } elseif ($Action -eq 'chatgpt_private_protocol_probe') {
+                if ($Arguments.mode -cne 'model_runtime_context') {throw 'Unexpected diagnostic mode'}
+            } elseif ($Action -eq 'get_web_chat_context') {
+                return [pscustomobject]@{
+                    control_ok=$true;provider_id='chatgpt_web';conversation_path='/c/synthetic-probe';streaming=$false
+                    messages=@([pscustomobject]@{source_message_id='private-assistant-id';role='friend'
+                        content=$fixture.state.conversation.messages[1].content;content_truncated=$false
+                        actions=if($Case -eq 'native_not_offered'){@('copy','more')}else{@('copy','regenerate','more')}})
+                }
+            } elseif ($Action -eq 'chatgpt_reveal_message') {
+                return [pscustomobject]@{control_ok=$false;error='message_not_rendered'}
             } elseif ($Action -ne 'chatgpt_open_conversation') {throw "Unexpected smoke write: $Action"}
             [pscustomobject]@{command_receipt=[pscustomobject]@{request_id='retry-id'}}
         }
@@ -127,30 +141,40 @@ foreach ($case in @('reuse', 'background', 'non_probe')) {
         }
         function Wait-ChatGptCommandReceipt($InvokeUiState,$RequestId,$ExpectedAction,$TimeoutSec,$PollIntervalSec) {
             & $InvokeUiState | Out-Null
+            [pscustomobject]@{state=$fixture.state;receipt=[pscustomobject]@{
+                status='succeeded';result=[pscustomobject]@{ok=$true;detail='model_runtime_context:ready'}
+            }}
         }
         function Assert-ChatGptWebSmokeAdapterVersion($State,$ExpectedAdapterVersion) {}
         function Normalize-ChatGptProbeReply($Value) {[string]$Value}
         function Stop-ChatGptWebSmokeAwakeLease($Runtime) {$fixture.cleanup++}
         function Register-ChatGptWebVerificationCases($Runtime,$CaseIds,$ExpectedAdapterVersion) {$fixture.recorded++}
         $runtime=@{}; $ReadyTimeoutSec=30; $ReplyTimeoutSec=30; $PollIntervalSec=1; $ExpectedAdapterVersion=312
-        $UseCurrentNativeSurface=$true; $UseExistingProbe=$true; $NativeRetry=$false; $RequireOfficialRuntime=$true
+        $UseCurrentNativeSurface=$true; $UseExistingProbe=$true
+        $NativeRetry=$Case -in @('native_not_offered','reveal_failed'); $RequireOfficialRuntime=$true
         $result=$null; $originPath=''; $originCaptured=$false; $originRestored=$false; $failure=''
-        try {. ([scriptblock]::Create($Main.Extent.Text)) | Out-Null} catch {$failure=$_.Exception.Message}
+        try {. ([scriptblock]::Create($Main.Extent.Text + "`n" + $Completion)) | Out-Null} catch {$failure=$_.Exception.Message}
         [pscustomobject]@{result=$result;actions=$fixture.actions;cleanup=$fixture.cleanup;recorded=$fixture.recorded;failure=$failure}
-    } $case $definitions $main
+    } $case $definitions $main $completion
     if ($case -eq 'reuse') {
         if ($outcome.failure) {throw "Reuse fixture failed: $($outcome.failure)"}
         Check ($outcome.result.passed -and $outcome.result.sent_messages -eq 0 -and
             $outcome.result.reused_initial_reply -and $outcome.result.original_user_turn_preserved -and
-            ($outcome.actions -join ',') -eq 'chatgpt_regenerate_response,chatgpt_open_conversation' -and
+            ($outcome.actions -join ',') -eq 'chatgpt_private_protocol_probe,chatgpt_regenerate_response,chatgpt_open_conversation' -and
             $outcome.recorded -eq 1 -and $outcome.cleanup -eq 1) 'real_orchestration_reuses_without_send'
     } elseif ($case -eq 'background') {
         Check ($outcome.failure -like '*native_chat_not_foreground*' -and $outcome.actions.Count -eq 0 -and
             $outcome.recorded -eq 0 -and $outcome.cleanup -eq 1) 'real_orchestration_stops_before_background_dispatch'
-    } else {
+    } elseif ($case -eq 'non_probe') {
         Check ($outcome.failure -eq 'Existing conversation is not an isolated regenerate probe.' -and
             ($outcome.actions -join ',') -eq 'chatgpt_open_conversation' -and $outcome.recorded -eq 0 -and
             $outcome.cleanup -eq 1) 'real_orchestration_rejects_non_probe_without_send'
+    } else {
+        $reason=if($case -eq 'native_not_offered'){'native_retry_not_offered'}else{'native_reveal_failed'}
+        Check ($outcome.failure -ceq "Regenerate acceptance deferred before write: $reason" -and
+            'chatgpt_regenerate_response' -notin $outcome.actions -and
+            'send_input' -notin $outcome.actions -and $outcome.recorded -eq 0 -and $outcome.cleanup -eq 1) `
+            "real_orchestration_blocks_$case"
     }
 }
 Write-Output "REGENERATE_REPLY_STATE_TESTS=passed count=$passed"

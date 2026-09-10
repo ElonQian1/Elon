@@ -42,6 +42,9 @@ foreach ($required in @(
     'RequireOfficialRuntime',
     'Test-ChatGptRegeneratedReplyIdentity -Receipt $lastReceipt',
     'function Assert-RetryDocument',
+    'Get-ChatGptNativeRetryAdmission -Baseline $initialReply -Native $native',
+    "-Action get_web_chat_context",
+    'if ($reveal.control_ok -ne $true)',
     "-Arguments @{mode='model_runtime_context'}",
     'Get-ChatGptRegenerateDocumentContinuity -Baseline $Baseline -Current $live.state',
     'Regenerate acceptance deferred before write:',
@@ -166,3 +169,33 @@ foreach($case in $cases){
     if($reason -cne $case.reason){throw "Regenerate document admission expected $($case.reason), got $reason."}
 }
 Write-Output "CHATGPT_WEB_REGENERATE_DOCUMENT_CONTRACT=passed cases=$($cases.Count)"
+
+function New-NativeRetryFixture {
+    [pscustomobject]@{
+        control_ok=$true;provider_id='chatgpt_web';conversation_path='/c/test-fixture';streaming=$false
+        messages=@([pscustomobject]@{source_message_id='assistant-row';role='friend'
+            content='synthetic reply';content_truncated=$false;actions=@('copy','regenerate','more')})
+    }
+}
+$cases=@(
+    @{reason='ready';change={param($s)}},
+    @{reason='native_context_unavailable';change={param($s) $s.control_ok=$false}},
+    @{reason='native_context_unavailable';change={param($s) $s.provider_id='google_web'}},
+    @{reason='native_conversation_changed';change={param($s) $s.conversation_path='/c/other-fixture'}},
+    @{reason='native_reply_active';change={param($s) $s.streaming=$true}},
+    @{reason='native_reply_active';change={param($s) $s.streaming=$null}},
+    @{reason='native_message_missing';change={param($s) $s.messages=@()}},
+    @{reason='native_message_missing';change={param($s) $s.messages+= $s.messages[0]}},
+    @{reason='native_message_missing';change={param($s) $s.messages[0].source_message_id='other-row'}},
+    @{reason='native_message_missing';change={param($s) $s.messages[0].role='user'}},
+    @{reason='native_message_changed';change={param($s) $s.messages[0].content='changed reply'}},
+    @{reason='native_message_changed';change={param($s) $s.messages[0].content_truncated=$true}},
+    @{reason='native_retry_not_offered';change={param($s) $s.messages[0].actions=@('copy','more')}}
+)
+foreach($case in $cases){
+    $native=New-NativeRetryFixture
+    & $case.change $native
+    $reason=Get-ChatGptNativeRetryAdmission -Baseline $baseline -Native $native
+    if($reason -cne $case.reason){throw "Native retry admission expected $($case.reason), got $reason."}
+}
+Write-Output "CHATGPT_WEB_REGENERATE_NATIVE_ADMISSION=passed cases=$($cases.Count)"

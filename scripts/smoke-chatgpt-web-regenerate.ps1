@@ -279,8 +279,13 @@ try {
     if ($NativeRetry) {
         Assert-ChatGptRegenerateForeground -Runtime $runtime
         $priorRetryIds = @($initialReply.command_requests | ForEach-Object { [string]$_.request_id })
-        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action chatgpt_reveal_message `
-            -Arguments @{message_id=[string]$initialAssistant.id;target='regenerate'} | Out-Null
+        $native = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action get_web_chat_context `
+            -Arguments @{message_offset=[Math]::Max(0, @($initialReply.conversation.messages).Count - 40);message_limit=40}
+        $admission = Get-ChatGptNativeRetryAdmission -Baseline $initialReply -Native $native
+        if ($admission -cne 'ready') { throw "Regenerate acceptance deferred before write: $admission" }
+        $reveal = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action chatgpt_reveal_message `
+            -Arguments @{message_id=[string]$initialAssistant.id;target='regenerate'}
+        if ($reveal.control_ok -ne $true) { throw 'Regenerate acceptance deferred before write: native_reveal_failed' }
         Assert-RetryDocument -Baseline $initialReply
         $stableId = ([string]$initialAssistant.id -replace '[^A-Za-z0-9_.:-]', '_')
         $stableId = $stableId.Substring(0, [Math]::Min(160, $stableId.Length))

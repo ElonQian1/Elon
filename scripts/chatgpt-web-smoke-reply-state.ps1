@@ -23,6 +23,22 @@ function Assert-ChatGptRegenerateForeground {
     }
 }
 
+function Get-ChatGptNativeRetryAdmission {
+    param([AllowNull()]$Baseline, [AllowNull()]$Native)
+    if ($Native.control_ok -ne $true -or $Native.provider_id -cne 'chatgpt_web') { return 'native_context_unavailable' }
+    $url = $null
+    if (![Uri]::TryCreate([string]$Baseline.conversation.url, [UriKind]::Absolute, [ref]$url) -or
+        $Native.conversation_path -cne $url.AbsolutePath) { return 'native_conversation_changed' }
+    if ($Native.streaming -isnot [bool] -or $Native.streaming) { return 'native_reply_active' }
+    $assistant = @($Baseline.conversation.messages | Where-Object { $_.role -ceq 'assistant' }) | Select-Object -Last 1
+    if (!$assistant.id -or $assistant.state -cne 'completed') { return 'native_target_unknown' }
+    $rows = @($Native.messages | Where-Object { $_.source_message_id -ceq $assistant.id })
+    if ($rows.Count -ne 1 -or $rows[0].role -cne 'friend') { return 'native_message_missing' }
+    if ($rows[0].content_truncated -ne $false -or $rows[0].content -cne $assistant.content) { return 'native_message_changed' }
+    if ('regenerate' -cnotin @($rows[0].actions)) { return 'native_retry_not_offered' }
+    return 'ready'
+}
+
 function Get-ChatGptRegenerateDocumentContinuity {
     param([AllowNull()]$Baseline, [AllowNull()]$Current)
 
