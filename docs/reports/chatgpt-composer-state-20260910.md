@@ -59,7 +59,8 @@ Command-log stems: `composer-state-jvm-20260910-073924-786`,
 ## Grouped device acceptance
 
 The 1626 preparation failure below is historical. The 1627 checkpoint resolves
-the tested navigation/model/temporary cases; quick-tool follow-up remains open.
+the tested navigation/model/temporary cases; 1628 resolves native quick-tool
+selection and clearing below.
 
 Normal 1.1.1626 (1626), source `03d017cc8`, passed the Release publisher and
 replacement installation. APK SHA-256:
@@ -132,7 +133,58 @@ Log stems: `document-new-chat-jvm-20260910-083524-487`,
 `composer-recovery-tools-device-20260910-090752-300`,
 `composer-recovery-temporary-device-20260910-091422-537`.
 
+## Normal 1628 quick-tool acceptance
+
+`f52bea956` corrects the production tool coordinator, not the official protocol.
+It admits ChatGPT tool discovery using the current allowed document rather than
+the global native/composer-ready conjunction. It claims in-flight ownership
+before dispatch can publish state and consumes options only after that tracked
+read succeeds. Other providers retain their existing session admission; no
+voice, dictation or send gate changed. 34 focused JVM cases passed (11 tool
+policy, 7 quick-action, 6 request-coordinator and 10 operation-readiness cases).
+
+Normal 1.1.1628 (1628), source `f52bea956`, published and replaced the installed
+APK without clearing data. SHA-256:
+`f50cc83050998562cdb933a1a075807f583fd4eff4ea006e1facf8eea01ecf2a`.
+Actual native Tools -> Create Image -> chip close and Tools -> Search -> chip
+close both passed. Each pair had exactly two successful private tool mutations,
+no failed/cancelled catalog read, matching official selection and native chip
+readback. The original two-message conversation, model and empty draft remained
+unchanged; the awake lease was restored. This completes the supported normal
+Search/Create Image toggle scope, not all tool/model/account combinations.
+
+Logs: `tool-request-jvm-20260910-092708-676`,
+`tool-request-release-20260910-093351-531`,
+`tool-request-device-20260910-094041-574`.
+
 Remaining outside this batch: physical drag sampling, other model/tier and
-server-preference variants, send after model selection, actual new image
-generation, temporary project/work/guest contexts and the other items in the
+server-preference variants, send after model selection, complete new-image
+acceptance, temporary project/work/guest contexts and the other items in the
 [remaining matrix](../web-ai-private-native-remaining-batch.md).
+
+## Generated-image reply evidence
+
+On the same installed 1628 APK, one isolated native send requested a synthetic
+black-circle image. A read during that run observed three messages: the user
+prompt, a completed assistant message with three image parts, and trailing
+assistant text without parts. `request_image_asset` also succeeded. These are
+actual reply-structure/asset-request observations, not screenshot or saved-byte
+proof and not a claim that the trailing text had completed.
+
+The existing smoke failed because it checked only the final assistant row and
+reported `observed_parts=none`. Commit `9aea4f2ff` fixes that acceptance defect:
+inspect completed assistant output after the exact user-message anchor, bind the
+conversation, and reject later user turns. Eleven behavioral tests and the
+existing smoke contract passed, including old-image exclusion and a completed
+image followed by separate text. No production APK change was required.
+
+Bounded attempts to reopen the already-generated result, first by title and then
+the latest five directory entries, did not find the exact timestamped synthetic
+marker. They issued no additional send and restored the original two-message
+conversation and empty draft. Therefore the corrected full smoke is **not yet
+device-passed**; do not turn the earlier structural observation into that claim.
+
+Logs: `native-image-generation-device-20260910-094152-767`,
+`existing-image-result-recent-20260910-100248-647`. The existing accepted 1518
+image-generation-state scope remains reused; this follow-up does not revoke it
+or broaden it to all current creation contexts.

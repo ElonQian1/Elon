@@ -3,11 +3,13 @@
 ## Status and scope
 
 - Capability: `android_chatgpt_private_composer_tools_state_v1`.
-- Status: implemented and production-default; `guest_search_toggle_v1` completed
-  on APK 1565 / adapter 302. Search on/off returned private runtime acceptance
-  without document reload. Image/account-scope acceptance is still pending, so
-  the combined capability is not fully completed. See
-  [delivery evidence](reports/chatgpt-runtime-tools-20260908.md).
+- Status: `completed` for the supported ordinary-chat Search/Create Image toggle
+  scope, production-default. Guest Search on/off passed on 1565 / adapter 302;
+  authenticated native Search and Create Image on/off, private receipts, native
+  chip clearing and original-state restoration passed on normal 1628. Reuse
+  these scopes; other model/project/temporary/entitlement combinations and actual
+  generation are separate. [1628 acceptance](reports/chatgpt-composer-state-20260910.md#normal-1628-quick-tool-acceptance),
+  [guest evidence](reports/chatgpt-runtime-tools-20260908.md).
 - Provider contract version: 2, using the shared versioned runtime bindings.
 - Production wiring: native Tools -> existing composer adapter -> official live
   tool signal. Search and Create Image use this path when its guards pass.
