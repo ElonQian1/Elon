@@ -62,6 +62,11 @@ access from composer readiness. Sending, attachment submission and new-chat
 confirmation keep their existing gates. Current investigation and delivery
 evidence are in [the project readiness report](reports/chatgpt-project-media-acceptance-20260909.md).
 
+The [library attachment deadline correction](chatgpt-private-library-attachment-deadline.md)
+aligns page-operation/native-receipt/UI budgets and prevents late publication.
+202 Node and 8 JVM checks passed; adapter 315 is source-only for the next grouped
+APK, not part of published 1631. Device acceptance remains pending.
+
 ## Recent Accepted Scopes
 
 [Normal Release 1589 evidence](reports/chatgpt-library-mutations-1589.md):
