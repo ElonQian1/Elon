@@ -49,14 +49,21 @@ internal object ChatGptWebPrivateProtocolEvidence {
     private fun sanitize(raw: String): String {
         require(raw.length <= 12000)
         val value = JSONObject(raw)
-        if (value.opt("schema") == "elon.download_source.v1") {
+        if (value.opt("schema") in setOf("elon.download_source.v1", "elon.download_source.v2")) {
+            val paired = value.opt("schema") == "elon.download_source.v2"
             require(value.keys().asSequence().toSet() == setOf("schema", "observed", "origin", "path",
-                "relative", "whitespace", "credentials", "port", "fragment"))
+                "relative", "whitespace", "credentials", "port", "fragment") +
+                if (paired) setOf("binding", "query_count") else emptySet())
             for (key in listOf("observed", "relative", "whitespace", "credentials", "port", "fragment")) {
                 require(value.opt(key) is Boolean)
             }
             require(value.opt("origin") in setOf("invalid", "same_origin", "non_https", "oaiusercontent", "azure_blob", "other_https"))
             require(value.getString("path").let { it.isEmpty() || Regex("(?:/(?:api|backend-api|files|library|download|content|project-content|estuary|attachment|attachments|\\{id\\})){1,8}/?").matches(it) })
+            if (paired) {
+                require(value.opt("binding") in setOf("not_applicable", "scope_missing", "scope_invalid",
+                    "library_mismatch", "file_missing", "file_duplicate", "file_mismatch", "matched"))
+                require(integer(value, "query_count", 0..999))
+            }
             return value.toString()
         }
         if (value.opt("schema") == "elon.document_state.v1") return documentState(value)

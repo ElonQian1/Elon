@@ -85,8 +85,9 @@ for (const href of ['https://chatgpt.com/', 'https://chatgpt.com/c/unrelated',
   });
 }
 
-test('authorized project-content returns saved bytes through the existing native byte owner', async () => {
-  const content = '/api/library/files/libfile_synthetic/project-content?file_id=file-synthetic';
+for (const query of ['', '&download=true', '&download=true&signature=synthetic']) {
+test('authorized project-content preserves server query and returns saved bytes: ' + query, async () => {
+  const content = '/api/library/files/libfile_synthetic/project-content?file_id=file-synthetic' + query;
   const f = fixture({ content });
   await f.run(f.register());
   assert.equal(f.saved, true); assert.equal(f.receipts.at(-1)[2], 'download_saved');
@@ -95,12 +96,14 @@ test('authorized project-content returns saved bytes through the existing native
   assert.equal(f.calls[2].init.credentials, 'same-origin');
   assert.equal(f.calls[2].init.redirect, 'error');
   assert.equal(f.calls[2].init.headers, undefined);
+  assert.equal(f.owner.sourceDiagnostics().binding, 'matched');
+  assert.equal(f.owner.sourceDiagnostics().query_count, 1 + (query.match(/&/g) || []).length);
 });
+}
 
 for (const suffix of [
   'libfile_other/project-content?file_id=file-synthetic',
   'libfile_synthetic/project-content?file_id=file-other',
-  'libfile_synthetic/project-content?file_id=file-synthetic&download=true',
   'libfile_synthetic/project-content?file_id=file-synthetic&file_id=file-other',
 ]) {
   test('authorized project content rejects mismatched scope without transfer: ' + suffix, async () => {

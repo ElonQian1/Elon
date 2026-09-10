@@ -281,5 +281,5 @@
       try { reader?.releaseLock(); } catch (_) {}
     }
   }
-  return Object.freeze({ version: 10, target, sharedReference, mountedTarget, catalogTarget, materialize, contentUrl, run, runContent });
+  return Object.freeze({ version: 11, target, sharedReference, mountedTarget, catalogTarget, materialize, contentUrl, run, runContent });
 });

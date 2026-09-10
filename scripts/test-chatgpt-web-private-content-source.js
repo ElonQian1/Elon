@@ -20,7 +20,7 @@ test('download diagnostics preserve only source categories and fixed route words
     const value = content.describe(url);
     assert.equal(value.origin, origin); assert.equal(value.path, path);
     assert.doesNotMatch(JSON.stringify(value), /secret|"credential"|private|bucket/);
-    assert.deepEqual(Object.keys(value), ['schema', 'observed', 'origin', 'path', 'relative', 'whitespace', 'credentials', 'port', 'fragment']);
+    assert.deepEqual(Object.keys(value), ['schema', 'observed', 'origin', 'path', 'relative', 'whitespace', 'credentials', 'port', 'fragment', 'binding', 'query_count']);
   }
   const value = content.describe(' https://user:pass@chatgpt.com:8443/api/content#private');
   assert.equal(value.whitespace, true); assert.equal(value.credentials, true);
@@ -39,13 +39,34 @@ test('project content requires explicit paired file identity and retains old pre
     assert.equal(content.contentUrl(prefix + path), null);
     assert.equal(content.previewUrl(prefix + path), null);
     assert.equal(library.contentUrl(prefix + path), null);
+    assert.equal(content.projectContentUrl(prefix + path + '&download=true&signature=synthetic', scope),
+      'https://chatgpt.com' + path + '&download=true&signature=synthetic');
   }
   for (const value of ['https://outside.test' + path, '//chatgpt.com' + path,
     'https://user@chatgpt.com' + path, 'https://chatgpt.com:8443' + path, path + '#secret',
-    path + '&extra=secret', path + '&file_id=file-synthetic', path + ' ',
+    path + '&file_id=file-synthetic', path + ' ',
     path.replace('libfile_synthetic', 'libfile_other'), path.replace('file-synthetic', 'file-other'),
     path.replace('/project-content', '/download')]) {
     assert.equal(content.projectContentUrl(value, scope), null);
+  }
+});
+
+test('paired download diagnostics identify the failed guard without identifiers or query values', () => {
+  const scope = { libraryFileId: 'libfile_synthetic', fileId: 'file-synthetic' };
+  const path = '/api/library/files/libfile_synthetic/project-content';
+  for (const [url, target, binding, count] of [
+    [path + '?file_id=file-synthetic', null, 'scope_missing', 1],
+    [path + '?file_id=file-synthetic', {}, 'scope_invalid', 1],
+    [path.replace('libfile_synthetic', 'libfile_other'), scope, 'library_mismatch', 0],
+    [path, scope, 'file_missing', 0],
+    [path + '?file_id=file-synthetic&file_id=file-synthetic', scope, 'file_duplicate', 2],
+    [path + '?file_id=file-other', scope, 'file_mismatch', 1],
+    [path + '?file_id=file-synthetic&sig=private', scope, 'matched', 2],
+  ]) {
+    const result = content.describe(url, target);
+    assert.equal(result.schema, 'elon.download_source.v2');
+    assert.equal(result.binding, binding); assert.equal(result.query_count, count);
+    assert.doesNotMatch(JSON.stringify(result), /synthetic|other|private|sig|file_id/);
   }
 });
 

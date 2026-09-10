@@ -131,3 +131,25 @@ rejected. Ordinary previews do not gain unscoped access to project content.
 `project-content-download-20260911-052912-717` passes 220 related Node cases,
 including actual owner/byte integration and rejected scope mismatches without
 another fetch. This does not yet prove the installed phone's saved bytes.
+
+## Adapter 331 Candidate
+
+Normal 1647 (adapter 330, source `7fbf48a01d223da4838d73344bf44aa4d607dc43`)
+was published and replacement-installed. APK SHA-256:
+`00a401e6e2b76b7127f87f3530fa5a0f47527f760d84cc1275aa9aeb043663c8`.
+`native-folder-download-1647-20260911-053914-925` still failed before any content
+request. The diagnostic now confirms `/api/library/files/{id}/project-content`;
+metadata and authorization returned 200. The original conversation, message count,
+empty draft and awake setting were restored. No saved-byte pass is claimed.
+
+Adapter 331 retains opaque server-returned query parameters while requiring exactly
+one matching `file_id` and the verified library ID. Official `DDt` consumes the
+returned address, not a locally reconstructed preview URL. The sole-query rule
+was unnecessarily restrictive; whether it caused this device failure is not yet
+proven. Source diagnostics v2 add only a closed binding-result enum and bounded
+query count to distinguish missing scope, library mismatch and file-ID failures.
+No query names/values or concrete IDs are exported. Native validation accepts v1
+for compatibility and rejects unbounded or additional fields.
+
+`project-content-binding-20260911-054916-818` passes 222 related Node tests.
+Actual saved-byte acceptance remains required for this scoped capability.

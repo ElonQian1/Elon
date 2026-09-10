@@ -101,6 +101,7 @@ WebView 身份与官网运行时按操作提供依赖；不是每次命令都重
 | 请求在响应头到达就取消超时，body 卡住后一直 busy；超时项目请求迟到覆盖新目录 | deadline 覆盖 body/解析；取消与 settle 有界，晚回调核对 owner/epoch | [生命周期](chatgpt-private-request-lifetime.md) |
 | 显式项目成员读取复用了两分钟后台预取新鲜度门槛 | 显式账户读取用自己的准入；后台节流不应拒绝用户的有效操作 | [项目附件后续](reports/chatgpt-project-media-1614.md) |
 | 只收到上传 reservation 200，没有上传字节；绕过原生选择器的 control 却成功 | 分开证明选择、建文件、传字节、处理完成、消息关联和内容可读 | [上传研究](chatgpt-private-attachment-upload.md) |
+| 项目文件目录被当作个人文件库，下载 404；修正 scope 后授权 200，返回的相对项目内容地址又被拒绝 | 保留目录 ID、实际文件 ID 和项目来源；逐层核对元数据、授权、返回地址类别、实际字节及原生落盘。根据当前官网源码绑定 ID 接入返回地址，不猜新请求，也不把授权成功算作下载完成 | [项目文件下载](reports/chatgpt-library-folder-download-1644.md) |
 | 响应 MIME 为 SSE，实际上传处理 body 是 NDJSON；进度 100 也不等于最终处理完成 | 以实际 framing 和终止事件为准，按 file ID 校验最终回执 | [上传研究](chatgpt-private-attachment-upload.md) |
 | 发送已发生，但页面上下文变化导致回执 unknown；盲目 fallback 有重复发送风险 | 账本绑定原请求，确认 dispatch 与清理编辑器分开，未知写结果只读对账 | [运行时发送](chatgpt-official-runtime-text-submit.md) |
 | 音频接通不代表有字幕；公开 Realtime 示例的 `oai-events` 不等于网页通道标签 | 使用网页实际 channel、text/binary 帧和 delta/final 协议；字幕按 item/response 去重 | [原生字幕](chatgpt-realtime-voice-native-transcript-stream.md) |

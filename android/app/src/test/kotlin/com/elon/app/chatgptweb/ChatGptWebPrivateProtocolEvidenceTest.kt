@@ -22,6 +22,23 @@ class ChatGptWebPrivateProtocolEvidenceTest {
         }
     }
 
+    @Test fun pairedDownloadSourceHasOnlyBoundedBindingEvidence() {
+        fun source() = JSONObject().put("schema", "elon.download_source.v2").put("observed", true)
+            .put("origin", "same_origin").put("path", "/api/library/files/{id}/project-content")
+            .put("relative", true).put("whitespace", false).put("credentials", false)
+            .put("port", false).put("fragment", false).put("binding", "matched").put("query_count", 2)
+        for (binding in listOf("not_applicable", "scope_missing", "scope_invalid", "library_mismatch",
+            "file_missing", "file_duplicate", "file_mismatch", "matched")) {
+            val value = source().put("binding", binding)
+            assertEquals(value.toString(), detail(value))
+        }
+        for (value in listOf(source().put("binding", "private"), source().put("query_count", "2"),
+            source().put("query_count", -1), source().put("query_count", 1000),
+            source().put("file_id", "private"), source().apply { remove("binding") })) {
+            assertEquals("invalid_protocol_evidence", detail(value))
+        }
+    }
+
     @Test fun modelContextAllowsKnownStagesAndRejectsUnboundedValues() {
         assertTrue("model_runtime_context" in ChatGptWebPrivateProtocolEvidence.MODES)
         for (code in listOf("not_observed", "identity_unavailable", "picker_missing", "owner_unavailable",

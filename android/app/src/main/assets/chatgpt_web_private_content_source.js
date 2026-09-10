@@ -34,13 +34,14 @@
       // CDt binds both the library row and concrete file; do not borrow current-chat scope.
       return url.origin === 'https://chatgpt.com' && !url.username && !url.password && !url.hash &&
         url.pathname === '/api/library/files/' + scope.libraryFileId + '/project-content' &&
-        [...url.searchParams].length === 1 && url.searchParams.get('file_id') === scope.fileId ? url.href : null;
+        url.searchParams.getAll('file_id').length === 1 && url.searchParams.get('file_id') === scope.fileId ? url.href : null;
     } catch (_) { return null; }
   }
 
-  function describe(value) {
-    const result = { schema: 'elon.download_source.v1', observed: true, origin: 'invalid', path: '',
-      relative: false, whitespace: false, credentials: false, port: false, fragment: false };
+  function describe(value, scope) {
+    const result = { schema: 'elon.download_source.v2', observed: true, origin: 'invalid', path: '',
+      relative: false, whitespace: false, credentials: false, port: false, fragment: false,
+      binding: 'not_applicable', query_count: 0 };
     if (typeof value !== 'string' || value.length > 16384) return result;
     result.relative = !/^[A-Za-z][A-Za-z0-9+.-]*:/.test(value);
     result.whitespace = /[\\\x00-\x20\x7f]/.test(value);
@@ -58,9 +59,19 @@
       result.credentials = Boolean(url.username || url.password);
       result.port = Boolean(url.port);
       result.fragment = Boolean(url.hash);
+      result.query_count = Math.min(999, [...url.searchParams].length);
+      if (result.origin === 'same_origin' && result.path === '/api/library/files/{id}/project-content') {
+        const files = url.searchParams.getAll('file_id');
+        result.binding = !scope ? 'scope_missing' :
+          !/^libfile[_-][A-Za-z0-9_-]{1,152}$/.test(scope.libraryFileId || '') ||
+          !/^file[_-][A-Za-z0-9_-]{1,152}$/.test(scope.fileId || '') ? 'scope_invalid' :
+          url.pathname !== '/api/library/files/' + scope.libraryFileId + '/project-content' ? 'library_mismatch' :
+          !files.length ? 'file_missing' : files.length !== 1 ? 'file_duplicate' :
+          files[0] !== scope.fileId ? 'file_mismatch' : 'matched';
+      }
     } catch (_) {}
     return result;
   }
 
-  return Object.freeze({ version: 4, contentUrl, previewUrl, projectContentUrl, describe });
+  return Object.freeze({ version: 5, contentUrl, previewUrl, projectContentUrl, describe });
 });
