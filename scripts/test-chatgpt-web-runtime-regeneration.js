@@ -7,8 +7,8 @@ const contract = require('../android/app/src/main/assets/chatgpt_web_private_reg
 const { fixture, id, flush } = require('./fixtures/chatgpt-runtime-regeneration.js');
 
 test('regeneration has a versioned official-runtime transaction', () => {
-  assert.equal(runtime.version, 7);
-  assert.equal(contract.version, 7);
+  assert.equal(runtime.version, 8);
+  assert.equal(contract.version, 8);
   assert.equal(typeof runtime.create, 'function');
 });
 
@@ -108,7 +108,8 @@ for (const [reason, change] of Object.entries({
     assert.equal(f.api.state().pending, true);
     f.runTimer(15000);
     assert.deepEqual(await result.completion, { status: 'unknown',
-      code: reason === 'parent' ? 'timeout_parent_mismatch' : 'timeout_owner_changed' });
+      code: 'timeout_' + ({ parent: 'parent_mismatch', identity: 'owner_auth',
+        conversation: 'owner_object', server_conversation: 'owner_server' }[reason] || 'owner_route') });
     assert.equal(f.calls.length, 1, 'an unknown result must not invoke a fallback or replay');
   });
 }

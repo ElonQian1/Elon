@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 8, create: factory });
+  const api = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateModelContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -79,15 +79,28 @@
 
   // Post-dispatch identity is independent of picker rendering. The reply owner
   // still verifies the new message, selected branch and original user parent.
-  function ownerCurrent(binding) {
+  function ownerState(binding) {
     try {
-      const now = binding && identityContext();
-      return !!now && ['href', 'cid', 'token', 'account'].every(key => now[key] === binding[key]) &&
-        binding.menu?.conversation === binding.conversation &&
-        typeof binding.conversation?.serverId$ === 'function' &&
-        (binding.conversation.serverId$() || null) === now.cid;
-    } catch (_) { return false; }
+      if (!binding) return 'owner_missing';
+      const now = identityContext();
+      if (!now) return ({ route_unsupported: 'owner_route', document_unavailable: 'owner_document',
+        identity_unavailable: 'owner_identity' })[code] || 'owner_unavailable';
+      if (now.href !== binding.href || now.cid !== binding.cid) return 'owner_route';
+      if (now.token !== binding.token) return 'owner_document';
+      if (now.account !== binding.account) {
+        const before = JSON.parse(binding.account), after = JSON.parse(now.account);
+        if (before[0] !== after[0]) return 'owner_auth';
+        if (before[1] !== after[1]) return 'owner_account';
+        return 'owner_device';
+      }
+      if (binding.menu?.conversation !== binding.conversation) return 'owner_object';
+      if (typeof binding.conversation?.serverId$ !== 'function' ||
+          (binding.conversation.serverId$() || null) !== now.cid) return 'owner_server';
+      return 'owner_current';
+    } catch (_) { return 'owner_unavailable'; }
   }
+
+  function ownerCurrent(binding) { return ownerState(binding) === 'owner_current'; }
 
   function validate(modules) {
     const { shared: s, conversation: c, composer: b } = modules || {};
@@ -371,6 +384,6 @@
     return advancedState(after);
   }
 
-  return Object.freeze({ version: 7, state: () => code, urls: URLS, capture, current, ownerCurrent, validate, catalog, read, matches, apply,
+  return Object.freeze({ version: 9, state: () => code, urls: URLS, capture, current, ownerCurrent, ownerState, validate, catalog, read, matches, apply,
     readAdvanced, advancedCatalog, applyAdvanced, matchesAdvanced });
 });

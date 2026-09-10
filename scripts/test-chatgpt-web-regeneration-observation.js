@@ -6,7 +6,7 @@ const { fixture, flush, id } = require('./fixtures/chatgpt-runtime-regeneration.
 
 for (const [code, change] of Object.entries({
   stream_missing: () => {},
-  owner_changed: f => { f.page.location.href += '#changed'; },
+  owner_route: f => { f.page.location.href += '#changed'; },
   conversation_mismatch: f => f.publish({ conversationId: id(9) }),
   message_invalid: f => f.publish({ id: 'not-an-id' }),
   old_variant: f => f.publish({ id: f.message.id }),
@@ -26,6 +26,27 @@ for (const [code, change] of Object.entries({
     assert.equal(f.api.state().pending, true, 'an unknown result still holds the single-writer fence');
     assert.equal(f.calls.length, 1);
     assert.equal((await f.api.regenerate(f.command).completion).code, 'busy');
+  });
+}
+
+for (const [code, change] of Object.entries({
+  owner_auth: headers => { headers.authorization = 'Bearer another-synthetic-user'; },
+  owner_account: headers => { headers['chatgpt-account-id'] = 'another-synthetic-workspace'; },
+  owner_device: headers => { headers['oai-device-id'] = 'another-synthetic-device'; },
+  owner_identity: headers => { delete headers.authorization; }
+})) {
+  test('post-dispatch identity changes remain fenced and identify only the changed component: ' + code, async () => {
+    const f = fixture(), headers = { authorization: 'Bearer synthetic-user',
+      'chatgpt-account-id': 'synthetic-workspace', 'oai-device-id': 'synthetic-device' };
+    f.page.__elonChatGptPrivateTransport.copySameOriginRequestHeaders = () => ({ ...headers });
+    const result = f.api.regenerate(f.command);
+    await flush(); change(headers); f.publish(); f.runTimer(15000);
+    const receipt = await result.completion;
+    assert.deepEqual(receipt, { status: 'unknown', code: 'timeout_' + code });
+    assert.ok(receipt.code.length <= 32, 'the production receipt must retain the complete reason');
+    assert.doesNotMatch(JSON.stringify(receipt), /Bearer|synthetic|workspace|device-id/);
+    assert.equal(f.api.state().pending, true);
+    assert.equal(f.calls.length, 1);
   });
 }
 

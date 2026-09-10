@@ -54,11 +54,36 @@ PID no longer exists and the actual installation is verified. Do not restart thi
 build based on that stale state file. Worktree auto-cleanup also warned about a
 missing Branch property; repository cleanup is checked separately at task finish.
 
-The real original conversation was restored before installation. After update,
+The real original conversation was restored before installation. Initially after update,
 the phone was locked/asleep and the app was on conversation home with no bound
 ChatGPT snapshot. No regeneration was attempted on 1638. A private, uncommitted
 restore checkpoint is retained under Git-local research artifacts; it contains
 only navigation/phase metadata, not message content or credentials. After unlock,
 restore/open the same synthetic probe, capture structural protocol evidence and
 run the existing native retry harness once. Do not resend the initial prompt or
-claim this installation as a passing regeneration case.
+claim this installation as a passing regeneration case. The following follow-up
+supersedes the locked-device boundary, not the failed acceptance status.
+
+## Normal 1638 unlocked follow-up
+
+The production native retry button was dispatched once on the same isolated
+synthetic probe, with no initial prompt resent. Run
+`native-regenerate-1638-20260910-191608-620` failed in 34.3 seconds with
+`official_runtime_v1:regenerate_unknown:timeout_owner_changed`. This isolates the
+first rejected observation layer; it does not identify which identity component
+changed. No automatic retry or fallback write followed.
+
+A later readonly reopen found the same URL, one user and one completed assistant
+turn. The assistant's 47-character text differed from the pre-click snapshot;
+its native row ID was unchanged. This is evidence of changed reply content, not
+a successful runtime receipt or verified provider UUID. The original view and
+prior device stay-awake setting were restored. The old protocol capture had no
+records, so it does not prove which HTTP request ran.
+
+The v8 source batch adds component-level ownership reasons without weakening
+the checks. Its failing fixture first reproduced all changes being collapsed to
+`owner_changed`; 141 related tests pass after the change. The native acceptance
+predicate is also corrected: stable display-row identity is not a provider UUID,
+but changed text alone still cannot turn an unknown write into a pass. Optional
+protocol capture and restoration are now ordered inside the runner rather than
+outside its initialization/cleanup window. Production acceptance remains open.

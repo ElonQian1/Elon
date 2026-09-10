@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 7, create: factory });
+  const api = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const old = root.__elonChatGptPrivateRegenerateRuntime;
@@ -131,5 +131,5 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 7, regenerate, available, state });
+  return Object.freeze({ version: 8, regenerate, available, state });
 });

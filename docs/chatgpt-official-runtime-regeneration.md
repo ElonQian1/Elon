@@ -1,9 +1,9 @@
 # Official-runtime response regeneration
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
-Status: source implemented and offline verified. v7 adds closed observation
-reasons and a final readonly deadline check. Normal 1637 still timed out at the
-native retry; end-to-end device acceptance is not passed or completed. See
+Status: source implemented and offline verified. v8 distinguishes the exact
+ownership component without relaxing admission or replay fencing. Normal 1638
+returned `timeout_owner_changed`; end-to-end device acceptance is not passed. See
 the [1637 follow-up](reports/chatgpt-regeneration-observation-1637.md) and
 the [grouped delivery](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).
 The original adapter 286 batch wired this candidate into the existing production
@@ -12,6 +12,20 @@ independent Android HTTP generation transport. Do not recreate it while waiting
 for the grouped ChatGPT APK acceptance.
 
 ## Current source correction
+
+Regeneration v8 and model contract v9 retain all v7 checks but distinguish route,
+document, authorization, account/workspace, device header, retained conversation
+object and server ID failures. No private values leave the page. The next real
+sample must identify the failed component before any identity policy is changed.
+141 focused tests pass, including auth/workspace/device divergence and the
+existing model writer, parent, selected leaf and unknown-result fence.
+
+The acceptance runner now distinguishes provider variant identity from a stable
+native turn-row ID. A reused row passes only with changed visible text and the
+successful runtime receipt, which already proves a new provider UUID under the
+original parent. Failed/unknown receipts cannot pass from text alone. Optional
+bounded protocol capture starts immediately before retry and is read before
+restoration; verification registration requires successful original-view restore.
 
 Contract/runtime v7 retains the same one-shot callback and ownership checks.
 The existing final timeout now rechecks the captured stream and official tree
