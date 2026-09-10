@@ -44,7 +44,8 @@ test('PCA, removed, masked, malformed and unsupported reference families remain 
     { type: 'webpage' }, { name: 'bad\nname.txt' }, { content_type: {} }]) {
     assert.equal(citation.target(file(extra)), null);
   }
-  for (const metadata of [{ conversation_context_citation_metadata: [] },
+  for (const metadata of [{ conversation_context_citation_metadata: [{}] },
+    { conversation_context_citation_metadata: {} },
     { conversation_context_citation_metadata_status: 'marker_only' }]) {
     assert.deepEqual(citation.references({ ...metadata, content_references: [file()] }), []);
   }
@@ -65,6 +66,59 @@ test('attachment-first deduplication retains file and library identity while kee
 const groupedFile = (extra = {}) => file({ type: 'webpage', category: 'files',
   url: 'https://cloud.example.test/reference', ...extra });
 const ids = refs => citation.references({ content_references: refs }).map(row => row.file.id);
+
+test('official file URL path identities enter the existing citation target without fetching that URL', () => {
+  for (const url of ['file://library/file-synthetic', 'file:///file-synthetic',
+    'FILE://library/nested/file%2Dsynthetic', 'file://library/file-synthetic#preview']) {
+    assert.deepEqual(citation.target(groupedFile({ id: undefined, url })), {
+      id: 'file-synthetic', name: 'reference.txt', mime_type: 'text/plain',
+    }, url);
+  }
+  assert.equal(citation.target(groupedFile({ id: undefined, category: undefined,
+    url: 'file://library/file_synthetic' })).id, 'file_synthetic');
+  assert.equal(citation.target(groupedFile({ url: 'file://library/file-other' })).id, 'file-synthetic',
+    'an explicit valid ID retains the existing precedence over attribution');
+});
+
+test('an empty context-citation array does not hide unrelated ordinary file references', () => {
+  const metadata = { conversation_context_citation_metadata: [], content_references: [file()] };
+  assert.deepEqual(citation.references(metadata).map(row => row.file.id), ['file-synthetic']);
+  for (const status of ['marker_only', 'unknown', '']) {
+    assert.deepEqual(citation.references({ ...metadata, conversation_context_citation_metadata_status: status }), []);
+  }
+  for (const extra of [{ retrieval_origin: 'pca' }, { deleted: true }, { type: 'conversation_context_citation' }]) {
+    assert.deepEqual(citation.references({ ...metadata, content_references: [file(extra)] }), []);
+  }
+});
+
+test('file URL fallback cannot rescue invalid explicit identity or acquire cloud/context access', () => {
+  const url = 'file://library/file-synthetic';
+  for (const extra of [{ id: '' }, { id: 42 }, { id: 'bad-id' }, { file_id: 'bad-id' },
+    { category: 'web' }, { retrieval_origin: 'pca' }, { deleted: true },
+    { context_scopes: ['other'] }, { preview_file: {} }, { mounted_library_file_id: 'mounted' }]) {
+    assert.equal(citation.target(groupedFile({ id: undefined, url, ...extra })), null);
+  }
+  for (const url of ['https://external.example.test/file-synthetic', 'file://file-synthetic',
+    'file://library/unknown-id', 'file://library/file-', 'file://library/file-synthetic?scope=other',
+    'file://library/file-synthetic%3Fscope%3Dother', 'file://library/file-synthetic%2Fother',
+    'file://library/file-synthetic%00', 'file://library/file-%zz', 'file://library/file-x\n',
+    'file://library/' + 'x'.repeat(8192) + '/file-synthetic']) {
+    assert.equal(citation.target(groupedFile({ id: undefined, url })), null, url.slice(0, 80));
+  }
+});
+
+test('grouped and cite-map URL-only references deduplicate against existing attachments', () => {
+  const item = groupedFile({ id: undefined, url: 'file://library/file-synthetic' });
+  for (const container of [{ type: 'grouped_webpages_v2', items: [item] }, { cite_map: { first: item } }]) {
+    const metadata = { content_references: [container] };
+    assert.deepEqual(citation.references(metadata).map(row => row.file.id), ['file-synthetic']);
+    assert.deepEqual(citation.references(metadata, [{ id: 'file-synthetic', name: 'original.txt' }]), []);
+  }
+  assert.deepEqual(ids([
+    file({ id: undefined, url: 'file://library/file-first' }),
+    file({ id: undefined, url: 'file://library/file-second' }),
+  ]), ['file-first', 'file-second']);
+});
 
 test('file-classified reference items retain concrete identity without using their cloud URL', () => {
   for (const extra of [{ category: 'files' }, { category: undefined, attribution: 'Library' },

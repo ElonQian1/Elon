@@ -92,6 +92,41 @@ for (const format of ['grouped', 'cite_map']) test(format + ' file citations reu
   assert.equal(f.root.location.href, 'https://chatgpt.com/c/visible');
 });
 
+for (const format of ['grouped', 'cite_map']) test(format + ' URL-only file identity reaches scoped native download', async () => {
+  const f = fixture();
+  const item = { ...ref(), id: undefined, type: 'webpage', category: 'files',
+    url: 'file://library/file%2Dcited#preview' };
+  f.payload.messages[0].metadata.content_references = [format === 'grouped'
+    ? { type: 'grouped_webpages_v2', items: [item] } : { cite_map: { fixture: item } }];
+  const rows = f.rows();
+  assert.equal(rows.length, 1);
+  assert.match(rows[0].downloadHandle, /^download_[a-f0-9]{32}$/);
+  assert.doesNotMatch(JSON.stringify(rows), /file-cited|file:|https|token/);
+  await f.run(rows[0]);
+  assert.equal(f.calls.length, 2);
+  assert.equal(new URL(f.calls[0].url).pathname, '/backend-api/files/file-cited/simple');
+  assert.equal(new URL(f.calls[1].url).pathname, '/backend-api/files/download/file-cited');
+  assert.equal(new URL(f.calls[1].url).searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+  assert.ok(f.calls.every(call => new URL(call.url).origin === 'https://chatgpt.com'));
+  assert.equal(f.queued.length, 1);
+  assert.equal(f.receipts.at(-1)[2], 'download_queued');
+});
+
+test('empty context metadata preserves the ordinary citation download path without DOM', async () => {
+  const f = fixture();
+  f.payload.messages[0].metadata.conversation_context_citation_metadata = [];
+  const rows = f.rows();
+  assert.equal(rows.length, 1);
+  await f.run(rows[0]);
+  assert.equal(f.calls.length, 2);
+  assert.equal(new URL(f.calls[1].url).searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+  assert.equal(f.queued.length, 1);
+  f.payload.messages[0].metadata.conversation_context_citation_metadata_status = 'marker_only';
+  assert.equal(f.rows().length, 0);
+  await f.run(rows[0]);
+  assert.equal(f.calls.length, 2, 'a newly masked source revokes the former ordinary handle');
+});
+
 test('grouped library citations preserve project metadata checks and existing attachment positions', async () => {
   const f = fixture(PROJECT_INFO);
   f.payload.messages[0].metadata.attachments = [{ id: 'file-original', name: 'original.txt' }];
@@ -319,7 +354,7 @@ test('Android loads the citation module before its owners and reinjection preser
   let retired = 0;
   const transport = {}, window = { location: { origin: 'https://chatgpt.com' },
     __elonChatGptPrivateTransport: transport,
-    __elonChatGptPrivateFileDownload: { version: 15, dispose() { retired++; } } };
+    __elonChatGptPrivateFileDownload: { version: 17, dispose() { retired++; } } };
   const context = vm.createContext({ window, Map, Set, URL });
   for (let i = 0; i < 2; i++) {
     for (const name of ['file_citation', 'history_projection', 'file_download']) {
@@ -329,5 +364,8 @@ test('Android loads the citation module before its owners and reinjection preser
   assert.equal(retired, 1);
   assert.equal(window.__elonChatGptPrivateTransport, transport);
   assert.equal(window.__elonChatGptPrivateHistoryProjection.create({}).files({ messages: [message()] }).files.length, 1);
+  const urlOnly = { ...ref(), id: undefined, url: 'file://library/file-cited' };
+  const projected = window.__elonChatGptPrivateHistoryProjection.create({}).files({ messages: [message('answer', [urlOnly])] });
+  assert.equal(projected.files.length, 1, 'reinjection installs the new citation parser in its existing owners');
   assert.equal(window.__elonChatGptPrivateFileDownload.version, download.version);
 });

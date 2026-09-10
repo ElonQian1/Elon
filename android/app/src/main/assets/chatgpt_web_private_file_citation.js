@@ -16,11 +16,25 @@
   }
 
   function eligible(metadata) {
-    // Context citations have a separate deletion/source-mask protocol. Do not
-    // treat an incomplete context graph as ordinary content references.
+    // Official GFi distinguishes empty metadata from a context graph. Nonempty
+    // graphs and marker states still need their separate deletion/source mask.
     return metadata && typeof metadata === 'object' && !Array.isArray(metadata) &&
-      metadata.conversation_context_citation_metadata == null &&
+      (metadata.conversation_context_citation_metadata == null ||
+        Array.isArray(metadata.conversation_context_citation_metadata) &&
+        metadata.conversation_context_citation_metadata.length === 0) &&
       metadata.conversation_context_citation_metadata_status == null;
+  }
+
+  function fileUrlId(value) {
+    const url = text(value);
+    if (!url.toLowerCase().startsWith('file://') || url.length > 8192) return '';
+    try {
+      const parsed = new URL(url);
+      // Official c6i appends search before g6i validates the concrete file ID.
+      // Never fetch the file URL or interpret its host as a provider identity.
+      const id = decodeURIComponent(parsed.pathname.split('/').filter(Boolean).at(-1) || '') + parsed.search;
+      return FILE.test(id) ? id : '';
+    } catch (_) { return ''; }
   }
 
   function target(reference) {
@@ -32,9 +46,13 @@
       reference.type === 'file' || ['files', 'library'].includes(text(reference.attribution).toLowerCase()) ||
       text(reference.url).toLowerCase().startsWith('file://');
     if (!isFile) return null;
-    // Official kpr -> p6i/g6i -> PXe: explicit file citations resolve to a
-    // ChatGPT file ID. A cloud URL by itself is not a download credential.
+    // Official p6i/c6i/g6i also resolves a concrete ID from a file URL path.
+    // A cloud URL by itself is not a download credential.
     const ids = [reference.file_id, reference.id].filter(value => value != null);
+    if (!ids.length) {
+      const id = fileUrlId(reference.url);
+      if (id) ids.push(id);
+    }
     if (!ids.length || ids.some(value => typeof value !== 'string' || !FILE.test(value)) ||
         new Set(ids).size !== 1) return null;
     if (['mounted_library_file_id', 'shared_library_file_id', 'library_download_id',
@@ -75,7 +93,8 @@
       if (visited >= limit) { truncated = true; return false; }
       visited++;
       if (!object(value)) return true;
-      const key = explicit ? 'file://' + text(value.source) + '/' + text(value.id || value.file_id) : text(value.url);
+      const key = explicit ? 'file://' + text(value.source) + '/' +
+        (text(value.id || value.file_id) || fileUrlId(value.url)) : text(value.url);
       if (!key || key.length > 8192 || urls.has(key)) return true;
       urls.add(key); items.push(value);
       return true;
@@ -131,5 +150,5 @@
     return result;
   }
 
-  return Object.freeze({ version: 2, eligible, target, references, scan });
+  return Object.freeze({ version: 3, eligible, target, references, scan });
 });
