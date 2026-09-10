@@ -112,9 +112,13 @@ try {
 } finally {
     if ($probeStarted) {
         try {
+            $source = Probe 'file_download_source'
+            $report.download_source = $source.receipt.result.detail | ConvertFrom-Json
+        } catch { $report.download_source_unavailable = $true }
+        try {
             $observed = Probe 'stop'
             $evidence = $observed.receipt.result.detail | ConvertFrom-Json
-            $report.protocol = @($evidence.records | Where-Object { $_.path -match '/files/' } |
+            $report.protocol = @($evidence.records | Where-Object { $_.path -match '/files/|/estuary/content' } |
                 Select-Object method,path,status,requestFields,responseFields)
             $report.protocol_dropped = $evidence.dropped
         } catch { $report.protocol_unavailable = $true }

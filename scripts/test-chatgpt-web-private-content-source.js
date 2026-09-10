@@ -6,6 +6,30 @@ const vm = require('node:vm');
 const content = require('../android/app/src/main/assets/chatgpt_web_private_content_source.js');
 const library = require('../android/app/src/main/assets/chatgpt_web_private_library_download.js');
 
+test('download diagnostics preserve only source categories and fixed route words', () => {
+  for (const [url, origin, path] of [
+    ['/backend-api/estuary/content?id=secret&sig=credential', 'same_origin', '/backend-api/estuary/content'],
+    ['https://chatgpt.com/api/library/files/libfile_secret/download?secret=value', 'same_origin', '/api/library/files/{id}/download'],
+    ['https://chatgpt.com/private-name/file-private', 'same_origin', '/{id}/{id}'],
+    ['https://bucket.oaiusercontent.com/secret?sig=credential', 'oaiusercontent', ''],
+    ['https://bucket.blob.core.windows.net/private?sig=credential', 'azure_blob', ''],
+    ['https://private-host.test/private', 'other_https', ''],
+    ['data:text/plain,private', 'non_https', ''],
+    ['https://chatgpt.com/', 'same_origin', ''],
+  ]) {
+    const value = content.describe(url);
+    assert.equal(value.origin, origin); assert.equal(value.path, path);
+    assert.doesNotMatch(JSON.stringify(value), /secret|"credential"|private|bucket/);
+    assert.deepEqual(Object.keys(value), ['schema', 'observed', 'origin', 'path', 'relative', 'whitespace', 'credentials', 'port', 'fragment']);
+  }
+  const value = content.describe(' https://user:pass@chatgpt.com:8443/api/content#private');
+  assert.equal(value.whitespace, true); assert.equal(value.credentials, true);
+  assert.equal(value.port, true); assert.equal(value.fragment, true);
+  for (const input of [null, {}, '', 'https://[', 'x'.repeat(16385)]) {
+    assert.doesNotThrow(() => content.describe(input));
+  }
+});
+
 test('shared content policy retains the released download URL boundary', () => {
   for (const path of ['/api/estuary/content', '/backend-api/estuary/content']) {
     for (const prefix of ['', 'https://chatgpt.com', 'https://chatgpt.com:443']) {

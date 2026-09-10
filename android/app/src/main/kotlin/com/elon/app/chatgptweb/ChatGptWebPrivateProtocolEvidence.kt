@@ -7,7 +7,7 @@ import org.json.JSONObject
 internal object ChatGptWebPrivateProtocolEvidence {
     val MODES = setOf("start", "read", "stop", "clear", "runtime_assets", "composer_tool_context",
         "stop_runtime_context", "stop_runtime_owner", "directory_refresh", "model_runtime_context", "document_state",
-        "library_attachment_policy")
+        "library_attachment_policy", "file_download_source")
     private val libraryPolicyCodes = setOf("not_observed", "runtime_unavailable", "validator_unavailable", "document_changed",
         "runtime_changed", "limits_bypassed", "composer_detached", "owner_unavailable", "store_mismatch",
         "scope_mismatch", "model_mismatch", "limits_missing", "limits_invalid", "ready", "attachment_limit", "validator_error")
@@ -49,6 +49,16 @@ internal object ChatGptWebPrivateProtocolEvidence {
     private fun sanitize(raw: String): String {
         require(raw.length <= 12000)
         val value = JSONObject(raw)
+        if (value.opt("schema") == "elon.download_source.v1") {
+            require(value.keys().asSequence().toSet() == setOf("schema", "observed", "origin", "path",
+                "relative", "whitespace", "credentials", "port", "fragment"))
+            for (key in listOf("observed", "relative", "whitespace", "credentials", "port", "fragment")) {
+                require(value.opt(key) is Boolean)
+            }
+            require(value.opt("origin") in setOf("invalid", "same_origin", "non_https", "oaiusercontent", "azure_blob", "other_https"))
+            require(value.getString("path").let { it.isEmpty() || Regex("(?:/(?:api|backend-api|files|library|download|content|estuary|attachment|attachments|\\{id\\})){1,8}/?").matches(it) })
+            return value.toString()
+        }
         if (value.opt("schema") == "elon.document_state.v1") return documentState(value)
         if (value.opt("schema") == ChatGptWebDirectoryDiagnostic.SCHEMA) {
             return ChatGptWebDirectoryDiagnostic.sanitize(value)

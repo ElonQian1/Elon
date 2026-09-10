@@ -4,7 +4,7 @@
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 19, create: root => factory(root, pointer, citation) });
+  const exported = Object.freeze({ version: 20, create: root => factory(root, pointer, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -21,6 +21,13 @@
   const ACTION = 'download_conversation_file';
   let active = null;
   let disposed = false;
+  let lastSource = null;
+
+  function sourceDiagnostics() {
+    if (disposed || !lastSource || !lastSource.value || lastSource.expiresAt <= Date.now() || lastSource.account !== identity() ||
+        lastSource.token !== root.__elonChatGptDocumentToken) return null;
+    return { ...lastSource.value };
+  }
 
   function identity() {
     const headers = root.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.();
@@ -299,6 +306,7 @@
       return respond(ACTION, false, 'download_selection_expired');
     }
     const job = { descriptor, entry, controller: new root.AbortController() };
+    lastSource = null;
     if (entry.mountedFileId) entries.delete(descriptor.downloadHandle);
     active = job;
     let timer = root.setTimeout(() => job.controller.abort(), 15000);
@@ -329,6 +337,8 @@
         throw new Error('download_authorization_failed');
       }
       const binary = root.__elonChatGptPrivateLibraryDownload;
+      lastSource = { account: entry.account, token: entry.token, expiresAt: Date.now() + 120000,
+        value: root.__elonChatGptPrivateContentSource?.describe?.(payload.download_url) };
       if (binary?.contentUrl?.(payload.download_url)) {
         // A fresh authorization may return the official same-origin content route,
         // not a signed external URL. Reuse the existing byte owner and save receipt.
@@ -364,6 +374,6 @@
     active.controller.abort();
     return true;
   }
-  function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 19, register, registerLibraryFile, start, cancel, dispose });
+  function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
+  return Object.freeze({ version: 20, register, registerLibraryFile, start, cancel, dispose, sourceDiagnostics });
 });

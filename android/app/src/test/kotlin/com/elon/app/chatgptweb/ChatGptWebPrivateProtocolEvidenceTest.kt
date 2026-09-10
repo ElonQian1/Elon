@@ -6,6 +6,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ChatGptWebPrivateProtocolEvidenceTest {
+    @Test fun downloadSourceAdmitsOnlyClosedStructuralEvidence() {
+        assertTrue("file_download_source" in ChatGptWebPrivateProtocolEvidence.MODES)
+        fun source() = JSONObject().put("schema", "elon.download_source.v1").put("observed", true)
+            .put("origin", "same_origin").put("path", "/api/library/files/{id}/download")
+            .put("relative", false).put("whitespace", false).put("credentials", false)
+            .put("port", false).put("fragment", false)
+        assertEquals(source().toString(), detail(source()))
+        for (value in listOf(source().put("url", "secret"), source().put("path", "/api/files/private"),
+            source().put("path", "/api/content?token=secret"), source().put("origin", "private.test"),
+            source().put("observed", "true"), source().apply { remove("port") })) {
+            assertEquals("invalid_protocol_evidence", detail(value))
+        }
+    }
+
     @Test fun modelContextAllowsKnownStagesAndRejectsUnboundedValues() {
         assertTrue("model_runtime_context" in ChatGptWebPrivateProtocolEvidence.MODES)
         for (code in listOf("not_observed", "identity_unavailable", "picker_missing", "owner_unavailable",

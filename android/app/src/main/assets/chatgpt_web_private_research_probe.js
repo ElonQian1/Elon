@@ -4,6 +4,11 @@
   const legacyEnabled = window.__elonChatGptPrivateResearchEnabled === true;
   if (location.origin !== 'https://chatgpt.com') return;
   const existingProbe = window.__elonChatGptPrivateResearchProbe;
+  function downloadSourceDetail() {
+    return JSON.stringify(window.__elonChatGptPrivateFileDownload?.sourceDiagnostics?.() ||
+      { schema: 'elon.download_source.v1', observed: false, origin: 'invalid', path: '',
+        relative: false, whitespace: false, credentials: false, port: false, fragment: false });
+  }
   function modelContextDetail() {
     let code;
     try { code = window.__elonChatGptPrivateModelState?.state?.(window); } catch (_) {}
@@ -50,10 +55,13 @@
       { schema: 'elon.directory_refresh.v1', observed: false, durationMs: 0, identityMs: 0, reads: [] });
   }
   if (existingProbe && Number(existingProbe.version) >= 13) {
-    if (Number(existingProbe.version) < 20) {
+    if (Number(existingProbe.version) < 21) {
       // Upgrade only the command surface; keep the existing network observers.
-      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 20,
+      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 21,
         handle(action, command, respond) {
+          if (action === 'private_protocol_probe' && command.value === 'file_download_source') {
+            respond(action, true, downloadSourceDetail()); return true;
+          }
           if (action === 'private_protocol_probe' && command.value === 'library_attachment_policy') {
             respond(action, true, libraryPolicyDetail()); return true;
           }
@@ -571,13 +579,14 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 20,
+    version: 21,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
       if (action !== 'private_protocol_probe') return false;
       const mode = String(command.value || '');
       let detail;
       if (mode === 'runtime_assets') detail = window.__elonChatGptPrivateProtocolEvidence?.runtimeAssets(window);
+      else if (mode === 'file_download_source') detail = downloadSourceDetail();
       else if (mode === 'document_state') detail = window.__elonChatGptPrivateProtocolEvidence?.documentState(window);
       else if (mode === 'model_runtime_context') detail = modelContextDetail();
       else if (mode === 'directory_refresh') detail = directoryDetail();

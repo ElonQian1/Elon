@@ -24,5 +24,29 @@
     } catch (_) { return null; }
   }
 
-  return Object.freeze({ version: 2, contentUrl, previewUrl });
+  function describe(value) {
+    const result = { schema: 'elon.download_source.v1', observed: true, origin: 'invalid', path: '',
+      relative: false, whitespace: false, credentials: false, port: false, fragment: false };
+    if (typeof value !== 'string' || value.length > 16384) return result;
+    result.relative = !/^[A-Za-z][A-Za-z0-9+.-]*:/.test(value);
+    result.whitespace = /[\\\x00-\x20\x7f]/.test(value);
+    try {
+      const url = new URL(value, 'https://chatgpt.com');
+      result.origin = url.origin === 'https://chatgpt.com' ? 'same_origin' :
+        url.protocol !== 'https:' ? 'non_https' :
+        /(^|\.)oaiusercontent\.com$/.test(url.hostname) ? 'oaiusercontent' :
+        /\.blob\.core\.windows\.net$/.test(url.hostname) ? 'azure_blob' : 'other_https';
+      if (result.origin === 'same_origin') {
+        const vocabulary = new Set(['api', 'backend-api', 'files', 'library', 'download', 'content', 'estuary', 'attachment', 'attachments']);
+        const parts = url.pathname.split('/').filter(Boolean).slice(0, 8);
+        result.path = parts.length ? '/' + parts.map(part => vocabulary.has(part) ? part : '{id}').join('/') : '';
+      }
+      result.credentials = Boolean(url.username || url.password);
+      result.port = Boolean(url.port);
+      result.fragment = Boolean(url.hash);
+    } catch (_) {}
+    return result;
+  }
+
+  return Object.freeze({ version: 3, contentUrl, previewUrl, describe });
 });

@@ -29,6 +29,7 @@ function fixture(options = {}) {
     setTimeout: (fn, ms) => setTimeout(fn, options.fastTimeout ? Math.min(ms, 25) : ms), clearTimeout,
     __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({ Authorization: identity }) },
     __elonChatGptPrivateJsonRequest: request, __elonChatGptPrivateLibraryDownload: library,
+    __elonChatGptPrivateContentSource: require('../android/app/src/main/assets/chatgpt_web_private_content_source.js'),
     elonChatGptFileDownload: bridge,
     get document() { throw Error('catalogue download must not read DOM'); },
     fetch: async (url, init) => {
@@ -84,8 +85,25 @@ for (const href of ['https://chatgpt.com/', 'https://chatgpt.com/c/unrelated',
   });
 }
 
+test('download diagnostics expire with identity and document without more requests', async () => {
+  const f = fixture();
+  assert.equal(f.owner.sourceDiagnostics(), null);
+  await f.run(f.register());
+  const count = f.calls.length;
+  assert.equal(f.owner.sourceDiagnostics().path, '/backend-api/estuary/content');
+  const copy = f.owner.sourceDiagnostics(); copy.path = 'secret';
+  assert.notEqual(f.owner.sourceDiagnostics().path, copy.path);
+  f.identity('Bearer changed-synthetic-identity');
+  assert.equal(f.owner.sourceDiagnostics(), null);
+  f.identity('Bearer synthetic-project-catalog');
+  f.root.__elonChatGptDocumentToken = 'doc_changed';
+  assert.equal(f.owner.sourceDiagnostics(), null);
+  f.owner.dispose(); assert.equal(f.owner.sourceDiagnostics(), null);
+  assert.equal(f.calls.length, count);
+});
+
 test('missing catalogue project ID is resolved from authoritative metadata', async () => {
-  const f = fixture({ source: { gizmo_id: undefined } });
+const f = fixture({ source: { gizmo_id: undefined } });
   await f.run(f.register());
   assert.equal(f.saved, true);
   assert.equal(new URL(f.calls[0].url).search, '');

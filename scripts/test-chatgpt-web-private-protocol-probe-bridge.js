@@ -91,6 +91,25 @@ test('directory diagnostics use the existing read-only probe without network cap
   assert.deepEqual(upgraded, value);
 });
 
+test('download source diagnostics are on demand and survive observer upgrade', () => {
+  const f = fixture();
+  assert.equal(JSON.parse(f.command('file_download_source').detail).observed, false);
+  const value = { schema: 'elon.download_source.v1', observed: true, origin: 'same_origin',
+    path: '/backend-api/estuary/content', relative: true, whitespace: false, credentials: false, port: false, fragment: false };
+  f.window.__elonChatGptPrivateFileDownload = { sourceDiagnostics: () => value };
+  for (const previous of [null, 20]) {
+    if (previous) {
+      f.window.__elonChatGptPrivateResearchProbe = { ...f.probe, version: previous };
+      vm.runInNewContext(source, f.context);
+    }
+    let detail;
+    f.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe', { value: 'file_download_source' },
+      (_, ok, result) => { assert.equal(ok, true); detail = JSON.parse(result); });
+    assert.deepEqual(detail, value);
+  }
+  assert.equal(f.requests.length, 0); assert.equal(f.read().active, false);
+});
+
 test('native gate admits the stop owner mode used by the page probe', () => {
   const native = fs.readFileSync(path.join(__dirname,
     '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPrivateProtocolEvidence.kt'), 'utf8');
@@ -191,7 +210,7 @@ test('version 13 command upgrade preserves existing observers and other commands
   const existing = f.probe;
   f.window.__elonChatGptPrivateResearchProbe = { ...existing, version: 13 };
   vm.runInNewContext(source, f.context);
-  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 20);
+  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 21);
   assert.equal(f.window.fetch, fetch);
   assert.equal(f.window.XMLHttpRequest.prototype.send, send);
   const answers = [];

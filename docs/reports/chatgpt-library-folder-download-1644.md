@@ -59,7 +59,8 @@ reuses the existing metadata, authorization, native transfer and save owners:
   or attachment/mutation capability is added.
 
 Scoped capability: `android_chatgpt_private_project_catalog_download_v1`.
-Code implemented; offline verified; corrected-build device acceptance pending.
+Code implemented; offline verified; corrected-build download acceptance failed
+at a later source-classification boundary, as recorded below.
 This does not complete mounted materialization, mounted attachment or citations.
 
 ## Verification
@@ -80,7 +81,29 @@ downloaded copy, and never pulls file content to the PC. It requires explicit
 phone-only-download authorization, a bounded selection, exact native file title,
 and a unique newly saved filename. It does not create a new cloud fixture.
 
-Next: install the grouped corrected Release and run this same native case once.
-Require successful scoped authorization, native save receipt, phone-side bytes,
-and restoration before marking this capability completed. A missing eligible
-project node, network failure or another 404 must remain distinct from success.
+## Normal 1645 Follow-up
+
+Normal 1.1.1645, adapter 328, source `a8fb45469fd2db7847346250a4dbcd4850574125`,
+was published and automatically replacement-installed on the same Xiaomi. APK
+SHA-256: `692e7e2df9a2f270452c7e8f7a856e725c229cdc1aeac7995ec79850be620e6e`.
+Build/publication run `project-catalog-release-20260911-044220-165` passed.
+
+`native-folder-download-1645-20260911-045545-484` failed after 41 seconds:
+the actual native Download now issued metadata `/backend-api/files/{id}/simple`
+and authorization `/backend-api/files/download/{id}`, both HTTP 200, with zero
+dropped observations. The personal-library 404 is gone. The native receipt was
+`download_source_unsupported`, received bytes zero; storage was **not** accepted.
+Conversation, message count, empty draft and awake setting were restored.
+
+The current diagnostic lacks the returned URL's category. Adapter 329 adds
+on-demand `file_download_source` diagnostics with only fixed origin categories,
+allowlisted route words, opaque segments and boolean formatting flags. The URL,
+host identifier, query, signed values and filename never enter diagnostic output.
+The observation expires with the identity/document or after two minutes and does
+not broaden download admission, start network capture or issue another request.
+139 related Node cases and the native acceptance contract pass. App-only run
+`download-source-native-app-gate-20260911-051208-265` reports BUILD SUCCESSFUL;
+the fresh XML contains 10 tests, zero failures/errors. The earlier root task
+matched an unrelated module with no matching tests and is not counted as a pass,
+despite its command wrapper's zero exit code. Corrected download completion still
+requires actual saved bytes; this diagnostic alone is not a fix.
