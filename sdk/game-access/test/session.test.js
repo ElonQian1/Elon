@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { verifyObservation } from '../src/verify.js';
-import { grantValues, units } from '../src/contract.js';
+import { grantValues, hex, identifier, units } from '../src/contract.js';
 import { signedFixture } from './fixture-builder.js';
 
 function check(f, overrides = {}) {
@@ -87,4 +87,15 @@ test('integer strings and maximum grant duration are bounded', () => {
   for (const value of [1, '01', '-1', '1.5', '9223372036854775808']) assert.throws(() => units(value));
   assert.equal(units('9007199254740993'), 9007199254740993n);
   assert.throws(() => grantValues({...signedFixture().observation.grant,expires_at_ms:'1700000900001'}));
+});
+
+test('line terminators cannot bypass full-string canonical validation', () => {
+  for (const suffix of ['\n', '\r', '\r\n', '\u2028', '\u2029', ' ', '\t']) {
+    assert.throws(() => identifier(`session-id${suffix}`), /invalid_contract/);
+    assert.throws(() => units(`1${suffix}`), /invalid_contract/);
+    assert.throws(() => hex('a'.repeat(64 - suffix.length) + suffix, 32), /invalid_contract/);
+  }
+  assert.equal(identifier('session-id'), 'session-id');
+  assert.equal(hex('a'.repeat(64), 32), 'a'.repeat(64));
+  assert.equal(units('0'), 0n);
 });

@@ -25,15 +25,18 @@ export function exactObject(value, fields) {
   requireCondition(keys.length === fields.length && keys.every(key => fields.includes(key)));
 }
 export function identifier(value) {
-  requireCondition(typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(value));
+  requireCondition(typeof value === 'string' && value.length >= 1 && value.length <= 128
+    && !/[^A-Za-z0-9_.:-]/.test(value));
   return value;
 }
 export function hex(value, bytes) {
-  requireCondition(typeof value === 'string' && value.length === bytes * 2 && /^[0-9a-f]+$/.test(value));
+  requireCondition(typeof value === 'string' && value.length > 0 && value.length === bytes * 2
+    && !/[^0-9a-f]/.test(value));
   return value;
 }
 export function units(value) {
-  requireCondition(typeof value === 'string' && /^(0|[1-9][0-9]{0,18})$/.test(value));
+  requireCondition(typeof value === 'string' && value.length >= 1 && value.length <= 19
+    && !/[^0-9]/.test(value) && (value.length === 1 || value[0] !== '0'));
   const integer = BigInt(value);
   requireCondition(integer <= 9_223_372_036_854_775_807n);
   return integer;
