@@ -12,12 +12,15 @@ September 10 source v8 adds receipt attribution without changing the transaction
 `official_temporary_runtime_v1:unchanged` means the desired state was already
 observed and no callback ran. Compatibility activation and failed transitions
 cannot emit these success markers. All 49 temporary-runtime Node cases pass;
-normal-release production toggle attribution still awaits the grouped install.
+normal 1627 subsequently passed actual native Header on/off with a fresh private
+accepted receipt for each direction, matching state, zero messages and restored
+original conversation. This ordinary empty-chat scope is completed and reused;
+[acceptance](reports/chatgpt-composer-state-20260910.md#normal-1627-recovery-and-acceptance).
 
 - Capability: `android_chatgpt_private_temporary_chat_state_v1`.
-- Status: released in normal 1595; post-reply native indicator device verified.
-  Direct private on/off passed in a research candidate; normal toggle receipt
-  attribution and other conversation contexts remain pending.
+- Status: normal 1595 post-reply native indicator and normal 1627 ordinary
+  empty-chat native on/off with private receipt attribution are device verified.
+  Other conversation contexts remain separate.
 - Contract version: 1. Production native temporary-chat selection invokes the
   inspected official runtime transaction and confirms its resulting state.
 - This is a page-runtime private state bridge, not an independent HTTP privacy

@@ -58,6 +58,9 @@ Command-log stems: `composer-state-jvm-20260910-073924-786`,
 
 ## Grouped device acceptance
 
+The 1626 preparation failure below is historical. The 1627 checkpoint resolves
+the tested navigation/model/temporary cases; quick-tool follow-up remains open.
+
 Normal 1.1.1626 (1626), source `03d017cc8`, passed the Release publisher and
 replacement installation. APK SHA-256:
 `a0b27a04f87d336da7e5f8b3da70b95f806181f845066d7e48dcdc49f54906ab`.
@@ -87,10 +90,47 @@ harness now exposes the native recovery banner's public message and its Retry
 control, so this failure can be diagnosed without screenshots or conversation
 text. This harness-only follow-up does not change the published APK.
 
-Next acceptance prerequisite: identify and resolve the current page/session
-recovery failure. Then verify the native level write, selected-tool clear and
-temporary-chat receipt once, with original-state restoration. Do not treat the
-missing composer/control as official feature absence or repeat blind retries.
+The original prerequisite was current-document recovery, not feature discovery.
+The follow-up below used that evidence rather than repeating blind retries.
+
+## Normal 1627 recovery and acceptance
+
+- `3eafd5ffb`: new-chat intent can proceed from a recoverable current document
+  even when the native connection state is error. The official transaction still
+  owns draft/attachment confirmation. On 1626, direct document navigation had
+  succeeded while the native intent was blocked; reopening the original route
+  restored its ready composer and two messages. This does not establish the
+  original missing-composer root cause.
+- `bab719362`: cached model labels remain immediate UI metadata, but old menu
+  handles are no longer submitted after dismissal. A unique fresh semantic
+  match binds the pending selection; ambiguous/current-catalog mismatches fail
+  closed. Deferred selection no longer dismisses its own pending mutation.
+- New-chat readiness: 37 focused JVM cases passed. Model follow-up: 28 cases
+  passed after correcting an obsolete test expectation that omitted the already
+  shipped file-library preset. XML failures/errors were checked explicitly.
+- Normal 1.1.1627 (1627), source `bab719362`, published and installed via `-r`.
+  APK SHA-256: `b632fff5c7aa7d29aeca163c1b01598a68bb72918fa8a14bd80a4a1680189d3d`.
+- Current-document diagnostics returned complete, one visible prompt, and no
+  incomplete flag. The native cached slider selected High, the current official
+  catalog confirmed High, and the same native control restored Extreme.
+- The native new-chat action produced an empty chat. Header temporary on and
+  off each yielded exactly one new `official_temporary_runtime_v1:accepted`
+  receipt and matching native/official state. Both cases are scoped completed,
+  not coverage of project/work/guest privacy variants.
+- Both acceptance scripts restored the original conversation, its two messages,
+  empty draft and awake lease. No sends, microphone sessions or uploads ran.
+- Native Tools -> Create Image failed: two catalog commands were superseded
+  before dispatch (about 200 ms and 6 ms); no selection command ran. A direct
+  tracked read then succeeded in 369 ms with `official_tool_runtime_v1:accepted`.
+  This isolates a native orchestration failure, not an absent official tool.
+  The native coordinator follow-up must be accepted before marking this passed.
+
+Log stems: `document-new-chat-jvm-20260910-083524-487`,
+`model-handle-jvm-confirmed-20260910-085514-982`,
+`composer-recovery-release-20260910-085828-570`,
+`composer-recovery-model-device-20260910-090705-844`,
+`composer-recovery-tools-device-20260910-090752-300`,
+`composer-recovery-temporary-device-20260910-091422-537`.
 
 Remaining outside this batch: physical drag sampling, other model/tier and
 server-preference variants, send after model selection, actual new image

@@ -2,6 +2,13 @@
 
 ## September 10 diagnosis
 
+Current checkpoint: normal 1625 accepted private Advanced/version selection;
+normal 1627 accepted cached native High selection, official catalog readback and
+Extreme restoration. These ordinary-chat scopes are completed and reused.
+[Device and recovery evidence](reports/chatgpt-composer-state-20260910.md#normal-1627-recovery-and-acceptance).
+Other models, response tiers, physical drag, subsequent generation and server
+preference persistence are not implied. The 1623 diagnosis below is historical.
+
 Normal 1623's native model request returned legacy `model_` handles, not
 `private_model_` handles. This is DOM fallback evidence, not private selection
 acceptance. No preference was changed during that check.
@@ -21,10 +28,9 @@ Android and device evidence remain pending at this source checkpoint.
 - Capability: `android_chatgpt_private_model_preset_state_v1`.
 - Extensions: `android_chatgpt_private_model_version_state_v1` and
   `android_chatgpt_private_service_tier_state_v1`.
-- Status: baseline implemented and packaged in 1.1.1548; not `completed` or
-  account-specific device accepted. [Grouped evidence](reports/chatgpt-grouped-native-20260907.md).
-- Source contract/controller versions: 5/3. The contract-5 preflight fix is
-  offline verified and awaiting the grouped APK build and device acceptance.
+- Status: ordinary cached High/Extreme and latest/specific-version selection
+  device verified through normal 1627; remaining variants are not completed.
+- Current source contract/controller versions: 6/5.
   Production native model selection reuses the current official picker state
   and its model/effort mutators when the guards pass.
 - Scope: available normal-chat presets and thinking effort, available model
@@ -40,7 +46,7 @@ Android and device evidence remain pending at this source checkpoint.
   POST. Temporary chat has its separate
   [guarded state transaction](chatgpt-private-temporary-chat.md).
 - Google stays last. Existing native official audio, captions, dictation and
-  read-aloud are unchanged. No APK was built or installed for this source batch.
+  read-aloud are unchanged. Source details below describe the September 7 baseline.
 
 ## Inspected official source
 
