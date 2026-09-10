@@ -52,6 +52,27 @@ function fixture(options = {}) {
 
 const tick = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
 
+test('document diagnostics upgrade only the command surface without network capture', () => {
+  const f = fixture({ window: { document: { readyState: 'loading', visibilityState: 'hidden',
+    hasFocus: () => false, querySelectorAll: () => [] } } });
+  const fetch = f.window.fetch;
+  for (const previous of [null, 18]) {
+    if (previous) {
+      f.window.__elonChatGptPrivateResearchProbe = { ...f.probe, version: previous };
+      vm.runInNewContext(source, f.context);
+    }
+    let value;
+    f.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe', { value: 'document_state' },
+      (_, ok, detail) => { assert.equal(ok, true); value = JSON.parse(detail); });
+    assert.equal(value.schema, 'elon.document_state.v1');
+    assert.equal(value.ready, 'loading');
+    assert.equal(value.prompt_count, 0);
+    assert.equal(f.window.fetch, fetch);
+    assert.equal(f.requests.length, 0);
+    assert.equal(f.read().active, false);
+  }
+});
+
 test('directory diagnostics use the existing read-only probe without network capture', () => {
   const f = fixture();
   assert.deepEqual(JSON.parse(f.command('directory_refresh').detail), {
@@ -140,7 +161,7 @@ test('version 13 command upgrade preserves existing observers and other commands
   const existing = f.probe;
   f.window.__elonChatGptPrivateResearchProbe = { ...existing, version: 13 };
   vm.runInNewContext(source, f.context);
-  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 18);
+  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 19);
   assert.equal(f.window.fetch, fetch);
   assert.equal(f.window.XMLHttpRequest.prototype.send, send);
   const answers = [];

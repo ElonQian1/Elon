@@ -6,7 +6,7 @@ import org.json.JSONObject
 /** Validates structural diagnostics before they enter the native command ledger. */
 internal object ChatGptWebPrivateProtocolEvidence {
     val MODES = setOf("start", "read", "stop", "clear", "runtime_assets", "composer_tool_context",
-        "stop_runtime_context", "stop_runtime_owner", "directory_refresh", "model_runtime_context")
+        "stop_runtime_context", "stop_runtime_owner", "directory_refresh", "model_runtime_context", "document_state")
     private val modelContextCodes = setOf("not_observed", "route_unsupported", "document_unavailable", "identity_unavailable",
         "trigger_detached", "owner_unavailable", "picker_missing", "picker_disabled", "picker_ambiguous",
         "conversation_mismatch", "capture_error", "cooldown", "menu_open", "runtime_not_observed",
@@ -44,6 +44,7 @@ internal object ChatGptWebPrivateProtocolEvidence {
     private fun sanitize(raw: String): String {
         require(raw.length <= 12000)
         val value = JSONObject(raw)
+        if (value.opt("schema") == "elon.document_state.v1") return documentState(value)
         if (value.opt("schema") == ChatGptWebDirectoryDiagnostic.SCHEMA) {
             return ChatGptWebDirectoryDiagnostic.sanitize(value)
         }
@@ -87,6 +88,32 @@ internal object ChatGptWebPrivateProtocolEvidence {
         }
         return JSONObject().put("schema", SCHEMA).put("active", value.getBoolean("active"))
             .put("dropped", value.getInt("dropped")).put("records", safeRecords).toString()
+    }
+
+    private fun documentState(value: JSONObject): String {
+        require(value.keys().asSequence().toSet() == setOf("schema", "ready", "visibility", "focused", "skin",
+            "viewport_width", "viewport_height", "body", "main_count", "form_count", "editable_count",
+            "prompt_count", "visible_prompt_count", "prompts", "incomplete"))
+        require(value.opt("ready") in setOf("loading", "interactive", "complete", "unknown"))
+        require(value.opt("visibility") in setOf("visible", "hidden", "prerender", "unknown"))
+        for (key in listOf("focused", "skin", "incomplete")) require(value.opt(key) is Boolean)
+        for (key in listOf("viewport_width", "viewport_height")) require(integer(value, key, 0..20000))
+        for (key in listOf("main_count", "form_count", "editable_count")) require(integer(value, key, 0..256))
+        require(integer(value, "prompt_count", 0..16))
+        require(integer(value, "visible_prompt_count", 0..value.getInt("prompt_count")))
+        val prompts = value.getJSONArray("prompts")
+        require(prompts.length() == minOf(8, value.getInt("prompt_count")))
+        fun shape(node: JSONObject) {
+            require(node.keys().asSequence().toSet() == setOf("tag", "connected", "editable", "width", "height", "display", "visibility"))
+            require(node.opt("tag") in setOf("div", "textarea", "input", "p", "span", "body", "unknown"))
+            require(node.opt("display") in setOf("none", "block", "inline", "inline-block", "flex", "grid", "contents", "unknown"))
+            require(node.opt("visibility") in setOf("visible", "hidden", "collapse", "unknown"))
+            for (key in listOf("connected", "editable")) require(node.opt(key) is Boolean)
+            for (key in listOf("width", "height")) require(integer(node, key, 0..20000))
+        }
+        for (index in 0 until prompts.length()) shape(prompts.getJSONObject(index))
+        if (value.opt("body") != JSONObject.NULL) shape(value.getJSONObject("body"))
+        return value.toString()
     }
 
     private fun integer(value: JSONObject, key: String, range: IntRange): Boolean {

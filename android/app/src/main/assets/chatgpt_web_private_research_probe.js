@@ -42,10 +42,14 @@
       { schema: 'elon.directory_refresh.v1', observed: false, durationMs: 0, identityMs: 0, reads: [] });
   }
   if (existingProbe && Number(existingProbe.version) >= 13) {
-    if (Number(existingProbe.version) < 18) {
+    if (Number(existingProbe.version) < 19) {
       // Upgrade only the command surface; keep the existing network observers.
-      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 18,
+      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 19,
         handle(action, command, respond) {
+          if (action === 'private_protocol_probe' && command.value === 'document_state') {
+            const detail = window.__elonChatGptPrivateProtocolEvidence?.documentState(window);
+            respond(action, typeof detail === 'string', detail || 'protocol_probe_unavailable'); return true;
+          }
           if (action === 'private_protocol_probe' && command.value === 'model_runtime_context') {
             respond(action, true, modelContextDetail()); return true;
           }
@@ -556,13 +560,14 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 18,
+    version: 19,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
       if (action !== 'private_protocol_probe') return false;
       const mode = String(command.value || '');
       let detail;
       if (mode === 'runtime_assets') detail = window.__elonChatGptPrivateProtocolEvidence?.runtimeAssets(window);
+      else if (mode === 'document_state') detail = window.__elonChatGptPrivateProtocolEvidence?.documentState(window);
       else if (mode === 'model_runtime_context') detail = modelContextDetail();
       else if (mode === 'directory_refresh') detail = directoryDetail();
       else if (mode === 'composer_tool_context') detail = toolContextDetail();

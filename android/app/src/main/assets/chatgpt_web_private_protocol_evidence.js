@@ -34,7 +34,62 @@
     } catch (_) { truncated = true; }
     return JSON.stringify({ schema: 'elon.private_runtime_assets.v1', assets: Array.from(names).sort(), truncated });
   }
-  const exported = Object.freeze({ version: 3, create: factory, runtimeAssets });
+  function documentState(page) {
+    if (page.location?.origin !== 'https://chatgpt.com') return null;
+    const doc = page.document;
+    if (!doc) return null;
+    let incomplete = false;
+    const read = (fallback, block) => {
+      try { return block(); } catch (_) { incomplete = true; return fallback; }
+    };
+    const dimension = value => Number.isFinite(value) ? Math.min(20000, Math.max(0, Math.round(value))) : 0;
+    const choice = (value, values) => values.includes(value) ? value : 'unknown';
+    const selectors = ['#prompt-textarea', '[data-testid="prompt-textarea"]',
+      'form [contenteditable="true"]', 'form textarea', 'main [contenteditable="true"]', 'textarea[placeholder]'];
+    const nodes = new Set();
+    for (const selector of selectors) {
+      const matches = read([], () => doc.querySelectorAll(selector));
+      if (matches.length > 16) incomplete = true;
+      for (let index = 0; index < Math.min(16, matches.length); index++) {
+        if (nodes.size >= 16 && !nodes.has(matches[index])) { incomplete = true; break; }
+        nodes.add(matches[index]);
+      }
+    }
+    const shape = node => {
+      const rect = read({}, () => node.getBoundingClientRect());
+      const style = read({}, () => page.getComputedStyle(node));
+      const tag = read('unknown', () => String(node.tagName || '').toLowerCase());
+      return { tag: choice(tag, ['div', 'textarea', 'input', 'p', 'span', 'body']),
+        connected: node.isConnected === true, editable: node.isContentEditable === true || tag === 'textarea',
+        width: dimension(rect.width), height: dimension(rect.height),
+        display: choice(style.display, ['none', 'block', 'inline', 'inline-block', 'flex', 'grid', 'contents']),
+        visibility: choice(style.visibility, ['visible', 'hidden', 'collapse']) };
+    };
+    const prompts = Array.from(nodes, shape);
+    const count = selector => {
+      const length = read(0, () => doc.querySelectorAll(selector).length);
+      if (length > 256) incomplete = true;
+      return Math.min(256, length);
+    };
+    const body = doc.body ? shape(doc.body) : null;
+    const result = {
+      schema: 'elon.document_state.v1',
+      ready: choice(doc.readyState, ['loading', 'interactive', 'complete']),
+      visibility: choice(doc.visibilityState, ['visible', 'hidden', 'prerender']),
+      focused: read(false, () => doc.hasFocus() === true),
+      skin: read(false, () => doc.documentElement?.getAttribute('data-elon-chatgpt-skin') === 'true'),
+      viewport_width: dimension(page.innerWidth), viewport_height: dimension(page.innerHeight),
+      body, main_count: count('main'), form_count: count('form'),
+      editable_count: count('[contenteditable="true"], textarea'),
+      prompt_count: prompts.length,
+      visible_prompt_count: prompts.filter(node => node.connected && node.width > 0 && node.height > 0 &&
+        node.display !== 'none' && node.visibility === 'visible').length,
+      prompts: prompts.slice(0, 8), incomplete: incomplete || prompts.length > 8
+    };
+    // Shapes only: never read text, HTML, input values, URLs, storage or credentials.
+    return JSON.stringify(result);
+  }
+  const exported = Object.freeze({ version: 4, create: factory, runtimeAssets, documentState });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateProtocolEvidence = exported;
 })(typeof window === 'object' ? window : null, function (root, safePath) {
