@@ -8,6 +8,7 @@ const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve()
 
 function fixture(options = {}) {
   const calls = [], timers = new Map(), listeners = new Set();
+  const identity = { userId: 'synthetic-user', accountId: id(7), loggedIn: true };
   let sequence = 0, prepared = 0, activeStream = null;
   const cid = id(1), conversation = { id: 'client_synthetic', serverId$: () => cid };
   const message = { id: id(3), author: { role: 'assistant' },
@@ -46,6 +47,9 @@ function fixture(options = {}) {
     clearTimeout(token) { timers.delete(token); }
   };
   const shared = {
+    H3: () => identity.loggedIn,
+    F5: () => identity.loggedIn ? { user: { id: identity.userId }, account: { id: identity.accountId } } : null,
+    mq: () => ({ id: identity.accountId, authUserId: identity.userId }),
     XM: () => tree, HM: {
       getCurrentLeafId: value => value.leaf, getVariantIds: value => value.variants,
       getParentPromptNode: (value, key) => value.nodes.get(key)?.parent,
@@ -81,7 +85,7 @@ function fixture(options = {}) {
     return !!entry;
   }
   return { api, page, command, modelMenu, modelButton, menu, turn, root, button, menuRoot,
-    tree, modules, message, parent, calls, timers, listeners, publish, runTimer, prepared: () => prepared };
+    tree, modules, identity, message, parent, calls, timers, listeners, publish, runTimer, prepared: () => prepared };
 }
 
 module.exports = { fixture, id, flush };

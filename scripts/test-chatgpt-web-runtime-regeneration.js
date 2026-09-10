@@ -7,8 +7,8 @@ const contract = require('../android/app/src/main/assets/chatgpt_web_private_reg
 const { fixture, id, flush } = require('./fixtures/chatgpt-runtime-regeneration.js');
 
 test('regeneration has a versioned official-runtime transaction', () => {
-  assert.equal(runtime.version, 8);
-  assert.equal(contract.version, 8);
+  assert.equal(runtime.version, 9);
+  assert.equal(contract.version, 9);
   assert.equal(typeof runtime.create, 'function');
 });
 
@@ -91,7 +91,7 @@ for (const [reason, change] of Object.entries({
 }
 
 for (const [reason, change] of Object.entries({
-  identity: f => { f.page.__elonChatGptPrivateTransport.copySameOriginRequestHeaders = () => ({ authorization: 'Bearer different-synthetic-identity' }); },
+  identity: f => { f.identity.userId = 'another-synthetic-user'; },
   conversation: f => { f.modelMenu.conversation = { id: 'other', serverId$: () => id(1) }; },
   server_conversation: f => { f.modelMenu.conversation.serverId$ = () => id(9); },
   route: f => { f.page.location.href = 'https://chatgpt.com/c/' + id(9); },

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 8, create: factory });
+  const api = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateRegenerateContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -75,6 +75,7 @@
   }
 
   function current(binding) {
+    if (binding.observationOwner && !models.ownerCurrent(binding.observationOwner)) return null;
     const now = capture(binding.turn, binding.getModelTrigger);
     return now && ['cid', 'token', 'conversation', 'message', 'callback', 'modelSlug'].every(key =>
       now[key] === binding[key]) && now.model.account === binding.model.account &&
@@ -82,11 +83,12 @@
   }
 
   function ownerCurrent(binding) {
-    return models.ownerCurrent(binding.model) && binding.model.conversation === binding.conversation;
+    return models.ownerCurrent(binding.observationOwner || binding.model) && binding.model.conversation === binding.conversation;
   }
 
   function validate(modules) {
     return typeof modules?.shared?.XM === 'function' &&
+      ['H3', 'F5', 'mq'].every(key => typeof modules.shared[key] === 'function') &&
       ['getCurrentLeafId', 'getParentPromptNode', 'getVariantIds', 'getNode'].every(key =>
         typeof modules.shared.HM?.[key] === 'function') && typeof modules?.conversation?.f8t === 'function';
   }
@@ -103,11 +105,12 @@
         !UUID.test(parent?.id || '') || parent?.message?.author?.role !== 'user' ||
         !Array.isArray(variants) || variants.length > 1000 || !variants.includes(now.message.id) ||
         !variants.every(id => UUID.test(id))) return null;
-    return { ...now, parentId: parent.id, variants: new Set(variants) };
+    const observationOwner = models.withRuntimeIdentity(now.model, modules.shared);
+    return observationOwner ? { ...now, observationOwner, parentId: parent.id, variants: new Set(variants) } : null;
   }
 
   function observation(binding, modules, stream) {
-    const owner = models.ownerState(binding.model);
+    const owner = models.ownerState(binding.observationOwner);
     if (owner !== 'owner_current') return owner;
     if (binding.model.conversation !== binding.conversation) return 'owner_object';
     if (!stream) return 'stream_missing';

@@ -1,8 +1,8 @@
 # Official-runtime response regeneration
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
-Status: source implemented and offline verified. v8 distinguishes the exact
-ownership component without relaxing write admission or replay fencing. Normal 1642
+Status: source implemented and offline verified. v9 uses the official runtime
+user/account for post-dispatch ownership rather than incidental cached headers. Normal 1642
 is installed and passed the native retry entry after the transcript reentry fix.
 Its single runtime invocation received a 200 stream, but completion failed with
 `timeout_owner_account`. End-to-end runtime acceptance is not passed. See
@@ -12,6 +12,33 @@ The original adapter 286 batch wired this candidate into the existing production
 `chatgpt_regenerate_response` command. It is an official-runtime bridge, not an
 independent Android HTTP generation transport. Do not recreate it while waiting
 for the grouped ChatGPT APK acceptance.
+
+## Runtime identity correction
+
+Model contract 10 and regeneration 9 bind observation to the loaded official
+session. Existing verified shared exports `H3`, `F5`, and `mq` expose logged-in
+state, the session store, and its derived account. Current public source maps
+these to `y5`/`po`, `G9`/`In`, and `QG`/`Sw`. `In` reads the session store;
+`Sw` derives the account from `session.account` and `session.user.id`, and the
+account getters expose `id` and `authUserId`. These are already included in
+runtime bindings 11; no speculative endpoint or new export mapping is added.
+
+The owner requires consistent, bounded user/account identifiers from both
+official readers. Missing getters, logout, unknown identity or inconsistent
+readers reject preparation. Each pre-invocation recheck retains the same owner;
+the callback and stream-reset hooks cannot switch accounts before the write.
+Observation still checks the route/document, retained conversation object,
+server conversation ID, selected new reply and original user parent. True user
+or account changes remain unknown/fenced against replay. Request-header cache
+hydration, incidental request scopes and token refresh are not account switches
+when the authoritative session owner is unchanged. Other model mutation paths
+retain their existing header-based admission; no sender or voice path is changed.
+
+The finite red run reproduced false rejection of header hydration and false
+acceptance of real runtime identity changes with unchanged cached headers.
+`regenerate-runtime-identity-related-20260911-020930-918` passes 236 cases, including
+17 focused identity checks and the existing model/reply/branch/writer guards.
+Adapter 326 carries the correction; normal release and phone acceptance are pending.
 
 ## Normal 1642 native reentry and remaining owner failure
 

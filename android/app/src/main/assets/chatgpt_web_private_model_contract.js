@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 9, create: factory });
+  const api = Object.freeze({ version: 10, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateModelContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -44,14 +44,14 @@
       fail(candidates.size ? 'picker_ambiguous' : 'picker_missing');
   }
 
-  function identityContext() {
+  function identityContext(readIdentity = identity) {
     const url = new URL(page.location.href);
     const cid = /^(?:\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.exec(url.pathname)?.[1] || null;
     const project = /^\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?\/project$/i.test(url.pathname);
     if (url.origin !== 'https://chatgpt.com' || url.username || url.password || url.hash ||
         url.search && url.search !== '?temporary-chat=true' || url.search && url.pathname.startsWith('/g/') ||
         url.pathname !== '/' && !cid && !project) return fail('route_unsupported');
-    const token = page.__elonChatGptDocumentToken, account = identity();
+    const token = page.__elonChatGptDocumentToken, account = readIdentity();
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '')) return fail('document_unavailable');
     if (!account) return fail('identity_unavailable');
     return { href: url.href, cid, token, account };
@@ -77,12 +77,30 @@
 
   function current(binding) { return matchingOwner(binding, false); }
 
+  function runtimeIdentity(shared) {
+    try {
+      if (!['H3', 'F5', 'mq'].every(key => typeof shared?.[key] === 'function') || shared.H3() !== true) return null;
+      const session = shared.F5(), account = shared.mq();
+      const userId = session?.user?.id, accountId = session?.account?.id;
+      if (![userId, accountId].every(value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,256}$/.test(value)) ||
+          account?.id !== accountId || account.authUserId !== userId) return null;
+      return JSON.stringify([userId, accountId]);
+    } catch (_) { return null; }
+  }
+
+  function withRuntimeIdentity(binding, shared) {
+    if (!binding) return null;
+    const account = runtimeIdentity(shared);
+    // Official runtime commands use this session, not the incidental request-header cache.
+    return account ? { ...binding, account, readIdentity: () => runtimeIdentity(shared) } : null;
+  }
+
   // Post-dispatch identity is independent of picker rendering. The reply owner
   // still verifies the new message, selected branch and original user parent.
   function ownerState(binding) {
     try {
       if (!binding) return 'owner_missing';
-      const now = identityContext();
+      const now = identityContext(binding.readIdentity || identity);
       if (!now) return ({ route_unsupported: 'owner_route', document_unavailable: 'owner_document',
         identity_unavailable: 'owner_identity' })[code] || 'owner_unavailable';
       if (now.href !== binding.href || now.cid !== binding.cid) return 'owner_route';
@@ -384,6 +402,6 @@
     return advancedState(after);
   }
 
-  return Object.freeze({ version: 9, state: () => code, urls: URLS, capture, current, ownerCurrent, ownerState, validate, catalog, read, matches, apply,
+  return Object.freeze({ version: 10, state: () => code, urls: URLS, capture, current, ownerCurrent, ownerState, withRuntimeIdentity, validate, catalog, read, matches, apply,
     readAdvanced, advancedCatalog, applyAdvanced, matchesAdvanced });
 });
