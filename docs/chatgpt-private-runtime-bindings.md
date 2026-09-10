@@ -2,6 +2,12 @@
 
 ## Status
 
+Version 13 adds the phone-observed September 11 build using 58 inspected export
+contracts, retaining all earlier profiles. The live `runtime_not_observed`
+fallback and 536 passing focused/adjacent checks are recorded in
+[the compatibility report](reports/chatgpt-runtime-bindings-20260911.md).
+Delivery and live acceptance remain separate from source compatibility.
+
 Version 12 adds only the inspected September 10-b `conversationStore` export
 `GJ` (`hS`) for bounded, request-owned regeneration observation. Older profiles
 do not guess this mapping. Source/getter/subscription evidence and the 314-case

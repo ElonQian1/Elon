@@ -2,7 +2,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { attach, CDN } = require('./fixtures/chatgpt-runtime-bindings');
-const profile = require('./fixtures/chatgpt-runtime-bindings-sep10b');
+const profiles = [require('./fixtures/chatgpt-runtime-bindings-sep10b'), require('./fixtures/chatgpt-runtime-bindings-sep11')];
+
+for (const profile of profiles) test.describe(profile.id, () => {
 
 test('current attachment validators and quota helpers preserve exact singleton identities', async () => {
   const expectedExports = Object.fromEntries(Object.keys(profile.files).map(role => [role,
@@ -49,4 +51,5 @@ test('an adjacent uninspected build cannot be admitted using a filename prefix',
   assert.equal(binding.api.observed('shared'), false);
   await assert.rejects(binding.api.load('shared'), /runtime_not_observed/);
   assert.equal(binding.loads.length, 0);
+});
 });

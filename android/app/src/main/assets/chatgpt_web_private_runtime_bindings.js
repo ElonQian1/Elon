@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 12, create: factory });
+  const api = Object.freeze({ version: 13, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -75,6 +75,19 @@
       attachmentPendingCount: 'pQt', attachmentConfiguredLimit: 'uQt' },
     composer: { Ih: 'ag', t_: 'w_', AS: 'eC', VS: 'dC', Ng: 'n_', Bg: 'l_', fh: 'Ph' }, react: {}
   };
+  const september11Exports = {
+    shared: { H3: 'w5', R5: '$9', F5: 'X9', mq: 'rK', wV: 'pR', SV: 'dR', XM: 'IJ', HM: 'OJ',
+      'M$': 'V0', RW: 'dV', uo: 'ws', t4: 'h6', IX: 'XU', t6: 'Q8', cX: 'cJ',
+      Fx: 'GS', Fl: 'td', v7: 'Net', $3: 'X8', Ur: 'Zi', zr: 'qi', attachmentUploadType: 'Gp',
+      conversationStore: 'XJ' },
+    conversation: { AGt: 'FKt', J5t: 'ren', Nrn: 'non', yRt: 'wzt', Grn: 'mon',
+      vRt: 'Czt', p8t: 'S7t', l0: 'w0', M1t: 't2t', Rdn: 'Hmn', Rrn: 'son',
+      win: 'qon', Ein: 'Yon', ay: '_y', iy: 'gy', ry: 'hy', Jrn: '_on', Hrn: 'don',
+      f8t: 'x7t', c0: 'C0', FVt: 'BHt', u1t: 'N0t', l1t: 'M0t', iin: 'Don',
+      attachmentBaseLimit: 'dQt', attachmentMaxUploads: 'vQt',
+      attachmentPendingCount: 'pQt', attachmentConfiguredLimit: 'uQt' },
+    composer: september10bExports.composer, react: {}
+  };
   const profiles = [
     { id: 'web_20260906', anchor: 'c2675c8c-f6cd0ubcb7y7eluj.js', files: legacy,
       tools: { owner: 'Whn' },
@@ -109,7 +122,13 @@
         conversation: 'conversation-small-cudd01juo7e4yskq.js',
         composer: '8b34dbc2-g959q8r0i61e6rlk.js', react: legacy.react },
       exports: september10bExports, tools: { owner: '$vn' },
-      temporary: { owner: 'fYt', action: '()=>{ml.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(CB.reset(c),Eg()&&Pg.delete(n),!o&&!Pg(n)&&uYt(s),u(pYt,{replace:!0})):Hy(l,{params:o?void 0:new URLSearchParams({[Z_]:`true`})})}' } }
+      temporary: { owner: 'fYt', action: '()=>{ml.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(CB.reset(c),Eg()&&Pg.delete(n),!o&&!Pg(n)&&uYt(s),u(pYt,{replace:!0})):Hy(l,{params:o?void 0:new URLSearchParams({[Z_]:`true`})})}' } },
+    { id: 'web_20260911', anchor: 'c2675c8c-bqh1u7ph1mhnj4w5.js',
+      files: { shared: '4813494d-c7ndis1pzhdkm9ow.js',
+        conversation: 'conversation-small-iklux3elvv7sfvxg.js',
+        composer: '8b34dbc2-tgz90yfx7ipn1n2e.js', react: legacy.react },
+      exports: september11Exports, tools: { owner: 'oyn' },
+      temporary: { owner: 'mYt', action: '()=>{Z.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(OB.reset(c),V_()&&Dm.delete(n),!o&&!Dm(n)&&fYt(s),u(hYt,{replace:!0})):JC(l,{params:o?void 0:new URLSearchParams({[vh]:`true`})})}' } }
   ];
   const roles = Object.keys(legacy);
   let document, token, selected, error = '';
@@ -223,8 +242,8 @@
 
   function state() {
     const p = profile();
-    return { version: 12, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 13, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 12, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 13, observed, load, peek, temporary, tools, state });
 });

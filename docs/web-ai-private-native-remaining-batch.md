@@ -28,6 +28,10 @@ a functional acceptance gate; do not expand performance tests in this phase.
 
 ## Current Status Map
 
+The [September 11 runtime compatibility](reports/chatgpt-runtime-bindings-20260911.md)
+repairs a new phone-observed build that caused fallback before native runtime
+send. Its release/acceptance and citation fixture boundaries are tracked there.
+
 This summary supersedes older delivery labels below; it does not broaden a
 passed scope. Bounded ordinary/project directory continuation is now completed,
 default-enabled and device-verified on normal 1611, adapter 311; see
