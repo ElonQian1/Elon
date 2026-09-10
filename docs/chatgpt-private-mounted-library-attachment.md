@@ -1,8 +1,9 @@
 # Mounted library attachment
 
 Capability: `android_chatgpt_private_mounted_library_attachment_v1`.
-Code: implemented. Verification: offline verified; grouped APK and production
-selection/send acceptance are pending. This is not a `completed` capability.
+Code: implemented. Verification: offline verified; normal 1631 is published,
+but installation and production selection/send acceptance are pending.
+This is not a `completed` capability.
 Source `8ed89f7e4`, adapter 314, mounted attachment module 1, library owner 2,
 attachment sender 21. The existing ordinary library attachment remains reused.
 
@@ -69,8 +70,11 @@ out of 25 (`attachment-lease-baseline-check-20260910-130638-592`). Test-only
 pre-dispatch invalidation and protecting the replacement editor. The production
 cleanup implementation was not changed to satisfy those stale assertions.
 
-Next: one grouped normal APK with the
+Normal 1631 groups this change with the
 [mounted catalogue download](chatgpt-private-library-mounted-download.md).
+Its [release receipt](reports/chatgpt-mounted-library-delivery-20260910.md)
+records successful publication and the failed wireless installation separately.
+Next: install the existing artifact, without another build.
 Use an existing authorized test cloud file, click the production Library file
 menu, verify one named removable card and unchanged draft, then explicitly send
 once in an isolated ordinary chat. Verify source/backing association and an
