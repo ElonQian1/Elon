@@ -2,6 +2,7 @@ package com.elon.app
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -109,6 +110,60 @@ class WebChatModelControlPolicyTest {
             models + option("next", "下一页", opensSubmenu = true), "Fast",
         )
         assertEquals(listOf("one", "two", "next"), paged.listOptions.map { it.id })
+    }
+
+    @Test
+    fun cachedDirectAndSubmenuHandlesRequireRefreshBeforeSubmission() {
+        val cached = option("private_model_old_high", "高")
+        assertTrue(WebChatModelControlPolicy.needsSelectionRefresh(cached, emptySet()))
+        assertTrue(WebChatModelControlPolicy.needsSelectionRefresh(cached.copy(opensSubmenu = true), emptySet()))
+        assertFalse(WebChatModelControlPolicy.needsSelectionRefresh(cached, setOf(cached.id)))
+    }
+
+    @Test
+    fun refreshRebindsTheDesiredLevelWithoutReusingTheCachedHandle() {
+        val cached = option("private_model_old_high", "高")
+        val fresh = option("private_model_new_high", "高")
+        val options = listOf(cached, fresh)
+        assertEquals(fresh, WebChatModelControlPolicy.resolveSelection(cached, options, setOf(fresh.id)))
+        assertNull(WebChatModelControlPolicy.resolveSelection(cached, options, emptySet()))
+    }
+
+    @Test
+    fun refreshSupportsShortEffortAliasesButNeverAmbiguousChoices() {
+        val expected = option("old", "标准")
+        val medium = option("new", "中")
+        assertEquals(medium, WebChatModelControlPolicy.resolveSelection(expected, listOf(medium), setOf("new")))
+        val duplicate = medium.copy(id = "duplicate")
+        assertNull(WebChatModelControlPolicy.resolveSelection(medium, listOf(medium, duplicate), setOf("new", "duplicate")))
+    }
+
+    @Test
+    fun refreshDoesNotConfuseModelsServiceTiersOrSubmenusWithEffort() {
+        val expected = option("old", "高")
+        val options = listOf(
+            option("tier", "高").copy(semantic = "service_tier"),
+            option("catalog", "高").copy(semantic = "model_catalog"),
+            option("submenu", "高", opensSubmenu = true),
+        )
+        assertNull(WebChatModelControlPolicy.resolveSelection(expected, options, options.map { it.id }.toSet()))
+        assertNull(WebChatModelControlPolicy.resolveSelection(expected.copy(opensSubmenu = true), listOf(expected), setOf("old")))
+    }
+
+    @Test
+    fun explicitModelNamesNeverRebindByTheirTruncatedPresentationLabel() {
+        val expected = option("old", "GPT-5.6 High").copy(semantic = "model_catalog")
+        val wrong = option("new", "GPT-5.5 High").copy(semantic = "model_catalog")
+        assertNull(WebChatModelControlPolicy.resolveSelection(expected, listOf(wrong), setOf("new")))
+        val fresh = expected.copy(id = "fresh")
+        assertEquals(fresh, WebChatModelControlPolicy.resolveSelection(expected, listOf(wrong, fresh), setOf("new", "fresh")))
+    }
+
+    @Test
+    fun cachedAdvancedNavigationResolvesToTheCurrentSubmenuInOneSelection() {
+        val cached = option("old", "高级", opensSubmenu = true)
+        val fresh = cached.copy(id = "fresh")
+        assertEquals(fresh, WebChatModelControlPolicy.resolveSelection(cached, listOf(fresh), setOf("fresh")))
     }
 
     private fun option(

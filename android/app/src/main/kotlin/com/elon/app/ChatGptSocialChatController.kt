@@ -91,7 +91,7 @@ internal class ChatGptSocialChatController(
     private var modelLiveOptionIds = emptySet<String>()
     private var modelRangeSelectionById = emptyMap<String, WebChatModelRangeSelection>()
     private var modelPickerActive = false
-    private var pendingPresetModelLabel: String? = null
+    private var pendingModelOption: WebChatConsumerOption? = null
     private var pendingOfficialDictationDraft = false
     private val realtimeVoiceTranscript = WebChatRealtimeVoiceTranscriptContinuity()
     private val privateDictation: WebChatPrivateDictationPort =
@@ -162,7 +162,7 @@ internal class ChatGptSocialChatController(
         modelLiveOptionIds = emptySet()
         modelRangeSelectionById = emptyMap()
         modelPickerActive = false
-        pendingPresetModelLabel = null
+        pendingModelOption = null
         session.dismissComposerOptions()
         session.deactivate()
     }
@@ -285,7 +285,8 @@ internal class ChatGptSocialChatController(
         val observed = socialConsumerPort.state().composerSections[MODEL_SECTION].orEmpty()
         presentModelOptions(
             options = readModelOptions(observed),
-            liveOptionIds = observed.mapTo(linkedSetOf(), WebChatConsumerOption::id),
+            // Closing the previous popup releases its official runtime handles.
+            liveOptionIds = emptySet(),
         )
         if (interactionCache.needsComposerRefresh(provider.id, MODEL_SECTION)) {
             session.requestModelOptions()
@@ -659,7 +660,7 @@ internal class ChatGptSocialChatController(
                 options = resolved,
                 liveOptionIds = observed.mapTo(linkedSetOf(), WebChatConsumerOption::id),
             )
-            resolvePendingPresetModel(resolved)
+            resolvePendingModel(resolved)
         }
     }
 
@@ -704,7 +705,7 @@ internal class ChatGptSocialChatController(
                 modelLiveOptionIds = emptySet()
                 modelRangeSelectionById = emptyMap()
                 modelPickerActive = false
-                pendingPresetModelLabel = null
+                pendingModelOption = null
                 socialConsumerPort.dismissComposerOptions()
             },
         )
@@ -713,7 +714,7 @@ internal class ChatGptSocialChatController(
             modelOptionById = emptyMap()
             modelLiveOptionIds = emptySet()
             modelRangeSelectionById = emptyMap()
-            pendingPresetModelLabel = null
+            pendingModelOption = null
         }
     }
 
@@ -725,37 +726,21 @@ internal class ChatGptSocialChatController(
             )
             return
         }
-        if (WebChatProductionBuiltInCatalog.isPresetId(option.id)) {
-            if (
-                !option.opensSubmenu &&
-                WebChatModelControlPolicy.compactLabel(option.label) ==
-                WebChatModelControlPolicy.compactLabel(currentModel())
-            ) {
-                modelPopup?.dismiss()
-                return
-            }
-            pendingPresetModelLabel = option.label.takeUnless { option.opensSubmenu }
-            session.requestModelOptions()
-            return
-        }
-        if (option.opensSubmenu && option.id !in modelLiveOptionIds) {
-            socialConsumerPort.dismissComposerOptions()
-            session.requestModelOptions()
+        val currentIds = socialConsumerPort.state().composerSections[MODEL_SECTION].orEmpty()
+            .mapTo(linkedSetOf(), WebChatConsumerOption::id)
+        if (WebChatModelControlPolicy.needsSelectionRefresh(option, modelLiveOptionIds.intersect(currentIds))) {
+            pendingModelOption = option
+            if (!session.requestModelOptions()) pendingModelOption = null
             return
         }
         modelOptionById[option.id]?.let { session.selectModel(it.id) }
     }
 
-    private fun resolvePendingPresetModel(options: List<WebChatConsumerOption>) {
-        val expected = pendingPresetModelLabel ?: return
-        pendingPresetModelLabel = null
-        val compactExpected = WebChatModelControlPolicy.compactLabel(expected)
-        val live = options.firstOrNull { option ->
-            option.id in modelLiveOptionIds &&
-                WebChatModelControlPolicy.compactLabel(option.label) == compactExpected
-        } ?: return
+    private fun resolvePendingModel(options: List<WebChatConsumerOption>) {
+        val expected = pendingModelOption ?: return
+        pendingModelOption = null
+        val live = WebChatModelControlPolicy.resolveSelection(expected, options, modelLiveOptionIds) ?: return
         session.selectModel(live.id)
-        modelPopup?.dismiss()
     }
 
     private fun updateComposerModel(model: String) {

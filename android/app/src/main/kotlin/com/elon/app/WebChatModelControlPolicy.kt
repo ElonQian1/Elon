@@ -45,6 +45,27 @@ internal object WebChatModelControlPolicy {
         option.selected || (!option.opensSubmenu && option.semantic == "model" &&
             compactLabel(option.label) == compactLabel(currentModel))
 
+    fun needsSelectionRefresh(option: WebChatConsumerOption, liveOptionIds: Set<String>): Boolean =
+        WebChatProductionBuiltInCatalog.isPresetId(option.id) || option.id !in liveOptionIds
+
+    fun resolveSelection(
+        expected: WebChatConsumerOption,
+        options: List<WebChatConsumerOption>,
+        liveOptionIds: Set<String>,
+    ): WebChatConsumerOption? {
+        if (expected.label.isBlank()) return null
+        val live = options.filter {
+            it.id in liveOptionIds && it.opensSubmenu == expected.opensSubmenu && it.semantic == expected.semantic &&
+                !WebChatProductionBuiltInCatalog.isPresetId(it.id)
+        }
+        val exact = live.filter { it.label.trim().equals(expected.label.trim(), ignoreCase = true) }
+        if (exact.isNotEmpty()) return exact.singleOrNull()
+        if (expected.opensSubmenu || expected.semantic != "model" || expected.label.length > MAX_LEVEL_LABEL_LENGTH) return null
+        return live.singleOrNull {
+            it.label.length <= MAX_LEVEL_LABEL_LENGTH && compactLabel(it.label) == compactLabel(expected.label)
+        }
+    }
+
     fun compactLabel(raw: String): String {
         val cleaned = raw.trim().replace(Regex("\\s+"), " ")
         val token = levelToken.findAll(cleaned).lastOrNull()?.value?.lowercase()

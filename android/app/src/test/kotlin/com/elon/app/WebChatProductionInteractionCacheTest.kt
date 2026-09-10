@@ -55,7 +55,7 @@ class WebChatProductionInteractionCacheTest {
             ).map(WebChatConsumerOption::label),
         )
         assertEquals(
-            listOf("图像"),
+            listOf("文件库", "图像"),
             coldCache.features(WebChatProviderId.CHATGPT_WEB, emptyList())
                 .map(WebChatConsumerFeature::label),
         )
