@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 8, create: factory });
+  const api = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -26,7 +26,7 @@
       vRt: 'QRt', p8t: 'q8t', l0: 'E0', M1t: 'f0t', Rdn: 'Ofn', Rrn: 'Oin',
       win: 'man', Ein: 'gan', ay: 'Sy', iy: 'xy', ry: 'by', Jrn: 'Rin', Hrn: 'Min',
       f8t: 'K8t', c0: 'T0', FVt: 'hHt', u1t: 'W1t', l1t: 'U1t', iin: 'Jin' },
-    composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC', Ng: 'Yg', Bg: 'n_' }, react: {}
+    composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC', Ng: 'Yg', Bg: 'n_', fh: 'Oh' }, react: {}
   };
   const september9Exports = {
     shared: { H3: 'L8', R5: 'N9', F5: 'A9', mq: 'UG', wV: 'eR', SV: 'QL', XM: 'SJ', HM: 'mJ',
@@ -36,7 +36,7 @@
       vRt: 'QRt', p8t: 'w5t', l0: 'Z1', M1t: 's0t', Rdn: 'Fpn', Rrn: 'can',
       win: 'Jan', Ein: 'Xan', ay: 'ty', iy: 'ey', ry: '$v', Jrn: 'van', Hrn: 'fan',
       f8t: 'C5t', c0: 'X1', FVt: 'hHt', u1t: 'z1t', l1t: 'R1t', iin: 'Oan' },
-    composer: { Ih: '$h', t_: 'v_', AS: 'qS', VS: 'iC', Ng: 'Xg', Bg: 'r_' }, react: {}
+    composer: { Ih: '$h', t_: 'v_', AS: 'qS', VS: 'iC', Ng: 'Xg', Bg: 'r_', fh: 'kh' }, react: {}
   };
   const september9bExports = {
     shared: { ...september9Exports.shared, H3: 'R8', R5: 'P9', F5: 'j9', t4: 'Z3',
@@ -55,7 +55,7 @@
       vRt: 'Tzt', p8t: 'o7t', l0: 'C0', M1t: 'U0t', Rdn: 'xmn', Rrn: 'Gan',
       win: 'jon', Ein: 'Non', ay: 'xy', iy: 'by', ry: 'yy', Jrn: 'ton', Hrn: 'Yan',
       f8t: 'a7t', c0: 'S0', FVt: 'HHt', u1t: 'x0t', l1t: 'b0t', iin: 'don' },
-    composer: { Ih: 'ig', t_: 'C_', AS: '$S', VS: 'uC', Ng: 't_', Bg: 'c_' }, react: {}
+    composer: { Ih: 'ig', t_: 'C_', AS: '$S', VS: 'uC', Ng: 't_', Bg: 'c_', fh: 'Ph' }, react: {}
   };
   const profiles = [
     { id: 'web_20260906', anchor: 'c2675c8c-f6cd0ubcb7y7eluj.js', files: legacy,
@@ -197,8 +197,8 @@
 
   function state() {
     const p = profile();
-    return { version: 8, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 9, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 8, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 9, observed, load, peek, temporary, tools, state });
 });

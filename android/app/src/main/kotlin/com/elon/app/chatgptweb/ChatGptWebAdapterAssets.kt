@@ -74,6 +74,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_private_transport.js",
         "chatgpt_web_private_library_download.js", "chatgpt_web_private_file_download.js",
         "chatgpt_web_private_mounted_library_attachment.js",
+        "chatgpt_web_private_library_attachment_policy.js",
         "chatgpt_web_private_library_attachment.js",
         "chatgpt_web_private_library_catalog.js", "chatgpt_web_private_library_mutations.js",
         "chatgpt_web_private_attachment_protocol.js",

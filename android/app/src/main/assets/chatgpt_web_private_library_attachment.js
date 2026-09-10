@@ -1,12 +1,14 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 3, operationTimeoutMs: 24000, create: factory });
+  const exported = Object.freeze({ version: 4, operationTimeoutMs: 24000, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateLibraryAttachment = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
   'use strict';
   const composer = options?.composer;
   const mounted = root.__elonChatGptPrivateMountedLibraryAttachment?.create(root);
+  const policy = root.__elonChatGptPrivateLibraryAttachmentPolicy ||
+    (typeof module === 'object' && module.exports ? require('./chatgpt_web_private_library_attachment_policy') : null);
   const receipts = new Map();
   const consumed = new Map();
   const OPERATION_TIMEOUT_MS = 24000;
@@ -62,15 +64,12 @@
     }
     const selection = root.__elonChatGptPrivateLibraryCatalog?.selectAttachment?.(input.fileHandle);
     const file = descriptor(selection?.source);
-    if (!file || !composer?.available()) return respond(action, false,
-      file ? 'composer_context_unavailable' : 'library_selection_expired');
+    if (!file) return respond(action, false, 'library_selection_expired');
     const remote = !!mounted?.descriptor(selection.source);
     for (const [handle, time] of consumed) if (Date.now() - time >= 60000) consumed.delete(handle);
-    if (remote && (consumed.has(input.fileHandle) || consumed.size >= 512)) {
-      return respond(action, false, 'library_selection_expired');
-    }
-    let binding;
-    try { binding = composer.capture(); } catch (_) { return respond(action, false, 'composer_context_unavailable'); }
+    let context;
+    try { context = composer.captureLibrary(); } catch (_) { return respond(action, false, 'composer_context_unavailable'); }
+    const { binding } = context;
     if (!binding.libraryEnabled || binding.isTemporaryChat || binding.projectId) {
       return respond(action, false, 'library_attachment_scope_unconfirmed');
     }
@@ -79,7 +78,8 @@
     const started = now();
     const current = () => selection.current() && composer.current(binding) &&
       !root.__elonChatGptPrivateLibraryMutations?.busy?.();
-    const canAssociate = () => !job.controller.signal.aborted && now() - started < OPERATION_TIMEOUT_MS && current();
+    const canAssociate = () => !job.controller.signal.aborted && now() - started < OPERATION_TIMEOUT_MS &&
+      current() && context.current();
     active = job;
     const entry = { handle: input.fileHandle, current };
     receipts.set(id, entry);
@@ -92,6 +92,14 @@
     });
     const execute = async () => {
       try {
+        if (canAssociate() && context.contains(selection.source)) return [true, 'library_attachment_associated'];
+        if (remote && (consumed.has(input.fileHandle) || consumed.size >= 512)) {
+          return [false, 'library_selection_expired'];
+        }
+        const admit = context.count ? await policy?.prepare(root, binding) : () => true;
+        if (!canAssociate()) return [false, 'library_attachment_context_changed'];
+        if (!admit) return [false, 'library_attachment_policy_unconfirmed'];
+        if (!admit(file)) return [false, 'library_attachment_limit'];
         if (!await composer.prepare(binding, job.controller.signal, file, false, false) || !canAssociate()) {
           return [false, 'library_attachment_context_changed'];
         }
@@ -102,9 +110,11 @@
           const prepared = await mounted.prepare(selection.source, id, job.controller.signal, canAssociate);
           if (!await composer.prepare(binding, job.controller.signal, prepared.descriptor, false, false) ||
               !canAssociate()) return [false, 'library_attachment_context_changed'];
+          if (!admit(prepared.descriptor)) return [false, 'library_attachment_limit'];
           item = prepared.item;
         } else item = ready(selection.source, id);
-        composer.associateLibrary(binding, item);
+        if (!canAssociate() || !admit(file)) return [false, 'library_attachment_context_changed'];
+        context.associate(item);
         changed(true);
         return [true, 'library_attachment_associated'];
       } catch (_) {

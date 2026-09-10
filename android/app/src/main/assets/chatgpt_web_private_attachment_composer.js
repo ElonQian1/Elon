@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 20, create: factory });
+  const exported = Object.freeze({ version: 21, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -263,21 +263,51 @@
     return publish(binding, [item]);
   }
 
-  function publish(binding, items) {
+  function captureLibrary() {
+    const value = attachedNow();
+    const binding = value?.binding || capture();
+    if (!binding.libraryEnabled || binding.isTemporaryChat || binding.projectId || projects.has(binding)) {
+      throw new Error('library_attachment_scope_unconfirmed');
+    }
+    const lease = value ? prepareSubmit(binding.store) : null;
+    if (value && !lease) throw new Error('composer_context_unavailable');
+    const unchanged = value ? lease.current : () => current(binding) && available();
+    function contains(source) {
+      return unchanged() && (value?.items || []).some(({ attached }) =>
+        (/^libfile[_-]/.test(source.id || '') && attached.fileId === source.file_id) || attached.fileId === source.id ||
+        attached.libraryFileId === source.id || attached.mountedLibraryFileId === source.id);
+    }
+    return Object.freeze({ binding, count: value?.items.length || 0, current: unchanged, contains,
+      associate(item) {
+        if (!unchanged() || !confirmed.has(binding) || item?.attached?.source !== 'library') {
+          throw new Error('composer_changed');
+        }
+        return publish(binding, [item], value, unchanged);
+      } });
+  }
+
+  function publish(binding, items, previous = null, unchanged = null) {
     const store = binding.store;
-    if (!current(binding) || store.files$().length !== 0 || store.hasUploadInProgress$()) throw new Error('composer_changed');
-    const attached = items.map(item => item.attached);
+    if (!current(binding) || (previous ? !unchanged?.() : store.files$().length !== 0) ||
+        store.hasUploadInProgress$()) throw new Error('composer_changed');
+    const added = items.map(item => item.attached), all = [...(previous?.items || []), ...items];
+    if (all.length > 9 || previous && new Set(all.map(item => item.attached.fileId)).size !== all.length) {
+      throw new Error('association_invalid');
+    }
+    const attached = all.map(item => item.attached);
     // Publish only after every selected file is processed; a partial batch must
     // never release the existing native text-send owner.
     store.files$.set(attached);
-    const ready = store.readyFiles$();
+    const ready = store.readyFiles$(), published = store.files$();
     if (!current(binding) || !Array.isArray(ready) || ready.length !== attached.length ||
+        !Array.isArray(published) || published.length !== attached.length ||
+        !published.every((item, index) => item === attached[index]) ||
         !attached.every(item => ready.includes(item) && item.fileSpec?.id === item.fileId && item.status === 'ready')) {
       const files = store.files$();
-      if (Array.isArray(files)) store.files$.set(files.filter(item => !attached.includes(item)));
+      if (Array.isArray(files)) store.files$.set(files.filter(item => !added.includes(item)));
       throw new Error('association_unconfirmed');
     }
-    owned = { binding, items };
+    owned = { binding, items: all };
     return { associated: true };
   }
 
@@ -374,5 +404,5 @@
     } catch (_) { return null; }
   }
 
-  return Object.freeze({ version: 20, available, capture, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, associateLibrary, merge, remove, prepareSubmit });
+  return Object.freeze({ version: 21, available, capture, captureLibrary, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, associateLibrary, merge, remove, prepareSubmit });
 });
