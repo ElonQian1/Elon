@@ -18372,15 +18372,15 @@
         },
         {
           "path": "docs/reports/win-browser-research-affinity-20260911.md",
-          "content_hash": "3487d6b12553a669ff2b26a48cfe8ad643eb71274a3b6cb0ca90bddba8303c01",
+          "content_hash": "0bc558dce5e2da056287d919f9590711b1641c39f25857ffbbb4ef0fe79f54fa",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "1acef0851c709fb01ea5659727873ceb21fac034",
-            "state": "index_only"
+            "head_commit": "98e3024b7966800cd72e8bf19d1cb82236a05efd",
+            "head_blob_oid": "1acef0851c709fb01ea5659727873ceb21fac034",
+            "worktree_blob_oid": "143884e36265f937d5dacaf05a04cf2ab4538f1b",
+            "state": "tracked_modified"
           }
         },
         {
@@ -18528,7 +18528,7 @@
         }
       ],
       "created_at_ms": 1789080936617,
-      "updated_at_ms": 1789082094569
+      "updated_at_ms": 1789083490381
     },
     {
       "id": "win-browser-research-mcp-v1",
@@ -25072,16 +25072,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_017a94fcd1e6499395056ea476913e72",
-      "feature_id": "esk-sui-testnet-publication-preflight-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-preflight",
-      "reason": "离线候选合同、仪式计划、失败关闭门禁和 CI 接线均已实现。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788663768758
-    },
-    {
       "id": "feature_event_13efd6203ee34eda89d3ad4ff3c68667",
       "feature_id": "esk-sui-testnet-publication-preflight-v1",
       "action": "transitioned",
@@ -27070,6 +27060,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789082094569
+    },
+    {
+      "id": "feature_event_caa8e0bc03d140789fd1aa7882cdf820",
+      "feature_id": "win-browser-research-affinity-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-quant-product",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789083490381
     }
   ]
 }
