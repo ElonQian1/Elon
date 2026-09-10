@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 5, operationTimeoutMs: 24000, create: factory });
+  const exported = Object.freeze({ version: 6, operationTimeoutMs: 24000, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateLibraryAttachment = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -76,10 +76,11 @@
     const job = { controller: new root.AbortController() };
     const now = () => root.performance?.now?.() ?? Date.now();
     const started = now();
-    const current = () => selection.current() && composer.current(binding) &&
+    let selectionVerified = false;
+    const current = () => (selection.owned?.() ?? selection.current()) && composer.current(binding) &&
       !root.__elonChatGptPrivateLibraryMutations?.busy?.();
     const canAssociate = () => !job.controller.signal.aborted && now() - started < OPERATION_TIMEOUT_MS &&
-      current() && context.current();
+      selectionVerified && current() && context.current();
     active = job;
     const entry = { handle: input.fileHandle, current };
     receipts.set(id, entry);
@@ -92,6 +93,10 @@
     });
     const execute = async () => {
       try {
+        if (!selection.current() && (!selection.refresh || !await selection.refresh(job.controller.signal))) {
+          return [false, 'library_selection_expired'];
+        }
+        selectionVerified = true;
         if (canAssociate() && context.contains(selection.source)) return [true, 'library_attachment_associated'];
         if (remote && (consumed.has(input.fileHandle) || consumed.size >= 512)) {
           return [false, 'library_selection_expired'];

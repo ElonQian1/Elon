@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 6, create: factory });
+  const exported = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateLibraryCatalog?.version || 0) < exported.version) {
@@ -13,6 +13,11 @@
   const HANDLE = /^library_[a-f0-9]{32}$/;
   const REQUEST = /^mcp_[a-z0-9]{1,32}$/;
   const TTL = 60000, MAX_ITEMS = 500, MAX_PAGES = 8;
+  const ATTACHMENT_FIELDS = ['id', 'kind', 'name', 'file_id', 'mime_type', 'file_size_bytes',
+    'parent_directory_id', 'external_account', 'cloud_doc_url', 'library_artifact_type',
+    'saved_entity', 'trashed_at', 'is_project', 'gizmo_id', 'project_id', 'context_scopes',
+    'preview_file', 'mounted_library_file_id', 'library_file_id', 'shared_library_file_id',
+    'library_download_id', 'context_connector_info', 'library_provider'];
   const pages = new Map(), directories = new Map(), renamed = new Map();
   let identityKey = '', active = null, disposed = false, failures = 0, retryAt = 0;
 
@@ -105,7 +110,7 @@
     if (!current(job)) return;
     const attachments = root.__elonChatGptPrivateLibraryAttachment?.create(root);
     // IDs, pagination tokens and credential material remain inside this page owner.
-    const items = page.items.map(({ source, ...item }) => {
+    const items = page.items.map(({ source, lookupUrl, observedAt, ...item }) => {
       const downloadHandle = item.kind === 'file'
         ? root.__elonChatGptPrivateFileDownload?.registerLibraryFile?.(source) || '' : '';
       const canAttach = !!attachments?.descriptor(source);
@@ -146,7 +151,7 @@
         directories.set(id, { id: source.id, breadcrumbs: [...job.breadcrumbs, { handle: id, name }] });
       } else id = handle();
       items.push({ handle: id, kind: source.kind, name, mediaType: source.mime_type || '',
-        sizeBytes: source.file_size_bytes ?? -1, source });
+        sizeBytes: source.file_size_bytes ?? -1, source, lookupUrl: job.lookupUrl, observedAt: Date.now() });
     }
     const cursors = [...(previous?.cursors || [])];
     const cursor = payload.cursor || '';
@@ -201,6 +206,7 @@
       url.searchParams.set('hydrate_folder_thumbnails', 'true');
       url.searchParams.set('include_folder_counts', 'true');
       url.searchParams.set('include_saved_entities', 'true');
+      job.lookupUrl = url.href;
       const remaining = job.deadline - Date.now();
       if (remaining <= 0) throw new Error('timeout');
       const result = await root.__elonChatGptPrivateJsonRequest.request(root, url.href, {
@@ -264,8 +270,41 @@
   }
   function cancelActiveRead() { active?.controller.abort(); active = null; }
   function selectAttachment(fileHandle) {
-    const selection = selectMutation(fileHandle);
-    return selection ? { source: selection.source, current: selection.fresh } : null;
+    const account = identity(), href = root.location.href, document = root.document;
+    const transport = root.__elonChatGptPrivateTransport;
+    if (disposed || !account || account !== identityKey || root.location.origin !== 'https://chatgpt.com') return null;
+    let item;
+    for (const page of pages.values()) {
+      if (!page.savedAt) continue;
+      item = page.items.find(row => row.handle === fileHandle);
+      if (item) break;
+    }
+    if (!item || item.kind !== 'file') return null;
+    const owned = () => !disposed && root.location.origin === 'https://chatgpt.com' &&
+      identity() === account && identityKey === account && root.location.href === href &&
+      root.document === document && root.__elonChatGptPrivateTransport === transport &&
+      !root.__elonChatGptPrivateLibraryMutations?.busy?.() &&
+      Array.from(pages.values()).some(page => page.savedAt && page.items.includes(item));
+    const current = () => owned() && Date.now() - item.observedAt < TTL;
+    return { source: { ...item.source }, current, owned,
+      async refresh(signal) {
+        if (!owned() || signal?.aborted) return false;
+        if (current()) return true;
+        // Re-read the exact observed page; neither a guessed per-file endpoint nor a renewed write ticket.
+        const response = await root.__elonChatGptPrivateJsonRequest.request(root, item.lookupUrl, {
+          method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+          headers: transport.copySameOriginRequestHeaders(), signal,
+        }, { timeoutMs: 10000, maxBytes: 2 * 1024 * 1024 });
+        if (!owned() || signal?.aborted) return false;
+        const rows = response.payload?.items;
+        if (!Array.isArray(rows) || rows.length > 1000) return false;
+        const matches = rows.filter(row => row?.id === item.source.id);
+        if (matches.length !== 1 || !ATTACHMENT_FIELDS.every(key =>
+          Object.is(matches[0][key], item.source[key]))) return false;
+        item.observedAt = Date.now();
+        return true;
+      },
+    };
   }
-  return Object.freeze({ version: 6, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead });
+  return Object.freeze({ version: 7, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead });
 });
