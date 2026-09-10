@@ -17,8 +17,9 @@ it does not use the public writer described here.
 ## Composer-independent readiness
 
 Current source uses share contract 4 and transaction module 5. The 2026-09-10
-readiness correction is offline verified and pending the next grouped APK build
-and native UI acceptance; it is not present in installed `1.1.1629`.
+readiness correction is offline verified and published/installed in normal
+`1.1.1630`; native UI acceptance remains pending. See the
+[grouped delivery](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).
 
 Native `ACCOUNT_MUTATION` admission and the share coordinator already allow a
 loaded conversation without its composer. The private contract redundantly

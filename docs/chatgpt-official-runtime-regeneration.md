@@ -1,9 +1,9 @@
 # Official-runtime response regeneration
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
-Status: source implemented and offline verified. v5 is installed on normal 1629;
-v6 awaits the grouped release below. End-to-end device acceptance is not passed
-or completed.
+Status: source implemented and offline verified. v6 is published and installed
+on normal 1630. End-to-end device acceptance is not passed or completed; see
+the [grouped delivery](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).
 The original adapter 286 batch wired this candidate into the existing production
 `chatgpt_regenerate_response` command. It is an official-runtime bridge, not an
 independent Android HTTP generation transport. Do not recreate it while waiting

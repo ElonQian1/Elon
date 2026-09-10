@@ -3,9 +3,9 @@
 ## Status and boundary
 
 Capability: `android_chatgpt_private_file_citation_download_v1`.
-Status: implemented; offline protocol/owner checks passed. Download owner v15 is
-included in installed APK 1629 (source `2a01aaf6f`); the v16 metadata/scope and
-cancellation correction awaits the next grouped APK build. Real production
+Status: implemented; offline protocol/owner checks passed. The download owner v16
+metadata/scope and cancellation correction is published/installed in APK 1630
+(source `794183af7`, includes `3a2037c5e`). Real production
 citation download acceptance remains pending. Not marked `completed`.
 
 This extends the existing conversation file index and download owner. It is not
@@ -103,12 +103,12 @@ Coverage includes missing library identity, personal/project resolution,
 metadata HTTP errors, malformed flags/IDs, owner invalidation and no download
 after cancellation. This does not prove other cloud/PCA protocols or real bytes.
 
-Use an existing synthetic conversation with an assistant file citation after
-the next grouped APK build. In production native UI, open Conversation files,
+Use an existing synthetic conversation with an assistant file citation on the
+grouped 1630 APK. In production native UI, open Conversation files,
 select the citation, download it and verify the save receipt and actual bytes.
 Keep the visible conversation/draft unchanged. Then exercise one library/project
 citation and a grouped/cite-map file if present; do not create private user
 content merely for a fixture.
-Wireless ADB was available on 2026-09-10, but the phone was locked/asleep during
-this correction. No account download, Android build or installation was run for
-v16; keep it in the grouped source batch rather than rebuilding per small fix.
+Wireless ADB was available on 2026-09-10, but the phone remained locked/asleep
+after the grouped build and installation. No real-account citation download was
+run for v16; see the [delivery evidence](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).

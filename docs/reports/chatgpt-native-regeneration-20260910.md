@@ -146,3 +146,25 @@ production receipt check (`regenerate-dom-owner-final-20260910-120709-126`,
 terminal pass in 0.8 s). No new private protocol is
 claimed by this lifecycle correction. Grouped APK delivery and native acceptance
 remain pending until recorded below.
+
+## Normal 1630 grouped delivery
+
+Source `794183af7` (regeneration/model observation), together with `da4378c68`
+(composer-independent sharing) and `3a2037c5e` (cited-file scope/cancellation),
+was built once as normal release `1.1.1630 (1630)`, published and installed on
+the existing whitelisted Xiaomi. Publication verified remote APK SHA-256/size;
+an independent package read confirmed installed code/name `1630`/`1.1.1630`.
+APK SHA-256:
+`3c8410fdc61cbd9de0f8b43244e62d49563bfa18280c1565c53046d6b8e22684`.
+
+Log `chatgpt-grouped-dom-decoupling-release-20260910-120913-917` is terminal pass
+in 382 seconds; Gradle reported `BUILD SUCCESSFUL in 5m 36s`, publication reported
+`APK_RELEASE_STATUS=published`, installation `APK_ADB_DEPLOY_STATUS=updated`.
+The LAN firewall warning did not block verified wireless ADB installation.
+No app/Cookie clearing, microphone use, proxy change or repeat probe send occurred.
+
+The phone remained locked/asleep after installation. Native retry, rendered
+sharing and cited-file saved-byte acceptance are deferred to unlock; neither
+installation nor the earlier cached two-message read is a passing UI workflow.
+Use the existing probe only after strict foreground/probe checks; do not issue a
+new initial prompt merely because the former observer was unavailable.
