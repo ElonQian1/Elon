@@ -84,3 +84,39 @@ Resolve the initial-reply boundary, then finish one real native retry acceptance
 Do not repeat already accepted tools/models, broaden to thermal tests or mark
 regeneration completed based on build/install or offline tests alone. Project,
 temporary, partial-turn and account-restriction scopes remain unverified.
+
+## Foreground follow-up and reusable acceptance
+
+The next readonly check observed a healthy wireless ADB transport, retained
+authentication and five cached directory entries. One title matched the
+synthetic-probe family; its body was not successfully inspected. While the
+foreground activity was outside the APK, the native snapshot stayed
+`connecting`, and queued open/probe commands timed out. A single foreground
+resume then reached `ready` with two messages and an empty draft in 4.8 seconds,
+but the phone left the APK again before the candidate navigation was dispatched.
+These are current foreground-boundary observations, not proof of what happened
+during the earlier 1629 initial-reply timeout or proof of a network failure.
+
+Commit `e78204397` changes the acceptance harness only; installed APK 1629 is
+unchanged. It adds structural initial-reply evidence and foreground checks before
+dispatch, during reply/receipt waits and during origin restoration. An
+interrupted run records restoration as deferred rather than bringing another
+app back to the foreground or claiming success from cached state.
+
+`-UseCurrentNativeSurface -UseExistingProbe` reuses an already open isolated
+synthetic probe with exactly one matching user prompt. It does not create a
+conversation or submit another initial message. The native retry still requires
+the new assistant identity, unchanged user turn, completed reply and, when
+requested, `official_runtime_v1:regenerate_observed`. Its result explicitly
+reports `sent_messages=0` and `reused_initial_reply=true`; this is not fresh proof
+of the earlier initial send. Non-test conversations are rejected.
+
+Twenty-three focused tests passed, including execution of the actual smoke
+orchestration against in-memory MCP responses for reuse, foreground loss and
+non-test rejection. That test found and corrected a PowerShell closure lookup
+issue before delivery. Parsing/static smoke contracts and source-size checks
+also passed. A bounded device attempt stopped at the current-native-surface
+precondition in 3.7 seconds before sending or regenerating anything; its log is
+`native-existing-regenerate-1629-20260910-110424-865`. No device retry success is
+claimed from this guard check. No APK rebuild, media capture, proxy changes or
+app/Cookie clearing were performed in this follow-up.

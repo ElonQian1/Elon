@@ -24,6 +24,11 @@ that the defect was the only cause of the live timeout. Normal 1629 is published
 and installed, but its acceptance stopped before retry: the initial send receipt
 passed and the completed-reply predicate timed out. See the
 [September 10 evidence](reports/chatgpt-native-regeneration-20260910.md).
+The acceptance harness now supports `-UseExistingProbe` on an already open,
+strictly identified synthetic test conversation. It records the initial-reply
+blocking condition and stops on foreground loss; it does not resend the probe
+or count cached/background state as a successful native acceptance. This is a
+test-runner correction, not a new APK transport or a passed retry case.
 
 Contract/runtime v4 extends the existing command to the source-observed
 `finished_partial_completion` terminal status, while retaining the committed
