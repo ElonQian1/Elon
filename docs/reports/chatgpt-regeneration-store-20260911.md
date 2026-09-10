@@ -50,6 +50,28 @@ failed four of 26 cases: missing active subscription and no late store release.
 29 focused store cases and all selected runtime-binding/model/retry guards.
 No skipped/cancelled tests. These are offline fixtures, not live stream proof.
 
-Adapter 327 is source-only pending normal publication and one production-native
-retry. The passive SSE capture gap, first-word timing, project/temporary/image
-contexts and independent Android HTTP remain separate unresolved scopes.
+## Normal 1644 Acceptance
+
+Source `0e137a23c73f18308fafa17f53a6ed6c0aff58dc` was published and installed as
+normal `1.1.1644 (1644)`, adapter 327/resolver 12. APK: 40,117,633 bytes,
+SHA-256 `c72111423e819df0e63925110a856bdbd3647c29adccbbc0da3ef442b00803e0`.
+`regenerate-official-store-release-20260911-024713-688` passed in 404 seconds,
+including compilation/lint, live version/artifact checks and replacement install.
+
+`native-retry-official-store-1644-20260911-025412-059` passed in 62.7 seconds
+including navigation and restoration. It confirmed both private model catalogues
+(6/6), the rendered native row and enabled retry button, then clicked once.
+The original synthetic prompt was reused; no additional user message was sent.
+The command returned `official_runtime_v1:regenerate_observed`, native streaming
+was observed, and changed marker-matching content finished. The native projected
+message ID remained unchanged; the runtime receipt independently requires a new
+official tree variant and the same original user parent. No second write or
+fallback was issued. The original user turn, native surface, conversation and
+stay-awake setting were preserved/restored; no Cookie or application-data clear.
+
+`android_chatgpt_official_runtime_regeneration_v1` is `completed` only for this
+ordinary authenticated text scope and remains default enabled. Do not repeat
+its implementation or expand samples without a regression. This receipt does
+not count frames by observer source or establish a latency/thermal improvement.
+The passive SSE capture gap, first-word timing, project/temporary/image contexts
+and independent Android HTTP remain separate unresolved scopes.

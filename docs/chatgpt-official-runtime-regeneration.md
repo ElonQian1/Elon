@@ -1,12 +1,13 @@
 # Official-runtime response regeneration
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
-Status: source implemented and offline verified. Normal 1643 / adapter 326 is
-installed; its retry passed the corrected runtime identity check but failed at
-`timeout_stream_missing`. Contract/runtime 10 and resolver 12 now also observe
-the official conversation store without a DOM poll or another request. The 314
-related checks pass; adapter 327 delivery and device acceptance are pending.
-End-to-end runtime acceptance is not passed. See the
+Status: `completed` for ordinary authenticated text retry through the production
+native button, default enabled and device verified on normal 1644 / adapter 327.
+Contract/runtime 10 and resolver 12 also observe the official conversation store
+without a DOM poll or another request. The 314 related checks and one actual
+native retry pass; original user turn, conversation and awake state were restored.
+Project/temporary/image variants, independent HTTP and measured first-word or
+thermal improvements are not implied. Reuse this accepted ordinary scope. See the
 [current evidence](reports/chatgpt-regeneration-store-20260911.md),
 the [1637 follow-up](reports/chatgpt-regeneration-observation-1637.md) and
 the [grouped delivery](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).
@@ -306,10 +307,10 @@ tests compiled and passed; this does not cover the full Android consumer build.
 The missing-node exception case first failed against the new runtime's initial
 implementation, then passed after retaining its bounded confirmation retry.
 
-The original source batch's build/install boundary is superseded by the normal
-1629 delivery above. Successful production retry/first-word display, real
-closed-portal confirmation, project/temporary cases and account restrictions
-remain pending.
+The original source batch's build/install boundary is superseded by normal
+1644. Ordinary authenticated native retry now passes; measured first-word
+latency, project/temporary/image cases and other account restrictions remain
+pending. This is official-runtime authority, not independent native HTTP.
 Thermal/resource optimization is deferred until functional acceptance. Browser
 navigation timed out during the original source batch; no successful
 authenticated regeneration was observed in this source batch. Preserve that

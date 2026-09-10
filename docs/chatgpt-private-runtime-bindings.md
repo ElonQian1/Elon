@@ -6,13 +6,16 @@ Version 12 adds only the inspected September 10-b `conversationStore` export
 `GJ` (`hS`) for bounded, request-owned regeneration observation. Older profiles
 do not guess this mapping. Source/getter/subscription evidence and the 314-case
 related run are in [the regeneration report](reports/chatgpt-regeneration-store-20260911.md).
-Adapter 327 publication and device acceptance remain pending.
+Normal 1644 / adapter 327 is published and installed; the ordinary authenticated
+native retry passed with the corrected contract. Other consumers retain their
+own acceptance boundaries.
 
 Version 11 adds the second September 10 build observed on normal APK 1639.
 It retains all earlier profiles and maps 57 consumed contracts from inspected
 public sources. The private model diagnostic had reported `runtime_not_observed`;
-132 focused and 304 adjacent tests now pass. Normal 1640 / adapter 325 is published
-and installed; production acceptance awaits phone unlock. See
+132 focused and 304 adjacent tests passed at that checkpoint. Normal 1640 /
+adapter 325 was published and installed; subsequent native model admission
+and ordinary retry are covered by the 1644 evidence above. See
 [source evidence and boundary](reports/chatgpt-runtime-bindings-20260910-b.md).
 
 Version 10 adds exact September 10 local-upload quota/type helpers for
