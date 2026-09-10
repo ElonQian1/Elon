@@ -7,8 +7,8 @@ const contract = require('../android/app/src/main/assets/chatgpt_web_private_reg
 const { fixture, id, flush } = require('./fixtures/chatgpt-runtime-regeneration.js');
 
 test('regeneration has a versioned official-runtime transaction', () => {
-  assert.equal(runtime.version, 4);
-  assert.equal(contract.version, 4);
+  assert.equal(runtime.version, 5);
+  assert.equal(contract.version, 5);
   assert.equal(typeof runtime.create, 'function');
 });
 
@@ -46,6 +46,40 @@ for (const reason of ['user_stop', 'server_error']) {
     assert.equal((await result.completion).status, 'accepted');
     assert.equal(f.tree.nodes.get(id(5)).parent, f.parent);
     assert.equal(f.calls.length, 1);
+  });
+}
+
+for (const state of ['streaming', 'completed']) {
+  test('observes an owned retry while the model picker is disabled: ' + state, async () => {
+    const f = fixture(), result = f.api.regenerate(f.command);
+    await flush();
+    f.modelButton.__reactFiber$test.return.memoizedProps.ariaDisabled = true;
+    assert.equal(f.api.available(f.turn, f.command.getModelTrigger), false,
+      'a disabled picker must still block starting a new mutation');
+    f.publish({ state });
+    assert.equal(f.api.state().pending, false,
+      'temporary picker disablement must not block observing the already dispatched reply');
+    assert.equal((await result.completion).status, 'accepted');
+    assert.equal(f.calls.length, 1);
+  });
+}
+
+for (const [reason, change] of Object.entries({
+  identity: f => { f.page.__elonChatGptPrivateTransport.copySameOriginRequestHeaders = () => ({ authorization: 'Bearer different-synthetic-identity' }); },
+  conversation: f => { f.modelMenu.conversation = { id: 'other', serverId$: () => id(1) }; },
+  unknown_disabled_state: f => { f.modelButton.__reactFiber$test.return.memoizedProps.ariaDisabled = undefined; },
+  parent: f => { f.parent.id = id(99); }
+})) {
+  test('disabled-picker observation still rejects changed ownership: ' + reason, async () => {
+    const f = fixture(), result = f.api.regenerate(f.command);
+    await flush();
+    f.modelButton.__reactFiber$test.return.memoizedProps.ariaDisabled = true;
+    change(f);
+    f.publish();
+    assert.equal(f.api.state().pending, true);
+    f.runTimer(15000);
+    assert.deepEqual(await result.completion, { status: 'unknown', code: 'timeout' });
+    assert.equal(f.calls.length, 1, 'an unknown result must not invoke a fallback or replay');
   });
 }
 
