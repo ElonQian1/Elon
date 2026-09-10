@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 2, create: factory });
+  const exported = Object.freeze({ version: 3, operationTimeoutMs: 24000, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateLibraryAttachment = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -9,6 +9,7 @@
   const mounted = root.__elonChatGptPrivateMountedLibraryAttachment?.create(root);
   const receipts = new Map();
   const consumed = new Map();
+  const OPERATION_TIMEOUT_MS = 24000;
   let active = null;
 
   function descriptor(source) {
@@ -74,24 +75,33 @@
       return respond(action, false, 'library_attachment_scope_unconfirmed');
     }
     const job = { controller: new root.AbortController() };
+    const now = () => root.performance?.now?.() ?? Date.now();
+    const started = now();
     const current = () => selection.current() && composer.current(binding) &&
       !root.__elonChatGptPrivateLibraryMutations?.busy?.();
+    const canAssociate = () => !job.controller.signal.aborted && now() - started < OPERATION_TIMEOUT_MS && current();
     active = job;
     const entry = { handle: input.fileHandle, current };
     receipts.set(id, entry);
     while (receipts.size > 64) receipts.delete(receipts.keys().next().value);
-    entry.result = (async () => {
+    let timer, onAbort;
+    const aborted = new Promise(resolve => {
+      onAbort = () => resolve([false, 'library_attachment_unconfirmed']);
+      job.controller.signal.addEventListener('abort', onAbort, { once: true });
+      timer = root.setTimeout(() => job.controller.abort(), OPERATION_TIMEOUT_MS);
+    });
+    const execute = async () => {
       try {
-        if (!await composer.prepare(binding, job.controller.signal, file, false, false) || !current() || job.controller.signal.aborted) {
+        if (!await composer.prepare(binding, job.controller.signal, file, false, false) || !canAssociate()) {
           return [false, 'library_attachment_context_changed'];
         }
         let item;
         if (remote) {
           // Consume this selected handle before the write; an unknown outcome is not replayed.
           consumed.set(input.fileHandle, Date.now());
-          const prepared = await mounted.prepare(selection.source, id, job.controller.signal, current);
+          const prepared = await mounted.prepare(selection.source, id, job.controller.signal, canAssociate);
           if (!await composer.prepare(binding, job.controller.signal, prepared.descriptor, false, false) ||
-              !current() || job.controller.signal.aborted) return [false, 'library_attachment_context_changed'];
+              !canAssociate()) return [false, 'library_attachment_context_changed'];
           item = prepared.item;
         } else item = ready(selection.source, id);
         composer.associateLibrary(binding, item);
@@ -99,11 +109,15 @@
         return [true, 'library_attachment_associated'];
       } catch (_) {
         return [false, 'library_attachment_unconfirmed'];
-      } finally {
-        job.controller.abort();
-        if (active === job) active = null;
       }
-    })();
+    };
+    // The caller owns one deadline across scope read and remote preparation. Late work cannot publish.
+    entry.result = Promise.race([execute(), aborted]).finally(() => {
+      root.clearTimeout(timer);
+      job.controller.signal.removeEventListener('abort', onAbort);
+      job.controller.abort();
+      if (active === job) active = null;
+    });
     respond(action, ...await entry.result);
   }
 

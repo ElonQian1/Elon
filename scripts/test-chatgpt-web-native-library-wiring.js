@@ -21,8 +21,10 @@ test('native attach waits for the exact receipt and returns without navigating o
   const read = name => fs.readFileSync(path.join(__dirname, '../android/app/src/main/kotlin/com/elon/app/', name), 'utf8');
   const ui = read('WebChatLibraryAttachmentAction.kt');
   assert.match(ui, /owner\.attachLibraryFile\(file\.handle\)/);
-  assert.match(ui, /receipt\.detail == "library_attachment_associated"/);
-  assert.match(ui, /elapsedRealtime\(\) - started >= 16_000/);
+  assert.match(ui, /WebChatLibraryAttachmentReceiptPolicy\.outcome\(/);
+  assert.match(ui, /it\.id == result\.requestId/);
+  assert.match(ui, /elapsedMs = SystemClock\.elapsedRealtime\(\) - started/);
+  assert.match(read('WebChatLibraryAttachmentReceiptPolicy.kt'), /detail == "library_attachment_associated"/);
   assert.match(ui, /host::removeCallbacks/);
   assert.doesNotMatch(ui, /evaluateJavascript|loadUrl|startVoice|setDraft|sendText/);
   assert.match(read('WebChatLibraryBrowser.kt'), /attachments\.start\(port, file\)/);

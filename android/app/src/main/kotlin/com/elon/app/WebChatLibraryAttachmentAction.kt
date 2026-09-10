@@ -32,17 +32,22 @@ internal class WebChatLibraryAttachmentAction(
                     return
                 }
                 val receipt = state.commandRequests.firstOrNull { it.id == result.requestId }
-                when {
-                    receipt?.status == WebChatConsumerCommandStatus.SUCCEEDED && receipt.detail == "library_attachment_associated" -> {
+                val outcome = WebChatLibraryAttachmentReceiptPolicy.outcome(
+                    succeeded = receipt?.status == WebChatConsumerCommandStatus.SUCCEEDED,
+                    terminal = receipt?.status in setOf(WebChatConsumerCommandStatus.FAILED, WebChatConsumerCommandStatus.TIMED_OUT),
+                    detail = receipt?.detail,
+                    elapsedMs = SystemClock.elapsedRealtime() - started,
+                )
+                when (outcome) {
+                    WebChatLibraryAttachmentReceiptPolicy.Outcome.ATTACHED -> {
                         stopWatching()
                         onAttached()
                     }
-                    receipt?.status in setOf(WebChatConsumerCommandStatus.FAILED, WebChatConsumerCommandStatus.TIMED_OUT) ||
-                        SystemClock.elapsedRealtime() - started >= 16_000 -> {
+                    WebChatLibraryAttachmentReceiptPolicy.Outcome.UNCONFIRMED -> {
                         stopWatching()
-                        status("附件未能确认加入；请保留当前草稿，检查附件后重试")
+                        status("附件结果未确认；请返回会话检查附件，勿重复加入")
                     }
-                    else -> host.postDelayed(this, 300)
+                    WebChatLibraryAttachmentReceiptPolicy.Outcome.WAIT -> host.postDelayed(this, 300)
                 }
             }
         }

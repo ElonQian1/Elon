@@ -428,6 +428,8 @@ internal class ChatGptWebObservedState(
         fun commandTimeoutMs(action: String): Long =
             if (action in setOf("download_conversation_file", "download_library_file")) {
                 ChatGptWebFileByteTransfer.COMMAND_TIMEOUT_MS
+            } else if (action == "attach_library_file") {
+                com.elon.app.WebChatLibraryAttachmentReceiptPolicy.COMMAND_TIMEOUT_MS
             } else if (action in CONVERSATION_MUTATION_ACTIONS || action == "mutate_library_file") {
                 CONVERSATION_MUTATION_COMMAND_TIMEOUT_MS
             } else {
