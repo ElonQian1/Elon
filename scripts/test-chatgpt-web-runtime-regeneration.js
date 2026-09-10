@@ -7,8 +7,8 @@ const contract = require('../android/app/src/main/assets/chatgpt_web_private_reg
 const { fixture, id, flush } = require('./fixtures/chatgpt-runtime-regeneration.js');
 
 test('regeneration has a versioned official-runtime transaction', () => {
-  assert.equal(runtime.version, 5);
-  assert.equal(contract.version, 5);
+  assert.equal(runtime.version, 6);
+  assert.equal(contract.version, 6);
   assert.equal(typeof runtime.create, 'function');
 });
 
@@ -65,12 +65,41 @@ for (const state of ['streaming', 'completed']) {
 }
 
 for (const [reason, change] of Object.entries({
+  detached: f => { f.modelButton.isConnected = false; },
+  unmounted: f => { f.modelButton.__reactFiber$test.return = null; },
+  picker_state_absent: f => { f.modelButton.__reactFiber$test.return.memoizedProps.ariaDisabled = undefined; },
+  picker_read_throws: f => { Object.defineProperty(f.modelButton, 'isConnected', {
+    get() { throw Error('post-dispatch confirmation must not inspect a DOM trigger'); }
+  }); }
+})) {
+  for (const state of ['streaming', 'completed']) {
+    test('owned ' + state + ' reply does not depend on model UI after dispatch: ' + reason, async () => {
+      const f = fixture(), result = f.api.regenerate(f.command);
+      await flush();
+      change(f);
+      assert.equal(f.api.available(f.turn, f.command.getModelTrigger), false,
+        'the unavailable picker still blocks preparing a new mutation');
+      f.publish({ state });
+      assert.equal(f.api.state().pending, false,
+        'a matching private reply and official parent must not wait for the picker');
+      assert.deepEqual(await result.completion, { status: 'accepted', code: 'regenerate_observed' });
+      assert.equal(f.calls.length, 1);
+      assert.equal(f.listeners.size, 0);
+      assert.equal(f.timers.size, 0);
+    });
+  }
+}
+
+for (const [reason, change] of Object.entries({
   identity: f => { f.page.__elonChatGptPrivateTransport.copySameOriginRequestHeaders = () => ({ authorization: 'Bearer different-synthetic-identity' }); },
   conversation: f => { f.modelMenu.conversation = { id: 'other', serverId$: () => id(1) }; },
-  unknown_disabled_state: f => { f.modelButton.__reactFiber$test.return.memoizedProps.ariaDisabled = undefined; },
+  server_conversation: f => { f.modelMenu.conversation.serverId$ = () => id(9); },
+  route: f => { f.page.location.href = 'https://chatgpt.com/c/' + id(9); },
+  route_query: f => { f.page.location.href += '?temporary-chat=true'; },
+  route_fragment: f => { f.page.location.href += '#other'; },
   parent: f => { f.parent.id = id(99); }
 })) {
-  test('disabled-picker observation still rejects changed ownership: ' + reason, async () => {
+  test('post-dispatch observation still rejects changed ownership: ' + reason, async () => {
     const f = fixture(), result = f.api.regenerate(f.command);
     await flush();
     f.modelButton.__reactFiber$test.return.memoizedProps.ariaDisabled = true;

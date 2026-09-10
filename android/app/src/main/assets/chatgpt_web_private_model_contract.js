@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 7, create: factory });
+  const api = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateModelContract = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -44,7 +44,7 @@
       fail(candidates.size ? 'picker_ambiguous' : 'picker_missing');
   }
 
-  function capture(getTrigger, allowDisabled = false) {
+  function identityContext() {
     const url = new URL(page.location.href);
     const cid = /^(?:\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.exec(url.pathname)?.[1] || null;
     const project = /^\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?\/project$/i.test(url.pathname);
@@ -54,12 +54,18 @@
     const token = page.__elonChatGptDocumentToken, account = identity();
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '')) return fail('document_unavailable');
     if (!account) return fail('identity_unavailable');
+    return { href: url.href, cid, token, account };
+  }
+
+  function capture(getTrigger, allowDisabled = false) {
+    const owner = identityContext();
+    if (!owner) return null;
     const menu = picker(getTrigger(), allowDisabled);
     if (!menu) return null;
     if (typeof menu.conversation.serverId$ !== 'function' ||
-        (menu.conversation.serverId$() || null) !== cid) return fail('conversation_mismatch');
+        (menu.conversation.serverId$() || null) !== owner.cid) return fail('conversation_mismatch');
     code = 'bound';
-    return { getTrigger, href: url.href, token, account, conversation: menu.conversation, menu };
+    return { ...owner, getTrigger, conversation: menu.conversation, menu };
   }
 
   function matchingOwner(binding, allowDisabled) {
@@ -71,8 +77,17 @@
 
   function current(binding) { return matchingOwner(binding, false); }
 
-  // A disabled picker blocks writes, not confirmation of an already-owned reply.
-  function ownerCurrent(binding) { return !!matchingOwner(binding, true); }
+  // Post-dispatch identity is independent of picker rendering. The reply owner
+  // still verifies the new message, selected branch and original user parent.
+  function ownerCurrent(binding) {
+    try {
+      const now = binding && identityContext();
+      return !!now && ['href', 'cid', 'token', 'account'].every(key => now[key] === binding[key]) &&
+        binding.menu?.conversation === binding.conversation &&
+        typeof binding.conversation?.serverId$ === 'function' &&
+        (binding.conversation.serverId$() || null) === now.cid;
+    } catch (_) { return false; }
+  }
 
   function validate(modules) {
     const { shared: s, conversation: c, composer: b } = modules || {};

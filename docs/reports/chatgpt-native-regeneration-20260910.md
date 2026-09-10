@@ -120,3 +120,29 @@ precondition in 3.7 seconds before sending or regenerating anything; its log is
 `native-existing-regenerate-1629-20260910-110424-865`. No device retry success is
 claimed from this guard check. No APK rebuild, media capture, proxy changes or
 app/Cookie clearing were performed in this follow-up.
+
+## Post-dispatch DOM dependency correction
+
+Wireless ADB and a readonly MCP check succeeded on September 10 while the phone
+was locked/asleep. The snapshot was authenticated, adapter-current, bridge-ready,
+not streaming and had an empty draft and two completed messages. It was not the
+isolated regeneration probe, so it is not new-send or retry acceptance. No
+foreground takeover or extra message was issued.
+
+Code inspection found that v5 still called the model contract's `capture()`
+after invocation, including the committed DOM trigger lookup. The eight new
+streaming/completed cases failed against v5 when that UI detached, unmounted,
+omitted its disabled attribute or threw on a DOM read (46/54 passed). This
+reproduces a code-level observation dependency, not the cause of the earlier
+1629 initial-reply timeout.
+
+v6/model-contract v8 keeps write admission unchanged but validates post-dispatch
+identity directly from the existing page-local account/document/route and
+retained server-conversation binding. The official tree still proves the new
+assistant, selected leaf and original user parent. Changed identity, context,
+server conversation, route and parent remain rejected without replay. The
+final related set passed 201 cases with no skips/cancellations, including the
+production receipt check (`regenerate-dom-owner-final-20260910-120709-126`,
+terminal pass in 0.8 s). No new private protocol is
+claimed by this lifecycle correction. Grouped APK delivery and native acceptance
+remain pending until recorded below.

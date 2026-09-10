@@ -54,6 +54,17 @@ test('the actual orchestrator routes regeneration to runtime and preserves the e
   assert.deepEqual(f.events, [{ action: 'regenerate_response', ok: true, detail: 'official_runtime_v1:regenerate_observed' }]);
 });
 
+test('the native command receipt does not wait for the model picker to remount', async () => {
+  const f = production(); f.run(); await flush();
+  f.modelButton.isConnected = false;
+  f.publish({ state: 'completed' }); await flush();
+  assert.equal(f.calls.length, 1);
+  assert.deepEqual(f.counts(), { fallback: 0, relay: 0, begin: 1 });
+  assert.deepEqual(f.events, [{ action: 'regenerate_response', ok: true,
+    detail: 'official_runtime_v1:regenerate_observed' }]);
+  assert.equal(f.api.state().pending, false);
+});
+
 test('uncertain regeneration cannot replay through a private template or an official menu', async () => {
   const f = production(); f.run(); await flush(); f.runTimer(15000); await flush();
   assert.equal(f.events[0].ok, false); assert.match(f.events[0].detail, /regenerate_unknown:timeout$/);

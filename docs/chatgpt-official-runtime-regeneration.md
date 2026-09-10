@@ -1,8 +1,9 @@
 # Official-runtime response regeneration
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
-Status: source implemented and offline verified; installed on normal 1629,
-but end-to-end device acceptance is not passed or completed.
+Status: source implemented and offline verified. v5 is installed on normal 1629;
+v6 awaits the grouped release below. End-to-end device acceptance is not passed
+or completed.
 The original adapter 286 batch wired this candidate into the existing production
 `chatgpt_regenerate_response` command. It is an official-runtime bridge, not an
 independent Android HTTP generation transport. Do not recreate it while waiting
@@ -10,7 +11,22 @@ for the grouped ChatGPT APK acceptance.
 
 ## Current source correction
 
-Contract/runtime v5 separates post-dispatch ownership observation from model
+Contract/runtime v6 with model contract v8 removes the remaining post-dispatch
+model-button lookup. A dispatched reply is confirmed against the captured
+document/account, exact URL/server conversation, retained conversation object,
+new assistant identity, official selected leaf and original user parent.
+The callback still has strict committed-picker and availability checks before
+invocation. Unmounted/replaced UI or an absent picker-disabled attribute is not
+evidence that an already-dispatched response belongs to another conversation.
+No new request, DOM poll, retry or system substitute is introduced.
+
+Eight failing cases reproduced the v5 dependency with streaming/completed replies
+after picker detach, unmount, missing disabled state or a throwing DOM getter.
+After the correction, 201 related model/regeneration checks passed, including
+the production-orchestrator receipt while the model button remains detached.
+This code evidence does not identify the full cause of the earlier live timeout.
+
+Contract/runtime v5 separated post-dispatch ownership observation from model
 write admission using model contract v7. A known disabled model picker during
 generation no longer invalidates an otherwise owned reply. New mutations still
 require an enabled picker; document/account/conversation, parent and leaf checks
@@ -78,7 +94,7 @@ recognized server-conversation binding are not covered by this candidate.
 
 ## Receipt and ownership
 
-- Bind the account/document, conversation object, selected assistant, callback,
+- Bind the account/document, exact URL and server ID, conversation object, selected assistant, callback,
   retry model, original user parent and existing variant IDs. Only the selected
   leaf is eligible; repeat availability and parent checks immediately before use.
 - Text submit, private-template send and runtime regeneration cannot overlap
@@ -87,7 +103,8 @@ recognized server-conversation binding are not covered by this candidate.
 - A callback invocation alone is not success. Reuse the existing private stream
   subscription and require a new, nonempty assistant reply whose ID was not an
   earlier variant, whose conversation matches, and whose official tree confirms
-  the same user parent and selected leaf.
+  the same user parent and selected leaf. After dispatch these checks use the
+  retained runtime state, not the presence or enabled state of a model button.
 - Stream-before-tree races use at most twenty 100ms memory-only checks per
   transaction, including the official selector's missing-node exception before
   a streamed node is committed. There is no new DOM polling, idle timer loop or
