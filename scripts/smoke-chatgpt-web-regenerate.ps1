@@ -11,13 +11,15 @@ param(
     [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
     [switch]$NativeRetry,
     [switch]$RequireOfficialRuntime,
-    [switch]$UseCurrentNativeSurface
+    [switch]$UseCurrentNativeSurface,
+    [switch]$UseExistingProbe
 )
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
 $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1")
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-reply-state.ps1")
 
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
@@ -42,12 +44,16 @@ function Invoke-ReceiptAction {
         [hashtable]$Arguments = @{}
     )
 
-    $dispatch = Invoke-ChatGptWebSmokeReadyAction -Runtime $runtime `
-        -Action $Action -Arguments $Arguments -TimeoutSec $ReadyTimeoutSec
+    Assert-ChatGptRegenerateForeground -Runtime $runtime
+    $dispatch = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
+        -Action $Action -Arguments $Arguments
     $requestId = [string]$dispatch.command_receipt.request_id
     if (-not $requestId) { throw "Missing command receipt for $Action." }
     return Wait-ChatGptCommandReceipt `
-        -InvokeUiState { Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" } `
+        -InvokeUiState {
+            Assert-ChatGptRegenerateForeground -Runtime $runtime
+            Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+        } `
         -RequestId $requestId -ExpectedAction $ExpectedAction `
         -TimeoutSec $ReadyTimeoutSec -PollIntervalSec $PollIntervalSec
 }
@@ -60,6 +66,7 @@ function Restore-Origin {
             -ExpectedAction "open_conversation" `
             -Arguments @{ conversation_path = $ConversationPath } | Out-Null
         Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+            -RequireChatGptForeground `
             -Description "original ChatGPT conversation restoration" -Predicate {
                 param($state)
                 [string]$state.conversation.url -like "*$ConversationPath*" -and
@@ -86,6 +93,7 @@ function Wait-RegeneratedReply {
     $lastReceipt = $null
     $lastProgressAt = [DateTimeOffset]::MinValue
     do {
+        Assert-ChatGptRegenerateForeground -Runtime $runtime
         $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
         if ([string]$state.conversation.url -ne $ExpectedConversationUrl) { throw 'Retry conversation changed.' }
         $currentUserIds = @($state.conversation.messages | Where-Object { $_.role -eq 'user' } | ForEach-Object { [string]$_.id })
@@ -145,14 +153,21 @@ $originCaptured = $false
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
     if ($UseCurrentNativeSurface) {
+        Assert-ChatGptRegenerateForeground -Runtime $runtime
         $current = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state -MainState
-        if ($current.active_surface -ne 'social_ai' -or $current.social_chat.web_chat_provider_id -ne 'chatgpt_web' -or
-            !(Test-WebChatNativeChatSurfaceForeground -Runtime $runtime)) { throw 'Current native ChatGPT surface is unavailable.' }
+        if ($current.active_surface -ne 'social_ai' -or $current.social_chat.web_chat_provider_id -ne 'chatgpt_web') {
+            throw 'Current native ChatGPT surface is unavailable.'
+        }
     } else {
         Open-ChatGptWebSmokeSurface -Runtime $runtime | Out-Null
     }
-    $origin = Wait-ChatGptWebSmokeAuthenticatedReady -Runtime $runtime `
-        -TimeoutSec $ReadyTimeoutSec -InitialWaitSec 20
+    $origin = Wait-ChatGptWebSmokeState -Runtime $runtime `
+        -TimeoutSec $ReadyTimeoutSec -RequireChatGptForeground `
+        -Description 'authenticated native regenerate surface' -Predicate {
+            param($state)
+            $state.surface -eq 'chatgpt_web' -and $state.bridge_state -eq 'ready' -and
+                $state.adapter_current -eq $true -and $state.authenticated -eq $true
+        }
     Assert-ChatGptWebSmokeAdapterVersion -State $origin `
         -ExpectedAdapterVersion $ExpectedAdapterVersion
     if ($origin.streaming -or $origin.input.text_length -ne 0 -or @($origin.conversation.attachments).Count) {
@@ -164,50 +179,69 @@ try {
     ).Value
     $originCaptured = $true
 
-    Write-Output "CHATGPT_REGENERATE_PROGRESS phase=create_isolated_conversation"
-    Invoke-ReceiptAction -Action "chatgpt_new_conversation" `
-        -ExpectedAction "new_conversation" | Out-Null
-    Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "isolated blank regenerate conversation" -Predicate {
-            param($state)
-            $state.page_kind -eq "home" -and
-                (-not $originPath -or [string]$state.conversation.url -notlike "*$originPath*") -and
-                $state.composer_ready -eq $true -and
-                $state.streaming -eq $false
-        }.GetNewClosure() | Out-Null
+    if ($UseExistingProbe) {
+        if (!$originPath) { throw 'Existing probe has no server conversation.' }
+        $probe = Get-ChatGptExistingRegenerateProbe -State $origin
+        $prompt = $probe.prompt
+        $marker = $probe.marker
+        Write-Output 'CHATGPT_REGENERATE_PROGRESS phase=reuse_existing_probe'
+    } else {
+        Write-Output "CHATGPT_REGENERATE_PROGRESS phase=create_isolated_conversation"
+        Invoke-ReceiptAction -Action "chatgpt_new_conversation" `
+            -ExpectedAction "new_conversation" | Out-Null
+        Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+            -RequireChatGptForeground `
+            -Description "isolated blank regenerate conversation" -Predicate {
+                param($state)
+                $state.page_kind -eq "home" -and
+                    (-not $originPath -or [string]$state.conversation.url -notlike "*$originPath*") -and
+                    $state.composer_ready -eq $true -and
+                    $state.streaming -eq $false
+            }.GetNewClosure() | Out-Null
 
-    Write-Output "CHATGPT_REGENERATE_PROGRESS phase=send_probe"
-    $marker = "ELON-CHATGPT-REGENERATE-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
-    $prompt = "Reply with a fresh 12-character lowercase hexadecimal token, one space, then exactly: $marker"
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
-        -Arguments @{ text = $prompt } | Out-Null
-    $beforeSend = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
-        -Description "regenerate probe draft synchronization" -Predicate {
-            param($state)
-            $state.bridge_state -eq "ready" -and
-                $state.adapter_current -eq $true -and
-                [string]$state.input.text -eq $prompt
-        }.GetNewClosure()
-    $beforeMain = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state -MainState
-    $previousSendAt = [long]$beforeMain.social_chat.web_chat_last_send_command.observed_at_ms
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input" | Out-Null
-    $sent = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec -MainState `
-        -Description 'production regenerate-probe send receipt' -Predicate {
-            param($s) $s.social_chat.web_chat_last_send_command.action -eq 'send_prompt' -and
-                [long]$s.social_chat.web_chat_last_send_command.observed_at_ms -gt $previousSendAt
-        }.GetNewClosure()
-    $sendReceipt = $sent.social_chat.web_chat_last_send_command
-    if ($sendReceipt.ok -ne $true -or ($RequireOfficialRuntime -and $sendReceipt.detail -ne 'official_runtime_v1:accepted')) {
-        throw 'Production regenerate-probe send was not confirmed.'
+        Write-Output "CHATGPT_REGENERATE_PROGRESS phase=send_probe"
+        $marker = "ELON-CHATGPT-REGENERATE-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+        $prompt = "Reply with a fresh 12-character lowercase hexadecimal token, one space, then exactly: $marker"
+        Assert-ChatGptRegenerateForeground -Runtime $runtime
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
+            -Arguments @{ text = $prompt } | Out-Null
+        $beforeSend = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec `
+            -RequireChatGptForeground `
+            -Description "regenerate probe draft synchronization" -Predicate {
+                param($state)
+                $state.bridge_state -eq "ready" -and
+                    $state.adapter_current -eq $true -and
+                    [string]$state.input.text -eq $prompt
+            }.GetNewClosure()
+        $beforeMain = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state -MainState
+        $previousSendAt = [long]$beforeMain.social_chat.web_chat_last_send_command.observed_at_ms
+        Assert-ChatGptRegenerateForeground -Runtime $runtime
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input" | Out-Null
+        $sent = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec -MainState `
+            -RequireChatGptForeground `
+            -Description 'production regenerate-probe send receipt' -Predicate {
+                param($s) $s.social_chat.web_chat_last_send_command.action -eq 'send_prompt' -and
+                    [long]$s.social_chat.web_chat_last_send_command.observed_at_ms -gt $previousSendAt
+            }.GetNewClosure()
+        $sendReceipt = $sent.social_chat.web_chat_last_send_command
+        if ($sendReceipt.ok -ne $true -or ($RequireOfficialRuntime -and $sendReceipt.detail -ne 'official_runtime_v1:accepted')) {
+            throw 'Production regenerate-probe send was not confirmed.'
+        }
     }
-    $initialReply = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReplyTimeoutSec `
-        -Description 'initial production regenerate-probe reply' -Predicate {
-            param($s)
-            $users = @($s.conversation.messages | Where-Object { $_.role -eq 'user' })
-            $assistant = @($s.conversation.messages | Where-Object { $_.role -eq 'assistant' }) | Select-Object -Last 1
-            $s.streaming -eq $false -and $users.Count -eq 1 -and $users[0].content -eq $prompt -and
-                $assistant.state -eq 'completed' -and ([string]$assistant.content).Contains($marker)
-        }.GetNewClosure()
+    $probeObservation = @{ last = $null }
+    $readReplyState = ${function:Get-ChatGptRegenerateReplyState}
+    try {
+        $initialReply = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReplyTimeoutSec `
+            -RequireChatGptForeground `
+            -Description 'initial production regenerate-probe reply' -Predicate {
+                param($s)
+                $probeObservation.last = & $readReplyState -State $s -Prompt $prompt -Marker $marker
+                $probeObservation.last.ready
+            }.GetNewClosure()
+    } catch {
+        Write-Output ('CHATGPT_REGENERATE_INITIAL_REPLY_STATE=' + ($probeObservation.last | ConvertTo-Json -Compress))
+        throw
+    }
     Write-Output "CHATGPT_REGENERATE_PROGRESS phase=initial_reply_complete"
     $initialAssistant = @($initialReply.conversation.messages) |
         Where-Object { [string]$_.role -eq "assistant" } |
@@ -220,6 +254,7 @@ try {
     )
 
     if ($NativeRetry) {
+        Assert-ChatGptRegenerateForeground -Runtime $runtime
         $priorRetryIds = @($initialReply.command_requests | ForEach-Object { [string]$_.request_id })
         Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action chatgpt_reveal_message `
             -Arguments @{message_id=[string]$initialAssistant.id;target='regenerate'} | Out-Null
@@ -228,7 +263,7 @@ try {
         & (Join-Path $PSScriptRoot 'invoke-conversation-ui-acceptance.ps1') `
             -DeviceSerial $DeviceSerial -ExpectedHardwareSerial $ExpectedHardwareSerial `
             -Step regenerate -Selector "web-chat-message-action:chatgpt_web:${stableId}:regenerate" | Out-Null
-        $dispatched = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec 20 -Description 'native retry dispatch' -Predicate {
+        $dispatched = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec 20 -RequireChatGptForeground -Description 'native retry dispatch' -Predicate {
             param($s) @($s.command_requests | Where-Object {
                 $_.expected_web_action -eq 'regenerate_response' -and $_.request_id -notin $priorRetryIds
             }).Count -gt 0
@@ -237,6 +272,7 @@ try {
             $_.expected_web_action -eq 'regenerate_response' -and $_.request_id -notin $priorRetryIds
         }) | Select-Object -Last 1).request_id
     } else {
+        Assert-ChatGptRegenerateForeground -Runtime $runtime
         $regenerate = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
             -Action "chatgpt_regenerate_response"
         $regenerateRequestId = [string]$regenerate.command_receipt.request_id
@@ -264,7 +300,8 @@ try {
         regenerated_assistant_completed = $true
         original_conversation_restored = $true
         production_surface_preserved = Test-ChatGptWebSmokeActivityForeground -Runtime $runtime
-        sent_messages = 1
+        sent_messages = if ($UseExistingProbe) { 0 } else { 1 }
+        reused_initial_reply = [bool]$UseExistingProbe
         regenerated_messages = 1
         native_retry_button = [bool]$NativeRetry
         official_runtime_confirmed = [bool]$regenerated.official_runtime_confirmed
@@ -279,7 +316,11 @@ try {
 } finally {
     if ($originCaptured -and -not $originRestored) {
         try {
-            Restore-Origin -ConversationPath $originPath
+            if (Test-WebChatNativeChatSurfaceForeground -Runtime $runtime) {
+                Restore-Origin -ConversationPath $originPath
+            } else {
+                Write-Warning 'Original ChatGPT view restoration deferred: native_chat_not_foreground.'
+            }
         } catch {
             Write-Warning "Unable to restore the original ChatGPT view after a failed regenerate smoke."
         }
