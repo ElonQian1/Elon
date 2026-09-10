@@ -18,6 +18,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-runtime.ps1")
 $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1")
+. (Join-Path $PSScriptRoot "chatgpt-web-smoke-tool-reply.ps1")
 
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
@@ -205,6 +206,11 @@ function Get-ToolOption {
 }
 
 function Wait-ToolStructuralReply {
+    param([Parameter(Mandatory = $true)]$CompletedReply)
+
+    $user = @($CompletedReply.conversation.messages | Where-Object { $_.role -eq 'user' }) | Select-Object -Last 1
+    if (!$user -or !$user.id) { throw 'Tool reply user anchor unavailable.' }
+    $expectedUrl = [string]$CompletedReply.conversation.url
     $expectedPartTypes = @($toolSpec.expected_parts)
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds([Math]::Min($ReplyTimeoutSec, 180))
     $observedPartTypes = @()
@@ -213,6 +219,7 @@ function Wait-ToolStructuralReply {
             throw "ChatGPT tool execution lost the production chat foreground while awaiting rich output."
         }
         $replyState = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state"
+        if ([string]$replyState.conversation.url -ne $expectedUrl) { throw 'Tool reply conversation changed.' }
         if (
             [string]$replyState.surface -ne "chatgpt_web" -or
             [string]$replyState.bridge_state -ne "ready" -or
@@ -228,20 +235,17 @@ function Wait-ToolStructuralReply {
         }
         $context = Invoke-ChatGptWebSmokeAction -Runtime $runtime `
             -Action "chatgpt_get_context" -Arguments @{
-                message_offset = [Math]::Max(0, $messageCount - 1)
-                message_limit = 1
+                message_offset = [int]$user.index
+                message_limit = [Math]::Min(20, $messageCount - [int]$user.index)
             }
-        $assistant = @($context.messages) | Select-Object -Last 1
-        $observedPartTypes = @(
-            $assistant.parts |
-                ForEach-Object { [string]$_.type } |
-                Where-Object { $_ } |
-                Sort-Object -Unique
-        )
-        $matchingPartCount = @(
-            $observedPartTypes | Where-Object { $_ -in $expectedPartTypes }
-        ).Count
-        if ($expectedPartTypes.Count -eq 0 -or $matchingPartCount -gt 0) {
+        if ($context.control_ok -ne $true -or [string]$context.conversation_url -ne $expectedUrl) {
+            throw 'Tool reply context is unavailable or belongs to another conversation.'
+        }
+        $evidence = Get-ChatGptWebToolReplyEvidence -Messages @($context.messages) `
+            -UserMessageId ([string]$user.id) -ExpectedPartTypes $expectedPartTypes
+        $observedPartTypes = @($evidence.observed_part_types)
+        $matchingPartCount = [int]$evidence.matching_part_count
+        if ($evidence.matched) {
             return [pscustomobject]@{
                 reply = $replyState
                 observed_part_types = $observedPartTypes
@@ -376,7 +380,7 @@ try {
     $reply = Wait-ToolReply `
         -InitialMainMessageCount ([int]$beforeMain.social_chat.message_count) `
         -InitialAdapterMessageCount ([int]$beforeSend.conversation.message_count)
-    $structuralReply = Wait-ToolStructuralReply
+    $structuralReply = Wait-ToolStructuralReply -CompletedReply $reply
     $reply = $structuralReply.reply
     $observedPartTypes = @($structuralReply.observed_part_types)
     $matchingPartCount = [int]$structuralReply.matching_part_count
