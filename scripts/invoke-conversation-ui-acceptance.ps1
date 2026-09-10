@@ -3,7 +3,7 @@
 param(
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
-    [ValidateSet('inspect','model','model_advanced','model_level','select_model','tools','image','search','clear_image','clear_search','header','temporary','back',
+    [ValidateSet('inspect','model','model_advanced','model_level','select_model','tools','image','search','clear_image','clear_search','header','temporary','retry_session','back',
         'conversation_actions','share','account_shares','share_list','close_shares','next_shares','previous_shares')]
     [string]$Step = 'inspect',
     [string]$Selector = '',

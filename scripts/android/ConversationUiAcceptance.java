@@ -85,6 +85,7 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             case "clear_search": click(description("\u5173\u95ed\u7f51\u9875\u641c\u7d22")); break;
             case "header": click(description("web-chat-page-actions:chatgpt_web")); break;
             case "temporary": click(description("chatgpt-native:temporary-chat:\u4e34\u65f6\u804a\u5929")); break;
+            case "retry_session": click(description("web-chat-consumer-retry")); break;
             case "conversation_actions":
                 click(new UiObject(new UiSelector().packageName(APP).descriptionStartsWith("chatgpt-conversation-actions:")));
                 assertTrue("conversation_actions_missing", description("web-chat-conversation-action-share").waitForExists(5000));
@@ -121,11 +122,16 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             .put("search_option", description("web-chat-composer-tool:chatgpt_web:web_search").exists())
             .put("image_active", description("\u5df2\u542f\u7528\u521b\u5efa\u56fe\u7247").exists())
             .put("search_active", description("\u5df2\u542f\u7528\u7f51\u9875\u641c\u7d22").exists())
+            .put("recovery_visible", description("web-chat-consumer-status").exists())
+            .put("retry_visible", description("web-chat-consumer-retry").exists())
             .put("share_menu", description("web-chat-conversation-share-options").exists())
             .put("account_share_page", accountTitle())
             .put("account_share_rows", description("web-chat-account-share-links-list").exists())
             .put("account_share_empty", text("\u8fd9\u4e2a\u8d26\u53f7\u6ca1\u6709\u516c\u5f00\u5206\u4eab\u94fe\u63a5\u3002").exists())
             .put("share_failed", text("\u5206\u4eab\u94fe\u63a5\u5c1a\u672a\u786e\u8ba4").exists());
+        UiObject recoveryText = description("web-chat-consumer-status").getChild(
+            new UiSelector().className("android.widget.TextView").index(0));
+        if (recoveryText.exists()) result.put("recovery_message", recoveryText.getText());
         android.os.Bundle report = new android.os.Bundle();
         report.putString("stream", "CONVERSATION_UI_RESULT=" + result.toString() + "\n");
         getAutomationSupport().sendStatus(0, report);
