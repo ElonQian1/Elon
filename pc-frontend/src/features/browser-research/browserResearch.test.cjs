@@ -25,7 +25,7 @@ const { nativeResearchErrorCode, receiptErrorCode, RESEARCH_FAILURE_CODES } = lo
 const { collecting, phaseLabel } = load('browserResearchStatus')
 const schema = 'yilong.browser-research.result.v1'
 const result = { schema, kind: 'sites', items: [], total: 0, offset: 0, next_offset: null }
-const action = (id = 'research_1') => ({ action_id: id, project_key: 'a'.repeat(64), command: { kind: 'sites' }, requested_at_ms: 100, expires_at_ms: 1000, status: 'queued' })
+const action = (id = 'research_1') => ({ action_id: id, instance_id: 'instance_a', project_key: 'a'.repeat(64), command: { kind: 'sites' }, requested_at_ms: 100, expires_at_ms: 1000, status: 'queued' })
 const resource = { id: 'resource_1', url: 'https://example.org/app.js', resource_type: 'Script', mime: 'text/javascript', size_bytes: 11, sha256: 'b'.repeat(64), generation: 2, truncated: false, redacted: true }
 
 test('opening or resuming is not displayed as collecting until host acknowledgement', () => {
@@ -94,6 +94,7 @@ test('invalidating a view discards prior and late results', () => {
 function harness(overrides = {}) {
   const calls = { invoked: [], receipts: [], claimed: [] }
   const deps = {
+    heartbeat: async () => 'instance_a',
     pending: async () => [action()],
     claim: async (id) => { calls.claimed.push(id); return { action: { ...action(id), status: 'executing' }, claim_token: 'claim_1' } },
     receipt: async (id, value) => { calls.receipts.push({ id, value }) },
@@ -102,6 +103,52 @@ function harness(overrides = {}) {
   }
   return { ...calls, executor: createResearchExecutor(deps), deps }
 }
+
+test('non-owner instance polling first never claims or invokes the session command', async () => {
+  const wrong = harness({ heartbeat: async () => 'instance_b' })
+  await wrong.executor.poll()
+  assert.equal(wrong.claimed.length, 0)
+  assert.equal(wrong.invoked.length, 0)
+  const right = harness()
+  await right.executor.poll()
+  assert.equal(right.invoked.length, 1)
+})
+
+test('owner change during heartbeat or claim never executes under the new owner', async () => {
+  for (const stage of ['heartbeat', 'claim']) {
+    let owner = 'first'
+    const h = harness({ owner: () => owner,
+      heartbeat: async () => { if (stage === 'heartbeat') owner = 'second'; return 'instance_a' },
+      claim: async () => { owner = 'second'; return { action: action(), claim_token: 'claim_1' } },
+    })
+    await h.executor.poll()
+    assert.equal(h.invoked.length, 0)
+    if (stage === 'claim') assert.equal(h.receipts[0].value.status, 'host_unavailable')
+  }
+})
+
+test('native execution receives no broker-only instance field', async () => {
+  const claimed = { ...action(), command: { kind: 'sites', instance_id: 'instance_a' } }
+  const h = harness({ claim: async () => ({ action: claimed, claim_token: 'claim_1' }) })
+  await h.executor.poll()
+  assert.deepEqual(h.invoked[0][2], { kind: 'sites' })
+})
+
+test('a mismatched successful claim is reported unavailable without native replay', async () => {
+  const h = harness({ claim: async () => ({ action: { ...action(), instance_id: 'wrong' }, claim_token: 'claim_1' }) })
+  await h.executor.poll()
+  await h.executor.poll()
+  assert.equal(h.invoked.length, 0)
+  assert.equal(h.receipts[0].value.status, 'host_unavailable')
+})
+
+test('native host identity projection is bounded and broker routing is stripped', () => {
+  const { parseResearchHost, nativeResearchCommand } = load('browserResearchHost')
+  assert.deepEqual(parseResearchHost({ instance_id: 'runtime_a', sessions: [] }), { instance_id: 'runtime_a', sessions: [] })
+  assert.throws(() => parseResearchHost({ instance_id: 'a', sessions: Array(9).fill({}) }))
+  assert.throws(() => parseResearchHost({ instance_id: '', sessions: [] }))
+  assert.deepEqual(nativeResearchCommand({ kind: 'status', session_id: 's', instance_id: 'a' }), { kind: 'status', session_id: 's' })
+})
 
 test('native execution uses successful claim payload exactly once', async () => {
   const h = harness({ claim: async () => ({ action: { ...action(), project_key: 'c'.repeat(64), command: { kind: 'sites' } }, claim_token: 'claim_2' }) })

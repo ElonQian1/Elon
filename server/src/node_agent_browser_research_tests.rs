@@ -154,7 +154,7 @@ fn browser_research_result_preserves_business_values_and_blocks_credentials() {
 
 #[test]
 fn browser_research_project_isolation_and_claim_is_single_use() {
-    let hub = BrowserResearchHub::default();
+    let hub = test_hub();
     let root = workspace();
     let action = hub
         .enqueue(&root, command(json!({"kind":"sites"})))
@@ -163,14 +163,14 @@ fn browser_research_project_isolation_and_claim_is_single_use() {
         .action(root.parent().unwrap(), &action.action_id)
         .is_err());
     assert!(hub.action(&root, &action.action_id).is_ok());
-    assert_eq!(hub.pending(8).unwrap().len(), 1);
-    let claim = hub.claim(&action.action_id).unwrap();
+    assert_eq!(hub.pending(8, "instance_a").unwrap().len(), 1);
+    let claim = hub.claim(&action.action_id, "instance_a").unwrap();
     assert_eq!(claim.action.status, "executing");
     assert_eq!(
-        hub.claim(&action.action_id).unwrap_err(),
+        hub.claim(&action.action_id, "instance_a").unwrap_err(),
         "action_not_claimable"
     );
-    assert!(hub.pending(8).unwrap().is_empty());
+    assert!(hub.pending(8, "instance_a").unwrap().is_empty());
     let serialized = serde_json::to_string(&hub.action(&root, &action.action_id).unwrap()).unwrap();
     assert!(!serialized.contains(&claim.claim_token));
     assert!(!serialized.contains(&root.to_string_lossy().to_string()));
@@ -178,7 +178,7 @@ fn browser_research_project_isolation_and_claim_is_single_use() {
 
 #[test]
 fn browser_research_receipts_require_token_and_exact_duplicate_is_idempotent() {
-    let hub = BrowserResearchHub::default();
+    let hub = test_hub();
     let action = hub
         .enqueue(&workspace(), command(json!({"kind":"sites"})))
         .unwrap();
@@ -187,7 +187,7 @@ fn browser_research_receipts_require_token_and_exact_duplicate_is_idempotent() {
             .unwrap_err(),
         "invalid_claim"
     );
-    let claim = hub.claim(&action.action_id).unwrap();
+    let claim = hub.claim(&action.action_id, "instance_a").unwrap();
     let done = hub
         .record_receipt(
             &action.action_id,
@@ -213,13 +213,13 @@ fn browser_research_receipts_require_token_and_exact_duplicate_is_idempotent() {
 
 #[test]
 fn browser_research_expiry_and_cancel_discard_late_results() {
-    let hub = BrowserResearchHub::default();
+    let hub = test_hub();
     let root = workspace();
     let action = hub
         .enqueue(&root, command(json!({"kind":"sites"})))
         .unwrap();
-    let claim = hub.claim(&action.action_id).unwrap();
-    hub.inner.lock().unwrap()[0].action.expires_at_ms = 0;
+    let claim = hub.claim(&action.action_id, "instance_a").unwrap();
+    hub.inner.lock().unwrap().entries[0].action.expires_at_ms = 0;
     assert_eq!(
         hub.action(&root, &action.action_id).unwrap().status,
         "expired"
@@ -230,7 +230,7 @@ fn browser_research_expiry_and_cancel_discard_late_results() {
     let action = hub
         .enqueue(&root, command(json!({"kind":"sites"})))
         .unwrap();
-    let claim = hub.claim(&action.action_id).unwrap();
+    let claim = hub.claim(&action.action_id, "instance_a").unwrap();
     assert_eq!(
         hub.cancel(&root, &action.action_id).unwrap().status,
         "cancelled"
@@ -242,7 +242,7 @@ fn browser_research_expiry_and_cancel_discard_late_results() {
 
 #[test]
 fn browser_research_queue_rejects_overflow_without_evicting_live_actions() {
-    let hub = BrowserResearchHub::default();
+    let hub = test_hub();
     let root = workspace();
     for _ in 0..16 {
         hub.enqueue(&root, command(json!({"kind":"sites"})))
@@ -253,17 +253,17 @@ fn browser_research_queue_rejects_overflow_without_evicting_live_actions() {
             .unwrap_err(),
         "queue_full"
     );
-    assert_eq!(hub.pending(16).unwrap().len(), 16);
-    assert_eq!(hub.pending(0).unwrap_err(), "invalid_limit");
+    assert_eq!(hub.pending(16, "instance_a").unwrap().len(), 16);
+    assert_eq!(hub.pending(0, "instance_a").unwrap_err(), "invalid_limit");
 }
 
 #[test]
 fn browser_research_failure_receipts_never_accept_raw_errors_or_results() {
-    let hub = BrowserResearchHub::default();
+    let hub = test_hub();
     let action = hub
         .enqueue(&workspace(), command(json!({"kind":"sites"})))
         .unwrap();
-    let claim = hub.claim(&action.action_id).unwrap();
+    let claim = hub.claim(&action.action_id, "instance_a").unwrap();
     let bad = ReceiptInput {
         claim_token: claim.claim_token.clone(),
         status: "failed".into(),
@@ -291,7 +291,7 @@ fn browser_research_command_and_pending_batches_are_bounded() {
     let oversized =
         command(json!({"kind":"search","session_id":"s","query":"x".repeat(MAX_COMMAND_BYTES)}));
     assert_eq!(oversized.validate(), Err("command_too_large"));
-    let hub = BrowserResearchHub::default();
+    let hub = test_hub();
     let root = workspace();
     let mut value = manifest();
     // Exact, distinct long origins remain valid; the batch must not multiply their size unboundedly.
@@ -307,7 +307,7 @@ fn browser_research_command_and_pending_batches_are_bounded() {
         )
         .unwrap();
     }
-    let pending = hub.pending(16).unwrap();
+    let pending = hub.pending(16, "instance_a").unwrap();
     assert!(!pending.is_empty());
     assert!(
         serde_json::to_vec(&json!({"ok":true,"actions":pending}))
@@ -315,4 +315,14 @@ fn browser_research_command_and_pending_batches_are_bounded() {
             .len()
             <= MAX_RESULT_BYTES
     );
+}
+
+fn test_hub() -> BrowserResearchHub {
+    let hub = BrowserResearchHub::default();
+    hub.register_host(affinity::HostInput {
+        instance_id: "instance_a".into(),
+        sessions: vec![],
+    })
+    .unwrap();
+    hub
 }

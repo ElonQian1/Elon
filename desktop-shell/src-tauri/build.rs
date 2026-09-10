@@ -2,6 +2,7 @@ fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
             "run_browser_research",
+            "browser_research_host",
             "list_local_ai_web_providers",
             "list_exchange_web_providers",
             "open_local_ai_web_session",

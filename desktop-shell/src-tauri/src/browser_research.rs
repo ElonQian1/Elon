@@ -16,6 +16,19 @@ use serde_json::Value;
 use tauri::{AppHandle, State, Webview};
 
 #[tauri::command]
+pub(crate) fn browser_research_host(
+    app: AppHandle,
+    webview: Webview,
+    runtime: State<'_, ResearchRuntime>,
+    owner_key: String,
+) -> Result<Value, String> {
+    if webview.label() != crate::MAIN_WINDOW_LABEL {
+        return Err("research_main_window_required".into());
+    }
+    runtime.host_identity(&app, &owner_key)
+}
+
+#[tauri::command]
 pub(crate) async fn run_browser_research(
     app: AppHandle,
     webview: Webview,

@@ -10,9 +10,29 @@ use std::{
 };
 use tauri::{AppHandle, Manager};
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub(crate) struct ResearchRuntime {
     inner: Arc<Mutex<Core>>,
+    instance_seed: Arc<String>,
+}
+
+impl Default for ResearchRuntime {
+    fn default() -> Self {
+        static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+        let seed = hash(
+            format!(
+                "{:?}:{}:{}",
+                std::time::SystemTime::now(),
+                std::process::id(),
+                SEQUENCE.fetch_add(1, Ordering::Relaxed)
+            )
+            .as_bytes(),
+        );
+        Self {
+            inner: Arc::new(Mutex::new(Core::default())),
+            instance_seed: Arc::new(seed),
+        }
+    }
 }
 #[derive(Default)]
 struct Core {
@@ -62,6 +82,29 @@ fn prune_handles<H>(
 }
 
 impl ResearchRuntime {
+    fn instance_id(&self, owner_hash: &str) -> String {
+        hash(format!("{}:{owner_hash}", self.instance_seed).as_bytes())
+    }
+    // Identity is process-lifetime stable across frontend reloads, and owner-specific.
+    // Only actual native handles are advertised; loaded disk history cannot steal a host.
+    pub(crate) fn host_identity(&self, app: &AppHandle, owner: &str) -> Result<Value, String> {
+        if owner.is_empty() || owner.len() > 512 || owner.chars().any(char::is_control) {
+            return Err("invalid_research_identity".into());
+        }
+        let owner_hash = hash(owner.as_bytes());
+        let instance_id = self.instance_id(&owner_hash);
+        let mut core = self.inner.lock().map_err(|_| "research_unavailable")?;
+        core.prune_missing_hosts(|label| app.get_webview(label).is_some());
+        let mut sessions: Vec<_> = core
+            .sessions
+            .values()
+            .filter(|s| s.owner_hash == owner_hash && core.hosts.contains_key(&s.id))
+            .map(|s| json!({"project_key":s.project_key,"session_id":s.id}))
+            .collect();
+        sessions.sort_by_key(|s| s["session_id"].as_str().unwrap_or_default().to_string());
+        Ok(json!({"instance_id":instance_id,"sessions":sessions}))
+    }
+
     fn scope(&self, app: &AppHandle, project: &str, owner: &str) -> Result<Scope, String> {
         if !digest_id(project)
             || owner.is_empty()
@@ -338,6 +381,24 @@ fn profile_key(project: &str, owner: &str, site: &str) -> String {
 #[cfg(test)]
 mod handle_tests {
     use super::*;
+    #[test]
+    fn host_identity_is_stable_for_clones_and_distinct_for_runtime_and_owner() {
+        let original = ResearchRuntime::default();
+        let clone = original.clone();
+        let another = ResearchRuntime::default();
+        assert_eq!(
+            original.instance_id("owner_a"),
+            clone.instance_id("owner_a")
+        );
+        assert_ne!(
+            original.instance_id("owner_a"),
+            another.instance_id("owner_a")
+        );
+        assert_ne!(
+            original.instance_id("owner_a"),
+            original.instance_id("owner_b")
+        );
+    }
     #[test]
     fn compact_profile_key_keeps_project_owner_and_site_isolated() {
         let key = profile_key("project", "owner", "site");

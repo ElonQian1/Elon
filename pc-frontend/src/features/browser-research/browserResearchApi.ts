@@ -3,6 +3,7 @@ import { nodeApi } from '../node/localNodeApi'
 import { parseResearchAction, parseResearchResult, record, ResearchError } from './browserResearchModel'
 import type { ResearchAction, ResearchCommand, ResearchResult } from './types'
 import { receiptErrorCode, type ResearchFailureCode } from './browserResearchErrors'
+import type { ResearchHost } from './browserResearchHost'
 
 const BASE = '/api/browser-research/actions'
 export interface ResearchClaim { action: ResearchAction; claim_token: string }
@@ -13,17 +14,22 @@ export interface ResearchReceipt {
   error_code?: ResearchFailureCode
 }
 async function call(path: string, options?: RequestInit): Promise<Record<string, unknown>> {
-  const value = await nodeApi<unknown>(safeNodeAdminUrl(), path, options)
-  if (!record(value) || value.ok !== true) throw new ResearchError('operation_failed')
+  let value: unknown
+  try { value = await nodeApi<unknown>(safeNodeAdminUrl(), path, options) }
+  catch (error) { throw new ResearchError(receiptErrorCode(error instanceof Error ? error.message : null)) }
+  if (!record(value) || value.ok !== true) throw new ResearchError(record(value) ? receiptErrorCode(value.error) : 'operation_failed')
   return value
 }
-export async function pendingResearchActions(): Promise<ResearchAction[]> {
-  const value = await call(`${BASE}/pending?limit=8`)
+export async function heartbeatResearchHost(host: ResearchHost): Promise<void> {
+  await call('/api/browser-research/hosts/heartbeat', { method: 'POST', body: JSON.stringify(host) })
+}
+export async function pendingResearchActions(instance: string): Promise<ResearchAction[]> {
+  const value = await call(`${BASE}/pending?limit=8&instance_id=${encodeURIComponent(instance)}`)
   if (!Array.isArray(value.actions) || value.actions.length > 8) throw new ResearchError('invalid_response')
   return value.actions.map(parseResearchAction)
 }
-export async function claimResearchAction(id: string): Promise<ResearchClaim> {
-  const value = await call(`${BASE}/${encodeURIComponent(id)}/claim`, { method: 'POST' })
+export async function claimResearchAction(id: string, instance: string): Promise<ResearchClaim> {
+  const value = await call(`${BASE}/${encodeURIComponent(id)}/claim`, { method: 'POST', body: JSON.stringify({ instance_id: instance }) })
   if (typeof value.claim_token !== 'string' || !value.claim_token || value.claim_token.length > 256) {
     throw new ResearchError('invalid_response')
   }

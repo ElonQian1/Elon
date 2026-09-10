@@ -16,6 +16,13 @@ fn workspace() -> PathBuf {
 }
 fn app() -> (Router, Arc<NodeRuntime>) {
     let runtime = Arc::new(NodeRuntime::default());
+    runtime
+        .browser_research
+        .register_host(node_agent_browser_research::affinity::HostInput {
+            instance_id: "instance_a".into(),
+            sessions: vec![],
+        })
+        .unwrap();
     (
         node_agent_browser_research::routes().with_state(runtime.clone()),
         runtime,
@@ -89,10 +96,22 @@ async fn http_claim_and_receipt_execute_the_real_queue_without_duplicate_executi
     let action = submit(&app, &workspace()).await;
     let id = action["action_id"].as_str().unwrap();
     let claim_uri = format!("/api/browser-research/actions/{id}/claim");
-    let (status, claim) = call(&app, "POST", &claim_uri, String::new()).await;
+    let (status, claim) = call(
+        &app,
+        "POST",
+        &claim_uri,
+        json!({"instance_id":"instance_a"}).to_string(),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(claim["action"]["status"], "executing");
-    let (status, again) = call(&app, "POST", &claim_uri, String::new()).await;
+    let (status, again) = call(
+        &app,
+        "POST",
+        &claim_uri,
+        json!({"instance_id":"instance_a"}).to_string(),
+    )
+    .await;
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(again["error"], "action_not_claimable");
     let receipt_uri = format!("/api/browser-research/actions/{id}/receipt");
@@ -137,7 +156,7 @@ async fn http_project_scope_is_canonical_and_mcp_cannot_read_or_cancel_another_p
     let (status, pending) = call(
         &app,
         "GET",
-        "/api/browser-research/actions/pending?limit=8",
+        "/api/browser-research/actions/pending?limit=8&instance_id=instance_a",
         String::new(),
     )
     .await;
@@ -167,8 +186,54 @@ async fn http_project_scope_is_canonical_and_mcp_cannot_read_or_cancel_another_p
             "/api/browser-research/actions/{}/claim",
             first["action_id"].as_str().unwrap()
         ),
-        String::new(),
+        json!({"instance_id":"instance_a"}).to_string(),
     )
     .await;
     assert_eq!(status, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn http_heartbeat_and_mcp_discovery_bind_session_without_legacy_steal() {
+    let (app, runtime) = app();
+    let root = workspace();
+    let project = node_agent_browser_research::project_key(&root).unwrap();
+    let (status, _) = call(&app, "POST", "/api/browser-research/hosts/heartbeat",
+        json!({"instance_id":"instance_b","sessions":[{"project_key":project,"session_id":"session_b"}]}).to_string()).await;
+    assert_eq!(status, StatusCode::OK);
+    let hosts = mcp(&runtime, &root, "hosts", json!({}));
+    assert_eq!(hosts["hosts"].as_array().unwrap().len(), 2);
+    assert_eq!(hosts["hosts"][1]["sessions"], json!(["session_b"]));
+    let other = mcp(&runtime, root.parent().unwrap(), "hosts", json!({}));
+    assert_eq!(other["hosts"][1]["sessions"], json!([]));
+    let ambiguous = mcp(&runtime, &root, "submit", json!({"kind":"sites"}));
+    assert_eq!(ambiguous["error"], "host_ambiguous");
+    let submitted = mcp(
+        &runtime,
+        &root,
+        "submit",
+        json!({"kind":"status","session_id":"session_b"}),
+    );
+    assert_eq!(submitted["action"]["instance_id"], "instance_b");
+    let id = submitted["action"]["action_id"].as_str().unwrap();
+    let claim_uri = format!("/api/browser-research/actions/{id}/claim");
+    let (status, denied) = call(&app, "POST", &claim_uri, String::new()).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(denied["error"], "host_identity_required");
+    let (status, _) = call(
+        &app,
+        "POST",
+        &claim_uri,
+        json!({"instance_id":"instance_a"}).to_string(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (status, claimed) = call(
+        &app,
+        "POST",
+        &claim_uri,
+        json!({"instance_id":"instance_b"}).to_string(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(claimed["action"]["instance_id"], "instance_b");
 }

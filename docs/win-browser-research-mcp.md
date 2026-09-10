@@ -22,6 +22,20 @@ Profile 采用 `appLocal/research-profiles-v1/SHA256([project, owner, site])` �
 
 ## MCP 合同
 
+### 多 Win 实例定向（2026-09-11，待发布验收）
+
+新版节点、原生壳和前端增加实例归属合同，修复两个实例竞争同一请求后出现假性
+`session_not_found` 的分配问题。代码与离线验证见[本批报告](reports/win-browser-research-affinity-20260911.md)；当前安装现场不能仅凭源码视为已升级。
+
+- 先调用 `{"action":"hosts"}`，得到在线实例、15 秒租约及该项目内的宿主会话 ID。
+- 无会话命令在多实例时必须指定 `instance_id`，例如 `{"action":"submit","payload":{"kind":"sessions","instance_id":"hosts 返回的值"}}`。
+- 已绑定的 `session_id` 自动路由原实例；显式实例不一致返回 `host_mismatch`，原实例离线返回 `host_unavailable`，不交给其他登录环境。
+- Win 页面使用所在原生进程及当前用户的实例身份；节点重启可由仍运行的宿主心跳恢复绑定。仅从磁盘加载的历史不宣称持有活动 WebView。
+- 心跳最多 32 个实例、每实例最多 8 个实际宿主；绑定上限 4,096，最后刷新后保留最多 24 小时。关闭或重启的旧宿主不会自动转移；新开会话使用新 ID，原登录 Profile 保留。
+- 原生身份跨前端刷新稳定，随进程或用户改变。仅成功领取方执行，回执重投不重放命令。新版节点拒绝旧版无身份领取，需要三个组成部分一起升级；保持原版本安装包作回退来源。
+
+实例 ID 是路由元数据，不是网站账号、凭据或登录状态证明。宿主存活不等于网站已登录、会话未过期或请求业务成功。
+
 复用项目文档 MCP bootstrap，profile 为 `browser_research`。可以在目标 Git 项目目录运行 `node <主项目路径>/plugins/yilong-project-memory/scripts/project-memory-mcp-proxy.mjs browser_research`，或通过 `ELON_PROJECT_ROOT` 选择项目。不要把带短期令牌的 descriptor URL 写进日志。
 
 只有一个工具 `browser_research`，调用次序如下：

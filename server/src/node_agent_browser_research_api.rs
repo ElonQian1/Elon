@@ -1,5 +1,6 @@
 //! Mounted only inside the existing loopback local-admin/Origin protected router.
 use super::{
+    affinity::HostInput,
     contract::{ResearchCommand, MAX_RESULT_BYTES},
     ReceiptInput,
 };
@@ -29,10 +30,18 @@ struct SubmitInput {
 #[serde(deny_unknown_fields)]
 struct PendingQuery {
     limit: Option<usize>,
+    instance_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ClaimInput {
+    instance_id: String,
 }
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
     Router::new()
+        .route("/api/browser-research/hosts/heartbeat", post(heartbeat))
         .route("/api/browser-research/actions", post(submit))
         .route("/api/browser-research/actions/pending", get(pending))
         .route("/api/browser-research/actions/:action_id", get(status))
@@ -55,12 +64,27 @@ fn failure(code: &'static str) -> Response {
     let status = match code {
         "action_not_found" => StatusCode::NOT_FOUND,
         "queue_full" | "queue_unavailable" => StatusCode::SERVICE_UNAVAILABLE,
-        "action_not_claimable" | "invalid_claim" | "receipt_conflict" | "action_not_executing" => {
-            StatusCode::CONFLICT
-        }
+        "action_not_claimable"
+        | "invalid_claim"
+        | "receipt_conflict"
+        | "action_not_executing"
+        | "host_mismatch" => StatusCode::CONFLICT,
         _ => StatusCode::BAD_REQUEST,
     };
     response(json!({"ok":false,"error":code}), status)
+}
+
+async fn heartbeat(
+    State(runtime): State<Arc<NodeRuntime>>,
+    input: Result<Json<HostInput>, JsonRejection>,
+) -> Response {
+    let Ok(Json(input)) = input else {
+        return failure("invalid_host");
+    };
+    match runtime.browser_research.register_host(input) {
+        Ok(()) => response(json!({"ok":true}), StatusCode::OK),
+        Err(code) => failure(code),
+    }
 }
 
 async fn submit(
@@ -92,7 +116,10 @@ async fn pending(
     let Ok(Query(query)) = query else {
         return failure("invalid_input");
     };
-    match runtime.browser_research.pending(query.limit.unwrap_or(8)) {
+    match runtime.browser_research.pending(
+        query.limit.unwrap_or(8),
+        query.instance_id.as_deref().unwrap_or(""),
+    ) {
         Ok(actions) => response(json!({"ok":true,"actions":actions}), StatusCode::OK),
         Err(code) => failure(code),
     }
@@ -114,8 +141,12 @@ async fn status(
 async fn claim(
     State(runtime): State<Arc<NodeRuntime>>,
     AxumPath(id): AxumPath<String>,
+    input: Result<Json<ClaimInput>, JsonRejection>,
 ) -> Response {
-    match runtime.browser_research.claim(&id) {
+    let Ok(Json(input)) = input else {
+        return failure("host_identity_required");
+    };
+    match runtime.browser_research.claim(&id, &input.instance_id) {
         Ok(value) => response(
             json!({"ok":true,"action":value.action,"claim_token":value.claim_token}),
             StatusCode::OK,

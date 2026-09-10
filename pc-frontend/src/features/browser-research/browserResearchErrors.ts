@@ -4,6 +4,7 @@ export const RESEARCH_FAILURE_CODES = [
   'session_not_found', 'session_expired', 'resource_not_found', 'request_not_found',
   'resource_unavailable', 'credentials_forbidden', 'limit_exceeded', 'unsupported',
   'site_not_found', 'navigation_blocked', 'result_too_large',
+  'host_ambiguous', 'host_mismatch', 'host_identity_required', 'host_limit',
 ] as const
 export type ResearchFailureCode = typeof RESEARCH_FAILURE_CODES[number]
 
@@ -53,6 +54,10 @@ export function nativeResearchErrorCode(error: unknown): ResearchFailureCode {
 }
 
 export const researchFailureLabels: Record<ResearchFailureCode, string> = {
+  host_ambiguous: '检测到多个 Windows 研究客户端，请先查看宿主列表并选择目标客户端。',
+  host_mismatch: '该研究会话属于另一个 Windows 客户端，请选择会话所属客户端。',
+  host_identity_required: '研究桥接版本不兼容，请一并更新本机服务和 Windows 客户端。',
+  host_limit: '研究客户端或会话登记已达上限，请稍后重试。',
   operation_failed: '操作未完成，请检查研究会话状态后重试。',
   host_unavailable: 'Windows 研究宿主未就绪或未能响应。请确认新版客户端正在运行后重试。',
   invalid_command: '研究参数或读取范围无效，请重新选择后重试。',

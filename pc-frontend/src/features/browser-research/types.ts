@@ -16,6 +16,7 @@ export interface SiteManifest {
 }
 export interface ResearchCommand {
   kind: ResearchKind
+  instance_id?: string
   site_id?: string
   session_id?: string
   resource_id?: string
@@ -91,6 +92,7 @@ export type ResearchResult =
   | (ResultBase & { kind: 'read_request'; request: ResearchRequest; request_body: ContentSlice | null; response_body: ContentSlice | null })
 export interface ResearchAction {
   action_id: string
+  instance_id: string
   project_key: string
   command: ResearchCommand
   requested_at_ms: number

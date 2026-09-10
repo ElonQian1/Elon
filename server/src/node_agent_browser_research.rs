@@ -1,4 +1,6 @@
 //! Project-isolated, bounded bridge queue. No page content enters diagnostics.
+#[path = "node_agent_browser_research_affinity.rs"]
+pub(crate) mod affinity;
 #[path = "node_agent_browser_research_api.rs"]
 mod api;
 #[path = "node_agent_browser_research_contract.rs"]
@@ -24,6 +26,7 @@ const RETENTION_MS: u64 = 600_000;
 pub(crate) struct ResearchAction {
     pub action_id: String,
     pub project_key: String,
+    pub instance_id: String,
     pub command: ResearchCommand,
     pub requested_at_ms: u64,
     pub expires_at_ms: u64,
@@ -62,7 +65,13 @@ struct Entry {
 
 #[derive(Default)]
 pub(crate) struct BrowserResearchHub {
-    inner: Mutex<VecDeque<Entry>>,
+    inner: Mutex<HubState>,
+}
+
+#[derive(Default)]
+struct HubState {
+    entries: VecDeque<Entry>,
+    affinity: affinity::Affinity,
 }
 
 pub(crate) fn project_key(workspace: &Path) -> ResearchResult<String> {
@@ -104,6 +113,24 @@ fn sweep(entries: &mut VecDeque<Entry>, now: u64) {
 }
 
 impl BrowserResearchHub {
+    pub(crate) fn register_host(&self, input: affinity::HostInput) -> ResearchResult<()> {
+        self.inner
+            .lock()
+            .map_err(|_| "queue_unavailable")?
+            .affinity
+            .register(input, now_ms())
+    }
+
+    pub(crate) fn hosts(&self, workspace: &Path) -> ResearchResult<Vec<affinity::HostSummary>> {
+        let project = project_key(workspace)?;
+        Ok(self
+            .inner
+            .lock()
+            .map_err(|_| "queue_unavailable")?
+            .affinity
+            .summaries(&project, now_ms()))
+    }
+
     pub(crate) fn enqueue(
         &self,
         workspace: &Path,
@@ -112,8 +139,10 @@ impl BrowserResearchHub {
         command.validate()?;
         let project_key = project_key(workspace)?;
         let now = now_ms();
-        let mut entries = self.inner.lock().map_err(|_| "queue_unavailable")?;
-        sweep(&mut entries, now);
+        let mut state = self.inner.lock().map_err(|_| "queue_unavailable")?;
+        let instance_id = state.affinity.route(&project_key, &command, now)?;
+        let entries = &mut state.entries;
+        sweep(entries, now);
         if entries
             .iter()
             .filter(|entry| {
@@ -137,6 +166,7 @@ impl BrowserResearchHub {
         let action = ResearchAction {
             action_id: format!("research_{}", uuid::Uuid::new_v4().simple()),
             project_key,
+            instance_id,
             command,
             requested_at_ms: now,
             expires_at_ms: now.saturating_add(ACTION_TTL_MS),
@@ -150,17 +180,25 @@ impl BrowserResearchHub {
         Ok(action)
     }
 
-    pub(crate) fn pending(&self, limit: usize) -> ResearchResult<Vec<ResearchAction>> {
+    pub(crate) fn pending(
+        &self,
+        limit: usize,
+        instance: &str,
+    ) -> ResearchResult<Vec<ResearchAction>> {
         if !(1..=16).contains(&limit) {
             return Err("invalid_limit");
         }
-        let mut entries = self.inner.lock().map_err(|_| "queue_unavailable")?;
-        sweep(&mut entries, now_ms());
+        let mut state = self.inner.lock().map_err(|_| "queue_unavailable")?;
+        if !state.affinity.live(instance, now_ms()) {
+            return Err("host_unavailable");
+        }
+        let entries = &mut state.entries;
+        sweep(entries, now_ms());
         let mut actions = Vec::new();
         let mut bytes = 128;
         for entry in entries
             .iter()
-            .filter(|entry| entry.action.status == "queued")
+            .filter(|entry| entry.action.status == "queued" && entry.action.instance_id == instance)
             .take(limit)
         {
             let size = serde_json::to_vec(&entry.action)
@@ -176,16 +214,23 @@ impl BrowserResearchHub {
         Ok(actions)
     }
 
-    pub(crate) fn claim(&self, id: &str) -> ResearchResult<ClaimedAction> {
+    pub(crate) fn claim(&self, id: &str, instance: &str) -> ResearchResult<ClaimedAction> {
         if !identifier(id) {
             return Err("action_not_found");
         }
-        let mut entries = self.inner.lock().map_err(|_| "queue_unavailable")?;
-        sweep(&mut entries, now_ms());
+        let mut state = self.inner.lock().map_err(|_| "queue_unavailable")?;
+        if !state.affinity.live(instance, now_ms()) {
+            return Err("host_unavailable");
+        }
+        let entries = &mut state.entries;
+        sweep(entries, now_ms());
         let entry = entries
             .iter_mut()
             .find(|entry| entry.action.action_id == id)
             .ok_or("action_not_found")?;
+        if entry.action.instance_id != instance {
+            return Err("host_mismatch");
+        }
         // A second bridge never receives a token and must never execute again.
         if entry.action.status != "queued" {
             return Err("action_not_claimable");
@@ -221,8 +266,9 @@ impl BrowserResearchHub {
             result: input.result,
             error_code: input.error_code,
         };
-        let mut entries = self.inner.lock().map_err(|_| "queue_unavailable")?;
-        sweep(&mut entries, now_ms());
+        let mut state = self.inner.lock().map_err(|_| "queue_unavailable")?;
+        let HubState { entries, affinity } = &mut *state;
+        sweep(entries, now_ms());
         let entry = entries
             .iter_mut()
             .find(|entry| entry.action.action_id == id)
@@ -240,6 +286,23 @@ impl BrowserResearchHub {
         if entry.action.status != "executing" {
             return Err("action_not_executing");
         }
+        if receipt.status == "succeeded" && entry.action.command.kind == "open" {
+            let result = receipt.result.as_ref().ok_or("invalid_result")?;
+            let session = result
+                .pointer("/session/id")
+                .and_then(Value::as_str)
+                .filter(|s| identifier(s))
+                .ok_or("invalid_result")?;
+            if result.get("kind").and_then(Value::as_str) != Some("open") {
+                return Err("invalid_result");
+            }
+            affinity.bind(
+                &entry.action.project_key,
+                session,
+                &entry.action.instance_id,
+                now_ms(),
+            )?;
+        }
         entry.action.status = receipt.status.clone();
         entry.action.receipt = Some(receipt);
         Ok(entry.action.clone())
@@ -256,8 +319,9 @@ impl BrowserResearchHub {
 
     pub(crate) fn cancel(&self, workspace: &Path, id: &str) -> ResearchResult<ResearchAction> {
         let project = project_key(workspace)?;
-        let mut entries = self.inner.lock().map_err(|_| "queue_unavailable")?;
-        sweep(&mut entries, now_ms());
+        let mut state = self.inner.lock().map_err(|_| "queue_unavailable")?;
+        let entries = &mut state.entries;
+        sweep(entries, now_ms());
         let entry = entries
             .iter_mut()
             .find(|entry| entry.action.action_id == id && entry.action.project_key == project)
@@ -273,8 +337,9 @@ impl BrowserResearchHub {
         if !identifier(id) {
             return Err("action_not_found");
         }
-        let mut entries = self.inner.lock().map_err(|_| "queue_unavailable")?;
-        sweep(&mut entries, now_ms());
+        let mut state = self.inner.lock().map_err(|_| "queue_unavailable")?;
+        let entries = &mut state.entries;
+        sweep(entries, now_ms());
         entries
             .iter()
             .find(|entry| entry.action.action_id == id)
@@ -283,6 +348,9 @@ impl BrowserResearchHub {
     }
 }
 
+#[cfg(test)]
+#[path = "node_agent_browser_research_affinity_tests.rs"]
+mod affinity_tests;
 #[cfg(test)]
 #[path = "node_agent_browser_research_tests.rs"]
 mod tests;

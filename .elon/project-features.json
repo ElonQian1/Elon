@@ -18309,6 +18309,228 @@
       "updated_at_ms": 1787228653680
     },
     {
+      "id": "win-browser-research-affinity-v1",
+      "title": "Win 研究会话实例定向与恢复",
+      "summary": "修复多 Win 实例竞争研究请求导致错误 session_not_found，按原生实例及会话绑定领取，提供有界发现、过期和兼容诊断，保留已登录窗口及至多一次执行。",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/win-browser-research-affinity-v1.md",
+        "content_hash": "276231ea9c50492541350c1cd98d26b85ab1f465f11d8e524089b4af049a75ee",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "b356d2ee6c3677ecd59b918ca858532952afaada",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "win-browser-research",
+      "tags": [],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/browser_research",
+        "pc-frontend/src/features/browser-research",
+        "server/src/node_agent_browser_research.rs",
+        "server/src/node_agent_browser_research_affinity.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "多实例竞争只有会话所属实例执行",
+        "重启、过期、旧客户端和用户变化保持隔离及至多一次",
+        "MCP 与 Win 页面均支持定向且原读取合同不回退",
+        "源码测试、构建、发布和现场只读证据分别记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/permissions/browser-research.toml",
+          "content_hash": "8cc14d38e2a19e9bac93ce31efd03c0e4da900e7ba1d5967243aad8ae76e3f63",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "592d638d949e12b5f36f27a5ae73362ef4cab7fd",
+            "worktree_blob_oid": "b46453db9beec8c7260a231c16b08ed77c6aae30",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "desktop-shell/src-tauri/src/browser_research/runtime.rs",
+          "content_hash": "2e753926da890a0174bf47b02a3756ca38f57bb6f9c2476ce8dc3ddaa3869685",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "73a503cc0a61349ccfe50316d20c3f0dd8534e43",
+            "worktree_blob_oid": "d7a44a19bdb35ddef76e6f5203761e9f7d4e49e1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/reports/win-browser-research-affinity-20260911.md",
+          "content_hash": "3487d6b12553a669ff2b26a48cfe8ad643eb71274a3b6cb0ca90bddba8303c01",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1acef0851c709fb01ea5659727873ceb21fac034",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/browser-research/browserResearch.test.cjs",
+          "content_hash": "5b5613b3aaa62cc92cdc8849acd4b31d426f48129fe4d8f7a53fd6e16e57dd24",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "99e1b513d6873de21458f20ba6c6ba54a8193c8d",
+            "worktree_blob_oid": "021f5daba3f26b5eaab71f5e736efb5f56373cb4",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/browser-research/browserResearchExecutor.ts",
+          "content_hash": "c1e5321bdac40da3e73ac64a6b2ac0fd4ec8a7c973065fc72541aed8a32a0d78",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "9b850e46381b59215c8c82b7f5999dc34e88e819",
+            "worktree_blob_oid": "1985fd4d72b63d54dd5200cdb83ddbfb4398f7fc",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/browser-research/browserResearchHost.ts",
+          "content_hash": "2899f1e7aeba609a2f840bcee8e3c82e462378a3082ce16890f7d3515e6a568d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c3545f9154c7caa332d2946dcc0e53644643ef48",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/browser-research/useResearchRequest.ts",
+          "content_hash": "bbf4cc0f5cc60e0428c83623787f97d4176b8e9761c334f6d74f2c2d744a79f0",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "3a948bda2b548817cb60a8b92c04ea96a68c65a4",
+            "worktree_blob_oid": "97837752918ef920e583f6c355182bbc2db0babe",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_browser_research.rs",
+          "content_hash": "36dc4300e95f692d5ad2a5443c99b5788b786085f2fd300164d9da45e015391d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "ec2a987a9caf0182d3bd79767d472f77ba542e07",
+            "worktree_blob_oid": "6b4f2c0beb3e3a484a89c2c1bcd5c958cb1ce0b8",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_browser_research_affinity.rs",
+          "content_hash": "8ff0d26a20e40f27dd2186ca0a3d0d549ea26c7a160ecac68d6d1450cf70e8b1",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ded4d959f751c5a3c5e519defc486bf548d06224",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/node_agent_browser_research_affinity_tests.rs",
+          "content_hash": "525b0c4d778eb21056774eaca1e497c0df9eb9656f37cd79ee28670d6ba0276f",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a208d6d7620e2e7eb5694f56f50d5c7a7b4ee7bf",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/node_agent_browser_research_api.rs",
+          "content_hash": "8936e99b99a83408e2698f7233ea415f00dbcc69cc4dcd231405f2739b047888",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "97bd4fa2ed4a66270618bef428bb3b04a213bfad",
+            "worktree_blob_oid": "784f95aceccb8c7bf12d4ff1b4903ff9b47cb12a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_browser_research_contract.rs",
+          "content_hash": "b88cb954ce1a40fbe291176f916c15cd47919bfcdec4ecc8ff240530b6ff7017",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "5fa02f31f7a3a38bd682ee8ca62b420ed8b81c85",
+            "worktree_blob_oid": "9ba8b7f310df2e8fc493d306debd75cc82e8357d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/node_agent_browser_research_mcp.rs",
+          "content_hash": "2a90d6013055c10e30f2cfc28bfb2a47d31aa9b57eb10449222242542c846697",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "76c0c9ffa4b73bd8dfc5e3e5043cd99ddb9c99c9",
+            "worktree_blob_oid": "49826e468c9236c1c90ce6646bf1fb6523d879b7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/tests/browser-research-harness/src/http_tests.rs",
+          "content_hash": "f0856a82abe1136d215194d8d75c6166ae460ee05104723b8b361713728342c0",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "00c9210570252d4ac829e6a7f94412f505129b25",
+            "head_blob_oid": "d86843ddea92dedd839d5101c2f58883b7d7f488",
+            "worktree_blob_oid": "7c276081d7b067712fa002653c82cc74891830ed",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1789080936617,
+      "updated_at_ms": 1789082094569
+    },
+    {
       "id": "win-browser-research-mcp-v1",
       "title": "Win 通用网页研究与 MCP V1",
       "summary": "复用 Win WebView2、隔离 Profile、本地资料存储与项目 MCP，建设站点无关的资源和网络研究内核；新网站以版本化清单和可选业务适配器接入，币安网格作为首个业务验证对象。完整业务资料本地保留，AI 按需搜索读取，取消反复手动导出。",
@@ -24850,56 +25072,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8c7b2a3c1cb241118d6d65033813a8cb",
-      "feature_id": "esk-sui-testnet-publication-preflight-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-preflight",
-      "reason": "原需求边界和三路独立复审结论保持不变。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788663760814
-    },
-    {
-      "id": "feature_event_477651bc257e49fc81477ca647ee6359",
-      "feature_id": "esk-sui-testnet-publication-preflight-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-preflight",
-      "reason": "全部依赖在合并后的上游注册表中仍已完成。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788663761418
-    },
-    {
-      "id": "feature_event_e63c43ee4e064f3697fa85e2a86b0690",
-      "feature_id": "esk-sui-testnet-publication-preflight-v1",
-      "action": "claimed",
-      "actor": "codex-sui-preflight",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788663762001
-    },
-    {
-      "id": "feature_event_ffef5dd32862476bbd196fce558c900e",
-      "feature_id": "esk-sui-testnet-publication-preflight-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-preflight",
-      "reason": "恢复 rebase 后的哈希证据绑定。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788663762558
-    },
-    {
-      "id": "feature_event_debc69d11d0841c68d18df9781db55a1",
-      "feature_id": "esk-sui-testnet-publication-preflight-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-sui-preflight",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788663768125
-    },
-    {
       "id": "feature_event_017a94fcd1e6499395056ea476913e72",
       "feature_id": "esk-sui-testnet-publication-preflight-v1",
       "action": "transitioned",
@@ -26848,6 +27020,56 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1789023488569
+    },
+    {
+      "id": "feature_event_2d0f37023b0b4cc789917151df218cc6",
+      "feature_id": "win-browser-research-affinity-v1",
+      "action": "registered",
+      "actor": "codex-quant-product",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789080936617
+    },
+    {
+      "id": "feature_event_f0d7d3b424964d5ca11fc51ce4ea42c5",
+      "feature_id": "win-browser-research-affinity-v1",
+      "action": "claimed",
+      "actor": "codex-quant-product",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789080936677
+    },
+    {
+      "id": "feature_event_72ce415a6ba34b678b1469febd852d12",
+      "feature_id": "win-browser-research-affinity-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-product",
+      "reason": "已复现双实例竞争并完成独立工作区与文件计划",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789081008598
+    },
+    {
+      "id": "feature_event_f4ae1a22347c4ea98c81c1fea5dc9e5f",
+      "feature_id": "win-browser-research-affinity-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-quant-product",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789082094449
+    },
+    {
+      "id": "feature_event_962f99ecb15a40cb971a7fa2e8556d0a",
+      "feature_id": "win-browser-research-affinity-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-product",
+      "reason": "前端23、节点合同20、原生研究43测试及完整节点构建通过；安装与现场仍待验",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789082094569
     }
   ]
 }

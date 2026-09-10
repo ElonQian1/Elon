@@ -24,6 +24,8 @@ pub(crate) struct SiteManifest {
 pub(crate) struct ResearchCommand {
     pub kind: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instance_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub site_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
@@ -75,11 +77,12 @@ impl ResearchCommand {
             .as_object()
             .ok_or("invalid_command")?
             .keys()
-            .any(|key| key != "kind" && !permitted.contains(&key.as_str()))
+            .any(|key| key != "kind" && key != "instance_id" && !permitted.contains(&key.as_str()))
         {
             return Err("invalid_command");
         }
         for id in [
+            &self.instance_id,
             &self.site_id,
             &self.session_id,
             &self.resource_id,
@@ -291,6 +294,10 @@ pub(crate) fn valid_error(code: &str) -> bool {
     matches!(
         code,
         "operation_failed"
+            | "host_ambiguous"
+            | "host_mismatch"
+            | "host_identity_required"
+            | "host_limit"
             | "host_unavailable"
             | "invalid_command"
             | "invalid_scope"

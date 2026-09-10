@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { getDesktopInvoke } from '../shell/desktopShell'
 import useLocalAiOwnerIdentity from '../user-browser/useLocalAiOwnerIdentity'
-import { claimResearchAction, pendingResearchActions, postResearchReceipt } from './browserResearchApi'
+import { claimResearchAction, pendingResearchActions, postResearchReceipt, heartbeatResearchHost } from './browserResearchApi'
 import { createResearchExecutor } from './browserResearchExecutor'
+import { parseResearchHost } from './browserResearchHost'
 
 export function useBrowserResearchBridge() {
   const identity = useLocalAiOwnerIdentity()
@@ -13,6 +14,13 @@ export function useBrowserResearchBridge() {
     const invoke = getDesktopInvoke()
     if (!invoke) return
     const executor = createResearchExecutor({
+      heartbeat: async (ownerKey) => {
+        const host = parseResearchHost(await invoke('browser_research_host', { ownerKey }))
+        if (owner.current !== ownerKey) throw new Error('host_unavailable')
+        await heartbeatResearchHost(host)
+        if (owner.current !== ownerKey) throw new Error('host_unavailable')
+        return host.instance_id
+      },
       pending: pendingResearchActions,
       claim: claimResearchAction,
       receipt: postResearchReceipt,

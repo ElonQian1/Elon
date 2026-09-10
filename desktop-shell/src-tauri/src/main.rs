@@ -145,6 +145,7 @@ fn main() {
         .manage(local_ai_browser::LocalAiBrowserRuntime::default())
         .invoke_handler(tauri::generate_handler![
             browser_research::run_browser_research,
+            browser_research::browser_research_host,
             local_ai_browser::list_local_ai_web_providers,
             local_ai_browser::exchange_webview::list_exchange_web_providers,
             local_ai_browser::resolve_local_ai_guest_owner_identity,

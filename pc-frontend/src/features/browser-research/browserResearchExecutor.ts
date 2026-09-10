@@ -2,10 +2,12 @@ import { parseResearchResult } from './browserResearchModel'
 import type { ResearchAction } from './types'
 import type { ResearchClaim, ResearchReceipt } from './browserResearchApi'
 import { nativeResearchErrorCode } from './browserResearchErrors'
+import { nativeResearchCommand } from './browserResearchHost'
 
 interface ExecutorDependencies {
-  pending: () => Promise<ResearchAction[]>
-  claim: (id: string) => Promise<ResearchClaim>
+  heartbeat: (owner: string) => Promise<string>
+  pending: (instance: string) => Promise<ResearchAction[]>
+  claim: (id: string, instance: string) => Promise<ResearchClaim>
   receipt: (id: string, receipt: ResearchReceipt) => Promise<unknown>
   invoke: (projectKey: string, ownerKey: string, command: ResearchAction['command']) => Promise<unknown>
   owner: () => string
@@ -38,23 +40,27 @@ export function createResearchExecutor(deps: ExecutorDependencies) {
       await flush()
       // A failed delivery must not accumulate arbitrary private content in memory.
       if (receipts.size > 0 || disposed || !deps.owner()) return
-      const pending = await deps.pending()
+      const pollingOwner = deps.owner()
+      const instance = await deps.heartbeat(pollingOwner)
+      if (disposed || deps.owner() !== pollingOwner) return
+      const pending = await deps.pending(instance)
       for (const candidate of pending) {
-        if (disposed || !deps.owner()) return
+        if (disposed || deps.owner() !== pollingOwner) return
+        if (candidate.instance_id !== instance) continue
         if (processed.has(candidate.action_id) || candidate.expires_at_ms <= deps.now()) continue
         let claim: ResearchClaim
-        try { claim = await deps.claim(candidate.action_id) } catch { continue }
+        try { claim = await deps.claim(candidate.action_id, instance) } catch { continue }
         const { action, claim_token } = claim
         if (action.action_id !== candidate.action_id) continue
         processed.add(action.action_id)
         if (processed.size > 256) processed.delete(processed.values().next().value as string)
         const ownerKey = deps.owner()
         let receipt: ResearchReceipt
-        if (disposed || !ownerKey || action.expires_at_ms <= deps.now()) {
+        if (disposed || !ownerKey || ownerKey !== pollingOwner || action.instance_id !== instance || action.expires_at_ms <= deps.now()) {
           receipt = { claim_token, status: 'host_unavailable', error_code: 'host_unavailable' }
         } else {
           try {
-            const value = await deps.invoke(action.project_key, ownerKey, action.command)
+            const value = await deps.invoke(action.project_key, ownerKey, nativeResearchCommand(action.command))
             if (disposed || deps.owner() !== ownerKey) {
               receipt = { claim_token, status: 'host_unavailable', error_code: 'host_unavailable' }
             } else {

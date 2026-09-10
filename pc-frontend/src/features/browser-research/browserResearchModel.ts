@@ -84,15 +84,15 @@ export function parseResearchResult(value: unknown, expected: ResearchCommand): 
   return value as unknown as ResearchResult
 }
 export function parseResearchAction(value: unknown): ResearchAction {
-  if (!record(value) || !identifier(value.action_id) || !string(value.project_key, 64)
+  if (!record(value) || !identifier(value.action_id) || !identifier(value.instance_id) || !string(value.project_key, 64)
     || !/^[a-f0-9]{64}$/.test(value.project_key) || !record(value.command)
     || !RESEARCH_KINDS.includes(value.command.kind as ResearchKind) || !boundedJson(value.command, 16384)
     || !integer(value.requested_at_ms) || !integer(value.expires_at_ms) || !string(value.status, 64)) {
     throw new ResearchError('invalid_response')
   }
-  const fields = ['kind', 'site_id', 'session_id', 'resource_id', 'request_id', 'query', 'offset', 'limit', 'manifest']
+  const fields = ['kind', 'instance_id', 'site_id', 'session_id', 'resource_id', 'request_id', 'query', 'offset', 'limit', 'manifest']
   if (Object.keys(value.command).some((key) => !fields.includes(key))) throw new ResearchError('invalid_response')
-  for (const key of ['site_id', 'session_id', 'resource_id', 'request_id']) {
+  for (const key of ['instance_id', 'site_id', 'session_id', 'resource_id', 'request_id']) {
     if (value.command[key] !== undefined && !identifier(value.command[key])) throw new ResearchError('invalid_response')
   }
   for (const key of ['offset', 'limit']) {

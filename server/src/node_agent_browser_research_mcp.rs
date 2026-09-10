@@ -42,7 +42,7 @@ pub(crate) fn handle_request(
         "tools/list" => Ok(json!({"tools":[{
             "name":"browser_research","description":"Project-bound local browser research; describe returns the bounded command contract.",
             "inputSchema":{"type":"object","required":["action"],"additionalProperties":false,
-                "properties":{"action":{"type":"string","enum":["describe","submit","action_status","cancel"]},
+                "properties":{"action":{"type":"string","enum":["describe","hosts","submit","action_status","cancel"]},
                     "payload":{"type":"object"}}}
         }]})),
         "tools/call" => call(runtime, workspace, &request.params),
@@ -70,6 +70,14 @@ fn call(runtime: &NodeRuntime, workspace: &Path, params: &Value) -> Result<Value
             runtime.browser_research.enqueue(workspace, command).map(|action| {
                 json!({"schema":"yilong.browser-research.action.v1","action":action,"terminal":false})
             })
+        }
+        "hosts"
+            if args.payload.is_null() || args.payload.as_object().is_some_and(|v| v.is_empty()) =>
+        {
+            runtime
+                .browser_research
+                .hosts(workspace)
+                .map(|hosts| json!({"schema":"yilong.browser-research.hosts.v1","hosts":hosts}))
         }
         "action_status" | "cancel" => {
             let input: ActionId =
@@ -100,11 +108,14 @@ fn describe() -> Value {
         "profile":PROFILE,"tool":"browser_research","result_max_bytes":65536,"command_max_bytes":16384,
         "action_ttl_ms":120000,"terminal_retention_ms":600000,
         "actions":{
+            "hosts":{"payload":{},"result":"Live native instances, lease expiry and session IDs in this project; no page content. Use an explicit instance_id when multiple hosts exist."},
             "submit":{"payload":"ResearchCommand; site-neutral, deny unknown fields"},
             "action_status":{"payload":{"action_id":"id returned by submit"}},
             "cancel":{"payload":{"action_id":"id returned by submit"},
                 "effect":"Cancel queued work or discard a running result; does not undo an already started host action."}
         },
+        "routing":{"instance_id":"Optional on every command. Session bindings take priority; mismatched explicit hosts are rejected. New commands without a binding need one live host or explicit selection.",
+            "host_lease_ms":15000,"legacy_bridge":"Clients without native instance identity cannot claim. Update node, desktop and PC frontend together."},
         "commands":{
             "sites":{"offset":"optional","limit":"1..50"},"sessions":{"offset":"optional","limit":"1..50"},
             "register_site":{"manifest":"SiteManifest"},
