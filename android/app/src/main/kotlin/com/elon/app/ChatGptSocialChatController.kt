@@ -143,6 +143,10 @@ internal class ChatGptSocialChatController(
 
     override fun activate(identity: WebChatProviderIdentity) {
         provider = identity
+        if (active) {
+            transcript.activate()
+            return
+        }
         active = true
         transcript.activate()
         session.activate()

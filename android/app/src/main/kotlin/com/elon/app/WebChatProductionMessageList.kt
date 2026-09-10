@@ -40,6 +40,7 @@ internal class WebChatProductionTranscript(
     private val updater = WebChatProductionMessageListUpdater(messages, adapter)
 
     fun activate() {
+        if (list.adapter === adapter) return
         adapter.onWebChatMessageAction = onMessageAction
         setChatAdapter(adapter)
         list.adapter = adapter

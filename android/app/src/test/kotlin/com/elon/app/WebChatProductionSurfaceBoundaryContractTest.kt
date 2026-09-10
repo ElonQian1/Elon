@@ -124,6 +124,20 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertTrue(deactivateIndex > activeGuardIndex)
         assertTrue(activateIndex > deactivateIndex)
         assertTrue(presentationIndex > activateIndex)
+        assertTrue(activation.substring(0, activateIndex).trimEnd().endsWith("}"))
+
+        listOf("ChatGptSocialChatController", "GoogleWebSocialChatController").forEach { name ->
+            val controller = read("android/app/src/main/kotlin/com/elon/app/$name.kt")
+            val body = controller.substringAfter("override fun activate(").substringBefore("override fun deactivate(")
+            val rebindOnly = Regex("if \\(active\\) \\{\\s*transcript.activate\\(\\)\\s*return\\s*}")
+                .find(body)
+            assertTrue("$name must rebind the active transcript without restarting its session", rebindOnly != null)
+            assertTrue(rebindOnly!!.range.last < body.indexOf("session.activate()"))
+        }
+        val transcript = read("android/app/src/main/kotlin/com/elon/app/WebChatProductionMessageList.kt")
+            .substringAfter("fun activate()").substringBefore("fun currentMessages()")
+        assertTrue(transcript.indexOf("if (list.adapter === adapter) return") in
+            0 until transcript.indexOf("list.adapter = adapter"))
     }
 
     @Test

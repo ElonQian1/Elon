@@ -584,8 +584,8 @@ internal class MainSocialAiChatFeature(
         if (!controller.isActive()) {
             if (chatGptControllerDelegate.isInitialized()) chatGptController.deactivate()
             if (googleControllerDelegate.isInitialized()) googleController.deactivate()
-            controller.activate(provider)
         }
+        controller.activate(provider)
         ensureConsumerEnhancementsAttached()
         binding.inputEdit.contentDescription = WebChatProductionSelectors.composerInput(provider.id)
         binding.moreButton.apply {
