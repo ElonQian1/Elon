@@ -1,15 +1,19 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateLibraryAttachment = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
   'use strict';
   const composer = options?.composer;
+  const mounted = root.__elonChatGptPrivateMountedLibraryAttachment?.create(root);
   const receipts = new Map();
+  const consumed = new Map();
   let active = null;
 
   function descriptor(source) {
+    const remote = mounted?.descriptor(source);
+    if (remote) return remote;
     if (source?.kind !== 'file' || !/^libfile[_-][A-Za-z0-9_-]{1,152}$/.test(source.id || '') ||
         !/^file[_-][A-Za-z0-9_-]{1,155}$/.test(source.file_id || '') ||
         source.external_account != null || source.cloud_doc_url != null || source.library_artifact_type != null ||
@@ -59,6 +63,11 @@
     const file = descriptor(selection?.source);
     if (!file || !composer?.available()) return respond(action, false,
       file ? 'composer_context_unavailable' : 'library_selection_expired');
+    const remote = !!mounted?.descriptor(selection.source);
+    for (const [handle, time] of consumed) if (Date.now() - time >= 60000) consumed.delete(handle);
+    if (remote && (consumed.has(input.fileHandle) || consumed.size >= 512)) {
+      return respond(action, false, 'library_selection_expired');
+    }
     let binding;
     try { binding = composer.capture(); } catch (_) { return respond(action, false, 'composer_context_unavailable'); }
     if (!binding.libraryEnabled || binding.isTemporaryChat || binding.projectId) {
@@ -76,7 +85,16 @@
         if (!await composer.prepare(binding, job.controller.signal, file, false, false) || !current() || job.controller.signal.aborted) {
           return [false, 'library_attachment_context_changed'];
         }
-        composer.associateLibrary(binding, ready(selection.source, id));
+        let item;
+        if (remote) {
+          // Consume this selected handle before the write; an unknown outcome is not replayed.
+          consumed.set(input.fileHandle, Date.now());
+          const prepared = await mounted.prepare(selection.source, id, job.controller.signal, current);
+          if (!await composer.prepare(binding, job.controller.signal, prepared.descriptor, false, false) ||
+              !current() || job.controller.signal.aborted) return [false, 'library_attachment_context_changed'];
+          item = prepared.item;
+        } else item = ready(selection.source, id);
+        composer.associateLibrary(binding, item);
         changed(true);
         return [true, 'library_attachment_associated'];
       } catch (_) {
