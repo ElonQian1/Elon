@@ -19,6 +19,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     val reports = BinanceGridReports(SystemClock::elapsedRealtime, System::currentTimeMillis)
     val document = WebBridgeDocumentSession()
     val diagnostics = BinanceHostDiagnostics()
+    val readRecovery = BinanceReadRecovery(SystemClock::elapsedRealtime)
     var view: WebView? = null; private set
     var status = "请先连接币安"; private set
     var pagePhase = "not_started"; private set
@@ -58,10 +59,24 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     fun recoverConnection() {
         if (!live() && !begin()) return
         if (state.fresh() || !adapterBound) return
+        refreshPendingRead()
+    }
+    private fun refreshPendingRead() {
         val now = SystemClock.elapsedRealtime()
-        if (now - lastResumeRefresh > 10_000) {
-            lastResumeRefresh = now
-            view?.evaluateJavascript("window.__elonBinanceReadV1?.refresh()", null)
+        if (!adapterBound || now - lastResumeRefresh <= 10_000) return
+        val page = view ?: return
+        val token = document.snapshot().documentToken
+        lastResumeRefresh = now
+        page.evaluateJavascript("window.__elonBinanceReadV1?.refresh()") { value ->
+            readRecovery.recover(value, canReload = {
+                view === page && live() && document.snapshot().documentToken == token &&
+                    adapterBound && !state.fresh() && page.parent == null && onCreateObservation == null &&
+                    page.url?.startsWith("$ORIGIN/zh-CN/trading-bots/futures/grid/") == true
+            }) {
+                status = "正在恢复币安网格连接，登录状态已保留"
+                page.reload()
+                onChanged?.invoke()
+            }
         }
     }
     private fun owner() = captured?.userId?.let(BinanceHostState::digest)
@@ -80,11 +95,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         if (!consent.recorded()) return status("consent_required")
         if (!begin()) return status("login_required")
         if (state.account == null || !state.fresh()) {
-            val now = SystemClock.elapsedRealtime()
-            if (adapterBound && now - lastResumeRefresh > 10_000) {
-                lastResumeRefresh = now
-                view?.evaluateJavascript("window.__elonBinanceReadV1?.refresh()", null)
-            }
+            refreshPendingRead()
             return status("pending")
         }
         if (!consent.permits(owner(), state.account, state.accountKind)) {
@@ -106,6 +117,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     }
     fun pageStarted(url: String) {
         document.beginPage()
+        readRecovery.pageStarted()
         state.unavailable()
         reports.clear()
         diagnostics.clear()
@@ -145,6 +157,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         val previousAccount = state.account
         runCatching { state.accept(raw) }.onFailure { fail("未取得可验证的本人网格响应，请在官网打开网格列表") }
             .onSuccess {
+                if (event["kind"] == "list" && state.fresh()) readRecovery.verifiedList()
                 if(previousAccount != state.account) reports.clear()
                 if (state.account != null && consent.recorded() && !consent.permits(owner(), state.account, state.accountKind)) consent.clear()
                 val label = when (state.accountKind) { "sub" -> "币安子账户"; "primary" -> "币安主账户"; else -> "当前币安账户" }
@@ -193,6 +206,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     fun fail(message: String) { state.unavailable(); status = message; onChanged?.invoke() }
     fun invalidate(message: String) {
         captured = null; state.unavailable(); reports.clear(); handler.removeCallbacks(expiry)
+        readRecovery.reset(); lastResumeRefresh = 0L
         diagnostics.clear()
         pagePhase = "closed"; adapterBound = false
         view?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); it.stopLoading(); it.destroy() }

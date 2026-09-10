@@ -17,6 +17,9 @@ internal fun mcpBinanceHostStatus(context: Context): JSONObject = runCatching {
             .put("page_phase", host.pagePhase)
             .put("page_progress", host.view?.progress ?: 0)
             .put("adapter_bound", host.adapterBound)
+            .put("read_recovery", JSONObject()
+                .put("reload_used", host.readRecovery.reloadUsed)
+                .put("reload_count", host.readRecovery.reloadCount))
             .put("page_diagnostics", JSONObject(host.diagnostics.facts))
             .put("diagnostics_observed_at_ms", host.diagnostics.observedAt)
             .put("page_origin", when {

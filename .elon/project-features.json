@@ -1703,6 +1703,49 @@
       "updated_at_ms": 1788885567487
     },
     {
+      "id": "android-binance-read-context-recovery-v1",
+      "title": "币安首次列表上下文缺失恢复",
+      "summary": "修复量化自动连接等待时主会话忽略 refresh=false 的缺口；仅对闲置后台官网文档执行一次受限重载，保留登录并禁止写入重放。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/android-exchange-session-host-v2.md",
+        "content_hash": "f8ddc4c51790f847dae100fed36f26ffe3aaadea6c342b2261fe3095937dea68",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "1143054bcf076abe2bd4c696323be1ea467bdd62",
+          "head_blob_oid": "ef0f998b64c264e3f43f93281b48b3bd45080c3b",
+          "worktree_blob_oid": "ef0f998b64c264e3f43f93281b48b3bd45080c3b",
+          "state": "tracked_clean"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "android-session-host",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostRuntime.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceReadRecovery.kt",
+        "android/app/src/main/kotlin/com/elon/app/mcp/McpBinanceHostStatus.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "上下文缺失且后台闲置时最多自动重载一次，正常请求与前台操作不重载",
+        "同文档、账号、创建管理互斥保护和纯策略测试通过",
+        "正式主包安装后量化读取一条新鲜网格，区分真实自动恢复与策略测试证据"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_47d2290fef5a498db3c8ac37eca8ac35",
+        "agent_id": "codex-binance-read-recovery",
+        "claimed_at_ms": 1789022387834,
+        "expires_at_ms": 1789036787834
+      },
+      "created_at_ms": 1789022387759,
+      "updated_at_ms": 1789022491612
+    },
+    {
       "id": "android-binance-report-recovery-v1",
       "title": "币安记录读取兼容与诊断",
       "summary": "修复可选展示字段使记录整页失败，提供有界只读请求诊断，严格保留账户和策略隔离。",
@@ -24747,36 +24790,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_56243ccef0ce4d7a9817646d624ba715",
-      "feature_id": "esk-early-support-policy-foundation-v1",
-      "action": "registered",
-      "actor": "codex-esk-primary",
-      "reason": "用户明确要求当前任务主导并启动新工作；只接受草案校验工程，不批准未定经济条款",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788662393346
-    },
-    {
-      "id": "feature_event_2c7aef80f2fd40b6b48b5f619df9d9e8",
-      "feature_id": "esk-early-support-policy-foundation-v1",
-      "action": "claimed",
-      "actor": "codex-esk-primary",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788662407695
-    },
-    {
-      "id": "feature_event_3ed6fcd023fa4b62a903f21294b39b67",
-      "feature_id": "esk-early-support-policy-foundation-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-primary",
-      "reason": "当前主任务实施草案合同；实现与测试子代理按独立路径分工",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788662501471
-    },
-    {
       "id": "feature_event_3c95797b66b74157af1ebc0164c27f27",
       "feature_id": "esk-early-support-policy-foundation-v1",
       "action": "evidence_recorded",
@@ -26745,6 +26758,36 @@
       "from_status": "in_progress",
       "to_status": "ready",
       "at_ms": 1788983543981
+    },
+    {
+      "id": "feature_event_fe8ce1344bc2498cb531904589b0db84",
+      "feature_id": "android-binance-read-context-recovery-v1",
+      "action": "registered",
+      "actor": "codex-binance-read-recovery",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789022387759
+    },
+    {
+      "id": "feature_event_396c8f7f70f641da97da138b73a805e6",
+      "feature_id": "android-binance-read-context-recovery-v1",
+      "action": "claimed",
+      "actor": "codex-binance-read-recovery",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789022387835
+    },
+    {
+      "id": "feature_event_5bc231daa497425bbf6f4a5e8f580359",
+      "feature_id": "android-binance-read-context-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-read-recovery",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789022491612
     }
   ]
 }
