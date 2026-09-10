@@ -1,0 +1,9 @@
+{
+  "name": "@yilong/game-access-contract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/verify.js", "./contract": "./src/contract.js" },
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test test/*.test.js" }
+}

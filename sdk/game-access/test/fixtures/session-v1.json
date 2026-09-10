@@ -1,0 +1,55 @@
+{
+  "schema": "esk.game.session.interoperability_fixture.v1",
+  "synthetic": true,
+  "main_issuer": "synthetic-main",
+  "key_id": "synthetic-key-v1",
+  "public_key_hex": "19f4492869ca586718fa314c7e967ef38b554317b3158927f260236a87b78ac8",
+  "now_ms": "1700000001500",
+  "expected_challenge": {
+    "domain": "esk.game.session.challenge.v1",
+    "main_issuer": "synthetic-main",
+    "audience": "esk-game",
+    "stage": "platform_recorded",
+    "nonce": "abababababababababababababababababababababababababababababababab",
+    "credential_digest": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "action": {
+      "kind": "accept_quote",
+      "quote_id": "synthetic-quote-1",
+      "idempotency_key": "synthetic-request-1"
+    }
+  },
+  "observation": {
+    "challenge": {
+      "domain": "esk.game.session.challenge.v1",
+      "main_issuer": "synthetic-main",
+      "audience": "esk-game",
+      "stage": "platform_recorded",
+      "nonce": "abababababababababababababababababababababababababababababababab",
+      "credential_digest": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "action": {
+        "kind": "accept_quote",
+        "quote_id": "synthetic-quote-1",
+        "idempotency_key": "synthetic-request-1"
+      }
+    },
+    "grant": {
+      "main_user_id": "synthetic-user-alice",
+      "main_session_id": "synthetic-session-1",
+      "grant_id": "synthetic-grant-1",
+      "revision": "2",
+      "not_before_ms": "1700000000000",
+      "expires_at_ms": "1700000900000",
+      "scopes": [
+        "play",
+        "inventory_read",
+        "redeem"
+      ]
+    },
+    "observed_at_ms": "1700000001000",
+    "key_id": "synthetic-key-v1",
+    "signature_hex": "38b253c24c444592bdc66f6ebdeae6bb2037cc377f82560221586e5ce178b0e6de919223eccbeb9c87c48519dcccd5a2649e366a8076972a120e71087f131c03"
+  },
+  "challenge_digest": "c8d6c39a652f2742231632c62b3ac10db7eccf48c8d5e7e7dbd5d5337f1d19bf",
+  "message_utf8": "[\"esk.game.session.observation.v1\",\"synthetic-key-v1\",\"c8d6c39a652f2742231632c62b3ac10db7eccf48c8d5e7e7dbd5d5337f1d19bf\",\"synthetic-user-alice\",\"synthetic-session-1\",\"synthetic-grant-1\",\"2\",\"1700000000000\",\"1700000900000\",\"play,inventory_read,redeem\",\"1700000001000\"]",
+  "authorization_digest": "44ae869393b259fd64106042938d186be84017ad61587eb9b4601c4e622bf0cc"
+}
