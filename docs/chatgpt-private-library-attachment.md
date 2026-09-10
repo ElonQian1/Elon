@@ -30,6 +30,9 @@ custom GPTs, cloud mounts, saved entities, artifacts, trashed files, occupied
 composers and unrecognized metadata remain unconfirmed, not fabricated support.
 Multiple simultaneous library selections and mixed local/library batches are
 not included. Existing local batch upload is unchanged.
+The later [mounted-file implementation](chatgpt-private-mounted-library-attachment.md)
+adds private preparation for concrete cloud files; its offline verification and
+pending device acceptance do not broaden the ordinary 1588 pass below.
 
 ## Ownership and UI
 
