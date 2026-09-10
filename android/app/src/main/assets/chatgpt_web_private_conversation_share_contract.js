@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptPrivateConversationShareContract = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -65,7 +65,8 @@
 
   function ready(binding) {
     const snapshot = binding.readSnapshot?.();
-    return snapshot?.url === binding.href && snapshot.composerReady === true && snapshot.streaming === false &&
+    // Sharing binds the committed conversation branch, not the independently mounted composer.
+    return snapshot?.url === binding.href && snapshot.streaming === false &&
       !snapshot.dictationActive && !snapshot.dictationCaptureActive && !snapshot.dictationCapturePending;
   }
 
@@ -114,5 +115,5 @@
       moderation: payload.moderation_state });
   }
 
-  return Object.freeze({ version: 3, capture, current, identity, created, moderation, urls, load, ready });
+  return Object.freeze({ version: 4, capture, current, identity, created, moderation, urls, load, ready });
 });

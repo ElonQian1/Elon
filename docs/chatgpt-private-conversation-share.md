@@ -8,11 +8,38 @@ offline verified and shipped in `1.1.1547`. Case
 production handler created a link from a synthetic conversation, its private list
 returned that exact link, and revocation succeeded. This does not accept every
 website variant or the rendered native confirmation/Copy/share-sheet interaction.
-Adapter 293, share contract 3 and transaction module 4; see
+The accepted release used adapter 293, share contract 3 and transaction module 4; see
 [current device evidence](reports/chatgpt-runtime-release-1547.md). The separate
 [project-member resolver](chatgpt-private-project-conversation-share.md) now
 reuses this command owner with distinct member-only consent and receipts;
 it does not use the public writer described here.
+
+## Composer-independent readiness
+
+Current source uses share contract 4 and transaction module 5. The 2026-09-10
+readiness correction is offline verified and pending the next grouped APK build
+and native UI acceptance; it is not present in installed `1.1.1629`.
+
+Native `ACCOUNT_MUTATION` admission and the share coordinator already allow a
+loaded conversation without its composer. The private contract redundantly
+required `composerReady`, blocking public sharing and project-member links;
+composer unmount during a request also discarded an otherwise valid result.
+The official modal asset referenced below was rechecked on 2026-09-10 with the same hash:
+its writer uses the selected conversation/node, not input-element readiness.
+
+Contract 4 removes only this composer dependency. It retains exact snapshot URL,
+document/account/branch/variant ownership, loaded runtime conversation, explicit
+non-streaming state, dictation exclusion, native confirmation, moderation checks
+and no replay of uncertain writes. Draft and attachment state are unchanged.
+Member resolution still requires current project membership and never creates
+a public link. The existing 60-second caches survive composer-only changes.
+
+The two share suites reproduced 12 failures before the correction (128 tests,
+116 passes). Afterward, those suites plus shared-link management pass 158/158,
+with no skipped/cancelled tests. Added cases cover missing/unmounted composer,
+cached reuse, draft preservation and unknown streaming state. Existing
+account/document/branch drift, consent, project scope and uncertain-write tests
+remain green. No sharing write was made on a real account for this source batch.
 
 ## Official evidence
 
@@ -143,7 +170,9 @@ remains a distinct unsupported scope. Personal shared-project member links are
 source-implemented separately. [Conversation-scoped public-link management and
 revocation](chatgpt-private-shared-links.md) are also source-implemented, with
 grouped Android acceptance pending. Still separate code gaps: workspace and
-private-project public sharing, eligible temporary-chat sharing, account-wide
-management, bulk revocation and Canvas/post shares. Do not reuse this public confirmation for a members-only link,
+private-project public sharing, eligible temporary-chat sharing,
+bulk revocation and Canvas/post shares. Account-wide management and cached paging
+are implemented; their current acceptance boundary is recorded in the linked
+shared-links document. Do not reuse this public confirmation for a members-only link,
 or mistake `/share/post` message-slice creation for full-conversation sharing.
 Keep these gaps in the [remaining batch](web-ai-private-native-remaining-batch.md).

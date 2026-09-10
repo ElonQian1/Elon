@@ -75,6 +75,25 @@ test('same context reuses the member link without a second metadata read', async
   assert.equal((await f.start()).ok, true); assert.equal(f.requests.length, 2);
 });
 
+for (const composerReady of [false, undefined]) {
+  test('member link and its cache do not require a composer: ' + composerReady, async () => {
+    const f = member(); f.snapshot.composerReady = composerReady;
+    assert.equal((await f.start()).url, link());
+    f.snapshot.composerReady = true;
+    assert.equal((await f.start()).url, link());
+    f.snapshot.composerReady = composerReady;
+    assert.equal((await f.start()).url, link());
+    assert.equal(f.requests.length, 1);
+    assert.equal(f.requests[0].init.method, 'GET');
+  });
+}
+
+test('member metadata remains valid if only the composer disappears during the read', async () => {
+  const f = member(); f.afterRead(() => { f.snapshot.composerReady = false; });
+  assert.equal((await f.start()).url, link());
+  assert.equal(f.requests.length, 1);
+});
+
 test('cache expiry requires a fresh permission read', async () => {
   const f = member(); await f.start();
   const now = Date.now;

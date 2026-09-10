@@ -40,6 +40,49 @@ test('validated current-branch result reused without a second write', async () =
   assert.equal(f.requests.length, 2);
 });
 
+for (const variant of ['control', 'modal_redesigned', 'toast']) {
+  for (const composerReady of [false, undefined]) {
+    test('share ' + variant + ' uses a committed branch without composer readiness: ' + composerReady, async () => {
+      const f = fixture(variant);
+      f.snapshot.composerReady = composerReady;
+      f.snapshot.draft = 'Unsent synthetic draft';
+      const attachments = f.snapshot.attachments = [{ id: 'synthetic-unsent-attachment' }];
+      assert.equal((await f.start()).url, LINK);
+      const count = variant === 'control' ? 2 : 1;
+      assert.equal(f.requests.length, count);
+      f.snapshot.composerReady = true;
+      assert.equal((await f.start()).url, LINK);
+      f.snapshot.composerReady = composerReady;
+      assert.equal((await f.start()).url, LINK);
+      assert.equal(f.requests.length, count);
+      assert.equal(f.snapshot.draft, 'Unsent synthetic draft');
+      assert.equal(f.snapshot.attachments, attachments);
+    });
+  }
+
+  test('share ' + variant + ' survives composer unmount after creation without replay', async () => {
+    const f = fixture(variant), request = f.page.__elonChatGptPrivateJsonRequest.request;
+    f.page.__elonChatGptPrivateJsonRequest.request = async (...args) => {
+      const response = await request(...args);
+      f.snapshot.composerReady = false;
+      return response;
+    };
+    assert.equal((await f.start()).url, LINK);
+    assert.equal((await f.start()).url, LINK);
+    assert.equal(f.requests.length, variant === 'control' ? 2 : 1);
+  });
+}
+
+for (const streaming of [undefined, null, 0, 'false']) {
+  test('unknown streaming state still blocks sharing without a composer: ' + streaming, async () => {
+    const f = fixture();
+    f.snapshot.composerReady = false;
+    f.snapshot.streaming = streaming;
+    assert.equal((await f.start()).code, 'share_conversation_busy');
+    assert.equal(f.requests.length, 0);
+  });
+}
+
 for (const variant of ['modal_redesigned', 'toast']) {
   test('v2 sharing variant ' + variant + ' creates exactly once without legacy publication', async () => {
     const f = fixture(variant);
