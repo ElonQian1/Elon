@@ -3,13 +3,43 @@
 ## Status and boundary
 
 Capability: `android_chatgpt_private_file_citation_download_v1`.
-Status: implemented; offline protocol/owner checks passed. The download owner v16
-metadata/scope and cancellation correction is published/installed in APK 1630
-(source `794183af7`, includes `3a2037c5e`). Real production
-citation download acceptance remains pending. Not marked `completed`.
+Status: implemented; current citation v3 / projection v9 / download owner v18
+(adapter 324, source `7b78394da`) passed offline checks and is awaiting the grouped
+Android build/install. The earlier v16 metadata/scope correction is already
+included in installed APK 1639. Real production citation download acceptance
+remains pending. Not marked `completed`.
 
 This extends the existing conversation file index and download owner. It is not
 a new uploader, downloader, background poller or guessed cloud-provider API.
+
+## Current resolver correction
+
+Two gaps in the original parser are corrected without changing the private
+metadata/authorization requests or native byte sink:
+
+- The hash-verified conversation bundle's `p6i -> c6i -> g6i` resolves a missing
+  explicit file ID from the decoded final pathname component of a `file://` URL.
+  Search is appended before ID validation, so query-bearing/unknown identities
+  are not silently reduced to an unscoped file. Only a bounded concrete
+  `file-`/`file_` identity is admitted; invalid explicit IDs are not rescued.
+  The URL itself is never fetched and HTTP cloud attribution cannot supply an ID.
+- Its `GFi` distinguishes an empty context-citation metadata array from a
+  nonempty context graph. Empty arrays with no status no longer suppress ordinary
+  file references. Nonempty/malformed graphs, marker/unknown statuses and
+  deleted/PCA references remain excluded; this does not implement PCA access.
+
+The new path uses the existing opaque native handle, attachment-first
+deduplication, project metadata and conversation-scoped authorization. Module
+versions advance so an already installed download owner does not retain the old
+parser on reinjection. Identity, audio and the request protocol are unchanged.
+
+Both defects were reproduced first: 4/53 failing URL cases, then 2/55 failing
+empty-context cases. The final related suite passes 216 cases with zero failures,
+skips or cancellations, including production asset assembly and native download
+packet/ACK fixtures with a throwing DOM getter. Log:
+`citation-resolver-final-20260910-202016-901` (terminal pass, 1.9s).
+These are source/integration fixtures, not actual Android saved bytes. No APK
+was rebuilt for this small batch; group adapter 324 with the remaining changes.
 
 ## Verified public source
 
@@ -42,18 +72,18 @@ keeps `download_intent=true`, not the preview-only `show_inline` behavior.
 
 ## Native integration
 
-- `chatgpt_web_private_file_citation.js` v2 accepts explicit files and concrete
+- `chatgpt_web_private_file_citation.js` v3 accepts explicit files and concrete
   file IDs in `grouped_webpages`, `grouped_webpages_v2`,
   `grouped_webpages_model_predicted_fallback` and cite-map values. It preserves
   library/project identities and rejects conflicting or unknown download scopes.
-  Classification follows the official category-first rule; attribution or a
-  `file://` URL alone still cannot supply a missing ChatGPT file ID.
+  Classification follows the official category-first rule; a `file://` pathname
+  can supply a concrete ChatGPT ID, but cloud attribution cannot.
 - Grouping follows `kpr`: fallback items are used only when the primary array
   is empty; supporting websites inherit the parent category/retrieval origin;
   the first source for a URL wins. Deleted/PCA children remain excluded even
   when their parent is ordinary. Cite-map keys are not download URLs.
   Traversal is bounded to 20 source candidates, without recursive metadata walks.
-- History projection v8 appends citation rows after existing image/attachment,
+- History projection v9 appends citation rows after existing image/attachment,
   shared and mounted rows. File and library IDs deduplicate against attachments.
   Selected-branch and hidden-message rules, index size and truncation remain
   controlled by the existing projection. Nested overflow marks the native index
@@ -103,8 +133,8 @@ Coverage includes missing library identity, personal/project resolution,
 metadata HTTP errors, malformed flags/IDs, owner invalidation and no download
 after cancellation. This does not prove other cloud/PCA protocols or real bytes.
 
-Use an existing synthetic conversation with an assistant file citation on the
-grouped 1630 APK. In production native UI, open Conversation files,
+Use an existing synthetic conversation with an assistant file citation after the
+grouped adapter 324 install. In production native UI, open Conversation files,
 select the citation, download it and verify the save receipt and actual bytes.
 Keep the visible conversation/draft unchanged. Then exercise one library/project
 citation and a grouped/cite-map file if present; do not create private user
