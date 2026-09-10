@@ -3,6 +3,7 @@ package com.elon.app
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.chatgptweb.ChatGptWebNavigationPolicy
 
 internal data class WebChatProductionComposerTool(
     val id: String,
@@ -39,6 +40,21 @@ internal enum class WebChatProductionQuickActionSyncOutcome {
 }
 
 internal object WebChatProductionQuickActionSyncPolicy {
+    fun canReadCatalog(
+        providerId: WebChatProviderId,
+        sessionReady: Boolean,
+        state: WebChatConsumerState?,
+    ): Boolean {
+        if (providerId != WebChatProviderId.CHATGPT_WEB) return sessionReady
+        return state?.adapterCurrent == true &&
+            ChatGptWebNavigationPolicy.supportsEnhancedMode(state.pageUrl) &&
+            !ChatGptWebNavigationPolicy.isAuthenticationPage(state.pageUrl) &&
+            state.pageKind !in setOf("login", "auth", "challenge", "blocked")
+    }
+
+    fun canUseOptions(requestStatus: WebChatConsumerCommandStatus?): Boolean =
+        requestStatus == WebChatConsumerCommandStatus.SUCCEEDED
+
     fun resolve(
         requestStatus: WebChatConsumerCommandStatus?,
         attemptsExhausted: Boolean,
@@ -166,7 +182,7 @@ internal class WebChatProductionComposerToolsCoordinator(
         }
         val pending = pendingQuickAction ?: return
         if (pending.providerId != provider.id || activeProvider() != provider.id) return
-        if (!sessionReady() || pending.requestInFlight) return
+        if (!canReadToolCatalog(pending.providerId) || pending.requestInFlight) return
         startPendingRequest(pending)
     }
 
@@ -184,7 +200,7 @@ internal class WebChatProductionComposerToolsCoordinator(
             epoch = requestEpoch,
         )
         pendingQuickAction = pending
-        if (!sessionReady()) {
+        if (!canReadToolCatalog(provider.id)) {
             requestSessionRecovery()
             showQuickActionQueued(action)
             return true
@@ -200,17 +216,20 @@ internal class WebChatProductionComposerToolsCoordinator(
             failPendingQuickAction(pending)
             return false
         }
+        // Dispatch can synchronously publish state. Claim before entering the port.
+        val inFlight = pending.copy(requestInFlight = true)
+        pendingQuickAction = inFlight
         val requested = port.requestComposerOptions(TOOLS_SECTION)
+        if (pendingQuickAction != inFlight) return requested.accepted
         if (!requested.accepted) {
-            failPendingQuickAction(pending)
+            failPendingQuickAction(inFlight)
             return false
         }
-        pendingQuickAction = pending.copy(requestInFlight = true)
         host.postDelayed(
             {
                 pollQuickAction(
                     port,
-                    pending.copy(requestInFlight = true),
+                    inFlight,
                     requested.requestId,
                     attempt = 0,
                 )
@@ -284,14 +303,17 @@ internal class WebChatProductionComposerToolsCoordinator(
             activeProvider() != pending.providerId ||
             pendingQuickAction != pending
         ) return
-        if (!sessionReady()) {
-            port.dismissComposerOptions()
+        if (!canReadToolCatalog(pending.providerId, port.state())) {
             pendingQuickAction = pending.copy(requestInFlight = false)
+            port.dismissComposerOptions()
             requestSessionRecovery()
             return
         }
+        val requestStatus = requestId?.let { id ->
+            port.state().commandRequests.firstOrNull { it.id == id }?.status
+        }
         val observed = observedToolOptions(port)
-        if (observed.isNotEmpty()) {
+        if (WebChatProductionQuickActionSyncPolicy.canUseOptions(requestStatus) && observed.isNotEmpty()) {
             interactionCache.composerOptions(pending.providerId, TOOLS_SECTION, observed)
             val tools = WebChatProductionComposerToolParser.parse(observed)
             val target = WebChatProductionQuickComposerActionResolver.find(pending.action, tools)
@@ -311,9 +333,6 @@ internal class WebChatProductionComposerToolsCoordinator(
                 return
             }
         }
-        val requestStatus = requestId?.let { id ->
-            port.state().commandRequests.firstOrNull { it.id == id }?.status
-        }
         when (WebChatProductionQuickActionSyncPolicy.resolve(
             requestStatus = requestStatus,
             attemptsExhausted = attempt >= MAX_POLL_ATTEMPTS,
@@ -329,7 +348,7 @@ internal class WebChatProductionComposerToolsCoordinator(
                 )
                 pendingQuickAction = next
                 host.postDelayed(
-                    { if (sessionReady()) startPendingRequest(next) },
+                    { if (canReadToolCatalog(next.providerId)) startPendingRequest(next) },
                     DISCOVERY_RETRY_DELAY_MS,
                 )
                 return
@@ -355,6 +374,11 @@ internal class WebChatProductionComposerToolsCoordinator(
 
     private fun observedToolOptions(port: WebChatConsumerPort): List<WebChatConsumerOption> =
         port.state().composerSections[TOOLS_SECTION].orEmpty()
+
+    private fun canReadToolCatalog(
+        providerId: WebChatProviderId,
+        state: WebChatConsumerState? = consumerPort()?.state(),
+    ): Boolean = WebChatProductionQuickActionSyncPolicy.canReadCatalog(providerId, sessionReady(), state)
 
     private fun executePendingCommand(
         provider: WebChatProviderIdentity,

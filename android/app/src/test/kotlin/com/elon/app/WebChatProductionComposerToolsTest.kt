@@ -7,6 +7,57 @@ import org.junit.Test
 
 class WebChatProductionComposerToolsTest {
     @Test
+    fun currentPrivateToolCatalogDoesNotWaitForTheComposer() {
+        assertTrue(WebChatProductionQuickActionSyncPolicy.canReadCatalog(
+            WebChatProviderId.CHATGPT_WEB, sessionReady = false, state = document(),
+        ))
+        assertTrue(WebChatProductionQuickActionSyncPolicy.canReadCatalog(
+            WebChatProviderId.CHATGPT_WEB, sessionReady = true, state = document(),
+        ))
+    }
+
+    @Test
+    fun staleOrMissingDocumentCannotUseThePrivateCatalogEvenWithCachedReadyState() {
+        listOf(null, document().copy(adapterCurrent = false)).forEach { state ->
+            assertFalse(WebChatProductionQuickActionSyncPolicy.canReadCatalog(
+                WebChatProviderId.CHATGPT_WEB, sessionReady = true, state = state,
+            ))
+        }
+    }
+
+    @Test
+    fun privateToolCatalogStillRejectsIdentityAndForeignPages() {
+        listOf("https://chatgpt.com/auth/login", "https://accounts.google.com/", "https://example.com/",
+            "http://chatgpt.com/", "https://chatgpt.com:444/", "https://user@chatgpt.com/").forEach { url ->
+            assertFalse(WebChatProductionQuickActionSyncPolicy.canReadCatalog(
+                WebChatProviderId.CHATGPT_WEB, true, document().copy(pageUrl = url),
+            ))
+        }
+        listOf("login", "auth", "challenge", "blocked").forEach { kind ->
+            assertFalse(WebChatProductionQuickActionSyncPolicy.canReadCatalog(
+                WebChatProviderId.CHATGPT_WEB, true, document().copy(pageKind = kind),
+            ))
+        }
+    }
+
+    @Test
+    fun nonChatGptProviderKeepsItsExistingSessionAdmission() {
+        assertFalse(WebChatProductionQuickActionSyncPolicy.canReadCatalog(
+            WebChatProviderId.GOOGLE_WEB, false, document(),
+        ))
+        assertTrue(WebChatProductionQuickActionSyncPolicy.canReadCatalog(
+            WebChatProviderId.GOOGLE_WEB, true, document(),
+        ))
+    }
+
+    @Test
+    fun staleToolOptionsCannotSupersedeTheCurrentUnfinishedRead() {
+        assertTrue(WebChatProductionQuickActionSyncPolicy.canUseOptions(WebChatConsumerCommandStatus.SUCCEEDED))
+        (WebChatConsumerCommandStatus.entries.filter { it != WebChatConsumerCommandStatus.SUCCEEDED } + null)
+            .forEach { assertFalse(WebChatProductionQuickActionSyncPolicy.canUseOptions(it)) }
+    }
+
+    @Test
     fun parsesCachedToolsForTheProductionComposer() {
         val result = WebChatProductionComposerToolParser.parse(listOf(
             tool("search", "搜索", selected = true, selector = "chatgpt-tool:search"),
@@ -121,6 +172,11 @@ class WebChatProductionComposerToolsTest {
         ))
         assertTrue(WebChatProductionSessionCommandPolicy.mayRecoverSession("chatgpt_start_dictation"))
     }
+
+    private fun document() = WebChatConsumerState(
+        streaming = false, dictationActive = false, composerSections = emptyMap(), pageKind = "conversation",
+        pageUrl = "https://chatgpt.com/c/test", features = emptyList(), commandRequests = emptyList(),
+    )
 
     private fun tool(
         id: String,
