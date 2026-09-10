@@ -86,6 +86,13 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             case "header": click(description("web-chat-page-actions:chatgpt_web")); break;
             case "temporary": click(description("chatgpt-native:temporary-chat:\u4e34\u65f6\u804a\u5929")); break;
             case "retry_session": click(description("web-chat-consumer-retry")); break;
+            case "regenerate":
+                String retrySelector = new String(android.util.Base64.decode(
+                    getParams().getString("selector_b64", ""), android.util.Base64.DEFAULT),
+                    java.nio.charset.StandardCharsets.UTF_8);
+                assertTrue("invalid_reply_retry_selector", retrySelector.matches(
+                    "^web-chat-message-action:chatgpt_web:[A-Za-z0-9_.:-]{1,160}:regenerate$"));
+                click(description(retrySelector)); break;
             case "conversation_actions":
                 click(new UiObject(new UiSelector().packageName(APP).descriptionStartsWith("chatgpt-conversation-actions:")));
                 assertTrue("conversation_actions_missing", description("web-chat-conversation-action-share").waitForExists(5000));

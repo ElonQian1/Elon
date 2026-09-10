@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
     [ValidateSet('inspect','model','model_advanced','model_level','select_model','tools','image','search','clear_image','clear_search','header','temporary','retry_session','back',
-        'conversation_actions','share','account_shares','share_list','close_shares','next_shares','previous_shares')]
+        'conversation_actions','share','account_shares','share_list','close_shares','next_shares','previous_shares','regenerate')]
     [string]$Step = 'inspect',
     [string]$Selector = '',
     [ValidateRange(0, 5)][int]$Level = 0,
@@ -21,6 +21,9 @@ $legacyModelSelector = '^(web-chat-model-(?:option|parent|preset):|chatgpt-optio
 $productionModelSelector = '^chatgpt-composer-option:model:[A-Za-z0-9_.-]{1,96}:[^\r\n]{1,120}$'
 if ($Step -eq 'select_model' -and $Selector -cnotmatch $legacyModelSelector -and $Selector -cnotmatch $productionModelSelector) {
     throw 'Only a visible native model option selector may be selected.'
+}
+if ($Step -eq 'regenerate' -and $Selector -cnotmatch '^web-chat-message-action:chatgpt_web:[A-Za-z0-9_.:-]{1,160}:regenerate$') {
+    throw 'Only an exact native ChatGPT reply retry selector may be selected.'
 }
 $parameters = @{}
 if ($Step -eq 'model_level') { $parameters.level = $Level }
