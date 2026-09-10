@@ -1,0 +1,24 @@
+name: Modular skill validation
+on:
+  push:
+    paths:
+      - '.github/skills/modular-long-term-dev/**'
+      - '.github/workflows/modular-skill.yml'
+  pull_request:
+    paths:
+      - '.github/skills/modular-long-term-dev/**'
+      - '.github/workflows/modular-skill.yml'
+permissions:
+  contents: read
+jobs:
+  portable-guard:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test .github/skills/modular-long-term-dev/scripts/modularity.test.mjs

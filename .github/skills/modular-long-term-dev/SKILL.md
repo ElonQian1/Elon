@@ -1,110 +1,59 @@
 ---
 name: modular-long-term-dev
-description: Use when creating, modifying, reviewing, or planning code in any project where AI agents should avoid giant files, split code by responsibility, refactor safely, and coordinate parallel AI work without duplicating or conflicting changes.
+description: Prevent giant source files and sprawling documents during software development. Use when adding features, refactoring, reviewing module boundaries, auditing file growth, or adopting incremental size gates across repositories. 中文：模块化开发、避免巨型文件、按职责拆分、历史文件止增。Does not manage binary assets or build-cache cleanup.
+metadata:
+  version: "2.0.0"
 ---
 
-# Modular Long-Term Dev
+# 模块化长期开发
 
-Use this skill before code changes, refactors, or reviews when maintainability matters. The goal is simple: do not let AI-assisted work create or worsen giant files. Keep changes modular, reviewable, and easy for other agents to continue.
+让新增功能进入清晰的职责模块，用可执行的增量门禁防止巨型文件继续增长。项目自身的明确规则优先；本 Skill 不携带一龙项目的部署、分支、服务器或认领流程。
 
-## Core Rules
+## 写代码前
 
-- Entry files assemble, route, or wire dependencies; they should not accumulate feature logic.
-- New feature logic belongs in a focused module with a domain name, not in `utils`, `helpers`, or `common`.
-- Prefer pure behavior-preserving extraction before changing behavior.
-- Keep refactor commits separate from feature or bug-fix commits.
-- In parallel AI work, divide ownership by module and sync frequently before editing, committing, and pushing.
-- Never discard or rewrite another agent's work unless the user explicitly asks.
+1. 读取目标项目的 `AGENTS.md` 和命中的架构文档，检查 Git 状态及目标文件的近期变动；保留其他任务的修改。需要远端基线时按项目实际 remote/branch fetch，不假定 `origin/main`，不自动 rebase、发布或派发代理。
+2. 找到本次行为所属领域及已有模块。新增功能或实质重构时，用简短表格或 JSON 列出目标文件、职责、当前行数、预计新增和上限；简单局部修复只核对目标文件即可。
+3. 超出预算先调整模块方案。入口负责生命周期、路由和依赖组装，业务规则、协议、持久化、UI 与外部副作用进入相应领域模块。
 
-## File Size Guardrails
+## 默认预算
 
-- Over 800 lines: check for an existing module before adding new logic.
-- Over 1500 lines: only tiny fixes may stay; substantial logic should be extracted first.
-- Over 120 lines in one function: consider extracting smaller functions or a focused helper.
-- More than 5 touched files or multiple concerns: split into smaller tasks or commits.
+以下为共享工具的默认值；项目可在 `.modularity.json` 显式配置更严格或有理由的角色规则。
 
-These are guardrails, not excuses for mechanical churn. A small, obvious one-line fix can stay in place. A new workflow, protocol parser, UI panel, command runner, or storage path should not.
+| 角色 | 建议目标 | 硬上限（物理行） |
+|---|---:|---:|
+| 入口/组装 | 300 | 500 |
+| 普通业务模块、脚本、样式 | 500 | 800 |
+| 工具模块 | 400 | 600 |
+| 协议/类型定义 | 600 | 1000 |
+| 测试 | 600 | 1000 |
+| Markdown 文档 | 500 | 800，且不超过 50000 UTF-8 字节 |
 
-## Workflow
+- 源码同时有 128000 字节上限；不要用压行、删除说明、改文件后缀或移到忽略目录绕过门禁。
+- 普通新文件超过 500 行需检查单一职责，超过角色硬上限必须拆分。函数超过约 80 行或同时承担两类职责时进行人工审查；脚本不假装能跨语言理解函数和依赖。
+- 历史超限文件可通过初次接入基线记录，之后不得增长；拆小后运行 `ratchet` 收紧基线。不能重建基线掩盖本次新增债务。
+- 行数过关不是模块化验收。避免机械分成 `part1/part2`、跨模块访问内部状态、循环依赖和为了拆文件而制造空转发层。
 
-1. Sync and inspect:
-   - Check git status and fetch remote changes.
-   - Inspect recent commits touching the same large file.
-   - If the workspace has unrelated changes, use a separate worktree or branch.
+## 实现与验收
 
-2. Map responsibilities:
-   - Identify what the target file currently owns.
-   - Name the responsibility being changed: UI composition, API handler, transport, parser, storage, prompt building, background job, validation, etc.
-   - Look for an existing module with that responsibility.
+- 优先沿已有领域边界扩展；新模块用业务名称。抽取混杂职责时先做可验证的行为等价搬迁，再改变行为；复杂任务拆成可独立验证的步骤，不按文件数量机械切分。
+- 保持入口、公开接口、数据所有权和依赖方向清晰；同步 import/export、模块声明、路由、构建入口和测试调用方。
+- 文档按主题分拆，入口只保留当前事实、约束和链接。生成物需有可复现生成入口及精确排除理由，不能把手写源码当生成物排除。
+- 并行工作仅在任务已授权并行时按模块协调，避免共同修改同一符号；不因加载本 Skill 自动创建代理或新任务。
+- 跑与修改有关的编译/测试，再执行项目大小检查。提交时只纳入本任务文件；报告目标文件变化和测试证据，不声称存量债务已全部解决。
 
-3. Choose the change shape:
-   - Tiny local fix: edit in place.
-   - New behavior in a large file: extract a module first, then add behavior.
-   - Existing mixed code block: move the whole block to a domain module without changing behavior.
-   - Large mixed task: split into staged commits.
+关于状态、依赖、纯搬迁及重构验收的具体判断，按需读 [模块边界原则](references/module-boundaries.md)。
 
-4. Implement narrowly:
-   - Move code with minimal edits.
-   - Add explicit imports, module declarations, exports, or route registration.
-   - Keep names stable and domain-specific.
-   - Do not rename unrelated modules during the same task.
+## 可移植检查工具
 
-5. Verify:
-   - Run the smallest meaningful build, lint, or test command.
-   - For pure extraction, compare behavior through existing tests or compile checks.
-   - Check for untracked new files before committing.
-
-6. Commit clearly:
-   - Stage only task files, including newly created module files.
-   - Use messages such as `refactor(server): extract project git module` or `refactor(android): split attachment composer from MainActivity`.
-   - Mention the source file slimming when useful: `project_api.rs 3000 -> 2700 lines`.
-
-## Decision Tree
+需要 Git 和 Node.js 18+，无 npm 依赖。`<skill-dir>` 指本 `SKILL.md` 所在目录；相对路径均以 `--root` 指定的仓库根为准。
 
 ```text
-Need to add or change logic?
-  |
-  +-- Target file < 800 lines and change is local?
-  |     -> edit in place if responsibility is clear.
-  |
-  +-- Target file >= 800 lines?
-  |     -> find or create a domain module for the changed responsibility.
-  |
-  +-- Target file >= 1500 lines and change is not tiny?
-  |     -> extract first, then change behavior in a separate step.
-  |
-  +-- Multiple responsibilities or >5 files?
-        -> split task/commits before coding.
+node <skill-dir>/scripts/modularity.mjs check --root <repo>
+node <skill-dir>/scripts/modularity.mjs check --root <repo> --staged
+node <skill-dir>/scripts/modularity.mjs check --root <repo> --base <commit>
+node <skill-dir>/scripts/modularity.mjs audit --root <repo> --json
 ```
 
-## Naming Guidance
+默认检查工作区已跟踪及未被 Git 忽略的新文件；`--staged` 只检查实际暂存版本。`--base` 检查基线未被放宽，并在已接入的仓库收紧历史文件预算；不存在的 ref 直接报错。
 
-Good module names:
-
-- `project_git`
-- `project_attachments`
-- `codex_stream`
-- `intent_router`
-- `task_scheduler`
-- `attachment_composer`
-- `conversation_list`
-
-Avoid vague names:
-
-- `utils`
-- `helpers`
-- `common`
-- `misc`
-- `manager` without a domain
-
-## Review Checklist
-
-Use this checklist before finalizing a change:
-
-- Did this task reduce or at least avoid increasing giant-file pressure?
-- Is each new module named by domain responsibility?
-- Are refactor and behavior changes separated?
-- Are new files explicitly staged?
-- Did the verification command cover the moved code?
-- Did the agent sync with remote work before commit/push?
-- Would another AI know where to continue the same feature tomorrow?
+首次接入、基线治理、CI 与跨电脑安装时读 [跨项目接入](references/adoption.md)，使用 [配置模板](assets/modularity.config.json)。工具只统计尺寸，不替代职责与依赖审查，也不限制模型、纹理、音视频等二进制资产。

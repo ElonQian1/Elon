@@ -1,4 +1,4 @@
 interface:
-  display_name: "Modular Long-Term Dev"
-  short_description: "Prevent giant files with modular AI work"
-  default_prompt: "Use the modular-long-term-dev skill to keep this change modular and avoid giant files."
+  display_name: "模块化长期开发"
+  short_description: "跨项目控制源码与文档增长，按职责拆分模块，保护历史开发成果"
+  default_prompt: "使用 $modular-long-term-dev 为当前项目接入巨型文件增量门禁，并按职责规划本次开发。"
