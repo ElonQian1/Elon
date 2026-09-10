@@ -4,11 +4,14 @@ param(
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
     [ValidateRange(1, 12)][int]$Limit = 6,
+    [ValidateRange(0, 49)][int]$CandidateOffset = 0,
+    [switch]$NativeMenu,
     [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe'
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-evidence.ps1')
+. (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial
 $report = [ordered]@{ schema = 'elon.chatgpt.file_reference_inventory.v1'; passed = $false
@@ -21,6 +24,11 @@ $fixtures = @('elon-chatgpt-attachment-fixture-v1.txt', 'elon-chatgpt-media-fixt
 function Web {
     if (-not (Test-WebChatNativeChatSurfaceForeground -Runtime $runtime)) { throw 'foreground_changed' }
     return Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state
+}
+function Ui([string]$Step) {
+    $report.ui_step = $Step
+    Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass ConversationUiAcceptance `
+        -Step $Step -ResultPrefix CONVERSATION_UI_RESULT
 }
 function Act([string]$Action, [hashtable]$Arguments, [string]$Expected) {
     $sent = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action $Action -Arguments $Arguments
@@ -66,10 +74,12 @@ try {
     $report.directory_has_more = [bool]$page.has_more
     $candidates = @($page.conversations | Where-Object {
         $_.title -match '(?i)fixture|file|attachment|test|\u5a92\u4f53|\u9644\u4ef6|\u6587\u4ef6'
-    } | Select-Object -First $Limit)
+    } | Select-Object -Skip $CandidateOffset -First $Limit)
+    $report.candidate_offset = $CandidateOffset
     $report.candidates = $candidates.Count
     foreach ($candidate in $candidates) {
         $case = [ordered]@{ ordinal = $report.cases.Count; index_read = $false }
+        $menuOpened = $false
         $report.cases += $case
         try {
             $navigated = $true
@@ -78,7 +88,18 @@ try {
             Act 'chatgpt_private_protocol_probe' @{ mode = 'start' } 'private_protocol_probe' | Out-Null
             $probeStarted = $true
             $report.stage = 'file_index'
-            Act 'chatgpt_list_conversation_files' @{ conversation_path = $candidate.path } 'list_conversation_files' | Out-Null
+            if ($NativeMenu) {
+                $menuOpened = $true
+                Ui 'header' | Out-Null
+                Ui 'current_settings' | Out-Null
+                Ui 'files' | Out-Null
+                Ui 'files_refresh' | Out-Null
+                $menu = Ui 'files_wait'
+                $case.native_menu = @{ visible = $menu.file_index_visible
+                    first_row = $menu.file_index_first_row; empty = $menu.file_index_empty }
+            } else {
+                Act 'chatgpt_list_conversation_files' @{ conversation_path = $candidate.path } 'list_conversation_files' | Out-Null
+            }
             $index = (Web).conversation_files
             if (-not $index -or $index.stale -or $index.conversation_path -ne $candidate.path) { throw 'file_index_unconfirmed' }
             $files = @($index.files)
@@ -91,8 +112,14 @@ try {
             $case.fixture_files = @($files | Where-Object name -CIn $fixtures).Count
             $case.assistant_fixture_files = @($assistant | Where-Object name -CIn $fixtures).Count
         } catch {
-            $case.error = if ($_.Exception.Message -match '^[a-z_]+$') { $_.Exception.Message } else { 'case_failed' }
+            $case.error = if ($_.Exception.Message -match '^[a-z_]+$') { $_.Exception.Message }
+                elseif ($_.Exception.Message -match '^Semantic UI acceptance failed: ([a-z_]{1,80})$') { $Matches[1] }
+                else { 'case_failed' }
+            if ($NativeMenu) { $case.ui_step = $report.ui_step }
         } finally {
+            if ($menuOpened) {
+                try { Ui 'back' | Out-Null } catch { $case.menu_restore_failed = $true; $case.index_read = $false }
+            }
             if ($probeStarted) {
                 try {
                     $stopped = Act 'chatgpt_private_protocol_probe' @{ mode = 'stop' } 'private_protocol_probe'

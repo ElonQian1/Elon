@@ -10,7 +10,7 @@ foreach ($required in @(
     'Test-WebChatNativeChatSurfaceForeground', 'existing_work_in_progress',
     'Start-ChatGptWebSmokeAwakeLease', 'Stop-ChatGptWebSmokeAwakeLease',
     'Wait-ChatGptCommandReceipt', 'chatgpt_list_conversation_files',
-    "[ValidateRange(1, 12)]", 'Select-Object -First $Limit',
+    "[ValidateRange(1, 12)]", 'Select-Object -Skip $CandidateOffset -First $Limit',
     'Open $origin.social_chat.web_chat_conversation_path',
     '$after.input.text -eq $origin.input.text',
     '$report.inventory_completed = $true',
@@ -18,6 +18,7 @@ foreach ($required in @(
     '$report.passed -and $report.restored -and $report.awake_restored',
     'sent_messages = 0', 'downloaded_files = 0', 'content_exported = $false',
     'Select-Object method, path, status', 'protocol_dropped'
+    'Invoke-AndroidSemanticAcceptance', "Ui 'current_settings'", "Ui 'files_refresh'", "Ui 'files_wait'", "Ui 'back'"
 )) {
     if (-not $source.Contains($required)) { throw "inventory_guard_missing: $required" }
 }

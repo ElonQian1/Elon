@@ -117,6 +117,10 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             case "clear_image": click(description("\u5173\u95ed\u521b\u5efa\u56fe\u7247")); break;
             case "clear_search": click(description("\u5173\u95ed\u7f51\u9875\u641c\u7d22")); break;
             case "header": click(description("web-chat-page-actions:chatgpt_web")); break;
+            case "current_settings":
+                click(text("\u4f1a\u8bdd\u8bbe\u7f6e"));
+                assertTrue("conversation_actions_missing", description("web-chat-conversation-action-files").waitForExists(5000));
+                break;
             case "temporary": click(description("chatgpt-native:temporary-chat:\u4e34\u65f6\u804a\u5929")); break;
             case "retry_session": click(description("web-chat-consumer-retry")); break;
             case "regenerate":
@@ -126,6 +130,22 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             case "conversation_actions":
                 click(new UiObject(new UiSelector().packageName(APP).descriptionStartsWith("chatgpt-conversation-actions:")));
                 assertTrue("conversation_actions_missing", description("web-chat-conversation-action-share").waitForExists(5000));
+                break;
+            case "files":
+                click(description("web-chat-conversation-action-files"));
+                assertTrue("conversation_files_missing", description("web-chat-conversation-files-status").waitForExists(5000));
+                break;
+            case "files_refresh": click(description("web-chat-conversation-files-refresh")); break;
+            case "files_wait":
+                UiObject status = description("web-chat-conversation-files-status");
+                assertTrue("conversation_files_missing", status.waitForExists(5000));
+                long filesDeadline = android.os.SystemClock.elapsedRealtime() + 18000;
+                while (text("\u6b63\u5728\u66f4\u65b0").exists() && android.os.SystemClock.elapsedRealtime() < filesDeadline) Thread.sleep(250);
+                assertFalse("conversation_files_still_loading", text("\u6b63\u5728\u66f4\u65b0").exists());
+                assertFalse("conversation_files_failed", text("\u8bfb\u53d6\u5931\u8d25\uff0c\u53ef\u91cd\u8bd5").exists());
+                assertTrue("conversation_files_result_missing", text("\u6b64\u4f1a\u8bdd\u6682\u65e0\u9644\u4ef6").exists() ||
+                    text("\u90e8\u5206\u9644\u4ef6").exists() || new UiObject(new UiSelector().packageName(APP)
+                        .textMatches("[0-9]+ \u4e2a\u9644\u4ef6")).exists());
                 break;
             case "share":
                 click(description("web-chat-conversation-action-share"));
@@ -151,6 +171,9 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
         }
         JSONObject result = new JSONObject().put("step", step)
             .put("reply_actions", replyActions)
+            .put("file_index_visible", description("web-chat-conversation-files-status").exists())
+            .put("file_index_first_row", description("web-chat-conversation-file-0").exists())
+            .put("file_index_empty", text("\u6b64\u4f1a\u8bdd\u6682\u65e0\u9644\u4ef6").exists())
             .put("model_button", modelButton().exists())
             .put("model_menu", description("web-chat-model-control").exists())
             .put("level_slider", description("web-chat-model-level-slider").exists())
