@@ -2,8 +2,9 @@
 
 Capability: `android_chatgpt_official_runtime_regeneration_v1`.
 Status: source implemented and offline verified. v8 distinguishes the exact
-ownership component without relaxing admission or replay fencing. Normal 1638
-returned `timeout_owner_changed`; end-to-end device acceptance is not passed. See
+ownership component without relaxing admission or replay fencing. Normal 1639
+is installed, but its changed reply used the legacy DOM fallback receipt rather
+than the required runtime receipt. End-to-end runtime acceptance is not passed. See
 the [1637 follow-up](reports/chatgpt-regeneration-observation-1637.md) and
 the [grouped delivery](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).
 The original adapter 286 batch wired this candidate into the existing production
@@ -26,6 +27,12 @@ successful runtime receipt, which already proves a new provider UUID under the
 original parent. Failed/unknown receipts cannot pass from text alone. Optional
 bounded protocol capture starts immediately before retry and is read before
 restoration; verification registration requires successful original-view restore.
+
+The runner also requires a fresh readonly page-command ACK after native message
+reveal and before either retry dispatch. It rejects a changed/unknown document
+generation, changed conversation/turn, nonready bridge, active reply or new draft
+or attachment. Eighteen focused cases pass. This is an acceptance safeguard, not
+proof of runtime availability or a production fix; it needs no replacement APK.
 
 Contract/runtime v7 retains the same one-shot callback and ownership checks.
 The existing final timeout now rechecks the captured stream and official tree

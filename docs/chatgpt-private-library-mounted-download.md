@@ -3,12 +3,14 @@
 ## Status
 
 Capability: `android_chatgpt_private_library_mounted_download_v1`.
-Implemented and offline verified on 2026-09-10. Grouped normal 1631 built and
-published; installation and production saved-byte acceptance remain pending.
+Implemented and offline verified on 2026-09-10. Included in installed normal
+1639 (adapter 323); production saved-byte acceptance remains pending.
 Not `completed`; see the [release receipt](reports/chatgpt-mounted-library-delivery-20260910.md).
 Activation: adapter 313, file-download owner 17 and library-download module 9.
 Source commit: `57435cf2d`.
-Last independently verified installed APK 1630 does not contain this addition.
+Source ancestry and the installed 1639 package are independently verified;
+see the [current delivery evidence](reports/chatgpt-regeneration-observation-1637.md#normal-1639-delivery-and-fallback-evidence).
+Do not rebuild or reimplement this module merely to resume its device acceptance.
 
 This closes the standalone catalogue-to-download gap, not a new cloud connector.
 The existing native library could display mounted files, but

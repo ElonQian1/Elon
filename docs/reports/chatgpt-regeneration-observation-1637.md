@@ -87,3 +87,45 @@ predicate is also corrected: stable display-row identity is not a provider UUID,
 but changed text alone still cannot turn an unknown write into a pass. Optional
 protocol capture and restoration are now ordered inside the runner rather than
 outside its initialization/cleanup window. Production acceptance remains open.
+
+## Normal 1639 delivery and fallback evidence
+
+Source `5cfacf1dd`, adapter 323, was built, published and installed as normal
+`1.1.1639 (1639)`. Release/lint passed in 7m47s; remote hash/size and unattended
+replacement were verified. A subsequent package-manager read confirms 1639.
+APK SHA-256:
+`29c0ded97a7fcf6a628767647d46326f4f9bb11f3834802c778ab790ed2de754`.
+Release run `regenerate-owner-323-release-20260910-193656-529` is terminal/passed.
+Its separate worktree-cleanup warning does not invalidate the installed artifact.
+
+Run `native-regenerate-1639-20260910-194723-146` clicked the rendered native retry
+once on the same synthetic probe; no initial prompt was resent. It failed the
+requested transport assertion in 30.2s. The command receipt was succeeded/ok with
+an empty detail, the legacy DOM regeneration result in the adapter, not
+`official_runtime_v1:regenerate_observed`. A readonly comparison confirms changed
+47-character completed text in the same native row and same conversation.
+This is fallback functionality, not successful private-runtime acceptance.
+
+The bounded capture contains eleven metadata-only records, including a 200
+stream response for `POST /backend-api/f/conversation` and a 200 stream-status
+GET. No headers, content or credentials were emitted. The pre-run snapshot had
+page generation 2; the post-retry capture had generation 3. The exact transition
+time and reason the runtime was not used are not established. In particular,
+1639 did not reproduce a component-level ownership failure; do not relax any
+identity check based on this sample.
+
+Later model-context/read commands timed out while native chat was not the
+foreground app. Cached native state still reported ready, so it is not evidence
+of a live ready document or a provider API failure. Phone manipulation stopped.
+The runner restored its probe origin, but the outer original-user view has not
+been confirmed restored after this run. Its private Git-local navigation
+checkpoint remains pending native foreground. The prior stay-awake setting was
+independently confirmed restored; no application data or cookies were cleared.
+
+Source-only acceptance correction `f53960de6` now requires a fresh readonly page
+ACK and unchanged document/turn immediately before native or direct retry.
+Eighteen continuity cases, five reply-identity cases and three script parse checks
+pass. This prevents a known stale-snapshot test path, without claiming to fix
+production regeneration or invoking another write. Use the installed artifact
+for the next controlled runtime-admission sample; no new APK is needed for this
+runner change. Private-runtime regeneration remains unaccepted.
