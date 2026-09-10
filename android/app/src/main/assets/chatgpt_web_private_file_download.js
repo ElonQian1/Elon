@@ -4,7 +4,7 @@
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 16, create: root => factory(root, pointer, citation) });
+  const exported = Object.freeze({ version: 17, create: root => factory(root, pointer, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -34,8 +34,10 @@
     const url = new URL('/backend-api/files/download/' + encodeURIComponent(entry.downloadFileId || entry.fileId), root.location.origin);
     for (const [key, value] of entry.downloadQuery || []) url.searchParams.set(key, value);
     if (projectId) url.searchParams.set('gizmo_id', projectId);
-    url.searchParams.set(entry.image || entry.fileCitation || entry.projectId || entry.libraryFileId
-      ? 'check_context_scopes_for_conversation_id' : 'conversation_id', entry.conversationId);
+    if (entry.conversationId) {
+      url.searchParams.set(entry.image || entry.fileCitation || entry.projectId || entry.libraryFileId
+        ? 'check_context_scopes_for_conversation_id' : 'conversation_id', entry.conversationId);
+    }
     url.searchParams.set('download_intent', 'true');
     return url.href;
   }
@@ -194,21 +196,23 @@
 
   function registerLibraryFile(file) {
     const account = identity(), token = root.__elonChatGptDocumentToken;
+    const mounted = root.__elonChatGptPrivateLibraryDownload?.catalogTarget?.(file);
     if (disposed || !account || !/^doc_[a-z0-9_]{3,80}$/.test(token || '') ||
-        !root.elonChatGptFileDownload || file?.kind !== 'file' || !LIBRARY.test(file.id || '') ||
+        !root.elonChatGptFileDownload || file?.kind !== 'file' || !mounted && !LIBRARY.test(file.id || '') ||
         typeof file.name !== 'string' || !file.name.trim() || /[\x00-\x1f\x7f]/.test(file.name) ||
-        file.name.length > 1024 || file.external_account != null || file.cloud_doc_url != null ||
+        file.name.length > 1024 || file.external_account != null || !mounted && file.cloud_doc_url != null ||
         file.library_artifact_type != null || file.saved_entity != null || file.trashed_at != null) return '';
     const name = file.name.trim().slice(0, 180);
     for (const [key, entry] of entries) {
       if (entry.expiresAt <= Date.now()) entries.delete(key);
-      else if (entry.path === '/library' && entry.sharedLibraryFileId === file.id && entry.name === name &&
+      else if (entry.path === '/library' && (mounted ? entry.mountedFileId : entry.sharedLibraryFileId) === file.id &&
+          entry.name === name && entry.mediaType === (file.mime_type || '') &&
           entry.token === token && entry.account === account) return key;
     }
     const bytes = root.crypto.getRandomValues(new Uint8Array(16));
     const handle = 'download_' + Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
-    // The node's library ID goes to the existing library binary route, never to a fabricated conversation.
-    entries.set(handle, { path: '/library', sharedLibraryFileId: file.id, name,
+    // Standalone mounted files reuse materialization; neither route borrows the open chat's scope.
+    entries.set(handle, { path: '/library', ...(mounted || { sharedLibraryFileId: file.id }), name,
       mediaType: file.mime_type || '', account, token, expiresAt: Date.now() + 120000 });
     while (entries.size > 800) entries.delete(entries.keys().next().value);
     return handle;
@@ -347,5 +351,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); }
-  return Object.freeze({ version: 16, register, registerLibraryFile, start, cancel, dispose });
+  return Object.freeze({ version: 17, register, registerLibraryFile, start, cancel, dispose });
 });

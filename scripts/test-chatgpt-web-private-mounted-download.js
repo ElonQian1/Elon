@@ -377,7 +377,7 @@ test('installed bridges upgrade once and load mounted modules without replacing 
   const adapter = fs.readFileSync(path.join(assets, '../kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt'), 'utf8');
   const version = Number(/ADAPTER_VERSION = (\d+)/.exec(adapter)[1]);
   const bootstrap = fs.readFileSync(path.join(assets, 'chatgpt_web_adapter_bootstrap.js'), 'utf8');
-  for (const previous of [294, 295, 296]) {
+  for (const previous of [294, 295, 296, 312]) {
     const identity = {}, audio = {};
     let disposed = 0, retired = 0;
     const window = { location: { origin: 'https://chatgpt.com' },
@@ -393,7 +393,7 @@ test('installed bridges upgrade once and load mounted modules without replacing 
       vm.runInNewContext(fs.readFileSync(path.join(assets, filename), 'utf8'), context);
     }
     assert.equal(window.__elonChatGptPrivateHistoryProjection.version, projection.version);
-    assert.equal(window.__elonChatGptPrivateLibraryDownload.version, 8);
+    assert.equal(window.__elonChatGptPrivateLibraryDownload.version, 9);
     assert.equal(window.__elonChatGptPrivateFileDownload.version, download.version);
     assert.equal(retired, 1);
     assert.equal(window.__elonChatGptPrivateAuthContext, identity);

@@ -92,6 +92,18 @@
     return { mountedFileId: id, mountedMediaType: sourceMime };
   }
 
+  function catalogTarget(file) {
+    // mWn/PYt select the mounted node ID, not a copied file_id or cloud_doc_url.
+    if (file?.kind !== 'file' || file.external_account != null ||
+        file.library_artifact_type != null || file.saved_entity != null || file.trashed_at != null ||
+        file.is_project != null && file.is_project !== false ||
+        ['gizmo_id', 'project_id', 'context_scopes', 'preview_file', 'mounted_library_file_id',
+          'library_file_id', 'shared_library_file_id', 'library_download_id', 'context_connector_info']
+          .some(key => file[key] != null)) return null;
+    return mountedTarget({ source: 'library', id: file.id, mounted_library_file_id: file.id,
+      name: file.name, mime_type: file.mime_type, library_provider: file.library_provider });
+  }
+
   async function materialize(root, job, current) {
     const check = () => { if (!current(job)) throw new Error('download_cancelled'); };
     check();
@@ -269,5 +281,5 @@
       try { reader?.releaseLock(); } catch (_) {}
     }
   }
-  return Object.freeze({ version: 8, target, sharedReference, mountedTarget, materialize, contentUrl, run, runContent });
+  return Object.freeze({ version: 9, target, sharedReference, mountedTarget, catalogTarget, materialize, contentUrl, run, runContent });
 });
