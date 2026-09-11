@@ -78,7 +78,7 @@ Evidence: `library-source-device-1663-20260911-20260911-181557-919` in the share
 AI command logs. The diagnostic's 15 JVM tests and JavaScript contracts passed
 before publication. The diagnostic alone does not fix the missing actions.
 
-## Generated Image Download Implementation
+## Raster Artifact Download Implementation
 
 The retained public runtime explicitly recognizes `image_gen`. In `w3n`,
 `z_e` / shared `fDt` first resolve backing-file metadata; a personal library
@@ -86,24 +86,32 @@ match supplies `libraryDownloadId` to `Vve` / shared `MDt`. `MDt` then uses the
 existing `/api/library/files/{libraryId}/download` byte route. It does not need
 a conversation navigation or a thumbnail-to-original conversion.
 
-The targeted implementation reuses `registerLibraryFile`, `resolveDestination`
-and the existing native byte lease. Only image_gen PNG/JPEG/WebP with bounded
-library/backing IDs and no cloud/project/preview scope qualify. Metadata must
-confirm the same personal library file before transfer. Unknown artifacts,
-saved entities and contradictory ownership remain unclaimed. Rename, trash
+The initial image_gen-only implementation shipped in 1664 (`d7ab46730`). Its
+native source check failed before downloading: all nine PNGs still had `other`
+artifact classification, not `image_gen`. Conversation/draft/awake restoration
+passed. This is explicitly not a successful download acceptance.
+
+Re-reading `s4n`/`dV` confirms the official download predicate does not require
+an image_gen tag. The correction reuses `registerLibraryFile`,
+`resolveDestination` and the existing native byte lease. PNG/JPEG/WebP artifacts
+with a bounded type marker, library/backing IDs and no cloud/project/preview
+scope qualify. Special document/saved-entity artifacts remain excluded, as do
+flashcard filenames. Metadata must
+confirm the same personal library file before transfer. Arbitrary/non-raster
+artifacts and contradictory ownership remain unclaimed. Rename, trash
 and attachment are not enabled by this download-only change.
 
 `test-chatgpt-web-private-library-generated-images.js` covers actual owner
 composition, original-byte storage, immutable selection, unsupported sources,
 metadata mismatch, cancellation, account/navigation changes and no error-path
 replay. The diagnostic vocabulary now recognizes `image_gen` separately.
-Real image_gen source classification and native saved-byte acceptance remain
-pending until the new implementation is installed and exercised.
+The live rows must not be called image_gen. Native saved-byte acceptance remains
+pending until the corrected source/format/ownership implementation is exercised.
 
 ## Remaining Evidence
 
-Use the extended diagnostic to confirm the live artifact type, then select one
-matching row through the existing native library and verify a saved original.
+Confirm the previously unclaimed raster group now has a download handle, then
+select one matching row through the existing native library and verify a saved original.
 The ordinary library and gallery saved-byte paths are already accepted; repeating
 them cannot establish the missing source contract. Normal Release has WebView
 CDP debugging disabled; a missing debug socket is not an ADB/network failure.

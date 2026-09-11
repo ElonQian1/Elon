@@ -4,7 +4,7 @@
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 31, create: root => factory(root, pointer, citation) });
+  const exported = Object.freeze({ version: 32, create: root => factory(root, pointer, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -244,9 +244,13 @@
   function registerLibraryFile(file) {
     const account = identity(), token = root.__elonChatGptDocumentToken;
     const mounted = root.__elonChatGptPrivateLibraryDownload?.catalogTarget?.(file);
-    // w3n/MDt download image_gen library artifacts after confirming backing-file
-    // ownership. Do not promote arbitrary artifacts or their thumbnail URLs.
-    const imageArtifact = file?.library_artifact_type === 'image_gen' &&
+    // s4n/dV do not require an image_gen tag. Raster artifacts use w3n/MDt's
+    // backing-file ownership check, never a guessed URL or a thumbnail.
+    const imageArtifact = typeof file?.library_artifact_type === 'string' &&
+      /^(?:[a-z][a-z0-9_]{0,63})?$/.test(file.library_artifact_type) &&
+      !['saved_entity', 'flashcards', 'deep_research_report', 'learning_quiz', 'app_block',
+        'site_preview', 'writing_block', 'chat_message_snapshot'].includes(file.library_artifact_type) &&
+      typeof file.name === 'string' && !/\.flashcards$/i.test(file.name.trimEnd()) &&
       /^file[_-][A-Za-z0-9_-]{1,152}$/.test(file.file_id || '') &&
       ['image/png', 'image/jpeg', 'image/webp'].includes(file.mime_type) &&
       (file.is_project == null || file.is_project === false) &&
@@ -429,5 +433,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 31, register, registerLibraryFile, registerGalleryImage, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 32, register, registerLibraryFile, registerGalleryImage, start, cancel, dispose, sourceDiagnostics });
 });

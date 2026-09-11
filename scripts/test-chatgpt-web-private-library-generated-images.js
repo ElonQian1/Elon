@@ -52,8 +52,10 @@ function fixture(options = {}) {
   return f;
 }
 
-test('generated library image confirms ownership then saves original bytes without page navigation', async () => {
-  const f = fixture(), file = node({ thumbnail_url: 'https://untrusted.test/thumbnail.png' });
+for (const artifact of ['image_gen', 'raster_fixture', '']) {
+test('raster library artifact uses file ownership rather than a generated-image tag: ' + JSON.stringify(artifact), async () => {
+  const f = fixture(), file = node({ library_artifact_type: artifact,
+    thumbnail_url: 'https://untrusted.test/thumbnail.png' });
   const handle = f.api.registerLibraryFile(file);
   assert.match(handle, /^download_[a-f0-9]{32}$/);
   Object.assign(file, { id: 'libfile_other', file_id: 'file-other' });
@@ -68,12 +70,16 @@ test('generated library image confirms ownership then saves original bytes witho
   await f.run({ ...file, name: 'retargeted.png' }, handle);
   assert.equal(f.calls.length, 2, 'retargeted selection cannot trigger a request');
 });
+}
 
-test('only bounded image_gen nodes qualify; unrelated artifacts and scopes remain unclaimed', () => {
+test('only bounded raster nodes qualify; special artifacts and scopes remain unclaimed', () => {
   const f = fixture();
-  for (const extra of [{ library_artifact_type: 'saved_entity' }, { library_artifact_type: 'unknown' },
+  for (const extra of [{ library_artifact_type: 'saved_entity' }, { library_artifact_type: { type: 'image_gen' } },
+    { library_artifact_type: 'a'.repeat(65) }, { library_artifact_type: 'private title' }, { name: 'test.flashcards' },
+    { library_artifact_type: 'app_block' }, { library_artifact_type: 'site_preview' },
+    { library_artifact_type: 'writing_block' }, { library_artifact_type: 'chat_message_snapshot' },
     { library_artifact_type: 'deep_research_report' }, { library_artifact_type: 'flashcards' },
-    { file_id: null }, { file_id: 'file-bad?scope=other' }, { mime_type: 'text/html' },
+    { file_id: null }, { file_id: 'file-bad?scope=other' }, { mime_type: 'text/html' }, { name: 123 },
     { is_project: true }, { gizmo_id: 'g-p-' + 'a'.repeat(32) }, { project_id: 'other' },
     { context_scopes: [] }, { preview_file: {} }, { library_file_id: 'libfile_other' },
     { mounted_library_file_id: 'external-gdrive:file:synthetic' }, { saved_entity: {} },

@@ -65,15 +65,15 @@ test('account/document/route/transport changes and disposal revoke diagnostics',
   }
 });
 
-test('generated images expose download only while unknown artifacts remain unclaimed', async () => {
+test('raster artifacts expose download only while special artifacts remain unclaimed', async () => {
   const f = fixture();
-  f.setRows([file(1, { library_artifact_type: 'image_gen' }), file(2, { library_artifact_type: 'unknown-artifact' })]);
+  f.setRows([file(1, { library_artifact_type: 'raster_fixture' }), file(2, { library_artifact_type: 'saved_entity' })]);
   await f.list();
   const [image, unknown] = f.service.sourceDiagnostics().groups;
-  assert.equal(image.artifact, 'image_gen');
+  assert.equal(image.artifact, 'other');
   assert.equal(image.download, true);
   assert.equal(image.attach || image.rename || image.trash, false);
-  assert.equal(unknown.artifact, 'other');
+  assert.equal(unknown.artifact, 'saved_entity');
   assert.equal(unknown.download, false);
 });
 

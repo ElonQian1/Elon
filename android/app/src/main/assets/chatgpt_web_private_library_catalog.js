@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 10, create: factory });
+  const exported = Object.freeze({ version: 11, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateLibraryCatalog?.version || 0) < exported.version) {
@@ -359,5 +359,5 @@
       },
     };
   }
-  return Object.freeze({ version: 10, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead, sourceDiagnostics });
+  return Object.freeze({ version: 11, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead, sourceDiagnostics });
 });
