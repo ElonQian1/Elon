@@ -1,18 +1,19 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateCanvasDocuments = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
   'use strict';
   options = options || {};
   const policy = options.policy || page.__elonChatGptPrivateCanvasDocumentPolicy;
-  const now = options.now || Date.now, caches = new Map();
+  const now = options.now || Date.now, caches = new Map(), histories = new Map();
   const context = (options.context || page.__elonChatGptPrivateCanvasEditContext).create(page, { current });
   const identity = page.__elonChatGptPrivateConversationShareContract.create(page).identity;
   const PATH = /^\/(?:g\/[A-Za-z0-9_-]{1,200}\/)?c\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i;
   const fail = code => { throw Error('canvas_' + code); };
   let active = false, sequence = 0, uncertain = null, scope = null;
+  let sharing;
 
   function sameSession(binding) {
     try {
@@ -32,7 +33,7 @@
       token: page.__elonChatGptDocumentToken, account: identity(), readSnapshot };
     if (!binding.account || !/^doc_[a-z0-9_]{3,80}$/.test(binding.token || '')) fail('auth_unavailable');
     if (!current(binding)) fail('context_changed');
-    if (!scope || !sameSession(scope.binding)) scope = { binding, token: ticket() };
+    if (!scope || !sameSession(scope.binding)) { scope = { binding, token: ticket() }; histories.clear(); }
     return binding;
   }
 
@@ -114,20 +115,25 @@
     if (!original || !policy.same(original, before)) fail('version_conflict');
     context.check(owner);
     if (policy.matches(original, before, expected, before.documentVersion)) return result(remember(binding, fresh), 'canvas_unchanged');
+    return persist(binding, before, before, expected, owner, '/backend-api/textdoc/' + before.id,
+      { version: before.documentVersion, content: expected.content, comments: expected.comments }, deadline);
+  }
+
+  async function persist(binding, before, expectedBase, expected, owner, path, body, deadline) {
     // Consumed immediately before the single write. Neither timeout nor readback failure may replay it.
     let attempted = false;
     try {
-      const response = await request(binding, '/backend-api/textdoc/' + before.id, 'POST', deadline,
-        { version: before.documentVersion, content: expected.content, comments: expected.comments }, () => {
+      const response = await request(binding, path, 'POST', deadline, body, () => {
           context.check(owner);
           caches.delete(binding.id);
-          uncertain = { binding, before, expected, version: null, owner };
+          histories.clear();
+          uncertain = { kind: 'content', binding, before, expectedBase, expected, version: null, owner };
           attempted = true;
         });
       if (!Number.isSafeInteger(response?.version) || response.version <= before.documentVersion) fail('write_unconfirmed');
       uncertain.version = response.version;
       const documents = await fetchDocuments(binding, deadline), saved = documents.find(value => value.id === before.id);
-      if (!policy.matches(saved, before, expected, response.version)) fail('write_unconfirmed');
+      if (!policy.matches(saved, expectedBase, expected, response.version)) fail('write_unconfirmed');
       const entry = remember(binding, documents);
       uncertain = null;
       // Native confirmation is the server readback, not a DOM refresh or a query refetch completing.
@@ -142,11 +148,12 @@
 
   async function verify(binding, input, confirmed, deadline) {
     if (!uncertain || !current(uncertain.binding)) fail('selection_expired');
+    if (uncertain.kind === 'share') fail('share_verification_required');
     const pending = uncertain, { document } = selected(binding, input);
     if (document.id !== pending.before.id) fail('selection_invalid');
     const documents = await fetchDocuments(binding, deadline), saved = documents.find(value => value.id === document.id);
     const version = pending.version ?? saved?.documentVersion;
-    const matches = version > pending.before.documentVersion && policy.matches(saved, pending.before, pending.expected, version);
+    const matches = version > pending.before.documentVersion && policy.matches(saved, pending.expectedBase, pending.expected, version);
     if (!matches && confirmed !== true) return result(remember(binding, documents), 'canvas_verification_pending');
     if (!matches && (!saved || !policy.same(document, saved))) fail('version_conflict');
     // Clearing a mismatch only acknowledges an explicit comparison, never submits a second POST.
@@ -155,17 +162,104 @@
     return result(remember(binding, documents), matches ? 'canvas_saved' : 'canvas_result_acknowledged');
   }
 
+  async function readHistory(binding, document, beforeVersion, deadline) {
+    if (!Number.isSafeInteger(beforeVersion) || beforeVersion < 1 || beforeVersion > document.documentVersion) fail('history_invalid');
+    if (beforeVersion === 1) return [];
+    const payload = await request(binding, '/backend-api/textdoc/' + document.id + '/history?before_version=' + beforeVersion, 'GET', deadline);
+    if (!Array.isArray(payload?.previous_doc_states) || payload.previous_doc_states.length > 200) fail('history_unconfirmed');
+    const versions = payload.previous_doc_states.map(row => policy.parse([row])[0]);
+    let previous = beforeVersion;
+    for (const version of versions) {
+      if (version.id !== document.id || version.documentVersion >= previous) fail('history_unconfirmed');
+      previous = version.documentVersion;
+    }
+    return versions;
+  }
+
+  async function history(binding, input, deadline) {
+    const { entry, document } = selected(binding, input);
+    const versions = await readHistory(binding, document, input.beforeVersion, deadline);
+    const selection = { binding, before: document, versions, beforeVersion: input.beforeVersion, token: ticket(), at: now() };
+    histories.set(document.id, selection);
+    while (histories.size > 2) histories.delete(histories.keys().next().value);
+    const oldest = versions.at(-1)?.documentVersion;
+    return { ...result(entry), history: { documentId: document.id, ticket: selection.token, beforeVersion: input.beforeVersion,
+      nextBeforeVersion: oldest > 1 ? oldest : null, versions } };
+  }
+
+  async function restore(binding, input, confirmed, deadline) {
+    if (confirmed !== true) fail('confirmation_required');
+    if (page.__elonChatGptPrivateConversationMutationsEnabled !== true) fail('disabled');
+    if (uncertain && sameSession(uncertain.binding)) fail('write_unconfirmed');
+    const { document: before } = selected(binding, input), selection = histories.get(before.id);
+    if (!selection || !current(selection.binding) || selection.token !== input.historyTicket ||
+        !policy.same(selection.before, before) || now() < selection.at || now() - selection.at > 1800000) fail('history_selection_expired');
+    const target = selection.versions.find(value => value.documentVersion === input.restoreVersion);
+    if (!target) fail('history_selection_invalid');
+    const owner = await context.capture(binding, before.id);
+    const fresh = await fetchDocuments(binding, deadline), original = fresh.find(value => value.id === before.id);
+    if (!original || !policy.same(original, before)) fail('version_conflict');
+    const versions = await readHistory(binding, before, selection.beforeVersion, deadline);
+    const verified = versions.find(value => value.documentVersion === target.documentVersion);
+    if (!verified || !policy.same(verified, target)) fail('history_changed');
+    context.check(owner);
+    const expected = { content: target.content, comments: policy.comments(target.comments, target.content, true) };
+    return persist(binding, before, target, expected, owner, '/backend-api/textdoc/' + before.id + '/restore',
+      { version: before.documentVersion, restore_from_version: target.documentVersion }, deadline);
+  }
+
+  async function share(binding, input, confirmed, deadline) {
+    if (input.operation === 'share_ack' && uncertain && sameSession(uncertain.binding) && uncertain.kind !== 'share') fail('write_unconfirmed');
+    const { entry, document: before } = selected(binding, input);
+    sharing ||= page.__elonChatGptPrivateCanvasDocumentSharing.create(page, { request, current, now });
+    const value = await sharing.lookup(binding, before.id, deadline);
+    if (uncertain && sameSession(uncertain.binding) && uncertain.kind === 'share' && uncertain.before.id === before.id) {
+      if (sharing.matches(value, uncertain.before) || input.operation === 'share_ack' && confirmed === true) {
+        context.reconcile(uncertain.owner, 'share').catch(() => {});
+        uncertain = null;
+      }
+    }
+    const ready = () => ({ ...result(entry, 'canvas_share_ready'), share: sharing.display(before.id, value) });
+    if (input.operation !== 'share_create' || value.state !== 'missing') return ready();
+    if (confirmed !== true) fail('confirmation_required');
+    if (page.__elonChatGptPrivateConversationMutationsEnabled !== true) fail('disabled');
+    if (uncertain && sameSession(uncertain.binding)) fail('write_unconfirmed');
+    const owner = await context.capture(binding, before.id);
+    const fresh = await fetchDocuments(binding, deadline), original = fresh.find(value => value.id === before.id);
+    if (!original || !policy.same(original, before)) fail('version_conflict');
+    context.check(owner);
+    let attempted = false;
+    try {
+      const created = await sharing.create(binding, before, deadline, () => {
+        context.check(owner);
+        caches.delete(binding.id);
+        uncertain = { kind: 'share', binding, before, owner };
+        attempted = true;
+      });
+      uncertain = null;
+      context.reconcile(owner, 'share').catch(() => {});
+      return { ...result(remember(binding, fresh), 'canvas_share_created'), attempted: true, share: sharing.display(before.id, created) };
+    } catch (error) {
+      if (/^http_(401|403)$/.test(error?.message || '')) page.__elonChatGptPrivateAuthContext?.invalidate?.('canvas_rejected');
+      if (attempted) return { ok: false, code: 'canvas_share_write_unconfirmed', attempted: true };
+      throw error;
+    }
+  }
+
   async function run(input, confirmed, readSnapshot) {
     if (active) return { ok: false, code: 'canvas_busy', attempted: false };
     active = true;
     try {
-      if (!input || !['list', 'save', 'verify'].includes(input.operation) || !policy ||
+      if (!input || !['list', 'save', 'verify', 'history', 'restore', 'share_lookup', 'share_create', 'share_ack'].includes(input.operation) || !policy ||
           !page.__elonChatGptPrivateJsonRequest?.request || !page.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders) {
         fail('request_invalid');
       }
       const binding = bind(input.path, readSnapshot), deadline = now() + 18000;
       if (input.operation === 'list') return await read(binding, input.force === true, deadline);
       if (input.operation === 'save') return await save(binding, input, confirmed, deadline);
+      if (input.operation === 'history') return await history(binding, input, deadline);
+      if (input.operation === 'restore') return await restore(binding, input, confirmed, deadline);
+      if (input.operation.startsWith('share_')) return await share(binding, input, confirmed, deadline);
       return await verify(binding, input, confirmed, deadline);
     } catch (error) {
       const code = String(error?.message || '');
@@ -175,5 +269,5 @@
     } finally { active = false; }
   }
 
-  return Object.freeze({ version: 2, run, busy: () => active });
+  return Object.freeze({ version: 3, run, busy: () => active });
 });

@@ -18,6 +18,7 @@ internal data class ChatGptWebCanvasDocument(
 internal data class ChatGptWebCanvasDocuments(
     val requestId: String, val path: String, val ticket: String, val scope: String,
     val documents: List<ChatGptWebCanvasDocument>, val unconfirmedWrite: Boolean,
+    val history: ChatGptWebCanvasHistory? = null, val share: ChatGptWebCanvasShare? = null,
 ) {
     override fun toString() = "CanvasDocuments(count=${documents.size},unconfirmed=$unconfirmedWrite)"
     fun diagnostic() = JSONObject().put("request_id", requestId).put("document_count", documents.size)
@@ -67,26 +68,31 @@ internal object ChatGptWebCanvasDocumentProtocol {
 
     fun parse(value: JSONObject): ChatGptWebCanvasDocuments? = runCatching {
         require(value.toString().length <= 2 * 1024 * 1024)
-        require(value.keys().asSequence().toSet() == setOf("type", "version", "requestId", "path", "ticket", "scope", "documents", "unconfirmedWrite"))
+        val required = setOf("type", "version", "requestId", "path", "ticket", "scope", "documents", "unconfirmedWrite")
+        val keys = value.keys().asSequence().toSet()
+        require(keys.containsAll(required) && keys.all { it in required || it == "history" || it == "share" })
         require(value.opt("type") == "canvas_documents" && value.opt("version") == 1 && value.opt("unconfirmedWrite") is Boolean)
         val req = value.getString("requestId"); val owner = value.getString("path")
         val selected = value.getString("ticket"); val scope = value.getString("scope")
         require(requestId.matches(req) && validPath(owner) && token.matches(selected) && token.matches(scope))
         val rows = value.getJSONArray("documents")
         require(rows.length() <= 200)
-        val documents = (0 until rows.length()).map { index ->
-            val row = rows.getJSONObject(index)
-            require(row.keys().asSequence().toSet() == setOf("id", "title", "content", "documentType", "documentVersion", "comments"))
-            val identifier = row.getString("id"); val title = row.getString("title"); val kind = row.getString("documentType")
-            require(id.matches(identifier) && !identifier.startsWith("temp-") && type.matches(kind))
-            require(title.isNotBlank() && title.length <= 512 && title.none { it.code < 32 || it.code == 127 })
-            val content = text(row.opt("content"))
-            ChatGptWebCanvasDocument(identifier, title, content, kind,
-                integer(row.opt("documentVersion"), 1..9_007_199_254_740_991L), parseComments(row.getJSONArray("comments"), content))
-        }
+        val documents = (0 until rows.length()).map { parseDocument(rows.getJSONObject(it)) }
         require(documents.distinctBy { it.id }.size == documents.size)
-        ChatGptWebCanvasDocuments(req, owner, selected, scope, documents, value.getBoolean("unconfirmedWrite"))
+        val history = if (value.has("history")) ChatGptWebCanvasManagementProtocol.history(value.getJSONObject("history"), documents) else null
+        val share = if (value.has("share")) ChatGptWebCanvasManagementProtocol.share(value.getJSONObject("share"), documents) else null
+        ChatGptWebCanvasDocuments(req, owner, selected, scope, documents, value.getBoolean("unconfirmedWrite"), history, share)
     }.getOrNull()
+
+    fun parseDocument(row: JSONObject): ChatGptWebCanvasDocument {
+        require(row.keys().asSequence().toSet() == setOf("id", "title", "content", "documentType", "documentVersion", "comments"))
+        val identifier = row.getString("id"); val title = row.getString("title"); val kind = row.getString("documentType")
+        require(id.matches(identifier) && !identifier.startsWith("temp-") && type.matches(kind))
+        require(title.isNotBlank() && title.length <= 512 && title.none { it.code < 32 || it.code == 127 })
+        val content = text(row.opt("content"))
+        return ChatGptWebCanvasDocument(identifier, title, content, kind,
+            integer(row.opt("documentVersion"), 1..9_007_199_254_740_991L), parseComments(row.getJSONArray("comments"), content))
+    }
 
     fun request(value: JSONObject): JSONObject? = runCatching {
         require(value.toString().length <= 2 * 1024 * 1024)
@@ -96,7 +102,9 @@ internal object ChatGptWebCanvasDocumentProtocol {
         val keys = when (operation) {
             "list" -> setOf("operation", "path", "force")
             "save" -> setOf("operation", "path", "ticket", "scope", "id", "content", "comments")
-            "verify" -> setOf("operation", "path", "ticket", "scope", "id")
+            "history" -> setOf("operation", "path", "ticket", "scope", "id", "beforeVersion")
+            "restore" -> setOf("operation", "path", "ticket", "scope", "id", "historyTicket", "restoreVersion")
+            "verify", "share_lookup", "share_create", "share_ack" -> setOf("operation", "path", "ticket", "scope", "id")
             else -> error("operation")
         }
         require(value.keys().asSequence().toSet() == keys)
@@ -105,6 +113,11 @@ internal object ChatGptWebCanvasDocumentProtocol {
             require(token.matches(value.opt("ticket") as? String ?: "") && token.matches(value.opt("scope") as? String ?: ""))
             require(id.matches(value.opt("id") as? String ?: ""))
             if (operation == "save") parseComments(value.getJSONArray("comments"), text(value.opt("content")))
+            if (operation == "history") integer(value.opt("beforeVersion"), 1..9_007_199_254_740_991L)
+            if (operation == "restore") {
+                require(token.matches(value.opt("historyTicket") as? String ?: ""))
+                integer(value.opt("restoreVersion"), 1..9_007_199_254_740_991L)
+            }
         }
         JSONObject(value.toString())
     }.getOrNull()
@@ -112,7 +125,8 @@ internal object ChatGptWebCanvasDocumentProtocol {
     fun dispatch(args: JSONObject, commands: ChatGptWebMcpCommandPort, dispatch: (String, (String) -> Unit) -> Unit): String? {
         val request = args.optJSONObject("canvas_request")?.let(::request) ?: return "canvas_request_invalid"
         val confirmed = args.opt("user_confirmed") as? Boolean ?: return "canvas_confirmation_required"
-        if (request.getString("operation") == "save" && !confirmed) return "canvas_confirmation_required"
+        if (request.getString("operation") in setOf("save", "restore", "share_create", "share_ack") && !confirmed)
+            return "canvas_confirmation_required"
         dispatch(ACTION) { commands.canvasDocument(request, confirmed, it) }
         return null
     }

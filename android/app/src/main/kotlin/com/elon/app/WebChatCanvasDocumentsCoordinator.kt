@@ -22,6 +22,7 @@ internal class WebChatCanvasDocumentsCoordinator(
     private var sheet: WebChatActionSheetHandle? = null
     private var sheetGeneration = 0
     private var editor: WebChatCanvasEditorView? = null
+    private var management: WebChatCanvasManagementCoordinator? = null
     private var draft: WebChatCanvasDraft? = null
     private var index: ChatGptWebCanvasDocuments? = null
 
@@ -102,8 +103,29 @@ internal class WebChatCanvasDocumentsCoordinator(
         draft = editing
         index = value
         val run = epoch
+        management?.cancel()
+        management = WebChatCanvasManagementCoordinator(activity, editing,
+            execute = { request, confirmed, done, failed ->
+                execute(owner, editing.path, request, confirmed, { result, _ ->
+                    index = result
+                    if (result.scope != editing.scope || result.documents.none { it.id == editing.base.id }) {
+                        failed("画布或登录身份已变化")
+                    } else done(result)
+                }, failed)
+            }, state = { message, working -> editor?.render(message, working) },
+            restored = { result ->
+                val restored = result.documents.firstOrNull { it.id == editing.base.id }
+                if (restored == null || result.scope != editing.scope || result.unconfirmedWrite || editing.changed) {
+                    editor?.render("恢复结果待核对，草稿已保留", allowed = false)
+                } else {
+                    editing.adopt(restored)
+                    editor?.render("已恢复 · 版本 ${restored.documentVersion}", allowed = true, reset = true)
+                }
+            })
         editor = WebChatCanvasEditorView(activity, editing,
-            save = { save(owner, editing) }, check = { refresh(owner, editing) }, closed = { if (run == epoch) cancel() })
+            save = { save(owner, editing) }, check = { refresh(owner, editing) },
+            history = { management?.showHistory() }, share = { management?.showShare() },
+            closed = { if (run == epoch) cancel() })
         editor?.show()
         if (value.unconfirmedWrite || !editing.matches(value)) editor?.render("官网版本需要核对，草稿已保留", allowed = false)
     }
@@ -181,7 +203,7 @@ internal class WebChatCanvasDocumentsCoordinator(
 
     private fun execute(owner: WebChatConsumerPort, path: String, request: JSONObject, confirmed: Boolean,
         done: (ChatGptWebCanvasDocuments, String?) -> Unit, failed: (String) -> Unit) {
-        if (poll != null) return
+        if (poll != null) { failed("已有画布操作正在处理，请稍后重试"); return }
         if (port() !== owner || !samePath(path) || provider() != WebChatProviderId.CHATGPT_WEB) {
             failed("当前会话已变化"); return
         }
@@ -228,6 +250,7 @@ internal class WebChatCanvasDocumentsCoordinator(
         epoch += 1
         stopPolling()
         dismissSheet()
+        management?.cancel(); management = null
         val view = editor; editor = null; view?.dismiss()
     }
 
@@ -246,10 +269,13 @@ internal class WebChatCanvasDocumentsCoordinator(
     private fun failure(detail: String?): String = when (detail) {
         "canvas_version_conflict" -> "官网版本已变化"
         "canvas_write_unconfirmed" -> "保存结果尚未确认，请核对版本"
-        "canvas_web_edits_pending", "canvas_context_busy", "canvas_busy" -> "官网画布正在编辑，请稍后重试"
+        "canvas_share_write_unconfirmed", "canvas_share_verification_required" -> "分享结果尚未确认，请打开画布分享核对"
+        "canvas_share_unconfirmed" -> "官网分享状态尚未确认"
+        "canvas_history_unconfirmed", "canvas_history_changed" -> "历史版本尚未确认，请重新读取"
+        "canvas_web_edit_pending", "canvas_conversation_busy", "canvas_busy" -> "官网画布正在编辑，请稍后重试"
         "canvas_auth_unavailable", "canvas_http_401", "canvas_http_403" -> "请确认官网登录状态"
         "canvas_timeout" -> "读取超时，请重试"
-        "canvas_selection_expired", "canvas_context_changed" -> "会话状态已变化，请核对版本"
+        "canvas_selection_expired", "canvas_context_changed", "canvas_history_selection_expired" -> "会话状态已变化，请核对版本"
         else -> "暂时未能完成，请重试"
     }
 }

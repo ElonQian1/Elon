@@ -41,12 +41,13 @@
     if (edits.some(edit => edit.isPending) || time && (time.lastTriggeredAt ?? 0) > (time.lastFlushedAt ?? 0)) fail('web_edit_pending');
   }
 
-  async function reconcile(context) {
+  async function reconcile(context, kind = 'document') {
     try {
       check(context);
-      // Invalidate only the original document query; do not reload the page, erase local edits,
+      // Invalidate only the affected query; do not reload the page, erase local edits,
       // instantiate a second cache, or optimistically acknowledge someone else's save queue.
-      await context.client.invalidateQueries({ queryKey: [context.binding.id, 'textdocs'], exact: true, refetchType: 'active' });
+      const queryKey = kind === 'share' ? ['canvas', 'textdoc', 'share', context.id] : [context.binding.id, 'textdocs'];
+      await context.client.invalidateQueries({ queryKey, exact: true, refetchType: 'active' });
       return true;
     } catch (_) { return false; }
   }

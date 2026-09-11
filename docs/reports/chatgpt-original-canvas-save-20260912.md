@@ -116,6 +116,7 @@ Source-size guard passed 25 files; documentation guard passed two files. The
 remaining-work map is near its size limit but shrank in this batch. No APK was
 assembled or installed; device pixels and a real save are not yet accepted.
 
-Still pending: grouped device save acceptance, original first-publication,
-rich formatting/comment authoring and revision restore. Do not mark the overall
-Canvas capability complete from offline verification.
+First-publication and history preview/restore are now implemented in the
+[management batch](chatgpt-canvas-history-first-share-20260912.md), awaiting grouped
+device acceptance with this editor. Rich formatting/comment authoring remain
+outside these batches. Do not mark overall Canvas complete from offline tests.

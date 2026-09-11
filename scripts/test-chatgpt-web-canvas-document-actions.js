@@ -107,7 +107,43 @@ test('production menu and canonical assets route to native editor rather than sh
   assert.match(read(dir + 'WebChatCanvasEditorView.kt'), /web-chat-canvas-version-comparison/);
   assert.doesNotMatch(read(dir + 'WebChatCanvasEditorView.kt'), /loadUrl|evaluateJavascript|android\.webkit/);
   const assets = read(dir + 'chatgptweb/ChatGptWebAdapterAssets.kt');
-  for (const name of ['document_policy', 'edit_context', 'documents']) assert.match(assets, new RegExp('chatgpt_web_private_canvas_' + name + '\\.js'));
+  for (const name of ['document_policy', 'edit_context', 'document_sharing', 'documents']) assert.match(assets, new RegExp('chatgpt_web_private_canvas_' + name + '\\.js'));
   assert.match(assets, /chatgpt_web_canvas_document_actions\.js/);
   assert.match(read('android/app/src/main/assets/chatgpt_web_adapter.js'), /__elonChatGptCanvasDocumentActions\?\.handle\(action, command, respond, snapshot, emitEvent\)/);
+});
+
+test('history and sharing use the same canonical display channel and explicit mutation confirmation', async () => {
+  const f = setup();
+  f.page.__elonChatGptPrivateCanvasDocumentSharing = require('../android/app/src/main/assets/chatgpt_web_private_canvas_document_sharing.js');
+  f.page.__elonChatGptPrivateCanvasContent = require('../android/app/src/main/assets/chatgpt_web_private_canvas_content.js');
+  await f.call({ operation: 'list', force: false });
+  const { ticket, scope } = f.events[0];
+  f.setHook(({ url }) => url.endsWith('/share') ? { payload: { shared_textdoc: null } } :
+    { payload: { previous_doc_states: [{ id: ID, title: 'Synthetic', content: 'Full source', version: 3, textdoc_type: 'document', comments: [] }] } });
+  assert.equal((await f.call({ operation: 'history', ticket, scope, id: ID, beforeVersion: 4 })).ok, true);
+  const page = f.events.at(-1).history;
+  assert.equal(page.documentId, ID); assert.equal(page.versions[0].content, 'Full source');
+  const request = { operation: 'restore', ticket, scope, id: ID, historyTicket: page.ticket, restoreVersion: 3 };
+  assert.equal((await f.call(request)).detail, 'canvas_confirmation_required');
+  assert.equal((await f.call({ ...request, historyTicket: 'bad' }, true)).detail, 'canvas_request_invalid');
+  assert.equal((await f.call({ operation: 'share_lookup', ticket, scope, id: ID })).ok, true);
+  assert.equal(f.events.at(-1).share.state, 'missing');
+  for (const operation of ['share_create', 'share_ack'])
+    assert.equal((await f.call({ operation, ticket, scope, id: ID })).detail, 'canvas_confirmation_required');
+  assert.equal(f.requests.filter(x => x.init.method === 'POST').length, 0);
+});
+
+test('management entries are native editor icons and parent close cancels child generation', () => {
+  const dir = path.resolve(__dirname, '../android/app/src/main/kotlin/com/elon/app');
+  const read = name => fs.readFileSync(path.join(dir, name + '.kt'), 'utf8');
+  const view = read('WebChatCanvasEditorView'), owner = read('WebChatCanvasDocumentsCoordinator');
+  const management = read('WebChatCanvasManagementCoordinator');
+  for (const id of ['history', 'share']) assert.ok(view.includes('web-chat-canvas-editor-' + id));
+  assert.match(owner, /history = \{ management\?\.showHistory\(\) \}, share = \{ management\?\.showShare\(\) \}/);
+  assert.match(owner, /fun cancel\(\) \{[^}]+management\?\.cancel\(\); management = null/s);
+  for (const id of ['web-chat-canvas-history-restore-confirm', 'web-chat-canvas-original-share-confirm', 'web-chat-canvas-history-content'])
+    assert.ok(management.includes(id));
+  assert.match(management, /!draft\.changed && draft\.matches\(value\)/);
+  assert.match(management, /if \(active\(run\)\) \{ state\("读取完成", false\); done\(value\) \}/);
+  assert.doesNotMatch(management + view, /loadUrl|evaluateJavascript|android\.webkit|WebView/);
 });

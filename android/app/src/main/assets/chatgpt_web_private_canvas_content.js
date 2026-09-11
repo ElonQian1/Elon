@@ -75,5 +75,5 @@
     }
   }
 
-  return Object.freeze({ version: 2, read, prepareUpdate, update, invalidate: () => cache.clear() });
+  return Object.freeze({ version: 2, read, prepareUpdate, update, decode: parse, invalidate: () => cache.clear() });
 });

@@ -13,6 +13,8 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
+import androidx.appcompat.widget.AppCompatImageButton
+import androidx.appcompat.widget.TooltipCompat
 import com.elon.app.chatgptweb.ChatGptWebCanvasDocument
 import com.elon.app.chatgptweb.ChatGptWebCanvasDocumentProtocol
 
@@ -21,6 +23,8 @@ internal class WebChatCanvasEditorView(
     private val draft: WebChatCanvasDraft,
     save: () -> Unit,
     check: () -> Unit,
+    history: () -> Unit,
+    share: () -> Unit,
     closed: () -> Unit,
 ) {
     private val padding = (16 * activity.resources.displayMetrics.density).toInt()
@@ -30,6 +34,8 @@ internal class WebChatCanvasEditorView(
         contentDescription = "web-chat-canvas-editor-comments"
         setOnClickListener { showComments() }
     }
+    private val historyButton = actionIcon(R.drawable.ic_popup_history, "历史版本", "web-chat-canvas-editor-history", history)
+    private val shareButton = actionIcon(R.drawable.ic_project_post_share, "分享画布", "web-chat-canvas-editor-share", share)
     private var replacing = false
     private var start = 0
     private var removed = 0
@@ -63,7 +69,13 @@ internal class WebChatCanvasEditorView(
         orientation = LinearLayout.VERTICAL
         setPadding(padding, padding / 2, padding, padding)
         addView(status)
-        addView(comments)
+        addView(LinearLayout(activity).apply {
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            val size = (48 * activity.resources.displayMetrics.density).toInt()
+            addView(comments, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(historyButton, LinearLayout.LayoutParams(size, size))
+            addView(shareButton, LinearLayout.LayoutParams(size, size))
+        })
         addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
     }
     private val dialog = AlertDialog.Builder(activity).setTitle(draft.base.title).setView(layout)
@@ -104,11 +116,23 @@ internal class WebChatCanvasEditorView(
         status.text = if (draft.needsRepair.isNotEmpty()) "$message · ${draft.needsRepair.size} 条评论需重新关联" else message
         comments.text = "评论（${draft.comments.size}）"
         comments.isEnabled = !busy && writable && draft.comments.isNotEmpty()
+        historyButton.isEnabled = !busy
+        shareButton.isEnabled = !busy
         body.isEnabled = !busy
         // A detached account/document draft remains selectable, but cannot be modified or saved.
         body.isFocusableInTouchMode = writable && !busy
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.isEnabled = !busy && writable && draft.changed && draft.needsRepair.isEmpty()
         dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.isEnabled = !busy
+    }
+
+    private fun actionIcon(resource: Int, label: String, semanticId: String, action: () -> Unit) = AppCompatImageButton(activity).apply {
+        setImageResource(resource)
+        val inset = (12 * activity.resources.displayMetrics.density).toInt()
+        setPadding(inset, inset, inset, inset)
+        background = null
+        contentDescription = semanticId
+        TooltipCompat.setTooltipText(this, label)
+        setOnClickListener { action() }
     }
 
     private fun showComments() {
