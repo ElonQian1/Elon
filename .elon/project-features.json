@@ -8726,7 +8726,7 @@
       "id": "esk-game-funding-source-v1",
       "title": "ESK game funding source",
       "summary": "Authenticated read-only funding source snapshots and bounded pending budget discovery.",
-      "status": "verified",
+      "status": "released",
       "priority": "p2",
       "requirement": {
         "path": "docs/requirements/esk-game-funding-source-v1.md",
@@ -8823,7 +8823,7 @@
         }
       ],
       "created_at_ms": 1789162917371,
-      "updated_at_ms": 1789163962064
+      "updated_at_ms": 1789165630244
     },
     {
       "id": "esk-native-snapshot-v1",
@@ -26309,16 +26309,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_afbb1f29342d43acaa90807194f1f080",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "claimed",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788767242050
-    },
-    {
       "id": "feature_event_0e251cd5a9d841ae9bf61fd7bfd1b4d0",
       "feature_id": "private-grid-read-bridge-v1",
       "action": "transitioned",
@@ -28307,6 +28297,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789164535763
+    },
+    {
+      "id": "feature_event_d0a4305aabed45d19bfa84d69497f6df",
+      "feature_id": "esk-game-funding-source-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-game-goal",
+      "reason": "Published backend v0.3.1743 at 312d96ec94992414c97a66742870ebd356c37c74; health/version/SHA verified; Server finish contract c881cd0bab55b2fe8d00217f9261cb362cd3fc3211302ea2c57a7fcab8a6e6bd FINALIZABLE=true. Runtime unchanged since publication.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1789165630244
     }
   ]
 }
