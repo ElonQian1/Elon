@@ -60,5 +60,27 @@ a matching user-turn anchor, completed native/official reply and restoration.
 Canvas additionally requires artifact/interactive/code output, not a plain
 text claim. It never exports conversation text or headers.
 
-Device evidence is pending the grouped normal release. Do not mark the new
-capabilities completed until the installed native flows pass.
+## Normal Release 1671
+
+Source `7e6648af6`, adapter 354, normal **1.1.1671 (1671)** was published.
+The Release build passed; remote APK hash and size were verified:
+`8ab1081abac09674f0adf659a2a6ccccfe260b86565c39ce8e0c8e08a27a1acb`,
+40,170,318 bytes. Focused Android tests passed again (10/10); the external
+semantic native UI runner also compiled successfully. No Debug APK is used.
+
+The publish command returned failure only after successful server publication,
+when automatic wireless installation timed out. Xiaomi became offline during
+the build; USB was not enumerated. A discovered TLS wireless endpoint also
+timed out. No 1671 installation or new-tool device result is claimed. Publisher
+cleanup additionally reported its existing missing `Branch` property warning;
+the task still uses the required explicit finish workflow.
+
+| Capability ID | Code | Default | Device | Completed |
+|---|---|---|---|---|
+| `android_chatgpt_private_study_tool_v1` | implemented | native preset, official admission | deferred | false |
+| `android_chatgpt_private_canvas_tool_v1` | implemented | native preset, official admission | deferred | false |
+
+Reuse this published artifact on reconnect, then run the native tool acceptance
+script. Do not rebuild or repeat protocol research merely because the device
+left. Full Canvas editing, other account/model tool eligibility and server
+preference persistence are not established by the offline tests.
