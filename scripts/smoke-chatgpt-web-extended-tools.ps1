@@ -9,6 +9,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
+. (Join-Path $PSScriptRoot 'chatgpt-web-smoke-native-draft.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-tool-reply.ps1')
 . (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial -ExpectedHardwareSerial $ExpectedHardwareSerial
@@ -78,7 +79,7 @@ try {
     if ((Get-ChatGptWebSmokeUserReadiness -Runtime $runtime).ready -ne $true) { throw 'device_locked' }
     $origin=Main; $w=Web
     if ($origin.active_surface -ne 'social_ai' -or $origin.social_chat.web_chat_provider_id -ne 'chatgpt_web' -or
-        $w.authenticated -ne $true -or $w.streaming -or $w.dictation_active -or $origin.input.text -or
+        $w.authenticated -ne $true -or $w.streaming -or $w.dictation_active -or -not (Test-ChatGptWebNativeDraftEmpty $origin) -or
         [int]$w.input.official_draft_length -gt 0 -or @($w.conversation.attachments | Where-Object { $_ }).Count -gt 0) { throw 'idle_authenticated_native_chat_required' }
     $report.adapter=$w.adapter_version
     if ($w.adapter_version -ne (Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion)) { throw 'installed_adapter_mismatch' }
@@ -123,12 +124,23 @@ try {
     $message=[string]$_.Exception.Message
     $report.error=if ($message -match '^[a-z_]+$') { $message } else { 'acceptance_failed' }
 } finally {
-    if ($active) { try { Clear-Tool $active } catch { $report.tool_cleanup_failed=$true } }
+    if ($active) {
+        try {
+            if (-not (Test-WebChatNativeChatSurfaceForeground -Runtime $runtime)) { throw 'foreground_changed' }
+            $current=Main
+            if (-not (Test-ChatGptWebNativeDraftEmpty $current)) { throw 'changed_draft_preserved' }
+            Clear-Tool $active
+        } catch { $report.tool_cleanup_failed=$true }
+    }
     if ($changed -and $origin) {
         try {
+            if (-not (Test-WebChatNativeChatSurfaceForeground -Runtime $runtime)) { throw 'foreground_changed' }
+            $current=Main
+            if (-not (Test-ChatGptWebNativeDraftEmpty $current)) { throw 'changed_draft_preserved' }
             $report.restored=Restore-WebChatNativeConversation -Runtime $runtime -ProviderId chatgpt_web -ConversationPath $origin.social_chat.web_chat_conversation_path -TimeoutSec 60
             $after=Main
-            $report.restored=$report.restored -and $after.input.text -eq $origin.input.text -and
+            $report.restored=$report.restored -and (Test-ChatGptWebNativeDraftEmpty $origin) -and
+                (Test-ChatGptWebNativeDraftEmpty $after) -and
                 $after.social_chat.web_chat_conversation_path -eq $origin.social_chat.web_chat_conversation_path
         } catch { $report.restored=$false }
     }

@@ -14,6 +14,7 @@ $ErrorActionPreference = 'Stop'
 if ($VerifyRefreshInPlace -and -not $NativeMenu) { throw 'refresh_check_requires_native_menu' }
 if ($CurrentConversation -and $CandidateOffset -ne 0) { throw 'current_conversation_has_no_offset' }
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
+. (Join-Path $PSScriptRoot 'chatgpt-web-smoke-native-draft.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-evidence.ps1')
 . (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
@@ -63,6 +64,9 @@ function Act([string]$Action, [hashtable]$Arguments, [string]$Expected) {
     }
 }
 function Open([string]$Path) {
+    $current = Get-ChatGptWebNativeChatState -Runtime $runtime
+    if (-not (Test-WebChatNativeChatSurfaceForeground -Runtime $runtime)) { throw 'foreground_changed' }
+    if (-not (Test-ChatGptWebNativeDraftEmpty $current)) { throw 'changed_draft_preserved' }
     Act 'chatgpt_open_conversation' @{ conversation_path = $Path } 'open_conversation' | Out-Null
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds(20)
     do {
@@ -83,7 +87,7 @@ try {
     if ($origin.active_surface -ne 'social_ai' -or $origin.social_chat.web_chat_provider_id -ne 'chatgpt_web' -or
         -not $before.authenticated -or -not $before.adapter_current -or
         -not $origin.social_chat.web_chat_conversation_path) { throw 'surface_not_ready' }
-    if ($origin.input.text -or $before.streaming -or $before.dictation_active -or
+    if (-not (Test-ChatGptWebNativeDraftEmpty $origin) -or $before.streaming -or $before.dictation_active -or
         [int]$before.input.official_draft_length -gt 0 -or $before.file_download.can_cancel -or
         [int]$origin.social_chat.web_chat_pending_attachment_count -gt 0) { throw 'existing_work_in_progress' }
     Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
@@ -203,7 +207,8 @@ try {
                 $web = Web
                 $report.restored = $after.social_chat.web_chat_conversation_path -eq $origin.social_chat.web_chat_conversation_path -and
                     @($after.social_chat.messages).Count -eq @($origin.social_chat.messages).Count -and
-                    $after.input.text -eq $origin.input.text -and [int]$web.input.official_draft_length -eq 0
+                    (Test-ChatGptWebNativeDraftEmpty $origin) -and (Test-ChatGptWebNativeDraftEmpty $after) -and
+                    [int]$web.input.official_draft_length -eq 0
                 if ($report.restored) { break }
                 Start-Sleep -Milliseconds 400
             } while ([DateTimeOffset]::UtcNow -lt $deadline)

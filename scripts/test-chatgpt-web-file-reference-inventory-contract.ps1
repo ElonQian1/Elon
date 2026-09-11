@@ -12,7 +12,7 @@ foreach ($required in @(
     'Wait-ChatGptCommandReceipt', 'chatgpt_list_conversation_files',
     "[ValidateRange(1, 12)]", 'Select-Object -Skip $CandidateOffset -First $Limit',
     'Open $origin.social_chat.web_chat_conversation_path',
-    '$after.input.text -eq $origin.input.text',
+    '(Test-ChatGptWebNativeDraftEmpty $origin)', '(Test-ChatGptWebNativeDraftEmpty $after)',
     '$report.inventory_completed = $true',
     '@($report.cases | Where-Object { -not $_.index_read }).Count -eq 0',
     '$report.passed -and $report.restored -and $report.awake_restored',

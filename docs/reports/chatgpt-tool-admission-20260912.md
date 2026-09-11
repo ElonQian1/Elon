@@ -100,3 +100,54 @@ Do not confuse request registration with execution: an absent MCP request row
 does not prove a native gesture failed. Conversely, a success receipt alone is
 not acceptance; the native gesture and confirmed destination/restored state are
 both required. Study/Canvas's separate missing raw hints remain unresolved.
+
+## Producer Trace
+
+Inspected the existing public `web_20260911_b` artifacts, without opening a
+private conversation or changing the phone's foreground. The trace is:
+
+1. Shared `cBe -> hT -> mT/fT`: cached `safeGet('/system_hints')`, `mode=basic`.
+   Ordinary query key: `['system-hints', 'basic']`; project keys additionally
+   bind the project ID. Suggestion keys are separate. The official query uses
+   infinite stale time; a missing menu item alone does not justify clearing it.
+2. Conversation `Vw -> hAt -> zw/Bw -> Cri -> Sri`: base/connector hints are
+   combined, then filtered for temporary chat, surface, project context, model
+   `enabledTools`, required models and conversation modes, and other eligibility.
+3. Composer `M2n -> e2n -> Rmn -> Jvn -> Pvn`: `Rmn` filters disconnected plugin
+   hints and the plan hint; `e2n` can filter active custom-agent hints. `Pvn` then
+   produces the rendered menu already consumed by our existing tool context.
+
+Therefore our diagnostic's `raw` means **Pvn input**, not the unfiltered server
+response. Its zero counts cannot distinguish upstream account data from model,
+surface or conversation filtering. Do not bypass these rules, duplicate their
+policy in Android, or claim that the server lacks Canvas/Study. A future live
+probe should compare only the four known tool counts at these boundaries in the
+same identity/document, not rescan every export or retry synthetic sends.
+
+Artifact SHA-256 (composer / conversation / shared):
+
+- `c4b74136b4efd5255fd91e9c0f2f9c382212ffc28f5ecee7aaa564ed05e36cec`
+- `a89952420338983e104e94be5fae8e9ae7a4169b9ea8a4ed30e639641e14f456`
+- `41e6e38589707e7c6ff5d181afa2193dda17f605dfe256224af09e6c85cfa096`
+
+## Acceptance Draft Contract Repair
+
+Current Main MCP intentionally returns `input.has_text` and `input.text_length`,
+not `input.text`. Legacy predicates using the omitted field can admit a nonempty
+draft and can falsely mark restoration successful (`null == null`). This is a
+test-harness defect, not evidence that the private provider operation failed.
+
+`chatgpt-web-smoke-native-draft.ps1` now requires a boolean false plus an integer
+zero. Unknown, missing, coerced and contradictory metadata fail closed. The
+pending file-reference inventory and extended-tool acceptance use it before
+work, before cleanup/navigation, and when confirming restoration. **48 focused
+cases passed**, along with
+the existing file-inventory contract. No APK implementation or protocol changed,
+so this batch does not require another APK build or repeat accepted features.
+
+Other legacy smokes still containing `.input.text` must be migrated before their
+next execution; exact-text cleanup needs semantic equality, not a length-only
+match. Previous model/selection evidence remains useful, but a legacy
+`draft_unchanged` flag alone is not proof of draft preservation. Wireless ADB is
+online; the phone was in the separate quant app, so no fresh Canvas/Study native
+acceptance or original-document write was performed in this batch.
