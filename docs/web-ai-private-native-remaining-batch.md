@@ -28,35 +28,31 @@ a functional acceptance gate; do not expand performance tests in this phase.
 
 ## Current Status Map
 
-The [latest runtime compatibility repair](reports/chatgpt-runtime-bindings-20260911-b.md)
-is verified on 1655. Personal/project TXT citation downloads passed on 1651/1657;
-reuse [accepted scopes](chatgpt-private-file-citations.md), not the old 404 label.
-[File-list recovery](reports/chatgpt-file-read-recovery-20260911.md#normal-1659-native-follow-up)
-on 1659 kept its sheet/cached rows during refresh; final overlap timing awaits unlock.
+Installed 1662 includes the [grouped source/file changes and acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence).
+Its first inventory run had one timeout, retaining cached rows. One targeted retry
+passed: three taps joined one 1077 ms read, without replacing the sheet or overlap.
+Project TXT native download again saved the expected 78 bytes. Reuse these cases;
+supplemental/PCA and URL-only cloud samples remain unverified. The older unlock,
+build and overlap-check prerequisites are no longer current.
 
-This summary supersedes older delivery labels below; it does not broaden a
-passed scope. Bounded ordinary/project directory continuation is now completed,
-default-enabled and device-verified on normal 1611, adapter 311; see
-[owned continuation](reports/chatgpt-directory-owned-continuation-20260909.md).
-Installed normal 1612 additionally passed the actual native file-library Download
-button and saved-byte checks for TXT/PNG/PDF without a ready composer; see
-[rendered download acceptance](reports/chatgpt-library-download-ui-20260909.md).
-[Explicit full-page browsing](chatgpt-private-directory-browser.md) is completed
-and production-verified on 1614: next/previous, project folder/back and existing
-conversation navigation. Large-account overflow remains synthetic coverage,
-not a claim that the whole live account was traversed. Project TXT/PNG/PDF
-upload, native send and actual file-content replies now passed on 1614; the
-post-send membership timing defect and source fix are recorded in
-[project-media follow-up](reports/chatgpt-project-media-1614.md).
+This map supersedes historical labels below without broadening passed scopes.
+Reuse [directory continuation on 1611](reports/chatgpt-directory-owned-continuation-20260909.md),
+[native TXT/PNG/PDF saved downloads on 1612](reports/chatgpt-library-download-ui-20260909.md),
+[full-page/project navigation on 1614](chatgpt-private-directory-browser.md) and
+[project upload/send/content reading on 1614](reports/chatgpt-project-media-1614.md).
+Large-account overflow is synthetic coverage, not full live-account traversal.
 
 Native project-folder PNG Download is completed/default-enabled on 1648, adapter
 331: actual native action, 2122 saved bytes and PNG decode passed; original state
 restored. Reuse this scope; 222 Node and 11 app tests pass. Other sources remain.
 See [the scoped regression](reports/chatgpt-library-folder-download-1644.md).
 
-Follow-up: [explicit account-read isolation](reports/chatgpt-explicit-account-read-20260911.md)
-fixes shared prefetch cooldown blocking attachment/membership reads. Device
-acceptance is tracked there; it does not complete citation or mounted workflows.
+[Explicit account-read isolation](reports/chatgpt-explicit-account-read-20260911.md)
+is device-verified for empty/populated file indexes and native Refresh on 1649.
+Reuse it; this does not prove idle membership, citation or mounted-file variants.
+The [1662 library source audit](reports/chatgpt-library-source-audit-1662.md) found
+nine PNG rows without native actions. Their source classification is unresolved;
+do not call them mounted files or generated images based only on their MIME type.
 
 | User workflow | Current result | Remaining boundary |
 |---|---|---|
@@ -66,10 +62,10 @@ acceptance is tracked there; it does not complete citation or mounted workflows.
 | File library navigation, saved download, single library attachment, rename/soft-delete/upload-copy | Earlier scopes through 1591 reused; native TXT/PNG/PDF Download buttons and saved bytes passed on 1612 | [Mounted catalogue download](chatgpt-private-library-mounted-download.md) (244 checks) and [mounted attachment preparation](chatgpt-private-mounted-library-attachment.md) (196 checks) are included in installed 1639; device acceptance pending. Large-transfer/cancel/crash cases, other special sources, folder writes and attachment scopes remain |
 | Personal full sharing/list/revoke and current-conversation delete | 1547 personal scopes and 1623 account-list UI reused; 1644 native Copy, exact clipboard readback and cross-conversation revoke passed, with other links and original chat preserved | [1644 evidence](reports/chatgpt-private-acceptance-1644.md#native-shared-link-copy-and-revoke). Large-account page controls, workspace/Canvas/post/bulk and server pagination remain; [contract](chatgpt-private-shared-links.md) |
 | Text submit/stream/stop/follow-up | Official runtime send reused; ordinary authenticated native retry completed/default-enabled on 1644, adapter 327/resolver 12 | [Actual native retry passed](reports/chatgpt-regeneration-store-20260911.md#normal-1644-acceptance): one invocation, successful runtime receipt, streaming and changed completed content, original user turn/conversation/awake state restored. Reuse the accepted identity/store confirmation and 1642 transcript reentry fixes. Independent Android POST, other reply contexts, passive stream-capture gaps and measured first-word timing remain unresolved |
-| Project attachments | Native new-project TXT/PNG/PDF upload, send and actual content reading verified on 1614 | Explicit membership query rejected when background freshness expires; fix passes offline tests, grouped install/idle-query acceptance pending |
+| Project attachments | Native TXT/PNG/PDF upload/send/content reading passed on 1614; read-isolation fix is installed and file-index verified on 1649 | Idle membership query itself is not separately device-verified; do not rebuild or repeat file-index acceptance for it |
 | Model/effort/tool combinations | 1625 Advanced/version and 1627 cached High/Extreme selection reused; native new blank chat and temporary on/off passed. 1628 fixed premature tool-read cancellation and passed authenticated native Create Image/Search on/off, private receipts and chip clearing; [evidence](reports/chatgpt-composer-state-20260910.md) | Physical drag, other model/tier/tool and temporary contexts, subsequent send and server preference persistence remain unclaimed |
 | Latest cursor image gallery and creation | Gallery entry/page/viewer passed on 1620; full native Create Image passed on 1644. Ordinary original-image Download completed/default-enabled on 1654: one saved 662,362-byte PNG, 1254 x 1254, native decode and state restoration passed | [Original-download evidence and boundaries](reports/chatgpt-gallery-original-download-20260911.md#normal-1654-acceptance). Project/shared/mounted/watermarked sources, other formats and model/account scopes remain. Thumbnail efficiency/thermal work remains deferred |
-| Explicit file citations / cloud references | Personal/project TXT native Download and 78 bytes/SHA-256 completed/default-enabled on 1651/1657 | [Evidence](chatgpt-private-file-citations.md). Per-file grouping and [supplemented context/PCA concrete-file inventory](chatgpt-private-context-source-files.md) are source-implemented; grouped build/source-shape device acceptance and URL-only cloud resolution remain |
+| Explicit file citations / cloud references | Personal/project TXT Download completed on 1651/1657; grouping, context/PCA and URL-only source links published in 1662, with 42 Kotlin tests and ordinary inventory/download device regression | [Evidence](chatgpt-private-context-source-files.md). Actual supplemental/PCA masks and URL-only source opening remain unverified; no further build is needed just to accept them |
 | Google private sender | Deferred by user priority | Start only after the remaining ChatGPT acceptance gate |
 
 Current code correction separates current-document navigation/private directory
