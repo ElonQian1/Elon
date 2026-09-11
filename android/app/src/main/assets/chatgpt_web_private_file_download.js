@@ -4,14 +4,16 @@
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 32, create: root => factory(root, pointer, citation) });
+  const raster = typeof module === 'object' && module.exports
+    ? require('./chatgpt_web_private_library_raster_policy.js') : root?.__elonChatGptPrivateLibraryRasterPolicy;
+  const exported = Object.freeze({ version: 33, create: root => factory(root, pointer, citation, raster) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
     root.__elonChatGptPrivateFileDownload?.dispose?.();
-    root.__elonChatGptPrivateFileDownload = factory(root, pointer, citation);
+    root.__elonChatGptPrivateFileDownload = factory(root, pointer, citation, raster);
   }
-})(typeof window === 'object' ? window : null, function (root, pointerParser, citationParser) {
+})(typeof window === 'object' ? window : null, function (root, pointerParser, citationParser, raster) {
   'use strict';
   const entries = new Map();
   const PATH = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([A-Za-z0-9_-]{1,160})$/i;
@@ -246,17 +248,7 @@
     const mounted = root.__elonChatGptPrivateLibraryDownload?.catalogTarget?.(file);
     // s4n/dV do not require an image_gen tag. Raster artifacts use w3n/MDt's
     // backing-file ownership check, never a guessed URL or a thumbnail.
-    const imageArtifact = typeof file?.library_artifact_type === 'string' &&
-      /^(?:[a-z][a-z0-9_]{0,63})?$/.test(file.library_artifact_type) &&
-      !['saved_entity', 'flashcards', 'deep_research_report', 'learning_quiz', 'app_block',
-        'site_preview', 'writing_block', 'chat_message_snapshot'].includes(file.library_artifact_type) &&
-      typeof file.name === 'string' && !/\.flashcards$/i.test(file.name.trimEnd()) &&
-      /^file[_-][A-Za-z0-9_-]{1,152}$/.test(file.file_id || '') &&
-      ['image/png', 'image/jpeg', 'image/webp'].includes(file.mime_type) &&
-      (file.is_project == null || file.is_project === false) &&
-      ['gizmo_id', 'project_id', 'context_scopes', 'preview_file', 'mounted_library_file_id',
-        'library_file_id', 'shared_library_file_id', 'library_download_id', 'context_connector_info',
-        'library_provider'].every(key => file[key] == null);
+    const imageArtifact = raster?.matches(file) === true;
     if (disposed || !account || !/^doc_[a-z0-9_]{3,80}$/.test(token || '') ||
         !root.elonChatGptFileDownload || file?.kind !== 'file' || !mounted && !LIBRARY.test(file.id || '') ||
         typeof file.name !== 'string' || !file.name.trim() || /[\x00-\x1f\x7f]/.test(file.name) ||
@@ -433,5 +425,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 32, register, registerLibraryFile, registerGalleryImage, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 33, register, registerLibraryFile, registerGalleryImage, start, cancel, dispose, sourceDiagnostics });
 });
