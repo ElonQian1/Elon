@@ -2,7 +2,7 @@
   'use strict';
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 9, create: dependencies => factory(dependencies, citation) });
+  const exported = Object.freeze({ version: 10, create: dependencies => factory(dependencies, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateHistoryProjection = exported;
 })(typeof window === 'object' ? window : null, function (dependencies, citation) {
@@ -244,5 +244,13 @@
       projectId: normalized.gizmo_id || normalized.project_id || '' } : null;
   }
 
-  return Object.freeze({ normalize, project, files, fileSource });
+  function sourceMessages(payload) {
+    return (orderedNodes(normalize(payload)) || []).flatMap(entry => {
+      const message = object(entry.node.message || entry.node);
+      return message && visible(message) ? [{ message,
+        id: clean(message.id || entry.node.id, 180) || entry.fallbackId }] : [];
+    });
+  }
+
+  return Object.freeze({ normalize, project, files, fileSource, sourceMessages });
 });

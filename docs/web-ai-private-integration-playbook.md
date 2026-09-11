@@ -111,6 +111,7 @@ WebView 身份与官网运行时按操作提供依赖；不是每次命令都重
 | 发送已发生，但页面上下文变化导致回执 unknown；盲目 fallback 有重复发送风险 | 账本绑定原请求，确认 dispatch 与清理编辑器分开，未知写结果只读对账 | [运行时发送](chatgpt-official-runtime-text-submit.md) |
 | 音频接通不代表有字幕；公开 Realtime 示例的 `oai-events` 不等于网页通道标签 | 使用网页实际 channel、text/binary 帧和 delta/final 协议；字幕按 item/response 去重 | [原生字幕](chatgpt-realtime-voice-native-transcript-stream.md) |
 | SSE 被当成逐条完整 JSON，丢掉事件类型与交错通道 | 先按实证解码 marker、channel、继承字段和相对补丁；失败保留最后有效内容，不误报完成。正文与来源补充流复用同一补丁模块 | [增量流协议](chatgpt-private-delta-stream.md) |
+| 补充来源的第一批快照被当最终列表；页面重注入后新解析器与旧缓存各持一份状态 | 命令完成前继续原位更新；状态所有者保持单例。来源删除/过滤先于列表限额，账号或文档变化使旧授权失效。代码测试不等于真实来源和下载验收 | [上下文来源集成](chatgpt-private-context-source-files.md) |
 | 当前 native 图库入口变为“图片已更新”，旧脚本报找不到功能 | 优先稳定 semantic ID；派生文案有变化时修测试定位，不削弱业务断言 | [1620 图库验收](reports/chatgpt-gallery-thumbnails.md#usb-acceptance-on-1620) |
 | 打开缓存预览成功，却没有新网络记录 | 只证明预览可用，不声称验证了独立缩略图传输或流量改善 | [1620 图库验收](reports/chatgpt-gallery-thumbnails.md#usb-acceptance-on-1620) |
 | 有界资源清单截断，漏掉全部运行时角色；模块重注入又丢掉诊断注册表 | 保留角色证据且不放大清单；同页面单例诊断与消费者保持同一生命周期，不把“未观察”当“不支持” | [1625 运行时修复](reports/chatgpt-runtime-bindings-20260910.md) |

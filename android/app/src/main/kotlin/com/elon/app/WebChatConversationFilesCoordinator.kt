@@ -73,20 +73,19 @@ internal class WebChatConversationFilesCoordinator(
                     val result = owner.conversationFiles(conversation.path)
                     val command = owner.state().commandRequests.firstOrNull { it.id == request.requestId }
                     val status = command?.status
-                    if (result?.requestId == request.requestId) {
-                        index = result
-                        sheet?.updateItems(WebChatConversationFilesPresentation.rows(index, false, false))
-                        pollTask = null
-                        return
-                    }
+                    val matched = result?.requestId == request.requestId
+                    if (matched) index = result
+                    val timedOut = status == WebChatConsumerCommandStatus.TIMED_OUT ||
+                        android.os.SystemClock.elapsedRealtime() - startedAt >= 15_000
                     if (status in setOf(WebChatConsumerCommandStatus.FAILED, WebChatConsumerCommandStatus.TIMED_OUT,
-                            WebChatConsumerCommandStatus.SUCCEEDED) || android.os.SystemClock.elapsedRealtime() - startedAt >= 15_000) {
-                        val reason = if (status == WebChatConsumerCommandStatus.TIMED_OUT ||
-                            android.os.SystemClock.elapsedRealtime() - startedAt >= 15_000) "files_read_timeout" else command?.detail
-                        sheet?.updateItems(WebChatConversationFilesPresentation.rows(index, false, true, reason))
+                            WebChatConsumerCommandStatus.SUCCEEDED) || timedOut) {
+                        val failed = timedOut || status != WebChatConsumerCommandStatus.SUCCEEDED || !matched
+                        val reason = if (timedOut) "files_read_timeout" else command?.detail
+                        sheet?.updateItems(WebChatConversationFilesPresentation.rows(index, false, failed, reason))
                         pollTask = null
                         return
                     }
+                    if (matched) sheet?.updateItems(WebChatConversationFilesPresentation.rows(index, true, false))
                     host.postDelayed(this, 250)
                 }
             }

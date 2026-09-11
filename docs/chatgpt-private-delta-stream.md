@@ -81,8 +81,11 @@ network/native fixtures, not phone audio or installed-APK evidence.
 
 `l5i` uses the same decoder for the same-origin context-source supplement stream.
 It also owns metadata-status admission, source identity replacement, PCA masks,
-per-conversation/message cancellation and completion. Those semantics still
-need integration into the bounded file inventory before broadening its scope.
+per-conversation/message cancellation and completion. The separate
+[bounded file integration](chatgpt-private-context-source-files.md) now implements
+that lifecycle for concrete-file inventory, with source-only verification.
+Its reader opts into strict ordinary JSON errors; existing text readers retain
+their prior admission. Actual context-source/native download acceptance is pending.
 Do not just remove the PCA guard, fetch every historical message, or treat a
 cloud source URL as downloadable bytes. Reuse the verified scope/download owners
 and the [inline citation boundary](chatgpt-private-file-citations.md#inline-context-file-coverage).

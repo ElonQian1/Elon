@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 27) ||
+  if ((existingTransport && Number(existingTransport.version) >= 28) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -181,6 +181,7 @@
     if (!request) throw new Error('request_unavailable');
     const headers = { Accept: 'application/json' };
     inherited.forEach((value, name) => { headers[name] = value; });
+    const contextSourcesOwner = window.__elonChatGptPrivateContextSources?.capture(headers);
     try {
       privateFetchDepth += 1;
       const response = await request.request(window, '/backend-api/conversations/' + encodeURIComponent(id), {
@@ -192,7 +193,7 @@
           ? 'conversation_membership'
           : 'conversation_prefetch'
       }, { timeoutMs: policy.attemptBudgetMs(), maxBytes: 4 * 1024 * 1024 });
-      return { payload: response.payload, elapsedMs: Date.now() - startedAt };
+      return { payload: response.payload, elapsedMs: Date.now() - startedAt, contextSourcesOwner };
     } catch (error) {
       if (/^http_(401|403)$/.test(String(error && error.message || ''))) {
         if (authContext && typeof authContext.invalidate === 'function') {
@@ -500,13 +501,24 @@
     try {
       const result = await fetchConversation(target.id);
       const projection = window.__elonChatGptPrivateHistoryProjection;
-      const index = projection && projection.create({}).files(result.payload);
-      if (!index) throw new Error('parse_files_unknown');
-      let files = index.files;
-      try { files = window.__elonChatGptPrivateFileDownload?.register(target.path, result.payload, index) || files; } catch (_) {}
+      const sources = window.__elonChatGptPrivateContextSources;
+      function publish(partial = false) {
+        if (sources && !result.contextSourcesOwner?.current()) throw new Error('context_sources_stale');
+        const index = projection && projection.create({}).files(result.payload);
+        if (!index) throw new Error('parse_files_unknown');
+        let files = index.files;
+        try { files = window.__elonChatGptPrivateFileDownload?.register(target.path, result.payload, index) || files; } catch (_) {}
+        emitEvent({ type: 'conversation_files_snapshot', conversationPath: target.path,
+          requestId, files, truncated: partial || index.truncated });
+      }
+      if (sources?.hasSources(result.payload)) {
+        sources.applyCached(result.payload, target.id);
+        publish(true);
+        const supplement = await sources.enrich(result.payload, target.id, result.contextSourcesOwner);
+        if (supplement.stale) throw new Error('context_sources_stale');
+        publish(supplement.partial);
+      } else publish();
       accountReadPolicy.recordSuccess(result.elapsedMs);
-      emitEvent({ type: 'conversation_files_snapshot', conversationPath: target.path,
-        requestId, files, truncated: index.truncated });
       respond(action, true, 'private_files_ready');
     } catch (error) {
       recordReadFailure(error, accountReadPolicy);
@@ -562,7 +574,7 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 27,
+    version: 28,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,

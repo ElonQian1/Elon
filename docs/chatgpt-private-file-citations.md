@@ -69,8 +69,10 @@ for the separate file-sheet acceptance boundary.
 
 ## Inline context-file coverage
 
-The shared [delta-stream prerequisite](chatgpt-private-delta-stream.md) is
-implemented separately; it does not yet enable supplemented/PCA downloads.
+The shared [delta-stream prerequisite](chatgpt-private-delta-stream.md) and
+[context-source integration](chatgpt-private-context-source-files.md) are now
+implemented. The latter extends ordinary concrete-file/PCA source handling;
+grouped Android build and actual source-shape/download acceptance remain pending.
 
 Parser v5 / adapter 342 adds ordinary file citations already present in a
 completed `conversation_context_citation_metadata` array. Code and synthetic
@@ -106,15 +108,15 @@ Logs: `inline-context-citation-green-20260911-142940-982` and final
 `inline-context-citation-final-20260911-143537-457`. All 114 production assets
 and their combined bundle parse; this is not Android compilation or installation.
 
-Full PCA/supplemented sources are **not implemented by this change**. Public
+The earlier v5 change did not implement supplemented sources. Public
 `l5i` (4116972) uses POST `/backend-api/sidebar/conversation_context_sources`
 with conversation/message identity and `expand_partial_inline`; its stream
 includes `conversation_context_source` and `pca_source_filter_mask`. `c5i`
 (4116628) controls when supplementation is required, while `JVi` (3760794)
-applies the returned source mask. That separate lifecycle still needs a real
-controlled response and matching integration; an endpoint name alone does not
-justify enabling it or removing PCA filtering. Resume the remaining source
-and native acceptance gaps without resending accepted personal/project fixtures.
+applies the returned source mask. The separate lifecycle is now integrated in
+the linked context-source module; it still needs a real controlled response and
+native acceptance. An endpoint name alone does not justify removing PCA guards.
+Resume pending source-shape acceptance without resending accepted personal/project fixtures.
 
 ## Current resolver correction
 
