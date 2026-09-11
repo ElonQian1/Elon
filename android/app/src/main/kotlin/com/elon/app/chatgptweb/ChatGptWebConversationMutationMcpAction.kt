@@ -21,11 +21,12 @@ internal object ChatGptWebConversationMutationMcpAction {
                 val selection = if (args.has("selection_ticket")) args.opt("selection_ticket") as? String
                     ?: return "share_invalid_selection" else null
                 ChatGptWebSharedLinks.accountRequest(offset, selection, canvas = resource == "canvas")
-            } else if (args.optString("operation") == "revoke_account" && resource == "canvas") {
+            } else if (args.optString("operation") in setOf("read_account", "revoke_account") && resource == "canvas") {
                 if (args.has("conversation_path")) return "share_invalid_selection"
                 val id = args.opt("share_id") as? String ?: return "share_invalid_selection"
                 val ticket = args.opt("selection_ticket") as? String ?: return "share_invalid_selection"
-                ChatGptWebSharedLinks.canvasRevokeRequest(id, ticket)
+                if (args.optString("operation") == "read_account") ChatGptWebCanvasContent.request(id, ticket)
+                else ChatGptWebSharedLinks.canvasRevokeRequest(id, ticket)
             } else {
                 if (resource != "conversation") return "share_invalid_selection"
                 if (path == null) return "invalid_conversation_path"

@@ -1,8 +1,10 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateConversationShare) {
+  if (root?.location?.origin === 'https://chatgpt.com' &&
+      Number(root.__elonChatGptPrivateConversationShare?.version || 0) < api.version &&
+      !root.__elonChatGptPrivateConversationShare?.busy?.()) {
     root.__elonChatGptPrivateConversationShare = factory(root);
   }
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -71,7 +73,7 @@
 
   function start(path, confirmed, readSnapshot) {
     const managed = path && typeof path === 'object' ? path : null;
-    const readOnly = ['list', 'list_account'].includes(managed?.operation);
+    const readOnly = ['list', 'list_account', 'read_account'].includes(managed?.operation);
     if (confirmed !== true && !readOnly) return Promise.resolve(outcome(false, 'user_confirmation_required', false));
     if (page.__elonChatGptPrivateConversationMutationsEnabled !== true || !transport ||
         !page.__elonChatGptPrivateJsonRequest?.request) return Promise.resolve(outcome(false, 'share_context_unavailable', false));
@@ -87,19 +89,26 @@
     }).finally(() => { if (active === job) active = null; });
   }
 
-  function handle(action, command, respond, readSnapshot) {
+  function handle(action, command, respond, readSnapshot, emit) {
     if (action !== 'share_conversation') return false;
     let value = command?.value;
     if (typeof value === 'string' && value.startsWith('{')) {
       try { if (value.length > 1024) throw new Error(); value = JSON.parse(value); }
       catch (_) { respond(action, false, 'share_invalid_selection'); return true; }
     }
+    if (value?.operation === 'read_account' && (typeof emit !== 'function' ||
+        !/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || ''))) {
+      respond(action, false, 'share_canvas_unavailable'); return true;
+    }
     start(value, command?.selected, readSnapshot).then(result => {
+      if (result.ok && result.content) {
+        emit({ type: 'canvas_shared_content', version: 1, requestId: command.requestId, ...result.content });
+      }
       // Preserve the audience-specific prefix; never confuse a members-only link with a public one.
       respond(action, result.ok, result.data ? JSON.stringify(result.data) :
         result.ok && result.url ? result.code + ':' + result.url : result.code);
     }).catch(() => respond(action, false, 'share_result_unconfirmed'));
     return true;
   }
-  return Object.freeze({ version: 5, start, handle, busy: () => active !== null });
+  return Object.freeze({ version: 6, start, handle, busy: () => active !== null });
 });

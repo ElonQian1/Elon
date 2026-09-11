@@ -64,6 +64,7 @@ internal class ChatGptWebMcpActions(
             .put("last_attachment_upload", ChatGptWebCommandReceipts.recentResultJson(observed, "request_attachment_upload"))
             .put("conversation_files", ChatGptWebMcpSnapshotJson.conversationFiles(observed, current?.url))
             .put("library_files", ChatGptWebLibraryProtocol.json(observed.libraryFiles.takeIf { observed.adapterCurrent }))
+            .put("canvas_content", observed.canvasContent?.takeIf { observed.adapterCurrent }?.diagnostic() ?: JSONObject.NULL)
             .put("file_download", commands.fileDownloadState()?.let { download ->
                 JSONObject().put("request_id", download.requestId).put("state", download.stage.wireName)
                     .put("received_bytes", download.receivedBytes).put("total_bytes", download.totalBytes)

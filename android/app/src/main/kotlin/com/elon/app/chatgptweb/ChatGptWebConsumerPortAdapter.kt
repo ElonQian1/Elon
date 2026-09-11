@@ -20,6 +20,7 @@ internal class ChatGptWebConsumerPortAdapter(
     private val readFileDownload: () -> com.elon.app.WebChatFileDownloadState? = { null },
 ) : WebChatConsumerPort {
     override fun libraryFiles() = observedState().let { it.libraryFiles.takeIf { _ -> it.adapterCurrent } }
+    override fun canvasContent() = observedState().let { it.canvasContent.takeIf { _ -> it.adapterCurrent } }
     override fun directoryPage() = observedState().let { it.directoryPage.takeIf { _ -> it.adapterCurrent } }
     override fun browseDirectoryPage(scope: String, handle: String) =
         execute(JSONObject().put("action", "chatgpt_browse_directory_page").put("scope", scope).put("page_handle", handle))
@@ -237,6 +238,10 @@ internal class ChatGptWebConsumerPortAdapter(
         .put("operation", if (shareId == null) "list_account" else "revoke_account").put("resource", "canvas")
         .put("page_offset", offset).put("share_id", shareId).put("selection_ticket", selectionTicket)
         .put("user_confirmed", userConfirmed))
+
+    override fun readCanvasShare(shareId: String, selectionTicket: String): WebChatConsumerCommandResult =
+        execute(JSONObject().put("action", "chatgpt_share_conversation").put("operation", "read_account")
+            .put("resource", "canvas").put("share_id", shareId).put("selection_ticket", selectionTicket))
 
     override fun renameConversation(
         conversationPath: String,

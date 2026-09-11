@@ -109,3 +109,6 @@ the native Link model constructs the official URL. Only the external harness
 was corrected, and its leftover dialog was closed before the successful run.
 Do not repeat the accepted read/Copy scope without regression evidence. Actual
 revocation, publishing and full Canvas editing remain unaccepted.
+
+The next [native shared Canvas source viewer](chatgpt-canvas-content-native-20260912.md)
+is a separate source batch, not an expansion of this 1673 device pass.

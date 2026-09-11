@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateSharedLinks = api;
 })(typeof window === 'object' ? window : null, function (page, contract, options) {
@@ -10,6 +10,7 @@
   const LIST = '/backend-api/shared_conversations?order=created';
   const now = options?.now || Date.now;
   const caches = new Map();
+  const canvasContent = page.__elonChatGptPrivateCanvasContent?.create({ now, current, request });
   let sequence = 0;
 
   function current(binding) {
@@ -96,10 +97,11 @@
       const accountList = input?.operation === 'list_account';
       const resource = input?.resource === undefined ? 'conversation' : input.resource;
       const canvasRevoke = input?.operation === 'revoke_account' && resource === 'canvas';
+      const canvasRead = input?.operation === 'read_account' && resource === 'canvas';
       if (!['conversation', 'canvas'].includes(resource) ||
-          resource === 'canvas' && !accountList && !canvasRevoke ||
-          !accountList && !canvasRevoke && (!UUID.test(id) || !['list', 'revoke'].includes(input?.operation)) ||
-          canvasRevoke && input.path !== undefined) {
+          resource === 'canvas' && !accountList && !canvasRevoke && !canvasRead ||
+          !accountList && !canvasRevoke && !canvasRead && (!UUID.test(id) || !['list', 'revoke'].includes(input?.operation)) ||
+          (canvasRevoke || canvasRead) && input.path !== undefined) {
         throw new Error('share_invalid_selection');
       }
       const binding = bind();
@@ -133,15 +135,22 @@
           ticket: result.ticket, complete: result.complete && matching.length === scoped.length && matching.length <= 100,
           items: matching.slice(0, 100).map(({ id, createdAt }) => ({ id, createdAt })) } };
       }
-      if (confirmed !== true) throw new Error('user_confirmation_required');
+      if (!canvasRead && confirmed !== true) throw new Error('user_confirmation_required');
       const selected = cached;
-      if (!(canvasRevoke ? CANVAS_ID : UUID).test(input.id || '') || !selected || input.ticket !== selected.ticket ||
+      if (!((canvasRevoke || canvasRead) ? CANVAS_ID : UUID).test(input.id || '') || !selected || input.ticket !== selected.ticket ||
           now() - selected.at < 0 || now() - selected.at > 120000 || !current(selected.binding) ||
-          !selected.items.some(row => row.id === input.id && (canvasRevoke || row.conversationId === id) && !row.workspace)) {
+          !selected.items.some(row => row.id === input.id && (canvasRevoke || canvasRead || row.conversationId === id) && !row.workspace)) {
         throw new Error('share_selection_expired');
+      }
+      if (canvasRead) {
+        if (!canvasContent) throw new Error('share_canvas_unavailable');
+        const content = await canvasContent.read(binding, input.id);
+        if (caches.get(resource) !== selected || !current(binding)) throw new Error('share_context_changed');
+        return { ok: true, attempted: false, code: 'share_canvas_ready', content };
       }
       // Consume selection before the write. A timeout cannot trigger another DELETE.
       caches.delete(resource);
+      canvasContent?.invalidate();
       options?.invalidateCreated?.();
       attempted = true;
       await request(binding, (canvasRevoke ? '/backend-api/textdoc/shared/' : '/backend-api/share/') + input.id, 'DELETE', 'none');
@@ -152,6 +161,7 @@
       const code = String(error?.message || '');
       if (/^http_(401|403)$/.test(code)) {
         caches.clear();
+        canvasContent?.invalidate();
         page.__elonChatGptPrivateAuthContext?.invalidate?.('shared_links_rejected');
       }
       return { ok: false, attempted, code: attempted ? 'share_revoke_unconfirmed' :
@@ -159,5 +169,5 @@
     }
   }
 
-  return Object.freeze({ version: 4, run, invalidate: () => { caches.clear(); } });
+  return Object.freeze({ version: 5, run, invalidate: () => { caches.clear(); canvasContent?.invalidate(); } });
 });

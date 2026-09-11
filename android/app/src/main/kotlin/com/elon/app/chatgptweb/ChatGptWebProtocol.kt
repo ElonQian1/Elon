@@ -163,6 +163,7 @@ internal object ChatGptWebProtocol {
                 "conversation_files_snapshot" -> ChatGptWebConversationFiles.parse(event)
                     ?.let { ChatGptWebEvent.ConversationFiles(it) }
                 "library_files_snapshot" -> ChatGptWebLibraryProtocol.parse(event)?.let { ChatGptWebEvent.LibraryFiles(it) }
+                "canvas_shared_content" -> ChatGptWebCanvasContent.parse(event)?.let { ChatGptWebEvent.CanvasContent(it) }
                 "directory_page" -> ChatGptWebDirectoryPage.parse(event, ::parseConversations, ::parseProjects)
                     ?.let { ChatGptWebEvent.DirectoryPage(it) }
                 "image_gallery_snapshot" -> ChatGptWebImageAssetProtocol.parseGallery(event)

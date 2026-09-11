@@ -105,16 +105,41 @@ internal class WebChatConversationSharedLinksCoordinator(
         conversation: ChatGptWebConversation, index: ChatGptWebSharedLinks.Index, link: ChatGptWebSharedLinks.Link,
         page: ChatGptWebSharedLinks.AccountIndex? = null,
     ) {
-        track(AlertDialog.Builder(activity).setTitle(if (canvasShares) "画布公开分享链接" else "公开分享链接").setMessage(link.url)
+        val builder = AlertDialog.Builder(activity).setTitle(if (canvasShares) "画布公开分享链接" else "公开分享链接").setMessage(link.url)
             .setPositiveButton("复制链接") { _, _ ->
                 val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                 clipboard?.setPrimaryClip(ClipData.newPlainText(if (canvasShares) "画布分享链接" else "会话分享链接", link.url))
                 if (clipboard != null) Toast.makeText(activity, "链接已复制", Toast.LENGTH_SHORT).show()
             }
             .setNeutralButton("取消分享") { _, _ -> confirmRevoke(conversation, index, link, page) }
-            .setNegativeButton("返回列表") { _, _ -> showLinks(conversation, index, page) }.create())
+            .setNegativeButton("返回列表") { _, _ -> showLinks(conversation, index, page) }
+        if (canvasShares) builder.setView(WebChatCanvasContentView.entry(activity) {
+            readCanvas(conversation, index, link, page)
+        })
+        track(builder.create())
         dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.contentDescription = "web-chat-existing-share-copy"
         dialog?.getButton(AlertDialog.BUTTON_NEUTRAL)?.contentDescription = "web-chat-share-revoke"
+    }
+
+    private fun readCanvas(
+        conversation: ChatGptWebConversation, index: ChatGptWebSharedLinks.Index, link: ChatGptWebSharedLinks.Link,
+        page: ChatGptWebSharedLinks.AccountIndex?,
+    ) {
+        if (!active() || link.resource != ChatGptWebSharedLinks.Resource.CANVAS) return
+        val result = consumerPort()?.readCanvasShare(link.id, index.ticket)
+            ?: return failure(conversation, "share_canvas_unavailable")
+        track(AlertDialog.Builder(activity).setTitle("画布原文").setMessage("正在读取")
+            .setNegativeButton("返回链接") { _, _ -> epoch += 1; showLink(conversation, index, link, page) }.create())
+        await(conversation, result, epoch, 0, revoking = false) { detail ->
+            val content = consumerPort()?.canvasContent()?.takeIf { it.requestId == result.requestId && it.id == link.id }
+            if (detail != "share_canvas_ready" || content == null) return@await failure(conversation, "share_canvas_unconfirmed")
+            track(WebChatCanvasContentView.dialog(activity, content) { showLink(conversation, index, link, page) })
+            dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
+                contentDescription = "web-chat-canvas-content-copy"
+                setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_msg_copy, 0, 0, 0)
+            }
+            dialog?.getButton(AlertDialog.BUTTON_NEGATIVE)?.contentDescription = "web-chat-canvas-content-back"
+        }
     }
 
     private fun confirmRevoke(
@@ -171,6 +196,9 @@ internal class WebChatConversationSharedLinksCoordinator(
     private fun failure(conversation: ChatGptWebConversation, code: String?) {
         if (!active()) return
         val message = when (code) {
+            "share_canvas_restricted" -> "这个画布当前受到访问限制，无法展示正文。"
+            "share_canvas_scope_unconfirmed" -> "画布分享范围已变化，请重新读取。"
+            "share_canvas_too_large" -> "画布较大，暂时无法完整显示。可以在官网查看完整内容。"
             "share_revoke_unconfirmed", "share_cooldown" -> "未能确认取消分享的结果。可以重新读取列表核对，不会自动重复取消。"
             "share_selection_expired", "share_context_changed" -> "账号或链接列表已经变化，请重新读取后再选择。"
             else -> "暂时未能读取或确认分享链接，请重试或在官网查看。"

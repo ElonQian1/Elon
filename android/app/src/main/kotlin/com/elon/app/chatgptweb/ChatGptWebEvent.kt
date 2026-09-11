@@ -55,6 +55,7 @@ internal sealed interface ChatGptWebEvent {
 
     data class ConversationFiles(val value: com.elon.app.WebChatConversationFileIndex) : ChatGptWebEvent
     data class LibraryFiles(val value: com.elon.app.WebChatLibrarySnapshot) : ChatGptWebEvent
+    data class CanvasContent(val value: ChatGptWebCanvasContent) : ChatGptWebEvent
 
     data class CommandResult(
         val action: String,
