@@ -67,6 +67,56 @@ const groupedFile = (extra = {}) => file({ type: 'webpage', category: 'files',
   url: 'https://cloud.example.test/reference', ...extra });
 const ids = refs => citation.references({ content_references: refs }).map(row => row.file.id);
 
+test('per-file references follow top-level references without treating bucket keys as file identities', () => {
+  const metadata = { content_references: [file({ id: 'file-first' })],
+    content_references_by_file: { 'not-a-file-id': [file({ id: 'file-second' })],
+      'file-not-a-target': [{ type: 'grouped_webpages', items: [groupedFile({ id: 'file-third' })] }] } };
+  assert.deepEqual(citation.references(metadata).map(row => row.file.id), ['file-first', 'file-second', 'file-third']);
+  delete metadata.content_references;
+  assert.deepEqual(citation.references(metadata).map(row => row.file.id), ['file-second', 'file-third']);
+  assert.deepEqual(citation.references(metadata, [{ id: 'file-second', name: 'existing.txt' }])
+    .map(row => row.file.id), ['file-third']);
+  metadata.content_references = [groupedFile({ id: 'file-first' })];
+  assert.deepEqual(citation.references(metadata).map(row => row.file.id), ['file-first', 'file-second'],
+    'first URL wins across both official metadata fields');
+});
+
+test('per-file references keep context masks, deleted sources and malformed buckets unclaimed', () => {
+  const metadata = { content_references_by_file: { valid: [file()],
+    notAnArray: file({ id: 'file-wrong' }), nested: [[file({ id: 'file-nested' })]],
+    removed: [file({ id: 'file-deleted', deleted: true })],
+    pca: [file({ id: 'file-pca', retrieval_origin: 'pca' })] } };
+  assert.deepEqual(citation.references(metadata).map(row => row.file.id), ['file-synthetic']);
+  for (const extra of [{ conversation_context_citation_metadata: [{}] },
+    { conversation_context_citation_metadata_status: 'marker_only' }]) {
+    assert.deepEqual(citation.references({ ...metadata, ...extra }), []);
+  }
+  for (const byFile of [null, [], 'invalid', 42]) {
+    assert.deepEqual(citation.references({ content_references: [file()], content_references_by_file: byFile })
+      .map(row => row.file.id), ['file-synthetic']);
+  }
+  const inherited = Object.create({ ignored: [file({ id: 'file-inherited' })] });
+  inherited.own = [file()];
+  assert.deepEqual(citation.references({ content_references_by_file: inherited }).map(row => row.file.id), ['file-synthetic']);
+});
+
+test('both metadata fields share bounded outer traversal, source budget and truncation', () => {
+  const many = Array.from({ length: 21 }, (_, i) => file({ id: 'file-' + i }));
+  const metadata = { content_references: many.slice(0, 10),
+    content_references_by_file: { first: many.slice(10, 20), second: many.slice(20) } };
+  assert.equal(citation.references(metadata).length, 20);
+  assert.equal(citation.scan(metadata).truncated, true);
+  assert.deepEqual(citation.references(metadata, [], 2).map(row => row.file.id), ['file-0', 'file-1']);
+  const emptyBuckets = Object.fromEntries(Array.from({ length: 20 }, (_, i) => ['empty' + i, []]));
+  Object.defineProperty(emptyBuckets, 'beyondBudget', { enumerable: true,
+    get() { throw new Error('must not read an unbounded number of buckets'); } });
+  assert.deepEqual(citation.scan({ content_references_by_file: emptyBuckets }), { items: [], truncated: true });
+  const nested = { type: 'grouped_webpages', items: many.map((f, i) => ({ ...f,
+    category: 'files', url: 'file://library/file-' + i })) };
+  assert.equal(citation.scan({ content_references_by_file: { grouped: [nested] } }).items.length, 20);
+  assert.equal(citation.scan({ content_references_by_file: { grouped: [nested] } }).truncated, true);
+});
+
 test('official file URL path identities enter the existing citation target without fetching that URL', () => {
   for (const url of ['file://library/file-synthetic', 'file:///file-synthetic',
     'FILE://library/nested/file%2Dsynthetic', 'file://library/file-synthetic#preview']) {

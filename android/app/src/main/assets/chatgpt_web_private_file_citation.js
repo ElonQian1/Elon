@@ -81,7 +81,7 @@
     const items = [], urls = new Set();
     let visited = 0, truncated = false;
     limit = Math.max(1, Math.min(20, Number.isSafeInteger(limit) ? limit : 20));
-    if (!eligible(metadata) || !Array.isArray(metadata.content_references)) return { items, truncated };
+    if (!eligible(metadata)) return { items, truncated };
     const object = value => value && typeof value === 'object' && !Array.isArray(value);
     const active = value => object(value) && value.retrieval_origin !== 'pca' &&
       (value.deleted == null || value.deleted === false);
@@ -99,8 +99,24 @@
       urls.add(key); items.push(value);
       return true;
     }
+    // Official R5i combines top-level references with one level of per-file arrays.
+    // Bucket keys identify rendered output files, not download targets or scopes.
+    const sources = Array.isArray(metadata.content_references) ? bounded(metadata.content_references) : [];
+    const byFile = metadata.content_references_by_file;
+    if (object(byFile)) {
+      let buckets = 0;
+      for (const key in byFile) {
+        if (!Object.prototype.hasOwnProperty.call(byFile, key)) continue;
+        if (++buckets > limit || sources.length >= limit) { truncated = true; break; }
+        const values = byFile[key];
+        if (!Array.isArray(values)) continue;
+        const remaining = limit - sources.length;
+        if (values.length > remaining) truncated = true;
+        sources.push(...values.slice(0, remaining));
+      }
+    }
     // kpr traverses these containers once. Do not recursively crawl arbitrary metadata.
-    for (const reference of bounded(metadata.content_references)) {
+    for (const reference of sources) {
       if (!active(reference)) continue;
       if (['grouped_webpages', 'grouped_webpages_v2', 'grouped_webpages_model_predicted_fallback'].includes(reference.type)) {
         if (!Array.isArray(reference.items)) continue;
@@ -150,5 +166,5 @@
     return result;
   }
 
-  return Object.freeze({ version: 3, eligible, target, references, scan });
+  return Object.freeze({ version: 4, eligible, target, references, scan });
 });

@@ -127,6 +127,39 @@ test('empty context metadata preserves the ordinary citation download path witho
   assert.equal(f.calls.length, 2, 'a newly masked source revokes the former ordinary handle');
 });
 
+test('per-file citations reach scoped native download and revoke removed selections without DOM', async () => {
+  const f = fixture();
+  f.payload.messages[0].metadata = { content_references_by_file: { answerFile: [ref()] } };
+  const rows = f.rows();
+  assert.equal(rows.length, 1);
+  assert.match(rows[0].downloadHandle, /^download_[a-f0-9]{32}$/);
+  assert.doesNotMatch(JSON.stringify(rows), /file-cited|cloud|https|token/);
+  await f.run(rows[0]);
+  assert.equal(f.calls.length, 2);
+  assert.equal(new URL(f.calls[1].url).pathname, '/backend-api/files/download/file-cited');
+  assert.equal(new URL(f.calls[1].url).searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+  assert.equal(f.queued.length, 1);
+  f.payload.messages[0].metadata.content_references_by_file.answerFile = [];
+  assert.deepEqual(f.rows(), []);
+  await f.run(rows[0]);
+  assert.equal(f.calls.length, 2);
+  assert.equal(f.queued.length, 1);
+  assert.equal(f.receipts.at(-1)[1], false);
+});
+
+test('per-file citation index truncation and source lookup use the same attachment-first positions', () => {
+  const answer = message('many', []);
+  answer.metadata.attachments = [{ id: 'file-existing', name: 'existing.txt' }];
+  answer.metadata.content_references_by_file = { group: Array.from({ length: 21 }, (_, i) => ref('file-' + i)) };
+  const payload = { messages: [answer] };
+  const index = projection.files(payload);
+  assert.equal(index.truncated, true);
+  assert.equal(index.files[0].name, 'existing.txt');
+  assert.equal(index.files.length, 21);
+  assert.equal(projection.fileSource(payload, 'many:20').fileCitationReference.id, 'file-19');
+  assert.equal(projection.fileSource(payload, 'many:21'), null);
+});
+
 test('grouped library citations preserve project metadata checks and existing attachment positions', async () => {
   const f = fixture(PROJECT_INFO);
   f.payload.messages[0].metadata.attachments = [{ id: 'file-original', name: 'original.txt' }];
