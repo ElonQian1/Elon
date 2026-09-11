@@ -28,9 +28,9 @@ a functional acceptance gate; do not expand performance tests in this phase.
 
 ## Current Status Map
 
-1679 installs [stream-resume repair](reports/chatgpt-passive-stream-resume-20260912.md)
-(258 offline checks). Native send failed with `runtime_not_observed`; resolve
-current runtime discovery before Google. No device pass is claimed.
+[September 12 runtime repair](reports/chatgpt-runtime-bindings-20260912.md)
+addresses 1679's `runtime_not_observed`. Canvas edit-store mapping was invalid;
+save/history remain gated. New send acceptance is pending before Google.
 
 1666 retains the [1662 grouped source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence).
 Its first inventory run had one timeout, retaining cached rows. One targeted retry

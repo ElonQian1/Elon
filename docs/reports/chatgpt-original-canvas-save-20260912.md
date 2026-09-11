@@ -39,18 +39,22 @@ Temporarily switching conversations cannot discard that guard.
 The original editor asset `ac476d6c-n5q4k6410vjb4971.js` owns `Da` (save), `Aa`
 (queue) and `Pa` (debounce); its exact hash and call sites are in the prior report.
 
-Two additional exports are now mapped only for the observed `web_20260911_b`
-profile in runtime bindings v15:
+Correction from the September 12 public-source audit: bindings v15 added two
+names, but only the query-client getter was an actual export. Bindings v16
+remove the invalid edit-store mapping. Original Canvas save/history/first-share
+remain unaccepted and fail closed at `canvas_runtime_unavailable` until the
+real page-owned edit queue can be accessed safely.
 
 Public source SHA-256: conversation module
 `a89952420338983e104e94be5fae8e9ae7a4169b9ea8a4ed30e639641e14f456`;
 shared module
 `41e6e38589707e7c6ff5d181afa2193dda17f605dfe256224af09e6c85cfa096`.
 
-- `conversation-small-ft205i7yqa6zc2nj.js`: `HH as one` is the existing Canvas
-  edit store. `VH` resets both timestamps to `null`; the dirty predicate compares
-  null-coalesced trigger/flush values. No React hooks or synthetic optimistic
-  entries are used. Existing pending edits are never deleted or acknowledged.
+- `conversation-small-ft205i7yqa6zc2nj.js`: `HH as one` is an **import** from
+  the shared module, not an exported Canvas edit store. The actual local `HH`
+  store has `userEdits` and `timestamps` but is not exported. The September 12
+  build similarly keeps its local `dir` store unexported. Shape-only mock tests
+  did not establish this bridge; no existing pending edits may be bypassed.
 - `4813494d-c6b4nsqqwi13e6rd.js`: `Jh as Z0` is a session-scoped query-client
   getter (`bn` -> `Sn` -> session context), not `useQueryClient`. The composer
   asset imports it as `dp`, passes `dp(sessionContext)` to its query provider;

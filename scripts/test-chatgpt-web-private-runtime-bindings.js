@@ -9,14 +9,17 @@ const old = {
   composer: CDN + '8b34dbc2-kjj15hg4y6iyx13p.js'
 };
 
-test('Canvas edit store and session query client are exposed only by the observed September 11b profile', async () => {
+test('unexported Canvas edit store is not fabricated from a similarly named import', async () => {
   const getter = () => 'session-client', store = { getState: () => ({ userEdits: {}, timestamps: {} }) };
-  const f = fixture({ loadRuntime: () => ({ Z0: getter, one: store, H3: () => true }) });
+  const f = fixture({ loadRuntime: () => ({ Z0: getter, one: store, Bqt: () => true }) });
   f.observed.clear(); f.observed.add(CDN + 'c2675c8c-m4ftlj32vtu9aroq.js');
   assert.equal((await f.api.load('shared')).canvasQueryClient, getter);
-  assert.equal((await f.api.load('conversation')).canvasEdits, store);
+  // The real conversation module has no export named one. Other real exports can still load.
+  const conversation = await f.api.load('conversation');
+  assert.equal(conversation.canvasEdits, undefined);
+  assert.equal(typeof conversation.AGt, 'function');
   f.page.__elonChatGptDocumentToken = 'doc_legacy'; f.observed.clear(); f.observed.add(old.shared);
-  assert.equal((await f.api.load('shared')).canvasQueryClient, undefined);
+  await assert.rejects(f.api.load('shared'), /runtime_exports_unknown/);
 });
 function fixture(options = {}) {
   const observed = new Set([CDN + files.shared]), calls = [];

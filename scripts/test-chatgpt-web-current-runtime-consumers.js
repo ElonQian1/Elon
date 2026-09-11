@@ -5,7 +5,7 @@ const { attach } = require('./fixtures/chatgpt-runtime-bindings');
 const assets = '../android/app/src/main/assets/';
 const flush = async () => { for (let i = 0; i < 70; i++) await Promise.resolve(); };
 const profiles = [undefined, require('./fixtures/chatgpt-runtime-bindings-sep10b'),
-  require('./fixtures/chatgpt-runtime-bindings-sep11b')];
+  require('./fixtures/chatgpt-runtime-bindings-sep11b'), require('./fixtures/chatgpt-runtime-bindings-sep12')];
 
 for (const profile of profiles) test.describe(profile?.id || 'web_20260907', () => {
 
