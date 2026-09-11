@@ -44,6 +44,47 @@ test('existing library file enters the existing owner without upload or automati
   assert.equal(f.sender.merge([]).length, 0);
 });
 
+test('raster artifacts retain official provenance through native association and submit lease', async () => {
+  for (const type of ['image_gen', 'raster_fixture', '']) {
+    const f = setup();
+    Object.assign(f.source, { name: 'image.png', mime_type: 'image/png', file_size_bytes: 662362,
+      library_artifact_type: type });
+    f.root.fetch = () => { throw Error('unexpected download or upload'); };
+    await f.attach();
+    assert.deepEqual(f.responses[0], ['attach_library_file', true, 'library_attachment_associated']);
+    const [item] = f.store.readyFiles$();
+    assert.equal(item.libraryArtifactType, type);
+    assert.equal(item.libraryFileId, f.source.id);
+    assert.equal(item.fileId, f.source.file_id);
+    assert.equal(item.fileSpec.size, 662362);
+    assert.equal(item.file.size, 0, 'reuse backing ID, no reupload or thumbnail download');
+    const lease = f.sender.prepareSubmit(f.store);
+    assert.deepEqual(lease.readyFiles[0], item);
+    assert.equal(lease.readyFiles[0].libraryArtifactType, type);
+    assert.equal(lease.current(), true);
+    const [native] = f.sender.merge([]);
+    assert.equal(native.removable, true);
+    assert.equal(f.sender.remove(native.id, () => {}, () => {}), true);
+    assert.equal(f.store.files$().length, 0);
+    assert.equal(lease.current(), false, 'removal revokes an earlier submit lease');
+  }
+});
+
+test('artifact attachment keeps format, ownership and size limits rather than trusting a type marker', async () => {
+  for (const patch of [{ library_artifact_type: 'saved_entity' }, { library_artifact_type: 'writing_block' },
+    { library_artifact_type: 'deep_research_report' }, { library_artifact_type: 'bad/type' },
+    { mime_type: 'application/pdf' }, { file_size_bytes: 8 * 1024 * 1024 + 1 },
+    { gizmo_id: 'g-p-' + 'a'.repeat(32) }, { project_id: 'project' }, { preview_file: {} },
+    { context_scopes: [] }, { library_provider: 'native_shared' }, { shared_library_file_id: 'libfile_other' }]) {
+    const f = setup();
+    Object.assign(f.source, { name: 'image.png', mime_type: 'image/png', library_artifact_type: 'raster_fixture' }, patch);
+    await f.attach();
+    assert.equal(f.responses[0][1], false, JSON.stringify(patch));
+    assert.equal(f.store.files$().length, 0);
+    assert.equal(f.changes.length, 0);
+  }
+});
+
 test('native removal and duplicate request use one attachment owner', async () => {
   const f = setup();
   await Promise.all([f.attach(), f.attach()]);

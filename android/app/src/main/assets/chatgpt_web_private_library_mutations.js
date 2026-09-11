@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 1, create: factory });
+  const exported = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateLibraryMutations) {
     root.__elonChatGptPrivateLibraryMutations = factory(root);
@@ -8,6 +8,8 @@
 })(typeof window === 'object' ? window : null, function (root) {
   'use strict';
   const ACTION = 'mutate_library_file', receipts = new Map();
+  const raster = root.__elonChatGptPrivateLibraryRasterPolicy ||
+    (typeof module === 'object' && module.exports ? require('./chatgpt_web_private_library_raster_policy') : null);
   let active = null, retryAt = 0, retryContext = null;
   const outcome = (ok, code) => ({ ok, code });
   const validName = name => typeof name === 'string' && name === name.trim() && name.length > 0 &&
@@ -15,7 +17,8 @@
 
   function capabilities(file) {
     const ordinary = file?.kind === 'file' && /^libfile[_-][A-Za-z0-9_-]{1,200}$/.test(file.id || '') &&
-      file.external_account == null && file.cloud_doc_url == null && file.library_artifact_type == null &&
+      file.external_account == null && file.cloud_doc_url == null &&
+      (file.library_artifact_type == null || raster?.matches(file) === true) &&
       file.saved_entity == null && file.trashed_at == null && file.is_project !== true;
     return { canRename: ordinary, canTrash: ordinary && /^file[_-][A-Za-z0-9_-]{1,200}$/.test(file.file_id || '') };
   }
@@ -107,5 +110,5 @@
       .catch(() => respond(ACTION, false, 'library_result_unconfirmed'));
     return true;
   }
-  return Object.freeze({ version: 1, capabilities, start, handle, busy: () => Boolean(active) });
+  return Object.freeze({ version: 2, capabilities, start, handle, busy: () => Boolean(active) });
 });

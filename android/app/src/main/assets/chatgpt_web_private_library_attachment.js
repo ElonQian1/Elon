@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 7, operationTimeoutMs: 24000, create: factory });
+  const exported = Object.freeze({ version: 8, operationTimeoutMs: 24000, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateLibraryAttachment = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -9,6 +9,8 @@
   const mounted = root.__elonChatGptPrivateMountedLibraryAttachment?.create(root);
   const policy = root.__elonChatGptPrivateLibraryAttachmentPolicy ||
     (typeof module === 'object' && module.exports ? require('./chatgpt_web_private_library_attachment_policy') : null);
+  const raster = root.__elonChatGptPrivateLibraryRasterPolicy ||
+    (typeof module === 'object' && module.exports ? require('./chatgpt_web_private_library_raster_policy') : null);
   const receipts = new Map();
   const consumed = new Map();
   const OPERATION_TIMEOUT_MS = 24000;
@@ -19,7 +21,8 @@
     if (remote) return remote;
     if (source?.kind !== 'file' || !/^libfile[_-][A-Za-z0-9_-]{1,152}$/.test(source.id || '') ||
         !/^file[_-][A-Za-z0-9_-]{1,155}$/.test(source.file_id || '') ||
-        source.external_account != null || source.cloud_doc_url != null || source.library_artifact_type != null ||
+        source.external_account != null || source.cloud_doc_url != null ||
+        source.library_artifact_type != null && raster?.matches(source) !== true ||
         source.saved_entity != null || source.trashed_at != null || source.is_project === true ||
         typeof source.name !== 'string' || !source.name.trim() || source.name.length > 120 ||
         /[\x00-\x1f\x7f/\\]/.test(source.name) || !Number.isSafeInteger(source.file_size_bytes) ||
@@ -38,6 +41,7 @@
     return { id: 'private_attachment_' + requestId, attached: {
       tempId: 'native_library_' + requestId, status: 'ready', file, fileId: source.file_id,
       cdnUrl: null, progress: 100, source: 'library', libraryFileId: source.id,
+      ...(source.library_artifact_type == null ? {} : { libraryArtifactType: source.library_artifact_type }),
       libraryProvider: 'native', libraryEntrypoint: 'composer_library_picker', isBigPaste: false,
       fileSpec: { id: source.file_id, name: value.name, size: value.size, mimeType: value.type,
         isBigPaste: false, ...(/^image\//.test(value.type) ? { width: 512, height: 512 } : {}) },

@@ -73,6 +73,55 @@ test('trash uses the observed soft-delete stream with the exact library and back
   assert.equal(f.events.at(-1).items.length, 0);
 });
 
+test('personal raster artifact rename uses the existing private write and retains artifact provenance', async () => {
+  for (const type of ['image_gen', 'raster_fixture', '']) {
+    const f = await fixture({ name: 'image.png', mime_type: 'image/png', library_artifact_type: type });
+    assert.equal(f.events[0].items[0].canRename, true);
+    assert.equal(f.events[0].items[0].canTrash, true);
+    const command = f.command();
+    command.value = JSON.stringify({ ...JSON.parse(command.value), name: 'renamed.png' });
+    assert.equal((await f.writer.start(command)).ok, true);
+    assert.deepEqual(JSON.parse(f.calls[1].init.body), { file_name: 'renamed.png' });
+    assert.equal(f.calls[1].url.pathname, '/backend-api/files/library/files/libfile_synthetic');
+    f.listReply(new Error('offline'));
+    await f.list();
+    const row = f.events.at(-1).items[0];
+    assert.equal(row.name, 'renamed.png');
+    assert.equal(row.canRename, true);
+    assert.equal(f.calls.filter(call => call.init.method === 'PATCH').length, 1);
+  }
+});
+
+test('raster deletion uses soft-delete acknowledgement, no permanent endpoint or duplicate replay', async () => {
+  const f = await fixture({ name: 'image.png', mime_type: 'image/png', library_artifact_type: 'raster_fixture' });
+  const command = f.command('trash');
+  const first = f.writer.start(command), second = f.writer.start(command);
+  assert.equal(first, second);
+  assert.equal((await first).ok, true);
+  const call = f.calls[1];
+  assert.equal(call.url.pathname, '/backend-api/files/library/files/libfile_synthetic/delete_stream');
+  assert.equal(call.url.searchParams.get('soft_delete'), 'true');
+  assert.equal(call.url.searchParams.get('file_id'), 'file-synthetic');
+  assert.equal(call.url.searchParams.get('file_name'), 'image.png');
+  assert.equal(f.calls.filter(row => row.init.method !== 'GET').length, 1);
+  f.listReply(new Error('offline'));
+  await f.list();
+  assert.equal(f.events.at(-1).items.length, 0);
+});
+
+test('raster write errors preserve inventory and retain the existing uncertain-result cooldown', async () => {
+  for (const response of [new Error('timeout'), { text: '{"event":"file.deletion.progress"}\n' }]) {
+    const f = await fixture({ name: 'image.png', mime_type: 'image/png', library_artifact_type: 'raster_fixture' });
+    f.reply(response);
+    assert.equal((await f.writer.start(f.command('trash'))).code, 'library_result_unconfirmed');
+    assert.equal((await f.writer.start(f.command('trash'))).code, 'library_mutation_cooldown');
+    f.listReply(new Error('offline'));
+    await f.list();
+    assert.equal(f.events.at(-1).items.length, 1);
+    assert.equal(f.calls.filter(row => row.init.method !== 'GET').length, 1);
+  }
+});
+
 for (const [name, text, ok] of [
   ['empty HTTP success', '', false],
   ['progress alone', '{"event":"file.deletion.progress"}\n', false],
