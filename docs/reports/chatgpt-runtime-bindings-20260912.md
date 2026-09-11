@@ -1,8 +1,8 @@
 # September 12 Runtime Compatibility
 
 Capability: `android_chatgpt_private_runtime_bindings_v1`, resolver 16,
-adapter 361. Compatibility repair, not a new HTTP sender. Device acceptance
-and release are pending at this source checkpoint.
+adapter 361. Compatibility repair, not a new HTTP sender. Normal 1681 is
+released and device-verified for one production native runtime send/reply.
 
 ## Evidence
 
@@ -55,5 +55,29 @@ alone are not public-protocol proof or device acceptance.
 - Native smoke receipt contract passed: optional `RequireRuntimeSend` requires a
   fresh `official_runtime_v1:accepted` receipt before recording success. A DOM
   reply, stale receipt or uncertain result cannot satisfy this check.
-- Grouped release and one production native send/reply remain pending.
+- Grouped release and one production native runtime send/reply passed below.
 No Cookie, application-data, microphone or proxy-core changes were made.
+
+## Normal 1681 Acceptance
+
+- Runtime source commit: `3941577e1`; acceptance receipt commit and release
+  candidate: `2c0213d97`. Both are pushed to `origin/main`.
+- APK `1.1.1681` / code 1681, adapter 361, SHA-256
+  `62cb5fc163d613d73f6b62e29d87d59cc0f997d7a6220537880bf432aedde82b`.
+- First queued candidate yielded before compilation after the receipt-script
+  commit advanced main. It did not build an obsolete APK. The current candidate
+  completed Gradle in 6m54s; release plus unattended Xiaomi installation took
+  463.7s. Remote bytes/hash and installed version were verified.
+- `runtime-sep12-native-1681-20260912-074129-683` passed in 23.9s. This is total
+  acceptance time including navigation/restoration, not first-token latency.
+  The production `social_ai` controller sent one fixed synthetic marker, received
+  the exact completed reply, and retained a fresh successful
+  `official_runtime_v1:accepted` receipt. `RequireRuntimeSend` was enabled, so
+  a DOM fallback reply could not satisfy this acceptance.
+- Original conversation and awake lease were restored. Read-only follow-up
+  confirmed adapter 361, empty native/official drafts and inactive dictation.
+  No microphone, content dump, account reset, Cookie clearing or proxy change.
+
+Reuse this result for the current runtime. It does not prove an independent
+Android HTTP sender, actual server stream-resume retry, Canvas original-editor
+save/history/first-share, supplemental source variants, or Google acceptance.

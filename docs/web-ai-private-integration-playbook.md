@@ -97,6 +97,7 @@ WebView 身份与官网运行时按操作提供依赖；不是每次命令都重
 | 坑与已观察结果 | 后续避免方式 | 本项目证据 |
 |---|---|---|
 | 官网更新资源后，旧导出映射使原生发送回退；观测清单截断又容易被当作模块不存在 | 从实测 anchor 的静态 imports 找角色；复用 `analyze-chatgpt-runtime-contracts.cjs` 做无执行 AST 比对，歧义按真实依赖确认。不能只改文件名或自动接受相似函数；最后核对运行时回执和原生回复 | [1655 兼容修复](reports/chatgpt-runtime-bindings-20260911-b.md) |
+| `HH as one` 实为导入，却被当作 Canvas store 的导出；mock 自造该导出后测试仍通过 | 绑定表逐项对照真实 AST 导出表和资源摘要；导入、局部变量、导出分开验证。真实 store 不可达时保留写入保护，不跳过官网待保存编辑检查。原生发送验收同时要求新鲜 runtime 回执，不能用 DOM 回复替代 | [1681 导出核验与验收](reports/chatgpt-runtime-bindings-20260912.md) |
 | 历史 GET 成功，但 JS 发字符串 `content`，Kotlin 按数组读取，原生消息为空 | producer 与真实 consumer 共用 wire fixture；同时验证部分快照不能清掉输入/语音状态 | [历史契约](chatgpt-private-history-native-contract.md) |
 | 文件元数据已返回 200，但官网的 `is_project:null` 被当作非法字段，原生下载仍失败 | fixture 保留真实的缺省、null、false 差异；按官网消费语义校验，不自行收严。分别记录 HTTP、解析、关联和落盘结果，不把协议成功当业务成功 | [1651 引用下载](reports/chatgpt-runtime-bindings-20260911.md#normal-1651-acceptance) |
 | 项目会话中的文件引用被强制先查元数据而返回 404 | 文件归属不等于会话项目；追踪当前官网调用者，缺少文件归属/库 ID 时可直接申请会话范围下载授权。保留权限检查，不在失败后去掉 scope 重试。系统下载排队既不算成功也不算失败，要核对本次新增文件字节 | [1657 项目引用下载](reports/chatgpt-project-citation-scope-20260911.md#normal-1657-acceptance) |
