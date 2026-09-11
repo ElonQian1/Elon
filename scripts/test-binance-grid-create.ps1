@@ -1,9 +1,13 @@
-param()
+param([switch]$AdapterOnly)
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-foreach ($name in @('test-binance-grid-create-adapter.cjs','test-binance-grid-manage-adapter.cjs','test-binance-grid-protection-contract.cjs','test-binance-grid-read-session.cjs','test-binance-grid-read-diagnostics.cjs','test-binance-grid-read-adapter.cjs')) {
+foreach ($name in @('test-binance-grid-create-adapter.cjs','test-binance-grid-manage-adapter.cjs','test-binance-grid-protection-contract.cjs','test-binance-grid-trailing-rules.cjs','test-binance-grid-trailing-contract.cjs','test-binance-grid-read-session.cjs','test-binance-grid-read-diagnostics.cjs','test-binance-grid-read-adapter.cjs')) {
     & node (Join-Path $PSScriptRoot $name)
     if ($LASTEXITCODE -ne 0) { throw "Binance adapter contract failed: $name" }
+}
+if ($AdapterOnly) {
+    Write-Output 'BINANCE_ADAPTER_SUITES_PASSED=8 NATIVE_TESTS_EXECUTED=false TRADING_REQUESTS_EXECUTED=false'
+    return
 }
 $previous = $env:GRADLE_EXIT_CONSOLE
 try {

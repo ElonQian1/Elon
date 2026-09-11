@@ -2444,6 +2444,127 @@
       "updated_at_ms": 1789107784904
     },
     {
+      "id": "android-binance-trailing-v4",
+      "title": "币安追踪价格会话服务 V4",
+      "summary": "追踪限价领域校验、固定网页合同、版本化服务及未知日志恢复；量化拥有UI",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/android-binance-trailing-v4.md",
+        "content_hash": "ed2dadd2a354e7dcc57f25f57df743ff66f67d367c104435da6836dc2e6fbe68",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "b205ff59746d7a8905e609f9f548eed2cd3d7c6e",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "9abd0a1ec980985e9ec4fcabfe191b631fd824fb",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_create_adapter.js",
+        "android/app/src/main/kotlin/com/elon/app/grid/manage"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "官网纯函数向量一致并验证边界",
+        "字段保留、账号变化、重复与未知结果不回退",
+        "V4及旧版本兼容、正式包与设备验收分报"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/binance_grid_trailing_contract.js",
+          "content_hash": "a659844493b85840c1468c99d9696d720a2a97f65beddb6678354a9e1ef8f32a",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b205ff59746d7a8905e609f9f548eed2cd3d7c6e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c73fbe91f39aecdd386483bf82d2d7d22b7a552e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/binance_grid_trailing_rules.js",
+          "content_hash": "afa3c78dbdcf34397494f475afb72fe915024318b0eeca61e59f2dad206b76ea",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b205ff59746d7a8905e609f9f548eed2cd3d7c6e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8cb4a12e432e4b212e9c0fc967c17c4fac2e7857",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/binance-grid-trailing-calculation.md",
+          "content_hash": "aed65b1e15801adcac02992bbd60632dd79cf50ac98564b981640a2c778ea40b",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b205ff59746d7a8905e609f9f548eed2cd3d7c6e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c46be1cec8795fea84c5ca734387d4d735606556",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/fixtures/binance-grid-trailing-vectors.json",
+          "content_hash": "440fcb4ca827a7b15edd1f918d305af564948e3e734f0558e48ca9fcd2d5b450",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b205ff59746d7a8905e609f9f548eed2cd3d7c6e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "11dbe9a73d21cc765f285500f09119ef3f2b7f15",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-trailing-contract.cjs",
+          "content_hash": "a84920626ddbf044b6529a58dce3b1234a2d132822779999f30b7d92229f373f",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b205ff59746d7a8905e609f9f548eed2cd3d7c6e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c729ec95590709189321187aedc03434261a1e7e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-trailing-rules.cjs",
+          "content_hash": "a2bc3e4782d8d01f98198a103e58d8a4090b76e4192080782ea54659c8a4bbc1",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b205ff59746d7a8905e609f9f548eed2cd3d7c6e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a3b0ba72184c530f7e9e02bae06ff473b5ab41c6",
+            "state": "untracked"
+          }
+        }
+      ],
+      "claim": {
+        "claim_id": "claim_aac6911471c94a30a8c0b45e8517edac",
+        "agent_id": "codex-grid",
+        "claimed_at_ms": 1789117808589,
+        "expires_at_ms": 1789204208589
+      },
+      "created_at_ms": 1789117808505,
+      "updated_at_ms": 1789119394537
+    },
+    {
       "id": "android-exchange-session-host-v2",
       "title": "量化 UI 与主 APK 会话服务长期边界",
       "summary": "量化持有选币和交易 UI，主 APK 独立提供登录、恢复及受授权业务接口；停止扩建旧主创建页，合同和迁移尚未实现。",
@@ -25555,46 +25676,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_88ce6d76566a4d128437dd150d330617",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "claimed",
-      "actor": "esk-primary",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788690490245
-    },
-    {
-      "id": "feature_event_c181af3904e344988cc9d629e72ba84c",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "transitioned",
-      "actor": "esk-primary",
-      "reason": "Independently confirmed repeated revoke aborts the current remote revocation; bounded SDK regression fix only.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788690490440
-    },
-    {
-      "id": "feature_event_afbdf725dc1f43969bf97a8d3130d30f",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "evidence_recorded",
-      "actor": "esk-primary",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788690719429
-    },
-    {
-      "id": "feature_event_d78541946fe9412992543c526f22ec5b",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "evidence_recorded",
-      "actor": "esk-primary",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788690722269
-    },
-    {
       "id": "feature_event_e26d932c63434023a407b39b08453444",
       "feature_id": "unified-account-asset-access-v1",
       "action": "claim_released",
@@ -27553,6 +27634,46 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1789111392093
+    },
+    {
+      "id": "feature_event_9b10910fd9c24e798622cf2cdda9ffdd",
+      "feature_id": "android-binance-trailing-v4",
+      "action": "registered",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789117808505
+    },
+    {
+      "id": "feature_event_51f70a6f28dc434e8101ea4bd26d9789",
+      "feature_id": "android-binance-trailing-v4",
+      "action": "claimed",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789117808593
+    },
+    {
+      "id": "feature_event_767f149123c04e95b84a27c3b088786f",
+      "feature_id": "android-binance-trailing-v4",
+      "action": "transitioned",
+      "actor": "codex-grid",
+      "reason": "量化 V4 合同已建立，当前主线无同名或重叠实现",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789117808934
+    },
+    {
+      "id": "feature_event_fc3d25b5beba4fcdb405497e88f08608",
+      "feature_id": "android-binance-trailing-v4",
+      "action": "evidence_recorded",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789119394537
     }
   ]
 }
