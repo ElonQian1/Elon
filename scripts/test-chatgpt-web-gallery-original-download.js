@@ -5,6 +5,7 @@ const { webcrypto } = require('node:crypto');
 const download = require('../android/app/src/main/assets/chatgpt_web_private_file_download.js');
 const json = require('../android/app/src/main/assets/chatgpt_web_private_json_request.js');
 const gallery = require('../android/app/src/main/assets/chatgpt_web_private_image_gallery.js');
+const contentSource = require('../android/app/src/main/assets/chatgpt_web_private_content_source.js');
 
 function fixture() {
   const calls = [], packets = [], receipts = [];
@@ -19,6 +20,7 @@ function fixture() {
     __elonChatGptDocumentToken: 'doc_gallery_original',
     __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({ Authorization: account }) },
     __elonChatGptPrivateJsonRequest: json, elonChatGptFileDownload: bridge,
+    __elonChatGptPrivateContentSource: contentSource,
     AbortController, crypto: webcrypto, setTimeout, clearTimeout,
     get document() { throw new Error('no DOM'); },
     fetch: async (url, init) => {
@@ -62,6 +64,35 @@ test('gallery selection rejects unknown source scopes without guessing', () => {
     assert.equal(f.select({ ...f.row, ...change }), '', JSON.stringify(change));
   }
   assert.equal(f.calls.length, 0);
+});
+
+test('catalog original URL uses byte storage without stale pointer reauthorization or thumbnail export', async () => {
+  const f = fixture(), urls = [];
+  const url = '/backend-api/estuary/content?id=synthetic-original&sig=synthetic';
+  f.root.__elonChatGptPrivateLibraryDownload = { contentUrl: contentSource.contentUrl,
+    runContent: async (root, job, current, source) => {
+      assert.equal(current(job), true); urls.push(source); return 'download_saved';
+    } };
+  const handle = f.select({ ...f.row, url, encodings: { thumbnail: { path: '/api/estuary/content?id=small' } } });
+  assert.match(handle, /^download_/);
+  await f.run(handle);
+  assert.deepEqual(urls, ['https://chatgpt.com' + url]);
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.packets.length, 0);
+  assert.equal(f.receipts.at(-1)[2], 'download_saved');
+});
+
+test('expired original URL reports failure once without probing a different authorization path', async () => {
+  const f = fixture(); let transfers = 0;
+  f.root.__elonChatGptPrivateLibraryDownload = { contentUrl: contentSource.contentUrl,
+    runContent: async () => { transfers++; throw new Error('download_file_unavailable'); } };
+  await f.run(f.select({ ...f.row, url: '/api/estuary/content?id=expired' }));
+  assert.equal(transfers, 1);
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.receipts.at(-1)[2], 'download_file_unavailable');
+  for (const url of ['https://evil.test/image', 'data:image/png;base64,AAA', '/api/arbitrary', '']) {
+    assert.equal(f.select({ ...f.row, url }), '');
+  }
 });
 
 test('closed gallery, changed account and switched document invalidate the original selection', async () => {

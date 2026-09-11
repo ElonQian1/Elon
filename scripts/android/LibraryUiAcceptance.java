@@ -194,7 +194,14 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
             if (queued) {
                 java.util.Set<String> completed = savedFiles(directory);
                 completed.removeAll(before);
-                saved = completed.size() == 1 && completed.iterator().next().endsWith("-image.png");
+                if (completed.size() == 1 && completed.iterator().next().endsWith("-image.png")) {
+                    java.io.File pending = new java.io.File(directory, completed.iterator().next());
+                    if (pending.length() > 32) try (java.io.RandomAccessFile input = new java.io.RandomAccessFile(pending, "r")) {
+                        boolean png = input.readLong() == 0x89504e470d0a1a0aL;
+                        input.seek(pending.length() - 12);
+                        saved = png && input.readInt() == 0 && input.readInt() == 0x49454e44 && input.readInt() == 0xae426082;
+                    } catch (java.io.IOException incomplete) { saved = false; }
+                }
             }
             if (saved) break;
             assertTrue("download_failed_or_unconfirmed", status.equals("\u6b63\u5728\u51c6\u5907\u4e0b\u8f7d") ||

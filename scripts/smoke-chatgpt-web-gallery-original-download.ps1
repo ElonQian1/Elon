@@ -37,7 +37,7 @@ try {
     if (-not (Get-ChatGptWebSmokeUserReadiness -Runtime $r).ready) {throw 'device_locked'}
     $origin=Native; $before=Web
     if ($origin.active_surface -ne 'social_ai' -or $origin.social_chat.web_chat_provider_id -ne 'chatgpt_web' -or
-        -not $before.authenticated -or -not $before.adapter_current -or [int]$before.adapter_version -lt 335 -or
+        -not $before.authenticated -or -not $before.adapter_current -or [int]$before.adapter_version -lt 336 -or
         -not $origin.social_chat.web_chat_conversation_path) {throw 'surface_not_ready'}
     if ($origin.input.text -or $before.streaming -or $before.dictation_active -or
         [int]$before.input.official_draft_length -gt 0 -or $before.file_download.can_cancel -or
