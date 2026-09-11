@@ -11,9 +11,11 @@ This extends `android_chatgpt_private_file_citation_download_v1`, not a second
 attachment system. Context-source policy/owner v2, citation v8, projection v11,
 private transport v28, download owner v30 and Android adapter 346 are implemented.
 The source path is wired into the existing native Conversation files command.
-Synthetic protocol/integration verification passed; grouped Android compilation,
-installation and production source-shape/download acceptance remain pending.
-Do not mark this scope completed or repeat accepted personal/project TXT tests.
+Synthetic protocol/integration verification and 42 grouped Android unit tests
+passed. Release 1662 / adapter 346 is published and installed; native inventory,
+refresh recovery and the shared citation-download path were checked on-device.
+New context-source shapes and cloud-source opening still lack live samples.
+Do not mark this scope completed or repeat accepted TXT tests without a regression.
 
 The new scope covers concrete file identities in completed inline or supplemented
 context sources, including PCA files admitted by the returned source mask. It
@@ -110,8 +112,8 @@ launch an old selection. MCP exposes availability, not the destination URL.
 fields, unsafe links, PCA ownership/deletion/masks, duplicate URLs, ordinary file
 positions and the no-DOM/no-download path. The source producer and Kotlin parser
 share `webchat/private-source-links-contract.json`. Added Kotlin parser, link
-policy and presentation tests await the grouped Android unit-test/build run;
-do not count their source presence as execution or native UI acceptance.
+policy and presentation tests passed in the grouped Android run below; this
+does not establish live cloud-source opening or provider source-mask acceptance.
 `cloud-source-links-final-js-20260911-164351-509` passes 138 runner cases.
 The follow-up `cloud-source-links-wire-verified-20260911-164451-373` passes
 27 affected cases, including the real private list-command emission matched to
@@ -146,13 +148,39 @@ bundle parse. Coverage includes exact outer flags/URLs, different supplemental
 UUIDs, masks, pre-limit filtering, warm-cache invalidation, handle revocation and
 upgrading captured policy/download owners before idempotent reinjection.
 
-Run one grouped Release and the production file sheet against an actual context
-source response. Confirm the final source mask, matching rows, one selected
-download and actual saved bytes, then restore the original conversation/draft.
-The 2026-09-11 retry connected to Xiaomi over wireless ADB and read installed
-`1.1.1661`; the existing APK MCP `phone_status` also returned without an error.
-That proves device/control connectivity only; adapter 346 is not installed
-or accepted by this check. No Cookie or application data was cleared.
+### Grouped Android And Device Evidence
+
+`private-files-release-unit-20260911-1658` passed all 42 tests in seven suites:
+source-link policy, file parsing/MCP/presentation, download dialog and conversation
+deletion/lifecycle. There were no failures, errors or skips. Release build and
+publication `private-files-release-publish-20260911-1701` passed for `1.1.1662`
+(code 1662), source `b205ff59746d7a8905e609f9f548eed2cd3d7c6e`, APK SHA-256
+`7dcf8f763cf9fe0fb6eb5cdce8d30abc342a151c5535b51d49db924c50b23cb8`.
+The whitelisted Xiaomi received the normal replacement install over wireless
+ADB; MCP confirmed 1662 and the native `social_ai` / `chatgpt_web` surface.
+
+`private-files-native-inventory-1662-20260911` exercised three existing test
+conversations through the production menu. Two passed; one refresh hit
+`files_read_timeout` after 3139 ms, with cached rows retained. The run is recorded
+as failed, not silently converted to a pass. A single targeted retry,
+`private-files-native-timeout-retry-1662-20260911`, passed: two rows, three refresh
+taps coalesced into one 1077 ms read, the same sheet retained and no overlapping
+reads. The other successful cases had five rows and a valid empty inventory.
+Both runs restored the prior conversation, draft and awake setting; no messages
+were sent. This establishes timeout recovery, not the absence of network stalls.
+
+`private-files-native-bytes-1662-20260911` checked the changed download owner's
+shared path once using the existing project TXT fixture, without another upload
+or send. The native file-detail/download UI saved 78 bytes; on-device SHA-256
+matched `75e2ed9bfe5772c9918e552ed07c2c0e689e7039367c81bb6906c63e396fa1f3`.
+The private download metadata request returned HTTP 200. Original conversation,
+draft and awake state were restored. No Cookie or application data was cleared.
+
+These samples did not exercise a live supplemental/PCA source mask or a URL-only
+cloud document. Their source-shape and `Open source` acceptance remains pending;
+do not repeat the successful ordinary inventory/download cases to fill that gap.
+Next acceptance needs an actual matching source response and native source row,
+not a new APK build unless code changes are required.
 
 Accepted scopes remain in [file citations](chatgpt-private-file-citations.md).
 Remaining work stays in [the batch map](web-ai-private-native-remaining-batch.md).
