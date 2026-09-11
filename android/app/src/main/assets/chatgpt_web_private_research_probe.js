@@ -26,6 +26,10 @@
       'eligibility_unavailable', 'menu_unavailable', 'hints_ambiguous', 'tool_unavailable'];
     return 'composer_tool_context:' + (codes.includes(code) ? code : 'not_observed');
   }
+  function toolAdmissionDetail() {
+    return JSON.stringify(window.__elonChatGptPrivateComposerToolContext?.diagnostics?.(window) ||
+      { schema: 'elon.composer_tool_admission.v1', observed: false, items: [] });
+  }
   function libraryPolicyDetail() {
     let code;
     try { code = window.__elonChatGptPrivateLibraryAttachmentPolicy?.state?.(window); } catch (_) {}
@@ -59,10 +63,13 @@
       { schema: 'elon.library_sources.v1', observed: false, stale: false, total: 0, omitted: 0, groups: [] });
   }
   if (existingProbe && Number(existingProbe.version) >= 13) {
-    if (Number(existingProbe.version) < 22) {
+    if (Number(existingProbe.version) < 23) {
       // Upgrade only the command surface; keep the existing network observers.
-      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 22,
+      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 23,
         handle(action, command, respond) {
+          if (action === 'private_protocol_probe' && command.value === 'composer_tool_admission') {
+            respond(action, true, toolAdmissionDetail()); return true;
+          }
           if (action === 'private_protocol_probe' && command.value === 'library_sources') {
             respond(action, true, librarySourceDetail()); return true;
           }
@@ -586,7 +593,7 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 22,
+    version: 23,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
       if (action !== 'private_protocol_probe') return false;
@@ -599,6 +606,7 @@
       else if (mode === 'directory_refresh') detail = directoryDetail();
       else if (mode === 'library_sources') detail = librarySourceDetail();
       else if (mode === 'composer_tool_context') detail = toolContextDetail();
+      else if (mode === 'composer_tool_admission') detail = toolAdmissionDetail();
       else if (mode === 'library_attachment_policy') detail = libraryPolicyDetail();
       else if (mode === 'stop_runtime_context') detail = stopContextDetail();
       else if (mode === 'stop_runtime_owner') detail = stopOwnerDetail();

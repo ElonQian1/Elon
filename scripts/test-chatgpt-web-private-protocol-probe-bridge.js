@@ -52,6 +52,27 @@ function fixture(options = {}) {
 
 const tick = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
 
+test('tool admission probe reuses passive observations on fresh and upgraded surfaces', () => {
+  const f = fixture();
+  assert.deepEqual(JSON.parse(f.command('composer_tool_admission').detail), {
+    schema: 'elon.composer_tool_admission.v1', observed: false, items: []
+  });
+  const fetch = f.window.fetch;
+  const value = { schema: 'elon.composer_tool_admission.v1', observed: true,
+    items: [{ tool: 'study', raw: 1, menu: 0, reason: 'menu_filtered' }] };
+  f.window.__elonChatGptPrivateComposerToolContext = { diagnostics: () => value,
+    capture() { assert.fail('read must not recapture or trigger provider work'); } };
+  f.window.__elonChatGptPrivateResearchProbe = { ...f.probe, version: 22 };
+  vm.runInNewContext(source, f.context);
+  let actual;
+  f.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe', { value: 'composer_tool_admission' },
+    (_, ok, detail) => { assert.equal(ok, true); actual = JSON.parse(detail); });
+  assert.deepEqual(actual, value);
+  assert.equal(f.window.fetch, fetch);
+  assert.equal(f.requests.length, 0);
+  assert.equal(f.read().active, false);
+});
+
 test('document diagnostics upgrade only the command surface without network capture', () => {
   const f = fixture({ window: { document: { readyState: 'loading', visibilityState: 'hidden',
     hasFocus: () => false, querySelectorAll: () => [] } } });
@@ -228,7 +249,7 @@ test('version 13 command upgrade preserves existing observers and other commands
   const existing = f.probe;
   f.window.__elonChatGptPrivateResearchProbe = { ...existing, version: 13 };
   vm.runInNewContext(source, f.context);
-  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 22);
+  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 23);
   assert.equal(f.window.fetch, fetch);
   assert.equal(f.window.XMLHttpRequest.prototype.send, send);
   const answers = [];

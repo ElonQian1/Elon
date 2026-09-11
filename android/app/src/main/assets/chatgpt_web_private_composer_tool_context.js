@@ -1,14 +1,22 @@
 (function (root, capture) {
   'use strict';
   const observations = new WeakMap();
-  const api = Object.freeze({ version: 3,
+  const api = Object.freeze({ version: 4,
     capture(page, tools) {
+      let items = [];
       const record = code => {
-        observations.set(page, { document: page.document, token: page.__elonChatGptDocumentToken, code });
+        observations.set(page, { document: page.document, token: page.__elonChatGptDocumentToken, code,
+          items: items.map(item => Object.freeze({ ...item })) });
         return null;
       };
-      try { const value = capture(page, tools, record); if (value) record('ready'); return value; }
+      try { const value = capture(page, tools, record, value => { items = value; }); if (value) record('ready'); return value; }
       catch (_) { return record('capture_error'); }
+    },
+    diagnostics(page) {
+      const value = observations.get(page);
+      const current = !!value && value.document === page.document && value.token === page.__elonChatGptDocumentToken;
+      return { schema: 'elon.composer_tool_admission.v1', observed: current,
+        items: current ? value.items.map(item => ({ ...item })) : [] };
     },
     state(page) {
       const value = observations.get(page);
@@ -18,7 +26,7 @@
   });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateComposerToolContext = api;
-})(typeof window === 'object' ? window : null, function (page, tools, unavailable) {
+})(typeof window === 'object' ? window : null, function (page, tools, unavailable, report) {
   'use strict';
   const spec = page.__elonChatGptPrivateRuntimeBindings?.tools?.();
   const ownerPath = page.__elonChatGptCommittedOwnerPath ||
@@ -68,18 +76,30 @@
   for (const slot of [90, 199]) visit(memo[slot]);
   if (!menus.length || menus.some(p => p.isLoading === true || p.isConsumerLockdownModeEnabled !== false)) return unavailable('menu_unavailable');
   const available = [];
+  const reports = [];
+  report(reports);
   for (const tool of tools) {
     const raw = props.availableSystemHints.filter(h => h?.systemHint === tool.hint);
-    if (raw.length > 1) return unavailable('hints_ambiguous');
+    const status = { tool: tool.semantic, raw: Math.min(raw.length, 2), menu: 0, reason: 'raw_missing' };
+    reports.push(status);
+    if (raw.length > 1) { status.reason = 'ambiguous'; return unavailable('hints_ambiguous'); }
     const matches = menus.flatMap(p => p.availableSystemHints.filter(h => h?.systemHint === tool.hint)
       .map(hint => ({ hint, menu: p })));
-    if (matches.length > 1) return unavailable('hints_ambiguous');
-    if (!raw.length || !matches.length) continue;
+    status.menu = Math.min(matches.length, 2);
+    if (matches.length > 1) { status.reason = 'ambiguous'; return unavailable('hints_ambiguous'); }
+    if (!raw.length) continue;
+    status.reason = 'menu_filtered';
+    if (!matches.length) continue;
     const { hint, menu } = matches[0];
-    if ([raw[0], hint].some(h => h.isLoggedOutUpsell || h.isConnector || h.isDangerous ||
-        h.hideFromInitialSelection || h.disabled || h.isDisabled)) continue;
+    const flags = [raw[0], hint];
+    const blocked = flags.some(h => h.isLoggedOutUpsell) ? 'upsell' :
+      flags.some(h => h.isConnector || h.isDangerous) ? 'different_kind' :
+      flags.some(h => h.hideFromInitialSelection) ? 'initial_hidden' :
+      flags.some(h => h.disabled || h.isDisabled) ? 'disabled' : null;
+    if (blocked) { status.reason = blocked; continue; }
     // A local action has a different transaction; never turn it into a hint write.
-    if (menu.resolveSystemHintBehavior(hint) != null) continue;
+    if (menu.resolveSystemHintBehavior(hint) != null) { status.reason = 'different_behavior'; continue; }
+    status.reason = 'admitted';
     available.push(tool.hint);
   }
   if (!available.length) return unavailable('tool_unavailable');

@@ -12,6 +12,39 @@ const CID = '00000000-0000-0000-0000-000000000001';
 const flush = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
 const toolContext = require(path.join(assets, 'chatgpt_web_private_composer_tool_context.js'));
 
+test('tool admission diagnostics explain missing hints without exporting page or account data', async () => {
+  const f = fixture();
+  assert.deepEqual(toolContext.diagnostics(f.page), { schema: 'elon.composer_tool_admission.v1', observed: false, items: [] });
+  f.list(); await flush();
+  const diagnostic = toolContext.diagnostics(f.page);
+  assert.deepEqual(diagnostic.items.map(item => [item.tool, item.raw, item.menu, item.reason]), [
+    ['web_search', 1, 1, 'admitted'], ['image_generation', 1, 1, 'admitted'],
+    ['study', 0, 0, 'raw_missing'], ['canvas', 0, 0, 'raw_missing']
+  ]);
+  assert.doesNotMatch(JSON.stringify(diagnostic), /Bearer|fixture-model|controller|headers|00000000/);
+  diagnostic.items[0].reason = 'tampered';
+  assert.equal(toolContext.diagnostics(f.page).items[0].reason, 'admitted');
+  f.page.__elonChatGptDocumentToken = 'doc_replaced';
+  assert.equal(toolContext.diagnostics(f.page).observed, false);
+  assert.equal(toolContext.diagnostics(f.page).items.length, 0);
+});
+
+for (const [reason, change] of Object.entries({
+  menu_filtered: f => { f.menu.availableSystemHints = f.props.availableSystemHints.slice(0, 2); },
+  upsell: f => { f.props.availableSystemHints[2].isLoggedOutUpsell = true; },
+  different_kind: f => { f.props.availableSystemHints[2].isConnector = true; },
+  initial_hidden: f => { f.props.availableSystemHints[2].hideFromInitialSelection = true; },
+  disabled: f => { f.props.availableSystemHints[2].disabled = true; },
+  different_behavior: f => { f.menu.resolveSystemHintBehavior = h => h.systemHint === 'tatertot' ? { kind: 'local_action' } : null; }
+})) test('admission diagnostics distinguish ' + reason + ' without changing policy', async () => {
+  const f = fixture();
+  f.props.availableSystemHints.push({ systemHint: 'tatertot', name: 'Not exported' });
+  change(f); f.list(); await flush();
+  assert.equal(toolContext.diagnostics(f.page).items.find(item => item.tool === 'study').reason, reason);
+  assert.equal(f.events.at(-1).some(item => item.semantic === 'study'), false);
+  assert.equal(f.calls.length, 0);
+});
+
 function fixture(options = {}) {
   const calls = [], events = [], results = [], timers = new Set();
   let loaded = true, account = 'Bearer fixture-only-not-a-credential', expanded = false;
