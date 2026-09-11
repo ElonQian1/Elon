@@ -2,7 +2,7 @@
   'use strict';
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 10, create: dependencies => factory(dependencies, citation) });
+  const exported = Object.freeze({ version: 11, create: dependencies => factory(dependencies, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateHistoryProjection = exported;
 })(typeof window === 'object' ? window : null, function (dependencies, citation) {
@@ -142,6 +142,9 @@
       if (withSource) value.fileCitationReference = reference;
       parts.push(value);
     }
+    if (!bounded) for (const source of citation?.sourceReferences(message.metadata, MAX_PARTS) || []) {
+      parts.push({ type: 'file', text: source.name, kind: 'source', sourceUrl: source.url });
+    }
     return bounded ? parts.slice(0, MAX_PARTS - 1) : parts;
   }
 
@@ -207,7 +210,8 @@
         if (rows.length >= 100) { truncated = true; return; }
         rows.push({ id: id + ':' + index, messageId: id,
           role: message.author && message.author.role || message.role,
-          name: part.text, kind: part.type, mediaType: part.mediaType || '' });
+          name: part.text, kind: part.kind, mediaType: part.mediaType || '',
+          ...(part.kind === 'source' ? { sourceUrl: part.sourceUrl } : {}) });
       });
     });
     return { files: rows, truncated };

@@ -103,6 +103,35 @@
       ...(projects.length ? { gizmo_id: projects[0] } : {}) };
   }
 
+  function sourceLink(reference) {
+    if (!context?.isFile(reference) || reference.type === 'conversation_context_citation' ||
+        reference.deleted != null && reference.deleted !== false ||
+        reference.retrieval_origin === 'pca' && !context.allows(reference)) return null;
+    // Official Zra/FKn expose an external source separately from concrete file IDs.
+    const primary = reference.cloud_doc_url;
+    const raw = typeof primary === 'string' && primary.trim() ? primary : reference.extra?.cloud_doc_url;
+    if (typeof raw !== 'string' || raw.length > 8192 || /[\x00-\x20\x7f\\]/.test(raw.trim())) return null;
+    try {
+      const url = new URL(raw.trim());
+      if (url.protocol !== 'https:' || !url.hostname || url.username || url.password ||
+          url.port && url.port !== '443') return null;
+      const name = text(reference.title) || text(reference.name) || url.hostname;
+      return { name: name.slice(0, 180), url: url.href };
+    } catch (_) { return null; }
+  }
+
+  function sourceReferences(metadata, limit = 20) {
+    const seen = new Set(), result = [];
+    for (const reference of scan(metadata, limit).items) {
+      if (target(reference)) continue;
+      const source = sourceLink(reference);
+      if (!source || seen.has(source.url)) continue;
+      seen.add(source.url);
+      result.push(source);
+    }
+    return result;
+  }
+
   function scan(metadata, limit = 20) {
     const items = [], urls = new Set();
     let visited = 0, truncated = false;
@@ -111,7 +140,7 @@
     if (resolved) {
       const files = resolved.items.filter(context.isFile);
       return { items: files.slice(0, limit), truncated: resolved.partial || files.length > limit ||
-        files.some(item => item.deleted == null || item.deleted === false ? !target(item) : false) };
+        files.some(item => item.deleted == null || item.deleted === false ? !target(item) && !sourceLink(item) : false) };
     }
     if (!eligible(metadata)) return { items, truncated:
       metadata?.conversation_context_citation_metadata != null ||
@@ -127,8 +156,9 @@
       if (visited >= limit) { truncated = true; return false; }
       visited++;
       if (!object(value)) return true;
-      const key = explicit ? 'file://' + text(value.source) + '/' +
-        (text(value.id || value.file_id) || fileUrlId(value.url)) : text(value.url);
+      const fileId = explicit && (text(value.id || value.file_id) || fileUrlId(value.url));
+      const key = explicit ? fileId ? 'file://' + text(value.source) + '/' + fileId :
+        sourceLink(value)?.url || text(value.url) : text(value.url);
       if (!key || key.length > 8192 || urls.has(key)) return true;
       urls.add(key); items.push(value);
       return true;
@@ -203,5 +233,5 @@
     return result;
   }
 
-  return Object.freeze({ version: 7, eligible, target, references, scan });
+  return Object.freeze({ version: 8, eligible, target, references, scan, sourceLink, sourceReferences });
 });

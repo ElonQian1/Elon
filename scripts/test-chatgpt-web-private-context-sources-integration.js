@@ -279,7 +279,7 @@ test('upgrading then reinjecting assets replaces old captures and retains valid 
   assert.equal(rows.length, 1);
   assert.match(rows[0].downloadHandle, /^download_[a-f0-9]{32}$/);
   assert.equal(f.calls.length, 1);
-  assert.equal(f.root.__elonChatGptPrivateFileDownload.version, 29);
+  assert.equal(f.root.__elonChatGptPrivateFileDownload.version, downloadModule.version);
   const metadata = f.payload.messages[0].metadata;
   metadata.conversation_context_citation_metadata = [{ citation: file(), deleted: true }];
   metadata.conversation_context_citation_metadata_status = 'complete';
