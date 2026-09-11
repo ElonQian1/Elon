@@ -557,15 +557,15 @@
         },
         {
           "path": "docs/delivery/android-binance-create-economics-20260912.md",
-          "content_hash": "d6485b50ff2be1185f3026ac531c494967b14caf34ded440e14cfe1794b94419",
+          "content_hash": "5ab4844e1d0e1292e77e21db2fa38c86a0273434de555b35025a378491f14f7e",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "ba05d1f71e931c35b9e084ecc501a61a54cd0b9b",
-            "state": "untracked"
+            "head_commit": "83ec53a8422ff53963707291aa054b1f30179a30",
+            "head_blob_oid": "ba05d1f71e931c35b9e084ecc501a61a54cd0b9b",
+            "worktree_blob_oid": "eeb57b770e8f084f49e4d2dbafb8c7c3c5b38a17",
+            "state": "tracked_modified"
           }
         },
         {
@@ -596,7 +596,7 @@
         }
       ],
       "created_at_ms": 1789167456648,
-      "updated_at_ms": 1789168672091
+      "updated_at_ms": 1789171077621
     },
     {
       "id": "android-binance-create-funds-v1",
@@ -26492,16 +26492,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_d25ec4939ddf4e748f9c40d8ee7b989d",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788782766165
-    },
-    {
       "id": "feature_event_af59328c6dd84ecaa7198a1e51d1600b",
       "feature_id": "private-grid-read-bridge-v1",
       "action": "evidence_recorded",
@@ -28490,6 +28480,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789168672091
+    },
+    {
+      "id": "feature_event_819582dd5d4540de8ef64a134ad0d5dc",
+      "feature_id": "android-binance-create-economics-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789171077621
     }
   ]
 }
