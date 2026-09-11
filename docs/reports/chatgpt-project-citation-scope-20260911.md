@@ -2,10 +2,11 @@
 
 ## Status
 
-Candidate correction: download owner v26 / adapter 338. Offline checks passed;
-normal APK build and device acceptance are pending. This is not a completed
-project citation download. Personal TXT citation and ordinary gallery download
-remain completed separately.
+Normal 1656 / owner v26 / adapter 338 is released and installed, but the native
+project citation still returned metadata 404. Candidate v27 / adapter 339 adds
+the verified official direct-authorization path; acceptance is pending. This is
+not a completed project citation download. Personal TXT citation and ordinary
+gallery download remain completed separately.
 
 ## Reproduction on normal 1655
 
@@ -55,6 +56,42 @@ bypass permissions, export credentials, or change uploads/audio.
 
 This is an evidence-backed parameter correction, not yet proof that this
 explains every project-file failure or that grouped/cloud/PCA variants work.
+
+## Normal 1656 and direct authorization
+
+Source `61359c4d6cfecc41dd40baa6a7c7ecfaeeb5d662` built and published normal
+`v1.1.1656` (1656), SHA-256
+`ffe8a9138a504cc25c2dd2a973384b1cca85a7c83e2d708e2b9d27a8d365767d`.
+The release script updated the trusted Xiaomi without clearing data; package,
+adapter 338 and authenticated state were reread. Release log
+`citation-scope-release-338-20260911-115445-199` passed in 494.9 seconds.
+
+The first device case stopped before Download when another application became
+foreground. A bounded retry reused the existing fresh fixture with zero sends
+and one native Download. It still returned metadata 404 and zero bytes;
+conversation/draft/awake were restored. Log
+`project-citation-1656-native-retry-20260911-120542-614`. Thus v26 did not fix the
+observed project citation failure.
+
+Further source tracing identified shared export `nm`, local `fDt`, called from
+the current conversation preview `w3n`. It skips metadata when both explicit
+file project and library identity are absent. That differs from the legacy
+`FileCitationPreviewSheet`, which always requests metadata. Composer `MW` routes
+concrete `file_` and `file-` IDs toward the generic preview when its feature is
+enabled; shared `jX/TMe` recognizes both forms.
+
+Candidate v27 applies that known direct authorization only to project-chat
+citations with neither explicit file project nor library identity. It sends
+the concrete file ID and `check_context_scopes_for_conversation_id`, without
+inventing file project ownership. Explicit ownership still gets metadata
+validation. Previously accepted personal citations keep their existing path.
+Authorization errors do not retry, drop conversation scope, or start bytes.
+This is the initial scoped authorization request, not a 404 permission bypass.
+
+The direct-path regression failed on v26, then the related 183 cases passed
+on v27. Additional rejection tests cover 403/404/429/500 without replay.
+Logs: `citation-direct-authorization-red-20260911-121008-848` and
+`citation-direct-authorization-green-20260911-121032-166`.
 
 ## Verification
 

@@ -4,7 +4,7 @@
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 26, create: root => factory(root, pointer, citation) });
+  const exported = Object.freeze({ version: 27, create: root => factory(root, pointer, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -142,6 +142,11 @@
       return { url: authorizationUrl(job.entry, entry.projectId), fileId: materialized.fileId };
     }
     if (!entry.libraryFileId && !entry.fileCitation) return { url: authorizationUrl(entry, entry.projectId) };
+    if (entry.fileCitation && entry.projectId && !entry.metadataProjectId && !entry.libraryFileId) {
+      // Official fDt skips metadata without explicit file ownership. A project
+      // conversation still supplies its access scope, not file ownership.
+      return { url: authorizationUrl(entry, null) };
+    }
     // FileCitationPreviewSheet uses cEt/OX even when the reference omits library identity.
     const url = new URL('/backend-api/files/' + encodeURIComponent(entry.fileId) + '/simple', root.location.origin);
     // Official V3t/w3n pass file-preview ownership, not the current chat's
@@ -411,5 +416,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 26, register, registerLibraryFile, registerGalleryImage, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 27, register, registerLibraryFile, registerGalleryImage, start, cancel, dispose, sourceDiagnostics });
 });

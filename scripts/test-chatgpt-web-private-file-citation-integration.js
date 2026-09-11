@@ -188,6 +188,7 @@ for (const projectFlag of [false, null]) test('citation metadata resolves a pers
   const f = fixture({ ...PROJECT_INFO, is_project: projectFlag, gizmo_id: null });
   const saved = [];
   f.payload.gizmo_id = PROJECT;
+  f.payload.messages[0].metadata.content_references[0].library_file_id = 'libfile_cited';
   f.root.__elonChatGptPrivateLibraryDownload = { async run(_root, job, current, _url, id) {
     assert.equal(current(job), true);
     saved.push(id);
@@ -202,13 +203,13 @@ for (const projectFlag of [false, null]) test('citation metadata resolves a pers
   assert.deepEqual(f.receipts, [['download_conversation_file', true, 'download_saved']]);
 });
 
-test('a project chat citation does not attach inferred project ownership to file metadata', async () => {
+test('a project citation without file ownership uses direct conversation-scoped authorization', async () => {
   const f = fixture({ file_id: 'file-cited', is_library_file: false });
   f.payload.gizmo_id = PROJECT;
   const fetch = f.root.fetch;
   f.root.fetch = async (url, init) => {
     const parsed = new URL(url);
-    if (parsed.pathname.endsWith('/simple') && parsed.searchParams.has('gizmo_id')) {
+    if (parsed.pathname.endsWith('/simple')) {
       f.calls.push({ url, init });
       return new Response('', { status: 404 });
     }
@@ -216,9 +217,12 @@ test('a project chat citation does not attach inferred project ownership to file
   };
   await f.run();
   assert.equal(f.receipts.at(-1)[1], true);
-  assert.equal(f.calls.length, 2);
-  assert.equal(new URL(f.calls[0].url).searchParams.get('conversation_id'), 'source');
-  assert.equal(new URL(f.calls[1].url).searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+  assert.equal(f.calls.length, 1, 'the optional metadata lookup must not block authorization');
+  const url = new URL(f.calls[0].url);
+  assert.equal(url.pathname, '/backend-api/files/download/file-cited');
+  assert.equal(url.searchParams.has('gizmo_id'), false);
+  assert.equal(url.searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+  assert.equal(url.searchParams.get('download_intent'), 'true');
   assert.equal(f.queued.length, 1);
 });
 
@@ -232,10 +236,27 @@ for (const field of ['gizmo_id', 'project_id']) test('explicit citation ' + fiel
   assert.equal(f.receipts.at(-1)[1], true);
 });
 
+for (const status of [403, 404, 429, 500]) test('project direct authorization HTTP ' + status + ' never retries or downloads', async () => {
+  const f = fixture();
+  f.payload.gizmo_id = PROJECT;
+  f.root.fetch = async (url, init) => {
+    f.calls.push({ url, init });
+    return new Response('', { status });
+  };
+  await f.run();
+  assert.equal(f.calls.length, 1);
+  const url = new URL(f.calls[0].url);
+  assert.equal(url.pathname, '/backend-api/files/download/file-cited');
+  assert.equal(url.searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+  assert.equal(f.queued.length, 0);
+  assert.equal(f.receipts.at(-1)[1], false);
+});
+
 test('non-library citation metadata retains the requested project instead of adopting an unrelated field', async () => {
   const other = 'g-p-fedcba9876543210fedcba9876543210';
   const f = fixture({ file_id: 'file-cited', is_library_file: false, is_project: true, gizmo_id: other });
   f.payload.gizmo_id = PROJECT;
+  f.payload.messages[0].metadata.content_references[0].gizmo_id = PROJECT;
   await f.run();
   assert.equal(f.calls.length, 2);
   assert.equal(new URL(f.calls[1].url).searchParams.get('gizmo_id'), PROJECT);
