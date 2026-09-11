@@ -56,7 +56,7 @@ internal class BinanceCreateCommands private constructor(private val context: Co
                 if (!BinanceCreateSlot.shared.acquire(this)) return unavailable("busy", "已有创建或管理操作占用连接")
                 ownsSlot = true; operation = id
                 failedRecovery = runCatching { journal.read()?.let(attempt::restore) }.isFailure
-                session = BinanceCreateSession(host, attempt, ::persist, ::changed)
+                session = BinanceCreateSession(host, attempt, ::persist, ::changed, reference)
                 host.onCreateObservation = { session?.observed(it) }
             }
             host.begin()

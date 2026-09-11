@@ -585,6 +585,96 @@
       "updated_at_ms": 1789156614063
     },
     {
+      "id": "android-binance-create-validation-v1",
+      "title": "创建准备强制动态规则检查",
+      "summary": "把已有只读动态格数与最低保证金校验接入正式准备，失败与取消不产生提交准备；沿用量化UI和用户确认。",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/android-binance-create-validation-v1.md",
+        "content_hash": "90a12c6b81dd716d2b8d1bff19b0e1712186580cfe461f39df25a7c1c9b0d08d",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "76c1c47294bff24437056b2583b073dfa9b67871",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "036bb9d6be509efa54bb234a300ac1d555f63319",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateCommands.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateRuleCheck.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateSession.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "动态范围与最低保证金在准备前强制检查，复用既有算法",
+        "取消、超时、失败和身份变化不恢复旧准备",
+        "发布与实际账号/设备证据分别登记"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateCommands.kt",
+          "content_hash": "228e6ef2044354b02ac051fd2d9e035e013462b39e32d77daaf6990d56b08439",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "76c1c47294bff24437056b2583b073dfa9b67871",
+            "head_blob_oid": "1f600f4ebb0de3c08cf8c53ec56cad2f95cb24a1",
+            "worktree_blob_oid": "cfed0171e4fddc7d4f29406d44daaa18a11914ae",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateRuleCheck.kt",
+          "content_hash": "1208189234b9e01c218bf68df26134889d91742622dbee0675bddf82be4caa2b",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "76c1c47294bff24437056b2583b073dfa9b67871",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8305206a48b51e600f3bac6c73fe3e999bd31e32",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateSession.kt",
+          "content_hash": "d0193b59033fb3ecdc6fabdf593d6beea31c2b76e58d2c3b40a2faa45a7b9e2a",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "76c1c47294bff24437056b2583b073dfa9b67871",
+            "head_blob_oid": "028816c8d1e57b23f3c5a8547f00c822438e4fcd",
+            "worktree_blob_oid": "129ce000f66e8d28851e512378cd1cdd5acf4244",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/create/BinanceCreateRuleCheckTest.kt",
+          "content_hash": "f2674fc8e5acb81dd1e2712740ef41d63a95b2bc6d45967466a86c8a3248d204",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "76c1c47294bff24437056b2583b073dfa9b67871",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2a172dda7fd6c1ddc32fc8d3b4f84303ffff11b0",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1789158470158,
+      "updated_at_ms": 1789159308519
+    },
+    {
       "id": "android-binance-create-visibility-v1",
       "title": "币安创建与连接页面可见性",
       "summary": "修正系统浅色模式下原生网格控件对比度，明确读取授权页面和官网重载入口。",
@@ -25962,56 +26052,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_1cef472589a54612b8f34840070f7161",
-      "feature_id": "binance-grid-observer-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-root",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1788726050592
-    },
-    {
-      "id": "feature_event_16c8b4cd5beb42f1a75ca4d9db573e94",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "registered",
-      "actor": "codex-grid-research",
-      "reason": "用户改为通用 Win 研究工具与 MCP 路线；仅登记已接受需求，新能力尚未实现。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788728866806
-    },
-    {
-      "id": "feature_event_9ec59b3fdb204d069ca12ff06fc167dd",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-grid-research",
-      "reason": "独立评审明确完整业务数据与凭据留在浏览器的边界，重新评审需求。",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1788728924158
-    },
-    {
-      "id": "feature_event_b5a80ed380034962a36a30eda49e4203",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-research",
-      "reason": "用户授权通用 Win 研究路线；完整业务资料与凭据边界评审通过。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788728924504
-    },
-    {
-      "id": "feature_event_0bd494c08fd844d3b748783a4318b14a",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-research",
-      "reason": "站点无关内核、站点清单、可选适配器与跨站验收范围已确定；尚未实现。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788728924892
-    },
-    {
       "id": "feature_event_de151b0d34384b2ab50e239b5b2ebf12",
       "feature_id": "win-browser-research-mcp-v1",
       "action": "claimed",
@@ -27960,6 +28000,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789156614063
+    },
+    {
+      "id": "feature_event_c033e0fd585c4dac96de6524f60a05ee",
+      "feature_id": "android-binance-create-validation-v1",
+      "action": "registered",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789158470158
+    },
+    {
+      "id": "feature_event_27bfac4b3a9d41cfacfb31d4977a5298",
+      "feature_id": "android-binance-create-validation-v1",
+      "action": "claimed",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789158470201
+    },
+    {
+      "id": "feature_event_8c5ff8ff6bf1481e9f7f2f8fcb06ed84",
+      "feature_id": "android-binance-create-validation-v1",
+      "action": "transitioned",
+      "actor": "codex-grid",
+      "reason": "已完成精确路径查重并实现动态准备检查，回归验证正在运行",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789158844036
+    },
+    {
+      "id": "feature_event_19c0542cfc0449e0b457a03ed72b2361",
+      "feature_id": "android-binance-create-validation-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789159308423
+    },
+    {
+      "id": "feature_event_03a29efd54c344caa7ca0ff021a0e317",
+      "feature_id": "android-binance-create-validation-v1",
+      "action": "transitioned",
+      "actor": "codex-grid",
+      "reason": "源码和离线回归通过；正式发布、装机和同账号动态比对分别继续取证，不标记已验收",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789159308519
     }
   ]
 }
