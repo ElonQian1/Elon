@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
     [ValidateSet('study','canvas')][string[]]$Tools = @('study','canvas'),
+    [ValidateRange(0,9999)][int]$ExpectedAdapterVersion = 0,
     [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe'
 )
 $ErrorActionPreference = 'Stop'
@@ -80,7 +81,7 @@ try {
         $w.authenticated -ne $true -or $w.streaming -or $w.dictation_active -or $origin.input.text -or
         [int]$w.input.official_draft_length -gt 0 -or @($w.conversation.attachments | Where-Object { $_ }).Count -gt 0) { throw 'idle_authenticated_native_chat_required' }
     $report.adapter=$w.adapter_version
-    if ($w.adapter_version -ne (Resolve-ChatGptWebSmokeExpectedAdapterVersion 0)) { throw 'installed_adapter_mismatch' }
+    if ($w.adapter_version -ne (Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion)) { throw 'installed_adapter_mismatch' }
     $initialUi=Ui 'inspect'
     if ($initialUi.study_active -or $initialUi.canvas_active -or $initialUi.image_active -or $initialUi.search_active) { throw 'initial_selected_tool_present' }
     Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null

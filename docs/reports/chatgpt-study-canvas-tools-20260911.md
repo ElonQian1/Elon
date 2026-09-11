@@ -77,10 +77,29 @@ the task still uses the required explicit finish workflow.
 
 | Capability ID | Code | Default | Device | Completed |
 |---|---|---|---|---|
-| `android_chatgpt_private_study_tool_v1` | implemented | native preset, official admission | deferred | false |
-| `android_chatgpt_private_canvas_tool_v1` | implemented | native preset, official admission | deferred | false |
+| `android_chatgpt_private_study_tool_v1` | implemented | native preset, official admission | failed: selection not dispatched | false |
+| `android_chatgpt_private_canvas_tool_v1` | implemented | native preset, official admission | pending: batch stopped at Study | false |
 
-Reuse this published artifact on reconnect, then run the native tool acceptance
-script. Do not rebuild or repeat protocol research merely because the device
-left. Full Canvas editing, other account/model tool eligibility and server
-preference persistence are not established by the offline tests.
+## Reconnected Device Attempt
+
+Xiaomi wireless ADB reconnected. The retained, hash-verified 1671 APK was installed
+with `adb install -r`; package version 1671 was read back. No Cookie or app data
+was cleared. The native social-AI page became ready and authenticated.
+
+The real native Study menu button was clicked. Tool-list commands succeeded with
+`official_tool_runtime_v1:accepted`, but no `select_composer_tool` command followed
+before the bounded timeout. The current private catalogue exposed only Search
+and Image Generation. The APK ZIP itself contains both new hint definitions, so
+this is not evidence of installing the old two-tool implementation. Which live
+hint/admission condition excluded the tools is not yet established; it must not
+be reported as the provider lacking those capabilities.
+
+The test sent **zero messages**, restored the original conversation and awake
+policy, and stopped before Canvas. Log group: `study-canvas-device-1671`. The
+acceptance script now accepts an explicit expected adapter version so a retained
+APK can be verified even while source is ahead; it still checks exact equality.
+
+Next: inspect the live official hint/admission context and fix the confirmed
+native-selection gap, then repeat only this failed case. Do not rebuild 1671 or
+repeat accepted Search/Image tests. Full Canvas editing, other account/model
+eligibility and server preference persistence remain separate unverified scopes.
