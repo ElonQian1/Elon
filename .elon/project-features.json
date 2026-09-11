@@ -1872,6 +1872,19 @@
           }
         },
         {
+          "path": "docs/android-binance-protection-v3-delivery.md",
+          "content_hash": "0f4e4ffbb19f03ed03b35ea187d88f29327cbbecddad50c977a5e149a72f1534",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "51291b2f6ab4e668491d7d7f216df8712db92605",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1866592bf6c1853460455ce323fe5aa070b70c5c",
+            "state": "untracked"
+          }
+        },
+        {
           "path": "docs/binance-protection-source-v3.md",
           "content_hash": "2c0228054ad598ad3ca6cc65e649fbc5395bbdaf295fbcaf77da002628028b49",
           "locator": "",
@@ -1912,7 +1925,7 @@
         }
       ],
       "created_at_ms": 1789087391199,
-      "updated_at_ms": 1789089050211
+      "updated_at_ms": 1789091135399
     },
     {
       "id": "android-binance-read-context-recovery-v1",
@@ -25284,16 +25297,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_4569c587e424449ab4187b2ceddb24a7",
-      "feature_id": "esk-sui-testnet-publication-preflight-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-preflight",
-      "reason": "远端交付证据已写入文档，代码语义未变化。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788664030371
-    },
-    {
       "id": "feature_event_49f8a40145ea4c8489d787f94d0c3257",
       "feature_id": "esk-sui-testnet-publication-preflight-v1",
       "action": "transitioned",
@@ -27282,6 +27285,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789089050211
+    },
+    {
+      "id": "feature_event_b4a39c5fc6d24cfab99c43c4b8f84aac",
+      "feature_id": "android-binance-protection-v3",
+      "action": "evidence_recorded",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789091135399
     }
   ]
 }
