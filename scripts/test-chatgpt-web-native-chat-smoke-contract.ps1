@@ -18,6 +18,8 @@ foreach ($token in @(
     'user_marker_matched',
     'assistant_marker_matched',
     'web_chat_last_send_command',
+    'RequireRuntimeSend',
+    'runtime_send_accepted',
     'ConvertTo-ChatGptWebSmokeSafeDiagnostic',
     'Register-ChatGptWebVerificationCases',
     '-CaseIds @("reversible/send_probe")',
@@ -31,6 +33,24 @@ foreach ($token in @(
         throw "Native ChatGPT Web smoke is missing required token: $token"
     }
 }
+$tokens = $null; $parseErrors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseInput($smoke, [ref]$tokens, [ref]$parseErrors)
+if ($parseErrors.Count) { throw "Native smoke PowerShell parsing failed." }
+$receiptFunction = $ast.Find({ param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Test-ChatGptWebNativeRuntimeReceipt'
+}, $true)
+Invoke-Expression $receiptFunction.Extent.Text
+$receipt = [pscustomobject]@{ action = 'send_prompt'; ok = $true; observed_at_ms = 12; detail = 'official_runtime_v1:accepted' }
+if (-not (Test-ChatGptWebNativeRuntimeReceipt $receipt 11)) { throw "Fresh runtime receipt was rejected." }
+if (Test-ChatGptWebNativeRuntimeReceipt $receipt 12) { throw "Stale receipt was accepted." }
+$receipt.detail = 'official_runtime_v1:unknown:completion_failed'
+if (Test-ChatGptWebNativeRuntimeReceipt $receipt 11) { throw "Uncertain send was accepted." }
+$receipt.detail = 'official page accepted'
+if (Test-ChatGptWebNativeRuntimeReceipt $receipt 11) { throw "DOM fallback was labeled runtime." }
+$receipt.detail = 'official_runtime_v1:accepted'; $receipt.ok = $false
+if (Test-ChatGptWebNativeRuntimeReceipt $receipt 11) { throw "Failed command was accepted." }
+if (Test-ChatGptWebNativeRuntimeReceipt $null 0) { throw "Absent receipt was accepted." }
 if ($smoke.Contains('chatgpt_web_auth')) {
     throw "Native ChatGPT Web smoke must not route through the legacy login page."
 }

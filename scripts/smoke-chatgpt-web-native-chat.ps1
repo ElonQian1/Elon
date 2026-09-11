@@ -8,6 +8,7 @@ param(
     [ValidateRange(10, 300)][int]$TimeoutSec = 120,
     [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
     [switch]$SendProbe,
+    [switch]$RequireRuntimeSend,
     [string]$ProbeMarker = "",
     [string]$Prompt = "",
     [string]$ExpectedReply = ""
@@ -33,6 +34,13 @@ function ConvertTo-ChatGptWebNativeProbeText {
     param([AllowNull()]$Value)
 
     return ([string]$Value).Trim() -replace '\\([_-])', '$1'
+}
+
+function Test-ChatGptWebNativeRuntimeReceipt {
+    param($Command, [long]$PreviousObservedAtMs = 0)
+    return $null -ne $Command -and [string]$Command.action -eq "send_prompt" -and
+        $Command.ok -eq $true -and [long]$Command.observed_at_ms -gt $PreviousObservedAtMs -and
+        [string]$Command.detail -eq "official_runtime_v1:accepted"
 }
 
 function Wait-ChatGptWebNativeProbeReply {
@@ -86,6 +94,9 @@ function Wait-ChatGptWebNativeProbeReply {
 if (-not $SendProbe -and ($ProbeMarker -or $Prompt -or $ExpectedReply)) {
     throw "Probe arguments require -SendProbe because the default ChatGPT smoke is read-only."
 }
+if ($RequireRuntimeSend -and -not $SendProbe) {
+    throw "RequireRuntimeSend needs SendProbe; no write is implied by a read-only check."
+}
 if ($ProbeMarker -and ($Prompt -or $ExpectedReply)) {
     throw "ProbeMarker cannot be combined with Prompt or ExpectedReply."
 }
@@ -132,6 +143,7 @@ try {
         project_total = [int]$navigation.project_total
         sent_messages = 0
         assistant_completed = $false
+        runtime_send_accepted = $false
         probe_kind = if ($Prompt) { "custom_exact" } else { "marker_exact" }
         original_conversation_restored = $true
         cleared_cookies = $false
@@ -153,9 +165,16 @@ try {
                 } | Out-Null
             Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "set_input_text" `
                 -Arguments @{ text = $probePrompt } | Out-Null
+            $beforeSend = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool "ui_state" -MainState
+            $previousReceiptAt = [long]$beforeSend.social_chat.web_chat_last_send_command.observed_at_ms
             Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input" | Out-Null
-            Wait-ChatGptWebNativeProbeReply -Runtime $runtime -Prompt $probePrompt `
-                -ExpectedReply $probeExpectedReply -WaitTimeoutSec $TimeoutSec | Out-Null
+            $completed = Wait-ChatGptWebNativeProbeReply -Runtime $runtime -Prompt $probePrompt `
+                -ExpectedReply $probeExpectedReply -WaitTimeoutSec $TimeoutSec
+            $report.runtime_send_accepted = Test-ChatGptWebNativeRuntimeReceipt `
+                -Command $completed.social_chat.web_chat_last_send_command -PreviousObservedAtMs $previousReceiptAt
+            if ($RequireRuntimeSend -and -not $report.runtime_send_accepted) {
+                throw "Reply completed, but no fresh accepted official-runtime send receipt was observed. No retry was sent."
+            }
             Register-ChatGptWebVerificationCases -Runtime $runtime `
                 -CaseIds @("reversible/send_probe") `
                 -ExpectedAdapterVersion $ExpectedAdapterVersion `

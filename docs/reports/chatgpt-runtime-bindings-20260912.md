@@ -52,5 +52,8 @@ alone are not public-protocol proof or device acceptance.
 - Pinned public-source check and versioned binding tests: 81 passed, none skipped.
 - Submit/stop/attachment/regeneration/stream checks: 333 passed.
 - Current-profile consumers and committed-owner checks: 25 passed.
+- Native smoke receipt contract passed: optional `RequireRuntimeSend` requires a
+  fresh `official_runtime_v1:accepted` receipt before recording success. A DOM
+  reply, stale receipt or uncertain result cannot satisfy this check.
 - Grouped release and one production native send/reply remain pending.
 No Cookie, application-data, microphone or proxy-core changes were made.
