@@ -54,8 +54,27 @@ observations remain valid. Do not relabel the earlier failures as proven timeout
   `WebChatConversationFilesPresentationTest` cases passed, zero failures/errors.
   These include cached failure rows, safe labels, refresh ownership and the
   default-dismiss contract for other footer actions.
-- Production-native device acceptance is pending for this candidate.
+- Java semantic-menu acceptance helper compiled. The existing inventory script
+  supports `-NativeMenu -VerifyRefreshInPlace`: wait for the initial read, tap
+  Refresh three times, compare the Android window identity, preserve cached
+  rows, and inspect successful native command receipts. If all three taps were
+  sampled while loading, exactly one new read command is required.
   Deterministic injected failures are not a controlled live network outage.
+
+## Normal 1658 Delivery
+
+- Published and installed through wireless ADB on the trusted Xiaomi, without
+  clearing data, at normal 1.1.1658 / code 1658 / adapter 340.
+- Source: `23658f56b6d6cb8948dc3c7f7ade6cde8411df48`.
+- APK SHA-256: `ed7979319a91d636f9563d07a503b8b3b8066f7142e6e3d3809a11b63ab53b51`.
+- `file-read-recovery-release-340-20260911-130738-409`: Release build, vital
+  lint, publication and unattended update passed. The auxiliary post-publish
+  worktree cleanup reported a missing `Branch` property; publication and device
+  version verification still completed. Task finalization is recorded separately.
+- `file-refresh-native-1658-20260911-131543-931` stopped at `device_locked`
+  before opening any native menu. Zero sends/downloads and no awake lease or
+  conversation change occurred. UI acceptance is **deferred**, not passed.
+  Resume the installed package after unlock; do not rebuild for this boundary.
 
 Reuse the completed citation download scopes. This correction does not complete
 mounted/cloud references, broaden model/account coverage or address thermal work.

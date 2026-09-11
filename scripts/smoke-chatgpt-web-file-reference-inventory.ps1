@@ -6,9 +6,11 @@ param(
     [ValidateRange(1, 12)][int]$Limit = 6,
     [ValidateRange(0, 49)][int]$CandidateOffset = 0,
     [switch]$NativeMenu,
+    [switch]$VerifyRefreshInPlace,
     [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe'
 )
 $ErrorActionPreference = 'Stop'
+if ($VerifyRefreshInPlace -and -not $NativeMenu) { throw 'refresh_check_requires_native_menu' }
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-evidence.ps1')
 . (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
@@ -93,8 +95,24 @@ try {
                 Ui 'header' | Out-Null
                 Ui 'current_settings' | Out-Null
                 Ui 'files' | Out-Null
-                Ui 'files_refresh' | Out-Null
+                if ($VerifyRefreshInPlace) {
+                    Ui 'files_wait' | Out-Null
+                    $priorRequestIds = @((Web).command_requests.request_id)
+                    $refresh = Ui 'files_refresh_stable'
+                    $case.refresh = $refresh.refresh
+                } else { Ui 'files_refresh' | Out-Null }
                 $menu = Ui 'files_wait'
+                if ($VerifyRefreshInPlace) {
+                    $reads = @((Web).command_requests | Where-Object {
+                        $_.request_id -notin $priorRequestIds -and $_.expected_web_action -eq 'list_conversation_files'
+                    })
+                    $case.refresh_read_commands = $reads.Count
+                    if (-not $case.refresh.same_window -or $reads.Count -eq 0 -or
+                        @($reads | Where-Object { $_.status -ne 'succeeded' -or $_.result.ok -ne $true }).Count -gt 0) {
+                        throw 'refresh_receipt_unconfirmed'
+                    }
+                    if ($case.refresh.loading_samples -eq 3 -and $reads.Count -ne 1) { throw 'duplicate_pending_read' }
+                }
                 $case.native_menu = @{ visible = $menu.file_index_visible
                     first_row = $menu.file_index_first_row; empty = $menu.file_index_empty }
             } else {

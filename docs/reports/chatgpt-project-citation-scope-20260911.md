@@ -2,11 +2,11 @@
 
 ## Status
 
-Normal 1656 / owner v26 / adapter 338 is released and installed, but the native
-project citation still returned metadata 404. Candidate v27 / adapter 339 adds
-the verified official direct-authorization path; acceptance is pending. This is
-not a completed project citation download. Personal TXT citation and ordinary
-gallery download remain completed separately.
+Project uploaded-TXT citation download is completed/default-enabled and verified
+on normal 1657 / owner v27 / adapter 339; see [the acceptance](#normal-1657-acceptance).
+The 1656 metadata 404 below is historical reproduction evidence, not current
+status. Personal TXT citation and ordinary gallery download remain completed
+separately; grouped/cloud/PCA and other-owner scopes are not implied.
 
 ## Reproduction on normal 1655
 

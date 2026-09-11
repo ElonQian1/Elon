@@ -19,6 +19,8 @@ foreach ($required in @(
     'sent_messages = 0', 'downloaded_files = 0', 'content_exported = $false',
     'Select-Object method, path, status', 'protocol_dropped'
     'Invoke-AndroidSemanticAcceptance', "Ui 'current_settings'", "Ui 'files_refresh'", "Ui 'files_wait'", "Ui 'back'"
+    '[switch]$VerifyRefreshInPlace', 'refresh_check_requires_native_menu', "Ui 'files_refresh_stable'",
+    'refresh_receipt_unconfirmed', 'duplicate_pending_read'
 )) {
     if (-not $source.Contains($required)) { throw "inventory_guard_missing: $required" }
 }
