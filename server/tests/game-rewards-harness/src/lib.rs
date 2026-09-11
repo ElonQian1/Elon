@@ -4,6 +4,8 @@
 pub mod authority;
 #[path = "../../../src/esk_platform/game_rewards/funding.rs"]
 pub mod funding;
+#[cfg(test)]
+mod interoperability;
 #[path = "../../../src/esk_platform/game_rewards/ledger.rs"]
 pub mod ledger;
 #[path = "../../../src/esk_platform/game_rewards/migration.rs"]

@@ -1,0 +1,83 @@
+{
+  "note": "Synthetic interoperability fixture. Public test seeds 11 and 22; never actual chain or profit evidence.",
+  "policy": {
+    "schema": "esk.game.rewards.policy.v1",
+    "main_issuer": "synthetic-main",
+    "network": "testnet",
+    "chain_identifier": "4c78adac",
+    "genesis_checkpoint_digest": "69WiPg3DAQiwdxfncX6wYQ2siKwAe6L9BZthQea3JNMD",
+    "rewards_package_id": "0x0303030303030303030303030303030303030303030303030303030303030303",
+    "registry_id": "0x0404040404040404040404040404040404040404040404040404040404040404",
+    "asset_type": "0x0505050505050505050505050505050505050505050505050505050505050505::test::TEST",
+    "asset_decimals": 6,
+    "reconciler_public_key_hex": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+    "funding_observer_public_key_hex": "511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a"
+  },
+  "policy_digest": "d31a08f277ba835ec6bb5ae568152c88b6d96cb53d8ab44a665ec62fa6558db5",
+  "settlement": {
+    "payload": {
+      "schema": "esk.game.rewards.settlement.v1",
+      "policy_digest": "d31a08f277ba835ec6bb5ae568152c88b6d96cb53d8ab44a665ec62fa6558db5",
+      "user_id": "alice",
+      "beneficiary": "0x0606060606060606060606060606060606060606060606060606060606060606",
+      "wallet_binding_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+      "sequence": "1",
+      "previous_report_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "period_end_ms": "1799999999000",
+      "cumulative_net_profit_units": "1000",
+      "reconciliation_digest": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    "signature_hex": "c7453433e30b822441fed731bfd91bad4b3aac7395a4cefba2b55a66d966c5da0dc09bb144f45f8f6323fdf23d1bc4429a104b22cb2ec82d2ebc21cd21363d00"
+  },
+  "intent": {
+    "schema": "esk.game.rewards.intent.v1",
+    "policy_digest": "d31a08f277ba835ec6bb5ae568152c88b6d96cb53d8ab44a665ec62fa6558db5",
+    "allocation_hash": "0101010101010101010101010101010101010101010101010101010101010101",
+    "report_digest": "749977eeff2d6cd58327c188e60b0aafd5a1e5f6c1f9b51c68960257f3e8c5c4",
+    "user_id": "alice",
+    "beneficiary": "0x0606060606060606060606060606060606060606060606060606060606060606",
+    "mint_authority": "0x0707070707070707070707070707070707070707070707070707070707070707",
+    "creator": "0x0808080808080808080808080808080808080808080808080808080808080808",
+    "content_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+    "license_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+    "allow_modification": true,
+    "allow_external_game": true,
+    "opens_at_ms": "0",
+    "direct_claim_after_ms": "0",
+    "denominations": [
+      "1",
+      "5",
+      "10",
+      "50",
+      "100",
+      "500"
+    ],
+    "tickets": [
+      "1",
+      "0",
+      "0",
+      "0",
+      "1",
+      "1"
+    ]
+  },
+  "intent_digest": "1efb8a036e28d4efeb8170385d606e1366ed32591a0eae49620817d363abfa5b",
+  "funding": {
+    "payload": {
+      "schema": "esk.game.rewards.funding.v1",
+      "policy_digest": "d31a08f277ba835ec6bb5ae568152c88b6d96cb53d8ab44a665ec62fa6558db5",
+      "intent_digest": "1efb8a036e28d4efeb8170385d606e1366ed32591a0eae49620817d363abfa5b",
+      "allocation_hash": "0101010101010101010101010101010101010101010101010101010101010101",
+      "budget_id": "0x0909090909090909090909090909090909090909090909090909090909090909",
+      "transaction_digest": "cGfHiC6Kgg3FpFZvgwGcswsCRtp4aBP2fzuXRQPizuN",
+      "checkpoint": "100",
+      "checkpoint_digest": "YMN9Qj5jPNp7j14VPcML1B6xGgcPWVZUGLFU3Mnyfaf",
+      "checkpoint_time_ms": "1799999999900",
+      "observed_at_ms": "1800000000000",
+      "amount_units": "601",
+      "beneficiary": "0x0606060606060606060606060606060606060606060606060606060606060606",
+      "initial_budget_verified": true
+    },
+    "signature_hex": "47346822776d37407655185f6b49a815ce830b287a3149cd185ecc875479c17a2e36765e08d84060a10693b843dc8f1ee18387a732b10b5d4e17a8623b99640e"
+  }
+}
