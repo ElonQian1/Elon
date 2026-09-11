@@ -2,8 +2,8 @@
   'use strict';
   const policy = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_context_sources_policy.js') : root?.__elonChatGptPrivateContextSourcesPolicy;
-  if (typeof module === 'object' && module.exports) module.exports = { version: 1, create: host => factory(host, policy) };
-  if (root && (!root.__elonChatGptPrivateContextSources || root.__elonChatGptPrivateContextSources.version < 1)) {
+  if (typeof module === 'object' && module.exports) module.exports = { version: 2, create: host => factory(host, policy) };
+  if (root && (!root.__elonChatGptPrivateContextSources || root.__elonChatGptPrivateContextSources.version < 2)) {
     root.__elonChatGptPrivateContextSources = factory(root, policy);
   }
 })(typeof window === 'object' ? window : null, function (root, policy) {
@@ -128,6 +128,6 @@
     return { stale: !token.current(), partial };
   }
 
-  return Object.freeze({ version: 1, capture: owner,
+  return Object.freeze({ version: 2, capture: owner,
     hasSources: payload => candidates(payload).length > 0, applyCached, enrich });
 });

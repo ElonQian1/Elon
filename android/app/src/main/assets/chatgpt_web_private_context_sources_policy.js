@@ -1,7 +1,7 @@
 (function (root, factory) {
   'use strict';
   const existing = root?.__elonChatGptPrivateContextSourcesPolicy;
-  const exported = existing?.version >= 1 ? existing : factory();
+  const exported = existing?.version >= 2 ? existing : factory();
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateContextSourcesPolicy = exported;
 })(typeof window === 'object' ? window : null, function () {
@@ -78,6 +78,16 @@
       return { fingerprint, items, status, fetch: supported && status !== 'complete' &&
         status !== 'pending_inline_finalize', expand: status === 'complete_inline_only', supported };
     } catch (_) { return { fingerprint: '', items: null, status, fetch: false, supported: false }; }
+  }
+
+  function withoutDeleted(metadata, items) {
+    const graph = metadata?.conversation_context_citation_metadata;
+    if (!Array.isArray(graph)) return items;
+    // Official AKn removes by the outer record's exact URL, even when a later
+    // supplemental item has a different UUID or an allowed PCA mask.
+    const deleted = new Set(graph.flatMap(entry => entry?.deleted === true &&
+      object(entry.citation) && hasUrl(entry.citation) ? [entry.citation.url] : []));
+    return items.filter(item => !hasUrl(item) || !deleted.has(item.url));
   }
 
   function validateMask(mask) {
@@ -168,7 +178,7 @@
     const complete = selected.status === 'done' && selected.mask?.status !== 'pending';
     const items = selected.items.filter(item => !masked(item, selected.mask) &&
       (complete || item.retrieval_origin !== 'pca'));
-    return { items, partial: !complete };
+    return { items: withoutDeleted(metadata, items), partial: !complete };
   }
 
   function resolve(metadata, supplement) {
@@ -188,5 +198,5 @@
   }
   function allows(item) { try { return approvals.get(item)?.() === true; } catch (_) { return false; } }
 
-  return Object.freeze({ version: 1, inspect, resolve, decode, attach, lookup, allows, isFile });
+  return Object.freeze({ version: 2, inspect, resolve, decode, attach, lookup, allows, isFile, withoutDeleted });
 });

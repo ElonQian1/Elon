@@ -8,8 +8,8 @@ reviewed_at: 2026-09-11
 ## Delivery Boundary
 
 This extends `android_chatgpt_private_file_citation_download_v1`, not a second
-attachment system. Context-source policy/owner v1, citation v6, projection v10,
-private transport v28, download owner v28 and Android adapter 344 are implemented.
+attachment system. Context-source policy/owner v2, citation v7, projection v10,
+private transport v28, download owner v29 and Android adapter 345 are implemented.
 The source path is wired into the existing native Conversation files command.
 Synthetic protocol/integration verification passed; grouped Android compilation,
 installation and production source-shape/download acceptance remain pending.
@@ -40,6 +40,21 @@ pending inline finalization, but allows explicit expansion of inline-only data.
 `JVi/KVi/x5i` apply mask URL/type selection and newly revealed source ordering.
 The shared bundle's `Qh/mX` exports define memory-category and matched-reference
 identity semantics; these are source counts/identities, not downloadable files.
+
+The companion `8b34dbc2-fpy4mlfnxc115y6k.js` consumer `AKn` independently
+excludes URLs whose outer metadata record has `deleted === true`. This exclusion
+survives supplemental UUID replacement and an allowed PCA mask. Policy v2 applies
+it after source selection; direct inline parsing uses the same filter before row
+limits. A changed inline fingerprint invalidates old cache approval, and replacing
+the native inventory revokes its previous download handles. Inner deletion checks
+remain unchanged. Exact URL equality and a boolean true match the observed code;
+an absent URL or a similarly named file is not evidence of deletion.
+
+The current file helpers are `eia/Yra/ria`; `Zra` reads `cloud_doc_url` or
+`extra.cloud_doc_url`. Composer `FKn` carries that as `externalUrl`, even without
+a concrete file ID. This is source-link metadata, not a cloud-to-file download
+protocol. A native source-link action and its final UI consumer remain unverified;
+do not fabricate download identities from cloud URLs.
 
 ## Ownership and UI
 
@@ -82,11 +97,20 @@ the actual module versions while retaining its disposal/identity assertions.
 Native file-save acknowledgements are synthetic; the native polling
 check is a source contract, not an Android execution test.
 
+The outer-deletion regression first reproduced three failures on the prior code.
+`context-source-deletion-verified-20260911-162601-806` then passed 131 targeted
+runner cases with zero failures/skips; all 113 registered assets and the assembled
+bundle parse. Coverage includes exact outer flags/URLs, different supplemental
+UUIDs, masks, pre-limit filtering, warm-cache invalidation, handle revocation and
+upgrading captured policy/download owners before idempotent reinjection.
+
 Run one grouped Release and the production file sheet against an actual context
 source response. Confirm the final source mask, matching rows, one selected
 download and actual saved bytes, then restore the original conversation/draft.
-The USB device list is currently empty; do not declare device success or
-reinterpret an absent device as an application protocol failure.
+The 2026-09-11 retry connected to Xiaomi over wireless ADB and read installed
+`1.1.1661`; the existing APK MCP `phone_status` also returned without an error.
+That proves device/control connectivity only; adapter 345 is not installed
+or accepted by this check. No Cookie or application data was cleared.
 
 Accepted scopes remain in [file citations](chatgpt-private-file-citations.md).
 Remaining work stays in [the batch map](web-ai-private-native-remaining-batch.md).

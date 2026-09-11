@@ -44,9 +44,10 @@
         items.push(reference);
       }
     }
-    return { items: items.slice(0, limit), truncated: items.length > limit ||
+    const visible = context.withoutDeleted(metadata, items);
+    return { items: visible.slice(0, limit), truncated: visible.length > limit ||
       metadata.conversation_context_citation_metadata_status === 'complete_inline_only' ||
-      items.some(item => item.retrieval_origin === 'pca') };
+      visible.some(item => item.retrieval_origin === 'pca') };
   }
 
   function fileUrlId(value) {
@@ -54,7 +55,7 @@
     if (!url.toLowerCase().startsWith('file://') || url.length > 8192) return '';
     try {
       const parsed = new URL(url);
-      // Official c6i appends search before g6i validates the concrete file ID.
+      // Official Yra appends search before ria validates the concrete file ID.
       // Never fetch the file URL or interpret its host as a provider identity.
       const id = decodeURIComponent(parsed.pathname.split('/').filter(Boolean).at(-1) || '') + parsed.search;
       return FILE.test(id) ? id : '';
@@ -71,7 +72,7 @@
       reference.type === 'file' || ['files', 'library'].includes(text(reference.attribution).toLowerCase()) ||
       text(reference.url).toLowerCase().startsWith('file://');
     if (!isFile) return null;
-    // Official p6i/c6i/g6i also resolves a concrete ID from a file URL path.
+    // Official eia/Yra/ria also resolves a concrete ID from a file URL path.
     // A cloud URL by itself is not a download credential.
     const ids = [reference.file_id, reference.id].filter(value => value != null);
     if (!ids.length) {
@@ -202,5 +203,5 @@
     return result;
   }
 
-  return Object.freeze({ version: 6, eligible, target, references, scan });
+  return Object.freeze({ version: 7, eligible, target, references, scan });
 });

@@ -24,6 +24,40 @@ test('seed and supplemental UUID replacement precede mask and row bounds', () =>
   assert.equal(result.partial, false);
 });
 
+test('outer URL tombstones survive changed UUIDs, allowed masks and supplemental replacement', () => {
+  const removed = file('gone', { retrieval_origin: 'pca' });
+  const metadata = meta([removed]);
+  metadata.conversation_context_citation_metadata[0].deleted = true;
+  const result = resolve(metadata, [source({ ...removed, citation_uuid: 'new', deleted: false }),
+    source(file('kept')), mask([removed.url])]);
+  assert.deepEqual(result.items.map(x => x.file_id), ['file-kept']);
+  assert.equal(result.partial, false);
+  policy.attach(metadata, result, () => true);
+  assert.deepEqual(citation.references(metadata).map(x => x.file.id), ['file-kept']);
+  assert.equal(metadata.conversation_context_citation_metadata[0].citation.deleted, undefined);
+});
+
+test('complete inline parsing applies outer deletions before the file row limit without an overlay', () => {
+  const metadata = meta([file('gone'), file('kept')], 'complete');
+  metadata.conversation_context_citation_metadata[0].deleted = true;
+  assert.deepEqual(citation.scan(metadata, 1).items.map(x => x.file_id), ['file-kept']);
+  assert.equal(citation.scan(metadata, 1).truncated, false);
+  assert.deepEqual(policy.resolve(metadata).items.map(x => x.file_id), ['file-kept']);
+});
+
+test('outer deletion requires exact true and exact URL, not an ID or normalized URL match', () => {
+  const variants = [file('false'), file('string'), file('upper'), file('no-url', { url: undefined })];
+  const metadata = meta(variants, 'complete');
+  const graph = metadata.conversation_context_citation_metadata;
+  graph[0].deleted = false;
+  graph[1].deleted = 'true';
+  graph[2] = { citation: { ...variants[2], url: variants[2].url.toUpperCase() }, deleted: true };
+  graph[3].deleted = true;
+  graph.push({ citation: variants[2] });
+  assert.deepEqual(policy.resolve(metadata).items.map(x => x.file_id),
+    ['file-false', 'file-string', 'file-upper', 'file-no-url']);
+});
+
 test('PCA approval is page-local, resolved, masked and revocable; raw flags cannot forge it', () => {
   const metadata = meta();
   const pca = file('pca', { retrieval_origin: 'pca' });

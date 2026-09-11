@@ -110,6 +110,24 @@ test('same ID in another conversation and changed seeds have separate cache owne
   assert.equal(f.calls.length, 3);
 });
 
+test('outer deletion invalidates warm sources and revokes the prior native download handle', async () => {
+  const f = fixture();
+  await f.api.enrich(f.payload, 'source');
+  const previous = f.rows()[0];
+  const metadata = f.payload.messages[0].metadata;
+  metadata.conversation_context_citation_metadata = [{ citation: file(), deleted: true }];
+  metadata.conversation_context_citation_metadata_status = 'complete';
+  f.api.applyCached(f.payload, 'source');
+  assert.equal(projection.files(f.payload).files.length, 0);
+  assert.equal(projection.files(f.payload).truncated, false);
+  assert.equal(f.rows().length, 0);
+  await f.api.enrich(f.payload, 'source');
+  await f.run(previous);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.queued.length, 0);
+  assert.notEqual(f.receipts.at(-1)?.[2], 'download_queued');
+});
+
 for (const change of ['account', 'document', 'navigation']) test('late ' + change + ' changes reject results and old approvals', async () => {
   const gate = deferred();
   const f = fixture(async () => { await gate.promise; return new Response(sse([source(file())])); });
@@ -231,10 +249,13 @@ test('native polling waits for command completion after intermediate snapshots',
   assert.ok(code.indexOf('pollTask = null', code.indexOf('val matched')) > code.indexOf('val timedOut'));
 });
 
-test('reinjecting production assets retains one policy/owner and valid resolved downloads', async () => {
+test('upgrading then reinjecting assets replaces old captures and retains valid resolved downloads', async () => {
   const f = fixture();
-  delete f.root.__elonChatGptPrivateContextSources;
-  delete f.root.__elonChatGptPrivateFileDownload;
+  const oldPolicy = { version: 1 }, oldOwner = { version: 1 };
+  let disposed = 0;
+  f.root.__elonChatGptPrivateContextSourcesPolicy = oldPolicy;
+  f.root.__elonChatGptPrivateContextSources = oldOwner;
+  f.root.__elonChatGptPrivateFileDownload = { version: 28, dispose() { disposed++; } };
   const context = { window: f.root, URL, Date, setTimeout, clearTimeout };
   const assets = ['chatgpt_web_private_context_sources_policy.js', 'chatgpt_web_private_file_citation.js',
     'chatgpt_web_private_history_projection.js', 'chatgpt_web_private_context_sources.js',
@@ -243,14 +264,28 @@ test('reinjecting production assets retains one policy/owner and valid resolved 
     fs.readFileSync(require.resolve(base + name), 'utf8'), context, { filename: name }); };
   inject();
   const api = f.root.__elonChatGptPrivateContextSources, policy = f.root.__elonChatGptPrivateContextSourcesPolicy;
+  assert.notEqual(api, oldOwner);
+  assert.notEqual(policy, oldPolicy);
+  assert.equal(api.version, 2);
+  assert.equal(policy.version, 2);
+  assert.equal(disposed, 1);
   await api.enrich(f.payload, 'source');
   inject();
   assert.equal(f.root.__elonChatGptPrivateContextSources, api);
   assert.equal(f.root.__elonChatGptPrivateContextSourcesPolicy, policy);
+  assert.equal(disposed, 1);
   const projected = f.root.__elonChatGptPrivateHistoryProjection.create({}).files(f.payload);
   const rows = f.root.__elonChatGptPrivateFileDownload.register('/c/source', f.payload, projected);
   assert.equal(rows.length, 1);
   assert.match(rows[0].downloadHandle, /^download_[a-f0-9]{32}$/);
   assert.equal(f.calls.length, 1);
-  assert.equal(f.root.__elonChatGptPrivateFileDownload.version, 28);
+  assert.equal(f.root.__elonChatGptPrivateFileDownload.version, 29);
+  const metadata = f.payload.messages[0].metadata;
+  metadata.conversation_context_citation_metadata = [{ citation: file(), deleted: true }];
+  metadata.conversation_context_citation_metadata_status = 'complete';
+  api.applyCached(f.payload, 'source');
+  const updated = f.root.__elonChatGptPrivateHistoryProjection.create({}).files(f.payload);
+  assert.equal(updated.files.length, 0);
+  assert.equal(updated.truncated, false);
+  assert.equal(f.root.__elonChatGptPrivateFileDownload.register('/c/source', f.payload, updated).length, 0);
 });
