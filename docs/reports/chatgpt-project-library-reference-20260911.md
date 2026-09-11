@@ -84,9 +84,30 @@ Composer v25/project v9 distinguish reference-only scope from upload scope.
 Actual local upload must promote it through the existing permission/index
 checks before bytes or writes, retaining the exact input lease during the read.
 Reference-only scope cannot generate upload metadata or a local ready receipt.
-Adapter 353 offline tests passed; its device acceptance is pending.
+Adapter 353 passed 101 targeted cases and 137 compatibility cases, including
+reference-to-upload promotion, identity/branch drift, input removal during the
+scope read, quota checks, mounted/local coexistence and exact submit ownership.
+
+## Normal 1670 Acceptance
+
+- Source `f472cd95b99783c69b2dca031772a570214730e3`; release `v1.1.1670` (1670),
+  adapter 353; Release build succeeded in 5m37s and was installed with `-r`.
+- APK SHA-256: `d7ad1af2cd890dad17269790da549e2887dd6c44f18dcf5474fff3e12eefd3cc`.
+- Native sidebar -> library -> image detail -> add to current chat -> native
+  ready attachment and remove control -> remove: passed in both an existing
+  project conversation and the same project's new-chat landing page.
+- Both cases used their own native Refresh receipt, not a competing MCP list
+  request. No coordinates, private content export or official-page UI substitute.
+- Original conversation, empty input/attachments and awake policy restored.
+  Sends=0, uploads=0, deletes=0. This proves reference/removal, not a fresh
+  attachment-content answer or local image upload on this account.
+- Receipt: `project-reference-protocol-fix-device-20260911-20260911-210506-351`,
+  passed in 58.6s with `existing=true`, `new_project=true`, `restored=true`.
 
 Capability `android_chatgpt_private_project_library_reference_v1` currently has
-`code_status=partial`, `verification_status=failed`; the shipped project path
-still needs live fault localization and repair. Google remains last. The wider
-Goal remains active, including raster deletion and other unverified sources.
+`code_status=implemented`, `verification_status=device_verified`,
+`completion_status=completed`, `production_default=true` for personal raster
+reference/removal in eligible existing/new project chats. Reuse this exact scope;
+do not repeat it without regression evidence. Mixed local upload has offline
+coverage; project reference sending was not repeated here. Google remains last.
+The wider Goal remains active, including raster deletion and unverified sources.
