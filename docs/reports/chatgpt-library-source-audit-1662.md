@@ -105,15 +105,48 @@ and attachment are not enabled by this download-only change.
 composition, original-byte storage, immutable selection, unsupported sources,
 metadata mismatch, cancellation, account/navigation changes and no error-path
 replay. The diagnostic vocabulary now recognizes `image_gen` separately.
-The live rows must not be called image_gen. Native saved-byte acceptance remains
-pending until the corrected source/format/ownership implementation is exercised.
+The live rows must not be called image_gen.
+
+## Normal 1666 Acceptance
+
+Capability `android_chatgpt_private_library_raster_download_v1` is
+`completed`, `device_verified` and default-enabled for the accepted personal
+PNG raster-artifact scope. No repeat research without current regression evidence.
+
+- APK 1.1.1666 / adapter 349, source
+  `d0b11b9cfe3b970a030eb6e4df9d0f3ed12a5aa7`.
+- APK SHA-256:
+  `c6b098a47b79722a41bf949da629c38142147c4bd679c996fe6fa8ac469f2504`.
+- Normal Release published and installed with `-r` over the existing Xiaomi
+  wireless transport. Cookie, login, proxy and original files were preserved.
+- All nine previously unclaimed PNG rows now expose download handles. Their
+  type still classifies as `other`; none has cloud/project/saved-entity flags.
+- The actual native library Refresh, selected row and Download controls were
+  exercised. The visible native status and command receipt both confirmed saved.
+- Exactly one new 662,362-byte PNG was pulled back from the handset. PNG signature
+  and IHDR dimensions are valid, 1254 x 1254; size matches the selected catalog
+  row. SHA-256:
+  `158c5fc89ee549dca81dac840a85a6f2ddf5f7ed219e50f50b82c112edb3754b`.
+- Download action through native confirmation took 6648 ms. This is one sample,
+  not a latency percentile or thermal measurement. No thumbnail URL was used.
+- Original conversation URL, draft and awake setting were restored. No message,
+  upload, microphone, cloud-account connection or deletion was performed.
+- Final 112 Node cases passed. The unchanged native diagnostic contract retains
+  its 15 passing JVM tests; the corrected APK's Release compile/assemble passed.
+
+Successful device log:
+`library-raster-native-owned-ui-1666-20260911-20260911-185613-946`.
+An earlier 1666 attempt stopped before download because the test sent a separate
+MCP refresh after opening the native library, replacing its in-flight request.
+The UI correctly ignored the unrelated request's snapshot. Correcting the test
+to use the native Refresh button passed without another APK. This is not a
+business download failure; do not repeat that competing-controller test pattern.
 
 ## Remaining Evidence
 
-Confirm the previously unclaimed raster group now has a download handle, then
-select one matching row through the existing native library and verify a saved original.
-The ordinary library and gallery saved-byte paths are already accepted; repeating
-them cannot establish the missing source contract. Normal Release has WebView
+PNG download is accepted, not all nine files individually and not raster
+attachment/rename/trash. JPEG/WebP raster-artifact variants remain offline-only.
+The ordinary library and gallery saved-byte paths are also accepted. Normal Release has WebView
 CDP debugging disabled; a missing debug socket is not an ADB/network failure.
 
 Mounted download/attachment still need a genuine authorized mounted sample;

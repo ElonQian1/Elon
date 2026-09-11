@@ -28,7 +28,7 @@ a functional acceptance gate; do not expand performance tests in this phase.
 
 ## Current Status Map
 
-Installed 1662 includes the [grouped source/file changes and acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence).
+1666 retains the [1662 grouped source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence).
 Its first inventory run had one timeout, retaining cached rows. One targeted retry
 passed: three taps joined one 1077 ms read, without replacing the sheet or overlap.
 Project TXT native download again saved the expected 78 bytes. Reuse these cases;
@@ -50,9 +50,9 @@ See [the scoped regression](reports/chatgpt-library-folder-download-1644.md).
 [Explicit account-read isolation](reports/chatgpt-explicit-account-read-20260911.md)
 is device-verified for empty/populated file indexes and native Refresh on 1649.
 Reuse it; this does not prove idle membership, citation or mounted-file variants.
-The [1662 library source audit](reports/chatgpt-library-source-audit-1662.md) found
-nine PNG rows without native actions. Their source classification is unresolved;
-do not call them mounted files or generated images based only on their MIME type.
+The [1666 raster-download acceptance](reports/chatgpt-library-source-audit-1662.md#normal-1666-acceptance)
+restored Download for nine PNG artifacts; one native saved-byte case passed.
+Download is completed/default-enabled; attachment/rename/trash remain separate.
 
 | User workflow | Current result | Remaining boundary |
 |---|---|---|
