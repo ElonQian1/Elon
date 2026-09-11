@@ -4,15 +4,20 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.WebChatConsumerPort
+import com.elon.app.WebChatFileDownloadDialog
 
 internal class ChatGptWebImageSession(
     activity: AppCompatActivity,
     host: FrameLayout,
     pageAdapter: () -> ChatGptWebPageAdapter?,
     onChanged: () -> Unit,
+    consumerPort: () -> WebChatConsumerPort?,
+    beginDownload: () -> String,
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private val store = ChatGptWebImageAssetStore(activity.applicationContext)
+    private val downloads = WebChatFileDownloadDialog(activity, host, consumerPort)
     val assets = ChatGptWebImageAssetCoordinator(
         store = store,
         request = { handle ->
@@ -31,6 +36,15 @@ internal class ChatGptWebImageSession(
             requestPage = { id, operation, handles -> pageAdapter()?.syncImageGallery(id, operation, handles) == true },
             cancelPage = { id -> pageAdapter()?.cancelImageGallery(id) },
             requestPreview = { handle -> pageAdapter()?.let { it.requestImageAsset(handle); true } ?: false },
+            downloadOriginal = download@{ handle ->
+                val owner = consumerPort() ?: return@download false
+                val adapter = pageAdapter() ?: return@download false
+                if (adapter.nativeDownloads.snapshot()?.active == true) return@download false
+                val id = beginDownload()
+                adapter.downloadGalleryImage(handle, id)
+                downloads.show(owner, id)
+                true
+            },
         )
     }
     private val gallery by galleryDelegate
@@ -47,6 +61,7 @@ internal class ChatGptWebImageSession(
     }
 
     fun dismissGallery() {
+        downloads.dismiss()
         if (galleryDelegate.isInitialized()) gallery.destroy()
     }
 

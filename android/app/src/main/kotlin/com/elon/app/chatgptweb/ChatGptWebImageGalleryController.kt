@@ -32,6 +32,7 @@ internal class ChatGptWebImageGalleryController(
     private val requestPage: (String, String, Set<String>) -> Boolean,
     private val cancelPage: (String) -> Unit,
     private val requestPreview: (String) -> Boolean,
+    private val downloadOriginal: (String) -> Boolean = { false },
 ) {
     private var dialog: Dialog? = null
     private var statusView: TextView? = null
@@ -279,10 +280,16 @@ internal class ChatGptWebImageGalleryController(
             renderEntries()
             return
         }
+        val download = pageSnapshot?.downloadHandles?.getOrNull(index)?.takeIf(String::isNotEmpty)
+        val owner = activeRequestId
         ChatImageViewer.show(activity, ChatAttachment(
             kind = "image", displayName = "图像 ${index + 1}", mimeType = "image/jpeg",
             localPath = entry.localPath, imageWidth = entry.width, imageHeight = entry.height,
-        ))
+        ), onDownloadOriginal = download?.let { selected -> {
+            if (dialog == null || activeRequestId != owner ||
+                pageSnapshot?.downloadHandles?.getOrNull(index) != selected) false
+            else downloadOriginal(selected)
+        } })
     }
 
     private fun renderStatus() {

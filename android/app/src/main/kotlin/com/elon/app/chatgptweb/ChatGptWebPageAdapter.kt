@@ -462,6 +462,13 @@ internal class ChatGptWebPageAdapter(
         else runCommand(action = "download_conversation_file", value = descriptor, requestId = requestId)
     }
 
+    fun downloadGalleryImage(handle: String, requestId: String) {
+        val descriptor = nativeDownloads.prepareGalleryImage(handle, requestId)
+        if (descriptor == null) onEvent(ChatGptWebEvent.CommandResult(
+            "download_conversation_file", false, "download_not_ready", requestId))
+        else runCommand("download_conversation_file", value = descriptor, requestId = requestId)
+    }
+
     fun startDictation() {
         ChatGptWebPrivateResearchEventRecorder.beginVoiceWindow()
         runCommand("start_dictation")
@@ -705,7 +712,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 334
+        internal const val ADAPTER_VERSION = 335
 
         private val ADAPTER_ASSETS = ChatGptWebAdapterAssets.names
         private const val BRIDGE_OBJECT = "elonChatGptNative"

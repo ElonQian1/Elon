@@ -8,7 +8,7 @@ param(
         'trash','confirm_fixture_trash','close_mutation','close_detail','back',
         'download','wait_download','close_download','query_fixture',
         'gallery','gallery_select','gallery_wait','gallery_inspect','gallery_next','gallery_previous',
-        'gallery_preview','gallery_close_preview','gallery_close')]
+        'gallery_preview','gallery_close_preview','gallery_close','gallery_download','gallery_download_verified')]
     [string]$Step = 'inspect',
     [string]$Handle = '',
     [string]$FixtureName = '',

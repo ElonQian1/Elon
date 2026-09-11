@@ -55,6 +55,19 @@ class ChatGptWebPrivateImageGalleryProtocolTest {
         )) assertNull("$key=$value", ChatGptWebImageAssetProtocol.parseGallery(page().put(key, value)))
     }
 
+    @Test fun originalDownloadHandlesAreOptionalAlignedAndOpaque() {
+        val handle = "download_" + "1".repeat(32)
+        assertNull(ChatGptWebImageAssetProtocol.parseGallery(page())!!.downloadHandles)
+        assertEquals(listOf(handle), ChatGptWebImageAssetProtocol.parseGallery(
+            page().put("downloadHandles", JSONArray().put(handle)))!!.downloadHandles)
+        assertEquals(listOf(""), ChatGptWebImageAssetProtocol.parseGallery(
+            page().put("downloadHandles", JSONArray().put("")))!!.downloadHandles)
+        for (handles in listOf(JSONArray(), JSONArray().put("https://example.test/private"),
+            JSONArray().put(handle).put(handle), JSONArray().put(JSONObject.NULL))) {
+            assertNull(ChatGptWebImageAssetProtocol.parseGallery(page().put("downloadHandles", handles)))
+        }
+    }
+
     @Test fun galleryAssetReceiptKeepsItsRequestOwner() {
         val asset = JSONObject().put("source", "private_image_gallery_v1")
             .put("requestId", "mcp_gallery1").put("handle", "image_0123456789abcdef")

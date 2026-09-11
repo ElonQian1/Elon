@@ -35,6 +35,7 @@ internal data class ChatGptWebImageGallerySnapshot(
     val hasNext: Boolean = false,
     val unavailableCount: Int = 0,
     val previewHandles: List<String>? = handles,
+    val downloadHandles: List<String>? = null,
 ) {
     companion object {
         const val STATE_LOADING = "loading"
@@ -94,6 +95,18 @@ internal object ChatGptWebImageAssetProtocol {
                     (array.opt(index) as? String)?.takeIf(HANDLE::matches) ?: return null
                 }.also { if (it.distinct().size != it.size) return null }
             } else handles
+            val downloads = if (event.has("downloadHandles")) {
+                val array = event.optJSONArray("downloadHandles") ?: return null
+                if (handles == null || array.length() != handles.size) return null
+                (0 until array.length()).map { index ->
+                    (array.opt(index) as? String)?.takeIf {
+                        it.isEmpty() || ChatGptWebFileDownloadPolicy.HANDLE.matches(it)
+                    } ?: return null
+                }.also { values ->
+                    val available = values.filter(String::isNotEmpty)
+                    if (available.distinct().size != available.size) return null
+                }
+            } else null
             val count = event.opt("observedCount") as? Int ?: return null
             if (count !in 0..25 || handles != null && handles.size > count) return null
             val page = if (handles != null) event.opt("pageIndex") as? Int ?: return null else 0
@@ -102,7 +115,7 @@ internal object ChatGptWebImageAssetProtocol {
             val unavailable = if (handles != null) event.opt("unavailableCount") as? Int ?: return null else 0
             if (page !in 0..255 || unavailable !in 0..count || previous != (page > 0) ||
                 state == "ready" && unavailable > 0) return null
-            return ChatGptWebImageGallerySnapshot(state, count, requestId, handles, page, previous, next, unavailable, previews)
+            return ChatGptWebImageGallerySnapshot(state, count, requestId, handles, page, previous, next, unavailable, previews, downloads)
         }
         return ChatGptWebImageGallerySnapshot(
             state = state,

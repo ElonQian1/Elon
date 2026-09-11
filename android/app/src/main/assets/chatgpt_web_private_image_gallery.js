@@ -2,7 +2,7 @@
   'use strict';
   const pointer = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
-  const exported = Object.freeze({ version: 8, create: root => factory(root, pointer) });
+  const exported = Object.freeze({ version: 9, create: root => factory(root, pointer) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       (Number(root.__elonChatGptPrivateImageGallery?.version || 0) < exported.version ||
@@ -52,7 +52,8 @@
     if (!current(job)) return;
     job.emit({ type: 'image_gallery_snapshot', source: 'private_image_gallery_v1',
       requestId: job.id, state, observedCount: page?.items.length || 0,
-      ...(page ? { handles: page.handles, previewHandles: page.previewHandles, unavailableCount: page.unavailable,
+      ...(page ? { handles: page.handles, previewHandles: page.previewHandles, downloadHandles: page.downloadHandles,
+        unavailableCount: page.unavailable,
         pageIndex: job.index, hasPrevious: job.index > 0, hasNext: page.cursor !== null } : {}) });
   }
 
@@ -144,7 +145,7 @@
   }
 
   function register(job, page) {
-    const handles = [], previewHandles = [], seen = new Set();
+    const handles = [], previewHandles = [], downloadHandles = [], seen = new Set();
     let unavailable = 0;
     for (const item of page.items) {
       const target = imageTarget(item);
@@ -178,8 +179,9 @@
       }
       handles.push(gridHandle);
       previewHandles.push(handle);
+      downloadHandles.push(root.__elonChatGptPrivateFileDownload?.registerGalleryImage?.(item, () => owned(job)) || '');
     }
-    return { ...page, handles, previewHandles, unavailable };
+    return { ...page, handles, previewHandles, downloadHandles, unavailable };
   }
 
   async function exportHandle(job, handle, listener, valid) {
@@ -336,5 +338,5 @@
   }
 
   function dispose() { cancel(); disposed = true; clearCache(); cacheIdentity = ''; }
-  return Object.freeze({ version: 8, get disposed() { return disposed; }, request, handle, cancel, dispose });
+  return Object.freeze({ version: 9, get disposed() { return disposed; }, request, handle, cancel, dispose });
 });

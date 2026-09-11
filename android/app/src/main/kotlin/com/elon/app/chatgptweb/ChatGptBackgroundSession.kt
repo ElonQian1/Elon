@@ -58,9 +58,12 @@ internal class ChatGptBackgroundSession(
     private val sendHandler = Handler(Looper.getMainLooper())
     private val conversationRefreshHandler = Handler(Looper.getMainLooper())
     private val composerOptionHandler = Handler(Looper.getMainLooper())
+    private var imageDownloadConsumer: WebChatConsumerPort? = null
     private val imageSession = ChatGptWebImageSession(
         activity, host, { pageAdapter },
         onChanged = { latestSnapshot?.let(onSnapshot) },
+        consumerPort = { imageDownloadConsumer },
+        beginDownload = { observedMcpState.beginCommand("download_conversation_file").id },
     )
     private val imageAssets get() = imageSession.assets
     private val surfaceMode: ChatGptWebSurfaceModeController by lazy(LazyThreadSafetyMode.NONE) {
@@ -387,7 +390,7 @@ internal class ChatGptBackgroundSession(
     )
 
     fun createConsumerPort(mcpPort: WebChatSocialMcpPort): WebChatConsumerPort =
-        portFactory.createConsumerPort(mcpPort)
+        portFactory.createConsumerPort(mcpPort).also { imageDownloadConsumer = it }
 
     private fun invokeRealtimeVoiceControl(): Boolean {
         val adapter = pageAdapter ?: return false

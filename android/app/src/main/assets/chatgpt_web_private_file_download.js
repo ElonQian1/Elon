@@ -4,7 +4,7 @@
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 23, create: root => factory(root, pointer, citation) });
+  const exported = Object.freeze({ version: 24, create: root => factory(root, pointer, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -200,8 +200,32 @@
 
   function current(job) {
     return !disposed && active === job && !job.controller.signal.aborted &&
+      (!job.entry.galleryCurrent || job.entry.galleryCurrent()) &&
       root.location.href === job.descriptor.href && root.__elonChatGptDocumentToken === job.entry.token &&
       identity() === job.entry.account && (Boolean(job.entry.sharedLibraryFileId) || job.byteTransfer || job.entry.expiresAt > Date.now());
+  }
+
+  function registerGalleryImage(item, galleryCurrent) {
+    const account = identity(), token = root.__elonChatGptDocumentToken;
+    const restricted = ['gizmo_id', 'project_id', 'post_id', 'library_file_id', 'shared_library_file_id',
+      'library_download_id', 'context_scopes', 'source_url', 'context_connector', 'connector_id',
+      'context_connector_info', 'shared', 'watermarked_url', 'watermarkedUrl'];
+    const pointer = pointerParser?.parse(item?.asset_pointer);
+    if (disposed || !account || !/^doc_[a-z0-9_]{3,80}$/.test(token || '') ||
+        !root.elonChatGptFileDownload || typeof galleryCurrent !== 'function' || !galleryCurrent() ||
+        typeof item?.conversation_id !== 'string' || !/^[A-Za-z0-9_-]{1,160}$/.test(item.conversation_id) ||
+        item.is_project != null && item.is_project !== false || restricted.some(key => item[key] != null) ||
+        !pointer || pointer.downloadQuery.some(([key]) => restricted.includes(key.toLowerCase()))) return '';
+    // Reuse the image-pointer download contract, never the resized JPEG preview.
+    const request = target('/c/' + item.conversation_id,
+      { image: { content_type: 'image_asset_pointer', asset_pointer: item.asset_pointer }, attachments: [] }, null);
+    if (!request) return '';
+    const handle = 'download_' + Array.from(root.crypto.getRandomValues(new Uint8Array(16)),
+      value => value.toString(16).padStart(2, '0')).join('');
+    entries.set(handle, { ...request, path: '/images', account, token, galleryCurrent,
+      expiresAt: Date.now() + 120000 });
+    while (entries.size > 800) entries.delete(entries.keys().next().value);
+    return handle;
   }
 
   function registerLibraryFile(file) {
@@ -302,7 +326,8 @@
     if (disposed || !HANDLE.test(descriptor?.downloadHandle || '') || !entry ||
         descriptor.version !== 1 || descriptor.path !== entry.path || descriptor.name !== entry.name ||
         descriptor.documentToken !== entry.token || descriptor.href !== root.location.href ||
-        !/^[a-f0-9-]{36}$/.test(descriptor.leaseId || '') || entry.expiresAt <= Date.now() || identity() !== entry.account) {
+        !/^[a-f0-9-]{36}$/.test(descriptor.leaseId || '') || entry.expiresAt <= Date.now() || identity() !== entry.account ||
+        entry.galleryCurrent && !entry.galleryCurrent()) {
       abandon(descriptor);
       return respond(ACTION, false, 'download_selection_expired');
     }
@@ -376,5 +401,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 23, register, registerLibraryFile, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 24, register, registerLibraryFile, registerGalleryImage, start, cancel, dispose, sourceDiagnostics });
 });

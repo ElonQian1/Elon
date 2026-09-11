@@ -87,6 +87,10 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
                 click(text("\u00d7"));
                 assertTrue("gallery_not_restored", description("\u540c\u6b65\u56fe\u50cf").waitForExists(5000));
                 break;
+            case "gallery_download":
+                click(description("\u4e0b\u8f7d\u539f\u56fe"));
+                assertTrue("download_status_missing", description("web-chat-file-download-status").waitForExists(8000));
+                break;
             case "gallery_close":
                 click(description("\u8fd4\u56de\u804a\u5929"));
                 assertTrue("gallery_not_closed", description("\u540c\u6b65\u56fe\u50cf").waitUntilGone(5000));
@@ -169,26 +173,32 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         return result;
     }
 
-    private JSONObject downloadPng() throws Exception {
-        String name = new String(android.util.Base64.decode(getParams().getString("nameBase64", ""),
+    private JSONObject downloadPng(boolean gallery) throws Exception {
+        String name = gallery ? "image.png" : new String(android.util.Base64.decode(getParams().getString("nameBase64", ""),
             android.util.Base64.DEFAULT), java.nio.charset.StandardCharsets.UTF_8);
         long expected = Long.parseLong(getParams().getString("expectedBytes", "0"));
         assertTrue("invalid_png_selection", name.matches("[A-Za-z0-9_. -]{1,120}\\.png") &&
-            expected > 0 && expected <= 524288);
-        assertTrue("selected_file_mismatch", text(name).exists());
+            (gallery || expected > 0 && expected <= 524288));
+        if (!gallery) assertTrue("selected_file_mismatch", text(name).exists());
         java.io.File directory = android.os.Environment.getExternalStoragePublicDirectory(
             android.os.Environment.DIRECTORY_DOWNLOADS);
         java.util.Set<String> before = savedFiles(directory);
-        click(text("\u4e0b\u8f7d"));
+        click(gallery ? description("\u4e0b\u8f7d\u539f\u56fe") : text("\u4e0b\u8f7d"));
         assertTrue("download_status_missing", description("web-chat-file-download-status").waitForExists(8000));
         long deadline = android.os.SystemClock.elapsedRealtime() + 25000;
         boolean saved = false;
         while (android.os.SystemClock.elapsedRealtime() < deadline) {
             String status = description("web-chat-file-download-status").getText();
             saved = status.equals("\u5df2\u4fdd\u5b58\u5230\u4e0b\u8f7d\u76ee\u5f55");
+            boolean queued = gallery && status.equals("\u5df2\u4ea4\u7ed9\u7cfb\u7edf\u4e0b\u8f7d");
+            if (queued) {
+                java.util.Set<String> completed = savedFiles(directory);
+                completed.removeAll(before);
+                saved = completed.size() == 1 && completed.iterator().next().endsWith("-image.png");
+            }
             if (saved) break;
             assertTrue("download_failed_or_unconfirmed", status.equals("\u6b63\u5728\u51c6\u5907\u4e0b\u8f7d") ||
-                status.equals("\u6b63\u5728\u4e0b\u8f7d") || status.equals("\u6b63\u5728\u4fdd\u5b58"));
+                status.equals("\u6b63\u5728\u4e0b\u8f7d") || status.equals("\u6b63\u5728\u4fdd\u5b58") || queued);
             Thread.sleep(250);
         }
         assertTrue("download_not_saved", saved);
@@ -198,19 +208,29 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         String stored = created.iterator().next();
         assertTrue("saved_file_name_mismatch", stored.startsWith("elon-") && stored.endsWith("-" + name));
         java.io.File file = new java.io.File(directory, stored);
-        assertEquals("saved_file_size_mismatch", expected, file.length());
+        if (!gallery) assertEquals("saved_file_size_mismatch", expected, file.length());
+        assertTrue("saved_image_size_invalid", file.length() > 32 && file.length() <= 32 * 1024 * 1024);
+        if (gallery) try (java.io.RandomAccessFile input = new java.io.RandomAccessFile(file, "r")) {
+            assertEquals("original_not_png", 0x89504e470d0a1a0aL, input.readLong());
+            input.seek(file.length() - 12);
+            assertEquals("original_png_incomplete", 0, input.readInt());
+            assertEquals("original_png_incomplete", 0x49454e44, input.readInt());
+            assertEquals("original_png_incomplete", 0xae426082, input.readInt());
+        }
         android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
         options.inJustDecodeBounds = true;
         android.graphics.BitmapFactory.decodeFile(file.getAbsolutePath(), options);
         assertTrue("saved_png_bounds_invalid", "image/png".equals(options.outMimeType) &&
             options.outWidth > 0 && options.outHeight > 0 && options.outWidth <= 8192 && options.outHeight <= 8192);
+        int originalWidth = options.outWidth, originalHeight = options.outHeight;
         options.inJustDecodeBounds = false;
         options.inSampleSize = 8;
         android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeFile(file.getAbsolutePath(), options);
         assertNotNull("saved_png_decode_failed", bitmap);
         bitmap.recycle();
         // Bytes stay on this handset. No image, filename, path or credential is returned.
-        return new JSONObject().put("saved", true).put("bytes", expected).put("png_decoded", true)
+        return new JSONObject().put("saved", true).put("bytes", file.length()).put("png_decoded", true)
+            .put("width", originalWidth).put("height", originalHeight)
             .put("created_files", 1).put("content_exported", false).put("download_retained", true);
     }
 
@@ -218,9 +238,9 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
         String step = getParams().getString("step", "inspect");
         String handle = getParams().getString("handle", "");
-        if (step.equals("download_png_verified")) {
+        if (step.equals("download_png_verified") || step.equals("gallery_download_verified")) {
             android.os.Bundle report = new android.os.Bundle();
-            report.putString("stream", "LIBRARY_UI_RESULT=" + downloadPng().toString() + "\n");
+            report.putString("stream", "LIBRARY_UI_RESULT=" + downloadPng(step.equals("gallery_download_verified")).toString() + "\n");
             getAutomationSupport().sendStatus(0, report);
             return;
         }

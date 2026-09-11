@@ -72,6 +72,9 @@ internal class ChatGptWebFileDownloadGateway(
     fun prepareLibrary(file: com.elon.app.WebChatLibraryEntry, requestId: String): String? =
         prepare("/library", file.name, file.mediaType, file.downloadHandle, requestId)
 
+    fun prepareGalleryImage(handle: String, requestId: String): String? =
+        prepare("/images", "image.png", "", handle, requestId)
+
     private fun prepare(path: String, name: String, mediaType: String, handle: String, requestId: String): String? {
         val state = document()
         val href = webView.url ?: return null

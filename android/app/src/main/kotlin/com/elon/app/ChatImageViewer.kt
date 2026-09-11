@@ -9,10 +9,12 @@ import android.view.ViewGroup
 import android.view.Window
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.ImageButton
 import android.widget.TextView
+import android.widget.Toast
 
 internal object ChatImageViewer {
-    fun show(context: Context, attachment: ChatAttachment) {
+    fun show(context: Context, attachment: ChatAttachment, onDownloadOriginal: (() -> Boolean)? = null) {
         val source = chatAttachmentImageSource(attachment) ?: return
         val dialog = Dialog(context).apply {
             requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -53,6 +55,23 @@ internal object ChatImageViewer {
             addView(image)
             addView(annotationOverlay)
             addView(createCloseButton(context, dialog))
+            onDownloadOriginal?.let { download ->
+                addView(ImageButton(context).apply {
+                    layoutParams = FrameLayout.LayoutParams(context.dp(48), context.dp(48), Gravity.BOTTOM or Gravity.END).apply {
+                        bottomMargin = context.dp(24)
+                        marginEnd = context.dp(18)
+                    }
+                    setImageResource(android.R.drawable.stat_sys_download)
+                    setColorFilter(Color.WHITE)
+                    background = ColorDrawable(Color.TRANSPARENT)
+                    contentDescription = "下载原图"
+                    tooltipText = contentDescription
+                    setOnClickListener {
+                        if (download()) { isEnabled = false; alpha = 0.5f }
+                        else Toast.makeText(context, "当前无法下载，请重新打开图片重试", Toast.LENGTH_SHORT).show()
+                    }
+                })
+            }
         }
 
         dialog.setContentView(root)
