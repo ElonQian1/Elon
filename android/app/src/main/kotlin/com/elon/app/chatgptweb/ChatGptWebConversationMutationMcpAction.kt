@@ -12,19 +12,27 @@ internal object ChatGptWebConversationMutationMcpAction {
     ): String? {
         val path = ChatGptWebConversationPath.normalize(args.optString("conversation_path"))
         if (args.optString("action") == "chatgpt_share_conversation" && args.has("operation")) {
-            val request = if (args.optString("operation") == "list_account") {
+            val resource = if (args.has("resource")) args.opt("resource") as? String else "conversation"
+            if (resource !in setOf("conversation", "canvas")) return "share_invalid_selection"
+            val request = (if (args.optString("operation") == "list_account") {
                 if (args.has("conversation_path") || args.has("share_id")) return "share_invalid_selection"
                 val offset = if (args.has("page_offset")) args.opt("page_offset") as? Int
                     ?: return "share_invalid_selection" else 0
                 val selection = if (args.has("selection_ticket")) args.opt("selection_ticket") as? String
                     ?: return "share_invalid_selection" else null
-                ChatGptWebSharedLinks.accountRequest(offset, selection)
+                ChatGptWebSharedLinks.accountRequest(offset, selection, canvas = resource == "canvas")
+            } else if (args.optString("operation") == "revoke_account" && resource == "canvas") {
+                if (args.has("conversation_path")) return "share_invalid_selection"
+                val id = args.opt("share_id") as? String ?: return "share_invalid_selection"
+                val ticket = args.opt("selection_ticket") as? String ?: return "share_invalid_selection"
+                ChatGptWebSharedLinks.canvasRevokeRequest(id, ticket)
             } else {
+                if (resource != "conversation") return "share_invalid_selection"
                 if (path == null) return "invalid_conversation_path"
                 ChatGptWebSharedLinks.request(path, args.optString("operation"),
                     args.optString("share_id"), args.optString("selection_ticket"))
-            } ?: return "share_invalid_selection"
-            if (request.getString("operation") == "revoke" && !args.optBoolean("user_confirmed", false)) {
+            }) ?: return "share_invalid_selection"
+            if (request.getString("operation") in setOf("revoke", "revoke_account") && args.opt("user_confirmed") != true) {
                 return "user_confirmation_required"
             }
             val page = runCatching { java.net.URI(snapshot?.url ?: "") }.getOrNull()

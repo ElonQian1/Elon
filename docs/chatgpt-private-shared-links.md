@@ -202,8 +202,9 @@ and the link no longer grants access. Check the draft/current thread stayed
 unchanged and the list updates. Do not publish or revoke real personal content
 merely to test this module.
 
-Remaining distinct scopes: account-wide UI device acceptance, workspace links, bulk
-revocation, Canvas/post/task shares and full-list pagination when the server
-returns a partial collection. They must not be reported as completed by this
-implementation. The account-wide personal UI is implemented in source; workspace,
-Canvas and post links are not silently treated as personal conversation links.
+The newer [Canvas management batch](reports/chatgpt-canvas-shared-links-20260911.md)
+adds a separate Canvas list/Copy/confirmed-cancellation route in this same owner
+and native menu. It is source-implemented, not device-accepted. Ordinary personal
+native Copy/revoke passed on [1644](reports/chatgpt-private-acceptance-1644.md).
+Workspace, post/task, bulk cancellation and server-side partial-list pagination
+remain distinct gaps. Canvas and post links are never treated as conversation links.

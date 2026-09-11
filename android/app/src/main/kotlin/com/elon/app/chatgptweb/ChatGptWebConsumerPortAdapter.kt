@@ -231,6 +231,13 @@ internal class ChatGptWebConsumerPortAdapter(
         execute(JSONObject().put("action", "chatgpt_share_conversation").put("operation", "list_account")
             .put("page_offset", offset).put("selection_ticket", selectionTicket))
 
+    override fun manageCanvasShares(
+        offset: Int, selectionTicket: String?, shareId: String?, userConfirmed: Boolean,
+    ): WebChatConsumerCommandResult = execute(JSONObject().put("action", "chatgpt_share_conversation")
+        .put("operation", if (shareId == null) "list_account" else "revoke_account").put("resource", "canvas")
+        .put("page_offset", offset).put("share_id", shareId).put("selection_ticket", selectionTicket)
+        .put("user_confirmed", userConfirmed))
+
     override fun renameConversation(
         conversationPath: String,
         title: String,

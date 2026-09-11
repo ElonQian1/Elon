@@ -30,11 +30,12 @@ internal class WebChatConversationShareCoordinator(
             ?: return failure(conversation, "share_project_scope_unconfirmed")
         track(AlertDialog.Builder(activity).setTitle("分享会话")
             .setItems(arrayOf(if (WebChatConversationSharePolicy.membersOnly(path)) "获取项目成员链接" else "创建公开链接",
-                "管理本会话公开链接", "管理全部公开链接")) { _, position ->
+                "管理本会话公开链接", "管理全部公开链接", "管理画布公开链接")) { _, position ->
                 when (position) {
                     0 -> create(conversation)
                     1 -> links.show(conversation)
                     2 -> links.show(conversation, allConversations = true)
+                    3 -> links.show(conversation, allConversations = true, canvas = true)
                 }
             }.setNegativeButton("取消", null).create())
         dialog?.listView?.contentDescription = "web-chat-conversation-share-options"
