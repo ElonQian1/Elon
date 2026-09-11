@@ -204,6 +204,20 @@ function installTransport(f) {
   return f.root.__elonChatGptPrivateTransport;
 }
 
+test('production source-link snapshot matches the native parser fixture without downloading or navigation', async () => {
+  const contract = require('../android/app/src/test/resources/webchat/private-source-links-contract.json');
+  const f = fixture();
+  Object.assign(f.payload, structuredClone(contract.payload));
+  const transport = installTransport(f), events = [], replies = [];
+  await transport.listConversationFiles('/c/source', 'mcp_source', e => events.push(e), (...args) => replies.push(args));
+  assert.deepEqual(JSON.parse(JSON.stringify(events.at(-1))), contract.event);
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0][1], true);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.queued.length, 0);
+  assert.equal(f.root.location.pathname, '/c/visible');
+});
+
 test('production list command emits base then enriched snapshots and settles exactly once', async () => {
   const gate = deferred();
   const f = fixture(async () => { await gate.promise; return new Response(sse([source(file())])); });

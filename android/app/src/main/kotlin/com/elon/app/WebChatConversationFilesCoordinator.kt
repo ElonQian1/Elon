@@ -31,7 +31,7 @@ internal object WebChatConversationFilesPresentation {
         index?.files?.forEachIndexed { position, file ->
             add(WebChatActionSheetItem("file-$position", file.name,
                 subtitle = listOf(if (file.role == "user") "我" else "AI",
-                    if (file.kind == "image") "图片" else "文件", file.mediaType)
+                    when (file.kind) { "image" -> "图片"; "source" -> "云文档"; else -> "文件" }, file.mediaType)
                     .filter(String::isNotEmpty).joinToString(" · "),
                 contentDescription = "web-chat-conversation-file-$position"))
         }
@@ -126,13 +126,23 @@ internal class WebChatConversationFilesCoordinator(
 
     private fun showFile(file: WebChatConversationFile, conversation: ChatGptWebConversation) {
         if (activity.isFinishing || activity.isDestroyed) return
+        val owner = consumerPort() ?: return
         val dialog = AlertDialog.Builder(activity).setTitle(file.name)
             .setMessage(listOf(if (file.role == "user") "来源：我" else "来源：AI",
                 file.mediaType).filter(String::isNotEmpty).joinToString("\n"))
             .setPositiveButton("打开所在会话") { _, _ -> openConversation(conversation) }
             .setNegativeButton("关闭", null)
         if (file.downloadHandle.isNotEmpty()) dialog.setNeutralButton("下载") { _, _ -> download(file, conversation) }
+        else if (file.kind == "source") dialog.setNeutralButton("打开来源") { _, _ ->
+            val url = if (consumerPort() === owner) WebChatSourceLinkPolicy.currentUrl(file,
+                owner.conversationFiles(conversation.path), System.currentTimeMillis()) else null
+            if (url == null) Toast.makeText(activity, "来源已更新，请刷新附件列表后重试", Toast.LENGTH_SHORT).show()
+            else MainExternalActions(activity).openUrl(url)
+        }
         detail = dialog.show()
+        detail?.getButton(AlertDialog.BUTTON_POSITIVE)?.contentDescription = "web-chat-conversation-file-open-chat"
+        detail?.getButton(AlertDialog.BUTTON_NEUTRAL)?.contentDescription =
+            if (file.kind == "source") "web-chat-conversation-file-open-source" else "web-chat-conversation-file-download"
     }
 
     private fun download(file: WebChatConversationFile, conversation: ChatGptWebConversation) {

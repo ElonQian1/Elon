@@ -4,6 +4,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WebChatConversationFilesPresentationTest {
+    @Test fun sourceRowsUseCloudDocumentLabelAndTheExistingFileSelector() {
+        val source = WebChatConversationFile("m:0", "m", "cloud", "source", "assistant", "",
+            sourceUrl = "https://docs.example.test/document/fixture")
+        val rows = WebChatConversationFilesPresentation.rows(WebChatConversationFileIndex(
+            "/c/fixture", "mcp_source", listOf(source), false, 1000), false, false)
+        assertTrue(rows[1].subtitle.orEmpty().contains("云文档"))
+        assertEquals("web-chat-conversation-file-0", rows[1].contentDescription)
+        assertTrue(rows[1].enabled)
+    }
+
     private val index = WebChatConversationFileIndex("/c/test", "mcp_test", listOf(
         WebChatConversationFile("m:0", "m", "sample.pdf", "file", "user", "application/pdf")), false, 1_000)
 

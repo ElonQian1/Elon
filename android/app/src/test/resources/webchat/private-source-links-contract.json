@@ -1,0 +1,26 @@
+{
+  "payload": {
+    "messages": [{
+      "id": "answer",
+      "author": { "role": "assistant" },
+      "content": { "parts": ["Synthetic cloud source fixture"] },
+      "metadata": {
+        "conversation_context_citation_metadata_status": "complete",
+        "conversation_context_citation_metadata": [
+          { "citation": { "type": "file", "name": "first", "url": "cloud:first", "cloud_doc_url": "https://docs.example.test/document/first#part" } },
+          { "citation": { "type": "file", "name": "second", "url": "cloud:second", "extra": { "cloud_doc_url": "https://docs.example.test/document/second?tab=one" } } }
+        ]
+      }
+    }]
+  },
+  "event": {
+    "type": "conversation_files_snapshot",
+    "conversationPath": "/c/source",
+    "requestId": "mcp_source",
+    "truncated": false,
+    "files": [
+      { "id": "answer:0", "messageId": "answer", "role": "assistant", "name": "first", "kind": "source", "mediaType": "", "sourceUrl": "https://docs.example.test/document/first#part" },
+      { "id": "answer:1", "messageId": "answer", "role": "assistant", "name": "second", "kind": "source", "mediaType": "", "sourceUrl": "https://docs.example.test/document/second?tab=one" }
+    ]
+  }
+}

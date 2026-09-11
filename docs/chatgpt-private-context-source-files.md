@@ -8,8 +8,8 @@ reviewed_at: 2026-09-11
 ## Delivery Boundary
 
 This extends `android_chatgpt_private_file_citation_download_v1`, not a second
-attachment system. Context-source policy/owner v2, citation v7, projection v10,
-private transport v28, download owner v29 and Android adapter 345 are implemented.
+attachment system. Context-source policy/owner v2, citation v8, projection v11,
+private transport v28, download owner v30 and Android adapter 346 are implemented.
 The source path is wired into the existing native Conversation files command.
 Synthetic protocol/integration verification passed; grouped Android compilation,
 installation and production source-shape/download acceptance remain pending.
@@ -53,8 +53,9 @@ an absent URL or a similarly named file is not evidence of deletion.
 The current file helpers are `eia/Yra/ria`; `Zra` reads `cloud_doc_url` or
 `extra.cloud_doc_url`. Composer `FKn` carries that as `externalUrl`, even without
 a concrete file ID. This is source-link metadata, not a cloud-to-file download
-protocol. A native source-link action and its final UI consumer remain unverified;
-do not fabricate download identities from cloud URLs.
+protocol. URL-only sources now enter the native file index as `kind: source`;
+concrete downloadable files retain their original row positions and download
+flow. Native source opening is implemented but not yet device-accepted.
 
 ## Ownership and UI
 
@@ -84,6 +85,47 @@ do not fabricate download identities from cloud URLs.
 
 ## Verification and Next Step
 
+### Cloud Source Links
+
+Capability `android_chatgpt_private_cloud_source_link_v1`: code implemented,
+JavaScript offline verified, native unit execution/build/device acceptance pending.
+The entry is enabled in adapter 346; no separate experimental switch is needed.
+
+The existing native file detail dialog shows `Open source` for URL-only cloud
+documents and retains `Open conversation`. It reuses `MainExternalActions`,
+opening the explicit HTTPS destination only on a user click; no identity headers,
+Cookie copying, connector login, automatic network request or file-ID synthesis
+is involved. This is a native entry for provider source-link metadata, not a new
+private download endpoint or a replacement Android document implementation.
+
+The source parser reads only `cloud_doc_url` / `extra.cloud_doc_url`, not an
+arbitrary citation URL. It respects category, deletion, resolved PCA masks and
+page-local approval. Native parsing independently rejects executable/local
+schemes, URL credentials, control characters, invalid URI escapes and nonstandard
+ports. Source rows cannot carry download handles. The click checks the same
+consumer and a matching fresh cached row; logout/cleared or replaced lists cannot
+launch an old selection. MCP exposes availability, not the destination URL.
+
+`test-chatgpt-web-private-source-links.js` exercises URL-only rows, exact source
+fields, unsafe links, PCA ownership/deletion/masks, duplicate URLs, ordinary file
+positions and the no-DOM/no-download path. The source producer and Kotlin parser
+share `webchat/private-source-links-contract.json`. Added Kotlin parser, link
+policy and presentation tests await the grouped Android unit-test/build run;
+do not count their source presence as execution or native UI acceptance.
+`cloud-source-links-final-js-20260911-164351-509` passes 138 runner cases.
+The follow-up `cloud-source-links-wire-verified-20260911-164451-373` passes
+27 affected cases, including the real private list-command emission matched to
+the shared native protocol fixture. All 113 registered assets and the combined
+bundle parse. Tests use synthetic responses, not live cloud connector data.
+
+Reuse lesson: distinguish a provider file ID, a byte-download authorization and
+an external document link. A URL-only row must not be dropped merely because it
+cannot pass the download validator, nor may it inherit a guessed download ID.
+Keep account/selection checks and unchanged attachment positions in the shared
+inventory instead of introducing a parallel cloud file store.
+
+### Existing Source Coverage
+
 Source tests: `test-chatgpt-web-private-context-sources-policy.js` and
 `test-chatgpt-web-private-context-sources-integration.js`. They cover source/mask
 delta channels, inline selection, late replacement/deletion, malformed/oversized
@@ -109,7 +151,7 @@ source response. Confirm the final source mask, matching rows, one selected
 download and actual saved bytes, then restore the original conversation/draft.
 The 2026-09-11 retry connected to Xiaomi over wireless ADB and read installed
 `1.1.1661`; the existing APK MCP `phone_status` also returned without an error.
-That proves device/control connectivity only; adapter 345 is not installed
+That proves device/control connectivity only; adapter 346 is not installed
 or accepted by this check. No Cookie or application data was cleared.
 
 Accepted scopes remain in [file citations](chatgpt-private-file-citations.md).

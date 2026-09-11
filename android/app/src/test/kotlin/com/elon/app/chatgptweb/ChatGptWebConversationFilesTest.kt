@@ -7,6 +7,38 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ChatGptWebConversationFilesTest {
+    @Test fun consumesExactPrivateSourceLinkProducerFixture() {
+        val fixture = JSONObject(requireNotNull(javaClass.classLoader?.getResourceAsStream(
+            "webchat/private-source-links-contract.json")).bufferedReader().use { it.readText() }).getJSONObject("event")
+        val parsed = (ChatGptWebProtocol.parse(JSONObject().put("schema", "yilong.ai.ui.v1")
+            .put("event", fixture).toString()) as ChatGptWebEvent.ConversationFiles).value
+        assertEquals(listOf("first", "second"), parsed.files.map { it.name })
+        assertEquals(listOf("https://docs.example.test/document/first#part",
+            "https://docs.example.test/document/second?tab=one"), parsed.files.map { it.sourceUrl })
+        assertTrue(parsed.files.all { it.kind == "source" && it.downloadHandle.isEmpty() })
+        assertFalse(parsed.truncated)
+    }
+
+    @Test fun sourceRowsCarryOnlyAnExplicitSafeLinkAndCannotAdvertiseDownload() {
+        val source = fixture()
+        val row = source.getJSONArray("files").getJSONObject(0)
+        row.put("kind", "source").put("sourceUrl", "https://docs.example.test/document/fixture#section")
+        val parsed = requireNotNull(ChatGptWebConversationFiles.parse(source))
+        assertEquals("source", parsed.files[0].kind)
+        assertEquals("https://docs.example.test/document/fixture#section", parsed.files[0].sourceUrl)
+        assertEquals("", parsed.files[0].downloadHandle)
+        assertFalse(parsed.truncated)
+        for (url in listOf("javascript:alert(1)", "https://user:pass@docs.example.test/", "")) {
+            row.put("sourceUrl", url)
+            val rejected = requireNotNull(ChatGptWebConversationFiles.parse(source))
+            assertTrue(rejected.truncated)
+            assertTrue(rejected.files.none { it.kind == "source" })
+        }
+        row.put("sourceUrl", "https://docs.example.test/document/fixture")
+            .put("downloadHandle", "download_" + "a".repeat(32))
+        assertTrue(requireNotNull(ChatGptWebConversationFiles.parse(source)).files.none { it.kind == "source" })
+    }
+
     @Test fun downloadSelectionAcceptsOnlyOpaqueHandlesWithoutChangingExistingDescriptors() {
         val source = fixture()
         val row = source.getJSONArray("files").getJSONObject(0)

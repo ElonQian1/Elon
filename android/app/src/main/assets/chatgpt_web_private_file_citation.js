@@ -114,6 +114,7 @@
     try {
       const url = new URL(raw.trim());
       if (url.protocol !== 'https:' || !url.hostname || url.username || url.password ||
+          url.href.length > 8192 || /%(?![0-9a-f]{2})/i.test(url.href) ||
           url.port && url.port !== '443') return null;
       const name = text(reference.title) || text(reference.name) || url.hostname;
       return { name: name.slice(0, 180), url: url.href };

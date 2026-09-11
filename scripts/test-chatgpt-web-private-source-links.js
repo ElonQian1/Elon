@@ -34,7 +34,8 @@ test('link validation rejects executable schemes, credentials, controls and malf
   for (const url of ['javascript:alert(1)', 'intent://x', 'file:///sdcard/a', 'data:text/plain,a',
     'http://docs.example.test/a', 'https://user:password@docs.example.test/a',
     'https://docs.example.test:8080/a', 'https://docs.example.test\\@evil.test/a',
-    'https://docs.example.test/a\nb', 'https://', 'https://docs.example.test/' + 'a'.repeat(8192)]) {
+    'https://docs.example.test/a\nb', 'https://docs.example.test/%xy', 'https://',
+    'https://docs.example.test/' + 'a'.repeat(8192)]) {
     assert.equal(citation.sourceLink(file('unsafe', { cloud_doc_url: url })), null, url.slice(0, 80));
   }
   assert.equal(citation.sourceLink(file('bad-primary', { cloud_doc_url: 'javascript:alert(1)',
@@ -103,4 +104,11 @@ test('source rows traverse the cached private inventory without DOM or a native 
   assert.equal(rows[0].sourceUrl, 'https://docs.example.test/document/native');
   assert.equal(rows[0].downloadHandle, undefined);
   assert.equal(network, 0);
+});
+
+test('exact source-list producer fixture is also consumed by native Kotlin tests', () => {
+  const fixture = require('../android/app/src/test/resources/webchat/private-source-links-contract.json');
+  const actual = projection.files(fixture.payload);
+  assert.deepEqual(actual.files, fixture.event.files);
+  assert.equal(actual.truncated, fixture.event.truncated);
 });

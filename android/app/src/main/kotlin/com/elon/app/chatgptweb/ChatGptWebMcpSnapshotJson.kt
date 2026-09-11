@@ -75,6 +75,7 @@ internal object ChatGptWebMcpSnapshotJson {
                         .put("file_id", file.id).put("message_id", file.messageId)
                         .put("name", file.name).put("kind", file.kind)
                         .put("role", file.role).put("media_type", file.mediaType)
+                        .put("source_link_available", fresh && file.kind == "source" && file.sourceUrl.isNotEmpty())
                         .put("download_handle", file.downloadHandle.takeIf {
                             fresh && ChatGptWebFileDownloadPolicy.HANDLE.matches(it)
                         }.orEmpty()))

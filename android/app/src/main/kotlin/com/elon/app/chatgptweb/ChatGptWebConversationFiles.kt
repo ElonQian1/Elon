@@ -2,6 +2,7 @@ package com.elon.app.chatgptweb
 
 import com.elon.app.WebChatConversationFile
 import com.elon.app.WebChatConversationFileIndex
+import com.elon.app.WebChatSourceLinkPolicy
 import org.json.JSONObject
 
 internal object ChatGptWebConversationFiles {
@@ -17,11 +18,14 @@ internal object ChatGptWebConversationFiles {
                 val id = item.optString("id").takeIf { ITEM_ID.matches(it) } ?: continue
                 val messageId = item.optString("messageId").takeIf { MESSAGE_ID.matches(it) } ?: continue
                 val name = item.optString("name").trim().take(180).takeIf(String::isNotEmpty) ?: continue
-                val kind = item.optString("kind").takeIf { it == "image" || it == "file" } ?: continue
+                val kind = item.optString("kind").takeIf { it in setOf("image", "file", "source") } ?: continue
                 val role = item.optString("role").takeIf { it == "user" || it == "assistant" } ?: continue
+                val sourceUrl = if (kind == "source") WebChatSourceLinkPolicy.normalize(item.optString("sourceUrl")) else null
+                if (kind == "source" && (sourceUrl == null || item.optString("downloadHandle").isNotBlank())) continue
                 add(WebChatConversationFile(id, messageId, name, kind, role,
                     item.optString("mediaType").takeIf { MIME.matches(it) }.orEmpty(),
-                    item.optString("downloadHandle").takeIf(ChatGptWebFileDownloadPolicy.HANDLE::matches).orEmpty()))
+                    item.optString("downloadHandle").takeIf(ChatGptWebFileDownloadPolicy.HANDLE::matches).orEmpty(),
+                    sourceUrl.orEmpty()))
             }
         }.distinctBy { it.id }
         // Malformed descriptors cannot be advertised as a complete empty file list.
