@@ -27,6 +27,10 @@ assert.match(pageAdapter, /WebViewFeature\.DOCUMENT_START_SCRIPT/);
 assert.match(pageAdapter, /WebViewCompat\.addDocumentStartJavaScript/);
 assert.match(pageAdapter, /chatgpt_web_private_socket_tap\.js/);
 assert.ok(
+  pageAdapter.indexOf('chatgpt_web_private_delta_document.js') <
+  pageAdapter.indexOf('chatgpt_web_private_stream_policy.js')
+);
+assert.ok(
   pageAdapter.indexOf('chatgpt_web_private_stream_policy.js') <
   pageAdapter.indexOf('chatgpt_web_private_stream_transport.js')
 );
@@ -145,7 +149,7 @@ function context(enabled, response) {
     'data: [DONE]\n\n'
   ]);
   const enabled = context(true, response);
-  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 17);
+  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 18);
   assert.equal(enabled.socketListenerCount(), 1);
   let notifications = 0;
   enabled.window.__elonChatGptPrivateStreamTransport.subscribe(() => { notifications += 1; });
@@ -168,6 +172,53 @@ function context(enabled, response) {
     't:none/k:conversation_id.message/dt:none/dk:none/mk:author.content.id.status/ck:parts',
     't:none/k:conversation_id.message/dt:none/dk:none/mk:author.content.id.status/ck:parts'
   ]);
+
+  const deltaEvent = (value) => 'event: delta\ndata: ' + JSON.stringify(value) + '\n\n';
+  const deltaRoot = { conversation_id: 'conversation-one', message: {
+    id: 'delta-answer', author: { role: 'assistant' }, status: 'in_progress',
+    content: { parts: ['hello'] }
+  } };
+  const deltaResponse = createResponse([
+    'event: delta_encoding\ndata: "v1"\n\n',
+    deltaEvent({ c: 13, v: deltaRoot }),
+    deltaEvent({ c: 1, p: '', o: 'add', v: { type: 'status', status: 'working' } }),
+    deltaEvent({ c: 13, p: '/message/content/parts/0', o: 'append', v: ' from delta' }),
+    deltaEvent({ p: '/message/status', o: 'replace', v: 'finished_successfully' }),
+    'data: [DONE]\n\n'
+  ]);
+  const deltaContext = context(true, deltaResponse);
+  assert.equal(await deltaContext.window.fetch(request, init), deltaResponse);
+  await tick(); await tick();
+  assert.equal(deltaContext.calls(), 1, 'delta observation does not replay the official send');
+  assert.equal(deltaContext.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').text,
+    'hello from delta');
+  assert.equal(deltaContext.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').state,
+    'completed');
+
+  const failedDelta = context(true, createResponse([
+    'event: delta_encoding\ndata: v1\n\n', deltaEvent({ c: 13, v: deltaRoot }),
+    deltaEvent({ p: '/constructor/unsafe', o: 'add', v: true }),
+    deltaEvent({ p: '/message/content/parts/0', o: 'append', v: ' must not appear' }),
+    'data: [DONE]\n\n'
+  ]));
+  await failedDelta.window.fetch(request, init);
+  await tick(); await tick();
+  const retainedDelta = failedDelta.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one');
+  assert.equal(retainedDelta.text, 'hello');
+  assert.equal(retainedDelta.state, 'streaming', 'a damaged observed stream is not a completed answer');
+  assert.ok(failedDelta.shapes.includes('delta/decode_error'));
+  assert.ok(failedDelta.outcomes.some((item) => item.outcome === 'error'));
+  assert.equal(failedDelta.outcomes.some((item) => item.outcome === 'success'), false);
+  assert.equal(failedDelta.calls(), 1);
+
+  const socketDelta = context(true, createResponse([]));
+  socketDelta.emitSocket(JSON.stringify({ c: 13, v: deltaRoot }));
+  socketDelta.emitSocket(JSON.stringify({ o: 'patch', p: '', v: [
+    { o: 'append', p: '/message/content/parts/0', v: ' once' },
+    { o: 'replace', p: '/message/status', v: 'finished_successfully' }
+  ] }));
+  assert.equal(socketDelta.window.__elonChatGptPrivateStreamTransport.current('/c/conversation-one').text,
+    'hello once', 'socket traversal must not apply the children of an already-consumed delta again');
 
   const compactResponse = createResponse([
     'data: {"c":"patch","o":"replace","p":"/messages/2/content/parts/0","v":{"text":"sentinel"}}\n\n',

@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 17) return;
+  if (existing && Number(existing.version) >= 18) return;
   if (existing && typeof existing.dispose === 'function') {
     try { existing.dispose(); }
     catch (_) { /* A stale transport must not block the upgraded observer. */ }
@@ -394,6 +394,7 @@
       reportShape(value, source);
       if (session.accept(value)) accepted = true;
       observePackedFinance(value);
+      if (policy.isCompactPayload && policy.isCompactPayload(value)) continue;
       if (value.author && value.author.role === 'assistant' &&
           session.accept({ message: value })) {
         accepted = true;
@@ -581,8 +582,9 @@
         }
         notify();
       },
-      () => {
+      (ending) => {
         if (!isCurrent()) return;
+        if (ending && ending.error) { recordShape('delta/decode_error'); report('error'); return; }
         const completed = session.finish();
         report(completed ? 'success' : 'empty');
         if (completed) notify();
@@ -641,7 +643,7 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 17,
+    version: 18,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,

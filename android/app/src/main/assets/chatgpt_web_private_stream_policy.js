@@ -374,24 +374,47 @@
   function createSseDecoder(onPayload, onDone) {
     let buffer = '';
     let closed = false;
+    let delta = null;
+    let decodeError = false;
+
+    function complete() {
+      closed = true;
+      if (typeof onDone === 'function') onDone(decodeError ? { error: 'delta_decode' } : undefined);
+    }
 
     function processEvent(rawEvent) {
-      const data = String(rawEvent || '').split(/\r?\n/)
+      const lines = String(rawEvent || '').split(/\r?\n/);
+      const eventLines = lines.filter((line) => line.startsWith('event:'));
+      const event = eventLines.length ? eventLines[eventLines.length - 1].slice(6).trim() : '';
+      const data = lines
         .filter((line) => line.startsWith('data:'))
         .map((line) => line.slice(5).trimStart())
         .join('\n')
         .trim();
       if (!data) return;
       if (data === '[DONE]') {
-        closed = true;
-        if (typeof onDone === 'function') onDone();
+        complete();
         return;
       }
+      if (event === 'delta_encoding') {
+        let encoding = data;
+        try { encoding = JSON.parse(data); } catch (_) { /* The marker may be unquoted. */ }
+        decodeError = encoding !== 'v1';
+        delta = decodeError ? null : deltaDocuments.create();
+        return;
+      }
+      if (decodeError) return;
       try {
-        const payload = JSON.parse(data);
+        let payload = JSON.parse(data);
+        if (event === 'delta') {
+          if (decodeError || !delta) { decodeError = true; return; }
+          const result = delta.apply(payload);
+          if (!result.ok) { decodeError = true; return; }
+          payload = result.value;
+        }
         if (typeof onPayload === 'function') onPayload(payload);
       } catch (_) {
-        // Unknown frames remain owned by the official page and are ignored.
+        if (event === 'delta') decodeError = true;
       }
     }
 
@@ -399,7 +422,10 @@
       if (closed || !chunk) return;
       buffer += String(chunk);
       if (buffer.length > MAX_BUFFER_LENGTH) {
-        buffer = buffer.slice(-MAX_BUFFER_LENGTH);
+        decodeError = true;
+        buffer = '';
+        complete();
+        return;
       }
       let boundary = buffer.search(/\r?\n\r?\n/);
       while (boundary >= 0) {
@@ -416,8 +442,7 @@
       if (closed) return;
       if (buffer.trim()) processEvent(buffer);
       buffer = '';
-      if (!closed && typeof onDone === 'function') onDone();
-      closed = true;
+      if (!closed) complete();
     }
 
     return Object.freeze({ push, finish });
@@ -584,8 +609,11 @@
     }
 
     function accept(payload) {
-      if (compact.accept(payload)) return true;
-      return acceptVisiblePayload(payload);
+      if (!stream) begin();
+      if (compact.handles(payload)) return compact.accept(payload);
+      const accepted = acceptVisiblePayload(payload);
+      if (accepted) compactDocument = payload;
+      return accepted;
     }
 
     function finish() {
@@ -668,6 +696,7 @@
     clientChartPartFromMetadata,
     createSession,
     createSseDecoder,
+    isCompactPayload: deltaDocuments.isCompactPayload,
     financePartFromWidget,
     financePartsFromMetadata,
     mergeMessages,

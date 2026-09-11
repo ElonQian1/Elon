@@ -69,6 +69,9 @@ for the separate file-sheet acceptance boundary.
 
 ## Inline context-file coverage
 
+The shared [delta-stream prerequisite](chatgpt-private-delta-stream.md) is
+implemented separately; it does not yet enable supplemented/PCA downloads.
+
 Parser v5 / adapter 342 adds ordinary file citations already present in a
 completed `conversation_context_citation_metadata` array. Code and synthetic
 integration checks are complete; grouped Android build and device acceptance
