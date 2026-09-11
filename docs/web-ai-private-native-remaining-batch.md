@@ -50,9 +50,9 @@ See [the scoped regression](reports/chatgpt-library-folder-download-1644.md).
 [Explicit account-read isolation](reports/chatgpt-explicit-account-read-20260911.md)
 is device-verified for empty/populated file indexes and native Refresh on 1649.
 Reuse it; this does not prove idle membership, citation or mounted-file variants.
-The [1666 raster-download acceptance](reports/chatgpt-library-source-audit-1662.md#normal-1666-acceptance)
-restored Download for nine PNG artifacts; one native saved-byte case passed.
-Download is completed/default-enabled; attachment/rename/trash remain separate.
+Personal raster download is accepted on 1666; native reference/removal and rename
+are [accepted/default-enabled on 1667](reports/chatgpt-library-raster-actions-20260911.md).
+Raster deletion remains offline-only; conditional project reference is still missing.
 
 | User workflow | Current result | Remaining boundary |
 |---|---|---|
