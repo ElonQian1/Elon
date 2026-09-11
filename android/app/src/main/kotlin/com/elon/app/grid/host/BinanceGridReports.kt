@@ -11,11 +11,13 @@ internal class BinanceReportQuery private constructor(val data: Map<String, Any?
     val page get() = data.number("page")
     fun json() = StrictJson.encode(data)
     companion object {
+        val kinds = setOf("history", "orders", "matches", "positions", "funds")
+        fun capabilities() = StrictJson.encode(mapOf("schema" to "yilong.binance_report_capabilities.v1", "kinds" to kinds.toList()))
         fun parse(raw: String): BinanceReportQuery {
             val q = StrictJson.parse(raw, 2048)
             require(q.keys == setOf("request", "kind", "page", "days", "symbol", "id"))
             require(q["request"] is String && Regex("[0-9a-f]{32}").matches(q["request"] as String))
-            require(q["kind"] in setOf("history", "orders", "matches", "positions"))
+            require(q["kind"] in kinds)
             require(q.number("page") in 1..1000 && q.number("days") in setOf(7L,30L,90L))
             val id = q["id"] as? String ?: error("REPORT_SCOPE")
             val symbol = q["symbol"] as? String ?: error("REPORT_SCOPE")
@@ -56,12 +58,13 @@ internal class BinanceGridReports(private val elapsed: () -> Long, private val e
         require(event["account"] is String && BinanceHostState.digest(event["account"] as String) == account && event["account_kind"] == accountKind)
         require(event["status"] in setOf("ready", "error"))
         val coverage = event["coverage"] as? String ?: error("REPORT_COVERAGE")
-        val allowed = when(q.kind) { "history", "matches" -> setOf("page"); "positions" -> setOf("strategy_position"); else -> setOf("grid_slots", "open_orders", "limited_grid_slots", "limited_open_orders") }
+        val allowed = when(q.kind) { "history", "matches" -> setOf("page"); "positions" -> setOf("strategy_position"); "funds" -> setOf("strategy_margin"); else -> setOf("grid_slots", "open_orders", "limited_grid_slots", "limited_open_orders") }
         require(coverage in allowed || coverage == "unavailable" && event["status"] == "error")
         val rows = event["rows"] as? List<*> ?: error("REPORT_ROWS")
         require(rows.size <= if (q.kind in setOf("history", "matches")) 20 else 500)
         val decoded = rows.map { BinanceReportFields.decode(q.kind, it) }
         val total = event.number("total"); require(total in decoded.size.toLong()..10000000L)
+        if (q.kind == "funds" && event["status"] == "ready") require(rows.size == 1 && total == 1L)
         if (event["status"] == "error") require(rows.isEmpty() && total == 0L && coverage == "unavailable")
         if (q.kind == "history" && event["status"] == "ready") {
             require(decoded.map { it["id"] }.toSet().size == decoded.size)

@@ -22,6 +22,39 @@ function fixture() {
   return {events,calls,data,account,known,reports,q,diagnostics,setProof:f=>{prove=f;}};
 }
 const grid = {strategyId:'123',symbol:'NEARUSDT',rootUserId:'42',strategyUserId:'99',strategyStatus:'WORKING'};
+test('funds selects the verified strategy UID and preserves exact amounts with a fixed USDT read',async()=>{
+  const h=fixture(); h.data.push({data:{...grid,strategyUserId:'9999999999999999999'}},
+    '{"success":true,"code":"000000","data":{"42":[{"marginBalance":"9000"}],"9999999999999999999":[{"asset":"USDT","marginBalance":1.234567890123456789,"crossInitialMargin":"0","email":"private@example.test"}]}}');
+  assert.equal(h.reports.query(h.q('funds')),true); await tick();
+  assert.equal(h.events[0].status,'ready'); assert.equal(h.events[0].coverage,'strategy_margin');
+  assert.equal(JSON.stringify(h.events[0].rows),JSON.stringify([{asset:'USDT',marginBalance:'1.234567890123456789',crossInitialMargin:'0'}]));
+  assert.equal(h.calls[1].url,'/bapi/futures/v1/private/future/strategy/user-data/get-future-account-info-asset');
+  assert.equal(h.calls[1].init.method,'POST');
+  assert.equal(h.calls[1].init.body,'{"marginAsset":"USDT","strategyUserIds":[9999999999999999999]}');
+  assert.ok(!JSON.stringify(h.events).includes('private@example')); assert.ok(!JSON.stringify(h.events).includes('local-only'));
+});
+test('funds never substitutes another account, an ambiguous row or a different currency',async()=>{
+  for(const data of [{'42':[{marginBalance:'9'}]},{'99':[]},{'99':[{},{}]},
+    {'99':[{asset:'USDC'}]},{'99':[{marginAsset:'BTC'}]}]) {
+    const h=fixture();h.data.push({data:grid},{data});assert.equal(h.reports.query(h.q('funds')),true);await tick();
+    assert.equal(h.events[0].status,'error');assert.equal(h.events[0].rows.length,0);
+  }
+});
+test('funds keeps unavailable amounts null, including invalid decimal values',async()=>{
+  const h=fixture();h.data.push({data:grid},{data:{'99':[{marginBalance:'not-a-number'}]}});
+  h.reports.query(h.q('funds'));await tick();
+  assert.equal(JSON.stringify(h.events[0].rows),JSON.stringify([{asset:'USDT',marginBalance:null,crossInitialMargin:null}]));
+});
+test('funds refuses unknown strategies and extra account inputs before issuing reads',()=>{
+  const h=fixture();for(const q of [h.q('funds',{id:'777'}),h.q('funds',{strategyUserId:'42'}),h.q('funds',{page:2})])
+    assert.equal(h.reports.query(q),false);
+  assert.equal(h.calls.length,0);
+});
+test('funds clears a result when identity changes after the read',async()=>{
+  const h=fixture();h.data.push({data:grid},{data:{'99':[{marginBalance:'5'}]}});let count=0;
+  h.setProof(async()=>({account:++count===1?'42':'43',account_kind:'sub'}));
+  h.reports.query(h.q('funds'));await tick();assert.equal(h.events[0].status,'error');assert.equal(h.events[0].rows.length,0);
+});
 test('history uses the actual v2 POST and never forwards credential or unrelated fields', async()=>{
   const h=fixture(); h.data.push({data:{grids:[{...grid,gridProfit:'0.1234567890123456789',email:'private@example.test'}],total:1}});
   assert.equal(h.reports.query(h.q()),true); await tick();

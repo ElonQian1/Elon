@@ -2186,6 +2186,161 @@
       "updated_at_ms": 1788953369678
     },
     {
+      "id": "android-binance-strategy-funds-v1",
+      "title": "币安策略账户资金只读",
+      "summary": "读取当前网格策略账户 USDT 保证金余额和全仓初始保证金；不等同交易所钱包总资产。",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/android-binance-strategy-funds-v1.md",
+        "content_hash": "c507ba312ba1fa54e9ba0a7a458d37b3bd29397c32c8e7cb3dfc04f54dfaed22",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "1f787b647e64efbd10b70b2ec7a3476730d2a882",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "9a50cc55ca6d6d577d8dce1e5f60bc12470544ad",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_reports_adapter.js",
+        "android/app/src/main/kotlin/com/elon/app/grid/host",
+        "scripts/test-binance-grid-reports.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "固定路由及策略/账号隔离、精确金额、缺失值和异常测试通过",
+        "能力协商兼容旧主应用，资金页面只读且明确口径",
+        "正式发布装机与真实响应、页面验收分开记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/binance_grid_read_diagnostics.js",
+          "content_hash": "ec1088bdc40484dbcd8d6ab7645ecb900711d8c2ef86666790e01c6b1c584fea",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f787b647e64efbd10b70b2ec7a3476730d2a882",
+            "head_blob_oid": "a30d77a54c1fdc656695c869050f63471b7b527f",
+            "worktree_blob_oid": "25772cd691dff69b932f219d314a55e17d76e104",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/binance_grid_reports_adapter.js",
+          "content_hash": "284ac0c1fa882d056aa47746a46c130b773ccb2b78da0c490e416656f2df6a46",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f787b647e64efbd10b70b2ec7a3476730d2a882",
+            "head_blob_oid": "0d565f9f3a8e8ec6d3b9897238af0d3edc0580cb",
+            "worktree_blob_oid": "a6ef92af5b20c37700eb7490b893b50a18668e19",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceGridReports.kt",
+          "content_hash": "f99900c40a7f9b906ab18c2e8ab7b2701b925ae99528951e666b6e291116a451",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f787b647e64efbd10b70b2ec7a3476730d2a882",
+            "head_blob_oid": "26c3c46766dc037511743508ae9f4d72bea624d2",
+            "worktree_blob_oid": "dda57e87a88dcc97f0c09974f6d97073d9b6d018",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostProvider.kt",
+          "content_hash": "654e5262f928895d532a81dc327e5405ff8bfa7127de234faf8c5bb9dd33083c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f787b647e64efbd10b70b2ec7a3476730d2a882",
+            "head_blob_oid": "17dc6380f66047b5147afa6a93ead1dfde604577",
+            "worktree_blob_oid": "5894da91783da2564c01018257620554868a910d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceReportDiagnostics.kt",
+          "content_hash": "363315d910f48c3fcf37290390c7aa0c939917023bf887e1fcb658484c4f9856",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f787b647e64efbd10b70b2ec7a3476730d2a882",
+            "head_blob_oid": "ee721ac6d05de215ffd4e0e945ee75743e33e0a6",
+            "worktree_blob_oid": "5d377a288d07d0f7157169be429c7d9a38a7b569",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceReportFields.kt",
+          "content_hash": "676c9671360869d60a5a3f87f0179472cbb38d06455744968e4574d65bd249b9",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f787b647e64efbd10b70b2ec7a3476730d2a882",
+            "head_blob_oid": "a81172194a93a1d7e1f7186fa0891ca09758818a",
+            "worktree_blob_oid": "39da44e5e8e2f860d23b8571e1df58fe55135c27",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/host/BinanceStrategyFundsTest.kt",
+          "content_hash": "4fe14158b66e9caff3a29319052086b0e2f3fff7808906e95615f599b7374966",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f787b647e64efbd10b70b2ec7a3476730d2a882",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7403ae4a498b689b5deb3d5be0155b6d41687f9f",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/android-binance-strategy-funds-v1-delivery.md",
+          "content_hash": "5419ea36df579d0ed3877ae077f0070796f2c1acf241fd543d394cbf9ba0e5c8",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f787b647e64efbd10b70b2ec7a3476730d2a882",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4cea9d1707ae09e748c11105eed8435e0d04ab70",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-reports.cjs",
+          "content_hash": "536b9f2d6482c2b8233b9c045a9336ef9e98d22ab2cc5f28301c9dc912b9c93d",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1f787b647e64efbd10b70b2ec7a3476730d2a882",
+            "head_blob_oid": "a1a8680a7c3b2e043f5d27935661f538a6eca4e4",
+            "worktree_blob_oid": "f24d720958059f122ed2a937b747a92c0a483526",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1789104878144,
+      "updated_at_ms": 1789106352984
+    },
+    {
       "id": "android-exchange-session-host-v2",
       "title": "量化 UI 与主 APK 会话服务长期边界",
       "summary": "量化持有选币和交易 UI，主 APK 独立提供登录、恢复及受授权业务接口；停止扩建旧主创建页，合同和迁移尚未实现。",
@@ -25297,56 +25452,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_2ac0584b55634adb8b79409eadb03750",
-      "feature_id": "esk-sui-testnet-publication-preflight-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-preflight",
-      "reason": "代码与交付证据均已推送，Quality Gates #2238 和 #2239 的 ESK Sui Move 作业成功；离线预检 V1 发布完成，真实链执行仍未授权且未发生。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788664263413
-    },
-    {
-      "id": "feature_event_f99a6dee47014babaf68d578d11fe7f9",
-      "feature_id": "esk-economic-ledger-preview-v1",
-      "action": "registered",
-      "actor": "esk-primary",
-      "reason": "用户已授权当前任务负责新工作；仅认领可独立验证的离线工程批次，经济政策仍未决。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788685952505
-    },
-    {
-      "id": "feature_event_7178571639d9454a9bf7248a148f42cf",
-      "feature_id": "esk-economic-ledger-preview-v1",
-      "action": "claimed",
-      "actor": "esk-primary",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788685962893
-    },
-    {
-      "id": "feature_event_6416dbfea0da464987a49004ba16b50f",
-      "feature_id": "esk-economic-ledger-preview-v1",
-      "action": "transitioned",
-      "actor": "esk-primary",
-      "reason": "查重与需求已完成，分配独立实现及风险测试。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788685975063
-    },
-    {
-      "id": "feature_event_8e8ee2c4467146f6b3f0b391e132ee67",
-      "feature_id": "esk-economic-ledger-preview-v1",
-      "action": "evidence_recorded",
-      "actor": "esk-primary",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788686881185
-    },
-    {
       "id": "feature_event_da422811a5c0494a90b560619e5f31d5",
       "feature_id": "esk-economic-ledger-preview-v1",
       "action": "transitioned",
@@ -27295,6 +27400,56 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1789091628448
+    },
+    {
+      "id": "feature_event_6a7bd6911a1247b988293b5adc449fb7",
+      "feature_id": "android-binance-strategy-funds-v1",
+      "action": "registered",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789104878144
+    },
+    {
+      "id": "feature_event_aba789b4db1746eb98778c9aaae42eca",
+      "feature_id": "android-binance-strategy-funds-v1",
+      "action": "claimed",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789104878183
+    },
+    {
+      "id": "feature_event_3e31b6b4cb4149e5994bb669e369b794",
+      "feature_id": "android-binance-strategy-funds-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789104878228
+    },
+    {
+      "id": "feature_event_a703e0516bac4e198001fdcb7e61303b",
+      "feature_id": "android-binance-strategy-funds-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789106352916
+    },
+    {
+      "id": "feature_event_68b65ed3a83542c8bc1d253fb1801643",
+      "feature_id": "android-binance-strategy-funds-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "Contract and offline tests passed; release, installation and actual account/UI acceptance are separate pending gates.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789106352984
     }
   ]
 }

@@ -37,6 +37,10 @@ class BinanceHostProvider : ContentProvider() {
             require(Regex("[0-9a-f]{64}").matches(token))
             BinanceHostRuntime.onMain(owner) { runtime ->
                 when (method) {
+                    "report_capabilities_v1" -> {
+                        runtime.readContinuous(token)
+                        Bundle().apply { putString("result", BinanceReportQuery.capabilities()) }
+                    }
                     "report_request_v1" -> { runtime.reportRequest(token, extras.getString("query") ?: error("QUERY_MISSING")); Bundle().apply { putString("status", "pending") } }
                     "report_read_v1" -> Bundle().apply { putString("result", runtime.reportRead(token, extras.getString("request") ?: error("REQUEST_MISSING"))) }
                     "read" -> Bundle().apply { putString("result", runtime.read(token)) }

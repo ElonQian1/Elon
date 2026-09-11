@@ -7,9 +7,9 @@
   const errors = new Set(['invalid_field', 'invalid_row', 'response_failed', 'business_failed', 'identity_unverified',
     'list_invalid', 'duplicate', 'account_mismatch', 'detail_mismatch', 'identity_response_failed', 'identity_business_failed']);
   let lastFailure = 'none', lastKind = 'none', lastStatus = 0;
-  const reportKinds = new Set(['none','history','orders','matches','positions']);
+  const reportKinds = new Set(['none','history','orders','matches','positions','funds']);
   const reportStages = new Set(['idle','identity_before','identity_after',
-    ...['history','detail','windowOrders','orders','matches','positions'].flatMap(key => [key,'parse_'+key])]);
+    ...['history','detail','windowOrders','orders','matches','positions','funds'].flatMap(key => [key,'parse_'+key])]);
   const reportErrors = new Set(['none','unsupported_field','unsupported_list','unsupported_object','response_failed',
     'business_failed','account_changed','scope_changed','restart_pagination','unsupported_total']);
   let report = {kind:'none',stage:'idle',outcome:'idle',error:'none',http:0,business:'none'};

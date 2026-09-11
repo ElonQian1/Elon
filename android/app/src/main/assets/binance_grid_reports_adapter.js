@@ -10,7 +10,8 @@
       windowOrders: ['GET', prefix + 'v2/private/future/grid/query-grid-open-items'],
       orders: ['POST', prefix + 'v1/private/future/strategy/streamer/um/open-orders'],
       matches: ['POST', prefix + 'v1/private/future/grid/query-grid-matched-items'],
-      positions: ['POST', prefix + 'v1/private/future/strategy/user-data/get-future-user-positions']
+      positions: ['POST', prefix + 'v1/private/future/strategy/user-data/get-future-user-positions'],
+      funds: ['POST', prefix + 'v1/private/future/strategy/user-data/get-future-account-info-asset']
     });
     const decimal = /^-?(0|[1-9][0-9]{0,29})(\.[0-9]{1,20})?$/;
     const integer = /^(0|[1-9][0-9]{0,19})$/;
@@ -86,7 +87,9 @@
       const headers = new Headers(context.headers);
       if (method === 'POST') headers.set('content-type', 'application/json');
       const response = await port.fetch(url, {method, headers, credentials: 'same-origin', redirect: 'error',
-        cache: 'no-store', signal: context.signal, ...(method === 'POST' ? {body: JSON.stringify(params)} : {})});
+        cache: 'no-store', signal: context.signal, ...(method === 'POST' ? {body: key === 'funds'
+          ? '{"marginAsset":"USDT","strategyUserIds":[' + scalar(params.strategyUserId, integer, true) + ']}'
+          : JSON.stringify(params)} : {})});
       const text = await response.text();
       context.http = response.status;
       if (response.status !== 200 || text.length > 1048576) throw Error('response_failed');
@@ -98,7 +101,7 @@
     }
     function valid(q) {
       if (!q || Object.keys(q).sort().join(',') !== 'days,id,kind,page,request,symbol') return false;
-      if (!/^[0-9a-f]{32}$/.test(q.request) || !['history','orders','matches','positions'].includes(q.kind)) return false;
+      if (!/^[0-9a-f]{32}$/.test(q.request) || !['history','orders','matches','positions','funds'].includes(q.kind)) return false;
       if (!Number.isInteger(q.page) || q.page < 1 || q.page > 1000 || ![7,30,90].includes(q.days)) return false;
       if (q.kind === 'history') return q.id === '' && (q.symbol === '' || /^[A-Z0-9]{1,24}USDT$/.test(q.symbol)) &&
         (q.page === 1 || historyWindows.has(q.days + ':' + q.symbol));
@@ -154,6 +157,18 @@
               }
               total = rows.length;
               if (rows.length > 500) { rows = rows.slice(0,500); coverage = 'limited_' + coverage; }
+            } else if (q.kind === 'funds') {
+              coverage = 'strategy_margin';
+              const uid = scalar(detail.strategyUserId, integer, true);
+              const data = object((await request('funds', {strategyUserId:uid}, context)).data);
+              // An absent strategy or ambiguous row is not a zero balance. Never fall back to the login UID.
+              const values = array(data[uid], 1);
+              if (values.length !== 1) throw Error('unsupported_list');
+              const value = object(values[0]);
+              if ((value.asset != null && value.asset !== 'USDT') ||
+                  (value.marginAsset != null && value.marginAsset !== 'USDT')) throw Error('scope_changed');
+              rows = [{asset:'USDT',marginBalance:dec(value.marginBalance),crossInitialMargin:dec(value.crossInitialMargin)}];
+              total = 1;
             } else {
               coverage = 'strategy_position';
               const uid = scalar(detail.strategyUserId, integer, true);

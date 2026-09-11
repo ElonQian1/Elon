@@ -13,8 +13,8 @@ internal object BinanceReportDiagnostics {
     fun valid(raw: Any?): Boolean = runCatching {
         val value = raw as? Map<*, *> ?: return false
         require(value.keys == setOf("kind", "stage", "outcome", "error", "http", "business"))
-        require(value["kind"] in setOf("none", "history", "orders", "matches", "positions"))
-        val endpoints = setOf("history", "detail", "windowOrders", "orders", "matches", "positions")
+        require(value["kind"] in setOf("none", "history", "orders", "matches", "positions", "funds"))
+        val endpoints = setOf("history", "detail", "windowOrders", "orders", "matches", "positions", "funds")
         require(value["stage"] in endpoints + endpoints.map { "parse_$it" } + setOf("idle", "identity_before", "identity_after"))
         require(value["outcome"] in setOf("idle", "loading", "ready", "failed"))
         require(value["error"] in setOf("none", "unsupported_field", "unsupported_list", "unsupported_object",
