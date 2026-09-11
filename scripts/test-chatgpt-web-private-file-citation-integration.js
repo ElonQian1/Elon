@@ -112,6 +112,33 @@ for (const format of ['grouped', 'cite_map']) test(format + ' URL-only file iden
   assert.equal(f.receipts.at(-1)[2], 'download_queued');
 });
 
+test('completed inline context references use the existing native scoped download and revoke replaced sources', async () => {
+  const f = fixture();
+  const metadata = f.payload.messages[0].metadata = {
+    conversation_context_citation_metadata_status: 'complete',
+    conversation_context_citation_metadata: [{ citation: { ...ref(), citation_uuid: 'inline-a' } }],
+  };
+  const rows = f.rows();
+  assert.equal(rows.length, 1);
+  assert.match(rows[0].downloadHandle, /^download_[a-f0-9]{32}$/);
+  assert.doesNotMatch(JSON.stringify(rows), /file-cited|cloud|https|token|citation_uuid/);
+  await f.run(rows[0]);
+  assert.equal(f.calls.length, 2);
+  assert.ok(f.calls.every(call => call.init.method === 'GET'));
+  assert.equal(new URL(f.calls[1].url).searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+  assert.equal(f.queued.length, 1);
+  metadata.conversation_context_citation_metadata.push({
+    citation: { ...ref(), citation_uuid: 'inline-a', deleted: true },
+  });
+  assert.deepEqual(f.rows(), []);
+  await f.run(rows[0]);
+  assert.equal(f.calls.length, 2);
+  assert.equal(f.queued.length, 1);
+  assert.equal(f.receipts.at(-1)[1], false);
+  metadata.conversation_context_citation_metadata = [{ citation: { ...ref(), retrieval_origin: 'pca' } }];
+  assert.deepEqual(projection.files(f.payload), { files: [], truncated: true });
+});
+
 test('empty context metadata preserves the ordinary citation download path without DOM', async () => {
   const f = fixture();
   f.payload.messages[0].metadata.conversation_context_citation_metadata = [];

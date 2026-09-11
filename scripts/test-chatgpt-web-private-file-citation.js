@@ -67,6 +67,74 @@ const groupedFile = (extra = {}) => file({ type: 'webpage', category: 'files',
   url: 'https://cloud.example.test/reference', ...extra });
 const ids = refs => citation.references({ content_references: refs }).map(row => row.file.id);
 
+const inline = (citations, status = 'complete') => ({
+  conversation_context_citation_metadata: citations,
+  conversation_context_citation_metadata_status: status,
+});
+
+test('completed inline context files use their explicit identity and exclude unrelated legacy references', () => {
+  const metadata = { ...inline([{ citation: file() }]),
+    content_references: [file({ id: 'file-legacy' })],
+    content_references_by_file: { old: [file({ id: 'file-per-file-legacy' })] } };
+  assert.deepEqual(citation.references(metadata).map(row => row.file.id), ['file-synthetic']);
+  assert.deepEqual(citation.references(metadata, [{ id: 'file-synthetic', name: 'existing.txt' }]), []);
+  const project = 'g-p-0123456789abcdef0123456789abcdef';
+  const scoped = citation.references(inline([{ citation: file({ library_file_id: 'libfile_inline', gizmo_id: project }) }]));
+  assert.equal(scoped[0].file.library_file_id, 'libfile_inline');
+  assert.equal(scoped[0].file.gizmo_id, project);
+});
+
+test('inline citation UUID replacement happens before source masking and download deduplication', () => {
+  const first = file({ citation_uuid: 'citation-a' });
+  const next = file({ citation_uuid: 'citation-a', id: 'file-new', name: 'new.txt' });
+  const metadata = inline([{ citation: first }, { citation: next }]);
+  assert.deepEqual(citation.references(metadata).map(row => row.file.id), ['file-new']);
+  metadata.conversation_context_citation_metadata.push({ citation: { ...next, deleted: true } });
+  assert.deepEqual(citation.references(metadata), []);
+  metadata.conversation_context_citation_metadata.at(-1).citation = { ...next, retrieval_origin: 'pca' };
+  assert.deepEqual(citation.references(metadata), []);
+  const laterDeletion = [{ citation: first }, ...Array.from({ length: 40 }, (_, i) => ({
+    citation: file({ id: 'file-filler-' + i }),
+  })), { citation: { ...first, deleted: true } }];
+  assert.ok(citation.references(inline(laterDeletion)).every(row => row.file.id !== first.id),
+    'inspect replacements beyond the 20-row display budget');
+});
+
+test('inline origin overrides follow the official wrapper contract without admitting PCA or past chats', () => {
+  const metadata = inline([
+    { citation: file(), retrieval_origin: 'pca' },
+    { citation: file({ id: 'file-allowed', retrieval_origin: 'pca' }), retrieval_origin: 'library' },
+    { citation: { type: 'conversation_context_citation', conversation_context_type: 'past_conversation',
+      id: 'file-past', name: 'past.txt' } },
+    { citation: file({ id: 'file-deleted', deleted: true }) },
+    { citation: file({ id: 'file-other-scope', context_scopes: ['other'] }) },
+  ]);
+  assert.deepEqual(citation.references(metadata).map(row => row.file.id), ['file-allowed']);
+});
+
+test('incomplete, marker and malformed context graphs cannot grant a file reference', () => {
+  for (const status of [undefined, 'seeded', 'pending_inline_finalize', 'marker_only', 'unknown', '']) {
+    const metadata = { ...inline([{ citation: file() }]), conversation_context_citation_metadata_status: status };
+    assert.deepEqual(citation.references(metadata), []);
+    assert.equal(citation.scan(metadata).truncated, true);
+  }
+  for (const entry of [null, [], 42, {}, { citation: null }, { citation: [] }]) {
+    assert.deepEqual(citation.references(inline([entry])), []);
+  }
+});
+
+test('inline-only and capped graphs report incomplete coverage rather than silently complete lists', () => {
+  const metadata = inline([{ citation: file() }], 'complete_inline_only');
+  assert.equal(citation.references(metadata).length, 1);
+  assert.equal(citation.scan(metadata).truncated, true);
+  const many = Array.from({ length: 21 }, (_, i) => ({ citation: file({ id: 'file-' + i }) }));
+  assert.equal(citation.references(inline(many)).length, 20);
+  assert.equal(citation.scan(inline(many)).truncated, true);
+  const oversized = Array.from({ length: 257 }, () => ({ citation: file() }));
+  Object.defineProperty(oversized, 256, { get() { throw Error('unbounded inline access'); } });
+  assert.deepEqual(citation.scan(inline(oversized)), { items: [], truncated: true });
+});
+
 test('per-file references follow top-level references without treating bucket keys as file identities', () => {
   const metadata = { content_references: [file({ id: 'file-first' })],
     content_references_by_file: { 'not-a-file-id': [file({ id: 'file-second' })],

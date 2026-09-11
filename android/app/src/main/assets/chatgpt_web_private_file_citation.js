@@ -16,13 +16,35 @@
   }
 
   function eligible(metadata) {
-    // Official GFi distinguishes empty metadata from a context graph. Nonempty
-    // graphs and marker states still need their separate deletion/source mask.
-    return metadata && typeof metadata === 'object' && !Array.isArray(metadata) &&
-      (metadata.conversation_context_citation_metadata == null ||
-        Array.isArray(metadata.conversation_context_citation_metadata) &&
-        metadata.conversation_context_citation_metadata.length === 0) &&
-      metadata.conversation_context_citation_metadata_status == null;
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false;
+    const graph = metadata.conversation_context_citation_metadata;
+    const status = metadata.conversation_context_citation_metadata_status;
+    if (graph != null && !Array.isArray(graph)) return false;
+    return graph?.length > 0 ? ['complete', 'complete_inline_only'].includes(status) : status == null;
+  }
+
+  function inlineSources(metadata, limit) {
+    const graph = metadata.conversation_context_citation_metadata;
+    if (!Array.isArray(graph) || !graph.length) return null;
+    // n5i/e5i replace matching citation UUIDs before the source mask. Inspect
+    // the bounded complete graph, so a later deletion cannot leave an old file.
+    if (graph.length > 256) return { items: [], truncated: true };
+    const items = [], positions = new Map();
+    for (const entry of graph) {
+      const value = entry?.citation;
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const reference = typeof entry.retrieval_origin === 'string'
+        ? { ...value, retrieval_origin: entry.retrieval_origin } : value;
+      const uuid = typeof reference.citation_uuid === 'string' && reference.citation_uuid;
+      if (uuid && positions.has(uuid)) items[positions.get(uuid)] = reference;
+      else {
+        if (uuid) positions.set(uuid, items.length);
+        items.push(reference);
+      }
+    }
+    return { items: items.slice(0, limit), truncated: items.length > limit ||
+      metadata.conversation_context_citation_metadata_status === 'complete_inline_only' ||
+      items.some(item => item.retrieval_origin === 'pca') };
   }
 
   function fileUrlId(value) {
@@ -81,7 +103,9 @@
     const items = [], urls = new Set();
     let visited = 0, truncated = false;
     limit = Math.max(1, Math.min(20, Number.isSafeInteger(limit) ? limit : 20));
-    if (!eligible(metadata)) return { items, truncated };
+    if (!eligible(metadata)) return { items, truncated:
+      metadata?.conversation_context_citation_metadata != null ||
+      metadata?.conversation_context_citation_metadata_status != null };
     const object = value => value && typeof value === 'object' && !Array.isArray(value);
     const active = value => object(value) && value.retrieval_origin !== 'pca' &&
       (value.deleted == null || value.deleted === false);
@@ -101,9 +125,12 @@
     }
     // Official R5i combines top-level references with one level of per-file arrays.
     // Bucket keys identify rendered output files, not download targets or scopes.
-    const sources = Array.isArray(metadata.content_references) ? bounded(metadata.content_references) : [];
+    const inline = inlineSources(metadata, limit);
+    if (inline?.truncated) truncated = true;
+    const sources = inline ? inline.items :
+      Array.isArray(metadata.content_references) ? bounded(metadata.content_references) : [];
     const byFile = metadata.content_references_by_file;
-    if (object(byFile)) {
+    if (!inline && object(byFile)) {
       let buckets = 0;
       for (const key in byFile) {
         if (!Object.prototype.hasOwnProperty.call(byFile, key)) continue;
@@ -166,5 +193,5 @@
     return result;
   }
 
-  return Object.freeze({ version: 4, eligible, target, references, scan });
+  return Object.freeze({ version: 5, eligible, target, references, scan });
 });

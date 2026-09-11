@@ -46,7 +46,8 @@ or project scope. Both fields share the 20-container/source limit; bucket scans
 are also bounded, and overflow remains explicit. Attachment-first and URL-first
 deduplication, concrete-ID validation, deletion/PCA/context masks, opaque native
 handles and scoped private authorization are unchanged. No new request or DOM
-read is added. Nonempty context/PCA graphs are still not implemented.
+read is added. Full PCA/supplemented graphs remain separate; inline ordinary
+context-file support is described below.
 
 All five new cases first failed on the prior implementation (63/68 passed).
 The fix passes 68/68 focused and 188/188 related runner cases, zero skips,
@@ -65,6 +66,52 @@ Per-file source-shape device acceptance remains deferred: ordinary native index
 reads do not prove which metadata field supplied a row. Reuse the personal/project
 completed scopes above. See [native refresh checks](reports/chatgpt-file-read-recovery-20260911.md#normal-1659-native-follow-up)
 for the separate file-sheet acceptance boundary.
+
+## Inline context-file coverage
+
+Parser v5 / adapter 342 adds ordinary file citations already present in a
+completed `conversation_context_citation_metadata` array. Code and synthetic
+integration checks are complete; grouped Android build and device acceptance
+are pending. This does not replace the installed 1659/1660 evidence above.
+
+The same hash-verified `conversation-small-ft205i7yqa6zc2nj.js` supplies the
+contract: `n5i` (4115631) extracts each `citation` and lets a string outer
+`retrieval_origin` override the inner value; `e5i` (4115074) replaces matching
+inner `citation_uuid` values. For ordinary files, the earlier past-conversation
+index and later past-chat URL identity rules do not apply. This is public-source
+evidence, not a captured live context-file response.
+
+Only `complete` and `complete_inline_only` inline arrays enter this path.
+Seeded/pending/marker/unknown states remain unresolved. A bounded 256-entry scan
+resolves later UUID replacements before the existing 20-source projection, so a
+late deletion/PCA replacement cannot leave an earlier downloadable file. Oversized
+graphs are withheld, not partially authorized. Partial, masked or unresolved
+graphs set the existing truncated flag; the native sheet already renders that
+as a partial list instead of a confirmed empty list. Legacy/per-file lists are
+not substituted for the selected context-citation surface.
+
+The existing concrete-file, deletion, PCA, library/project and scope validators,
+opaque handles, same-origin metadata/authorization and Android download owner
+remain in use. No new request, DOM lookup, source-URL fetch or system substitute
+was added. The native-row fixture proves scoped GETs and old-handle revocation;
+its save acknowledgement is synthetic, not measured phone bytes.
+
+Five new regressions first failed (`inline-context-citation-red-20260911-142837-381`,
+69/74 passed). The fix passed 74 focused cases and 208 related runner cases,
+plus 12 history projection internal assertions; zero failures/skips/cancellations.
+Logs: `inline-context-citation-green-20260911-142940-982` and final
+`inline-context-citation-final-20260911-143537-457`. All 114 production assets
+and their combined bundle parse; this is not Android compilation or installation.
+
+Full PCA/supplemented sources are **not implemented by this change**. Public
+`l5i` (4116972) uses POST `/backend-api/sidebar/conversation_context_sources`
+with conversation/message identity and `expand_partial_inline`; its stream
+includes `conversation_context_source` and `pca_source_filter_mask`. `c5i`
+(4116628) controls when supplementation is required, while `JVi` (3760794)
+applies the returned source mask. That separate lifecycle still needs a real
+controlled response and matching integration; an endpoint name alone does not
+justify enabling it or removing PCA filtering. Resume the remaining source
+and native acceptance gaps without resending accepted personal/project fixtures.
 
 ## Current resolver correction
 
