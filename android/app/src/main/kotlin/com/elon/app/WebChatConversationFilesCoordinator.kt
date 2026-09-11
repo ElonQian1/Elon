@@ -7,9 +7,19 @@ import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptWebConversation
 
 internal object WebChatConversationFilesPresentation {
-    fun rows(index: WebChatConversationFileIndex?, loading: Boolean, failed: Boolean): List<WebChatActionSheetItem> = buildList {
+    fun rows(index: WebChatConversationFileIndex?, loading: Boolean, failed: Boolean,
+        failureDetail: String? = null): List<WebChatActionSheetItem> = buildList {
         val status = when {
-            failed -> "读取失败，可重试"
+            failed -> when (failureDetail) {
+                "files_read_timeout" -> "读取超时，可重试"
+                "files_read_network" -> "网络连接中断，可重试"
+                "files_read_rate_limit" -> "请求过于频繁，请稍后重试"
+                "files_read_cooldown" -> "请稍后重试"
+                "files_identity_unavailable" -> "登录状态需要确认"
+                "files_read_parse" -> "附件数据暂时无法解析"
+                "files_read_http" -> "官网读取失败，请稍后重试"
+                else -> "读取失败，可重试"
+            }
             loading -> "正在更新"
             index == null -> "尚未读取"
             index.truncated -> "部分附件"
@@ -48,11 +58,46 @@ internal class WebChatConversationFilesCoordinator(
         var index = owner.conversationFiles(conversation.path)
         val needsRefresh = force || index?.isFresh(System.currentTimeMillis()) != true
         var selected: WebChatConversationFile? = null
+        fun refresh() {
+            if (currentEpoch != epoch || consumerPort() !== owner || sheet == null || pollTask != null) return
+            sheet?.updateItems(WebChatConversationFilesPresentation.rows(index, true, false))
+            val request = owner.requestConversationFiles(conversation.path)
+            if (!request.accepted || request.requestId == null) {
+                sheet?.updateItems(WebChatConversationFilesPresentation.rows(index, false, true, request.error))
+                return
+            }
+            val startedAt = android.os.SystemClock.elapsedRealtime()
+            val task = object : Runnable {
+                override fun run() {
+                    if (currentEpoch != epoch || sheet == null || consumerPort() !== owner) return
+                    val result = owner.conversationFiles(conversation.path)
+                    val command = owner.state().commandRequests.firstOrNull { it.id == request.requestId }
+                    val status = command?.status
+                    if (result?.requestId == request.requestId) {
+                        index = result
+                        sheet?.updateItems(WebChatConversationFilesPresentation.rows(index, false, false))
+                        pollTask = null
+                        return
+                    }
+                    if (status in setOf(WebChatConsumerCommandStatus.FAILED, WebChatConsumerCommandStatus.TIMED_OUT,
+                            WebChatConsumerCommandStatus.SUCCEEDED) || android.os.SystemClock.elapsedRealtime() - startedAt >= 15_000) {
+                        val reason = if (status == WebChatConsumerCommandStatus.TIMED_OUT ||
+                            android.os.SystemClock.elapsedRealtime() - startedAt >= 15_000) "files_read_timeout" else command?.detail
+                        sheet?.updateItems(WebChatConversationFilesPresentation.rows(index, false, true, reason))
+                        pollTask = null
+                        return
+                    }
+                    host.postDelayed(this, 250)
+                }
+            }
+            pollTask = task
+            host.post(task)
+        }
         sheet = WebChatActionSheet.showUpdatable(activity, "会话附件",
             WebChatConversationFilesPresentation.rows(index, needsRefresh, false),
             footerActions = buildList {
-                add(WebChatActionSheetFooterAction("刷新", "web-chat-conversation-files-refresh") {
-                    host.post { if (currentEpoch == epoch && consumerPort() === owner) show(conversation, force = true) }
+                add(WebChatActionSheetFooterAction("刷新", "web-chat-conversation-files-refresh", dismissOnClick = false) {
+                    host.post { refresh() }
                 })
                 owner.fileDownloadState()?.let { download ->
                     add(WebChatActionSheetFooterAction("下载进度", "web-chat-conversation-files-download-progress") {
@@ -77,35 +122,7 @@ internal class WebChatConversationFilesCoordinator(
             val position = item.id.removePrefix("file-").toIntOrNull()
             selected = position?.let { index?.files?.getOrNull(it) }
         }
-        if (sheet == null || !needsRefresh) return
-        val request = owner.requestConversationFiles(conversation.path)
-        if (!request.accepted || request.requestId == null) {
-            sheet?.updateItems(WebChatConversationFilesPresentation.rows(index, false, true))
-            return
-        }
-        val startedAt = android.os.SystemClock.elapsedRealtime()
-        val task = object : Runnable {
-            override fun run() {
-                if (currentEpoch != epoch || sheet == null || consumerPort() !== owner) return
-                val result = owner.conversationFiles(conversation.path)
-                val status = owner.state().commandRequests.firstOrNull { it.id == request.requestId }?.status
-                if (result?.requestId == request.requestId) {
-                    index = result
-                    sheet?.updateItems(WebChatConversationFilesPresentation.rows(index, false, false))
-                    pollTask = null
-                    return
-                }
-                if (status in setOf(WebChatConsumerCommandStatus.FAILED, WebChatConsumerCommandStatus.TIMED_OUT,
-                        WebChatConsumerCommandStatus.SUCCEEDED) || android.os.SystemClock.elapsedRealtime() - startedAt >= 15_000) {
-                    sheet?.updateItems(WebChatConversationFilesPresentation.rows(index, false, true))
-                    pollTask = null
-                    return
-                }
-                host.postDelayed(this, 250)
-            }
-        }
-        pollTask = task
-        host.post(task)
+        if (needsRefresh) refresh()
     }
 
     private fun showFile(file: WebChatConversationFile, conversation: ChatGptWebConversation) {

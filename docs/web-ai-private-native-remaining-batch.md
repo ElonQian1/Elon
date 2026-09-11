@@ -31,6 +31,8 @@ a functional acceptance gate; do not expand performance tests in this phase.
 The [latest runtime compatibility repair](reports/chatgpt-runtime-bindings-20260911-b.md)
 is verified on 1655. Personal/project TXT citation downloads passed on 1651/1657;
 reuse [accepted scopes](chatgpt-private-file-citations.md), not the old 404 label.
+[File-list recovery](reports/chatgpt-file-read-recovery-20260911.md) addresses
+manual retry cooldown and refresh-sheet dismissal; candidate acceptance is pending.
 
 This summary supersedes older delivery labels below; it does not broaden a
 passed scope. Bounded ordinary/project directory continuation is now completed,

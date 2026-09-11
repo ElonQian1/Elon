@@ -28,6 +28,45 @@ class WebChatConversationFilesPresentationTest {
         assertEquals("部分附件", partial.title)
     }
 
+    @Test fun failuresKeepCachedRowsAndOnlyRenderKnownSafeMessages() {
+        val expected = mapOf(
+            "files_read_timeout" to "读取超时，可重试",
+            "files_read_network" to "网络连接中断，可重试",
+            "files_read_rate_limit" to "请求过于频繁，请稍后重试",
+            "files_read_cooldown" to "请稍后重试",
+            "files_identity_unavailable" to "登录状态需要确认",
+            "files_read_parse" to "附件数据暂时无法解析",
+            "files_read_http" to "官网读取失败，请稍后重试",
+            "untrusted-server-detail" to "读取失败，可重试",
+        )
+        for ((detail, title) in expected) {
+            val rows = WebChatConversationFilesPresentation.rows(index, false, true, detail)
+            assertEquals(title, rows[0].title)
+            assertEquals("web-chat-conversation-files-status", rows[0].contentDescription)
+            assertEquals("sample.pdf", rows[1].title)
+            assertTrue(rows[1].enabled)
+            assertFalse(rows[0].enabled)
+        }
+    }
+
+    @Test fun refreshKeepsItsSheetAndPendingReadWhileOtherFooterActionsStillDismiss() {
+        assertTrue(WebChatActionSheetFooterAction("Open", "open") {}.dismissOnClick)
+        assertFalse(WebChatActionSheetFooterAction("Refresh", "refresh", dismissOnClick = false) {}.dismissOnClick)
+        val root = generateSequence(java.nio.file.Paths.get("").toAbsolutePath()) { it.parent }
+            .first { java.nio.file.Files.isDirectory(it.resolve("android/app/src/main/kotlin/com/elon/app")) }
+            .resolve("android/app/src/main/kotlin/com/elon/app")
+        val coordinator = String(java.nio.file.Files.readAllBytes(root.resolve("WebChatConversationFilesCoordinator.kt")), Charsets.UTF_8)
+        val sheet = String(java.nio.file.Files.readAllBytes(root.resolve("WebChatActionSheet.kt")), Charsets.UTF_8)
+        assertTrue(sheet.contains("if (action.dismissOnClick) dialog.dismiss()"))
+        assertTrue(coordinator.contains("\"web-chat-conversation-files-refresh\", dismissOnClick = false"))
+        val refresh = coordinator.substringAfter("fun refresh() {").substringBefore("sheet = WebChatActionSheet")
+        assertTrue(refresh.contains("pollTask != null) return"))
+        assertTrue(refresh.contains("currentEpoch != epoch || consumerPort() !== owner"))
+        assertFalse(refresh.contains("show(conversation"))
+        assertFalse(refresh.contains("cancel()"))
+        assertTrue(refresh.contains("sheet?.updateItems"))
+    }
+
     @Test fun productionLifecycleClosesConversationSheetsWithoutInstantiatingInactiveFeatures() {
         val sourcePath = generateSequence(java.nio.file.Paths.get("").toAbsolutePath()) { it.parent }
             .map { it.resolve("android/app/src/main/kotlin/com/elon/app/MainSocialAiChatFeature.kt") }

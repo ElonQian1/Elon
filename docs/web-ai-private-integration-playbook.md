@@ -104,6 +104,7 @@ WebView 身份与官网运行时按操作提供依赖；不是每次命令都重
 | 未读到 DOM 被记为成功的空图片库，六小时内不再刷新 | unknown 不落成 authoritative empty；只有完整有效响应能确认空结果 | [历史契约中的图库修复](chatgpt-private-history-native-contract.md) |
 | 请求在响应头到达就取消超时，body 卡住后一直 busy；超时项目请求迟到覆盖新目录 | deadline 覆盖 body/解析；取消与 settle 有界，晚回调核对 owner/epoch | [生命周期](chatgpt-private-request-lifetime.md) |
 | 显式项目成员读取复用了两分钟后台预取新鲜度门槛 | 显式账户读取用自己的准入；后台节流不应拒绝用户的有效操作 | [项目附件后续](reports/chatgpt-project-media-1614.md) |
+| 用户重试沿用后台长冷却，刷新又关闭面板取消观察 | 区分手动恢复和自动重试；瞬时网络故障允许短等待后手动重试，保留认证/限流保护。刷新原位更新并复用请求，不只验证底层 HTTP 去重 | [附件列表恢复](reports/chatgpt-file-read-recovery-20260911.md) |
 | 只收到上传 reservation 200，没有上传字节；绕过原生选择器的 control 却成功 | 分开证明选择、建文件、传字节、处理完成、消息关联和内容可读 | [上传研究](chatgpt-private-attachment-upload.md) |
 | 项目文件目录被当作个人文件库，下载 404；修正 scope 后，客户端单参数限制又误拒绝带两个参数的官网授权地址 | 保留目录、实际文件和项目来源；使用官网返回的地址，校验来源和 ID，保留授权参数，不拿预览 URL 模板限制下载 URL。逐层诊断到原生落盘，不能只看授权 200。1648 已实测保存和 PNG 解码通过，不重复研究 | [项目文件下载](reports/chatgpt-library-folder-download-1644.md) |
 | 响应 MIME 为 SSE，实际上传处理 body 是 NDJSON；进度 100 也不等于最终处理完成 | 以实际 framing 和终止事件为准，按 file ID 校验最终回执 | [上传研究](chatgpt-private-attachment-upload.md) |

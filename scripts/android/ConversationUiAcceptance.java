@@ -39,6 +39,13 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
         return text("\u5168\u90e8\u516c\u5f00\u5206\u4eab\u94fe\u63a5").exists() ||
             text("\u5168\u90e8\u516c\u5f00\u5206\u4eab\u94fe\u63a5\uff08\u90e8\u5206\uff09").exists();
     }
+    private int windowId(UiObject node) throws Exception {
+        java.lang.reflect.Method method = UiObject.class.getDeclaredMethod("findAccessibilityNodeInfo", long.class);
+        method.setAccessible(true);
+        AccessibilityNodeInfo info = (AccessibilityNodeInfo) method.invoke(node, 0L);
+        assertNotNull("refresh_window_missing", info);
+        try { return info.getWindowId(); } finally { info.recycle(); }
+    }
     private String retrySelector() {
         String selector = new String(android.util.Base64.decode(
             getParams().getString("selector_b64", ""), android.util.Base64.DEFAULT),
@@ -96,6 +103,7 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
         assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
         String step = getParams().getString("step", "inspect");
         JSONObject replyActions = null;
+        JSONObject refreshEvidence = null;
         switch (step) {
             case "model":
                 click(modelButton());
@@ -136,6 +144,22 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                 assertTrue("conversation_files_missing", description("web-chat-conversation-files-status").waitForExists(5000));
                 break;
             case "files_refresh": click(description("web-chat-conversation-files-refresh")); break;
+            case "files_refresh_stable":
+                UiObject refresh = description("web-chat-conversation-files-refresh");
+                int beforeWindow = windowId(refresh);
+                boolean hadRows = description("web-chat-conversation-file-0").exists();
+                int loadingSamples = 0;
+                for (int tap = 0; tap < 3; tap++) {
+                    click(refresh);
+                    Thread.sleep(80);
+                    assertEquals("refresh_replaced_sheet", beforeWindow, windowId(refresh));
+                    assertTrue("refresh_status_missing", description("web-chat-conversation-files-status").exists());
+                    if (hadRows) assertTrue("refresh_dropped_cached_rows", description("web-chat-conversation-file-0").exists());
+                    if (text("\u6b63\u5728\u66f4\u65b0").exists()) loadingSamples++;
+                }
+                refreshEvidence = new JSONObject().put("taps", 3).put("same_window", true)
+                    .put("cached_rows", hadRows).put("loading_samples", loadingSamples);
+                break;
             case "file_row":
                 int fileIndex = Integer.parseInt(getParams().getString("file_index", "-1"));
                 assertTrue("invalid_file_index", fileIndex >= 0 && fileIndex < 160);
@@ -178,6 +202,7 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
         }
         JSONObject result = new JSONObject().put("step", step)
             .put("reply_actions", replyActions)
+            .put("refresh", refreshEvidence)
             .put("file_index_visible", description("web-chat-conversation-files-status").exists())
             .put("file_index_first_row", description("web-chat-conversation-file-0").exists())
             .put("file_index_empty", text("\u6b64\u4f1a\u8bdd\u6682\u65e0\u9644\u4ef6").exists())

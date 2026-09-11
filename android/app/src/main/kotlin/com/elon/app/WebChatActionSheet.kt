@@ -25,6 +25,7 @@ internal data class WebChatActionSheetItem(
 internal data class WebChatActionSheetFooterAction(
     val label: String,
     val contentDescription: String,
+    val dismissOnClick: Boolean = true,
     val action: () -> Unit,
 )
 
@@ -103,7 +104,7 @@ internal object WebChatActionSheet {
             if (footerActions.isNotEmpty()) addView(footer(activity, footerActions) { action ->
                 handled = true
                 action.action()
-                dialog.dismiss()
+                if (action.dismissOnClick) dialog.dismiss()
             })
         }
         renderItems(items)
