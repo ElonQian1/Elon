@@ -289,15 +289,31 @@ try {
     $report.download_attempts=1; $downloadOpen=$true
     Ui 'download' -Download | Out-Null
     $detailOpen=$false
-    $result=Ui 'wait_download' -Download
+    $result=Ui 'wait_download_handoff' -Download
     $w=Web
     $receipt=@($w.command_requests | Where-Object {
         $_.request_id -notin $idsBefore -and $_.expected_web_action -eq 'download_conversation_file'
     }) | Select-Object -Last 1
-    if ($receipt.status -ne 'succeeded' -or $receipt.result.detail -ne 'download_saved' -or -not $result.download_saved) {throw 'download_save_unconfirmed'}
-    $created=@(Saved | Where-Object {$_ -notin $savedBefore})
-    if ($created.Count -ne 1) {throw 'saved_fixture_not_unique'}
-    $report.storage=Confirm-Saved $created[0]
+    $savedReceipt=$receipt.result.detail -eq 'download_saved' -and $result.download_saved
+    $queuedReceipt=$receipt.result.detail -eq 'download_queued' -and $result.download_queued
+    if ($receipt.status -ne 'succeeded' -or -not ($savedReceipt -or $queuedReceipt)) {throw 'download_save_unconfirmed'}
+    $report.native_download_handoff=$queuedReceipt
+    # A system handoff is not proof of saving. Require a new file with the exact fixture bytes.
+    $deadline=[DateTimeOffset]::UtcNow.AddSeconds(25)
+    $verifiedStorage=$null
+    do {
+        $created=@(Saved | Where-Object {$_ -notin $savedBefore})
+        if ($created.Count -gt 1) {throw 'saved_fixture_not_unique'}
+        if ($created.Count -eq 1) {
+            try {$verifiedStorage=Confirm-Saved $created[0]} catch {
+                if ($_.Exception.Message -notin @('saved_fixture_hash_mismatch','saved_fixture_size_mismatch')) {throw}
+            }
+        }
+        if ($verifiedStorage) {break}
+        Start-Sleep -Milliseconds 500
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    if (-not $verifiedStorage) {throw 'download_bytes_unconfirmed'}
+    $report.storage=$verifiedStorage
     $report.native_download_saved=$true
     Ui 'close_download' -Download | Out-Null
     $downloadOpen=$false

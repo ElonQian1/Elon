@@ -307,17 +307,21 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
                 assertTrue("download_status_missing", description("web-chat-file-download-status").waitForExists(8000));
                 break;
             case "wait_download":
+            case "wait_download_handoff":
+                boolean allowHandoff = step.equals("wait_download_handoff");
                 long deadline = android.os.SystemClock.elapsedRealtime() + 25000;
                 while (android.os.SystemClock.elapsedRealtime() < deadline) {
                     assertTrue("download_status_missing", description("web-chat-file-download-status").exists());
                     String value = description("web-chat-file-download-status").getText();
                     if (value.equals("\u5df2\u4fdd\u5b58\u5230\u4e0b\u8f7d\u76ee\u5f55")) break;
+                    if (allowHandoff && value.equals("\u5df2\u4ea4\u7ed9\u7cfb\u7edf\u4e0b\u8f7d")) break;
                     assertTrue("download_failed_or_unconfirmed", value.equals("\u6b63\u5728\u51c6\u5907\u4e0b\u8f7d") ||
                         value.equals("\u6b63\u5728\u4e0b\u8f7d") || value.equals("\u6b63\u5728\u4fdd\u5b58"));
                     Thread.sleep(500);
                 }
-                assertEquals("download_not_saved", "\u5df2\u4fdd\u5b58\u5230\u4e0b\u8f7d\u76ee\u5f55",
-                    description("web-chat-file-download-status").getText());
+                String terminalDownload = description("web-chat-file-download-status").getText();
+                assertTrue("download_not_saved", terminalDownload.equals("\u5df2\u4fdd\u5b58\u5230\u4e0b\u8f7d\u76ee\u5f55") ||
+                    (allowHandoff && terminalDownload.equals("\u5df2\u4ea4\u7ed9\u7cfb\u7edf\u4e0b\u8f7d")));
                 break;
             case "close_download":
                 click(description("web-chat-file-download-collapse"));
@@ -393,6 +397,8 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         result.put("download_status_visible", downloadStatus.exists());
         result.put("download_saved", downloadStatus.exists() && downloadStatus.getText().equals(
             "\u5df2\u4fdd\u5b58\u5230\u4e0b\u8f7d\u76ee\u5f55"));
+        result.put("download_queued", downloadStatus.exists() && downloadStatus.getText().equals(
+            "\u5df2\u4ea4\u7ed9\u7cfb\u7edf\u4e0b\u8f7d"));
         result.put("download_cancel_visible", description("web-chat-file-download-cancel").exists());
         result.put("download_progress_visible", description("web-chat-file-download-progress").exists());
         result.put("download_bytes_visible", description("web-chat-file-download-bytes").exists());

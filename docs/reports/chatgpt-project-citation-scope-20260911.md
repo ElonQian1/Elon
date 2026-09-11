@@ -92,6 +92,8 @@ The direct-path regression failed on v26, then the related 183 cases passed
 on v27. Additional rejection tests cover 403/404/429/500 without replay.
 Logs: `citation-direct-authorization-red-20260911-121008-848` and
 `citation-direct-authorization-green-20260911-121032-166`.
+The final seven-file set including rejection cases passed all 187 tests:
+`citation-direct-authorization-final-20260911-121136-001`.
 
 ## Verification
 
@@ -118,3 +120,15 @@ refresh. Fresh project fixtures have a local checkpoint and an explicit reuse
 mode; a retained checkpoint prevents a second upload/send. `FixtureCheckpoint`
 allows retaining this navigation-only artifact outside a disposable worktree.
 Downloads still use the native UI button and require saved-byte/hash evidence.
+
+The byte sink has two legitimate outcomes: same-origin transfers report saved,
+while authorized external URLs are handed to Android DownloadManager. The
+previous UI waiter rejected that queued state immediately, before checking
+storage. It therefore did not prove that the original attachment control failed
+to transfer. A later read-only check found six retained fixed TXT fixtures with
+matching hashes; it cannot attribute those files to a particular earlier run.
+The citation harness now explicitly accepts either confirmed handoff or saved
+receipt, then waits at most 25 seconds for exactly one newly created file with
+the expected 78 bytes and SHA-256. Queued alone never passes. Other existing
+acceptance callers retain the strict saved-state waiter. The PowerShell contract
+and Java semantic harness compile passed after this correction.

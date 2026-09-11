@@ -10,7 +10,7 @@ foreach ($required in @(
     'Test-WebChatNativeChatSurfaceForeground','Start-ChatGptWebSmokeAwakeLease','Stop-ChatGptWebSmokeAwakeLease',
     "Act 'start_new_web_chat_conversation'",'ordinary_chat_required',"Act 'send_input'",
     'fixed_ascii_text_v1','assistant_fixture_citation_unavailable','saved_fixture_hash_mismatch',
-    "Ui 'current_settings'","Ui 'file_row'","Ui 'download' -Download","Ui 'wait_download' -Download",
+    "Ui 'current_settings'","Ui 'file_row'","Ui 'download' -Download","Ui 'wait_download_handoff' -Download",
     'download_save_unconfirmed','saved_fixture_not_unique','operation_still_active','changed_draft_preserved',
     'conversation_path=$origin.social_chat.web_chat_conversation_path',
     '$report.passed -and $report.restored -and $report.awake_restored',
@@ -29,6 +29,8 @@ foreach ($required in @(
     '$blankRoute -and $w.composer_ready','-not $url.Query -and -not $url.Fragment'
     'project-citation-download-fixture.json','Select-Object state,received_bytes,total_bytes,can_cancel'
     'fresh_fixture_exists_use_reuse','if ($FixtureCheckpoint)',"mode='file_download_source'"
+    '$queuedReceipt','download_queued','if (-not $verifiedStorage)', 'download_bytes_unconfirmed'
+    '$report.storage=$verifiedStorage','$_ -notin $savedBefore','Confirm-Saved $created[0]'
 )) {if (-not $source.Contains($required)) {throw "citation_acceptance_guard_missing: $required"}}
 if ([regex]::Matches($source,"Act 'send_input'").Count -ne 2 -or
     [regex]::Matches($source,"Ui 'download' -Download").Count -ne 1) {throw 'citation_acceptance_write_replay'}
@@ -38,6 +40,10 @@ foreach ($forbidden in @('chatgpt_download_conversation_file','chatgpt_delete_',
 $java=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'android/ConversationUiAcceptance.java') -Raw
 if (-not $java.Contains('fileIndex >= 0 && fileIndex < 160') -or
     -not $java.Contains('click(description("web-chat-conversation-file-" + fileIndex))')) {throw 'citation_native_row_guard_missing'}
+$downloadJava=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'android/LibraryUiAcceptance.java') -Raw
+if (-not $downloadJava.Contains('case "wait_download_handoff":') -or
+    -not $downloadJava.Contains('boolean allowHandoff = step.equals("wait_download_handoff");') -or
+    -not $downloadJava.Contains('result.put("download_queued"')) {throw 'citation_handoff_guard_missing'}
 $fixture=Get-Content -LiteralPath (Join-Path $PSScriptRoot '../android/app/src/main/kotlin/com/elon/app/ChatGptWebAcceptanceAttachmentFixture.kt') -Raw
 $literal=[regex]::Match($fixture,'private const val CONTENT = ("(?:\\.|[^"\\])*")').Groups[1].Value
 $bytes=[Text.Encoding]::UTF8.GetBytes(($literal | ConvertFrom-Json))
