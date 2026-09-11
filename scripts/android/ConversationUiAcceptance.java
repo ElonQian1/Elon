@@ -95,6 +95,19 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             .put("skin_exit", description("web-chat-skin-exit:chatgpt").exists())
             .put("buttons", buttons);
     }
+    private JSONObject modelRange() throws Exception {
+        UiObject slider = description("web-chat-model-level-slider");
+        if (!slider.exists()) return null;
+        java.lang.reflect.Method method = UiObject.class.getDeclaredMethod("findAccessibilityNodeInfo", long.class);
+        method.setAccessible(true);
+        AccessibilityNodeInfo info = (AccessibilityNodeInfo) method.invoke(slider, 1000L);
+        if (info == null) return null;
+        try {
+            AccessibilityNodeInfo.RangeInfo range = info.getRangeInfo();
+            return range == null ? null : new JSONObject().put("min", range.getMin())
+                .put("max", range.getMax()).put("current", range.getCurrent());
+        } finally { info.recycle(); }
+    }
     private void setModelLevel() throws Exception {
         UiObject slider = description("web-chat-model-level-slider");
         assertTrue("model_level_slider_missing", slider.waitForExists(5000));
@@ -243,6 +256,7 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             .put("model_button", modelButton().exists())
             .put("model_menu", description("web-chat-model-control").exists())
             .put("level_slider", description("web-chat-model-level-slider").exists())
+            .put("model_range", modelRange())
             .put("model_advanced", description("web-chat-model-advanced").exists())
             .put("model_preset", description("web-chat-model-preset:auto").exists())
             .put("image_option", description("web-chat-composer-tool:chatgpt_web:image_generation").exists())

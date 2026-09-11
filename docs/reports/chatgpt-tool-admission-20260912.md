@@ -72,5 +72,31 @@ guards, scan arbitrary message text or add another model store.
 
 All **90 focused Node cases passed** after the repair, including private model
 selection and restrictions. This is a scoped repair within the existing model
-capability. Updated device selection/restore verification is pending;
-Study/Canvas remain incomplete.
+capability; Study/Canvas remain incomplete.
+
+## Normal 1673 Native Acceptance
+
+Normal **1.1.1673 (1673)**, source `4dfed0941`, adapter 357, was built, published
+and installed on the same Xiaomi. APK: 40,175,178 bytes, SHA-256
+`2e2b2e32a9741a094b0f77eed5a78d5c3f8fc0a106f4d84648453be3bdc81e4b`.
+The publisher verified the remote artifact and installed package version.
+
+`smoke-chatgpt-web-instant-model.ps1` uses the existing external semantic runner
+to move the production native slider. **Passed**: Instant selected, subsequent
+private model catalogue still available, `model_runtime_context:ready`, original
+Extra High restored, conversation/draft/awake policy unchanged, zero messages.
+Log group: `instant-native-1673-confirm`. Reuse this accepted repair without
+another build or broader model matrix unless new regression evidence appears.
+
+The first native attempt timed out because the new harness incorrectly waited
+for `command_requests`: native `ChatGptBackgroundSession.selectModel` dispatches
+directly to the page adapter without allocating an MCP request ID. The harness
+now checks a fresh `last_command` selection receipt plus the actual private
+selected-state readback. The corrected test passed on the **same APK**; no app
+code or republish was needed for that harness correction. The external runner
+also reports only numeric slider min/max/current for structural diagnosis.
+
+Do not confuse request registration with execution: an absent MCP request row
+does not prove a native gesture failed. Conversely, a success receipt alone is
+not acceptance; the native gesture and confirmed destination/restored state are
+both required. Study/Canvas's separate missing raw hints remain unresolved.

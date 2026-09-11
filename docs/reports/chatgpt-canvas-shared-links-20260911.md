@@ -65,3 +65,14 @@ not only the outer process exit code. No APK was packaged for this source batch.
 cancellation and rendered UI acceptance remain pending, using a disposable link
 owned by the test. Do not revoke an existing personal link merely for testing.
 This source batch follows the grouped-build workflow; it is not a device pass.
+
+## September 12 Grouped Device Read
+
+The module shipped in normal **1.1.1672**, adapter 356, source `f5229dce2`.
+The pinned Xiaomi's production MCP `chatgpt_share_conversation` action with
+`operation=list_account` and `resource=canvas` returned a valid
+`elon.canvas_shares.v1` receipt: **3 rows**, complete, offset zero, no next page.
+No write was issued and no link identifier, URL or source text was exported.
+This verifies the authenticated private list and native receipt parsing, not
+rendered list interaction, Copy or cancellation. Do not revoke those existing
+personal links for acceptance. The full capability remains `completed=false`.
