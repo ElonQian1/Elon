@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 22, create: factory });
+  const exported = Object.freeze({ version: 23, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -63,7 +63,9 @@
       const slug = props.currentModelId ?? props.currentModelConfig?.id;
       if (typeof slug !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(slug)) return null;
       const policy = { modelSlug: slug,
-        libraryEnabled: props.entrySurface === 'chat_composer' && props.isLibraryEnabled === true };
+        libraryEnabled: props.entrySurface === 'chat_composer' && props.isLibraryEnabled === true,
+        libraryProjectId: props.isProjectEnabledForGizmo === true && props.libraryEligibilityReason === 'eligible' &&
+          /^g-p-[a-f0-9]{32}$/i.test(props.gizmoId || '') ? props.gizmoId : null };
       candidates.set(JSON.stringify(policy), policy);
     }
     return candidates.size === 1 ? candidates.values().next().value : null;
@@ -100,7 +102,8 @@
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '') || !account) throw new Error('composer_context_unavailable');
     const policy = composerPolicy();
     const binding = Object.freeze({ store: resolveStore(), href: root.location.href, token, account,
-      model: model(), modelSlug: policy?.modelSlug ?? null, libraryEnabled: policy?.libraryEnabled === true, ...route() });
+      model: model(), modelSlug: policy?.modelSlug ?? null, libraryEnabled: policy?.libraryEnabled === true,
+      libraryProjectId: policy?.libraryProjectId ?? null, ...route() });
     if (binding.conversationId === null && !binding.projectId) confirmed.add(binding);
     return binding;
   }
@@ -171,6 +174,7 @@
         root.__elonChatGptDocumentToken === binding.token && identity() === binding.account &&
         (!checkModel || model() === binding.model && (policy?.modelSlug ?? null) === binding.modelSlug &&
           (policy?.libraryEnabled === true) === binding.libraryEnabled &&
+          (policy?.libraryProjectId ?? null) === binding.libraryProjectId &&
           projects.get(binding)?.thread?.current() !== false) &&
         resolveStore() === binding.store;
     } catch (_) { return false; }
@@ -257,16 +261,20 @@
 
   function associateLibrary(binding, item) {
     if (!current(binding) || !confirmed.has(binding) || !binding.libraryEnabled || binding.isTemporaryChat ||
-        binding.projectId || projects.has(binding) || item?.attached?.source !== 'library') {
+        (projects.get(binding)?.projectId || null) !== binding.libraryProjectId || item?.attached?.source !== 'library') {
       throw new Error('library_attachment_scope_unconfirmed');
     }
     return publish(binding, [item]);
   }
 
-  function captureCollection() {
+  function captureCollection(allowProject = false) {
     const value = attachedNow();
     const binding = value?.binding || capture();
-    if (!binding.libraryEnabled || binding.isTemporaryChat || binding.projectId || projects.has(binding)) {
+    const expected = allowProject ? binding.libraryProjectId : null;
+    if (!binding.libraryEnabled || binding.isTemporaryChat ||
+        binding.libraryProjectId && !allowProject ||
+        binding.projectId && binding.projectId !== expected ||
+        projects.has(binding) && projects.get(binding).projectId !== expected) {
       throw new Error('library_attachment_scope_unconfirmed');
     }
     const lease = value ? prepareSubmit(binding.store) : null;
@@ -276,7 +284,7 @@
   }
 
   function captureUpload() {
-    const { value, binding, unchanged } = captureCollection();
+    const { value, binding, unchanged } = captureCollection(true);
     if (!value) throw new Error('composer_context_unavailable');
     return Object.freeze({ binding, current: unchanged,
       associateMany(completed) {
@@ -296,15 +304,20 @@
   }
 
   function captureLibrary() {
-    const { value, binding, unchanged } = captureCollection();
+    const { value, binding, unchanged } = captureCollection(true);
+    const scopeMatches = () => (projects.get(binding)?.projectId || null) === binding.libraryProjectId;
     function contains(source) {
       return unchanged() && (value?.items || []).some(({ attached }) =>
         (/^libfile[_-]/.test(source.id || '') && attached.fileId === source.file_id) || attached.fileId === source.id ||
         attached.libraryFileId === source.id || attached.mountedLibraryFileId === source.id);
     }
     return Object.freeze({ binding, count: value?.items.length || 0, current: unchanged, contains,
+      async prepare(signal, descriptor) {
+        if (!unchanged() || !await prepare(binding, signal, descriptor, false, !!binding.libraryProjectId)) return false;
+        return unchanged() && scopeMatches();
+      },
       associate(item) {
-        if (!unchanged() || !confirmed.has(binding) || item?.attached?.source !== 'library') {
+        if (!unchanged() || !confirmed.has(binding) || !scopeMatches() || item?.attached?.source !== 'library') {
           throw new Error('composer_changed');
         }
         return publish(binding, [item], value, unchanged);
@@ -429,5 +442,5 @@
     } catch (_) { return null; }
   }
 
-  return Object.freeze({ version: 22, available, capture, captureLibrary, captureUpload, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, associateLibrary, merge, remove, prepareSubmit });
+  return Object.freeze({ version: 23, available, capture, captureLibrary, captureUpload, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, associateLibrary, merge, remove, prepareSubmit });
 });

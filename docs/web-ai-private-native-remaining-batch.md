@@ -52,7 +52,7 @@ is device-verified for empty/populated file indexes and native Refresh on 1649.
 Reuse it; this does not prove idle membership, citation or mounted-file variants.
 Personal raster download is accepted on 1666; native reference/removal and rename
 are [accepted/default-enabled on 1667](reports/chatgpt-library-raster-actions-20260911.md).
-Raster deletion remains offline-only; conditional project reference is still missing.
+Raster deletion remains offline-only; [project reference is implemented, pending device](reports/chatgpt-project-library-reference-20260911.md).
 
 | User workflow | Current result | Remaining boundary |
 |---|---|---|

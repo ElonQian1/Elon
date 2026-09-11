@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 8, operationTimeoutMs: 24000, create: factory });
+  const exported = Object.freeze({ version: 9, operationTimeoutMs: 24000, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateLibraryAttachment = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -78,7 +78,7 @@
       return respond(action, false, code);
     }
     const { binding } = context;
-    if (!binding.libraryEnabled || binding.isTemporaryChat || binding.projectId) {
+    if (!binding.libraryEnabled || binding.isTemporaryChat) {
       return respond(action, false, 'library_attachment_scope_unconfirmed');
     }
     const job = { controller: new root.AbortController() };
@@ -109,11 +109,11 @@
         if (remote && (consumed.has(input.fileHandle) || consumed.size >= 512)) {
           return [false, 'library_selection_expired'];
         }
-        const admit = context.count ? await policy?.prepare(root, binding) : () => true;
+        const admit = context.count || binding.libraryProjectId ? await policy?.prepare(root, binding) : () => true;
         if (!canAssociate()) return [false, 'library_attachment_context_changed'];
         if (!admit) return [false, 'library_attachment_policy_unconfirmed'];
         if (!admit(file)) return [false, 'library_attachment_limit'];
-        if (!await composer.prepare(binding, job.controller.signal, file, false, false) || !canAssociate()) {
+        if (!await context.prepare(job.controller.signal, file) || !canAssociate()) {
           return [false, 'library_attachment_context_changed'];
         }
         let item;
@@ -121,7 +121,7 @@
           // Consume this selected handle before the write; an unknown outcome is not replayed.
           consumed.set(input.fileHandle, Date.now());
           const prepared = await mounted.prepare(selection.source, id, job.controller.signal, canAssociate);
-          if (!await composer.prepare(binding, job.controller.signal, prepared.descriptor, false, false) ||
+          if (!await context.prepare(job.controller.signal, prepared.descriptor) ||
               !canAssociate()) return [false, 'library_attachment_context_changed'];
           if (!admit(prepared.descriptor)) return [false, 'library_attachment_limit'];
           item = prepared.item;

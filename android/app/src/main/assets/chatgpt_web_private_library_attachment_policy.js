@@ -1,7 +1,7 @@
 (function (root, prepare) {
   'use strict';
   const states = new WeakMap();
-  const api = Object.freeze({ version: 3,
+  const api = Object.freeze({ version: 4,
     prepare(page, binding) {
       const document = page.document, token = page.__elonChatGptDocumentToken;
       return prepare(page, binding, code => states.set(page, { document, token, code }));
@@ -64,8 +64,11 @@
     }
     if (matches !== 1) return reject('store_mismatch');
     if (!props?.conversation || props.composerDisabled !== false ||
-        props.isTemporaryChat !== false || props.isProjectThread === true || props.gizmoEditorMode === true ||
+        props.isTemporaryChat !== false || props.gizmoEditorMode === true ||
         props.loginModalGate?.shouldGateToLoginModal) return reject('scope_mismatch');
+    // Project recall is conditional in the official composer, not universally disabled.
+    if (binding.libraryProjectId ? props.isProjectThread !== true || props.libraryEligibilityReason !== 'eligible'
+      : props.isProjectThread === true) return reject('scope_mismatch');
     if ((props.currentModelId ?? props.currentModelConfig?.id) !== binding.modelSlug) return reject('model_mismatch');
     if (localUpload && props.isFileUploadEnabled !== true) return reject('upload_unavailable');
     const upload = props.maxLibraryAttachmentCount, total = props.maxTotalLibraryAttachmentCount;
