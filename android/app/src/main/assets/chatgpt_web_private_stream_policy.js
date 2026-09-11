@@ -391,12 +391,13 @@
         .map((line) => line.slice(5).trimStart())
         .join('\n')
         .trim();
-      if (!data) return;
+      if (!data || event === 'ping') return;
       if (data === '[DONE]') {
         complete();
         return;
       }
       if (decodeError) return;
+      if (typeof options.onEvent === 'function') options.onEvent();
       if (event === 'delta_encoding') {
         let encoding = data;
         try { encoding = JSON.parse(data); } catch (_) { /* The marker may be unquoted. */ }
@@ -440,12 +441,19 @@
 
     function finish() {
       if (closed) return;
+      if (options.requireDone === true) {
+        // A torn SSE event must be redelivered by the official resume stream.
+        buffer = '';
+        if (decodeError) complete();
+        else if (typeof onDone === 'function') onDone({ interrupted: true });
+        return;
+      }
       if (buffer.trim()) processEvent(buffer);
       buffer = '';
       if (!closed) complete();
     }
 
-    return Object.freeze({ push, finish });
+    return Object.freeze({ push, finish, resumable: () => !closed && !decodeError });
   }
 
   function conversationMatches(pathname, conversationId) {

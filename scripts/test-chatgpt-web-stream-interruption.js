@@ -28,8 +28,8 @@ function fixture(fetchResponse) {
   const location = { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/c/thread-one',
     pathname: '/c/thread-one' };
   const sandbox = { window: page, location, URL, TextDecoder };
-  for (const name of ['policy', 'transport']) vm.runInNewContext(fs.readFileSync(path.join(
-    __dirname, '../android/app/src/main/assets/chatgpt_web_private_stream_' + name + '.js'
+  for (const name of ['delta_document', 'stream_policy', 'stream_transport']) vm.runInNewContext(fs.readFileSync(path.join(
+    __dirname, '../android/app/src/main/assets/chatgpt_web_private_' + name + '.js'
   ), 'utf8'), sandbox);
   const api = page.__elonChatGptPrivateStreamTransport;
   return { api, page, location, reads, outcomes, calls: () => calls, released: () => released,
@@ -55,7 +55,7 @@ for (const error of ['AbortError', 'TypeError']) test(error + ' retains the rece
   const current = f.api.current(f.location.pathname);
   assert.ok(current, 'an interrupted reader must not erase the visible reply');
   assert.equal(current.text, 'Partial answer');
-  assert.equal(current.state, 'completed', 'the reader is no longer streaming');
+  assert.equal(current.state, 'streaming', 'a disconnected reader is not evidence of a completed answer');
   const merged = f.api.mergeMessages([{ id: 'user-one', role: 'user', content: [] }], f.location.pathname);
   assert.equal(merged.length, 2);
   assert.equal(merged[1].content[0].text, 'Partial answer');

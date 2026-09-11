@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 18) return;
+  if (existing && Number(existing.version) >= 19) return;
   if (existing && typeof existing.dispose === 'function') {
     try { existing.dispose(); }
     catch (_) { /* A stale transport must not block the upgraded observer. */ }
@@ -34,6 +34,7 @@
   let privateUser = null;
   let conversationGeneration = 0;
   let activeReader = null;
+  let continuation = null;
   let blockedConversationId = '';
   const ACCESS_SIGNAL_TTL_MS = 2 * 60 * 1000;
 
@@ -83,6 +84,7 @@
     const active = session.current(location.pathname);
     blockedConversationId = String(active && active.conversationId || '').slice(0, 180);
     conversationGeneration += 1;
+    continuation = null;
     retireReader();
     observedWidgets.clear();
     socketFrames = 0;
@@ -96,6 +98,7 @@
   function prepareSend() {
     blockedConversationId = '';
     conversationGeneration += 1;
+    continuation = null;
     retireReader();
     observedWidgets.clear();
     socketFrames = 0;
@@ -539,12 +542,25 @@
     try { url = new URL(String(event.url || ''), location.href); }
     catch (_) { return; }
     observeAccessResponse(event.method, url, event.response);
-    if (isOfficialConversationStream(event.method, url, event.response)) observe(event.response);
+    if (isOfficialConversationStream(event.method, url, event.response)) observe(event.response, event);
+    else if (event.resume && /^\/(?:backend-api|backend-anon)\/f\/conversation\/resume$/.test(url.pathname)) {
+      const originalUrl = new URL(url.href.replace(/\/resume$/, ''));
+      if (isOfficialConversationStream(event.method, originalUrl, event.response)) observe(event.response, event);
+    }
     else if (isOfficialStreamStatus(event.method, url, event.response)) observeStreamStatus(event.response);
   }
 
-  async function observe(response) {
+  async function observe(response, event = {}) {
     const observedGeneration = conversationGeneration;
+    const documentToken = String(window.__elonChatGptDocumentToken || '');
+    const resume = event.resume;
+    let owner = continuation;
+    if (resume && (!owner || !owner.valid || !owner.sse.resumable() ||
+        !documentToken || event.documentToken !== documentToken || owner.token !== documentToken ||
+        event.pathname !== location.pathname || owner.generation !== observedGeneration ||
+        event.requestId !== owner.requestId || resume.offset !== owner.offset ||
+        resume.conversationId !== owner.conversationId ||
+        !session.current(location.pathname))) return;
     const startedAt = Date.now();
     let frames = 0;
     let firstReported = false;
@@ -560,18 +576,31 @@
       ? clone.body.getReader()
       : null;
     if (!reader) return;
+    if (resume) owner.sse.finish();
     retireReader();
     activeReader = reader;
-    const isCurrent = () => !disposed && observedGeneration === conversationGeneration && activeReader === reader;
-    session.begin();
+    if (!resume) {
+      owner = { generation: observedGeneration, token: documentToken, requestId: event.requestId,
+        offset: 0, conversationId: '', valid: true, sse: null };
+      continuation = owner;
+      session.begin();
+    }
+    const ownsSession = () => !disposed && owner.valid && continuation === owner &&
+      observedGeneration === conversationGeneration &&
+      owner.token === String(window.__elonChatGptDocumentToken || '');
+    const isCurrent = () => ownsSession() && activeReader === reader;
     const decoder = new TextDecoder();
-    const sse = policy.createSseDecoder(
+    const sse = owner.sse || policy.createSseDecoder(
       (payload) => {
-        if (!isCurrent()) return;
-        if (isStaleConversationPayload(payload)) {
+        if (!ownsSession()) return;
+        const conversationId = payloadConversationId(payload);
+        if (isStaleConversationPayload(payload) ||
+            (conversationId && owner.conversationId && conversationId !== owner.conversationId)) {
+          owner.valid = false;
           recordShape('conversation_boundary/stale_rejected');
           return;
         }
+        if (conversationId) owner.conversationId = conversationId;
         reportShape(payload);
         if (!session.accept(payload)) return;
         observePackedFinance(payload);
@@ -583,13 +612,16 @@
         notify();
       },
       (ending) => {
-        if (!isCurrent()) return;
+        if (!ownsSession()) return;
         if (ending && ending.error) { recordShape('delta/decode_error'); report('error'); return; }
+        if (ending && ending.interrupted) { recordShape('sse/interrupted'); report('error'); return; }
         const completed = session.finish();
         report(completed ? 'success' : 'empty');
         if (completed) notify();
-      }
+      },
+      { strict: true, requireDone: true, onEvent: () => { owner.offset += 1; } }
     );
+    owner.sse = sse;
     try {
       while (isCurrent()) {
         const value = await reader.read();
@@ -604,12 +636,10 @@
       // Aborting the official request also rejects its cloned reader. Keep
       // received text for the same turn while the official snapshot catches up.
       if (isCurrent()) {
-        if (!session.finish()) session.reset();
-        report('error');
-        notify();
+        sse.finish();
       }
     } finally {
-      if (activeReader === reader) activeReader = null;
+      if (activeReader === reader) retireReader();
       try { reader.releaseLock(); }
       catch (_) { /* The stream may already be closed. */ }
     }
@@ -643,7 +673,7 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 18,
+    version: 19,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,
@@ -661,6 +691,7 @@
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      continuation = null;
       retireReader();
       listeners.clear();
       observedWidgets.clear();
