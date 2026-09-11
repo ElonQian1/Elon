@@ -25,6 +25,8 @@ class ChatGptWebLibrarySourceDiagnosticTest {
         assertEquals(empty.toString(), detail(empty))
         val capped = fixture().put("total", 500).put("omitted", 497).put("stale", true)
         assertEquals(capped.toString(), detail(capped))
+        val image = fixture().apply { getJSONArray("groups").getJSONObject(0).put("artifact", "image_gen") }
+        assertEquals(image.toString(), detail(image))
     }
 
     @Test fun countMismatchDuplicatesAndCoercionAreRejected() {

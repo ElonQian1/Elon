@@ -6,7 +6,7 @@ internal object ChatGptWebLibrarySourceDiagnostic {
     const val SCHEMA = "elon.library_sources.v1"
     private val kinds = setOf("none", "library", "file", "external", "other")
     private val artifacts = setOf("none", "other", "saved_entity", "deep_research_report",
-        "flashcards", "learning_quiz", "app_block", "site_preview")
+        "flashcards", "learning_quiz", "app_block", "site_preview", "image_gen")
     private val mimeTypes = setOf("none", "other", "image/png", "image/jpeg", "application/pdf", "text/plain")
     private val sourceFlags = setOf("external_account", "cloud_doc_url", "saved_entity", "trashed_at", "is_project",
         "gizmo_id", "project_id", "context_scopes", "preview_file", "mounted_library_file_id",

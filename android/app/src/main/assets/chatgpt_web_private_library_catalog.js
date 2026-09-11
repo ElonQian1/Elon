@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 9, create: factory });
+  const exported = Object.freeze({ version: 10, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateLibraryCatalog?.version || 0) < exported.version) {
@@ -272,7 +272,7 @@
     const idKind = id => id == null ? 'none' : /^libfile[_-][A-Za-z0-9_-]{1,152}$/.test(id) ? 'library' :
       /^file[_-][A-Za-z0-9_-]{1,152}$/.test(id) ? 'file' :
       /^external-(?:gdrive|box|dropbox|sharepoint):/.test(id) ? 'external' : 'other';
-    const artifacts = ['saved_entity', 'deep_research_report', 'flashcards', 'learning_quiz', 'app_block', 'site_preview'];
+    const artifacts = ['saved_entity', 'deep_research_report', 'flashcards', 'learning_quiz', 'app_block', 'site_preview', 'image_gen'];
     const flags = ['external_account', 'cloud_doc_url', 'saved_entity', 'trashed_at', 'is_project',
       'gizmo_id', 'project_id', 'context_scopes', 'preview_file', 'mounted_library_file_id',
       'library_file_id', 'shared_library_file_id', 'library_download_id', 'context_connector_info', 'library_provider'];
@@ -359,5 +359,5 @@
       },
     };
   }
-  return Object.freeze({ version: 9, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead, sourceDiagnostics });
+  return Object.freeze({ version: 10, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead, sourceDiagnostics });
 });

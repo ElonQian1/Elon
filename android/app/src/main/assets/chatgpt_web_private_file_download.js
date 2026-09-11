@@ -4,7 +4,7 @@
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 30, create: root => factory(root, pointer, citation) });
+  const exported = Object.freeze({ version: 31, create: root => factory(root, pointer, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -170,6 +170,9 @@
       throw new Error('download_scope_unconfirmed');
     }
     const isLibrary = info.is_library_file === true;
+    if (entry.catalogArtifact && (info.is_project === true || info.gizmo_id != null)) {
+      throw new Error('download_scope_unconfirmed');
+    }
     if (entry.catalogProject && (!isLibrary || info.is_project !== true || !PROJECT.test(info.gizmo_id || '') ||
         entry.projectId && info.gizmo_id !== entry.projectId)) throw new Error('download_scope_unconfirmed');
     const projectId = isLibrary ? (info.is_project === true || PROJECT.test(info.gizmo_id || '')
@@ -241,12 +244,22 @@
   function registerLibraryFile(file) {
     const account = identity(), token = root.__elonChatGptDocumentToken;
     const mounted = root.__elonChatGptPrivateLibraryDownload?.catalogTarget?.(file);
+    // w3n/MDt download image_gen library artifacts after confirming backing-file
+    // ownership. Do not promote arbitrary artifacts or their thumbnail URLs.
+    const imageArtifact = file?.library_artifact_type === 'image_gen' &&
+      /^file[_-][A-Za-z0-9_-]{1,152}$/.test(file.file_id || '') &&
+      ['image/png', 'image/jpeg', 'image/webp'].includes(file.mime_type) &&
+      (file.is_project == null || file.is_project === false) &&
+      ['gizmo_id', 'project_id', 'context_scopes', 'preview_file', 'mounted_library_file_id',
+        'library_file_id', 'shared_library_file_id', 'library_download_id', 'context_connector_info',
+        'library_provider'].every(key => file[key] == null);
     if (disposed || !account || !/^doc_[a-z0-9_]{3,80}$/.test(token || '') ||
         !root.elonChatGptFileDownload || file?.kind !== 'file' || !mounted && !LIBRARY.test(file.id || '') ||
         typeof file.name !== 'string' || !file.name.trim() || /[\x00-\x1f\x7f]/.test(file.name) ||
         file.name.length > 1024 || file.external_account != null || !mounted && file.cloud_doc_url != null ||
-        file.library_artifact_type != null || file.saved_entity != null || file.trashed_at != null) return '';
-    let destination = mounted || { sharedLibraryFileId: file.id };
+        file.library_artifact_type != null && !imageArtifact || file.saved_entity != null || file.trashed_at != null) return '';
+    let destination = imageArtifact ? { fileId: file.file_id, libraryFileId: file.id, catalogArtifact: true }
+      : mounted || { sharedLibraryFileId: file.id };
     if (!mounted && (file.is_project != null && file.is_project !== false || file.gizmo_id != null ||
         file.project_id != null || file.context_scopes != null)) {
       if (file.is_project !== true || !/^file[_-][A-Za-z0-9_-]{1,152}$/.test(file.file_id || '') ||
@@ -416,5 +429,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 30, register, registerLibraryFile, registerGalleryImage, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 31, register, registerLibraryFile, registerGalleryImage, start, cancel, dispose, sourceDiagnostics });
 });

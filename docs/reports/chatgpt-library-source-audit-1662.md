@@ -28,8 +28,8 @@ This is 21 first-page items, not the total library. A later MCP snapshot retaine
 these exact structural counts. Private titles, server IDs and source URLs were
 not exported. No rendered action menu or saved-byte download was tested here.
 
-The nine unresolved PNGs are a concrete native-action coverage gap, but their
-cause is not established. The current MCP row omits the source fields needed to
+The nine unresolved PNGs were a concrete native-action coverage gap, but their
+cause was not established in build 1662. The MCP row omitted the source fields needed to
 distinguish ordinary files, saved artifacts, cloud mounts and unsupported scopes.
 `can_rename=false` alone does not identify any one of them. A matching byte size
 with an accepted gallery image also does not establish that it is the same file.
@@ -57,12 +57,53 @@ selects the download route; `chatgpt_web_private_library_download.js` handles
 validated library/mounted transactions. Do not add a parallel byte downloader,
 convert thumbnails into originals, or guess a files/download ID from a title.
 
-## Next Evidence Required
+## Source Diagnostic On 1663
 
-Inspect only an unresolved row's bounded source classification inside the
-existing page owner: ID category, artifact type, saved-entity presence and scope
-flags, without credentials or private values. Then trace that exact official
-download path and reuse the existing owner for a targeted implementation/test.
+Normal Release 1.1.1663, source `a4935f803`, was published and installed with
+`adb install -r` on the existing Xiaomi wireless transport. The new on-demand
+`private_protocol_probe/library_sources` reads the existing page-local catalog;
+it neither fetches data nor reads DOM itself. Both native validation and the
+page owner restrict it to counts, closed source types and field-presence flags.
+No filenames, IDs, URLs or credentials are included.
+
+One explicit library refresh and diagnostic passed in 5.8 seconds total. The
+21-row inventory was unchanged. All nine unresolved PNG rows had library node
+IDs, ordinary backing-file IDs and a non-null artifact type outside the initial
+diagnostic vocabulary. None had any reported cloud, saved-entity or project
+scope flag. Conversation, draft and authenticated state remained unchanged.
+This establishes an artifact-filter gap, not a mounted-cloud sample. It does
+not yet establish the exact live artifact type or a successful download.
+
+Evidence: `library-source-device-1663-20260911-20260911-181557-919` in the shared
+AI command logs. The diagnostic's 15 JVM tests and JavaScript contracts passed
+before publication. The diagnostic alone does not fix the missing actions.
+
+## Generated Image Download Implementation
+
+The retained public runtime explicitly recognizes `image_gen`. In `w3n`,
+`z_e` / shared `fDt` first resolve backing-file metadata; a personal library
+match supplies `libraryDownloadId` to `Vve` / shared `MDt`. `MDt` then uses the
+existing `/api/library/files/{libraryId}/download` byte route. It does not need
+a conversation navigation or a thumbnail-to-original conversion.
+
+The targeted implementation reuses `registerLibraryFile`, `resolveDestination`
+and the existing native byte lease. Only image_gen PNG/JPEG/WebP with bounded
+library/backing IDs and no cloud/project/preview scope qualify. Metadata must
+confirm the same personal library file before transfer. Unknown artifacts,
+saved entities and contradictory ownership remain unclaimed. Rename, trash
+and attachment are not enabled by this download-only change.
+
+`test-chatgpt-web-private-library-generated-images.js` covers actual owner
+composition, original-byte storage, immutable selection, unsupported sources,
+metadata mismatch, cancellation, account/navigation changes and no error-path
+replay. The diagnostic vocabulary now recognizes `image_gen` separately.
+Real image_gen source classification and native saved-byte acceptance remain
+pending until the new implementation is installed and exercised.
+
+## Remaining Evidence
+
+Use the extended diagnostic to confirm the live artifact type, then select one
+matching row through the existing native library and verify a saved original.
 The ordinary library and gallery saved-byte paths are already accepted; repeating
 them cannot establish the missing source contract. Normal Release has WebView
 CDP debugging disabled; a missing debug socket is not an ADB/network failure.
