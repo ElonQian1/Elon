@@ -195,10 +195,41 @@ for (const projectFlag of [false, null]) test('citation metadata resolves a pers
   } };
   await f.run();
   assert.equal(f.calls.length, 1);
-  assert.equal(new URL(f.calls[0].url).searchParams.get('gizmo_id'), PROJECT);
+  assert.equal(new URL(f.calls[0].url).searchParams.get('gizmo_id'), null,
+    'the current conversation project is not the cited file metadata owner');
   assert.deepEqual(saved, ['libfile_cited']);
   assert.equal(f.queued.length, 0);
   assert.deepEqual(f.receipts, [['download_conversation_file', true, 'download_saved']]);
+});
+
+test('a project chat citation does not attach inferred project ownership to file metadata', async () => {
+  const f = fixture({ file_id: 'file-cited', is_library_file: false });
+  f.payload.gizmo_id = PROJECT;
+  const fetch = f.root.fetch;
+  f.root.fetch = async (url, init) => {
+    const parsed = new URL(url);
+    if (parsed.pathname.endsWith('/simple') && parsed.searchParams.has('gizmo_id')) {
+      f.calls.push({ url, init });
+      return new Response('', { status: 404 });
+    }
+    return fetch(url, init);
+  };
+  await f.run();
+  assert.equal(f.receipts.at(-1)[1], true);
+  assert.equal(f.calls.length, 2);
+  assert.equal(new URL(f.calls[0].url).searchParams.get('conversation_id'), 'source');
+  assert.equal(new URL(f.calls[1].url).searchParams.get('check_context_scopes_for_conversation_id'), 'source');
+  assert.equal(f.queued.length, 1);
+});
+
+for (const field of ['gizmo_id', 'project_id']) test('explicit citation ' + field + ' remains in metadata scope', async () => {
+  const f = fixture(PROJECT_INFO);
+  f.payload.gizmo_id = PROJECT;
+  f.payload.messages[0].metadata.content_references[0][field] = PROJECT;
+  await f.run();
+  assert.equal(new URL(f.calls[0].url).searchParams.get('gizmo_id'), PROJECT);
+  assert.equal(new URL(f.calls[1].url).searchParams.get('gizmo_id'), PROJECT);
+  assert.equal(f.receipts.at(-1)[1], true);
 });
 
 test('non-library citation metadata retains the requested project instead of adopting an unrelated field', async () => {

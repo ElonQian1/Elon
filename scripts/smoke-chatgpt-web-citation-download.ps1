@@ -5,9 +5,14 @@ param(
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
     [switch]$ReuseFixture,
     [switch]$ExistingProjectFixture,
+    [switch]$ProjectAttachmentControl,
+    [switch]$FreshProjectFixture,
+    [string]$FixtureCheckpoint = '',
     [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe'
 )
 $ErrorActionPreference = 'Stop'
+if ($ProjectAttachmentControl -and -not $ExistingProjectFixture) {throw 'project_control_requires_existing_fixture'}
+if ($FreshProjectFixture -and (-not $ExistingProjectFixture -or $ProjectAttachmentControl)) {throw 'invalid_fresh_project_fixture_mode'}
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-evidence.ps1')
 . (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
@@ -16,13 +21,16 @@ $fixture = 'fixed_ascii_text_v1'
 $name = 'elon-chatgpt-attachment-fixture-v1.txt'
 $expectedHash = '75e2ed9bfe5772c9918e552ed07c2c0e689e7039367c81bb6906c63e396fa1f3'
 $checkpoint=Join-Path (Split-Path -Parent $PSScriptRoot) '.ai-tmp/citation-download-fixture.json'
+if ($FreshProjectFixture) {$checkpoint=Join-Path (Split-Path -Parent $PSScriptRoot) '.ai-tmp/project-citation-download-fixture.json'}
+if ($FixtureCheckpoint) {$checkpoint=[IO.Path]::GetFullPath($FixtureCheckpoint)}
 $prompt = 'Read the attached text file. Quote its exact first line and cite the uploaded file using a file citation in your answer. Do not create, copy, or modify any file.'
-if ($ExistingProjectFixture) {
+if ($ExistingProjectFixture -and -not $FreshProjectFixture) {
     $prompt = 'Use the previously uploaded elon-chatgpt-attachment-fixture-v1.txt. Quote its exact first line and cite that uploaded file using a file citation. Do not create, copy, or modify any file.'
 }
 $report = [ordered]@{schema='elon.chatgpt.citation_download_ui.v1'; passed=$false; stage='prepare'
     restored=$false; awake_restored=$false; content_exported=$false; send_attempts=0; download_attempts=0}
 $origin=$null; $navigated=$false; $menuOpen=$false; $detailOpen=$false; $downloadOpen=$false; $probe=$false
+$verifiedProjectPath=''; $verifiedProjectId=''
 function Native { Get-ChatGptWebNativeChatState -Runtime $r }
 function Web {
     if (-not (Test-WebChatNativeChatSurfaceForeground -Runtime $r)) { throw 'foreground_changed' }
@@ -60,8 +68,11 @@ function Confirm-Saved([string]$Path) {
 function Open-ExistingFixture {
     if (-not (Test-Path -LiteralPath $checkpoint)) {throw 'fixture_checkpoint_unavailable'}
     $saved=Get-Content -LiteralPath $checkpoint -Raw | ConvertFrom-Json
+    $validPath=if ($FreshProjectFixture) {
+        $saved.path -cmatch '^/g/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?/c/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$'
+    } else {$saved.path -cmatch '^/c/[A-Za-z0-9_-]{1,160}$'}
     if ($saved.schema -ne 'elon.citation_fixture.v1' -or $saved.device -cne $ExpectedHardwareSerial -or
-        $saved.path -notmatch '^/c/[A-Za-z0-9_-]{1,160}$') {throw 'fixture_checkpoint_invalid'}
+        -not $validPath) {throw 'fixture_checkpoint_invalid'}
     Command 'chatgpt_open_conversation' @{conversation_path=$saved.path} 'open_conversation' | Out-Null
     $deadline=[DateTimeOffset]::UtcNow.AddSeconds(20)
     do {
@@ -77,23 +88,41 @@ function Open-ExistingFixture {
 }
 function Open-ProjectFixture {
     $mediaPrompt = 'Read all three attached test files. Reply in English: quote the exact first line from each document, then describe the shapes in the image, including their counts and colors. If an attachment is unavailable, say so instead of guessing.'
-    $page=Act 'chatgpt_get_conversations' @{offset=0;limit=50}
-    if ($page.stale) {throw 'directory_stale'}
-    $candidate=$page.conversations | Where-Object {
-        $_.project_id -cmatch '^g-p-[a-f0-9]{32}$' -and $_.title -match '(?i)fixture|attachment|test|media|file'
-    } | Select-Object -First 1
+    $completedProbes=@(
+        'Use the previously uploaded elon-chatgpt-attachment-fixture-v1.txt. Quote its exact first line and cite that uploaded file using a file citation. Do not create, copy, or modify any file.',
+        'Reply exactly ELON_PROJECT_RUNTIME_337_OK. Do not use tools or modify files.',
+        'Reply exactly ELON337READY. Do not use tools or modify files.'
+    )
+    # A cached row is a locator only; live path, fixed messages and file index
+    # below establish the target before any write or download.
+    $candidate=$null
+    foreach ($offset in @(0,50,100,150)) {
+        $page=Act 'chatgpt_get_conversations' @{offset=$offset;limit=50}
+        $candidate=$page.conversations | Where-Object {
+            $_.project_id -cmatch '^g-p-[a-f0-9]{32}$' -and $_.title -match '(?i)fixture|attachment|test|media|file'
+        } | Select-Object -First 1
+        if ($candidate -or -not $page.has_more) {break}
+    }
+    $report.cached_directory_candidate=$page.stale -eq $true
     if (-not $candidate -or $candidate.path -cnotmatch ('^/g/'+[regex]::Escape($candidate.project_id)+
         '(?:-[A-Za-z0-9_-]{1,124})?/c/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$')) {
         throw 'project_fixture_candidate_unavailable'
     }
+    if ($candidate.project_path -cnotmatch ('^/g/'+[regex]::Escape($candidate.project_id)+'(?:-[A-Za-z0-9_-]{1,124})?/project$')) {throw 'project_fixture_path_unconfirmed'}
+    $script:verifiedProjectPath=$candidate.project_path
+    $script:verifiedProjectId=$candidate.project_id
     Command 'chatgpt_open_conversation' @{conversation_path=$candidate.path} 'open_conversation' | Out-Null
     $deadline=[DateTimeOffset]::UtcNow.AddSeconds(25)
     do {
         $s=Native; $w=Web
         $users=@($s.social_chat.messages | Where-Object role -eq user)
         $media=@($users | Where-Object {([string]$_.content).Contains($mediaPrompt,[StringComparison]::Ordinal)})
-        $other=@($users | Where-Object {-not ([string]$_.content).Contains($mediaPrompt,[StringComparison]::Ordinal) -and
-            -not ([string]$_.content).Contains($prompt,[StringComparison]::Ordinal)})
+        $other=@($users | Where-Object {
+            $body=[string]$_.content
+            -not $body.Contains($mediaPrompt,[StringComparison]::Ordinal) -and
+                -not $body.Contains($prompt,[StringComparison]::Ordinal) -and
+                -not @($completedProbes | Where-Object {$body.Contains($_,[StringComparison]::Ordinal)}).Count
+        })
         $ready=$s.social_chat.web_chat_conversation_path -eq $candidate.path -and
             ([uri]$w.conversation.url).AbsolutePath -eq $candidate.path -and $media.Count -eq 1 -and
             $other.Count -eq 0 -and -not $s.input.text -and -not $w.streaming -and
@@ -110,6 +139,8 @@ function Open-ProjectFixture {
     }
     $report.project_fixture_verified=$true
     $report.existing_fixture_reused=$true
+    if ($FreshProjectFixture) {return}
+    if ($ProjectAttachmentControl) {return}
     $citation=@($index.files | Where-Object {$_.role -eq 'assistant' -and $_.name -ceq $name -and $_.download_handle})
     if ($citation.Count -gt 0) {return}
     # A fixed follow-up is sent at most once; an uncertain result is never replayed.
@@ -144,10 +175,11 @@ try {
         [int]$before.input.official_draft_length -gt 0 -or $before.file_download.can_cancel -or
         [int]$origin.social_chat.web_chat_pending_attachment_count -gt 0) {throw 'existing_work_in_progress'}
     if ($fixture -notin $origin.chatgpt_web_acceptance_attachment.supported_fixture_ids) {throw 'fixture_not_supported'}
+    if ($FreshProjectFixture -and -not $ReuseFixture -and (Test-Path -LiteralPath $checkpoint)) {throw 'fresh_fixture_exists_use_reuse'}
     Start-ChatGptWebSmokeAwakeLease -Runtime $r | Out-Null
     $report.adapter=$before.adapter_version
     $navigated=$true
-    if ($ExistingProjectFixture) {
+    if ($ExistingProjectFixture -and -not $FreshProjectFixture) {
         $report.stage='reuse_project_fixture'
         Open-ProjectFixture
     } elseif ($ReuseFixture) {
@@ -155,18 +187,35 @@ try {
         Open-ExistingFixture
         $report.existing_fixture_reused=$true
     } else {
-    Act 'start_new_web_chat_conversation' | Out-Null
+    if ($FreshProjectFixture) {
+        Open-ProjectFixture
+        Act 'open_web_chat_project' @{project_path=$verifiedProjectPath} | Out-Null
+    } else {Act 'start_new_web_chat_conversation' | Out-Null}
     $deadline=[DateTimeOffset]::UtcNow.AddSeconds(30)
     do {
         $s=Native; $w=Web
-        $blank=([uri]$w.conversation.url).AbsolutePath -eq '/' -and $w.composer_ready -and
+        # The website canonicalizes the display slug; project identity must match,
+        # not the mutable title in the cached route.
+        $blankPath=if ($FreshProjectFixture) {$verifiedProjectPath} else {'/'}
+        $url=[uri]$w.conversation.url
+        $blankRoute=if ($FreshProjectFixture) {
+            $url.AbsolutePath -cmatch ('^/g/'+[regex]::Escape($verifiedProjectId)+'(?:-[A-Za-z0-9_-]{1,124})?/project$')
+        } else {$url.AbsolutePath -ceq '/'}
+        $blank=$url.GetLeftPart([UriPartial]::Authority) -ceq 'https://chatgpt.com' -and
+            -not $url.Query -and -not $url.Fragment -and $blankRoute -and $w.composer_ready -and
             @($s.social_chat.messages).Count -eq 0 -and -not $s.input.text -and [int]$w.input.official_draft_length -eq 0
         if ($blank) {break}
         Start-Sleep -Milliseconds 500
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
-    if (-not $blank) {throw 'blank_chat_not_ready'}
+    if (-not $blank) {
+        $report.blank_state=@{web_path_matches=([uri]$w.conversation.url).AbsolutePath -eq $blankPath
+            native_path_matches=$s.social_chat.web_chat_conversation_path -eq $blankPath
+            composer_ready=$w.composer_ready;native_messages=@($s.social_chat.messages).Count
+            native_draft_present=[bool]$s.input.text;web_draft_present=[int]$w.input.official_draft_length -gt 0}
+        throw 'blank_chat_not_ready'
+    }
     $temporary=$w.ui_manifest.controls | Where-Object semantic -eq temporary_chat | Select-Object -First 1
-    if ($null -eq $temporary -or $temporary.selected -ne $false) {throw 'ordinary_chat_required'}
+    if (-not $FreshProjectFixture -and ($null -eq $temporary -or $temporary.selected -ne $false)) {throw 'ordinary_chat_required'}
     $report.stage='stage_fixture'
     Act 'stage_chatgpt_web_acceptance_attachment' @{fixture_id=$fixture} | Out-Null
     $s=Native
@@ -197,11 +246,12 @@ try {
     $report.user_rows=@($s.social_chat.messages | Where-Object role -eq user).Count
     $report.response_ms=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()-$since
     if (-not $done -or -not $report.private_upload -or $report.user_rows -ne 1) {throw 'fixture_reply_unconfirmed'}
+    if ($FreshProjectFixture -and $s.social_chat.web_chat_conversation_path -cnotmatch ('^/g/'+[regex]::Escape($verifiedProjectId)+'(?:-[A-Za-z0-9_-]{1,124})?/c/')) {throw 'fresh_project_membership_unconfirmed'}
     }
     $s=Native
     $path=$s.social_chat.web_chat_conversation_path
     if ($path -notmatch '^(/g/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?)?/c/[A-Za-z0-9_-]{1,160}$') {throw 'fixture_conversation_unconfirmed'}
-    if (-not $ReuseFixture -and -not $ExistingProjectFixture) {
+    if (-not $ReuseFixture -and (-not $ExistingProjectFixture -or $FreshProjectFixture)) {
         # Local navigation checkpoint only; never emit it in logs or retry the send.
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $checkpoint) | Out-Null
         [IO.File]::WriteAllText($checkpoint,(@{schema='elon.citation_fixture.v1';device=$ExpectedHardwareSerial;path=$path} | ConvertTo-Json -Compress))
@@ -213,15 +263,22 @@ try {
     Ui 'files' | Out-Null
     Ui 'files_refresh' | Out-Null
     Ui 'files_wait' | Out-Null
-    $w=Web; $index=$w.conversation_files
+    $deadline=[DateTimeOffset]::UtcNow.AddSeconds(20)
+    do {
+        $w=Web; $index=$w.conversation_files
+        if ($index -and -not $index.stale -and $index.conversation_path -eq $path) {break}
+        Start-Sleep -Milliseconds 500
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
     if (-not $index -or $index.stale -or $index.conversation_path -ne $path) {throw 'file_index_unconfirmed'}
     $files=@($index.files)
     $report.index_files=$files.Count
     $report.assistant_files=@($files | Where-Object role -eq assistant).Count
+    $selectedRole=if ($ProjectAttachmentControl) {'user'} else {'assistant'}
+    $report.download_role=$selectedRole
     $positions=@(for ($i=0;$i -lt $files.Count;$i++) {
-        if ($files[$i].role -eq 'assistant' -and $files[$i].name -ceq $name -and $files[$i].download_handle) {$i}
+        if ($files[$i].role -eq $selectedRole -and $files[$i].name -ceq $name -and $files[$i].download_handle) {$i}
     })
-    if ($positions.Count -ne 1) {throw 'assistant_fixture_citation_unavailable'}
+    if ($positions.Count -ne 1) {throw $(if ($ProjectAttachmentControl) {'project_attachment_control_unavailable'} else {'assistant_fixture_citation_unavailable'})}
     $savedBefore=@(Saved)
     Command 'chatgpt_private_protocol_probe' @{mode='start'} 'private_protocol_probe' | Out-Null
     $probe=$true
@@ -251,11 +308,16 @@ try {
         elseif ($message -match '^Semantic UI acceptance failed: ([a-z_]+)$') {$Matches[1]} else {'citation_acceptance_failed'}
     if ($report.download_attempts -gt 0) {
         try {
-            $failed=@((Web).command_requests | Where-Object {
+            $downloadState=Web
+            $report.download_job=$downloadState.file_download | Select-Object state,received_bytes,total_bytes,can_cancel
+            $failed=@($downloadState.command_requests | Where-Object {
                 $_.request_id -notin $idsBefore -and $_.expected_web_action -eq 'download_conversation_file'
             }) | Select-Object -Last 1
             $report.download_status=$failed.status
             $report.download_detail=if ($failed.result.detail -cmatch '^[a-z_]+$') {$failed.result.detail} else {'other'}
+            $source=Command 'chatgpt_private_protocol_probe' @{mode='file_download_source'} 'private_protocol_probe'
+            $report.download_source=($source.receipt.result.detail | ConvertFrom-Json) |
+                Select-Object schema,observed,origin,path,binding,query_count
         } catch {$report.download_receipt_unavailable=$true}
     }
 } finally {

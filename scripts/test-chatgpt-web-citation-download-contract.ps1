@@ -20,6 +20,15 @@ foreach ($required in @(
     'ExistingProjectFixture','project_synthetic_fixture_unconfirmed','project_fixture_attachment_unconfirmed'
     'project_fixture_prior_send_unconfirmed','project_citation_reply_unconfirmed','project_fixture_verified=$true'
     'if ($origin.social_chat.web_chat_conversation_path)', 'elseif ($ReuseFixture)'
+    'project_control_requires_existing_fixture','if ($ProjectAttachmentControl) {return}'
+    '$files[$i].role -eq $selectedRole','project_attachment_control_unavailable'
+    '$report.cached_directory_candidate=$page.stale -eq $true'
+    'invalid_fresh_project_fixture_mode','fresh_project_membership_unconfirmed'
+    "Act 'open_web_chat_project'",'project_fixture_path_unconfirmed'
+    'foreach ($offset in @(0,50,100,150))','[regex]::Escape($verifiedProjectId)'
+    '$blankRoute -and $w.composer_ready','-not $url.Query -and -not $url.Fragment'
+    'project-citation-download-fixture.json','Select-Object state,received_bytes,total_bytes,can_cancel'
+    'fresh_fixture_exists_use_reuse','if ($FixtureCheckpoint)',"mode='file_download_source'"
 )) {if (-not $source.Contains($required)) {throw "citation_acceptance_guard_missing: $required"}}
 if ([regex]::Matches($source,"Act 'send_input'").Count -ne 2 -or
     [regex]::Matches($source,"Ui 'download' -Download").Count -ne 1) {throw 'citation_acceptance_write_replay'}

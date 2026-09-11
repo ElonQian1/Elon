@@ -10,6 +10,11 @@ original conversation/draft were restored. No message was resent. Reuse this
 scope; 126 related tests pass. Project/grouped/cloud/PCA variants remain separate.
 [Acceptance and nullable-metadata fix](reports/chatgpt-runtime-bindings-20260911.md#normal-1651-acceptance).
 
+Project metadata 404 also reproduced with a fresh fixed TXT on 1655. Candidate
+v26 separates explicit file ownership from conversation project scope;
+183 related offline cases pass, device verification pending.
+[Scope correction and reusable fixture](reports/chatgpt-project-citation-scope-20260911.md).
+
 Earlier delivery: citation v3 / projection v9 / download owner v18
 (source `7b78394da`) passed offline checks and is included in normal 1640 / adapter
 325 with the earlier metadata/scope correction. Grouped Release/install passed;

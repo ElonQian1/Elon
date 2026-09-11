@@ -4,7 +4,7 @@
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 25, create: root => factory(root, pointer, citation) });
+  const exported = Object.freeze({ version: 26, create: root => factory(root, pointer, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -122,7 +122,7 @@
       projectId: projects[0] || null, libraryFileId,
       connectorCopy: file.context_connector_info != null,
       mediaType: typeof file.mime_type === 'string' ? file.mime_type : '',
-      ...(fileCitation ? { fileCitation: true } : {}),
+      ...(fileCitation ? { fileCitation: true, metadataProjectId: file.gizmo_id || file.project_id || null } : {}),
       ...(mounted || {}),
       ...(libraryReference || {}),
       ...(libraryReference || mounted ? { name: file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180), mediaType: file.mime_type || '' } : {}),
@@ -144,7 +144,10 @@
     if (!entry.libraryFileId && !entry.fileCitation) return { url: authorizationUrl(entry, entry.projectId) };
     // FileCitationPreviewSheet uses cEt/OX even when the reference omits library identity.
     const url = new URL('/backend-api/files/' + encodeURIComponent(entry.fileId) + '/simple', root.location.origin);
-    if (entry.projectId) url.searchParams.set('gizmo_id', entry.projectId);
+    // Official V3t/w3n pass file-preview ownership, not the current chat's
+    // project. Conversation scope is still sent separately for access checks.
+    const metadataProjectId = entry.fileCitation ? entry.metadataProjectId : entry.projectId;
+    if (metadataProjectId) url.searchParams.set('gizmo_id', metadataProjectId);
     if (entry.conversationId) url.searchParams.set('conversation_id', entry.conversationId);
     const result = await request.request(root, url.href, {
       method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
@@ -408,5 +411,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 25, register, registerLibraryFile, registerGalleryImage, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 26, register, registerLibraryFile, registerGalleryImage, start, cancel, dispose, sourceDiagnostics });
 });
