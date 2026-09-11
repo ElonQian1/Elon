@@ -371,7 +371,7 @@
     };
   }
 
-  function createSseDecoder(onPayload, onDone) {
+  function createSseDecoder(onPayload, onDone, options = {}) {
     let buffer = '';
     let closed = false;
     let delta = null;
@@ -396,6 +396,7 @@
         complete();
         return;
       }
+      if (decodeError) return;
       if (event === 'delta_encoding') {
         let encoding = data;
         try { encoding = JSON.parse(data); } catch (_) { /* The marker may be unquoted. */ }
@@ -403,7 +404,6 @@
         delta = decodeError ? null : deltaDocuments.create();
         return;
       }
-      if (decodeError) return;
       try {
         let payload = JSON.parse(data);
         if (event === 'delta') {
@@ -414,7 +414,7 @@
         }
         if (typeof onPayload === 'function') onPayload(payload);
       } catch (_) {
-        if (event === 'delta') decodeError = true;
+        if (event === 'delta' || options.strict === true) decodeError = true;
       }
     }
 

@@ -1,9 +1,11 @@
 (function (root, factory) {
   'use strict';
-  const exported = factory();
+  const context = typeof module === 'object' && module.exports
+    ? require('./chatgpt_web_private_context_sources_policy.js') : root?.__elonChatGptPrivateContextSourcesPolicy;
+  const exported = factory(context);
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateFileCitation = exported;
-})(typeof window === 'object' ? window : null, function () {
+})(typeof window === 'object' ? window : null, function (context) {
   'use strict';
   const FILE = /^file[_-][A-Za-z0-9_-]{1,155}$/;
   const LIBRARY = /^libfile[_-][A-Za-z0-9_-]{1,152}$/;
@@ -61,7 +63,8 @@
 
   function target(reference) {
     if (!reference || typeof reference !== 'object' || Array.isArray(reference) ||
-        reference.type === 'conversation_context_citation' || reference.retrieval_origin === 'pca' ||
+        reference.type === 'conversation_context_citation' ||
+        reference.retrieval_origin === 'pca' && !context?.allows(reference) ||
         reference.deleted != null && reference.deleted !== false) return null;
     // c2 classifies grouped/cite-map items by category before type/attribution.
     const isFile = reference.category != null ? text(reference.category).toLowerCase() === 'files' :
@@ -103,6 +106,12 @@
     const items = [], urls = new Set();
     let visited = 0, truncated = false;
     limit = Math.max(1, Math.min(20, Number.isSafeInteger(limit) ? limit : 20));
+    const resolved = context?.lookup(metadata);
+    if (resolved) {
+      const files = resolved.items.filter(context.isFile);
+      return { items: files.slice(0, limit), truncated: resolved.partial || files.length > limit ||
+        files.some(item => item.deleted == null || item.deleted === false ? !target(item) : false) };
+    }
     if (!eligible(metadata)) return { items, truncated:
       metadata?.conversation_context_citation_metadata != null ||
       metadata?.conversation_context_citation_metadata_status != null };
@@ -193,5 +202,5 @@
     return result;
   }
 
-  return Object.freeze({ version: 5, eligible, target, references, scan });
+  return Object.freeze({ version: 6, eligible, target, references, scan });
 });
