@@ -7,13 +7,18 @@ delivery_status: published
 
 # Private generated-image gallery
 
-Latest published: `1.1.1620`, source `91df1aa7a`, gallery v8. Thumbnail-first
+Latest addition: normal `1.1.1654`, source `4db5261b3`, gallery v9/download v25,
+completes ordinary original PNG Download in the native viewer. One real saved
+1254 x 1254 PNG and original-state restoration passed; special scopes remain
+separate. Reuse [the scoped download owner and acceptance](reports/chatgpt-gallery-original-download-20260911.md#normal-1654-acceptance).
+
+Earlier published: `1.1.1620`, source `91df1aa7a`, gallery v8. Thumbnail-first
 loading, on-demand full previews and shared expiry recovery pass 52 Node and
 7 JVM checks plus normal Release/lint and packaged-source verification. The same
 artifact is now installed and production-tested over USB. See
 [delivery and acceptance](reports/chatgpt-gallery-thumbnails.md#usb-acceptance-on-1620).
 
-Latest real acceptance: `1.1.1620` opened the native gallery, loaded the previously
+Earlier paging acceptance: `1.1.1620` opened the native gallery, loaded the previously
 unopened page 4 to ready without partial/failure, opened its native viewer and
 returned to the same page and then native chat. The preview click had no new
 network records, so distinct thumbnail/full-image transfers remain unverified;

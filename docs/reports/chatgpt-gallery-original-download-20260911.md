@@ -1,7 +1,7 @@
 # Native Gallery Original Download
 
 Capability: `android_chatgpt_private_gallery_original_download_v1`.
-Status: implemented; device acceptance pending.
+Status: completed; default-enabled; device-verified for ordinary original PNGs.
 
 ## Scope
 
@@ -68,3 +68,27 @@ A local same-version research APK was built but not installed: another task
 published and installed normal 1653 meanwhile, so Android correctly rejected
 the older candidate. No downgrade or data reset was attempted. Final delivery
 must include the 1653 mainline changes and keep the research flag disabled.
+
+## Normal 1654 Acceptance
+
+- Published and installed normal `1.1.1654` with `adb install -r` on the Xiaomi
+  over wireless ADB; source `4db5261b3cce7a12f666c60b938cbb39b780f243` includes
+  the 1653 mainline changes. Research remains disabled.
+- APK SHA-256:
+  `8e7977219803ce27c723453b9d4ecd3c804b5dedc7173e77ebcef06624b39556`.
+- Targeted URL/download regression suite: 131 passed. Normal Release/lint passed;
+  the earlier 17 Android unit tests covered the unchanged native integration.
+- The native new-chat screen -> Images -> viewer -> Download original workflow
+  passed. One download command received `download_saved`; the content request
+  returned HTTP 200 at `/backend-api/estuary/content`.
+- Exactly one new PNG was saved on the handset: 662,362 bytes, 1254 x 1254,
+  valid PNG signature/IEND and successful bitmap decoding. No image bytes were
+  exported. The file was retained for the user.
+- Conversation/draft and awake settings were restored. No messages were sent,
+  generated or deleted. No microphone, Cookie or application-data changes.
+- Evidence: `gallery-original-1654-ui-ready-20260911-095433-057`, passed in 33.6s.
+  An initial preflight incorrectly required a selected historical conversation;
+  the script now also accepts a blank native chat. This was a test-only fix.
+- Project/shared/mounted/watermarked sources, other formats and large transfers
+  remain separate scopes. Reuse this completed ordinary-image capability;
+  do not repeat its protocol discovery without new regression evidence.
