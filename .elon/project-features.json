@@ -2312,15 +2312,15 @@
         },
         {
           "path": "docs/android-binance-strategy-funds-v1-delivery.md",
-          "content_hash": "5419ea36df579d0ed3877ae077f0070796f2c1acf241fd543d394cbf9ba0e5c8",
+          "content_hash": "cd370d4c237a2d97dd6c9c42952844342bec8a1727ad5fa80fa81c0bfabf325d",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "1f787b647e64efbd10b70b2ec7a3476730d2a882",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "4cea9d1707ae09e748c11105eed8435e0d04ab70",
-            "state": "untracked"
+            "head_commit": "9a2e4d1fd831e485db9d53ed061d651fb2d55036",
+            "head_blob_oid": "4cea9d1707ae09e748c11105eed8435e0d04ab70",
+            "worktree_blob_oid": "5ac0ab894152e51384f3908a8c82d3c3497925de",
+            "state": "tracked_modified"
           }
         },
         {
@@ -2338,7 +2338,7 @@
         }
       ],
       "created_at_ms": 1789104878144,
-      "updated_at_ms": 1789106352984
+      "updated_at_ms": 1789107784904
     },
     {
       "id": "android-exchange-session-host-v2",
@@ -25452,16 +25452,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_da422811a5c0494a90b560619e5f31d5",
-      "feature_id": "esk-economic-ledger-preview-v1",
-      "action": "transitioned",
-      "actor": "esk-primary",
-      "reason": "离线源码、合成合同、独立审查和46项不同测试已有通过证据；仅验证离线工程，不批准真实经济操作。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788686919876
-    },
-    {
       "id": "feature_event_ca0ed9ae2063406db711732397340403",
       "feature_id": "esk-economic-ledger-preview-v1",
       "action": "transitioned",
@@ -27450,6 +27440,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789106352984
+    },
+    {
+      "id": "feature_event_06b0d88aaab44474afef198e013ce566",
+      "feature_id": "android-binance-strategy-funds-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789107784904
     }
   ]
 }
