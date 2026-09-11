@@ -97,6 +97,41 @@ The final seven-file set including rejection cases passed all 187 tests:
 
 ## Verification
 
+### Normal 1657 acceptance
+
+Source `2f761bc38d8dffaf9b0981628ea6d0cea823a9f1` built and published normal
+`v1.1.1657` (1657), SHA-256
+`c9a5239cb53b411850e74e0f3ded693647e8a29b1c592df99c7752f7618fdbf1`.
+The release script updated the trusted Xiaomi without clearing data. Endpoint
+version/source/hash and installed adapter 339/authenticated state were reread.
+Log `citation-direct-release-339-20260911-122114-843` passed in 433 seconds.
+
+The first acceptance stopped at a failed file-list read, before any Download.
+Two retained list receipts reported `files_read_failed`; its root cause is not
+established. It restored the conversation and awake settings. The outer one-off
+wrapper initially failed to propagate the child script's exit status, so its
+runner-level pass is not a business pass. The emitted report correctly says
+`passed:false`. The wrapper was corrected before the bounded retry.
+
+`project-citation-1657-index-retry-20260911-123122-806` passed: zero uploads/sends,
+one actual native Download on the assistant TXT citation, exactly one new file,
+78 bytes, SHA-256
+`75e2ed9bfe5772c9918e552ed07c2c0e689e7039367c81bb6906c63e396fa1f3`.
+Both the native handoff and saved-byte/hash checks passed; original conversation,
+draft and awake settings were restored. No private content was exported.
+
+This retry temporarily observed requests before the file-list step; background
+website traffic filled the bounded probe (19 dropped records), so the log does
+not independently record the final authorization HTTP status. Do not claim it
+does. The native command receipt and new verified file prove the consumer result.
+The retained harness keeps its normal download-only observation window.
+
+The project uploaded-TXT citation scope of
+`android_chatgpt_private_file_citation_download_v1` is **completed**, default
+enabled, and device verified on 1657. Reuse it without another upload or research
+cycle. This does not complete grouped/cloud/PCA citations, every explicit-owner
+variant, or explain the initial file-list read failure.
+
 The focused regression first failed three cases on v25: personal-library
 citations inside project chats (false/null project flag) and a metadata endpoint
 rejecting inherited project ownership. Explicit file ownership remains covered.

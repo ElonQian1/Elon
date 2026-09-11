@@ -3,16 +3,20 @@
 ## Status and boundary
 
 Capability: `android_chatgpt_private_file_citation_download_v1`.
-Completed scope: personal uploaded TXT citation, default-enabled and
+Completed scopes: personal and project uploaded TXT citations, default-enabled.
+Personal scope was
 device-verified on normal 1651 / adapter 334 / download owner v23. The actual
 native Download action saved 78 bytes with the exact expected SHA-256; the
 original conversation/draft were restored. No message was resent. Reuse this
-scope; 126 related tests pass. Project/grouped/cloud/PCA variants remain separate.
+scope; 126 related tests pass. Grouped/cloud/PCA variants remain separate.
 [Acceptance and nullable-metadata fix](reports/chatgpt-runtime-bindings-20260911.md#normal-1651-acceptance).
 
-Fresh project TXT metadata 404 persisted after v26 on normal 1656. Candidate
-v27 reuses the current official direct-authorization path when the citation
-has no explicit file ownership; device verification is pending.
+Project scope passed on normal 1657 / adapter 339 / download owner v27: one
+native Download, one new 78-byte file with matching SHA-256, no message resent,
+original conversation/draft/awake restored. v27 reuses the official direct
+authorization path without inferred file ownership; v26 had still returned
+metadata 404 on 1656. The related 187 tests pass. Reuse this completed scope;
+other ownership variants and an initial file-list read failure remain unclaimed.
 [Scope correction and reusable fixture](reports/chatgpt-project-citation-scope-20260911.md).
 
 Earlier delivery: citation v3 / projection v9 / download owner v18

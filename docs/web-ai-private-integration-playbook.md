@@ -99,6 +99,7 @@ WebView 身份与官网运行时按操作提供依赖；不是每次命令都重
 | 官网更新资源后，旧导出映射使原生发送回退；观测清单截断又容易被当作模块不存在 | 从实测 anchor 的静态 imports 找角色；复用 `analyze-chatgpt-runtime-contracts.cjs` 做无执行 AST 比对，歧义按真实依赖确认。不能只改文件名或自动接受相似函数；最后核对运行时回执和原生回复 | [1655 兼容修复](reports/chatgpt-runtime-bindings-20260911-b.md) |
 | 历史 GET 成功，但 JS 发字符串 `content`，Kotlin 按数组读取，原生消息为空 | producer 与真实 consumer 共用 wire fixture；同时验证部分快照不能清掉输入/语音状态 | [历史契约](chatgpt-private-history-native-contract.md) |
 | 文件元数据已返回 200，但官网的 `is_project:null` 被当作非法字段，原生下载仍失败 | fixture 保留真实的缺省、null、false 差异；按官网消费语义校验，不自行收严。分别记录 HTTP、解析、关联和落盘结果，不把协议成功当业务成功 | [1651 引用下载](reports/chatgpt-runtime-bindings-20260911.md#normal-1651-acceptance) |
+| 项目会话中的文件引用被强制先查元数据而返回 404 | 文件归属不等于会话项目；追踪当前官网调用者，缺少文件归属/库 ID 时可直接申请会话范围下载授权。保留权限检查，不在失败后去掉 scope 重试。系统下载排队既不算成功也不算失败，要核对本次新增文件字节 | [1657 项目引用下载](reports/chatgpt-project-citation-scope-20260911.md#normal-1657-acceptance) |
 | 图库有原始资源 URL，却重新用 asset pointer 申请下载，返回 404 | 区分原始资源、缩略图和文件指针；按官网 URL-download 证据复用既有字节下载模块。确认完整落盘和解码，不拿预览 JPEG 或 queued 回执冒充原图下载成功 | [1654 原图下载](reports/chatgpt-gallery-original-download-20260911.md#normal-1654-acceptance) |
 | 未读到 DOM 被记为成功的空图片库，六小时内不再刷新 | unknown 不落成 authoritative empty；只有完整有效响应能确认空结果 | [历史契约中的图库修复](chatgpt-private-history-native-contract.md) |
 | 请求在响应头到达就取消超时，body 卡住后一直 busy；超时项目请求迟到覆盖新目录 | deadline 覆盖 body/解析；取消与 settle 有界，晚回调核对 owner/epoch | [生命周期](chatgpt-private-request-lifetime.md) |

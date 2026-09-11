@@ -15,6 +15,10 @@ saved-byte download were verified through `1544`. Native TXT/PNG/PDF library
 downloads passed on `1612`; project-folder PNG download, saved bytes and decode
 passed on `1648`. Reuse these scopes; other sources remain separate. See
 [project download acceptance](reports/chatgpt-library-folder-download-1644.md).
+Personal/project uploaded-TXT citation Download is completed and default-enabled
+on 1651/1657, including new saved bytes and SHA-256. Reuse
+[`android_chatgpt_private_file_citation_download_v1`](chatgpt-private-file-citations.md);
+grouped/cloud/PCA and other ownership variants remain separate.
 The [request lifetime repair](chatgpt-private-request-lifetime.md) bounds private response
 consumption and prevents timed-out project reads from replacing newer results.
 The [directory paging acceptance](reports/chatgpt-directory-pagination-20260909.md)
