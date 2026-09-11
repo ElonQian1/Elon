@@ -7,10 +7,12 @@ param(
     [ValidateRange(0, 49)][int]$CandidateOffset = 0,
     [switch]$NativeMenu,
     [switch]$VerifyRefreshInPlace,
+    [switch]$CurrentConversation,
     [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe'
 )
 $ErrorActionPreference = 'Stop'
 if ($VerifyRefreshInPlace -and -not $NativeMenu) { throw 'refresh_check_requires_native_menu' }
+if ($CurrentConversation -and $CandidateOffset -ne 0) { throw 'current_conversation_has_no_offset' }
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-evidence.ps1')
 . (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
@@ -31,6 +33,23 @@ function Ui([string]$Step) {
     $report.ui_step = $Step
     Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass ConversationUiAcceptance `
         -Step $Step -ResultPrefix CONVERSATION_UI_RESULT
+}
+function Get-FileRefreshReadSequence($Reads, [int]$Taps) {
+    $rows = @($Reads | Sort-Object started_at_ms)
+    $result = [pscustomobject]@{ valid = $false; overlap = $false; intervals = @() }
+    if ($rows.Count -lt 1 -or $rows.Count -gt $Taps) { return $result }
+    $base = [long]$rows[0].started_at_ms
+    $previousEnd = 0L
+    foreach ($row in $rows) {
+        if ($null -eq $row.started_at_ms -or $null -eq $row.completed_at_ms) { return $result }
+        $start = [long]$row.started_at_ms; $end = [long]$row.completed_at_ms
+        if ($start -le 0 -or $end -lt $start) { return $result }
+        if ($start -lt $previousEnd) { $result.overlap = $true }
+        $result.intervals += [pscustomobject]@{ start_offset_ms = $start - $base; end_offset_ms = $end - $base }
+        $previousEnd = [Math]::Max($previousEnd, $end)
+    }
+    $result.valid = -not $result.overlap
+    return $result
 }
 function Act([string]$Action, [hashtable]$Arguments, [string]$Expected) {
     $sent = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action $Action -Arguments $Arguments
@@ -69,14 +88,22 @@ try {
         [int]$origin.social_chat.web_chat_pending_attachment_count -gt 0) { throw 'existing_work_in_progress' }
     Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
     $report.adapter = $before.adapter_version
-    $page = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action 'chatgpt_get_conversations' `
-        -Arguments @{ offset = 0; limit = 50 }
-    if ($page.stale) { throw 'directory_stale' }
-    $report.directory_returned = @($page.conversations).Count
-    $report.directory_has_more = [bool]$page.has_more
-    $candidates = @($page.conversations | Where-Object {
-        $_.title -match '(?i)fixture|file|attachment|test|\u5a92\u4f53|\u9644\u4ef6|\u6587\u4ef6'
-    } | Select-Object -Skip $CandidateOffset -First $Limit)
+    $report.current_conversation_only = [bool]$CurrentConversation
+    if ($CurrentConversation) {
+        if (([uri]$before.conversation.url).AbsolutePath -ne $origin.social_chat.web_chat_conversation_path) {
+            throw 'current_conversation_identity_mismatch'
+        }
+        $candidates = @([pscustomobject]@{ path = $origin.social_chat.web_chat_conversation_path })
+    } else {
+        $page = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action 'chatgpt_get_conversations' `
+            -Arguments @{ offset = 0; limit = 50 }
+        if ($page.stale) { throw 'directory_stale' }
+        $report.directory_returned = @($page.conversations).Count
+        $report.directory_has_more = [bool]$page.has_more
+        $candidates = @($page.conversations | Where-Object {
+            $_.title -match '(?i)fixture|file|attachment|test|\u5a92\u4f53|\u9644\u4ef6|\u6587\u4ef6'
+        } | Select-Object -Skip $CandidateOffset -First $Limit)
+    }
     $report.candidate_offset = $CandidateOffset
     $report.candidates = $candidates.Count
     foreach ($candidate in $candidates) {
@@ -84,9 +111,11 @@ try {
         $menuOpened = $false
         $report.cases += $case
         try {
-            $navigated = $true
-            $report.stage = 'navigate'
-            Open $candidate.path | Out-Null
+            if (-not $CurrentConversation) {
+                $navigated = $true
+                $report.stage = 'navigate'
+                Open $candidate.path | Out-Null
+            }
             Act 'chatgpt_private_protocol_probe' @{ mode = 'start' } 'private_protocol_probe' | Out-Null
             $probeStarted = $true
             $report.stage = 'file_index'
@@ -111,7 +140,10 @@ try {
                         @($reads | Where-Object { $_.status -ne 'succeeded' -or $_.result.ok -ne $true }).Count -gt 0) {
                         throw 'refresh_receipt_unconfirmed'
                     }
-                    if ($case.refresh.loading_samples -eq 3 -and $reads.Count -ne 1) { throw 'duplicate_pending_read' }
+                    $sequence = Get-FileRefreshReadSequence -Reads $reads -Taps $case.refresh.taps
+                    $case.refresh_read_sequence = $sequence
+                    if ($sequence.overlap) { throw 'duplicate_pending_read' }
+                    if (-not $sequence.valid) { throw 'refresh_timing_unconfirmed' }
                 }
                 $case.native_menu = @{ visible = $menu.file_index_visible
                     first_row = $menu.file_index_first_row; empty = $menu.file_index_empty }

@@ -57,8 +57,8 @@ observations remain valid. Do not relabel the earlier failures as proven timeout
 - Java semantic-menu acceptance helper compiled. The existing inventory script
   supports `-NativeMenu -VerifyRefreshInPlace`: wait for the initial read, tap
   Refresh three times, compare the Android window identity, preserve cached
-  rows, and inspect successful native command receipts. If all three taps were
-  sampled while loading, exactly one new read command is required.
+  rows, and inspect successful native command receipts. The original loading
+  sample assertion was replaced by actual command-interval checks below.
   Deterministic injected failures are not a controlled live network outage.
 
 ## Normal 1658 Delivery
@@ -78,3 +78,47 @@ observations remain valid. Do not relabel the earlier failures as proven timeout
 
 Reuse the completed citation download scopes. This correction does not complete
 mounted/cloud references, broaden model/account coverage or address thermal work.
+
+## Normal 1659 Native Follow-Up
+
+1659 / adapter 341 also includes the per-file citation parser correction; see
+[its separate delivery evidence](../chatgpt-private-file-citations.md#per-file-reference-coverage).
+The following are file-sheet checks, not per-file-source download acceptance.
+
+- Initial `file-refresh-native-1659-20260911-134319-531` and `...-ready-20260911-134439-207`
+  stopped at `directory_stale`. One explicit directory refresh subsequently
+  completed with `directory_partial`; this bounded directory was not a full-account audit.
+- `...-settled-20260911-134615-219` reached the native menu but could not find the
+  attachment action. Structural inspection confirmed the menu's visible scroll
+  area contained only its first four rows; the fifth action was below it.
+  The external Java helper now scrolls via `ACTION_SCROLL_FORWARD` on a ScrollView
+  in the menu's own accessibility window, not coordinate swipes. It also reports
+  bounded menu-visibility booleans without exporting conversation text.
+- The earlier `...-visible-20260911-135202-575` attempt lost the app foreground;
+  its restoration was unconfirmed. The probe was subsequently stopped. This
+  interrupted attempt is not recovery evidence or a proven app crash.
+- A navigation receipt timeout in `...-scoped-menu-20260911-135806-264` prevented
+  that inventory run from reaching the file menu; original state was restored.
+  `-CurrentConversation` now checks the existing native/web path identity and
+  skips directory discovery/navigation, isolating file-refresh acceptance.
+- `file-refresh-native-1659-current-ready-20260911-140301-635` actually reached
+  the production file sheet. Three Refresh clicks retained the same Android
+  window and cached rows; all three post-click samples showed loading. Two new
+  read commands succeeded, and the probe saw three HTTP 200 conversation reads
+  including the initial index read. Zero sends/downloads; conversation, draft
+  and awake setting were restored. The run was **not an overall pass**:
+  the old assertion labelled two commands `duplicate_pending_read`.
+- Loading after each click does not prove the reads overlap: a request can finish
+  between sampled clicks. The retained harness now checks actual command
+  `started_at_ms`/`completed_at_ms`, rejects overlapping or malformed intervals,
+  and caps reads at the number of clicks. Relative intervals are reported, not
+  content/credentials. Pure checks cover sequential, overlapping, empty,
+  over-count and incomplete intervals; the contract test passes.
+- The final timing run did not start because native-surface preparation timed
+  out and a read-only check confirmed `unlock_device`. The bridge still reported
+  ready/adapter 341. Do not rebuild or declare the timing check passed. Resume
+  `-CurrentConversation -NativeMenu -VerifyRefreshInPlace` after unlock.
+
+Scope now proven: native menu access, same-sheet refresh and cached-row retention.
+Still unconfirmed: actual non-overlap under the corrected timing assertion and
+live failure/retry recovery. Earlier failed/interrupted attempts are not passes.

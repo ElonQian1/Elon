@@ -31,8 +31,8 @@ a functional acceptance gate; do not expand performance tests in this phase.
 The [latest runtime compatibility repair](reports/chatgpt-runtime-bindings-20260911-b.md)
 is verified on 1655. Personal/project TXT citation downloads passed on 1651/1657;
 reuse [accepted scopes](chatgpt-private-file-citations.md), not the old 404 label.
-[File-list recovery](reports/chatgpt-file-read-recovery-20260911.md) is installed
-on 1658; native UI acceptance awaits device unlock.
+[File-list recovery](reports/chatgpt-file-read-recovery-20260911.md#normal-1659-native-follow-up)
+on 1659 kept its sheet/cached rows during refresh; final overlap timing awaits unlock.
 
 This summary supersedes older delivery labels below; it does not broaden a
 passed scope. Bounded ordinary/project directory continuation is now completed,
@@ -69,7 +69,7 @@ acceptance is tracked there; it does not complete citation or mounted workflows.
 | Project attachments | Native new-project TXT/PNG/PDF upload, send and actual content reading verified on 1614 | Explicit membership query rejected when background freshness expires; fix passes offline tests, grouped install/idle-query acceptance pending |
 | Model/effort/tool combinations | 1625 Advanced/version and 1627 cached High/Extreme selection reused; native new blank chat and temporary on/off passed. 1628 fixed premature tool-read cancellation and passed authenticated native Create Image/Search on/off, private receipts and chip clearing; [evidence](reports/chatgpt-composer-state-20260910.md) | Physical drag, other model/tier/tool and temporary contexts, subsequent send and server preference persistence remain unclaimed |
 | Latest cursor image gallery and creation | Gallery entry/page/viewer passed on 1620; full native Create Image passed on 1644. Ordinary original-image Download completed/default-enabled on 1654: one saved 662,362-byte PNG, 1254 x 1254, native decode and state restoration passed | [Original-download evidence and boundaries](reports/chatgpt-gallery-original-download-20260911.md#normal-1654-acceptance). Project/shared/mounted/watermarked sources, other formats and model/account scopes remain. Thumbnail efficiency/thermal work remains deferred |
-| Explicit file citations / remaining cloud references | Personal/project TXT citation native Download and 78 saved bytes/SHA-256 completed/default-enabled on 1651/1657; 187 checks pass | [Evidence](chatgpt-private-file-citations.md). Grouped/other-owner citations, URL-only cloud and nonempty PCA graphs remain |
+| Explicit file citations / cloud references | Personal/project TXT native Download and 78 bytes/SHA-256 completed/default-enabled on 1651/1657 | [Evidence](chatgpt-private-file-citations.md). Per-file grouping now implemented, 188 checks pass; grouped/other-owner device evidence, URL-only cloud and nonempty PCA graphs remain |
 | Google private sender | Deferred by user priority | Start only after the remaining ChatGPT acceptance gate |
 
 Current code correction separates current-document navigation/private directory

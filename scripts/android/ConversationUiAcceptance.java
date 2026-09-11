@@ -39,6 +39,24 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
         return text("\u5168\u90e8\u516c\u5f00\u5206\u4eab\u94fe\u63a5").exists() ||
             text("\u5168\u90e8\u516c\u5f00\u5206\u4eab\u94fe\u63a5\uff08\u90e8\u5206\uff09").exists();
     }
+    private void revealConversationAction(String selector) throws Exception {
+        UiObject title = text("\u4f1a\u8bdd\u64cd\u4f5c");
+        assertTrue("conversation_menu_missing", title.waitForExists(5000));
+        UiObject target = description(selector);
+        for (int attempt = 0; !target.waitForExists(350) && attempt < 3; attempt++) {
+            UiObject scroll = new UiObject(new UiSelector().packageName(APP)
+                .className("android.widget.ScrollView").scrollable(true));
+            java.lang.reflect.Method method = UiObject.class.getDeclaredMethod("findAccessibilityNodeInfo", long.class);
+            method.setAccessible(true);
+            AccessibilityNodeInfo info = (AccessibilityNodeInfo) method.invoke(scroll, 1000L);
+            assertNotNull("conversation_menu_scroll_missing", info);
+            try {
+                assertEquals("conversation_menu_scroll_owner", windowId(title), info.getWindowId());
+                assertTrue("conversation_menu_scroll_failed", info.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD));
+            } finally { info.recycle(); }
+        }
+        assertTrue("conversation_actions_missing", target.waitForExists(1000));
+    }
     private int windowId(UiObject node) throws Exception {
         java.lang.reflect.Method method = UiObject.class.getDeclaredMethod("findAccessibilityNodeInfo", long.class);
         method.setAccessible(true);
@@ -127,7 +145,7 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             case "header": click(description("web-chat-page-actions:chatgpt_web")); break;
             case "current_settings":
                 click(text("\u4f1a\u8bdd\u8bbe\u7f6e"));
-                assertTrue("conversation_actions_missing", description("web-chat-conversation-action-files").waitForExists(5000));
+                revealConversationAction("web-chat-conversation-action-files");
                 break;
             case "temporary": click(description("chatgpt-native:temporary-chat:\u4e34\u65f6\u804a\u5929")); break;
             case "retry_session": click(description("web-chat-consumer-retry")); break;
@@ -203,6 +221,13 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
         JSONObject result = new JSONObject().put("step", step)
             .put("reply_actions", replyActions)
             .put("refresh", refreshEvidence)
+            .put("header_settings", text("\u804a\u5929\u8bbe\u7f6e").exists())
+            .put("conversation_settings", text("\u4f1a\u8bdd\u8bbe\u7f6e").exists())
+            .put("conversation_actions", text("\u4f1a\u8bdd\u64cd\u4f5c").exists())
+            .put("conversation_files_action", description("web-chat-conversation-action-files").exists())
+            .put("conversation_files_label", text("\u4f1a\u8bdd\u9644\u4ef6").exists())
+            .put("conversation_pin_action", description("web-chat-conversation-action-set-pinned").exists())
+            .put("conversation_page_actions", text("\u5f53\u524d\u7f51\u9875\u64cd\u4f5c").exists())
             .put("file_index_visible", description("web-chat-conversation-files-status").exists())
             .put("file_index_first_row", description("web-chat-conversation-file-0").exists())
             .put("file_index_empty", text("\u6b64\u4f1a\u8bdd\u6682\u65e0\u9644\u4ef6").exists())

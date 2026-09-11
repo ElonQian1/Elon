@@ -29,6 +29,43 @@ result above supersedes that pending label, not other variants.
 This extends the existing conversation file index and download owner. It is not
 a new uploader, downloader, background poller or guessed cloud-provider API.
 
+## Per-file reference coverage
+
+Parser v4 / adapter 341 (`6e23eca82`) also reads
+`metadata.content_references_by_file`. The previous parser returned no citations
+when only that field was present. The retained public bundle
+`conversation-small-ft205i7yqa6zc2nj.js`, SHA-256
+`a89952420338983e104e94be5fae8e9ae7a4169b9ea8a4ed30e639641e14f456`,
+combines ordinary references with `Object.values(...content_references_by_file).flat()`
+in `R5i` (offset 4122272), then applies `gki` and the existing source grouping.
+This is source evidence, not a successful live-account response sample.
+
+The existing scanner now combines those fields in that order, accepting only
+one level of own array-valued buckets. Bucket names never supply file identity
+or project scope. Both fields share the 20-container/source limit; bucket scans
+are also bounded, and overflow remains explicit. Attachment-first and URL-first
+deduplication, concrete-ID validation, deletion/PCA/context masks, opaque native
+handles and scoped private authorization are unchanged. No new request or DOM
+read is added. Nonempty context/PCA graphs are still not implemented.
+
+All five new cases first failed on the prior implementation (63/68 passed).
+The fix passes 68/68 focused and 188/188 related runner cases, zero skips,
+plus the history script's 12 internal assertions and 114-asset bundle syntax.
+Logs: `citation-by-file-red-20260911-133106-409`,
+`citation-by-file-green-20260911-133153-082`, and
+`citation-by-file-related-20260911-133249-610`. Tests include private authorization,
+source removal revoking the old selection, row positions and truncation with a
+throwing DOM getter. HTTP/native save receipts are fixtures, not actual bytes.
+Normal 1.1.1659 / code 1659 was published and installed over wireless ADB;
+`citation-by-file-release-341-20260911-133459-239` passed Release/vital lint and
+installation (447.1 s). APK SHA-256:
+`f355a1206d9d197e18c9248f8e44f882d91a44abb0959c625816544c45a8ae8b`.
+The production chat reported adapter 341, authenticated and ready, empty drafts.
+Per-file source-shape device acceptance remains deferred: ordinary native index
+reads do not prove which metadata field supplied a row. Reuse the personal/project
+completed scopes above. See [native refresh checks](reports/chatgpt-file-read-recovery-20260911.md#normal-1659-native-follow-up)
+for the separate file-sheet acceptance boundary.
+
 ## Current resolver correction
 
 Two gaps in the original parser are corrected without changing the private
@@ -150,12 +187,11 @@ Coverage includes missing library identity, personal/project resolution,
 metadata HTTP errors, malformed flags/IDs, owner invalidation and no download
 after cancellation. This does not prove other cloud/PCA protocols or real bytes.
 
-Use an existing synthetic conversation with an assistant file citation on the
-installed adapter 325. In production native UI, open Conversation files,
-select the citation, download it and verify the save receipt and actual bytes.
-Keep the visible conversation/draft unchanged. Then exercise one library/project
-citation and a grouped/cite-map file if present; do not create private user
-content merely for a fixture.
-Wireless ADB was available on 2026-09-10, but the phone remained locked/asleep
-after the grouped build and installation. No real-account citation download was
-run for v16; see the [delivery evidence](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).
+The 1630/v16 delivery initially lacked device acceptance; see its historical
+[delivery evidence](reports/chatgpt-native-regeneration-20260910.md#normal-1630-grouped-delivery).
+The 1651/1657 results above supersede that gap for personal/project TXT, not
+other source structures. Do not recreate or resend those accepted fixtures.
+Next acceptance uses an existing grouped/cite-map/per-file reference if present
+on the current normal APK: native Conversation files, Download, saved-byte
+verification, then restore conversation/draft. Absence of such a sample is an
+evidence gap, not a reason to invent another protocol or repeat accepted tests.
