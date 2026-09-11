@@ -3,17 +3,19 @@
 ## Status and boundary
 
 Capability: `android_chatgpt_private_file_citation_download_v1`.
-Latest regression: normal 1650 reached the actual native citation Download action.
-Metadata first returned 404, then 200 with a nullable `is_project` flag that the
-validator rejected. Download owner v23 / adapter 334 corrects this one field;
-126 offline checks pass and saved-byte acceptance is pending.
-[Current evidence](reports/chatgpt-runtime-bindings-20260911.md#nullable-file-metadata-regression).
+Completed scope: personal uploaded TXT citation, default-enabled and
+device-verified on normal 1651 / adapter 334 / download owner v23. The actual
+native Download action saved 78 bytes with the exact expected SHA-256; the
+original conversation/draft were restored. No message was resent. Reuse this
+scope; 126 related tests pass. Project/grouped/cloud/PCA variants remain separate.
+[Acceptance and nullable-metadata fix](reports/chatgpt-runtime-bindings-20260911.md#normal-1651-acceptance).
 
-Status: implemented; current citation v3 / projection v9 / download owner v18
+Earlier delivery: citation v3 / projection v9 / download owner v18
 (source `7b78394da`) passed offline checks and is included in normal 1640 / adapter
 325 with the earlier metadata/scope correction. Grouped Release/install passed;
-real production citation download acceptance awaits phone unlock. Not marked
-`completed`. [Delivery evidence](reports/chatgpt-runtime-bindings-20260910-b.md#grouped-normal-release-1640).
+production citation download was unverified at that point. The scoped 1651
+result above supersedes that pending label, not other variants.
+[Earlier evidence](reports/chatgpt-runtime-bindings-20260910-b.md#grouped-normal-release-1640).
 
 This extends the existing conversation file index and download owner. It is not
 a new uploader, downloader, background poller or guessed cloud-provider API.

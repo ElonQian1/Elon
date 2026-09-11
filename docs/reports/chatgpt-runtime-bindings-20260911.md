@@ -125,5 +125,36 @@ project flag. File/library identities, string/number rejection, project
 resolution, cancellation and metadata HTTP failures stay guarded. Controlled
 tests first reproduced two failures out of 53, then all 126 related cases passed:
 `citation-null-project-red-20260911-081325-405` and
-`citation-null-project-green-20260911-081418-467`. Grouped release and saved-byte
-acceptance for this correction are pending; reuse the checkpoint, never resend.
+`citation-null-project-green-20260911-081418-467`.
+
+## Normal 1651 acceptance
+
+Normal 1.1.1651 / code 1651, source `01790e5ec721bbf40d65155fb54bf9638ece0aba`,
+APK SHA-256 `ab9ea1fe78489353e235c8569e1f77c0f7e46c294889b26129500b0991269b0a`,
+was published and installed with `-r`. Release log
+`citation-null-project-release-20260911-081645-367` passed (362.8s), including
+Android build, remote hash verification and installed version. The authenticated
+native production page reported adapter 334/current true.
+
+`citation-reuse-1651-20260911-082341-004` passed in 51.5s including native menu
+navigation, download, byte verification and restoration. It reused the exact
+1650 fixture: zero sends, one Download action, two indexed files and one
+assistant citation. Both metadata and `/api/library/files/{id}/download` returned
+200. The native receipt confirmed `download_saved`; one new handset file was
+78 bytes, SHA-256
+`75e2ed9bfe5772c9918e552ed07c2c0e689e7039367c81bb6906c63e396fa1f3`.
+No file was pulled to the PC. The synthetic downloaded file is retained, and the
+original conversation/draft and the acceptance awake lease were restored.
+
+Mark only the personal uploaded TXT citation case as completed/default-enabled
+for `android_chatgpt_private_file_citation_download_v1`; do not repeat without
+a current regression. Project/grouped/PCA/mounted/cloud variants remain separate.
+The local synthetic navigation checkpoint is retained outside Git worktrees at
+`.git/ai-acceptance-fixtures/chatgpt-citation-1650-e0d909c3.json`; its contents are
+never emitted. A future authorized variant can copy it into the harness's
+`.ai-tmp/citation-download-fixture.json` and use `-ReuseFixture`, not resend.
+
+The harness now includes only safe receipt codes and response field types in
+failure reports, so a 200/schema failure is distinguishable from a network or
+save failure without another broad diagnosis. It still exports no content,
+credentials, request headers or provider file identities.

@@ -28,9 +28,9 @@ a functional acceptance gate; do not expand performance tests in this phase.
 
 ## Current Status Map
 
-The [September 11 runtime compatibility](reports/chatgpt-runtime-bindings-20260911.md)
-repairs a new phone-observed build that caused fallback before native runtime
-send. Its release/acceptance and citation fixture boundaries are tracked there.
+The [September 11 compatibility and citation fixes](reports/chatgpt-runtime-bindings-20260911.md)
+are released and device-verified: native runtime send on 1650; personal TXT
+citation download with exact saved bytes on 1651. Reuse these scoped results.
 
 This summary supersedes older delivery labels below; it does not broaden a
 passed scope. Bounded ordinary/project directory continuation is now completed,
@@ -67,7 +67,7 @@ acceptance is tracked there; it does not complete citation or mounted workflows.
 | Project attachments | Native new-project TXT/PNG/PDF upload, send and actual content reading verified on 1614 | Explicit membership query rejected when background freshness expires; fix passes offline tests, grouped install/idle-query acceptance pending |
 | Model/effort/tool combinations | 1625 Advanced/version and 1627 cached High/Extreme selection reused; native new blank chat and temporary on/off passed. 1628 fixed premature tool-read cancellation and passed authenticated native Create Image/Search on/off, private receipts and chip clearing; [evidence](reports/chatgpt-composer-state-20260910.md) | Physical drag, other model/tier/tool and temporary contexts, subsequent send and server preference persistence remain unclaimed |
 | Latest cursor image gallery and creation | Gallery entry/page/viewer passed on 1620; corrected full native Create Image execution passed on 1644, with completed image output and original conversation/tool restoration | [1644 evidence](reports/chatgpt-private-acceptance-1644.md#create-image). Saved image bytes, pixel inspection and other model/account scopes are not implied. Thumbnail efficiency/thermal work remains deferred |
-| Explicit file citations / remaining cloud references | Metadata/scope and source `7b78394da` file-URL identity/empty-context corrections are included in installed 1640 / adapter 325; 216 checks pass. Production citation download acceptance awaits device reconnection | [Boundary and source evidence](chatgpt-private-file-citations.md). URL-only cloud without a ChatGPT ID and nonempty PCA graphs remain incomplete |
+| Explicit file citations / remaining cloud references | Personal TXT citation native Download and 78 saved bytes/SHA-256 completed/default-enabled on 1651, adapter 334; nullable metadata fix and 126 checks passed | [Evidence and boundaries](chatgpt-private-file-citations.md). Project/grouped citation variants, URL-only cloud and nonempty PCA graphs remain |
 | Google private sender | Deferred by user priority | Start only after the remaining ChatGPT acceptance gate |
 
 Current code correction separates current-document navigation/private directory

@@ -184,12 +184,21 @@ try {
     $message=$_.Exception.Message
     $report.error=if ($message -cmatch '^[a-z_]+$') {$message}
         elseif ($message -match '^Semantic UI acceptance failed: ([a-z_]+)$') {$Matches[1]} else {'citation_acceptance_failed'}
+    if ($report.download_attempts -gt 0) {
+        try {
+            $failed=@((Web).command_requests | Where-Object {
+                $_.request_id -notin $idsBefore -and $_.expected_web_action -eq 'download_conversation_file'
+            }) | Select-Object -Last 1
+            $report.download_status=$failed.status
+            $report.download_detail=if ($failed.result.detail -cmatch '^[a-z_]+$') {$failed.result.detail} else {'other'}
+        } catch {$report.download_receipt_unavailable=$true}
+    }
 } finally {
     if ($probe) {
         try {
             $stopped=Command 'chatgpt_private_protocol_probe' @{mode='stop'} 'private_protocol_probe'
             $evidence=$stopped.receipt.result.detail | ConvertFrom-Json
-            $report.protocol=@($evidence.records | Select-Object method,path,status)
+            $report.protocol=@($evidence.records | Select-Object method,path,status,responseState,responseFields)
             $report.protocol_dropped=$evidence.dropped
         } catch {$report.protocol_unavailable=$true}
     }

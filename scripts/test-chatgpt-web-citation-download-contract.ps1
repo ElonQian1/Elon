@@ -16,6 +16,7 @@ foreach ($required in @(
     '$report.passed -and $report.restored -and $report.awake_restored',
     'synthetic_remote_artifacts_may_remain','content_exported=$false','Select-Object method,path,status'
     'existing_synthetic_fixture_unavailable', '.Contains($prompt,[StringComparison]::Ordinal)', 'fixture_checkpoint_invalid'
+    'download_receipt_unavailable', 'download_detail', 'status,responseState,responseFields'
 )) {if (-not $source.Contains($required)) {throw "citation_acceptance_guard_missing: $required"}}
 if ([regex]::Matches($source,"Act 'send_input'").Count -ne 1 -or
     [regex]::Matches($source,"Ui 'download' -Download").Count -ne 1) {throw 'citation_acceptance_write_replay'}
