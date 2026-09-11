@@ -1,4 +1,4 @@
-# Canvas Release 1675 And Production Acceptance
+# Canvas Releases 1675/1677 And Production Acceptance
 
 ## Release
 
@@ -63,7 +63,46 @@ was attempted after observing the quant activity.
   External Java compiled/dexed and ran on the handset. Unreached write branches
   remain unverified. No production Android source changed in this test batch.
 
-## Next
+## Follow-up: Landscape And Shared Content On 1677
+
+The two resumed 1676 read-only runs failed before the private content read:
+`canvas-content-native-1676-20260912-054717-163` reported
+`conversation_actions_missing`; the bounded semantic-scroll retry
+`canvas-content-native-1676-scroll-20260912-054927-161` reported
+`conversation_menu_scroll_failed`. A filtered native accessibility inspection
+showed the 448dp action list extending below the landscape window, with later
+rows and footer clipped even at the scroll end. This was a native layout bug,
+not a provider capability or authentication failure.
+
+Source `27ac7a9e308f1d505da7a1089ad1201350de3454` gives the existing list a
+vertical layout weight so it shrinks before the fixed title/footer. The
+acceptance runner reuses its package/window-bound scroll helper to reveal Share.
+Eight focused Node checks and source-size/diff guards passed; the layout check
+is a source-wiring guard, not an Android rendering simulation.
+
+Normal APK **1.1.1677 (1677)** was published and replacement-installed without
+clearing data. SHA-256:
+`0a91b751079571a0221f6945944b167a274eaad3b531f3a1490a4558e0d58645`.
+Release log `web-chat-action-sheet-1677-release-20260912-060022-728` passed in
+485.8 seconds; Gradle completed in 7m7s. Remote hash/size/version and installed
+version matched. The existing background cleanup warning was separate from
+successful release/install. Adapter remains 359.
+
+**Device result:** `canvas-content-native-1677-20260912-060925-643` passed in
+44.9 seconds in production `social_ai`, with a 2400x1080 landscape window
+(rotation 270). Native conversation actions -> Share -> existing Canvas list ->
+View -> Back to the same link/list and conversation succeeded. The inert native
+TextView contained **1392 UTF-16 units**, matching canonical content length;
+type was `document`, optional version null. `sent_messages=0`, `writes=0`,
+`content_exported=false`, `restored=true`, `awake_restored=true`.
+
+This supersedes the earlier interrupted shared-source-viewer result only.
+`android_chatgpt_private_canvas_shared_content_v1:read_and_return` is completed
+and device-verified. Source Copy, hot reopen/cancel races, original edit/save/
+history/restore, first publication/update and disposable revocation were not
+exercised by this read-only run. No private protocol or voice transport changed.
+
+## Remaining Acceptance
 
 Reserve one uninterrupted handset window. Reuse an owned disposable original
 Canvas if available; avoid repeated creation prompts or protocol rediscovery.

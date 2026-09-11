@@ -13,11 +13,14 @@ reuses this viewer and records the now-resolved original editor/save owner. That
 separate source capability does not broaden this read-only acceptance scope.
 
 - `transport=page_private_http`; identity stays in the existing WebView.
-- `code_status=implemented`; adapter 358, content module v1, share owner v6.
-- `verification_status=offline_verified`; device content acceptance deferred.
-- `completed=false`; candidate source, not a new published/installed APK.
-- Normal 1673 does not contain this new content viewer. No default-promotion
-  or full Canvas capability completion is claimed by this source batch.
+- `code_status=implemented`; initially adapter 358, accepted with adapter 359.
+- `verification_status=device_verified` for native source read and return.
+- `android_chatgpt_private_canvas_shared_content_v1:read_and_return`:
+  `completed=true`, available through the normal production entry on APK 1677.
+- [1677 acceptance](chatgpt-canvas-production-1675-20260912.md#follow-up-landscape-and-shared-content-on-1677)
+  matched native/canonical body length and restored the same conversation/draft.
+  Source Copy and write operations were not exercised; full Canvas completion
+  is not claimed. The initial offline evidence below remains historical.
 
 ## Website Evidence
 
@@ -42,8 +45,9 @@ Public assets were downloaded without credentials and parsed, not executed.
 Further evidence exists for conversation textdoc lists, diff reads,
 version-bound restore, comment deletion and PDF/DOCX export. These are separate
 operations. `conversation/textdocs/infer_metadata` infers a temporary document's
-metadata; it is not a persist/create endpoint. The full edit/save owner has not
-been traced sufficiently and no write protocol was invented.
+metadata; it is not a persist/create endpoint. The initial read-only batch had
+not traced the edit/save owner; the linked subsequent batch records that owner
+separately. No write protocol was invented for this viewer.
 
 ## State And Presentation
 
@@ -94,7 +98,8 @@ workflow. An installed-1673 read-only list command timed out during research;
 that does not verify or disprove the new, uninstalled content reader. No
 content, link, account token or header was exported; no link was revoked.
 
-Next acceptance: one owned public Canvas -> native View -> compare full source
-in-process -> Copy source -> Back to same link/list; verify hot reopen, cancel
-during read and original conversation/draft restoration without any send.
-Actual edit/publish/revoke and rich preview remain separate unfinished scopes.
+Native View/full body length/Back and conversation/draft restoration passed on
+1677. Do not repeat that accepted path absent a regression. Source Copy, hot
+reopen and cancel during read remain offline-tested or unexercised, not part of
+that device result. Actual edit/publish/revoke and rich preview remain separate
+unfinished scopes.
