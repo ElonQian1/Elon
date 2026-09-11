@@ -177,7 +177,7 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                 replyActions = inspectReplyActions(retrySelector()); break;
             case "conversation_actions":
                 click(new UiObject(new UiSelector().packageName(APP).descriptionStartsWith("chatgpt-conversation-actions:")));
-                assertTrue("conversation_actions_missing", description("web-chat-conversation-action-share").waitForExists(5000));
+                revealConversationAction("web-chat-conversation-action-share");
                 break;
             case "files":
                 click(description("web-chat-conversation-action-files"));

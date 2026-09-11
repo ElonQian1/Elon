@@ -83,6 +83,8 @@ internal object WebChatActionSheet {
             itemScroll.layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(activity, (updatedItems.size * ITEM_HEIGHT_DP).coerceAtMost(MAX_LIST_HEIGHT_DP)),
+                // Shrink the list, not the footer, when the window is shorter than the sheet.
+                1f,
             )
             itemContainer.removeAllViews()
             updatedItems.forEach { item ->
