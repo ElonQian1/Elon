@@ -5,9 +5,10 @@ import com.elon.app.privateaccess.StrictJson
 
 /** One typed intention. Exchange validation remains in the existing management domain and adapter. */
 internal data class BinanceManageCommandDraft(val id: String, val action: String, val cps: Boolean,
-    val amount: String, val range: BinanceRangeDraft?,val protection:BinanceProtectionDraft?=null) {
+    val amount: String, val range: BinanceRangeDraft?,val protection:BinanceProtectionDraft?=null,val trailing:BinanceTrailingDraft?=null) {
     companion object {
         fun parse(raw: String,version:Int=2): BinanceManageCommandDraft {
+            require(version in 2..4)
             val values = StrictJson.parse(raw, 4096)
             require(values.values.all { it is String }) { "参数格式不完整" }
             fun value(key: String) = values[key] as? String ?: error("缺少管理参数")
@@ -17,7 +18,8 @@ internal data class BinanceManageCommandDraft(val id: String, val action: String
                 "settings", "close" -> setOf("cps")
                 "investment" -> setOf("amount")
                 "range" -> setOf("lower", "upper", "count", "close_positions", "amount")
-                "protection" -> BinanceProtectionDraft.keys.also{require(version==3)}
+                "protection" -> BinanceProtectionDraft.keys.also{require(version>=3)}
+                "trailing" -> setOf("up_price","down_price").also{require(version>=4)}
                 else -> error("当前尚不支持这项管理操作")
             }
             require(values.keys == setOf("id", "action") + extra) { "参数与操作类型不匹配" }
@@ -29,7 +31,8 @@ internal data class BinanceManageCommandDraft(val id: String, val action: String
                     count.toInt(), flag("close_positions"), value("amount"))
             } else null
             val protection=if(action=="protection")BinanceProtectionDraft.parse(BinanceProtectionDraft.keys.associateWith { if(it=="tpsl_cps")flag(it) else value(it) }) else null
-            return BinanceManageCommandDraft(id,action,if(action in setOf("settings","close")) flag("cps") else false,amount,range,protection)
+            val trailing=if(action=="trailing")BinanceTrailingDraft.parse(mapOf("up_price" to value("up_price"),"down_price" to value("down_price"))) else null
+            return BinanceManageCommandDraft(id,action,if(action in setOf("settings","close")) flag("cps") else false,amount,range,protection,trailing)
         }
     }
 }
@@ -39,14 +42,17 @@ internal object BinanceManageCommandView {
     fun action(value: String) = when(value) {
         "settings" -> "修改终止时仓位处理"; "close" -> "结束网格"
         "investment" -> "追加策略投入"; "range" -> "修改区间和格数"
-        "protection" -> "修改止盈止损"; else -> "尚未选择"
+        "protection" -> "修改止盈止损"; "trailing" -> "修改停止追踪价格"; else -> "尚未选择"
     }
     fun detail(s: BinanceManageSnapshot,version:Int=2): Map<String,Any?> = linkedMapOf(
         "id" to s.id, "symbol" to s.symbol, "status" to s.status, "cps" to s.cps, "cos" to s.cos,
         "investment" to s.investment?.invested(), "range" to s.range?.let {
             mapOf("lower" to it.lower,"upper" to it.upper,"count" to it.count.toString(),
                 "stop_lower" to it.preserved["stopLowerLimit"],"stop_upper" to it.preserved["stopUpperLimit"])
-        }).apply {if(version==3)put("protection",s.protection?.publicDetail(s.investment))}
+        }).apply {
+            if(version>=3)put("protection",s.protection?.publicDetail(s.investment))
+            if(version>=4)put("trailing",s.trailingRules?.let{rules->s.trailing?.publicDetail(rules)})
+        }
     fun summary(state: BinanceManageState) = buildString {
         val s = state.snapshot ?: return@buildString
         append("${s.symbol} · 策略 ${s.id}\n当前状态：${s.status}\n终止时：${mode(s.cps)}\n")
@@ -54,9 +60,16 @@ internal object BinanceManageCommandView {
         s.investment?.let { append("参考累计投入：${it.invested()} USDT\n") }
         s.range?.let { append("当前区间：${it.lower} ～ ${it.upper} · ${it.count} 格\n原价格止盈止损：${it.preserved["stopLowerLimit"] ?: "未设置"} / ${it.preserved["stopUpperLimit"] ?: "未设置"}\n") }
         s.protection?.let {append("当前保护：${if(it.current().mode=="CLEAR")"未设置止盈止损" else it.current().description()}\n")}
+        s.trailing?.let {append("当前停止追踪价：上移 ${it.upPrice.ifEmpty{"未设置"}} / 下移 ${it.downPrice.ifEmpty{"未设置"}}\n")}
         if(state.status != "prepared") return@buildString
         append("\n本次操作：${action(state.action)}\n")
         when(state.action) {
+            "trailing" -> state.trailingDraft?.let {
+                append("停止追踪上限：${s.trailing?.upPrice?.ifEmpty{"未设置"}} → ${it.upPrice.ifEmpty{"未开启"}}\n")
+                append("停止追踪下限：${s.trailing?.downPrice?.ifEmpty{"未设置"}} → ${it.downPrice.ifEmpty{"未开启"}}\n")
+                append("参考允许范围：${s.trailingRules?.minimum} ～ ${s.trailingRules?.maximum}；提交前重新核验。\n")
+                append("仅修改已开启方向的停止追踪价；追踪方向、区间、格数、投入、止盈止损和终止处理保持。本次不直接调整仓位；停止追踪不等于结束网格。")
+            }
             "protection" -> state.protectionDraft?.let {
                 append("${state.protectionInput?.description()}\n")
                 if(state.protectionInput?.mode=="ROI")append("换算基数参考：${s.investment?.invested()} USDT\n最终金额：${it.description()}\n")
@@ -74,5 +87,5 @@ internal object BinanceManageCommandView {
     }
     fun digest(state: BinanceManageState) = BinanceHostState.digest(StrictJson.encode(linkedMapOf(
         "action" to state.action,"id" to state.id,"cps" to state.cps,"amount" to state.investmentDelta,
-        "range" to state.rangeDraft?.payload(),"protection" to state.protectionDraft?.payload(),"summary" to summary(state))))
+        "range" to state.rangeDraft?.payload(),"protection" to state.protectionDraft?.payload(),"trailing" to state.trailingDraft?.payload(),"summary" to summary(state))))
 }

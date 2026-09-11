@@ -38,7 +38,9 @@
     return v;
   }
   function sameBaseline(current,expected) {
-    return !!current?.trailing && !!expected?.trailing && JSON.stringify(canonical(current))===JSON.stringify(canonical(expected));
+    if(!current?.trailing || !expected?.trailing || !window.__elonBinanceProtectionV1?.sameBaseline(current,expected))return false;
+    const rest=v=>Object.fromEntries(Object.entries(v).filter(([k])=>!['investment','protection','trailing_rules'].includes(k)));
+    return JSON.stringify(canonical(rest(current)))===JSON.stringify(canonical(rest(expected)));
   }
   function body(id,s,input,rules) {
     const v=draft(input),p=s?.protection,t=s?.trailing;

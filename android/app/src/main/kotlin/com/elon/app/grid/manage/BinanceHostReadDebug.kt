@@ -39,9 +39,9 @@ internal object BinanceHostReadDebug {
         return try {
             session?.close()
             val state=BinanceManageState(SystemClock::elapsedRealtime)
-            val active=BinanceManageSession(host,state,{true}) {
+            val active=BinanceManageSession(host,state,{true},changed = {
                 if(session?.busy==false)release(host)
-            }
+            })
             session=active;requestCount++
             hook={active.observed(it)};host.onCreateObservation=hook
             active.read(id);"read_started"

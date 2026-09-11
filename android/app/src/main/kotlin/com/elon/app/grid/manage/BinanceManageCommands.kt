@@ -26,20 +26,20 @@ internal class BinanceManageCommands private constructor(context: Context, priva
     private var creationPending = false
     private var touched = 0L
     private var version=2
-    private val schema get()=if(version==3)"yilong.binance_manage_command.v3" else SCHEMA
-    private val legacyProtection get()=version==2 && state.unresolved && state.action=="protection"
+    private val schema get()="yilong.binance_manage_command.v$version"
+    private val legacyOperation get()=state.unresolved && ((version<3 && state.action=="protection") || (version<4 && state.action=="trailing"))
     private val expiry = Runnable { expire() }
 
     fun call(requestedMethod: String, extras: Bundle): Bundle {
         require(requestedMethod in methods)
-        val requestedVersion=if(requestedMethod.endsWith("_v3"))3 else 2
-        val method=requestedMethod.removeSuffix("_v3").let {if(requestedVersion==3)it+"_v2" else it}
+        val requestedVersion=requestedMethod.takeLast(1).toInt()
+        val method=requestedMethod.dropLast(1)+"2"
         if(method == "manage_capabilities_v2") {
             require(extras.isEmpty)
-            return reply(mapOf("schema" to if(requestedVersion==3)"yilong.binance_manage_command.v3" else SCHEMA,"status" to "supported","version" to requestedVersion.toString(),
-                "operations" to (listOf("settings","close","investment","range")+if(requestedVersion==3)listOf("protection") else emptyList()),"confirmation_owner" to "com.elon.quant"))
+            return reply(mapOf("schema" to "yilong.binance_manage_command.v$requestedVersion","status" to "supported","version" to requestedVersion.toString(),
+                "operations" to (listOf("settings","close","investment","range")+(if(requestedVersion>=3)listOf("protection") else emptyList())+(if(requestedVersion>=4)listOf("trailing") else emptyList())),"confirmation_owner" to "com.elon.quant"))
         }
-        if(operation.isNotEmpty() && version!=requestedVersion)return reply(mapOf("schema" to if(requestedVersion==3)"yilong.binance_manage_command.v3" else SCHEMA,"status" to "busy","message" to "请先退出当前管理页面，再使用另一版本连接。"))
+        if(operation.isNotEmpty() && version!=requestedVersion)return reply(mapOf("schema" to "yilong.binance_manage_command.v$requestedVersion","status" to "busy","message" to "请先退出当前管理页面，再使用另一版本连接。"))
         val fields = when(method) {
             "manage_read_v2" -> setOf("operation","id")
             "manage_prepare_v2" -> setOf("operation","draft")
@@ -56,12 +56,12 @@ internal class BinanceManageCommands private constructor(context: Context, priva
                 operation = id
                 corrupt = runCatching { journal.read()?.let(state::restore) }.isFailure
                 creationPending = runCatching { creation.read() != null }.getOrDefault(true)
-                session = BinanceManageSession(host,state,::persist,::changed)
+                session = BinanceManageSession(host,state,::persist,::changed,enableTrailing=version>=4)
                 host.onCreateObservation = { session?.observed(it) }
             }
         } else require(operation == id && session != null)
         touch()
-        if(legacyProtection && method !in setOf("manage_open_v2","manage_poll_v2","manage_close_v2"))return snapshot()
+        if(legacyOperation && method !in setOf("manage_open_v2","manage_poll_v2","manage_close_v2"))return snapshot()
         if(method in setOf("manage_open_v2","manage_poll_v2")) {
             creationPending = runCatching { creation.read() != null }.getOrDefault(true)
             host.recoverConnection()
@@ -76,7 +76,7 @@ internal class BinanceManageCommands private constructor(context: Context, priva
                     require(available()) { "请先连接并授权读取当前账号" }
                     val draft = BinanceManageCommandDraft.parse(extras.getString("draft").orEmpty(),version)
                     selected = draft.id
-                    session!!.prepare(draft.id,draft.action,draft.cps,draft.amount,draft.range,draft.protection)
+                    session!!.prepare(draft.id,draft.action,draft.cps,draft.amount,draft.range,draft.protection,draft.trailing)
                 }.onFailure { session?.cancel();note = (it as? IllegalArgumentException)?.message?.take(180) ?: "参数检查未完成，未提交操作" }
             }
             "manage_submit_v2" -> {
@@ -99,7 +99,7 @@ internal class BinanceManageCommands private constructor(context: Context, priva
         }
         return snapshot()
     }
-    private fun available() = !corrupt && !creationPending && !legacyProtection && host.readConsentCurrent()
+    private fun available() = !corrupt && !creationPending && !legacyOperation && host.readConsentCurrent()
     private fun cancel() { permit.clear(); preparation = ""; digest = ""; session?.cancel(); note = "" }
     private fun read(id: String) {
         require(available() && session?.busy == false && state.status != "submitting")
@@ -108,18 +108,18 @@ internal class BinanceManageCommands private constructor(context: Context, priva
         cancel(); selected = id; session!!.read(id)
     }
     private fun changed() {
-        if(state.status == "prepared" && preparation.isEmpty()) {
+        if(state.status == "prepared" && preparation.isEmpty() && session?.canSubmit()==true) {
             digest = BinanceManageCommandView.digest(state); preparation = randomId()
             permit.bind(operation,state.account,state.document,digest,preparation)
         }
     }
     private fun snapshot(): Bundle {
         val authorized = host.readConsentCurrent()
-        val same = !legacyProtection && authorized && (state.account == host.state.account || (!state.unresolved && session?.detailCurrent(selected) == true))
+        val same = !legacyOperation && authorized && (state.account == host.state.account || (!state.unresolved && session?.detailCurrent(selected) == true))
         val canSubmit = available() && session?.canSubmit() == true && permit.valid(operation,host.state.account,
             host.document.snapshot().documentToken,digest,preparation)
         val phase = when {
-            corrupt || legacyProtection -> "recovery_error"
+            corrupt || legacyOperation -> "recovery_error"
             creationPending -> "creation_pending"
             state.unresolved && state.account != host.state.account -> "account_required"
             !host.live() || !host.state.fresh() -> "connecting"
@@ -133,7 +133,7 @@ internal class BinanceManageCommands private constructor(context: Context, priva
         val current = state.snapshot?.takeIf { currentDetail }
         val choices = if(authorized) host.state.managementChoices().filter { BinanceManageSnapshot.validId(it.first) } else emptyList()
         return reply(linkedMapOf("schema" to schema,"operation" to operation,"status" to phase,
-            "message" to if(legacyProtection)"存在新版止盈止损操作记录，请更新量化应用后查询；不会补发或清除记录。" else note.ifEmpty { session?.message.orEmpty() },"connection" to host.status,
+            "message" to if(legacyOperation)"存在新版管理操作记录，请更新量化应用后查询；不会补发或清除记录。" else note.ifEmpty { session?.message.orEmpty() },"connection" to host.status,
             "account" to if(authorized) host.state.account.orEmpty() else "","account_kind" to if(authorized) host.state.accountKind else "",
             "choices" to choices.map { mapOf("id" to it.first,"label" to it.second) },
             "can_read" to (available() && session?.busy == false && (!state.unresolved || same)),
@@ -159,7 +159,7 @@ internal class BinanceManageCommands private constructor(context: Context, priva
     companion object {
         const val SCHEMA="yilong.binance_manage_command.v2"
         val methods=setOf("manage_capabilities_v2","manage_open_v2","manage_poll_v2","manage_read_v2","manage_prepare_v2",
-            "manage_submit_v2","manage_cancel_v2","manage_ack_v2","manage_close_v2").let{it+it.map{method->method.replace("_v2","_v3")}}
+            "manage_submit_v2","manage_cancel_v2","manage_ack_v2","manage_close_v2").let{base->(2..4).flatMap{v->base.map{it.dropLast(1)+v}}.toSet()}
         private var instance: BinanceManageCommands?=null
         fun dispatch(context: Context,host: BinanceHostRuntime,method: String,extras: Bundle): Bundle =
             (instance ?: BinanceManageCommands(context.applicationContext,host).also { instance=it }).call(method,extras)

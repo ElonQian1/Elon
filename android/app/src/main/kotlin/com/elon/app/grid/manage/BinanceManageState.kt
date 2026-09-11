@@ -4,18 +4,20 @@ import com.elon.app.privateaccess.StrictJson
 
 internal data class BinanceManageSnapshot(val id: String, val symbol: String, val status: String,
     val cps: Boolean, val cos: Boolean, val sharing: Boolean, val trailingLower: Boolean, val trailingUpper: Boolean,
-    val investment:BinanceInvestmentSnapshot?=null,val range:BinanceRangeSnapshot?=null,val protection:BinanceProtectionSnapshot?=null) {
+    val investment:BinanceInvestmentSnapshot?=null,val range:BinanceRangeSnapshot?=null,val protection:BinanceProtectionSnapshot?=null,
+    val trailing:BinanceTrailingSnapshot?=null,val trailingRules:BinanceTrailingRules?=null) {
     companion object {
         fun parse(raw: Any?): BinanceManageSnapshot {
             val v = raw as? Map<*, *> ?: error("详情格式不完整")
             val base=setOf("strategy_id","symbol","provider_status","cps","cos","sharing","trailingStopLowerLimit","trailingStopUpperLimit")
-            require(v.keys.containsAll(base) && v.keys.all{it in base+setOf("investment","range","protection")})
+            require(v.keys.containsAll(base) && v.keys.all{it in base+setOf("investment","range","protection","trailing","trailing_rules")})
             val id = v["strategy_id"] as String; require(validId(id))
             val symbol = v["symbol"] as String; require(Regex("[A-Z0-9]{1,24}USDT").matches(symbol))
             val status = v["provider_status"] as String; require(Regex("[A-Z][A-Z0-9_]{0,63}").matches(status))
             return BinanceManageSnapshot(id,symbol,status,v["cps"] as Boolean,v["cos"] as Boolean,
                 v["sharing"] as Boolean,v["trailingStopLowerLimit"] as Boolean,v["trailingStopUpperLimit"] as Boolean,
-                v["investment"]?.let(BinanceInvestmentSnapshot::parse),v["range"]?.let(BinanceRangeSnapshot::parse),v["protection"]?.let(BinanceProtectionSnapshot::parse))
+                v["investment"]?.let(BinanceInvestmentSnapshot::parse),v["range"]?.let(BinanceRangeSnapshot::parse),v["protection"]?.let(BinanceProtectionSnapshot::parse),
+                v["trailing"]?.let(BinanceTrailingSnapshot::parse),v["trailing_rules"]?.let(BinanceTrailingRules::parse))
         }
         fun validId(id: String) = Regex("[1-9][0-9]{0,15}").matches(id) && (id.toLongOrNull() ?: Long.MAX_VALUE) <= 9_007_199_254_740_991L
     }
@@ -36,15 +38,19 @@ internal class BinanceManageState(private val elapsed: () -> Long) {
     var protectionDraft:BinanceProtectionDraft?=null;private set
     var protectionInput:BinanceProtectionDraft?=null;private set
     private var protectionTarget=""
+    var trailingDraft:BinanceTrailingDraft?=null;private set
+    private var trailingTarget=""
     var snapshot: BinanceManageSnapshot? = null; private set
     var providerStatus = ""; private set
     private var expires = 0L
     val unresolved get() = status in setOf("submitting","unknown","accepted","observed")
-    fun prepare(account: String, document: String, action: String, cps: Boolean, snapshot: BinanceManageSnapshot, investmentDelta:String="",rangeDraft:BinanceRangeDraft?=null,protectionInput:BinanceProtectionDraft?=null) {
+    fun prepare(account: String, document: String, action: String, cps: Boolean, snapshot: BinanceManageSnapshot, investmentDelta:String="",rangeDraft:BinanceRangeDraft?=null,protectionInput:BinanceProtectionDraft?=null,trailingInput:BinanceTrailingDraft?=null) {
         require(!unresolved && Regex("[a-f0-9]{64}").matches(account) && Regex("doc_[a-z0-9_]{3,80}").matches(document))
-        require(action in setOf("settings","close","investment","range","protection") && snapshot.status == "WORKING")
+        require(action in setOf("settings","close","investment","range","protection","trailing") && snapshot.status == "WORKING")
         require((action=="range")==(rangeDraft!=null))
         require((action=="protection")==(protectionInput!=null))
+        require((action=="trailing")==(trailingInput!=null))
+        if(trailingInput!=null)trailingInput.validate(snapshot.trailing ?: error("追踪设置不完整"),snapshot.trailingRules ?: error("追踪规则尚未核验"))
         require(if (action == "settings") snapshot.cps != cps else snapshot.cps == cps)
         val amount=if(action=="investment")BinanceInvestment.amount(investmentDelta) else "".also{require(investmentDelta.isEmpty())}
         val target=if(action=="investment")(snapshot.investment ?: error("官网尚未返回可核验的投入详情")).target(amount) else ""
@@ -63,6 +69,7 @@ internal class BinanceManageState(private val elapsed: () -> Long) {
         this.investmentDelta=amount;investmentTarget=target
         this.rangeDraft=rangeDraft;rangeTarget=rangeDraft?.target().orEmpty()
         this.protectionInput=protectionInput;protectionDraft=protection;protectionTarget=protection?.target().orEmpty()
+        trailingDraft=trailingInput;trailingTarget=trailingInput?.target(snapshot.trailing!!).orEmpty()
         this.snapshot=snapshot;providerStatus=snapshot.status;expires=elapsed()+60_000;status="prepared"
     }
     fun canSubmit(account: String?, document: String) = status=="prepared" && snapshot!=null &&
@@ -88,29 +95,34 @@ internal class BinanceManageState(private val elapsed: () -> Long) {
             "investment"->investmentTarget.isNotEmpty() && it.investment?.target("0")==investmentTarget
             "range"->rangeTarget.isNotEmpty() && it.range?.target()==rangeTarget
             "protection"->protectionTarget.isNotEmpty() && it.protection?.target()==protectionTarget
+            "trailing"->trailingTarget.isNotEmpty() && it.trailing?.target()==trailingTarget
             else->action=="close" && it.status in setOf("CANCELED","CANCELLED","CLOSE_WITH_POSITION")
         }
     } == true
     fun investmentPreview()=snapshot?.investment?.invested(investmentDelta.ifEmpty{"0"})
-    fun journal() = StrictJson.encode(mapOf("schema" to if(action=="protection")"yilong.binance_manage_journal.v4" else "yilong.binance_manage_journal.v3","status" to status,
+    fun journal() = StrictJson.encode(mapOf("schema" to if(action=="trailing")"yilong.binance_manage_journal.v5" else if(action=="protection")"yilong.binance_manage_journal.v4" else "yilong.binance_manage_journal.v3","status" to status,
         "account" to account,"strategy_id" to id,"action" to action,"cps" to cps,"provider_status" to providerStatus,"investment_target" to investmentTarget,"range_target" to rangeTarget)+
-        if(action=="protection")mapOf("protection_target" to protectionTarget) else emptyMap())
+        (if(action in setOf("protection","trailing"))mapOf("protection_target" to protectionTarget) else emptyMap())+
+        (if(action=="trailing")mapOf("trailing_target" to trailingTarget) else emptyMap()))
     fun restore(raw: String) {
         val v=StrictJson.parse(raw,2048)
-        val v4=v["schema"]=="yilong.binance_manage_journal.v4"
+        val v5=v["schema"]=="yilong.binance_manage_journal.v5"
+        val v4=v5 || v["schema"]=="yilong.binance_manage_journal.v4"
         val v3=v4 || v["schema"]=="yilong.binance_manage_journal.v3"
         val v2=v3 || v["schema"]=="yilong.binance_manage_journal.v2"
-        require(v.keys==setOf("schema","status","account","strategy_id","action","cps","provider_status")+(if(v2)setOf("investment_target") else emptySet())+(if(v3)setOf("range_target") else emptySet())+(if(v4)setOf("protection_target") else emptySet()))
+        require(v.keys==setOf("schema","status","account","strategy_id","action","cps","provider_status")+(if(v2)setOf("investment_target") else emptySet())+(if(v3)setOf("range_target") else emptySet())+(if(v4)setOf("protection_target") else emptySet())+(if(v5)setOf("trailing_target") else emptySet()))
         require((v2 || v["schema"]=="yilong.binance_manage_journal.v1") && v["status"] in setOf("submitting","unknown","accepted","observed"))
         account=v["account"] as String;require(Regex("[a-f0-9]{64}").matches(account))
         id=v["strategy_id"] as String;require(BinanceManageSnapshot.validId(id))
-        action=v["action"] as String;require(action in setOf("settings","close") || (v2 && action=="investment") || (v3 && action=="range") || (v4 && action=="protection"));cps=v["cps"] as Boolean
+        action=v["action"] as String;require(action in setOf("settings","close") || (v2 && action=="investment") || (v3 && action=="range") || (v4 && action=="protection") || (v5 && action=="trailing"));cps=v["cps"] as Boolean
         investmentDelta="";investmentTarget=if(v2)v["investment_target"] as String else ""
         require(if(action=="investment")Regex("[a-f0-9]{64}").matches(investmentTarget) else investmentTarget.isEmpty())
         rangeDraft=null;rangeTarget=if(v3)v["range_target"] as String else ""
         require(if(action=="range")Regex("[a-f0-9]{64}").matches(rangeTarget) else rangeTarget.isEmpty())
         protectionInput=null;protectionDraft=null;protectionTarget=if(v4)v["protection_target"] as String else ""
         require(if(action=="protection")Regex("[a-f0-9]{64}").matches(protectionTarget) else protectionTarget.isEmpty())
+        trailingDraft=null;trailingTarget=if(v5)v["trailing_target"] as String else ""
+        require(if(action=="trailing")Regex("[a-f0-9]{64}").matches(trailingTarget) else trailingTarget.isEmpty())
         providerStatus=v["provider_status"] as String;require(providerStatus.isEmpty() || Regex("[A-Z][A-Z0-9_]{0,63}").matches(providerStatus))
         status=if(v["status"] in setOf("accepted","observed")) "accepted" else "unknown"
         document="";snapshot=null;expires=0

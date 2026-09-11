@@ -18,7 +18,8 @@
   const scalarId = v => validId(v) ? v : Number.isSafeInteger(v) && v >= 0 ? String(v) : null;
   const safeCode = v => ['response_unrecognized','account_unverified','account_changed','configuration_unavailable',
     'session_context_expired','configuration_changed','detail_unverified','cancelled_before_send',
-    'settings_changed','settings_unavailable','not_working','no_change','close_mode_changed','investment_unavailable','range_unavailable','protection_unavailable'].includes(v) ? v : 'network_unavailable';
+    'settings_changed','settings_unavailable','not_working','no_change','close_mode_changed','investment_unavailable','range_unavailable','protection_unavailable',
+    'trailing_unavailable','trailing_rules_unavailable'].includes(v) ? v : 'network_unavailable';
   const businessCode = v => typeof v === 'string' && (/^[0-9]{1,12}$/.test(v) || v === 'symbolInTwap') ? v : 'business_rejected';
   function keys(v, expected) {
     return v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).sort().join(',') === expected.sort().join(',');
@@ -219,14 +220,28 @@
     if(flags.some(k=>typeof d[k] !== 'boolean')) throw Error('settings_unavailable');
     return {strategy_id:p.strategy,symbol:d.symbol,provider_status:d.strategyStatus,
       ...Object.fromEntries(flags.map(k=>[k,d[k]])),investment:fundingSnapshot(d),range:window.__elonBinanceRangeV1?.snapshot(d) || null,
-      protection:window.__elonBinanceProtectionV1?.snapshot(d) || null};
+      protection:window.__elonBinanceProtectionV1?.snapshot(d) || null,
+      ...(window.__elonBinanceTrailingV1?{trailing:window.__elonBinanceTrailingV1.snapshot(d)}:{})};
+  }
+  async function trailingRules(snapshot,market,h) {
+    const v=await request(COEF,h),d=v.data;
+    if(v.code!=='000000' || v.success!==true || !d ||
+      !['string','number'].includes(typeof d.adjustCoef) || !Number.isInteger(d.windowCount))throw Error('trailing_rules_unavailable');
+    const result=window.__elonBinanceTrailingRulesV1?.editorBounds(snapshot,market,{adjust:String(d.adjustCoef),window_count:d.windowCount},Date.now());
+    if(!result)throw Error('trailing_rules_unavailable');
+    return result;
   }
   window.__elonBinanceManageV1 = Object.freeze({
-    inspect(token,id,account,strategy) {
+    inspect(token,id,account,strategy,market=null) {
       if(!scope(token,id,account) || !manageId(strategy) || !context || activeSend) return false;
+      const publicInput=market===null?null:JSON.parse(JSON.stringify(market));
       const p={mode:'manage',token,id,account,strategy,seq:++sequence}; prepared=null;
       (async()=>{try {
-        const snapshot=await managementSnapshot(p,headers());
+        const h=headers(),snapshot=await managementSnapshot(p,h);
+        if(publicInput!==null && snapshot.trailing) {
+          try {snapshot.trailing_rules=await trailingRules(snapshot,publicInput,h);}catch{snapshot.trailing_rules=null;}
+          await identity(account,h);
+        }
         if(p.seq===sequence) emit(p,'detail',{snapshot});
       }catch(e){if(p.seq===sequence) emit(p,'read_failed',{code:safeCode(e?.message)});}})();
       return true;
@@ -294,16 +309,40 @@
       }catch(e){if(p.seq===sequence)emit(p,'prepare_failed',{code:safeCode(e?.message)});}})();
       return true;
     },
+    prepareTrailing(token,id,account,strategy,input) {
+      const contract=window.__elonBinanceTrailingV1,draft=contract?.draft(input?.draft);
+      if(!keys(input,['baseline','draft','market']) || !scope(token,id,account) || !manageId(strategy) || !draft ||
+        !context || activeSend || consumed.has(id) || consumed.size>=16)return false;
+      const baseline=JSON.parse(JSON.stringify(input.baseline)),market=JSON.parse(JSON.stringify(input.market));
+      const p={mode:'manage',token,id,account,strategy,action:'trailing',trailingDraft:draft,seq:++sequence};prepared=null;
+      (async()=>{try {
+        const h=headers(),snapshot=await managementSnapshot(p,h);
+        if(snapshot.provider_status!=='WORKING')throw Error('not_working');
+        if(!contract.sameBaseline(snapshot,baseline))throw Error('settings_changed');
+        const rules=await trailingRules(snapshot,market,h);
+        contract.body(strategy,snapshot,draft,rules);
+        await identity(account,h);
+        if(p.seq!==sequence)return;
+        p.cps=snapshot.cps;p.snapshot=snapshot;p.expires=Date.now()+60000;prepared=p;
+        emit(p,'prepared',{snapshot:{...snapshot,trailing_rules:rules},action:p.action,cps:p.cps,trailing_draft:draft});
+      }catch(e){if(p.seq===sequence)emit(p,'prepare_failed',{code:safeCode(e?.message)});}})();
+      return true;
+    },
     cancel() { window.__elonBinanceCreateV1.cancel(); },
-    submit(token,id) {
+    submit(token,id,market=null) {
       const p=prepared;
       if(!p || p.mode!=='manage' || p.token!==token || p.id!==id || consumed.has(id) || activeSend || Date.now()>=p.expires) return false;
+      if(p.action==='trailing' && (!market || typeof market!=='object' || Array.isArray(market)))return false;
+      const publicInput=p.action==='trailing'?JSON.parse(JSON.stringify(market)):null;
       consumed.add(id);prepared=null;sequence++;activeSend=p;
       (async()=>{let dispatched=false;try {
         const h=headers(), latest=await managementSnapshot(p,h);
-        if(JSON.stringify(latest)!==JSON.stringify(p.snapshot)) throw Error('settings_changed');
+        if(p.action==='trailing'?!window.__elonBinanceTrailingV1.sameBaseline(latest,p.snapshot):JSON.stringify(latest)!==JSON.stringify(p.snapshot)) throw Error('settings_changed');
+        const rules=p.action==='trailing'?await trailingRules(latest,publicInput,h):null;
+        if(p.action==='trailing')await identity(p.account,h);
         if(p.cancelled) throw Error('cancelled_before_send');
-        const body=p.action==='protection'?window.__elonBinanceProtectionV1.body(p.strategy,latest,p.protectionDraft):
+        const body=p.action==='trailing'?window.__elonBinanceTrailingV1.body(p.strategy,latest,p.trailingDraft,rules):
+          p.action==='protection'?window.__elonBinanceProtectionV1.body(p.strategy,latest,p.protectionDraft):
           p.action==='range'?window.__elonBinanceRangeV1.body(p.strategy,latest.symbol,latest.range,p.rangeDraft):
           p.action==='investment'?{strategyId:Number(p.strategy),symbol:latest.symbol,investmentDelta:p.investmentDelta}:
           p.action==='close' ? {strategyId:Number(p.strategy)} : {strategyId:Number(p.strategy),

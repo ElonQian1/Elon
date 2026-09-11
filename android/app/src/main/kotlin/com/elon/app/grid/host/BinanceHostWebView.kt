@@ -45,7 +45,7 @@ internal fun createBinanceHostWebView(context: Context, runtime: BinanceHostRunt
             }
         }
         WebViewCompat.addDocumentStartJavaScript(this,
-            listOf("binance_grid_read_diagnostics.js", "binance_grid_reports_adapter.js", "binance_grid_read_adapter.js", "binance_grid_range_contract.js", "binance_grid_protection_contract.js", "binance_grid_create_adapter.js").joinToString("\n") { asset ->
+            listOf("binance_grid_read_diagnostics.js", "binance_grid_reports_adapter.js", "binance_grid_read_adapter.js", "binance_grid_range_contract.js", "binance_grid_protection_contract.js", "binance_grid_trailing_rules.js", "binance_grid_trailing_contract.js", "binance_grid_create_adapter.js").joinToString("\n") { asset ->
                 context.assets.open(asset).bufferedReader().use { it.readText() }
             }, setOf(BinanceHostRuntime.ORIGIN))
         webViewClient = object : WebViewClient() {

@@ -6,7 +6,7 @@ import com.elon.app.privateaccess.StrictJson
 import java.util.UUID
 
 internal class BinanceManageSession(private val host: BinanceHostRuntime, val state: BinanceManageState,
-    private val persist: () -> Boolean, private val changed: () -> Unit) {
+    private val persist: () -> Boolean, private val changed: () -> Unit,private val enableTrailing:Boolean=false) {
     var message="先选择策略并读取当前设置。"; private set
     var busy=false; private set
     val readTrace=BinanceManageReadTrace()
@@ -22,9 +22,14 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
     private var pendingProtection:BinanceProtectionDraft?=null
     private var normalizedProtection:BinanceProtectionDraft?=null
     private var protectionBaseline:Map<String,Any?>?=null
+    private val trailingLoader=BinanceTrailingLoader(host.handler)
+    private var trailingReadAttempted=false
+    private var pendingTrailing:BinanceTrailingDraft?=null
+    private var trailingBaseline:Map<String,Any?>?=null
     fun detailCurrent(id:String?)=readTrace.outcome=="verified" && host.live() && host.state.fresh() &&
         host.state.account==account && host.document.snapshot().documentToken==token && state.snapshot?.id==id
     fun cancel() {
+        trailingLoader.cancel();trailingReadAttempted=false
         readTrace.cancel()
         ticket="";busy=false;state.cancel()
         host.view?.evaluateJavascript("window.__elonBinanceManageV1?.cancel()",null)
@@ -40,10 +45,17 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
         begin(id);readTrace.start();message="正在读取当前策略；不会发送交易。";changed()
         execute("inspect",listOf(token,ticket,account,id),false)
     }
-    fun prepare(id: String, action: String, cps: Boolean, investmentDelta:String="",rangeDraft:BinanceRangeDraft?=null,protection:BinanceProtectionDraft?=null) {
-        require(!state.unresolved && action in setOf("settings","close","investment","range","protection")) { "请先核对并结束上次本机记录。" }
+    fun prepare(id: String, action: String, cps: Boolean, investmentDelta:String="",rangeDraft:BinanceRangeDraft?=null,protection:BinanceProtectionDraft?=null,trailing:BinanceTrailingDraft?=null) {
+        require(!state.unresolved && action in setOf("settings","close","investment","range","protection","trailing")) { "请先核对并结束上次本机记录。" }
         require((action=="range")==(rangeDraft!=null))
         require((action=="protection")==(protection!=null))
+        require((action=="trailing")==(trailing!=null) && (trailing==null || enableTrailing))
+        if(trailing!=null) {
+            require(detailCurrent(id)){"请先读取当前策略，再编辑追踪价格。"}
+            val s=state.snapshot ?: error("详情不可用")
+            trailing.validate(s.trailing ?: error("当前策略未提供可编辑追踪设置"),s.trailingRules ?: error("请先重新读取并核验追踪范围"))
+            trailingBaseline=s.trailing.baseline(s)
+        } else trailingBaseline=null
         if(protection!=null) {
             require(detailCurrent(id)) {"请先读取当前策略，再修改止盈止损。"}
             val s=state.snapshot ?: error("详情不可用")
@@ -59,8 +71,12 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
         pendingInvestment=amount
         pendingRange=rangeDraft
         pendingProtection=protection
+        pendingTrailing=trailing
         message="正在核对账号和当前设置，尚未提交。";changed()
-        if(action=="protection")execute("prepareProtection",listOf(token,ticket,account,id,mapOf("baseline" to protectionBaseline,"draft" to normalizedProtection!!.payload())),false)
+        if(action=="trailing")loadMarket(state.snapshot!!.symbol,{market->
+            execute("prepareTrailing",listOf(token,ticket,account,id,mapOf("baseline" to trailingBaseline,"draft" to trailing!!.payload(),"market" to market)),false)
+        },{cancel();message="行情或规则尚未就绪，请重新读取后检查；未提交操作。";changed()})
+        else if(action=="protection")execute("prepareProtection",listOf(token,ticket,account,id,mapOf("baseline" to protectionBaseline,"draft" to normalizedProtection!!.payload())),false)
         else if(action=="range")execute("prepareRange",listOf(token,ticket,account,id,rangeDraft!!.payload()),false)
         else if(action=="investment")execute("prepareInvestment",listOf(token,ticket,account,id,amount),false)
         else execute("prepare",listOf(token,ticket,account,id,action,cps),false)
@@ -69,10 +85,36 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
         state.canSubmit(host.state.account,host.document.snapshot().documentToken)
     fun submit() {
         require(canSubmit()) { "准备已过期或账号变化，请重新检查。" }
+        if(state.action=="trailing") {
+            busy=true;message="正在核验最新追踪范围，尚未发送操作。";changed()
+            loadMarket(state.snapshot!!.symbol,{market->busy=false;require(canSubmit());dispatchSubmit(market)},
+                {cancel();message="最新行情核验未完成，未发送操作，请重新检查。";changed()})
+        } else dispatchSubmit(null)
+    }
+    private fun dispatchSubmit(market:Map<String,Any>?) {
+        require(canSubmit())
         state.start(host.state.account,host.document.snapshot().documentToken)
         if(!persist()) {state.outcome("not_sent");error("无法记录本机状态，未发送操作。")}
         busy=true;message="正在提交本次操作，不会自动重试。";changed()
-        execute("submit",listOf(token,ticket),true)
+        execute("submit",listOf(token,ticket)+(market?.let{listOf(it)} ?: emptyList()),true)
+    }
+    private fun loadMarket(symbol:String,ready:(Map<String,Any>)->Unit,failed:()->Unit) {
+        val expected=ticket;busy=true
+        trailingLoader.load(symbol) {result->
+            if(closed || ticket!=expected)return@load
+            if(!host.live() || host.state.account!=account || host.document.snapshot().documentToken!=token) {
+                cancel();message="账号或连接已变化，请重新读取；未提交新操作。";changed();return@load
+            }
+            result.fold({value->runCatching{ready(value)}.onFailure{failed()}},{failed()})
+        }
+    }
+    private fun enrichTrailing(snapshot:BinanceManageSnapshot):Boolean {
+        if(!enableTrailing || state.unresolved || snapshot.trailing==null || trailingReadAttempted)return false
+        state.observe(account,snapshot);trailingReadAttempted=true
+        message="当前策略已读取，正在核验追踪价格范围。";changed()
+        loadMarket(snapshot.symbol,{market->execute("inspect",listOf(token,ticket,account,target,market),false)},
+            {busy=false;readTrace.finish("verified");message="当前策略已读取；追踪行情暂不可用，请稍后重新读取。其他管理按各自条件检查。";changed()})
+        return true
     }
     private fun execute(action: String, args: List<Any>, writing: Boolean) {
         val expected=ticket
@@ -111,12 +153,13 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
                     val investing=v["kind"]=="prepared" && pendingAction=="investment"
                     val ranging=v["kind"]=="prepared" && pendingAction=="range"
                     val protecting=v["kind"]=="prepared" && pendingAction=="protection"
+                    val trailing=v["kind"]=="prepared" && pendingAction=="trailing"
                     require(v.keys==base+(if(v["kind"]=="prepared") setOf("snapshot","action","cps") else setOf("snapshot"))+
-                        (if(investing)setOf("investment_delta") else emptySet())+(if(ranging)setOf("range_draft") else emptySet())+(if(protecting)setOf("protection_draft") else emptySet()))
+                        (if(investing)setOf("investment_delta") else emptySet())+(if(ranging)setOf("range_draft") else emptySet())+(if(protecting)setOf("protection_draft") else emptySet())+(if(trailing)setOf("trailing_draft") else emptySet()))
                     require(host.live() && host.state.account==account)
                     val snapshot=BinanceManageSnapshot.parse(v["snapshot"]);require(snapshot.id==target)
                     if(v["kind"]=="prepared") {
-                        require(host.state.contains(target) && v["action"]==pendingAction && v["cps"]==if(investing || ranging || protecting)snapshot.cps else pendingCps)
+                        require(host.state.contains(target) && v["action"]==pendingAction && v["cps"]==if(investing || ranging || protecting || trailing)snapshot.cps else pendingCps)
                         require(!investing || v["investment_delta"]==pendingInvestment)
                         require(!ranging || BinanceRangeDraft.parse(v["range_draft"])==pendingRange)
                         if(protecting) {
@@ -124,13 +167,20 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
                             require(BinanceProtectionDraft.parse(v["protection_draft"])==normalizedProtection)
                             require(pendingProtection?.normalize(snapshot.investment)==normalizedProtection)
                         }
-                        state.prepare(account,token,pendingAction,if(investing || ranging || protecting)snapshot.cps else pendingCps,snapshot,pendingInvestment,pendingRange,pendingProtection)
+                        if(trailing) {
+                            require(snapshot.trailing?.baseline(snapshot)==trailingBaseline)
+                            require(BinanceTrailingDraft.parse(v["trailing_draft"])==pendingTrailing)
+                        }
+                        state.prepare(account,token,pendingAction,if(investing || ranging || protecting || trailing)snapshot.cps else pendingCps,snapshot,pendingInvestment,pendingRange,pendingProtection,pendingTrailing)
                         message="检查完成，尚未提交。请核对下方本次操作摘要。"
                         host.handler.postDelayed({if(!closed) changed()},60_000)
                     } else {
+                        if(enrichTrailing(snapshot))return
                         state.observe(account,snapshot);persist()
                         readTrace.finish("verified")
-                        message=if(state.unresolved && state.effectObserved()) "详情已观察到目标值；仍须核对本次操作与资金、挂单和仓位。" else "已读取当前详情；不代表操作完成或仓位已归零。"
+                        message=if(state.unresolved && state.effectObserved()) "详情已观察到目标值；仍须核对本次操作与资金、挂单和仓位。"
+                            else if(enableTrailing && snapshot.trailing!=null && snapshot.trailingRules==null) "当前策略已读取；追踪范围未能核验，请重新读取后再编辑。"
+                            else "已读取当前详情；不代表操作完成或仓位已归零。"
                     }
                 }
                 "accepted" -> {
@@ -148,6 +198,7 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
                     message=when(v["code"]) {"no_change"->"所选设置没有变化。";"close_mode_changed"->"当前终止处理与选择不同，请先单独修改设置，再重新检查结束。";
                         "not_working"->"策略不是运行状态，请使用官网核对。";"settings_unavailable"->"详情缺少可验证设置，请使用官网。";
                         "range_unavailable"->"当前仅支持参数完整的普通非追踪网格；收益金额止盈止损或未识别参数请在官网修改。";
+                        "trailing_unavailable","trailing_rules_unavailable"->"追踪设置或最新价格范围未能核验，请重新读取后检查。";
                         "investment_unavailable"->"官网尚未返回完整投入详情，请在官网追加并核对结果。";else->"账号或详情核验未通过，未提交操作。"}
                 }
                 else -> return

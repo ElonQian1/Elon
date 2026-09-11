@@ -6,7 +6,8 @@ import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
 internal class BinanceGridRule(val symbol: String, val tick: BigDecimal, val minimumQuantity: String, val minimumNotional: String?,
-    val categories: List<String> = emptyList()) {
+    val categories: List<String> = emptyList(), val quantityStep: String? = null,
+    val priceMinimum: String? = null, val priceMaximum: String? = null, val pricePrecision: Int? = null) {
     fun validate(draft: BinanceGridDraft) {
         require(draft.symbol == symbol) { "合约已变化，请刷新行情" }
         for (key in listOf("lower", "upper")) require(BigDecimal(draft.input.getValue(key)).remainder(tick).signum() == 0) {
@@ -69,7 +70,10 @@ internal class BinanceGridMarket {
                 val qty = filter("LOT_SIZE", "minQty") ?: return@mapNotNull null
                 if (!positive(tick) || !positive(qty)) return@mapNotNull null
                 val notional = filter("MIN_NOTIONAL", "notional")?.takeIf(::positive)
-                BinanceGridRule(symbol, BigDecimal(tick), qty, notional, BinanceSymbolCatalog.tags(data["underlyingSubType"]))
+                val precision=(data["pricePrecision"] as? StrictJson.Number)?.text?.toIntOrNull()?.takeIf { it in 0..20 }
+                BinanceGridRule(symbol, BigDecimal(tick), qty, notional, BinanceSymbolCatalog.tags(data["underlyingSubType"]),
+                    filter("LOT_SIZE","stepSize")?.takeIf(::positive),filter("PRICE_FILTER","minPrice")?.takeIf(::positive),
+                    filter("PRICE_FILTER","maxPrice")?.takeIf(::positive),precision)
             }.distinctBy { it.symbol }.sortedBy { it.symbol }.also { require(it.isNotEmpty()) { "暂未取得可交易的 U 本位永续合约" } }
         }
         fun parseQuote(raw: String, expected: String, now: Long): BinanceGridQuote {

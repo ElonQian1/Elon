@@ -19,6 +19,10 @@ class BinanceHostProvider : ContentProvider() {
                     com.elon.app.grid.manage.BinanceManageCommands.dispatch(owner, runtime, method, extras)
                 }
             }
+            if (Regex("manage_capabilities_v[1-9][0-9]{0,3}").matches(method)) {
+                require(extras.isEmpty)
+                return@runCatching Bundle().apply { putString("error","METHOD_UNSUPPORTED") }
+            }
             if (method in com.elon.app.grid.create.BinanceCreateCommands.methods) {
                 return@runCatching BinanceHostRuntime.onMain(owner) { runtime ->
                     com.elon.app.grid.create.BinanceCreateCommands.dispatch(owner, runtime, method, extras)
