@@ -122,6 +122,7 @@ function context(enabled, response) {
     Array,
     RegExp
   };
+  vm.runInNewContext(asset('chatgpt_web_private_delta_document.js'), sandbox);
   vm.runInNewContext(policySource, sandbox, { filename: 'chatgpt_web_private_stream_policy.js' });
   vm.runInNewContext(transportSource, sandbox, { filename: 'chatgpt_web_private_stream_transport.js' });
   return {

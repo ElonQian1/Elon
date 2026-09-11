@@ -219,7 +219,7 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
     ),
     (
         "chatgpt_web_private_stream_policy.js",
-        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_stream_policy.js"),
+        concat!(include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_delta_document.js"), "\n", include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_stream_policy.js")),
     ),
     (
         "chatgpt_web_private_stream_transport.js",

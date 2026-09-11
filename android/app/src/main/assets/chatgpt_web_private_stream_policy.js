@@ -1,18 +1,18 @@
 (function (root, factory) {
   'use strict';
 
-  const policy = factory();
+  const policy = factory(typeof module === 'object' && module.exports
+    ? require('./chatgpt_web_private_delta_document.js')
+    : root && root.__elonChatGptPrivateDeltaDocument);
   if (typeof module === 'object' && module.exports) module.exports = policy;
   if (root) root.__elonChatGptPrivateStreamPolicy = Object.freeze(policy);
-})(typeof window === 'object' ? window : null, function () {
+})(typeof window === 'object' ? window : null, function (deltaDocuments) {
   'use strict';
 
   const MAX_TEXT_LENGTH = 40000;
   const MAX_BUFFER_LENGTH = 2 * 1024 * 1024;
-  const MAX_PATCH_TEXT_LENGTH = 524288;
   const MAX_AGE_MS = 5 * 60 * 1000;
   const MAX_PROGRESS_LENGTH = 220;
-  const MAX_PATCH_ARRAY_LENGTH = 128;
   const MAX_FINANCE_WIDGETS = 4;
   const MAX_PACKED_WIDGET_LENGTH = 1024 * 1024;
   const MAX_FINANCE_POINTS = 256;
@@ -505,110 +505,10 @@
     const now = typeof options.now === 'function' ? options.now : Date.now;
     let stream = null;
     let compactDocument = null;
-    let compactContinuation = null;
-
-    function clonePatchValue(value) {
-      if (value === undefined) return undefined;
-      try { return JSON.parse(JSON.stringify(value)); }
-      catch (_) { return null; }
-    }
-
-    function pointerSegments(path) {
-      const value = String(path || '');
-      if (!value || value.length > 320 || value[0] !== '/') return null;
-      const segments = value.slice(1).split('/').map((segment) =>
-        segment.replace(/~1/g, '/').replace(/~0/g, '~')
-      );
-      if (!segments.length || segments.length > 16 || segments[0] !== 'message' ||
-          segments.some((segment) => !segment ||
-            segment === '__proto__' || segment === 'prototype' || segment === 'constructor')) return null;
-      return segments;
-    }
-
-    function patchContainer(root, segments) {
-      let owner = root;
-      for (let index = 0; index < segments.length - 1; index += 1) {
-        const segment = segments[index];
-        if (!owner || typeof owner !== 'object' || !Object.prototype.hasOwnProperty.call(owner, segment)) {
-          return null;
-        }
-        owner = owner[segment];
-      }
-      return owner && typeof owner === 'object'
-        ? { owner, key: segments[segments.length - 1] }
-        : null;
-    }
-
-    function applyPatchOperation(root, operation) {
-      if (!root || typeof root !== 'object' || !operation || typeof operation !== 'object') return false;
-      const kind = String(operation.o || '').toLowerCase();
-      if (!/^(?:add|append|replace|remove)$/.test(kind)) return false;
-      const segments = pointerSegments(operation.p);
-      if (!segments) return false;
-      const target = patchContainer(root, segments);
-      if (!target) return false;
-      const { owner, key } = target;
-      if (kind === 'remove') {
-        if (Array.isArray(owner) && /^\d+$/.test(key)) owner.splice(Number(key), 1);
-        else delete owner[key];
-        return true;
-      }
-      const value = clonePatchValue(operation.v);
-      if (kind === 'append') {
-        const existing = owner[key];
-        if (typeof existing === 'string' && typeof value === 'string') {
-          owner[key] = (existing + value).slice(0, MAX_PATCH_TEXT_LENGTH);
-          return true;
-        }
-        if (Array.isArray(existing)) {
-          const additions = Array.isArray(value) ? value : [value];
-          owner[key] = existing.concat(additions).slice(0, MAX_PATCH_ARRAY_LENGTH);
-          return true;
-        }
-        if (existing && typeof existing === 'object' && value && typeof value === 'object' &&
-            !Array.isArray(value)) {
-          Object.assign(existing, value);
-          return true;
-        }
-      }
-      if (Array.isArray(owner) && key === '-') owner.push(value);
-      else owner[key] = value;
-      return true;
-    }
-
-    function applyCompactPayload(payload) {
-      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
-      if (Number.isFinite(payload.c) && payload.v && typeof payload.v === 'object') {
-        compactDocument = clonePatchValue(payload.v);
-        compactContinuation = null;
-        return compactDocument ? acceptVisiblePayload(compactDocument) : false;
-      }
-      if (!compactDocument) return false;
-      let changed = false;
-      const patchBatch = Array.isArray(payload.v) && payload.v.length > 0 &&
-        payload.v.every((operation) => operation && typeof operation === 'object' &&
-          operation.o && operation.p);
-      if ((payload.o === 'patch' || patchBatch) && Array.isArray(payload.v)) {
-        payload.v.slice(0, MAX_PATCH_ARRAY_LENGTH).forEach((operation) => {
-          if (applyPatchOperation(compactDocument, operation)) changed = true;
-        });
-        const last = payload.v[payload.v.length - 1];
-        compactContinuation = last && last.o === 'append'
-          ? { o: last.o, p: last.p }
-          : null;
-      } else if (payload.o && payload.p) {
-        changed = applyPatchOperation(compactDocument, payload);
-        compactContinuation = payload.o === 'append'
-          ? { o: payload.o, p: payload.p }
-          : null;
-      } else if (compactContinuation && Object.keys(payload).length === 1 &&
-          Object.prototype.hasOwnProperty.call(payload, 'v')) {
-        changed = applyPatchOperation(compactDocument, Object.assign({}, compactContinuation, {
-          v: payload.v
-        }));
-      }
-      return changed && acceptVisiblePayload(compactDocument);
-    }
+    const compact = deltaDocuments.createLegacy((document) => {
+      compactDocument = document;
+      return acceptVisiblePayload(document);
+    });
 
     function acceptVisiblePayload(payload) {
       let accepted = false;
@@ -680,11 +580,11 @@
         state: 'streaming', richParts: [], updatedAt: now()
       };
       compactDocument = null;
-      compactContinuation = null;
+      compact.reset();
     }
 
     function accept(payload) {
-      if (applyCompactPayload(payload)) return true;
+      if (compact.accept(payload)) return true;
       return acceptVisiblePayload(payload);
     }
 
@@ -731,7 +631,7 @@
     function reset() {
       stream = null;
       compactDocument = null;
-      compactContinuation = null;
+      compact.reset();
     }
 
     function current(pathname) {

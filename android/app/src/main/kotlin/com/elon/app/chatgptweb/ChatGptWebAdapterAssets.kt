@@ -99,7 +99,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_private_dictation_orchestrator.js",
         "chatgpt_web_private_text_transaction_policy.js",
         "chatgpt_web_private_text_transaction_relay.js",
-        "chatgpt_web_private_stream_policy.js",
+        "chatgpt_web_private_delta_document.js", "chatgpt_web_private_stream_policy.js",
         "chatgpt_web_private_stream_transport.js",
         "chatgpt_web_private_send_observer.js", "chatgpt_web_private_text_runtime_submit.js",
         "chatgpt_web_runtime_generation_state.js",

@@ -66,6 +66,7 @@ function responseFor(chunks) {
 
   vm.runInNewContext(fetchTapSource, sandbox, { filename: 'chatgpt_web_private_fetch_tap.js' });
   const reactCapturedFetch = window.fetch;
+  vm.runInNewContext(asset('chatgpt_web_private_delta_document.js'), sandbox);
   vm.runInNewContext(policySource, sandbox, { filename: 'chatgpt_web_private_stream_policy.js' });
   vm.runInNewContext(transportSource, sandbox, { filename: 'chatgpt_web_private_stream_transport.js' });
   assert.equal(window.__elonChatGptPrivateFetchTap.version, 2);

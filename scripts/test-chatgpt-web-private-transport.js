@@ -95,7 +95,7 @@ function createContext(
   vm.runInNewContext(policySource, context, {
     filename: 'chatgpt_web_private_transport_policy.js'
   });
-  for (const asset of ['chatgpt_web_private_history_projection.js', 'chatgpt_web_private_stream_policy.js']) {
+  for (const asset of ['chatgpt_web_private_history_projection.js', 'chatgpt_web_private_delta_document.js', 'chatgpt_web_private_stream_policy.js']) {
     vm.runInNewContext(fs.readFileSync(path.join(
       __dirname, '..', 'android', 'app', 'src', 'main', 'assets', asset
     ), 'utf8'), context, { filename: asset });
