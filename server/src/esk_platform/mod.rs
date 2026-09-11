@@ -12,6 +12,7 @@ pub(crate) mod access;
 mod access_projection;
 mod api;
 pub(crate) mod game_access;
+pub(crate) mod game_rewards;
 mod history_api;
 mod history_model;
 pub(crate) mod migration;
@@ -33,6 +34,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .merge(access::routes())
         .merge(game_access::routes())
+        .merge(game_rewards::routes())
         .merge(sui_address_binding::routes())
         .merge(sellback::routes())
         .route(

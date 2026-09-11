@@ -393,6 +393,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (290, "ESK 平台认证 Sui 地址一次性绑定", crate::esk_asset::platform::sui_address_binding::migration::migration_v290),
     (291, "节点账号隔离的私人只读投影", crate::store::node_credentials::private_projection::migrate),
     (292, "第一方游戏账号授权与动作观测", crate::esk_asset::platform::game_access::migration::migration_v292),
+    (293, "游戏收益证明与已备付奖励预算", crate::esk_asset::platform::game_rewards::migration::migration_v293),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

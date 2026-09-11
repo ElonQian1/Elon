@@ -1,0 +1,19 @@
+[package]
+name = "elon-game-rewards-harness"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+anyhow = "1"
+chrono = "0.4"
+ed25519-dalek = "2"
+hex = "0.4"
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "1"
+tempfile = "3"

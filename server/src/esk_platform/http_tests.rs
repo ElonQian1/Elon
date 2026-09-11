@@ -7,6 +7,8 @@ mod account_snapshot_http_tests;
 mod game_access_browser_tests;
 #[path = "game_access/http_tests.rs"]
 mod game_access_http_tests;
+#[path = "game_rewards/http_tests.rs"]
+mod game_rewards_http_tests;
 #[path = "history_http_tests.rs"]
 mod history_http_tests;
 #[path = "reconciliation_http_tests.rs"]
