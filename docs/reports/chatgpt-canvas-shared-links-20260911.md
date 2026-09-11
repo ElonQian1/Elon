@@ -61,10 +61,10 @@ the successful run. The initial Gradle wrapper returned zero despite compiler
 errors; verification therefore checks terminal Gradle output and test-result XML,
 not only the outer process exit code. No APK was packaged for this source batch.
 
-`code_status=implemented`; `completed=false`. Authenticated Canvas list/Copy/
-cancellation and rendered UI acceptance remain pending, using a disposable link
-owned by the test. Do not revoke an existing personal link merely for testing.
-This source batch follows the grouped-build workflow; it is not a device pass.
+`code_status=implemented`; full capability `completed=false`. The grouped source
+batch itself was not a device pass. List/Copy and non-mutating confirmation are
+now accepted below. Actual cancellation needs a disposable link owned by the
+test; do not revoke an existing personal link merely for testing.
 
 ## September 12 Grouped Device Read
 
@@ -76,3 +76,36 @@ No write was issued and no link identifier, URL or source text was exported.
 This verifies the authenticated private list and native receipt parsing, not
 rendered list interaction, Copy or cancellation. Do not revoke those existing
 personal links for acceptance. The full capability remains `completed=false`.
+
+## Native List, Copy And Keep-Link Acceptance
+
+On normal **1.1.1673**, adapter 357, existing APK source `4dfed0941`, case
+`android_chatgpt_private_canvas_shared_links_v1:list_copy_keep_link` is
+**completed**, `production_default=true`. No additional APK was built.
+
+The production sidebar conversation menu -> Share -> Manage Canvas links showed
+three visible, enabled native ListView rows. The first selected row matched the
+canonical Canvas URL. Its cancel-sharing confirmation identified the same link
+and explicitly retained the original Canvas; choosing **Keep link** returned to
+the selected link, and **Back to list** restored the same three rows.
+
+Native **Copy link** was verified by pasting into the empty native composer,
+comparing on-device, and clearing the test draft without sending. Reopening the
+native list returned the same ID set; its existing cache may participate, so this
+is not fresh-server cancellation evidence. Conversation, native/official draft
+and awake policy were restored. Zero sends, created links or revoked links.
+No URL, document name, content or clipboard value was exported in the report.
+
+The external `SharedLinkUiAcceptance` runner was extended, not replaced; Canvas
+scope explicitly rejects its destructive `revoke` step. New smoke
+`scripts/smoke-chatgpt-web-canvas-share-read-ui.ps1` and both Canvas-read/ordinary
+share source guards pass. Java compiled and ran on the pinned Xiaomi. Bounded
+log: `canvas-share-native-read-1673-confirm-20260912-012339-823`, 62.9 seconds,
+`passed=true`, all restoration/Copy/confirmation booleans true.
+
+The first attempt stopped after successfully showing the rows because the smoke
+expected a URL field in the receipt. The receipt intentionally contains an ID;
+the native Link model constructs the official URL. Only the external harness
+was corrected, and its leftover dialog was closed before the successful run.
+Do not repeat the accepted read/Copy scope without regression evidence. Actual
+revocation, publishing and full Canvas editing remain unaccepted.

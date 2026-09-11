@@ -9,7 +9,7 @@ import java.nio.charset.StandardCharsets;
 import org.json.JSONObject;
 import org.json.JSONArray;
 
-/** External acceptance of one newly-created synthetic share. No URL or clipboard export. */
+/** External native share acceptance. Canvas scope is read/copy/cancel only. No content export. */
 public final class SharedLinkUiAcceptance extends UiAutomatorTestCase {
     private static final String APP = "com.elon.app";
     private UiObject description(String value) {
@@ -43,9 +43,18 @@ public final class SharedLinkUiAcceptance extends UiAutomatorTestCase {
     private String expectedUrl() {
         String value = new String(android.util.Base64.decode(getParams().getString("url_b64", ""),
             android.util.Base64.DEFAULT), StandardCharsets.UTF_8);
-        assertTrue("invalid_share_url", value.matches(
-            "^https://chatgpt\\.com/share/[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$"));
+        String pattern = canvas() ? "^https://chatgpt\\.com/canvas/shared/[A-Za-z0-9_-]{1,128}$"
+            : "^https://chatgpt\\.com/share/[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$";
+        assertTrue("invalid_share_url", value.matches(pattern));
         return value;
+    }
+    private boolean canvas() {
+        String resource = getParams().getString("resource", "conversation");
+        assertTrue("invalid_share_resource", resource.equals("conversation") || resource.equals("canvas"));
+        return resource.equals("canvas");
+    }
+    private UiObject shareList() {
+        return description(canvas() ? "web-chat-canvas-share-links-list" : "web-chat-account-share-links-list");
     }
     private void assertSelected(String expected) throws Exception {
         assertTrue("selected_share_mismatch", text(expected).waitForExists(5000));
@@ -53,7 +62,7 @@ public final class SharedLinkUiAcceptance extends UiAutomatorTestCase {
         assertTrue("revoke_action_missing", description("web-chat-share-revoke").exists());
     }
     private void selectFirst(String expected) throws Exception {
-        UiObject list = description("web-chat-account-share-links-list");
+        UiObject list = shareList();
         UiObject first = list.getChild(new UiSelector().index(0));
         AccessibilityNodeInfo row = node(first);
         try { row.performAction(AccessibilityNodeInfo.ACTION_CLICK); }
@@ -77,9 +86,39 @@ public final class SharedLinkUiAcceptance extends UiAutomatorTestCase {
     public void testStep() throws Exception {
         assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
         String step = getParams().getString("step", "inspect");
-        String expected = expectedUrl();
+        String expected = step.equals("open_canvas_list") || step.equals("inspect_list") || step.equals("close_list") ||
+            step.equals("inspect") && !getParams().containsKey("url_b64")
+            ? "" : expectedUrl();
         JSONObject result = new JSONObject().put("step", step).put("content_exported", false);
         switch (step) {
+            case "open_canvas_list":
+                assertTrue("canvas_resource_required", canvas());
+                assertTrue("share_menu_missing", description("web-chat-conversation-share-options").exists());
+                click(text("\u7ba1\u7406\u753b\u5e03\u516c\u5f00\u94fe\u63a5"));
+                result.put("native_entry_clicked", true);
+                break;
+            case "inspect_list":
+                AccessibilityNodeInfo listInfo = node(shareList());
+                try {
+                    result.put("native_list_visible", listInfo.isVisibleToUser())
+                        .put("row_count", listInfo.getChildCount());
+                    assertTrue("native_list_wrong_type", String.valueOf(listInfo.getClassName()).endsWith("ListView"));
+                    for (int i = 0; i < listInfo.getChildCount(); i++) {
+                        AccessibilityNodeInfo child = listInfo.getChild(i);
+                        try {
+                            assertNotNull("native_share_row_missing", child);
+                            assertTrue("native_share_row_not_visible", child.isVisibleToUser());
+                            assertTrue("native_share_row_disabled", child.isEnabled());
+                        } finally { if (child != null) child.recycle(); }
+                    }
+                } finally { listInfo.recycle(); }
+                break;
+            case "close_list":
+                assertTrue("share_list_missing", shareList().exists());
+                click(text("\u5173\u95ed"));
+                assertTrue("share_list_not_closed", shareList().waitUntilGone(5000));
+                result.put("list_closed", true);
+                break;
             case "select_first":
                 selectFirst(expected);
                 result.put("selected_matches", true);
@@ -116,6 +155,7 @@ public final class SharedLinkUiAcceptance extends UiAutomatorTestCase {
                 result.put("clipboard_exact_match", true).put("test_draft_cleared", true);
                 break;
             case "revoke":
+                assertFalse("canvas_write_not_permitted", canvas());
                 assertSelected(expected);
                 click(description("web-chat-share-revoke"));
                 assertTrue("revoke_confirmation_missing", description("web-chat-share-revoke-confirm").waitForExists(5000));
@@ -124,11 +164,30 @@ public final class SharedLinkUiAcceptance extends UiAutomatorTestCase {
                 click(description("web-chat-share-revoke-confirm"));
                 result.put("revoke_confirmed_once", true);
                 break;
+            case "cancel_revoke":
+                assertSelected(expected);
+                click(description("web-chat-share-revoke"));
+                assertTrue("revoke_confirmation_missing", description("web-chat-share-revoke-confirm").waitForExists(5000));
+                UiObject confirmation = new UiObject(new UiSelector().packageName(APP).resourceId("android:id/message"));
+                assertTrue("revoke_confirmation_target_mismatch", confirmation.exists() && confirmation.getText().endsWith("\n\n" + expected));
+                if (canvas()) assertTrue("canvas_retention_notice_missing", confirmation.getText().contains("\u539f\u753b\u5e03\u4e0d\u4f1a\u5220\u9664"));
+                click(text("\u4fdd\u7559\u94fe\u63a5"));
+                assertTrue("revoke_confirmation_not_closed", description("web-chat-share-revoke-confirm").waitUntilGone(5000));
+                assertSelected(expected);
+                result.put("confirmation_canceled", true);
+                break;
+            case "back_to_list":
+                assertSelected(expected);
+                click(text("\u8fd4\u56de\u5217\u8868"));
+                assertTrue("share_list_not_restored", shareList().waitForExists(5000));
+                result.put("list_restored", true);
+                break;
             case "inspect":
                 result.put("account_list", description("web-chat-account-share-links-list").exists())
+                    .put("canvas_list", description("web-chat-canvas-share-links-list").exists())
                     .put("selected_dialog", description("web-chat-existing-share-copy").exists())
                     .put("revoke_dialog", description("web-chat-share-revoke-confirm").exists())
-                    .put("selected_matches", text(expected).exists());
+                    .put("selected_matches", !expected.isEmpty() && text(expected).exists());
                 JSONArray editors = new JSONArray();
                 for (int i = 0; i < 4; i++) {
                     UiObject editor = new UiObject(new UiSelector().packageName(APP).className("android.widget.EditText").instance(i));

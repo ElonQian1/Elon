@@ -204,7 +204,7 @@ merely to test this module.
 
 The newer [Canvas management batch](reports/chatgpt-canvas-shared-links-20260911.md)
 adds a separate Canvas list/Copy/confirmed-cancellation route in this same owner
-and native menu. It is source-implemented, not device-accepted. Ordinary personal
-native Copy/revoke passed on [1644](reports/chatgpt-private-acceptance-1644.md).
+and native menu. Native list/Copy/keep-link passed on 1673; actual Canvas revoke
+remains unaccepted. Ordinary personal Copy/revoke passed on [1644](reports/chatgpt-private-acceptance-1644.md).
 Workspace, post/task, bulk cancellation and server-side partial-list pagination
 remain distinct gaps. Canvas and post links are never treated as conversation links.
