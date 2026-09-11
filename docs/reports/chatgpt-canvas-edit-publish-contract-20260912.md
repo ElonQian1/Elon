@@ -60,12 +60,11 @@ content; `uvt` resolves to `zH` at 2198676 for the inverse conversion. Original
 saving must preserve comments, resolve version conflicts, and reconcile local
 pending edits. The existing source-viewer cache is not this edit store.
 
-Next implementation should start with an original conversation textdoc owner
-using the already-observed `/conversation/{conversation_id}/textdocs` read and
-real persisted IDs/versions, then source editing and conflict-safe saving.
-Do not rediscover the panel, use `infer_metadata` as a save endpoint, or write
-an edited public snapshot back under its shared ID. Rich editing, comment
-position mapping, original first-publication and revision restore remain gaps.
+The [original read/save core](chatgpt-original-canvas-save-20260912.md) now uses
+that original conversation owner, persisted IDs/versions, comment offset codec
+and guarded saves. Production editor wiring and device acceptance remain pending.
+Do not rediscover it, use `infer_metadata` as a save endpoint, or save under a
+shared ID. Rich editing, first-publication and revision restore remain gaps.
 
 ## Native Update Behavior
 

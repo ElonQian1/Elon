@@ -136,6 +136,11 @@ project branch association, model/effort state, direct runtime text submission,
 regeneration, stop-generation and temporary-chat transactions. Their existing
 scope, confirmation, single-writer and completion checks are unchanged.
 
+Bindings v15 adds only observed September 11b original Canvas edit-store and
+session query-client aliases. The [read/save core](reports/chatgpt-original-canvas-save-20260912.md)
+checks pending edits and reconciles the exact document query without a reload.
+Its production editor wiring/device acceptance remain pending.
+
 The production script catalog was extracted without changing its order;
 404 related Node runner cases passed before behavior changes. The runtime batch
 then exercised 558 cases. One test still expected the previous regeneration

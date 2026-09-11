@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 14, create: factory });
+  const api = Object.freeze({ version: 15, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -22,13 +22,13 @@
     shared: { H3: 'c6', R5: 'i7', F5: 't7', mq: 'Pq', wV: 'UV', SV: 'VV', XM: 'mN', HM: 'oN',
       'M$': 'Q$', RW: 'rG', uo: 'uo', t4: 'x4', IX: 'nZ', t6: 'x6', cX: 'OX',
       Fx: 'Lx', Fl: 'Il', v7: 'R7', $3: 'y6', Ur: 'Ur', zr: 'zr', attachmentUploadType: undefined,
-      conversationStore: undefined },
+      conversationStore: undefined, canvasQueryClient: undefined },
     conversation: { AGt: 'uKt', J5t: 'O7t', Nrn: 'Cin', yRt: '$Rt', Grn: 'Fin',
       vRt: 'QRt', p8t: 'q8t', l0: 'E0', M1t: 'f0t', Rdn: 'Ofn', Rrn: 'Oin',
       win: 'man', Ein: 'gan', ay: 'Sy', iy: 'xy', ry: 'by', Jrn: 'Rin', Hrn: 'Min',
       f8t: 'K8t', c0: 'T0', FVt: 'hHt', u1t: 'W1t', l1t: 'U1t', iin: 'Jin',
       attachmentBaseLimit: undefined, attachmentMaxUploads: undefined,
-      attachmentPendingCount: undefined, attachmentConfiguredLimit: undefined },
+      attachmentPendingCount: undefined, attachmentConfiguredLimit: undefined, canvasEdits: undefined },
     composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC', Ng: 'Yg', Bg: 'n_', fh: 'Oh' }, react: {}
   };
   const september9Exports = {
@@ -92,13 +92,13 @@
     shared: { H3: 'D5', R5: 'net', F5: '$9', mq: 'rK', wV: 'pR', SV: 'dR', XM: 'IJ', HM: 'OJ',
       'M$': 'U0', RW: 'dV', uo: 'ws', t4: 'v6', IX: 'XU', t6: 't5', cX: 'cJ',
       Fx: 'GS', Fl: 'td', v7: 'Iet', $3: '$8', Ur: 'Zi', zr: 'qi', attachmentUploadType: 'Gp',
-      conversationStore: 'XJ' },
+      conversationStore: 'XJ', canvasQueryClient: 'Z0' },
     conversation: { AGt: 'Bqt', J5t: 'ctn', Nrn: 'Yon', yRt: 'kBt', Grn: 'ssn',
       vRt: 'OBt', p8t: 'D9t', l0: 'b2', M1t: 'o4t', Rdn: 'Fhn', Rrn: 'esn',
       win: 'Bsn', Ein: 'Hsn', ay: 'Qy', iy: 'Zy', ry: 'Xy', Jrn: 'usn', Hrn: 'isn',
       f8t: 'E9t', c0: 'y2', FVt: 'GUt', u1t: 'R2t', l1t: 'L2t', iin: 'bsn',
       attachmentBaseLimit: 'g$t', attachmentMaxUploads: 'C$t',
-      attachmentPendingCount: 'v$t', attachmentConfiguredLimit: 'h$t' },
+      attachmentPendingCount: 'v$t', attachmentConfiguredLimit: 'h$t', canvasEdits: 'one' },
     composer: { Ih: 'og', t_: 'T_', AS: 'tC', VS: 'fC', Ng: 'r_', Bg: 'u_', fh: 'Fh' }, react: {}
   };
   const profiles = [
@@ -261,8 +261,8 @@
 
   function state() {
     const p = profile();
-    return { version: 14, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 15, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 14, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 15, observed, load, peek, temporary, tools, state });
 });

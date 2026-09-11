@@ -8,6 +8,16 @@ const old = {
   conversation: CDN + 'conversation-small-hiw4wce20lu6te81.js',
   composer: CDN + '8b34dbc2-kjj15hg4y6iyx13p.js'
 };
+
+test('Canvas edit store and session query client are exposed only by the observed September 11b profile', async () => {
+  const getter = () => 'session-client', store = { getState: () => ({ userEdits: {}, timestamps: {} }) };
+  const f = fixture({ loadRuntime: () => ({ Z0: getter, one: store, H3: () => true }) });
+  f.observed.clear(); f.observed.add(CDN + 'c2675c8c-m4ftlj32vtu9aroq.js');
+  assert.equal((await f.api.load('shared')).canvasQueryClient, getter);
+  assert.equal((await f.api.load('conversation')).canvasEdits, store);
+  f.page.__elonChatGptDocumentToken = 'doc_legacy'; f.observed.clear(); f.observed.add(old.shared);
+  assert.equal((await f.api.load('shared')).canvasQueryClient, undefined);
+});
 function fixture(options = {}) {
   const observed = new Set([CDN + files.shared]), calls = [];
   const page = { location: { origin: 'https://chatgpt.com' }, document: { querySelector: () => null },
