@@ -64,7 +64,27 @@ Composer v24 and project scope v8 now retain closed failure reasons for server
 membership, selected branch, project permission and upload policy checks.
 Library v10 reports them separately from actual input drift. This does not
 weaken admission or replay a write. Targeted compatibility tests passed;
-device localization with adapter 352 remains pending.
+Device localization in 1669 (adapter 352) confirmed two separate blockers:
+
+- Existing chat: `project_branch_mismatch`. Current official `PHt` reads
+  `/conversations/{conversation_id}` as a paginated `messages` array and builds
+  its client mapping from message IDs. Our scope reader only examined mapping.
+- New project: `project_image_gate_unconfirmed`. The project GET was HTTP 200;
+  a reference was unnecessarily coupled to gate `2031707412`, which official
+  `IKt` uses to decide indexing of new image uploads, not library references.
+
+Evidence: `PHt`/`MHt` in shared `4813494d-c6b4nsqqwi13e6rd.js`, and `IKt` plus
+`DV.attachLibraryFile` in composer `8b34dbc2-fpy4mlfnxc115y6k.js`, from the same
+current public runtime already recorded above. No additional credential flow.
+
+Transport v29 accepts IDs from the current bounded Message[] as well as the
+legacy mapping. It still requires matching server conversation/project scope
+and the selected official leaf; it never substitutes the server default branch.
+Composer v25/project v9 distinguish reference-only scope from upload scope.
+Actual local upload must promote it through the existing permission/index
+checks before bytes or writes, retaining the exact input lease during the read.
+Reference-only scope cannot generate upload metadata or a local ready receipt.
+Adapter 353 offline tests passed; its device acceptance is pending.
 
 Capability `android_chatgpt_private_project_library_reference_v1` currently has
 `code_status=partial`, `verification_status=failed`; the shipped project path

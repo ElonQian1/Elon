@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 8, create: factory });
+  const exported = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentProject = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -15,7 +15,7 @@
 
   function projectId(path) { return PATH.exec(path || '')?.[1] || null; }
 
-  async function read(binding, signal, file) {
+  async function read(binding, signal, file, referenceOnly = false) {
     readFailure = 'project_scope_unconfirmed';
     const id = binding.projectId;
     const request = root.__elonChatGptPrivateJsonRequest?.request;
@@ -37,6 +37,12 @@
     // Read-only members may upload to their chat, but not to the project file collection.
     const canWrite = gizmo.current_user_permission.can_write;
     const usesInjestPath = gizmo.use_injest_path === true;
+    // Existing library references have no upload/indexing operation. This scope
+    // cannot authorize local upload; prepare must promote it before reading bytes.
+    if (referenceOnly) {
+      readFailure = 'project_scope_unconfirmed';
+      return Object.freeze({ projectId: id, canWrite, usesInjestPath, referenceOnly: true });
+    }
     let imageIndexForRetrieval = false;
     if (usesInjestPath && /^image\//.test(file?.type || '') && IMAGE.test(file.name)) {
       readFailure = 'project_runtime_unavailable';
@@ -109,11 +115,12 @@
       current: () => { try { return selectedLeaf() === leafId; } catch (_) { return false; } } });
   }
 
-  function supports(scope, file) {
+  function supports(scope, file, referenceOnly = false) {
     if (!PROJECT.test(scope?.projectId || '') || typeof scope.canWrite !== 'boolean') return false;
+    if (scope.referenceOnly && !referenceOnly) return false;
     if (root.__elonChatGptPrivateAttachmentProtocol?.isDocument(file)) return true;
     return ['image/jpeg', 'image/png', 'image/webp'].includes(file?.type) &&
-      (!scope.usesInjestPath || typeof scope.imageIndexForRetrieval === 'boolean');
+      (scope.referenceOnly || !scope.usesInjestPath || typeof scope.imageIndexForRetrieval === 'boolean');
   }
 
   function uploadContext(scope, file, imageDimensions) {
@@ -136,5 +143,5 @@
     });
   }
 
-  return Object.freeze({ version: 8, projectId, read, captureThread, supports, uploadContext, failureDetail: () => readFailure });
+  return Object.freeze({ version: 9, projectId, read, captureThread, supports, uploadContext, failureDetail: () => readFailure });
 });

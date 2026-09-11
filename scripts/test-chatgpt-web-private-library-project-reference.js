@@ -186,6 +186,8 @@ test('local append reuses the existing project upload context instead of library
     const f = setup({ canWrite });
     assert.equal((await f.attach(f.source(1)))[1], true);
     const append = f.composer.captureUpload(), file = new File(['local fixture'], 'local.txt', { type: 'text/plain' });
+    assert.throws(() => f.composer.uploadContext(append.binding, file), /unsupported_upload_context/);
+    assert.equal(await f.composer.prepare(append.binding, new AbortController().signal, file), true);
     const context = f.composer.uploadContext(append.binding, file);
     assert.equal(context.projectScopeId, PROJECT);
     assert.equal(context.storeInLibrary, false);
@@ -203,4 +205,37 @@ test('local append reuses the existing project upload context instead of library
     assert.equal(lease.readyFiles[1].source, 'local');
     assert.equal(lease.readyFiles[1].isProjectThread, true);
   }
+});
+
+test('library image references do not need the unrelated new-upload image-index gate', async () => {
+  for (const path of ['/g/' + PROJECT + '/project', '/g/' + PROJECT + '/c/' + CID]) {
+    const f = setup({ path });
+    f.project.use_injest_path = true;
+    let gateReads = 0;
+    f.namespace.t6 = () => ({ loadingStatus: 'Ready', getFeatureGate: name => {
+      gateReads++;
+      return { name, value: false, details: { reason: 'Unrecognized' } };
+    } });
+    const file = new File(['image'], 'local.png', { type: 'image/png' });
+    assert.equal((await f.attach(f.source(1, { name: 'reference.png', mime_type: 'image/png' })))[1], true);
+    assert.equal(gateReads, 0);
+    const append = f.composer.captureUpload();
+    assert.throws(() => f.composer.uploadContext(append.binding, file), /unsupported_upload_context/);
+    assert.equal(await f.composer.prepare(append.binding, new AbortController().signal, file), null);
+    assert.equal(gateReads, 1, 'real upload still evaluates its own policy');
+    assert.equal(f.store.files$().length, 1, 'failed promotion retains the reference');
+    assert.throws(() => f.composer.uploadContext(append.binding, file), /composer_changed/);
+  }
+});
+
+test('upload promotion retains the owned input lease across an asynchronous scope read', async () => {
+  let reads = 0;
+  const f = setup({ beforePermission: f => {
+    if (++reads === 2) f.store.files$.set([]);
+  } });
+  assert.equal((await f.attach(f.source(1)))[1], true);
+  const append = f.composer.captureUpload(), file = new File(['text'], 'local.txt', { type: 'text/plain' });
+  await assert.rejects(f.composer.prepare(append.binding, new AbortController().signal, file), /composer_changed/);
+  assert.equal(f.store.files$().length, 0, 'user removal is not undone');
+  assert.equal(append.current(), false);
 });

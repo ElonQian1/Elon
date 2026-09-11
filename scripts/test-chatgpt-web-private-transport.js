@@ -138,7 +138,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 28);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 29);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -150,7 +150,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 28);
+  assert.equal(transport.version, 29);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
@@ -561,6 +561,16 @@ const detailPayload = {
   }
   scope.window.location.pathname = attachmentPath;
   scope.window.location.href = 'https://chatgpt.com' + attachmentPath;
+  // The current official PHt reader builds mapping from this paginated Message[].
+  scopePayload = { ...projectPayload, mapping: undefined, messages: [
+    { id: attachmentLeaf, author: { role: 'user' }, content: { parts: ['synthetic'] } },
+    { id: differentLeaf, author: { role: 'assistant' } }, { id: 'invalid' }, null] };
+  const paginatedScope = await reader.readAttachmentContext(attachmentPath);
+  assert.deepEqual(Array.from(paginatedScope.nodeIds), [attachmentLeaf, differentLeaf]);
+  assert.equal(paginatedScope.projectId, attachmentProject);
+  assert.equal(JSON.stringify(paginatedScope).includes('synthetic'), false);
+  scopePayload = { ...projectPayload, mapping: undefined, messages: Array(20001).fill({ id: attachmentLeaf }) };
+  assert.deepEqual(Array.from((await reader.readAttachmentContext(attachmentPath)).nodeIds), []);
   for (const patch of [{ project_id: 'g-p-fedcba9876543210fedcba9876543210' },
     { is_do_not_remember: true }, { is_temporary_chat: true }, { context_scopes: ['HEALTH'] }]) {
     scopePayload = { ...projectPayload, ...patch };

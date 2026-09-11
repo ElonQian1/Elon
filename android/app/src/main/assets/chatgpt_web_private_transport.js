@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 28) ||
+  if ((existingTransport && Number(existingTransport.version) >= 29) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -563,8 +563,11 @@
       noAdditionalScope && payload.is_do_not_remember === false && payload.is_temporary_chat !== true
       ? payload.gizmo_id : null;
     const mapping = payload.mapping;
-    const nodes = projectId && mapping && !Array.isArray(mapping) && typeof mapping === 'object'
-      ? Object.entries(mapping) : [];
+    // Current /conversations/{id} returns Message[]; the website builds its tree
+    // from these IDs. Keep support for already-normalized legacy mapping payloads.
+    const nodes = !projectId ? [] : Array.isArray(payload.messages)
+      ? payload.messages.map(message => [message?.id, message])
+      : mapping && !Array.isArray(mapping) && typeof mapping === 'object' ? Object.entries(mapping) : [];
     const nodeIds = nodes.length <= 20000 ? nodes.filter(([id, value]) => value?.id === id &&
       /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)).map(([id]) => id) : [];
     return Object.freeze({ conversationId: target.id,
@@ -574,7 +577,7 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 28,
+    version: 29,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,
