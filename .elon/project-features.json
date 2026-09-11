@@ -400,20 +400,20 @@
         },
         {
           "path": "docs/android-binance-account-read-v3-delivery.md",
-          "content_hash": "c1d8b00d54cd4a92b7cca2026621259b0050f2d00b12894544b74a883e2be131",
+          "content_hash": "4b322f3800d95a85fc1480ddffcd64ac31e587f99733e718ebf51389e1eb4113",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6db0059c2622daf9cce5e8d7bffca5021e70d3dd",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "4bf9f0f7a99ca0d9bcf4124fc4d248295e06a08a",
-            "state": "untracked"
+            "head_commit": "a82bb3182aec5996b845acef73e0920ea50a6a20",
+            "head_blob_oid": "4bf9f0f7a99ca0d9bcf4124fc4d248295e06a08a",
+            "worktree_blob_oid": "0542b429fe46dab9351709ac46ea1ca64dfdc983",
+            "state": "tracked_modified"
           }
         }
       ],
       "created_at_ms": 1789108956714,
-      "updated_at_ms": 1789110339474
+      "updated_at_ms": 1789111392093
     },
     {
       "id": "android-binance-create-visibility-v1",
@@ -25555,16 +25555,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_3f73397d53f941d9b8b01719ba0a7629",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "claim_released",
-      "actor": "esk-primary",
-      "reason": "SDK hardening batch complete: 69/69 tests with fresh Rust wire, 25 current evidence items. Release finite batch claim; TLS, Android integration, grant management, Web/AI hosts and user acceptance remain, so whole feature is not implemented/verified/released.",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1788689591490
-    },
-    {
       "id": "feature_event_88ce6d76566a4d128437dd150d330617",
       "feature_id": "unified-account-asset-access-v1",
       "action": "claimed",
@@ -27553,6 +27543,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789110339474
+    },
+    {
+      "id": "feature_event_7847501276574867a6ddc1f28045919a",
+      "feature_id": "android-binance-account-read-v3",
+      "action": "evidence_recorded",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789111392093
     }
   ]
 }
