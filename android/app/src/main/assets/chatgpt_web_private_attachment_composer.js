@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 23, create: factory });
+  const exported = Object.freeze({ version: 24, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentComposer = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -9,6 +9,7 @@
   let owned = null;
   const confirmed = new WeakSet();
   const projects = new WeakMap();
+  const scopeFailures = new WeakMap();
   const project = root.__elonChatGptPrivateAttachmentProject?.create(root);
   const ownerPath = root.__elonChatGptCommittedOwnerPath ||
     (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path') : null);
@@ -110,12 +111,16 @@
 
   async function prepare(binding, signal, descriptor, refreshScope = false, allowProject = true) {
     if (!current(binding) || signal?.aborted) throw new Error('composer_changed');
-    if (root.__elonChatGptPrivateAttachmentProtocol?.isPdf(descriptor) && !binding.modelSlug) return null;
+    scopeFailures.delete(binding);
+    const fail = (code, result = null) => { scopeFailures.set(binding, code); return result; };
+    const projectFailure = () => project?.failureDetail?.() || 'project_scope_unconfirmed';
+    if (root.__elonChatGptPrivateAttachmentProtocol?.isPdf(descriptor) && !binding.modelSlug) return fail('model_unconfirmed');
     if (refreshScope && binding.conversationId) { confirmed.delete(binding); projects.delete(binding); }
     if (confirmed.has(binding)) return !projects.has(binding) || project.supports(projects.get(binding), descriptor);
     const read = binding.projectId && !binding.conversationId ? () => project?.read(binding, signal, descriptor)
       : root.__elonChatGptPrivateTransport?.readAttachmentContext;
-    if (typeof read !== 'function') return null;
+    if (typeof read !== 'function') return fail('context_reader_unavailable');
+    let stage = binding.projectId && !binding.conversationId ? 'project_scope_unconfirmed' : 'conversation_scope_unconfirmed';
     let timer, abort;
     try {
       const context = await Promise.race([
@@ -128,39 +133,41 @@
       ]);
       if (!current(binding) || signal?.aborted || !available()) throw new Error('composer_changed');
       if (binding.projectId && !binding.conversationId) {
-        if (!context || !project.supports(context, descriptor)) return context === false ? false : null;
+        if (!context || !project.supports(context, descriptor)) return fail(projectFailure(), context === false ? false : null);
         projects.set(binding, context);
         confirmed.add(binding);
         return true;
       }
       if (context?.conversationId !== binding.conversationId) throw new Error('composer_context_unavailable');
       if (context?.projectId) {
-        if (!allowProject) return false;
-        if (!project || binding.isTemporaryChat || binding.projectId && binding.projectId !== context.projectId) return null;
+        if (!allowProject) return fail('project_reference_disallowed', false);
+        if (!project || binding.isTemporaryChat || binding.projectId && binding.projectId !== context.projectId) return fail('project_identity_mismatch');
+        stage = 'project_branch_unconfirmed';
         const thread = await project.captureThread(binding, context.projectId, signal);
-        if (!Array.isArray(context.nodeIds) || !context.nodeIds.includes(thread.leafId)) return null;
+        if (!Array.isArray(context.nodeIds) || !context.nodeIds.includes(thread.leafId)) return fail('project_branch_mismatch');
         // Keep the branch guard active even when the permission request fails.
         projects.set(binding, Object.freeze({ projectId: context.projectId, thread }));
+        stage = 'project_scope_unconfirmed';
         const scope = await project.read({ ...binding, projectId: context.projectId }, signal, descriptor);
         if (!current(binding) || signal?.aborted || !available() || !thread.current()) throw new Error('composer_changed');
-        if (!scope || !project.supports(scope, descriptor)) return scope === false ? false : null;
+        if (!scope || !project.supports(scope, descriptor)) return fail(projectFailure(), scope === false ? false : null);
         projects.set(binding, Object.freeze({ ...scope, thread }));
         confirmed.add(binding);
         return true;
       }
-      if (binding.projectId) return null;
+      if (binding.projectId) return fail('project_membership_unconfirmed');
       const supported = binding.isTemporaryChat ? context?.temporary : context?.ordinary;
       if (context?.conversationId !== binding.conversationId || typeof supported !== 'boolean') {
         throw new Error('composer_context_unavailable');
       }
-      if (!supported) return false;
+      if (!supported) return fail('conversation_scope_disallowed', false);
       confirmed.add(binding);
       return true;
     } catch (error) {
       if (error?.message === 'composer_changed' || !current(binding) || signal?.aborted || !available()) throw error;
       // Unknown metadata cannot authorize a private write, nor remove the
       // existing upload capability. The caller may select compatibility now.
-      return null;
+      return fail(stage === 'project_scope_unconfirmed' ? projectFailure() : stage);
     } finally {
       root.clearTimeout(timer);
       if (abort) signal?.removeEventListener('abort', abort);
@@ -314,8 +321,10 @@
     return Object.freeze({ binding, count: value?.items.length || 0, current: unchanged, contains,
       async prepare(signal, descriptor) {
         if (!unchanged() || !await prepare(binding, signal, descriptor, false, !!binding.libraryProjectId)) return false;
+        if (!scopeMatches()) scopeFailures.set(binding, 'project_membership_mismatch');
         return unchanged() && scopeMatches();
       },
+      failureDetail: () => 'library_attachment_' + (scopeFailures.get(binding) || 'context_changed'),
       associate(item) {
         if (!unchanged() || !confirmed.has(binding) || !scopeMatches() || item?.attached?.source !== 'library') {
           throw new Error('composer_changed');
@@ -442,5 +451,5 @@
     } catch (_) { return null; }
   }
 
-  return Object.freeze({ version: 23, available, capture, captureLibrary, captureUpload, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, associateLibrary, merge, remove, prepareSubmit });
+  return Object.freeze({ version: 24, available, capture, captureLibrary, captureUpload, prepare, current, uploadContext, reservationContext, pickerReservationContext, associate, associateMany, associateLibrary, merge, remove, prepareSubmit });
 });

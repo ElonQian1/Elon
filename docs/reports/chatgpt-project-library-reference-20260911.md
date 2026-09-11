@@ -52,7 +52,21 @@ composer, upload-library integration, mounted reference and full bundle cases pa
 These establish code behavior, not live project eligibility or server send
 acceptance. Device acceptance and release evidence follow in this report.
 
+Release 1668 (adapter 351, source `10c7449eb`) was installed without clearing
+data. Both existing-project and new-project native library references failed
+before publication with `library_attachment_context_changed`. The new-project
+probe observed a successful project GET (HTTP 200); no attachment, send, upload
+or delete occurred. Original conversation, empty draft and awake policy were
+restored. Project title slug canonicalization initially confused the acceptance
+script; checking the stable project ID removed that separate test precondition.
+
+Composer v24 and project scope v8 now retain closed failure reasons for server
+membership, selected branch, project permission and upload policy checks.
+Library v10 reports them separately from actual input drift. This does not
+weaken admission or replay a write. Targeted compatibility tests passed;
+device localization with adapter 352 remains pending.
+
 Capability `android_chatgpt_private_project_library_reference_v1` currently has
-`code_status=implemented`, `verification_status=offline_verified`; publication
-and native project UI acceptance are pending. Google remains last. The wider
+`code_status=partial`, `verification_status=failed`; the shipped project path
+still needs live fault localization and repair. Google remains last. The wider
 Goal remains active, including raster deletion and other unverified sources.

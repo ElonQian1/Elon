@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 7, create: factory });
+  const exported = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateAttachmentProject = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -11,37 +11,48 @@
   const RUNTIME_URL = 'https://chatgpt.com/cdn/assets/4813494d-hrplraurzfyvxb10.js';
   const IMAGE = /\.(?:jpg|jpeg|png|gif|webp|heic|heif|mpo|avif)$/i;
   let runtime;
+  let readFailure = 'project_scope_unconfirmed';
 
   function projectId(path) { return PATH.exec(path || '')?.[1] || null; }
 
   async function read(binding, signal, file) {
+    readFailure = 'project_scope_unconfirmed';
     const id = binding.projectId;
     const request = root.__elonChatGptPrivateJsonRequest?.request;
     if (!PROJECT.test(id || '') || binding.isTemporaryChat || signal?.aborted ||
         root.location.href !== binding.href || typeof request !== 'function') return null;
     const headers = root.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.();
+    readFailure = 'project_request_failed';
     const result = await request(root, '/backend-api/gizmos/' + encodeURIComponent(id), {
       method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error', headers, signal,
     }, { timeoutMs: 7000, maxBytes: 1024 * 1024 });
     if (signal?.aborted || root.location.href !== binding.href) throw new Error('composer_changed');
     const gizmo = result.payload?.gizmo;
-    if (!gizmo || gizmo.id !== id || typeof gizmo.current_user_permission?.can_write !== 'boolean' ||
-        gizmo.use_injest_path !== undefined && typeof gizmo.use_injest_path !== 'boolean') return null;
+    readFailure = 'project_identity_unconfirmed';
+    if (!gizmo || gizmo.id !== id) return null;
+    readFailure = 'project_permission_unconfirmed';
+    if (typeof gizmo.current_user_permission?.can_write !== 'boolean') return null;
+    readFailure = 'project_upload_policy_unconfirmed';
+    if (gizmo.use_injest_path !== undefined && typeof gizmo.use_injest_path !== 'boolean') return null;
     // Read-only members may upload to their chat, but not to the project file collection.
     const canWrite = gizmo.current_user_permission.can_write;
     const usesInjestPath = gizmo.use_injest_path === true;
     let imageIndexForRetrieval = false;
     if (usesInjestPath && /^image\//.test(file?.type || '') && IMAGE.test(file.name)) {
+      readFailure = 'project_runtime_unavailable';
       const namespace = await loadedRuntime(signal);
       if (signal?.aborted || root.location.href !== binding.href ||
           root.__elonChatGptDocumentToken !== binding.token) throw new Error('composer_changed');
       const client = namespace?.t6?.();
+      readFailure = 'project_runtime_not_ready';
       if (client?.loadingStatus !== 'Ready') return null;
       const gate = client.getFeatureGate?.('2031707412', { disableExposureLog: true });
+      readFailure = 'project_image_gate_unconfirmed';
       if (gate?.name !== '2031707412' || typeof gate.value !== 'boolean' ||
           !/^[A-Za-z]+:Recognized$/.test(gate.details?.reason || '') || gate.details?.warnings?.length) return null;
       imageIndexForRetrieval = gate.value;
     }
+    readFailure = 'project_scope_unconfirmed';
     return Object.freeze({ projectId: id, canWrite, usesInjestPath, imageIndexForRetrieval });
   }
 
@@ -125,5 +136,5 @@
     });
   }
 
-  return Object.freeze({ version: 7, projectId, read, captureThread, supports, uploadContext });
+  return Object.freeze({ version: 8, projectId, read, captureThread, supports, uploadContext, failureDetail: () => readFailure });
 });

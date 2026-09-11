@@ -119,6 +119,25 @@ test('project first reference respects official count and size rejection', async
   }
 });
 
+test('reference receipts identify the failing scope check without exposing server data', async () => {
+  for (const [change, code] of [
+    [f => { f.context.nodeIds = []; }, 'project_branch_mismatch'],
+    [f => { f.thread.isLoading = true; }, 'project_branch_unconfirmed'],
+    [f => { f.context.projectId = OTHER; }, 'project_identity_mismatch'],
+    [f => { delete f.context.projectId; }, 'project_membership_unconfirmed'],
+    [f => { delete f.project.current_user_permission; }, 'project_permission_unconfirmed'],
+    [f => { f.project.use_injest_path = 'unknown'; }, 'project_upload_policy_unconfirmed'],
+    [f => { f.project.id = OTHER; }, 'project_identity_unconfirmed'],
+  ]) {
+    const f = setup(); change(f);
+    const result = await f.attach(f.source(1));
+    assert.equal(result[1], false);
+    assert.equal(result[2], 'library_attachment_' + code);
+    assert.equal(f.store.files$().length, 0);
+    assert.equal(JSON.stringify(result).includes(PROJECT), false);
+  }
+});
+
 test('project append, duplicate reference, native removal and submit revocation share one owner', async () => {
   const f = setup(), a = f.source(1), b = f.source(2);
   assert.equal((await f.attach(a))[1], true);

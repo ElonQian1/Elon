@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 9, operationTimeoutMs: 24000, create: factory });
+  const exported = Object.freeze({ version: 10, operationTimeoutMs: 24000, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateLibraryAttachment = exported;
 })(typeof window === 'object' ? window : null, function (root, options) {
@@ -113,16 +113,15 @@
         if (!canAssociate()) return [false, 'library_attachment_context_changed'];
         if (!admit) return [false, 'library_attachment_policy_unconfirmed'];
         if (!admit(file)) return [false, 'library_attachment_limit'];
-        if (!await context.prepare(job.controller.signal, file) || !canAssociate()) {
-          return [false, 'library_attachment_context_changed'];
-        }
+        if (!await context.prepare(job.controller.signal, file)) return [false, context.failureDetail()];
+        if (!canAssociate()) return [false, 'library_attachment_context_changed'];
         let item;
         if (remote) {
           // Consume this selected handle before the write; an unknown outcome is not replayed.
           consumed.set(input.fileHandle, Date.now());
           const prepared = await mounted.prepare(selection.source, id, job.controller.signal, canAssociate);
-          if (!await context.prepare(job.controller.signal, prepared.descriptor) ||
-              !canAssociate()) return [false, 'library_attachment_context_changed'];
+          if (!await context.prepare(job.controller.signal, prepared.descriptor)) return [false, context.failureDetail()];
+          if (!canAssociate()) return [false, 'library_attachment_context_changed'];
           if (!admit(prepared.descriptor)) return [false, 'library_attachment_limit'];
           item = prepared.item;
         } else item = ready(selection.source, id);
