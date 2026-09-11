@@ -54,11 +54,18 @@
     return JSON.stringify(window.__elonChatGptPrivateConversationDirectory?.refreshDiagnostics?.() ||
       { schema: 'elon.directory_refresh.v1', observed: false, durationMs: 0, identityMs: 0, reads: [] });
   }
+  function librarySourceDetail() {
+    return JSON.stringify(window.__elonChatGptPrivateLibraryCatalog?.sourceDiagnostics?.() ||
+      { schema: 'elon.library_sources.v1', observed: false, stale: false, total: 0, omitted: 0, groups: [] });
+  }
   if (existingProbe && Number(existingProbe.version) >= 13) {
-    if (Number(existingProbe.version) < 21) {
+    if (Number(existingProbe.version) < 22) {
       // Upgrade only the command surface; keep the existing network observers.
-      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 21,
+      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 22,
         handle(action, command, respond) {
+          if (action === 'private_protocol_probe' && command.value === 'library_sources') {
+            respond(action, true, librarySourceDetail()); return true;
+          }
           if (action === 'private_protocol_probe' && command.value === 'file_download_source') {
             respond(action, true, downloadSourceDetail()); return true;
           }
@@ -579,7 +586,7 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 21,
+    version: 22,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
       if (action !== 'private_protocol_probe') return false;
@@ -590,6 +597,7 @@
       else if (mode === 'document_state') detail = window.__elonChatGptPrivateProtocolEvidence?.documentState(window);
       else if (mode === 'model_runtime_context') detail = modelContextDetail();
       else if (mode === 'directory_refresh') detail = directoryDetail();
+      else if (mode === 'library_sources') detail = librarySourceDetail();
       else if (mode === 'composer_tool_context') detail = toolContextDetail();
       else if (mode === 'library_attachment_policy') detail = libraryPolicyDetail();
       else if (mode === 'stop_runtime_context') detail = stopContextDetail();

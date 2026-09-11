@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 8, create: factory });
+  const exported = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateLibraryCatalog?.version || 0) < exported.version) {
@@ -20,6 +20,7 @@
     'library_download_id', 'context_connector_info', 'library_provider'];
   const pages = new Map(), directories = new Map(), renamed = new Map();
   let identityKey = '', active = null, disposed = false, failures = 0, retryAt = 0;
+  let diagnostic = null;
 
   function sameAttachmentMetadata(left, right) {
     let remaining = 4096;
@@ -52,6 +53,7 @@
     renamed.clear();
     failures = 0;
     retryAt = 0;
+    diagnostic = null;
   }
 
   function opaque(value, max = 2048) {
@@ -131,6 +133,8 @@
       const canAttach = !!attachments?.descriptor(source);
       return { ...item, downloadHandle, canAttach, ...root.__elonChatGptPrivateLibraryMutations?.capabilities?.(source) };
     });
+    diagnostic = { page, rows: page.items, items, savedAt: page.savedAt, expiresAt: Date.now() + TTL,
+      account: job.identity, href: job.href, token: job.token, transport: job.transport, stale };
     emit({ type: 'library_files_snapshot', version: 1, requestId: job.requestId,
       directoryHandle: job.directoryHandle, query: job.query, breadcrumbs: job.breadcrumbs,
       items, hasMore: Boolean(page.cursor) && !page.capped, partial: page.partial || page.capped, stale });
@@ -258,6 +262,41 @@
     return true;
   }
   function dispose() { disposed = true; reset(); }
+  function sourceDiagnostics() {
+    const value = diagnostic;
+    if (disposed || !value || root.location.origin !== 'https://chatgpt.com' ||
+        Date.now() >= value.expiresAt || value.account !== identity() ||
+        value.account !== identityKey || value.href !== root.location.href ||
+        value.token !== root.__elonChatGptDocumentToken || value.transport !== root.__elonChatGptPrivateTransport ||
+        value.page.savedAt !== value.savedAt || value.page.items !== value.rows) return null;
+    const idKind = id => id == null ? 'none' : /^libfile[_-][A-Za-z0-9_-]{1,152}$/.test(id) ? 'library' :
+      /^file[_-][A-Za-z0-9_-]{1,152}$/.test(id) ? 'file' :
+      /^external-(?:gdrive|box|dropbox|sharepoint):/.test(id) ? 'external' : 'other';
+    const artifacts = ['saved_entity', 'deep_research_report', 'flashcards', 'learning_quiz', 'app_block', 'site_preview'];
+    const flags = ['external_account', 'cloud_doc_url', 'saved_entity', 'trashed_at', 'is_project',
+      'gizmo_id', 'project_id', 'context_scopes', 'preview_file', 'mounted_library_file_id',
+      'library_file_id', 'shared_library_file_id', 'library_download_id', 'context_connector_info', 'library_provider'];
+    const mimeTypes = ['image/png', 'image/jpeg', 'application/pdf', 'text/plain'];
+    const groups = new Map();
+    let omitted = 0;
+    for (let index = 0; index < value.rows.length; index++) {
+      const file = value.rows[index].source, row = value.items[index];
+      const group = { kind: row.kind, node: idKind(file.id), file: idKind(file.file_id),
+        artifact: file.library_artifact_type == null ? 'none' :
+          artifacts.includes(file.library_artifact_type) ? file.library_artifact_type : 'other',
+        mime: mimeTypes.includes(file.mime_type) ? file.mime_type : file.mime_type ? 'other' : 'none',
+        flags: flags.filter(key => key === 'is_project' ? file[key] === true : file[key] != null),
+        download: Boolean(row.downloadHandle), attach: row.canAttach === true,
+        rename: row.canRename === true, trash: row.canTrash === true };
+      const key = JSON.stringify(group), existing = groups.get(key);
+      if (existing) existing.count++;
+      else if (groups.size < 16) groups.set(key, { ...group, count: 1 });
+      else omitted++;
+    }
+    return { schema: 'elon.library_sources.v1', observed: true,
+      stale: value.stale || Date.now() - value.savedAt >= TTL,
+      total: value.rows.length, omitted, groups: Array.from(groups.values()) };
+  }
   function selectMutation(fileHandle) {
     const account = identity(), href = root.location.href;
     if (disposed || !account || account !== identityKey || root.location.origin !== 'https://chatgpt.com') return null;
@@ -320,5 +359,5 @@
       },
     };
   }
-  return Object.freeze({ version: 8, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead });
+  return Object.freeze({ version: 9, list, cancel, dispose, selectMutation, selectAttachment, cancelActiveRead, sourceDiagnostics });
 });

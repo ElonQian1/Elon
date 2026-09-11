@@ -110,6 +110,24 @@ test('download source diagnostics are on demand and survive observer upgrade', (
   assert.equal(f.requests.length, 0); assert.equal(f.read().active, false);
 });
 
+test('library source diagnostics reuse the catalog and preserve the existing network observers', () => {
+  const f = fixture();
+  assert.equal(JSON.parse(f.command('library_sources').detail).observed, false);
+  const value = require('../android/app/src/test/resources/webchat/private-library-sources-contract.json');
+  f.window.__elonChatGptPrivateLibraryCatalog = { sourceDiagnostics: () => value };
+  const fetch = f.window.fetch;
+  for (const previous of [null, 21]) {
+    if (previous) {
+      f.window.__elonChatGptPrivateResearchProbe = { ...f.probe, version: previous };
+      vm.runInNewContext(source, f.context);
+    }
+    f.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe', { value: 'library_sources' },
+      (_, ok, detail) => { assert.equal(ok, true); assert.deepEqual(JSON.parse(detail), value); });
+    assert.equal(f.window.fetch, fetch);
+  }
+  assert.equal(f.requests.length, 0); assert.equal(f.read().active, false);
+});
+
 test('native gate admits the stop owner mode used by the page probe', () => {
   const native = fs.readFileSync(path.join(__dirname,
     '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPrivateProtocolEvidence.kt'), 'utf8');
@@ -210,7 +228,7 @@ test('version 13 command upgrade preserves existing observers and other commands
   const existing = f.probe;
   f.window.__elonChatGptPrivateResearchProbe = { ...existing, version: 13 };
   vm.runInNewContext(source, f.context);
-  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 21);
+  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 22);
   assert.equal(f.window.fetch, fetch);
   assert.equal(f.window.XMLHttpRequest.prototype.send, send);
   const answers = [];

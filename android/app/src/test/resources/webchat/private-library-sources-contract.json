@@ -1,0 +1,9 @@
+{
+  "schema": "elon.library_sources.v1", "observed": true, "stale": false, "total": 3, "omitted": 0,
+  "groups": [
+    { "kind": "file", "node": "library", "file": "file", "artifact": "none", "mime": "image/png",
+      "flags": [], "download": true, "attach": true, "rename": true, "trash": true, "count": 2 },
+    { "kind": "file", "node": "library", "file": "file", "artifact": "saved_entity", "mime": "image/png",
+      "flags": ["saved_entity"], "download": false, "attach": false, "rename": false, "trash": false, "count": 1 }
+  ]
+}
