@@ -4,6 +4,11 @@
 pub mod authority;
 #[path = "../../../src/esk_platform/game_rewards/funding.rs"]
 pub mod funding;
+#[path = "../../../src/esk_platform/game_rewards/funding_source.rs"]
+pub mod funding_source;
+#[cfg(test)]
+#[path = "../../../src/esk_platform/game_rewards/funding_source_tests.rs"]
+mod funding_source_tests;
 #[cfg(test)]
 mod interoperability;
 #[path = "../../../src/esk_platform/game_rewards/ledger.rs"]

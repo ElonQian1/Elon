@@ -6,7 +6,7 @@ use super::{
 use ed25519_dalek::{Signer, SigningKey};
 use rusqlite::{params, Connection};
 use std::cell::RefCell;
-const NOW: i64 = 1_800_000_000_000;
+pub(crate) const NOW: i64 = 1_800_000_000_000;
 struct TestDir(std::path::PathBuf);
 impl TestDir {
     fn new() -> Self {
@@ -121,7 +121,7 @@ pub(crate) fn report(user: &str, at: i64) -> Signed<Settlement> {
         11,
     )
 }
-fn fixture(path: Option<&std::path::Path>) -> (Connection, Policy) {
+pub(crate) fn fixture(path: Option<&std::path::Path>) -> (Connection, Policy) {
     let c = path.map_or_else(
         || Connection::open_in_memory().unwrap(),
         |p| Connection::open(p).unwrap(),

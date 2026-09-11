@@ -98,6 +98,86 @@ async fn game_rewards_real_store_tls_signed_settlement_and_read_are_account_boun
     .await;
     assert_eq!(status, StatusCode::OK, "{prepared}");
     assert_eq!(prepared["state"], "reserved_awaiting_funding");
+    let source_url = "/api/admin/game-rewards/v1/budgets/source";
+    let source_request = json!({"schema":"esk.game.rewards.funding-source.request.v1",
+        "policy_digest":intent.policy_digest,"allocation_hash":intent.allocation_hash});
+    let pending_url = "/api/admin/game-rewards/v1/budgets/pending";
+    let pending_request = json!({"schema":"esk.game.rewards.pending-funding.request.v1",
+        "policy_digest":intent.policy_digest,"limit":20});
+    for (url, body) in [
+        (source_url, source_request.clone()),
+        (pending_url, pending_request.clone()),
+    ] {
+        assert_eq!(
+            request(&router, url, &f.user_token, Some(body.clone()), None)
+                .await
+                .0,
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            request(&f.router, url, &f.admin_token, Some(body.clone()), None)
+                .await
+                .0,
+            StatusCode::UPGRADE_REQUIRED
+        );
+        assert_eq!(
+            request(
+                &router,
+                url,
+                &f.admin_token,
+                Some(body.clone()),
+                Some("https://evil.example.test")
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            request(
+                &router,
+                &format!("{url}?user_id=other"),
+                &f.admin_token,
+                Some(body.clone()),
+                None
+            )
+            .await
+            .0,
+            StatusCode::BAD_REQUEST
+        );
+        let mut unknown = body;
+        unknown["verified"] = true.into();
+        assert_eq!(
+            request(&router, url, &f.admin_token, Some(unknown), None)
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    let (status, source) = request(
+        &router,
+        source_url,
+        &f.admin_token,
+        Some(source_request.clone()),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{source}");
+    assert_eq!(source["source"]["source_status"], "reserved");
+    assert_eq!(
+        source["source"]["original_settlement"],
+        serde_json::to_value(&proof).unwrap()
+    );
+    assert_eq!(source["offchain_payment_authorized"], false);
+    let (status, page) = request(
+        &router,
+        pending_url,
+        &f.admin_token,
+        Some(pending_request.clone()),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(page["sources"].as_array().unwrap().len(), 1);
     let (status, confirmed) = request(
         &router,
         "/api/admin/game-rewards/v1/budgets/confirm-funding",
@@ -109,6 +189,24 @@ async fn game_rewards_real_store_tls_signed_settlement_and_read_are_account_boun
     assert_eq!(status, StatusCode::OK, "{confirmed}");
     assert_eq!(confirmed["state"], "funding_attested");
     assert_eq!(confirmed["offchain_payment_authorized"], false);
+    let (_, source) = request(
+        &router,
+        source_url,
+        &f.admin_token,
+        Some(source_request),
+        None,
+    )
+    .await;
+    assert_eq!(source["source"]["source_status"], "funding_attested");
+    let (_, page) = request(
+        &router,
+        pending_url,
+        &f.admin_token,
+        Some(pending_request),
+        None,
+    )
+    .await;
+    assert!(page["sources"].as_array().unwrap().is_empty());
     let (status, account) = request(
         &router,
         "/api/me/game-rewards/v1/account",

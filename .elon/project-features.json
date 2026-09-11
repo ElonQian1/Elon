@@ -8582,6 +8582,109 @@
       "updated_at_ms": 1788686920070
     },
     {
+      "id": "esk-game-funding-source-v1",
+      "title": "ESK game funding source",
+      "summary": "Authenticated read-only funding source snapshots and bounded pending budget discovery.",
+      "status": "verified",
+      "priority": "p2",
+      "requirement": {
+        "path": "docs/requirements/esk-game-funding-source-v1.md",
+        "content_hash": "105036b2960300ba2e34cb9ef583f9bf6e76158f9b4594835c3209c264a41d46",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "4776eae190d4333878cfe801d877c5c70c19962a",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "84723a79cf14409948dbd02c0aef3660900a018f",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "",
+      "tags": [],
+      "task_paths": [
+        "docs/esk-game-funding-source.md",
+        "server/src/esk_platform/game_rewards/funding_source.rs",
+        "server/src/esk_platform/game_rewards/funding_source_api.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Authenticated TLS admin queries reject revoked sessions",
+        "Source signature and intent verification with loss and disabled-user blockers",
+        "Bounded keyset pagination and SQL/HTTP regression coverage"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/esk-game-funding-source.md",
+          "content_hash": "e439eda733d28c0224fbd64c2d128ebbd661f09f4ab27c010fac96170339f5ee",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4776eae190d4333878cfe801d877c5c70c19962a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f8798c3d8c9d4036eac1896404061598975da543",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/game_rewards/funding_source.rs",
+          "content_hash": "955369856a0aad4ce3826dbb2b6b834528a69e4e55960bc11912a982e9a2f75b",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4776eae190d4333878cfe801d877c5c70c19962a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1572c7c2bc81c0d429bd40a5005fc829015088d1",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/game_rewards/funding_source_api.rs",
+          "content_hash": "e489da45fcbccb12b6d6dd4f9ed4f134a43dc6a2de1b6892018f35ac3e3ed1ad",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4776eae190d4333878cfe801d877c5c70c19962a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5ee7911d871a7bc370538e177dc9f9bdd4ac04e9",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/game_rewards/funding_source_tests.rs",
+          "content_hash": "d56c233da0439888223c4d1862ae42c706a30b30d6a1e26bda1f7f9fb2915fe0",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4776eae190d4333878cfe801d877c5c70c19962a",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4a49f0a90a923bed98caf7fb8d00af1f6154882f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/game_rewards/http_tests.rs",
+          "content_hash": "698f09024ac01b615b23daa65ed96c684c6edb90493273a8a38e8bd90ae6bf5f",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "4776eae190d4333878cfe801d877c5c70c19962a",
+            "head_blob_oid": "aebfa80ce7764eb9f4487cb8fd4e465a0aefca7b",
+            "worktree_blob_oid": "c313a1cefe406fb7c46965ba4d8dc5670ac2ee3e",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1789162917371,
+      "updated_at_ms": 1789163962064
+    },
+    {
       "id": "esk-native-snapshot-v1",
       "title": "ESK 双 APK 原生只读快照授权 V1",
       "summary": "在官方双 APK 间确认本人账户并展示短期 Paper ESK 快照，HTTP 私有请求失败关闭，不向 WebView 传凭据。",
@@ -26065,66 +26168,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_9f74a8b3a1ee4a7e8cfc07809efd8623",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-research",
-      "reason": "通用Win采集、站点清单、研究资料库、MCP队列及界面已开始接线；尚未编译或现场验收。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788730291997
-    },
-    {
-      "id": "feature_event_f4816b81c5fe4782a5c384dc73b4ab41",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "claim_released",
-      "actor": "codex-grid-research",
-      "reason": "需求状态更新为实施中并链接实际运行合同，重绑同一验收范围",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788731738169
-    },
-    {
-      "id": "feature_event_5ef25b861cff4736b58264ae355182b0",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-grid-research",
-      "reason": "同一用户要求的实现状态与运行说明更新，不改变验收目标",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788731738588
-    },
-    {
-      "id": "feature_event_556a250a460d4083b16ea6f3c8795657",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-research",
-      "reason": "复核需求和原验收范围一致，继续已授权实现",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788731738759
-    },
-    {
-      "id": "feature_event_c4d6b032716c470d84b65c983af7892a",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-research",
-      "reason": "复核需求和原验收范围一致，继续已授权实现",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788731738925
-    },
-    {
-      "id": "feature_event_b6c93ee585aa45578053c4a276df1896",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "claimed",
-      "actor": "codex-grid-research",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788731739106
-    },
-    {
       "id": "feature_event_9a2bf9f4e1e2495692ac5897f5b1b2f2",
       "feature_id": "win-browser-research-mcp-v1",
       "action": "transitioned",
@@ -28063,6 +28106,66 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1789162070807
+    },
+    {
+      "id": "feature_event_9567af7fb9ec49afa1c7cc57caa27297",
+      "feature_id": "esk-game-funding-source-v1",
+      "action": "registered",
+      "actor": "codex-esk-game-goal",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789162917371
+    },
+    {
+      "id": "feature_event_aebfa7fdd035414380f21dcdd5d1bc7d",
+      "feature_id": "esk-game-funding-source-v1",
+      "action": "claimed",
+      "actor": "codex-esk-game-goal",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789162928161
+    },
+    {
+      "id": "feature_event_65ff0ae998e54b7db82d102e73ee23e7",
+      "feature_id": "esk-game-funding-source-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-game-goal",
+      "reason": "Implement the accepted funding source slice.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789162939843
+    },
+    {
+      "id": "feature_event_bf1f7edf67aa4edd81561d91e0942fce",
+      "feature_id": "esk-game-funding-source-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-game-goal",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789163961705
+    },
+    {
+      "id": "feature_event_dbdb51c1a330470ca22a08b33adbdae7",
+      "feature_id": "esk-game-funding-source-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-game-goal",
+      "reason": "Production source queries implemented; 19 SQL and 20 server reward tests passed. Publication pending.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789163961895
+    },
+    {
+      "id": "feature_event_f4f52848985c4560978b57f7fa03c041",
+      "feature_id": "esk-game-funding-source-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-game-goal",
+      "reason": "Production source queries implemented; 19 SQL and 20 server reward tests passed. Publication pending.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1789163962065
     }
   ]
 }

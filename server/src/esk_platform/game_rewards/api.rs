@@ -16,7 +16,7 @@ use std::sync::Arc;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Empty {}
-fn respond<T: Serialize>(result: Result<T>) -> Response {
+pub(super) fn respond<T: Serialize>(result: Result<T>) -> Response {
     match result {
         Ok(value) => Json(value).into_response(),
         Err(error) => {
