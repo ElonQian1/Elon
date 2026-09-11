@@ -1,0 +1,75 @@
+/* Fixed read-only reference operation. All network dependencies are captured by
+ * the host adapter; callers cannot supply URLs, headers, scripts or trade bodies. */
+(() => {
+  'use strict';
+  const schema='yilong.binance_create_reference.v1';
+  const keys=['symbol','direction','lower','upper','count','leverage','spacing','triggerPrice','trailingUp','trailingDown','marginType'];
+  const decimal=v=>typeof v==='string' && /^(0|[1-9][0-9]{0,29})(\.[0-9]{1,20})?$/.test(v) && /[1-9]/.test(v);
+  const int=(v,low,high)=>Number.isSafeInteger(v) && v>=low && v<=high;
+  function valid(input,market) {
+    return input && Object.keys(input).sort().join(',')===keys.slice().sort().join(',') && keys.every(k=>typeof input[k]==='string') &&
+      /^[A-Z0-9]{1,24}USDT$/.test(input.symbol) && ['LONG','SHORT','NEUTRAL'].includes(input.direction) &&
+      ['ISOLATED','CROSSED'].includes(input.marginType) && ['ARITH','GEO'].includes(input.spacing) &&
+      ['trailingUp','trailingDown'].every(k=>['true','false'].includes(input[k])) &&
+      decimal(input.lower) && decimal(input.upper) && Number(input.lower)<Number(input.upper) &&
+      (input.triggerPrice==='' || decimal(input.triggerPrice)) &&
+      (input.count==='' || /^[1-9][0-9]{0,4}$/.test(input.count) && Number(input.count)<=10000) &&
+      /^[1-9][0-9]{0,2}$/.test(input.leverage) && Number(input.leverage)<=125 &&
+      market && Object.keys(market).sort().join(',')==='mark,minNotional,minQty,observedAt,qtyPrecision,tick' &&
+      ['mark','minNotional','minQty','tick'].every(k=>decimal(market[k])) && int(market.qtyPrecision,0,20) &&
+      int(market.observedAt,1,Number.MAX_SAFE_INTEGER) && Date.now()-market.observedAt>=-5000 && Date.now()-market.observedAt<=120000;
+  }
+  function configuration(value) {
+    if(value?.success!==true || value.code!=='000000')throw Error('configuration_unavailable');
+    const c=value.data;
+    if(!c || !['minGridCount','maxGridCount','maxTrailingGridCount','windowCount'].every(k=>int(c[k],1,10000)) ||
+      c.minGridCount<2 || c.minGridCount>c.maxGridCount || c.minGridCount>c.maxTrailingGridCount ||
+      !['priceDiffBuffer','adjustCoef','trailingCoef'].every(k=>typeof c[k]==='number' && Number.isFinite(c[k]) && c[k]>0) ||
+      c.adjustCoef>1)throw Error('configuration_unavailable');
+    return c;
+  }
+  window.__elonBinanceCreateReferenceFactoryV1=deps=>{
+    let generation=0,current=null,config=null,fees=null;
+    const status=(request,account,symbol,state)=>({schema,request,account,symbol,status:state});
+    return Object.freeze({
+      start(token,request,account,input,market) {
+        if(!/^doc_[a-z0-9_]{3,80}$/.test(token) || !/^[a-f0-9]{64}$/.test(request) || !/^[a-f0-9]{64}$/.test(account) || !valid(input,market))return false;
+        input=JSON.parse(JSON.stringify(input));market=JSON.parse(JSON.stringify(market));
+        const ticket=++generation,base=status(request,account,input.symbol,'pending');current={...base,token};
+        (async()=>{try {
+          const h=deps.headers();await deps.identity(account,h);
+          if(!config || Date.now()-config.at<0 || Date.now()-config.at>=300000)config={value:configuration(await deps.configuration(h)),at:Date.now()};
+          if(!fees || fees.account!==account || fees.symbol!==input.symbol || fees.token!==token || Date.now()-fees.at<0 || Date.now()-fees.at>=60000) {
+            const v=await deps.commission(h,input.symbol),fee=v?.data?.makerCommission;
+            if(v?.success!==true || v.code!=='000000' || typeof fee!=='number' || !Number.isFinite(fee) || fee<=-1000000 || fee>=1000000)throw Error('commission_unavailable');
+            fees={account,symbol:input.symbol,token,value:String(fee/1000000),at:Date.now()};
+          }
+          const c=config.value,fee=fees.value,api=window.__elonBinanceCreateRulesV1;
+          const trailing=input.trailingUp==='true'||input.trailingDown==='true';
+          const maximum=api.maximumCount(input.upper,input.lower,input.spacing,market.tick,fee,
+            String(trailing?c.maxTrailingGridCount:c.maxGridCount),Number(market.tick)>0.00001?'1':String(c.priceDiffBuffer));
+          if(!int(maximum,0,10000))throw Error('calculation_unavailable');
+          const count=Number(input.count),countValid=input.count!=='' && count>=c.minGridCount && count<=maximum;
+          const precision=window.__elonBinanceDecimalV1.decimal(market.tick).s;
+          const minimum=countValid?api.minimumMargin(input.direction,market.minQty,market.minNotional,input.lower,input.upper,
+            market.mark,input.triggerPrice,input.count,input.leverage,String(c.adjustCoef),market.qtyPrecision,precision,
+            input.spacing,trailing,String(c.trailingCoef),c.windowCount):'';
+          if(countValid && !decimal(minimum))throw Error('calculation_unavailable');
+          await deps.identity(account,h);
+          if(ticket!==generation)return;
+          if(Date.now()-market.observedAt>120000)throw Error('market_expired');
+          current={...base,token,status:'ready',minimum_count:c.minGridCount,maximum_count:maximum,minimum_margin:minimum,
+            observed_at:market.observedAt,source:'binance_create_rules_v1',code:maximum<c.minGridCount?'range_too_narrow':input.count===''?'count_required':countValid?'':'count_outside_range'};
+        }catch(error){if(ticket===generation){fees=null;current={...base,token,status:'unavailable'};}}})();
+        return true;
+      },
+      read(token,request,account) {
+        if(!current || current.token!==token || current.request!==request || current.account!==account)return null;
+        const {token:_,...result}=current;
+        if(result.status==='ready' && (Date.now()-result.observed_at>120000 || Date.now()-result.observed_at< -5000))return status(request,account,result.symbol,'expired');
+        return result;
+      },
+      cancel(){generation++;current=null;fees=null;}
+    });
+  };
+})();

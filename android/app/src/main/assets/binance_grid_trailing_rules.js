@@ -170,5 +170,6 @@
       return true;
     } catch{return false;}
   }
+  window.__elonBinanceDecimalV1=Object.freeze({decimal,add,subtract,multiply,divide,compare,down,text,number,minimum,maximum,gridRatio});
   window.__elonBinanceTrailingRulesV1=Object.freeze({cap,quoteQuantity,bounds,editorBounds,validate});
 })();

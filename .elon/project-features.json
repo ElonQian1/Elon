@@ -416,6 +416,175 @@
       "updated_at_ms": 1789111392093
     },
     {
+      "id": "android-binance-create-reference-v1",
+      "title": "币安创建动态参考接口",
+      "summary": "为量化原生创建页提供绑定账号与参数的动态网格数量范围、最低保证金，只读计算不提交交易。",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/android-binance-create-reference-v1.md",
+        "content_hash": "9e4826efbc8428084addfdd9b114e38045dfab3e8456be10e1aee1602c39fb2b",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "cb187c1d9cedc192d9ed614f9e3bd88f6a8efd80",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "3c9188382da538c6c95cb15026e30f8d20af2533",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_create*",
+        "android/app/src/main/kotlin/com/elon/app/grid/create",
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostProvider.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostWebView.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "固定只读接口，账号、文档、请求和参数隔离",
+        "动态计算与同代前端向量一致，字段缺失不猜测",
+        "发布与真实账号页面比对分别取证"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/binance_grid_create_adapter.js",
+          "content_hash": "0f5e577c701b852fac79395b88af244c7714e71baf08e63c5838cb8b68bb9bbd",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb187c1d9cedc192d9ed614f9e3bd88f6a8efd80",
+            "head_blob_oid": "581196076c650785126fbe6182c389455f13cd0d",
+            "worktree_blob_oid": "f189b194b17ec7799aa4cfb3c3b26007f6a52158",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/binance_grid_create_reference.js",
+          "content_hash": "13f595bd17b524dc0b98b832f2b7e491b7bbabc2aab523623f4ec4ce62007237",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb187c1d9cedc192d9ed614f9e3bd88f6a8efd80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "29cfd367ab1210225d2d3c6aa0fa126ef4498859",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/binance_grid_create_rules.js",
+          "content_hash": "e936205bba9b36ca8842a6b8fdb6740667d5f71cc6777d43228091b74cc47aa5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb187c1d9cedc192d9ed614f9e3bd88f6a8efd80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b77faee26b2cd607630c81407dbf22f803c9f4db",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/binance_grid_trailing_rules.js",
+          "content_hash": "191413bce841b6be603abb96039da8270da3ec4b9b155c5bc5d0d9cb428437c5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb187c1d9cedc192d9ed614f9e3bd88f6a8efd80",
+            "head_blob_oid": "8cb4a12e432e4b212e9c0fc967c17c4fac2e7857",
+            "worktree_blob_oid": "aefa77be3b2123852253c2ab3464d76196845ec9",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateCommands.kt",
+          "content_hash": "6ab508ee764ce443883c9705e9ea54c5844978f24356e0462ed9fbebd5bb3f99",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb187c1d9cedc192d9ed614f9e3bd88f6a8efd80",
+            "head_blob_oid": "6f7fed4839949c388217f6e8cc0e146a8992b07a",
+            "worktree_blob_oid": "1f600f4ebb0de3c08cf8c53ec56cad2f95cb24a1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateReference.kt",
+          "content_hash": "9fa5c3481ff1e1d458fb3fc6fb0cbec93bbaa5644d590502eb50eca449cb80f4",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb187c1d9cedc192d9ed614f9e3bd88f6a8efd80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "903733902c6e085b2600571b2185c50b64ef6571",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostWebView.kt",
+          "content_hash": "d29e07374c566b94f11aa12847322f8814fa11e2e30caf3146720d2ec0083a18",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb187c1d9cedc192d9ed614f9e3bd88f6a8efd80",
+            "head_blob_oid": "db0751d8ed9373f6281a4f2ed5c85f488740a551",
+            "worktree_blob_oid": "732437fe5f5390b38cba1d904ca8b39865e975d2",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/create/BinanceReferenceContractTest.kt",
+          "content_hash": "97964147316539f466546c9bedec5afbcfee6b6577e0c7c67826cb8b7c20c0c0",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb187c1d9cedc192d9ed614f9e3bd88f6a8efd80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "038ec707fa83ce88cb443f29394c21e05a292123",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/fixtures/binance-grid-create-reference-vectors.json",
+          "content_hash": "2367949044d513662fdc47cdba5a36130fb299b54930a9b10988c35ea254db42",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb187c1d9cedc192d9ed614f9e3bd88f6a8efd80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3f2d6d84ae7fc7bdea94a97c726807a1479a4e6e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-create-reference.cjs",
+          "content_hash": "8ec713c8547928686df7828dd4bec9dc1d7f80199dcd0ca85ee325552e26947a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cb187c1d9cedc192d9ed614f9e3bd88f6a8efd80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "52bb261325993859e9afbd5a456d9ed8bbcce2b0",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1789154665758,
+      "updated_at_ms": 1789156614063
+    },
+    {
       "id": "android-binance-create-visibility-v1",
       "title": "币安创建与连接页面可见性",
       "summary": "修正系统浅色模式下原生网格控件对比度，明确读取授权页面和官网重载入口。",
@@ -25793,56 +25962,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_057597dbf4714e51b1056b6360429a01",
-      "feature_id": "binance-grid-observer-v1",
-      "action": "claimed",
-      "actor": "codex-grid-root",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788724686823
-    },
-    {
-      "id": "feature_event_57fa1c07ef0d452fb21b080b96bcdf99",
-      "feature_id": "binance-grid-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-root",
-      "reason": "独立Chrome被动观察工具开始实现；只读采样与现场验收分开",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788725002347
-    },
-    {
-      "id": "feature_event_21fdcb85f40d4329942bb257827e4293",
-      "feature_id": "binance-grid-observer-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-root",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788725627745
-    },
-    {
-      "id": "feature_event_03d3a062d3ca4eb4bc302167be950488",
-      "feature_id": "binance-grid-observer-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-root",
-      "reason": "独立MV3观察工具及包装完成，36项离线测试通过；真实Chrome/币安采样待现场验收，不标记verified或released",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788725643590
-    },
-    {
-      "id": "feature_event_462781f075af40c69c4bc66c0f7ddf24",
-      "feature_id": "binance-grid-observer-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-root",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1788725904609
-    },
-    {
       "id": "feature_event_1cef472589a54612b8f34840070f7161",
       "feature_id": "binance-grid-observer-v1",
       "action": "evidence_recorded",
@@ -27791,6 +27910,56 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1789122476720
+    },
+    {
+      "id": "feature_event_76240eb190674b86a307c6df14757b80",
+      "feature_id": "android-binance-create-reference-v1",
+      "action": "registered",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789154665758
+    },
+    {
+      "id": "feature_event_3e2d724fae1543158f3d2cc766683392",
+      "feature_id": "android-binance-create-reference-v1",
+      "action": "claimed",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789154803208
+    },
+    {
+      "id": "feature_event_1a98e73d800a4f94aa31856137aea3df",
+      "feature_id": "android-binance-create-reference-v1",
+      "action": "transitioned",
+      "actor": "codex-grid",
+      "reason": "已核对量化 UI 归属，新增固定只读合同及已捕获计算向量。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789154823602
+    },
+    {
+      "id": "feature_event_70dac74b62ae4c41b69b39985456f004",
+      "feature_id": "android-binance-create-reference-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789156276569
+    },
+    {
+      "id": "feature_event_e78399b22060400bb306ce7a8750966b",
+      "feature_id": "android-binance-create-reference-v1",
+      "action": "transitioned",
+      "actor": "codex-grid",
+      "reason": "固定只读参考服务与规则模块已接通，最终67项创建/宿主和52项JS回归通过；账号实测与发布装机独立待验。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789156614063
     }
   ]
 }

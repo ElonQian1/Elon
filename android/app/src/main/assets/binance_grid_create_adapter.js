@@ -129,6 +129,9 @@
     const entropy = window.crypto.getRandomValues(new Uint32Array(1))[0] % 1000000 + 1;
     return `manual_mm_web_${entropy}${Date.now()}`.slice(0,32);
   }
+  window.__elonBinanceCreateReferenceV1=window.__elonBinanceCreateReferenceFactoryV1?.({headers,identity,
+    configuration:h=>request(COEF,h),
+    commission:(h,symbol)=>request('/bapi/futures/v1/private/future/user-data/account-tier-commission',h,{name:symbol})});
   window.__elonBinanceCreateV1 = Object.freeze({
     prepare(token,id,account,payload) {
       if(!scope(token,id,account) || !validPayload(payload) || consumed.has(id) || consumed.size >= 16 || !context || activeSend) return false;
