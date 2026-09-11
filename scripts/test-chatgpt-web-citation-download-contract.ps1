@@ -17,8 +17,11 @@ foreach ($required in @(
     'synthetic_remote_artifacts_may_remain','content_exported=$false','Select-Object method,path,status'
     'existing_synthetic_fixture_unavailable', '.Contains($prompt,[StringComparison]::Ordinal)', 'fixture_checkpoint_invalid'
     'download_receipt_unavailable', 'download_detail', 'status,responseState,responseFields'
+    'ExistingProjectFixture','project_synthetic_fixture_unconfirmed','project_fixture_attachment_unconfirmed'
+    'project_fixture_prior_send_unconfirmed','project_citation_reply_unconfirmed','project_fixture_verified=$true'
+    'if ($origin.social_chat.web_chat_conversation_path)', 'elseif ($ReuseFixture)'
 )) {if (-not $source.Contains($required)) {throw "citation_acceptance_guard_missing: $required"}}
-if ([regex]::Matches($source,"Act 'send_input'").Count -ne 1 -or
+if ([regex]::Matches($source,"Act 'send_input'").Count -ne 2 -or
     [regex]::Matches($source,"Ui 'download' -Download").Count -ne 1) {throw 'citation_acceptance_write_replay'}
 foreach ($forbidden in @('chatgpt_download_conversation_file','chatgpt_delete_', 'screencap','pm clear','removeAllCookies',"@('pull'")) {
     if ($source.Contains($forbidden)) {throw "citation_acceptance_bypass_or_export: $forbidden"}

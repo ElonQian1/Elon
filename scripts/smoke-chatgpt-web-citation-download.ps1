@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
     [switch]$ReuseFixture,
+    [switch]$ExistingProjectFixture,
     [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe'
 )
 $ErrorActionPreference = 'Stop'
@@ -16,6 +17,9 @@ $name = 'elon-chatgpt-attachment-fixture-v1.txt'
 $expectedHash = '75e2ed9bfe5772c9918e552ed07c2c0e689e7039367c81bb6906c63e396fa1f3'
 $checkpoint=Join-Path (Split-Path -Parent $PSScriptRoot) '.ai-tmp/citation-download-fixture.json'
 $prompt = 'Read the attached text file. Quote its exact first line and cite the uploaded file using a file citation in your answer. Do not create, copy, or modify any file.'
+if ($ExistingProjectFixture) {
+    $prompt = 'Use the previously uploaded elon-chatgpt-attachment-fixture-v1.txt. Quote its exact first line and cite that uploaded file using a file citation. Do not create, copy, or modify any file.'
+}
 $report = [ordered]@{schema='elon.chatgpt.citation_download_ui.v1'; passed=$false; stage='prepare'
     restored=$false; awake_restored=$false; content_exported=$false; send_attempts=0; download_attempts=0}
 $origin=$null; $navigated=$false; $menuOpen=$false; $detailOpen=$false; $downloadOpen=$false; $probe=$false
@@ -71,13 +75,71 @@ function Open-ExistingFixture {
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
     throw 'existing_synthetic_fixture_unavailable'
 }
+function Open-ProjectFixture {
+    $mediaPrompt = 'Read all three attached test files. Reply in English: quote the exact first line from each document, then describe the shapes in the image, including their counts and colors. If an attachment is unavailable, say so instead of guessing.'
+    $page=Act 'chatgpt_get_conversations' @{offset=0;limit=50}
+    if ($page.stale) {throw 'directory_stale'}
+    $candidate=$page.conversations | Where-Object {
+        $_.project_id -cmatch '^g-p-[a-f0-9]{32}$' -and $_.title -match '(?i)fixture|attachment|test|media|file'
+    } | Select-Object -First 1
+    if (-not $candidate -or $candidate.path -cnotmatch ('^/g/'+[regex]::Escape($candidate.project_id)+
+        '(?:-[A-Za-z0-9_-]{1,124})?/c/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$')) {
+        throw 'project_fixture_candidate_unavailable'
+    }
+    Command 'chatgpt_open_conversation' @{conversation_path=$candidate.path} 'open_conversation' | Out-Null
+    $deadline=[DateTimeOffset]::UtcNow.AddSeconds(25)
+    do {
+        $s=Native; $w=Web
+        $users=@($s.social_chat.messages | Where-Object role -eq user)
+        $media=@($users | Where-Object {([string]$_.content).Contains($mediaPrompt,[StringComparison]::Ordinal)})
+        $other=@($users | Where-Object {-not ([string]$_.content).Contains($mediaPrompt,[StringComparison]::Ordinal) -and
+            -not ([string]$_.content).Contains($prompt,[StringComparison]::Ordinal)})
+        $ready=$s.social_chat.web_chat_conversation_path -eq $candidate.path -and
+            ([uri]$w.conversation.url).AbsolutePath -eq $candidate.path -and $media.Count -eq 1 -and
+            $other.Count -eq 0 -and -not $s.input.text -and -not $w.streaming -and
+            -not $w.dictation_active -and [int]$w.input.official_draft_length -eq 0
+        if ($ready) {break}
+        Start-Sleep -Milliseconds 500
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    if (-not $ready) {throw 'project_synthetic_fixture_unconfirmed'}
+    Command 'chatgpt_list_conversation_files' @{conversation_path=$candidate.path} 'list_conversation_files' | Out-Null
+    $index=(Web).conversation_files
+    if ($index.stale -or $index.conversation_path -ne $candidate.path -or
+        @($index.files | Where-Object {$_.role -eq 'user' -and $_.name -ceq $name}).Count -lt 1) {
+        throw 'project_fixture_attachment_unconfirmed'
+    }
+    $report.project_fixture_verified=$true
+    $report.existing_fixture_reused=$true
+    $citation=@($index.files | Where-Object {$_.role -eq 'assistant' -and $_.name -ceq $name -and $_.download_handle})
+    if ($citation.Count -gt 0) {return}
+    # A fixed follow-up is sent at most once; an uncertain result is never replayed.
+    if ($users.Count -ne 1) {throw 'project_fixture_prior_send_unconfirmed'}
+    $assistantBefore=@($s.social_chat.messages | Where-Object role -eq friend).Count
+    Act 'set_input_text' @{text=$prompt} | Out-Null
+    $report.stage='project_citation_followup'; $report.send_attempts=1
+    $report.synthetic_remote_artifacts_may_remain=$true
+    Act 'send_input' | Out-Null
+    $deadline=[DateTimeOffset]::UtcNow.AddSeconds(100)
+    do {
+        $s=Native; $w=Web
+        $assistant=@($s.social_chat.messages | Where-Object role -eq friend)
+        $last=([string]($assistant | Select-Object -Last 1).content).Replace('\_', '_').Replace('**', '').Replace('`', '')
+        $done=$assistant.Count -gt $assistantBefore -and $last.Contains('ELON_CHATGPT_ATTACHMENT_FIXTURE_V1=ready') -and
+            -not $w.streaming -and -not $s.social_chat.web_chat_streaming -and -not $s.input.text
+        if ($done) {break}
+        Start-Sleep -Seconds 1
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+    $report.runtime_send=$s.social_chat.web_chat_last_send_command.detail -eq 'official_runtime_v1:accepted'
+    $report.user_rows=@($s.social_chat.messages | Where-Object role -eq user).Count
+    if (-not $done -or -not $report.runtime_send -or $report.user_rows -ne 2 -or
+        $s.social_chat.web_chat_conversation_path -ne $candidate.path) {throw 'project_citation_reply_unconfirmed'}
+}
 try {
     Assert-ChatGptWebSmokeTrustedDevice -Runtime $r
     if (-not (Get-ChatGptWebSmokeUserReadiness -Runtime $r).ready) {throw 'device_locked'}
     $origin=Native; $before=Web
     if ($origin.active_surface -ne 'social_ai' -or $origin.social_chat.web_chat_provider_id -ne 'chatgpt_web' -or
-        -not $before.authenticated -or -not $before.adapter_current -or
-        -not $origin.social_chat.web_chat_conversation_path) {throw 'surface_not_ready'}
+        -not $before.authenticated -or -not $before.adapter_current) {throw 'surface_not_ready'}
     if ($origin.input.text -or $before.streaming -or $before.dictation_active -or
         [int]$before.input.official_draft_length -gt 0 -or $before.file_download.can_cancel -or
         [int]$origin.social_chat.web_chat_pending_attachment_count -gt 0) {throw 'existing_work_in_progress'}
@@ -85,7 +147,10 @@ try {
     Start-ChatGptWebSmokeAwakeLease -Runtime $r | Out-Null
     $report.adapter=$before.adapter_version
     $navigated=$true
-    if ($ReuseFixture) {
+    if ($ExistingProjectFixture) {
+        $report.stage='reuse_project_fixture'
+        Open-ProjectFixture
+    } elseif ($ReuseFixture) {
         $report.stage='reuse_existing_fixture'
         Open-ExistingFixture
         $report.existing_fixture_reused=$true
@@ -135,8 +200,8 @@ try {
     }
     $s=Native
     $path=$s.social_chat.web_chat_conversation_path
-    if ($path -notmatch '^/c/[A-Za-z0-9_-]{1,160}$') {throw 'fixture_conversation_unconfirmed'}
-    if (-not $ReuseFixture) {
+    if ($path -notmatch '^(/g/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?)?/c/[A-Za-z0-9_-]{1,160}$') {throw 'fixture_conversation_unconfirmed'}
+    if (-not $ReuseFixture -and -not $ExistingProjectFixture) {
         # Local navigation checkpoint only; never emit it in logs or retry the send.
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $checkpoint) | Out-Null
         [IO.File]::WriteAllText($checkpoint,(@{schema='elon.citation_fixture.v1';device=$ExpectedHardwareSerial;path=$path} | ConvertTo-Json -Compress))
@@ -212,7 +277,9 @@ try {
             if ($s.input.text -and $s.input.text -cne $prompt) {throw 'changed_draft_preserved'}
             if ($s.chatgpt_web_acceptance_attachment.fixture_staged) {Act 'remove_chatgpt_web_acceptance_attachment' @{fixture_id=$fixture} | Out-Null}
             if ($s.input.text -ceq $prompt) {Act 'set_input_text' @{text=''} | Out-Null}
-            Command 'chatgpt_open_conversation' @{conversation_path=$origin.social_chat.web_chat_conversation_path} 'open_conversation' | Out-Null
+            if ($origin.social_chat.web_chat_conversation_path) {
+                Command 'chatgpt_open_conversation' @{conversation_path=$origin.social_chat.web_chat_conversation_path} 'open_conversation' | Out-Null
+            } else {Act 'start_new_web_chat_conversation' | Out-Null}
         }
         if ($origin) {
             $deadline=[DateTimeOffset]::UtcNow.AddSeconds(20)

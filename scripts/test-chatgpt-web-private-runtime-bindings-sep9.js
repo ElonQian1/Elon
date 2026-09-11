@@ -5,7 +5,7 @@ const bindings = require('../android/app/src/main/assets/chatgpt_web_private_run
 const { attach, CDN, expectedExports: prior } = require('./fixtures/chatgpt-runtime-bindings');
 const profiles = [require('./fixtures/chatgpt-runtime-bindings-sep9'), require('./fixtures/chatgpt-runtime-bindings-sep9b'),
   require('./fixtures/chatgpt-runtime-bindings-sep10'), require('./fixtures/chatgpt-runtime-bindings-sep10b'),
-  require('./fixtures/chatgpt-runtime-bindings-sep11')];
+  require('./fixtures/chatgpt-runtime-bindings-sep11'), require('./fixtures/chatgpt-runtime-bindings-sep11b')];
 
 for (const profile of profiles) test.describe(profile.id, () => {
 

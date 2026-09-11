@@ -2,7 +2,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { attach, CDN } = require('./fixtures/chatgpt-runtime-bindings');
-const profiles = [require('./fixtures/chatgpt-runtime-bindings-sep10b'), require('./fixtures/chatgpt-runtime-bindings-sep11')];
+const profiles = [require('./fixtures/chatgpt-runtime-bindings-sep10b'), require('./fixtures/chatgpt-runtime-bindings-sep11'),
+  require('./fixtures/chatgpt-runtime-bindings-sep11b')];
 
 for (const profile of profiles) test.describe(profile.id, () => {
 
