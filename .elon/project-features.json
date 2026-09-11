@@ -313,6 +313,109 @@
       "updated_at_ms": 1786762799336
     },
     {
+      "id": "android-binance-account-read-v3",
+      "title": "账户绑定的网格读取与管理导航",
+      "summary": "列表来源携带不透明账户证明，同账户详情进入管理自动核验及读取，换号清理旧目标。",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/android-binance-account-read-v3.md",
+        "content_hash": "336d3afdbee103172940a0975fa1dcaf6fdcd0c115a1bdc450dee4e644a975a8",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "6db0059c2622daf9cce5e8d7bffca5021e70d3dd",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "8e41e9fd7d0691b7f07c35961a1efa5c4b12c994",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostProvider.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostRuntime.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostState.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "同源账户只读合同及旧版兼容、换号清除通过",
+        "目标导航核验、有效期、重建及用户编辑保护通过",
+        "正式签名发布、装机与实际导航分别验收"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostProvider.kt",
+          "content_hash": "0c0b008c58dcb9fef3ddaebc64999e3ba0920d0b5e2aa39883d0ff95211f1f19",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6db0059c2622daf9cce5e8d7bffca5021e70d3dd",
+            "head_blob_oid": "5894da91783da2564c01018257620554868a910d",
+            "worktree_blob_oid": "e0013dcb238481a6fa5db3aabd04c016e0d11434",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostRuntime.kt",
+          "content_hash": "c6a8d85b15de35c2fabf9e572452d588afc0d304143f160ec19b7661f8b709a3",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6db0059c2622daf9cce5e8d7bffca5021e70d3dd",
+            "head_blob_oid": "2125af06a3d4dae184a03e06a1605b56cd3c2981",
+            "worktree_blob_oid": "d68a7db1ee3974f7447e08f4068839d517349b3f",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostState.kt",
+          "content_hash": "cbcefb66bdaf2778ecf47b6977274bfcc9322aaae87683ac6de555b73e5c80f2",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6db0059c2622daf9cce5e8d7bffca5021e70d3dd",
+            "head_blob_oid": "f4d5c987105f1118eb9f2fdca1c7934dae460f82",
+            "worktree_blob_oid": "9ca7a21d1b69512d187388f556ad20e9869eb4b8",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/host/BinanceAccountReadTest.kt",
+          "content_hash": "e0c6d8772447c3117dc03b653bfbcffac1742a29505277cb78fd7e3f89d8ba88",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6db0059c2622daf9cce5e8d7bffca5021e70d3dd",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5776ced48a2aa296005db5fa784bb9a80e357d24",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/android-binance-account-read-v3-delivery.md",
+          "content_hash": "c1d8b00d54cd4a92b7cca2026621259b0050f2d00b12894544b74a883e2be131",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6db0059c2622daf9cce5e8d7bffca5021e70d3dd",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4bf9f0f7a99ca0d9bcf4124fc4d248295e06a08a",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1789108956714,
+      "updated_at_ms": 1789110339474
+    },
+    {
       "id": "android-binance-create-visibility-v1",
       "title": "币安创建与连接页面可见性",
       "summary": "修正系统浅色模式下原生网格控件对比度，明确读取授权页面和官网重载入口。",
@@ -25452,56 +25555,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_ca0ed9ae2063406db711732397340403",
-      "feature_id": "esk-economic-ledger-preview-v1",
-      "action": "transitioned",
-      "actor": "esk-primary",
-      "reason": "离线源码、合成合同、独立审查和46项不同测试已有通过证据；仅验证离线工程，不批准真实经济操作。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788686920070
-    },
-    {
-      "id": "feature_event_b4f0d39e2e7b437399c4d3fd3648c266",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "reclaimed",
-      "actor": "esk-primary",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "claimed",
-      "at_ms": 1788688424659
-    },
-    {
-      "id": "feature_event_c9991af113a54bdabece49664b8245fe",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "transitioned",
-      "actor": "esk-primary",
-      "reason": "已有16条证据无漂移，原claim过期后已接续；本批仅修复已复现SDK撤销竞态、跨页重复与重复JSON键，生产和产品接入仍待完成。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788688462999
-    },
-    {
-      "id": "feature_event_b71ae8eeefc34de6a496ac043fa01b70",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "evidence_recorded",
-      "actor": "esk-primary",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788689547629
-    },
-    {
-      "id": "feature_event_43f9218cf9204acc8c411defcd1dc7b3",
-      "feature_id": "unified-account-asset-access-v1",
-      "action": "evidence_recorded",
-      "actor": "esk-primary",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788689550164
-    },
-    {
       "id": "feature_event_3f73397d53f941d9b8b01719ba0a7629",
       "feature_id": "unified-account-asset-access-v1",
       "action": "claim_released",
@@ -27450,6 +27503,56 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1789107784904
+    },
+    {
+      "id": "feature_event_2217e498ea4540c99bb4b6f1979f28ae",
+      "feature_id": "android-binance-account-read-v3",
+      "action": "registered",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789108956714
+    },
+    {
+      "id": "feature_event_6c6b9136b18a42b38852378b6e3cdad6",
+      "feature_id": "android-binance-account-read-v3",
+      "action": "claimed",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789108956769
+    },
+    {
+      "id": "feature_event_d92334efadc847c59597314a831c1a2e",
+      "feature_id": "android-binance-account-read-v3",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789108956805
+    },
+    {
+      "id": "feature_event_eebac7c1a34e4f1393f7c14bf01b8358",
+      "feature_id": "android-binance-account-read-v3",
+      "action": "evidence_recorded",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789110339410
+    },
+    {
+      "id": "feature_event_a0abedb7bfc44378b96f58a350762cf2",
+      "feature_id": "android-binance-account-read-v3",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "Contract and offline tests passed; release, installation and actual account/UI acceptance are separate pending gates.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789110339474
     }
   ]
 }

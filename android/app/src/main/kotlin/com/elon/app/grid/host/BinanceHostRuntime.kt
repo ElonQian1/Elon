@@ -104,11 +104,12 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         val token = resumeToken?.takeIf(state::authorized) ?: state.grant(continuous = true).also { resumeToken = it }
         return status("ready").apply { putString("grant", token) }
     }
-    fun readContinuous(token: String): String {
+    fun readContinuous(token: String, version: Int = 2): String {
+        require(version in 2..3)
         require(live() && consent.permits(owner(), state.account, state.accountKind))
         state.renew(token)
         deadline = SystemClock.elapsedRealtime() + 900_000; armExpiry()
-        return state.reply(token, v2 = true)
+        return state.replyVersion(token, version)
     }
     fun disconnect() { consent.clear(); invalidate("已断开量化只读连接，币安登录资料保留") }
     private fun armExpiry() {

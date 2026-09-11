@@ -92,12 +92,15 @@ internal class BinanceHostState(private val elapsed: () -> Long, private val epo
     fun managementChoices(): List<Pair<String,String>> = if (!fresh()) emptyList() else rows.values.map {
         (it["id"] as String) to "${it["symbol"]} · ${it["status"]} · ${it["id"]}"
     }
-    fun reply(token: String, v2: Boolean = false): String {
+    fun reply(token: String, v2: Boolean = false): String = replyVersion(token,if(v2)2 else 1)
+    fun replyVersion(token: String, version: Int): String {
+        require(version in 1..3)
         require(authorized(token))
-        return StrictJson.encode(mapOf("schema" to if (v2) "yilong.binance_host_read.v2" else "yilong.binance_host_read.v1", "source" to "android_webview",
+        val identity=if(version==3)mapOf("account" to (account ?: error("ACCOUNT_UNVERIFIED")),"account_kind" to accountKind) else emptyMap()
+        return StrictJson.encode(mapOf("schema" to "yilong.binance_host_read.v$version", "source" to "android_webview",
             "remaining_ms" to remaining(token), "generation" to generation, "observed_at_ms" to observed,
             "status" to if (fresh()) "fresh" else "stale", "coverage" to "observed_response_only",
-            "rows" to if (fresh()) rows.values.map { if (v2) it + ("metrics" to BinanceGridMetrics.decode(it["metrics"])) else it.filterKeys { key -> key != "metrics" } } else emptyList<Any>()))
+            "rows" to if (fresh()) rows.values.map { if (version>=2) it + ("metrics" to BinanceGridMetrics.decode(it["metrics"])) else it.filterKeys { key -> key != "metrics" } } else emptyList<Any>())+identity)
     }
     private fun decode(value: Any?): Map<String, Any?> {
         @Suppress("UNCHECKED_CAST") val row = value as? Map<String, Any?> ?: error("ROW_INVALID")

@@ -45,6 +45,7 @@ class BinanceHostProvider : ContentProvider() {
                     "report_read_v1" -> Bundle().apply { putString("result", runtime.reportRead(token, extras.getString("request") ?: error("REQUEST_MISSING"))) }
                     "read" -> Bundle().apply { putString("result", runtime.read(token)) }
                     "read_v2" -> Bundle().apply { putString("result", runtime.readContinuous(token)) }
+                    "read_v3" -> Bundle().apply { putString("result", runtime.readContinuous(token,3)) }
                     "refresh" -> { runtime.refresh(token); Bundle().apply { putString("status", "pending") } }
                     "detail" -> {
                         runtime.detail(token, extras.getString("id") ?: error("GRID_MISSING"))
