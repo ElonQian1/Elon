@@ -15,12 +15,22 @@ import androidx.appcompat.widget.AppCompatButton
 import com.elon.app.chatgptweb.ChatGptWebCanvasContent
 
 internal object WebChatCanvasContentView {
-    fun entry(activity: AppCompatActivity, open: () -> Unit): View = AppCompatButton(activity).apply {
-        text = "查看画布"
-        isAllCaps = false
-        contentDescription = "web-chat-canvas-share-view"
-        setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_side_menu_files, 0, 0, 0)
-        setOnClickListener { open() }
+    fun entry(activity: AppCompatActivity, open: () -> Unit, update: () -> Unit): View = LinearLayout(activity).apply {
+        orientation = LinearLayout.VERTICAL
+        addView(AppCompatButton(activity).apply {
+            text = "查看画布"
+            isAllCaps = false
+            contentDescription = "web-chat-canvas-share-view"
+            setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_side_menu_files, 0, 0, 0)
+            setOnClickListener { open() }
+        })
+        addView(AppCompatButton(activity).apply {
+            text = "更新到最新版本"
+            isAllCaps = false
+            contentDescription = "web-chat-canvas-share-update"
+            setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_side_menu_refresh, 0, 0, 0)
+            setOnClickListener { update() }
+        })
     }
 
     fun dialog(activity: AppCompatActivity, value: ChatGptWebCanvasContent, back: () -> Unit): AlertDialog {

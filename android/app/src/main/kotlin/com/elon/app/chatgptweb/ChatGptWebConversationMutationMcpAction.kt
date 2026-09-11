@@ -21,19 +21,22 @@ internal object ChatGptWebConversationMutationMcpAction {
                 val selection = if (args.has("selection_ticket")) args.opt("selection_ticket") as? String
                     ?: return "share_invalid_selection" else null
                 ChatGptWebSharedLinks.accountRequest(offset, selection, canvas = resource == "canvas")
-            } else if (args.optString("operation") in setOf("read_account", "revoke_account") && resource == "canvas") {
+            } else if (args.optString("operation") in setOf("read_account", "revoke_account", "update_account") && resource == "canvas") {
                 if (args.has("conversation_path")) return "share_invalid_selection"
                 val id = args.opt("share_id") as? String ?: return "share_invalid_selection"
                 val ticket = args.opt("selection_ticket") as? String ?: return "share_invalid_selection"
-                if (args.optString("operation") == "read_account") ChatGptWebCanvasContent.request(id, ticket)
-                else ChatGptWebSharedLinks.canvasRevokeRequest(id, ticket)
+                when (args.optString("operation")) {
+                    "read_account" -> ChatGptWebCanvasContent.request(id, ticket)
+                    "update_account" -> ChatGptWebCanvasContent.updateRequest(id, ticket)
+                    else -> ChatGptWebSharedLinks.canvasRevokeRequest(id, ticket)
+                }
             } else {
                 if (resource != "conversation") return "share_invalid_selection"
                 if (path == null) return "invalid_conversation_path"
                 ChatGptWebSharedLinks.request(path, args.optString("operation"),
                     args.optString("share_id"), args.optString("selection_ticket"))
             }) ?: return "share_invalid_selection"
-            if (request.getString("operation") in setOf("revoke", "revoke_account") && args.opt("user_confirmed") != true) {
+            if (request.getString("operation") in setOf("revoke", "revoke_account", "update_account") && args.opt("user_confirmed") != true) {
                 return "user_confirmation_required"
             }
             val page = runCatching { java.net.URI(snapshot?.url ?: "") }.getOrNull()

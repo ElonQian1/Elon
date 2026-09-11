@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateSharedLinks = api;
 })(typeof window === 'object' ? window : null, function (page, contract, options) {
@@ -56,7 +56,7 @@
       payload.has_more !== true && !payload.next_cursor };
   }
 
-  async function request(binding, url, method, mode) {
+  async function request(binding, url, method, mode, timeoutMs = 7000) {
     if (!current(binding)) throw new Error('share_context_changed');
     const headers = { Accept: 'application/json' };
     for (const [name, value] of Object.entries(page.__elonChatGptPrivateTransport.copySameOriginRequestHeaders())) {
@@ -66,7 +66,7 @@
     const response = await page.__elonChatGptPrivateJsonRequest.request(page, url, {
       method, headers, credentials: 'include', cache: 'no-store', redirect: 'error',
       __elonPrivateTransport: 'conversation_shared_links_v1',
-    }, { timeoutMs: 7000, maxBytes: 1024 * 1024, mode });
+    }, { timeoutMs, maxBytes: 1024 * 1024, mode });
     if (!current(binding)) throw new Error('share_context_changed');
     return response;
   }
@@ -92,16 +92,18 @@
 
   async function run(input, confirmed) {
     let attempted = false;
+    const canvasUpdate = input?.operation === 'update_account' && input?.resource === 'canvas';
     try {
       const id = typeof input?.path === 'string' && input.path.startsWith('/c/') ? input.path.slice(3) : '';
       const accountList = input?.operation === 'list_account';
       const resource = input?.resource === undefined ? 'conversation' : input.resource;
       const canvasRevoke = input?.operation === 'revoke_account' && resource === 'canvas';
       const canvasRead = input?.operation === 'read_account' && resource === 'canvas';
+      const canvasAction = canvasRevoke || canvasRead || canvasUpdate;
       if (!['conversation', 'canvas'].includes(resource) ||
-          resource === 'canvas' && !accountList && !canvasRevoke && !canvasRead ||
-          !accountList && !canvasRevoke && !canvasRead && (!UUID.test(id) || !['list', 'revoke'].includes(input?.operation)) ||
-          (canvasRevoke || canvasRead) && input.path !== undefined) {
+          resource === 'canvas' && !accountList && !canvasAction ||
+          !accountList && !canvasAction && (!UUID.test(id) || !['list', 'revoke'].includes(input?.operation)) ||
+          canvasAction && input.path !== undefined) {
         throw new Error('share_invalid_selection');
       }
       const binding = bind();
@@ -137,9 +139,9 @@
       }
       if (!canvasRead && confirmed !== true) throw new Error('user_confirmation_required');
       const selected = cached;
-      if (!((canvasRevoke || canvasRead) ? CANVAS_ID : UUID).test(input.id || '') || !selected || input.ticket !== selected.ticket ||
+      if (!(canvasAction ? CANVAS_ID : UUID).test(input.id || '') || !selected || input.ticket !== selected.ticket ||
           now() - selected.at < 0 || now() - selected.at > 120000 || !current(selected.binding) ||
-          !selected.items.some(row => row.id === input.id && (canvasRevoke || canvasRead || row.conversationId === id) && !row.workspace)) {
+          !selected.items.some(row => row.id === input.id && (canvasAction || row.conversationId === id) && !row.workspace)) {
         throw new Error('share_selection_expired');
       }
       if (canvasRead) {
@@ -147,6 +149,18 @@
         const content = await canvasContent.read(binding, input.id);
         if (caches.get(resource) !== selected || !current(binding)) throw new Error('share_context_changed');
         return { ok: true, attempted: false, code: 'share_canvas_ready', content };
+      }
+      if (canvasUpdate) {
+        if (!canvasContent?.prepareUpdate || !canvasContent?.update) throw new Error('share_canvas_unavailable');
+        const deadline = now() + 18000;
+        const before = await canvasContent.prepareUpdate(binding, input.id, deadline);
+        if (caches.get(resource) !== selected || !current(binding)) throw new Error('share_context_changed');
+        // Consume the ticket before POST, including when its outcome later becomes unknown.
+        caches.delete(resource);
+        options?.invalidateCreated?.();
+        attempted = true;
+        const content = await canvasContent.update(binding, input.id, before, deadline);
+        return { ok: true, attempted: true, code: 'share_canvas_updated', content };
       }
       // Consume selection before the write. A timeout cannot trigger another DELETE.
       caches.delete(resource);
@@ -164,10 +178,10 @@
         canvasContent?.invalidate();
         page.__elonChatGptPrivateAuthContext?.invalidate?.('shared_links_rejected');
       }
-      return { ok: false, attempted, code: attempted ? 'share_revoke_unconfirmed' :
+      return { ok: false, attempted, code: attempted ? (canvasUpdate ? 'share_canvas_update_unconfirmed' : 'share_revoke_unconfirmed') :
         /^(share_[a-z0-9_]+|user_confirmation_required)$/.test(code) ? code : 'share_list_unavailable' };
     }
   }
 
-  return Object.freeze({ version: 5, run, invalidate: () => { caches.clear(); canvasContent?.invalidate(); } });
+  return Object.freeze({ version: 6, run, invalidate: () => { caches.clear(); canvasContent?.invalidate(); } });
 });

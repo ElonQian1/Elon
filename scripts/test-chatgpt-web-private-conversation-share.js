@@ -331,7 +331,7 @@ test('share modules parse in the same concatenated asset scope and are registere
     .map(file => fs.readFileSync(path.join(assets, file), 'utf8')).join('\n');
   const f = fixture();
   vm.runInNewContext(source, { window: f.page, URL, setTimeout, clearTimeout });
-  assert.equal(f.page.__elonChatGptPrivateConversationShare.version, 6);
+  assert.equal(f.page.__elonChatGptPrivateConversationShare.version, 7);
   assert.equal(typeof f.page.__elonChatGptPrivateConversationShare.start, 'function');
   const owned = f.page.__elonChatGptPrivateConversationShare;
   vm.runInNewContext(source, { window: f.page, URL, setTimeout, clearTimeout });
@@ -358,12 +358,12 @@ test('share upgrade preserves an in-flight legacy writer and replaces it only wh
   const source = ['chatgpt_web_private_conversation_share_contract.js', 'chatgpt_web_private_conversation_share.js']
     .map(file => fs.readFileSync(path.join(assets, file), 'utf8')).join('\n');
   const f = fixture(); let busy = true;
-  const old = { version: 5, busy: () => busy };
+  const old = { version: 6, busy: () => busy };
   f.page.__elonChatGptPrivateConversationShare = old;
   vm.runInNewContext(source, { window: f.page, URL, setTimeout, clearTimeout });
   assert.equal(f.page.__elonChatGptPrivateConversationShare, old);
   busy = false;
   vm.runInNewContext(source, { window: f.page, URL, setTimeout, clearTimeout });
   assert.notEqual(f.page.__elonChatGptPrivateConversationShare, old);
-  assert.equal(f.page.__elonChatGptPrivateConversationShare.version, 6);
+  assert.equal(f.page.__elonChatGptPrivateConversationShare.version, 7);
 });

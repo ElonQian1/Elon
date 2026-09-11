@@ -8,6 +8,10 @@ the manager, publish or edit a Canvas, restore a version, execute code, or
 delete the original document. The previously accepted list/Copy/Keep-link case
 remains [unchanged](chatgpt-canvas-shared-links-20260911.md).
 
+The subsequent [existing-link update batch](chatgpt-canvas-edit-publish-contract-20260912.md)
+reuses this viewer and records the now-resolved original editor/save owner. That
+separate source capability does not broaden this read-only acceptance scope.
+
 - `transport=page_private_http`; identity stays in the existing WebView.
 - `code_status=implemented`; adapter 358, content module v1, share owner v6.
 - `verification_status=offline_verified`; device content acceptance deferred.

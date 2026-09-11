@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateCanvasContent = api;
 })(typeof window === 'object' ? window : null, function (options) {
@@ -26,22 +26,54 @@
       documentVersion: doc.version ?? null, access: 'public' });
   }
 
-  async function read(binding, id) {
+  function remaining(deadline) {
+    const budget = Math.min(7000, deadline - now());
+    if (budget <= 0) fail('timeout');
+    return budget;
+  }
+
+  async function read(binding, id, { force = false, deadline = Infinity } = {}) {
     if (!ID.test(id)) fail('unconfirmed');
     if (!options.current(binding)) throw new Error('share_context_changed');
     for (const [key, item] of cache) {
       if (!options.current(item.binding) || now() - item.at < 0 || now() - item.at >= 60000) cache.delete(key);
     }
+    if (force) cache.delete(id);
     const cached = cache.get(id);
     if (cached) return cached.value;
     // This is the website's shared-textdoc read, not the editable source textdoc.
-    const response = await options.request(binding, '/backend-api/textdoc/shared/' + id, 'GET', 'json');
+    const response = await options.request(binding, '/backend-api/textdoc/shared/' + id, 'GET', 'json', remaining(deadline));
     if (!options.current(binding)) throw new Error('share_context_changed');
+    remaining(deadline);
     const value = parse(response.payload, id);
     cache.set(id, { binding, at: now(), value });
     while (cache.size > 2) cache.delete(cache.keys().next().value);
     return value;
   }
 
-  return Object.freeze({ version: 1, read, invalidate: () => cache.clear() });
+  async function prepareUpdate(binding, id, deadline) {
+    const before = await read(binding, id, { force: true, deadline });
+    if (before.documentVersion == null) fail('version_unconfirmed');
+    return before;
+  }
+
+  async function update(binding, id, before, deadline) {
+    cache.delete(id);
+    try {
+      if (!ID.test(id) || before.id !== id || before.documentVersion == null) fail('unconfirmed');
+      // The website publishes the latest source into this existing share, not a new document.
+      const response = await options.request(binding, '/backend-api/textdoc/shared/' + id + '/update_to_latest',
+        'POST', 'json', remaining(deadline));
+      const published = parse(response.payload, id);
+      if (published.documentVersion == null || published.documentVersion < before.documentVersion) fail('unconfirmed');
+      const observed = await read(binding, id, { force: true, deadline });
+      if (['title', 'content', 'documentType', 'documentVersion'].some(key => published[key] !== observed[key])) fail('unconfirmed');
+      return observed;
+    } catch (error) {
+      cache.delete(id);
+      throw error;
+    }
+  }
+
+  return Object.freeze({ version: 2, read, prepareUpdate, update, invalidate: () => cache.clear() });
 });

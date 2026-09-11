@@ -34,6 +34,9 @@ internal data class ChatGptWebCanvasContent(
                 .put("id", id).put("ticket", selection)
         }
 
+        fun updateRequest(id: String, selection: String): JSONObject? =
+            request(id, selection)?.put("operation", "update_account")
+
         fun parse(value: JSONObject): ChatGptWebCanvasContent? = runCatching {
             require(value.keys().asSequence().toSet() == keys)
             require(value.opt("type") == "canvas_shared_content" && value.opt("version") == 1)

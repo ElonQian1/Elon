@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateConversationShare?.version || 0) < api.version &&
@@ -96,7 +96,7 @@
       try { if (value.length > 1024) throw new Error(); value = JSON.parse(value); }
       catch (_) { respond(action, false, 'share_invalid_selection'); return true; }
     }
-    if (value?.operation === 'read_account' && (typeof emit !== 'function' ||
+    if (['read_account', 'update_account'].includes(value?.operation) && (typeof emit !== 'function' ||
         !/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || ''))) {
       respond(action, false, 'share_canvas_unavailable'); return true;
     }
@@ -110,5 +110,5 @@
     }).catch(() => respond(action, false, 'share_result_unconfirmed'));
     return true;
   }
-  return Object.freeze({ version: 6, start, handle, busy: () => active !== null });
+  return Object.freeze({ version: 7, start, handle, busy: () => active !== null });
 });

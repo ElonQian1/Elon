@@ -38,3 +38,16 @@ foreach ($forbidden in @('evaluateJavascript', 'WebView(', 'loadUrl(', 'loadData
     if ($content.Contains($forbidden)) { throw 'canvas_content_must_remain_inert_native_text' }
 }
 'CANVAS_CONTENT_UI_CONTRACT=passed'
+foreach ($guard in @('confirmCanvasUpdate(conversation, index, link, page)',
+    'web-chat-canvas-share-update-confirm', 'web-chat-canvas-share-update-cancel',
+    'consumerPort()?.updateCanvasShare(link.id, index.ticket, userConfirmed = true)',
+    'timeoutCode = "share_canvas_update_unconfirmed"', 'detail != "share_canvas_updated"',
+    'showCanvasContent(conversation, result, link, backToList = true) { load(conversation) }')) {
+    if (-not $links.Contains($guard)) { throw "missing_canvas_publish_ui_guard:$guard" }
+}
+if (-not $content.Contains('web-chat-canvas-share-update') -or
+    -not $port.Contains('override fun updateCanvasShare(') -or
+    -not $port.Contains('.put("operation", "update_account")')) {
+    throw 'canvas_publish_missing_production_entry'
+}
+'CANVAS_PUBLISH_UI_CONTRACT=passed'

@@ -243,6 +243,11 @@ internal class ChatGptWebConsumerPortAdapter(
         execute(JSONObject().put("action", "chatgpt_share_conversation").put("operation", "read_account")
             .put("resource", "canvas").put("share_id", shareId).put("selection_ticket", selectionTicket))
 
+    override fun updateCanvasShare(shareId: String, selectionTicket: String, userConfirmed: Boolean): WebChatConsumerCommandResult =
+        execute(JSONObject().put("action", "chatgpt_share_conversation").put("operation", "update_account")
+            .put("resource", "canvas").put("share_id", shareId).put("selection_ticket", selectionTicket)
+            .put("user_confirmed", userConfirmed))
+
     override fun renameConversation(
         conversationPath: String,
         title: String,
