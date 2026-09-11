@@ -65,6 +65,7 @@ internal class ChatGptWebMcpActions(
             .put("conversation_files", ChatGptWebMcpSnapshotJson.conversationFiles(observed, current?.url))
             .put("library_files", ChatGptWebLibraryProtocol.json(observed.libraryFiles.takeIf { observed.adapterCurrent }))
             .put("canvas_content", observed.canvasContent?.takeIf { observed.adapterCurrent }?.diagnostic() ?: JSONObject.NULL)
+            .put("canvas_documents", observed.canvasDocuments?.takeIf { observed.adapterCurrent }?.diagnostic() ?: JSONObject.NULL)
             .put("file_download", commands.fileDownloadState()?.let { download ->
                 JSONObject().put("request_id", download.requestId).put("state", download.stage.wireName)
                     .put("received_bytes", download.receivedBytes).put("total_bytes", download.totalBytes)
@@ -257,6 +258,8 @@ internal class ChatGptWebMcpActions(
             "chatgpt_toggle_private_read_aloud" ->
                 ChatGptWebPrivateReadAloudMcpAction.dispatch(args, snapshot(), commands, ::dispatch)
                     ?.let { return error(action, it) }
+            "chatgpt_canvas_document" -> ChatGptWebCanvasDocumentProtocol.dispatch(args, commands, ::dispatch)
+                ?.let { return error(action, it) }
             "chatgpt_set_conversation_pinned",
             "chatgpt_set_conversation_archived",
             "chatgpt_delete_conversation",

@@ -135,6 +135,9 @@ internal interface WebChatConsumerPort {
     fun updateCanvasShare(shareId: String, selectionTicket: String, userConfirmed: Boolean): WebChatConsumerCommandResult =
         WebChatConsumerCommandResult(false, "unsupported_consumer_command")
     fun canvasContent(): com.elon.app.chatgptweb.ChatGptWebCanvasContent? = null
+    fun canvasDocuments(): com.elon.app.chatgptweb.ChatGptWebCanvasDocuments? = null
+    fun canvasDocument(request: org.json.JSONObject, confirmed: Boolean = false): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, "canvas_unavailable")
     fun moveConversationToProject(
         conversationPath: String,
         conversationTitle: String,

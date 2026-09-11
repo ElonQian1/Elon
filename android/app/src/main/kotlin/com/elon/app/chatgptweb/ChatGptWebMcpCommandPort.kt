@@ -22,6 +22,7 @@ internal interface ChatGptWebMcpCommandPort {
     fun deleteConversation(path: String, requestId: String) = Unit
     fun shareConversation(path: String, requestId: String) = Unit
     fun manageConversationShares(request: org.json.JSONObject, requestId: String) = Unit
+    fun canvasDocument(request: org.json.JSONObject, confirmed: Boolean, requestId: String) = Unit
     fun renameConversation(path: String, title: String, requestId: String) = Unit
     fun moveConversationToProject(
         path: String,

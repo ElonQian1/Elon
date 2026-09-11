@@ -20,6 +20,7 @@ internal object ChatGptWebOperationReadiness {
         ),
         Requirement.DIRECTORY_READ to setOf("chatgpt_list_conversations"),
         Requirement.ACCOUNT_READ to setOf(
+            "chatgpt_canvas_document",
             "chatgpt_list_conversation_files", "chatgpt_list_library_files",
             "chatgpt_browse_directory_page",
             "chatgpt_download_conversation_file", "chatgpt_download_library_file",

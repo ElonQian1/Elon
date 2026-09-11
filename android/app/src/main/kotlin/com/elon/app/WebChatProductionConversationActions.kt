@@ -58,6 +58,9 @@ internal class WebChatProductionConversationActionsCoordinator(
     private val files = WebChatConversationFilesCoordinator(
         activity, host, consumerPort, ::openFilesConversation, ::showPageActionsFor,
     )
+    private val canvas = WebChatCanvasDocumentsCoordinator(
+        activity, host, activeProvider, consumerPort, currentConversationPath, openConversationTracked,
+    )
     private val conversationMutation = WebChatConversationMutationCoordinator(
         activity = activity,
         host = host,
@@ -139,6 +142,10 @@ internal class WebChatProductionConversationActionsCoordinator(
                 contentDescription = "web-chat-conversation-action-files",
             ))
             add(WebChatActionSheetItem(
+                id = ACTION_CANVAS, title = "画布",
+                contentDescription = "web-chat-conversation-action-canvas",
+            ))
+            add(WebChatActionSheetItem(
                 id = ACTION_MORE_SETTINGS,
                 title = "更多会话设置",
                 contentDescription = "web-chat-conversation-action-more-settings",
@@ -195,6 +202,7 @@ internal class WebChatProductionConversationActionsCoordinator(
             ACTION_MOVE_TO_PROJECT -> privateProjectMove.show(conversation)
             ACTION_MORE_SETTINGS -> showPageActionsFor(conversation)
             ACTION_FILES -> files.show(conversation)
+            ACTION_CANVAS -> canvas.show(conversation)
             ACTION_SHARE -> sharing.show(conversation)
         }
     }
@@ -273,6 +281,7 @@ internal class WebChatProductionConversationActionsCoordinator(
         activeSheet = null
         sheet?.dismiss()
         files.cancel()
+        canvas.cancel()
         sharing.cancel()
         conversationMutation.cancelPending()
         privateProjectMove.cancelPending()
@@ -379,6 +388,7 @@ internal class WebChatProductionConversationActionsCoordinator(
         const val ACTION_MOVE_TO_PROJECT = "move-to-project"
         const val ACTION_MORE_SETTINGS = "more-settings"
         const val ACTION_FILES = "files"
+        const val ACTION_CANVAS = "canvas"
         const val ACTION_SHARE = "share"
         const val ACTION_SHEET_HANDOFF_SETTLE_MS = 48L
         const val POLL_INTERVAL_MS = 250L

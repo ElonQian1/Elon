@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateCanvasDocuments = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -12,7 +12,7 @@
   const identity = page.__elonChatGptPrivateConversationShareContract.create(page).identity;
   const PATH = /^\/(?:g\/[A-Za-z0-9_-]{1,200}\/)?c\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i;
   const fail = code => { throw Error('canvas_' + code); };
-  let active = false, sequence = 0, uncertain = null;
+  let active = false, sequence = 0, uncertain = null, scope = null;
 
   function sameSession(binding) {
     try {
@@ -32,6 +32,7 @@
       token: page.__elonChatGptDocumentToken, account: identity(), readSnapshot };
     if (!binding.account || !/^doc_[a-z0-9_]{3,80}$/.test(binding.token || '')) fail('auth_unavailable');
     if (!current(binding)) fail('context_changed');
+    if (!scope || !sameSession(scope.binding)) scope = { binding, token: ticket() };
     return binding;
   }
 
@@ -80,7 +81,8 @@
 
   function selected(binding, input) {
     const entry = caches.get(binding.id);
-    if (!entry || !current(entry.binding) || input.ticket !== entry.ticket || now() < entry.at || now() - entry.at > 1800000) {
+    if (!entry || !current(entry.binding) || input.ticket !== entry.ticket ||
+        input.scope != null && input.scope !== scope.token || now() < entry.at || now() - entry.at > 1800000) {
       fail('selection_expired');
     }
     const document = entry.documents.find(value => value.id === input.id);
@@ -90,7 +92,7 @@
 
   function result(entry, code = 'canvas_ready') {
     return { ok: true, attempted: false, code, path: entry.binding.path,
-      ticket: entry.ticket, documents: entry.documents, unconfirmedWrite: !!uncertain && current(uncertain.binding) };
+      ticket: entry.ticket, scope: scope.token, documents: entry.documents, unconfirmedWrite: !!uncertain && current(uncertain.binding) };
   }
 
   async function read(binding, force, deadline) {
@@ -173,5 +175,5 @@
     } finally { active = false; }
   }
 
-  return Object.freeze({ version: 1, run, busy: () => active });
+  return Object.freeze({ version: 2, run, busy: () => active });
 });

@@ -1,15 +1,16 @@
-# Original Canvas Read and Save Core
+# Original Canvas Native Editor
 
 - capability_id: `android_chatgpt_private_canvas_original_edit_v1`
-- code_status: `protocol_core_implemented`
+- code_status: `implemented`
 - verification_status: `offline_verified`
 - completed: `false`
-- Production editor/command wiring and device acceptance: pending.
+- Production editor/command wiring: implemented; grouped device acceptance pending.
 - No APK release, personal document write, Cookie reset or voice/proxy change.
 
 This extends the [observed editor contract](chatgpt-canvas-edit-publish-contract-20260912.md).
-It is not another shared snapshot viewer. Reuse these modules when connecting
-the original native editor; do not reimplement its transport or rediscover APIs.
+It is not another shared snapshot viewer. The production entry is
+`Conversation actions -> Canvas`, separate from public sharing. Reuse these
+modules rather than rebuilding the transport or rediscovering APIs.
 
 ## Ownership and Requests
 
@@ -69,12 +70,26 @@ Comment IDs/text are preserved. Duplicate, missing, invalid, surrogate-splitting
 or collapsed previously nonempty anchors reject the write. Removing/editing
 comments needs its own explicit decision and is not silently bundled into save.
 
-The pending native editor must track anchor positions through text edits,
-retain its draft after failure, show server/native conflict comparison and send
-explicit saves through a dedicated `canvas_document` command. It must not reuse
-the shared-publication command or truncate original source in a diagnostic receipt.
-Expose body/list in a request-bound typed event; diagnostics contain counts only.
-No editor should be advertised as delivered until that production wiring exists.
+`WebChatCanvasDocumentsCoordinator` uses the production consumer port and the
+dedicated `chatgpt_canvas_document` / `canvas_document` command. Adapter 359
+registers its action owner and request-bound `canvas_documents` display event.
+MCP diagnostics contain counts, not the body, IDs, credentials or selection tokens.
+An opaque identity/document scope is stable across refreshes but changes when
+the account or WebView document changes. Old native drafts cannot acquire a new
+account's selection ticket. No composer readiness gate is added to Canvas reads.
+
+`WebChatCanvasEditorView` renders the full inert source in an Android editor.
+`WebChatCanvasDraft` follows comment anchors through edits and requires explicit
+re-anchoring after a range is deleted or becomes invalid. It preserves comment
+IDs/text; it does not silently drop comments. Input beyond 128 Ki UTF-16 units is
+rejected as a whole rather than truncated. Source HTML is never executed.
+
+Save failures retain the in-memory draft. Refresh does not adopt a newer base
+silently: the comparison displays both full versions, with explicit choices to
+keep the local draft, adopt the server version, or continue editing the draft
+against the reviewed version. The latter does not POST until Save is pressed.
+Unknown writes are checked with GET and require explicit comparison if different.
+Draft retention is scoped to the live coordinator, not process-death persistence.
 
 ## Verification and Remaining Work
 
@@ -86,7 +101,21 @@ single flight, no replay, explicit conflict acknowledgment and Unicode comments.
 The existing runtime-binding suite also verifies that old profiles cannot expose
 these new aliases. All fixtures are synthetic, no private documents or credentials.
 
-Still pending: production native editor/command wiring, comment anchor tracking
-and conflict UI, grouped Android compilation/device save acceptance, original
-first-publication, rich editing and revision restore. Do not mark the overall
-Canvas capability complete from this protocol-only batch.
+The native-editor batch passed 167 Node checks across six suites (original policy,
+documents, canonical actions, shared content, publishing and runtime bindings).
+Canonical checks cover production menu/asset wiring, typed output, explicit
+confirmation, unknown-write verification and opaque scope changes.
+
+Release compilation and `:app:testReleaseUnitTest` passed, with 28 JUnit cases
+and zero failures/errors/skips: CanvasDocuments 5, CanvasContent 6, Draft 7,
+OperationReadiness 10. The final run was `canvas-native-editor-release-tests-fixed`
+(272.4 seconds, `BUILD SUCCESSFUL`). The first compile caught a missing empty-row
+accessibility ID, fixed before this passing build. Programmatic sheet replacement
+also uses a generation guard so old dismiss callbacks cannot cancel the new view.
+Source-size guard passed 25 files; documentation guard passed two files. The
+remaining-work map is near its size limit but shrank in this batch. No APK was
+assembled or installed; device pixels and a real save are not yet accepted.
+
+Still pending: grouped device save acceptance, original first-publication,
+rich formatting/comment authoring and revision restore. Do not mark the overall
+Canvas capability complete from offline verification.
