@@ -19,6 +19,9 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
     private var pendingCps=false
     private var pendingInvestment=""
     private var pendingRange:BinanceRangeDraft?=null
+    private var pendingProtection:BinanceProtectionDraft?=null
+    private var normalizedProtection:BinanceProtectionDraft?=null
+    private var protectionBaseline:Map<String,Any?>?=null
     fun detailCurrent(id:String?)=readTrace.outcome=="verified" && host.live() && host.state.fresh() &&
         host.state.account==account && host.document.snapshot().documentToken==token && state.snapshot?.id==id
     fun cancel() {
@@ -37,15 +40,28 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
         begin(id);readTrace.start();message="正在读取当前策略；不会发送交易。";changed()
         execute("inspect",listOf(token,ticket,account,id),false)
     }
-    fun prepare(id: String, action: String, cps: Boolean, investmentDelta:String="",rangeDraft:BinanceRangeDraft?=null) {
-        require(!state.unresolved && action in setOf("settings","close","investment","range")) { "请先核对并结束上次本机记录。" }
+    fun prepare(id: String, action: String, cps: Boolean, investmentDelta:String="",rangeDraft:BinanceRangeDraft?=null,protection:BinanceProtectionDraft?=null) {
+        require(!state.unresolved && action in setOf("settings","close","investment","range","protection")) { "请先核对并结束上次本机记录。" }
         require((action=="range")==(rangeDraft!=null))
+        require((action=="protection")==(protection!=null))
+        if(protection!=null) {
+            require(detailCurrent(id)) {"请先读取当前策略，再修改止盈止损。"}
+            val s=state.snapshot ?: error("详情不可用")
+            require(s.protection!=null) {"币安尚未返回完整保护设置，请重新读取。"}
+            normalizedProtection=protection.normalize(s.investment)
+            protectionBaseline=s.protection.baseline(s.investment)
+            val current=s.protection.current()
+            require(protection.mode!="CLEAR" || (protection.stopType==current.stopType && protection.closePositions==current.closePositions)) {"请重新读取保护设置后再清除。"}
+            require(current.target()!=normalizedProtection!!.target()) {"保护设置没有变化。"}
+        } else {normalizedProtection=null;protectionBaseline=null}
         val amount=if(action=="investment")BinanceInvestment.amount(investmentDelta) else "".also{require(investmentDelta.isEmpty())}
         begin(id);pendingAction=action;pendingCps=cps
         pendingInvestment=amount
         pendingRange=rangeDraft
+        pendingProtection=protection
         message="正在核对账号和当前设置，尚未提交。";changed()
-        if(action=="range")execute("prepareRange",listOf(token,ticket,account,id,rangeDraft!!.payload()),false)
+        if(action=="protection")execute("prepareProtection",listOf(token,ticket,account,id,mapOf("baseline" to protectionBaseline,"draft" to normalizedProtection!!.payload())),false)
+        else if(action=="range")execute("prepareRange",listOf(token,ticket,account,id,rangeDraft!!.payload()),false)
         else if(action=="investment")execute("prepareInvestment",listOf(token,ticket,account,id,amount),false)
         else execute("prepare",listOf(token,ticket,account,id,action,cps),false)
     }
@@ -94,15 +110,21 @@ internal class BinanceManageSession(private val host: BinanceHostRuntime, val st
                 "prepared","detail" -> {
                     val investing=v["kind"]=="prepared" && pendingAction=="investment"
                     val ranging=v["kind"]=="prepared" && pendingAction=="range"
+                    val protecting=v["kind"]=="prepared" && pendingAction=="protection"
                     require(v.keys==base+(if(v["kind"]=="prepared") setOf("snapshot","action","cps") else setOf("snapshot"))+
-                        (if(investing)setOf("investment_delta") else emptySet())+(if(ranging)setOf("range_draft") else emptySet()))
+                        (if(investing)setOf("investment_delta") else emptySet())+(if(ranging)setOf("range_draft") else emptySet())+(if(protecting)setOf("protection_draft") else emptySet()))
                     require(host.live() && host.state.account==account)
                     val snapshot=BinanceManageSnapshot.parse(v["snapshot"]);require(snapshot.id==target)
                     if(v["kind"]=="prepared") {
-                        require(host.state.contains(target) && v["action"]==pendingAction && v["cps"]==if(investing || ranging)snapshot.cps else pendingCps)
+                        require(host.state.contains(target) && v["action"]==pendingAction && v["cps"]==if(investing || ranging || protecting)snapshot.cps else pendingCps)
                         require(!investing || v["investment_delta"]==pendingInvestment)
                         require(!ranging || BinanceRangeDraft.parse(v["range_draft"])==pendingRange)
-                        state.prepare(account,token,pendingAction,if(investing || ranging)snapshot.cps else pendingCps,snapshot,pendingInvestment,pendingRange)
+                        if(protecting) {
+                            require(snapshot.protection?.baseline(snapshot.investment)==protectionBaseline)
+                            require(BinanceProtectionDraft.parse(v["protection_draft"])==normalizedProtection)
+                            require(pendingProtection?.normalize(snapshot.investment)==normalizedProtection)
+                        }
+                        state.prepare(account,token,pendingAction,if(investing || ranging || protecting)snapshot.cps else pendingCps,snapshot,pendingInvestment,pendingRange,pendingProtection)
                         message="检查完成，尚未提交。请核对下方本次操作摘要。"
                         host.handler.postDelayed({if(!closed) changed()},60_000)
                     } else {

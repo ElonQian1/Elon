@@ -25,14 +25,21 @@ internal class BinanceManageCommands private constructor(context: Context, priva
     private var corrupt = false
     private var creationPending = false
     private var touched = 0L
+    private var version=2
+    private val schema get()=if(version==3)"yilong.binance_manage_command.v3" else SCHEMA
+    private val legacyProtection get()=version==2 && state.unresolved && state.action=="protection"
     private val expiry = Runnable { expire() }
 
-    fun call(method: String, extras: Bundle): Bundle {
+    fun call(requestedMethod: String, extras: Bundle): Bundle {
+        require(requestedMethod in methods)
+        val requestedVersion=if(requestedMethod.endsWith("_v3"))3 else 2
+        val method=requestedMethod.removeSuffix("_v3").let {if(requestedVersion==3)it+"_v2" else it}
         if(method == "manage_capabilities_v2") {
             require(extras.isEmpty)
-            return reply(mapOf("schema" to SCHEMA,"status" to "supported","version" to "2",
-                "operations" to listOf("settings","close","investment","range"),"confirmation_owner" to "com.elon.quant"))
+            return reply(mapOf("schema" to if(requestedVersion==3)"yilong.binance_manage_command.v3" else SCHEMA,"status" to "supported","version" to requestedVersion.toString(),
+                "operations" to (listOf("settings","close","investment","range")+if(requestedVersion==3)listOf("protection") else emptyList()),"confirmation_owner" to "com.elon.quant"))
         }
+        if(operation.isNotEmpty() && version!=requestedVersion)return reply(mapOf("schema" to if(requestedVersion==3)"yilong.binance_manage_command.v3" else SCHEMA,"status" to "busy","message" to "请先退出当前管理页面，再使用另一版本连接。"))
         val fields = when(method) {
             "manage_read_v2" -> setOf("operation","id")
             "manage_prepare_v2" -> setOf("operation","draft")
@@ -44,6 +51,7 @@ internal class BinanceManageCommands private constructor(context: Context, priva
         if(method == "manage_open_v2") {
             if(operation.isNotEmpty() && operation != id) return short("busy","已有管理流程，请回原页面处理")
             if(operation.isEmpty()) {
+                version=requestedVersion
                 if(!BinanceCreateSlot.shared.acquire(this)) return short("busy","创建或管理连接正在使用中")
                 operation = id
                 corrupt = runCatching { journal.read()?.let(state::restore) }.isFailure
@@ -53,6 +61,7 @@ internal class BinanceManageCommands private constructor(context: Context, priva
             }
         } else require(operation == id && session != null)
         touch()
+        if(legacyProtection && method !in setOf("manage_open_v2","manage_poll_v2","manage_close_v2"))return snapshot()
         if(method in setOf("manage_open_v2","manage_poll_v2")) {
             creationPending = runCatching { creation.read() != null }.getOrDefault(true)
             host.recoverConnection()
@@ -62,13 +71,13 @@ internal class BinanceManageCommands private constructor(context: Context, priva
             "manage_read_v2" -> read(extras.getString("id").orEmpty())
             "manage_prepare_v2" -> {
                 require(!state.unresolved && session?.busy == false)
-                cancel()
+                permit.clear();preparation="";digest="";note=""
                 runCatching {
                     require(available()) { "请先连接并授权读取当前账号" }
-                    val draft = BinanceManageCommandDraft.parse(extras.getString("draft").orEmpty())
+                    val draft = BinanceManageCommandDraft.parse(extras.getString("draft").orEmpty(),version)
                     selected = draft.id
-                    session!!.prepare(draft.id,draft.action,draft.cps,draft.amount,draft.range)
-                }.onFailure { note = (it as? IllegalArgumentException)?.message?.take(180) ?: "参数检查未完成，未提交操作" }
+                    session!!.prepare(draft.id,draft.action,draft.cps,draft.amount,draft.range,draft.protection)
+                }.onFailure { session?.cancel();note = (it as? IllegalArgumentException)?.message?.take(180) ?: "参数检查未完成，未提交操作" }
             }
             "manage_submit_v2" -> {
                 require(available() && session?.canSubmit() == true)
@@ -90,7 +99,7 @@ internal class BinanceManageCommands private constructor(context: Context, priva
         }
         return snapshot()
     }
-    private fun available() = !corrupt && !creationPending && host.readConsentCurrent()
+    private fun available() = !corrupt && !creationPending && !legacyProtection && host.readConsentCurrent()
     private fun cancel() { permit.clear(); preparation = ""; digest = ""; session?.cancel(); note = "" }
     private fun read(id: String) {
         require(available() && session?.busy == false && state.status != "submitting")
@@ -106,11 +115,11 @@ internal class BinanceManageCommands private constructor(context: Context, priva
     }
     private fun snapshot(): Bundle {
         val authorized = host.readConsentCurrent()
-        val same = authorized && (state.account == host.state.account || (!state.unresolved && session?.detailCurrent(selected) == true))
+        val same = !legacyProtection && authorized && (state.account == host.state.account || (!state.unresolved && session?.detailCurrent(selected) == true))
         val canSubmit = available() && session?.canSubmit() == true && permit.valid(operation,host.state.account,
             host.document.snapshot().documentToken,digest,preparation)
         val phase = when {
-            corrupt -> "recovery_error"
+            corrupt || legacyProtection -> "recovery_error"
             creationPending -> "creation_pending"
             state.unresolved && state.account != host.state.account -> "account_required"
             !host.live() || !host.state.fresh() -> "connecting"
@@ -123,15 +132,15 @@ internal class BinanceManageCommands private constructor(context: Context, priva
         val currentDetail = same && (state.unresolved || state.status == "prepared" || session?.detailCurrent(selected) == true)
         val current = state.snapshot?.takeIf { currentDetail }
         val choices = if(authorized) host.state.managementChoices().filter { BinanceManageSnapshot.validId(it.first) } else emptyList()
-        return reply(linkedMapOf("schema" to SCHEMA,"operation" to operation,"status" to phase,
-            "message" to note.ifEmpty { session?.message.orEmpty() },"connection" to host.status,
+        return reply(linkedMapOf("schema" to schema,"operation" to operation,"status" to phase,
+            "message" to if(legacyProtection)"存在新版止盈止损操作记录，请更新量化应用后查询；不会补发或清除记录。" else note.ifEmpty { session?.message.orEmpty() },"connection" to host.status,
             "account" to if(authorized) host.state.account.orEmpty() else "","account_kind" to if(authorized) host.state.accountKind else "",
             "choices" to choices.map { mapOf("id" to it.first,"label" to it.second) },
             "can_read" to (available() && session?.busy == false && (!state.unresolved || same)),
             "can_prepare" to (available() && session?.busy == false && !state.unresolved && choices.isNotEmpty()),
             "can_submit" to canSubmit,"preparation" to if(canSubmit) preparation else "","digest" to if(canSubmit) digest else "",
             "summary" to if(current != null) BinanceManageCommandView.summary(state) else "",
-            "detail" to current?.let(BinanceManageCommandView::detail),
+            "detail" to current?.let{BinanceManageCommandView.detail(it,version)},
             "strategy_id" to if(same && state.unresolved) state.id else "",
             "action" to if(same) state.action else "","effect_observed" to (current != null && state.unresolved && state.effectObserved())))
     }
@@ -146,11 +155,11 @@ internal class BinanceManageCommands private constructor(context: Context, priva
         host.handler.removeCallbacks(expiry); BinanceCreateSlot.shared.release(this); operation=""; instance=null
     }
     private fun reply(values: Map<String,Any?>) = Bundle().apply { putString("result",StrictJson.encode(values)) }
-    private fun short(status: String,message: String) = reply(mapOf("schema" to SCHEMA,"status" to status,"message" to message))
+    private fun short(status: String,message: String) = reply(mapOf("schema" to schema,"status" to status,"message" to message))
     companion object {
         const val SCHEMA="yilong.binance_manage_command.v2"
         val methods=setOf("manage_capabilities_v2","manage_open_v2","manage_poll_v2","manage_read_v2","manage_prepare_v2",
-            "manage_submit_v2","manage_cancel_v2","manage_ack_v2","manage_close_v2")
+            "manage_submit_v2","manage_cancel_v2","manage_ack_v2","manage_close_v2").let{it+it.map{method->method.replace("_v2","_v3")}}
         private var instance: BinanceManageCommands?=null
         fun dispatch(context: Context,host: BinanceHostRuntime,method: String,extras: Bundle): Bundle =
             (instance ?: BinanceManageCommands(context.applicationContext,host).also { instance=it }).call(method,extras)

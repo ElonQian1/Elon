@@ -2,6 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {createHash,webcrypto}=require('node:crypto');
 const code=fs.readFileSync(require('node:path').join(__dirname,'../android/app/src/main/assets/binance_grid_create_adapter.js'),'utf8');
 const rangeCode=fs.readFileSync(require('node:path').join(__dirname,'../android/app/src/main/assets/binance_grid_range_contract.js'),'utf8');
+const protectionCode=fs.readFileSync(require('node:path').join(__dirname,'../android/app/src/main/assets/binance_grid_protection_contract.js'),'utf8');
 const prefix='/bapi/futures/v1/private/future/grid/';
 const LIST='/bapi/futures/v2/private/future/grid/query-open-grids',INFO='/bapi/accounts/v1/private/account/get-user-base-info';
 const hash=createHash('sha256').update('42').digest('hex'),token='doc_manage_123',attempt='a'.repeat(32);
@@ -28,7 +29,7 @@ function fixture(){
       }
       return response([]);
     }};window.top=window;
-  vm.runInNewContext(rangeCode+'\n'+code,{window,location:{origin:'https://www.binance.com',href:'https://www.binance.com/'},URL,Headers,XMLHttpRequest:Xhr,AbortController,TextEncoder,setTimeout,clearTimeout,Date});
+  vm.runInNewContext(rangeCode+'\n'+protectionCode+'\n'+code,{window,location:{origin:'https://www.binance.com',href:'https://www.binance.com/'},URL,Headers,XMLHttpRequest:Xhr,AbortController,TextEncoder,setTimeout,clearTimeout,Date});
   const api=window.__elonBinanceManageV1,create=window.__elonBinanceCreateV1;
   const observe=()=>window.fetch(LIST,{method:'POST',headers:{'x-canary':'SECRET_CANARY'}});
   const prepare=async(action='settings',cps=true,id=attempt)=>{await observe();assert.equal(api.prepare(token,id,hash,'123',action,cps),true);await tick();};
@@ -39,6 +40,37 @@ test('inspection and preparation are fixed reads without credentials in receipt'
   const h=fixture();await h.observe();h.api.inspect(token,attempt,hash,'123');await tick();assert.equal(h.events.at(-1).kind,'detail');
   await h.prepare();assert.equal(h.events.at(-1).kind,'prepared');assert.equal(h.writes().length,0);
   assert.ok(!JSON.stringify(h.events).includes('SECRET_CANARY'));
+});
+
+async function protectionInput(h) {
+  await h.observe();h.api.inspect(token,attempt,hash,'123');await tick();
+  const {protection,investment}=h.events.at(-1).snapshot;
+  return {baseline:{protection,investment},draft:{mode:'PNL',lower:'',upper:'',tp:'10',sl:'5',stop_type:'MARK_PRICE',tpsl_cps:true}};
+}
+test('protection reads and prepares without a write, then submits exactly one fixed update',async()=>{
+  const h=fixture(),input=await protectionInput(h);
+  assert.equal(h.api.prepareProtection(token,attempt,hash,'123',input),true);input.draft.tp='900';await tick();
+  assert.equal(h.events.at(-1).kind,'prepared');assert.equal(h.writes().length,0);
+  assert.equal(h.api.submit(token,attempt),true);assert.equal(h.api.submit(token,attempt),false);await tick();
+  const body=JSON.parse(h.writes()[0].init.body);assert.equal(body.stopTpPnl,'10');assert.equal(body.stopSlPnl,'5');
+  assert.equal(body.stopLowerLimit,'');assert.equal(body.stopUpperLimit,'');assert.equal(body.cps,false);assert.equal(body.cos,true);
+  assert.equal(h.writes().length,1);assert.equal(h.events.at(-1).kind,'accepted');
+});
+test('protection rejects baseline drift, account change and post-preparation drift',async()=>{
+  for(const mutation of [d=>d.totalAdjustmentAmount='1',d=>d.stopUpperLimit='4',d=>d.trailingUp=true]) {
+    const h=fixture(),input=await protectionInput(h);mutation(h.detail);
+    h.api.prepareProtection(token,attempt,hash,'123',input);await tick();
+    assert.equal(h.events.at(-1).kind,'prepare_failed');assert.equal(h.writes().length,0);
+  }
+  for(const change of [h=>h.detail.tpslCps=false,h=>h.account.userId='99',h=>h.detail.triggerPrice='1.1']) {
+    const h=fixture(),input=await protectionInput(h);h.api.prepareProtection(token,attempt,hash,'123',input);await tick();
+    change(h);h.api.submit(token,attempt);await tick();assert.equal(h.events.at(-1).kind,'not_sent');assert.equal(h.writes().length,0);
+  }
+});
+test('protection ambiguous write result is retained and never replayed',async()=>{
+  const h=fixture(),input=await protectionInput(h);h.api.prepareProtection(token,attempt,hash,'123',input);await tick();
+  h.behavior.fail='network';h.api.submit(token,attempt);await tick();assert.equal(h.events.at(-1).kind,'unknown');
+  assert.equal(h.api.submit(token,attempt),false);assert.equal(h.writes().length,1);assert.ok(!JSON.stringify(h.events).includes('SECRET_CANARY'));
 });
 
 const rangeDraft=()=>({lower:'1.1',upper:'2.1',count:12,close_positions:false,investment_delta:'0'});
