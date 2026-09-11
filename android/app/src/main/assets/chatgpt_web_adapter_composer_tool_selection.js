@@ -84,7 +84,9 @@
     const PREFIX = 'private_tool_';
     const TOOLS = [
       { hint: 'search', semantic: 'web_search', label: '网页搜索' },
-      { hint: 'picture_v2', semantic: 'image_generation', label: '创建图片' }
+      { hint: 'picture_v2', semantic: 'image_generation', label: '创建图片' },
+      { hint: 'tatertot', semantic: 'study', label: '学习与研究' },
+      { hint: 'canvas', semantic: 'canvas', label: '画布' }
     ];
     let namespace, namespaceDocument, namespaceToken, loading, cooldown = 0, serial = 0, catalog = null, pending = null, receipt = null;
 
@@ -104,7 +106,7 @@
     function state(binding) {
       if (!current(binding) || typeof namespace?.Ng !== 'function' || typeof namespace?.Bg !== 'function') return null;
       const value = namespace.Ng(binding.controller);
-      if (value?.locked !== false || ![null, 'search', 'picture_v2'].includes(value.activeSystemHintType) ||
+      if (value?.locked !== false || ![null, ...TOOLS.map(tool => tool.hint)].includes(value.activeSystemHintType) ||
           !(value.activeConnectorSystemHintTypes instanceof Set) || value.activeConnectorSystemHintTypes.size ||
           value.activeCustomAgentSystemHintType !== null) return null;
       return value;
@@ -226,7 +228,7 @@
       return owned;
     }
 
-    return Object.freeze({ version: 2, requestPrivateOptions, selectPrivate, dismissPrivateOptions });
+    return Object.freeze({ version: 3, requestPrivateOptions, selectPrivate, dismissPrivateOptions });
   }
 
   let privateRuntime;

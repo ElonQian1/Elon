@@ -140,6 +140,15 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             case "tools": click(description("web-chat-composer-tools:chatgpt_web")); break;
             case "image": click(description("web-chat-composer-tool:chatgpt_web:image_generation")); break;
             case "search": click(description("web-chat-composer-tool:chatgpt_web:web_search")); break;
+            case "study": click(description("web-chat-composer-tool:chatgpt_web:study")); break;
+            case "canvas": click(description("web-chat-composer-tool:chatgpt_web:canvas")); break;
+            case "clear_study": click(description("\u5173\u95ed\u5b66\u4e60\u4e0e\u7814\u7a76")); break;
+            case "clear_canvas": click(description("\u5173\u95ed\u753b\u5e03")); break;
+            case "send_extended_tool_fixture":
+                UiObject fixtureInput = description("web-chat-composer-input:chatgpt_web");
+                assertTrue("fixture_prompt_missing", fixtureInput.exists() && fixtureInput.getText()
+                    .startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"));
+                click(description("web-chat-send")); break;
             case "clear_image": click(description("\u5173\u95ed\u521b\u5efa\u56fe\u7247")); break;
             case "clear_search": click(description("\u5173\u95ed\u7f51\u9875\u641c\u7d22")); break;
             case "header": click(description("web-chat-page-actions:chatgpt_web")); break;
@@ -238,6 +247,10 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             .put("model_preset", description("web-chat-model-preset:auto").exists())
             .put("image_option", description("web-chat-composer-tool:chatgpt_web:image_generation").exists())
             .put("search_option", description("web-chat-composer-tool:chatgpt_web:web_search").exists())
+            .put("study_option", description("web-chat-composer-tool:chatgpt_web:study").exists())
+            .put("canvas_option", description("web-chat-composer-tool:chatgpt_web:canvas").exists())
+            .put("study_active", description("\u5df2\u542f\u7528\u5b66\u4e60\u4e0e\u7814\u7a76").exists())
+            .put("canvas_active", description("\u5df2\u542f\u7528\u753b\u5e03").exists())
             .put("image_active", description("\u5df2\u542f\u7528\u521b\u5efa\u56fe\u7247").exists())
             .put("search_active", description("\u5df2\u542f\u7528\u7f51\u9875\u641c\u7d22").exists())
             .put("recovery_visible", description("web-chat-consumer-status").exists())

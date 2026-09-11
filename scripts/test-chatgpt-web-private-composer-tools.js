@@ -242,6 +242,54 @@ for (const current of [false, true]) {
   });
 }
 
+test('study and canvas share the official live signal and idempotent selection owner', async () => {
+  const f = fixture({ current: true });
+  f.props.availableSystemHints.push({ systemHint: 'tatertot' }, { systemHint: 'canvas' });
+  assert.equal(f.list(), true); await flush();
+  assert.deepEqual(f.events.at(-1).map(item => item.semantic), ['web_search', 'image_generation', 'study', 'canvas']);
+  for (const [semantic, hint] of [['study', 'tatertot'], ['canvas', 'canvas'], ['web_search', 'search']]) {
+    const option = f.choice(semantic);
+    assert.equal(f.pick(option.id), true);
+    assert.equal(f.results.at(-1)[1], true);
+    assert.equal(f.namespace.Ng(f.controller).activeSystemHintType, hint);
+    assert.deepEqual(f.events.at(-1).filter(item => item.selected).map(item => item.semantic), [semantic]);
+    const writes = f.calls.length;
+    f.pick(option.id);
+    assert.equal(f.calls.length, writes, 'same request never toggles or sends twice');
+    assert.equal(f.calls.at(-1).command.skipComposerAutofocus, true);
+  }
+  f.pick(f.choice('web_search').id);
+  assert.equal(f.namespace.Ng(f.controller).activeSystemHintType, null);
+  assert.equal(f.fallbacks, 0);
+  assert.equal(f.timers.size, 0);
+});
+
+for (const hint of ['tatertot', 'canvas']) {
+  for (const restriction of ['filtered', 'disabled', 'upsell', 'hidden', 'local_action']) {
+    test(hint + ' retains official ' + restriction + ' eligibility', async () => {
+      const f = fixture();
+      const entry = { systemHint: hint };
+      f.props.availableSystemHints.push(entry);
+      if (restriction === 'filtered') f.menu.availableSystemHints = f.props.availableSystemHints.slice(0, 2);
+      if (restriction === 'disabled') entry.disabled = true;
+      if (restriction === 'upsell') entry.isLoggedOutUpsell = true;
+      if (restriction === 'hidden') entry.hideFromInitialSelection = true;
+      if (restriction === 'local_action') f.menu.resolveSystemHintBehavior = h => h === entry ? { kind: 'local_action' } : undefined;
+      f.list(); await flush();
+      assert.deepEqual(f.events.at(-1).map(item => item.semantic), ['web_search', 'image_generation']);
+      assert.equal(f.calls.length, 0);
+    });
+  }
+  test(hint + ' stale model selection cannot mutate the replacement composer', async () => {
+    const f = fixture(); f.props.availableSystemHints.push({ systemHint: hint });
+    f.list(); await flush(); const id = f.choice(hint === 'tatertot' ? 'study' : 'canvas').id;
+    f.props.currentModelId = 'other-model'; f.pick(id);
+    assert.equal(f.results.at(-1)[1], false);
+    assert.equal(f.calls.length, 0);
+    assert.equal(f.fallbacks, 0);
+  });
+}
+
 test('one unavailable hint does not remove the other eligible tool', async () => {
   const f = fixture(); f.menu.availableSystemHints = [f.props.availableSystemHints[0]];
   assert.equal(f.list(), true); await flush();

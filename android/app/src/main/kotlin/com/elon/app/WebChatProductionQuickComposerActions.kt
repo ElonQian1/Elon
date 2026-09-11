@@ -6,6 +6,8 @@ internal enum class WebChatProductionQuickComposerAction(
 ) {
     IMAGE_GENERATION("image_generation", "创建图片"),
     WEB_SEARCH("web_search", "网页搜索"),
+    STUDY("study", "学习与研究"),
+    CANVAS("canvas", "画布"),
 }
 
 internal object WebChatProductionQuickComposerActionCatalog {
@@ -35,10 +37,13 @@ internal object WebChatProductionQuickComposerActionResolver {
         tools: List<WebChatProductionComposerTool>,
     ): WebChatProductionComposerTool? = tools.firstOrNull { actionFor(it) == action }
 
-    fun actionFor(tool: WebChatProductionComposerTool): WebChatProductionQuickComposerAction? =
-        WebChatProductionQuickComposerAction.entries.firstOrNull { action ->
+    fun actionFor(tool: WebChatProductionComposerTool): WebChatProductionQuickComposerAction? {
+        WebChatProductionQuickComposerAction.entries.firstOrNull { it.semantic == tool.semantic }?.let { return it }
+        if (tool.semantic !in setOf("", "tool")) return null
+        return WebChatProductionQuickComposerAction.entries.firstOrNull { action ->
             matches(action, listOf(tool.id, tool.label, tool.semantic))
         }
+    }
 
     private fun matches(
         action: WebChatProductionQuickComposerAction,
@@ -61,6 +66,12 @@ internal object WebChatProductionQuickComposerActionResolver {
                     "searchtheweb" in normalized ||
                     "网页搜索" in normalized ||
                     "联网搜索" in normalized
+
+            WebChatProductionQuickComposerAction.STUDY ->
+                signals[1].trim().lowercase() in setOf("study and learn", "学习与研究", "学习和研究", "学习模式")
+
+            WebChatProductionQuickComposerAction.CANVAS ->
+                signals[1].trim().lowercase() in setOf("canvas", "画布")
         }
     }
 }

@@ -70,11 +70,15 @@ internal class WebChatProductionActiveToolChip(
             when (action) {
                 WebChatProductionQuickComposerAction.IMAGE_GENERATION -> R.drawable.ic_attach_function
                 WebChatProductionQuickComposerAction.WEB_SEARCH -> R.drawable.ic_search_simple
+                WebChatProductionQuickComposerAction.STUDY -> R.drawable.ic_msg_ai_reply
+                WebChatProductionQuickComposerAction.CANVAS -> R.drawable.ic_expand_editor
             },
         )
         label.text = when (action) {
             WebChatProductionQuickComposerAction.IMAGE_GENERATION -> "创建图片"
             WebChatProductionQuickComposerAction.WEB_SEARCH -> "搜索"
+            WebChatProductionQuickComposerAction.STUDY -> "学习"
+            WebChatProductionQuickComposerAction.CANVAS -> "画布"
         }
         contentDescription = "已启用${action.label}"
         close.contentDescription = "关闭${action.label}"
