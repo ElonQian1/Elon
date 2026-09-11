@@ -4,7 +4,7 @@
     ? require('./chatgpt_web_private_image_pointer.js') : root?.__elonChatGptPrivateImagePointer;
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 22, create: root => factory(root, pointer, citation) });
+  const exported = Object.freeze({ version: 23, create: root => factory(root, pointer, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -157,7 +157,7 @@
         entry.libraryFileId && (info.is_library_file !== true || info.library_file_id !== entry.libraryFileId) ||
         info.file_id != null && info.file_id !== entry.fileId ||
         info.library_file_id != null && (typeof info.library_file_id !== 'string' || !LIBRARY.test(info.library_file_id)) ||
-        info.is_project !== undefined && typeof info.is_project !== 'boolean' ||
+        info.is_project != null && typeof info.is_project !== 'boolean' ||
         info.gizmo_id != null && (typeof info.gizmo_id !== 'string' || !PROJECT.test(info.gizmo_id))) {
       throw new Error('download_scope_unconfirmed');
     }
@@ -376,5 +376,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 22, register, registerLibraryFile, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 23, register, registerLibraryFile, start, cancel, dispose, sourceDiagnostics });
 });

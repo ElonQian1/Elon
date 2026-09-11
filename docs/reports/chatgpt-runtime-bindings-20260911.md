@@ -62,8 +62,18 @@ uncertain-write no-replay. No wildcard imports or guessed exports are allowed.
   for submit, attachment dispatch, stop, regeneration, tools and temporary mode
   against controlled fixtures; they are not live provider requests.
 
-Grouped normal release and production acceptance are pending below. No thermal
-improvement or private-independent Android HTTP sender is claimed.
+Normal 1.1.1650 / code 1650 was published and installed with `-r` on the
+Xiaomi. Source `da4007102e6b5518f35031e786f80a715a69a042`, APK SHA-256
+`4e83a83f840eb33b3712318831abf30adfab58085a1af61f281d03ea03c79834`.
+Release log `runtime-sep11-release-20260911-074923-195` passed (408.6s),
+including Android compilation, remote hash verification and installed version.
+The native production page reported adapter 333 and retained authentication.
+
+The fixed attachment acceptance on 1650 confirmed private upload, an
+`official_runtime_v1:accepted` send, exactly one user row and actual file-content
+reading, in 26.28s to the completed reply. This is not a first-token measurement.
+The runtime compatibility regression is device-verified; do not repeat it.
+No thermal improvement or independent Android HTTP sender is claimed.
 
 ## Citation acceptance boundary
 
@@ -87,3 +97,33 @@ fixture and consumer send once; private-upload and runtime-send outcomes stay
 separate from download evidence. Unknown results do not cause a second send.
 This harness is not itself a successful citation download. Mounted/PCA/URL-only
 cloud references remain separate unresolved scopes.
+
+## Nullable file metadata regression
+
+The 1650 native file sheet contained two rows, including one assistant citation.
+Its actual Download action first returned metadata HTTP 404, before any byte
+transfer (`citation-download-1650-20260911-075817-813`, 72.1s). The original
+conversation/draft and awake lease were restored. This was one send, one
+download attempt, zero saved files, not a completed citation capability.
+
+A single checkpoint-based retry sent no message and reused the same fixture.
+Metadata then returned HTTP 200, but the native receipt was
+`download_prepare_failed` (`citation-reuse-1650-20260911-081106-172`, 44.6s).
+The bounded protocol record exposed field types only: `is_library_file:boolean`,
+`library_file_id:string`, `gizmo_id:null`, `is_project:null`. The existing
+validator rejected null `is_project` before calling the binary owner.
+
+Current shared source `aDt/dX` treats null like an absent project flag; an
+explicit true flag or a valid project ID still determines project ownership.
+Current lazy preview `98ca14f9-eo7dh0q9bo7mib42.js`, SHA-256
+`015f3411feab758f56cd384e59a81ea9d17b794dbf713c11196f8ac84f1db2a6`, also waits
+for successful metadata. No metadata-error bypass is justified. The first 404
+and later schema rejection are distinct failures, not a network outage.
+
+Download owner v23 / adapter 334 accepts only null as the additional absent
+project flag. File/library identities, string/number rejection, project
+resolution, cancellation and metadata HTTP failures stay guarded. Controlled
+tests first reproduced two failures out of 53, then all 126 related cases passed:
+`citation-null-project-red-20260911-081325-405` and
+`citation-null-project-green-20260911-081418-467`. Grouped release and saved-byte
+acceptance for this correction are pending; reuse the checkpoint, never resend.

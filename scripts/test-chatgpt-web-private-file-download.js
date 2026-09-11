@@ -123,6 +123,7 @@ test('project library downloads resolve effective ownership before ordinary auth
     [{ is_project: true, gizmo_id: OTHER_PROJECT }, OTHER_PROJECT],
     [{ is_project: true, gizmo_id: null }, PROJECT],
     [{ is_project: false, gizmo_id: OTHER_PROJECT }, OTHER_PROJECT],
+    [{ is_project: null, gizmo_id: OTHER_PROJECT }, OTHER_PROJECT],
     [{ gizmo_id: OTHER_PROJECT }, OTHER_PROJECT],
   ]) {
     const f = libraryFixture({ is_library_file: true, library_file_id: LIBRARY, ...info });

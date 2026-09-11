@@ -184,8 +184,8 @@ test('citation metadata discovers a project library file even when the reference
   assert.equal(f.queued.length, 1);
 });
 
-test('citation metadata resolves a personal library file through the existing binary owner', async () => {
-  const f = fixture({ ...PROJECT_INFO, is_project: false, gizmo_id: null });
+for (const projectFlag of [false, null]) test('citation metadata resolves a personal library file with project flag ' + projectFlag, async () => {
+  const f = fixture({ ...PROJECT_INFO, is_project: projectFlag, gizmo_id: null });
   const saved = [];
   f.payload.gizmo_id = PROJECT;
   f.root.__elonChatGptPrivateLibraryDownload = { async run(_root, job, current, _url, id) {

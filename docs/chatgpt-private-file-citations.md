@@ -3,6 +3,12 @@
 ## Status and boundary
 
 Capability: `android_chatgpt_private_file_citation_download_v1`.
+Latest regression: normal 1650 reached the actual native citation Download action.
+Metadata first returned 404, then 200 with a nullable `is_project` flag that the
+validator rejected. Download owner v23 / adapter 334 corrects this one field;
+126 offline checks pass and saved-byte acceptance is pending.
+[Current evidence](reports/chatgpt-runtime-bindings-20260911.md#nullable-file-metadata-regression).
+
 Status: implemented; current citation v3 / projection v9 / download owner v18
 (source `7b78394da`) passed offline checks and is included in normal 1640 / adapter
 325 with the earlier metadata/scope correction. Grouped Release/install passed;
