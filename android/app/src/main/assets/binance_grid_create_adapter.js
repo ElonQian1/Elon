@@ -95,10 +95,10 @@
   XMLHttpRequest.prototype.send = function() {
     const t = xhr.get(this); if(t) capture(t.url,t.method,t.headers); return originalSend.apply(this,arguments);
   };
-  async function request(path, headers, body) {
+  async function request(path, headers, body, method=body ? 'POST' : 'GET') {
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 20_000);
     try {
-      const response = await fetch.call(window,path,{method:body ? 'POST' : 'GET',headers,
+      const response = await fetch.call(window,path,{method,headers,
         credentials:'same-origin',redirect:'error',cache:'no-store',signal:controller.signal,
         ...(body ? {body:JSON.stringify(body)} : {})});
       const text = await response.clone().text();
@@ -129,6 +129,10 @@
     const entropy = window.crypto.getRandomValues(new Uint32Array(1))[0] % 1000000 + 1;
     return `manual_mm_web_${entropy}${Date.now()}`.slice(0,32);
   }
+  window.__elonBinanceCreateFundsV1=window.__elonBinanceCreateFundsFactoryV1?.({headers,identity,
+    mode:h=>request('/bapi/futures/v1/private/future/portfolio/margin/get-user-basic',h,undefined,'POST'),
+    futures:h=>request('/bapi/futures/v2/private/future/user-data/getMaxWithdrawAmount',h,{assetName:'USDT'}),
+    spot:h=>request('/bapi/asset/v3/private/asset-service/asset/get-user-asset',h,{})});
   window.__elonBinanceCreateReferenceV1=window.__elonBinanceCreateReferenceFactoryV1?.({headers,identity,
     configuration:h=>request(COEF,h),
     commission:(h,symbol)=>request('/bapi/futures/v1/private/future/user-data/account-tier-commission',h,{name:symbol})});

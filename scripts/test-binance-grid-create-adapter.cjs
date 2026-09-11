@@ -4,6 +4,10 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const { webcrypto, createHash } = require('node:crypto');
 const code = fs.readFileSync(require('node:path').join(__dirname, '../android/app/src/main/assets/binance_grid_create_adapter.js'), 'utf8');
+const fundsCode = fs.readFileSync(require('node:path').join(__dirname, '../android/app/src/main/assets/binance_grid_create_funds.js'), 'utf8');
+const MODE='/bapi/futures/v1/private/future/portfolio/margin/get-user-basic';
+const FUNDS='/bapi/futures/v2/private/future/user-data/getMaxWithdrawAmount';
+const SPOT='/bapi/asset/v3/private/asset-service/asset/get-user-asset';
 const LIST = '/bapi/futures/v2/private/future/grid/query-open-grids';
 const CREATE = '/bapi/futures/v2/private/future/grid/place-grid';
 const INFO = '/bapi/accounts/v1/private/account/get-user-base-info';
@@ -26,6 +30,9 @@ function harness() {
     fetch:async(url, init={})=>{
       calls.push({url,init});
       if(url===INFO) return response(account);
+      if(url===MODE)return response({enable:behavior.portfolio===true});
+      if(url===FUNDS)return response('12.345678901234');
+      if(url===SPOT)return response([{asset:'USDT',free:'7.8900'}]);
       if(url===COEF) {
         if(behavior.switchDuringConfig) {account.userId='43';account.subUser=true;account.parentUser=false;}
         return response({windowCount:behavior.windowCount});
@@ -42,6 +49,7 @@ function harness() {
       return response([]);
     }};
   window.top=window;
+  vm.runInNewContext(fundsCode,{window,Date});
   vm.runInNewContext(code,{window,location:{origin:'https://www.binance.com',href:'https://www.binance.com/'},
     URL,Headers,XMLHttpRequest:Xhr,AbortController,TextEncoder,setTimeout,clearTimeout,Date});
   const api=window.__elonBinanceCreateV1;
@@ -49,6 +57,19 @@ function harness() {
   const prepare=async(body=payload())=>{await observe(); assert.equal(api.prepare('doc_test_123','a'.repeat(32),hash,body),true); await tick();};
   return {window,api,observe,prepare,calls,events,account,behavior,Xhr};
 }
+test('funds uses the captured ordinary and portfolio read requests without trade bodies',async()=>{
+  for(const portfolio of [false,true]) {
+    const h=harness();h.behavior.portfolio=portfolio;await h.observe();const funds=h.window.__elonBinanceCreateFundsV1;
+    assert.equal(funds.start('doc_funds_test','b'.repeat(64),hash),true);await tick();
+    const result=funds.read('doc_funds_test','b'.repeat(64),hash);assert.equal(result.status,'ready');
+    assert.equal(result.available,portfolio?'7.8900':'12.345678901234');
+    const calls=h.calls.filter(c=>c.url!==LIST);assert.deepEqual(calls.map(c=>c.url),[INFO,MODE,portfolio?SPOT:FUNDS,INFO]);
+    const mode=calls[1];assert.equal(mode.init.method,'POST');assert.ok(!Object.hasOwn(mode.init,'body'));
+    const balance=calls[2];assert.equal(balance.init.method,'POST');assert.equal(balance.init.credentials,'same-origin');
+    assert.equal(balance.init.redirect,'error');assert.deepEqual(JSON.parse(balance.init.body),portfolio?{}:{assetName:'USDT'});
+    assert.ok(!JSON.stringify(result).includes('SENSITIVE_CANARY'));assert.equal(h.events.length,0);
+  }
+});
 test('neutral and trailing payloads preserve the official conditional fields', async () => {
   const h=harness(), p=payload(); p.direction='NEUTRAL'; delete p.autoInitPos;
   Object.assign(p,{trailingUp:true,trailingDown:false,orderCurrency:'QUOTE',trailingStopLowerLimit:true,trailingStopUpperLimit:false,

@@ -416,6 +416,147 @@
       "updated_at_ms": 1789111392093
     },
     {
+      "id": "android-binance-create-funds-v1",
+      "title": "创建可用资金只读宿主",
+      "summary": "当前创建操作读取真实账号的USDT可用资金，区分普通/组合保证金来源，过期与失败不当零；只改未提交草稿，不发送金融请求。",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/android-binance-create-funds-v1.md",
+        "content_hash": "470e968a353252c1dbc0287c94baa1809cf86cc26f4a61135c5ccd678ef35d1e",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "312d96ec94992414c97a66742870ebd356c37c74",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "201aa875d69c563af436aa76fb0c16d4f7a2180c",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_create_adapter.js",
+        "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateCommands.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "固定只读合同及账号/文档/请求隔离",
+        "真实金额或明确未知，比例仅修改未提交草稿",
+        "离线验证、发布、装机及两类来源实测分别记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/binance_grid_create_adapter.js",
+          "content_hash": "ebc1d07fec54c45fd83de90651017d9b8ddc6b88e2018d04420ebfb5b14b877d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "312d96ec94992414c97a66742870ebd356c37c74",
+            "head_blob_oid": "f189b194b17ec7799aa4cfb3c3b26007f6a52158",
+            "worktree_blob_oid": "07ceb91bf0ef4218cf94327ababafb8c5fa7d4a5",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/binance_grid_create_funds.js",
+          "content_hash": "477f513b3f3dd360d62f338607452c8bfcb4006841505a7bddc34001a42b6128",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "312d96ec94992414c97a66742870ebd356c37c74",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f3345350d8b76292ec7537f70c0bfdfc029ca78c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateCommands.kt",
+          "content_hash": "0ed04f333933c34fc3129e17e8612588f85a031a3881a7e6b1d93d4775d8408c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "312d96ec94992414c97a66742870ebd356c37c74",
+            "head_blob_oid": "cfed0171e4fddc7d4f29406d44daaa18a11914ae",
+            "worktree_blob_oid": "98043200569ec680bb567dc0c928d15fbacee71d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateFunds.kt",
+          "content_hash": "465e1f1e7d121845ff7dad7e5250cb233c0026c39ea42147a0388069b42b570e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "312d96ec94992414c97a66742870ebd356c37c74",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5daef7ab619833fc69b87df06dfd921499dfdc51",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostWebView.kt",
+          "content_hash": "afbeebf6dd62d27630a37081196a369bb61e5169eb034239972fdce28a583e63",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "312d96ec94992414c97a66742870ebd356c37c74",
+            "head_blob_oid": "732437fe5f5390b38cba1d904ca8b39865e975d2",
+            "worktree_blob_oid": "d8d39cb9a4ac02accbb8964602ffd1f4b22fbff3",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/create/BinanceCreateFundsResultTest.kt",
+          "content_hash": "808d89e25bda4116ffdac106705d8a211f376e79be96dd4f0d2c31c741655723",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "312d96ec94992414c97a66742870ebd356c37c74",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9430de3ee229f2a31e05220748e5335d4f616dba",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-create-adapter.cjs",
+          "content_hash": "d504f128701c344991b385ce1fa6c12c3c62376701b53a41047d722df2ea61ce",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "312d96ec94992414c97a66742870ebd356c37c74",
+            "head_blob_oid": "f3ce33dbcc87b9614c8d7383d500f9a825081531",
+            "worktree_blob_oid": "817d12bef200df11fcf78586fb71de633afd2daa",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-create-funds.cjs",
+          "content_hash": "b62de33d33f3a645a910fc3b3842ec0caf76f2ffa234ccad6512ee7a0990bb9e",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "312d96ec94992414c97a66742870ebd356c37c74",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "880ab98ebd8e4e1625ef3a00bcac75895dfab516",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1789164533657,
+      "updated_at_ms": 1789164535763
+    },
+    {
       "id": "android-binance-create-reference-v1",
       "title": "币安创建动态参考接口",
       "summary": "为量化原生创建页提供绑定账号与参数的动态网格数量范围、最低保证金，只读计算不提交交易。",
@@ -26168,56 +26309,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_9a2bf9f4e1e2495692ac5897f5b1b2f2",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-research",
-      "reason": "实现已接线，继续编译与实际WebView2联调",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788731739287
-    },
-    {
-      "id": "feature_event_2a7a1b6c120649fab9e871e675ddd9d5",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-research",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788731990383
-    },
-    {
-      "id": "feature_event_a73d6d9288f64a7d80b9d2bdb25912cc",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-research",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788734552894
-    },
-    {
-      "id": "feature_event_ae3b64a6d0d14d3498972a358635c013",
-      "feature_id": "win-browser-research-mcp-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-research",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788736415141
-    },
-    {
-      "id": "feature_event_7426e83037d648a39e6d07439642e8d3",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "registered",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788767191531
-    },
-    {
       "id": "feature_event_afbb1f29342d43acaa90807194f1f080",
       "feature_id": "private-grid-read-bridge-v1",
       "action": "claimed",
@@ -28166,6 +28257,56 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1789163962065
+    },
+    {
+      "id": "feature_event_5ab8dfeeb163404eaf3b1e7e0f5ae551",
+      "feature_id": "android-binance-create-funds-v1",
+      "action": "registered",
+      "actor": "quant-grid",
+      "reason": "仅注册表并发冲突；保留上游所有功能，以官方工作流重放本功能登记及已验证证据。",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789164533657
+    },
+    {
+      "id": "feature_event_f02eb7405418499db618f5940a928df2",
+      "feature_id": "android-binance-create-funds-v1",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789164533713
+    },
+    {
+      "id": "feature_event_af758dd02cd5425c84eec7667d7386e8",
+      "feature_id": "android-binance-create-funds-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "重放本功能已完成实现，保留上游其他功能。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789164533755
+    },
+    {
+      "id": "feature_event_cb325c050cd84fefaee4373d95c236eb",
+      "feature_id": "android-binance-create-funds-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789164535721
+    },
+    {
+      "id": "feature_event_d1fdcf59d2d143a68d797cb896f6d21f",
+      "feature_id": "android-binance-create-funds-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "业务源码无冲突，已有编译及专项测试通过；实际账户/视觉仍待验。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789164535763
     }
   ]
 }
