@@ -63,18 +63,16 @@
         const n=add(d(count),one),value=max(mul(n,notional),mul(mul(mul(n,d(trailingCoef)),u),qty));
         return text(div(value,lev,16,true));
       }
-      const reference=trigger===''?d(mark):d(trigger);
-      let sum=zero;
-      for(const price of levels(lower,upper,count,pricePrecision,type,windowCount)) {
-        let amount=price;
-        if(direction!=='NEUTRAL') {
-          const loss=max(zero,direction==='LONG'?sub(price,reference):sub(reference,price));
-          amount=add(direction==='SHORT'?max(price,reference):price,mul(lev,loss));
-        }
-        sum=add(sum,mul(qty,amount));
-      }
+      const sum=mul(qty,weightedSum(direction,lower,upper,mark,trigger,count,leverage,pricePrecision,type,windowCount));
       return text(divideUp(sum,mul(lev,coefficient),pricePrecision));
     } catch{return null;}
   }
-  window.__elonBinanceCreateRulesV1=Object.freeze({maximumCount,minimumMargin});
+  function weightedSum(direction,lower,upper,mark,trigger,count,leverage,pricePrecision,type,windowCount) {
+    const reference=trigger===''?d(mark):d(trigger),lev=d(leverage);
+    return levels(lower,upper,count,pricePrecision,type,windowCount).reduce((sum,price)=>{
+      const loss=direction==='NEUTRAL'?zero:max(zero,direction==='LONG'?sub(price,reference):sub(reference,price));
+      return add(sum,add(direction==='SHORT'?max(price,reference):price,mul(lev,loss)));
+    },zero);
+  }
+  window.__elonBinanceCreateRulesV1=Object.freeze({maximumCount,minimumMargin,weightedSum});
 })();

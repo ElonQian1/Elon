@@ -34,6 +34,12 @@ internal class BinanceGridMarket {
         return parseQuote(get("/fapi/v1/premiumIndex?symbol=$symbol", 16_384), symbol, System.currentTimeMillis())
     }
     fun tickers(): Map<String, BinanceSymbolTicker> = BinanceSymbolTicker.parse(get("/fapi/v1/ticker/24hr", 4_194_304), System.currentTimeMillis())
+    fun ticker(symbol:String):BinanceSymbolTicker {
+        require(Regex("[A-Z0-9]{1,24}USDT").matches(symbol))
+        val raw=get("/fapi/v1/ticker/24hr?symbol=$symbol",16_384)
+        return BinanceSymbolTicker.parse("[$raw]",System.currentTimeMillis())[symbol]?.also {require(it.last!=null)}
+            ?: error("当前合约最新价不可用")
+    }
     private fun get(path: String, maximum: Int): String {
         val connection = URL("https://fapi.binance.com$path").openConnection() as HttpsURLConnection
         try {

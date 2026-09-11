@@ -133,9 +133,11 @@
     mode:h=>request('/bapi/futures/v1/private/future/portfolio/margin/get-user-basic',h,undefined,'POST'),
     futures:h=>request('/bapi/futures/v2/private/future/user-data/getMaxWithdrawAmount',h,{assetName:'USDT'}),
     spot:h=>request('/bapi/asset/v3/private/asset-service/asset/get-user-asset',h,{})});
-  window.__elonBinanceCreateReferenceV1=window.__elonBinanceCreateReferenceFactoryV1?.({headers,identity,
+  const referenceDependencies={headers,identity,
     configuration:h=>request(COEF,h),
-    commission:(h,symbol)=>request('/bapi/futures/v1/private/future/user-data/account-tier-commission',h,{name:symbol})});
+    commission:(h,symbol)=>request('/bapi/futures/v1/private/future/user-data/account-tier-commission',h,{name:symbol})};
+  window.__elonBinanceCreateReferenceV1=window.__elonBinanceCreateReferenceFactoryV1?.(referenceDependencies);
+  window.__elonBinanceCreateReferenceV2=window.__elonBinanceCreateReferenceFactoryV1?.(referenceDependencies,2);
   window.__elonBinanceCreateV1 = Object.freeze({
     prepare(token,id,account,payload) {
       if(!scope(token,id,account) || !validPayload(payload) || consumed.has(id) || consumed.size >= 16 || !context || activeSend) return false;

@@ -18,6 +18,7 @@ internal class BinanceCreateCommands private constructor(private val context: Co
     private val journal = BinanceCreateJournal(context)
     private val market = BinanceGridMarket()
     private val reference = BinanceCreateReference(host)
+    private val referenceV2 = BinanceCreateReference(host,2)
     private val funds = BinanceCreateFunds(host)
     private var session: BinanceCreateSession? = null
     private var operation = ""
@@ -36,9 +37,10 @@ internal class BinanceCreateCommands private constructor(private val context: Co
             require(extras.isEmpty)
             return reply(mapOf("schema" to "yilong.binance_create_funds_capabilities.v1","status" to "supported","version" to "1","read_only" to true))
         }
-        if(method=="create_reference_capabilities_v1") {
+        if(method in setOf("create_reference_capabilities_v1","create_reference_capabilities_v2")) {
             require(extras.isEmpty)
-            return reply(mapOf("schema" to "yilong.binance_create_reference_capabilities.v1","status" to "supported","version" to "1","read_only" to true))
+            val version=if(method.endsWith("v2"))"2" else "1"
+            return reply(mapOf("schema" to "yilong.binance_create_reference_capabilities.v$version","status" to "supported","version" to version,"read_only" to true))
         }
         if (method == "create_capabilities_v2") {
             require(extras.isEmpty)
@@ -47,8 +49,8 @@ internal class BinanceCreateCommands private constructor(private val context: Co
         }
         val allowed = when (method) {
             "create_prepare_v2" -> setOf("operation", "draft")
-            "create_reference_v1" -> setOf("operation", "request", "draft")
-            "create_reference_poll_v1" -> setOf("operation", "request")
+            "create_reference_v1", "create_reference_v2" -> setOf("operation", "request", "draft")
+            "create_reference_poll_v1", "create_reference_poll_v2" -> setOf("operation", "request")
             "create_funds_v1", "create_funds_poll_v1" -> setOf("operation", "request")
             "create_submit_v2" -> setOf("operation", "preparation", "digest")
             else -> setOf("operation")
@@ -74,11 +76,12 @@ internal class BinanceCreateCommands private constructor(private val context: Co
             if(method=="create_funds_v1")funds.start(request)
             return reply(funds.snapshot(request)+("operation" to operation))
         }
-        if(method in setOf("create_reference_v1","create_reference_poll_v1")) {
+        if(method in setOf("create_reference_v1","create_reference_poll_v1","create_reference_v2","create_reference_poll_v2")) {
             require(!attempt.unresolved && !validating && session?.busy==false)
             val request=extras.getString("request") ?: error("REQUEST_MISSING")
-            if(method=="create_reference_v1")reference.start(request,extras.getString("draft") ?: error("DRAFT_MISSING"))
-            return reply(reference.snapshot(request)+("operation" to operation))
+            val reader=if(method.endsWith("v2"))referenceV2 else reference
+            if(method in setOf("create_reference_v1","create_reference_v2"))reader.start(request,extras.getString("draft") ?: error("DRAFT_MISSING"))
+            return reply(reader.snapshot(request)+("operation" to operation))
         }
         if (method in setOf("create_open_v2", "create_poll_v2")) host.recoverConnection()
         when (method) {
@@ -183,6 +186,7 @@ internal class BinanceCreateCommands private constructor(private val context: Co
     private fun expire() { if (SystemClock.elapsedRealtime() - touched >= 90_000 && attempt.status != "submitting") release() }
     private fun release(persistState: Boolean = true) {
         reference.close()
+        referenceV2.close()
         funds.close()
         generation++; validating = false; permit.clear(); preparation = ""
         session?.close(persistState)
@@ -199,6 +203,7 @@ internal class BinanceCreateCommands private constructor(private val context: Co
         val methods = setOf("create_capabilities_v2", "create_open_v2", "create_poll_v2", "create_prepare_v2",
             "create_submit_v2", "create_detail_v2", "create_cancel_v2", "create_ack_v2", "create_close_v2",
             "create_reference_v1", "create_reference_poll_v1", "create_reference_capabilities_v1",
+            "create_reference_v2", "create_reference_poll_v2", "create_reference_capabilities_v2",
             "create_funds_v1", "create_funds_poll_v1", "create_funds_capabilities_v1")
         private var instance: BinanceCreateCommands? = null
         private val worker = ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, ArrayBlockingQueue(1))

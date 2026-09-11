@@ -73,7 +73,7 @@ test('production adapter binds the reference operation to only observed identity
   }};window.top=window;
   class Xhr{open(){}send(){}setRequestHeader(){}}
   const context={window,location:{origin:'https://www.binance.com',href:'https://www.binance.com/'},URL,Headers,XMLHttpRequest:Xhr,AbortController,TextEncoder,setTimeout,clearTimeout,Date};
-  for(const name of ['binance_grid_trailing_rules.js','binance_grid_create_rules.js','binance_grid_create_reference.js','binance_grid_create_adapter.js'])
+  for(const name of ['binance_grid_trailing_rules.js','binance_grid_create_rules.js','binance_grid_create_economics.js','binance_grid_create_reference.js','binance_grid_create_adapter.js'])
     vm.runInNewContext(fs.readFileSync(path.join(assets,name),'utf8'),context);
   await window.fetch('/bapi/futures/v2/private/future/grid/query-open-grids',{method:'POST',headers:{'x-fixture':'CANARY'}});
   const api=window.__elonBinanceCreateReferenceV1;
@@ -82,5 +82,10 @@ test('production adapter binds the reference operation to only observed identity
   const result=api.read(h.token,h.id,account);assert.equal(result.status,'ready');assert.ok(!JSON.stringify(result).includes('CANARY'));
   assert.equal(calls.filter(x=>x.url.endsWith('account-tier-commission')).length,1);
   assert.deepEqual(JSON.parse(calls.find(x=>x.url.endsWith('account-tier-commission')).body),{name:'NEARUSDT'});
+  const v2=window.__elonBinanceCreateReferenceV2;
+  assert.equal(v2.start(h.token,h.id,account,{...h.input,margin:'200'},{...h.market,observedAt:Date.now(),last:'1.84',pricePrecision:3}),true);
+  for(let i=0;i<10 && v2.read(h.token,h.id,account)?.status==='pending';i++)await new Promise(resolve=>setTimeout(resolve,5));
+  assert.equal(v2.read(h.token,h.id,account).quantity_status,'ready');
+  assert.equal(v2.read(h.token,h.id,account).quantity_unit,'NEAR');
   assert.ok(calls.every(x=>['query-open-grids','get-user-base-info','coef','account-tier-commission'].some(endpoint=>x.url.endsWith(endpoint))));
 });

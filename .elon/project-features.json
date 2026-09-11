@@ -416,6 +416,189 @@
       "updated_at_ms": 1789111392093
     },
     {
+      "id": "android-binance-create-economics-v1",
+      "title": "创建网格经济参数只读参考",
+      "summary": "V2参考在动态范围和最低投入基础上提供手续费后利润和每笔数量，保留V1合同和会话隔离。",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/android-binance-create-economics-v1.md",
+        "content_hash": "a925ec5512a8d610116c6db16e6f3905050965b0f8540782577e4399274a8d23",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "1d8a922746e0b829b8aa1d2372104418889f9c75",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "android-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_create_economics.js",
+        "android/app/src/main/assets/binance_grid_create_reference.js",
+        "android/app/src/main/assets/binance_grid_create_rules.js",
+        "android/app/src/main/kotlin/com/elon/app/grid/create",
+        "scripts/test-binance-grid-create-reference.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "官方差分和旧合同测试通过",
+        "账号文档请求隔离及V1兼容",
+        "真实读取与发布装机证据分别记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/binance_grid_create_adapter.js",
+          "content_hash": "ec1f491a38b54b8d90d4252c33cf5c35d9986ef609d0381f3f7d2124f000bbb8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
+            "head_blob_oid": "07ceb91bf0ef4218cf94327ababafb8c5fa7d4a5",
+            "worktree_blob_oid": "31d3b01469efb863ab1338fe2296eed43e10c461",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/binance_grid_create_economics.js",
+          "content_hash": "f27ea90b4752ee84c58a9c9280868c2aba995b3f3a1d1b110ae6cd431b1167ab",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "162e3dd6bab0519f6f28e235836cb0a83e937a30",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/binance_grid_create_reference.js",
+          "content_hash": "6ee619a2b14add7185f308783644e3496301023e31c97cf31d5cf3d307cb57e4",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
+            "head_blob_oid": "29cfd367ab1210225d2d3c6aa0fa126ef4498859",
+            "worktree_blob_oid": "760f5e24d6385eafe61aff42e644193545e2e1c1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/assets/binance_grid_create_rules.js",
+          "content_hash": "e77e0b431beba991108699e1402092d205e38be48ee4dff2a31253219f20eb6f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
+            "head_blob_oid": "b77faee26b2cd607630c81407dbf22f803c9f4db",
+            "worktree_blob_oid": "3ba49452c8fdd4e620aaa0d4cd415426d82bd055",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateCommands.kt",
+          "content_hash": "aecf9cf615bed8d6ba2dfd99ae2943349f1cdbf650e29e571c3ad54c02b7fc17",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
+            "head_blob_oid": "98043200569ec680bb567dc0c928d15fbacee71d",
+            "worktree_blob_oid": "862abd7a4c58727d51e6922dfc2e9d11ed620bee",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateReference.kt",
+          "content_hash": "b37d430ecc08940d372dca5468d0756a7d36c4c699cf53b83bd2512e267e3446",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
+            "head_blob_oid": "903733902c6e085b2600571b2185c50b64ef6571",
+            "worktree_blob_oid": "f636a1cb7df3421d2435662e7ebea1edd09d9ccf",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceReferenceEconomics.kt",
+          "content_hash": "82fe2d5bd5bebe3291aa7ba63e505327d25c37dce6c97346d6dfc030dcad9ef4",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f713af271358bc9d928066de85d48b95cc228d40",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/create/BinanceReferenceEconomicsTest.kt",
+          "content_hash": "df4937e634dd23f42e3857f594898757b6962300b8408decc72c630f6b21c996",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d4dd50f836daf2200f75104ffd30063ac583c656",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/delivery/android-binance-create-economics-20260912.md",
+          "content_hash": "d6485b50ff2be1185f3026ac531c494967b14caf34ded440e14cfe1794b94419",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ba05d1f71e931c35b9e084ecc501a61a54cd0b9b",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/fixtures/binance-grid-create-economics-vectors.json",
+          "content_hash": "d64820ce7d9ab0959ab476c47421952f9249b89acfb777062e23da603d6e3021",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8fc6966d16bed0f27393a6e8da58d89163721a7e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-create-economics.cjs",
+          "content_hash": "e4a58aa9e7ea04315111e5672811047485e764e04b6c9d1d58a66854de0a70fa",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "d81656259e60470ba4824aad631f584a9d5ea8fa",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "fa5bc37d8eee9f35dbd0dcbd873f411a8502951d",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1789167456648,
+      "updated_at_ms": 1789168672091
+    },
+    {
       "id": "android-binance-create-funds-v1",
       "title": "创建可用资金只读宿主",
       "summary": "当前创建操作读取真实账号的USDT可用资金，区分普通/组合保证金来源，过期与失败不当零；只改未提交草稿，不发送金融请求。",
@@ -26309,56 +26492,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_0e251cd5a9d841ae9bf61fd7bfd1b4d0",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-read",
-      "reason": "已认领主账号私密投影通道并实现首版，正在与量化APK合同联调；公网和真实终端验收尚未完成。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788767292727
-    },
-    {
-      "id": "feature_event_8f3b3337442d442ba61359cfecfdf921",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788770615710
-    },
-    {
-      "id": "feature_event_8cc52d05ad8b42c8ad88021cf2c3d0f6",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788771628404
-    },
-    {
-      "id": "feature_event_541fb5fa8686446e86c61d9c1f504643",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788775648466
-    },
-    {
-      "id": "feature_event_1fc7b4a158ac4856a356344829dd83d7",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788780305071
-    },
-    {
       "id": "feature_event_d25ec4939ddf4e748f9c40d8ee7b989d",
       "feature_id": "private-grid-read-bridge-v1",
       "action": "evidence_recorded",
@@ -28307,6 +28440,56 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1789165630244
+    },
+    {
+      "id": "feature_event_fcb74be21a54483698c5e8c69c7178a9",
+      "feature_id": "android-binance-create-economics-v1",
+      "action": "registered",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789167456648
+    },
+    {
+      "id": "feature_event_6b35ecae36944c3a912a578a4152b341",
+      "feature_id": "android-binance-create-economics-v1",
+      "action": "claimed",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789167456717
+    },
+    {
+      "id": "feature_event_2fd6f09a35ce4ee0828d656c74f48559",
+      "feature_id": "android-binance-create-economics-v1",
+      "action": "transitioned",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789168214074
+    },
+    {
+      "id": "feature_event_9f3090bd3d644239ade2ec01b842d6be",
+      "feature_id": "android-binance-create-economics-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789168671995
+    },
+    {
+      "id": "feature_event_03734be58f1c4fd0b0e450dd270e1367",
+      "feature_id": "android-binance-create-economics-v1",
+      "action": "transitioned",
+      "actor": "codex-grid",
+      "reason": "64项创建/宿主JVM与官方差分通过；发布与真实读取独立待验",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789168672091
     }
   ]
 }
