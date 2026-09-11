@@ -6,6 +6,7 @@ import {
   listExchangeWebProviders,
   openExchangeWebSession,
 } from './exchangeWebviewApi'
+import { exchangeWebviewErrorMessage } from './exchangeWebviewErrors.js'
 import styles from './WindowsExchangeWebviewLaunch.module.css'
 
 export interface WindowsWebviewLaunchContract {
@@ -45,7 +46,7 @@ export default function WindowsExchangeWebviewLaunch({
       await openExchangeWebSession(provider.providerId, identity.ownerKey)
       setMessage(`${provider.displayName} 已在独立窗口打开。`)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '交易所官网窗口打开失败，请重试。')
+      setError(exchangeWebviewErrorMessage(caught))
     } finally {
       openingRef.current = false
       setOpening(false)

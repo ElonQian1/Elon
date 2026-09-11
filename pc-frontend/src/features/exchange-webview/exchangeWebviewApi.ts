@@ -1,4 +1,5 @@
 import { getDesktopInvoke } from '../shell/desktopShell'
+import { normalizeExchangeWebviewError } from './exchangeWebviewErrors.js'
 
 const PROVIDER_SCHEMA = 'yilong.exchange_webview.provider.v1'
 const SESSION_SCHEMA = 'yilong.exchange_webview.session.v1'
@@ -32,7 +33,12 @@ export function isExchangeWebviewAvailable(): boolean {
 
 export async function listExchangeWebProviders(): Promise<ExchangeWebProvider[]> {
   const invoke = requireDesktopInvoke()
-  const providers = await invoke<ExchangeWebProvider[]>('list_exchange_web_providers')
+  let providers: ExchangeWebProvider[]
+  try {
+    providers = await invoke<ExchangeWebProvider[]>('list_exchange_web_providers')
+  } catch (error) {
+    throw normalizeExchangeWebviewError(error)
+  }
   if (!Array.isArray(providers)) throw new Error('Win 客户端返回了无效的交易所官网列表。')
   const seen = new Set<string>()
   for (const provider of providers) {
@@ -73,11 +79,7 @@ export async function openExchangeWebSession(
       return session
     })
     .catch((error) => {
-      const message = error instanceof Error ? error.message : String(error)
-      if (/not found|unknown command|not allowed/i.test(message)) {
-        throw new Error('当前 Win 客户端还不支持交易所 WebView，请先更新客户端。')
-      }
-      throw error
+      throw normalizeExchangeWebviewError(error)
     })
     .finally(() => { openFlight = null })
   return openFlight
