@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 26) ||
+  if ((existingTransport && Number(existingTransport.version) >= 27) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -510,8 +510,9 @@
       respond(action, true, 'private_files_ready');
     } catch (error) {
       recordReadFailure(error, accountReadPolicy);
-      respond(action, false, failureKind(error) === 'auth' || failureKind(error) === 'context'
-        ? 'files_identity_unavailable' : 'files_read_failed');
+      const kind = failureKind(error);
+      respond(action, false, kind === 'auth' || kind === 'context'
+        ? 'files_identity_unavailable' : 'files_read_' + kind);
     }
   }
 
@@ -561,7 +562,7 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 26,
+    version: 27,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,

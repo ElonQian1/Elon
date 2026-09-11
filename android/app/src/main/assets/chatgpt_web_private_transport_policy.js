@@ -142,7 +142,8 @@
       state.failures = Math.min(1000, state.failures + 1);
       state.consecutiveFailures = Math.min(20, state.consecutiveFailures + 1);
       state.lastOutcome = kind;
-      const cooldown = kind === 'auth' || kind === 'context'
+      const transientUserRead = config.scope === 'account_read' && ['network', 'timeout'].includes(kind);
+      const cooldown = transientUserRead ? 2000 : kind === 'auth' || kind === 'context'
         ? 5 * 60 * 1000
         : kind === 'timeout' || kind === 'rate_limit' ? 60_000
           : kind === 'parse' || kind === 'empty' ? 30_000
@@ -178,5 +179,5 @@
     });
   }
 
-  return Object.freeze({ version: 2, storageKey: STORAGE_KEY, create });
+  return Object.freeze({ version: 3, storageKey: STORAGE_KEY, create });
 });

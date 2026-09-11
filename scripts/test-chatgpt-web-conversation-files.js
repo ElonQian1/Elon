@@ -143,7 +143,7 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
       (...a) => receipts.push(a));
     await read(); await read();
     assert.equal(count, 1);
-    assert.deepEqual(receipts.map(r => r[2]), ['files_read_failed', 'files_read_cooldown']);
+    assert.deepEqual(receipts.map(r => r[2]), ['files_read_network', 'files_read_cooldown']);
   });
   await test('file read attaches download selection through the private owner without an extra request', async () => {
     const events = []; let count = 0;
@@ -173,7 +173,7 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
       const { transport, timers } = runtime(async () => response(payload)); const receipts = [];
       await transport.listConversationFiles('/c/test', 'mcp_x', () => assert.fail('no empty success'),
         (...args) => receipts.push(args));
-      assert.deepEqual(receipts, [['list_conversation_files', false, 'files_read_failed']]);
+      assert.deepEqual(receipts, [['list_conversation_files', false, 'files_read_parse']]);
       assert.equal(timers.size, 0);
     }
   });
@@ -187,6 +187,39 @@ const plain = (value) => JSON.parse(JSON.stringify(value));
     await read(); advance(10_001); await read();
     assert.equal(count, 2); assert.equal(events.length, 1);
     assert.deepEqual(receipts.map(r => r[1]), [false, true]);
+  });
+  await test('transient file failure allows one explicit retry after two seconds without auto replay', async () => {
+    for (const failure of ['network', 'timeout']) {
+      let count = 0; const receipts = []; const events = [];
+      const { transport, advance, timers } = runtime(async () => {
+        if (++count === 1) throw new Error(failure);
+        return response(fixture.input);
+      });
+      const read = () => transport.listConversationFiles('/c/test', 'mcp_recovery', e => events.push(e),
+        (...args) => receipts.push(args));
+      await read();
+      assert.equal(count, 1); assert.equal(timers.size, 0, 'no scheduled retry');
+      assert.equal(receipts[0][2], 'files_read_' + failure);
+      await read();
+      assert.equal(count, 1); assert.equal(receipts.at(-1)[2], 'files_read_cooldown');
+      advance(2001); await read();
+      assert.equal(count, 2); assert.equal(events.length, 1);
+      assert.equal(receipts.at(-1)[2], 'private_files_ready');
+      assert.equal(timers.size, 0);
+    }
+  });
+  await test('file failure receipts retain safe categories without exposing response text', async () => {
+    for (const [failure, expected] of [['http_401', 'files_identity_unavailable'],
+      ['http_403', 'files_identity_unavailable'], ['http_429', 'files_read_rate_limit'],
+      ['http_500', 'files_read_http'], ['invalid_json', 'files_read_parse'],
+      ['untrusted-response-content', 'files_read_network']]) {
+      const { transport, timers } = runtime(async () => {throw new Error(failure);});
+      const receipts = [];
+      await transport.listConversationFiles('/c/test', 'mcp_failure', () => assert.fail('no empty snapshot'),
+        (...args) => receipts.push(args));
+      assert.equal(receipts[0][2], expected);
+      assert.equal(timers.size, 0);
+    }
   });
   await test('domain dispatcher reuses file transport and preserves cancel/probe behavior', () => {
     const { window } = runtime(() => assert.fail('no fetch')); const calls = []; const receipts = [];

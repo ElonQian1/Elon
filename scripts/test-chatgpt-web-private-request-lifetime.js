@@ -209,16 +209,29 @@ test('timed-out project refresh cannot replace a later successful directory', as
   let calls = 0;
   const value = runtime(async () => ++calls === 1
     ? { ok: true, status: 200, text: () => late.promise }
-    : json({ items: [{ id: 'new-record', title: 'New fixture' }] }));
+    : json({ items: [{ id: 'new-record', title: 'New fixture', owner: null }], cursor: null }));
+  const headers = { Authorization: 'Bearer synthetic-directory-fixture' };
+  Object.assign(value.root, {
+    __elonChatGptDocumentToken: 'doc_directory_lifetime_fixture',
+    __elonChatGptPrivateTransport: {
+      copySameOriginRequestHeaders: () => headers,
+      acquireSameOriginRequestHeaders: async () => headers,
+    },
+    __elonChatGptPrivateDirectoryPages: require(path.join(assets, 'chatgpt_web_private_directory_pages.js')),
+    __elonChatGptPrivateDirectoryRefresh: require(path.join(assets, 'chatgpt_web_private_directory_refresh.js')),
+  });
   const context = { window: value.root, location: value.root.location, URL };
   vm.runInNewContext(fs.readFileSync(path.join(assets, 'chatgpt_web_private_conversation_directory.js'), 'utf8'), context);
   const directory = value.root.__elonChatGptPrivateConversationDirectory;
   const pending = directory.refreshProject('g-p-fixture');
-  assert.equal(pending, directory.refreshProject('g-p-fixture'));
-  await flush(); value.expire(); assert.equal(await pending, false);
+  const joined = directory.refreshProject('g-p-fixture');
+  await flush();
+  assert.equal(calls, 1, 'public result wrappers still share one underlying read');
+  value.expire();
+  assert.deepEqual(await Promise.all([pending, joined]), [false, false]);
   assert.equal(await directory.refreshProject('g-p-fixture'), true);
   const revision = directory.snapshot().revision;
-  late.resolve(JSON.stringify({ items: [{ id: 'stale-record', title: 'Stale fixture' }] }));
+  late.resolve(JSON.stringify({ items: [{ id: 'stale-record', title: 'Stale fixture', owner: null }], cursor: null }));
   await flush();
   assert.equal(directory.snapshot().revision, revision);
   assert.deepEqual(Array.from(directory.snapshot().conversations, x => x.id), ['new-record']);

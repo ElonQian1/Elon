@@ -65,6 +65,19 @@ account.recordFailure('network');
 assert.equal(policyModule.create({ enabled: true, now: () => now, storage,
   scope: 'account_read' }).snapshot().lastOutcome, 'network');
 assert.equal(policyModule.create({ enabled: true, now: () => now, storage }).snapshot().lastOutcome, 'timeout');
+for (const failure of ['network', 'timeout']) {
+  const userRead = policyModule.create({ enabled: true, now: () => now, scope: 'account_read' });
+  userRead.recordFailure(failure);
+  assert.equal(userRead.snapshot().cooldownRemainingMs, 2000,
+    'transient explicit reads permit a bounded manual retry, not a background-length lockout');
+  now += 2001;
+  assert.equal(userRead.snapshot().cooldownRemainingMs, 0);
+}
+for (const failure of ['auth', 'context', 'rate_limit', 'parse', 'http']) {
+  const protectedRead = policyModule.create({ enabled: true, now: () => now, scope: 'account_read' });
+  protectedRead.recordFailure(failure);
+  assert.ok(protectedRead.snapshot().cooldownRemainingMs >= 10000);
+}
 for (const status of [401, 403, 429]) {
   const shared = new MemoryStorage();
   const background = policyModule.create({ enabled: true, now: () => now, storage: shared });
