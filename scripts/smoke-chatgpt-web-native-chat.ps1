@@ -54,6 +54,20 @@ function Wait-ChatGptWebNativeProbeReply {
             Select-Object -Last 1
         $assistant = @($messages | Where-Object { [string]$_.role -eq "friend" }) |
             Select-Object -Last 1
+        $command = $state.social_chat.web_chat_last_send_command
+        $diagnostic = [ordered]@{
+            provider_state = [string]$state.social_chat.web_chat_state
+            composer_ready = $state.social_chat.web_chat_composer_ready -eq $true
+            streaming = $state.social_chat.web_chat_streaming -eq $true
+            message_count = $messages.Count
+            user_marker_matched = [string]$user.content -eq $Prompt
+            assistant_marker_matched = (ConvertTo-ChatGptWebNativeProbeText $assistant.content) -eq
+                (ConvertTo-ChatGptWebNativeProbeText $ExpectedReply)
+            assistant_text_length = ([string]$assistant.content).Length
+            command_action = [string]$command.action
+            command_ok = $command.ok
+            command_detail = ConvertTo-ChatGptWebSmokeSafeDiagnostic -Value $command.detail -MaxLength 160
+        }
         if (
             [string]$state.social_chat.web_chat_provider_id -eq "chatgpt_web" -and
             [string]$state.social_chat.web_chat_state -eq "ready" -and
@@ -66,7 +80,7 @@ function Wait-ChatGptWebNativeProbeReply {
         }
         Start-Sleep -Seconds $Runtime.poll_interval_sec
     } while ([DateTimeOffset]::UtcNow -lt $deadline)
-    throw "Timed out waiting for the ChatGPT Web AI probe reply."
+    throw "Timed out waiting for the ChatGPT Web AI probe reply: $($diagnostic | ConvertTo-Json -Compress)"
 }
 
 if (-not $SendProbe -and ($ProbeMarker -or $Prompt -or $ExpectedReply)) {

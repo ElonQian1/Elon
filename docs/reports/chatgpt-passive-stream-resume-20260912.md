@@ -2,7 +2,8 @@
 
 Capability: `android_chatgpt_passive_stream_resume_v1`.
 Code: implemented, enabled with the existing private stream observer.
-Verification: offline verified; APK and device evidence pending.
+Verification: offline verified and published/installed; live sending acceptance
+failed before resume coverage could be established. Do not mark device verified.
 This is passive observation of an official request, not an Android HTTP sender.
 
 ## Evidence and scope
@@ -45,7 +46,7 @@ The new regression suite reproduced both failures before the change.
   with tap 3 on the next normal document load; ordinary observation still works.
 - Page adapter 360 loads the revised assets through existing assembly.
 
-## Verification
+## Offline verification
 
 Twelve focused Node test files pass (258 tests), including 26 continuation cases
 and 15 reader-interruption/ownership cases. Coverage includes repeated resumes,
@@ -62,3 +63,39 @@ Live network interruption/resumption has not yet been observed for this change.
 Synthetic tests do not establish server resume timing or independent POST
 viability. Do not declare the broader private-sending goal completed from this
 observer improvement, or disable VPN to manufacture acceptance evidence.
+
+## Normal APK and device checkpoint
+
+- APK `1.1.1679` / code `1679`, adapter `360`, source
+  `66122dcf3ee6a65b12c025a1ea29d25a3fd14ac1`.
+- SHA-256 `1daaf5851a7334ca689de343d7d5b80b78426ffe2556566f958b0ebe01ccbe80`.
+- Release log `chatgpt-stream-resume-release-20260912-064205-776` passed in
+  458.4 seconds; Gradle completed in 6m39s. Normal `com.elon.app` updated in place
+  over wireless ADB; package version independently checked. No data/login reset.
+- Production `social_ai` bound with adapter 360, authenticated and composer
+  ready, native/official draft lengths zero and streaming false before testing.
+- First native send probe `chatgpt-stream-resume-native-1679-20260912-065032-414`
+  failed its 90-second reply condition; the runner completed restoration.
+  Its original timeout did not retain enough send diagnostics to classify it.
+- One distinct diagnostic probe, not a replay of the first send,
+  `chatgpt-stream-send-diagnostic-1679-20260912-065836-776`, also failed. Final
+  diagnostics: ready/composer-ready, streaming false, 3 native messages,
+  user-marker matched, assistant-marker not matched, assistant text length 4.
+  The send receipt succeeded through DOM with `template_unavailable` and
+  `runtime_not_observed`. This is not evidence that a private resume succeeded.
+- The native smoke now includes bounded non-content failure diagnostics before
+  restoration clears the send receipt. Its contract check passes.
+- Read-only `runtime_assets` returned a truncated 96-file manifest containing
+  `c2675c8c-o59yc0xo7p9m3q3o.js`, but not the recognized composer/conversation/shared
+  role names (which the collector prioritizes). `document_state` was complete,
+  with one visible editable prompt, one form and no incomplete collection.
+  This supports a runtime-discovery investigation, not a proven new export map
+  or a conclusion that network connectivity is universally healthy.
+- Fetching that public asset from the PC failed to connect within 25 seconds.
+  No guessed profile was enabled. Reuse the native protocol probe and public
+  asset analysis on the next batch; do not repeat the completed Canvas case.
+
+The original conversation and awake setting were restored by both runners;
+subsequent canonical state was ready, streaming false, dictation false and
+empty input. Remaining priority is current official runtime discovery and
+normal native send/reply acceptance, then a genuine resume sample if available.

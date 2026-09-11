@@ -28,6 +28,10 @@ a functional acceptance gate; do not expand performance tests in this phase.
 
 ## Current Status Map
 
+1679 installs [stream-resume repair](reports/chatgpt-passive-stream-resume-20260912.md)
+(258 offline checks). Native send failed with `runtime_not_observed`; resolve
+current runtime discovery before Google. No device pass is claimed.
+
 1666 retains the [1662 grouped source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence).
 Its first inventory run had one timeout, retaining cached rows. One targeted retry
 passed: three taps joined one 1077 ms read, without replacing the sheet or overlap.
