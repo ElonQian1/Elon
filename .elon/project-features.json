@@ -1873,15 +1873,15 @@
         },
         {
           "path": "docs/android-binance-protection-v3-delivery.md",
-          "content_hash": "0f4e4ffbb19f03ed03b35ea187d88f29327cbbecddad50c977a5e149a72f1534",
+          "content_hash": "7f13a6650fb72a01f75941c58ec3cafac2d3e6618360f00d2d0f6ce5a0dd2c4d",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "51291b2f6ab4e668491d7d7f216df8712db92605",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "1866592bf6c1853460455ce323fe5aa070b70c5c",
-            "state": "untracked"
+            "head_commit": "e692a52fa8ec21892645fe0b53dfb91bac02831b",
+            "head_blob_oid": "1866592bf6c1853460455ce323fe5aa070b70c5c",
+            "worktree_blob_oid": "8edaa189d55273284bdbcdbe988f524498db1bbb",
+            "state": "tracked_modified"
           }
         },
         {
@@ -1925,7 +1925,7 @@
         }
       ],
       "created_at_ms": 1789087391199,
-      "updated_at_ms": 1789091135399
+      "updated_at_ms": 1789091628448
     },
     {
       "id": "android-binance-read-context-recovery-v1",
@@ -25297,16 +25297,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_49f8a40145ea4c8489d787f94d0c3257",
-      "feature_id": "esk-sui-testnet-publication-preflight-v1",
-      "action": "transitioned",
-      "actor": "codex-sui-preflight",
-      "reason": "本地验证与远端 ESK Sui Move 作业均通过，证据当前。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788664030994
-    },
-    {
       "id": "feature_event_2ac0584b55634adb8b79409eadb03750",
       "feature_id": "esk-sui-testnet-publication-preflight-v1",
       "action": "transitioned",
@@ -27295,6 +27285,16 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1789091135399
+    },
+    {
+      "id": "feature_event_ab0a95e32dd24eb88d21aeca3be833cd",
+      "feature_id": "android-binance-protection-v3",
+      "action": "evidence_recorded",
+      "actor": "codex-grid",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789091628448
     }
   ]
 }
