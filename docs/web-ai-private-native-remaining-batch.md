@@ -28,9 +28,9 @@ a functional acceptance gate; do not expand performance tests in this phase.
 
 ## Current Status Map
 
-The [September 11 compatibility and citation fixes](reports/chatgpt-runtime-bindings-20260911.md)
-are released and device-verified: native runtime send on 1650; personal TXT
-citation download with exact saved bytes on 1651. Reuse these scoped results.
+The [latest runtime compatibility repair](reports/chatgpt-runtime-bindings-20260911-b.md)
+is device-verified on 1655: one project runtime send/reply. Personal TXT citation
+saved bytes passed on 1651; project citation metadata still returns 404.
 
 This summary supersedes older delivery labels below; it does not broaden a
 passed scope. Bounded ordinary/project directory continuation is now completed,

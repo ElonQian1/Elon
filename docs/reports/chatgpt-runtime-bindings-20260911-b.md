@@ -2,7 +2,8 @@
 
 Capability: `android_chatgpt_private_runtime_bindings_v1`, resolver 14,
 adapter 337. Repair of an observed compatibility regression, not a new sender.
-Device verification of the new profile remains pending.
+Normal 1655 is released and device-verified for one project runtime send/reply.
+Project citation download remains failed; the two outcomes are separate.
 
 ## Evidence and boundaries
 
@@ -62,9 +63,40 @@ runtime tokens, request headers or conversation contents.
 - Adjacent submit/stop/model/tool/temporary/attachment/citation tests: 477 passed.
 - Reusable analyzer: 5 tests passed, including preserved literals/property keys,
   ambiguous stores, repeated assignments and refusal of external/traversal imports.
-- Updated citation acceptance contract parses and passes. Android release and
-  native post-install verification follow separately; source tests are not a
-  successful provider request.
+- Updated citation acceptance contract parses and passes. Source tests alone
+  are not a successful provider request; installed evidence follows below.
+
+## Normal 1655 acceptance
+
+- Released source: `faf63a381de47fed9a060ac4d28a713f7e0471d4`.
+- APK: `v1.1.1655` (1655), adapter 337; server distribution
+  `/app/ElonSpeed-latest.apk`. Verified SHA-256:
+  `bcfb393ac3c68712d32d390b64a91957eec7f900fbd697d2cecb90403b3f4f95`.
+- Release completed in 391.4 seconds. The whitelisted Xiaomi received an
+  unattended in-place install over wireless ADB; no data or identity reset.
+- First directory check stopped at stale cache without a send or download.
+  Subsequent background checks overlapped a foreground switch to WeChat.
+  APK network probes returned ChatGPT 200 / Google 204. On returning to the
+  production surface, the existing private directory command completed with
+  `source=official_private`, `stale=false`; this was not missing capability.
+- The first fixed runtime probe was interrupted by navigation to the home
+  surface. Read-only reconciliation confirmed exactly one probe and completed
+  reply in the synthetic project. Its Markdown-escaped underscores required
+  normalization in the acceptance matcher. The send receipt was no longer
+  retained after leaving the surface, so that run did not prove transport.
+- Only after reconciling that completed request, a distinct fixed probe was
+  sent once. Native `send_input` reported `official_runtime_v1:accepted`, and
+  the native transcript received the exact marker in the same project.
+  One new user turn, completed reply, home restoration and awake restoration
+  all passed. Submit-to-completed-reply time was 16,151 ms, not first-token
+  latency. This validates the native command path, not physical button pixels.
+
+Evidence logs: `runtime-sep11b-release-20260911-103844-318`,
+`project-runtime-1655-readback-20260911-110638-828`, and
+`project-runtime-1655-receipt-20260911-110754-542`. The interrupted probe was not
+blindly replayed. Its final readback and the distinct accepted probe remain in
+the isolated synthetic project; no private contents were exported. Reuse this
+compatibility result, without broadening it to independent Android HTTP POST.
 
 ## Project citation remains separate
 
@@ -74,6 +106,13 @@ Its actual Download action failed at `GET /backend-api/files/{id}/simple` with
 HTTP 404, before file authorization or saving bytes. Evidence:
 `project-citation-existing-1654-ui-20260911-102854-879`; one download attempt,
 zero sends, original state restored. This is not a completed project download.
+
+Normal 1655 repeated only the native Download action on the existing citation:
+zero sends/uploads, five indexed files, one assistant reference, one download.
+The same metadata request returned 404 and `download_file_unavailable`;
+no bytes were saved. Conversation and awake state were restored. Evidence:
+`project-citation-1655-ready-ui-20260911-105839-044`. Keep this scope failed,
+not completed or resolved by the runtime compatibility change.
 
 Current public `98ca14f9-e91ouw2dmvxxzxzk.js` still calls shared `uDt` (`$p`)
 for metadata before URL resolution. Its query keeps file, conversation and
