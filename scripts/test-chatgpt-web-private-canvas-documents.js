@@ -183,8 +183,11 @@ test('a website draft created during POST survives; native confirmation does not
 
 test('native save confirmation is not blocked by website query refetch completion', async () => {
   const f = fixture(), read = await f.list(), original = f.page.__elonChatGptPrivateRuntimeBindings.load;
-  f.page.__elonChatGptPrivateRuntimeBindings.load = async role => role === 'shared' ?
-    { canvasQueryClient: () => ({ invalidateQueries: () => new Promise(() => {}) }) } : original(role);
+  f.page.__elonChatGptPrivateRuntimeBindings.load = async role => {
+    const value = await original(role);
+    return role === 'shared' ? { canvasQueryClient: () => ({ ...value.canvasQueryClient(),
+      invalidateQueries: () => new Promise(() => {}) }) } : value;
+  };
   assert.equal((await f.save(read.ticket)).code, 'canvas_saved');
 });
 

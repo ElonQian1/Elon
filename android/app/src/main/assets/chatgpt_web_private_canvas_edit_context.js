@@ -1,26 +1,38 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateCanvasEditContext = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
   'use strict';
   const fail = code => { throw Error('canvas_' + code); };
+  let retained;
 
   async function capture(binding, id) {
     const bindings = page.__elonChatGptPrivateRuntimeBindings;
     if (!bindings?.observed('conversation') || !bindings.observed('shared')) fail('runtime_unavailable');
-    const [conversation, shared] = await Promise.all([bindings.load('conversation'), bindings.load('shared')]);
+    const [conversation, shared, react] = await Promise.all([
+      bindings.load('conversation'), bindings.load('shared'), bindings.load('react')]);
     if (!options.current(binding)) fail('context_changed');
-    if (typeof conversation?.canvasEdits?.getState !== 'function' || typeof shared?.canvasQueryClient !== 'function') {
+    if (typeof page.__elonChatGptPrivateCanvasEditObserver?.create !== 'function' ||
+        typeof shared?.canvasQueryClient !== 'function') {
       fail('runtime_unavailable');
     }
-    // Z0 is a session-scoped singleton getter, not React's useQueryClient hook.
+    // A session-scoped singleton getter, not React's useQueryClient hook.
     const client = shared.canvasQueryClient();
     if (!client || typeof client.invalidateQueries !== 'function') fail('runtime_unavailable');
     const profile = bindings.state?.().profile_id;
     if (!profile) fail('runtime_unavailable');
-    const context = { binding, id, edits: conversation.canvasEdits, client, bindings, profile };
+    const same = retained && retained.client === client && retained.profile === profile &&
+      retained.binding.document === binding.document && retained.binding.token === binding.token &&
+      retained.binding.account === binding.account;
+    if (!same) {
+      retained?.observer.dispose();
+      retained = { binding, client, profile,
+        observer: page.__elonChatGptPrivateCanvasEditObserver.create(page, react, conversation, client) };
+    }
+    const observer = retained.observer;
+    const context = { binding, id, observer, client, bindings, profile };
     check(context);
     return context;
   }
@@ -33,12 +45,7 @@
         snapshot.dictationCaptureActive || snapshot.dictationCapturePending ||
         page.__elonChatGptPrivateConversationDelete?.busy?.() ||
         page.__elonChatGptPrivateConversationMutation?.state?.().state === 'busy') fail('conversation_busy');
-    const state = context.edits.getState();
-    if (!state?.userEdits || !state.timestamps) fail('runtime_unavailable');
-    const edits = state.userEdits[context.id] ?? [], time = state.timestamps[context.id];
-    if (!Array.isArray(edits) || edits.some(edit => !edit || typeof edit.isPending !== 'boolean') ||
-        time && ['lastTriggeredAt', 'lastFlushedAt'].some(key => time[key] !== null && !Number.isFinite(time[key]))) fail('runtime_unavailable');
-    if (edits.some(edit => edit.isPending) || time && (time.lastTriggeredAt ?? 0) > (time.lastFlushedAt ?? 0)) fail('web_edit_pending');
+    context.observer.check(context.id);
   }
 
   async function reconcile(context, kind = 'document') {
@@ -52,5 +59,5 @@
     } catch (_) { return false; }
   }
 
-  return Object.freeze({ version: 1, capture, check, reconcile });
+  return Object.freeze({ version: 2, capture, check, reconcile });
 });
