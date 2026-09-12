@@ -43,7 +43,26 @@ Other contexts retain the established sender before any independent dispatch.
 The page-local `__elonChatGptFreshTextDispatchEnabled = false` remains an explicit
 kill switch; disabling the existing private transaction flag also disables this
 path. An explicit trial can override only the former for one owned command.
-Publication/default-without-trial verification is recorded after the release.
+### Default Release
+
+- APK **1.1.1696** / code **1696**, source
+  `199a3af746b87f4e749223b4f8d6cea6f44eab7b`, is published and installed on the
+  existing Xiaomi with an in-place update. Published metadata was independently
+  checked; APK SHA-256:
+  `406b258451dabc70c450e26f915221222ed73b4a664bbe9df86a621eafac99af`.
+- Release build, Android release checks and publication passed in
+  `fresh-text-default-release-20260913-072906-426`. The optional automatic
+  worktree-cleanup warning did not affect publication or verified installation;
+  the required task finish remains a separate operation.
+- `fresh-text-default-native-1696-20260913-073724-222` passed with
+  `-UseDefault -FirstOnly`: no experimental permit, one native send click, no
+  new seed, one unique user turn, matching reply, 21 delivery events and confirmed
+  terminal history. The owner completed with `pending=false`; original
+  conversation/draft and screen-awake setting were restored.
+- The observed reply was at 9.2 seconds and the whole send case at 14.9 seconds,
+  including semantic UI automation and MCP polling. This verifies default
+  routing, not a network-TTFT or thermal improvement claim. The accepted first,
+  follow-up and stop cases above were not expanded or repeated unnecessarily.
 
 ## Controlled Production Acceptance
 
