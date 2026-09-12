@@ -28,16 +28,15 @@ a functional acceptance gate; do not expand performance tests in this phase.
 
 ## Current Status Map
 
-[1681](reports/chatgpt-runtime-bindings-20260912.md) passed native send/reply.
-Canvas [text exports](reports/chatgpt-canvas-text-export-20260912.md)
-link AI/comment/PDF evidence; original editor device acceptance is pending.
+[1682](reports/chatgpt-canvas-provider-boundary-1682.md) is published/installed.
+Canvas listing passed; the current model declined new Canvas creation, consistent
+with the linked official retirement notice. Preserve old-document support; stop
+repeating creation prompts. Original writes/exports need an owned sample, not
+more rebuilds. Writing Blocks are a separate current-product audit, not accepted.
 
-1666 retains the [1662 grouped source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence).
-Its first inventory run had one timeout, retaining cached rows. One targeted retry
-passed: three taps joined one 1077 ms read, without replacing the sheet or overlap.
-Project TXT native download again saved the expected 78 bytes. Reuse these cases;
-supplemental/PCA and URL-only cloud samples remain unverified. The older unlock,
-build and overlap-check prerequisites are no longer current.
+Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
+three taps joined one 1077 ms read; native TXT saved 78 bytes. Supplemental/PCA
+and URL-only cloud samples remain unverified; old setup blockers are stale.
 
 This map supersedes historical labels below without broadening passed scopes.
 Reuse [directory continuation on 1611](reports/chatgpt-directory-owned-continuation-20260909.md),
@@ -64,7 +63,7 @@ Raster deletion is offline-only; [project raster reference/removal is accepted o
 | Pin, rename, archive, move conversation to a project | Device-verified, reused | Other account/permission variants are not implied |
 | Ordinary new-chat text + PNG + PDF attachments | Completed on 1598 | Project/temporary/other-format variants remain separate |
 | File library navigation, saved download, single library attachment, rename/soft-delete/upload-copy | Earlier scopes through 1591 reused; native TXT/PNG/PDF Download buttons and saved bytes passed on 1612 | [Mounted catalogue download](chatgpt-private-library-mounted-download.md) (244 checks) and [mounted attachment preparation](chatgpt-private-mounted-library-attachment.md) (196 checks) are included in installed 1639; device acceptance pending. Large-transfer/cancel/crash cases, other special sources, folder writes and attachment scopes remain |
-| Personal sharing/list/revoke and deletion | Reuse [1644](reports/chatgpt-private-acceptance-1644.md), [Canvas 1673](reports/chatgpt-canvas-shared-links-20260911.md). [1677](reports/chatgpt-canvas-production-1675-20260912.md) passed native shared source/return and fixed landscape menu clipping | Original fixture missing; editor/writes, disposable revoke, workspace/post/bulk and pagination pending |
+| Personal sharing/list/revoke and deletion | Reuse [1644](reports/chatgpt-private-acceptance-1644.md), [Canvas 1673](reports/chatgpt-canvas-shared-links-20260911.md) and [1677 source/return](reports/chatgpt-canvas-production-1675-20260912.md) | Original Canvas sample unavailable; no creation retries on the current model. Editor/writes, disposable revoke and other sharing scopes remain unverified |
 | Text submit/stream/stop/follow-up | Official runtime send reused; ordinary authenticated native retry completed/default-enabled on 1644, adapter 327/resolver 12 | [Actual native retry passed](reports/chatgpt-regeneration-store-20260911.md#normal-1644-acceptance): one invocation, successful runtime receipt, streaming and changed completed content, original user turn/conversation/awake state restored. Reuse the accepted identity/store confirmation and 1642 transcript reentry fixes. Independent Android POST, other reply contexts, passive stream-capture gaps and measured first-word timing remain unresolved |
 | Project attachments | Native TXT/PNG/PDF upload/send/content reading passed on 1614; read-isolation fix is installed and file-index verified on 1649 | Idle membership query itself is not separately device-verified; do not rebuild or repeat file-index acceptance for it |
 | Model/effort/tool combinations | Reuse [models and Image/Search](reports/chatgpt-composer-state-20260910.md). [Instant native roundtrip passed on 1673](reports/chatgpt-tool-admission-20260912.md) | Study/Canvas absent in raw hints for both tested levels, not our filtering; neither tool accepted. Other contexts, preference persistence and full Canvas editing remain |
@@ -72,15 +71,9 @@ Raster deletion is offline-only; [project raster reference/removal is accepted o
 | Explicit file citations / cloud references | Personal/project TXT Download completed on 1651/1657; grouping, context/PCA and URL-only source links published in 1662, with 42 Kotlin tests and ordinary inventory/download device regression | [Evidence](chatgpt-private-context-source-files.md). Actual supplemental/PCA masks and URL-only source opening remain unverified; no further build is needed just to accept them |
 | Google private sender | Deferred by user priority | Start only after the remaining ChatGPT acceptance gate |
 
-Current code correction separates current-document navigation/private directory
-access from composer readiness. Sending, attachment submission and new-chat
-confirmation keep their existing gates. Current investigation and delivery
-evidence are in [the project readiness report](reports/chatgpt-project-media-acceptance-20260909.md).
-
-The [library attachment deadline correction](chatgpt-private-library-attachment-deadline.md)
-aligns page-operation/native-receipt/UI budgets and prevents late publication.
-202 Node and 8 JVM checks passed; the correction is included in normal
-1632/1634/1635. Slow mounted-file device acceptance remains pending.
+Reuse [operation readiness](reports/chatgpt-project-media-acceptance-20260909.md)
+and [aligned attachment deadlines](chatgpt-private-library-attachment-deadline.md)
+(202 Node/8 JVM checks; installed 1632-1635). Slow mounted-file acceptance remains.
 
 [Library append](chatgpt-private-library-append.md) reuses the private attachment
 owner for consecutive Library files and Library files after a local-upload batch,
