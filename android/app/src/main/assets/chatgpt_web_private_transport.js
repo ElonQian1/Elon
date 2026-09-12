@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 31) ||
+  if ((existingTransport && Number(existingTransport.version) >= 32) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -19,6 +19,7 @@
   const privateConversationDirectory = window.__elonChatGptPrivateConversationDirectory;
   const delegateFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
   let privateFetchDepth = 0;
+  let writingRuntimePrimed = '';
 
   function optionalSessionStorage() {
     try {
@@ -391,6 +392,13 @@
     }
     owner.recordSuccess(result.elapsedMs);
     recordPrivateOutcome('success', messages.length, result.elapsedMs);
+    const bindings = window.__elonChatGptPrivateRuntimeBindings;
+    const token = window.__elonChatGptDocumentToken;
+    if (bindings?.state?.().profile_id === 'web_20260912' && token && writingRuntimePrimed !== token &&
+        messages.some(message => message.content?.some(part => part.type === 'writing_block'))) {
+      writingRuntimePrimed = token;
+      try { bindings.load('shared').catch(() => {}); } catch (_) {}
+    }
     emitEvent({
       type: 'message_snapshot',
       snapshotScope: 'content',
@@ -582,7 +590,7 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 31,
+    version: 32,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,

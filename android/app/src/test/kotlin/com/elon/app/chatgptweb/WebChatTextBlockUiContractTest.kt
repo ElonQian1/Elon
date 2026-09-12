@@ -25,4 +25,16 @@ class WebChatTextBlockUiContractTest {
         assertTrue(source.contains("imageTintList = android.content.res.ColorStateList("))
         assertTrue(source.contains("intArrayOf(status.currentTextColor,"))
     }
+
+    @Test fun verifiedCloudSaveTakesPrecedenceOverTheEarlierExportOfTheSameBody() {
+        val source = editor()
+        val pending = source.indexOf("cloud?.pending == true ->")
+        val saved = source.indexOf("cloud?.savedToCloud == true && cloud.ready && !cloud.busy && !changed ->")
+        val exported = source.indexOf("exported == body.text.toString() ->")
+        assertTrue(pending >= 0 && pending < saved && saved < exported)
+        val session = File("src/main/kotlin/com/elon/app/WebChatTextBlockCloudSession.kt").readText()
+        assertTrue(session.contains("var savedToCloud = false; private set"))
+        assertTrue(session.contains("receipt.detail == \"writing_saved\" && !pending"))
+        assertTrue(session.contains("savedContent = content; savedToCloud = true; submitted = null"))
+    }
 }

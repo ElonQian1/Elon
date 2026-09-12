@@ -348,4 +348,21 @@ assert.equal(messages.messageContent(withStatus, 'assistant'), 'Visible answer')
   child.closestMap['[data-testid^="conversation-turn-"]'] = new ElementNode();
   assert.equal(messages.readMessageWindow(false).messages[0].id, 'conversation-turn-0', 'quoted child turn cannot own the outer message');
 }
+{
+  const turn = new ElementNode('', { attributes: { 'data-message-author-role': 'assistant', 'data-message-id': 'writing-owner' },
+    candidates: [new ElementNode('Old rendered body')] });
+  context.document.querySelector = selector => selector === 'main' ? { querySelectorAll: () => [turn] } : null;
+  let reads = 0;
+  context.window.__elonChatGptTextBlocks = { runtimeProjection(_, id) {
+    assert.equal(id, 'writing-owner'); reads++;
+    return { text: 'Current writing body', parts: [{ type: 'writing_block', textBlock: { content: 'Current writing body' } }] };
+  } };
+  const value = messages.readMessageWindow(false).messages[0];
+  assert.equal(value.content[0].text, 'Current writing body');
+  assert.equal(value.content.filter(p => p.type === 'writing_block').length, 1);
+  assert.equal(reads, 1);
+  assert.equal(messages.readMessageWindow(true).messages[0].content[0].text, 'Old rendered body');
+  assert.equal(reads, 1, 'streaming DOM must not be overwritten by the completed runtime message');
+  delete context.window.__elonChatGptTextBlocks;
+}
 console.log('CHATGPT_COMPOSITE_ANSWER_EXTRACTION=passed');

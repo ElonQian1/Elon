@@ -127,3 +127,29 @@ test('typed writing widgets work without a textual wrapper and unrelated widgets
   assert.equal(stream.mergeMessages([], frame)[0].content.find(p => p.type === 'writing_block').textBlock.content, 'Original');
   assert.equal(history.project({ messages: [input] })[0].content[0].type, 'writing_block');
 });
+
+test('DOM snapshots reuse current structured writing state without imports, requests or composer access', () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  const input = message(':::writing{id="x" variant="standard"}\nOld\n:::\n```js\nlet x;\n```',
+    { writing_blocks: { x: { content: 'Current\n', variant: 'standard' } } });
+  const owner = { id: 'client', serverId$: () => id };
+  const page = { location: { href: 'https://chatgpt.com/c/' + id }, __elonChatGptDocumentToken: 'doc_owner',
+    __elonChatGptPrivateConversationShareContract: { create: () => ({ identity: () => 'account' }) },
+    __elonChatGptPrivateRuntimeBindings: { state: () => ({ profile_id: 'web_20260912' }),
+      peek(role) { assert.equal(role, 'shared'); return { canvasConversations: () => [owner],
+        XM(key) { assert.equal(key, 'client'); return {}; }, HM: { getNodeIfExists: (_, key) => ({ message: key === input.id ? input : null }) } }; },
+      load() { assert.fail('render cannot import'); } },
+    fetch() { assert.fail('render cannot fetch'); } };
+  const before = JSON.stringify(input);
+  const value = blocks.runtimeProjection(page, input.id);
+  assert.deepEqual(value.parts.map(part => part.type), ['writing_block', 'code']);
+  assert.equal(value.parts[0].textBlock.content, 'Current\n');
+  assert.equal(JSON.stringify(input), before);
+  assert.equal(blocks.runtimeProjection(page, 'other'), null);
+  input.status = 'in_progress'; assert.equal(blocks.runtimeProjection(page, input.id), null);
+  input.status = 'finished_successfully';
+  page.location.href += '?temporary-chat=true'; assert.equal(blocks.runtimeProjection(page, input.id), null);
+  page.location.href = 'https://chatgpt.com/c/' + id;
+  page.__elonChatGptPrivateRuntimeBindings.state = () => ({ profile_id: 'unknown' });
+  assert.equal(blocks.runtimeProjection(page, input.id), null);
+});

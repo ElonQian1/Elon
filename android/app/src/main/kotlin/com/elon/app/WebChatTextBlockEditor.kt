@@ -110,6 +110,7 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
             saving -> "正在导出"
             !block.complete -> "未完整 · 只读"
             cloud?.pending == true -> cloud.status
+            cloud?.savedToCloud == true && cloud.ready && !cloud.busy && !changed -> cloud.status
             exported == body.text.toString() -> "副本已导出"
             changed -> if (cloud != null) "修改未保存到官网" else "副本未导出"
             cloud?.busy == true || cloud != null && !cloud.ready -> cloud.status

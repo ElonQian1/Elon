@@ -95,7 +95,7 @@ function createContext(
   vm.runInNewContext(policySource, context, {
     filename: 'chatgpt_web_private_transport_policy.js'
   });
-  for (const asset of ['chatgpt_web_private_history_projection.js', 'chatgpt_web_private_delta_document.js', 'chatgpt_web_private_stream_policy.js']) {
+  for (const asset of ['chatgpt_web_text_blocks.js', 'chatgpt_web_private_history_projection.js', 'chatgpt_web_private_delta_document.js', 'chatgpt_web_private_stream_policy.js']) {
     vm.runInNewContext(fs.readFileSync(path.join(
       __dirname, '..', 'android', 'app', 'src', 'main', 'assets', asset
     ), 'utf8'), context, { filename: asset });
@@ -138,7 +138,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 31);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 32);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -150,7 +150,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 31);
+  assert.equal(transport.version, 32);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
@@ -387,6 +387,28 @@ const detailPayload = {
   assert.equal(coldMembershipReads[1].options.method, 'GET');
   assert.equal(coldMembershipReads[1].options.body, undefined);
   assert.equal(explicitReader.conversationPrefetchReady(), false);
+
+  const writingPayload = JSON.parse(JSON.stringify(detailPayload));
+  writingPayload.mapping['assistant-node'].message.content = { content_type: 'text',
+    parts: [':::writing{id="writing" variant="standard"}\nSynthetic body\n:::'] };
+  const writingContext = createContext(async () => jsonResponse(writingPayload), false, true, new MemoryStorage(), [], {
+    canAcquire: () => true, acquireRequestHeaders: async () => ({ Authorization: 'synthetic-writing' })
+  });
+  let writingImports = 0;
+  writingContext.window.__elonChatGptDocumentToken = 'doc_writing';
+  writingContext.window.__elonChatGptPrivateRuntimeBindings = {
+    state: () => ({ profile_id: 'web_20260912' }),
+    load(role) { assert.equal(role, 'shared'); writingImports++; return new Promise(() => {}); }
+  };
+  const writingEvents = [];
+  const writingReader = writingContext.window.__elonChatGptPrivateTransport;
+  assert.equal(writingReader.prefetchConversation('/c/writing-chat', event => writingEvents.push(event)), true);
+  await flush();
+  assert.equal(writingEvents.length, 1, 'an unresolved module import cannot block the private body');
+  assert.equal(writingImports, 1);
+  assert.equal(writingReader.prefetchConversation('/c/writing-chat', event => writingEvents.push(event)), true);
+  await flush();
+  assert.equal(writingEvents.length, 2); assert.equal(writingImports, 1, 'prime once per document, not once per DOM poll');
 
   let membershipNow = Date.now();
   class MembershipClock extends Date { static now() { return membershipNow; } }

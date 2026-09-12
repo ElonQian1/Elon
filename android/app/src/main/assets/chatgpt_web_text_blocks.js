@@ -153,5 +153,26 @@
     return block('code', 'code-' + index, '', language, content, true);
   }
 
-  return { version: 1, project, domCode, MAX_CONTENT };
+  function runtimeProjection(page, messageId) {
+    try {
+      const url = new URL(page.location.href), id = /^\/c\/([a-f0-9-]{36})$/.exec(url.pathname)?.[1];
+      const bindings = page.__elonChatGptPrivateRuntimeBindings;
+      if (url.origin !== 'https://chatgpt.com' || !id || url.search || url.hash ||
+          !/^doc_[a-z0-9_]{3,80}$/.test(page.__elonChatGptDocumentToken || '') ||
+          bindings?.state?.().profile_id !== 'web_20260912' ||
+          !page.__elonChatGptPrivateConversationShareContract?.create(page).identity()) return null;
+      // Only read an already loaded, reviewed module. Rendering must never fetch or wait.
+      const shared = bindings.peek('shared');
+      const owners = shared?.canvasConversations?.().filter(item => item?.serverId$?.() === id) || [];
+      if (owners.length !== 1) return null;
+      const message = shared.HM.getNodeIfExists(shared.XM(owners[0].id), messageId)?.message;
+      if (message?.id !== messageId || message.author?.role !== 'assistant' ||
+          !/^(finished_successfully|completed|finished)$/.test(message.status || '')) return null;
+      const value = project(message);
+      return value?.parts.some(part => part.type === 'writing_block') &&
+        value.parts.every(part => part.textBlock?.complete === true) ? value : null;
+    } catch (_) { return null; }
+  }
+
+  return { version: 1, project, domCode, runtimeProjection, MAX_CONTENT };
 });

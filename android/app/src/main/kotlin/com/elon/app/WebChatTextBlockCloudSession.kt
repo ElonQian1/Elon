@@ -20,6 +20,7 @@ internal class WebChatTextBlockCloudSession(
     var pending = false; private set
     var ready = false; private set
     var savedContent = block.content; private set
+    var savedToCloud = false; private set
     var status = "官网尚未核对"; private set
 
     fun prepare() {
@@ -70,7 +71,7 @@ internal class WebChatTextBlockCloudSession(
                     pending = value.pending
                     if (receipt.detail == "writing_saved" && !pending) {
                         val content = submitted
-                        if (content != null) { savedContent = content; submitted = null; finish("已保存到官网", true) }
+                        if (content != null) { savedContent = content; savedToCloud = true; submitted = null; finish("已保存到官网", true) }
                         else finish("官网已更新，请重新打开原文", false)
                     } else if (receipt.detail == "writing_ready" && !pending) finish("官网已核对", true)
                     else finish(if (receipt.detail == "writing_saved_sync_pending") "已写入官网，页面同步待核对" else "保存结果待核对", false)

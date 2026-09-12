@@ -503,14 +503,22 @@
       const role = messageRole(node);
       const content = messageScope(node);
       const richParts = role === 'assistant' && richContent ? richContent.parts(content) : [];
-      const text = messageContent(node, role);
-      const parts = richParts.concat(structuredParts(content));
+      let text = messageContent(node, role);
+      let parts = richParts.concat(structuredParts(content));
       richParts.forEach((part) => lastStructuredTypes.add(part.type));
       if (richParts.length) lastComplexOutput = true;
       const globalIndex = startIndex + index;
       const baseId = messageIdentity(node, role, globalIndex);
       const id = seen.has(baseId) ? baseId + '-' + globalIndex : baseId;
       seen.add(id);
+      const canonical = !streaming && role === 'assistant' && id === baseId &&
+        window.__elonChatGptTextBlocks?.runtimeProjection?.(window, id);
+      if (canonical) {
+        text = canonical.text.slice(0, MAX_MESSAGE_LENGTH);
+        parts = parts.filter(part => !['code', 'writing_block'].includes(part.type)).concat(canonical.parts);
+        canonical.parts.forEach(part => lastStructuredTypes.add(part.type));
+        lastComplexOutput = true;
+      }
       return {
         id,
         role,
