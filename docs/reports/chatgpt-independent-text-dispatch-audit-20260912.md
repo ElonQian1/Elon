@@ -2,6 +2,9 @@
 
 Date: 2026-09-12. Investigation against main `85b7bdd9a`, adapter 364.
 This report does not mark independent private POST implemented or device-verified.
+Subsequent source work and its remaining acceptance gaps are tracked in
+[Fresh Text Dispatch](../chatgpt-fresh-text-dispatch.md); this dated audit remains
+the evidence baseline, not a claim that the implementation is still only a plan.
 
 ## Conclusion
 

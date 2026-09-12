@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptTextTransactionOrchestrator;
-  if (existing && Number(existing.version) >= 7) return;
+  if (existing && Number(existing.version) >= 8) return;
 
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
@@ -163,11 +163,44 @@
       return { handled: true, code: '' };
     }
 
-    function sendPrompt(value, expectedDraft, respond, allowPrivateTextTransaction) {
+    function tryFreshSend(composer, value, expectedDraft, respond, fallback) {
+      const fresh = window.__elonChatGptFreshTextTransaction;
+      if (!fresh) return false;
+      const transaction = fresh.send({
+        prompt: value, expectedDraft, composer, requestId: respond.requestId || '',
+        readDraft: () => options.composerValue(composer),
+        clearDraft: () => options.setComposerValue(composer, ''),
+        onDispatch: () => options.scheduleSnapshot(true),
+        onSettled: () => options.scheduleSnapshot(true)
+      });
+      if (!transaction?.handled) return false;
+      Promise.resolve(transaction.completion).then(receipt => {
+        if (receipt?.status === 'unavailable' && transaction.claimFallback?.() === true) return fallback();
+        if (receipt?.status === 'rejected' || receipt?.status === 'unavailable') {
+          // Reuse the native pre-dispatch failure UI. This command never wrote;
+          // it must not leave the native ledger waiting for a server receipt.
+          return respond('send_prompt', false, 'official_runtime_v1:rejected:not_ready');
+        }
+        respond('send_prompt', receipt?.status === 'accepted', 'private_text_v1:' +
+          (receipt?.status === 'accepted' ? 'accepted' : 'unknown:' + safeCode(receipt?.code, 'unknown')));
+        options.scheduleSnapshot(true);
+      }).catch(() => {
+        respond('send_prompt', false, 'private_text_v1:unknown:completion_failed');
+      });
+      return true;
+    }
+
+    function sendPrompt(value, expectedDraft, respond, allowPrivateTextTransaction, freshAttempted = false) {
+      if ((freshAttempted || allowPrivateTextTransaction !== true) &&
+          window.__elonChatGptFreshTextTransaction?.state?.().pending) {
+        return respond('send_prompt', false, 'private_text_v1:unknown:reconciliation_pending');
+      }
       if (window.__elonChatGptPrivateStopRuntime?.state?.().pending) {
         return respond('send_prompt', false, 'official_runtime_v1:unknown:stop_pending');
       }
       const composer = options.findComposer();
+      if (!freshAttempted && allowPrivateTextTransaction === true && tryFreshSend(composer, value, expectedDraft, respond,
+        () => sendPrompt(value, expectedDraft, respond, allowPrivateTextTransaction, true))) return;
       const assistantBeforeSend = options.streamingPolicyModule &&
         options.streamingPolicyModule.messageObservation(options.messageAdapter);
       let privateFallbackCode = '';
@@ -258,6 +291,9 @@
     }
 
     function regenerateResponse(respond, fallback) {
+      if (window.__elonChatGptFreshTextTransaction?.state?.().pending) {
+        return respond('regenerate_response', false, 'private_text_v1:unknown:reconciliation_pending');
+      }
       if (window.__elonChatGptPrivateStopRuntime?.state?.().pending) {
         return respond('regenerate_response', false, 'official_runtime_v1:regenerate_unknown:stop_pending');
       }
@@ -304,6 +340,13 @@
     }
 
     function stopGeneration(respond, fallback) {
+      const fresh = window.__elonChatGptFreshTextTransaction;
+      if (fresh?.state?.().pending) {
+        fresh.cancel();
+        respond('stop_generation', false, 'private_text_v1:unknown:server_stop_unconfirmed');
+        options.scheduleSnapshot(true);
+        return;
+      }
       if (stopPrivate(respond)) return;
       const transaction = window.__elonChatGptPrivateStopRuntime?.stop({
         composer: options.findComposer(), requestId: respond.requestId || ''
@@ -329,5 +372,5 @@
     return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, stopPrivate, stopGeneration });
   }
 
-  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 7, create });
+  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 8, create });
 })();

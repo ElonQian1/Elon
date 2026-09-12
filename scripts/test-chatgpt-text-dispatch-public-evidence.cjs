@@ -9,6 +9,8 @@ const crypto = require('node:crypto');
 const { parseSource } = require('./analyze-chatgpt-runtime-contracts.cjs');
 const directory = process.env.CHATGPT_PUBLIC_RUNTIME_DIR;
 const assets = {
+  shared: ['4813494d-gf2h57w5fiay19bd.js',
+    '6c015001732054f4143ef1922609407c540967762109dcd128bbf56706889c3e'],
   conversation: ['conversation-small-h1dtzoris1y9588z.js',
     'da08c64c132306779e09ba89cac64fa560b120e7560ffdc29b3ce5a0b8ccd67e'],
   composer: ['8b34dbc2-fqgb3eqijpn96umi.js',
@@ -59,7 +61,20 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     assert.equal(crypto.createHash('sha256').update(source).digest('hex'), hash, role);
     modules[role] = parseSource(source.toString('utf8'));
   }
-  const { conversation, composer } = modules;
+  const { conversation, composer, shared } = modules;
+
+  await t.test('fresh request uses the reviewed security-aware client and header builder', () => {
+    assert.equal(shared.exported.get('b4'), 'K');
+    const client = facts(definition(shared, 'Sd'));
+    includes(client.properties, ['disableAutomaticRetry', 'signal', 'requestBody', 'additionalHeaders']);
+    const header = facts(definition(shared, 'ac', true));
+    includes(header.strings, ['OpenAI-Sentinel-Chat-Requirements-Token',
+      'OpenAI-Sentinel-Chat-Requirements-Prepare-Token', 'OpenAI-Sentinel-Turnstile-Token', 'OpenAI-Sentinel-Proof-Token']);
+    assert.equal(shared.exported.get('xJ'), 'wS');
+    assert.equal(shared.exported.get('Pc'), 'h$');
+    assert.equal(conversation.exported.get('FKt'), 'Uun');
+    assert.equal(conversation.exported.get('MKt'), 'Xun');
+  });
 
   await t.test('fresh integrity material has an exported website provider', () => {
     const fresh = facts(definition(conversation, 'VKt', true));
@@ -67,6 +82,17 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
       'getEnforcementTokenSync', 'getEnforcementToken']);
     assert.deepEqual(composer.imports.get('THe'), { file: './' + assets.conversation[0], name: 'VKt' });
     assert.deepEqual(composer.imports.get('Iee'), { file: './4813494d-gf2h57w5fiay19bd.js', name: 'ac' });
+  });
+
+  await t.test('authoritative history can fetch and apply without reloading the document', () => {
+    assert.equal(conversation.exported.get('BEn'), 'gy');
+    const hydrate = facts(definition(conversation, 'BEn', true));
+    includes(hydrate.calls, ['hy', 'fy']);
+    includes(hydrate.properties, ['forceNetworkFetch', 'includeMessageId', 'signal',
+      'shouldApplyResponse', 'onConversationLoadedFromNetwork', 'skipIfExisting']);
+    const apply = facts(definition(conversation, 'KEn', true));
+    includes(apply.calls, ['Dbe', 'du']);
+    includes(apply.properties, ['existingCurrentLeafId', 'serverCurrentLeafId', 'setCurrentLeafId']);
   });
 
   await t.test('stream transport also performs request and response integrity checks', () => {

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 18, create: factory });
+  const api = Object.freeze({ version: 19, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -23,14 +23,17 @@
       'M$': 'Q$', RW: 'rG', uo: 'uo', t4: 'x4', IX: 'nZ', t6: 'x6', cX: 'OX',
       Fx: 'Lx', Fl: 'Il', v7: 'R7', $3: 'y6', Ur: 'Ur', zr: 'zr', attachmentUploadType: undefined,
       conversationStore: undefined, canvasQueryClient: undefined,
-      canvasConversations: undefined, useCanvasSendBlocked: undefined },
+      canvasConversations: undefined, useCanvasSendBlocked: undefined,
+      textApi: undefined, textSecurityHeaders: undefined, textHistoryDisabled: undefined, textModelOverride: undefined },
     conversation: { AGt: 'uKt', J5t: 'O7t', Nrn: 'Cin', yRt: '$Rt', Grn: 'Fin',
       vRt: 'QRt', p8t: 'q8t', l0: 'E0', M1t: 'f0t', Rdn: 'Ofn', Rrn: 'Oin',
       win: 'man', Ein: 'gan', ay: 'Sy', iy: 'xy', ry: 'by', Jrn: 'Rin', Hrn: 'Min',
       f8t: 'K8t', c0: 'T0', FVt: 'hHt', u1t: 'W1t', l1t: 'U1t', iin: 'Jin',
       attachmentBaseLimit: undefined, attachmentMaxUploads: undefined,
       attachmentPendingCount: undefined, attachmentConfiguredLimit: undefined,
-      canvasDirtyInit: undefined, useCanvasDirty: undefined },
+      canvasDirtyInit: undefined, useCanvasDirty: undefined,
+      textSecurity: undefined, textStream: undefined, textPrepareEnabled: undefined, textReviewAck: undefined,
+      textHydrateHistory: undefined },
     composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC', Ng: 'Yg', Bg: 'n_', fh: 'Oh' },
     react: { reactApi: undefined, reactDom: undefined, reactRoot: undefined,
       intlInit: undefined, intlProvider: undefined }
@@ -109,14 +112,17 @@
     shared: { H3: 'J5', R5: 'Cet', F5: 'bet', mq: 'bK', wV: 'AR', SV: 'OR', XM: '$J', HM: 'GJ',
       'M$': 'o2', RW: 'AV', uo: 'Fs', t4: 'R6', IX: 'hW', t6: 'S5', cX: 'TJ',
       Fx: 'aC', Fl: 'md', v7: 'rtt', $3: 'b5', Ur: 'ca', zr: 'ia', attachmentUploadType: 'am',
-      conversationStore: 'pY', canvasQueryClient: 'h2', canvasConversations: 'MP', useCanvasSendBlocked: 'tP' },
+      conversationStore: 'pY', canvasQueryClient: 'h2', canvasConversations: 'MP', useCanvasSendBlocked: 'tP',
+      textApi: 'b4', textSecurityHeaders: 'ac', textHistoryDisabled: 'xJ', textModelOverride: 'Pc' },
     conversation: { AGt: 'gJt', J5t: 'rnn', Nrn: 'Wsn', yRt: 'iVt', Grn: 'ncn',
       vRt: 'rVt', p8t: 'Sen', l0: 'z2', M1t: 'P4t', Rdn: 'Ggn', Rrn: 'Ysn',
       win: 'Fcn', Ein: 'Lcn', ay: 'ub', iy: 'lb', ry: 'cb', Jrn: 'acn', Hrn: '$sn',
       f8t: 'xen', c0: 'R2', FVt: 'xWt', u1t: 'f4t', l1t: 'd4t', iin: 'hcn',
       attachmentBaseLimit: 'W$t', attachmentMaxUploads: 'Z$t',
       attachmentPendingCount: 'K$t', attachmentConfiguredLimit: 'U$t',
-      canvasDirtyInit: 'Dvt', useCanvasDirty: 'Avt' },
+      canvasDirtyInit: 'Dvt', useCanvasDirty: 'Avt',
+      textSecurity: 'VKt', textStream: 'jGt', textPrepareEnabled: 'FKt', textReviewAck: 'MKt',
+      textHydrateHistory: 'BEn' },
     composer: { Ih: 'ig', t_: 'x_', AS: 'ZS', VS: 'cC', Ng: '$g', Bg: 'o_', fh: 'Nh' },
     react: { reactApi: 'zn', reactDom: 'Wt', reactRoot: 'Ut', intlInit: 'In', intlProvider: 'An' }
   };
@@ -289,8 +295,8 @@
 
   function state() {
     const p = profile();
-    return { version: 18, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 19, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 18, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 19, observed, load, peek, temporary, tools, state });
 });

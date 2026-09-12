@@ -11,9 +11,11 @@ repeat_implementation: forbidden_without_current_regression_evidence
 
 Current independent-dispatch investigation: [September 12 evidence and staged
 implementation boundary](reports/chatgpt-independent-text-dispatch-audit-20260912.md).
-Fresh security preparation is reachable below the composer, but body construction,
-consumable prepare ownership, response integrity and stream handoff remain part of
-the missing transaction. This is not solved by replaying captured request headers.
+The [fresh-request source candidate](chatgpt-fresh-text-dispatch.md) now builds
+owned preparation/body/security requests, calls the lower HTTP/SSE transport and
+guards authoritative history hydration. It remains disabled and not device
+verified; server stop, handoff recovery and initial ownership without a composer
+are still incomplete. This is not solved by replaying captured request headers.
 
 This capability gives native ChatGPT text actions one versioned transaction owner for
 send, stop, regenerate, stream completion, and official-page reconciliation. The existing

@@ -1,0 +1,50 @@
+(function (root, factory) {
+  'use strict';
+  const api = Object.freeze({ version: 1, create: factory });
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.__elonChatGptFreshTextReconcile = api;
+})(typeof window === 'object' ? window : null, function () {
+  'use strict';
+  const ownsKey = (object, key) => object && Object.prototype.hasOwnProperty.call(object, key);
+
+  function ownsResponse(payload, binding, userMessageId) {
+    if (!payload || payload.conversation_id !== binding.conversationId ||
+        !payload.mapping || Array.isArray(payload.mapping)) return false;
+    const mapping = payload.mapping, user = ownsKey(mapping, userMessageId) && mapping[userMessageId];
+    if (user?.id !== userMessageId || user.message?.id !== userMessageId ||
+        user.message.author?.role !== 'user' || user.parent !== binding.parentId) return false;
+    let id = payload.current_node;
+    const leaf = ownsKey(mapping, id) && mapping[id]?.message;
+    if (!leaf || leaf.id !== id || leaf.author?.role !== 'assistant' ||
+        leaf.status !== 'finished_successfully' || leaf.end_turn !== true) return false;
+    const seen = new Set();
+    while (id && seen.size < 4096) {
+      if (id === userMessageId) return true;
+      if (seen.has(id) || !ownsKey(mapping, id)) return false;
+      seen.add(id);
+      const node = mapping[id];
+      // A later user turn or a sibling branch is not our completion.
+      if (!node || node.message?.author?.role === 'user') return false;
+      id = node.parent;
+    }
+    return false;
+  }
+
+  async function reconcile(binding, request, signal) {
+    if (signal.aborted || !binding.canReconcile(request.userMessageId) ||
+        typeof binding.runtime.textHydrateHistory !== 'function') return false;
+    let verified = false;
+    // BEn performs official fetch + tree reconciliation. Do not replace the
+    // website store, reload the document, or apply another branch's response.
+    await binding.runtime.textHydrateHistory(binding.conversationId, {
+      forceNetworkFetch: true, includeMessageId: request.userMessageId,
+      signal, skipIfExisting: false, source: 'native_fresh_text_v1',
+      onConversationLoadedFromNetwork(payload) {
+        verified = !signal.aborted && ownsResponse(payload, binding, request.userMessageId);
+      },
+      shouldApplyResponse: () => verified && !signal.aborted && binding.canReconcile(request.userMessageId)
+    });
+    return !signal.aborted && verified && binding.reconciled(request.userMessageId);
+  }
+  return Object.freeze({ reconcile, ownsResponse });
+});
