@@ -138,7 +138,7 @@ const detailPayload = {
   assert.equal(disabled.window.__elonChatGptPrivateTransport, undefined);
 
   const gated = createContext(async () => jsonResponse(detailPayload), true, false);
-  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 30);
+  assert.equal(gated.window.__elonChatGptPrivateTransport.version, 31);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchEnabled, false);
   assert.equal(gated.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
 
@@ -150,7 +150,7 @@ const detailPayload = {
     return jsonResponse(detailPayload);
   }, false, true);
   const transport = detail.window.__elonChatGptPrivateTransport;
-  assert.equal(transport.version, 30);
+  assert.equal(transport.version, 31);
   assert.equal(transport.conversationPrefetchEnabled, true);
   assert.equal(transport.conversationPrefetchAvailable, true);
   assert.equal(transport.experimentalConversationPrefetchAvailable, true);
@@ -179,8 +179,8 @@ const detailPayload = {
   assert.equal(requests[1].options.__elonPrivateTransport, 'conversation_prefetch');
   assert.equal(snapshots[0].composerReady, false);
   assert.equal(snapshots[0].snapshotScope, 'content');
-  assert.equal(transport.health().successes, 1);
-  assert.equal(transport.health().lastOutcome, 'success');
+  assert.equal(transport.accountReadHealth().successes, 1);
+  assert.equal(transport.accountReadHealth().lastOutcome, 'success');
   assert.equal(detail.outcomes.length, 0);
   assert.equal(detail.shapes.length, 0);
   assert.deepEqual(
@@ -307,7 +307,7 @@ const detailPayload = {
   ), true);
   await flush();
   assert.equal(failedNavigation, 1);
-  assert.equal(failed.window.__elonChatGptPrivateTransport.health().failures, 1);
+  assert.equal(failed.window.__elonChatGptPrivateTransport.accountReadHealth().failures, 1);
   assert.equal(failed.outcomes[0].outcome, 'network');
 
   const wrappedSnapshots = [];
@@ -344,7 +344,10 @@ const detailPayload = {
   await flush();
   assert.equal(linearSnapshots.length, 1);
   assert.equal(linearSnapshots[0].messages.length, 2);
-  assert.equal(failed.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), false);
+  assert.equal(failed.window.__elonChatGptPrivateTransport.conversationPrefetchReady(), true,
+    'a transient explicit-read failure does not poison background freshness');
+  assert.equal(failed.window.__elonChatGptPrivateTransport.prefetchConversation('/c/plain-chat',
+    () => assert.fail('cooling explicit read emitted')), false);
 
   const explicitMembershipPayload = { ...detailPayload, gizmo_id: 'g-p-destination' };
   const coldMembershipReads = [];
@@ -371,6 +374,19 @@ const detailPayload = {
   assert.equal(coldMembershipReads[0].options.cache, 'no-store');
   assert.equal(coldMembershipReads[0].options.body, undefined);
   assert.equal(explicitReader.conversationPrefetchReady(), false, 'explicit reads do not manufacture fresh official observations');
+  const coldSnapshots = [];
+  let coldSettled = 0;
+  assert.equal(explicitReader.prefetchConversation('/c/cold-writing-chat', event => coldSnapshots.push(event),
+    () => coldSettled++), true, 'user navigation can read with identity before background freshness is known');
+  assert.equal(explicitReader.prefetchConversation('/c/cold-writing-chat', () => assert.fail('duplicate emission'),
+    () => coldSettled++), true);
+  await flush();
+  assert.equal(coldSettled, 2);
+  assert.equal(coldMembershipReads.length, 2, 'duplicate navigations share one read');
+  assert.equal(coldSnapshots.length, 1);
+  assert.equal(coldMembershipReads[1].options.method, 'GET');
+  assert.equal(coldMembershipReads[1].options.body, undefined);
+  assert.equal(explicitReader.conversationPrefetchReady(), false);
 
   let membershipNow = Date.now();
   class MembershipClock extends Date { static now() { return membershipNow; } }
@@ -611,6 +627,12 @@ const detailPayload = {
     isolated.window.location.pathname = attachmentPath;
     assert.equal((await owner.readAttachmentContext(attachmentPath)).ordinary, true);
     assert.equal(reads, 2, 'attachment scope is still force-read rather than cached');
+    const navigationSnapshots = [];
+    assert.equal(owner.prefetchConversation(attachmentPath, event => navigationSnapshots.push(event)), true);
+    await flush();
+    assert.equal(navigationSnapshots.length, 1, 'navigation is independent of background cooldown');
+    assert.equal(reads, 3);
+    assert.equal(owner.health().lastOutcome, backgroundFailure);
   }
   for (const rejection of [401, 403, 429]) {
     let reads = 0;
@@ -626,6 +648,8 @@ const detailPayload = {
     const expected = rejection === 429 ? 'rate_limit' : 'auth';
     assert.equal(owner.health().lastOutcome, expected);
     assert.equal(owner.accountReadHealth().lastOutcome, expected);
+    assert.equal(owner.prefetchConversation(attachmentPath, () => assert.fail('rejected navigation emitted')), false,
+      'explicit navigation still respects authentication and rate-limit cooldown');
     await owner.listConversationFiles(attachmentPath, 'mcp_repeated', () => assert.fail('no index on cooldown'),
       (...values) => receipts.push(values));
     assert.equal(receipts.at(-1)[2], 'files_read_cooldown');

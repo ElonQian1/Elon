@@ -8,6 +8,7 @@ class ChatGptWebTextBlockInventoryTest {
     private fun sample() = JSONObject().put("schema", ChatGptWebTextBlockInventory.SCHEMA)
         .put("status", "ready").put("bounded", true).put("messages", 1).put("code_blocks", 1)
         .put("writing_blocks", 1).put("writable_blocks", 1).put("metadata_messages", 0).put("unparsed_messages", 0)
+        .put("dom_id_matches", 0).put("dom_code_matches", 0).put("dom_writing_matches", 0).put("dom_line_ending_matches", 0)
     private fun detail(value: JSONObject) = ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", value.toString())
 
     @Test fun boundedCountOnlyReceiptIsAccepted() {

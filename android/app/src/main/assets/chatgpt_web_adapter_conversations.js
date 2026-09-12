@@ -730,6 +730,10 @@
     const target = conversationLinks().find((node) => conversationPath(node) === path);
     cancelDirectoryWork(false);
     result('open_conversation', true, '');
+    if (location.pathname === path && !location.search && !location.hash) {
+      closeSidebarIfOpen();
+      return;
+    }
     const assignTarget = () => location.assign(new URL(path, location.origin).href);
     if (!target) return assignTarget();
     try {

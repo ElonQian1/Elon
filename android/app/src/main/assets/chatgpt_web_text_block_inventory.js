@@ -6,8 +6,9 @@
 })(typeof window === 'object' ? window : null, function (page) {
   'use strict';
   let active = false;
-  const empty = status => ({ schema: 'elon.text_block_inventory.v1', status, messages: 0, code_blocks: 0,
-    writing_blocks: 0, writable_blocks: 0, metadata_messages: 0, unparsed_messages: 0, bounded: true });
+  const empty = status => ({ schema: 'elon.text_block_inventory.v2', status, messages: 0, code_blocks: 0,
+    writing_blocks: 0, writable_blocks: 0, metadata_messages: 0, unparsed_messages: 0, bounded: true,
+    dom_id_matches: 0, dom_code_matches: 0, dom_writing_matches: 0, dom_line_ending_matches: 0 });
   async function read() {
     if (active) return empty('busy');
     active = true;
@@ -37,7 +38,12 @@
       if (!rows.length && Object.keys(payload.mapping || {}).length) return empty('invalid_response');
       const result = empty('ready');
       result.messages = rows.length;
+      const dom = page.__elonChatGptMessages?.readMessages?.(false) || [];
+      const domBodies = dom.flatMap(row => (row.content || []).flatMap(part =>
+        typeof part.textBlock?.content === 'string' ? [part.textBlock.content] : []));
+      const lines = value => value.replace(/\r\n/g, '\n').replace(/\n$/, '');
       for (const { message } of rows) {
+        if (dom.some(row => row.id === message.id && row.role === message.author?.role)) result.dom_id_matches++;
         if (message.metadata?.writing_blocks && Object.keys(message.metadata.writing_blocks).length ||
             message.metadata?.content_references?.some?.(value => value?.category === 'writing_block')) result.metadata_messages++;
         const parsed = page.__elonChatGptTextBlocks.project(message);
@@ -46,6 +52,9 @@
           if (part.textBlock.kind === 'code') result.code_blocks++;
           else if (part.textBlock.kind === 'writing') result.writing_blocks++;
           if (part.textBlock.sourceMessageId) result.writable_blocks++;
+          if (domBodies.includes(part.textBlock.content)) {
+            result[part.textBlock.kind === 'code' ? 'dom_code_matches' : 'dom_writing_matches']++;
+          } else if (domBodies.some(body => lines(body) === lines(part.textBlock.content))) result.dom_line_ending_matches++;
         }
       }
       return current() ? result : empty('context_changed');

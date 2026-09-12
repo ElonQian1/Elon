@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 30) ||
+  if ((existingTransport && Number(existingTransport.version) >= 31) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -380,16 +380,16 @@
     return { path: value, id: match[1] || match[2] };
   }
 
-  function emitConversationSnapshot(target, result, emitEvent) {
+  function emitConversationSnapshot(target, result, emitEvent, owner) {
     recordPrivatePayloadShape(result.payload);
     const payload = normalizedConversationPayload(result.payload);
     const messages = conversationMessages(payload);
     if (!messages.length) {
-      policy.recordFailure('empty');
+      owner.recordFailure('empty');
       recordPrivateOutcome('empty', 0, result.elapsedMs);
       return;
     }
-    policy.recordSuccess(result.elapsedMs);
+    owner.recordSuccess(result.elapsedMs);
     recordPrivateOutcome('success', messages.length, result.elapsedMs);
     emitEvent({
       type: 'message_snapshot',
@@ -417,17 +417,18 @@
     try { action(); } catch (_) { /* The official navigation fallback owns its errors. */ }
   }
 
-  function requestConversationSnapshot(path, emitEvent, onSettled) {
+  function requestConversationSnapshot(path, emitEvent, onSettled, explicitRead) {
     const target = conversationTarget(path);
     if (!target || typeof emitEvent !== 'function') return false;
-    if (!conversationPrefetchReady()) return false;
+    if (!(explicitRead ? explicitAccountReadReady() : conversationPrefetchReady())) return false;
+    const owner = explicitRead ? accountReadPolicy : policy;
     let request = activeConversationRequests.get(target.id);
     if (!request) {
       request = fetchConversation(target.id).then((result) => {
-        emitConversationSnapshot(target, result, emitEvent);
+        emitConversationSnapshot(target, result, emitEvent, owner);
       }).catch((error) => {
         const outcome = failureKind(error);
-        recordReadFailure(error, policy);
+        recordReadFailure(error, owner);
         recordPrivateOutcome(outcome, 0, 0);
       }).finally(() => {
         if (activeConversationRequests.get(target.id) === request) {
@@ -441,7 +442,7 @@
   }
 
   function prefetchConversation(path, emitEvent, navigate) {
-    return requestConversationSnapshot(path, emitEvent, navigate);
+    return requestConversationSnapshot(path, emitEvent, navigate, true);
   }
 
   function refreshCurrentConversation(path, emitEvent) {
@@ -581,7 +582,7 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 30,
+    version: 31,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,

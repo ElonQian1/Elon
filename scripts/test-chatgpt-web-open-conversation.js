@@ -25,12 +25,14 @@ function visibleNode(attributes, onClick) {
   const targetPath = '/c/conversation-target';
   let sidebarOpen = true;
   let closeClicks = 0;
+  let routeChanges = 0;
   const location = {
     origin: 'https://chatgpt.com',
     pathname: '/c/conversation-source',
-    assign: (href) => { location.pathname = new URL(href).pathname; }
+    assign: (href) => { routeChanges++; location.pathname = new URL(href).pathname; }
   };
   const target = visibleNode({ href: targetPath }, () => {
+    routeChanges++;
     location.pathname = targetPath;
   });
   const close = visibleNode({ 'aria-label': 'Close sidebar' }, () => {
@@ -82,6 +84,19 @@ function visibleNode(attributes, onClick) {
   await new Promise((resolve) => setTimeout(resolve, 180));
   assert.equal(closeClicks, 1, 'route navigation must dismiss the official mobile sidebar');
   assert.equal(sidebarOpen, false);
+
+  sidebarOpen = true;
+  window.__elonChatGptConversations.openConversation(targetPath, (...value) => results.push(value));
+  assert.equal(routeChanges, 1, 'selecting the current route must not click or reload it');
+  assert.equal(sidebarOpen, false, 'current-route selection still dismisses the sidebar');
+  assert.deepEqual(results[1], ['open_conversation', true, '']);
+  location.search = '?temporary-chat=true';
+  window.__elonChatGptConversations.openConversation(targetPath, () => {});
+  assert.equal(routeChanges, 2, 'a different query context still requires navigation');
+  location.search = '';
+  location.hash = '#fragment';
+  window.__elonChatGptConversations.openConversation(targetPath, () => {});
+  assert.equal(routeChanges, 3, 'a different fragment context still requires navigation');
 
   process.stdout.write('PASS ChatGPT open-conversation sidebar boundary\n');
 })().catch((error) => {

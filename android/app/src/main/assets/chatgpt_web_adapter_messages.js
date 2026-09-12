@@ -480,7 +480,14 @@
   }
 
   function messageIdentity(node, role, globalIndex) {
+    // Turn test IDs are viewport positions, not the server message identity.
+    const nestedIds = Array.from(node.querySelectorAll('[data-message-author-role][data-message-id]'))
+      .filter(child => child.getAttribute('data-message-author-role') === role &&
+        !isTransientContent(child) &&
+        (!child.closest('[data-testid^="conversation-turn-"]') || child.closest('[data-testid^="conversation-turn-"]') === node))
+      .map(child => child.getAttribute('data-message-id')).filter(Boolean);
     return node.getAttribute('data-message-id')
+      || (new Set(nestedIds).size === 1 ? nestedIds[0] : '')
       || node.getAttribute('data-testid')
       || node.id
       || role + '-' + globalIndex;

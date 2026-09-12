@@ -3,9 +3,9 @@ package com.elon.app.chatgptweb
 import org.json.JSONObject
 
 internal object ChatGptWebTextBlockInventory {
-    const val SCHEMA = "elon.text_block_inventory.v1"
+    const val SCHEMA = "elon.text_block_inventory.v2"
     private val counts = setOf("messages", "code_blocks", "writing_blocks", "writable_blocks",
-        "metadata_messages", "unparsed_messages")
+        "metadata_messages", "unparsed_messages", "dom_id_matches", "dom_code_matches", "dom_writing_matches", "dom_line_ending_matches")
     private val statuses = setOf("ready", "busy", "context_unavailable", "context_changed", "invalid_response", "read_failed")
 
     fun sanitize(value: JSONObject): String {
@@ -20,6 +20,11 @@ internal object ChatGptWebTextBlockInventory {
         require(value.getInt("metadata_messages") <= value.getInt("messages"))
         require(value.getInt("unparsed_messages") <= value.getInt("messages"))
         require(value.getInt("writable_blocks") <= value.getInt("writing_blocks"))
+        require(value.getInt("dom_id_matches") <= value.getInt("messages"))
+        require(value.getInt("dom_code_matches") <= value.getInt("code_blocks"))
+        require(value.getInt("dom_writing_matches") <= value.getInt("writing_blocks"))
+        require(value.getInt("dom_code_matches") + value.getInt("dom_writing_matches") + value.getInt("dom_line_ending_matches") <=
+            value.getInt("code_blocks") + value.getInt("writing_blocks"))
         require(value.getInt("code_blocks") + value.getInt("writing_blocks") <= value.getInt("messages") * 16)
         return value.toString()
     }

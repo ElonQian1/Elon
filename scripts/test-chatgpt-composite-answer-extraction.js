@@ -329,4 +329,23 @@ const visibleText = new ElementNode('Visible answer');
 const withStatus = new ElementNode(''); withStatus.childNodes = [hiddenStatus, visibleText];
 assert.equal(messages.messageContent(withStatus, 'assistant'), 'Visible answer');
 
+{
+  const turn = new ElementNode('', { attributes: { 'data-testid': 'conversation-turn-0',
+    'data-message-author-role': 'assistant' }, candidates: [new ElementNode('Owned fixture')] });
+  const child = new ElementNode('', { attributes: { 'data-message-author-role': 'assistant', 'data-message-id': 'server-a' },
+    closestMap: { '[data-testid^="conversation-turn-"]': turn } });
+  turn.querySelectorAllMap['[data-message-author-role][data-message-id]'] = [child];
+  context.document.querySelector = selector => selector === 'main' ? {
+    querySelectorAll: query => query === '[data-testid^="conversation-turn-"]' ? [turn] : []
+  } : null;
+  assert.equal(messages.readMessageWindow(false).messages[0].id, 'server-a');
+  assert.equal(messages.lastAssistantObservation().key, 'server-a');
+  const other = new ElementNode('', { attributes: { 'data-message-author-role': 'assistant', 'data-message-id': 'server-b' } });
+  turn.querySelectorAllMap['[data-message-author-role][data-message-id]'] = [child, other];
+  assert.equal(messages.readMessageWindow(false).messages[0].id, 'conversation-turn-0', 'ambiguous descendants cannot own the turn');
+  other.attributes['data-message-author-role'] = 'user';
+  assert.equal(messages.readMessageWindow(false).messages[0].id, 'server-a');
+  child.closestMap['[data-testid^="conversation-turn-"]'] = new ElementNode();
+  assert.equal(messages.readMessageWindow(false).messages[0].id, 'conversation-turn-0', 'quoted child turn cannot own the outer message');
+}
 console.log('CHATGPT_COMPOSITE_ANSWER_EXTRACTION=passed');
