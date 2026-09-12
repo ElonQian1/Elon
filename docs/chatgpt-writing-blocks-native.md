@@ -1,6 +1,8 @@
 # ChatGPT Writing Blocks 原生读取、编辑与导出
 
-状态：source-integrated；原生 UI / 文件保存 / 官网写回真机验收待完成。不是 Canvas 完成标记。
+状态：已集成并发布原生读取、编辑副本与导出；真机验收分项记录，不等同于官网写回完成。不是 Canvas 完成标记。
+
+2026-09-13 发布与验收：[本轮记录](reports/chatgpt-writing-blocks-release-20260913.md)。
 
 能力 ID：`android_chatgpt_text_block_local_editor_export_v1`。
 
@@ -48,7 +50,7 @@
 - `updated_at` 是官网客户端提供的更新时间，**不是服务端 compare-and-swap 版本条件**。前后核对能检测已观察的冲突，但不能承诺跨设备同时写入绝无竞态。库文件乐观锁协议不得混入此接口。
 - 新增模块：`chatgpt_web_writing_block_policy.js`、`chatgpt_web_writing_block_context.js`、`chatgpt_web_private_writing_blocks.js`；原生命令/回执 `ChatGptWebWritingBlock.kt`，编辑器协调 `WebChatTextBlockCloudSession.kt`。回执不包含正文或凭证。
 
-待验收：一次有归属的真实写作块修改与回读，生产按钮、返回会话后的正文与缓存一致；跨设备并发保存仅作限制声明。本批未发布新 APK，不重复已有音频或听写验收。
+待验收：一次有归属的真实写作块修改与回读，生产按钮、返回会话后的正文与缓存一致；跨设备并发保存仅作限制声明。上述源码批次已进入后续集中发布，不重复已有音频或听写验收。
 
 ## 代码与验证
 
@@ -56,7 +58,7 @@
 - 原生模型：`WebChatTextBlock.kt`；原生编辑与导出：`WebChatTextBlockEditor.kt`、`WebChatTextBlockExport.kt`。
 - 定向测试：`scripts/test-chatgpt-web-text-blocks.cjs`、`scripts/test-chatgpt-writing-block-public-evidence.cjs`、`WebChatTextBlockTest.kt`。
 - 官网写回测试：`scripts/test-chatgpt-web-writing-block-save.cjs`、`ChatGptWebWritingBlockTest.kt`；2026-09-13 JavaScript 合并回归 87 项通过、无跳过，覆盖请求契约、消息归属、重复写入、未知结果、回读及官网本地编辑冲突。
-- 2026-09-13 最终源码的 Android Debug Kotlin/Java 编译及 21 项定向单元测试通过；修改后重新验证，不复用旧源码编译结果。未打包发布，未宣称生产 UI 或真实账号写回已验收。
+- 2026-09-13 源码批次的 Android Debug Kotlin/Java 编译及 21 项定向单元测试通过；修改后重新验证，不复用旧源码编译结果。当时未打包，后续集中发布及真机结果见本轮记录。
 - 共享回归：既有历史投影、私有 stream / delta / fetch、快照缓存和原生富内容策略测试。
 - 2026-09-12：JavaScript 回归 73 项通过（包含保留的官方源码契约检查，无跳过）；Android Debug Kotlin/Java 编译与 14 项定向单元测试通过。未打包发布 APK、未执行真机视觉/文件导出验收。
 - 首次 Android 检查被 180 秒日志静默保护中止，没有源码错误；确认是在 Kotlin 编译阶段后延长至 600 秒，重跑通过。不把被中止的检查记为通过。

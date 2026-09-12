@@ -108,21 +108,22 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
         val changed = body.text.toString() != (cloud?.savedContent ?: block.content)
         status.text = when {
             saving -> "正在导出"
-            cloud?.busy == true || cloud?.pending == true -> cloud.status
-            cloud != null && !cloud.ready -> cloud.status
             !block.complete -> "未完整 · 只读"
+            cloud?.pending == true -> cloud.status
             exported == body.text.toString() -> "副本已导出"
-            cloud != null && body.text.toString() == cloud.savedContent -> cloud.status
             changed -> if (cloud != null) "修改未保存到官网" else "副本未导出"
+            cloud?.busy == true || cloud != null && !cloud.ready -> cloud.status
+            cloud != null && body.text.toString() == cloud.savedContent -> cloud.status
             editing -> "本机副本"
             else -> "原文"
         }
-        val working = saving || cloud?.busy == true
+        // Preparing a cloud ticket is read-only and must not block local work.
+        val working = saving || (cloud?.busy == true && cloud.pending)
         edit.isEnabled = block.complete && !working
         reset.isEnabled = body.text.toString() != block.content && !working
         export.isEnabled = block.complete && !working
         body.isEnabled = !working
-        cloudSave.isEnabled = !working && cloud != null &&
+        cloudSave.isEnabled = !working && cloud != null && !cloud.busy &&
             (!cloud.ready || cloud.pending || body.text.toString() != cloud.savedContent)
         cloudSave.setImageResource(if (cloud?.pending == true || cloud?.ready == false) R.drawable.ic_side_menu_refresh else android.R.drawable.ic_menu_save)
         TooltipCompat.setTooltipText(cloudSave, if (cloud?.pending == true) "核对保存结果" else if (cloud?.ready == false) "核对官网" else "保存到官网")
@@ -165,7 +166,7 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
     }
 
     private fun close() {
-        if (saving || cloud?.busy == true) return
+        if (saving || (cloud?.busy == true && cloud.pending)) return
         if (cloud?.pending != true && (body.text.toString() == (cloud?.savedContent ?: block.content) ||
             body.text.toString() == exported)) { dialog.dismiss(); return }
         child = AlertDialog.Builder(activity).setTitle("修改尚未确认").setMessage(
@@ -176,6 +177,10 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
 
     private fun icon(resource: Int, label: String, id: String, action: () -> Unit) = AppCompatImageButton(activity).apply {
         setImageResource(resource)
+        imageTintList = android.content.res.ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_enabled), intArrayOf()),
+            intArrayOf(status.currentTextColor, androidx.core.graphics.ColorUtils.setAlphaComponent(status.currentTextColor, 96)),
+        )
         setPadding(dp(12), dp(12), dp(12), dp(12))
         background = null
         contentDescription = "web-chat-text-block-$id"
