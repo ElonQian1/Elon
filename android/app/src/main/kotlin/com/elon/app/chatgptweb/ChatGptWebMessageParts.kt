@@ -2,6 +2,7 @@ package com.elon.app.chatgptweb
 
 import com.elon.app.WebChatProductionRichCard
 import com.elon.app.WebChatImageOriginal
+import com.elon.app.WebChatTextBlock
 import org.json.JSONObject
 
 internal data class ChatGptWebMessagePart(
@@ -9,6 +10,7 @@ internal data class ChatGptWebMessagePart(
     val label: String,
     val metadata: ChatGptWebMessagePartMetadata? = null,
     val richCard: WebChatProductionRichCard? = null,
+    val textBlock: WebChatTextBlock? = null,
 )
 
 internal data class ChatGptWebMessagePartMetadata(
@@ -52,7 +54,10 @@ internal object ChatGptWebMessagePartParser {
                 if (label.isBlank()) continue
                 val richCard = if (type == "rich_card") ChatGptWebRichCardParser.parse(part) else null
                 if (type == "rich_card" && richCard == null) continue
-                add(ChatGptWebMessagePart(type, label, parseMetadata(part), richCard))
+                val block = if (type == "code" || type == "writing_block")
+                    WebChatTextBlock.parse(part.optJSONObject("textBlock"), message.optString("state") == "streaming")
+                        ?.takeIf { (it.kind == "code") == (type == "code") } else null
+                add(ChatGptWebMessagePart(type, label, parseMetadata(part), richCard, block))
             }
         }.take(MAX_PARTS)
     }
@@ -105,6 +110,7 @@ internal object ChatGptWebMessagePartParser {
         "file",
         "citation",
         "code",
+        "writing_block",
         "table",
         "artifact",
         "audio",

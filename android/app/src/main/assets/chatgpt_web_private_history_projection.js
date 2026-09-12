@@ -2,10 +2,12 @@
   'use strict';
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 12, create: dependencies => factory(dependencies, citation) });
+  const blocks = typeof module === 'object' && module.exports
+    ? require('./chatgpt_web_text_blocks.js') : root?.__elonChatGptTextBlocks;
+  const exported = Object.freeze({ version: 13, create: dependencies => factory(dependencies, citation, blocks) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateHistoryProjection = exported;
-})(typeof window === 'object' ? window : null, function (dependencies, citation) {
+})(typeof window === 'object' ? window : null, function (dependencies, citation, textBlocks) {
   'use strict';
 
   const MAX_MESSAGES = 80;
@@ -165,13 +167,14 @@
     const message = node && object(node.message || node);
     if (!message || !visible(message)) return null;
     const role = message.author && message.author.role || message.role;
-    let text = textContent(message.content);
+    const blocks = textBlocks?.project(message);
+    let text = blocks?.text ?? textContent(message.content);
     let citations = [];
     let cards = [];
     if (role === 'assistant' && streamPolicy) {
       if (typeof streamPolicy.visibleContentText === 'function') text = streamPolicy.visibleContentText(text);
       const projected = streamPolicy.assistantFrame({ message: Object.assign({}, message, {
-        author: { role }, content: { content_type: 'text', parts: [text] }
+        author: { role }, content: blocks ? message.content : { content_type: 'text', parts: [text] }
       }) });
       if (projected) { text = projected.text.slice(0, MAX_TEXT); citations = projected.citations || []; }
       cards = streamPolicy.financePartsFromMetadata(message.metadata);
@@ -181,6 +184,7 @@
     const content = [];
     if (text) content.push({ type: role === 'assistant' ? 'markdown' : 'text', text });
     content.push(...mediaParts(message), ...citations, ...cards);
+    content.push(...(blocks?.parts || []));
     if (!content.length) return null;
     return {
       id: clean(message.id || node.id, 180) || entry.fallbackId,

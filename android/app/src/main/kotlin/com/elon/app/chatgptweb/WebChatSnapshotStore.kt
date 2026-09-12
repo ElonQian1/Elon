@@ -135,7 +135,8 @@ internal object WebChatSnapshotCacheCodec {
                 put(JSONObject()
                     .put("type", part.type)
                     .put("label", part.label.take(MAX_PART_LABEL))
-                    .put("metadata", metadataJson(part.metadata)))
+                    .put("metadata", metadataJson(part.metadata))
+                    .put("text_block", part.textBlock?.toJson()))
             }
         })
 
@@ -146,7 +147,10 @@ internal object WebChatSnapshotCacheCodec {
             val type = value.optString("type").takeIf(SUPPORTED_PARTS::contains) ?: continue
             val label = value.optString("label").trim().take(MAX_PART_LABEL)
             if (label.isBlank()) continue
-            add(ChatGptWebMessagePart(type, label, metadata(value.optJSONObject("metadata"))))
+            add(ChatGptWebMessagePart(type, label, metadata(value.optJSONObject("metadata")),
+                textBlock = if (type == "code" || type == "writing_block")
+                    com.elon.app.WebChatTextBlock.parse(value.optJSONObject("text_block"))
+                        ?.takeIf { (it.kind == "code") == (type == "code") } else null))
         }
     }
 
@@ -186,6 +190,6 @@ internal object WebChatSnapshotCacheCodec {
     private const val MAX_OBSERVED_MESSAGES = 10_000
     private val SUPPORTED_PARTS = setOf(
         "image", "file", "citation", "code", "table", "artifact", "audio", "video",
-        "math", "chart", "map", "interactive",
+        "math", "chart", "map", "interactive", "writing_block",
     )
 }

@@ -210,7 +210,7 @@ internal object WebChatProductionRichContentBinder {
 
 internal object WebChatProductionRichContentPolicy {
     fun fallbackParts(parts: List<WebChatProductionContentPart>): List<WebChatProductionContentPart> =
-        parts.filterNot { it.type in INLINE_RENDERED_TYPES }
+        parts.filterNot { it.type in INLINE_RENDERED_TYPES && it.textBlock == null }
 
     private val INLINE_RENDERED_TYPES = setOf(
         "citation",

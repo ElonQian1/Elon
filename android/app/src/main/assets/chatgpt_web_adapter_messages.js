@@ -323,14 +323,15 @@
     };
   }
 
-  function codeMetadata(node) {
+  function codeMetadata(node, index) {
     const code = node.querySelector('code') || node;
     const match = String(code.className || '').match(/language-([A-Za-z0-9_+.#-]+)/);
     const value = String(code.textContent || '');
     return {
       kind: 'code_block',
       language: match ? match[1].slice(0, 32) : '',
-      lineCount: Math.max(1, value.split('\n').length)
+      lineCount: Math.max(1, value.split('\n').length),
+      textBlock: window.__elonChatGptTextBlocks?.domCode(value, match ? match[1] : '', index)
     };
   }
 
@@ -387,8 +388,8 @@
     images.forEach((image) => {
       add('image', image.label, image.node, image.metadata);
     });
-    Array.from(content.querySelectorAll('pre')).forEach((node) => {
-      const metadata = codeMetadata(node);
+    Array.from(content.querySelectorAll('pre')).forEach((node, index) => {
+      const metadata = codeMetadata(node, index);
       const label = metadata.language ? metadata.language + ' 代码' : '代码块';
       add('code', label, node, metadata);
     });

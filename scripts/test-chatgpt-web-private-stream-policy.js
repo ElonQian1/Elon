@@ -19,6 +19,7 @@ const payload = (text, status = 'in_progress') => ({
 });
 
 assert.deepEqual(policy.assistantFrame(payload('first')), {
+  blockParts: [],
   id: 'assistant-one',
   conversationId: 'conversation-one',
   text: 'first',

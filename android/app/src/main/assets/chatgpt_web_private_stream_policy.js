@@ -3,10 +3,11 @@
 
   const policy = factory(typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_delta_document.js')
-    : root && root.__elonChatGptPrivateDeltaDocument);
+    : root && root.__elonChatGptPrivateDeltaDocument,
+    typeof module === 'object' && module.exports ? require('./chatgpt_web_text_blocks.js') : root?.__elonChatGptTextBlocks);
   if (typeof module === 'object' && module.exports) module.exports = policy;
   if (root) root.__elonChatGptPrivateStreamPolicy = Object.freeze(policy);
-})(typeof window === 'object' ? window : null, function (deltaDocuments) {
+})(typeof window === 'object' ? window : null, function (deltaDocuments, textBlocks) {
   'use strict';
 
   const MAX_TEXT_LENGTH = 40000;
@@ -358,14 +359,17 @@
     const contentType = String(message.content && message.content.content_type || '').toLowerCase();
     if (contentType && contentType !== 'text') return null;
     const citations = citationRecords(message.metadata);
-    const text = linkedText(contentText(message.content), citations).slice(0, MAX_TEXT_LENGTH);
-    if (!text) return null;
+    const blocks = textBlocks?.project(message);
+    const resolved = blocks && blocks.text !== message.content.parts.join('');
+    const text = (resolved ? visibleContentText(blocks.text) : linkedText(contentText(message.content), citations)).slice(0, MAX_TEXT_LENGTH);
+    if (!text && !blocks?.parts.length) return null;
     const rawStatus = String(message.status || envelope.status || '').toLowerCase();
     const completed = /^(completed|finished_successfully|finished)$/.test(rawStatus);
     return {
       id: String(message.id || '').slice(0, 180),
       conversationId: String(envelope.conversation_id || envelope.conversationId || '').slice(0, 180),
       text,
+      blockParts: blocks?.parts || [],
       citations: citations.map((citation) => citation.part),
       state: completed ? 'completed' : 'streaming'
     };
@@ -474,6 +478,7 @@
     const replaceFinance = Array.isArray(stream.richParts) && stream.richParts.length > 0;
     const content = Array.isArray(message.content)
       ? message.content.filter((part) => part &&
+        (!Array.isArray(stream.blockParts) || !['code', 'writing_block'].includes(part.type)) &&
         (!replaceCitations || part.type !== 'citation') &&
         (!replaceFinance || !(
           (part.type === 'rich_card' && (part.kind === 'finance' ||
@@ -487,12 +492,13 @@
     else content.unshift(part);
     (stream.citations || []).forEach((citation) => content.push(Object.assign({}, citation)));
     (stream.richParts || []).forEach((richPart) => content.push(Object.assign({}, richPart)));
+    (stream.blockParts || []).forEach((blockPart) => content.push(Object.assign({}, blockPart)));
     return Object.assign({}, message, { state: stream.state, content });
   }
 
   function mergeMessages(messages, stream) {
     const values = Array.isArray(messages) ? messages : [];
-    if (!stream || (!stream.text && stream.state !== 'streaming')) return values;
+    if (!stream || (!stream.text && !stream.blockParts?.length && stream.state !== 'streaming')) return values;
     let assistantIndex = -1;
     for (let index = values.length - 1; index >= 0; index -= 1) {
       if (values[index] && values[index].role === 'assistant') {
@@ -516,7 +522,7 @@
       sameTurn
     );
     if (sameMessage) {
-      if (text.length > stream.text.length) {
+      if (text.length > stream.text.length && !stream.blockParts?.length) {
         stream = Object.assign({}, stream, { text });
       }
       const result = values.slice();
@@ -529,7 +535,8 @@
       state: stream.state,
       content: [{ type: 'markdown', text: stream.text }].concat(
         (stream.citations || []).map((citation) => Object.assign({}, citation)),
-        (stream.richParts || []).map((richPart) => Object.assign({}, richPart))
+        (stream.richParts || []).map((richPart) => Object.assign({}, richPart)),
+        (stream.blockParts || []).map((blockPart) => Object.assign({}, blockPart))
       )
     }]);
   }

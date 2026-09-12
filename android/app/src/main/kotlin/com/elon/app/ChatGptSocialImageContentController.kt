@@ -10,6 +10,7 @@ internal class ChatGptSocialImageContentController(
     private val openOfficialFallback: () -> Unit,
 ) {
     fun open(part: WebChatProductionContentPart) {
+        part.textBlock?.let { WebChatTextBlockEditor(activity, it).show(); return }
         part.richCard?.let { card ->
             WebChatProductionRichCardViews.show(activity, card)
             return

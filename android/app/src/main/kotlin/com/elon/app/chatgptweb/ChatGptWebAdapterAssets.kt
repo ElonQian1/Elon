@@ -28,6 +28,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_private_content_source.js", "chatgpt_web_image_assets.js",
         "chatgpt_web_private_image_pointer.js",
         "chatgpt_web_private_image_gallery.js",
+        "chatgpt_web_text_blocks.js",
         "chatgpt_web_adapter_messages.js",
         "chatgpt_web_adapter_model_label_policy.js",
         "chatgpt_web_private_model_contract.js",

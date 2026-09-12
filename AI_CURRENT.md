@@ -8,6 +8,8 @@ reviewed_at: 2026-09-05
 
 ## 当前产品主链
 
+- [Writing Blocks](docs/chatgpt-writing-blocks-native.md)
+
 - 量化拥有网格 UI；[事件通信](docs/reports/android-binance-session-events-20260912.md)已发布1685，配套量化0.7.39；待设备验收。历史：[读取1661](docs/android-binance-account-read-v3-delivery.md)、[资金1660](docs/android-binance-strategy-funds-v1-delivery.md)，设备待验。
 
 - Android Web AI 默认使用已验证的同源私有传输、预设和有界缓存，失败回退官网且不导出凭证或重放写请求。近期真机验收：附件进度 `v1.1.1491`、原生项目选择器 `v1.1.1493`、私有朗读 `v1.1.1498`、会话置顶/重命名/归档 `v1.1.1506`（adapter `244`，正式发布 `v1.1.1510`）、私有项目迁移 `v1.1.1514`（adapter `245`，恰好一次移入和一次移回且恢复原项目），以及图片生成状态 `v1.1.1518`（adapter `247`，单次生产发送、原生图片结构、状态恢复与验收登记通过）。私有项目迁移已取代正常路径的 DOM 激活，旧官网菜单仅作兼容修复兜底；这些能力默认不等待官网 DOM，证据见 `docs/web-ai-private-transport-capability-matrix.md`，无当前回归不得重复实现。
