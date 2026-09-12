@@ -38,9 +38,19 @@
     const preparedBody = body(context);
     const userMessageId = page.crypto.randomUUID(), turnId = page.crypto.randomUUID();
     if (!UUID.test(userMessageId) || !UUID.test(turnId)) fail('identifier_invalid');
-    let consumed = false;
+    let consumed = false, stopConduit = null, stopConsumed = false;
     return Object.freeze({ userMessageId, turnId,
       preparationBody: () => JSON.parse(JSON.stringify(preparedBody)),
+      consumeStop(excludeAsyncTypes, current) {
+        if (!consumed || !stopConduit || stopConsumed) fail('stop_ownership_unavailable');
+        if (!Array.isArray(excludeAsyncTypes) || ![JSON.stringify([]), JSON.stringify(['pro_mode'])]
+          .includes(JSON.stringify(excludeAsyncTypes))) fail('stop_scope_invalid');
+        if (current() !== true) fail('context_changed');
+        stopConsumed = true;
+        const conduit = stopConduit; stopConduit = null;
+        return { requestBody: { conversation_id: context.conversationId, exclude_async_types: [...excludeAsyncTypes] },
+          additionalHeaders: { 'x-conduit-token': conduit, 'x-oai-turn-trace-id': turnId } };
+      },
       consume(preparation, security, headersFromSecurity, current) {
         if (consumed) fail('preparation_consumed');
         if (current() !== true) fail('context_changed');
@@ -55,6 +65,7 @@
               typeof value !== 'string' || !value || value.length > 65536 || /[\r\n]/.test(value))) fail('security_invalid');
         if (current() !== true) fail('context_changed');
         consumed = true;
+        stopConduit = conduit;
         return {
           headers: { ...headers, 'x-conduit-token': conduit, 'x-oai-turn-trace-id': turnId },
           body: { ...preparedBody, client_prepare_state: 'success', messages: [{

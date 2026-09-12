@@ -10,6 +10,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 function fixture(fresh) {
   const results = [], calls = [];
   const page = { __elonChatGptFreshTextTransaction: fresh,
+    __elonChatGptPrivateStreamTransport: { finishPrivateSend: () => calls.push('finish_stream') },
     __elonChatGptPrivateTextRuntimeSubmit: { submit() {
       calls.push('official'); return { handled: true, completion: Promise.resolve({ status: 'accepted' }) };
     } } };
@@ -66,12 +67,24 @@ test('an unreconciled private write blocks attachment and regeneration callbacks
   f.api.regenerateResponse(f.respond, () => { throw Error('must not fall back'); });
   assert.equal(f.calls.includes('official'), false); assert.equal(f.results.length, 2);
 });
-test('cancelling a private HTTP reader does not falsely report confirmed server stop', () => {
+test('missing owned stop never cancels the reader or falls back to another server request', async () => {
   let cancelled = 0;
   const f = fixture({ state: () => ({ pending: true }), cancel: () => { cancelled++; } });
   f.api.stopGeneration(f.respond, () => { throw Error('must not fall back'); });
-  assert.equal(cancelled, 1);
+  await tick();
+  assert.equal(cancelled, 0);
   assert.deepEqual(f.results[0], ['stop_generation', false, 'private_text_v1:unknown:server_stop_unconfirmed']);
+});
+
+for (const status of ['accepted', 'unknown']) test('owned stop router reports ' + status + ' without clearing text prematurely', async () => {
+  let resolve;
+  const completion = new Promise(done => { resolve = done; });
+  const f = fixture({ state: () => ({ pending: true }), stop: () => ({ handled: true, completion }) });
+  f.api.stopGeneration(f.respond, () => { throw Error('must not fall back'); });
+  assert.equal(f.results.length, 0); assert.equal(f.calls.includes('finish_stream'), false);
+  resolve({ status, code: 'stop_unconfirmed' }); await tick();
+  assert.equal(f.results[0][1], status === 'accepted');
+  assert.equal(f.calls.includes('finish_stream'), status === 'accepted');
 });
 test('production asset assembly loads dependencies before the one existing send router', () => {
   const source = require('./chatgpt-web-adapter-assembly').readAdapterSource();
@@ -79,7 +92,7 @@ test('production asset assembly loads dependencies before the one existing send 
     .matchAll(/"([a-z0-9_]+\.js)"/g)].map(m => m[1]);
   const chain = ['chatgpt_web_private_runtime_bindings.js', 'chatgpt_web_private_text_runtime_submit.js',
     'chatgpt_web_fresh_text_request.js', 'chatgpt_web_fresh_text_context.js',
-    'chatgpt_web_fresh_text_reconcile.js',
+    'chatgpt_web_fresh_text_reconcile.js', 'chatgpt_web_fresh_text_stop.js',
     'chatgpt_web_fresh_text_transaction.js', 'chatgpt_web_text_transaction_orchestrator.js'];
   for (let i = 0; i < chain.length; i++) {
     assert.equal(names.filter(n => n === chain[i]).length, 1);

@@ -134,4 +134,18 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     includes(dispatch.calls, ['HOe', 'THe', 'IB', 'ZZt', 'iQt', 'rNe', 'QZt']);
     includes(dispatch.strings, ['x-conduit-token', '/f/conversation']);
   });
+
+  await t.test('server stop uses this prepared conduit, observed gates and explicit async exclusions', () => {
+    const node = definition(conversation, 'xWt', true), stop = facts(node);
+    includes(stop.strings, ['/stop_conversation', 'x-conduit-token', 'x-oai-turn-trace-id',
+      '3922476776', '877631007', 'pro_mode']);
+    includes(stop.properties, ['safePost', 'requestBody', 'additionalHeaders', 'conversation_id',
+      'exclude_async_types', 'stopConduitToken', 'chime_version']);
+    assert.deepEqual(conversation.imports.get('ts'), { file: './' + assets.shared[0], name: 'b5' });
+    assert.match(conversation.text.slice(node.start, node.end), /exclude_async_types:T\?\[`pro_mode`\]:\[\]/);
+    assert.match(composer.text, /conduitToken:null,stopConduitToken:t/);
+    assert.match(shared.text, /case`finished_partial_completion`/);
+    assert.match(shared.text, /e\[e\.STREAMING=3\]=`STREAMING`,e\[e\.UNREAD=4\]=`UNREAD`/);
+    assert.match(conversation.text, /value:t\.async_status/);
+  });
 });

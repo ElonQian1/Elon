@@ -206,6 +206,16 @@ test('cancel before POST cannot start on late preparation', async () => {
   assert.equal(f.api.state().pending, false); assert.equal(f.calls.some(x => x.kind === 'post'), false);
 });
 
+test('owned stop before dispatch confirms local cancellation without calling a server stop', async () => {
+  const pending = deferred(), f = fixture({ prepare: () => pending.promise });
+  const send = f.send(); await turn();
+  assert.deepEqual(await f.api.stop().completion, { status: 'accepted', code: 'cancelled_before_dispatch' });
+  await send.completion;
+  pending.resolve({ conduit_token: 'fixture' }); await turn();
+  assert.equal(f.api.state().pending, false);
+  assert.equal(f.calls.some(x => x.kind === 'post'), false);
+});
+
 test('cancel an open request retains unknown server status; no automatic stop success', async () => {
   const wait = deferred(), f = fixture({ stream: value => (async function* () {
     value.onBeforeRequestStart();

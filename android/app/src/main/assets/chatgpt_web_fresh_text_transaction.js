@@ -1,8 +1,9 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptFreshTextTransaction) {
+  if (root?.location?.origin === 'https://chatgpt.com' &&
+      !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
     root.__elonChatGptFreshTextTransaction = factory(root);
   }
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -11,6 +12,7 @@
   const context = options.context || page.__elonChatGptFreshTextContext.create(page);
   const requests = (options.requests || page.__elonChatGptFreshTextRequest).create(page);
   const reconciliation = options.reconciliation || page.__elonChatGptFreshTextReconcile.create();
+  const stopping = options.stopping || page.__elonChatGptFreshTextStop?.create(page, { reconciliation });
   const records = new Map();
   let document = page.document, token = page.__elonChatGptDocumentToken, active = null;
   const knownCodes = new Set(['context_changed', 'context_invalid', 'command_invalid', 'scope_unsupported',
@@ -22,16 +24,17 @@
   function boundary() {
     if (document === page.document && token === page.__elonChatGptDocumentToken) return;
     active?.controller.abort();
+    active?.stopBoundaryController.abort();
     active = null; records.clear();
     document = page.document; token = page.__elonChatGptDocumentToken;
   }
 
   function state() {
     boundary();
-    if (active?.dispatched && active.finished) {
-      try { if (active.binding.reconciled(active.request.userMessageId)) active = null; } catch (_) {}
+    if (active?.dispatched && active.finished && !active.stopping) {
+      try { if (active.stopConfirmed || active.binding.reconciled(active.request.userMessageId, active.stopAcknowledged === true)) active = null; } catch (_) {}
     }
-    return { version: 1, transport: 'fresh_page_http_v1', pending: active !== null,
+    return { version: 2, transport: 'fresh_page_http_v1', pending: active !== null,
       phase: active?.phase || 'idle', dispatched: active?.dispatched === true,
       accepted: active?.accepted === true, code: active?.code || '' };
   }
@@ -59,7 +62,12 @@
     if (records.size >= 32) return { handled: false, code: 'trial_budget' };
     let resolve;
     const owner = { token, document, stamp, controller: new page.AbortController(), phase: 'preparing',
+      stopBoundaryController: new page.AbortController(),
       dispatched: false, accepted: false, finished: false, settled: false, fallback: false };
+    owner.stopBoundary = owner.stopBoundaryController.signal;
+    owner.stopCurrent = () => active === owner && owner.document === page.document &&
+      owner.token === page.__elonChatGptDocumentToken && owner.binding?.owns() === true;
+    owner.stopReading = () => owner.controller.abort();
     const completion = new Promise(done => { resolve = done; });
     function receipt(value) { if (!owner.settled) { owner.settled = true; resolve(value); } }
     const transaction = Object.freeze({ handled: true, completion,
@@ -192,5 +200,24 @@
     // This cancels our HTTP reader; it does not falsely confirm server stop.
     return true;
   }
-  return Object.freeze({ version: 1, send, state, cancel });
+  function stop() {
+    state();
+    const owner = active;
+    if (!owner) return { handled: false };
+    if (!owner.dispatched) {
+      cancel();
+      return { handled: true, completion: Promise.resolve({ status: 'accepted', code: 'cancelled_before_dispatch' }) };
+    }
+    if (!stopping) return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'server_stop_unconfirmed' }) };
+    owner.phase = 'stopping';
+    const completion = stopping.stop(owner).then(receipt => {
+      if (active === owner) {
+        owner.phase = receipt.status === 'accepted' ? 'completed' : 'uncertain';
+        owner.code = receipt.status === 'accepted' ? '' : receipt.code;
+      }
+      return receipt;
+    });
+    return { handled: true, completion };
+  }
+  return Object.freeze({ version: 2, send, state, cancel, stop });
 });

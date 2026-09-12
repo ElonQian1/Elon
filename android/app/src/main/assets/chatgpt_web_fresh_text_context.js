@@ -83,8 +83,9 @@
           page.__elonChatGptCanvasDocumentActions?.generationPending?.()) fail('conversation_busy');
       const parent = shared.HM.getCurrentMessage(state), model = conversation.Nrn(selected);
       if (!parent || parent.id !== props.currentLeafId || !idPattern.test(parent.id) ||
-          parent.author?.role !== 'assistant' || parent.status !== 'finished_successfully' ||
-          parent.end_turn !== true || shared.textModelOverride()?.model_slug === model?.id) fail('parent_unavailable');
+          parent.author?.role !== 'assistant' || !(parent.status === 'finished_partial_completion' ||
+          parent.status === 'finished_successfully' && parent.end_turn === true) ||
+          shared.textModelOverride()?.model_slug === model?.id) fail('parent_unavailable');
       return { conversationId: binding.serverId, parentId: parent.id, model: model?.id,
         effort: conversation.yRt(selected).conversationThinkingEffort$() ?? null,
         serviceTier: conversation.l0(selected).getServiceTierForSubmission$() ?? null,
@@ -107,14 +108,28 @@
         return leaf?.id === snapshot.parentId || leaf?.id === userMessageId ||
           shared.HM.getParentPromptNode(state, leaf?.id)?.id === userMessageId;
       },
-      reconciled(userMessageId) {
-        if (!owns()) return false;
+      canStop(userMessageId) {
+        if (!this.canReconcile(userMessageId)) return false;
+        const status = shared.Fx(selected);
+        return shared.Fl(shared.HM.getRequestId(tree())) === false &&
+          (status == null || status.value === shared.v7.UNREAD || status.value === shared.v7.STREAMING) &&
+          !submit.state?.().pending && !page.__elonChatGptPrivateRegenerateRuntime?.state?.().pending &&
+          !page.__elonChatGptPrivateTextTransactionRelay?.state?.().active &&
+          !page.__elonChatGptPrivateStopRuntime?.state?.().pending;
+      },
+      reconciled(userMessageId, stopped = false, emptyStopped = false) {
+        if (!owns() || stopped && !this.canStop(userMessageId)) return false;
+        const status = shared.Fx(selected);
+        if (stopped && status != null && status.value !== shared.v7.UNREAD) return false;
         const state = tree(), user = shared.HM.getNodeIfExists(state, userMessageId);
         const parent = shared.HM.getParentNode(state, userMessageId);
         const leaf = shared.HM.getCurrentMessage(state);
+        if (stopped && emptyStopped && user?.message?.author?.role === 'user' &&
+            parent?.id === snapshot.parentId && leaf?.id === userMessageId && leaf.author?.role === 'user') return true;
         return user?.message?.author?.role === 'user' && parent?.id === snapshot.parentId &&
           leaf?.id !== snapshot.parentId && leaf?.id !== userMessageId &&
-          leaf?.author?.role === 'assistant' && leaf.status === 'finished_successfully' && leaf.end_turn === true &&
+          leaf?.author?.role === 'assistant' && (leaf.status === 'finished_successfully' && leaf.end_turn === true ||
+            stopped && leaf.status === 'finished_partial_completion') &&
           shared.HM.getParentPromptNode(state, leaf.id)?.id === userMessageId;
       }
     });

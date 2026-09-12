@@ -23,7 +23,7 @@ function fixture() {
     textApi: { safePost() {} }, textSecurityHeaders() {}, textHistoryDisabled: () => false,
     textModelOverride: () => ({ model_slug: 'another-model' }), XM: () => tree,
     HM: { getGizmoId: () => null, getRequestId: () => null, getCurrentMessage: () => parent },
-    cX: () => false, uo: () => false, Fx: () => null, Fl: () => false, v7: { UNREAD: 4 },
+    cX: () => false, uo: () => false, Fx: () => null, Fl: () => false, v7: { STREAMING: 3, UNREAD: 4 },
     canvasConversations: () => [selected] };
   const conversation = { textSecurity() {}, textStream() {}, textHydrateHistory() {},
     textPrepareEnabled: () => true, textReviewAck: () => null,
@@ -99,4 +99,16 @@ test('read-only reconciliation requires own user and original parent on the sele
   f.shared.HM.getParentPromptNode = () => ({ id: 'other' });
   assert.equal(binding.reconciled(uid), false);
   assert.equal(binding.canReconcile(uid), false);
+});
+
+test('stopped partial assistant can be the next parent but an active writer cannot be stopped', async () => {
+  const f = fixture(); f.parent.status = 'finished_partial_completion'; f.parent.end_turn = false;
+  const binding = await f.api.capture(f.node);
+  assert.equal(binding.parentId, PID); assert.equal(binding.canStop('fixture-user'), true);
+  f.shared.Fx = () => ({ value: 3 });
+  assert.equal(binding.canStop('fixture-user'), true, 'history will prove which server stream owns this request');
+  assert.equal(binding.reconciled('fixture-user', true), false);
+  f.shared.Fl = () => true; assert.equal(binding.canStop('fixture-user'), false);
+  f.shared.Fl = () => false; f.shared.Fx = () => ({ value: 5 });
+  assert.equal(binding.canStop('fixture-user'), false);
 });

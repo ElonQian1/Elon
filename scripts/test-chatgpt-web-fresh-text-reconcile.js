@@ -58,3 +58,13 @@ test('same-owner check happens before any history request', async () => {
   assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal), false);
   assert.equal(f.calls.length, 0);
 });
+
+test('stopped partial history requires an explicit idle server status, not EOF or an omitted field', async () => {
+  for (const status of [undefined, 3, 5, null, 4]) {
+    const f = fixture(); f.payload.async_status = status;
+    f.payload.mapping[AID].message.status = 'finished_partial_completion';
+    f.payload.mapping[AID].message.end_turn = false;
+    assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal), false);
+    assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal, true), status === null || status === 4);
+  }
+});
