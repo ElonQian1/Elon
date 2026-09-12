@@ -44,6 +44,39 @@ class WebChatProductionComposerVisualModeTest {
         )
     }
 
+    @Test
+    fun webChatCollapsedDraftKeepsSendWithoutReopeningTheKeyboard() {
+        assertEquals(
+            WebChatProductionComposerVisualMode.SEND,
+            resolve(hasText = true, composerExpanded = false, allowCollapsedDraftSend = true),
+        )
+        assertEquals(
+            WebChatProductionComposerVisualMode.INPUT_MODE,
+            resolve(composerExpanded = false, allowCollapsedDraftSend = true),
+        )
+    }
+
+    @Test
+    fun collapsedDraftDoesNotReplaceVoiceOrDictationControls() {
+        assertEquals(
+            WebChatProductionComposerVisualMode.INPUT_MODE,
+            resolve(hasText = true, composerExpanded = false, allowCollapsedDraftSend = true, voiceMode = true),
+        )
+        assertEquals(
+            WebChatProductionComposerVisualMode.INPUT_MODE,
+            resolve(hasText = true, composerExpanded = false, allowCollapsedDraftSend = true, dictationActive = true),
+        )
+    }
+
+    @Test
+    fun streamingStopWinsOverCollapsedDraftAndDictation() {
+        assertEquals(
+            WebChatProductionComposerVisualMode.STOP,
+            resolve(streaming = true, hasText = true, composerExpanded = false,
+                allowCollapsedDraftSend = true, dictationActive = true),
+        )
+    }
+
     private fun resolve(
         streaming: Boolean = false,
         hasText: Boolean = false,
@@ -51,6 +84,7 @@ class WebChatProductionComposerVisualModeTest {
         voiceMode: Boolean = false,
         composerExpanded: Boolean = true,
         dictationActive: Boolean = false,
+        allowCollapsedDraftSend: Boolean = false,
     ) = WebChatProductionComposerVisualModeResolver.resolve(
         streaming = streaming,
         hasText = hasText,
@@ -58,5 +92,6 @@ class WebChatProductionComposerVisualModeTest {
         voiceMode = voiceMode,
         composerExpanded = composerExpanded,
         dictationActive = dictationActive,
+        allowCollapsedDraftSend = allowCollapsedDraftSend,
     )
 }

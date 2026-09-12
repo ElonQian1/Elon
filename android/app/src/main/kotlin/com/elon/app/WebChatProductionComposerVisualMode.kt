@@ -14,12 +14,13 @@ internal object WebChatProductionComposerVisualModeResolver {
         voiceMode: Boolean,
         composerExpanded: Boolean,
         dictationActive: Boolean = false,
+        allowCollapsedDraftSend: Boolean = false,
     ): WebChatProductionComposerVisualMode {
         if (streaming) return WebChatProductionComposerVisualMode.STOP
         if (dictationActive) return WebChatProductionComposerVisualMode.INPUT_MODE
         val canSend = (hasText || hasAttachments) &&
             !voiceMode &&
-            (composerExpanded || hasAttachments)
+            (composerExpanded || hasAttachments || (allowCollapsedDraftSend && hasText))
         return if (canSend) {
             WebChatProductionComposerVisualMode.SEND
         } else {

@@ -31,6 +31,7 @@ internal class MainSendButtonVisualActions(
         val hasAttachments = hasPendingAttachments()
         val composerExpanded = inputComposerMotion()?.isExpanded == true
         val streaming = isWebChatStreaming()
+        val webChatComposer = binding.modelButton.tag == WEB_CHAT_MODEL_BUTTON_OWNER
         val visualMode = WebChatProductionComposerVisualModeResolver.resolve(
             streaming = streaming,
             hasText = hasText,
@@ -38,6 +39,7 @@ internal class MainSendButtonVisualActions(
             voiceMode = isVoiceMode(),
             composerExpanded = composerExpanded,
             dictationActive = isWebChatDictationActive(),
+            allowCollapsedDraftSend = webChatComposer,
         )
         val params = binding.sendButton.layoutParams as? FrameLayout.LayoutParams
         if (visualMode != WebChatProductionComposerVisualMode.INPUT_MODE) {
@@ -51,7 +53,6 @@ internal class MainSendButtonVisualActions(
                 binding.sendButton.background = InsetDrawable(it, dp(3))
             }
             binding.sendButton.text = ""
-            val webChatComposer = binding.modelButton.tag == WEB_CHAT_MODEL_BUTTON_OWNER
             binding.sendButton.contentDescription = if (webChatComposer) {
                 WebChatProductionSelectors.composerAction(
                     streaming = visualMode == WebChatProductionComposerVisualMode.STOP,

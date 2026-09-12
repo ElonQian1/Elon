@@ -26,8 +26,7 @@ public final class CanvasUiAcceptance extends UiAutomatorTestCase {
     }
     private void focusComposer() throws Exception {
         if (!input().exists()) {
-            UiObject fixture = new UiObject(new UiSelector().packageName(APP).textStartsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"));
-            click(fixture.exists() ? fixture : text("\u8f93\u5165\u5185\u5bb9"));
+            click(composerPreview());
         }
         assertTrue("fixture_input_missing", input().waitForExists(5000));
     }
@@ -116,11 +115,64 @@ public final class CanvasUiAcceptance extends UiAutomatorTestCase {
         }
         assertTrue("history_preview_missing", description("web-chat-canvas-history-content").waitForExists(5000));
     }
+    private UiObject composerPreview() throws Exception {
+        UiObject panel = new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/inputLayout"));
+        UiObject fixture = panel.getChild(new UiSelector().className("android.widget.TextView").clickable(true)
+            .textStartsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"));
+        return fixture.exists() ? fixture : panel.getChild(new UiSelector().className("android.widget.TextView")
+            .clickable(true).text("\u8f93\u5165\u5185\u5bb9"));
+    }
+    private JSONObject inspectComposer() throws Exception {
+        UiObject editor = input();
+        JSONObject result = new JSONObject().put("editor", editor.exists())
+            .put("collapsed_preview", composerPreview().exists())
+            .put("send", description("web-chat-send").exists())
+            .put("voice", description("web-chat-composer-command:chatgpt_web:start-realtime-voice").exists());
+        if (editor.exists()) {
+            AccessibilityNodeInfo info = node(editor);
+            try {
+                Rect bounds = new Rect(); info.getBoundsInScreen(bounds);
+                result.put("focused", info.isFocused()).put("enabled", info.isEnabled())
+                    .put("height", bounds.height()).put("visible", info.isVisibleToUser())
+                    .put("text_length", info.getText() == null ? 0 : info.getText().length());
+            } finally { info.recycle(); }
+        }
+        return result;
+    }
     public void testStep() throws Exception {
         assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
         String step = getParams().getString("step", "inspect");
         JSONObject result = new JSONObject().put("step", step).put("content_exported", false);
         switch (step) {
+            case "inspect_composer": result.put("composer", inspectComposer()); break;
+            case "probe_composer_focus":
+                result.put("before", inspectComposer());
+                click(composerPreview());
+                result.put("after_click", inspectComposer());
+                Thread.sleep(300);
+                result.put("after_300ms", inspectComposer());
+                Thread.sleep(1700);
+                result.put("after_2s", inspectComposer());
+                break;
+            case "set_composer_fixture":
+                focusComposer();
+                AccessibilityNodeInfo composer = node(input());
+                try {
+                    assertTrue("composer_not_editable", composer.isEditable() && composer.isEnabled());
+                    assertTrue("composer_not_empty", composer.getText() == null || composer.getText().length() == 0 ||
+                        composer.isShowingHintText());
+                    Bundle args = new Bundle();
+                    args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                        "ELON_EXTENDED_TOOL_ACCEPTANCE_V1: Reply exactly COMPOSER_READY");
+                    assertTrue("composer_edit_failed", composer.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args));
+                } finally { composer.recycle(); }
+                result.put("draft_set", true); break;
+            case "collapse_composer":
+                assertTrue("composer_fixture_required", input().exists() && String.valueOf(input().getText())
+                    .startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"));
+                getUiDevice().pressBack();
+                assertTrue("composer_not_collapsed", input().waitUntilGone(5000));
+                result.put("composer", inspectComposer()); break;
             case "focus_composer":
                 focusComposer(); break;
             case "clear_fixture_draft":
@@ -135,11 +187,12 @@ public final class CanvasUiAcceptance extends UiAutomatorTestCase {
                 result.put("cleared", true); break;
             case "send_fixture":
                 UiObject input = input();
-                assertTrue("fixture_input_missing", input.waitForExists(5000));
+                UiObject visibleDraft = input.exists() ? input : composerPreview();
+                assertTrue("fixture_input_missing", visibleDraft.waitForExists(5000));
                 long deadline = android.os.SystemClock.elapsedRealtime() + 3000;
-                while (!String.valueOf(input.getText()).startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1") &&
+                while (!String.valueOf(visibleDraft.getText()).startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1") &&
                     android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(100);
-                assertTrue("fixture_prompt_missing", String.valueOf(input.getText()).startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"));
+                assertTrue("fixture_prompt_missing", String.valueOf(visibleDraft.getText()).startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"));
                 click(description("web-chat-send")); result.put("sent_once", true); break;
             case "open_documents": revealEntry(); result.put("native_entry", true); break;
             case "open_first":
