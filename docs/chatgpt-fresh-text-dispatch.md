@@ -181,6 +181,17 @@ There is no periodic polling or second transcript store in these modules.
 
 ## Not Completed
 
+September 13 follow-on source batch: the experimental 32-send lifetime ceiling
+is replaced by 32 retained receipts and an exact retired-command sequence range.
+The sequence comes from `ChatGptWebObservedState.beginCommand` (positive base-36
+Long IDs). Only settled/reconciled receipts can retire; uncertain writes retain
+their owner. Old commands outside the retained window are rejected, including
+when the private sender is disabled, rather than replayed through another sender.
+Diagnostics v6 count up to 65535 without limiting sends; the receiver also accepts
+bounded v5 receipts from an older active writer. The 92 focused JavaScript cases
+passed in `fresh-text-receipt-lifetime-20260913-075142-300`; Android validation and
+the grouped release are pending. This is not a repeated live-send stress test.
+
 - Follow-up after a stopped user-only turn and extended stopped-turn variants.
   The ordinary completed-turn follow-up and native stop above are accepted;
   cancelling a reader alone still **does not** confirm server stop.

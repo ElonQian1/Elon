@@ -164,6 +164,7 @@ test('owned stop crosses the real fresh transaction and releases only after serv
     await streamWait;
   })();
   const api = transaction.create(f.page, { requests: requestModule, reconciliation: history, stopping: f.api,
+    receipts: require(assets + 'chatgpt_web_fresh_text_receipts'),
     context: { capture: async () => f.binding, stamp: () => 'fixture-owner' } });
   const sent = api.send({ requestId: 'mcp_lifecycle', prompt: 'fixture', expectedDraft: '', readDraft: () => '' });
   assert.equal((await sent.completion).status, 'accepted');

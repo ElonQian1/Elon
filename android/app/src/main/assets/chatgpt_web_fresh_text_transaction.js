@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 7, create: factory });
+  const api = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -17,7 +17,7 @@
   const recovery = options.recovery || page.__elonChatGptFreshTextRecovery?.create(page, {
     reconciliation, timeoutMs: options.reconcileTimeoutMs || 15000
   });
-  const records = new Map();
+  const records = (options.receipts || page.__elonChatGptFreshTextReceipts).create();
   let document = page.document, token = page.__elonChatGptDocumentToken, active = null, disposed = false;
   let trial = null, last = null;
   const now = options.now || Date.now;
@@ -46,7 +46,7 @@
       try { if (active.stopConfirmed || active.recoveryConfirmed ||
         active.binding.reconciled(active.request.userMessageId, active.stopAcknowledged === true)) active = null; } catch (_) {}
     }
-    return { version: 5, transport: 'fresh_page_http_v1', pending: active !== null,
+    return { version: 6, transport: 'fresh_page_http_v1', pending: active !== null,
       phase: active?.phase || 'idle', dispatched: active?.dispatched === true,
       accepted: active?.accepted === true, code: active?.code || '', recovering: active?.recovering === true };
   }
@@ -70,9 +70,9 @@
     } else if (mode !== 'state') control = 'invalid_mode';
     const armed = trialArmed();
     const safeCode = value => /^[a-z_]{0,64}$/.test(value || '') ? value || '' : 'unknown';
-    return { schema: 'elon.fresh_text_trial.v1', version: 5, control, armed,
+    return { schema: 'elon.fresh_text_trial.v1', version: 6, control, armed,
       remaining_ms: armed ? Math.max(0, Math.min(120000, trial.expiresAt - now())) : 0,
-      attempts: records.size, pending: active !== null, phase: last?.phase || 'idle',
+      attempts: records.attempts(), pending: active !== null, phase: last?.phase || 'idle',
       code: safeCode(last?.code), dispatched: last?.dispatched === true,
       accepted: last?.accepted === true, reconciled: last?.recoveryConfirmed === true || last?.stopConfirmed === true,
       stream_events: last?.streamEvents || 0, event_types: Array.from(last?.eventTypes || []),
@@ -86,6 +86,8 @@
     if (previous) return previous.prompt === command.prompt && previous.expectedDraft === command.expectedDraft &&
       previous.href === page.location.href && previous.stamp === context.stamp() ? previous.transaction :
       { handled: true, completion: Promise.resolve({ status: 'rejected', code: 'request_id_conflict' }) };
+    if (records.retired(command?.requestId)) return { handled: true,
+      completion: Promise.resolve({ status: 'rejected', code: 'request_retired' }) };
     // A stopped/uncertain write still owns the ledger even if the trial is disabled.
     if (active) return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'busy' }) };
     if (page.__elonChatGptFreshTextDispatchEnabled === false && !trialArmed() ||
@@ -99,9 +101,8 @@
     if (!/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || '') || typeof command.prompt !== 'string' ||
         !command.prompt.trim() || command.prompt.length > 20000 || typeof command.expectedDraft !== 'string' ||
         command.expectedDraft && command.expectedDraft !== command.prompt) return { handled: false, code: 'invalid_command' };
-    // No eviction of write receipts within this document: exceeding this trial
-    // budget requires a fresh document, not permission to reuse an old command ID.
-    if (records.size >= 32) return { handled: false, code: 'trial_budget' };
+    const admission = records.admit(command.requestId);
+    if (admission) return { handled: true, completion: Promise.resolve({ status: 'rejected', code: admission }) };
     trial = null;
     let resolve;
     const owner = { token, document, stamp, controller: new page.AbortController(), phase: 'preparing',
@@ -126,7 +127,9 @@
       }
     });
     records.set(command.requestId, { prompt: command.prompt, expectedDraft: command.expectedDraft,
-      href: page.location.href, stamp, transaction });
+      href: page.location.href, stamp, transaction,
+      retirable: () => owner.finished && !owner.stopping && !owner.recovering && !owner.recoveryCompletion &&
+        (!owner.dispatched || owner.stopConfirmed === true || owner.recoveryConfirmed === true) });
     active = owner;
     last = owner;
     function current() {
@@ -315,5 +318,5 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 7, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
+  return Object.freeze({ version: 8, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

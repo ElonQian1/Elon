@@ -56,6 +56,7 @@ function fixture(options = {}) {
   const recovery = page.__elonChatGptFreshTextRecovery.create(page, { reconciliation, delays: [0, 0, 0],
     timeoutMs: options.reconcileTimeoutMs || 1000 });
   const api = transactionModule.create(page, { requests: requestModule, reconciliation, recovery,
+    receipts: asset('chatgpt_web_fresh_text_receipts'),
     now: options.now,
     context: { capture: options.capture || (async () => binding), stamp: () => current ? 'fixture-stamp' : 'changed' },
     prepareTimeoutMs: options.prepareTimeoutMs || 1000, openTimeoutMs: options.openTimeoutMs || 1000,
@@ -108,6 +109,27 @@ test('current independent writer remains visible before text and during reconcil
   f.setCurrent(false); assert.equal(f.api.hasCurrentWriter(), false);
   f.setCurrent(true); history.resolve(true); await turn(); await turn();
   assert.equal(f.api.hasCurrentWriter(), false);
+});
+
+test('more than 32 default sends stay independent and retired commands cannot replay through either sender', async () => {
+  const f = fixture({ reconciliation: async () => true });
+  delete f.page.__elonChatGptFreshTextDispatchEnabled;
+  let latest;
+  for (let i = 1; i <= 48; i++) {
+    latest = f.send({ requestId: 'mcp_' + i.toString(36) });
+    assert.equal((await latest.completion).status, 'accepted');
+    await turn(); await turn();
+    assert.equal(f.api.state().pending, false);
+  }
+  assert.equal(f.api.trialControl('state').attempts, 48);
+  assert.equal(f.api.trialControl('state').version, 6);
+  assert.equal(f.send({ requestId: 'mcp_' + (48).toString(36) }), latest);
+  f.page.__elonChatGptFreshTextDispatchEnabled = false;
+  const replay = f.send({ requestId: 'mcp_1' });
+  assert.equal(replay.handled, true);
+  assert.equal((await replay.completion).code, 'request_retired');
+  assert.equal(replay.claimFallback, undefined);
+  assert.equal(f.calls.filter(c => c.kind === 'post').length, 48);
 });
 
 test('stream diagnostics distinguish handoff without exporting events or releasing the writer', async () => {
@@ -426,7 +448,7 @@ test('an explicit history recovery releases a delayed turn then permits a new co
   assert.equal(f.api.state().pending, false);
   assert.equal(f.calls.filter(c => c.kind === 'post').length, 1);
   assert.equal(f.calls.filter(c => c.kind === 'finish_stream').length, 1);
-  await f.send({ requestId: 'mcp_afterrecovery' }).completion; await turn();
+  assert.equal((await f.send({ requestId: 'mcp_next2' }).completion).status, 'accepted'); await turn();
   assert.equal(f.calls.filter(c => c.kind === 'post').length, 2);
 });
 

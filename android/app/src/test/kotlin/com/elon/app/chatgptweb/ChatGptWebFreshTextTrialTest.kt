@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatGptWebFreshTextTrialTest {
-    private fun sample() = JSONObject().put("schema", ChatGptWebFreshTextTrial.SCHEMA).put("version", 5)
+    private fun sample() = JSONObject().put("schema", ChatGptWebFreshTextTrial.SCHEMA).put("version", 6)
         .put("control", "state").put("armed", false).put("remaining_ms", 0).put("attempts", 1)
         .put("pending", false).put("phase", "completed").put("code", "")
         .put("dispatched", true).put("accepted", true).put("reconciled", true)
@@ -23,7 +23,7 @@ class ChatGptWebFreshTextTrialTest {
 
     @Test fun rejectsUnknownFieldsAndOutOfRangeCounters() {
         for (value in listOf(sample().put("content", "fixture"), sample().put("remaining_ms", 120001),
-            sample().put("attempts", 33), sample().put("code", "/c/fixture"), sample().put("version", 6),
+            sample().put("attempts", 65536), sample().put("code", "/c/fixture"), sample().put("version", 7),
             sample().put("pending", "false"), sample().put("phase", "fixture"))) {
             assertEquals("invalid_protocol_evidence",
                 ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", value.toString()))
@@ -42,5 +42,19 @@ class ChatGptWebFreshTextTrialTest {
     @Test fun endedPermissionCannotClaimTimeRemaining() {
         assertEquals("invalid_protocol_evidence", ChatGptWebPrivateProtocolEvidence.detail(
             "private_protocol_probe", sample().put("remaining_ms", 10).toString()))
+    }
+
+    @Test fun acceptsMoreThanTrialBudgetWithoutUnboundedCounters() {
+        for (count in listOf(33, 1000, 65535)) {
+            val result = ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", sample().put("attempts", count).toString())
+            assertEquals(count, JSONObject(result).getInt("attempts"))
+        }
+    }
+
+    @Test fun retainsVersionFiveReceiptsWhileAnOlderWriterIsStillActive() {
+        val old = sample().put("version", 5).put("attempts", 32)
+        assertEquals(32, JSONObject(ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", old.toString())).getInt("attempts"))
+        assertEquals("invalid_protocol_evidence", ChatGptWebPrivateProtocolEvidence.detail(
+            "private_protocol_probe", old.put("attempts", 33).toString()))
     }
 }

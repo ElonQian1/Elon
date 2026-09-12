@@ -10,7 +10,7 @@ internal object ChatGptWebFreshTextTrial {
         require(value.keys().asSequence().toSet() == setOf("schema", "version", "control", "armed",
             "remaining_ms", "attempts", "pending", "phase", "code", "dispatched", "accepted", "reconciled",
             "stream_events", "event_types", "history"))
-        require(value.opt("version") == 5)
+        require(value.opt("version") in setOf(5, 6))
         require(value.opt("control") in setOf("state", "armed", "ended", "busy", "disabled", "disposed",
             "identity_unavailable", "invalid_mode"))
         require(value.opt("phase") in setOf("idle", "preparing", "dispatching", "streaming", "reconciling",
@@ -19,7 +19,8 @@ internal object ChatGptWebFreshTextTrial {
         for (key in listOf("armed", "pending", "dispatched", "accepted", "reconciled")) {
             require(value.opt(key) is Boolean)
         }
-        for ((key, maximum) in listOf("remaining_ms" to 120000L, "attempts" to 32L, "stream_events" to 65535L)) {
+        val maximumAttempts = if (value.opt("version") == 5) 32L else 65535L
+        for ((key, maximum) in listOf("remaining_ms" to 120000L, "attempts" to maximumAttempts, "stream_events" to 65535L)) {
             val number = value.opt(key)
             require((number is Int || number is Long) && (number as Number).toLong() in 0..maximum)
         }
