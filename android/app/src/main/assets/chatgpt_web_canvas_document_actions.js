@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptCanvasDocumentActions) {
     root.__elonChatGptCanvasDocumentActions = factory(root);
@@ -16,10 +16,10 @@
     const keys = op === 'list' ? ['operation', 'path', 'force'] :
       op === 'save' ? [...base, 'content', 'comments'] : op === 'rename' ? [...base, 'title'] :
       op === 'generate' ? [...base, 'prompt', 'start', 'end'] :
-      op === 'dismiss_comment' ? [...base, 'commentId'] : op === 'history' ? [...base, 'beforeVersion'] :
+      ['dismiss_comment', 'accept_comment'].includes(op) ? [...base, 'commentId'] : op === 'history' ? [...base, 'beforeVersion'] :
       op === 'prepare_export' ? [...base, 'format'] :
       op === 'restore' ? [...base, 'historyTicket', 'restoreVersion'] :
-      ['verify', 'share_lookup', 'share_create', 'share_ack'].includes(op) ? base : [];
+      ['verify', 'resume_comment', 'share_lookup', 'share_create', 'share_ack'].includes(op) ? base : [];
     if (!keys.length || !input || typeof input !== 'object' || Array.isArray(input) ||
         Object.keys(input).some(key => !keys.includes(key)) || typeof input.path !== 'string' ||
         input.path.length > 256 || op === 'list' && typeof input.force !== 'boolean' ||
@@ -32,7 +32,7 @@
         input.end < input.start || input.end > 128 * 1024)) throw Error();
     if (op === 'rename' && (typeof input.title !== 'string' || !input.title || input.title !== input.title.trim() ||
         input.title.length > 512 || /[\u0000-\u001f\u007f]/.test(input.title))) throw Error();
-    if (op === 'dismiss_comment' && (typeof input.commentId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(input.commentId))) throw Error();
+    if (['dismiss_comment', 'accept_comment'].includes(op) && (typeof input.commentId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(input.commentId))) throw Error();
     if (op === 'prepare_export' && !['pdf', 'docx'].includes(input.format)) throw Error();
     if (op === 'history' && (!Number.isSafeInteger(input.beforeVersion) || input.beforeVersion < 1) ||
         op === 'restore' && (!TOKEN.test(input.historyTicket || '') || !Number.isSafeInteger(input.restoreVersion) || input.restoreVersion < 1)) throw Error();
@@ -45,7 +45,7 @@
       input = parse(command?.value);
       if (typeof emit !== 'function' || !/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || '')) throw Error();
     } catch (_) { respond(action, false, 'canvas_request_invalid'); return true; }
-    if (['save', 'rename', 'generate', 'dismiss_comment', 'restore', 'share_create', 'share_ack'].includes(input.operation) && command.selected !== true) {
+    if (['save', 'rename', 'generate', 'accept_comment', 'resume_comment', 'dismiss_comment', 'restore', 'share_create', 'share_ack'].includes(input.operation) && command.selected !== true) {
       respond(action, false, 'canvas_confirmation_required'); return true;
     }
     try {
@@ -61,5 +61,5 @@
     } catch (_) { respond(action, false, 'canvas_unavailable'); }
     return true;
   }
-  return Object.freeze({ version: 2, handle, generationPending: () => core?.generationPending?.() === true });
+  return Object.freeze({ version: 3, handle, generationPending: () => core?.generationPending?.() === true });
 });

@@ -113,11 +113,11 @@ internal object ChatGptWebCanvasDocumentProtocol {
             "save" -> setOf("operation", "path", "ticket", "scope", "id", "content", "comments")
             "rename" -> setOf("operation", "path", "ticket", "scope", "id", "title")
             "generate" -> setOf("operation", "path", "ticket", "scope", "id", "prompt", "start", "end")
-            "dismiss_comment" -> setOf("operation", "path", "ticket", "scope", "id", "commentId")
+            "dismiss_comment", "accept_comment" -> setOf("operation", "path", "ticket", "scope", "id", "commentId")
             "prepare_export" -> setOf("operation", "path", "ticket", "scope", "id", "format")
             "history" -> setOf("operation", "path", "ticket", "scope", "id", "beforeVersion")
             "restore" -> setOf("operation", "path", "ticket", "scope", "id", "historyTicket", "restoreVersion")
-            "verify", "share_lookup", "share_create", "share_ack" -> setOf("operation", "path", "ticket", "scope", "id")
+            "verify", "resume_comment", "share_lookup", "share_create", "share_ack" -> setOf("operation", "path", "ticket", "scope", "id")
             else -> error("operation")
         }
         require(value.keys().asSequence().toSet() == keys)
@@ -132,7 +132,7 @@ internal object ChatGptWebCanvasDocumentProtocol {
                 val start = integer(value.opt("start"), 0L..MAX_CONTENT.toLong())
                 integer(value.opt("end"), start..MAX_CONTENT.toLong())
             }
-            if (operation == "dismiss_comment") require(id.matches(value.opt("commentId") as? String ?: ""))
+            if (operation in setOf("dismiss_comment", "accept_comment")) require(id.matches(value.opt("commentId") as? String ?: ""))
             if (operation == "prepare_export") require(value.opt("format") in setOf("pdf", "docx"))
             if (operation == "history") integer(value.opt("beforeVersion"), 1..9_007_199_254_740_991L)
             if (operation == "restore") {
@@ -146,7 +146,7 @@ internal object ChatGptWebCanvasDocumentProtocol {
     fun dispatch(args: JSONObject, commands: ChatGptWebMcpCommandPort, dispatch: (String, (String) -> Unit) -> Unit): String? {
         val request = args.optJSONObject("canvas_request")?.let(::request) ?: return "canvas_request_invalid"
         val confirmed = args.opt("user_confirmed") as? Boolean ?: return "canvas_confirmation_required"
-        if (request.getString("operation") in setOf("save", "rename", "generate", "dismiss_comment", "restore", "share_create", "share_ack") && !confirmed)
+        if (request.getString("operation") in setOf("save", "rename", "generate", "accept_comment", "resume_comment", "dismiss_comment", "restore", "share_create", "share_ack") && !confirmed)
             return "canvas_confirmation_required"
         dispatch(ACTION) { commands.canvasDocument(request, confirmed, it) }
         return null

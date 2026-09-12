@@ -104,6 +104,11 @@ internal class WebChatCanvasDraft(val path: String, val scope: String, document:
             .put("prompt", prompt).put("start", start).put("end", end))
     }
 
+    fun acceptCommentRequest(index: ChatGptWebCanvasDocuments, id: String): JSONObject? {
+        if (changed || !matches(index) || index.unconfirmedWrite || base.comments.none { it.id == id }) return null
+        return ChatGptWebCanvasDocumentProtocol.request(selection(index, "accept_comment").put("commentId", id))
+    }
+
     fun adopt(document: ChatGptWebCanvasDocument) {
         require(document.id == base.id)
         base = document

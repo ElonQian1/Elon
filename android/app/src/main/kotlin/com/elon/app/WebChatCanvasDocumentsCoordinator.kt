@@ -24,6 +24,7 @@ internal class WebChatCanvasDocumentsCoordinator(
     private var editor: WebChatCanvasEditorView? = null
     private var management: WebChatCanvasManagementCoordinator? = null
     private var generation: WebChatCanvasGenerationCoordinator? = null
+    private var commentAcceptance: WebChatCanvasCommentAcceptanceCoordinator? = null
     private var generationWatch: Runnable? = null
     private var draft: WebChatCanvasDraft? = null
     private var index: ChatGptWebCanvasDocuments? = null
@@ -152,12 +153,20 @@ internal class WebChatCanvasDocumentsCoordinator(
                 { result, _ -> index = result; done(result) }, failed) },
             state = { message, working, allowed -> editor?.render(message, working, allowed) },
             dispatched = { watchGeneration(owner, editing) })
+        commentAcceptance?.cancel()
+        commentAcceptance = WebChatCanvasCommentAcceptanceCoordinator(activity, editing,
+            execute = { request, confirmed, done, failed -> execute(owner, editing.path, request, confirmed,
+                { result, _ -> index = result; done(result) }, failed) },
+            state = { message, working, allowed -> editor?.render(message, working, allowed) },
+            dispatched = { watchGeneration(owner, editing) },
+            recover = { refresh(owner, editing) }, stopped = { review(owner, editing, it) })
         editor = WebChatCanvasEditorView(activity, editing,
             save = { save(owner, editing) }, check = { refresh(owner, editing) },
             history = { management?.showHistory() }, share = { management?.showShare() },
             rename = { management?.showRename() },
             export = { management?.showExport() },
             generate = { start, end -> generation?.show(start, end) },
+            acceptComment = { commentAcceptance?.confirm(it) },
             dismissComment = { management?.confirmDismissComment(it) },
             closed = { if (run == epoch) cancel() })
         editor?.show()
@@ -278,8 +287,14 @@ internal class WebChatCanvasDocumentsCoordinator(
         execute(owner, editing.path, editing.selection(value, "verify"), confirmed,
             { checked, detail ->
                 index = checked
-                if (detail == "canvas_generation_pending") editor?.render("正在等待改写结果，原正文已保留", allowed = false)
-                else done(checked)
+                when (detail) {
+                    "canvas_generation_pending" -> editor?.render("正在等待改写结果，原正文已保留", allowed = false)
+                    "canvas_comment_accept_ready" -> {
+                        generationWatch?.let(host::removeCallbacks); generationWatch = null
+                        commentAcceptance?.resolve(checked)
+                    }
+                    else -> done(checked)
+                }
             }, { reason -> editor?.render("$reason，草稿已保留", allowed = false) })
     }
 
@@ -334,6 +349,7 @@ internal class WebChatCanvasDocumentsCoordinator(
         dismissSheet()
         management?.cancel(); management = null
         generation?.cancel(); generation = null
+        commentAcceptance?.cancel(); commentAcceptance = null
         generationWatch?.let(host::removeCallbacks); generationWatch = null
         downloads.dismiss()
         val view = editor; editor = null; view?.dismiss()
@@ -357,6 +373,7 @@ internal class WebChatCanvasDocumentsCoordinator(
         "canvas_comment_invalid" -> "这条评论已变化，请核对官网版本"
         "canvas_write_unconfirmed" -> "保存结果尚未确认，请核对版本"
         "canvas_generation_unconfirmed" -> "改写请求结果尚未确认，请核对版本，不要重复提交"
+        "canvas_comment_accept_unconfirmed" -> "采纳评论尚未完成，正在核对结果，不会重复提交"
         "canvas_generation_unavailable", "canvas_generation_owner_unavailable" -> "当前官网改写链路尚未就绪"
         "canvas_generation_blocked" -> "官网当前不允许发起改写"
         "canvas_share_write_unconfirmed", "canvas_share_verification_required" -> "分享结果尚未确认，请打开画布分享核对"

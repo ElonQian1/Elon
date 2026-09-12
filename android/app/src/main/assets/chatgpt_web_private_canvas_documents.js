@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 7, create: factory });
+  const api = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateCanvasDocuments = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -185,13 +185,26 @@
     if (pending.kind === 'generation') {
       // Neither an idle DOM nor a manual comparison can acknowledge an unobserved generation.
       if (!pending.generation.settled()) return result(remember(binding, documents), 'canvas_generation_pending');
-      if (!saved || saved.documentType !== pending.before.documentType || saved.documentVersion < pending.before.documentVersion) {
+      const baseVersion = pending.comparisonVersion ?? pending.before.documentVersion;
+      if (!saved || saved.documentType !== pending.before.documentType || saved.documentVersion < baseVersion) {
         fail('version_conflict');
       }
       uncertain = null;
       context.reconcile(pending.owner).catch(() => {});
-      return result(remember(binding, documents), saved.documentVersion > pending.before.documentVersion
+      return result(remember(binding, documents), saved.documentVersion > baseVersion
         ? 'canvas_generated' : 'canvas_generation_no_change');
+    }
+    if (pending.kind === 'comment_acceptance') {
+      const version = pending.version ?? saved?.documentVersion;
+      const removed = version > pending.before.documentVersion && policy.matches(saved, pending.before, pending.expected, version);
+      if (removed) pending.version = version;
+      if (!confirmed) return result(remember(binding, documents), removed
+        ? 'canvas_comment_accept_ready' : 'canvas_verification_pending');
+      if (!saved || !policy.same(document, saved)) fail('version_conflict');
+      // Only the DELETE was attempted. Explicit acknowledgement abandons the unsent AI turn.
+      uncertain = null;
+      context.reconcile(pending.owner).catch(() => {});
+      return result(remember(binding, documents), 'canvas_comment_accept_stopped');
     }
     const version = pending.version ?? saved?.documentVersion;
     const renaming = pending.kind === 'rename';
@@ -245,6 +258,55 @@
     // Official DISMISS is a version-bound comment DELETE, not a body save or ACCEPT/AI edit.
     const path = '/backend-api/textdoc/' + before.id + '/' + before.documentVersion + '/comment/' + input.commentId + '?reason=dismiss';
     return persist(binding, before, before, expected, owner, path, undefined, deadline, true);
+  }
+
+  async function acceptComment(binding, input, confirmed, deadline) {
+    if (confirmed !== true) fail('confirmation_required');
+    if (page.__elonChatGptPrivateConversationMutationsEnabled !== true) fail('disabled');
+    const resuming = input.operation === 'resume_comment';
+    if (resuming ? uncertain?.kind !== 'comment_acceptance' || !current(uncertain.binding) : uncertain && sameSession(uncertain.binding)) {
+      fail('write_unconfirmed');
+    }
+    const { document } = selected(binding, input);
+    const pending = resuming ? uncertain : { kind: 'comment_acceptance', binding, before: document,
+      expected: policy.dismissComment(document, input.commentId), commentId: input.commentId, version: null };
+    if (document.id !== pending.before.id) fail('selection_invalid');
+    const before = pending.before, owner = await context.capture(binding, before.id);
+    const service = page.__elonChatGptPrivateCanvasGeneration?.create(page);
+    if (!service) fail('generation_unavailable');
+    const generation = await service.prepare(binding, before,
+      { operation: 'accept_comment', commentId: pending.commentId }, () => context.check(owner));
+    let attempted = resuming;
+    try {
+      const fresh = await fetchDocuments(binding, deadline), original = fresh.find(row => row.id === before.id);
+      if (!original || !(resuming
+        ? pending.version > before.documentVersion && policy.matches(original, before, pending.expected, pending.version)
+        : policy.same(original, before))) fail('version_conflict');
+      context.check(owner);
+      generation.validate();
+      let documents = fresh, saved = original;
+      if (!resuming) {
+        const path = '/backend-api/textdoc/' + before.id + '/' + before.documentVersion + '/comment/' + pending.commentId + '?reason=accept';
+        const response = await request(binding, path, 'DELETE', deadline, undefined, () => {
+          context.check(owner); caches.delete(binding.id); histories.clear();
+          uncertain = pending; pending.owner = owner; attempted = true;
+        });
+        if (!Number.isSafeInteger(response?.version) || response.version <= before.documentVersion) fail('write_unconfirmed');
+        pending.version = response.version;
+        documents = await fetchDocuments(binding, deadline); saved = documents.find(row => row.id === before.id);
+        if (!policy.matches(saved, before, pending.expected, pending.version)) fail('version_conflict');
+      }
+      await generation.invoke(() => {
+        context.check(owner); caches.delete(binding.id); histories.clear();
+        uncertain = { kind: 'generation', binding, before, owner, generation, comparisonVersion: saved.documentVersion };
+      });
+      return { ...result(remember(binding, documents), 'canvas_generation_dispatched'), attempted: true };
+    } catch (error) {
+      if (/^http_(401|403)$/.test(error?.message || '')) page.__elonChatGptPrivateAuthContext?.invalidate?.('canvas_rejected');
+      if (attempted) return { ok: false, code: uncertain?.kind === 'generation'
+        ? 'canvas_generation_unconfirmed' : 'canvas_comment_accept_unconfirmed', attempted: true };
+      throw error;
+    }
   }
 
   async function rename(binding, input, confirmed, deadline) {
@@ -368,7 +430,7 @@
     if (active) return { ok: false, code: 'canvas_busy', attempted: false };
     active = true;
     try {
-      if (!input || !['list', 'save', 'rename', 'generate', 'dismiss_comment', 'prepare_export', 'verify', 'history', 'restore', 'share_lookup', 'share_create', 'share_ack'].includes(input.operation) || !policy ||
+      if (!input || !['list', 'save', 'rename', 'generate', 'accept_comment', 'resume_comment', 'dismiss_comment', 'prepare_export', 'verify', 'history', 'restore', 'share_lookup', 'share_create', 'share_ack'].includes(input.operation) || !policy ||
           !page.__elonChatGptPrivateJsonRequest?.request || !page.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders) {
         fail('request_invalid');
       }
@@ -377,6 +439,7 @@
       if (input.operation === 'prepare_export') return exportFile(binding, input);
       if (input.operation === 'save') return await save(binding, input, confirmed, deadline);
       if (input.operation === 'generate') return await generate(binding, input, confirmed, deadline);
+      if (['accept_comment', 'resume_comment'].includes(input.operation)) return await acceptComment(binding, input, confirmed, deadline);
       if (input.operation === 'rename') return await rename(binding, input, confirmed, deadline);
       if (input.operation === 'dismiss_comment') return await dismissComment(binding, input, confirmed, deadline);
       if (input.operation === 'history') return await history(binding, input, deadline);
@@ -392,8 +455,10 @@
   }
 
   function generationPending() {
-    if (uncertain?.kind !== 'generation' || !current(uncertain.binding)) return false;
+    if (!uncertain || !current(uncertain.binding)) return false;
+    if (uncertain.kind === 'comment_acceptance') return true;
+    if (uncertain.kind !== 'generation') return false;
     try { return !uncertain.generation.settled(); } catch (_) { return true; }
   }
-  return Object.freeze({ version: 7, run, busy: () => active, generationPending });
+  return Object.freeze({ version: 8, run, busy: () => active, generationPending });
 });

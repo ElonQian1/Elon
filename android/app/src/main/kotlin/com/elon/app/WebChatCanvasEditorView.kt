@@ -28,6 +28,7 @@ internal class WebChatCanvasEditorView(
     rename: () -> Unit,
     export: () -> Unit,
     generate: (Int, Int) -> Unit,
+    private val acceptComment: (String) -> Unit,
     private val dismissComment: (String) -> Unit,
     closed: () -> Unit,
 ) {
@@ -158,13 +159,25 @@ internal class WebChatCanvasEditorView(
         child = AlertDialog.Builder(activity).setTitle("画布评论")
             .setItems(draft.comments.map { (if (it.id in draft.needsRepair) "待关联 · " else "") + it.content }.toTypedArray()) { _, index ->
                 val comment = draft.comments[index]
-                child = AlertDialog.Builder(activity).setTitle("评论").setMessage(comment.content)
-                    .setPositiveButton("关联选区") { _, _ ->
+                val content = LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(padding, 0, padding, padding)
+                    addView(TextView(activity).apply { text = comment.content; setTextIsSelectable(true) })
+                    fun action(label: String, id: String, callback: () -> Unit) {
+                        addView(AppCompatButton(activity).apply {
+                            text = label; isAllCaps = false; contentDescription = id
+                            setOnClickListener { if (!busy && writable) { child?.dismiss(); callback() } }
+                        }, LinearLayout.LayoutParams(-1, -2))
+                    }
+                    action("采纳并改写", "web-chat-canvas-comment-accept") { acceptComment(comment.id) }
+                    action("关联选区", "web-chat-canvas-comment-reanchor") {
                         val accepted = draft.reanchor(comment.id, minOf(selectionStart, selectionEnd), maxOf(selectionStart, selectionEnd))
                         render(if (accepted) "评论位置已更新，尚未保存" else "请先选中正文，再关联评论")
-                    }.setNeutralButton("忽略评论") { _, _ -> if (!busy && writable) dismissComment(comment.id) }
+                    }
+                    action("忽略评论", "web-chat-canvas-comment-dismiss") { dismissComment(comment.id) }
+                }
+                child = AlertDialog.Builder(activity).setTitle("评论").setView(ScrollView(activity).apply { addView(content) })
                     .setNegativeButton("返回", null).show()
-                child?.getButton(AlertDialog.BUTTON_NEUTRAL)?.contentDescription = "web-chat-canvas-comment-dismiss"
             }.setNegativeButton("返回", null).show()
         child?.listView?.contentDescription = "web-chat-canvas-editor-comments-list"
     }

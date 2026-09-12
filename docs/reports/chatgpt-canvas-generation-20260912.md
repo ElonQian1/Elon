@@ -92,9 +92,9 @@ streaming result, unchanged-body waiting, repeated taps, and version adoption.
 Small-screen/landscape layout and real reply metadata still require device
 evidence. Existing audio/subtitles/dictation/read-aloud need no repeated research.
 
-Original comment acceptance is not dismissal: the official editor first awaits
-`DELETE .../comment/{id}?reason=accept`, then invokes `Hn` with `accept_comment`,
-the original range and `EDIT`. That two-write workflow is still not implemented.
+Original comment acceptance is not dismissal. The subsequent
+[comment acceptance candidate](chatgpt-canvas-comment-accept-20260912.md) now
+implements its two-step flow and partial-success recovery; live acceptance is pending.
 Faithful Markdown/code export source leads and earlier original-editor acceptance
 are in the [export report](chatgpt-canvas-original-export-20260912.md).
 Follow the [remaining map](../web-ai-private-native-remaining-batch.md); do not

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateCanvasGeneration = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -12,13 +12,18 @@
   const policy = page.__elonChatGptPrivateCanvasDocumentPolicy;
 
   function command(document, input) {
-    if (typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > 4000) fail('prompt_invalid');
-    policy.offsets(input.prompt);
-    const start = input.start, end = input.end, points = policy.offsets(document.content);
+    const accepting = input.operation === 'accept_comment';
+    const comment = accepting ? document.comments?.find(row => row.id === input.commentId) : null;
+    if (accepting && !comment) fail('comment_invalid');
+    const prompt = accepting ? comment.content : input.prompt;
+    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > (accepting ? 16384 : 4000)) fail('prompt_invalid');
+    policy.offsets(prompt);
+    const start = accepting ? comment.start : input.start, end = accepting ? comment.end : input.end;
+    const points = policy.offsets(document.content);
     if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end ||
         !points.includes(start) || !points.includes(end)) fail('selection_invalid');
-    const selected = start !== end;
-    return { content: input.prompt, action: 'edit', userMessageType: 'ask_chatgpt',
+    const selected = accepting || start !== end;
+    return { content: prompt, action: 'edit', userMessageType: accepting ? 'accept_comment' : 'ask_chatgpt',
       ...(selected ? { sourceRange: { start, end },
         selectionMetadata: { selection_type: 'selection', selection_position_range: { start, end } } } : {}),
       sourceEvent: new page.Event('click') };
@@ -92,6 +97,11 @@
     if (shared.HM.getCurrentLeafId(tree()) !== leaf) fail('context_changed');
     let dispatched = false, promptId, completed = false;
     return Object.freeze({
+      validate() {
+        current();
+        if (dispatched || shared.HM.getCurrentLeafId(tree()) !== leaf) fail('context_changed');
+        captureCallback();
+      },
       invoke(beforeDispatch) {
         if (dispatched) fail('write_unconfirmed');
         current();
@@ -118,10 +128,10 @@
           range?.start === value.sourceRange.start && range?.end === value.sourceRange.end : selection == null;
         if (!user?.id || user.id === leaf || promptId && promptId !== user.id ||
             user.message?.author?.role !== 'user' || text?.content_type !== 'text' ||
-            !Array.isArray(text.parts) || text.parts.length !== 1 || text.parts[0] !== input.prompt ||
+            !Array.isArray(text.parts) || text.parts.length !== 1 || text.parts[0] !== value.content ||
             metadata?.textdoc_id !== document.id || metadata.textdoc_type !== document.documentType ||
             metadata.version !== document.documentVersion || metadata.textdoc_content_length !== document.content.length ||
-            metadata.user_message_type !== 'ask_chatgpt' || !sameSelection) return false;
+            metadata.user_message_type !== value.userMessageType || !sameSelection) return false;
         promptId = user.id;
         completed = message?.author?.role === 'assistant' &&
           ['finished_successfully', 'finished_partial_completion'].includes(message.status);

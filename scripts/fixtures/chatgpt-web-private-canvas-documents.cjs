@@ -35,7 +35,7 @@ function fixture() {
         rows[0].title = JSON.parse(init.body).title;
         return { status: 204, ok: true };
       }
-      const dismissal = url.match(new RegExp('^' + SAVE + '/([0-9]+)/comment/([A-Za-z0-9_-]+)\\?reason=dismiss$'));
+      const dismissal = url.match(new RegExp('^' + SAVE + '/([0-9]+)/comment/([A-Za-z0-9_-]+)\\?reason=(?:dismiss|accept)$'));
       if (dismissal && init.method === 'DELETE') {
         if (rows[0].version !== Number(dismissal[1]) || !rows[0].comments.some(value => value.id === dismissal[2])) throw Error('http_409');
         rows[0].comments = rows[0].comments.filter(value => value.id !== dismissal[2]);

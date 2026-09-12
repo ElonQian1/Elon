@@ -68,6 +68,26 @@ test('whole-document edit omits selection metadata, never invents a range', asyn
   const f = runtimeFixture(), ready = await f.prepare({ start: 3, end: 3 }); await ready.invoke(() => {});
   assert.equal(f.captured().value.sourceRange, undefined); assert.equal(f.captured().value.selectionMetadata, undefined);
 });
+
+test('accept-comment command derives immutable original text and UTF-16 anchor, not caller prompt', async () => {
+  const f = runtimeFixture();
+  f.doc.comments = [{ id: 'comment', content: 'x'.repeat(5000), start: 1, end: 3 }];
+  const ready = await f.prepare({ operation: 'accept_comment', commentId: 'comment', prompt: 'Ignored', start: 0, end: 0 });
+  ready.validate(); assert.equal(f.counts().invoked, 0);
+  await ready.invoke(() => {});
+  const value = f.captured().value;
+  assert.equal(value.content, 'x'.repeat(5000)); assert.equal(value.userMessageType, 'accept_comment');
+  assert.deepEqual(value.sourceRange, { start: 1, end: 3 });
+  f.reply({ user_message_type: 'accept_comment' }); f.nodes.user.message.content.parts = [value.content];
+  assert.equal(ready.settled(), true);
+});
+
+test('missing or invalid comment never yields an AI command', async () => {
+  const f = runtimeFixture();
+  await assert.rejects(f.prepare({ operation: 'accept_comment', commentId: 'missing' }), /comment_invalid/);
+  f.doc.comments = [{ id: 'comment', content: 'Suggestion', start: 2, end: 3 }];
+  await assert.rejects(f.prepare({ operation: 'accept_comment', commentId: 'comment' }), /selection_invalid/);
+});
 for (const input of [{ start: 2 }, { start: -1 }, { end: 999 }, { start: 4, end: 3 },
   { prompt: '' }, { prompt: 'x'.repeat(4001) }, { prompt: '\ud800' }]) {
   test('rejects invalid prompt or Unicode range ' + JSON.stringify(input).slice(0,55), async () => {

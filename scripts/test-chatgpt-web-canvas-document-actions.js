@@ -104,6 +104,31 @@ test('canonical comment dismissal confirms a versioned delete, never an accept o
   assert.equal(f.requests.filter(value => value.init.method === 'POST').length, 0);
 });
 
+test('canonical acceptance and explicit continuation use strict distinct commands', async () => {
+  const f = setup(); let denied = true, calls = 0;
+  f.rows[0].comments = [{ id: 'comment', start: 0, end: 1, content: 'Synthetic suggestion' }];
+  f.page.__elonChatGptPrivateCanvasGeneration = { create: () => ({ prepare: async () => ({ validate() {},
+    invoke(before) { if (denied) throw Error('canvas_generation_blocked'); before(); calls++; }, settled: () => false
+  }) }) };
+  await f.call({ operation: 'list', force: true });
+  const command = (operation, patch = {}) => ({ operation, ticket: f.events.at(-1).ticket,
+    scope: f.events.at(-1).scope, id: ID, ...patch });
+  const input = command('accept_comment', { commentId: 'comment' });
+  for (const patch of [{ commentId: '../other' }, { reason: 'dismiss' }, { prompt: 'forged' }, { start: 1 }])
+    assert.equal((await f.call({ ...input, ...patch }, true)).detail, 'canvas_request_invalid');
+  assert.equal((await f.call(input)).detail, 'canvas_confirmation_required');
+  assert.equal((await f.call(input, true)).detail, 'canvas_comment_accept_unconfirmed');
+  await f.call({ operation: 'list', force: true });
+  assert.equal((await f.call(command('verify'))).detail, 'canvas_comment_accept_ready');
+  assert.equal(f.events.at(-1).unconfirmedWrite, true);
+  assert.equal((await f.call(command('resume_comment', { commentId: 'forged' }), true)).detail, 'canvas_request_invalid');
+  assert.equal((await f.call(command('resume_comment'))).detail, 'canvas_confirmation_required');
+  denied = false;
+  assert.equal((await f.call(command('resume_comment'), true)).detail, 'canvas_generation_dispatched');
+  assert.equal(f.events.at(-1).unconfirmedWrite, true); assert.equal(calls, 1);
+  assert.equal(f.requests.filter(row => row.init.method === 'DELETE').length, 1);
+});
+
 test('scope is stable across refresh but changes with identity or document', async () => {
   const f = setup();
   await f.call({ operation: 'list', force: false });
