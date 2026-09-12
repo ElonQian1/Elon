@@ -1,7 +1,7 @@
 ---
 capability_id: android_chatgpt_fresh_text_dispatch_v1
 implementation_status: partial_source_candidate
-verification_status: offline_contract_and_transaction_tests
+verification_status: device_handoff_gap_confirmed_fix_pending_acceptance
 production_default: false
 ---
 
@@ -53,8 +53,46 @@ Transaction v5 adds bounded event-type counts and history rejection codes to the
 trial receipt. These distinguish protocol handoff, missing/foreign history and
 store reconciliation without exposing messages, IDs, topics or credentials. The
 reviewed website `DM` yields `{event,data}` packets; its composer additionally
-handles `stream_handoff`. Whether that is this device failure's cause remains to
-be established; it is not inferred from a successful HTTP response.
+handles `stream_handoff`.
+
+APK **1.1.1694**, source `827fbf7e7`, established the missing delivery boundary in
+`fresh-text-native-1694-20260913-063510-307`: one candidate click, successful
+response headers, exactly three events (`delta_encoding`,
+`resume_conversation_token`, `stream_handoff`) and matching history still in
+`server_active`. No answer was received within the 45-second observation window.
+No follow-up or stop was attempted. Returning to the original route does not
+mean the unresolved independent writer was released.
+
+### In-Band Stream Handoff
+
+The reviewed September 12 composer `ZZt -> HZt` subscribes an offered
+`subscribe_ws_topic` through shared export `ej -> G9e -> getTopic`. Its topic
+items use `conversation-turn-stream`, `stream-item`, `encoded_item`, linked
+stream item IDs and a separate authoritative `done`. The public AST evidence
+test checks these exact contracts without executing the downloaded website.
+
+- `chatgpt_web_fresh_text_stream.js` follows only the offered topic, with history
+  catchup, duplicate suppression, missing-parent rejection, bounded queues and
+  an idle timeout. It registers listeners before subscribing, disposes them on
+  completion/cancellation/error, and never acquires an already-used provider
+  topic. The provider client is reused; no credentials or endpoint are guessed.
+- `chatgpt_web_private_owned_stream.js` feeds the existing native session and
+  v1 delta decoder. There is no second transcript cache. It validates the exact
+  conversation/document owner and suppresses passive duplicate observations
+  while the independent sender owns delivery.
+- Transaction v6 connects these modules; bindings v21 exposes the topic helper
+  only for the reviewed profile. Private-stream transport v20 preserves the
+  accepted passive path outside owned delivery. Root SSE EOF or an encoded
+  `[DONE]` inside a topic is not treated as topic completion. Terminal history
+  reconciliation is still required before the next send is allowed.
+- Unknown handoff, stream gaps, server errors and lost ownership stop local
+  consumption and retain the uncertain-write barrier. They do not replay the
+  user message or invoke a second sender.
+
+The targeted source/integration/public-contract run passed **159 tests, zero
+failures and zero skips** (`fresh-text-handoff-verified-20260913-065528-775`).
+Actual first-send, follow-up and active-stop acceptance of this fix remain
+pending; the existing runtime sender remains the production default.
 
 ## Implemented
 

@@ -148,4 +148,18 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     assert.match(shared.text, /e\[e\.STREAMING=3\]=`STREAMING`,e\[e\.UNREAD=4\]=`UNREAD`/);
     assert.match(conversation.text, /value:t\.async_status/);
   });
+  await t.test('in-band handoff subscribes the existing provider topic with history catchup', () => {
+    assert.equal(shared.exported.get('ej'), 'G9e');
+    includes(facts(definition(shared, 'ej', true)).properties, ['getTopic']);
+    assert.deepEqual(composer.imports.get('ene'), { file: './' + assets.shared[0], name: 'ej' });
+    const handoff = facts(definition(composer, 'ZZt'));
+    includes(handoff.strings, ['subscribe_ws_topic', 'resume_sse_endpoint']);
+    includes(handoff.calls, ['HZt']);
+    const reader = facts(definition(composer, 'HZt'));
+    includes(reader.properties, ['subscribe', 'includeAllHistory', 'onMessage', 'unsubscribe',
+      'onPotentialMissedMessages', 'stream_item_id', 'parent_stream_item_id', 'encoded_item']);
+    includes(reader.strings, ['conversation-turn-stream', 'stream-item', 'done', '[DONE]']);
+    const topic = facts(definition(shared, 'net'));
+    includes(topic.properties, ['state', 'hasEverSubscribed', 'offset', 'catchups', 'recovered']);
+  });
 });
