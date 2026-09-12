@@ -95,7 +95,7 @@ evidence. Existing audio/subtitles/dictation/read-aloud need no repeated researc
 Original comment acceptance is not dismissal. The subsequent
 [comment acceptance candidate](chatgpt-canvas-comment-accept-20260912.md) now
 implements its two-step flow and partial-success recovery; live acceptance is pending.
-Faithful Markdown/code export source leads and earlier original-editor acceptance
-are in the [export report](chatgpt-canvas-original-export-20260912.md).
+Faithful Markdown/code export is now an implemented
+[text-export candidate](chatgpt-canvas-text-export-20260912.md), pending phone acceptance.
 Follow the [remaining map](../web-ai-private-native-remaining-batch.md); do not
 start Google before the remaining ChatGPT acceptance gate.

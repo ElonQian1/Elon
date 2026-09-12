@@ -76,8 +76,8 @@ Stable IDs: `web-chat-canvas-comment-accept`, `-accept-confirm`, `-accept-cancel
 
 ## Next Work
 
-Faithful Markdown/code export remains a code gap with exact source leads in the
-[export report](chatgpt-canvas-original-export-20260912.md). Then perform the
+The Markdown/code export code gap is now covered by the
+[text-export candidate](chatgpt-canvas-text-export-20260912.md). Perform the
 grouped original-editor acceptance round, preserving the proven native audio,
 subtitles, dictation and read-aloud. Keep Google after the ChatGPT gate in the
 [remaining map](../web-ai-private-native-remaining-batch.md).

@@ -13,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptWebCanvasDocument
 import com.elon.app.chatgptweb.ChatGptWebCanvasDocumentProtocol
 import com.elon.app.chatgptweb.ChatGptWebCanvasDocuments
+import com.elon.app.chatgptweb.ChatGptWebCanvasExportFormats
 import com.elon.app.chatgptweb.ChatGptWebCanvasHistory
 import org.json.JSONObject
 
@@ -37,17 +38,18 @@ internal class WebChatCanvasManagementCoordinator(
         val run = epoch
         if (draft.changed) {
             dialog = AlertDialog.Builder(activity).setTitle("草稿尚未保存")
-                .setMessage("PDF 和 Word 导出使用官网已保存的版本。请先保存正文修改。")
+                .setMessage("导出使用官网已保存的版本。请先保存正文修改。")
                 .setPositiveButton("返回编辑", null).show()
             return
         }
-        if (draft.base.documentType != "document") return
+        val formats = ChatGptWebCanvasExportFormats.options(draft.base.documentType)
+        if (formats.isEmpty()) return
         dialog = AlertDialog.Builder(activity).setTitle("导出画布")
-            .setItems(arrayOf("PDF", "Word (.docx)")) { _, position ->
+            .setItems(formats.map { it.label }.toTypedArray()) { _, position ->
                 if (active(run)) prepare { value ->
                     if (draft.changed || !draft.matches(value) || value.unconfirmedWrite) {
                         state("官网版本已变化，请先核对，草稿已保留", false)
-                    } else request(draft.selection(value, "prepare_export").put("format", if (position == 0) "pdf" else "docx"),
+                    } else request(draft.selection(value, "prepare_export").put("format", formats[position].key),
                         false, "正在准备导出", exported)
                 }
             }.setNegativeButton("取消", null).show()

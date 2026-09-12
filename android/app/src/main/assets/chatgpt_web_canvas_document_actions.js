@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptCanvasDocumentActions) {
     root.__elonChatGptCanvasDocumentActions = factory(root);
@@ -33,7 +33,7 @@
     if (op === 'rename' && (typeof input.title !== 'string' || !input.title || input.title !== input.title.trim() ||
         input.title.length > 512 || /[\u0000-\u001f\u007f]/.test(input.title))) throw Error();
     if (['dismiss_comment', 'accept_comment'].includes(op) && (typeof input.commentId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(input.commentId))) throw Error();
-    if (op === 'prepare_export' && !['pdf', 'docx'].includes(input.format)) throw Error();
+    if (op === 'prepare_export' && !['pdf', 'docx', 'md', 'source'].includes(input.format)) throw Error();
     if (op === 'history' && (!Number.isSafeInteger(input.beforeVersion) || input.beforeVersion < 1) ||
         op === 'restore' && (!TOKEN.test(input.historyTicket || '') || !Number.isSafeInteger(input.restoreVersion) || input.restoreVersion < 1)) throw Error();
     return input;
@@ -61,5 +61,5 @@
     } catch (_) { respond(action, false, 'canvas_unavailable'); }
     return true;
   }
-  return Object.freeze({ version: 3, handle, generationPending: () => core?.generationPending?.() === true });
+  return Object.freeze({ version: 4, handle, generationPending: () => core?.generationPending?.() === true });
 });

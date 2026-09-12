@@ -11,8 +11,9 @@ download progress/cancel/save path. No system print-to-PDF, page screenshots,
 second download service, or standalone test page is used.
 
 Offline verification is recorded below. A grouped APK and real production-phone
-export remain pending. Markdown/code export and AI-generated Canvas rewriting
-are not implemented by this change. Do not mark the parent capability completed.
+export remain pending. Later [text-export](chatgpt-canvas-text-export-20260912.md)
+and [AI-edit](chatgpt-canvas-generation-20260912.md) candidates extend this scope.
+Do not mark the parent capability completed before grouped phone acceptance.
 Reuse the earlier [rename](chatgpt-canvas-original-rename-20260912.md) and
 [comment dismissal](chatgpt-canvas-comment-dismiss-20260912.md) implementation.
 

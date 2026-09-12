@@ -6,14 +6,16 @@
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
   const raster = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_library_raster_policy.js') : root?.__elonChatGptPrivateLibraryRasterPolicy;
-  const exported = Object.freeze({ version: 34, create: root => factory(root, pointer, citation, raster) });
+  const canvas = typeof module === 'object' && module.exports
+    ? require('./chatgpt_web_private_canvas_text_export.js') : root?.__elonChatGptPrivateCanvasTextExport;
+  const exported = Object.freeze({ version: 35, create: root => factory(root, pointer, citation, raster, canvas) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
     root.__elonChatGptPrivateFileDownload?.dispose?.();
-    root.__elonChatGptPrivateFileDownload = factory(root, pointer, citation, raster);
+    root.__elonChatGptPrivateFileDownload = factory(root, pointer, citation, raster, canvas);
   }
-})(typeof window === 'object' ? window : null, function (root, pointerParser, citationParser, raster) {
+})(typeof window === 'object' ? window : null, function (root, pointerParser, citationParser, raster, canvas) {
   'use strict';
   const entries = new Map();
   const PATH = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([A-Za-z0-9_-]{1,160})$/i;
@@ -287,9 +289,7 @@
   function registerCanvasExport(path, file, prepare) {
     const account = identity(), token = root.__elonChatGptDocumentToken;
     if (disposed || !account || !token || !PATH.test(path) || root.location.pathname !== path ||
-        typeof prepare !== 'function' || !/^canvas-export-[A-Za-z0-9_-]{1,128}-(pdf|docx)$/.test(file?.id || '') ||
-        typeof file.name !== 'string' || file.name.length > 200 || /[\x00-\x1f\x7f\\/]/.test(file.name) ||
-        !['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.mediaType)) return '';
+        typeof prepare !== 'function' || !canvas?.validFile(file)) return '';
     const handle = 'download_' + Array.from(root.crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
     entries.set(handle, { path, name: file.name, mediaType: file.mediaType, account, token,
       canvasPrepare: prepare, expiresAt: Date.now() + 120000 });
@@ -449,5 +449,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 34, register, registerLibraryFile, registerGalleryImage, registerCanvasExport, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 35, register, registerLibraryFile, registerGalleryImage, registerCanvasExport, start, cancel, dispose, sourceDiagnostics });
 });

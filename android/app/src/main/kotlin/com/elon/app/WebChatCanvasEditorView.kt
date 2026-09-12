@@ -133,7 +133,8 @@ internal class WebChatCanvasEditorView(
         historyButton.isEnabled = !busy
         shareButton.isEnabled = !busy
         renameButton.isEnabled = !busy && writable
-        exportButton.visibility = if (draft.base.documentType == "document") android.view.View.VISIBLE else android.view.View.GONE
+        exportButton.visibility = if (com.elon.app.chatgptweb.ChatGptWebCanvasExportFormats.options(draft.base.documentType).isNotEmpty())
+            android.view.View.VISIBLE else android.view.View.GONE
         exportButton.isEnabled = !busy && writable
         generateButton.isEnabled = !busy && writable
         body.isEnabled = !busy

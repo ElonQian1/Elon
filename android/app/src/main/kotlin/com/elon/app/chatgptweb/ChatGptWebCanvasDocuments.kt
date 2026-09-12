@@ -133,7 +133,7 @@ internal object ChatGptWebCanvasDocumentProtocol {
                 integer(value.opt("end"), start..MAX_CONTENT.toLong())
             }
             if (operation in setOf("dismiss_comment", "accept_comment")) require(id.matches(value.opt("commentId") as? String ?: ""))
-            if (operation == "prepare_export") require(value.opt("format") in setOf("pdf", "docx"))
+            if (operation == "prepare_export") require(value.opt("format") in setOf("pdf", "docx", "md", "source"))
             if (operation == "history") integer(value.opt("beforeVersion"), 1..9_007_199_254_740_991L)
             if (operation == "restore") {
                 require(token.matches(value.opt("historyTicket") as? String ?: ""))

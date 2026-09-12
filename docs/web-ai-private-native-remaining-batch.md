@@ -29,8 +29,8 @@ a functional acceptance gate; do not expand performance tests in this phase.
 ## Current Status Map
 
 [1681](reports/chatgpt-runtime-bindings-20260912.md) passed native send/reply.
-Canvas [comment acceptance](reports/chatgpt-canvas-comment-accept-20260912.md)
-links AI edit/export evidence; original editor device acceptance is pending.
+Canvas [text exports](reports/chatgpt-canvas-text-export-20260912.md)
+link AI/comment/PDF evidence; original editor device acceptance is pending.
 
 1666 retains the [1662 grouped source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence).
 Its first inventory run had one timeout, retaining cached rows. One targeted retry

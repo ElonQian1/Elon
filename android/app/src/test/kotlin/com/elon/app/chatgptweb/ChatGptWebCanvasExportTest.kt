@@ -42,7 +42,41 @@ class ChatGptWebCanvasExportTest {
             .put("ticket", ticket).put("id", doc.id).put("format", "pdf")
         assertNotNull(ChatGptWebCanvasDocumentProtocol.request(request()))
         assertNotNull(ChatGptWebCanvasDocumentProtocol.request(request().put("format", "docx")))
+        assertNotNull(ChatGptWebCanvasDocumentProtocol.request(request().put("format", "md")))
+        assertNotNull(ChatGptWebCanvasDocumentProtocol.request(request().put("format", "source")))
         for ((key, input) in listOf("format" to "html", "format" to 1, "body" to "changed", "url" to "https://example.com"))
             assertNull(ChatGptWebCanvasDocumentProtocol.request(request().put(key, input)))
+    }
+
+    @Test fun markdownAndSourceFormatsRemainBoundToOriginalType() {
+        val types = listOf("document", "code/python", "code/react", "code/json", "code/html", "code/dockerfile", "code/other")
+        for (documentType in types) {
+            val current = doc.copy(documentType = documentType)
+            for (format in ChatGptWebCanvasExportFormats.options(documentType)) {
+                val row = raw().put("format", format.key)
+                row.getJSONObject("file").put("id", "canvas-export-${doc.id}-${format.key}")
+                    .put("name", "Synthetic.${format.extension}").put("mediaType", format.mediaType)
+                val parsed = ChatGptWebCanvasExportProtocol.parse(row, listOf(current))
+                assertEquals(format.mediaType, parsed.file.mediaType)
+                assertEquals(format.key, parsed.format)
+                row.getJSONObject("file").put("name", "Synthetic.wrong")
+                assertTrue(runCatching { ChatGptWebCanvasExportProtocol.parse(row, listOf(current)) }.isFailure)
+            }
+        }
+        assertTrue(ChatGptWebCanvasExportFormats.options("loading").isEmpty())
+        assertTrue(ChatGptWebCanvasExportFormats.options("webview").isEmpty())
+        assertTrue(ChatGptWebCanvasExportFormats.options("code/unknown").isEmpty())
+        assertNull(ChatGptWebCanvasExportFormats.find("code/python", "md"))
+        assertNull(ChatGptWebCanvasExportFormats.find("document", "source"))
+        assertEquals(listOf("md", "pdf", "docx"), ChatGptWebCanvasExportFormats.options("document").map { it.key })
+    }
+
+    @Test fun controlCharactersAndTruncatedExtensionsCannotReachDownloads() {
+        for (name in listOf("x\u202e.pdf", "x\u0085.pdf", "x".repeat(150) + ".pdf", "x.pdf/secret")) {
+            val row = raw(); row.getJSONObject("file").put("name", name)
+            assertTrue(runCatching { ChatGptWebCanvasExportProtocol.parse(row, listOf(doc)) }.isFailure)
+        }
+        val name = "x".repeat(139) + ".Dockerfile"
+        assertEquals(name, ChatGptWebFileDownloadPolicy.safeName(name))
     }
 }
