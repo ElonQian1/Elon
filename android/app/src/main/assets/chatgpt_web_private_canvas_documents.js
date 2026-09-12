@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateCanvasDocuments = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -119,15 +119,15 @@
       { version: before.documentVersion, content: expected.content, comments: expected.comments }, deadline);
   }
 
-  async function persist(binding, before, expectedBase, expected, owner, path, body, deadline) {
+  async function persist(binding, before, expectedBase, expected, owner, path, body, deadline, dismissing = false) {
     // Consumed immediately before the single write. Neither timeout nor readback failure may replay it.
     let attempted = false;
     try {
-      const response = await request(binding, path, 'POST', deadline, body, () => {
+      const response = await request(binding, path, dismissing ? 'DELETE' : 'POST', deadline, body, () => {
           context.check(owner);
           caches.delete(binding.id);
           histories.clear();
-          uncertain = { kind: 'content', binding, before, expectedBase, expected, version: null, owner };
+          uncertain = { kind: dismissing ? 'comment_dismissal' : 'content', binding, before, expectedBase, expected, version: null, owner };
           attempted = true;
         });
       if (!Number.isSafeInteger(response?.version) || response.version <= before.documentVersion) fail('write_unconfirmed');
@@ -138,7 +138,7 @@
       uncertain = null;
       // Native confirmation is the server readback, not a DOM refresh or a query refetch completing.
       context.reconcile(owner).catch(() => {});
-      return { ...result(entry, 'canvas_saved'), attempted: true };
+      return { ...result(entry, dismissing ? 'canvas_comment_dismissed' : 'canvas_saved'), attempted: true };
     } catch (error) {
       if (/^http_(401|403)$/.test(error?.message || '')) page.__elonChatGptPrivateAuthContext?.invalidate?.('canvas_rejected');
       if (attempted) return { ok: false, code: 'canvas_write_unconfirmed', attempted: true };
@@ -161,7 +161,22 @@
     // Clearing a mismatch only acknowledges an explicit comparison, never submits a second POST.
     uncertain = null;
     if (matches) context.reconcile(pending.owner).catch(() => {});
-    return result(remember(binding, documents), matches ? renaming ? 'canvas_renamed' : 'canvas_saved' : 'canvas_result_acknowledged');
+    const verifiedCode = renaming ? 'canvas_renamed' : pending.kind === 'comment_dismissal' ? 'canvas_comment_dismissed' : 'canvas_saved';
+    return result(remember(binding, documents), matches ? verifiedCode : 'canvas_result_acknowledged');
+  }
+
+  async function dismissComment(binding, input, confirmed, deadline) {
+    if (confirmed !== true) fail('confirmation_required');
+    if (page.__elonChatGptPrivateConversationMutationsEnabled !== true) fail('disabled');
+    if (uncertain && sameSession(uncertain.binding)) fail('write_unconfirmed');
+    const { document: before } = selected(binding, input), expected = policy.dismissComment(before, input.commentId);
+    const owner = await context.capture(binding, before.id);
+    const fresh = await fetchDocuments(binding, deadline), original = fresh.find(value => value.id === before.id);
+    if (!original || !policy.same(original, before)) fail('version_conflict');
+    context.check(owner);
+    // Official DISMISS is a version-bound comment DELETE, not a body save or ACCEPT/AI edit.
+    const path = '/backend-api/textdoc/' + before.id + '/' + before.documentVersion + '/comment/' + input.commentId + '?reason=dismiss';
+    return persist(binding, before, before, expected, owner, path, undefined, deadline, true);
   }
 
   async function rename(binding, input, confirmed, deadline) {
@@ -285,7 +300,7 @@
     if (active) return { ok: false, code: 'canvas_busy', attempted: false };
     active = true;
     try {
-      if (!input || !['list', 'save', 'rename', 'verify', 'history', 'restore', 'share_lookup', 'share_create', 'share_ack'].includes(input.operation) || !policy ||
+      if (!input || !['list', 'save', 'rename', 'dismiss_comment', 'verify', 'history', 'restore', 'share_lookup', 'share_create', 'share_ack'].includes(input.operation) || !policy ||
           !page.__elonChatGptPrivateJsonRequest?.request || !page.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders) {
         fail('request_invalid');
       }
@@ -293,6 +308,7 @@
       if (input.operation === 'list') return await read(binding, input.force === true, deadline);
       if (input.operation === 'save') return await save(binding, input, confirmed, deadline);
       if (input.operation === 'rename') return await rename(binding, input, confirmed, deadline);
+      if (input.operation === 'dismiss_comment') return await dismissComment(binding, input, confirmed, deadline);
       if (input.operation === 'history') return await history(binding, input, deadline);
       if (input.operation === 'restore') return await restore(binding, input, confirmed, deadline);
       if (input.operation.startsWith('share_')) return await share(binding, input, confirmed, deadline);
@@ -305,5 +321,5 @@
     } finally { active = false; }
   }
 
-  return Object.freeze({ version: 4, run, busy: () => active });
+  return Object.freeze({ version: 5, run, busy: () => active });
 });

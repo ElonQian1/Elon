@@ -14,7 +14,8 @@
     const input = JSON.parse(raw), op = input?.operation;
     const base = ['operation', 'path', 'ticket', 'scope', 'id'];
     const keys = op === 'list' ? ['operation', 'path', 'force'] :
-      op === 'save' ? [...base, 'content', 'comments'] : op === 'rename' ? [...base, 'title'] : op === 'history' ? [...base, 'beforeVersion'] :
+      op === 'save' ? [...base, 'content', 'comments'] : op === 'rename' ? [...base, 'title'] :
+      op === 'dismiss_comment' ? [...base, 'commentId'] : op === 'history' ? [...base, 'beforeVersion'] :
       op === 'restore' ? [...base, 'historyTicket', 'restoreVersion'] :
       ['verify', 'share_lookup', 'share_create', 'share_ack'].includes(op) ? base : [];
     if (!keys.length || !input || typeof input !== 'object' || Array.isArray(input) ||
@@ -26,6 +27,7 @@
         !Array.isArray(input.comments) || input.comments.length > 1000)) throw Error();
     if (op === 'rename' && (typeof input.title !== 'string' || !input.title || input.title !== input.title.trim() ||
         input.title.length > 512 || /[\u0000-\u001f\u007f]/.test(input.title))) throw Error();
+    if (op === 'dismiss_comment' && (typeof input.commentId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(input.commentId))) throw Error();
     if (op === 'history' && (!Number.isSafeInteger(input.beforeVersion) || input.beforeVersion < 1) ||
         op === 'restore' && (!TOKEN.test(input.historyTicket || '') || !Number.isSafeInteger(input.restoreVersion) || input.restoreVersion < 1)) throw Error();
     return input;
@@ -37,7 +39,7 @@
       input = parse(command?.value);
       if (typeof emit !== 'function' || !/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || '')) throw Error();
     } catch (_) { respond(action, false, 'canvas_request_invalid'); return true; }
-    if (['save', 'rename', 'restore', 'share_create', 'share_ack'].includes(input.operation) && command.selected !== true) {
+    if (['save', 'rename', 'dismiss_comment', 'restore', 'share_create', 'share_ack'].includes(input.operation) && command.selected !== true) {
       respond(action, false, 'canvas_confirmation_required'); return true;
     }
     try {

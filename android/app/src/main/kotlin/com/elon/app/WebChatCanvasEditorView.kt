@@ -26,6 +26,7 @@ internal class WebChatCanvasEditorView(
     history: () -> Unit,
     share: () -> Unit,
     rename: () -> Unit,
+    private val dismissComment: (String) -> Unit,
     closed: () -> Unit,
 ) {
     private val padding = (16 * activity.resources.displayMetrics.density).toInt()
@@ -149,8 +150,11 @@ internal class WebChatCanvasEditorView(
                     .setPositiveButton("关联选区") { _, _ ->
                         val accepted = draft.reanchor(comment.id, minOf(selectionStart, selectionEnd), maxOf(selectionStart, selectionEnd))
                         render(if (accepted) "评论位置已更新，尚未保存" else "请先选中正文，再关联评论")
-                    }.setNegativeButton("返回", null).show()
+                    }.setNeutralButton("忽略评论") { _, _ -> if (!busy && writable) dismissComment(comment.id) }
+                    .setNegativeButton("返回", null).show()
+                child?.getButton(AlertDialog.BUTTON_NEUTRAL)?.contentDescription = "web-chat-canvas-comment-dismiss"
             }.setNegativeButton("返回", null).show()
+        child?.listView?.contentDescription = "web-chat-canvas-editor-comments-list"
     }
 
     fun compare(server: ChatGptWebCanvasDocument, adopt: () -> Unit, rebase: () -> Unit) {

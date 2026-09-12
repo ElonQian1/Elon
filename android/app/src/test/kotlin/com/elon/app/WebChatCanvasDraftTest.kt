@@ -155,4 +155,62 @@ class WebChatCanvasDraftTest {
         for (title in listOf("", " ", " padded", "line\nfeed", "x".repeat(513), "\uD800"))
             assertNull(d.renameRequest(index(original), title))
     }
+
+    @Test fun explicitCommentDismissalPreservesUnsavedBodyAndOtherAnchorRepairs() {
+        val original = document(comments = listOf(ChatGptWebCanvasComment("c", 4, 7, "Dismiss"),
+            ChatGptWebCanvasComment("keep", 0, 3, "Keep")))
+        val d = draft(original)
+        d.replace(0, 3, "")
+        val text = d.content
+        val kept = d.comments.single { it.id == "keep" }
+        val request = requireNotNull(d.dismissCommentRequest(index(original), "c"))
+        assertEquals(setOf("operation", "path", "scope", "ticket", "id", "commentId"), request.keys().asSequence().toSet())
+        assertEquals("dismiss_comment", request.getString("operation"))
+        assertEquals("c", request.getString("commentId"))
+        val result = original.copy(documentVersion = 5, comments = original.comments.filterNot { it.id == "c" })
+        assertTrue(d.acceptCommentDismissal(result))
+        assertEquals(result, d.base)
+        assertEquals(text, d.content)
+        assertEquals(listOf(kept), d.comments)
+        assertEquals(setOf("keep"), d.needsRepair)
+        assertNull(d.saveRequest(index(result)))
+        assertTrue(d.reanchor("keep", 0, 2))
+        assertNotNull(d.saveRequest(index(result)))
+        assertFalse(d.acceptCommentDismissal(result))
+    }
+
+    @Test fun dismissalRequiresIntentAndAnExactServerResult() {
+        val original = document()
+        val d = draft(original)
+        d.replace(4, 3, "")
+        val removed = original.copy(documentVersion = 5, comments = emptyList())
+        assertFalse(d.acceptCommentDismissal(removed))
+        for (value in listOf(index(original, unknown = true), index(original, scope = "foreign"),
+            index(original).copy(path = "/c/foreign"), index(original.copy(documentVersion = 5))))
+            assertNull(d.dismissCommentRequest(value, "c"))
+        assertNull(d.dismissCommentRequest(index(original), "foreign"))
+        assertNotNull(d.dismissCommentRequest(index(original), "c"))
+        for (value in listOf(original, removed.copy(documentVersion = 4), removed.copy(id = "foreign"),
+            removed.copy(content = "Other body"), removed.copy(title = "Other title"), removed.copy(documentType = "code/python"))) {
+            assertFalse(d.acceptCommentDismissal(value))
+            assertEquals(original, d.base)
+            assertEquals(setOf("c"), d.needsRepair)
+        }
+        val text = d.content
+        assertTrue(d.acceptCommentDismissal(removed))
+        assertEquals(text, d.content)
+        assertTrue(d.needsRepair.isEmpty())
+        assertNotNull(d.saveRequest(index(removed)))
+    }
+
+    @Test fun reviewingOrAdoptingAnotherBaseClearsTheOldDismissalIntent() {
+        val original = document()
+        val d = draft(original)
+        assertNotNull(d.dismissCommentRequest(index(original), "c"))
+        d.rebase(original)
+        assertFalse(d.acceptCommentDismissal(original.copy(documentVersion = 5, comments = emptyList())))
+        assertNotNull(d.dismissCommentRequest(index(original), "c"))
+        d.adopt(original)
+        assertFalse(d.acceptCommentDismissal(original.copy(documentVersion = 5, comments = emptyList())))
+    }
 }

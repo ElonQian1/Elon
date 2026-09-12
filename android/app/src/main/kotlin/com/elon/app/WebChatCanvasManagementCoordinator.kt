@@ -23,12 +23,30 @@ internal class WebChatCanvasManagementCoordinator(
     private val state: (String, Boolean) -> Unit,
     private val restored: (ChatGptWebCanvasDocuments) -> Unit,
     private val renamed: (ChatGptWebCanvasDocuments) -> Unit,
+    private val commentDismissed: (ChatGptWebCanvasDocuments) -> Unit,
 ) {
     private var epoch = 0
     private var dialog: AlertDialog? = null
 
     fun showHistory() = prepare { value -> history(value, value.documents.first { it.id == draft.base.id }.documentVersion) }
     fun showShare() = prepare { value -> share(value, "share_lookup", false) }
+
+    fun confirmDismissComment(id: String) {
+        if (draft.base.comments.none { it.id == id }) return
+        cancel()
+        val run = epoch
+        dialog = AlertDialog.Builder(activity).setTitle("忽略这条评论？")
+            .setMessage("这条评论将从官网画布中移除，不会让 AI 改写正文。未保存的正文草稿会保留。")
+            .setPositiveButton("忽略评论") { _, _ ->
+                if (active(run)) prepare { value ->
+                    val command = draft.dismissCommentRequest(value, id)
+                    if (command == null) state("官网版本已变化，请先核对，草稿已保留", false)
+                    else request(command, true, "正在忽略评论", commentDismissed)
+                }
+            }.setNegativeButton("取消", null).show()
+        dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.contentDescription = "web-chat-canvas-comment-dismiss-confirm"
+        dialog?.getButton(AlertDialog.BUTTON_NEGATIVE)?.contentDescription = "web-chat-canvas-comment-dismiss-cancel"
+    }
 
     fun showRename() {
         cancel()

@@ -70,6 +70,23 @@ test('malformed commands and missing display channel cannot dispatch', async () 
   assert.equal(f.api.handle('other', {}, () => {}, () => f.snapshot, () => {}), false);
 });
 
+test('canonical comment dismissal confirms a versioned delete, never an accept or save', async () => {
+  const f = setup();
+  f.rows[0].comments = [{ id: 'comment', start: 0, end: 1, content: 'Synthetic suggestion' }];
+  await f.call({ operation: 'list', force: true });
+  const { ticket, scope } = f.events[0];
+  const input = { operation: 'dismiss_comment', ticket, scope, id: ID, commentId: 'comment' };
+  for (const bad of [{ ...input, reason: 'accept' }, { ...input, content: 'not_allowed' }, { ...input, commentId: '../other' }])
+    assert.equal((await f.call(bad, true)).detail, 'canvas_request_invalid');
+  assert.equal((await f.call(input)).detail, 'canvas_confirmation_required');
+  assert.equal(f.requests.filter(value => value.init.method !== 'GET').length, 0);
+  assert.equal((await f.call(input, true)).detail, 'canvas_comment_dismissed');
+  assert.equal(f.events.at(-1).documents[0].comments.length, 0);
+  assert.equal(f.events.at(-1).documents[0].documentVersion, 5);
+  assert.equal(f.requests.filter(value => value.init.method === 'DELETE').length, 1);
+  assert.equal(f.requests.filter(value => value.init.method === 'POST').length, 0);
+});
+
 test('scope is stable across refresh but changes with identity or document', async () => {
   const f = setup();
   await f.call({ operation: 'list', force: false });
@@ -156,4 +173,10 @@ test('management entries are native editor icons and parent close cancels child 
   assert.match(management, /!draft\.changed && draft\.matches\(value\)/);
   assert.match(management, /if \(active\(run\)\) \{ state\("读取完成", false\); done\(value\) \}/);
   assert.doesNotMatch(management + view, /loadUrl|evaluateJavascript|android\.webkit|WebView/);
+  for (const id of ['web-chat-canvas-comment-dismiss', 'web-chat-canvas-editor-comments-list']) assert.ok(view.includes(id));
+  for (const id of ['web-chat-canvas-comment-dismiss-confirm', 'web-chat-canvas-comment-dismiss-cancel']) assert.ok(management.includes(id));
+  assert.ok(owner.includes('dismissComment = { management?.confirmDismissComment(it) }'));
+  assert.ok(owner.includes('editing.acceptCommentDismissal(changed)'));
+  assert.ok(owner.includes('!value.unconfirmedWrite && editing.acceptCommentDismissal(server)'));
+  assert.ok(!owner.includes('editing.adopt(changed)'));
 });

@@ -97,5 +97,11 @@
       same({ ...saved, title: before.title, documentVersion: before.documentVersion }, before);
   }
 
-  return { version: 2, parse, draft, same, matches, renamed, renameTitle, equalComments, comments, offsets };
+  function dismissComment(before, id) {
+    if (typeof id !== 'string' || !ID.test(id) || !before.comments.some(value => value.id === id)) fail('comment_invalid');
+    return Object.freeze({ content: before.content,
+      comments: comments(before.comments.filter(value => value.id !== id), before.content, true) });
+  }
+
+  return { version: 3, parse, draft, same, matches, renamed, renameTitle, dismissComment, equalComments, comments, offsets };
 });

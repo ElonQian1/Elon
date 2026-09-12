@@ -15,6 +15,7 @@ internal class WebChatCanvasDraft(val path: String, val scope: String, document:
     var comments = document.comments.toList()
         private set
     private val brokenAnchors = mutableSetOf<String>()
+    private var pendingCommentDismissal: String? = null
     val needsRepair: Set<String> get() = brokenAnchors.toSet()
     val changed: Boolean get() = content != base.content || comments != base.comments || brokenAnchors.isNotEmpty()
 
@@ -73,6 +74,25 @@ internal class WebChatCanvasDraft(val path: String, val scope: String, document:
         return true
     }
 
+    fun dismissCommentRequest(index: ChatGptWebCanvasDocuments, id: String): JSONObject? {
+        if (!matches(index) || index.unconfirmedWrite || base.comments.none { it.id == id }) return null
+        pendingCommentDismissal = id
+        return selection(index, "dismiss_comment").put("commentId", id)
+    }
+
+    fun acceptCommentDismissal(document: ChatGptWebCanvasDocument): Boolean {
+        val id = pendingCommentDismissal ?: return false
+        if (document.documentVersion <= base.documentVersion ||
+            document.copy(comments = base.comments, documentVersion = base.documentVersion) != base ||
+            document.comments != base.comments.filterNot { it.id == id }) return false
+        // Only the explicitly dismissed comment is removed from the unsaved native draft.
+        base = document
+        comments = comments.filterNot { it.id == id }
+        brokenAnchors -= id
+        pendingCommentDismissal = null
+        return true
+    }
+
     fun selection(index: ChatGptWebCanvasDocuments, operation: String) = JSONObject()
         .put("operation", operation).put("path", path).put("scope", scope)
         .put("ticket", index.ticket).put("id", base.id)
@@ -83,12 +103,14 @@ internal class WebChatCanvasDraft(val path: String, val scope: String, document:
         content = document.content
         comments = document.comments.toList()
         brokenAnchors.clear()
+        pendingCommentDismissal = null
     }
 
     fun rebase(document: ChatGptWebCanvasDocument) {
         require(document.id == base.id)
         val previous = base
         base = document
+        pendingCommentDismissal = null
         if (document == previous) return
         // A newer server comment may describe different text. Require an explicit new selection.
         comments = document.comments.map { it.copy(start = 0, end = 0) }

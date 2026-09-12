@@ -132,4 +132,31 @@ class ChatGptWebCanvasDocumentsTest {
         assertNull(port.canvasDocuments())
         assertNull(ChatGptWebOperationReadiness.rejection("chatgpt_canvas_document", null, adapterCurrent = true, bridgeReady = false))
     }
+
+    @Test fun commentDismissalCannotCarryAcceptReasonOrAReplacementBody() {
+        fun dismiss(comment: Any = "c") = JSONObject().put("operation", "dismiss_comment").put("path", path)
+            .put("ticket", token).put("scope", token).put("id", "synthetic").put("commentId", comment)
+        for (comment in listOf("", "../foreign", "c?reason=accept", 5))
+            assertNull(ChatGptWebCanvasDocumentProtocol.request(dismiss(comment)))
+        assertNull(ChatGptWebCanvasDocumentProtocol.request(dismiss().put("reason", "accept")))
+        assertNull(ChatGptWebCanvasDocumentProtocol.request(dismiss().put("content", "replacement")))
+        var submitted: JSONObject? = null
+        val commands = object : ChatGptWebMcpCommandPort by ChatGptWebMcpTestCommandPort() {
+            override fun canvasDocument(request: JSONObject, confirmed: Boolean, requestId: String) {
+                assertTrue(confirmed)
+                submitted = request
+            }
+        }
+        val dispatch: (String, (String) -> Unit) -> Unit = { _, send -> send("mcp_dismiss") }
+        val args = JSONObject().put("canvas_request", dismiss())
+        for (confirmation in listOf(false, "true")) {
+            args.put("user_confirmed", confirmation)
+            assertEquals("canvas_confirmation_required", ChatGptWebCanvasDocumentProtocol.dispatch(args, commands, dispatch))
+            assertNull(submitted)
+        }
+        args.put("user_confirmed", true)
+        assertNull(ChatGptWebCanvasDocumentProtocol.dispatch(args, commands, dispatch))
+        assertEquals("dismiss_comment", submitted?.getString("operation"))
+        assertEquals("c", submitted?.getString("commentId"))
+    }
 }
