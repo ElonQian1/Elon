@@ -3,7 +3,7 @@
 
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptImageAssets;
-  if (existing && Number(existing.version) >= 4) return;
+  if (existing && Number(existing.version) >= 5) return;
   if (existing && typeof existing.dispose === 'function') existing.dispose();
 
   const MAX_ENTRIES = 96;
@@ -75,8 +75,10 @@
     if (!source) return {};
     const handle = handleFor(source);
     remember(handle, source, node);
+    const original = window.__elonChatGptPrivateMessageImage?.describe(node);
     return {
       assetHandle: handle,
+      ...(original ? { original } : {}),
       imageWidth: Math.max(0, Math.min(4096, Number(node.naturalWidth) || 0)),
       imageHeight: Math.max(0, Math.min(4096, Number(node.naturalHeight) || 0))
     };
@@ -282,5 +284,5 @@
     if (!job.listeners.size) finish(job, { ok: false, error: 'cancelled' });
   }
 
-  window.__elonChatGptImageAssets = Object.freeze({ version: 4, describe, request, scan, dispose, registerPrivate, cancel });
+  window.__elonChatGptImageAssets = Object.freeze({ version: 5, describe, request, scan, dispose, registerPrivate, cancel });
 })();

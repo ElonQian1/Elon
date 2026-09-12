@@ -8,7 +8,7 @@
     ? require('./chatgpt_web_private_library_raster_policy.js') : root?.__elonChatGptPrivateLibraryRasterPolicy;
   const canvas = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_canvas_text_export.js') : root?.__elonChatGptPrivateCanvasTextExport;
-  const exported = Object.freeze({ version: 35, create: root => factory(root, pointer, citation, raster, canvas) });
+  const exported = Object.freeze({ version: 36, create: root => factory(root, pointer, citation, raster, canvas) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -194,7 +194,7 @@
 
   function register(path, payload, index) {
     for (const [key, entry] of entries) {
-      if (entry.path === path || entry.expiresAt <= Date.now()) entries.delete(key);
+      if (entry.path === path && !entry.imageSelection || entry.expiresAt <= Date.now()) entries.delete(key);
     }
     const account = identity(), token = root.__elonChatGptDocumentToken;
     const projection = root.__elonChatGptPrivateHistoryProjection?.create({});
@@ -216,9 +216,34 @@
   function current(job) {
     return !disposed && active === job && !job.controller.signal.aborted &&
       (!job.entry.galleryCurrent || job.entry.galleryCurrent()) &&
+      (!job.entry.imageCurrent || job.entry.imageCurrent()) &&
       (!job.entry.canvasCurrent || job.entry.canvasCurrent()) &&
       root.location.href === job.descriptor.href && root.__elonChatGptDocumentToken === job.entry.token &&
       identity() === job.entry.account && (Boolean(job.entry.sharedLibraryFileId) || job.byteTransfer || job.entry.expiresAt > Date.now());
+  }
+
+  function registerMessageImage(path, source, selection, imageCurrent) {
+    const account = identity(), token = root.__elonChatGptDocumentToken;
+    const request = target(path, source, null);
+    if (disposed || !account || !/^doc_[a-z0-9_]{3,80}$/.test(token || '') ||
+        !root.elonChatGptFileDownload || !request?.image || !selection ||
+        typeof imageCurrent !== 'function' || !imageCurrent() || root.location.pathname !== path) return null;
+    const key = JSON.stringify(request);
+    for (const [handle, entry] of entries) {
+      if (entry.expiresAt <= Date.now()) entries.delete(handle);
+      else if (entry.imageSelection === selection && entry.imageKey === key && entry.path === path &&
+          entry.account === account && entry.token === token && entry.imageCurrent?.()) {
+        return { path, name: entry.name, handle };
+      }
+    }
+    const handle = 'download_' + Array.from(root.crypto.getRandomValues(new Uint8Array(16)),
+      value => value.toString(16).padStart(2, '0')).join('');
+    entries.set(handle, { ...request, path, account, token, imageCurrent,
+      // This is a live-bound file descriptor, not a signed URL. Authorization
+      // and the native one-use lease are still refreshed for each user request.
+      imageSelection: selection, imageKey: key, expiresAt: Number.POSITIVE_INFINITY });
+    while (entries.size > 800) entries.delete(entries.keys().next().value);
+    return { path, name: request.name, handle };
   }
 
   function registerGalleryImage(item, galleryCurrent) {
@@ -360,7 +385,7 @@
         descriptor.version !== 1 || descriptor.path !== entry.path || descriptor.name !== entry.name ||
         descriptor.documentToken !== entry.token || descriptor.href !== root.location.href ||
         !/^[a-f0-9-]{36}$/.test(descriptor.leaseId || '') || entry.expiresAt <= Date.now() || identity() !== entry.account ||
-        entry.galleryCurrent && !entry.galleryCurrent()) {
+        entry.galleryCurrent && !entry.galleryCurrent() || entry.imageCurrent && !entry.imageCurrent()) {
       abandon(descriptor);
       return respond(ACTION, false, 'download_selection_expired');
     }
@@ -449,5 +474,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 35, register, registerLibraryFile, registerGalleryImage, registerCanvasExport, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 36, register, registerLibraryFile, registerGalleryImage, registerMessageImage, registerCanvasExport, start, cancel, dispose, sourceDiagnostics });
 });

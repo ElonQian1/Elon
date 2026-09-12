@@ -1,6 +1,7 @@
 package com.elon.app.chatgptweb
 
 import com.elon.app.WebChatProductionRichCard
+import com.elon.app.WebChatImageOriginal
 import org.json.JSONObject
 
 internal data class ChatGptWebMessagePart(
@@ -17,6 +18,7 @@ internal data class ChatGptWebMessagePartMetadata(
     val targetKind: String? = null,
     val targetHost: String? = null,
     val assetHandle: String? = null,
+    val imageOriginal: WebChatImageOriginal? = null,
     val imageWidth: Int? = null,
     val imageHeight: Int? = null,
     val lineCount: Int? = null,
@@ -30,6 +32,7 @@ internal data class ChatGptWebMessagePartMetadata(
             targetKind == null &&
             targetHost == null &&
             assetHandle == null &&
+            imageOriginal == null &&
             imageWidth == null &&
             imageHeight == null &&
             lineCount == null &&
@@ -63,6 +66,8 @@ internal object ChatGptWebMessagePartParser {
             targetHost = boundedToken(part, "targetHost", TARGET_HOST, MAX_TARGET_HOST_LENGTH),
             assetHandle = part.optString("assetHandle")
                 .takeIf(ChatGptWebImageAssetProtocol::validHandle),
+            imageOriginal = if (part.optString("type") == "image")
+                WebChatImageOriginal.parse(part.optJSONObject("original")) else null,
             imageWidth = boundedCount(part, "imageWidth", MAX_IMAGE_DIMENSION),
             imageHeight = boundedCount(part, "imageHeight", MAX_IMAGE_DIMENSION),
             lineCount = boundedCount(part, "lineCount", MAX_LINE_COUNT),

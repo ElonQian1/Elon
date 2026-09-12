@@ -6,14 +6,15 @@ import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.WebChatConsumerPort
 import com.elon.app.WebChatFileDownloadDialog
+import com.elon.app.WebChatImageOriginal
 
 internal class ChatGptWebImageSession(
     activity: AppCompatActivity,
     host: FrameLayout,
-    pageAdapter: () -> ChatGptWebPageAdapter?,
+    private val pageAdapter: () -> ChatGptWebPageAdapter?,
     onChanged: () -> Unit,
-    consumerPort: () -> WebChatConsumerPort?,
-    beginDownload: () -> String,
+    private val consumerPort: () -> WebChatConsumerPort?,
+    private val beginDownload: () -> String,
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private val store = ChatGptWebImageAssetStore(activity.applicationContext)
@@ -36,18 +37,24 @@ internal class ChatGptWebImageSession(
             requestPage = { id, operation, handles -> pageAdapter()?.syncImageGallery(id, operation, handles) == true },
             cancelPage = { id -> pageAdapter()?.cancelImageGallery(id) },
             requestPreview = { handle -> pageAdapter()?.let { it.requestImageAsset(handle); true } ?: false },
-            downloadOriginal = download@{ handle ->
-                val owner = consumerPort() ?: return@download false
-                val adapter = pageAdapter() ?: return@download false
-                if (adapter.nativeDownloads.snapshot()?.active == true) return@download false
-                val id = beginDownload()
-                adapter.downloadGalleryImage(handle, id)
-                downloads.show(owner, id)
-                true
-            },
+            downloadOriginal = { handle -> download { adapter, id -> adapter.downloadGalleryImage(handle, id) } },
         )
     }
     private val gallery by galleryDelegate
+
+    fun downloadOriginal(original: WebChatImageOriginal): Boolean = download { adapter, id ->
+        adapter.downloadConversationFile(original.path, original.asFile(), id)
+    }
+
+    private fun download(dispatch: (ChatGptWebPageAdapter, String) -> Unit): Boolean {
+        val owner = consumerPort() ?: return false
+        val adapter = pageAdapter() ?: return false
+        if (adapter.nativeDownloads.snapshot()?.active == true) return false
+        val id = beginDownload()
+        dispatch(adapter, id)
+        downloads.show(owner, id)
+        return true
+    }
 
     fun show(onCreateImage: () -> Unit): Boolean = gallery.show(onCreateImage)
 

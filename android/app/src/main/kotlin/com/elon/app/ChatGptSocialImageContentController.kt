@@ -29,6 +29,9 @@ internal class ChatGptSocialImageContentController(
                     imageWidth = part.imageWidth,
                     imageHeight = part.imageHeight,
                 ),
+                onDownloadOriginal = part.imageOriginal?.let { original ->
+                    { session.downloadImageOriginal(original) }
+                },
             )
             return
         }

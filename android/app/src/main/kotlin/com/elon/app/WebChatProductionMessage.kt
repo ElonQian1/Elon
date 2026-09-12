@@ -13,6 +13,7 @@ data class WebChatProductionContentPart(
     val mediaType: String? = null,
     val targetHost: String? = null,
     val assetHandle: String? = null,
+    val imageOriginal: WebChatImageOriginal? = null,
     val imageSource: String? = null,
     val imageWidth: Int? = null,
     val imageHeight: Int? = null,

@@ -283,6 +283,7 @@ internal class ChatGptBackgroundSession(
     fun imagePreviewPath(handle: String): String? = imageAssets.resolvePath(handle)
     fun imagePreviewState(): ChatGptWebImagePreviewState = imageAssets.state()
     fun retryImagePreview(handle: String) = imageAssets.retry(handle)
+    fun downloadImageOriginal(original: com.elon.app.WebChatImageOriginal): Boolean = imageSession.downloadOriginal(original)
     fun retryMissingImagePreviews() = imageAssets.retryMissing(latestSnapshot)
     fun showImageGallery(onCreateImage: () -> Unit): Boolean {
         ensureInitialized()

@@ -126,6 +126,7 @@ internal object ChatGptFriendMessageMapper {
             mediaType = part.metadata?.mediaType,
             targetHost = part.metadata?.targetHost,
             assetHandle = assetHandle,
+            imageOriginal = part.metadata?.imageOriginal,
             imageSource = imageSource,
             imageWidth = part.metadata?.imageWidth,
             imageHeight = part.metadata?.imageHeight,
