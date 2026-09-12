@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 16, create: factory });
+  const api = Object.freeze({ version: 17, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -28,8 +28,10 @@
       win: 'man', Ein: 'gan', ay: 'Sy', iy: 'xy', ry: 'by', Jrn: 'Rin', Hrn: 'Min',
       f8t: 'K8t', c0: 'T0', FVt: 'hHt', u1t: 'W1t', l1t: 'U1t', iin: 'Jin',
       attachmentBaseLimit: undefined, attachmentMaxUploads: undefined,
-      attachmentPendingCount: undefined, attachmentConfiguredLimit: undefined, canvasEdits: undefined },
-    composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC', Ng: 'Yg', Bg: 'n_', fh: 'Oh' }, react: {}
+      attachmentPendingCount: undefined, attachmentConfiguredLimit: undefined,
+      canvasDirtyInit: undefined, useCanvasDirty: undefined },
+    composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC', Ng: 'Yg', Bg: 'n_', fh: 'Oh' },
+    react: { reactApi: undefined, reactDom: undefined, reactRoot: undefined }
   };
   const september9Exports = {
     shared: { H3: 'L8', R5: 'N9', F5: 'A9', mq: 'UG', wV: 'eR', SV: 'QL', XM: 'SJ', HM: 'mJ',
@@ -111,8 +113,10 @@
       win: 'Fcn', Ein: 'Lcn', ay: 'ub', iy: 'lb', ry: 'cb', Jrn: 'acn', Hrn: '$sn',
       f8t: 'xen', c0: 'R2', FVt: 'xWt', u1t: 'f4t', l1t: 'd4t', iin: 'hcn',
       attachmentBaseLimit: 'W$t', attachmentMaxUploads: 'Z$t',
-      attachmentPendingCount: 'K$t', attachmentConfiguredLimit: 'U$t' },
-    composer: { Ih: 'ig', t_: 'x_', AS: 'ZS', VS: 'cC', Ng: '$g', Bg: 'o_', fh: 'Nh' }, react: {}
+      attachmentPendingCount: 'K$t', attachmentConfiguredLimit: 'U$t',
+      canvasDirtyInit: 'Dvt', useCanvasDirty: 'Avt' },
+    composer: { Ih: 'ig', t_: 'x_', AS: 'ZS', VS: 'cC', Ng: '$g', Bg: 'o_', fh: 'Nh' },
+    react: { reactApi: 'zn', reactDom: 'Wt', reactRoot: 'Ut' }
   };
   const profiles = [
     { id: 'web_20260906', anchor: 'c2675c8c-f6cd0ubcb7y7eluj.js', files: legacy,
@@ -218,7 +222,10 @@
       if (map[name] === undefined && !p.exports?.[role]?.[name]) continue;
       const exported = p.exports ? p.exports[role][name] : name;
       if (namespace != null && Object.prototype.hasOwnProperty.call(namespace, exported)) {
-        result[name] = namespace[exported];
+        // This hook is initialized lazily by canvasDirtyInit. Keep its ES-module live binding.
+        if (name === 'useCanvasDirty') Object.defineProperty(result, name,
+          { enumerable: true, get: () => namespace[exported] });
+        else result[name] = namespace[exported];
       }
     }
     return Object.freeze(result);
@@ -234,7 +241,7 @@
   function load(url) {
     let p, role;
     try { role = roleOf(url); p = role && profile(); } catch (_) {}
-    if (!p || !role || role === 'react' || !observed(url)) {
+    if (!p || !role || role === 'react' && !p.exports?.react?.reactRoot || !observed(url)) {
       return Promise.reject(Error('runtime_not_observed'));
     }
     if (cache.has(role)) return cache.get(role);
@@ -280,8 +287,8 @@
 
   function state() {
     const p = profile();
-    return { version: 16, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 17, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 16, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 17, observed, load, peek, temporary, tools, state });
 });

@@ -21,6 +21,20 @@ test('unexported Canvas edit store is not fabricated from a similarly named impo
   f.page.__elonChatGptDocumentToken = 'doc_legacy'; f.observed.clear(); f.observed.add(old.shared);
   await assert.rejects(f.api.load('shared'), /runtime_exports_unknown/);
 });
+test('Canvas hook keeps its lazy live binding and only the reviewed build exposes React factories', async () => {
+  const namespace = { Dvt: () => { namespace.Avt = hook; }, Avt: undefined }, hook = () => false;
+  const react = { zn: () => 'react', Wt: () => 'dom', Ut: () => 'root', arbitrary: () => 'not_admitted' };
+  const f = fixture({ loadRuntime: url => url.includes('2340486e-') ? react : namespace });
+  f.observed.clear(); f.observed.add(CDN + 'c2675c8c-o59yc0xo7p9m3q3o.js');
+  const conversation = await f.api.load('conversation');
+  assert.equal(conversation.useCanvasDirty, undefined);
+  conversation.canvasDirtyInit(); assert.equal(conversation.useCanvasDirty, hook);
+  const library = await f.api.load('react');
+  assert.equal(library.reactApi, react.zn); assert.equal(library.reactDom, react.Wt);
+  assert.equal(library.reactRoot, react.Ut); assert.equal(library.arbitrary, undefined);
+  f.page.__elonChatGptDocumentToken = 'doc_legacy'; f.observed.clear(); f.observed.add(old.shared);
+  await assert.rejects(f.api.load('react'), /runtime_not_observed/);
+});
 function fixture(options = {}) {
   const observed = new Set([CDN + files.shared]), calls = [];
   const page = { location: { origin: 'https://chatgpt.com' }, document: { querySelector: () => null },
