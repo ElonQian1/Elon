@@ -15,8 +15,10 @@
   const fail = code => { throw Error('writing_' + code); };
   const result = (entry, code) => ({ ok: true, code, ticket: entry.ticket, path: entry.binding.path,
     id: entry.source.id, messageId: entry.source.messageId, pending: !!entry.pending });
+  const expired = entry => now() < entry.at || now() - entry.at > 1800000;
   function valid(entry) {
-    if (!entry || !entry.binding.current() || now() < entry.at || now() - entry.at > 1800000) fail('selection_expired');
+    // An uncertain write remains verifiable after its preparation TTL, but cannot be replayed.
+    if (!entry || !entry.binding.current() || !entry.pending && expired(entry)) fail('selection_expired');
   }
   async function request(entry, method, body, deadline, dispatch) {
     valid(entry);
@@ -58,10 +60,15 @@
       const deadline = now() + 24000;
       if (input.operation === 'prepare') {
         const binding = await context.capture(input, snapshot);
-        for (const [key, value] of entries) if (!value.binding.current()) entries.delete(key);
+        for (const [key, value] of entries) {
+          if (!value.pending && (!value.binding.current() || expired(value))) entries.delete(key);
+        }
         const existing = [...entries.values()].find(value => value.binding.id === binding.id &&
           value.source.messageId === input.messageId && value.source.id === input.id);
-        if (existing?.pending) return result(existing, 'writing_write_unconfirmed');
+        if (existing?.pending) {
+          if (!existing.binding.current()) fail('selection_expired');
+          return result(existing, 'writing_write_unconfirmed');
+        }
         const bytes = new Uint8Array(16);
         page.crypto.getRandomValues(bytes);
         entry = { ticket: 'wb_' + Array.from(bytes, value => value.toString(16).padStart(2, '0')).join(''),
@@ -71,6 +78,10 @@
         binding.local(fresh);
         entry.source = fresh;
         if (existing) entries.delete(existing.ticket);
+        if (entries.size >= 16) {
+          const oldest = [...entries.values()].filter(value => !value.pending).sort((a, b) => a.at - b.at)[0];
+          if (oldest) entries.delete(oldest.ticket);
+        }
         if (entries.size >= 16) fail('selection_limit');
         entries.set(entry.ticket, entry);
         return result(entry, 'writing_ready');

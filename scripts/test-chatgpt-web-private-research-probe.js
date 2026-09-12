@@ -70,7 +70,7 @@ function response(status, contentType) {
   };
 }
 
-async function run(enabled) {
+async function run(enabled, extensions = {}) {
   const events = [];
   const requests = [];
   class FakeXhr {
@@ -92,6 +92,7 @@ async function run(enabled) {
       return response(200, 'application/json');
     }
   };
+  Object.assign(window, extensions);
   window.window = window;
   const context = {
     window,
@@ -158,7 +159,7 @@ async function run(enabled) {
   const enabled = await run(true);
   assert.equal(enabled.requests.length, 6);
   assert.equal(enabled.events.length, 19);
-  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 22);
+  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 24);
   assert.equal(
     enabled.window.__elonChatGptPrivateResearchProbe
       .copyRequestContext('conversation_content').Authorization,
@@ -201,6 +202,20 @@ async function run(enabled) {
   const emitted = JSON.stringify(enabled.events);
   assert.doesNotMatch(emitted, /offset|limit|must-not-be-observed|123e4567|\bnext\b/);
   assert.ok(enabled.events.every((event) => event.action === 'research_network_observation'));
+  let inventoryReads = 0;
+  const production = await run(false, {
+    __elonChatGptPrivateProtocolEvidence: { create: () => ({ active: () => false }) },
+    __elonChatGptTextBlockInventory: { handle(action, command, respond) {
+      if (action !== 'private_protocol_probe' || command.value !== 'text_block_inventory') return false;
+      inventoryReads++; respond(action, true, 'counts-only'); return true;
+    } }
+  });
+  assert.equal(inventoryReads, 0);
+  const replies = [];
+  assert.equal(production.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe',
+    { value: 'text_block_inventory' }, (...value) => replies.push(value)), true);
+  assert.equal(inventoryReads, 1); assert.equal(replies[0][2], 'counts-only');
+  assert.equal(production.events.length, 0);
   console.log('CHATGPT_WEB_PRIVATE_RESEARCH_PROBE_TESTS=passed');
 })().catch((error) => {
   console.error(error);

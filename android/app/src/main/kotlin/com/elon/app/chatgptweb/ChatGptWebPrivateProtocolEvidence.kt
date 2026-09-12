@@ -7,7 +7,7 @@ import org.json.JSONObject
 internal object ChatGptWebPrivateProtocolEvidence {
     val MODES = setOf("start", "read", "stop", "clear", "runtime_assets", "composer_tool_context",
         "stop_runtime_context", "stop_runtime_owner", "directory_refresh", "model_runtime_context", "document_state",
-        "library_attachment_policy", "file_download_source", "library_sources", "composer_tool_admission")
+        "library_attachment_policy", "file_download_source", "library_sources", "composer_tool_admission", "text_block_inventory")
     private val libraryPolicyCodes = setOf("not_observed", "runtime_unavailable", "validator_unavailable", "document_changed",
         "runtime_changed", "limits_bypassed", "composer_detached", "owner_unavailable", "store_mismatch",
         "scope_mismatch", "model_mismatch", "limits_missing", "limits_invalid", "ready", "attachment_limit", "validator_error")
@@ -50,6 +50,7 @@ internal object ChatGptWebPrivateProtocolEvidence {
     private fun sanitize(raw: String): String {
         require(raw.length <= 12000)
         val value = JSONObject(raw)
+        if (value.opt("schema") == ChatGptWebTextBlockInventory.SCHEMA) return ChatGptWebTextBlockInventory.sanitize(value)
         if (value.opt("schema") == ChatGptWebToolAdmissionDiagnostic.SCHEMA) {
             return ChatGptWebToolAdmissionDiagnostic.sanitize(value)
         }

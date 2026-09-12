@@ -15,7 +15,8 @@ function payload() {
       metadata: { writing_blocks: { 'block-a': { content: original, variant: 'standard', title: 'Example', metadata: { tag: 'keep' } } } } } } } };
 }
 function harness() {
-  const state = { payload: payload(), current: true, local: true, sync: true, posts: [], requests: [], effects: true, postError: null };
+  const state = { payload: payload(), current: true, local: true, sync: true, posts: [], requests: [], effects: true,
+    postError: null, now: Date.now() };
   const root = { crypto: crypto.webcrypto, __elonChatGptTextBlocks: parser, __elonChatGptWritingBlockPolicy: policy,
     __elonChatGptPrivateConversationMutationsEnabled: true,
     __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({}) },
@@ -32,8 +33,8 @@ function harness() {
     } } };
   const ctx = { async capture() { return { id: conversationId, path, current: () => state.current,
     local() { if (!state.local) throw Error('writing_web_edit_pending'); }, reconcile: async () => state.sync }; } };
-  const core = transport.create(root, { context: ctx });
-  const prepare = () => core.run({ operation: 'prepare', path, messageId, id: 'block-a', content: original }, false);
+  const core = transport.create(root, { context: ctx, now: () => state.now });
+  const prepare = (id = 'block-a') => core.run({ operation: 'prepare', path, messageId, id, content: original }, false);
   return { state, root, core, prepare, save: (ticket, content = 'changed') => core.run({ operation: 'save', path, ticket, content }, true) };
 }
 test('explicit provider ownership is retained without exposing write metadata in display cards', () => {
@@ -129,6 +130,45 @@ test('explicit permission rejection is not confused with uncertain server timeou
   const g = harness(), q = await g.prepare(); g.state.postError = 'http_408';
   assert.equal((await g.save(q.ticket)).pending, true);
   await g.save(q.ticket); assert.equal(g.state.posts.length, 1);
+});
+
+function selectBlock(h, index) {
+  const id = 'block-' + index;
+  const next = payload(), message = next.mapping[messageId].message;
+  message.content.parts[0] = message.content.parts[0].replace('block-a', id);
+  message.metadata.writing_blocks = { [id]: message.metadata.writing_blocks['block-a'] };
+  h.state.payload = next;
+  return h.prepare(id);
+}
+
+test('expired preparations and bounded nonpending eviction do not permanently exhaust the editor', async () => {
+  for (const expire of [false, true]) {
+    const h = harness(); let first;
+    for (let i = 0; i < 16; i++) {
+      const p = await selectBlock(h, i); assert.equal(p.code, 'writing_ready'); first ||= p;
+      h.state.now += 1;
+    }
+    if (expire) h.state.now += 1800001;
+    assert.equal((await selectBlock(h, 16)).code, 'writing_ready');
+    assert.equal((await h.save(first.ticket)).code, 'writing_selection_expired');
+    assert.equal(h.state.posts.length, 0);
+  }
+});
+
+test('uncertain writes survive TTL and cache pressure; only readback releases the barrier', async () => {
+  const h = harness(), p = await h.prepare(); h.state.postError = 'timeout';
+  assert.equal((await h.save(p.ticket)).pending, true);
+  const written = structuredClone(h.state.payload);
+  h.state.now += 1800001;
+  for (let i = 0; i < 18; i++) assert.equal((await selectBlock(h, i)).code, 'writing_ready');
+  h.state.current = false;
+  assert.equal((await h.prepare()).code, 'writing_selection_expired');
+  h.state.current = true;
+  assert.equal((await h.prepare()).code, 'writing_write_unconfirmed');
+  assert.equal((await h.save(p.ticket, 'do not replay')).pending, true);
+  h.state.payload = written;
+  assert.equal((await h.core.run({ operation: 'verify', path, ticket: p.ticket }, false)).code, 'writing_saved');
+  assert.equal(h.state.posts.length, 1);
 });
 test('command retries share one promise, conflicting payload rejected, receipts never include body', async () => {
   const h = harness(), p = await h.prepare(), replies = [], events = [];

@@ -2,6 +2,7 @@ package com.elon.app.chatgptweb
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.elon.app.WebChatTextBlock
 
 class WebChatSnapshotWindowMergerTest {
     @Test
@@ -60,6 +61,23 @@ class WebChatSnapshotWindowMergerTest {
         assertEquals(10, merged.messageWindowStart)
         assertEquals("内容10", merged.messages.first().content)
         assertEquals("更新89", merged.messages.last().content)
+    }
+
+    @Test
+    fun exactDomBlockKeepsStructuredIdentityInBothWindowPaths() {
+        val source = ChatGptWebMessagePart("writing_block", "Draft", textBlock =
+            WebChatTextBlock("writing-a", "writing", "Draft", "", "body", true, "a1"))
+        val dom = ChatGptWebMessagePart("code", "Code", textBlock =
+            WebChatTextBlock("code-0", "code", "", "", "body", true))
+        val old = message("a1", "body").copy(parts = listOf(source))
+        val fresh = message("a1", "body").copy(parts = listOf(dom))
+        for (reorder in listOf(false, true)) {
+            val cached = snapshot(listOf(old, message("a2", "other")), observed = 2)
+            val incoming = if (reorder) listOf(message("a2", "other"), fresh) else listOf(fresh)
+            val merged = WebChatSnapshotWindowMerger.merge(cached, snapshot(incoming, observed = 2), true)
+            // A reordered window cannot establish the same positional owner.
+            assertEquals(if (reorder) dom else source, merged.messages.single { it.id == "a1" }.parts.single())
+        }
     }
 
     private fun snapshot(

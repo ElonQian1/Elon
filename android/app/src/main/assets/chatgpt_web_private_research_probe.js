@@ -63,10 +63,11 @@
       { schema: 'elon.library_sources.v1', observed: false, stale: false, total: 0, omitted: 0, groups: [] });
   }
   if (existingProbe && Number(existingProbe.version) >= 13) {
-    if (Number(existingProbe.version) < 23) {
+    if (Number(existingProbe.version) < 24) {
       // Upgrade only the command surface; keep the existing network observers.
-      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 23,
+      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 24,
         handle(action, command, respond) {
+          if (window.__elonChatGptTextBlockInventory?.handle(action, command, respond)) return true;
           if (action === 'private_protocol_probe' && command.value === 'composer_tool_admission') {
             respond(action, true, toolAdmissionDetail()); return true;
           }
@@ -593,9 +594,10 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 23,
+    version: 24,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
+      if (window.__elonChatGptTextBlockInventory?.handle(action, command, respond)) return true;
       if (action !== 'private_protocol_probe') return false;
       const mode = String(command.value || '');
       let detail;

@@ -51,9 +51,10 @@ internal object WebChatSnapshotWindowMerger {
         }
         val first = common.first()
         val last = common.last()
-        return deduplicated(
-            previous.take(first.previous) + incoming + previous.drop(last.previous + 1),
-        )
+        val enriched = incoming.map { message ->
+            WebChatTextBlockContinuity.merge(previousIndex[message.id]?.let(previous::get), message)
+        }
+        return deduplicated(previous.take(first.previous) + enriched + previous.drop(last.previous + 1))
     }
 
     private fun mergeByWindow(
@@ -65,7 +66,8 @@ internal object WebChatSnapshotWindowMerger {
             indexed[previous.messageWindowStart + index] = message
         }
         incoming.messages.forEachIndexed { index, message ->
-            indexed[incoming.messageWindowStart + index] = message
+            val position = incoming.messageWindowStart + index
+            indexed[position] = WebChatTextBlockContinuity.merge(indexed[position], message)
         }
         val last = indexed.lastKey()
         var first = last

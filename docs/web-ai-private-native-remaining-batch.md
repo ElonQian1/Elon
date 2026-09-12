@@ -26,8 +26,8 @@ published/installed and native-send accepted. Reuse this completed UI fix.
 only. The current model declined creation; stop repeating prompts. Original
 writes/exports need an owned sample. [Writing Blocks](chatgpt-writing-blocks-native.md)
 now have structured reading, native copy editing/export and scoped ordinary-message
-save-back source integration. Account writes and production UI acceptance remain
-unverified; project/library/typed-widget writes are not completed.
+save-back source integration. Code-block copy editing/export is device-accepted on
+1688; Writing Block UI/account writes and project/library/typed-widget writes remain unverified.
 
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
 three taps joined one 1077 ms read; native TXT saved 78 bytes. Supplemental/PCA

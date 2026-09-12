@@ -65,6 +65,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_adapter_realtime_voice_policy.js",
         "chatgpt_web_adapter_layout.js",
         "chatgpt_web_private_protocol_evidence.js",
+        "chatgpt_web_text_block_inventory.js",
         "chatgpt_web_private_research_probe.js",
         "chatgpt_web_private_voice_relay.js",
         "chatgpt_web_realtime_data_channel_research.js",
