@@ -21,7 +21,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, private val block: WebChatTextBlock) {
+internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, private val block: WebChatTextBlock,
+    private val cloud: WebChatTextBlockCloudSession? = null) {
     private val density = activity.resources.displayMetrics.density
     private val title = block.title.ifBlank { if (block.kind == "code") "${block.language} 代码".trim() else "写作块" }
     private val status = TextView(activity).apply { textSize = 14f; contentDescription = "web-chat-text-block-status" }
@@ -70,13 +71,15 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
             .setPositiveButton("恢复") { _, _ -> body.setText(block.content) }.setNegativeButton("取消", null).show()
     }
     private val export = icon(android.R.drawable.stat_sys_download_done, "导出副本", "export", ::chooseExport)
+    private val cloudSave = icon(android.R.drawable.ic_menu_save, "保存到官网", "save", ::saveCloud)
     private val dialog = AlertDialog.Builder(activity).setTitle(title).setView(LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(16), dp(8), dp(16), dp(16))
+        addView(status, LinearLayout.LayoutParams(-1, -2))
         addView(LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
-            addView(status, LinearLayout.LayoutParams(0, -2, 1f))
-            for (button in listOf(edit, copy, reset, export)) addView(button, LinearLayout.LayoutParams(dp(48), dp(48)))
+            for (button in listOf(edit, copy, reset, export, cloudSave)) addView(button, LinearLayout.LayoutParams(dp(48), dp(48)))
+            cloudSave.visibility = if (cloud != null) android.view.View.VISIBLE else android.view.View.GONE
         })
         addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
     }).setNegativeButton("返回", null).create()
@@ -89,31 +92,50 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
             dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener { close() }
             render()
+            cloud?.changed = ::render
+            cloud?.prepare()
         }
         dialog.setOnKeyListener { _, key, event ->
             if (key == android.view.KeyEvent.KEYCODE_BACK && event.action == android.view.KeyEvent.ACTION_UP) { close(); true } else false
         }
         dialog.setCanceledOnTouchOutside(false)
         dialog.setCancelable(false)
-        dialog.setOnDismissListener { child?.dismiss() }
+        dialog.setOnDismissListener { cloud?.close(); child?.dismiss() }
         dialog.show()
     }
 
     private fun render() {
-        val changed = body.text.toString() != block.content
+        val changed = body.text.toString() != (cloud?.savedContent ?: block.content)
         status.text = when {
             saving -> "正在导出"
+            cloud?.busy == true || cloud?.pending == true -> cloud.status
+            cloud != null && !cloud.ready -> cloud.status
             !block.complete -> "未完整 · 只读"
             exported == body.text.toString() -> "副本已导出"
-            changed -> "副本未导出"
+            cloud != null && body.text.toString() == cloud.savedContent -> cloud.status
+            changed -> if (cloud != null) "修改未保存到官网" else "副本未导出"
             editing -> "本机副本"
             else -> "原文"
         }
-        edit.isEnabled = block.complete && !saving
-        reset.isEnabled = changed && !saving
-        export.isEnabled = block.complete && !saving
-        body.isEnabled = !saving
+        val working = saving || cloud?.busy == true
+        edit.isEnabled = block.complete && !working
+        reset.isEnabled = body.text.toString() != block.content && !working
+        export.isEnabled = block.complete && !working
+        body.isEnabled = !working
+        cloudSave.isEnabled = !working && cloud != null &&
+            (!cloud.ready || cloud.pending || body.text.toString() != cloud.savedContent)
+        cloudSave.setImageResource(if (cloud?.pending == true || cloud?.ready == false) R.drawable.ic_side_menu_refresh else android.R.drawable.ic_menu_save)
+        TooltipCompat.setTooltipText(cloudSave, if (cloud?.pending == true) "核对保存结果" else if (cloud?.ready == false) "核对官网" else "保存到官网")
         edit.isSelected = editing
+    }
+
+    private fun saveCloud() {
+        val session = cloud ?: return
+        if (session.pending) { session.verify(); return }
+        if (!session.ready) { session.prepare(); return }
+        val content = body.text.toString()
+        child = AlertDialog.Builder(activity).setTitle("保存到官网？").setMessage("将更新这条消息中的写作块。")
+            .setPositiveButton("保存") { _, _ -> session.save(content) }.setNegativeButton("取消", null).show()
     }
 
     private fun chooseExport() {
@@ -143,9 +165,12 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
     }
 
     private fun close() {
-        if (saving) return
-        if (body.text.toString() == block.content || body.text.toString() == exported) { dialog.dismiss(); return }
-        child = AlertDialog.Builder(activity).setTitle("修改尚未导出").setMessage("离开将丢弃本机修改，官网原文不受影响。")
+        if (saving || cloud?.busy == true) return
+        if (cloud?.pending != true && (body.text.toString() == (cloud?.savedContent ?: block.content) ||
+            body.text.toString() == exported)) { dialog.dismiss(); return }
+        child = AlertDialog.Builder(activity).setTitle("修改尚未确认").setMessage(
+            if (cloud?.pending == true) "官网保存结果尚未确认。离开会丢弃本机副本，不会撤销已发出的保存。"
+            else "离开将丢弃尚未保存或导出的本机修改。")
             .setPositiveButton("继续编辑", null).setNegativeButton("丢弃修改") { _, _ -> dialog.dismiss() }.show()
     }
 

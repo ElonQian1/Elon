@@ -22,6 +22,9 @@ internal class ChatGptWebConsumerPortAdapter(
     override fun libraryFiles() = observedState().let { it.libraryFiles.takeIf { _ -> it.adapterCurrent } }
     override fun canvasContent() = observedState().let { it.canvasContent.takeIf { _ -> it.adapterCurrent } }
     override fun canvasDocuments() = observedState().let { it.canvasDocuments.takeIf { _ -> it.adapterCurrent } }
+    override fun writingBlock() = observedState().let { it.writingBlock.takeIf { _ -> it.adapterCurrent } }
+    override fun writingBlock(request: JSONObject, confirmed: Boolean) =
+        execute(JSONObject().put("action", "chatgpt_writing_block").put("writing_request", request).put("user_confirmed", confirmed))
     override fun canvasDocument(request: JSONObject, confirmed: Boolean) =
         execute(JSONObject().put("action", "chatgpt_canvas_document").put("canvas_request", request).put("user_confirmed", confirmed))
     override fun directoryPage() = observedState().let { it.directoryPage.takeIf { _ -> it.adapterCurrent } }

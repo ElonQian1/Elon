@@ -67,7 +67,7 @@ internal class ChatGptSocialChatController(
         audioPermissionController = audioPermissionController,
         onRealtimeVoiceTranscript = ::handleRealtimeVoiceTranscript,
     )
-    private val imageContent by lazy(LazyThreadSafetyMode.NONE) { ChatGptSocialImageContentController(activity, session, openOfficialFallback) }
+    private val imageContent by lazy(LazyThreadSafetyMode.NONE) { ChatGptSocialImageContentController(activity, session, openOfficialFallback) { if (active) socialConsumerPort else null } }
     private val skinPresentation = ChatGptWebSkinPresentationController(binding, session)
     private val newConversationConfirmation by lazy(LazyThreadSafetyMode.NONE) {
         ChatGptNewConversationConfirmationDialog(activity, { active }, {

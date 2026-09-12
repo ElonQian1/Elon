@@ -321,6 +321,9 @@ internal class ChatGptWebPageAdapter(
         action = "share_conversation", value = management?.toString() ?: path.take(MAX_CONVERSATION_PATH_LENGTH), requestId = requestId, selected = true,
     )
 
+    fun writingBlock(request: JSONObject, confirmed: Boolean, requestId: String) = runCommand(
+        action = "writing_block", value = request.toString(), requestId = requestId, selected = confirmed,
+    )
     fun canvasDocument(request: JSONObject, confirmed: Boolean, requestId: String) = runCommand(
         action = "canvas_document", value = request.toString(), requestId = requestId, selected = confirmed,
     )
@@ -716,7 +719,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 366
+        internal const val ADAPTER_VERSION = 367
 
         private val ADAPTER_ASSETS = ChatGptWebAdapterAssets.names
         private const val BRIDGE_OBJECT = "elonChatGptNative"

@@ -1,6 +1,6 @@
 # ChatGPT Writing Blocks 原生读取、编辑与导出
 
-状态：source-integrated；原生 UI / 文件保存真机验收待完成。不是 Canvas 完成标记。
+状态：source-integrated；原生 UI / 文件保存 / 官网写回真机验收待完成。不是 Canvas 完成标记。
 
 能力 ID：`android_chatgpt_text_block_local_editor_export_v1`。
 
@@ -18,9 +18,9 @@
 
 ## 边界
 
-原生编辑目前是**本机副本编辑与导出**，不是“保存回官网”。离开未导出的副本会明确确认丢弃；官网原文保持不变。
+原生编辑默认保留本机副本；符合下节范围的写作块额外提供显式“保存到官网”。打开、编辑、复制、导出本身不会写回，离开未保存的副本会确认丢弃。
 
-本轮只读取与输出文本文件；不增加邮箱发送、AI 改写、代码执行、Canvas 转换或库文件覆盖。
+不增加邮箱发送、AI 改写、代码执行、Canvas 转换或库文件覆盖。
 保留 Canvas 原生编辑/版本/导出链路，不把 Writing Blocks 换个标签接到 Canvas 写接口。
 
 生成中的快照和未闭合写作块不允许编辑或导出。块超过 120,000 字符、未知协议版本或类型不匹配时，保留普通消息展示，不创建可编辑的截断文档。
@@ -36,11 +36,27 @@
 
 以上不是账号下的实际写回验收。后续官网写回必须先核对具体块的消息 / 库文件归属与版本，读取后校验，单次提交后确认；不能猜接口、覆盖别的块或把失败自动重发成重复写入。
 
+## 官网写回源代码批次
+
+2026-09-13 新增 `android_chatgpt_writing_block_save_v1`，`code_status=partial`、`verification_status=offline_verified`，不是 completed。普通会话中具有明确 provider ID、variant、源消息 ID 的完整 `:::writing` 块已接上原生保存按钮；项目/临时会话、库文件联动、typed widget、无明确 ID/variant 的块不允许写回。界面中的源 ID 只表示可以后台核对，范围或归属核对不通过时保留副本编辑/导出，不能冒充完整写回。
+
+- 官方 `a965fc59-fzrm5l4zirdbhwph.js`，SHA-256 `752c85e9623229704c208167584c5b7a6e8f18410e6258713d2de7d483a62e19` 的 `nc`：POST `/conversation/message/writing-blocks`，携带 `conversation_id`、`message_id`、字符串 `index`、`id`、`writing_block`、`updated_at`；块内保存 content / index / variant / metadata / title / id。
+- 页面同源请求仅由既有身份层提供请求头，数据不离开设备。原生缓存中的源 ID 只是定位提示，不能代替当前页面、账号、分支和服务器正文校验。
+- 打开本机编辑器立即展示正文，后台准备保存选择票据；保存前再次读取原消息并核对完整块、元数据及当前官网内存内容。输入框未就绪不阻挡这条读写链路。
+- 用户确认后只发送一次；只有回读与提交内容一致，并通过已有 `textHydrateHistory` 对账后才显示“已保存到官网”。不 reload WebView，不更改输入草稿，不直接替换 React store。
+- 超时/连接失败/服务端不确定结果保留 pending，后续只读核对；HTTP 已知拒绝单独处理。官网写入成功但页面同步失败单独标记，不能把重新保存当恢复。
+- `updated_at` 是官网客户端提供的更新时间，**不是服务端 compare-and-swap 版本条件**。前后核对能检测已观察的冲突，但不能承诺跨设备同时写入绝无竞态。库文件乐观锁协议不得混入此接口。
+- 新增模块：`chatgpt_web_writing_block_policy.js`、`chatgpt_web_writing_block_context.js`、`chatgpt_web_private_writing_blocks.js`；原生命令/回执 `ChatGptWebWritingBlock.kt`，编辑器协调 `WebChatTextBlockCloudSession.kt`。回执不包含正文或凭证。
+
+待验收：一次有归属的真实写作块修改与回读，生产按钮、返回会话后的正文与缓存一致；跨设备并发保存仅作限制声明。本批未发布新 APK，不重复已有音频或听写验收。
+
 ## 代码与验证
 
 - 解析：`android/app/src/main/assets/chatgpt_web_text_blocks.js`。
 - 原生模型：`WebChatTextBlock.kt`；原生编辑与导出：`WebChatTextBlockEditor.kt`、`WebChatTextBlockExport.kt`。
 - 定向测试：`scripts/test-chatgpt-web-text-blocks.cjs`、`scripts/test-chatgpt-writing-block-public-evidence.cjs`、`WebChatTextBlockTest.kt`。
+- 官网写回测试：`scripts/test-chatgpt-web-writing-block-save.cjs`、`ChatGptWebWritingBlockTest.kt`；2026-09-13 JavaScript 合并回归 87 项通过、无跳过，覆盖请求契约、消息归属、重复写入、未知结果、回读及官网本地编辑冲突。
+- 2026-09-13 最终源码的 Android Debug Kotlin/Java 编译及 21 项定向单元测试通过；修改后重新验证，不复用旧源码编译结果。未打包发布，未宣称生产 UI 或真实账号写回已验收。
 - 共享回归：既有历史投影、私有 stream / delta / fetch、快照缓存和原生富内容策略测试。
 - 2026-09-12：JavaScript 回归 73 项通过（包含保留的官方源码契约检查，无跳过）；Android Debug Kotlin/Java 编译与 14 项定向单元测试通过。未打包发布 APK、未执行真机视觉/文件导出验收。
 - 首次 Android 检查被 180 秒日志静默保护中止，没有源码错误；确认是在 Kotlin 编译阶段后延长至 600 秒，重跑通过。不把被中止的检查记为通过。
@@ -49,4 +65,4 @@
 
 一次生产页验收即可：打开已有写作块与代码块，确认正文无截断；编辑副本并导出；核对文件字节和扩展名；返回原会话，确认原文和输入草稿未改变；重开会话检查缓存入口。
 无需说话、重新登录、清 Cookie 或重复研究已经完成的语音功能。
-官网写回仍是独立未完成项，应继续核对身份和版本契约，不能登记为 completed。
+官网写回仍未完成真实账号与生产 UI 验收；以上受限范围以外的变体仍有代码缺口，不能登记为 completed。

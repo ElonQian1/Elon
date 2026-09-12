@@ -262,6 +262,8 @@ internal class ChatGptWebMcpActions(
                     ?.let { return error(action, it) }
             "chatgpt_canvas_document" -> ChatGptWebCanvasDocumentProtocol.dispatch(args, commands, ::dispatch)
                 ?.let { return error(action, it) }
+            "chatgpt_writing_block" -> ChatGptWebWritingBlockProtocol.dispatch(args, commands, ::dispatch)
+                ?.let { return error(action, it) }
             "chatgpt_set_conversation_pinned",
             "chatgpt_set_conversation_archived",
             "chatgpt_delete_conversation",

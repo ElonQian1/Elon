@@ -25,6 +25,7 @@ internal object ChatGptWebMcpActionCatalog {
         "chatgpt_delete_conversation",
         "chatgpt_share_conversation",
         "chatgpt_canvas_document",
+        "chatgpt_writing_block",
         "chatgpt_rename_conversation",
         "chatgpt_move_conversation_to_project",
         "chatgpt_start_dictation",

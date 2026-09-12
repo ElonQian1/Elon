@@ -25,7 +25,7 @@ test('normal production part routing reaches the native editor, and export reuse
   const base = path.join(__dirname, '../android/app/src/main/kotlin/com/elon/app');
   const route = fs.readFileSync(path.join(base, 'ChatGptSocialImageContentController.kt'), 'utf8');
   assert.ok(route.indexOf('part.textBlock') < route.indexOf('openOfficialFallback()'));
-  assert.match(route, /WebChatTextBlockEditor\(activity, it\)\.show\(\)/);
+  assert.match(route, /WebChatTextBlockEditor\(activity, it, cloud\)\.show\(\)/);
   const editor = fs.readFileSync(path.join(base, 'WebChatTextBlockEditor.kt'), 'utf8');
   assert.match(editor, /WebChatTextBlockExport\.save/);
   assert.doesNotMatch(editor, /evaluateJavascript|openOfficialFallback|loadUrl/);
@@ -33,4 +33,20 @@ test('normal production part routing reaches the native editor, and export reuse
   assert.match(exporter, /ChatGptWebFileByteStorage\.open/);
   assert.match(exporter, /target\.publish\(\)/);
   assert.match(exporter, /target\.discard\(\)/);
+});
+
+test('reviewed official writing save uses original message ownership, not a library or Canvas write', {
+  skip: !directory && 'Requires retained public assets; never evaluates downloaded JavaScript.'
+}, () => {
+  const source = fs.readFileSync(path.join(directory, 'a965fc59-fzrm5l4zirdbhwph.js'), 'utf8');
+  assert.equal(crypto.createHash('sha256').update(source).digest('hex'),
+    '752c85e9623229704c208167584c5b7a6e8f18410e6258713d2de7d483a62e19');
+  const start = source.indexOf('async function nc('), end = source.indexOf('function rc(', start);
+  assert.ok(start > 0 && end > start);
+  const save = source.slice(start, end);
+  for (const contract of ['message_id:n', 'conversation_id:e', 'index:String(t)', 'id:i',
+    'content:a.content', 'variant:r.variant.toString()', 'metadata:a.metadata', 'title:a.title',
+    'updated_at:s', 'safePost(`/conversation/message/writing-blocks`', 'authOption:f.SendIfAvailable'])
+    assert.ok(save.includes(contract), contract);
+  assert.doesNotMatch(save, /magic-edit|files\/library\/files/);
 });

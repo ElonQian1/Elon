@@ -8,9 +8,14 @@ internal class ChatGptSocialImageContentController(
     private val activity: AppCompatActivity,
     private val session: ChatGptBackgroundSession,
     private val openOfficialFallback: () -> Unit,
+    private val consumerPort: () -> WebChatConsumerPort?,
 ) {
     fun open(part: WebChatProductionContentPart) {
-        part.textBlock?.let { WebChatTextBlockEditor(activity, it).show(); return }
+        part.textBlock?.let {
+            val cloud = if (it.complete && it.sourceMessageId != null) WebChatTextBlockCloudSession(
+                activity.window.decorView, consumerPort, it) else null
+            WebChatTextBlockEditor(activity, it, cloud).show(); return
+        }
         part.richCard?.let { card ->
             WebChatProductionRichCardViews.show(activity, card)
             return

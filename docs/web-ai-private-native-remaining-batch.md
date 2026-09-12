@@ -24,7 +24,10 @@ functional completeness, not a gate for this phase.
 published/installed and native-send accepted. Reuse this completed UI fix.
 [1682 Canvas](reports/chatgpt-canvas-provider-boundary-1682.md) accepts listing
 only. The current model declined creation; stop repeating prompts. Original
-writes/exports need an owned sample. Writing Blocks remain unverified.
+writes/exports need an owned sample. [Writing Blocks](chatgpt-writing-blocks-native.md)
+now have structured reading, native copy editing/export and scoped ordinary-message
+save-back source integration. Account writes and production UI acceptance remain
+unverified; project/library/typed-widget writes are not completed.
 
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
 three taps joined one 1077 ms read; native TXT saved 78 bytes. Supplemental/PCA

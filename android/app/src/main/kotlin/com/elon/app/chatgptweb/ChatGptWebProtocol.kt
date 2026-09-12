@@ -165,6 +165,7 @@ internal object ChatGptWebProtocol {
                 "library_files_snapshot" -> ChatGptWebLibraryProtocol.parse(event)?.let { ChatGptWebEvent.LibraryFiles(it) }
                 "canvas_shared_content" -> ChatGptWebCanvasContent.parse(event)?.let { ChatGptWebEvent.CanvasContent(it) }
                 "canvas_documents" -> ChatGptWebCanvasDocumentProtocol.parse(event)?.let { ChatGptWebEvent.CanvasDocuments(it) }
+                "writing_block" -> ChatGptWebWritingBlockProtocol.parse(event)?.let { ChatGptWebEvent.WritingBlock(it) }
                 "directory_page" -> ChatGptWebDirectoryPage.parse(event, ::parseConversations, ::parseProjects)
                     ?.let { ChatGptWebEvent.DirectoryPage(it) }
                 "image_gallery_snapshot" -> ChatGptWebImageAssetProtocol.parseGallery(event)

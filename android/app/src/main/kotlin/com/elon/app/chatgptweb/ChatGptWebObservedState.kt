@@ -18,6 +18,7 @@ internal class ChatGptWebObservedState(
     private var libraryFiles: com.elon.app.WebChatLibrarySnapshot? = null
     private var canvasContent: ChatGptWebCanvasContent? = null
     private var canvasDocuments: ChatGptWebCanvasDocuments? = null
+    private var writingBlock: ChatGptWebWritingBlock? = null
     private var directoryPage: ChatGptWebDirectoryPage? = null
     private val deleted = ChatGptDeletedConversations()
     private var composerSections: Map<String, List<ChatGptWebComposerOption>> = emptyMap()
@@ -33,6 +34,12 @@ internal class ChatGptWebObservedState(
     fun accept(event: ChatGptWebEvent) {
         val observedAtMs = nowMs()
         when (event) {
+            is ChatGptWebEvent.WritingBlock -> {
+                expirePendingCommands(observedAtMs)
+                val request = commandRequests.lastOrNull { it.expectedAction == ChatGptWebWritingBlockProtocol.ACTION }
+                if (request?.id != event.value.requestId || request.status != CommandRequest.PENDING) return
+                writingBlock = event.value
+            }
             is ChatGptWebEvent.CanvasDocuments -> {
                 expirePendingCommands(observedAtMs)
                 val request = commandRequests.lastOrNull { it.expectedAction == ChatGptWebCanvasDocumentProtocol.ACTION }
@@ -144,8 +151,9 @@ internal class ChatGptWebObservedState(
         libraryFiles = null
         canvasContent = null
         canvasDocuments = null
+        writingBlock = null
         commandRequests = commandRequests.map { request ->
-            if (request.expectedAction in setOf(ChatGptWebConversationFiles.ACTION, ChatGptWebLibraryProtocol.ACTION, ChatGptWebDirectoryPage.ACTION, ChatGptWebCanvasContent.ACTION, ChatGptWebCanvasDocumentProtocol.ACTION) && request.status == CommandRequest.PENDING) {
+            if (request.expectedAction in setOf(ChatGptWebWritingBlockProtocol.ACTION, ChatGptWebConversationFiles.ACTION, ChatGptWebLibraryProtocol.ACTION, ChatGptWebDirectoryPage.ACTION, ChatGptWebCanvasContent.ACTION, ChatGptWebCanvasDocumentProtocol.ACTION) && request.status == CommandRequest.PENDING) {
                 request.copy(status = CommandRequest.FAILED, completedAtMs = nowMs(),
                     result = ChatGptWebEvent.CommandResult(request.expectedAction, false, "history_cleared", request.id))
             } else request
@@ -164,6 +172,7 @@ internal class ChatGptWebObservedState(
             libraryFiles = null
             canvasContent = null
             canvasDocuments = null
+            writingBlock = null
             conversationCollection = if (conversations.isEmpty()) {
                 ChatGptWebConversationCollection()
             } else {
@@ -225,6 +234,7 @@ internal class ChatGptWebObservedState(
     ): CommandRequest {
         if (expectedAction == ChatGptWebCanvasContent.ACTION) canvasContent = null
         if (expectedAction == ChatGptWebCanvasDocumentProtocol.ACTION) canvasDocuments = null
+        if (expectedAction == ChatGptWebWritingBlockProtocol.ACTION) writingBlock = null
         val request = CommandRequest(
             id = "mcp_${(++nextCommandId).toString(36)}",
             expectedAction = expectedAction,
@@ -318,6 +328,7 @@ internal class ChatGptWebObservedState(
             libraryFiles = libraryFiles,
             canvasContent = canvasContent,
             canvasDocuments = canvasDocuments,
+            writingBlock = writingBlock,
             directoryPage = directoryPage,
         )
     }
@@ -388,6 +399,7 @@ internal class ChatGptWebObservedState(
         val libraryFiles: com.elon.app.WebChatLibrarySnapshot? = null,
         val canvasContent: ChatGptWebCanvasContent? = null,
         val canvasDocuments: ChatGptWebCanvasDocuments? = null,
+        val writingBlock: ChatGptWebWritingBlock? = null,
         val directoryPage: ChatGptWebDirectoryPage? = null,
     ) {
         val adapterCurrent: Boolean

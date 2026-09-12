@@ -74,7 +74,7 @@
       lineCount: value.content.split('\n').length, textBlock: value };
   }
 
-  function project(message) {
+  function project(message, includeWriteSources = false) {
     const content = message && message.content;
     if (!content || content.content_type !== 'text' || !Array.isArray(content.parts) ||
         content.parts.some(value => typeof value !== 'string')) return null;
@@ -85,15 +85,18 @@
       if (!match[0]) continue;
       lines.push({ line: match[0].replace(/[\r\n]+$/, ''), start: match.index, end: match.index + match[0].length });
     }
-    const parts = [], edits = [];
+    const parts = [], edits = [], writeSources = [], writingIds = new Map();
+    let scanned = 0, ambiguousWriting = false;
     let codeIndex = 0, writingIndex = 0;
     const finished = /^(finished_successfully|completed|finished)$/.test(message.status || '');
     for (let i = 0; i < lines.length && parts.length < MAX_BLOCKS; i++) {
+      scanned = i + 1;
       const open = fence(lines[i].line);
       const writing = !open && lines[i].line.match(/^ {0,3}:::writing\{([^}]*)\}\s*$/);
       if (!open && !writing) continue;
       const attrs = writing && attributes(writing[1]);
-      if (writing && !attrs) continue;
+      if (writing && !attrs) { ambiguousWriting = true; continue; }
+      if (writing) writingIds.set(attrs.id, (writingIds.get(attrs.id) || 0) + 1);
       const end = open ? fenceEnd(lines, i, open) : writingEnd(lines, i);
       const bodyEnd = end < 0 ? raw.length : lines[end].start;
       const original = raw.slice(lines[i].end, bodyEnd);
@@ -107,6 +110,17 @@
         const metadata = token(attrs.id) && own(message.metadata?.writing_blocks, attrs.id);
         const saved = metadata && typeof metadata.content === 'string' ? metadata.content : original;
         value = block('writing', id, metadata?.title || attrs.title || attrs.subject || '', '', saved, end >= 0);
+        const variant = metadata?.variant ?? attrs.variant;
+        // Only explicit provider IDs on original messages can authorize a later read-check-save.
+        if (value && end >= 0 && finished && token(attrs.id) &&
+            /^[A-Za-z0-9_-]{1,128}$/.test(message.id || '') &&
+            message.author?.role === 'assistant' && !message.clientMetadata?.writingBlockOwners &&
+            !metadata?.library_file_id && typeof variant === 'string' && /^[A-Za-z0-9_-]{1,48}$/.test(variant)) {
+          value.sourceMessageId = message.id;
+          if (includeWriteSources) writeSources.push({ id, messageId: message.id, index: writingIndex - 1,
+            variant, title: metadata?.title ?? attrs.title ?? attrs.subject ?? '',
+            metadata: metadata?.metadata ?? {}, content: saved, locallyEdited: metadata?.locallyEdited === true });
+        }
         // Only replace complete, supported blocks. Incomplete wrappers remain visible and read-only.
         if (value && end >= 0) edits.push({ start: lines[i].start, end: lines[end].end,
           text: saved + (saved.endsWith('\n') ? '' : '\n') });
@@ -114,6 +128,7 @@
       const projected = part(value);
       if (projected) parts.push(projected);
       i = end < 0 ? lines.length : end;
+      scanned = end < 0 ? lines.length : end + 1;
     }
     let text = raw;
     for (const edit of edits.reverse()) text = text.slice(0, edit.start) + edit.text + text.slice(edit.end);
@@ -129,7 +144,9 @@
       const value = part(block('writing', id, data.title || data.subject || '', '', data.content, finished));
       if (value) parts.push(value);
     }
-    return { text, parts };
+    const canOwn = id => !ambiguousWriting && scanned >= lines.length && writingIds.get(id) === 1;
+    for (const row of parts) if (!canOwn(row.textBlock.id)) delete row.textBlock.sourceMessageId;
+    return { text, parts, ...(includeWriteSources ? { writeSources: writeSources.filter(row => canOwn(row.id)) } : {}) };
   }
 
   function domCode(content, language, index) {

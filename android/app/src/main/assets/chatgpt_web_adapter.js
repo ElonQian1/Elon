@@ -466,8 +466,8 @@
       });
     }
     if (privateReadAloudAdapter?.handle(action, command, respond)) return;
-    if (window.__elonChatGptCanvasDocumentActions?.handle(action, command, respond, snapshot, emitEvent)) return;
-    if (window.__elonChatGptPrivateConversationShare?.handle(action, command, respond, snapshot, emitEvent)) return;
+    for (const owner of [window.__elonChatGptPrivateWritingBlocks, window.__elonChatGptCanvasDocumentActions, window.__elonChatGptPrivateConversationShare])
+      if (owner?.handle(action, command, respond, snapshot, emitEvent)) return;
     if (window.__elonChatGptPrivateConversationMutation?.handle(action, command, respond, scheduleSnapshot, conversationDirectoryRequests, snapshot)) return;
     if (action === 'set_skin_mode') {
       if (!skinAdapter || typeof skinAdapter.setEnabled !== 'function') {

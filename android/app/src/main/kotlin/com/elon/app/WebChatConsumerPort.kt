@@ -136,6 +136,9 @@ internal interface WebChatConsumerPort {
         WebChatConsumerCommandResult(false, "unsupported_consumer_command")
     fun canvasContent(): com.elon.app.chatgptweb.ChatGptWebCanvasContent? = null
     fun canvasDocuments(): com.elon.app.chatgptweb.ChatGptWebCanvasDocuments? = null
+    fun writingBlock(): com.elon.app.chatgptweb.ChatGptWebWritingBlock? = null
+    fun writingBlock(request: org.json.JSONObject, confirmed: Boolean = false): WebChatConsumerCommandResult =
+        WebChatConsumerCommandResult(false, error = "unsupported_action")
     fun canvasDocument(request: org.json.JSONObject, confirmed: Boolean = false): WebChatConsumerCommandResult =
         WebChatConsumerCommandResult(false, "canvas_unavailable")
     fun moveConversationToProject(
