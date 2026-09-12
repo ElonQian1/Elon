@@ -41,6 +41,19 @@
       stopped && owned.leaf.status === 'finished_partial_completion';
   }
 
+  function rejection(payload, binding, userMessageId, stopped, emptyStopped) {
+    if (!payload) return 'payload_missing';
+    if (payload.conversation_id !== binding.conversationId) return 'conversation_mismatch';
+    const user = payload.mapping?.[userMessageId];
+    if (!user || user.id !== userMessageId || user.message?.id !== userMessageId ||
+        user.message?.author?.role !== 'user') return 'user_missing';
+    if (user.parent !== binding.parentId) return 'parent_mismatch';
+    const owned = branch(payload, binding, userMessageId);
+    if (!owned) return 'branch_mismatch';
+    if (ownsKey(payload, 'async_status') && owned.asyncStatus !== null && owned.asyncStatus !== 4) return 'server_active';
+    return ownsResponse(payload, binding, userMessageId, stopped, emptyStopped) ? 'verified' : 'not_terminal';
+  }
+
   async function read(binding, request, signal) {
     if (signal.aborted || !binding.canReconcile(request.userMessageId)) return null;
     let value = null;
@@ -52,9 +65,11 @@
     return !signal.aborted && binding.canReconcile(request.userMessageId) ? value : null;
   }
 
-  async function reconcile(binding, request, signal, stopped = false, emptyStopped = false) {
+  async function reconcile(binding, request, signal, stopped = false, emptyStopped = false, onObservation) {
+    const report = code => { try { onObservation?.(code); } catch (_) {} };
     if (signal.aborted || !binding.canReconcile(request.userMessageId) ||
-        typeof binding.runtime.textHydrateHistory !== 'function') return false;
+        typeof binding.runtime.textHydrateHistory !== 'function') { report('owner_changed'); return false; }
+    report('reading');
     let verified = false;
     // BEn performs official fetch + tree reconciliation. Do not replace the
     // website store, reload the document, or apply another branch's response.
@@ -63,10 +78,14 @@
       signal, skipIfExisting: false, source: 'native_fresh_text_v1',
       onConversationLoadedFromNetwork(payload) {
         verified = !signal.aborted && ownsResponse(payload, binding, request.userMessageId, stopped, emptyStopped);
+        report(signal.aborted ? 'owner_changed' : rejection(payload, binding, request.userMessageId, stopped, emptyStopped));
       },
       shouldApplyResponse: () => verified && !signal.aborted && binding.canReconcile(request.userMessageId)
     });
-    return !signal.aborted && verified && binding.reconciled(request.userMessageId, stopped, emptyStopped);
+    const done = !signal.aborted && verified && binding.reconciled(request.userMessageId, stopped, emptyStopped);
+    if (verified) report(done ? 'reconciled' : signal.aborted || !binding.canReconcile(request.userMessageId)
+      ? 'owner_changed' : 'store_not_reconciled');
+    return done;
   }
   return Object.freeze({ reconcile, ownsResponse, branch, read });
 });

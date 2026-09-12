@@ -34,6 +34,28 @@ fixture on subsequent runs and restores the original conversation/draft and
 screen-awake setting. This acceptance control is not a completion/default-enable
 claim; live results belong below after a real run.
 
+### September 13 Device Result
+
+APK **1.1.1693**, source `c1cd275e84a9ac988d4248f26f46d3332749798d`, was
+installed without resetting app data. The native composer is initially collapsed;
+the acceptance runner now reuses the existing semantic focus step before typing.
+It matches this command's response rather than mistaking a later status row for
+the assistant, and retains its marked fixture as soon as its route is established.
+
+In `fresh-text-native-1693-20260913-060440-671`, the accepted sender's seed passed
+in 10.7 seconds. Exactly one candidate click reached the fresh owner: one dispatch,
+successful SSE response headers, but no matched native answer and no confirmed
+history reconciliation within 90 seconds. The original conversation and awake
+setting were restored. This is **not** successful fresh-send acceptance. No
+follow-up or active stop was attempted, and the normal sender remains default.
+
+Transaction v5 adds bounded event-type counts and history rejection codes to the
+trial receipt. These distinguish protocol handoff, missing/foreign history and
+store reconciliation without exposing messages, IDs, topics or credentials. The
+reviewed website `DM` yields `{event,data}` packets; its composer additionally
+handles `stream_handoff`. Whether that is this device failure's cause remains to
+be established; it is not inferred from a successful HTTP response.
+
 ## Implemented
 
 - `chatgpt_web_fresh_text_context.js` binds a personal authenticated account,

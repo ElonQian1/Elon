@@ -6,10 +6,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatGptWebFreshTextTrialTest {
-    private fun sample() = JSONObject().put("schema", ChatGptWebFreshTextTrial.SCHEMA).put("version", 4)
+    private fun sample() = JSONObject().put("schema", ChatGptWebFreshTextTrial.SCHEMA).put("version", 5)
         .put("control", "state").put("armed", false).put("remaining_ms", 0).put("attempts", 1)
         .put("pending", false).put("phase", "completed").put("code", "")
         .put("dispatched", true).put("accepted", true).put("reconciled", true)
+        .put("stream_events", 3).put("event_types", org.json.JSONArray(listOf("delta_encoding", "message")))
+        .put("history", "reconciled")
 
     @Test fun acceptsBoundedEvidenceThroughActualCommandReceiver() {
         val result = ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", sample().toString())
@@ -21,8 +23,17 @@ class ChatGptWebFreshTextTrialTest {
 
     @Test fun rejectsUnknownFieldsAndOutOfRangeCounters() {
         for (value in listOf(sample().put("content", "fixture"), sample().put("remaining_ms", 120001),
-            sample().put("attempts", 33), sample().put("code", "/c/fixture"), sample().put("version", 5),
+            sample().put("attempts", 33), sample().put("code", "/c/fixture"), sample().put("version", 6),
             sample().put("pending", "false"), sample().put("phase", "fixture"))) {
+            assertEquals("invalid_protocol_evidence",
+                ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", value.toString()))
+        }
+    }
+
+    @Test fun rejectsPrivateOrUnboundedStreamDiagnostics() {
+        for (value in listOf(sample().put("stream_events", 65536), sample().put("history", "private_fixture"),
+            sample().put("event_types", org.json.JSONArray(listOf("private_fixture"))),
+            sample().put("event_types", org.json.JSONArray(listOf("message", "message"))))) {
             assertEquals("invalid_protocol_evidence",
                 ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", value.toString()))
         }

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -21,6 +21,9 @@
   let document = page.document, token = page.__elonChatGptDocumentToken, active = null, disposed = false;
   let trial = null, last = null;
   const now = options.now || Date.now;
+  const eventTypes = new Set(['delta_encoding', 'message', 'input_message', 'message_stream_complete',
+    'stream_handoff', 'resume_conversation_token', 'conversation_async_status', 'server_ste_metadata',
+    'stream-message-start', 'stream-message-patch', 'stream-message-done', 'delta', 'other']);
   const knownCodes = new Set(['context_changed', 'context_invalid', 'command_invalid', 'scope_unsupported',
     'runtime_unavailable', 'identity_unavailable', 'context_unavailable', 'attachments_active', 'tools_active',
     'conversation_busy', 'parent_unavailable', 'prepare_unconfirmed', 'security_unavailable', 'security_invalid',
@@ -41,7 +44,7 @@
       try { if (active.stopConfirmed || active.recoveryConfirmed ||
         active.binding.reconciled(active.request.userMessageId, active.stopAcknowledged === true)) active = null; } catch (_) {}
     }
-    return { version: 4, transport: 'fresh_page_http_v1', pending: active !== null,
+    return { version: 5, transport: 'fresh_page_http_v1', pending: active !== null,
       phase: active?.phase || 'idle', dispatched: active?.dispatched === true,
       accepted: active?.accepted === true, code: active?.code || '', recovering: active?.recovering === true };
   }
@@ -65,11 +68,13 @@
     } else if (mode !== 'state') control = 'invalid_mode';
     const armed = trialArmed();
     const safeCode = value => /^[a-z_]{0,64}$/.test(value || '') ? value || '' : 'unknown';
-    return { schema: 'elon.fresh_text_trial.v1', version: 4, control, armed,
+    return { schema: 'elon.fresh_text_trial.v1', version: 5, control, armed,
       remaining_ms: armed ? Math.max(0, Math.min(120000, trial.expiresAt - now())) : 0,
       attempts: records.size, pending: active !== null, phase: last?.phase || 'idle',
       code: safeCode(last?.code), dispatched: last?.dispatched === true,
-      accepted: last?.accepted === true, reconciled: last?.recoveryConfirmed === true || last?.stopConfirmed === true };
+      accepted: last?.accepted === true, reconciled: last?.recoveryConfirmed === true || last?.stopConfirmed === true,
+      stream_events: last?.streamEvents || 0, event_types: Array.from(last?.eventTypes || []),
+      history: last?.historyCode || 'not_observed' };
   }
 
   function send(command) {
@@ -98,6 +103,7 @@
     trial = null;
     let resolve;
     const owner = { token, document, stamp, controller: new page.AbortController(), phase: 'preparing',
+      streamEvents: 0, eventTypes: new Set(), historyCode: 'not_observed',
       stopBoundaryController: new page.AbortController(),
       dispatched: false, accepted: false, finished: false, settled: false, fallback: false };
     owner.stopBoundary = owner.stopBoundaryController.signal;
@@ -189,6 +195,13 @@
       for (;;) {
         const next = await abortable(iterator.next());
         if (next.done) break;
+        if (next.value && 'data' in next.value) {
+          owner.streamEvents = Math.min(65535, owner.streamEvents + 1);
+          const data = next.value.data;
+          const type = next.value.event === 'delta_encoding' ? 'delta_encoding' :
+            data?.type || (data?.message ? 'message' : data?.o ? 'delta' : 'other');
+          owner.eventTypes.add(eventTypes.has(type) ? type : 'other');
+        }
         if (next.value?.response) {
           if (!owner.dispatched) throw Error('runtime_unavailable');
           if (next.value.response.ok !== true ||

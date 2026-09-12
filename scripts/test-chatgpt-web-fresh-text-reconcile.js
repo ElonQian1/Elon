@@ -29,6 +29,27 @@ test('owned completed branch hydrates the existing official store without editor
   assert.equal(f.calls[0].options.forceNetworkFetch, true);
   assert.equal(f.calls[0].options.skipIfExisting, false);
 });
+
+test('history diagnostics locate mismatch without weakening ownership or exporting the payload', async () => {
+  for (const [expected, mutate] of [
+    ['conversation_mismatch', p => { p.conversation_id = 'private_fixture'; }],
+    ['user_missing', p => { delete p.mapping[UID]; }],
+    ['parent_mismatch', p => { p.mapping[UID].parent = 'private_fixture'; }],
+    ['branch_mismatch', p => { p.current_node = 'private_fixture'; }],
+    ['server_active', p => { p.async_status = 3; }],
+    ['not_terminal', p => { p.mapping[AID].message.end_turn = false; }]
+  ]) {
+    const f = fixture(), observations = []; mutate(f.payload);
+    assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal, false, false,
+      code => observations.push(code)), false);
+    assert.deepEqual(observations, ['reading', expected]);
+    assert.equal(f.applied(), false);
+  }
+  const f = fixture(), observations = [];
+  assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal, false, false,
+    code => observations.push(code)), true);
+  assert.deepEqual(observations, ['reading', 'verified', 'reconciled']);
+});
 for (const [name, change] of [
   ['conversation', p => { p.conversation_id = 'another'; }],
   ['user identity', p => { p.mapping[UID].message.id = 'another'; }],

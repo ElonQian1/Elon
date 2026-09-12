@@ -59,7 +59,7 @@
         // delivery uncertainty only permits a partial result with terminal history.
         const stopped = owner.stopAttempted === true;
         const done = await wait(history.reconcile(owner.binding, owner.request, controller.signal,
-          stopped, stopped && owner.stopAcknowledged === true));
+          stopped, stopped && owner.stopAcknowledged === true, code => { owner.historyCode = code; }));
         if (!current()) return unknown('context_changed');
         if (done) {
           owner.recoveryConfirmed = true;

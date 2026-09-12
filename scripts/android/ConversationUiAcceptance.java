@@ -163,9 +163,24 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                     .startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"));
                 click(description("web-chat-send")); break;
             case "send_fresh_text_fixture":
+                String freshPrompt = new String(android.util.Base64.decode(
+                    getParams().getString("prompt_b64", ""), android.util.Base64.DEFAULT),
+                    java.nio.charset.StandardCharsets.UTF_8);
+                assertTrue("fresh_fixture_prompt_invalid", freshPrompt.matches(
+                    "ELON_FRESH_TEXT_ACCEPTANCE_V1 [a-z]+ [0-9]{13}\\. Reply exactly FRESH_[A-Z]+_[0-9]{13}\\."));
                 UiObject freshInput = description("web-chat-composer-input:chatgpt_web");
-                assertTrue("fresh_fixture_prompt_missing", freshInput.exists() && freshInput.getText()
-                    .matches("ELON_FRESH_TEXT_ACCEPTANCE_V1 [a-z]+ [0-9]{13}\\. Reply exactly FRESH_[A-Z]+_[0-9]{13}\\."));
+                assertTrue("fresh_input_missing", freshInput.waitForExists(3000));
+                java.lang.reflect.Method finder = UiObject.class.getDeclaredMethod("findAccessibilityNodeInfo", long.class);
+                finder.setAccessible(true);
+                AccessibilityNodeInfo edit = (AccessibilityNodeInfo) finder.invoke(freshInput, 1000L);
+                assertNotNull("fresh_input_node_missing", edit);
+                try {
+                    assertTrue("fresh_input_not_editable", edit.isEditable());
+                    android.os.Bundle inputArgs = new android.os.Bundle();
+                    inputArgs.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, freshPrompt);
+                    assertTrue("fresh_input_set_failed", edit.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, inputArgs));
+                } finally { edit.recycle(); }
+                assertEquals("fresh_fixture_prompt_mismatch", freshPrompt, freshInput.getText());
                 click(description("web-chat-send")); break;
             case "clear_image": click(description("\u5173\u95ed\u521b\u5efa\u56fe\u7247")); break;
             case "clear_search": click(description("\u5173\u95ed\u7f51\u9875\u641c\u7d22")); break;

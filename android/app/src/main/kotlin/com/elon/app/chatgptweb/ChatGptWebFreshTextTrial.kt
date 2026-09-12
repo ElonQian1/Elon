@@ -8,8 +8,9 @@ internal object ChatGptWebFreshTextTrial {
 
     fun sanitize(value: JSONObject): String {
         require(value.keys().asSequence().toSet() == setOf("schema", "version", "control", "armed",
-            "remaining_ms", "attempts", "pending", "phase", "code", "dispatched", "accepted", "reconciled"))
-        require(value.opt("version") == 4)
+            "remaining_ms", "attempts", "pending", "phase", "code", "dispatched", "accepted", "reconciled",
+            "stream_events", "event_types", "history"))
+        require(value.opt("version") == 5)
         require(value.opt("control") in setOf("state", "armed", "ended", "busy", "disabled", "disposed",
             "identity_unavailable", "invalid_mode"))
         require(value.opt("phase") in setOf("idle", "preparing", "dispatching", "streaming", "reconciling",
@@ -18,10 +19,23 @@ internal object ChatGptWebFreshTextTrial {
         for (key in listOf("armed", "pending", "dispatched", "accepted", "reconciled")) {
             require(value.opt(key) is Boolean)
         }
-        for ((key, maximum) in listOf("remaining_ms" to 120000L, "attempts" to 32L)) {
+        for ((key, maximum) in listOf("remaining_ms" to 120000L, "attempts" to 32L, "stream_events" to 65535L)) {
             val number = value.opt(key)
             require((number is Int || number is Long) && (number as Number).toLong() in 0..maximum)
         }
+        val types = value.getJSONArray("event_types")
+        val allowed = setOf("delta_encoding", "message", "input_message", "message_stream_complete",
+            "stream_handoff", "resume_conversation_token", "conversation_async_status", "server_ste_metadata",
+            "stream-message-start", "stream-message-patch", "stream-message-done", "delta", "other")
+        require(types.length() <= allowed.size)
+        val seen = mutableSetOf<String>()
+        for (index in 0 until types.length()) {
+            val type = types.opt(index)
+            require(type is String && type in allowed && seen.add(type))
+        }
+        require(value.opt("history") in setOf("not_observed", "reading", "owner_changed", "payload_missing",
+            "conversation_mismatch", "user_missing", "parent_mismatch", "branch_mismatch", "server_active",
+            "verified", "not_terminal", "store_not_reconciled", "reconciled"))
         require(value.getBoolean("armed") || value.getLong("remaining_ms") == 0L)
         return value.toString()
     }

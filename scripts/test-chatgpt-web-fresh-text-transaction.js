@@ -85,6 +85,24 @@ test('controlled trial allows one production dispatch without changing the defau
   assert.equal(JSON.stringify(evidence).includes(command.prompt), false);
 });
 
+test('stream diagnostics distinguish handoff without exporting events or releasing the writer', async () => {
+  const f = fixture({ stream: value => (async function* () {
+    value.onBeforeRequestStart();
+    yield { response: new Response(null, { headers: { 'content-type': 'text/event-stream' } }) };
+    yield { event: 'delta_encoding', data: 'v1' };
+    yield { data: { type: 'stream_handoff', options: [{ topic_id: 'private_fixture' }] } };
+    yield { data: { type: 'private_fixture', message: { content: 'private_fixture' } } };
+  })() });
+  await f.send().completion; await turn();
+  const evidence = f.api.trialControl('state');
+  assert.equal(evidence.stream_events, 3);
+  assert.deepEqual(evidence.event_types, ['delta_encoding', 'stream_handoff', 'other']);
+  assert.equal(evidence.pending, true);
+  assert.equal(evidence.reconciled, false);
+  assert.equal(JSON.stringify(evidence).includes('private_fixture'), false);
+  f.api.dispose();
+});
+
 test('trial is scoped to identity and route, expires without polling, and does not extend on repeated start', () => {
   let clock = 1000;
   const f = fixture({ now: () => clock });

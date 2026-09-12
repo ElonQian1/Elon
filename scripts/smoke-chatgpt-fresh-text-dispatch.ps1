@@ -40,12 +40,14 @@ function Native-Send([string]$Kind, [bool]$Candidate) {
     $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     $marker = "FRESH_$($Kind.ToUpperInvariant())_$stamp"
     $prompt = "ELON_FRESH_TEXT_ACCEPTANCE_V1 $Kind $stamp. Reply exactly $marker."
+    Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass CanvasUiAcceptance `
+        -Step focus_composer -ResultPrefix CANVAS_UI_RESULT | Out-Null
     $before = if ($Candidate) { Trial 'start' } else { $null }
     if ($Candidate -and $before.armed -ne $true) { throw "trial_not_armed:$($before.control)" }
-    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action set_input_text -Arguments @{text=$prompt} | Out-Null
     $started = [DateTimeOffset]::UtcNow
     Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass ConversationUiAcceptance `
-        -Step send_fresh_text_fixture -ResultPrefix CONVERSATION_UI_RESULT | Out-Null
+        -Step send_fresh_text_fixture -ResultPrefix CONVERSATION_UI_RESULT `
+        -Parameters @{ prompt_b64=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($prompt)) } | Out-Null
     if ($Candidate) { $report.candidate_clicks++ } else { $report.seed_sends++ }
     $until = $started.AddSeconds($TimeoutSec)
     $firstReplyMs = $null; $matched = $false; $diagnostic = $null
@@ -53,14 +55,21 @@ function Native-Send([string]$Kind, [bool]$Candidate) {
         $main = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state -MainState
         $messages = @($main.social_chat.messages)
         $users = @($messages | Where-Object { $_.role -eq 'user' -and $_.content -eq $prompt })
-        $lastAssistant = @($messages | Where-Object { $_.role -eq 'friend' }) | Select-Object -Last 1
-        $matched = ([string]$lastAssistant.content -replace '\\([_-])', '$1').Contains($marker)
+        $matched = @($messages | Where-Object {
+            $_.role -eq 'friend' -and (([string]$_.content -replace '\\([_-])', '$1').Contains($marker))
+        }).Count -gt 0
+        if (-not $Candidate -and $users.Count -eq 1 -and
+            [string]$main.social_chat.web_chat_conversation_path -match '^/c/[a-f0-9-]{36}$') {
+            @{path=[string]$main.social_chat.web_chat_conversation_path} | ConvertTo-Json -Compress |
+                Set-Content -LiteralPath $fixtureFile -Encoding utf8
+        }
         if ($users.Count -eq 1 -and $matched -and $null -eq $firstReplyMs) {
             $firstReplyMs = [long]([DateTimeOffset]::UtcNow - $started).TotalMilliseconds
         }
         if ($users.Count -gt 1) { throw 'duplicate_user_message' }
         if ($Candidate) {
             $diagnostic = Trial 'state'
+            $report.last_trial = $diagnostic
             if ($diagnostic.phase -eq 'rejected') { throw "fresh_rejected:$($diagnostic.code)" }
             if ($diagnostic.attempts -ne ($before.attempts + 1)) { throw 'fresh_route_not_used' }
         }
@@ -120,6 +129,8 @@ try {
     $report.passed = $true; $report.stage = 'complete'
 } catch {
     $report.error = if ($_.Exception.Message -match '^[a-z_:]+$') { $_.Exception.Message } else { 'acceptance_failed' }
+    if ($_.Exception.Message -match '^Semantic UI acceptance failed: ([a-z_]+)$') { $report.error = $Matches[1] }
+    $report.failure_line = $_.InvocationInfo.ScriptLineNumber
 } finally {
     if ($opened) {
         try { Trial 'end' | Out-Null } catch {}
