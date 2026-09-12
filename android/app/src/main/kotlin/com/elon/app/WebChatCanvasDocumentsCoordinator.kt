@@ -23,6 +23,8 @@ internal class WebChatCanvasDocumentsCoordinator(
     private var sheetGeneration = 0
     private var editor: WebChatCanvasEditorView? = null
     private var management: WebChatCanvasManagementCoordinator? = null
+    private var generation: WebChatCanvasGenerationCoordinator? = null
+    private var generationWatch: Runnable? = null
     private var draft: WebChatCanvasDraft? = null
     private var index: ChatGptWebCanvasDocuments? = null
     private val downloads = WebChatFileDownloadDialog(activity, host, port)
@@ -144,15 +146,53 @@ internal class WebChatCanvasDocumentsCoordinator(
                     } else editor?.render("暂时无法导出，请重试")
                 } else editor?.render("版本尚未确认，草稿已保留", allowed = false)
             })
+        generation?.cancel()
+        generation = WebChatCanvasGenerationCoordinator(activity, editing,
+            execute = { request, confirmed, done, failed -> execute(owner, editing.path, request, confirmed,
+                { result, _ -> index = result; done(result) }, failed) },
+            state = { message, working, allowed -> editor?.render(message, working, allowed) },
+            dispatched = { watchGeneration(owner, editing) })
         editor = WebChatCanvasEditorView(activity, editing,
             save = { save(owner, editing) }, check = { refresh(owner, editing) },
             history = { management?.showHistory() }, share = { management?.showShare() },
             rename = { management?.showRename() },
             export = { management?.showExport() },
+            generate = { start, end -> generation?.show(start, end) },
             dismissComment = { management?.confirmDismissComment(it) },
             closed = { if (run == epoch) cancel() })
         editor?.show()
         if (value.unconfirmedWrite || !editing.matches(value)) editor?.render("官网版本需要核对，草稿已保留", allowed = false)
+    }
+
+    private fun watchGeneration(owner: WebChatConsumerPort, editing: WebChatCanvasDraft) {
+        generationWatch?.let(host::removeCallbacks)
+        val run = epoch
+        val started = SystemClock.elapsedRealtime()
+        var nextRead = started + 2_000
+        var reads = 0
+        val watcher = object : Runnable {
+            override fun run() {
+                if (!alive(run, owner) || !samePath(editing.path) || index?.unconfirmedWrite == false) {
+                    generationWatch = null
+                    return
+                }
+                val now = SystemClock.elapsedRealtime()
+                if (now - started >= 90_000 || reads >= 6) {
+                    generationWatch = null
+                    editor?.render("改写结果待核对，原正文已保留", allowed = false)
+                    return
+                }
+                // Read cached native stream state. Only idle transitions trigger bounded canonical reads.
+                if (!owner.state().streaming && poll == null && now >= nextRead) {
+                    reads += 1
+                    nextRead = now + 10_000
+                    refresh(owner, editing)
+                }
+                host.postDelayed(this, 1_000)
+            }
+        }
+        generationWatch = watcher
+        host.postDelayed(watcher, 1_000)
     }
 
     private fun save(owner: WebChatConsumerPort, editing: WebChatCanvasDraft) {
@@ -189,6 +229,11 @@ internal class WebChatCanvasDocumentsCoordinator(
         val server = value.documents.firstOrNull { it.id == editing.base.id }
         if (server == null || value.scope != editing.scope) {
             editor?.render("原画布或身份已变化，草稿仅供复制", allowed = false)
+            return
+        }
+        if (!value.unconfirmedWrite && !editing.changed && server.documentVersion > editing.base.documentVersion) {
+            editing.adopt(server)
+            editor?.render("已更新 · 版本 ${server.documentVersion}", allowed = true, reset = true)
             return
         }
         if (!value.unconfirmedWrite && editing.acceptRename(server)) {
@@ -231,7 +276,11 @@ internal class WebChatCanvasDocumentsCoordinator(
         confirmed: Boolean, done: (ChatGptWebCanvasDocuments) -> Unit) {
         editor?.render("正在核对上次保存结果", working = true)
         execute(owner, editing.path, editing.selection(value, "verify"), confirmed,
-            { checked, _ -> done(checked) }, { reason -> editor?.render("$reason，草稿已保留", allowed = false) })
+            { checked, detail ->
+                index = checked
+                if (detail == "canvas_generation_pending") editor?.render("正在等待改写结果，原正文已保留", allowed = false)
+                else done(checked)
+            }, { reason -> editor?.render("$reason，草稿已保留", allowed = false) })
     }
 
     private fun execute(owner: WebChatConsumerPort, path: String, request: JSONObject, confirmed: Boolean,
@@ -284,6 +333,8 @@ internal class WebChatCanvasDocumentsCoordinator(
         stopPolling()
         dismissSheet()
         management?.cancel(); management = null
+        generation?.cancel(); generation = null
+        generationWatch?.let(host::removeCallbacks); generationWatch = null
         downloads.dismiss()
         val view = editor; editor = null; view?.dismiss()
     }
@@ -305,6 +356,9 @@ internal class WebChatCanvasDocumentsCoordinator(
         "canvas_title_invalid" -> "画布名称无效"
         "canvas_comment_invalid" -> "这条评论已变化，请核对官网版本"
         "canvas_write_unconfirmed" -> "保存结果尚未确认，请核对版本"
+        "canvas_generation_unconfirmed" -> "改写请求结果尚未确认，请核对版本，不要重复提交"
+        "canvas_generation_unavailable", "canvas_generation_owner_unavailable" -> "当前官网改写链路尚未就绪"
+        "canvas_generation_blocked" -> "官网当前不允许发起改写"
         "canvas_share_write_unconfirmed", "canvas_share_verification_required" -> "分享结果尚未确认，请打开画布分享核对"
         "canvas_share_unconfirmed" -> "官网分享状态尚未确认"
         "canvas_history_unconfirmed", "canvas_history_changed" -> "历史版本尚未确认，请重新读取"

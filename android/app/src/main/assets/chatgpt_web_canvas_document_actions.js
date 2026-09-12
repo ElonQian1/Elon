@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptCanvasDocumentActions) {
     root.__elonChatGptCanvasDocumentActions = factory(root);
@@ -15,6 +15,7 @@
     const base = ['operation', 'path', 'ticket', 'scope', 'id'];
     const keys = op === 'list' ? ['operation', 'path', 'force'] :
       op === 'save' ? [...base, 'content', 'comments'] : op === 'rename' ? [...base, 'title'] :
+      op === 'generate' ? [...base, 'prompt', 'start', 'end'] :
       op === 'dismiss_comment' ? [...base, 'commentId'] : op === 'history' ? [...base, 'beforeVersion'] :
       op === 'prepare_export' ? [...base, 'format'] :
       op === 'restore' ? [...base, 'historyTicket', 'restoreVersion'] :
@@ -26,6 +27,9 @@
           typeof input.id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(input.id))) throw Error();
     if (op === 'save' && (typeof input.content !== 'string' || input.content.length > 128 * 1024 ||
         !Array.isArray(input.comments) || input.comments.length > 1000)) throw Error();
+    if (op === 'generate' && (typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > 4000 ||
+        !Number.isSafeInteger(input.start) || !Number.isSafeInteger(input.end) || input.start < 0 ||
+        input.end < input.start || input.end > 128 * 1024)) throw Error();
     if (op === 'rename' && (typeof input.title !== 'string' || !input.title || input.title !== input.title.trim() ||
         input.title.length > 512 || /[\u0000-\u001f\u007f]/.test(input.title))) throw Error();
     if (op === 'dismiss_comment' && (typeof input.commentId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(input.commentId))) throw Error();
@@ -41,7 +45,7 @@
       input = parse(command?.value);
       if (typeof emit !== 'function' || !/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || '')) throw Error();
     } catch (_) { respond(action, false, 'canvas_request_invalid'); return true; }
-    if (['save', 'rename', 'dismiss_comment', 'restore', 'share_create', 'share_ack'].includes(input.operation) && command.selected !== true) {
+    if (['save', 'rename', 'generate', 'dismiss_comment', 'restore', 'share_create', 'share_ack'].includes(input.operation) && command.selected !== true) {
       respond(action, false, 'canvas_confirmation_required'); return true;
     }
     try {
@@ -57,5 +61,5 @@
     } catch (_) { respond(action, false, 'canvas_unavailable'); }
     return true;
   }
-  return Object.freeze({ version: 1, handle });
+  return Object.freeze({ version: 2, handle, generationPending: () => core?.generationPending?.() === true });
 });

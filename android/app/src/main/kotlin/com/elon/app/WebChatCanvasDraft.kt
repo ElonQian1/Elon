@@ -97,6 +97,13 @@ internal class WebChatCanvasDraft(val path: String, val scope: String, document:
         .put("operation", operation).put("path", path).put("scope", scope)
         .put("ticket", index.ticket).put("id", base.id)
 
+    fun generationRequest(index: ChatGptWebCanvasDocuments, prompt: String, start: Int, end: Int): JSONObject? {
+        if (changed || !matches(index) || index.unconfirmedWrite || start > end ||
+            !ChatGptWebCanvasDocumentProtocol.boundary(content, start) || !ChatGptWebCanvasDocumentProtocol.boundary(content, end)) return null
+        return ChatGptWebCanvasDocumentProtocol.request(selection(index, "generate")
+            .put("prompt", prompt).put("start", start).put("end", end))
+    }
+
     fun adopt(document: ChatGptWebCanvasDocument) {
         require(document.id == base.id)
         base = document

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateCanvasDocuments = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -182,6 +182,17 @@
     const pending = uncertain, { document } = selected(binding, input);
     if (document.id !== pending.before.id) fail('selection_invalid');
     const documents = await fetchDocuments(binding, deadline), saved = documents.find(value => value.id === document.id);
+    if (pending.kind === 'generation') {
+      // Neither an idle DOM nor a manual comparison can acknowledge an unobserved generation.
+      if (!pending.generation.settled()) return result(remember(binding, documents), 'canvas_generation_pending');
+      if (!saved || saved.documentType !== pending.before.documentType || saved.documentVersion < pending.before.documentVersion) {
+        fail('version_conflict');
+      }
+      uncertain = null;
+      context.reconcile(pending.owner).catch(() => {});
+      return result(remember(binding, documents), saved.documentVersion > pending.before.documentVersion
+        ? 'canvas_generated' : 'canvas_generation_no_change');
+    }
     const version = pending.version ?? saved?.documentVersion;
     const renaming = pending.kind === 'rename';
     const matches = renaming ? policy.renamed(saved, pending.before, pending.title) :
@@ -193,6 +204,33 @@
     if (matches) context.reconcile(pending.owner).catch(() => {});
     const verifiedCode = renaming ? 'canvas_renamed' : pending.kind === 'comment_dismissal' ? 'canvas_comment_dismissed' : 'canvas_saved';
     return result(remember(binding, documents), matches ? verifiedCode : 'canvas_result_acknowledged');
+  }
+
+  async function generate(binding, input, confirmed, deadline) {
+    if (confirmed !== true) fail('confirmation_required');
+    if (page.__elonChatGptPrivateConversationMutationsEnabled !== true) fail('disabled');
+    if (uncertain && sameSession(uncertain.binding)) fail('write_unconfirmed');
+    const { document: before } = selected(binding, input);
+    const owner = await context.capture(binding, before.id);
+    const service = page.__elonChatGptPrivateCanvasGeneration?.create(page);
+    if (!service) fail('generation_unavailable');
+    const generation = await service.prepare(binding, before, input, () => context.check(owner));
+    const fresh = await fetchDocuments(binding, deadline), original = fresh.find(value => value.id === before.id);
+    if (!original || !policy.same(original, before)) fail('version_conflict');
+    context.check(owner);
+    let attempted = false;
+    try {
+      await generation.invoke(() => {
+        context.check(owner);
+        caches.delete(binding.id); histories.clear();
+        uncertain = { kind: 'generation', binding, before, owner, generation };
+        attempted = true;
+      });
+      return { ...result(remember(binding, fresh), 'canvas_generation_dispatched'), attempted: true };
+    } catch (error) {
+      if (attempted) return { ok: false, code: 'canvas_generation_unconfirmed', attempted: true };
+      throw error;
+    }
   }
 
   async function dismissComment(binding, input, confirmed, deadline) {
@@ -330,7 +368,7 @@
     if (active) return { ok: false, code: 'canvas_busy', attempted: false };
     active = true;
     try {
-      if (!input || !['list', 'save', 'rename', 'dismiss_comment', 'prepare_export', 'verify', 'history', 'restore', 'share_lookup', 'share_create', 'share_ack'].includes(input.operation) || !policy ||
+      if (!input || !['list', 'save', 'rename', 'generate', 'dismiss_comment', 'prepare_export', 'verify', 'history', 'restore', 'share_lookup', 'share_create', 'share_ack'].includes(input.operation) || !policy ||
           !page.__elonChatGptPrivateJsonRequest?.request || !page.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders) {
         fail('request_invalid');
       }
@@ -338,6 +376,7 @@
       if (input.operation === 'list') return await read(binding, input.force === true, deadline);
       if (input.operation === 'prepare_export') return exportFile(binding, input);
       if (input.operation === 'save') return await save(binding, input, confirmed, deadline);
+      if (input.operation === 'generate') return await generate(binding, input, confirmed, deadline);
       if (input.operation === 'rename') return await rename(binding, input, confirmed, deadline);
       if (input.operation === 'dismiss_comment') return await dismissComment(binding, input, confirmed, deadline);
       if (input.operation === 'history') return await history(binding, input, deadline);
@@ -352,5 +391,9 @@
     } finally { active = false; }
   }
 
-  return Object.freeze({ version: 6, run, busy: () => active });
+  function generationPending() {
+    if (uncertain?.kind !== 'generation' || !current(uncertain.binding)) return false;
+    try { return !uncertain.generation.settled(); } catch (_) { return true; }
+  }
+  return Object.freeze({ version: 7, run, busy: () => active, generationPending });
 });

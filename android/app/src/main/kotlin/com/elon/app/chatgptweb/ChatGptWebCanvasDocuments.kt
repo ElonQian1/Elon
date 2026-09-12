@@ -112,6 +112,7 @@ internal object ChatGptWebCanvasDocumentProtocol {
             "list" -> setOf("operation", "path", "force")
             "save" -> setOf("operation", "path", "ticket", "scope", "id", "content", "comments")
             "rename" -> setOf("operation", "path", "ticket", "scope", "id", "title")
+            "generate" -> setOf("operation", "path", "ticket", "scope", "id", "prompt", "start", "end")
             "dismiss_comment" -> setOf("operation", "path", "ticket", "scope", "id", "commentId")
             "prepare_export" -> setOf("operation", "path", "ticket", "scope", "id", "format")
             "history" -> setOf("operation", "path", "ticket", "scope", "id", "beforeVersion")
@@ -126,6 +127,11 @@ internal object ChatGptWebCanvasDocumentProtocol {
             require(id.matches(value.opt("id") as? String ?: ""))
             if (operation == "save") parseComments(value.getJSONArray("comments"), text(value.opt("content")))
             if (operation == "rename") require(validTitle(value.opt("title") as? String ?: ""))
+            if (operation == "generate") {
+                require(text(value.opt("prompt")).let { it.isNotBlank() && it.length <= 4000 })
+                val start = integer(value.opt("start"), 0L..MAX_CONTENT.toLong())
+                integer(value.opt("end"), start..MAX_CONTENT.toLong())
+            }
             if (operation == "dismiss_comment") require(id.matches(value.opt("commentId") as? String ?: ""))
             if (operation == "prepare_export") require(value.opt("format") in setOf("pdf", "docx"))
             if (operation == "history") integer(value.opt("beforeVersion"), 1..9_007_199_254_740_991L)
@@ -140,7 +146,7 @@ internal object ChatGptWebCanvasDocumentProtocol {
     fun dispatch(args: JSONObject, commands: ChatGptWebMcpCommandPort, dispatch: (String, (String) -> Unit) -> Unit): String? {
         val request = args.optJSONObject("canvas_request")?.let(::request) ?: return "canvas_request_invalid"
         val confirmed = args.opt("user_confirmed") as? Boolean ?: return "canvas_confirmation_required"
-        if (request.getString("operation") in setOf("save", "rename", "dismiss_comment", "restore", "share_create", "share_ack") && !confirmed)
+        if (request.getString("operation") in setOf("save", "rename", "generate", "dismiss_comment", "restore", "share_create", "share_ack") && !confirmed)
             return "canvas_confirmation_required"
         dispatch(ACTION) { commands.canvasDocument(request, confirmed, it) }
         return null

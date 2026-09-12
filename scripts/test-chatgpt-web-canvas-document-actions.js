@@ -70,6 +70,23 @@ test('malformed commands and missing display channel cannot dispatch', async () 
   assert.equal(f.api.handle('other', {}, () => {}, () => f.snapshot, () => {}), false);
 });
 
+test('generation is explicit, range-bounded and preserves unknown outcomes in canonical events', async () => {
+  const f = setup(); let calls = 0;
+  f.page.__elonChatGptPrivateCanvasGeneration = { create: () => ({ prepare: async () => ({
+    invoke: async before => { before(); calls++; }, settled: () => false
+  }) }) };
+  await f.call({ operation: 'list', force: false });
+  const index = f.events[0], input = { operation: 'generate', ticket: index.ticket, scope: index.scope,
+    id: ID, prompt: 'Rewrite synthetic content', start: 0, end: 0 };
+  for (const bad of [{ ...input, headers: {} }, { ...input, end: -1 }, { ...input, prompt: '' }, { ...input, start: 0.5 }])
+    assert.equal((await f.call(bad, true)).detail, 'canvas_request_invalid');
+  assert.equal((await f.call(input)).detail, 'canvas_confirmation_required');
+  assert.equal(calls, 0);
+  assert.equal((await f.call(input, true)).detail, 'canvas_generation_dispatched');
+  assert.equal(f.events.at(-1).unconfirmedWrite, true); assert.equal(calls, 1);
+  assert.equal(f.events.at(-1).documents[0].content, index.documents[0].content);
+});
+
 test('canonical comment dismissal confirms a versioned delete, never an accept or save', async () => {
   const f = setup();
   f.rows[0].comments = [{ id: 'comment', start: 0, end: 1, content: 'Synthetic suggestion' }];

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 19, create: factory });
+  const exported = Object.freeze({ version: 20, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -239,7 +239,8 @@
     if (page.__elonChatGptPrivateTextTransactionsEnabled !== true) return { handled: false, code: 'disabled' };
     // Retry only local retirement on a later user action, never the network send.
     if (active?.retain && retireAcceptedFiles(active)) active = null;
-    if (active || page.__elonChatGptPrivateRegenerateRuntime?.state?.().pending ||
+    if (active || page.__elonChatGptCanvasDocumentActions?.generationPending?.() ||
+        page.__elonChatGptPrivateRegenerateRuntime?.state?.().pending ||
         page.__elonChatGptPrivateStopRuntime?.state?.().pending) {
       return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'busy' }) };
     }
@@ -330,5 +331,5 @@
       if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
     }
   } catch (_) {}
-  return Object.freeze({ version: 19, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 20, submit, captureConversation, state: () => ({ pending: active !== null }) });
 });

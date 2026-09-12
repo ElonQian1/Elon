@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 17, create: factory });
+  const api = Object.freeze({ version: 18, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -22,7 +22,8 @@
     shared: { H3: 'c6', R5: 'i7', F5: 't7', mq: 'Pq', wV: 'UV', SV: 'VV', XM: 'mN', HM: 'oN',
       'M$': 'Q$', RW: 'rG', uo: 'uo', t4: 'x4', IX: 'nZ', t6: 'x6', cX: 'OX',
       Fx: 'Lx', Fl: 'Il', v7: 'R7', $3: 'y6', Ur: 'Ur', zr: 'zr', attachmentUploadType: undefined,
-      conversationStore: undefined, canvasQueryClient: undefined },
+      conversationStore: undefined, canvasQueryClient: undefined,
+      canvasConversations: undefined, useCanvasSendBlocked: undefined },
     conversation: { AGt: 'uKt', J5t: 'O7t', Nrn: 'Cin', yRt: '$Rt', Grn: 'Fin',
       vRt: 'QRt', p8t: 'q8t', l0: 'E0', M1t: 'f0t', Rdn: 'Ofn', Rrn: 'Oin',
       win: 'man', Ein: 'gan', ay: 'Sy', iy: 'xy', ry: 'by', Jrn: 'Rin', Hrn: 'Min',
@@ -31,7 +32,8 @@
       attachmentPendingCount: undefined, attachmentConfiguredLimit: undefined,
       canvasDirtyInit: undefined, useCanvasDirty: undefined },
     composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC', Ng: 'Yg', Bg: 'n_', fh: 'Oh' },
-    react: { reactApi: undefined, reactDom: undefined, reactRoot: undefined }
+    react: { reactApi: undefined, reactDom: undefined, reactRoot: undefined,
+      intlInit: undefined, intlProvider: undefined }
   };
   const september9Exports = {
     shared: { H3: 'L8', R5: 'N9', F5: 'A9', mq: 'UG', wV: 'eR', SV: 'QL', XM: 'SJ', HM: 'mJ',
@@ -107,7 +109,7 @@
     shared: { H3: 'J5', R5: 'Cet', F5: 'bet', mq: 'bK', wV: 'AR', SV: 'OR', XM: '$J', HM: 'GJ',
       'M$': 'o2', RW: 'AV', uo: 'Fs', t4: 'R6', IX: 'hW', t6: 'S5', cX: 'TJ',
       Fx: 'aC', Fl: 'md', v7: 'rtt', $3: 'b5', Ur: 'ca', zr: 'ia', attachmentUploadType: 'am',
-      conversationStore: 'pY', canvasQueryClient: 'h2' },
+      conversationStore: 'pY', canvasQueryClient: 'h2', canvasConversations: 'MP', useCanvasSendBlocked: 'tP' },
     conversation: { AGt: 'gJt', J5t: 'rnn', Nrn: 'Wsn', yRt: 'iVt', Grn: 'ncn',
       vRt: 'rVt', p8t: 'Sen', l0: 'z2', M1t: 'P4t', Rdn: 'Ggn', Rrn: 'Ysn',
       win: 'Fcn', Ein: 'Lcn', ay: 'ub', iy: 'lb', ry: 'cb', Jrn: 'acn', Hrn: '$sn',
@@ -116,7 +118,7 @@
       attachmentPendingCount: 'K$t', attachmentConfiguredLimit: 'U$t',
       canvasDirtyInit: 'Dvt', useCanvasDirty: 'Avt' },
     composer: { Ih: 'ig', t_: 'x_', AS: 'ZS', VS: 'cC', Ng: '$g', Bg: 'o_', fh: 'Nh' },
-    react: { reactApi: 'zn', reactDom: 'Wt', reactRoot: 'Ut' }
+    react: { reactApi: 'zn', reactDom: 'Wt', reactRoot: 'Ut', intlInit: 'In', intlProvider: 'An' }
   };
   const profiles = [
     { id: 'web_20260906', anchor: 'c2675c8c-f6cd0ubcb7y7eluj.js', files: legacy,
@@ -223,7 +225,7 @@
       const exported = p.exports ? p.exports[role][name] : name;
       if (namespace != null && Object.prototype.hasOwnProperty.call(namespace, exported)) {
         // This hook is initialized lazily by canvasDirtyInit. Keep its ES-module live binding.
-        if (name === 'useCanvasDirty') Object.defineProperty(result, name,
+        if (name === 'useCanvasDirty' || name === 'intlProvider') Object.defineProperty(result, name,
           { enumerable: true, get: () => namespace[exported] });
         else result[name] = namespace[exported];
       }
@@ -287,8 +289,8 @@
 
   function state() {
     const p = profile();
-    return { version: 17, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 18, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 17, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 18, observed, load, peek, temporary, tools, state });
 });

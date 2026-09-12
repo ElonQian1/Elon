@@ -37,7 +37,7 @@ function retainedReply(f) {
   };
   f.page.fetch = async () => { throw Error('this contract check must not issue a request'); };
   const context = vm.createContext({ window: f.page, location: f.page.location, URL, TextDecoder });
-  for (const name of ['chatgpt_web_private_stream_policy', 'chatgpt_web_private_stream_transport']) {
+  for (const name of ['chatgpt_web_private_delta_document', 'chatgpt_web_private_stream_policy', 'chatgpt_web_private_stream_transport']) {
     vm.runInContext(source(name), context);
   }
   const payload = JSON.stringify({ conversation_id: id(1), message: f.message });

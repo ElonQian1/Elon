@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 10, create: factory });
+  const api = Object.freeze({ version: 11, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const old = root.__elonChatGptPrivateRegenerateRuntime;
@@ -54,7 +54,8 @@
 
   function regenerate(command) {
     if (page.__elonChatGptPrivateTextTransactionsEnabled !== true || !contract) return { handled: false };
-    if (state().pending || page.__elonChatGptPrivateStopRuntime?.state?.().pending ||
+    if (state().pending || page.__elonChatGptCanvasDocumentActions?.generationPending?.() ||
+        page.__elonChatGptPrivateStopRuntime?.state?.().pending ||
         page.__elonChatGptPrivateTextRuntimeSubmit?.state?.().pending ||
         page.__elonChatGptPrivateTextTransactionRelay?.state?.().active) {
       return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'busy' }) };
@@ -137,5 +138,5 @@
     return { handled: true, completion };
   }
 
-  return Object.freeze({ version: 10, regenerate, available, state });
+  return Object.freeze({ version: 11, regenerate, available, state });
 });

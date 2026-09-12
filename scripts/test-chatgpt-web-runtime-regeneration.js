@@ -7,9 +7,15 @@ const contract = require('../android/app/src/main/assets/chatgpt_web_private_reg
 const { fixture, id, flush } = require('./fixtures/chatgpt-runtime-regeneration.js');
 
 test('regeneration has a versioned official-runtime transaction', () => {
-  assert.equal(runtime.version, 10);
+  assert.equal(runtime.version, 11);
   assert.equal(contract.version, 10);
   assert.equal(typeof runtime.create, 'function');
+});
+
+test('pending Canvas generation cannot start another regeneration', async () => {
+  const f = fixture(); f.page.__elonChatGptCanvasDocumentActions = { generationPending: () => true };
+  const result = f.api.regenerate(f.command);
+  assert.equal((await result.completion).code, 'busy'); assert.equal(f.calls.length, 0);
 });
 
 test('closed portal callback is called once without menu opening and waits for a new reply', async () => {
