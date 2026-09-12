@@ -9009,6 +9009,134 @@
       "updated_at_ms": 1789165630244
     },
     {
+      "id": "esk-game-reconciliation-candidate-v1",
+      "title": "ESK game reconciliation candidates",
+      "summary": "Offline signed-source accounting and evidence archives produce unsigned settlement candidates.",
+      "status": "verified",
+      "priority": "p2",
+      "requirement": {
+        "path": "docs/requirements/esk-game-reconciliation-candidate-v1.md",
+        "content_hash": "b61032fe567c135a6b118c597e1ab28507fbcb189d2dd27b382431a2b1f9b1c3",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "5ee960deb73399256642277994635031ebccf8a0",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "59ada4cc01340e8381696955c9a11a64122a44d3",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "",
+      "tags": [],
+      "task_paths": [
+        "docs/esk-game-reconciliation.md",
+        "tools/esk-game-reconciler"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Verify pinned source identity and continuous signed accounting periods.",
+        "Calculate exact cumulative net profit excluding principal and unrealized gains.",
+        "Verify archived evidence and emit unsigned existing-protocol candidates with tested CLI failures."
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/esk-game-reconciliation.md",
+          "content_hash": "88576849c56e8c394e078d5b8e39c47a72ba5cd73177515e2b03dd8a47475361",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ee960deb73399256642277994635031ebccf8a0",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b171a87bdc8e6142c1b099eeda7b7b0ec55d4e1c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "tools/esk-game-reconciler/src/calculate.rs",
+          "content_hash": "0c0a5f95c6d680d3247659de1c174fd6c2220621adb2a6b12e690ae2bc7e1f42",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ee960deb73399256642277994635031ebccf8a0",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "942fdac54da3a069ff647b24b3b1e45b31dec112",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "tools/esk-game-reconciler/src/files.rs",
+          "content_hash": "1500f9b9e834e0e4c4f3cd0dd3ab6de56bf675e7929376289e00a66b77cf9bcf",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ee960deb73399256642277994635031ebccf8a0",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e64f5a37298fe99615e567d608124b32f8a33d31",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "tools/esk-game-reconciler/src/ledger_integration.rs",
+          "content_hash": "ccb2019711c3e506d56d7e11505f1f0c4e4cbf7a7e69930d5f5d0a999422f315",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ee960deb73399256642277994635031ebccf8a0",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d5862b500627f4a105e195fa7e2f6a443d73985b",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "tools/esk-game-reconciler/src/tests.rs",
+          "content_hash": "1ceb40e27500bda6a3514ebd1ba80c92d6c1597ed10fe1c88e0d9d83327bb293",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ee960deb73399256642277994635031ebccf8a0",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9b551aa9249798f750e3a96665f807a5bafe7066",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "tools/esk-game-reconciler/src/verify.rs",
+          "content_hash": "5c8d8104fff41bc8957077fedb2ab51fd03251501e7551ee1d5a796310dbc325",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ee960deb73399256642277994635031ebccf8a0",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "43955f999700acf68f6765dfd2bb631f083c9fe9",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "tools/esk-game-reconciler/tests/cli.rs",
+          "content_hash": "760da6446661465904424bfbebb9960976bfacd1d36016ea0cb25683dc0ec695",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ee960deb73399256642277994635031ebccf8a0",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "23d3a60c2080822c472405c3dfc6bafc41c6cbde",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1789174147490,
+      "updated_at_ms": 1789175255509
+    },
+    {
       "id": "esk-native-snapshot-v1",
       "title": "ESK 双 APK 原生只读快照授权 V1",
       "summary": "在官方双 APK 间确认本人账户并展示短期 Paper ESK 快照，HTTP 私有请求失败关闭，不向 WebView 传凭据。",
@@ -26492,66 +26620,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_af59328c6dd84ecaa7198a1e51d1600b",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788783609339
-    },
-    {
-      "id": "feature_event_f2d847f7c0314ac0a29de10d83eaf091",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788783944536
-    },
-    {
-      "id": "feature_event_76ac7ce72af04e69b1d1dc3003988e91",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788786362154
-    },
-    {
-      "id": "feature_event_271e7c11568b4065bce4af265d6ab20d",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788787660121
-    },
-    {
-      "id": "feature_event_e0cb69a3b64440f1b664dfbf478a1e3f",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788797008393
-    },
-    {
-      "id": "feature_event_98dc32d4d78643e0944fb620650b64b7",
-      "feature_id": "node-status-runtime-identity-v1",
-      "action": "registered",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788798417287
-    },
-    {
       "id": "feature_event_6b5d739ab86f4c459a364048988147ec",
       "feature_id": "node-status-runtime-identity-v1",
       "action": "claimed",
@@ -28490,6 +28558,66 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1789171077621
+    },
+    {
+      "id": "feature_event_ba726e377a0d443fa098024b44e3c82b",
+      "feature_id": "esk-game-reconciliation-candidate-v1",
+      "action": "registered",
+      "actor": "codex-esk-game",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789174147490
+    },
+    {
+      "id": "feature_event_9b0b1c62c542498184675388e611ce70",
+      "feature_id": "esk-game-reconciliation-candidate-v1",
+      "action": "claimed",
+      "actor": "codex-esk-game",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789174157952
+    },
+    {
+      "id": "feature_event_f34d5805d3de48e5985578eae78892e9",
+      "feature_id": "esk-game-reconciliation-candidate-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-game",
+      "reason": "Implement bounded offline accounting candidate tool after source audit.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789174221838
+    },
+    {
+      "id": "feature_event_f1ede0bd35274997be220224b9349196",
+      "feature_id": "esk-game-reconciliation-candidate-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-esk-game",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789175232310
+    },
+    {
+      "id": "feature_event_c3a45421db5e4c3d840cde9b0fac4497",
+      "feature_id": "esk-game-reconciliation-candidate-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-game",
+      "reason": "Offline candidate tool: 9 library and 4 real CLI tests, original main-ledger interoperability, strict Clippy and format guards passed. Live quant source remains outside this feature.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789175255315
+    },
+    {
+      "id": "feature_event_f700708299e3481784c4e218eba8ee6b",
+      "feature_id": "esk-game-reconciliation-candidate-v1",
+      "action": "transitioned",
+      "actor": "codex-esk-game",
+      "reason": "Offline candidate tool: 9 library and 4 real CLI tests, original main-ledger interoperability, strict Clippy and format guards passed. Live quant source remains outside this feature.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1789175255509
     }
   ]
 }

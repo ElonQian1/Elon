@@ -54,6 +54,7 @@ $crates = @(
 # These crates are available only for explicit file requests. Keep the default
 # and -All baseline above unchanged until a dedicated format-baseline migration.
 $fileOnlyCrates = @(
+    @{ Root = "tools/esk-game-reconciler"; Manifest = "tools/esk-game-reconciler/Cargo.toml" },
     @{ Root = "desktop-shell/src-tauri"; Manifest = "desktop-shell/src-tauri/Cargo.toml" }
 )
 

@@ -124,6 +124,10 @@ if [[ ${#files[@]} -gt 0 ]]; then
         manifest="${manifests[$index]}"
       fi
     done
+    # Explicit-file-only crate; preserve the existing repository-wide baseline.
+    if [[ "$relative" == tools/esk-game-reconciler/* ]]; then
+      manifest="tools/esk-game-reconciler/Cargo.toml"
+    fi
     if [[ -z "$manifest" ]]; then
       echo "Rust file is not under a known crate: $relative" >&2
       exit 1
