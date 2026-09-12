@@ -1,5 +1,14 @@
 # Writing Blocks 集中发布与验收
 
+## 当前交付
+
+- 修正源码 `ee9d97527bb5b914ccbe08cd12c221864c035865` 已推送 `origin/main`，正式版本 `1.1.1688` / code `1688` 已无损安装至小米。
+- 最新 APK SHA-256：`40f733106597a672429685b7331d99488ec220546362c710705d2f8a4be61286`；线上版本元数据已独立核对。
+- 修正后的 Release Kotlin/Java 编译及 13 项定向测试通过（3 个套件，无失败、错误或跳过）；覆盖块模型、格式、缓存、写回回执和本地操作不被只读核对阻塞的 UI 契约。
+- 真机日志 `text-block-native-export-1688-20260913-024333-717`：`passed=true`，明确验收范围 `required_kinds=[code]`。两个真实回复中的代码块均通过编辑副本、导出 `.txt`、SHA-256 核对、恢复原文、重开源内容不变。
+- 该次复用已有受控样本，`sent=0`、`cloud_writes=0`、`restored=true`、`awake_restored=true`，最终返回首页。未采集或导出私人会话内容。
+- **代码块本机编辑/导出已实测，不因后续 Writing Block 验收重复生成代码块样本。** `android_chatgpt_text_block_local_editor_export_v1` 的写作块变体验收仍待补齐，不把部分覆盖登记为整体 completed。
+
 ## 已发布基线
 
 - `aaf3973e42a78624d1c2863d1b210d78f0c78cc3`：Release Kotlin/Java 与 1,272 项单元测试通过，243 个套件，无失败或跳过。
