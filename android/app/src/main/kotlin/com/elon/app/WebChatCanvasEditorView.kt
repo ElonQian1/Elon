@@ -25,6 +25,7 @@ internal class WebChatCanvasEditorView(
     check: () -> Unit,
     history: () -> Unit,
     share: () -> Unit,
+    rename: () -> Unit,
     closed: () -> Unit,
 ) {
     private val padding = (16 * activity.resources.displayMetrics.density).toInt()
@@ -36,6 +37,7 @@ internal class WebChatCanvasEditorView(
     }
     private val historyButton = actionIcon(R.drawable.ic_popup_history, "历史版本", "web-chat-canvas-editor-history", history)
     private val shareButton = actionIcon(R.drawable.ic_project_post_share, "分享画布", "web-chat-canvas-editor-share", share)
+    private val renameButton = actionIcon(R.drawable.ic_project_action_rename, "重命名画布", "web-chat-canvas-editor-rename", rename)
     private var replacing = false
     private var start = 0
     private var removed = 0
@@ -73,6 +75,7 @@ internal class WebChatCanvasEditorView(
             gravity = android.view.Gravity.CENTER_VERTICAL
             val size = (48 * activity.resources.displayMetrics.density).toInt()
             addView(comments, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(renameButton, LinearLayout.LayoutParams(size, size))
             addView(historyButton, LinearLayout.LayoutParams(size, size))
             addView(shareButton, LinearLayout.LayoutParams(size, size))
         })
@@ -107,10 +110,10 @@ internal class WebChatCanvasEditorView(
     fun render(message: String, working: Boolean = false, allowed: Boolean = writable, reset: Boolean = false) {
         busy = working
         writable = allowed
+        dialog.setTitle(draft.base.title)
         if (reset) {
             replacing = true
             body.setText(draft.content)
-            dialog.setTitle(draft.base.title)
             replacing = false
         }
         status.text = if (draft.needsRepair.isNotEmpty()) "$message · ${draft.needsRepair.size} 条评论需重新关联" else message
@@ -118,6 +121,7 @@ internal class WebChatCanvasEditorView(
         comments.isEnabled = !busy && writable && draft.comments.isNotEmpty()
         historyButton.isEnabled = !busy
         shareButton.isEnabled = !busy
+        renameButton.isEnabled = !busy && writable
         body.isEnabled = !busy
         // A detached account/document draft remains selectable, but cannot be modified or saved.
         body.isFocusableInTouchMode = writable && !busy

@@ -38,6 +38,12 @@ internal object ChatGptWebCanvasDocumentProtocol {
     fun boundary(text: String, offset: Int): Boolean = offset in 0..text.length &&
         (offset == 0 || offset == text.length || !(text[offset].isLowSurrogate() && text[offset - 1].isHighSurrogate()))
 
+    fun validTitle(value: String): Boolean = runCatching {
+        require(value.isNotEmpty() && value == value.trim() && value.length <= 512 && value.none { it.code < 32 || it.code == 127 })
+        text(value)
+        true
+    }.getOrDefault(false)
+
     private fun text(value: Any?): String {
         val content = value as? String ?: error("content_type")
         require(content.length <= MAX_CONTENT)
@@ -102,6 +108,7 @@ internal object ChatGptWebCanvasDocumentProtocol {
         val keys = when (operation) {
             "list" -> setOf("operation", "path", "force")
             "save" -> setOf("operation", "path", "ticket", "scope", "id", "content", "comments")
+            "rename" -> setOf("operation", "path", "ticket", "scope", "id", "title")
             "history" -> setOf("operation", "path", "ticket", "scope", "id", "beforeVersion")
             "restore" -> setOf("operation", "path", "ticket", "scope", "id", "historyTicket", "restoreVersion")
             "verify", "share_lookup", "share_create", "share_ack" -> setOf("operation", "path", "ticket", "scope", "id")
@@ -113,6 +120,7 @@ internal object ChatGptWebCanvasDocumentProtocol {
             require(token.matches(value.opt("ticket") as? String ?: "") && token.matches(value.opt("scope") as? String ?: ""))
             require(id.matches(value.opt("id") as? String ?: ""))
             if (operation == "save") parseComments(value.getJSONArray("comments"), text(value.opt("content")))
+            if (operation == "rename") require(validTitle(value.opt("title") as? String ?: ""))
             if (operation == "history") integer(value.opt("beforeVersion"), 1..9_007_199_254_740_991L)
             if (operation == "restore") {
                 require(token.matches(value.opt("historyTicket") as? String ?: ""))
@@ -125,7 +133,7 @@ internal object ChatGptWebCanvasDocumentProtocol {
     fun dispatch(args: JSONObject, commands: ChatGptWebMcpCommandPort, dispatch: (String, (String) -> Unit) -> Unit): String? {
         val request = args.optJSONObject("canvas_request")?.let(::request) ?: return "canvas_request_invalid"
         val confirmed = args.opt("user_confirmed") as? Boolean ?: return "canvas_confirmation_required"
-        if (request.getString("operation") in setOf("save", "restore", "share_create", "share_ack") && !confirmed)
+        if (request.getString("operation") in setOf("save", "rename", "restore", "share_create", "share_ack") && !confirmed)
             return "canvas_confirmation_required"
         dispatch(ACTION) { commands.canvasDocument(request, confirmed, it) }
         return null

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateCanvasDocuments = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -43,7 +43,7 @@
     return remaining;
   }
 
-  async function request(binding, path, method, deadline, body, dispatch) {
+  async function request(binding, path, method, deadline, body, dispatch, mode = 'json') {
     if (!current(binding)) fail('context_changed');
     const timeoutMs = budget(deadline), headers = { Accept: 'application/json' };
     for (const [name, value] of Object.entries(page.__elonChatGptPrivateTransport.copySameOriginRequestHeaders())) {
@@ -55,7 +55,7 @@
     if (body !== undefined) { headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(body); }
     dispatch?.();
     const response = await page.__elonChatGptPrivateJsonRequest.request(page, path, init,
-      { timeoutMs, maxBytes: 1024 * 1024, mode: 'json' });
+      { timeoutMs, maxBytes: 1024 * 1024, mode });
     if (!current(binding)) fail('context_changed');
     budget(deadline);
     return response.payload;
@@ -153,13 +153,48 @@
     if (document.id !== pending.before.id) fail('selection_invalid');
     const documents = await fetchDocuments(binding, deadline), saved = documents.find(value => value.id === document.id);
     const version = pending.version ?? saved?.documentVersion;
-    const matches = version > pending.before.documentVersion && policy.matches(saved, pending.expectedBase, pending.expected, version);
+    const renaming = pending.kind === 'rename';
+    const matches = renaming ? policy.renamed(saved, pending.before, pending.title) :
+      version > pending.before.documentVersion && policy.matches(saved, pending.expectedBase, pending.expected, version);
     if (!matches && confirmed !== true) return result(remember(binding, documents), 'canvas_verification_pending');
     if (!matches && (!saved || !policy.same(document, saved))) fail('version_conflict');
     // Clearing a mismatch only acknowledges an explicit comparison, never submits a second POST.
     uncertain = null;
     if (matches) context.reconcile(pending.owner).catch(() => {});
-    return result(remember(binding, documents), matches ? 'canvas_saved' : 'canvas_result_acknowledged');
+    return result(remember(binding, documents), matches ? renaming ? 'canvas_renamed' : 'canvas_saved' : 'canvas_result_acknowledged');
+  }
+
+  async function rename(binding, input, confirmed, deadline) {
+    if (confirmed !== true) fail('confirmation_required');
+    if (page.__elonChatGptPrivateConversationMutationsEnabled !== true) fail('disabled');
+    if (uncertain && sameSession(uncertain.binding)) fail('write_unconfirmed');
+    const { document: before } = selected(binding, input), title = policy.renameTitle(input.title);
+    const owner = await context.capture(binding, before.id);
+    const fresh = await fetchDocuments(binding, deadline), original = fresh.find(value => value.id === before.id);
+    if (!original || !policy.same(original, before)) fail('version_conflict');
+    context.check(owner);
+    if (title === before.title) return result(remember(binding, fresh), 'canvas_unchanged');
+    let attempted = false;
+    try {
+      // The official rename owner consumes no result body. A 2xx/204 alone is not
+      // success here: confirm the title and unchanged source by canonical readback.
+      await request(binding, '/backend-api/textdoc/' + before.id + '/rename', 'POST', deadline, { title }, () => {
+        context.check(owner);
+        caches.delete(binding.id);
+        histories.clear();
+        uncertain = { kind: 'rename', binding, before, title, owner };
+        attempted = true;
+      }, 'none');
+      const documents = await fetchDocuments(binding, deadline), saved = documents.find(value => value.id === before.id);
+      if (!policy.renamed(saved, before, title)) fail('write_unconfirmed');
+      uncertain = null;
+      context.reconcile(owner).catch(() => {});
+      return { ...result(remember(binding, documents), 'canvas_renamed'), attempted: true };
+    } catch (error) {
+      if (/^http_(401|403)$/.test(error?.message || '')) page.__elonChatGptPrivateAuthContext?.invalidate?.('canvas_rejected');
+      if (attempted) return { ok: false, code: 'canvas_write_unconfirmed', attempted: true };
+      throw error;
+    }
   }
 
   async function readHistory(binding, document, beforeVersion, deadline) {
@@ -250,13 +285,14 @@
     if (active) return { ok: false, code: 'canvas_busy', attempted: false };
     active = true;
     try {
-      if (!input || !['list', 'save', 'verify', 'history', 'restore', 'share_lookup', 'share_create', 'share_ack'].includes(input.operation) || !policy ||
+      if (!input || !['list', 'save', 'rename', 'verify', 'history', 'restore', 'share_lookup', 'share_create', 'share_ack'].includes(input.operation) || !policy ||
           !page.__elonChatGptPrivateJsonRequest?.request || !page.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders) {
         fail('request_invalid');
       }
       const binding = bind(input.path, readSnapshot), deadline = now() + 18000;
       if (input.operation === 'list') return await read(binding, input.force === true, deadline);
       if (input.operation === 'save') return await save(binding, input, confirmed, deadline);
+      if (input.operation === 'rename') return await rename(binding, input, confirmed, deadline);
       if (input.operation === 'history') return await history(binding, input, deadline);
       if (input.operation === 'restore') return await restore(binding, input, confirmed, deadline);
       if (input.operation.startsWith('share_')) return await share(binding, input, confirmed, deadline);
@@ -269,5 +305,5 @@
     } finally { active = false; }
   }
 
-  return Object.freeze({ version: 3, run, busy: () => active });
+  return Object.freeze({ version: 4, run, busy: () => active });
 });

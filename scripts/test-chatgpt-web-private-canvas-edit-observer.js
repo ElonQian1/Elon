@@ -8,7 +8,7 @@ const mutation = (status, patch = {}) => ({ options: { mutationKey: ['canvas', '
 function fixture() {
   const f = observerFixture();
   const api = observer.create({ document: f.document }, f.runtime, f.conversation, f.client);
-  return { ...f, check: () => api.check(ID), dispose: api.dispose };
+  return { ...f, check: () => api.check(ID, 'synthetic_conversation'), dispose: api.dispose };
 }
 
 test('reads only a committed hook result, without mounting UI or leaving a subscriber', () => {
@@ -44,6 +44,13 @@ test('another Canvas or unrelated mutation cannot block this document', () => {
   f.rows.push(mutation('pending', { variables: { textdocId: 'other' } }),
     { options: { mutationKey: ['other'] }, state: { status: 'error' } });
   f.check();
+});
+test('official title mutation cannot race a native write for the same document', () => {
+  const f = fixture(), rename = { options: { mutationKey: ['synthetic_conversation', 'textdocs'] },
+    state: { status: 'pending', variables: { textdocId: ID, newTitle: 'Synthetic title' } } };
+  f.rows.push(rename); assert.throws(f.check, /web_edit_pending/);
+  rename.state.status = 'success'; f.check();
+  rename.state.status = 'pending'; rename.state.variables.textdocId = 'other'; f.check();
 });
 test('a failed save stays protected after cache GC and clears only after a newer success', () => {
   const f = fixture(), error = mutation('error');

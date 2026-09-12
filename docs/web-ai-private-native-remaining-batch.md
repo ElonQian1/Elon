@@ -29,8 +29,9 @@ a functional acceptance gate; do not expand performance tests in this phase.
 ## Current Status Map
 
 [1681](reports/chatgpt-runtime-bindings-20260912.md) passed native send/reply.
-[Canvas observer](reports/chatgpt-canvas-edit-observer-20260912.md) replaces the
-invalid store binding; source tests pass, device writes remain unverified.
+Canvas [observer](reports/chatgpt-canvas-edit-observer-20260912.md) and
+[rename](reports/chatgpt-canvas-original-rename-20260912.md): compiled/tested;
+device writes pending.
 
 1666 retains the [1662 grouped source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence).
 Its first inventory run had one timeout, retaining cached rows. One targeted retry

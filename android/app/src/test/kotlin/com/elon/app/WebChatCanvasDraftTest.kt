@@ -99,4 +99,60 @@ class WebChatCanvasDraftTest {
         assertEquals(3, other.comments.single().start)
         assertEquals(5, other.comments.single().end)
     }
+
+    @Test fun renamePreservesUnsavedTextAndCommentAnchors() {
+        val original = document()
+        val d = draft(original)
+        d.replace(0, 0, "Prefix ")
+        val text = d.content
+        val comments = d.comments
+        val command = requireNotNull(d.renameRequest(index(original), "New title"))
+        assertEquals(setOf("operation", "path", "scope", "ticket", "id", "title"), command.keys().asSequence().toSet())
+        assertEquals("rename", command.getString("operation"))
+        assertEquals("New title", command.getString("title"))
+        val renamed = original.copy(title = "New title")
+        assertTrue(d.acceptRename(renamed))
+        assertEquals(renamed, d.base)
+        assertEquals(text, d.content)
+        assertEquals(comments, d.comments)
+        assertTrue(d.changed)
+        assertTrue(d.needsRepair.isEmpty())
+        assertNotNull(d.saveRequest(index(renamed)))
+    }
+
+    @Test fun titleOnlyChangesDoNotLoseCommentRepairRequirements() {
+        val original = document()
+        val d = draft(original)
+        d.replace(4, 3, "")
+        val text = d.content
+        val comments = d.comments
+        assertNotNull(d.renameRequest(index(original), "Renamed"))
+        val renamed = original.copy(title = "Renamed", documentVersion = 5)
+        assertTrue(d.acceptRename(renamed))
+        assertEquals(text, d.content)
+        assertEquals(comments, d.comments)
+        assertEquals(setOf("c"), d.needsRepair)
+        assertNull(d.saveRequest(index(renamed)))
+    }
+
+    @Test fun renameNeverAdoptsForeignOrModifiedSource() {
+        val original = document()
+        val d = draft(original)
+        d.replace(0, 0, "Mine ")
+        val text = d.content
+        val titleOnly = original.copy(title = "New title")
+        for (remote in listOf(titleOnly.copy(id = "foreign"), titleOnly.copy(content = "Foreign body"),
+            titleOnly.copy(documentType = "code/python"), titleOnly.copy(documentVersion = 3),
+            titleOnly.copy(comments = emptyList()), original)) {
+            assertFalse(d.acceptRename(remote))
+            assertEquals(original, d.base)
+            assertEquals(text, d.content)
+        }
+        for (remoteIndex in listOf(index(original, scope = "foreign"), index(original, unknown = true),
+            index(original).copy(path = "/c/foreign"), index(titleOnly))) {
+            assertNull(d.renameRequest(remoteIndex, "Renamed"))
+        }
+        for (title in listOf("", " ", " padded", "line\nfeed", "x".repeat(513), "\uD800"))
+            assertNull(d.renameRequest(index(original), title))
+    }
 }

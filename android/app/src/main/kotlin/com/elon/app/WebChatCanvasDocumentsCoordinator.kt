@@ -121,10 +121,16 @@ internal class WebChatCanvasDocumentsCoordinator(
                     editing.adopt(restored)
                     editor?.render("已恢复 · 版本 ${restored.documentVersion}", allowed = true, reset = true)
                 }
+            }, renamed = { result ->
+                val renamed = result.documents.firstOrNull { it.id == editing.base.id }
+                if (result.scope == editing.scope && !result.unconfirmedWrite && renamed != null && editing.acceptRename(renamed)) {
+                    editor?.render(if (editing.changed) "名称已更新，正文草稿未保存" else "名称已更新", allowed = true)
+                } else editor?.render("名称结果待核对，草稿已保留", allowed = false)
             })
         editor = WebChatCanvasEditorView(activity, editing,
             save = { save(owner, editing) }, check = { refresh(owner, editing) },
             history = { management?.showHistory() }, share = { management?.showShare() },
+            rename = { management?.showRename() },
             closed = { if (run == epoch) cancel() })
         editor?.show()
         if (value.unconfirmedWrite || !editing.matches(value)) editor?.render("官网版本需要核对，草稿已保留", allowed = false)
@@ -164,6 +170,10 @@ internal class WebChatCanvasDocumentsCoordinator(
         val server = value.documents.firstOrNull { it.id == editing.base.id }
         if (server == null || value.scope != editing.scope) {
             editor?.render("原画布或身份已变化，草稿仅供复制", allowed = false)
+            return
+        }
+        if (!value.unconfirmedWrite && editing.acceptRename(server)) {
+            editor?.render(if (editing.changed) "名称已更新，正文草稿未保存" else "名称已更新", allowed = true)
             return
         }
         if (!value.unconfirmedWrite && server.content == editing.content && server.comments == editing.comments) {
@@ -268,6 +278,7 @@ internal class WebChatCanvasDocumentsCoordinator(
 
     private fun failure(detail: String?): String = when (detail) {
         "canvas_version_conflict" -> "官网版本已变化"
+        "canvas_title_invalid" -> "画布名称无效"
         "canvas_write_unconfirmed" -> "保存结果尚未确认，请核对版本"
         "canvas_share_write_unconfirmed", "canvas_share_verification_required" -> "分享结果尚未确认，请打开画布分享核对"
         "canvas_share_unconfirmed" -> "官网分享状态尚未确认"

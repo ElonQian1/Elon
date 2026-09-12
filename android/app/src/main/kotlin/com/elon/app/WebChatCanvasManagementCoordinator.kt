@@ -4,12 +4,14 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.LinearLayout
+import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptWebCanvasDocument
+import com.elon.app.chatgptweb.ChatGptWebCanvasDocumentProtocol
 import com.elon.app.chatgptweb.ChatGptWebCanvasDocuments
 import com.elon.app.chatgptweb.ChatGptWebCanvasHistory
 import org.json.JSONObject
@@ -20,12 +22,51 @@ internal class WebChatCanvasManagementCoordinator(
     private val execute: (JSONObject, Boolean, (ChatGptWebCanvasDocuments) -> Unit, (String) -> Unit) -> Unit,
     private val state: (String, Boolean) -> Unit,
     private val restored: (ChatGptWebCanvasDocuments) -> Unit,
+    private val renamed: (ChatGptWebCanvasDocuments) -> Unit,
 ) {
     private var epoch = 0
     private var dialog: AlertDialog? = null
 
     fun showHistory() = prepare { value -> history(value, value.documents.first { it.id == draft.base.id }.documentVersion) }
     fun showShare() = prepare { value -> share(value, "share_lookup", false) }
+
+    fun showRename() {
+        cancel()
+        val run = epoch
+        val input = EditText(activity).apply {
+            setSingleLine(true)
+            setText(draft.base.title)
+            selectAll()
+            filters = arrayOf(android.text.InputFilter.LengthFilter(512))
+            contentDescription = "web-chat-canvas-rename-title"
+        }
+        val padding = (16 * activity.resources.displayMetrics.density).toInt()
+        val frame = LinearLayout(activity).apply {
+            setPadding(padding, 0, padding, 0)
+            addView(input, LinearLayout.LayoutParams(-1, -2))
+        }
+        dialog = AlertDialog.Builder(activity).setTitle("重命名画布").setView(frame)
+            .setPositiveButton("保存名称", null).setNegativeButton("取消", null).show()
+        dialog?.getButton(AlertDialog.BUTTON_NEGATIVE)?.contentDescription = "web-chat-canvas-rename-cancel"
+        dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
+            contentDescription = "web-chat-canvas-rename-confirm"
+            setOnClickListener {
+                if (!active(run)) return@setOnClickListener
+                val title = input.text.toString().trim()
+                if (!ChatGptWebCanvasDocumentProtocol.validTitle(title)) {
+                    input.error = "请输入有效名称（最多 512 字符）"
+                    return@setOnClickListener
+                }
+                if (title == draft.base.title) { dismissDialog(); return@setOnClickListener }
+                isEnabled = false
+                prepare { value ->
+                    val command = draft.renameRequest(value, title)
+                    if (command == null) state("官网版本已变化，请先核对，草稿已保留", false)
+                    else request(command, true, "正在保存名称", renamed)
+                }
+            }
+        }
+    }
 
     private fun prepare(done: (ChatGptWebCanvasDocuments) -> Unit) {
         cancel()

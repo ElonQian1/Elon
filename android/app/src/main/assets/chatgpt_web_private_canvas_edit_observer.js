@@ -70,15 +70,20 @@
     return value;
   }
 
-  function check(id) {
+  function check(id, conversationId) {
     if (disposed || uncertain) fail('runtime_unavailable');
     if (dirty(id)) fail('web_edit_pending');
     const all = cache.getAll();
     if (!Array.isArray(all)) fail('runtime_unavailable');
     const mutations = [];
     for (const mutation of all) {
+      const key = mutation?.options?.mutationKey, state = mutation?.state;
+      if (Array.isArray(key) && key.length === 2 && key[0] === conversationId && key[1] === 'textdocs' &&
+          state?.variables?.textdocId === id && Object.prototype.hasOwnProperty.call(state.variables, 'newTitle')) {
+        if (state.status === 'pending') fail('web_edit_pending');
+        if (!['idle', 'success', 'error'].includes(state.status)) fail('runtime_unavailable');
+      }
       if (!isSave(mutation)) continue;
-      const state = mutation.state;
       if (state?.status === 'idle') continue;
       if (typeof state?.variables?.textdocId !== 'string') fail('runtime_unavailable');
       if (state.variables.textdocId !== id) continue;

@@ -44,6 +44,16 @@ test('canonical save is explicit, emits version readback and submits only once',
   assert.equal((await f.call(input, true)).detail, 'canvas_selection_expired');
   assert.equal(f.requests.filter(x => x.init.method === 'POST').length, 1);
 });
+test('canonical rename requires confirmation and emits the unchanged source with the new title', async () => {
+  const f = setup(); await f.call({ operation: 'list', force: true });
+  const index = f.events[0], input = { operation: 'rename', ticket: index.ticket, scope: index.scope, id: ID, title: 'New title' };
+  assert.equal((await f.call(input, false)).detail, 'canvas_confirmation_required');
+  assert.equal(f.requests.filter(value => value.init.method === 'POST').length, 0);
+  assert.equal((await f.call(input, true)).detail, 'canvas_renamed');
+  assert.equal(f.events.at(-1).documents[0].title, 'New title');
+  assert.equal(f.events.at(-1).documents[0].content, index.documents[0].content);
+  assert.equal((await f.call({ ...input, extra: 'not_allowed' }, true)).detail, 'canvas_request_invalid');
+});
 
 test('malformed commands and missing display channel cannot dispatch', async () => {
   const f = setup();

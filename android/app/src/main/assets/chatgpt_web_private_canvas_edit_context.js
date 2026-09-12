@@ -45,7 +45,7 @@
         snapshot.dictationCaptureActive || snapshot.dictationCapturePending ||
         page.__elonChatGptPrivateConversationDelete?.busy?.() ||
         page.__elonChatGptPrivateConversationMutation?.state?.().state === 'busy') fail('conversation_busy');
-    context.observer.check(context.id);
+    context.observer.check(context.id, context.binding.id);
   }
 
   async function reconcile(context, kind = 'document') {

@@ -31,6 +31,10 @@ function fixture() {
         if (!/^\/backend-api\/conversation\/[a-f0-9-]+\/textdocs$/.test(url)) throw Error('unknown_request');
         return { payload: structuredClone(rows) };
       }
+      if (url === SAVE + '/rename' && init.method === 'POST') {
+        rows[0].title = JSON.parse(init.body).title;
+        return { status: 204, ok: true };
+      }
       if (url !== SAVE || init.method !== 'POST') throw Error('unknown_request');
       const body = JSON.parse(init.body);
       if (rows[0].version !== body.version) throw Error('http_409');

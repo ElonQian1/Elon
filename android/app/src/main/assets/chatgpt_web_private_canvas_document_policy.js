@@ -85,5 +85,17 @@
       equalComments(saved.comments, comments(expected.comments, expected.content));
   }
 
-  return { version: 1, parse, draft, same, matches, equalComments, comments, offsets };
+  function renameTitle(value) {
+    if (typeof value !== 'string' || !value || value !== value.trim() || value.length > 512 ||
+        /[\u0000-\u001f\u007f]/.test(value)) fail('title_invalid');
+    offsets(value);
+    return value;
+  }
+
+  function renamed(saved, before, title) {
+    return !!saved && saved.title === title && saved.documentVersion >= before.documentVersion &&
+      same({ ...saved, title: before.title, documentVersion: before.documentVersion }, before);
+  }
+
+  return { version: 2, parse, draft, same, matches, renamed, renameTitle, equalComments, comments, offsets };
 });

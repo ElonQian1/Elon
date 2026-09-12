@@ -85,6 +85,37 @@ class ChatGptWebCanvasDocumentsTest {
         assertNull(state.snapshot().canvasDocuments)
     }
 
+    @Test fun renameRequiresExactSchemaAndExplicitConfirmation() {
+        fun rename(title: Any = "New title") = JSONObject().put("operation", "rename")
+            .put("path", path).put("ticket", token).put("scope", token).put("id", "synthetic").put("title", title)
+        for (title in listOf("", " ", " padded", "trailing ", "line\nfeed", "\u0000", "x".repeat(513), "\uD800", 5))
+            assertNull(ChatGptWebCanvasDocumentProtocol.request(rename(title)))
+        assertNull(ChatGptWebCanvasDocumentProtocol.request(rename().put("content", "Not part of rename")))
+        assertNull(ChatGptWebCanvasDocumentProtocol.request(rename().put("documentVersion", 4)))
+        assertNotNull(ChatGptWebCanvasDocumentProtocol.request(rename("中文\uD83D\uDE00")))
+        var submitted: JSONObject? = null
+        val commands = object : ChatGptWebMcpCommandPort by ChatGptWebMcpTestCommandPort() {
+            override fun canvasDocument(request: JSONObject, confirmed: Boolean, requestId: String) {
+                assertTrue(confirmed)
+                assertEquals("mcp_rename", requestId)
+                submitted = request
+            }
+        }
+        val dispatch: (String, (String) -> Unit) -> Unit = { action, send ->
+            assertEquals("canvas_document", action); send("mcp_rename")
+        }
+        val args = JSONObject().put("canvas_request", rename())
+        for (confirmation in listOf(false, "true")) {
+            args.put("user_confirmed", confirmation)
+            assertEquals("canvas_confirmation_required", ChatGptWebCanvasDocumentProtocol.dispatch(args, commands, dispatch))
+            assertNull(submitted)
+        }
+        args.put("user_confirmed", true)
+        assertNull(ChatGptWebCanvasDocumentProtocol.dispatch(args, commands, dispatch))
+        assertEquals("New title", submitted?.getString("title"))
+        assertFalse(requireNotNull(submitted).has("content"))
+    }
+
     @Test fun productionPortPreservesSelectionAndDoesNotRequireComposer() {
         val value = requireNotNull(ChatGptWebCanvasDocumentProtocol.parse(payload()))
         var state = ChatGptWebObservedState.Snapshot.EMPTY.copy(pageGeneration = 1, adapterGeneration = 1, canvasDocuments = value)

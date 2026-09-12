@@ -60,6 +60,19 @@ internal class WebChatCanvasDraft(val path: String, val scope: String, document:
             .put("comments", JSONArray(comments.map(ChatGptWebCanvasComment::json)))
     }
 
+    fun renameRequest(index: ChatGptWebCanvasDocuments, title: String): JSONObject? {
+        if (!matches(index) || index.unconfirmedWrite || !ChatGptWebCanvasDocumentProtocol.validTitle(title)) return null
+        return selection(index, "rename").put("title", title)
+    }
+
+    fun acceptRename(document: ChatGptWebCanvasDocument): Boolean {
+        if (document.title == base.title || document.documentVersion < base.documentVersion ||
+            document.copy(title = base.title, documentVersion = base.documentVersion) != base) return false
+        // A title-only server change must not replace unsaved text or repaired comment anchors.
+        base = document
+        return true
+    }
+
     fun selection(index: ChatGptWebCanvasDocuments, operation: String) = JSONObject()
         .put("operation", operation).put("path", path).put("scope", scope)
         .put("ticket", index.ticket).put("id", base.id)
