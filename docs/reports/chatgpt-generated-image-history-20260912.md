@@ -1,14 +1,14 @@
 # Generated Images in Private File History
 
-Date: 2026-09-12. Source batch, not phone acceptance.
+Date: 2026-09-12. Source evidence plus normal 1684 phone acceptance.
 
 ## Status and Scope
 
 `android_chatgpt_generated_image_file_index_v1`:
 
-- `code_status=implemented`; `verification_status=offline_verified`.
-- Grouped APK build, production file-list/download acceptance and `completed`
-  remain pending. No APK build or installation in this batch.
+- `code_status=completed`; `verification_status=device_verified`; default-enabled
+  for the owned current generated-image scope. [Normal 1684 acceptance](chatgpt-image-files-1684.md)
+  passed native file listing, one download, saved PNG decode and state restoration.
 - Reuses the private history reader, selected-branch projection, opaque file
   registry, fresh download authorization and native save/cancel owner.
 - Complements [generated bubble originals](chatgpt-generated-image-original-20260912.md).
@@ -36,9 +36,9 @@ same default variant as the website. The versioned `web_20260912` mapping is
 required when a watermark variant exists. A missing account policy is a
 preparation failure that can be retried, not evidence that images are unsupported.
 
-This proves a projection gap in code. The earlier owned phone sample's raw
-history was not inspected, so its exact message variant is still unconfirmed.
-Do not declare that sample or all historical generated images fixed.
+This proved a projection gap in code. The later 1684 acceptance confirms the
+owned generated sample now has a downloadable native file row. Raw private
+history was not exported; other historical generated variants are not implied.
 
 ## Implementation Boundaries
 
@@ -59,18 +59,18 @@ Do not declare that sample or all historical generated images fixed.
 - Android adapter 364 registers the policy before the existing download owner.
   Existing gallery, uploaded-image, library, citation and connector paths remain.
 
-## Verification and Next Acceptance
+## Verification
 
 Two targeted Node runs passed: 75 and 230 tests (14 new tests overlap between
 runs; the history script also checks 12 projection cases). All 127 production
 adapter assets parsed. The shared regressions cover ordinary images, file
 citations, libraries, mounted/shared references, source links and connectors.
-No full Android compilation is claimed for these source-only changes.
+The initial source batch did not compile Android; grouped release 1684 later
+passed 29 Android unit tests, the normal APK build and production acceptance.
 
-Wireless ADB is connected to the previously trusted Xiaomi. This batch did not
-record audio, alter private conversations, clear Cookie/data or change the proxy.
-Grouped acceptance must open the production Files view for an owned generated
-sample, confirm the actual rows, tap native Download, verify saved original
-bytes/decode and restore the original conversation. Old DALL-E/image_gen names,
-other accounts/protocol builds, shared-page variants and independent native
-generated-image transcript rendering are not covered by this acceptance claim.
+The [grouped report](chatgpt-image-files-1684.md) records the production Files
+path, 671,371 saved bytes, PNG decode and restoration on the trusted Xiaomi.
+No audio, private conversation changes, Cookie/data clearing or proxy changes
+were required. Old DALL-E/image_gen names, other accounts/protocol builds,
+shared-page variants and independent native generated-image transcript rendering
+remain outside this accepted scope.

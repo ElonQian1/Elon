@@ -173,12 +173,13 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         return result;
     }
 
-    private JSONObject downloadPng(boolean gallery) throws Exception {
-        String name = gallery ? "image.png" : new String(android.util.Base64.decode(getParams().getString("nameBase64", ""),
+    private JSONObject downloadPng(boolean gallery, boolean generated) throws Exception {
+        boolean original = gallery || generated;
+        String name = original ? "image.png" : new String(android.util.Base64.decode(getParams().getString("nameBase64", ""),
             android.util.Base64.DEFAULT), java.nio.charset.StandardCharsets.UTF_8);
         long expected = Long.parseLong(getParams().getString("expectedBytes", "0"));
         assertTrue("invalid_png_selection", name.matches("[A-Za-z0-9_. -]{1,120}\\.png") &&
-            (gallery || expected > 0 && expected <= 524288));
+            (original || expected > 0 && expected <= 524288));
         if (!gallery) assertTrue("selected_file_mismatch", text(name).exists());
         java.io.File directory = android.os.Environment.getExternalStoragePublicDirectory(
             android.os.Environment.DIRECTORY_DOWNLOADS);
@@ -190,7 +191,7 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         while (android.os.SystemClock.elapsedRealtime() < deadline) {
             String status = description("web-chat-file-download-status").getText();
             saved = status.equals("\u5df2\u4fdd\u5b58\u5230\u4e0b\u8f7d\u76ee\u5f55");
-            boolean queued = gallery && status.equals("\u5df2\u4ea4\u7ed9\u7cfb\u7edf\u4e0b\u8f7d");
+            boolean queued = original && status.equals("\u5df2\u4ea4\u7ed9\u7cfb\u7edf\u4e0b\u8f7d");
             if (queued) {
                 java.util.Set<String> completed = savedFiles(directory);
                 completed.removeAll(before);
@@ -215,9 +216,9 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         String stored = created.iterator().next();
         assertTrue("saved_file_name_mismatch", stored.startsWith("elon-") && stored.endsWith("-" + name));
         java.io.File file = new java.io.File(directory, stored);
-        if (!gallery) assertEquals("saved_file_size_mismatch", expected, file.length());
+        if (!original) assertEquals("saved_file_size_mismatch", expected, file.length());
         assertTrue("saved_image_size_invalid", file.length() > 32 && file.length() <= 32 * 1024 * 1024);
-        if (gallery) try (java.io.RandomAccessFile input = new java.io.RandomAccessFile(file, "r")) {
+        if (original) try (java.io.RandomAccessFile input = new java.io.RandomAccessFile(file, "r")) {
             assertEquals("original_not_png", 0x89504e470d0a1a0aL, input.readLong());
             input.seek(file.length() - 12);
             assertEquals("original_png_incomplete", 0, input.readInt());
@@ -245,9 +246,13 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
         assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
         String step = getParams().getString("step", "inspect");
         String handle = getParams().getString("handle", "");
-        if (step.equals("download_png_verified") || step.equals("gallery_download_verified")) {
+        if (step.equals("download_png_verified") || step.equals("gallery_download_verified") ||
+            step.equals("message_image_download_verified") ||
+            step.equals("conversation_image_download_verified")) {
             android.os.Bundle report = new android.os.Bundle();
-            report.putString("stream", "LIBRARY_UI_RESULT=" + downloadPng(step.equals("gallery_download_verified")).toString() + "\n");
+            report.putString("stream", "LIBRARY_UI_RESULT=" + downloadPng(step.equals("gallery_download_verified") ||
+                step.equals("message_image_download_verified"),
+                step.equals("conversation_image_download_verified")).toString() + "\n");
             getAutomationSupport().sendStatus(0, report);
             return;
         }
@@ -259,6 +264,19 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
             return;
         }
         switch (step) {
+            case "message_image_preview":
+                String imageSelector = new String(android.util.Base64.decode(
+                    getParams().getString("selector_b64", ""), android.util.Base64.DEFAULT),
+                    java.nio.charset.StandardCharsets.UTF_8);
+                assertTrue("invalid_message_image_selector", imageSelector.matches(
+                    "web-chat-message-part:chatgpt_web:[A-Za-z0-9_-]{1,180}:[0-9]{1,3}:image"));
+                click(description(imageSelector));
+                assertTrue("image_viewer_not_visible", text("\u00d7").waitForExists(15000));
+                break;
+            case "message_image_close_preview":
+                click(text("\u00d7"));
+                assertTrue("image_viewer_not_closed", text("\u00d7").waitUntilGone(5000));
+                break;
             case "browse":
                 click(description("web-chat-feature-navigation:chatgpt_web"));
                 click(libraryFeature());
@@ -386,6 +404,8 @@ public final class LibraryUiAcceptance extends UiAutomatorTestCase {
                 fail("unsupported_step");
         }
         JSONObject result = new JSONObject();
+        result.put("image_preview_visible", text("\u00d7").exists());
+        result.put("image_original_available", description("\u4e0b\u8f7d\u539f\u56fe").exists());
         result.put("step", step);
         result.put("library_visible", description("web-chat-library-browser").exists());
         result.put("search_visible", description("web-chat-library-query").exists());

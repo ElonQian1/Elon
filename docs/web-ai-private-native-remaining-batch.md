@@ -9,22 +9,14 @@ Operation admission and remaining composer dependencies: [readiness policy](chat
 
 Use the [private integration playbook](web-ai-private-integration-playbook.md) for evidence acquisition, known pitfalls, scoped completion and Google reuse; it is not a second capability register.
 
-Implement coherent modules with targeted checks and separate commits. Do not
-publish an APK for every small correction. Use one grouped install/acceptance
-round after the candidate batch is ready. Existing proven native audio,
-subtitles, dictation, read-aloud, directory cache, and mutations are not repeated
-research. System alternatives remain explicit choices, not silent replacements
-for website functionality. Persistent WebView identity remains intentional.
-
-Latest user priority: finish the remaining ChatGPT private code first, then
-perform one grouped Android build/install and production-phone acceptance of
-the completed ChatGPT workflows. Fix that round's failures before starting
-Google protocol work. Google receives its equivalent implementation and
-acceptance only after this ChatGPT gate passes. Completed capabilities stay
-reused; source-only or installation status does not satisfy the acceptance gate.
-Latest user clarification: finish and accept the remaining private-API functions
-before thermal/battery optimization. Heat measurements are deferred and are not
-a functional acceptance gate; do not expand performance tests in this phase.
+Implement coherent modules with targeted checks and separate commits; group APK
+build/install and production acceptance instead of rebuilding every correction.
+Reuse accepted audio, subtitles, dictation, read-aloud, caches and mutations.
+System alternatives are explicit choices; persistent WebView identity is intentional.
+Finish ChatGPT private functionality and fix its acceptance failures before
+Google implementation/acceptance. Source-only or installation is not acceptance.
+Thermal/battery optimization and expanded performance tests follow private
+functional completeness, not a gate for this phase.
 
 ## Current Status Map
 
@@ -52,10 +44,10 @@ See [the scoped regression](reports/chatgpt-library-folder-download-1644.md).
 
 [Explicit account-read isolation](reports/chatgpt-explicit-account-read-20260911.md)
 is device-verified for empty/populated file indexes and native Refresh on 1649.
-Reuse it. [Read ownership](reports/chatgpt-file-read-owner-20260912.md),
-[image originals](reports/chatgpt-generated-image-original-20260912.md) and
-[generated file indexing](reports/chatgpt-generated-image-history-20260912.md)
-await grouped release/acceptance. Raster deletion and idle variants remain unverified.
+Reuse it. [Generated file indexing and bubble originals](reports/chatgpt-image-files-1684.md)
+are completed/default-enabled and native-download verified on 1684.
+[Read ownership](reports/chatgpt-file-read-owner-20260912.md) shipped in 1684;
+its race, ordinary uploaded-image originals and idle variants remain unverified.
 Personal raster download is accepted on 1666; native reference/removal and rename
 are [accepted/default-enabled on 1667](reports/chatgpt-library-raster-actions-20260911.md).
 Raster deletion is offline-only; [project raster reference/removal is accepted on 1670](reports/chatgpt-project-library-reference-20260911.md).

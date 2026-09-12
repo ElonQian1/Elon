@@ -1,13 +1,14 @@
 # Generated Message Image Originals
 
-Date: 2026-09-12. Source batch, not device acceptance.
+Date: 2026-09-12. Source evidence plus normal 1684 device acceptance.
 
 ## Scope
 
 `android_chatgpt_generated_message_original_v1`:
 
-- `code_status=implemented` for the observed inline final-image renderer.
-- `verification_status=offline_verified`; grouped APK/production acceptance pending.
+- `code_status=completed` for the observed inline final-image renderer.
+- `verification_status=device_verified`, default-enabled; [normal 1684](chatgpt-image-files-1684.md)
+  passed the actual native bubble/viewer/original-download path and saved PNG decode.
 - Download uses the existing native image viewer, file authorization, save/cancel
   owner and opaque descriptor introduced in
   [message originals](chatgpt-message-image-original-20260912.md).
@@ -66,13 +67,13 @@ replay was added. Original descriptors remain absent from persistent snapshots.
   originals, missing/duplicate owners, previews, identity changes and late replies.
 - Wireless ADB remained connected to the same Xiaomi hardware. No recording,
   private conversation changes, Cookie clearing or proxy changes were performed.
-- No APK build/install in this batch; Kotlin edits are asset registration and the
-  adapter version only. Grouped Android build and native saved-image decode remain
-  required before `device_verified` or `completed`.
+- The initial source batch did not build/install an APK. The later grouped 1684
+  release passed 29 Android unit tests, normal build/install and actual native
+  original-image download/decode; see the linked acceptance report.
 
-The earlier owned generated sample's empty private file index is not proven fixed:
-this batch binds originals directly to committed generated images. The history
-projection still filters non-user/assistant messages; raw sample history was not
-inspected, and hidden/tool-message text was not broadly exposed to work around it.
+This reader binds originals to committed generated images. The separate
+[history projection](chatgpt-generated-image-history-20260912.md) later added
+typed generated images, and its owned sample file index/download also passed on
+1684. Hidden/tool-message text is not broadly exposed by either path.
 Compact multi-image rails, old DALL-E owners, absent inline overlays and shared
 conversation variants remain outside this verified source contract.

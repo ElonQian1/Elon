@@ -19,6 +19,8 @@ Personal/project uploaded-TXT citation Download is completed and default-enabled
 on 1651/1657, including new saved bytes and SHA-256. Reuse
 [`android_chatgpt_private_file_citation_download_v1`](chatgpt-private-file-citations.md);
 grouped/cloud/PCA and other ownership variants remain separate.
+Generated file indexing and bubble original downloads are completed/default-enabled
+on normal 1684; [scope and native saved-PNG evidence](reports/chatgpt-image-files-1684.md).
 The [request lifetime repair](chatgpt-private-request-lifetime.md) bounds private response
 consumption and prevents timed-out project reads from replacing newer results.
 The [directory paging acceptance](reports/chatgpt-directory-pagination-20260909.md)
