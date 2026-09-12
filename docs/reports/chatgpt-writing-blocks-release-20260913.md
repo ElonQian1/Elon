@@ -2,8 +2,16 @@
 
 ## 当前交付
 
+- 最新正式包 `1.1.1692` / code `1692`，源码 `876513bc9` 已推送并无损安装小米。APK SHA-256：`a92dad5667711b2af7124a6e107ea596ee0756f4cd94338043055cbb931c0798`；线上元数据已独立核对。
+- Release 构建/发布通过，日志 `writing-native-final-release-20260913-050436-615`。保存状态修正的 10 项 Android 测试通过；最新结构投影/写回 JavaScript 48 项通过，无失败或跳过。
+- `writing-save-native-1692-20260913-051317-276`，42.2 秒：`passed=true`，原生编辑、Markdown 导出和物理字节核对、显式官网保存、返回并重开正文一致、会话无重载全部通过。
+- `sent=0`、`cloud_write_attempts=1`、`restored=true`、`awake_restored=true`。复用自有测试样本和生产原生按钮，未清 Cookie/应用数据，未修改代理，导出副本保留。
+- `android_chatgpt_text_block_local_editor_export_v1` 已完成；`android_chatgpt_writing_block_save_v1` 的普通独立会话范围已完成并默认启用。项目/临时/库文件/typed-widget 等扩展写回仍不开放，不宣告所有变体完成。
+
+## 已验收代码块基线
+
 - 修正源码 `ee9d97527bb5b914ccbe08cd12c221864c035865` 已推送 `origin/main`，正式版本 `1.1.1688` / code `1688` 已无损安装至小米。
-- 最新 APK SHA-256：`40f733106597a672429685b7331d99488ec220546362c710705d2f8a4be61286`；线上版本元数据已独立核对。
+- 该版本 APK SHA-256：`40f733106597a672429685b7331d99488ec220546362c710705d2f8a4be61286`；线上版本元数据当时已独立核对。
 - 修正后的 Release Kotlin/Java 编译及 13 项定向测试通过（3 个套件，无失败、错误或跳过）；覆盖块模型、格式、缓存、写回回执和本地操作不被只读核对阻塞的 UI 契约。
 - 真机日志 `text-block-native-export-1688-20260913-024333-717`：`passed=true`，明确验收范围 `required_kinds=[code]`。两个真实回复中的代码块均通过编辑副本、导出 `.txt`、SHA-256 核对、恢复原文、重开源内容不变。
 - 该次复用已有受控样本，`sent=0`、`cloud_writes=0`、`restored=true`、`awake_restored=true`，最终返回首页。未采集或导出私人会话内容。
@@ -53,6 +61,6 @@
 ## 验收范围
 
 - `scripts/smoke-chatgpt-web-text-block-ui.ps1` 与 `scripts/android/TextBlockUiAcceptance.java` 操作生产原生控件；复用已生成且内容完全匹配的测试会话，支持按 `RequiredKinds` 明确分项范围。
-- 当前未获得真实 Writing Block 变体的完整生产验收，不把普通代码块通过替代 Writing Block 或官网写回通过。
+- Writing Block 的完整生产主链已在 1692 单独验收，不把旧的普通代码块通过替代 Writing Block 或官网写回通过。
 - 早期失败测试曾停留在导出选项；已显式取消并恢复测试块原文、关闭编辑器。该失败运行的原会话恢复结果为 false，不改写为成功。
-- 官网写回仍为 `partial / offline_verified`，项目、临时会话、库文件联动和不具备明确源身份的变体继续禁止写回。
+- 普通独立会话的官网写回已 `completed / production_verified`；项目、临时会话、库文件联动和不具备明确源身份的变体继续禁止写回。

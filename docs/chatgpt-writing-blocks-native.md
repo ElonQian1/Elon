@@ -1,10 +1,10 @@
 # ChatGPT Writing Blocks 原生读取、编辑与导出
 
-状态：已集成并发布原生读取、编辑副本与导出；真机验收分项记录，不等同于官网写回完成。不是 Canvas 完成标记。
+状态：原生结构化读取、本机编辑与导出已完成；普通独立会话的显式官网保存已在 `1.1.1692` 通过生产 UI 验收。扩展写回类型仍受下述边界限制，不是 Canvas 完成标记。
 
 2026-09-13 发布与验收：[本轮记录](reports/chatgpt-writing-blocks-release-20260913.md)。
 
-能力 ID：`android_chatgpt_text_block_local_editor_export_v1`。
+能力 ID：`android_chatgpt_text_block_local_editor_export_v1`，`completed / production_verified`，生产入口默认启用，代码块与真实 Writing Block 均已实测，不重复研究。
 
 ## 本轮范围
 
@@ -49,7 +49,7 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 
 ## 官网写回源代码批次
 
-2026-09-13 新增 `android_chatgpt_writing_block_save_v1`，`code_status=partial`、`verification_status=offline_verified`，不是 completed。普通会话中具有明确 provider ID、variant、源消息 ID 的完整 `:::writing` 块已接上原生保存按钮；项目/临时会话、库文件联动、typed widget、无明确 ID/variant 的块不允许写回。界面中的源 ID 只表示可以后台核对，范围或归属核对不通过时保留副本编辑/导出，不能冒充完整写回。
+2026-09-13 `android_chatgpt_writing_block_save_v1` 的普通独立会话范围已 `completed / production_verified`，随现有官网写入开关默认启用。范围限定具有明确 provider ID、variant、源消息 ID 的完整 `:::writing` 块；项目/临时会话、库文件联动、typed widget、无明确 ID/variant 的块不允许写回，不能把本范围通过扩大为所有变体完成。界面中的源 ID 只是后台核对提示，范围或归属核对不通过时仍可编辑/导出副本。
 
 - 官方 `a965fc59-fzrm5l4zirdbhwph.js`，SHA-256 `752c85e9623229704c208167584c5b7a6e8f18410e6258713d2de7d483a62e19` 的 `nc`：POST `/conversation/message/writing-blocks`，携带 `conversation_id`、`message_id`、字符串 `index`、`id`、`writing_block`、`updated_at`；块内保存 content / index / variant / metadata / title / id。
 - 页面同源请求仅由既有身份层提供请求头，数据不离开设备。原生缓存中的源 ID 只是定位提示，不能代替当前页面、账号、分支和服务器正文校验。
@@ -60,7 +60,7 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 - `updated_at` 是官网客户端提供的更新时间，**不是服务端 compare-and-swap 版本条件**。前后核对能检测已观察的冲突，但不能承诺跨设备同时写入绝无竞态。库文件乐观锁协议不得混入此接口。
 - 新增模块：`chatgpt_web_writing_block_policy.js`、`chatgpt_web_writing_block_context.js`、`chatgpt_web_private_writing_blocks.js`；原生命令/回执 `ChatGptWebWritingBlock.kt`，编辑器协调 `WebChatTextBlockCloudSession.kt`。回执不包含正文或凭证。
 
-待验收：一次有归属的真实写作块修改与回读，生产按钮、返回会话后的正文与缓存一致；跨设备并发保存仅作限制声明。上述源码批次已进入后续集中发布，不重复已有音频或听写验收。
+`1.1.1692` 已完成一次受控写作块的生产原生修改、Markdown 导出与字节核对、显式官网保存、返回与重开正文一致、不重载及状态恢复验收；发送新消息为 0，云写入尝试为 1。跨设备并发保存仍只有上述限制声明，不扩大验收范围。
 
 ## 代码与验证
 
@@ -73,8 +73,7 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 - 2026-09-12：JavaScript 回归 73 项通过（包含保留的官方源码契约检查，无跳过）；Android Debug Kotlin/Java 编译与 14 项定向单元测试通过。未打包发布 APK、未执行真机视觉/文件导出验收。
 - 首次 Android 检查被 180 秒日志静默保护中止，没有源码错误；确认是在 Kotlin 编译阶段后延长至 600 秒，重跑通过。不把被中止的检查记为通过。
 
-## 下一次验收
+## 完成与剩余
 
-代码块本机链路已在 `1.1.1688` 真机完成，无当前回归证据不重复测试。`1.1.1690` 的真实 Writing Block 已通过原生编辑、Markdown 导出与文件字节核对；一次显式保存的服务端回读匹配，但页面对账未完成，不能记为整链通过。下一次聚焦生产会话导航不重载、官网单块保存与返回后缓存一致，不再重复生成样本。
-无需说话、重新登录、清 Cookie 或重复研究已经完成的语音功能。
-官网写回仍未完成真实账号与生产 UI 验收；以上受限范围以外的变体仍有代码缺口，不能登记为 completed。
+代码块本机链路在 `1.1.1688` 完成；Writing Block 本机编辑/导出、普通会话官网保存及原生回显在 `1.1.1692` 完成。早期 `1690/1691` 失败与后续修正均保留在发布报告，不能将早期失败改写为通过，也不再重复已通过范围。
+剩余为项目/临时会话、库文件联动、typed widget 等扩展写回协议；它们仍没有完整实现/验收。代码块保持本机编辑和文件导出，不执行代码或伪造官网代码保存；PDF/DOCX 导出未实现。
