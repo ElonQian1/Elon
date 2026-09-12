@@ -51,30 +51,18 @@ class ChatGptWebComposerContractTest {
         val textTransactionOrchestrator = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_text_transaction_orchestrator.js",
         )
-        val pageAdapter = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
+        assertChatGptAssetsInOrder(
+            "chatgpt_web_adapter_model_label_policy.js",
+            "chatgpt_web_adapter_composer_option_policy.js",
+            "chatgpt_web_adapter_composer_submenu.js",
+            "chatgpt_web_adapter_composer_tool_state_policy.js",
+            "chatgpt_web_adapter_composer_tool_selection.js",
+            "chatgpt_web_adapter_action_target_policy.js",
+            "chatgpt_web_adapter_composer_dismiss_policy.js",
+            "chatgpt_web_adapter_dictation_session_policy.js",
+            "chatgpt_web_adapter_dictation_actions.js",
+            "chatgpt_web_adapter_composer.js",
         )
-
-        val policyAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_option_policy.js")
-        val submenuAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_submenu.js")
-        val toolStateAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_tool_state_policy.js")
-        val toolSelectionAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_tool_selection.js")
-        val actionTargetAsset = pageAdapter.indexOf("chatgpt_web_adapter_action_target_policy.js")
-        val dismissPolicyAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer_dismiss_policy.js")
-        val dictationSessionAsset = pageAdapter.indexOf("chatgpt_web_adapter_dictation_session_policy.js")
-        val dictationActionsAsset = pageAdapter.indexOf("chatgpt_web_adapter_dictation_actions.js")
-        val modelLabelAsset = pageAdapter.indexOf("chatgpt_web_adapter_model_label_policy.js")
-        val composerAsset = pageAdapter.indexOf("chatgpt_web_adapter_composer.js")
-        assertTrue(modelLabelAsset >= 0)
-        assertTrue(policyAsset > modelLabelAsset)
-        assertTrue(submenuAsset > policyAsset)
-        assertTrue(toolStateAsset > submenuAsset)
-        assertTrue(toolSelectionAsset > toolStateAsset)
-        assertTrue(actionTargetAsset > toolSelectionAsset)
-        assertTrue(dismissPolicyAsset > actionTargetAsset)
-        assertTrue(dictationSessionAsset > dismissPolicyAsset)
-        assertTrue(dictationActionsAsset > dictationSessionAsset)
-        assertTrue(composerAsset > dictationActionsAsset)
         assertTrue(dictationActions.contains("confirmed === true ? 'capture_started'"))
         assertTrue(dictationActions.contains("confirmed === true ? 'capture_finished'"))
         assertTrue(core.contains("composerAdapter.capabilities(composer)"))

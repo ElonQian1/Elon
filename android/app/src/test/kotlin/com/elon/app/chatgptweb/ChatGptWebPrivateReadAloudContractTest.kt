@@ -18,9 +18,6 @@ class ChatGptWebPrivateReadAloudContractTest {
         val adapterModule = read(
             "android/app/src/main/assets/chatgpt_web_private_read_aloud_adapter.js",
         )
-        val pageAdapter = read(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
-        )
         val backgroundWebView = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptBackgroundWebViewFactory.kt",
         )
@@ -47,8 +44,7 @@ class ChatGptWebPrivateReadAloudContractTest {
         assertTrue(adapter.contains("privateReadAloudAdapter?.handle"))
         assertTrue(adapterModule.contains("transport.toggle"))
         assertTrue(adapterModule.contains("event.privateReadAloudState"))
-        assertTrue(pageAdapter.contains("chatgpt_web_private_read_aloud_transport.js"))
-        assertTrue(pageAdapter.contains("chatgpt_web_private_read_aloud_adapter.js"))
+        assertChatGptAssetsInOrder("chatgpt_web_private_read_aloud_transport.js", "chatgpt_web_private_read_aloud_adapter.js")
         assertTrue(backgroundWebView.contains(
             "mediaPlaybackRequiresUserGesture = !BuildConfig.CHATGPT_PRIVATE_READ_ALOUD_ENABLED",
         ))

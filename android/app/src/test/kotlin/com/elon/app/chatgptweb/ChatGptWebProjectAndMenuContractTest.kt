@@ -11,24 +11,14 @@ import org.junit.Test
 class ChatGptWebProjectAndMenuContractTest {
     @Test
     fun projectAndContextMenuPoliciesLoadBeforeTheirConsumers() {
-        val adapter = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt")
         val bootstrap = read("android/app/src/main/assets/chatgpt_web_adapter_bootstrap.js")
 
-        assertTrue(
-            adapter.indexOf("chatgpt_web_adapter_project_policy.js") <
-                adapter.indexOf("chatgpt_web_adapter_conversations.js"),
-        )
-        assertTrue(
-            adapter.indexOf("chatgpt_web_adapter_context_menu_policy.js") <
-                adapter.indexOf("chatgpt_web_adapter_layout.js"),
-        )
-        assertTrue(
-            adapter.indexOf("chatgpt_web_adapter_control_labels.js") <
-                adapter.indexOf("chatgpt_web_adapter_layout.js"),
-        )
-        assertTrue(
-            adapter.indexOf("chatgpt_web_adapter_project_choice_reveal.js") <
-                adapter.indexOf("chatgpt_web_adapter_layout.js"),
+        assertChatGptAssetsInOrder("chatgpt_web_adapter_project_policy.js", "chatgpt_web_adapter_conversations.js")
+        assertChatGptAssetsInOrder(
+            "chatgpt_web_adapter_context_menu_policy.js",
+            "chatgpt_web_adapter_control_labels.js",
+            "chatgpt_web_adapter_project_choice_reveal.js",
+            "chatgpt_web_adapter_layout.js",
         )
         assertTrue(bootstrap.contains("'__elonChatGptProjectPolicy'"))
         assertTrue(bootstrap.contains("'__elonChatGptContextMenuPolicy'"))

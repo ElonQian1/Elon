@@ -189,9 +189,6 @@ class ChatGptWebProductIntegrationContractTest {
         val portalPolicy = read(
             "android/app/src/main/assets/chatgpt_web_adapter_message_portal_policy.js",
         )
-        val pageAdapter = read(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
-        )
         val mcp = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMcpActions.kt")
         val messageJson = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebMessageJson.kt")
         val background = read(
@@ -214,21 +211,12 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(layoutAdapter.contains("messagePortalPolicy.inferMessageContext"))
         assertTrue(portalPolicy.contains("function inferMessageIndex"))
         assertTrue(portalPolicy.contains("role: input && input.role"))
-        assertTrue(
-            pageAdapter.indexOf("chatgpt_web_adapter_message_portal_policy.js") <
-                pageAdapter.indexOf("chatgpt_web_adapter_layout.js"),
-        )
-        assertTrue(
-            pageAdapter.indexOf("chatgpt_web_adapter_streaming_policy.js") <
-                pageAdapter.indexOf("chatgpt_web_stream_watchdog_probe.js"),
-        )
-        assertTrue(
-            pageAdapter.indexOf("chatgpt_web_stream_watchdog_probe.js") <
-                pageAdapter.indexOf("chatgpt_web_stream_watchdog_acceptance.js"),
-        )
-        assertTrue(
-            pageAdapter.indexOf("chatgpt_web_stream_watchdog_acceptance.js") <
-                pageAdapter.indexOf("chatgpt_web_adapter.js"),
+        assertChatGptAssetsInOrder("chatgpt_web_adapter_message_portal_policy.js", "chatgpt_web_adapter_layout.js")
+        assertChatGptAssetsInOrder(
+            "chatgpt_web_adapter_streaming_policy.js",
+            "chatgpt_web_stream_watchdog_probe.js",
+            "chatgpt_web_stream_watchdog_acceptance.js",
+            "chatgpt_web_adapter.js",
         )
         assertTrue(layoutAdapter.contains("scrollIntoView"))
         val baseAdapter = read("android/app/src/main/assets/chatgpt_web_adapter.js")

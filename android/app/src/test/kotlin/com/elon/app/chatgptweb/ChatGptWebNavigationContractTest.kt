@@ -21,15 +21,9 @@ class ChatGptWebNavigationContractTest {
             "android/app/src/main/assets/chatgpt_web_adapter_sidebar_control_policy.js",
         )
         val core = readRepositoryFile("android/app/src/main/assets/chatgpt_web_adapter.js")
-        val pageAdapter = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
-        )
-
-        assertTrue(pageAdapter.contains("chatgpt_web_adapter_navigation.js"))
-        assertTrue(pageAdapter.contains("chatgpt_web_adapter_sidebar_control_policy.js"))
-        assertTrue(
-            pageAdapter.indexOf("chatgpt_web_adapter_sidebar_control_policy.js") <
-                pageAdapter.indexOf("chatgpt_web_adapter_navigation.js"),
+        assertChatGptAssetsInOrder(
+            "chatgpt_web_adapter_sidebar_control_policy.js",
+            "chatgpt_web_adapter_navigation.js",
         )
         assertTrue(core.contains("navigationAdapter.capabilities()"))
         assertTrue(core.contains("action === 'list_navigation'"))
@@ -94,9 +88,6 @@ class ChatGptWebNavigationContractTest {
         val history = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_conversation_history.js",
         )
-        val pageAdapter = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
-        )
         val requestList = adapter.substringAfter("function requestList")
             .substringBefore("function newConversation")
 
@@ -109,9 +100,9 @@ class ChatGptWebNavigationContractTest {
         assertTrue(history.contains("scrollRestored"))
         assertTrue(history.contains("stablePassesRequired"))
         assertTrue(history.contains("collected.size >= maximum"))
-        assertTrue(
-            pageAdapter.indexOf("chatgpt_web_adapter_conversation_history.js") <
-                pageAdapter.indexOf("chatgpt_web_adapter_conversations.js"),
+        assertChatGptAssetsInOrder(
+            "chatgpt_web_adapter_conversation_history.js",
+            "chatgpt_web_adapter_conversations.js",
         )
     }
 

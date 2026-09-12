@@ -35,7 +35,7 @@ class ChatGptWebSkinContractTest {
         assertTrue(controller.contains("binding.chatList.visibility = View.GONE"))
         assertTrue(controller.contains("binding.inputLayout.visibility = View.GONE"))
         assertTrue(controller.contains("web-chat-skin-exit:chatgpt"))
-        assertTrue(pageAdapter.contains("chatgpt_web_adapter_skin.js"))
+        assertTrue(ChatGptWebAdapterAssets.names.contains("chatgpt_web_adapter_skin.js"))
         assertTrue(pageAdapter.contains("action = \"set_skin_mode\""))
         assertTrue(bridge.contains("action === 'set_skin_mode'"))
         assertTrue(bridge.contains("if (observer) observer.disconnect()"))
