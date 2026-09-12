@@ -8,14 +8,16 @@
     ? require('./chatgpt_web_private_library_raster_policy.js') : root?.__elonChatGptPrivateLibraryRasterPolicy;
   const canvas = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_canvas_text_export.js') : root?.__elonChatGptPrivateCanvasTextExport;
-  const exported = Object.freeze({ version: 37, create: root => factory(root, pointer, citation, raster, canvas) });
+  const generated = typeof module === 'object' && module.exports
+    ? require('./chatgpt_web_private_generated_image_download.js') : root?.__elonChatGptPrivateGeneratedImageDownload;
+  const exported = Object.freeze({ version: 38, create: root => factory(root, pointer, citation, raster, canvas, generated) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
     root.__elonChatGptPrivateFileDownload?.dispose?.();
-    root.__elonChatGptPrivateFileDownload = factory(root, pointer, citation, raster, canvas);
+    root.__elonChatGptPrivateFileDownload = factory(root, pointer, citation, raster, canvas, generated);
   }
-})(typeof window === 'object' ? window : null, function (root, pointerParser, citationParser, raster, canvas) {
+})(typeof window === 'object' ? window : null, function (root, pointerParser, citationParser, raster, canvas, generated) {
   'use strict';
   const entries = new Map();
   const PATH = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([A-Za-z0-9_-]{1,160})$/i;
@@ -123,6 +125,8 @@
     if (projects.some(value => typeof value !== 'string' || !PROJECT.test(value)) || new Set(projects).size > 1) return null;
     const libraryFileId = mounted || file.library_file_id == null || file.library_file_id === '' ? null : file.library_file_id;
     if (libraryFileId !== null && (typeof libraryFileId !== 'string' || !LIBRARY.test(libraryFileId))) return null;
+    const generatedTarget = source.generatedImageHistory == null ? null : generated?.target(source);
+    if (source.generatedImageHistory != null && (!generatedTarget || !image || libraryFileId)) return null;
     return Object.freeze({ conversationId: conversation[2], fileId: file.id,
       projectId: projects[0] || null, libraryFileId,
       connectorCopy: file.context_connector_info != null,
@@ -134,12 +138,16 @@
       ...(image ? { image: true,
         downloadFileId: file.downloadFileId, downloadQuery: file.downloadQuery,
         name: typeof file.name === 'string' && file.name.trim() ? file.name.replace(/\u00a0/g, ' ').trim().slice(0, 180) : 'image.png',
-        mediaType: file.mime_type || '' } : {}) });
+        mediaType: file.mime_type || '' } : {}), ...(generatedTarget || {}) });
   }
 
   async function resolveDestination(job, request) {
     const entry = job.entry;
     if (!request?.request || !current(job)) throw new Error('download_cancelled');
+    if (entry.generatedImageAssets) {
+      await generated.prepare(root, job, current);
+      return { url: authorizationUrl(job.entry, null) };
+    }
     if (entry.mountedFileId) {
       const materialized = await root.__elonChatGptPrivateLibraryDownload.materialize(root, job, current);
       if (!current(job)) throw new Error('download_cancelled');
@@ -219,6 +227,7 @@
       (!job.entry.galleryCurrent || job.entry.galleryCurrent()) &&
       (!job.entry.imageCurrent || job.entry.imageCurrent()) &&
       (!job.entry.canvasCurrent || job.entry.canvasCurrent()) &&
+      (!job.entry.generatedPolicyCurrent || job.entry.generatedPolicyCurrent()) &&
       root.location.href === job.descriptor.href && root.__elonChatGptDocumentToken === job.entry.token &&
       identity() === job.entry.account && (Boolean(job.entry.sharedLibraryFileId) || job.byteTransfer || job.entry.expiresAt > Date.now());
   }
@@ -437,8 +446,8 @@
         if (!current(job)) throw new Error('download_cancelled');
         const payload = result.payload;
         if (payload?.status === 'retry') throw new Error('download_file_not_ready');
-        if (payload?.status !== 'success' || (payload.file_id && payload.file_id !== (destination.fileId || entry.fileId) &&
-          payload.file_id !== entry.downloadFileId)) {
+        if (payload?.status !== 'success' || (payload.file_id && payload.file_id !== (destination.fileId || job.entry.fileId) &&
+          payload.file_id !== job.entry.downloadFileId)) {
           throw new Error('download_authorization_failed');
         }
         sourceUrl = payload.download_url;
@@ -482,5 +491,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 37, register, registerLibraryFile, registerGalleryImage, registerMessageImage, registerCanvasExport, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 38, register, registerLibraryFile, registerGalleryImage, registerMessageImage, registerCanvasExport, start, cancel, dispose, sourceDiagnostics });
 });

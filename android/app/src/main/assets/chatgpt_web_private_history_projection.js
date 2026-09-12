@@ -2,7 +2,7 @@
   'use strict';
   const citation = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
-  const exported = Object.freeze({ version: 11, create: dependencies => factory(dependencies, citation) });
+  const exported = Object.freeze({ version: 12, create: dependencies => factory(dependencies, citation) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root) root.__elonChatGptPrivateHistoryProjection = exported;
 })(typeof window === 'object' ? window : null, function (dependencies, citation) {
@@ -80,6 +80,18 @@
     return parts.slice(0, 128).map((part) => typeof part === 'string' ? part :
       part && (part.text || (typeof part.content === 'string' ? part.content : '')) || '')
       .map((value) => clean(value, MAX_TEXT)).filter(Boolean).join('\n').slice(0, MAX_TEXT);
+  }
+
+  function generatedImage(message) {
+    // Official Lx/Ix select this tool's multimodal images, not arbitrary tool text.
+    return message.author?.role === 'tool' && message.author.name === 't2uay3k.sj1i4kz' &&
+      message.content?.content_type === 'multimodal_text' &&
+      !message.metadata?.is_visually_hidden_from_conversation;
+  }
+
+  function fileParts(message, withSource = false) {
+    // Do not project internal tool attachments, citations or text into the file index.
+    return mediaParts(generatedImage(message) ? { content: message.content } : message, false, withSource);
   }
 
   function mediaParts(message, bounded = true, withSource = false) {
@@ -194,22 +206,23 @@
     nodes.forEach((entry) => {
       const node = object(entry.node);
       const message = node && object(node.message || node);
-      if (!message || !visible(message)) return;
+      if (!message || !visible(message) && !generatedImage(message)) return;
       const id = clean(message.id || node.id, 180) || entry.fallbackId;
-      const parts = mediaParts(message, false);
-      const rawAttachments = message.metadata && message.metadata.attachments;
+      const parts = fileParts(message);
+      const metadata = generatedImage(message) ? null : message.metadata;
+      const rawAttachments = metadata && metadata.attachments;
       if (Array.isArray(rawAttachments) && rawAttachments.length > MAX_PARTS) truncated = true;
-      const rawShared = message.metadata && message.metadata.shared_library_file_references;
+      const rawShared = metadata && metadata.shared_library_file_references;
       if (Array.isArray(rawShared) && rawShared.length > MAX_PARTS) truncated = true;
-      const rawMounted = message.metadata && message.metadata.mounted_library_file_references;
+      const rawMounted = metadata && metadata.mounted_library_file_references;
       if (Array.isArray(rawMounted) && rawMounted.length > MAX_PARTS) truncated = true;
-      if (citation?.scan(message.metadata, MAX_PARTS).truncated) truncated = true;
+      if (citation?.scan(metadata, MAX_PARTS).truncated) truncated = true;
       const rawParts = message.content && message.content.parts;
       if (Array.isArray(rawParts) && rawParts.length > MAX_PARTS) truncated = true;
       parts.forEach((part, index) => {
         if (rows.length >= 100) { truncated = true; return; }
         rows.push({ id: id + ':' + index, messageId: id,
-          role: message.author && message.author.role || message.role,
+          role: generatedImage(message) ? 'assistant' : message.author && message.author.role || message.role,
           name: part.text, kind: part.kind, mediaType: part.mediaType || '',
           ...(part.kind === 'source' ? { sourceUrl: part.sourceUrl } : {}) });
       });
@@ -223,14 +236,16 @@
     const normalized = normalize(payload);
     const matches = (orderedNodes(normalized) || []).filter(entry => {
       const message = object(entry.node.message || entry.node);
-      return message && visible(message) &&
+      return message && (visible(message) || generatedImage(message)) &&
         (clean(message.id || entry.node.id, 180) || entry.fallbackId) === match[1];
     });
     if (matches.length !== 1) return null;
     const message = matches[0].node.message || matches[0].node;
-    const part = mediaParts(message, false, true)[Number(match[2])];
+    const part = fileParts(message, true)[Number(match[2])];
     // Only the private download owner sees the raw descriptor, never the native index.
     if (part?.imageSource) {
+      if (generatedImage(message)) return { image: part.imageSource, name: part.text,
+        attachments: [], generatedImageHistory: true };
       const attachments = message.metadata?.attachments;
       return { image: part.imageSource, name: part.text,
         attachments: Array.isArray(attachments) ? attachments.slice(0, MAX_PARTS) : [],

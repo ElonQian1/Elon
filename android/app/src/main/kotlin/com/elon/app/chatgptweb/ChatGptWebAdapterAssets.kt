@@ -76,6 +76,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_private_transport.js",
         "chatgpt_web_private_library_raster_policy.js",
         "chatgpt_web_private_canvas_text_export.js",
+        "chatgpt_web_private_generated_image_download.js",
         "chatgpt_web_private_library_download.js", "chatgpt_web_private_file_download.js",
         "chatgpt_web_private_generated_image.js",
         "chatgpt_web_private_message_image.js",
