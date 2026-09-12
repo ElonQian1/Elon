@@ -44,6 +44,7 @@ class WebChatConversationFilesPresentationTest {
             "files_read_network" to "网络连接中断，可重试",
             "files_read_rate_limit" to "请求过于频繁，请稍后重试",
             "files_read_cooldown" to "请稍后重试",
+            "files_context_changed" to "会话状态已更新，请重试",
             "files_identity_unavailable" to "登录状态需要确认",
             "files_read_parse" to "附件数据暂时无法解析",
             "files_read_http" to "官网读取失败，请稍后重试",

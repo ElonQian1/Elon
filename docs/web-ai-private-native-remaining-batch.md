@@ -52,7 +52,9 @@ See [the scoped regression](reports/chatgpt-library-folder-download-1644.md).
 
 [Explicit account-read isolation](reports/chatgpt-explicit-account-read-20260911.md)
 is device-verified for empty/populated file indexes and native Refresh on 1649.
-Reuse it; this does not prove idle membership, citation or mounted-file variants.
+Reuse it. [Superseded-read handling](reports/chatgpt-file-read-owner-20260912.md)
+is a tested source fix awaiting grouped release; direct message-image original
+binding and raster deletion remain open. Idle membership/citation variants are unverified.
 Personal raster download is accepted on 1666; native reference/removal and rename
 are [accepted/default-enabled on 1667](reports/chatgpt-library-raster-actions-20260911.md).
 Raster deletion is offline-only; [project raster reference/removal is accepted on 1670](reports/chatgpt-project-library-reference-20260911.md).

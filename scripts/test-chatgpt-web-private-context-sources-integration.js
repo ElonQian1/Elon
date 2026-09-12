@@ -235,7 +235,7 @@ test('production list command emits base then enriched snapshots and settles exa
   assert.equal(f.calls.length, 2);
 });
 
-test('account switch during history fetch cannot rebind old content to a new source request', async () => {
+for (const change of ['account', 'document', 'route']) test(change + ' switch discards the old index without cooling fresh reads', async () => {
   const f = fixture(), gate = deferred(), original = f.root.fetch;
   f.root.fetch = async (...args) => { const result = await original(...args);
     if (String(args[0]).includes('/conversations/')) await gate.promise;
@@ -243,9 +243,38 @@ test('account switch during history fetch cannot rebind old content to a new sou
   const transport = installTransport(f), events = [], replies = [];
   const task = transport.listConversationFiles('/c/source', 'mcp_stale', e => events.push(e), (...args) => replies.push(args));
   await new Promise(r => setTimeout(r, 20));
-  f.setAccount('Bearer new-synthetic-account'); gate.resolve(); await task;
+  if (change === 'account') f.setAccount('Bearer new-synthetic-account');
+  if (change === 'document') f.root.__elonChatGptDocumentToken = 'doc_context_2';
+  if (change === 'route') Object.assign(f.root.location, { pathname: '/c/next', href: 'https://chatgpt.com/c/next' });
+  gate.resolve(); await task;
   assert.equal(events.length, 0); assert.equal(f.calls.length, 1);
-  assert.equal(replies[0][1], false);
+  assert.deepEqual(replies, [['list_conversation_files', false, 'files_context_changed']]);
+  assert.equal(transport.accountReadHealth().failures, 0);
+  assert.equal(transport.accountReadHealth().cooldownRemainingMs, 0);
+  assert.equal(transport.health().failures, 0);
+  f.payload.messages[0].metadata = { attachments: [{ id: 'file-fresh', name: 'fresh.txt' }] };
+  await transport.listConversationFiles('/c/next', 'mcp_fresh', e => events.push(e), (...args) => replies.push(args));
+  assert.equal(f.calls.length, 2, 'fresh explicit read must not wait for a stale-response cooldown');
+  assert.equal(events.length, 1);
+  assert.equal(events[0].files[0].name, 'fresh.txt');
+  assert.equal(replies.at(-1)[2], 'private_files_ready');
+});
+
+test('route switch during source enrichment preserves the base snapshot without a false network failure', async () => {
+  const gate = deferred();
+  const f = fixture(async () => { await gate.promise; return new Response(sse([source(file())])); });
+  f.payload.messages[0].metadata.attachments = [{ id: 'file-existing', name: 'existing.txt' }];
+  const transport = installTransport(f), events = [], replies = [];
+  const task = transport.listConversationFiles('/c/source', 'mcp_enrich', e => events.push(e), (...args) => replies.push(args));
+  await new Promise(r => setTimeout(r, 20));
+  assert.equal(events.length, 1);
+  Object.assign(f.root.location, { pathname: '/c/next', href: 'https://chatgpt.com/c/next' });
+  gate.resolve(); await task;
+  assert.equal(events.length, 1, 'old enrichment must not reach the new conversation');
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0][2], 'files_context_changed');
+  assert.equal(transport.accountReadHealth().cooldownRemainingMs, 0);
+  assert.equal(transport.accountReadHealth().failures, 0);
 });
 
 test('ordinary inventory keeps one GET and one snapshot, no source request', async () => {

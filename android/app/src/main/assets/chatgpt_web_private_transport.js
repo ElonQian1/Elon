@@ -4,7 +4,7 @@
   const existingTransport = window.__elonChatGptPrivateTransport;
   const prefetchEnabled = window.__elonChatGptPrivateConversationPrefetchEnabled === true;
   const researchEnabled = window.__elonChatGptPrivateResearchEnabled === true;
-  if ((existingTransport && Number(existingTransport.version) >= 29) ||
+  if ((existingTransport && Number(existingTransport.version) >= 30) ||
       (!prefetchEnabled && !researchEnabled) ||
       location.origin !== 'https://chatgpt.com') return;
 
@@ -346,8 +346,9 @@
   }
 
   function recordReadFailure(error, owner) {
-    // Identity preparation already has its own short retry/cooldown policy.
-    if (['auth_cooldown', 'auth_unavailable', 'missing_context', 'request_unavailable']
+    // A superseded owner is not a failed connection. Identity preparation also
+    // has its own short retry/cooldown policy.
+    if (['auth_cooldown', 'auth_unavailable', 'missing_context', 'request_unavailable', 'context_sources_stale']
       .includes(String(error && error.message || ''))) return;
     const kind = failureKind(error);
     owner.recordFailure(kind);
@@ -522,6 +523,9 @@
       respond(action, true, 'private_files_ready');
     } catch (error) {
       recordReadFailure(error, accountReadPolicy);
+      if (error?.message === 'context_sources_stale') {
+        return respond(action, false, 'files_context_changed');
+      }
       const kind = failureKind(error);
       respond(action, false, kind === 'auth' || kind === 'context'
         ? 'files_identity_unavailable' : 'files_read_' + kind);
@@ -577,7 +581,7 @@
   }
 
   window.__elonChatGptPrivateTransport = Object.freeze({
-    version: 29,
+    version: 30,
     conversationPrefetchEnabled: prefetchEnabled,
     conversationPrefetchAvailable: true,
     experimentalConversationPrefetchAvailable: true,
