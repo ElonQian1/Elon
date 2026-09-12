@@ -3,7 +3,7 @@ version_status: current
 reviewed_at: 2026-09-12
 implementation_status: implemented
 verification_status: partial
-delivery_status: pending
+delivery_status: published
 acceptance_status: deferred
 ---
 
@@ -19,8 +19,12 @@ acceptance_status: deferred
 
 ## 当前证据
 
-网格 JVM 151 项、JS 88 项通过。验证包含订阅 UID、容量、清理、一次性完成和失败通知、取消无迟到通知、准备规则截止及既有读写合同。主 JVM 首次构建发生原生内存分配失败，降低 Gradle 占用后通过。
+网格 JVM 151 项、JS 88 项通过。验证包含订阅 UID、容量、清理、一次性完成和失败通知、取消无迟到通知、准备规则截止及既有读写合同。一次主 JVM 构建发生原生内存分配失败，降低 Gradle 占用后通过。
 
-正式发布版本待补。量化 0.7.39 是本批对应消费者候选；必须先更新宿主再更新量化。设备清单为空，装机、实际 Binder 跨 APK 通知和手机功耗待验，不能以单元测试替代。没有重启 Win/Chrome 或执行金融交易。
+主 APK 1.1.1685(1685) 已按官方入口构建发布，服务器版本与 sourceSha 核对通过，源 `0cb9234dd7b4e3ac695e592691657bae16e7f5bb`；APK SHA-256 `f546fd4544d65a01605f537d120c98df571957b178236c6af82ac492f89f8a6f`。
+
+量化 0.7.39(56) 随后原签名发布，源 `88cd7a97d9032cbd4252a9238ea07574e7bb6689`，发布回执 `rel_7899c7614df94551bb123963db793311`。384 项 Release、382 项 Debug（另 2 项仅正式身份）、官方 Android 合同及完整仓库验证通过。先更新宿主再更新量化。
+
+设备清单为空，未安装本批双包；实际 Binder 跨 APK 通知、手机公开 WebSocket 连通性、功耗和视觉待验，不能以单元测试替代。没有重启 Win/Chrome 或执行金融交易。发布脚本的通用 worktree 自动清理曾报告 Branch 属性缺失，独立 finish 结果作为收尾依据；未为此更改共享清理代码或处置其他任务文件。
 
 量化仓库 `docs/delivery/grid-session-events-20260912.md` 保存周期调度审计、公开行情来源及双端验收清单。需求和 Feature Registry 分别保存正文与工具维护的状态/证据，发布后补当前版本事实。
