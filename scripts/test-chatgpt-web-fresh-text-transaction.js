@@ -87,6 +87,29 @@ test('controlled trial allows one production dispatch without changing the defau
   assert.equal(JSON.stringify(evidence).includes(command.prompt), false);
 });
 
+test('verified existing-conversation scope is enabled by default but preserves both explicit off switches', async () => {
+  const f = fixture({ reconciliation: async () => true });
+  delete f.page.__elonChatGptFreshTextDispatchEnabled;
+  assert.equal((await f.send().completion).status, 'accepted');
+  await turn(); await turn();
+  assert.equal(f.api.trialControl('state').attempts, 1);
+  f.page.__elonChatGptPrivateTextTransactionsEnabled = false;
+  assert.equal(f.send({ requestId: 'mcp_disabled' }).handled, false);
+  const g = fixture(); g.page.__elonChatGptFreshTextDispatchEnabled = false;
+  assert.equal(g.send().handled, false); assert.equal(g.calls.length, 0);
+});
+
+test('current independent writer remains visible before text and during reconciliation, not in another conversation', async () => {
+  const history = deferred(), f = fixture({ reconciliation: () => history.promise });
+  assert.equal(f.api.hasCurrentWriter(), false);
+  await f.send().completion;
+  assert.equal(f.api.hasCurrentWriter(), true);
+  await turn(); assert.equal(f.api.hasCurrentWriter(), true);
+  f.setCurrent(false); assert.equal(f.api.hasCurrentWriter(), false);
+  f.setCurrent(true); history.resolve(true); await turn(); await turn();
+  assert.equal(f.api.hasCurrentWriter(), false);
+});
+
 test('stream diagnostics distinguish handoff without exporting events or releasing the writer', async () => {
   const f = fixture({ stream: value => (async function* () {
     value.onBeforeRequestStart();

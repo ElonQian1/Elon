@@ -167,7 +167,8 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                     getParams().getString("prompt_b64", ""), android.util.Base64.DEFAULT),
                     java.nio.charset.StandardCharsets.UTF_8);
                 assertTrue("fresh_fixture_prompt_invalid", freshPrompt.matches(
-                    "ELON_FRESH_TEXT_ACCEPTANCE_V1 [a-z]+ [0-9]{13}\\. Reply exactly FRESH_[A-Z]+_[0-9]{13}\\."));
+                    "ELON_FRESH_TEXT_ACCEPTANCE_V1 [a-z]+ [0-9]{13}\\. Reply exactly FRESH_[A-Z]+_[0-9]{13}\\.") || freshPrompt.matches(
+                    "ELON_FRESH_TEXT_ACCEPTANCE_V1 stop [0-9]{13}\\. Write a numbered list of 1000 simple English words\\. Do not summarize\\."));
                 UiObject freshInput = description("web-chat-composer-input:chatgpt_web");
                 assertTrue("fresh_input_missing", freshInput.waitForExists(3000));
                 java.lang.reflect.Method finder = UiObject.class.getDeclaredMethod("findAccessibilityNodeInfo", long.class);
@@ -182,6 +183,7 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                 } finally { edit.recycle(); }
                 assertEquals("fresh_fixture_prompt_mismatch", freshPrompt, freshInput.getText());
                 click(description("web-chat-send")); break;
+            case "stop_fresh_text_fixture": click(description("web-chat-stop-generation")); break;
             case "clear_image": click(description("\u5173\u95ed\u521b\u5efa\u56fe\u7247")); break;
             case "clear_search": click(description("\u5173\u95ed\u7f51\u9875\u641c\u7d22")); break;
             case "header": click(description("web-chat-page-actions:chatgpt_web")); break;

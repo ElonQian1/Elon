@@ -131,3 +131,10 @@ test('owned delivery rejects foreign conversation, bad encoding and late documen
   assert.throws(() => g.sink.push({ data: message('late') }), /context_changed/);
   const h = sinkFixture(); assert.throws(() => h.sink.push({ event: 'delta_encoding', data: 'unsupported' }), /stream_decode_failed/);
 });
+
+test('native generating state does not wait for DOM, composer or the first assistant text', () => {
+  const streaming = require('../android/app/src/main/assets/chatgpt_web_adapter_streaming_policy');
+  const document = { querySelector() { throw Error('DOM must not be queried'); } };
+  assert.deepEqual(streaming.readState(null, null, document, null, null,
+    { privateWriterActive: true, privateStreamState: 'idle' }), { active: true, assistantKey: '' });
+});

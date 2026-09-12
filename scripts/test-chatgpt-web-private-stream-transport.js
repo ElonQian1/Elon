@@ -150,7 +150,7 @@ function context(enabled, response) {
     'data: [DONE]\n\n'
   ]);
   const enabled = context(true, response);
-  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 20);
+  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 21);
   assert.equal(enabled.socketListenerCount(), 1);
   let notifications = 0;
   enabled.window.__elonChatGptPrivateStreamTransport.subscribe(() => { notifications += 1; });
@@ -722,6 +722,19 @@ function context(enabled, response) {
   await fresh.window.fetch(request, init); await tick();
   assert.equal(native.current('/c/conversation-one').text, 'hello world', 'the accepted passive path still works after fresh ownership ends');
   native.dispose();
+
+  let resolveStatus;
+  const delayedStatus = new Promise(resolve => { resolveStatus = resolve; });
+  const delayed = context(true, createJsonResponse(delayedStatus));
+  await delayed.window.fetch('https://chatgpt.com/backend-api/conversation/conversation-one/stream_status');
+  const delayedNative = delayed.window.__elonChatGptPrivateStreamTransport;
+  delayedNative.preparePrivateSend('synthetic new turn', 'synthetic-user-id');
+  const delayedSink = delayedNative.beginPrivateStream({ conversationId: 'conversation-one', userMessageId: 'synthetic-user-id', current: () => true });
+  delayedSink.push({ data: ownedMessage });
+  resolveStatus({ ...ownedMessage, message: { ...ownedMessage.message, content: { parts: ['late old status'] } } });
+  await tick();
+  assert.equal(delayedNative.current('/c/conversation-one').text, 'owned stream');
+  delayedNative.dispose();
 
   const disabled = context(false, response);
   assert.equal(disabled.window.__elonChatGptPrivateStreamTransport, undefined);

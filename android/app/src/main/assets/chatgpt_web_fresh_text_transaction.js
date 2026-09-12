@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -88,7 +88,7 @@
       { handled: true, completion: Promise.resolve({ status: 'rejected', code: 'request_id_conflict' }) };
     // A stopped/uncertain write still owns the ledger even if the trial is disabled.
     if (active) return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'busy' }) };
-    if (page.__elonChatGptFreshTextDispatchEnabled !== true && !trialArmed() ||
+    if (page.__elonChatGptFreshTextDispatchEnabled === false && !trialArmed() ||
         page.__elonChatGptPrivateTextTransactionsEnabled !== true) {
       return { handled: false, code: 'disabled' };
     }
@@ -313,5 +313,7 @@
     page.removeEventListener?.('pageshow', resume);
     return true;
   }
-  return Object.freeze({ version: 6, send, state, cancel, stop, recover, dispose, trialControl });
+  const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
+    !active.recoveryConfirmed && active.stopCurrent();
+  return Object.freeze({ version: 7, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

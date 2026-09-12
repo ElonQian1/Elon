@@ -168,6 +168,7 @@
   }
 
   function readState(policy, messageAdapter, document, composer, visible, options) {
+    if (options?.privateWriterActive === true) return { active: true, assistantKey: '' };
     const observation = messageObservation(messageAdapter);
     const active = officialActive(document, composer, visible);
     if (policy && options?.privateStreamState === 'completed' &&

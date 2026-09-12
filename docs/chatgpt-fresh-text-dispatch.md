@@ -1,17 +1,49 @@
 ---
 capability_id: android_chatgpt_fresh_text_dispatch_v1
-implementation_status: partial_source_candidate
-verification_status: device_handoff_gap_confirmed_fix_pending_acceptance
-production_default: false
+implementation_status: completed
+verification_status: production_ui_verified
+production_default: true
+scope: authenticated_existing_personal_plain_text
 ---
 
 # Fresh Text Dispatch
 
 September 12 source implementation following the
 [protocol audit](reports/chatgpt-independent-text-dispatch-audit-20260912.md).
-This is not an accepted production transport or an Android HTTP implementation.
-Reuse these modules for subsequent work rather than repeating the audit or
-creating another native sender. The accepted runtime sender remains the default.
+The existing ordinary personal-conversation scope is now `completed`, after
+production native-button first-send, follow-up, stream and stop acceptance on
+APK 1.1.1695. Transaction v7 enables this scope by default. It is a page-owned
+private HTTP implementation, not Android HTTP and not removal of the WebView
+identity/runtime layer. Reuse these modules; do not repeat the completed audit.
+Other contexts retain the established sender before any independent dispatch.
+
+## Accepted Scope And Promotion
+
+- `fresh-text-native-1695-20260913-070727-877`: two native send clicks, no new
+  seed, two unique user turns, both matching replies and both terminal-history
+  reconciliations. The handoff delivered 20 events for the follow-up, including
+  input, delta, assistant completion and metadata. No pending writer remained.
+- `fresh-text-stop-ui-1695-20260913-071502-019`: native stop button clicked for
+  one fresh long-response turn; stop/history confirmation completed and released
+  the writer. The prior flag-gated run `fresh-text-stop-native-1695-20260913-071025-899`
+  timed out and is not counted as a successful stop test.
+- All three successful cases restored the original conversation/draft and
+  screen-awake setting. Cookie, app data, voice and proxy settings were preserved.
+- The UI harness observed the first/follow-up replies at 10.3/11.0 seconds; these
+  include focus, semantic automation and MCP polling. They are **not** network
+  TTFT or proof of reduced latency/temperature. The verified benefit is complete
+  independent request/delivery ownership without invoking the website Submit
+  callback, with deterministic reconciliation and no duplicate sends.
+- Adapter 374 projects the exact current independent writer into generation
+  state even before the first text. Another conversation cannot inherit it.
+  Stream transport v21 also rejects a late passive status response while owned
+  delivery is active. These promotion changes passed 163 focused tests with no
+  skips (`fresh-text-default-verified-20260913-072002-847`).
+
+The page-local `__elonChatGptFreshTextDispatchEnabled = false` remains an explicit
+kill switch; disabling the existing private transaction flag also disables this
+path. An explicit trial can override only the former for one owned command.
+Publication/default-without-trial verification is recorded after the release.
 
 ## Controlled Production Acceptance
 
@@ -91,8 +123,8 @@ test checks these exact contracts without executing the downloaded website.
 
 The targeted source/integration/public-contract run passed **159 tests, zero
 failures and zero skips** (`fresh-text-handoff-verified-20260913-065528-775`).
-Actual first-send, follow-up and active-stop acceptance of this fix remain
-pending; the existing runtime sender remains the production default.
+Those tests preceded the device acceptance and promotion above; they were not
+used alone to enable the default.
 
 ## Implemented
 
@@ -130,24 +162,20 @@ There is no periodic polling or second transcript store in these modules.
 
 ## Not Completed
 
-- Live fresh preparation, first send, follow-up and native stream acceptance.
-  Offline source parsing and fixtures are not server or device evidence.
-- Live server-stop and follow-up acceptance for this new request owner. Source
-  integration is present, but no real stop response/history was observed in this
-  batch. Cancelling a reader alone still **does not** confirm server stop.
-- Live delayed-history recovery and stream-handoff variants. Bounded read-only
-  recovery is now source-integrated below; resumable streaming transport still
-  relies on the existing observation path. An unproven result retains its barrier.
+- Follow-up after a stopped user-only turn and extended stopped-turn variants.
+  The ordinary completed-turn follow-up and native stop above are accepted;
+  cancelling a reader alone still **does not** confirm server stop.
+- Live delayed-history/network-loss recovery, early handoff, anonymous SSE
+  resume and additional handoff variants. The in-band authenticated WebSocket
+  handoff is accepted; unknown variants retain their write barrier.
 - Initial ownership without a mounted composer. This version removes the
   submission callback/readiness dependency but does not claim zero DOM bootstrap.
 - New chats, tools, attachments, temporary/project/shared chats, non-personal
   workspaces and unobserved website asset profiles remain on existing paths.
 
-The candidate requires both the existing transaction flag and the page-local
-`__elonChatGptFreshTextDispatchEnabled === true`. No production host or consumer
-setting currently enables the latter. Do not enable it as a default merely
-because the source tests pass. A controlled trial switch must remain tied to the
-owned transaction and the exact reviewed provider profile.
+Default enablement covers only the accepted scope above. It must not be expanded
+from offline tests alone. Controlled trials remain tied to the owned transaction
+and the exact reviewed provider profile.
 
 ## Verification
 

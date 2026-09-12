@@ -227,7 +227,8 @@
     return streamingPolicyModule
       ? streamingPolicyModule.readState(
         streamingPolicy, messageAdapter, document, composer, isVisible,
-        { privateStreamState: String(privateStream?.state || 'idle'), readRuntimeGeneration: () =>
+        { privateStreamState: String(privateStream?.state || 'idle'),
+          privateWriterActive: window.__elonChatGptFreshTextTransaction?.hasCurrentWriter?.() === true, readRuntimeGeneration: () =>
           window.__elonChatGptRuntimeGenerationState?.read(composer, privateStream) }
       )
       : { active: false, assistantKey: '' };

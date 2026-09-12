@@ -4,7 +4,10 @@ param(
     [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe',
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
-    [ValidateRange(30,180)][int]$TimeoutSec = 90
+    [ValidateRange(30,180)][int]$TimeoutSec = 90,
+    [switch]$OnlyStop,
+    [switch]$UseDefault,
+    [switch]$FirstOnly
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
@@ -40,10 +43,12 @@ function Native-Send([string]$Kind, [bool]$Candidate) {
     $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     $marker = "FRESH_$($Kind.ToUpperInvariant())_$stamp"
     $prompt = "ELON_FRESH_TEXT_ACCEPTANCE_V1 $Kind $stamp. Reply exactly $marker."
+    $stop = $Kind -eq 'stop'; $stopClicked = $false
+    if ($stop) { $prompt = "ELON_FRESH_TEXT_ACCEPTANCE_V1 stop $stamp. Write a numbered list of 1000 simple English words. Do not summarize." }
     Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass CanvasUiAcceptance `
         -Step focus_composer -ResultPrefix CANVAS_UI_RESULT | Out-Null
-    $before = if ($Candidate) { Trial 'start' } else { $null }
-    if ($Candidate -and $before.armed -ne $true) { throw "trial_not_armed:$($before.control)" }
+    $before = if ($Candidate) { Trial $(if ($UseDefault) { 'state' } else { 'start' }) } else { $null }
+    if ($Candidate -and -not $UseDefault -and $before.armed -ne $true) { throw "trial_not_armed:$($before.control)" }
     $started = [DateTimeOffset]::UtcNow
     Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass ConversationUiAcceptance `
         -Step send_fresh_text_fixture -ResultPrefix CONVERSATION_UI_RESULT `
@@ -72,11 +77,18 @@ function Native-Send([string]$Kind, [bool]$Candidate) {
             $report.last_trial = $diagnostic
             if ($diagnostic.phase -eq 'rejected') { throw "fresh_rejected:$($diagnostic.code)" }
             if ($diagnostic.attempts -ne ($before.attempts + 1)) { throw 'fresh_route_not_used' }
+            if ($stop) { $report.stop_native_streaming = $main.social_chat.web_chat_streaming -eq $true }
+            if ($stop -and -not $stopClicked -and $diagnostic.accepted -and $diagnostic.pending) {
+                Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass ConversationUiAcceptance `
+                    -Step stop_fresh_text_fixture -ResultPrefix CONVERSATION_UI_RESULT | Out-Null
+                $stopClicked = $true
+                $report.stop_clicked = $true
+            }
         }
-        if ($matched -and $users.Count -eq 1 -and $main.social_chat.web_chat_streaming -ne $true -and
+        if (($matched -or ($stop -and $stopClicked)) -and $users.Count -eq 1 -and $main.social_chat.web_chat_streaming -ne $true -and
             (-not $Candidate -or ($diagnostic.dispatched -and $diagnostic.accepted -and
                 $diagnostic.reconciled -and -not $diagnostic.pending))) {
-            return [ordered]@{ kind=$Kind; native_button=$true; unique_user=$true; reply_matched=$true;
+            return [ordered]@{ kind=$Kind; native_button=$true; unique_user=$true; reply_matched=$matched; stop_clicked=$stopClicked;
                 fresh_http=$Candidate; reconciled=(!$Candidate -or $diagnostic.reconciled);
                 reply_observed_ms=$firstReplyMs; total_ms=[long]([DateTimeOffset]::UtcNow - $started).TotalMilliseconds }
         }
@@ -122,7 +134,7 @@ try {
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $fixtureFile) | Out-Null
         @{path=$path} | ConvertTo-Json -Compress | Set-Content -LiteralPath $fixtureFile -Encoding utf8
     }
-    foreach ($kind in @('first','followup')) {
+    foreach ($kind in $(if ($OnlyStop) { @('stop') } elseif ($FirstOnly) { @('first') } else { @('first','followup') })) {
         $report.stage = $kind; Write-Output "FRESH_TEXT_STAGE=$kind"
         $report.cases += Native-Send $kind $true
     }
