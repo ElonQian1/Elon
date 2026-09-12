@@ -156,9 +156,11 @@ public final class CanvasUiAcceptance extends UiAutomatorTestCase {
                 break;
             case "set_composer_fixture":
                 focusComposer();
+                click(input());
+                Thread.sleep(300);
                 AccessibilityNodeInfo composer = node(input());
                 try {
-                    assertTrue("composer_not_editable", composer.isEditable() && composer.isEnabled());
+                    assertTrue("composer_not_editable", composer.isEditable() && composer.isEnabled() && composer.isFocused());
                     assertTrue("composer_not_empty", composer.getText() == null || composer.getText().length() == 0 ||
                         composer.isShowingHintText());
                     Bundle args = new Bundle();
@@ -171,6 +173,13 @@ public final class CanvasUiAcceptance extends UiAutomatorTestCase {
                 assertTrue("composer_fixture_required", input().exists() && String.valueOf(input().getText())
                     .startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"));
                 getUiDevice().pressBack();
+                if (!input().waitUntilGone(1500)) {
+                    // The IME can consume the first Back without closing the native editor.
+                    assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
+                    assertTrue("composer_fixture_required", input().exists() && String.valueOf(input().getText())
+                        .startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"));
+                    getUiDevice().pressBack();
+                }
                 assertTrue("composer_not_collapsed", input().waitUntilGone(5000));
                 result.put("composer", inspectComposer()); break;
             case "focus_composer":

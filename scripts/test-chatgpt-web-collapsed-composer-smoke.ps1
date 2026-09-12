@@ -19,7 +19,7 @@ foreach($forbidden in @('send_input','chatgpt_send_message','set_input_text','ch
     if($smoke.Contains($forbidden)){throw "native_composer_bypass:$forbidden"}
 }
 foreach($guard in @('resourceId(APP + ":id/inputLayout")','click(composerPreview())','composer_not_empty',
-    'composer.isShowingHintText()','composer_not_editable','ACTION_SET_TEXT','composer_fixture_required',
+    'composer.isShowingHintText()','composer.isFocused()','click(input())','composer_not_editable','ACTION_SET_TEXT','composer_fixture_required',
     'getUiDevice().pressBack()','composer_not_collapsed','not_owned_draft',
     'UiObject visibleDraft = input.exists() ? input : composerPreview()',
     'click(description("web-chat-send"))','semantic_owner_mismatch')){

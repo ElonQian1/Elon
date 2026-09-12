@@ -28,11 +28,11 @@ a functional acceptance gate; do not expand performance tests in this phase.
 
 ## Current Status Map
 
-[1682](reports/chatgpt-canvas-provider-boundary-1682.md) is published/installed.
-Canvas listing passed; the current model declined new Canvas creation, consistent
-with the linked official retirement notice. Preserve old-document support; stop
-repeating creation prompts. Original writes/exports need an owned sample, not
-more rebuilds. Writing Blocks are a separate current-product audit, not accepted.
+[1683 collapsed composer](reports/chatgpt-collapsed-composer-20260912.md) is
+published/installed and native-send accepted. Reuse this completed UI fix.
+[1682 Canvas](reports/chatgpt-canvas-provider-boundary-1682.md) accepts listing
+only. The current model declined creation; stop repeating prompts. Original
+writes/exports need an owned sample. Writing Blocks remain unverified.
 
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
 three taps joined one 1077 ms read; native TXT saved 78 bytes. Supplemental/PCA

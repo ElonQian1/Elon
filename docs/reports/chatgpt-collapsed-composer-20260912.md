@@ -44,8 +44,28 @@ for native text entry or Send. Context reads use the observed message index.
   `WebChatProductionComposerVisualModeTest` cases passed with no skipped tests
   (`collapsed-composer-unit`, 320.7 seconds).
 - Source-size and document-modularity guards passed.
-- Post-fix normal APK acceptance is pending.
 
-Acceptance must prove collapsed Send visible, voice hidden, exactly one native
-send, a fresh `official_runtime_v1` receipt, the matching completed synthetic
-reply, and restoration. A published/installed APK alone is not a pass.
+## Normal 1683 acceptance
+
+- APK 1.1.1683 / 1683, adapter 361; published and wirelessly installed with
+  replacement/data preservation. Source: `9fb33a7dce07c47f8ab1ca1b3250b658f6e9b727`.
+- APK SHA-256:
+  `0b6ba8dc64b052fd7cd6d95df0983b5c643343fe80763359b7460b9e2d29b36e`.
+- The first post-install run stopped at `composer_not_collapsed`, sent nothing
+  and restored state. A focused inspection found the editor focused while
+  `mInputShown=false`; a native Back then collapsed it with Send visible and
+  voice hidden. Do not equate visible editor, keyboard and collapsed preview.
+- The semantic helper now clicks/focuses the editor before synthetic typing.
+  If the IME consumes Back, a second Back is allowed only while the owned
+  synthetic editor remains visible in the foreground app. No extra APK build.
+- `collapsed-composer-1683-native-roundtrip` passed in 38.7 seconds. Actual
+  native entry, collapsed preview, Send visible and voice hidden all passed.
+- Exactly one native Send returned a fresh successful `official_runtime_v1`
+  receipt; the same-conversation user anchor and matching completed synthetic
+  reply passed. `restored=true`, `awake_restored=true`, `content_exported=false`.
+
+Capability `android_web_chat_collapsed_draft_send_v1`: completed/default-enabled
+for this authenticated ChatGPT plain-text production flow. Reuse it without
+repeating this acceptance absent a regression. Google shares the visual policy
+but its send protocol/roundtrip is not accepted by this test. Existing voice,
+dictation and work-mode precedence is unit-tested here, not re-recorded live.
