@@ -47,9 +47,10 @@ class ChatGptConversationNavigationCoordinatorTest {
     }
 
     @Test
-    fun prefetchedTargetDoesNotFinishNavigationBeforeTheOfficialComposerIsReady() {
+    fun prefetchedTargetDoesNotProveTheOfficialRouteArrived() {
         val prefetched = snapshot("cached target", "/c/target").copy(
             composerReady = false,
+            contentOnly = true,
             capabilities = ChatGptWebCapabilities(setOf("conversation_history")),
         )
 
@@ -58,6 +59,13 @@ class ChatGptConversationNavigationCoordinatorTest {
         assertTrue(coordinator.shouldAccept(prefetched))
         assertTrue(coordinator.hasPending())
         assertTrue(coordinator.shouldAccept(snapshot("fresh target", "/c/target")))
+        assertFalse(coordinator.hasPending())
+    }
+
+    @Test
+    fun reachedOfficialConversationDoesNotWaitForItsComposer() {
+        coordinator.beginOpen("/c/target", snapshot("old", "/c/old"))
+        assertTrue(coordinator.shouldAccept(snapshot("target", "/c/target").copy(composerReady = false)))
         assertFalse(coordinator.hasPending())
     }
 

@@ -71,7 +71,7 @@ try {
         Start-Sleep -Seconds 2
     }while([DateTimeOffset]::UtcNow -lt $deadline)
     if(-not $parts.Count){throw 'provider_text_block_sample_missing'}
-    foreach($item in $parts|Select-Object -First 2){
+    foreach($item in $parts|Where-Object {$_.part.type -in $RequiredKinds}|Select-Object -First 2){
         Stage "native_$($item.part.type)"
         Act 'chatgpt_reveal_message' @{message_id=$item.message;part_index=$item.index;target='message'}|Out-Null
         $messageKey=([string]$item.message -creplace '[^A-Za-z0-9_.:-]','_')

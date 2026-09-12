@@ -52,7 +52,8 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 - 官方 `a965fc59-fzrm5l4zirdbhwph.js`，SHA-256 `752c85e9623229704c208167584c5b7a6e8f18410e6258713d2de7d483a62e19` 的 `nc`：POST `/conversation/message/writing-blocks`，携带 `conversation_id`、`message_id`、字符串 `index`、`id`、`writing_block`、`updated_at`；块内保存 content / index / variant / metadata / title / id。
 - 页面同源请求仅由既有身份层提供请求头，数据不离开设备。原生缓存中的源 ID 只是定位提示，不能代替当前页面、账号、分支和服务器正文校验。
 - 打开本机编辑器立即展示正文，后台准备保存选择票据；保存前再次读取原消息并核对完整块、元数据及当前官网内存内容。输入框未就绪不阻挡这条读写链路。
-- 用户确认后只发送一次；只有回读与提交内容一致，并通过已有 `textHydrateHistory` 对账后才显示“已保存到官网”。不 reload WebView，不更改输入草稿，不直接替换 React store。
+- 用户确认后只发送一次；只有回读与提交内容一致，并通过官网单节点写作块更新动作对账后才显示“已保存到官网”。使用已核对的 `shared.sY` 状态事务与 `shared.KJ.updateTree`，只更新源消息内对应块的 metadata，保留其他消息、块和新产生的本地编辑。不再调用整段 `textHydrateHistory`，不 reload WebView，也不直接替换 React store；确认成功后复用私有正文预取刷新原生缓存。
+- 单节点动作证据：`2120deb9-jv4295pp9oyi96ww.js`，SHA-256 `87d27849205f36c88e3364ca5557290ce59f78766bb623a058760754b2adcdc5`，`b → Jr → Gr`。当前版本映射限定 `web_20260912`，未知版本不猜符号。
 - 超时/连接失败/服务端不确定结果保留 pending，后续只读核对；HTTP 已知拒绝单独处理。官网写入成功但页面同步失败单独标记，不能把重新保存当恢复。
 - `updated_at` 是官网客户端提供的更新时间，**不是服务端 compare-and-swap 版本条件**。前后核对能检测已观察的冲突，但不能承诺跨设备同时写入绝无竞态。库文件乐观锁协议不得混入此接口。
 - 新增模块：`chatgpt_web_writing_block_policy.js`、`chatgpt_web_writing_block_context.js`、`chatgpt_web_private_writing_blocks.js`；原生命令/回执 `ChatGptWebWritingBlock.kt`，编辑器协调 `WebChatTextBlockCloudSession.kt`。回执不包含正文或凭证。
@@ -72,6 +73,6 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 
 ## 下一次验收
 
-代码块本机链路已在 `1.1.1688` 真机完成，无当前回归证据不重复测试。下一次仅补真实 Writing Block：确认正文无截断；编辑副本并导出；核对文件字节和扩展名；返回原会话，确认原文和输入草稿未改变；重开会话检查缓存入口。
+代码块本机链路已在 `1.1.1688` 真机完成，无当前回归证据不重复测试。`1.1.1690` 的真实 Writing Block 已通过原生编辑、Markdown 导出与文件字节核对；一次显式保存的服务端回读匹配，但页面对账未完成，不能记为整链通过。下一次聚焦生产会话导航不重载、官网单块保存与返回后缓存一致，不再重复生成样本。
 无需说话、重新登录、清 Cookie 或重复研究已经完成的语音功能。
 官网写回仍未完成真实账号与生产 UI 验收；以上受限范围以外的变体仍有代码缺口，不能登记为 completed。

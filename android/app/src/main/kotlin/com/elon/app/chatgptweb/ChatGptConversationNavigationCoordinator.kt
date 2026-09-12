@@ -37,7 +37,8 @@ internal class ChatGptConversationNavigationCoordinator(
         pendingConversationPath?.let { targetPath ->
             if (ChatGptWebConversationPath.fromUrl(incoming.url) == targetPath) {
                 if (
-                    ChatGptWebAccessPolicy.canChat(incoming) ||
+                    !incoming.contentOnly && incoming.pageKind == "conversation" &&
+                        ChatGptWebAccessPolicy.canNavigate(incoming, adapterCurrent = true) ||
                     ChatGptWebAccessPolicy.requiresLogin(incoming)
                 ) {
                     clearBoundary()

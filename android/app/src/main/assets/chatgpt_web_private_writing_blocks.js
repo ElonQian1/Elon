@@ -131,6 +131,10 @@
       while (receipts.size > 64) receipts.delete(receipts.keys().next().value);
     }
     job.promise.then(value => {
+      if (value.code === 'writing_saved' && !value.pending && !job.refreshed) {
+        job.refreshed = true;
+        try { page.__elonChatGptPrivateTransport.prefetchConversation(value.path, emit, null); } catch (_) {}
+      }
       if (value.ok) emit({ type: 'writing_block', version: 1, requestId: command.requestId,
         path: value.path, ticket: value.ticket, id: value.id, messageId: value.messageId, pending: value.pending });
       respond(action, value.ok, value.code);

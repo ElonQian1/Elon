@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import org.json.JSONObject;
 
-/** Production editor only. Local mutations and exports require the exact synthetic body hash. */
+/** Production editor only. Mutations require the exact synthetic body hash. */
 public final class TextBlockUiAcceptance extends UiAutomatorTestCase {
     private static final String APP = "com.elon.app";
     private static final String MARKER = "ELON_TEXT_BLOCK_ACCEPTANCE_V1";
@@ -90,6 +90,19 @@ public final class TextBlockUiAcceptance extends UiAutomatorTestCase {
                 assertTrue("invalid_block_selector", selector.matches("web-chat-message-part:chatgpt_web:[A-Za-z0-9_.:-]+:[0-9]+:(code|writing_block)"));
                 click(desc(selector)); result.put("body", inspect()); break;
             case "inspect": result.put("body", inspect()); break;
+            case "save":
+            case "verify":
+                guarded();
+                click(desc("web-chat-text-block-save"));
+                if (step.equals("save")) {
+                    assertTrue("cloud_save_confirmation_missing", text("\u4fdd\u5b58\u5230\u5b98\u7f51\uff1f").waitForExists(5000));
+                    click(text("\u4fdd\u5b58"));
+                }
+                long saveDeadline = android.os.SystemClock.elapsedRealtime() + 28000;
+                while (!"\u5df2\u4fdd\u5b58\u5230\u5b98\u7f51".equals(desc("web-chat-text-block-status").getText()) &&
+                    android.os.SystemClock.elapsedRealtime() < saveDeadline) Thread.sleep(200);
+                assertTrue("cloud_save_unconfirmed", "\u5df2\u4fdd\u5b58\u5230\u5b98\u7f51".equals(desc("web-chat-text-block-status").getText()));
+                result.put("saved", true).put("body", inspect()); break;
             case "edit":
                 String original = guarded();
                 click(desc("web-chat-text-block-edit"));
@@ -121,10 +134,13 @@ public final class TextBlockUiAcceptance extends UiAutomatorTestCase {
                 assertTrue("export_format_dialog_missing", text("\u5bfc\u51fa\u526f\u672c").exists());
                 click(text("\u53d6\u6d88")); result.put("body", inspect()); break;
             case "close":
+            case "discard_owned_local":
                 if (body().exists()) {
-                    fixture(); click(text("\u8fd4\u56de"));
+                    if (step.equals("discard_owned_local")) guarded(); else fixture();
+                    click(text("\u8fd4\u56de"));
                     if (text("\u4fee\u6539\u5c1a\u672a\u786e\u8ba4").exists()) {
-                        fail("unsaved_fixture_requires_explicit_cleanup");
+                        if (step.equals("discard_owned_local")) click(text("\u4e22\u5f03\u4fee\u6539"));
+                        else fail("unsaved_fixture_requires_explicit_cleanup");
                     }
                     assertTrue("native_editor_still_open", body().waitUntilGone(3000));
                 }

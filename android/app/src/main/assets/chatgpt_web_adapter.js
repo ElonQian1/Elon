@@ -656,6 +656,7 @@
       invalidatePrivateTextContext();
       const path = String(command.value || '');
       const navigate = () => conversationAdapter.openConversation(path, respond);
+      if (path === location.pathname && !location.search && !location.hash) snapshot();
       if (privateTransport && privateTransport.conversationPrefetchEnabled === true &&
           typeof privateTransport.prefetchConversation === 'function') {
         privateTransport.prefetchConversation(path, emitEvent, null);

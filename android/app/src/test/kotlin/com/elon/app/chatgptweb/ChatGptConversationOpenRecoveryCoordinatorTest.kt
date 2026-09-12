@@ -30,13 +30,21 @@ class ChatGptConversationOpenRecoveryCoordinatorTest {
     }
 
     @Test
-    fun reloadsATargetPathThatStillHasNotProducedAReadySnapshot() {
+    fun retainsTheReachedTargetWhileItsSnapshotIsHydrating() {
         currentUrl = "https://chatgpt.com/c/target"
         coordinator.schedule("/c/target")
         scheduled.removeAt(0).run()
 
+        assertTrue(loaded.isEmpty())
+        assertTrue(recoveries.isEmpty())
+    }
+
+    @Test
+    fun aDifferentQueryContextStillRequiresNavigation() {
+        currentUrl = "https://chatgpt.com/c/target?temporary-chat=true"
+        coordinator.schedule("/c/target")
+        scheduled.removeAt(0).run()
         assertEquals(listOf("https://chatgpt.com/c/target"), loaded)
-        assertEquals(listOf(true), recoveries)
     }
 
     @Test

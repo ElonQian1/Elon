@@ -16,10 +16,11 @@ function payload() {
 }
 function harness() {
   const state = { payload: payload(), current: true, local: true, sync: true, posts: [], requests: [], effects: true,
-    postError: null, now: Date.now() };
+    postError: null, now: Date.now(), refreshes: [] };
   const root = { crypto: crypto.webcrypto, __elonChatGptTextBlocks: parser, __elonChatGptWritingBlockPolicy: policy,
     __elonChatGptPrivateConversationMutationsEnabled: true,
-    __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({}) },
+    __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({}),
+      prefetchConversation: (...args) => state.refreshes.push(args) },
     __elonChatGptPrivateJsonRequest: { async request(_, url, init, limits) {
       state.requests.push({ url, init, limits });
       if (init.method === 'POST') {
@@ -178,30 +179,68 @@ test('command retries share one promise, conflicting payload rejected, receipts 
   h.core.handle('writing_block', command, reply, () => ({}), e => events.push(e));
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.state.posts.length, 1); assert.equal(replies.length, 2);
+  assert.equal(h.state.refreshes.length, 1); assert.equal(h.state.refreshes[0][0], path);
+  assert.equal(h.state.refreshes[0][2], null);
   assert.equal(JSON.stringify(events).includes('changed'), false);
   h.core.handle('writing_block', { ...command, value: command.value.replace('changed', 'different') }, reply, () => ({}), () => {});
   assert.equal(replies.at(-1)[2], 'writing_request_conflict');
 });
-for (const localEditDuringRead of [false, true]) test('context hydrate guards late local edits=' + localEditDuringRead + ' without composer/DOM', async () => {
-  let account = 'session-a', message = payload().mapping[messageId].message;
+test('uncertain save does not refresh the native body until verified', async () => {
+  const h = harness(), p = await h.prepare(); h.state.sync = false;
+  h.core.handle('writing_block', { value: JSON.stringify({ operation: 'save', path, ticket: p.ticket, content: 'saved' }),
+    selected: true, requestId: 'mcp_pending' }, () => {}, () => ({}), () => {});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.state.refreshes.length, 0); assert.equal(h.state.posts.length, 1);
+});
+
+async function contextHarness() {
+  const state = { account: 'session-a', leaf: messageId, message: payload().mapping[messageId].message,
+    updates: 0, beforeUpdate: () => {}, missing: false };
+  state.message.metadata.other = { keep: true };
+  state.message.metadata.writing_blocks.unrelated = { content: 'keep' };
   const selected = { id: 'client-a', serverId$: () => conversationId };
   const root = { document: {}, location: { href: 'https://chatgpt.com' + path }, __elonChatGptDocumentToken: 'doc_test_owner',
     setTimeout, clearTimeout, AbortController, __elonChatGptTextBlocks: parser, __elonChatGptWritingBlockPolicy: policy,
-    __elonChatGptPrivateConversationShareContract: { create: () => ({ identity: () => account }) } };
+    __elonChatGptPrivateConversationShareContract: { create: () => ({ identity: () => state.account }) } };
   const shared = { canvasConversations: () => [selected], XM: () => ({}), Fl: () => false,
-    HM: { getNodeIfExists: () => ({ message }), getCurrentLeafId: () => messageId, getRequestId: () => null } };
-  const conversation = { async textHydrateHistory(_, options) {
-    const next = payload(); next.mapping[messageId].message.metadata.writing_blocks['block-a'].content = 'saved';
-    options.onConversationLoadedFromNetwork(next);
-    if (localEditDuringRead) message.metadata.writing_blocks['block-a'].content = 'new local edit';
-    assert.equal(options.shouldApplyResponse(), !localEditDuringRead);
-    if (options.shouldApplyResponse()) message = next.mapping[messageId].message;
-  } };
-  root.__elonChatGptPrivateRuntimeBindings = { state: () => ({ profile_id: 'web_20260912' }), load: async role => ({ shared, conversation })[role] };
+    HM: { getNodeIfExists: () => ({ message: state.message }), getCurrentLeafId: () => state.leaf, getRequestId: () => null },
+    writingUpdateState(id, callback) { assert.equal(id, selected.id); state.beforeUpdate(); callback({}); },
+    writingTreeOwner: { updateTree(_, callback) { callback({
+      containsNode: id => id === messageId && !state.missing, getMaybeMessage: () => state.message,
+      updateNodeMessageMetadata(id, value) { assert.equal(id, messageId); state.updates++; Object.assign(state.message.metadata, value); }
+    }); } } };
+  root.__elonChatGptPrivateRuntimeBindings = { state: () => ({ profile_id: 'web_20260912' }),
+    load: async role => { assert.equal(role, 'shared'); return shared; } };
   const binding = await context.create(root).capture({ path }, () => ({ url: root.location.href, streaming: false, composerReady: false }));
   const source = policy.source(payload(), conversationId, messageId, 'block-a', parser);
   binding.local(source);
-  assert.equal(await binding.reconcile({ ...source, content: 'saved' }, Date.now() + 1000), !localEditDuringRead);
-  assert.equal(message.metadata.writing_blocks['block-a'].content, localEditDuringRead ? 'new local edit' : 'saved');
-  account = 'session-b'; assert.equal(binding.current(), false);
+  return { state, root, shared, binding, source, apply: (value = { ...source, content: 'saved' }, deadline = Date.now() + 1000) =>
+    binding.reconcile(value, deadline) };
+}
+test('server-confirmed content updates exactly one official tree node, without composer or history reload', async () => {
+  const h = await contextHarness(); assert.equal(await h.apply(), true); assert.equal(h.state.updates, 1);
+  assert.equal(h.state.message.metadata.writing_blocks['block-a'].content, 'saved');
+  assert.equal(h.state.message.metadata.writing_blocks['block-a'].locallyEdited, undefined);
+  assert.deepEqual(h.state.message.metadata.writing_blocks.unrelated, { content: 'keep' });
+  assert.deepEqual(h.state.message.metadata.other, { keep: true });
+  assert.equal(await h.apply(), true); assert.equal(h.state.updates, 1);
+});
+for (const change of ['localEdit', 'lateLocalEdit', 'lateAccount', 'document', 'leaf', 'missing', 'deadline', 'metadata', 'message'])
+  test('writing reconciliation rejects changed ' + change, async () => {
+    const h = await contextHarness(); let value = { ...h.source, content: 'saved' }, deadline = Date.now() + 1000;
+    const edit = () => { h.state.message.metadata.writing_blocks['block-a'].content = 'new local edit'; };
+    if (change === 'localEdit') edit();
+    if (change === 'lateLocalEdit') h.state.beforeUpdate = edit;
+    if (change === 'lateAccount') h.state.beforeUpdate = () => { h.state.account = 'other'; };
+    if (change === 'document') h.root.document = {};
+    if (change === 'leaf') h.state.leaf = 'other';
+    if (change === 'missing') h.state.missing = true;
+    if (change === 'deadline') deadline = Date.now() - 1;
+    if (change === 'metadata') value.metadata = { tag: 'changed' };
+    if (change === 'message') value.messageId = 'other';
+    assert.equal(await h.apply(value, deadline), false); assert.equal(h.state.updates, 0);
+  });
+test('missing official tree owner fails preparation without touching state', async () => {
+  const h = await contextHarness(); delete h.shared.writingTreeOwner;
+  await assert.rejects(context.create(h.root).capture({ path }, () => ({})), /writing_runtime_unavailable/);
 });

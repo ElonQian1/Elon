@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 19, create: factory });
+  const api = Object.freeze({ version: 20, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -24,7 +24,8 @@
       Fx: 'Lx', Fl: 'Il', v7: 'R7', $3: 'y6', Ur: 'Ur', zr: 'zr', attachmentUploadType: undefined,
       conversationStore: undefined, canvasQueryClient: undefined,
       canvasConversations: undefined, useCanvasSendBlocked: undefined,
-      textApi: undefined, textSecurityHeaders: undefined, textHistoryDisabled: undefined, textModelOverride: undefined },
+      textApi: undefined, textSecurityHeaders: undefined, textHistoryDisabled: undefined, textModelOverride: undefined,
+      writingUpdateState: undefined, writingTreeOwner: undefined },
     conversation: { AGt: 'uKt', J5t: 'O7t', Nrn: 'Cin', yRt: '$Rt', Grn: 'Fin',
       vRt: 'QRt', p8t: 'q8t', l0: 'E0', M1t: 'f0t', Rdn: 'Ofn', Rrn: 'Oin',
       win: 'man', Ein: 'gan', ay: 'Sy', iy: 'xy', ry: 'by', Jrn: 'Rin', Hrn: 'Min',
@@ -113,7 +114,8 @@
       'M$': 'o2', RW: 'AV', uo: 'Fs', t4: 'R6', IX: 'hW', t6: 'S5', cX: 'TJ',
       Fx: 'aC', Fl: 'md', v7: 'rtt', $3: 'b5', Ur: 'ca', zr: 'ia', attachmentUploadType: 'am',
       conversationStore: 'pY', canvasQueryClient: 'h2', canvasConversations: 'MP', useCanvasSendBlocked: 'tP',
-      textApi: 'b4', textSecurityHeaders: 'ac', textHistoryDisabled: 'xJ', textModelOverride: 'Pc' },
+      textApi: 'b4', textSecurityHeaders: 'ac', textHistoryDisabled: 'xJ', textModelOverride: 'Pc',
+      writingUpdateState: 'sY', writingTreeOwner: 'KJ' },
     conversation: { AGt: 'gJt', J5t: 'rnn', Nrn: 'Wsn', yRt: 'iVt', Grn: 'ncn',
       vRt: 'rVt', p8t: 'Sen', l0: 'z2', M1t: 'P4t', Rdn: 'Ggn', Rrn: 'Ysn',
       win: 'Fcn', Ein: 'Lcn', ay: 'ub', iy: 'lb', ry: 'cb', Jrn: 'acn', Hrn: '$sn',
@@ -295,8 +297,8 @@
 
   function state() {
     const p = profile();
-    return { version: 19, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 20, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 19, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 20, observed, load, peek, temporary, tools, state });
 });

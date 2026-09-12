@@ -28,11 +28,13 @@ internal class ChatGptConversationOpenRecoveryCoordinator(
     fun schedule(path: String) {
         cancel()
         val normalized = ChatGptWebConversationPath.normalize(path) ?: return
+        val targetUrl = ChatGptWebNavigationPolicy.START_URL.removeSuffix("/") + normalized
         val task = Runnable {
             recoveryTask = null
-            if (!navigationPending()) return@Runnable
-            onRecovery(ChatGptWebConversationPath.fromUrl(currentUrl()) == normalized)
-            loadUrl(ChatGptWebNavigationPolicy.START_URL.removeSuffix("/") + normalized)
+            // Reached routes may still be hydrating. Reloading discards their private read.
+            if (!navigationPending() || currentUrl() == targetUrl) return@Runnable
+            onRecovery(false)
+            loadUrl(targetUrl)
         }
         recoveryTask = task
         schedule(task, RECOVERY_DELAY_MS)
