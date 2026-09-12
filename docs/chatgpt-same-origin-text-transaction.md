@@ -9,6 +9,12 @@ repeat_implementation: forbidden_without_current_regression_evidence
 
 # ChatGPT same-origin text transaction
 
+Current independent-dispatch investigation: [September 12 evidence and staged
+implementation boundary](reports/chatgpt-independent-text-dispatch-audit-20260912.md).
+Fresh security preparation is reachable below the composer, but body construction,
+consumable prepare ownership, response integrity and stream handoff remain part of
+the missing transaction. This is not solved by replaying captured request headers.
+
 This capability gives native ChatGPT text actions one versioned transaction owner for
 send, stop, regenerate, stream completion, and official-page reconciliation. The existing
 background WebView remains the identity and authoritative page runtime.
