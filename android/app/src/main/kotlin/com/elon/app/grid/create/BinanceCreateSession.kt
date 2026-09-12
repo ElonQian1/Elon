@@ -20,6 +20,7 @@ internal class BinanceCreateSession(private val host: BinanceHostRuntime, val at
     private val ruleCheck = BinanceCreateRuleCheck(reference::start, reference::snapshot, reference::close,
         { task, delay -> host.handler.postDelayed(task, delay); Unit }, { host.handler.removeCallbacks(it) },
         SystemClock::elapsedRealtime, System::currentTimeMillis)
+    init {reference.onResult=ruleCheck::changed}
 
     fun prepare(draft: BinanceGridDraft) {
         require(!busy && !attempt.unresolved && host.live() && host.state.fresh()) { "请先完成币安登录，并等待读取当前账号" }

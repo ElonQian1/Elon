@@ -64,7 +64,7 @@ internal class BinanceManageCommands private constructor(context: Context, priva
         if(legacyOperation && method !in setOf("manage_open_v2","manage_poll_v2","manage_close_v2"))return snapshot()
         if(method in setOf("manage_open_v2","manage_poll_v2")) {
             creationPending = runCatching { creation.read() != null }.getOrDefault(true)
-            host.recoverConnection()
+            if(method=="manage_open_v2")host.recoverConnection()
         }
         when(method) {
             "manage_open_v2","manage_poll_v2" -> Unit
@@ -111,7 +111,10 @@ internal class BinanceManageCommands private constructor(context: Context, priva
         if(state.status == "prepared" && preparation.isEmpty() && session?.canSubmit()==true) {
             digest = BinanceManageCommandView.digest(state); preparation = randomId()
             permit.bind(operation,state.account,state.document,digest,preparation)
+            val bound=preparation
+            host.handler.postDelayed({if(preparation==bound)host.events.changed("state")},55_000)
         }
+        host.events.changed("state")
     }
     private fun snapshot(): Bundle {
         val authorized = host.readConsentCurrent()
@@ -147,6 +150,7 @@ internal class BinanceManageCommands private constructor(context: Context, priva
     private fun persist() = if(state.unresolved) journal.save(state.journal()) else if(!corrupt) journal.save(null) else false
     private fun touch() { touched=SystemClock.elapsedRealtime(); host.keepAlive(); host.handler.removeCallbacks(expiry); host.handler.postDelayed(expiry,120_000) }
     private fun expire() {
+        if(host.events.holds("manage",operation))return
         if(SystemClock.elapsedRealtime()-touched < 120_000) return
         if(state.status == "submitting") host.handler.postDelayed(expiry,15_000) else release()
     }
@@ -157,6 +161,7 @@ internal class BinanceManageCommands private constructor(context: Context, priva
     private fun reply(values: Map<String,Any?>) = Bundle().apply { putString("result",StrictJson.encode(values)) }
     private fun short(status: String,message: String) = reply(mapOf("schema" to schema,"status" to status,"message" to message))
     companion object {
+        fun membershipChanged(){instance?.touch()}
         const val SCHEMA="yilong.binance_manage_command.v2"
         val methods=setOf("manage_capabilities_v2","manage_open_v2","manage_poll_v2","manage_read_v2","manage_prepare_v2",
             "manage_submit_v2","manage_cancel_v2","manage_ack_v2","manage_close_v2").let{base->(2..4).flatMap{v->base.map{it.dropLast(1)+v}}.toSet()}

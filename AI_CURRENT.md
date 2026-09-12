@@ -4,11 +4,11 @@ reviewed_at: 2026-09-05
 ---
 
 # 一龙项目当前事实
-现状以当前源码与验收为准；需求、架构及详细证据按链接读取。草稿和历史不能覆盖当前事实。
+以当前源码与验收为准；草稿和历史不能覆盖事实。
 
 ## 当前产品主链
 
-- UI归量化：[账户读取V3](docs/android-binance-account-read-v3-delivery.md)已发布1661、待装机实测；[策略资金](docs/android-binance-strategy-funds-v1-delivery.md)已发布1660、待实读。既有保护管理验收见账户读取交付的关联说明。
+- 量化拥有网格 UI；[事件通信](docs/reports/android-binance-session-events-20260912.md)已实现待双包验收。历史：[读取1661](docs/android-binance-account-read-v3-delivery.md)、[资金1660](docs/android-binance-strategy-funds-v1-delivery.md)，设备待验。
 
 - Android Web AI 默认使用已验证的同源私有传输、预设和有界缓存，失败回退官网且不导出凭证或重放写请求。近期真机验收：附件进度 `v1.1.1491`、原生项目选择器 `v1.1.1493`、私有朗读 `v1.1.1498`、会话置顶/重命名/归档 `v1.1.1506`（adapter `244`，正式发布 `v1.1.1510`）、私有项目迁移 `v1.1.1514`（adapter `245`，恰好一次移入和一次移回且恢复原项目），以及图片生成状态 `v1.1.1518`（adapter `247`，单次生产发送、原生图片结构、状态恢复与验收登记通过）。私有项目迁移已取代正常路径的 DOM 激活，旧官网菜单仅作兼容修复兜底；这些能力默认不等待官网 DOM，证据见 `docs/web-ai-private-transport-capability-matrix.md`，无当前回归不得重复实现。
 - Android ChatGPT 已完成并默认启用 `android_chatgpt_conversation_project_directory_cache_v1` 与 `android_chatgpt_webview_proxy_prepare_fail_open_v1`：目录约 0.3 秒从有界缓存恢复；代理回调超过 750ms 会一次性放行，正式版 `v1.1.1240 (1250)` 冷启动约 2.2 秒、后台返回约 1.9 秒恢复可输入。两项均已真机验收且不再重复研究，详见 `docs/chatgpt-conversation-project-directory-cache.md`、`docs/chatgpt-webview-proxy-prepare-recovery.md`。

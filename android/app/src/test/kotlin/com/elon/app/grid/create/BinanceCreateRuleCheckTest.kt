@@ -63,18 +63,25 @@ class BinanceCreateRuleCheckTest {
             val f=Fixture();f.response=f.ready()+edit;f.begin();f.run();assertTrue(edit.toString(),f.results.single().isFailure)
         }
     }
-    @Test fun pendingPollsAreBoundedAndNeverRestartTheRead() {
+    @Test fun pendingWaitHasOneDeadlineAndNeverRestartsTheRead() {
         val f=Fixture();f.response=f.ready().filterKeys {it in setOf("schema","request","account","symbol")}+("status" to "pending")
         f.begin();f.run();assertTrue(f.results.isEmpty())
         f.elapsed=30000;f.run()
         assertTrue(f.failure().contains("超时"));assertEquals(1,f.starts);assertEquals(1,f.reads);assertTrue(f.queue.isEmpty())
     }
+    @Test fun completionEventFinishesImmediatelyWithoutPolling() {
+        val f=Fixture();f.response=f.ready().filterKeys {it in setOf("schema","request","account","symbol")}+("status" to "pending")
+        f.begin();f.run();assertEquals(1,f.reads);assertEquals(1,f.queue.size)
+        f.response=f.ready();f.check.changed()
+        assertTrue(f.results.single().isSuccess);assertEquals(2,f.reads);assertTrue(f.queue.isEmpty())
+        f.check.changed();assertEquals(1,f.results.size)
+    }
     @Test fun lateReadyAfterCancellationCannotCompletePreparation() {
-        val f=Fixture();f.begin();val old=f.queue.single();f.check.cancel();old.run()
+        val f=Fixture();f.begin();val old=f.queue.first();f.check.cancel();old.run()
         assertTrue(f.results.isEmpty());assertEquals(0,f.reads);assertTrue(f.queue.isEmpty());assertTrue(f.clears>=1)
     }
     @Test fun replacedJobCannotSatisfyTheNewDraft() {
-        val f=Fixture();f.begin();val old=f.queue.single();f.begin(draft("1"));old.run()
+        val f=Fixture();f.begin();val old=f.queue.first();f.begin(draft("1"));old.run()
         assertTrue(f.results.isEmpty());f.run();assertTrue(f.failure().contains("至少投入"));assertEquals(2,f.starts)
     }
     @Test fun unavailableExpiredAndStartFailureRemainNonSubmittable() {

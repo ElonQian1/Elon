@@ -71,19 +71,19 @@ internal class BinanceCreateCommands private constructor(private val context: Co
         } else require(ownsSlot && operation == id) { "创建连接已结束，请重新连接" }
         touch()
         if(method in setOf("create_funds_v1","create_funds_poll_v1")) {
-            require(!attempt.unresolved && !validating && session?.busy==false)
+            if(method=="create_funds_v1")require(!attempt.unresolved && !validating && session?.busy==false)
             val request=extras.getString("request") ?: error("REQUEST_MISSING")
             if(method=="create_funds_v1")funds.start(request)
             return reply(funds.snapshot(request)+("operation" to operation))
         }
         if(method in setOf("create_reference_v1","create_reference_poll_v1","create_reference_v2","create_reference_poll_v2")) {
-            require(!attempt.unresolved && !validating && session?.busy==false)
+            if(method in setOf("create_reference_v1","create_reference_v2"))require(!attempt.unresolved && !validating && session?.busy==false)
             val request=extras.getString("request") ?: error("REQUEST_MISSING")
             val reader=if(method.endsWith("v2"))referenceV2 else reference
             if(method in setOf("create_reference_v1","create_reference_v2"))reader.start(request,extras.getString("draft") ?: error("DRAFT_MISSING"))
             return reply(reader.snapshot(request)+("operation" to operation))
         }
-        if (method in setOf("create_open_v2", "create_poll_v2")) host.recoverConnection()
+        if (method == "create_open_v2") host.recoverConnection()
         when (method) {
             "create_open_v2", "create_poll_v2" -> Unit
             "create_prepare_v2" -> runCatching { prepare(extras.getString("draft") ?: error("DRAFT_MISSING")) }
@@ -138,12 +138,13 @@ internal class BinanceCreateCommands private constructor(private val context: Co
                 if (ticket != generation || !ownsSlot) return@post
                 validating = false
                 if (!host.live() || host.state.account != account || host.document.snapshot().documentToken != document) {
-                    note = "账号或连接已变化，请重新检查"; return@post
+                    note = "账号或连接已变化，请重新检查"; changed(); return@post
                 }
                 result.fold({
                     note = ""
                     runCatching { session!!.prepare(draft) }.onFailure { note = safeMessage(it) }
                 }, { note = safeMessage(it) })
+                changed()
             }
         } } catch (_: java.util.concurrent.RejectedExecutionException) { validating = false; note = "规则查询仍在完成，请稍后重试" }
     }
@@ -153,7 +154,10 @@ internal class BinanceCreateCommands private constructor(private val context: Co
             digest = BinanceHostState.digest(StrictJson.encode(attempt.draft!!.input.toSortedMap()))
             preparation = randomId()
             permit.bind(operation, attempt.account, attempt.document, digest, preparation)
+            val bound=preparation
+            host.handler.postDelayed({if(preparation==bound)host.events.changed("state")},55_000)
         }
+        host.events.changed("state")
     }
     private fun snapshot(): Bundle {
         val same = host.state.account != null && host.state.account == attempt.account
@@ -183,7 +187,7 @@ internal class BinanceCreateCommands private constructor(private val context: Co
         touched = SystemClock.elapsedRealtime(); host.keepAlive()
         host.handler.removeCallbacks(expiry); host.handler.postDelayed(expiry, 90_000)
     }
-    private fun expire() { if (SystemClock.elapsedRealtime() - touched >= 90_000 && attempt.status != "submitting") release() }
+    private fun expire() { if (!host.events.holds("create",operation) && SystemClock.elapsedRealtime() - touched >= 90_000 && attempt.status != "submitting") release() }
     private fun release(persistState: Boolean = true) {
         reference.close()
         referenceV2.close()
@@ -199,6 +203,7 @@ internal class BinanceCreateCommands private constructor(private val context: Co
     private fun safeMessage(error: Throwable) = (error as? IllegalArgumentException)?.message?.take(160)
         ?: "合约规则或连接暂不可用，请稍后重新检查；未下单"
     companion object {
+        fun membershipChanged(){instance?.touch()}
         const val SCHEMA = "yilong.binance_create_command.v2"
         val methods = setOf("create_capabilities_v2", "create_open_v2", "create_poll_v2", "create_prepare_v2",
             "create_submit_v2", "create_detail_v2", "create_cancel_v2", "create_ack_v2", "create_close_v2",

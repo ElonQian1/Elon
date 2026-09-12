@@ -14,13 +14,15 @@ internal class BinanceCreateRuleCheck(
 ) {
     private var generation=0L
     private var job:Runnable?=null
+    private var deadline:Runnable?=null
+    fun changed(){job?.run()}
 
     fun begin(request:String,account:String,draft:BinanceGridDraft,complete:(Result<Long>)->Unit) {
         cancel()
         val ticket=generation;val began=elapsed()
         fun finish(result:Result<Long>) {
             if(ticket!=generation)return
-            generation++;job?.let(unschedule);job=null
+            generation++;job?.let(unschedule);job=null;deadline?.let(unschedule);deadline=null
             complete(result)
         }
         val poll=Runnable {
@@ -38,18 +40,19 @@ internal class BinanceCreateRuleCheck(
                         }
                     }
                     if(result.isFailure)finish(Result.failure(publicFailure(result.exceptionOrNull())))
-                    else result.getOrNull()?.let {finish(Result.success(it))} ?: job?.let {schedule(it,350)}
+                    else result.getOrNull()?.let {finish(Result.success(it))}
                 }
             }
         }
         job=poll
+        deadline=Runnable {if(ticket==generation)finish(Result.failure(IllegalArgumentException("动态规则检查超时，请恢复连接后重新检查；未下单")))}
         runCatching {
             val input=(BinanceCreateOptions.defaults+draft.input).filterKeys {it in BinanceReferenceInput.keys}
             start(request,StrictJson.encode(input))
-        }.fold({schedule(poll,0)},{finish(Result.failure(publicFailure(it)))})
+        }.fold({schedule(poll,0);deadline?.let {schedule(it,30_000)}},{finish(Result.failure(publicFailure(it)))})
     }
 
-    fun cancel() {generation++;job?.let(unschedule);job=null;clear()}
+    fun cancel() {generation++;job?.let(unschedule);job=null;deadline?.let(unschedule);deadline=null;clear()}
 
     private fun validate(draft:BinanceGridDraft,value:Map<String,Any?>):Long {
         val minimum=value["minimum_count"] as Long;val maximum=value["maximum_count"] as Long

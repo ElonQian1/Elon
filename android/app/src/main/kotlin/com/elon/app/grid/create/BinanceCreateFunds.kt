@@ -12,12 +12,16 @@ internal class BinanceCreateFunds(private val host:BinanceHostRuntime) {
     private var started=0L
     private var reading=false
     private var result:Map<String,Any?> = emptyMap()
+        set(value) {val changed=field!=value;field=value;if(changed && value["status"] in setOf("ready","unavailable","expired"))host.events.changed("funds")}
     fun start(id:String) {
         require(Regex("[a-f0-9]{64}").matches(id) && host.live() && host.state.fresh())
         val ticket=++generation
+        host.pendingReferenceReads.remove(request)
         account=host.state.account ?: error("ACCOUNT_MISSING")
         document=host.document.snapshot().documentToken;request=id
         started=System.currentTimeMillis();reading=false;result=base("pending")
+        host.pendingReferenceReads[id]={if(ticket==generation)collectResult()}
+        host.handler.postDelayed({if(ticket==generation && result["status"]=="pending")result=base("unavailable")},30_000)
         val args=listOf(document,request,account).joinToString(","){StrictJson.encode(it)}
         host.view?.evaluateJavascript("window.__elonBinanceCreateFundsV1?.start($args)") {
             if(ticket==generation && it!="true")result=base("unavailable")
@@ -29,6 +33,9 @@ internal class BinanceCreateFunds(private val host:BinanceHostRuntime) {
         val now=System.currentTimeMillis()
         if(result["status"]=="pending" && now-started !in 0..30_000)result=base("unavailable")
         if(result["status"]=="ready" && now-(result["observed_at"] as Long) !in -5000..60_000)result=base("expired")
+        return result
+    }
+    private fun collectResult() {
         if(!reading && result["status"]=="pending") {
             reading=true;val ticket=generation
             val args=listOf(document,request,account).joinToString(","){StrictJson.encode(it)}
@@ -43,9 +50,8 @@ internal class BinanceCreateFunds(private val host:BinanceHostRuntime) {
                 }.onFailure {result=base("unavailable")}
             } ?: run {reading=false;result=base("unavailable")}
         }
-        return result
     }
-    fun close(){generation++;result=emptyMap();reading=false;host.view?.evaluateJavascript("window.__elonBinanceCreateFundsV1?.cancel()",null)}
+    fun close(){generation++;host.pendingReferenceReads.remove(request);result=emptyMap();reading=false;host.view?.evaluateJavascript("window.__elonBinanceCreateFundsV1?.cancel()",null)}
     private fun current()=host.live() && host.state.fresh() && host.state.account==account && host.document.snapshot().documentToken==document
     private fun base(status:String):Map<String,Any?> = mapOf("schema" to BinanceCreateFundsResult.SCHEMA,"request" to request,"account" to account,"status" to status)
 }

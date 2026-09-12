@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const assets=path.join(__dirname,'../android/app/src/main/assets');
 const vectors=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/binance-grid-create-reference-vectors.json'),'utf8'));
 function harness() {
-  const window={},clock={now:200000},state={account:'a'.repeat(64)},calls=[];
+  const notifications=[],window={ElonBinanceReference:{postMessage:value=>notifications.push(JSON.parse(value))}},clock={now:200000},state={account:'a'.repeat(64)},calls=[];
   const config={windowCount:169,maxGridCount:1000,minGridCount:2,maxTrailingGridCount:169,adjustCoef:0.8,trailingCoef:2,priceDiffBuffer:10};
   for(const name of ['binance_grid_trailing_rules.js','binance_grid_create_rules.js','binance_grid_create_reference.js'])
     vm.runInNewContext(fs.readFileSync(path.join(assets,name),'utf8'),{window,Date:{now:()=>clock.now}});
@@ -13,9 +13,17 @@ function harness() {
   const input={symbol:'NEARUSDT',direction:'LONG',lower:'1.2',upper:'2.4',count:'33',leverage:'10',spacing:'ARITH',triggerPrice:'',trailingUp:'false',trailingDown:'false',marginType:'ISOLATED'};
   const market={mark:'1.85',minQty:'0.1',minNotional:'5',tick:'0.001',qtyPrecision:1,observedAt:200000};
   const token='doc_reference_test',id='b'.repeat(64),account=state.account;
-  return {window,clock,state,calls,config,api,input,market,token,id,account};
+  return {window,clock,state,calls,config,api,input,market,token,id,account,notifications};
 }
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
+test('completion emits only request identity once; cancellation emits no stale notification',async()=>{
+  const h=harness();h.api.start(h.token,h.id,h.account,h.input,h.market);await settle();
+  assert.deepEqual(h.notifications,[{token:h.token,request:h.id}]);
+  h.api.read(h.token,h.id,h.account);await settle();assert.equal(h.notifications.length,1);
+  const x=harness();x.api.start(x.token,x.id,x.account,x.input,x.market);x.api.cancel();await settle();assert.deepEqual(x.notifications,[]);
+  const f=harness();delete f.config.minGridCount;f.api.start(f.token,f.id,f.account,f.input,f.market);await settle();
+  assert.equal(f.api.read(f.token,f.id,f.account).status,'unavailable');assert.deepEqual(f.notifications,[{token:f.token,request:f.id}]);
+});
 async function start(h,input=h.input,id=h.id){assert.equal(h.api.start(h.token,id,h.account,input,h.market),true);await settle();return h.api.read(h.token,id,h.account);}
 test('336 captured same-generation oracle results match exact minimum margin and range calculations',()=>{
   const h=harness();assert.equal(vectors.vectors.length,336);

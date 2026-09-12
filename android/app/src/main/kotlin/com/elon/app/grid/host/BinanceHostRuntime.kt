@@ -15,6 +15,8 @@ import java.util.concurrent.TimeUnit
 /** One main-process host; a new process requires a new grant, while website storage stays local. */
 internal class BinanceHostRuntime private constructor(private val context: Context) {
     val handler = Handler(Looper.getMainLooper())
+    val events=BinanceHostEvents(handler,::membershipChanged)
+    val pendingReferenceReads=linkedMapOf<String,()->Unit>()
     val state = BinanceHostState(SystemClock::elapsedRealtime, System::currentTimeMillis)
     val reports = BinanceGridReports(SystemClock::elapsedRealtime, System::currentTimeMillis)
     val document = WebBridgeDocumentSession()
@@ -34,6 +36,19 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     private var resumeToken: String? = null
     private var lastResumeRefresh = 0L
     private val expiry = Runnable { invalidate("连接已结束，请重新授权") }
+    private val freshnessExpiry=Runnable {notifyChanged()}
+
+    private fun membershipChanged() {
+        com.elon.app.grid.create.BinanceCreateCommands.membershipChanged()
+        com.elon.app.grid.manage.BinanceManageCommands.membershipChanged()
+        if(captured!=null){deadline=SystemClock.elapsedRealtime()+900_000;armExpiry()}
+    }
+    private fun notifyChanged(){onChanged?.invoke();events.changed("state");events.changed("read")}
+    fun referenceObserved(raw:String) {
+        val data=runCatching {StrictJson.parse(raw,512)}.getOrNull() ?: return
+        if(data.keys!=setOf("token","request") || document.accept(data["token"] as? String ?: "")==null || !live())return
+        pendingReferenceReads[data["request"] as? String]?.invoke()
+    }
 
     fun begin(): Boolean {
         check(Looper.myLooper() == Looper.getMainLooper())
@@ -50,7 +65,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         return true
     }
     fun live(): Boolean = captured?.let { it.sameAs(sessions.capture()) && it.validAt(System.currentTimeMillis()) } == true &&
-        SystemClock.elapsedRealtime() < deadline
+        (events.active || SystemClock.elapsedRealtime() < deadline)
     fun keepAlive(): Boolean {
         if (!live()) return false
         deadline = SystemClock.elapsedRealtime() + 900000; armExpiry(); return true
@@ -75,7 +90,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
             }) {
                 status = "正在恢复币安网格连接，登录状态已保留"
                 page.reload()
-                onChanged?.invoke()
+                notifyChanged()
             }
         }
     }
@@ -114,6 +129,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     fun disconnect() { consent.clear(); invalidate("已断开量化只读连接，币安登录资料保留") }
     private fun armExpiry() {
         handler.removeCallbacks(expiry)
+        if(events.active)return
         handler.postDelayed(expiry, (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0))
     }
     fun pageStarted(url: String) {
@@ -124,7 +140,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         diagnostics.clear()
         pagePhase = "loading"; adapterBound = false
         status = if (url.startsWith("https://accounts.binance.com/")) "请在币安官方页面登录或验证" else "正在等待币安网格响应"
-        onChanged?.invoke()
+        notifyChanged()
     }
     fun pageReady(url: String, finished: Boolean = true) {
         if (!live() || !url.startsWith("$ORIGIN/")) return
@@ -132,7 +148,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         val token = document.ensurePage().documentToken
         view?.evaluateJavascript("window.__elonBinanceReadV1?.bind(${StrictJson.encode(token)})") { value ->
             if (value == "true" && live() && document.snapshot().documentToken == token) {
-                adapterBound = true; inspectPage()
+                adapterBound = true; inspectPage(); recoverConnection(); notifyChanged()
             }
         }
     }
@@ -146,7 +162,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         val event = runCatching { StrictJson.parse(raw) }.getOrNull() ?: return fail("响应格式暂不支持")
         if (event["schema"] == "yilong.binance_report_observation.v1") {
             if (document.accept(event["token"] as? String ?: "") != null) {
-                runCatching { reports.accept(event) }.onFailure { reports.fail(event["request"] as? String ?: "") }
+                runCatching { reports.accept(event) }.onFailure { reports.fail(event["request"] as? String ?: "") }; events.changed("reports")
             }
             return
         }
@@ -158,14 +174,14 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         val previousAccount = state.account
         runCatching { state.accept(raw) }.onFailure { fail("未取得可验证的本人网格响应，请在官网打开网格列表") }
             .onSuccess {
-                if (event["kind"] == "list" && state.fresh()) readRecovery.verifiedList()
+                if (event["kind"] == "list" && state.fresh()) { readRecovery.verifiedList(); handler.removeCallbacks(freshnessExpiry); handler.postDelayed(freshnessExpiry,300_001) }
                 if(previousAccount != state.account) reports.clear()
                 if (state.account != null && consent.recorded() && !consent.permits(owner(), state.account, state.accountKind)) consent.clear()
                 val label = when (state.accountKind) { "sub" -> "币安子账户"; "primary" -> "币安主账户"; else -> "当前币安账户" }
                 status = if (state.ready) "$label · 已读取 ${state.count} 条网格；仅代表本次页面响应"
                     else if (state.account != null) "已确认$label，等待网格列表"
                     else "币安响应暂不可用，请重新连接"
-                onChanged?.invoke()
+                notifyChanged()
             }
     }
     fun read(token: String): String { require(live()); return state.reply(token) }
@@ -174,7 +190,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         val documentToken = document.ensurePage().documentToken
         view?.evaluateJavascript("window.__elonBinanceReadV1?.refresh()") { value ->
             if (document.accept(documentToken) != null && live() && value != "true") {
-                status = "尚未取得官网列表请求，请打开官网网格列表后重试"; onChanged?.invoke()
+                status = "尚未取得官网列表请求，请打开官网网格列表后重试"; notifyChanged()
             }
         }
     }
@@ -197,21 +213,22 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         reports.start(q, state.account ?: error("ACCOUNT_MISSING"), state.accountKind)
         val doc = document.ensurePage().documentToken
         view?.evaluateJavascript("window.__elonBinanceReadV1?.report(${q.json()})") { result ->
-            if (document.accept(doc) != null && result != "true") reports.fail(q.request)
-        } ?: reports.fail(q.request)
+            if (document.accept(doc) != null && result != "true") { reports.fail(q.request); events.changed("reports") }
+        } ?: run { reports.fail(q.request); events.changed("reports") }
     }
     fun reportRead(token: String, request: String): String {
         readContinuous(token)
         return reports.reply(request, state.account, state.accountKind)
     }
-    fun fail(message: String) { state.unavailable(); status = message; onChanged?.invoke() }
+    fun fail(message: String) { state.unavailable(); status = message; notifyChanged() }
     fun invalidate(message: String) {
         captured = null; state.unavailable(); reports.clear(); handler.removeCallbacks(expiry)
+        handler.removeCallbacks(freshnessExpiry); pendingReferenceReads.clear()
         readRecovery.reset(); lastResumeRefresh = 0L
         diagnostics.clear()
         pagePhase = "closed"; adapterBound = false
         view?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); it.stopLoading(); it.destroy() }
-        view = null; status = message; onChanged?.invoke()
+        view = null; status = message; notifyChanged()
     }
     private fun reject(message: String): Boolean { invalidate(message); return false }
     companion object {

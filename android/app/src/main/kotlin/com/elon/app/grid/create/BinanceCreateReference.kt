@@ -18,16 +18,23 @@ internal class BinanceCreateReference(private val host:BinanceHostRuntime,privat
     private var symbol=""
     private var started=0L
     private var reading=false
+    var onResult:(()->Unit)?=null
     private var result:Map<String,Any?> = emptyMap()
+        set(value) {val changed=field!=value;field=value;if(changed && value["status"] in setOf("ready","unavailable","expired")) {
+            host.events.changed("reference");host.handler.post {onResult?.invoke()}
+        }}
 
     fun start(id:String,raw:String) {
         val input=BinanceReferenceInput.parse(raw,version)
         require(Regex("[a-f0-9]{64}").matches(id))
         require(host.live() && host.state.fresh())
         val ticket=++generation
+        host.pendingReferenceReads.remove(request)
         account=host.state.account ?: error("ACCOUNT_MISSING")
         document=host.document.snapshot().documentToken;request=id;symbol=input.getValue("symbol")
         started=System.currentTimeMillis();reading=false;result=base("pending")
+        host.pendingReferenceReads[id]={if(ticket==generation)collectResult()}
+        host.handler.postDelayed({if(ticket==generation && result["status"]=="pending")result=base("unavailable")},45_000)
         val expectedAccount=account;val expectedDocument=document
         try {worker.execute {
             val loaded=runCatching {
@@ -67,6 +74,9 @@ internal class BinanceCreateReference(private val host:BinanceHostRuntime,privat
             val observed=result["observed_at"] as Long
             if(now-observed !in -5000..120000)result=base("expired")
         }
+        return result
+    }
+    private fun collectResult() {
         if(!reading && result["status"]=="pending") {
             reading=true;val ticket=generation
             val args=listOf(document,request,account).joinToString(","){StrictJson.encode(it)}
@@ -82,9 +92,8 @@ internal class BinanceCreateReference(private val host:BinanceHostRuntime,privat
                 }.onFailure {result=base("unavailable")}
             } ?: run {reading=false;result=base("unavailable")}
         }
-        return result
     }
-    fun close(){generation++;result=emptyMap();reading=false;host.view?.evaluateJavascript("window.__elonBinanceCreateReferenceV$version?.cancel()",null)}
+    fun close(){generation++;host.pendingReferenceReads.remove(request);result=emptyMap();reading=false;host.view?.evaluateJavascript("window.__elonBinanceCreateReferenceV$version?.cancel()",null)}
     private fun current()=host.live() && host.state.fresh() && host.state.account==account && host.document.snapshot().documentToken==document
     private fun base(status:String):Map<String,Any?> = mapOf("schema" to "yilong.binance_create_reference.v$version","request" to request,"account" to account,"symbol" to symbol,"status" to status)
     companion object {private val worker=ThreadPoolExecutor(1,1,0,TimeUnit.MILLISECONDS,ArrayBlockingQueue(1))}

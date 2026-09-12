@@ -2885,6 +2885,92 @@
       "updated_at_ms": 1788953369678
     },
     {
+      "id": "android-binance-session-events-v1",
+      "title": "币安宿主事件通信",
+      "summary": "认证 Binder 通知替代固定状态查询和轮询续租，私有请求完成后按需读取。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/android-binance-session-events-v1.md",
+        "content_hash": "752198fa15436787fbba90a331f779c36d1f1f9c8f315686e1649521f2397e6f",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "559881ee10207788d326de1eaeb602ff0d759871",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "6a7faefed8212f0fc4de7d103fba3282d5228c27",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "",
+      "tags": [],
+      "task_paths": [],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "UID、订阅和操作租约有界，通知不携带私有正文",
+        "参考及资金完成事件推进，无定时 JS 读取",
+        "正式双包交付与设备实测分报"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostEvents.kt",
+          "content_hash": "2b8d95567c7edf9b6f8ae127793323c08d59081005c7a9f676ac1054022631de",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "559881ee10207788d326de1eaeb602ff0d759871",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b146fe2a619f83499c0cb07b9145d284b5dceaef",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/host/BinanceEventSubscriptionsTest.kt",
+          "content_hash": "73ea6ed13d56eb493ce8110f683718a0f178b13513df9eaede7090f1f928447a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "559881ee10207788d326de1eaeb602ff0d759871",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "784c522f14e332156b71ae4184fb337a552d0711",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-create-funds.cjs",
+          "content_hash": "d3f196b504501200c0027c0db72c70dc202698068db2173cdaf35063318711f7",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "559881ee10207788d326de1eaeb602ff0d759871",
+            "head_blob_oid": "880ab98ebd8e4e1625ef3a00bcac75895dfab516",
+            "worktree_blob_oid": "a363332c913574bc4a94d8ace586c5d3fd68fd55",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-create-reference.cjs",
+          "content_hash": "bf976ac17bb443207a8b9a184826096f2c30b9d963af14b39fca90000b91560e",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "559881ee10207788d326de1eaeb602ff0d759871",
+            "head_blob_oid": "82ee47fc92613f058f2d1ce31c9adb73571e7e18",
+            "worktree_blob_oid": "102fd46e11638138fbb8c6bbfb31887525dfcc90",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1789212142676,
+      "updated_at_ms": 1789212293258
+    },
+    {
       "id": "android-binance-strategy-funds-v1",
       "title": "币安策略账户资金只读",
       "summary": "读取当前网格策略账户 USDT 保证金余额和全仓初始保证金；不等同交易所钱包总资产。",
@@ -26620,56 +26706,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_6b5d739ab86f4c459a364048988147ec",
-      "feature_id": "node-status-runtime-identity-v1",
-      "action": "claimed",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788798444178
-    },
-    {
-      "id": "feature_event_98518578fb3b42238224ef68178f64f7",
-      "feature_id": "node-status-runtime-identity-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-read",
-      "reason": "Fix the observed status compaction compatibility gap while retaining fail-closed update checks.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788798491977
-    },
-    {
-      "id": "feature_event_8f77a3afd3974e98bbf34728a51ff725",
-      "feature_id": "node-status-runtime-identity-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788799674117
-    },
-    {
-      "id": "feature_event_68fbb4f1c31d411fa46676c9009dd298",
-      "feature_id": "node-status-runtime-identity-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788799975004
-    },
-    {
-      "id": "feature_event_5302ef51cabc407ba96031b25ad7a1fe",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "claim_released",
-      "actor": "codex-grid-read",
-      "reason": "Continue real-device read acceptance; replace expired task claim",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1788824983557
-    },
-    {
       "id": "feature_event_46f0a05a9f844314b99cd534dee82823",
       "feature_id": "private-grid-read-bridge-v1",
       "action": "claimed",
@@ -28618,6 +28654,56 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1789175255509
+    },
+    {
+      "id": "feature_event_fb333790080d4b0e93503c49130db2f2",
+      "feature_id": "android-binance-session-events-v1",
+      "action": "registered",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789212142677
+    },
+    {
+      "id": "feature_event_3deac957c2a34ee9be5acb8097bb66e1",
+      "feature_id": "android-binance-session-events-v1",
+      "action": "claimed",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789212142768
+    },
+    {
+      "id": "feature_event_dea56c3009ec466b9d017f2f2490f649",
+      "feature_id": "android-binance-session-events-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789212142820
+    },
+    {
+      "id": "feature_event_f15bcc51ec7b47ea930c01f4406929fa",
+      "feature_id": "android-binance-session-events-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789212293151
+    },
+    {
+      "id": "feature_event_166b549412184a9aba265bf2a96181bc",
+      "feature_id": "android-binance-session-events-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "151 项 JVM 和 88 项 JS 通过，正式发布及设备验收独立待办",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789212293258
     }
   ]
 }

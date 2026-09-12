@@ -34,6 +34,10 @@ internal fun createBinanceHostWebView(context: Context, runtime: BinanceHostRunt
         }
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
+        WebViewCompat.addWebMessageListener(this,"ElonBinanceReference",setOf(BinanceHostRuntime.ORIGIN)) { _,message,origin,mainFrame,_ ->
+            if(mainFrame && origin.toString().trimEnd('/')==BinanceHostRuntime.ORIGIN)
+                message.data?.takeIf {it.length<=512}?.let(runtime::referenceObserved)
+        }
         WebViewCompat.addWebMessageListener(this, "ElonBinanceRead", setOf(BinanceHostRuntime.ORIGIN)) { _, message, origin, mainFrame, _ ->
             if (mainFrame && origin.toString().trimEnd('/') == BinanceHostRuntime.ORIGIN) {
                 message.data?.takeIf { it.length <= 262144 }?.let(runtime::observed)

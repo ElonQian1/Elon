@@ -12,8 +12,12 @@ class BinanceHostProvider : ContentProvider() {
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle {
         val owner = context ?: throw SecurityException("HOST_UNAVAILABLE")
         if (!BinanceHostCaller.ipc(owner)) throw SecurityException("CALLER_REJECTED")
+        val uid=android.os.Binder.getCallingUid()
         return runCatching {
             require(arg == null && extras != null)
+            if(method in BinanceHostEvents.methods)return@runCatching BinanceHostRuntime.onMain(owner) {
+                it.events.call(method,uid,extras)
+            }
             if (method in com.elon.app.grid.manage.BinanceManageCommands.methods) {
                 return@runCatching BinanceHostRuntime.onMain(owner) { runtime ->
                     com.elon.app.grid.manage.BinanceManageCommands.dispatch(owner, runtime, method, extras)

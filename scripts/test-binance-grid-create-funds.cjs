@@ -4,14 +4,20 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
 const ok=data=>({success:true,code:'000000',data});
 function harness() {
   const clock={now:200000},state={owner:'a'.repeat(64),mode:ok({enable:false}),futures:ok('123.45678901234567890123'),spot:ok([{asset:'USDT',free:'12.30000000'},{asset:'BTC',free:'999'}])},calls=[];
-  const window={};vm.runInNewContext(code,{window,Date:{now:()=>clock.now}});
+  const notifications=[],window={ElonBinanceReference:{postMessage:value=>notifications.push(JSON.parse(value))}};vm.runInNewContext(code,{window,Date:{now:()=>clock.now}});
   const deps={headers:()=>({secret:'CANARY'}),identity:async account=>{calls.push('identity');if(state.wait)await state.wait;if(state.owner!==account)throw Error('changed')},
     mode:async()=>{calls.push('mode');return state.mode},futures:async()=>{calls.push('futures');if(state.onRead)state.onRead();return state.futures},spot:async()=>{calls.push('spot');return state.spot}};
   const api=window.__elonBinanceCreateFundsFactoryV1(deps),token='doc_funds_test',request='b'.repeat(64),account=state.owner;
   const read=(id=request)=>api.read(token,id,account);
   const start=async(id=request)=>{assert.equal(api.start(token,id,account),true);await settle();return read(id)};
-  return {state,clock,calls,api,token,request,account,read,start};
+  return {state,clock,calls,api,token,request,account,read,start,notifications};
 }
+test('funds completion notifies once without funds or credentials; cancellation suppresses late events',async()=>{
+  const h=harness();await h.start();assert.deepEqual(h.notifications,[{token:h.token,request:h.request}]);
+  h.read();await settle();assert.equal(h.notifications.length,1);
+  const x=harness();x.api.start(x.token,x.request,x.account);x.api.cancel();await settle();assert.deepEqual(x.notifications,[]);
+  const f=harness();f.state.mode=ok({});await f.start();assert.deepEqual(f.notifications,[{token:f.token,request:f.request}]);
+});
 test('ordinary UM funds retain exact decimals and only the required projection',async()=>{
   const h=harness(),r=await h.start();assert.equal(r.status,'ready');assert.equal(r.available,'123.45678901234567890123');assert.equal(r.source,'futures_transferable');
   assert.equal(Object.keys(r).sort().join(','),'account,asset,available,observed_at,request,schema,source,status');

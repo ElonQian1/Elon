@@ -80,7 +80,8 @@
           if(Date.now()-market.observedAt>120000)throw Error('market_expired');
           current={...base,token,status:'ready',minimum_count:c.minGridCount,maximum_count:maximum,minimum_margin:minimum,
             observed_at:market.observedAt,source:`binance_create_rules_v${version}`,code:maximum<c.minGridCount?'range_too_narrow':input.count===''?'count_required':countValid?'':'count_outside_range',...economics};
-        }catch(error){if(ticket===generation){fees=null;current={...base,token,status:'unavailable'};}}})();
+        }catch(error){if(ticket===generation){fees=null;current={...base,token,status:'unavailable'};}}
+        finally {if(ticket===generation)window.ElonBinanceReference?.postMessage(JSON.stringify({token,request}));}})();
         return true;
       },
       read(token,request,account) {

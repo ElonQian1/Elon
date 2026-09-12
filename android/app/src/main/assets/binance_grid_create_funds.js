@@ -36,7 +36,8 @@
           }
           await deps.identity(account,headers);alive();
           current={...base(request,account,'ready'),token,asset:'USDT',available,source,observed_at:Date.now()};
-        }catch(_){if(ticket===generation)current={...base(request,account,'unavailable'),token};}})();
+        }catch(_){if(ticket===generation)current={...base(request,account,'unavailable'),token};}
+        finally {if(ticket===generation)window.ElonBinanceReference?.postMessage(JSON.stringify({token,request}));}})();
         return true;
       },
       read(token,request,account) {
