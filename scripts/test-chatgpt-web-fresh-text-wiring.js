@@ -93,9 +93,30 @@ test('production asset assembly loads dependencies before the one existing send 
   const chain = ['chatgpt_web_private_runtime_bindings.js', 'chatgpt_web_private_text_runtime_submit.js',
     'chatgpt_web_fresh_text_request.js', 'chatgpt_web_fresh_text_context.js',
     'chatgpt_web_fresh_text_reconcile.js', 'chatgpt_web_fresh_text_stop.js',
+    'chatgpt_web_fresh_text_recovery.js',
     'chatgpt_web_fresh_text_transaction.js', 'chatgpt_web_text_transaction_orchestrator.js'];
   for (let i = 0; i < chain.length; i++) {
     assert.equal(names.filter(n => n === chain[i]).length, 1);
     if (i) assert.ok(names.indexOf(chain[i]) > names.indexOf(chain[i - 1]));
   }
+});
+
+test('native refresh delegates a pending fresh turn to read-only recovery before generic prefetch', async () => {
+  const source = fs.readFileSync(path.join(assets, 'chatgpt_web_adapter.js'), 'utf8');
+  const branch = source.slice(source.indexOf("if (action === 'refresh_current_conversation')"),
+    source.indexOf("if (action === 'verify_private_stream_watchdog')"));
+  assert.match(branch, /textTransactionOrchestrator\?\.refreshConversation\(privateTransport, location.pathname, emitEvent\)/);
+  let recovery = 0, prefetch = 0;
+  const fresh = { state: () => ({ pending: true }),
+    recover: () => { recovery++; return { completion: Promise.resolve() }; } };
+  const f = fixture(fresh), emit = () => {};
+  const transport = { conversationPrefetchEnabled: true, refreshCurrentConversation(path, event) {
+    assert.equal(path, '/c/fixture'); assert.equal(event, emit); prefetch++;
+  } };
+  f.api.refreshConversation(transport, '/c/fixture', emit);
+  assert.equal(recovery, 1); assert.equal(prefetch, 0);
+  await tick(); assert.equal(f.calls.filter(c => c === 'snapshot').length, 1);
+  fresh.state = () => ({ pending: false });
+  f.api.refreshConversation(transport, '/c/fixture', emit);
+  assert.equal(prefetch, 1);
 });

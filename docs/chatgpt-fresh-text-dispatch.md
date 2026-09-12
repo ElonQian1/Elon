@@ -54,8 +54,9 @@ There is no periodic polling or second transcript store in these modules.
 - Live server-stop and follow-up acceptance for this new request owner. Source
   integration is present, but no real stop response/history was observed in this
   batch. Cancelling a reader alone still **does not** confirm server stop.
-- Recovery for delayed history and stream-handoff variants. A history response
-  that cannot prove completion leaves a barrier, not a fabricated success.
+- Live delayed-history recovery and stream-handoff variants. Bounded read-only
+  recovery is now source-integrated below; resumable streaming transport still
+  relies on the existing observation path. An unproven result retains its barrier.
 - Initial ownership without a mounted composer. This version removes the
   submission callback/readiness dependency but does not claim zero DOM bootstrap.
 - New chats, tools, attachments, temporary/project/shared chats, non-personal
@@ -123,3 +124,54 @@ The final context check permits our server-owned streaming turn to be inspected,
 while refusing another live runtime writer and refusing to reconcile as stopped
 until the local provider state is idle or unread.
 It is distinct from the earlier September 12 sender run with the same total.
+
+## Read-Only Recovery Source Batch
+
+September 13: `android_chatgpt_fresh_text_history_recovery_v1`, source-integrated,
+offline verification only. `chatgpt_web_fresh_text_recovery.js` reuses the reviewed
+`textHydrateHistory` fetch/apply contract instead of another sender or a second
+transcript store. Adapter 369 assembles it; transaction v3 replaces an older
+instance only after its pending writer has settled.
+
+- A completed or interrupted local reader triggers one bounded recovery cycle.
+  It checks the original conversation, message and parent, and retries an
+  inconclusive history response at most twice, with 400 ms and 1,200 ms gaps.
+  The whole cycle has a 15-second deadline; an HTTP failure ends that cycle.
+- Foreground visibility, `pageshow` and `online` can resume a pending owner.
+  Hidden documents do no automatic reads. Automatic work has a 10-second
+  cooldown and three-cycle budget per turn; no interval or snapshot polling
+  is introduced. Concurrent triggers share one job and one native finalization.
+- The existing native conversation-refresh command joins this recovery while
+  the independent writer is pending. It does not start generic prefetch in
+  parallel or require the composer to be rendered/ready. Manual refresh can
+  perform another bounded read after the automatic budget is exhausted.
+- Reconciliation checks the registered account/document/branch both before
+  fetching and before applying. A new runtime sender, regeneration, relay,
+  Canvas generation or voice session prevents application. Explicit active or
+  unknown server async status cannot masquerade as a completed reply.
+- Confirmation finishes the native stream without resetting its text, schedules
+  a snapshot and releases the next-send barrier. A new draft is left untouched.
+  An uncertain original POST is never replayed; its old command receipt remains
+  immutable, while authoritative history may later prove the turn completed.
+- Stop preempts recovery. An uncertain stop may settle from terminal partial
+  history; a user-only stopped branch still needs the stop acknowledgement.
+  Document replacement cancels outstanding reads and invalidates late results.
+
+This adds no new endpoint or credential channel and does not enable the fresh
+sender as a production default. New chat/tool/attachment scopes, initial
+composer-free ownership, active-stream resumption and actual device recovery
+remain separate work. Navigation away suppresses recovery for that owner;
+returning to its exact conversation permits recovery again. It is not yet a
+multi-conversation independent-writer implementation.
+
+The source/regression run passed **298 tests, zero failures and zero skips**:
+`fresh-recovery-final-20260913-012824-171`. Coverage includes real module
+composition for late history / runtime-writer races, recovery single-flight,
+timeouts and late replies, foreground/online triggers, immutable write receipts,
+native refresh routing, preserved drafts and the existing stream/stop/attachment
+regressions. The public AST contract check ran against the retained reviewed
+assets, without executing them or contacting a private account.
+
+Android build, APK publication and real-account delayed-history/recovery
+acceptance remain grouped with the other pending source batches; no phone
+message was sent in this batch.

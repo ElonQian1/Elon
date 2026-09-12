@@ -1,9 +1,10 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
+    root.__elonChatGptFreshTextTransaction?.dispose?.();
     root.__elonChatGptFreshTextTransaction = factory(root);
   }
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -13,8 +14,11 @@
   const requests = (options.requests || page.__elonChatGptFreshTextRequest).create(page);
   const reconciliation = options.reconciliation || page.__elonChatGptFreshTextReconcile.create();
   const stopping = options.stopping || page.__elonChatGptFreshTextStop?.create(page, { reconciliation });
+  const recovery = options.recovery || page.__elonChatGptFreshTextRecovery?.create(page, {
+    reconciliation, timeoutMs: options.reconcileTimeoutMs || 15000
+  });
   const records = new Map();
-  let document = page.document, token = page.__elonChatGptDocumentToken, active = null;
+  let document = page.document, token = page.__elonChatGptDocumentToken, active = null, disposed = false;
   const knownCodes = new Set(['context_changed', 'context_invalid', 'command_invalid', 'scope_unsupported',
     'runtime_unavailable', 'identity_unavailable', 'context_unavailable', 'attachments_active', 'tools_active',
     'conversation_busy', 'parent_unavailable', 'prepare_unconfirmed', 'security_unavailable', 'security_invalid',
@@ -31,15 +35,17 @@
 
   function state() {
     boundary();
-    if (active?.dispatched && active.finished && !active.stopping) {
-      try { if (active.stopConfirmed || active.binding.reconciled(active.request.userMessageId, active.stopAcknowledged === true)) active = null; } catch (_) {}
+    if (active?.dispatched && active.finished && !active.stopping && !active.recovering && !active.recoveryCompletion) {
+      try { if (active.stopConfirmed || active.recoveryConfirmed ||
+        active.binding.reconciled(active.request.userMessageId, active.stopAcknowledged === true)) active = null; } catch (_) {}
     }
-    return { version: 2, transport: 'fresh_page_http_v1', pending: active !== null,
+    return { version: 3, transport: 'fresh_page_http_v1', pending: active !== null,
       phase: active?.phase || 'idle', dispatched: active?.dispatched === true,
-      accepted: active?.accepted === true, code: active?.code || '' };
+      accepted: active?.accepted === true, code: active?.code || '', recovering: active?.recovering === true };
   }
 
   function send(command) {
+    if (disposed) return { handled: false, code: 'disposed' };
     state();
     const previous = records.get(command?.requestId);
     if (previous) return previous.prompt === command.prompt && previous.expectedDraft === command.expectedDraft &&
@@ -68,6 +74,7 @@
     owner.stopCurrent = () => active === owner && owner.document === page.document &&
       owner.token === page.__elonChatGptDocumentToken && owner.binding?.owns() === true;
     owner.stopReading = () => owner.controller.abort();
+    owner.notify = () => { try { command.onSettled?.(); } catch (_) {} };
     const completion = new Promise(done => { resolve = done; });
     function receipt(value) { if (!owner.settled) { owner.settled = true; resolve(value); } }
     const transaction = Object.freeze({ handled: true, completion,
@@ -164,12 +171,6 @@
       }
       if (!owner.accepted) throw Error('stream_unavailable');
       owner.phase = 'reconciling'; owner.code = 'history_reconciliation_required';
-      // Iterator completion is not evidence that the official selected branch
-      // has incorporated this turn. Keep the write barrier until it has.
-      timeout(options.reconcileTimeoutMs || 15000, 'reconciliation_timeout');
-      if (await abortable(reconciliation.reconcile(owner.binding, owner.request, owner.controller.signal))) {
-        owner.phase = 'completed'; owner.code = '';
-      }
     }
     void run().catch(error => {
       owner.code ||= knownCodes.has(error?.message) ? error.message : 'request_failed';
@@ -188,7 +189,8 @@
         try { Promise.resolve(owner.iterator?.return?.()).catch(() => {}); } catch (_) {}
       }
       if (!owner.dispatched && active === owner) active = null;
-      try { command.onSettled?.(); } catch (_) {}
+      owner.notify();
+      if (active === owner && owner.dispatched && !owner.stopping) recover(true);
     });
     return transaction;
   }
@@ -209,6 +211,7 @@
       return { handled: true, completion: Promise.resolve({ status: 'accepted', code: 'cancelled_before_dispatch' }) };
     }
     if (!stopping) return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'server_stop_unconfirmed' }) };
+    owner.recoveryController?.abort();
     owner.phase = 'stopping';
     const completion = stopping.stop(owner).then(receipt => {
       if (active === owner) {
@@ -219,5 +222,39 @@
     });
     return { handled: true, completion };
   }
-  return Object.freeze({ version: 2, send, state, cancel, stop });
+  function recover(automatic = false) {
+    state();
+    const owner = active;
+    if (!owner || !recovery || disposed) return { handled: false };
+    if (owner.recoveryCompletion) return { handled: true, completion: owner.recoveryCompletion };
+    const completion = recovery.recover(owner, automatic).then(receipt => {
+      if (active !== owner || owner.stopping || owner.stopConfirmed || !owner.stopCurrent()) return receipt;
+      if (receipt.status === 'accepted') {
+        owner.phase = 'completed'; owner.code = ''; owner.accepted = true;
+        page.__elonChatGptPrivateStreamTransport?.finishPrivateSend?.();
+      } else if (!['recovery_not_ready', 'recovery_deferred', 'recovery_cancelled'].includes(receipt.code)) {
+        owner.code = receipt.code;
+      }
+      owner.notify();
+      return receipt;
+    }).catch(() => ({ status: 'unknown', code: 'history_unavailable' }))
+      .finally(() => { owner.recoveryCompletion = null; });
+    owner.recoveryCompletion = completion;
+    return { handled: true, completion };
+  }
+  const visibility = () => { if (page.document.visibilityState !== 'hidden') recover(true); };
+  const resume = () => recover(true);
+  const eventDocument = page.document;
+  eventDocument.addEventListener?.('visibilitychange', visibility);
+  page.addEventListener?.('online', resume);
+  page.addEventListener?.('pageshow', resume);
+  function dispose() {
+    if (active) return false;
+    disposed = true;
+    eventDocument.removeEventListener?.('visibilitychange', visibility);
+    page.removeEventListener?.('online', resume);
+    page.removeEventListener?.('pageshow', resume);
+    return true;
+  }
+  return Object.freeze({ version: 3, send, state, cancel, stop, recover, dispose });
 });

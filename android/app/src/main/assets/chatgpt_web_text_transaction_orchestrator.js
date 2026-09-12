@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptTextTransactionOrchestrator;
-  if (existing && Number(existing.version) >= 9) return;
+  if (existing && Number(existing.version) >= 10) return;
 
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
@@ -375,8 +375,21 @@
       });
     }
 
-    return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, stopPrivate, stopGeneration });
+    function refreshConversation(transport, path, emitEvent) {
+      const fresh = window.__elonChatGptFreshTextTransaction;
+      if (fresh?.state?.().pending) {
+        Promise.resolve(fresh.recover?.()?.completion).then(
+          () => options.scheduleSnapshot(true), () => options.scheduleSnapshot(true));
+        return;
+      }
+      if (transport?.conversationPrefetchEnabled === true &&
+          typeof transport.refreshCurrentConversation === 'function') {
+        transport.refreshCurrentConversation(path, emitEvent);
+      }
+    }
+
+    return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, stopPrivate, stopGeneration, refreshConversation });
   }
 
-  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 9, create });
+  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 10, create });
 })();

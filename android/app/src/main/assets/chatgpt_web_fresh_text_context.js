@@ -100,27 +100,30 @@
     function current() {
       try { return owns() && JSON.stringify(read()) === fingerprint; } catch (_) { return false; }
     }
+    function historyAllowed() {
+      const status = shared.Fx(selected);
+      return shared.Fl(shared.HM.getRequestId(tree())) === false &&
+        (status == null || status.value === shared.v7.UNREAD || status.value === shared.v7.STREAMING) &&
+        !submit.state?.().pending && !page.__elonChatGptPrivateRegenerateRuntime?.state?.().pending &&
+        !page.__elonChatGptPrivateTextTransactionRelay?.state?.().active &&
+        !page.__elonChatGptPrivateStopRuntime?.state?.().pending &&
+        !page.__elonChatGptCanvasDocumentActions?.generationPending?.();
+    }
     if (!current()) fail('context_changed');
     return Object.freeze({ ...snapshot, token, current, owns, shared, runtime: conversation,
       canReconcile(userMessageId) {
-        if (!owns()) return false;
+        if (!owns() || !historyAllowed()) return false;
         const state = tree(), leaf = shared.HM.getCurrentMessage(state);
         return leaf?.id === snapshot.parentId || leaf?.id === userMessageId ||
           shared.HM.getParentPromptNode(state, leaf?.id)?.id === userMessageId;
       },
       canStop(userMessageId) {
-        if (!this.canReconcile(userMessageId)) return false;
-        const status = shared.Fx(selected);
-        return shared.Fl(shared.HM.getRequestId(tree())) === false &&
-          (status == null || status.value === shared.v7.UNREAD || status.value === shared.v7.STREAMING) &&
-          !submit.state?.().pending && !page.__elonChatGptPrivateRegenerateRuntime?.state?.().pending &&
-          !page.__elonChatGptPrivateTextTransactionRelay?.state?.().active &&
-          !page.__elonChatGptPrivateStopRuntime?.state?.().pending;
+        return this.canReconcile(userMessageId);
       },
       reconciled(userMessageId, stopped = false, emptyStopped = false) {
-        if (!owns() || stopped && !this.canStop(userMessageId)) return false;
+        if (!owns() || !historyAllowed()) return false;
         const status = shared.Fx(selected);
-        if (stopped && status != null && status.value !== shared.v7.UNREAD) return false;
+        if (status != null && status.value !== shared.v7.UNREAD) return false;
         const state = tree(), user = shared.HM.getNodeIfExists(state, userMessageId);
         const parent = shared.HM.getParentNode(state, userMessageId);
         const leaf = shared.HM.getCurrentMessage(state);

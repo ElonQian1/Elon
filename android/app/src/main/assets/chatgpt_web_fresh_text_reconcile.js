@@ -34,6 +34,7 @@
     const owned = branch(payload, binding, userMessageId);
     if (!owned) return false;
     // Reviewed provider async enum: 3 streaming, 4 completed but unread.
+    if (ownsKey(payload, 'async_status') && owned.asyncStatus !== null && owned.asyncStatus !== 4) return false;
     if (stopped && owned.asyncStatus !== null && owned.asyncStatus !== 4) return false;
     if (owned.leaf.author.role === 'user') return stopped && emptyStopped;
     return owned.leaf.status === 'finished_successfully' && owned.leaf.end_turn === true ||

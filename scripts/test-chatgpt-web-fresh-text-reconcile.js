@@ -68,3 +68,15 @@ test('stopped partial history requires an explicit idle server status, not EOF o
     assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal, true), status === null || status === 4);
   }
 });
+
+test('completed-looking assistant in a still-active server session cannot release the writer', async () => {
+  for (const status of [3, 5, 6, 7, '4', {}, undefined]) {
+    const f = fixture(); f.payload.async_status = status;
+    assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal), false);
+    assert.equal(f.applied(), false);
+  }
+  for (const status of [null, 4]) {
+    const f = fixture(); f.payload.async_status = status;
+    assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal), true);
+  }
+});

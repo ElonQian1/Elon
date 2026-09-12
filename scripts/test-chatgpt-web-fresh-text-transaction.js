@@ -17,12 +17,17 @@ const turn = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 
 function fixture(options = {}) {
-  const calls = [], page = { document: {}, __elonChatGptDocumentToken: 'doc_fresh_test',
+  const document = new EventTarget(); document.visibilityState = 'visible';
+  const events = new EventTarget();
+  const calls = [], page = { document, __elonChatGptDocumentToken: 'doc_fresh_test',
+    addEventListener: events.addEventListener.bind(events), removeEventListener: events.removeEventListener.bind(events),
+    dispatchEvent: events.dispatchEvent.bind(events),
     location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/c/' + CID },
     __elonChatGptPrivateTextTransactionsEnabled: true, __elonChatGptFreshTextDispatchEnabled: true,
     crypto, AbortController, setTimeout, clearTimeout };
   let current = true, reconciled = false, draft = '';
-  const binding = { ...base, token: page.__elonChatGptDocumentToken,
+  page.__elonChatGptFreshTextRecovery = require('../android/app/src/main/assets/chatgpt_web_fresh_text_recovery');
+  const binding = { ...base, token: page.__elonChatGptDocumentToken, canReconcile: () => current,
     current: () => current, owns: () => current, reconciled: () => reconciled,
     shared: { textApi: { safePost: async (url, value) => {
       calls.push({ kind: 'prepare', url, value });
@@ -42,11 +47,13 @@ function fixture(options = {}) {
       }
     }
   };
-  page.__elonChatGptPrivateStreamTransport = { preparePrivateSend(prompt, id) {
+  page.__elonChatGptPrivateStreamTransport = { finishPrivateSend: () => calls.push({ kind: 'finish_stream' }), preparePrivateSend(prompt, id) {
     calls.push({ kind: 'native_stream', prompt, id }); return true;
   } };
-  const api = transactionModule.create(page, { requests: requestModule,
-    reconciliation: { reconcile: options.reconciliation || (async () => false) },
+  const reconciliation = { reconcile: options.reconciliation || (async () => false) };
+  const recovery = page.__elonChatGptFreshTextRecovery.create(page, { reconciliation, delays: [0, 0, 0],
+    timeoutMs: options.reconcileTimeoutMs || 1000 });
+  const api = transactionModule.create(page, { requests: requestModule, reconciliation, recovery,
     context: { capture: options.capture || (async () => binding), stamp: () => current ? 'fixture-stamp' : 'changed' },
     prepareTimeoutMs: options.prepareTimeoutMs || 1000, openTimeoutMs: options.openTimeoutMs || 1000,
     streamTimeoutMs: options.streamTimeoutMs || 1000, reconcileTimeoutMs: options.reconcileTimeoutMs || 1000 });
@@ -273,4 +280,69 @@ test('unsupported plain-text context preserves the accepted sender, but another 
     assert.equal(result.claimFallback(), allowed);
     assert.equal(f.calls.length, 0);
   }
+});
+
+test('an explicit history recovery releases a delayed turn then permits a new command, without replay', async () => {
+  let available = false, reads = 0;
+  const f = fixture({ reconciliation: async () => {
+    reads++; if (available) f.reconcile(); return available;
+  } });
+  await f.send().completion; await turn();
+  assert.equal(f.api.state().pending, true); assert.equal(reads, 3);
+  available = true;
+  const first = f.api.recover(), second = f.api.recover();
+  assert.equal(first.completion, second.completion);
+  assert.equal((await first.completion).status, 'accepted');
+  assert.equal(f.api.state().pending, false);
+  assert.equal(f.calls.filter(c => c.kind === 'post').length, 1);
+  assert.equal(f.calls.filter(c => c.kind === 'finish_stream').length, 1);
+  await f.send({ requestId: 'mcp_afterrecovery' }).completion; await turn();
+  assert.equal(f.calls.filter(c => c.kind === 'post').length, 2);
+});
+
+test('background settlement waits for visibility and does not clear a new draft', async () => {
+  let reads = 0;
+  const f = fixture({ reconciliation: async () => { reads++; f.reconcile(); return true; } });
+  f.page.document.visibilityState = 'hidden';
+  await f.send().completion; await turn();
+  assert.equal(reads, 0); assert.equal(f.api.state().pending, true);
+  f.draft('next unsent fixture');
+  f.page.document.visibilityState = 'visible';
+  f.page.document.dispatchEvent(new Event('visibilitychange')); await turn();
+  assert.equal(reads, 1); assert.equal(f.api.state().pending, false);
+  assert.equal(f.draft(), 'next unsent fixture');
+  assert.equal(f.calls.filter(c => c.kind === 'finish_stream').length, 1);
+});
+
+test('online/pageshow events coalesce while recovering; idle and disposed owners do no work', async () => {
+  const pending = deferred(); let reads = 0;
+  const f = fixture({ reconciliation: async () => { reads++; await pending.promise; f.reconcile(); return true; } });
+  f.page.dispatchEvent(new Event('online')); assert.equal(reads, 0);
+  await f.send().completion; await turn();
+  f.page.dispatchEvent(new Event('online')); f.page.dispatchEvent(new Event('pageshow'));
+  assert.equal(reads, 1); assert.equal(f.api.dispose(), false);
+  pending.resolve(); await turn(); assert.equal(f.api.state().pending, false);
+  assert.equal(f.calls.filter(c => c.kind === 'finish_stream').length, 1);
+  assert.equal(f.api.dispose(), true);
+  f.page.dispatchEvent(new Event('online')); f.page.document.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(reads, 1); assert.equal(f.send({ requestId: 'mcp_disposed' }).handled, false);
+});
+
+test('post-dispatch transport failure recovers through history without reusing prepare or security', async () => {
+  const f = fixture({ reconciliation: async () => { f.reconcile(); return true; },
+    stream: value => (async function* () { value.onBeforeRequestStart(); throw Error('fixture lost response'); })() });
+  const sent = f.send(); assert.equal((await sent.completion).status, 'unknown'); await turn();
+  assert.equal(f.api.state().pending, false);
+  assert.equal(f.calls.filter(c => c.kind === 'prepare').length, 1);
+  assert.equal(f.calls.filter(c => c.kind === 'stream_setup').length, 1);
+  assert.equal(sent.claimFallback(), false);
+});
+
+test('document change retires an in-flight recovery; late results cannot update native state', async () => {
+  const pending = deferred(), f = fixture({ reconciliation: () => pending.promise });
+  await f.send().completion; await turn();
+  f.page.document = {}; f.page.__elonChatGptDocumentToken = 'doc_new_recovery';
+  assert.equal(f.api.state().pending, false);
+  pending.resolve(true); await turn();
+  assert.equal(f.calls.filter(c => c.kind === 'finish_stream').length, 0);
 });

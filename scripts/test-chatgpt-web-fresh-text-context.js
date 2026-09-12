@@ -112,3 +112,37 @@ test('stopped partial assistant can be the next parent but an active writer cann
   f.shared.Fl = () => false; f.shared.Fx = () => ({ value: 5 });
   assert.equal(binding.canStop('fixture-user'), false);
 });
+
+test('history apply never replaces a newly active runtime writer or voice session', async () => {
+  for (const mutate of [f => { f.shared.Fl = () => true; },
+    f => { f.shared.Fx = () => ({ value: 5 }); },
+    f => { f.page.__elonChatGptPrivateTextRuntimeSubmit.state = () => ({ pending: true }); },
+    f => { f.page.__elonChatGptPrivateRegenerateRuntime = { state: () => ({ pending: true }) }; },
+    f => { f.page.__elonChatGptPrivateTextTransactionRelay = { state: () => ({ active: true }) }; },
+    f => { f.page.__elonChatGptCanvasDocumentActions = { generationPending: () => true }; }]) {
+    const f = fixture(), binding = await f.api.capture(f.node);
+    assert.equal(binding.canReconcile('fixture-user'), true);
+    mutate(f);
+    assert.equal(binding.canReconcile('fixture-user'), false);
+    assert.equal(binding.reconciled('fixture-user'), false);
+  }
+});
+
+test('real history reconciliation rejects a writer that starts between network receipt and apply', async () => {
+  const f = fixture(), binding = await f.api.capture(f.node);
+  const uid = '33333333-3333-4333-8333-333333333333', aid = '44444444-4444-4444-8444-444444444444';
+  const payload = { conversation_id: CID, current_node: aid, async_status: null, mapping: {
+    [uid]: { id: uid, parent: PID, message: { id: uid, author: { role: 'user' } } },
+    [aid]: { id: aid, parent: uid, message: { id: aid, author: { role: 'assistant' },
+      status: 'finished_successfully', end_turn: true } }
+  } };
+  let applies = 0;
+  f.conversation.textHydrateHistory = async (_, options) => {
+    options.onConversationLoadedFromNetwork(payload);
+    f.shared.Fl = () => true;
+    if (options.shouldApplyResponse()) applies++;
+  };
+  const history = require('../android/app/src/main/assets/chatgpt_web_fresh_text_reconcile').create();
+  assert.equal(await history.reconcile(binding, { userMessageId: uid }, new AbortController().signal), false);
+  assert.equal(applies, 0);
+});

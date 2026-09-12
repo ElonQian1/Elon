@@ -639,11 +639,7 @@
     }
     if (conversationDirectoryRequests && conversationDirectoryRequests.handleCommand(command, respond)) return;
     if (action === 'refresh_current_conversation') {
-      if (privateTransport && privateTransport.conversationPrefetchEnabled === true &&
-          typeof privateTransport.refreshCurrentConversation === 'function') {
-        privateTransport.refreshCurrentConversation(location.pathname, emitEvent);
-      }
-      return;
+      return textTransactionOrchestrator?.refreshConversation(privateTransport, location.pathname, emitEvent);
     }
     if (action === 'verify_private_stream_watchdog') {
       const armed = streamWatchdogAcceptance && streamWatchdogAcceptance.run(
