@@ -93,7 +93,7 @@ test('production asset assembly loads dependencies before the one existing send 
   const chain = ['chatgpt_web_private_runtime_bindings.js', 'chatgpt_web_private_text_runtime_submit.js',
     'chatgpt_web_fresh_text_request.js', 'chatgpt_web_fresh_text_context.js',
     'chatgpt_web_fresh_text_reconcile.js', 'chatgpt_web_fresh_text_stop.js',
-    'chatgpt_web_fresh_text_recovery.js',
+    'chatgpt_web_fresh_text_recovery.js', 'chatgpt_web_fresh_text_stream.js',
     'chatgpt_web_fresh_text_transaction.js', 'chatgpt_web_text_transaction_orchestrator.js'];
   for (let i = 0; i < chain.length; i++) {
     assert.equal(names.filter(n => n === chain[i]).length, 1);

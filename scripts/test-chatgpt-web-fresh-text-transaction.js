@@ -27,12 +27,13 @@ function fixture(options = {}) {
     crypto, AbortController, setTimeout, clearTimeout };
   let current = true, reconciled = false, draft = '';
   page.__elonChatGptFreshTextRecovery = require('../android/app/src/main/assets/chatgpt_web_fresh_text_recovery');
+  page.__elonChatGptFreshTextStream = require('../android/app/src/main/assets/chatgpt_web_fresh_text_stream');
   const binding = { ...base, token: page.__elonChatGptDocumentToken, canReconcile: () => current,
     current: () => current, owns: () => current, reconciled: () => reconciled,
     shared: { textApi: { safePost: async (url, value) => {
       calls.push({ kind: 'prepare', url, value });
       return options.prepare ? options.prepare() : { conduit_token: 'fixture-conduit' };
-    } }, textSecurityHeaders: headers },
+    } }, textSecurityHeaders: headers, textTopic: () => { throw Error('unexpected_topic'); } },
     runtime: {
       textSecurity: () => { calls.push({ kind: 'security' }); return options.security ? options.security() : security; },
       textStream: (url, value) => {
@@ -50,6 +51,7 @@ function fixture(options = {}) {
   page.__elonChatGptPrivateStreamTransport = { finishPrivateSend: () => calls.push({ kind: 'finish_stream' }), preparePrivateSend(prompt, id) {
     calls.push({ kind: 'native_stream', prompt, id }); return true;
   } };
+  page.__elonChatGptPrivateStreamTransport.beginPrivateStream = () => ({ push() {}, finish() {} });
   const reconciliation = { reconcile: options.reconciliation || (async () => false) };
   const recovery = page.__elonChatGptFreshTextRecovery.create(page, { reconciliation, delays: [0, 0, 0],
     timeoutMs: options.reconcileTimeoutMs || 1000 });
@@ -95,12 +97,41 @@ test('stream diagnostics distinguish handoff without exporting events or releasi
   })() });
   await f.send().completion; await turn();
   const evidence = f.api.trialControl('state');
-  assert.equal(evidence.stream_events, 3);
-  assert.deepEqual(evidence.event_types, ['delta_encoding', 'stream_handoff', 'other']);
+  assert.equal(evidence.stream_events, 2);
+  assert.deepEqual(evidence.event_types, ['delta_encoding', 'stream_handoff']);
   assert.equal(evidence.pending, true);
   assert.equal(evidence.reconciled, false);
   assert.equal(JSON.stringify(evidence).includes('private_fixture'), false);
   f.api.dispose();
+});
+
+test('transaction consumes handed-off data before reconciliation and retains the writer until history agrees', async () => {
+  const history = deferred(), messages = [];
+  let deliver;
+  const f = fixture({ reconciliation: () => history.promise, stream: value => (async function* () {
+    value.onBeforeRequestStart();
+    yield { response: new Response(null, { headers: { 'content-type': 'text/event-stream' } }) };
+    yield { event: 'delta_encoding', data: 'v1' };
+    yield { data: { type: 'stream_handoff', options: [{ type: 'subscribe_ws_topic', topic_id: 'synthetic-topic' }] } };
+  })() });
+  let unsubscribed = false, finished = false;
+  f.binding.shared.textTopic = () => ({ state: 2, hasEverSubscribed: false,
+    subscribe() {}, unsubscribe() { unsubscribed = true; }, onPotentialMissedMessages() { return () => {}; },
+    onMessage(callback) { deliver = callback; return () => { deliver = null; }; } });
+  f.page.__elonChatGptPrivateStreamTransport.beginPrivateStream = () => ({
+    push: value => messages.push(value), finish: () => { finished = true; } });
+  await f.send().completion; await turn();
+  assert.equal(f.api.trialControl('state').phase, 'streaming');
+  assert.equal(f.api.state().pending, true); assert.equal(finished, false);
+  deliver({ type: 'conversation-turn-stream', payload: { type: 'stream-item', stream_item_id: 'a',
+    encoded_item: 'data: {"message":{"id":"synthetic-answer"}}\n\n' } });
+  deliver({ type: 'conversation-turn-stream', payload: { type: 'done' } });
+  await turn();
+  assert.equal(messages.at(-1).data.message.id, 'synthetic-answer');
+  assert.equal(unsubscribed, true); assert.equal(finished, true);
+  assert.equal(f.api.state().pending, true);
+  history.resolve(true); await turn(); await turn();
+  assert.equal(f.api.state().pending, false);
 });
 
 test('trial is scoped to identity and route, expires without polling, and does not extend on repeated start', () => {

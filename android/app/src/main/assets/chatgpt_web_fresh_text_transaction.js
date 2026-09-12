@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -28,7 +28,9 @@
     'runtime_unavailable', 'identity_unavailable', 'context_unavailable', 'attachments_active', 'tools_active',
     'conversation_busy', 'parent_unavailable', 'prepare_unconfirmed', 'security_unavailable', 'security_invalid',
     'login_required', 'draft_changed', 'stream_unavailable', 'preparation_timeout', 'stream_open_timeout',
-    'stream_timeout', 'reconciliation_timeout', 'cancelled']);
+    'stream_timeout', 'reconciliation_timeout', 'cancelled', 'stream_item_invalid', 'stream_server_error',
+    'stream_handoff_unavailable', 'stream_topic_owned', 'stream_topic_timeout', 'stream_item_gap',
+    'stream_item_limit', 'stream_queue_limit', 'stream_subscribe_failed', 'stream_owner_changed', 'stream_decode_failed']);
 
   function boundary() {
     if (document === page.document && token === page.__elonChatGptDocumentToken) return;
@@ -159,6 +161,7 @@
       check();
       owner.request = requests.create(owner.binding, command);
       const { shared, runtime } = owner.binding;
+      if (typeof shared.textTopic !== 'function') throw Error('runtime_unavailable');
       // This is a new preparation request for this exact parent/model/command,
       // not a template captured from a previous website send.
       const prepared = await abortable(shared.textApi.safePost('/f/conversation/prepare', {
@@ -170,7 +173,8 @@
       check();
       const request = owner.request.consume(prepared, security, shared.textSecurityHeaders, current);
       const stream = page.__elonChatGptPrivateStreamTransport;
-      if (typeof stream?.preparePrivateSend !== 'function') throw Error('stream_unavailable');
+      if (typeof stream?.preparePrivateSend !== 'function' || typeof stream.beginPrivateStream !== 'function' ||
+          !page.__elonChatGptFreshTextStream) throw Error('stream_unavailable');
       timeout(options.openTimeoutMs || 15000, 'stream_open_timeout');
       // DM, not its retrying MGt wrapper, retains official auth and response
       // integrity. The native command owns body construction and dispatch.
@@ -185,12 +189,19 @@
           // this boundary is uncertain even if fetch subsequently throws.
           owner.dispatched = true; owner.phase = 'dispatching';
           if (!stream.preparePrivateSend(command.prompt, owner.request.userMessageId)) throw Error('stream_unavailable');
+          owner.sink = stream.beginPrivateStream({ conversationId: owner.binding.conversationId,
+            userMessageId: owner.request.userMessageId, current: owner.stopCurrent });
+          if (!owner.sink) throw Error('stream_unavailable');
           command.onDispatch?.();
           return {};
         }
       });
-      const iterator = source?.[Symbol.asyncIterator]?.();
-      if (!iterator) throw Error('runtime_unavailable');
+      const rootIterator = source?.[Symbol.asyncIterator]?.();
+      if (!rootIterator) throw Error('runtime_unavailable');
+      const iterator = page.__elonChatGptFreshTextStream.create({
+        getTopic: shared.textTopic, current: owner.stopCurrent, signal: owner.controller.signal,
+        setTimeout: page.setTimeout.bind(page), clearTimeout: page.clearTimeout.bind(page)
+      }).follow(rootIterator);
       owner.iterator = iterator;
       for (;;) {
         const next = await abortable(iterator.next());
@@ -201,6 +212,7 @@
           const type = next.value.event === 'delta_encoding' ? 'delta_encoding' :
             data?.type || (data?.message ? 'message' : data?.o ? 'delta' : 'other');
           owner.eventTypes.add(eventTypes.has(type) ? type : 'other');
+          owner.sink.push(next.value);
         }
         if (next.value?.response) {
           if (!owner.dispatched) throw Error('runtime_unavailable');
@@ -214,6 +226,7 @@
         }
       }
       if (!owner.accepted) throw Error('stream_unavailable');
+      owner.sink.finish();
       owner.phase = 'reconciling'; owner.code = 'history_reconciliation_required';
     }
     void run().catch(error => {
@@ -300,5 +313,5 @@
     page.removeEventListener?.('pageshow', resume);
     return true;
   }
-  return Object.freeze({ version: 4, send, state, cancel, stop, recover, dispose, trialControl });
+  return Object.freeze({ version: 6, send, state, cancel, stop, recover, dispose, trialControl });
 });

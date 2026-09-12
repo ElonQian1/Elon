@@ -91,6 +91,7 @@ function context(enabled, response) {
     return response;
   };
   const window = {
+    __elonChatGptPrivateOwnedStream: require('../android/app/src/main/assets/chatgpt_web_private_owned_stream'),
     __elonChatGptPrivateStreamObserverEnabled: enabled,
     __elonChatGptPrivateResearchProbe: {
       recordPrivateStreamOutcome: (outcome, frames, elapsedMs) =>
@@ -149,7 +150,7 @@ function context(enabled, response) {
     'data: [DONE]\n\n'
   ]);
   const enabled = context(true, response);
-  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 19);
+  assert.equal(enabled.window.__elonChatGptPrivateStreamTransport.version, 20);
   assert.equal(enabled.socketListenerCount(), 1);
   let notifications = 0;
   enabled.window.__elonChatGptPrivateStreamTransport.subscribe(() => { notifications += 1; });
@@ -703,6 +704,24 @@ function context(enabled, response) {
   transport.dispose();
   assert.equal(enabled.window.fetch, enabled.originalFetch);
   assert.equal(enabled.socketListenerCount(), 0);
+
+  const fresh = context(true, response), native = fresh.window.__elonChatGptPrivateStreamTransport;
+  native.preparePrivateSend('synthetic owned send', 'synthetic-user-id');
+  const sink = native.beginPrivateStream({ conversationId: 'conversation-one', userMessageId: 'synthetic-user-id', current: () => true });
+  assert.ok(sink);
+  const ownedMessage = { conversation_id: 'conversation-one', message: { id: 'synthetic-owned-answer',
+    author: { role: 'assistant' }, content: { parts: ['owned stream'] }, status: 'in_progress' } };
+  sink.push({ data: ownedMessage });
+  await fresh.window.fetch(request, init);
+  fresh.emitSocket(JSON.stringify({ ...ownedMessage, message: { ...ownedMessage.message, content: { parts: ['duplicate passive'] } } }));
+  await tick();
+  assert.equal(native.current('/c/conversation-one').text, 'owned stream', 'passive taps cannot overwrite the owned sink');
+  sink.finish(); native.finishPrivateSend();
+  native.prepareSend();
+  assert.throws(() => sink.push({ data: ownedMessage }), /context_changed/);
+  await fresh.window.fetch(request, init); await tick();
+  assert.equal(native.current('/c/conversation-one').text, 'hello world', 'the accepted passive path still works after fresh ownership ends');
+  native.dispose();
 
   const disabled = context(false, response);
   assert.equal(disabled.window.__elonChatGptPrivateStreamTransport, undefined);

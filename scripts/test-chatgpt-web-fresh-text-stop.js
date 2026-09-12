@@ -148,7 +148,10 @@ test('owned stop crosses the real fresh transaction and releases only after serv
   Object.assign(f.page, { document: {}, location: { href: 'https://chatgpt.com/c/' + CID },
     __elonChatGptDocumentToken: 'doc_fresh_stop', __elonChatGptPrivateTextTransactionsEnabled: true,
     __elonChatGptFreshTextDispatchEnabled: true,
-    __elonChatGptPrivateStreamTransport: { preparePrivateSend: () => true } });
+    __elonChatGptFreshTextStream: require(assets + 'chatgpt_web_fresh_text_stream'),
+    __elonChatGptPrivateStreamTransport: { preparePrivateSend: () => true,
+      beginPrivateStream: () => ({ push() {}, finish() {} }) } });
+  f.binding.shared.textTopic = () => { throw Error('unexpected_topic'); };
   let release;
   const streamWait = new Promise(resolve => { release = resolve; });
   f.binding.runtime.textSecurity = () => ({ chatReq: { token: 'fixture-security' } });

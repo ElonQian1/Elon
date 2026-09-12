@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 19) return;
+  if (existing && Number(existing.version) >= 20) return;
   if (existing && typeof existing.dispose === 'function') {
     try { existing.dispose(); }
     catch (_) { /* A stale transport must not block the upgraded observer. */ }
@@ -16,6 +16,10 @@
   if (!policy || !originalFetch || typeof TextDecoder !== 'function') return;
 
   const session = policy.createSession({ now: Date.now });
+  const ownedStream = window.__elonChatGptPrivateOwnedStream?.create({
+    policy, session, notify, conversationId: payloadConversationId,
+    report: reportShape, rich: observePackedFinance
+  });
   const researchProbe = window.__elonChatGptPrivateResearchProbe;
   const listeners = new Set();
   const MAX_SOCKET_DEPTH = 6;
@@ -81,6 +85,7 @@
   }
 
   function resetConversationBoundary() {
+    ownedStream?.reset();
     const active = session.current(location.pathname);
     blockedConversationId = String(active && active.conversationId || '').slice(0, 180);
     conversationGeneration += 1;
@@ -96,6 +101,7 @@
   }
 
   function prepareSend() {
+    ownedStream?.reset();
     blockedConversationId = '';
     conversationGeneration += 1;
     continuation = null;
@@ -130,6 +136,7 @@
   }
 
   function finishPrivateSend() {
+    ownedStream?.reset();
     if (!session.finish()) session.reset();
     notify();
     return true;
@@ -461,7 +468,7 @@
   }
 
   function observeSocket(text) {
-    if (disposed) return;
+    if (disposed || ownedStream?.active()) return;
     const parsed = parseSocketText(text);
     if (!parsed.length) {
       recordShape('socket/unparsed/size:' + socketLengthBucket(String(text || '').length));
@@ -537,7 +544,7 @@
   }
 
   function observeTappedFetch(event) {
-    if (disposed || !event || !event.response) return;
+    if (disposed || ownedStream?.active() || !event || !event.response) return;
     let url;
     try { url = new URL(String(event.url || ''), location.href); }
     catch (_) { return; }
@@ -654,7 +661,7 @@
     catch (_) { return originalFetch.apply(this, args); }
     const method = init.method || input && input.method || 'GET';
     return Promise.resolve(originalFetch.apply(this, args)).then((response) => {
-      if (disposed) return response;
+      if (disposed || ownedStream?.active()) return response;
       if (!fetchUnsubscribe) {
         observeAccessResponse(method, url, response);
         if (isOfficialConversationStream(method, url, response)) observe(response);
@@ -673,12 +680,18 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 19,
+    version: 20,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,
     mergeMessages: (messages, pathname) => session.merge(mergePrivateUser(messages), pathname),
     preparePrivateSend,
+    beginPrivateStream: (binding) => {
+      if (disposed || privateUser?.id !== binding.userMessageId) return null;
+      const generation = conversationGeneration, token = window.__elonChatGptDocumentToken;
+      return ownedStream?.begin({ ...binding, current: () => !disposed &&
+        generation === conversationGeneration && token === window.__elonChatGptDocumentToken && binding.current() });
+    },
     preparePrivateRegeneration,
     finishPrivateSend,
     prepareSend,
@@ -691,6 +704,7 @@
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      ownedStream?.reset();
       continuation = null;
       retireReader();
       listeners.clear();
