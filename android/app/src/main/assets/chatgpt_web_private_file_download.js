@@ -8,7 +8,7 @@
     ? require('./chatgpt_web_private_library_raster_policy.js') : root?.__elonChatGptPrivateLibraryRasterPolicy;
   const canvas = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_canvas_text_export.js') : root?.__elonChatGptPrivateCanvasTextExport;
-  const exported = Object.freeze({ version: 36, create: root => factory(root, pointer, citation, raster, canvas) });
+  const exported = Object.freeze({ version: 37, create: root => factory(root, pointer, citation, raster, canvas) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -46,9 +46,10 @@
     for (const [key, value] of entry.downloadQuery || []) url.searchParams.set(key, value);
     if (projectId) url.searchParams.set('gizmo_id', projectId);
     if (entry.conversationId) {
-      url.searchParams.set(entry.image || entry.fileCitation || entry.projectId || entry.libraryFileId
+      url.searchParams.set(!entry.imageConversationScope && (entry.image || entry.fileCitation || entry.projectId || entry.libraryFileId)
         ? 'check_context_scopes_for_conversation_id' : 'conversation_id', entry.conversationId);
     }
+    if (entry.imageConversationScope) url.searchParams.set('inline', 'false');
     url.searchParams.set('download_intent', 'true');
     return url.href;
   }
@@ -224,7 +225,14 @@
 
   function registerMessageImage(path, source, selection, imageCurrent) {
     const account = identity(), token = root.__elonChatGptDocumentToken;
-    const request = target(path, source, null);
+    let request = target(path, source, null);
+    if (source?.generatedImageConversationId != null) {
+      if (!request?.image || request.libraryFileId || source.attachments.length !== 0 ||
+          source.generatedImageConversationId !== request.conversationId) return null;
+      // ImageGenActionOverlay resolves the selected asset using conversationId,
+      // not the uploaded-image context-scope or the current route's project ID.
+      request = { ...request, projectId: null, imageConversationScope: true };
+    }
     if (disposed || !account || !/^doc_[a-z0-9_]{3,80}$/.test(token || '') ||
         !root.elonChatGptFileDownload || !request?.image || !selection ||
         typeof imageCurrent !== 'function' || !imageCurrent() || root.location.pathname !== path) return null;
@@ -474,5 +482,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 36, register, registerLibraryFile, registerGalleryImage, registerMessageImage, registerCanvasExport, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 37, register, registerLibraryFile, registerGalleryImage, registerMessageImage, registerCanvasExport, start, cancel, dispose, sourceDiagnostics });
 });

@@ -54,8 +54,8 @@ See [the scoped regression](reports/chatgpt-library-folder-download-1644.md).
 is device-verified for empty/populated file indexes and native Refresh on 1649.
 Reuse it. [Superseded-read handling](reports/chatgpt-file-read-owner-20260912.md)
 awaits grouped release. [Message originals](reports/chatgpt-message-image-original-20260912.md)
-have native wiring/observed-upload binding; generated binding and phone acceptance
-remain open. Raster deletion and idle membership/citation variants are unverified.
+and [generated originals](reports/chatgpt-generated-image-original-20260912.md)
+are offline-verified; phone acceptance remains. Raster deletion and idle variants are unverified.
 Personal raster download is accepted on 1666; native reference/removal and rename
 are [accepted/default-enabled on 1667](reports/chatgpt-library-raster-actions-20260911.md).
 Raster deletion is offline-only; [project raster reference/removal is accepted on 1670](reports/chatgpt-project-library-reference-20260911.md).

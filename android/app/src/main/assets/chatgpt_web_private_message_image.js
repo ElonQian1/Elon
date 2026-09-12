@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateMessageImage = factory(root);
 })(typeof window === 'object' ? window : null, function (page) {
@@ -11,14 +11,16 @@
     (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path.js') : null);
 
   function capture(node) {
-    if (!node?.isConnected || !(node instanceof page.HTMLImageElement) ||
-        !node.closest('[data-message-author-role="user"], [data-message-author-role="assistant"]')) return null;
-    if (!(page.__elonChatGptPrivateRuntimeBindings?.observed(RUNTIME) ||
-        page.performance?.getEntriesByName?.(RUNTIME, 'resource')?.length > 0)) return null;
+    if (!node?.isConnected || !(node instanceof page.HTMLImageElement)) return null;
     const path = page.location.pathname, match = PATH.exec(path);
     const keys = Object.keys(node).filter(key => key.startsWith('__reactFiber$'));
     if (!match || keys.length !== 1) return null;
     const chain = ownerPath?.resolve(node[keys[0]])?.ancestors || [];
+    const generated = page.__elonChatGptPrivateGeneratedImage?.capture(node, path, chain);
+    if (generated) return generated;
+    if (!node.closest('[data-message-author-role="user"], [data-message-author-role="assistant"]') ||
+        !(page.__elonChatGptPrivateRuntimeBindings?.observed(RUNTIME) ||
+        page.performance?.getEntriesByName?.(RUNTIME, 'resource')?.length > 0)) return null;
     // Den's observed download callback pairs asset with conversation/library
     // scope. A nearby thumbnail URL or another image's owner is not a descriptor.
     const owners = chain.filter(fiber => typeof fiber.type === 'function' && fiber.type.name === 'Den');
@@ -60,5 +62,5 @@
     } catch (_) { return null; }
   }
 
-  return Object.freeze({ version: 1, describe });
+  return Object.freeze({ version: 2, describe });
 });
