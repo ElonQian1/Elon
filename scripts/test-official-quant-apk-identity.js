@@ -104,31 +104,32 @@ function verify(raw) {
   assert.match(s.projectSpace, /url:\s*release\.download_url,[\s\S]*identity:\s*format!\("task:\{\}:\{\}:\{\}", task_id, updated_at, release\.identity_url\)/, 'project space exposes the stable URL while retaining release identity')
 
   const target = functionSource(s.actions, 'resolveProjectApkDownloadTarget')
-  assert.match(target, /OfficialQuantApkPolicy\.appliesTo\(projectId\)/, 'public branch uses stable project ID')
+  assert.match(target, /OfficialQuantApkPolicy\.appliesTo\(projectId\)/, 'member branch uses stable project ID')
   assert.match(target, /officialServerUrl:\s*String\s*=\s*BuildConfig\.SERVER_URL/, 'official origin comes from the configured server')
-  assert.match(target, /val expectedUrl = officialQuantPublicApkUrl\(officialServerUrl\) \?: return null/, 'official route is derived from the trusted origin')
-  assert.match(target, /return ProjectApkDownloadTarget\(expectedUrl, isPublic = true\)/, 'catalog paths are replaced by the trusted tokenless route')
-  assert.match(target, /token\?\.trim\(\)\?\.takeIf\(String::isNotEmpty\) \?: return null/, 'private branch still requires token')
+  assert.match(target, /val cleanToken = token\?\.trim\(\)\?\.takeIf\(String::isNotEmpty\) \?: return null[\s\S]*val expectedUrl = officialQuantMemberApkUrl\(officialServerUrl\) \?: return null/, 'official route requires a token and is derived from the trusted origin')
+  assert.match(target, /ProjectApkDownloadTarget\([\s\S]*expectedUrl,[\s\S]*isolatedClient = true,[\s\S]*bearerToken = cleanToken/, 'catalog paths are replaced by the trusted member route with header credentials')
+  assert.match(target, /token\?\.trim\(\)\?\.takeIf\(String::isNotEmpty\) \?: return null/, 'every download branch still requires token')
   assert.match(target, /projectApkUrlWithToken\(cleanUrl, cleanToken\)/, 'private branch still appends token')
-  before(target, 'return ProjectApkDownloadTarget(expectedUrl, isPublic = true)', 'projectApkUrlWithToken(cleanUrl, cleanToken)', 'official return must precede private token assembly')
-  const publicUrl = functionSource(s.actions, 'officialQuantPublicApkUrl')
-  assert.match(publicUrl, /uri\.scheme\.equals\("http", ignoreCase = true\)[\s\S]*uri\.scheme\.equals\("https", ignoreCase = true\)/, 'trusted server only allows HTTP or HTTPS')
+  before(target, 'bearerToken = cleanToken', 'projectApkUrlWithToken(cleanUrl, cleanToken)', 'official return must precede private token assembly')
+  const memberUrl = functionSource(s.actions, 'officialQuantMemberApkUrl')
+  assert.match(memberUrl, /uri\.scheme\.equals\("http", ignoreCase = true\)[\s\S]*uri\.scheme\.equals\("https", ignoreCase = true\)/, 'trusted server only allows HTTP or HTTPS')
   for (const gate of ['uri.host.isNullOrBlank()', 'uri.userInfo != null', 'uri.rawQuery != null', 'uri.rawFragment != null',
-    'uri.rawPath.orEmpty().isNotEmpty()']) assert.ok(publicUrl.includes(gate), `trusted server gate: ${gate}`)
-  assert.match(publicUrl, /return cleanBase \+ OFFICIAL_QUANT_PUBLIC_APK_PATH/, 'trusted server receives only the fixed route')
+    'uri.rawPath.orEmpty().isNotEmpty()']) assert.ok(memberUrl.includes(gate), `trusted server gate: ${gate}`)
+  assert.match(memberUrl, /return cleanBase \+ OFFICIAL_QUANT_MEMBER_APK_PATH/, 'trusted server receives only the fixed route')
   const client = functionSource(s.actions, 'projectApkDownloadClient')
-  assert.match(client, /if \(!target\.isPublic\) return authenticatedClient/, 'private downloads keep their authenticated client')
-  assert.match(client, /OkHttpClient\.Builder\(\)[\s\S]*followRedirects\(false\)[\s\S]*followSslRedirects\(false\)/, 'public client drops interceptors and redirects')
+  assert.match(client, /if \(!target\.isolatedClient\) return authenticatedClient/, 'private downloads keep their authenticated client')
+  assert.match(client, /OkHttpClient\.Builder\(\)[\s\S]*followRedirects\(false\)[\s\S]*followSslRedirects\(false\)/, 'official client drops interceptors and redirects')
   const download = functionSource(s.download, 'openProjectApkDownload')
   assert.match(download, /officialServerUrl:\s*String\s*=\s*BuildConfig\.SERVER_URL/, 'download entry accepts the active trusted server')
   assert.match(download, /val officialQuant = OfficialQuantApkPolicy\.appliesTo\(projectId\)/)
-  assert.match(download, /if \(officialQuant\) null else AuthManager\.token\(activity\)\?\.trim\(\)/, 'official branch must not read a login token')
-  assert.match(download, /if \(!officialQuant && token\.isNullOrBlank\(\)\)/, 'only private downloads require login')
+  assert.match(download, /val token = AuthManager\.token\(activity\)\?\.trim\(\)/, 'official branch reads the current login token')
+  assert.match(download, /if \(token\.isNullOrBlank\(\)\)/, 'every download requires login')
   assert.match(download, /openProjectApkInstall\([\s\S]*officialServerUrl,[\s\S]*\)/, 'active trusted server reaches installer')
   const install = functionSource(s.actions, 'openProjectApkInstall')
   assert.match(install, /resolveProjectApkDownloadTarget\(\s*apkUrl,\s*projectId,\s*token,\s*officialServerUrl,\s*\)/, 'download target policy receives the active trusted server')
   assert.match(install, /url = target\.url/, 'installer must use the policy result')
-  assert.match(install, /http = projectApkDownloadClient\(http, target\)/, 'installer must use the isolated public client')
+  assert.match(install, /http = projectApkDownloadClient\(http, target\)/, 'installer must use the isolated official client')
+  assert.match(install, /bearerToken = target\.bearerToken/, 'installer must receive official header credentials')
   assert.doesNotMatch(install, /url = projectApkUrlWithToken\(/, 'installer cannot append token outside the policy')
 
   const launch = functionSource(s.launcher, 'openOfficialQuantApp')
@@ -167,12 +168,12 @@ for (const [key, from, to] of [
   ['installer', 'createOfficialQuantApkFile(activity.cacheDir)', 'createOfficialQuantApkFile(activity.getExternalFilesDir(null))'],
   ['installer', 'check(apkFile.setReadOnly())', 'apkFile.setReadOnly()'],
   ['paths', 'path="official-quant-apk/"', 'path="."'],
-  ['actions', 'return ProjectApkDownloadTarget(expectedUrl, isPublic = true)', 'return ProjectApkDownloadTarget(cleanUrl, isPublic = true)'],
+  ['actions', 'val expectedUrl = officialQuantMemberApkUrl(officialServerUrl)', 'val expectedUrl = cleanUrl'],
   ['actions', 'uri.host.isNullOrBlank()', 'false'],
   ['actions', 'uri.scheme.equals("https", ignoreCase = true)', 'uri.scheme.equals("ftp", ignoreCase = true)'],
   ['actions', '.followRedirects(false)', '.followRedirects(true)'],
   ['actions', 'http = projectApkDownloadClient(http, target)', 'http = http'],
-  ['download', 'if (officialQuant) null else AuthManager.token(activity)?.trim()', 'AuthManager.token(activity)?.trim()'],
+  ['download', 'val token = AuthManager.token(activity)?.trim()', 'val token: String? = null'],
   ['controller', 'officialServerUrl = serverUrl', 'officialServerUrl = BuildConfig.SERVER_URL'],
   ['apkDelivery', 'project_id == OFFICIAL_QUANT_PROJECT_ID', 'false'],
   ['projectSpace', 'release.identity_url', 'release.download_url'],

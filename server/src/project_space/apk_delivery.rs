@@ -26,7 +26,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn official_quant_release_uses_fixed_public_route_and_actual_url_for_identity() {
+    fn official_quant_release_uses_fixed_member_route_and_actual_url_for_identity() {
         let actual_release_url =
             "https://main.example/api/projects/yilong-quant/download/latest.apk";
 

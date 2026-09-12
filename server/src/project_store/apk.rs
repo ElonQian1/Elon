@@ -8,7 +8,7 @@ use std::{collections::HashMap, path::Path as StdPath, sync::Arc};
 
 use crate::{
     project_attachment_paths::percent_encode_path_segment,
-    project_auth::{auth_from_headers_or_query, json_error, project_access},
+    project_auth::{auth_from_headers, auth_from_headers_or_query, json_error, project_access},
     store::PublicProjectItem,
     types::AppState,
 };
@@ -29,6 +29,10 @@ fn decorate_projects(state: &AppState, projects: &mut [PublicProjectItem], publi
     for project in projects {
         let official_quant =
             crate::project_releases::admission::is_official_quant_project(&project.id);
+        if official_quant && public_only && project.viewer_role.is_none() {
+            project.latest_apk_url = None;
+            continue;
+        }
         if !official_quant && project.latest_apk_url.is_some() {
             continue;
         }
@@ -75,10 +79,33 @@ pub(crate) async fn download_project_android(
     Path(project_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
+    let official_quant = crate::project_releases::admission::is_official_quant_project(&project_id);
+    if official_quant {
+        let user = match auth_from_headers(&state, &headers) {
+            Ok(user) => user,
+            Err(error) => return json_error(StatusCode::UNAUTHORIZED, error.to_string()),
+        };
+        if let Err(error) = project_access(&state, &user.id, &project_id) {
+            return json_error(StatusCode::FORBIDDEN, error.to_string());
+        }
+        return match state.store.project_android_download(&project_id) {
+            Ok(Some((target, _))) => serve_managed_release(&state, &project_id, &target)
+                .await
+                .unwrap_or_else(|| {
+                    json_error(StatusCode::SERVICE_UNAVAILABLE, "APK 发布文件暂时不可用")
+                }),
+            Ok(None) => official_quant_empty_download_response(&project_id)
+                .expect("official quant project should have a protected empty response"),
+            Err(error) => {
+                tracing::warn!(project_id = %project_id, error = %error, "读取成员项目 Android 下载失败");
+                json_error(StatusCode::INTERNAL_SERVER_ERROR, "APK 下载入口暂时不可用")
+            }
+        };
+    }
+
     match state.store.public_project_android_download(&project_id) {
         Ok(Some((target, _))) => {
-            if let Some(response) = serve_managed_public_release(&state, &project_id, &target).await
-            {
+            if let Some(response) = serve_managed_release(&state, &project_id, &target).await {
                 return response;
             }
             return redirect_without_credentials(&target);
@@ -121,7 +148,7 @@ fn official_quant_empty_download_response(project_id: &str) -> Option<Response> 
     })
 }
 
-async fn serve_managed_public_release(
+async fn serve_managed_release(
     state: &AppState,
     project_id: &str,
     target: &str,

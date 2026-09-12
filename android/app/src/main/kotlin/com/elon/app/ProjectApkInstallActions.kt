@@ -15,12 +15,13 @@ import java.util.Locale
 
 internal fun isAndroidApkInstallSupported(): Boolean = Build.VERSION.SDK_INT > 0
 
-private const val OFFICIAL_QUANT_PUBLIC_APK_PATH =
+private const val OFFICIAL_QUANT_MEMBER_APK_PATH =
     "/api/store/projects/yilong-quant/downloads/android"
 
 internal data class ProjectApkDownloadTarget(
     val url: String,
-    val isPublic: Boolean,
+    val isolatedClient: Boolean,
+    val bearerToken: String? = null,
 )
 
 internal fun cleanProjectApkUrl(apkUrl: String?): String? {
@@ -67,17 +68,22 @@ internal fun resolveProjectApkDownloadTarget(
 ): ProjectApkDownloadTarget? {
     val cleanUrl = cleanProjectApkUrl(apkUrl) ?: return null
     if (OfficialQuantApkPolicy.appliesTo(projectId)) {
-        val expectedUrl = officialQuantPublicApkUrl(officialServerUrl) ?: return null
-        return ProjectApkDownloadTarget(expectedUrl, isPublic = true)
+        val cleanToken = token?.trim()?.takeIf(String::isNotEmpty) ?: return null
+        val expectedUrl = officialQuantMemberApkUrl(officialServerUrl) ?: return null
+        return ProjectApkDownloadTarget(
+            expectedUrl,
+            isolatedClient = true,
+            bearerToken = cleanToken,
+        )
     }
     val cleanToken = token?.trim()?.takeIf(String::isNotEmpty) ?: return null
     return ProjectApkDownloadTarget(
         projectApkUrlWithToken(cleanUrl, cleanToken),
-        isPublic = false,
+        isolatedClient = false,
     )
 }
 
-private fun officialQuantPublicApkUrl(serverUrl: String): String? {
+private fun officialQuantMemberApkUrl(serverUrl: String): String? {
     val cleanBase = cleanProjectApkUrl(serverUrl)?.trimEnd('/') ?: return null
     val uri = runCatching { URI(cleanBase) }.getOrNull() ?: return null
     val allowedScheme = uri.scheme.equals("http", ignoreCase = true) ||
@@ -88,14 +94,14 @@ private fun officialQuantPublicApkUrl(serverUrl: String): String? {
     ) {
         return null
     }
-    return cleanBase + OFFICIAL_QUANT_PUBLIC_APK_PATH
+    return cleanBase + OFFICIAL_QUANT_MEMBER_APK_PATH
 }
 
 internal fun projectApkDownloadClient(
     authenticatedClient: OkHttpClient,
     target: ProjectApkDownloadTarget,
 ): OkHttpClient {
-    if (!target.isPublic) return authenticatedClient
+    if (!target.isolatedClient) return authenticatedClient
     return OkHttpClient.Builder()
         .followRedirects(false)
         .followSslRedirects(false)
@@ -129,8 +135,12 @@ internal fun openProjectApkInstall(
         officialServerUrl,
     )
     if (target == null) {
-        val message = if (!OfficialQuantApkPolicy.appliesTo(projectId) && token.isNullOrBlank()) {
-            "请先登录后安装 APK"
+        val message = if (token.isNullOrBlank()) {
+            if (OfficialQuantApkPolicy.appliesTo(projectId)) {
+                "成功加入项目并登录后才能下载或更新量化 APK"
+            } else {
+                "请先登录后安装 APK"
+            }
         } else {
             "APK 下载地址不符合安全要求"
         }
@@ -142,6 +152,7 @@ internal fun openProjectApkInstall(
         activity = activity,
         url = target.url,
         http = projectApkDownloadClient(http, target),
+        bearerToken = target.bearerToken,
         projectId = projectId,
         projectName = projectName,
         apkIdentity = apkIdentity,

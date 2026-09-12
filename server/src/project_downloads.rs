@@ -33,11 +33,24 @@ pub async fn download_project_apk(
 
 pub async fn download_user_project_apk(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     AxumPath((user_id, project_id, filename)): AxumPath<(String, String, String)>,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Response {
-    let user = match state.store.ensure_device_user(&user_id) {
-        Ok(user) => user,
-        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    let user = if crate::project_releases::admission::is_official_quant_project(&project_id) {
+        let authenticated = match auth_from_headers_or_query(&state, &headers, &query) {
+            Ok(user) => user,
+            Err(error) => return json_error(StatusCode::UNAUTHORIZED, error.to_string()),
+        };
+        if authenticated.id != user_id {
+            return json_error(StatusCode::FORBIDDEN, "下载身份与当前登录账号不一致");
+        }
+        authenticated
+    } else {
+        match state.store.ensure_device_user(&user_id) {
+            Ok(user) => user,
+            Err(error) => return json_error(StatusCode::BAD_REQUEST, error.to_string()),
+        }
     };
     let project = match project_access(&state, &user.id, &project_id) {
         Ok(project) => project,

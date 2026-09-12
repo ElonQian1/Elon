@@ -259,6 +259,16 @@
   line-height: 1.45;
 }
 
+.downloadError {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border: 1px solid rgba(223, 92, 92, .28);
+  border-radius: 7px;
+  background: rgba(223, 92, 92, .09);
+  color: #ffd6d6;
+  font-size: 11px;
+}
+
 @media (max-width: 720px) {
   .downloadGrid {
     grid-template-columns: 1fr;

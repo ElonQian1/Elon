@@ -334,6 +334,7 @@
   font-size: 13px;
 }
 .loading svg { animation: spin 900ms linear infinite; }
+.spin { animation: spin 900ms linear infinite; }
 .empty strong {
   color: var(--text-soft);
   font-size: 14px;

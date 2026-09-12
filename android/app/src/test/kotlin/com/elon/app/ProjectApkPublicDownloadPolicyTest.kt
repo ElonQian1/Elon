@@ -10,47 +10,48 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProjectApkPublicDownloadPolicyTest {
-    private val publicServer = "http://main.example:8080"
-    private val publicUrl =
-        "$publicServer/api/store/projects/yilong-quant/downloads/android"
+    private val memberServer = "http://main.example:8080"
+    private val memberUrl =
+        "$memberServer/api/store/projects/yilong-quant/downloads/android"
 
     private fun target(url: String?, projectId: String?, token: String?) =
-        resolveProjectApkDownloadTarget(url, projectId, token, publicServer)
+        resolveProjectApkDownloadTarget(url, projectId, token, memberServer)
 
-    @Test fun officialQuantUsesTheSamePublicUrlWithOrWithoutLoginToken() {
-        val anonymous = target(publicUrl, "yilong-quant", null)
-        val loggedIn = target(publicUrl, "yilong-quant", "secret bearer")
+    @Test fun officialQuantRequiresAMemberTokenAndKeepsItOutOfTheUrl() {
+        val anonymous = target(memberUrl, "yilong-quant", null)
+        val loggedIn = target(memberUrl, "yilong-quant", "secret bearer")
 
-        assertEquals(publicUrl, anonymous?.url)
-        assertEquals(anonymous, loggedIn)
-        assertTrue(anonymous?.isPublic == true)
-        assertFalse(anonymous?.url.orEmpty().contains("token="))
+        assertNull(anonymous)
+        assertEquals(memberUrl, loggedIn?.url)
+        assertEquals("secret bearer", loggedIn?.bearerToken)
+        assertTrue(loggedIn?.isolatedClient == true)
+        assertFalse(loggedIn?.url.orEmpty().contains("token="))
     }
 
-    @Test fun officialQuantIgnoresCatalogPathsAndBuildsTheTrustedPublicRoute() {
+    @Test fun officialQuantIgnoresCatalogPathsAndBuildsTheTrustedMemberRoute() {
         listOf(
             "http://user:pass@main.example:8080/api/store/projects/yilong-quant/downloads/android",
-            "$publicUrl?token=secret",
-            "$publicUrl?download=1",
-            "$publicUrl#fragment",
+            "$memberUrl?token=secret",
+            "$memberUrl?download=1",
+            "$memberUrl#fragment",
             "http://main.example:8080/api/projects/yilong-quant/downloads/android",
             "http://main.example:8080/api/store/projects/yilong-quant/downloads/android/",
             "https://other.example/download/latest.apk",
         ).forEach { url ->
-            assertEquals(url, publicUrl, target(url, "yilong-quant", "secret")?.url)
+            assertEquals(url, memberUrl, target(url, "yilong-quant", "secret")?.url)
         }
         assertNull(target("ftp://main.example/download/latest.apk", "yilong-quant", null))
     }
 
     @Test fun officialQuantRequiresATrustedAbsoluteHttpOrHttpsServer() {
-        val secureUrl = publicUrl.replace("http://", "https://")
+        val secureUrl = memberUrl.replace("http://", "https://")
         assertEquals(
             secureUrl,
             resolveProjectApkDownloadTarget(
                 secureUrl,
                 "yilong-quant",
-                null,
-                publicServer.replace("http://", "https://"),
+                "member-token",
+                memberServer.replace("http://", "https://"),
             )?.url,
         )
 
@@ -58,22 +59,22 @@ class ProjectApkPublicDownloadPolicyTest {
             "/api/store/projects/yilong-quant/downloads/android",
             "file:///api/store/projects/yilong-quant/downloads/android",
         ).forEach { url ->
-            assertNull(url, target(url, "yilong-quant", null))
+            assertNull(url, target(url, "yilong-quant", "member-token"))
         }
         assertEquals(
-            publicUrl,
+            memberUrl,
             target(
                 "http:///api/store/projects/yilong-quant/downloads/android",
                 "yilong-quant",
-                null,
+                "member-token",
             )?.url,
         )
         assertEquals(
-            publicUrl,
+            memberUrl,
             target(
                 "http://127.0.0.1:8080/api/projects/yilong-quant/download/latest.apk",
                 "yilong-quant",
-                null,
+                "member-token",
             )?.url,
         )
         listOf(
@@ -82,15 +83,16 @@ class ProjectApkPublicDownloadPolicyTest {
             "http://main.example:8080/base",
             "http://main.example:8080?token=secret",
         ).forEach { server ->
-            assertNull(resolveProjectApkDownloadTarget(publicUrl, "yilong-quant", null, server))
+            assertNull(resolveProjectApkDownloadTarget(memberUrl, "yilong-quant", "member-token", server))
         }
     }
 
-    @Test fun onlyTheStableProjectIdGetsThePublicBranch() {
+    @Test fun onlyTheStableProjectIdGetsTheProtectedBranch() {
         listOf(null, "", "YILONG-QUANT", "yilong-quant-copy", "一龙量化交易").forEach { id ->
-            assertNull(target(publicUrl, id, null))
-            val authenticated = target(publicUrl, id, "member token")
-            assertTrue(authenticated?.isPublic == false)
+            assertNull(target(memberUrl, id, null))
+            val authenticated = target(memberUrl, id, "member token")
+            assertTrue(authenticated?.isolatedClient == false)
+            assertNull(authenticated?.bearerToken)
             assertTrue(authenticated?.url.orEmpty().endsWith("?token=member+token"))
         }
     }
@@ -102,10 +104,11 @@ class ProjectApkPublicDownloadPolicyTest {
 
         val downloadTarget = target(privateUrl, "private-project", "member token")
         assertEquals("https://downloads.example/project.apk?token=member+token", downloadTarget?.url)
-        assertFalse(downloadTarget?.isPublic ?: true)
+        assertFalse(downloadTarget?.isolatedClient ?: true)
+        assertNull(downloadTarget?.bearerToken)
     }
 
-    @Test fun publicDownloadsUseAnIsolatedClientWithoutRedirectsOrInterceptors() {
+    @Test fun protectedOfficialDownloadsUseAnIsolatedClientWithoutRedirectsOrInterceptors() {
         val authenticatedClient = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 chain.proceed(
@@ -115,16 +118,16 @@ class ProjectApkPublicDownloadPolicyTest {
                 )
             }
             .build()
-        val publicTarget = requireNotNull(
-            target(publicUrl, "yilong-quant", "member-secret"),
+        val memberTarget = requireNotNull(
+            target(memberUrl, "yilong-quant", "member-secret"),
         )
-        val publicClient = projectApkDownloadClient(authenticatedClient, publicTarget)
+        val memberClient = projectApkDownloadClient(authenticatedClient, memberTarget)
 
-        assertNotSame(authenticatedClient, publicClient)
-        assertTrue(publicClient.interceptors.isEmpty())
-        assertTrue(publicClient.networkInterceptors.isEmpty())
-        assertFalse(publicClient.followRedirects)
-        assertFalse(publicClient.followSslRedirects)
+        assertNotSame(authenticatedClient, memberClient)
+        assertTrue(memberClient.interceptors.isEmpty())
+        assertTrue(memberClient.networkInterceptors.isEmpty())
+        assertFalse(memberClient.followRedirects)
+        assertFalse(memberClient.followSslRedirects)
 
         val privateTarget = requireNotNull(
             target(
@@ -134,5 +137,13 @@ class ProjectApkPublicDownloadPolicyTest {
             ),
         )
         assertSame(authenticatedClient, projectApkDownloadClient(authenticatedClient, privateTarget))
+    }
+
+    @Test fun officialMemberTokenUsesTheAuthorizationHeaderOnly() {
+        val request = projectApkDownloadRequest(memberUrl, "member-secret")
+
+        assertEquals("Bearer member-secret", request.header("Authorization"))
+        assertFalse(request.url.toString().contains("member-secret"))
+        assertNull(projectApkDownloadRequest(memberUrl, null).header("Authorization"))
     }
 }

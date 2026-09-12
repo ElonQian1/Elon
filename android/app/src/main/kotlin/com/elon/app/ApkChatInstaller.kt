@@ -14,6 +14,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 
+internal fun projectApkDownloadRequest(url: String, bearerToken: String?): Request {
+    val request = Request.Builder().url(url)
+    if (!bearerToken.isNullOrBlank()) {
+        request.header("Authorization", "Bearer $bearerToken")
+    }
+    return request.build()
+}
+
 /**
  * 下载并安装 AI 项目生成的 APK。
  * 复用 AppUpdateManager 的下载+安装逻辑，但只需要一个 URL。
@@ -24,6 +32,7 @@ internal object ApkChatInstaller {
         activity: AppCompatActivity,
         url: String,
         http: OkHttpClient,
+        bearerToken: String? = null,
         projectId: String? = null,
         projectName: String? = null,
         apkIdentity: String? = null,
@@ -53,9 +62,15 @@ internal object ApkChatInstaller {
         Thread {
             try {
                 activity.runOnUiThread { progressText.text = "正在下载安装包..." }
-                val request = Request.Builder().url(url).build()
+                val request = projectApkDownloadRequest(url, bearerToken)
                 http.newCall(request).execute().use { resp ->
-                    if (!resp.isSuccessful) error("HTTP ${resp.code}")
+                    if (!resp.isSuccessful) {
+                        when (resp.code) {
+                            401 -> error("成功加入项目并登录后才能下载或更新量化 APK")
+                            403 -> error("当前账号尚未成功加入量化项目，暂不能下载或更新")
+                            else -> error("APK 下载失败（HTTP ${resp.code}）")
+                        }
+                    }
                     val body = resp.body ?: error("空响应体")
                     val totalBytes = body.contentLength()
                     val officialQuant = OfficialQuantApkPolicy.appliesTo(projectId)

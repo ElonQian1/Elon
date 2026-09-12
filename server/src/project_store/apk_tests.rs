@@ -8,43 +8,59 @@ use axum::{
 use tokio::sync::RwLock;
 
 use super::download_project_android;
+use crate::project_auth::{login_inner, LoginRequest};
 use crate::types::{AgentsConfig, AiBackend, AiCliConfig, AppState};
 
 #[tokio::test]
-async fn official_quant_without_admitted_release_is_public_not_found() {
+async fn official_quant_download_requires_a_current_project_member() {
     let state = empty_download_state();
-    let mut bearer_headers = HeaderMap::new();
-    bearer_headers.insert(header::AUTHORIZATION, "Bearer not-a-token".parse().unwrap());
+    let anonymous = download_project_android(
+        State(Arc::clone(&state)),
+        HeaderMap::new(),
+        Path("yilong-quant".to_string()),
+        Query(HashMap::new()),
+    )
+    .await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
 
-    for (headers, query) in [
-        (HeaderMap::new(), HashMap::new()),
-        (
-            HeaderMap::new(),
-            HashMap::from([("token".to_string(), "not-a-token".to_string())]),
-        ),
-        (bearer_headers, HashMap::new()),
-    ] {
-        let response = download_project_android(
-            State(Arc::clone(&state)),
-            headers,
-            Path("yilong-quant".to_string()),
-            Query(query),
-        )
-        .await;
+    let member_token = login_token(&state, "quant-member@example.com", "member-password");
+    let query_token = download_project_android(
+        State(Arc::clone(&state)),
+        HeaderMap::new(),
+        Path("yilong-quant".to_string()),
+        Query(HashMap::from([("token".to_string(), member_token.clone())])),
+    )
+    .await;
+    assert_eq!(query_token.status(), StatusCode::UNAUTHORIZED);
 
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        assert_eq!(
-            response.headers().get(header::CACHE_CONTROL).unwrap(),
-            "no-store"
-        );
-        let body = to_bytes(response.into_body(), 4096).await.unwrap();
-        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(
-            value,
-            serde_json::json!({ "error": "这个项目暂无可安装新版 APK" })
-        );
-        assert!(!String::from_utf8_lossy(&body).contains("token"));
-    }
+    let outsider_token = login_token(&state, "quant-outsider@example.com", "outsider-password");
+    let outsider = download_project_android(
+        State(Arc::clone(&state)),
+        bearer_headers(&outsider_token),
+        Path("yilong-quant".to_string()),
+        Query(HashMap::new()),
+    )
+    .await;
+    assert_eq!(outsider.status(), StatusCode::FORBIDDEN);
+
+    let member = download_project_android(
+        State(Arc::clone(&state)),
+        bearer_headers(&member_token),
+        Path("yilong-quant".to_string()),
+        Query(HashMap::new()),
+    )
+    .await;
+    assert_eq!(member.status(), StatusCode::NOT_FOUND);
+    assert_eq!(
+        member.headers().get(header::CACHE_CONTROL).unwrap(),
+        "no-store"
+    );
+    let body = to_bytes(member.into_body(), 4096).await.unwrap();
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+        serde_json::json!({ "error": "这个项目暂无可安装新版 APK" })
+    );
+    assert!(!String::from_utf8_lossy(&body).contains("token"));
 }
 
 #[tokio::test]
@@ -73,13 +89,16 @@ fn empty_download_state() -> Arc<AppState> {
     std::fs::create_dir_all(&root).expect("test directory should be created");
     let store = crate::store::Store::open(&root.join("store.db")).expect("store should open");
     let owner = store
+        .create_user("quant-member@example.com", "member-password", None, None)
+        .expect("owner should be created");
+    store
         .create_user(
-            "quant-public-empty-owner@example.com",
-            "synthetic-password",
+            "quant-outsider@example.com",
+            "outsider-password",
             None,
             None,
         )
-        .expect("owner should be created");
+        .expect("outsider should be created");
     let conn = store.conn().expect("connection should open");
     for (id, name, join_mode, is_public) in [
         ("yilong-quant", "一龙量化交易", "readonly", 1),
@@ -96,6 +115,12 @@ fn empty_download_state() -> Arc<AppState> {
         )
         .expect("project should be inserted");
     }
+    conn.execute(
+        "INSERT INTO project_members (project_id, user_id, role, created_at)
+         VALUES ('yilong-quant', ?1, 'member', '2026-09-05T00:00:00Z')",
+        rusqlite::params![owner.id],
+    )
+    .expect("quant member should be inserted");
     drop(conn);
 
     Arc::new(AppState {
@@ -135,4 +160,28 @@ fn empty_download_state() -> Arc<AppState> {
         server_traces: Arc::new(crate::server_trace::ServerTraceStore::new()),
         owner_token: None,
     })
+}
+
+fn login_token(state: &AppState, account: &str, password: &str) -> String {
+    login_inner(
+        state,
+        LoginRequest {
+            account: account.to_string(),
+            password: password.to_string(),
+            device_name: Some("member-download-test".to_string()),
+            apk_version: None,
+            remember_device: false,
+        },
+    )
+    .expect("test login should succeed")
+    .0
+}
+
+fn bearer_headers(token: &str) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::AUTHORIZATION,
+        format!("Bearer {token}").parse().unwrap(),
+    );
+    headers
 }

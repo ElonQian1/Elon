@@ -502,6 +502,11 @@ fn latest_project_apk_delivery(
     state: &AppState,
     project: &crate::store::ProjectAccess,
 ) -> Option<LatestProjectApkDelivery> {
+    if crate::project_releases::admission::is_official_quant_project(&project.id)
+        && project.role == "visitor"
+    {
+        return None;
+    }
     if !crate::project_releases::admission::is_official_quant_project(&project.id) {
         match state.store.latest_project_apk_delivery(&project.id) {
             Ok(Some((task_id, apk_url, updated_at))) => {

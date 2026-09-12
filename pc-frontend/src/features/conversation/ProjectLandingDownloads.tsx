@@ -1,5 +1,12 @@
+import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Apple, Download, FileText, Globe2, Laptop, Monitor, Smartphone, Terminal } from 'lucide-react'
+import { getAuthToken } from '../../api/client'
+import { resolveApiUrl } from '../../api/runtime'
+import {
+  downloadMemberProtectedProjectApk,
+  isMemberProtectedProjectApk,
+} from '../project-download/projectApkMemberDownload.js'
 import type { ProjectLandingDownload } from './types'
 import styles from './ProjectLandingDownloads.module.css'
 
@@ -15,8 +22,41 @@ const PLATFORM_META: Record<string, { label: string; short: string; icon: Lucide
   linux: { label: 'Linux', short: 'Linux', icon: Terminal },
 }
 
-export default function ProjectLandingDownloads({ downloads }: { downloads: ProjectLandingDownload[] }) {
-  const availableCount = downloads.filter(isLandingDownloadEnabled).length
+export default function ProjectLandingDownloads({
+  downloads,
+  projectId,
+  projectRole,
+}: {
+  downloads: ProjectLandingDownload[]
+  projectId?: string
+  projectRole?: string
+}) {
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState('')
+  const lockedForVisitor = isMemberProtectedProjectApk(projectId) && projectRole === 'visitor'
+  const availableCount = downloads.filter((download) =>
+    isLandingDownloadEnabled(download) && !(lockedForVisitor && isAndroidDownload(download)),
+  ).length
+
+  const openDownload = async (url: string, protectedApk: boolean) => {
+    if (!protectedApk) {
+      openUrl(url)
+      return
+    }
+    setDownloading(true)
+    setDownloadError('')
+    try {
+      await downloadMemberProtectedProjectApk({
+        projectId: projectId || '',
+        url: resolveApiUrl('/api/store/projects/yilong-quant/downloads/android'),
+        token: getAuthToken(),
+      })
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : 'APK 下载失败，请重试')
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   return (
     <section id="project-landing-downloads" className={styles.downloadSection}>
@@ -40,15 +80,35 @@ export default function ProjectLandingDownloads({ downloads }: { downloads: Proj
           {[...downloads]
             .sort((left, right) => Number(isLandingDownloadEnabled(right)) - Number(isLandingDownloadEnabled(left)))
             .map((download, index) => (
-              <DownloadCard key={`${download.platform ?? 'download'}-${index}`} download={download} />
+              <DownloadCard
+                key={`${download.platform ?? 'download'}-${index}`}
+                download={download}
+                memberProtected={isMemberProtectedProjectApk(projectId) && isAndroidDownload(download)}
+                locked={lockedForVisitor && isAndroidDownload(download)}
+                downloading={downloading}
+                onOpen={openDownload}
+              />
             ))}
         </div>
       )}
+      {downloadError && <p className={styles.downloadError} role="alert">{downloadError}</p>}
     </section>
   )
 }
 
-function DownloadCard({ download }: { download: ProjectLandingDownload }) {
+function DownloadCard({
+  download,
+  memberProtected,
+  locked,
+  downloading,
+  onOpen,
+}: {
+  download: ProjectLandingDownload
+  memberProtected: boolean
+  locked: boolean
+  downloading: boolean
+  onOpen: (url: string, protectedApk: boolean) => void
+}) {
   const platform = normalizePlatform(download.platform)
   const meta = PLATFORM_META[platform] ?? {
     label: download.platform || '通用下载',
@@ -58,7 +118,7 @@ function DownloadCard({ download }: { download: ProjectLandingDownload }) {
   const Icon = meta.icon
   const status = normalizeStatus(download.status, download.url)
   const variants = download.variants ?? []
-  const enabled = isLandingDownloadEnabled(download)
+  const enabled = isLandingDownloadEnabled(download) && !locked && !(downloading && memberProtected)
 
   if (variants.length > 0) {
     return (
@@ -75,7 +135,7 @@ function DownloadCard({ download }: { download: ProjectLandingDownload }) {
         <div className={styles.variantList}>
           {variants.map((variant, index) => {
             const variantStatus = normalizeStatus(variant.status, variant.url)
-            const variantEnabled = isVariantEnabled(variant)
+            const variantEnabled = isVariantEnabled(variant) && !locked && !(downloading && memberProtected)
             return (
               <div className={styles.variantRow} key={`${variant.label ?? variant.arch ?? 'variant'}-${index}`}>
                 <span className={styles.variantCopy}>
@@ -87,9 +147,9 @@ function DownloadCard({ download }: { download: ProjectLandingDownload }) {
                   className={styles.variantAction}
                   type="button"
                   disabled={!variantEnabled}
-                  onClick={() => variant.url && openUrl(variant.url)}
+                  onClick={() => variant.url && onOpen(variant.url, memberProtected)}
                 >
-                  {variantEnabled ? '下载' : statusLabel(variantStatus, false)}
+                  {locked ? '加入后下载' : downloading && memberProtected ? '下载中' : variantEnabled ? '下载' : statusLabel(variantStatus, false)}
                 </button>
               </div>
             )
@@ -108,7 +168,7 @@ function DownloadCard({ download }: { download: ProjectLandingDownload }) {
       ].join(' ')}
       type="button"
       disabled={!enabled}
-      onClick={() => download.url && openUrl(download.url)}
+      onClick={() => download.url && onOpen(download.url, memberProtected)}
     >
       <span className={styles.platformBadge}><Icon size={19} aria-hidden="true" /></span>
       <span className={styles.downloadCopy}>
@@ -116,7 +176,7 @@ function DownloadCard({ download }: { download: ProjectLandingDownload }) {
         <small>{[download.version, downloadSizeLabel(download)].filter(Boolean).join(' · ') || download.short || meta.short}</small>
         {download.note && <em>{download.note}</em>}
       </span>
-      <span className={styles.downloadStatus}>{statusLabel(status, enabled)}</span>
+      <span className={styles.downloadStatus}>{locked ? '加入后下载' : downloading && memberProtected ? '下载中' : statusLabel(status, enabled)}</span>
     </button>
   )
 }
@@ -149,6 +209,10 @@ function normalizePlatform(platform?: string) {
   if (raw === 'mac' || raw === 'osx' || raw === 'darwin') return 'macos'
   if (raw === 'browser' || raw === 'h5' || raw === 'website') return 'web'
   return raw
+}
+
+function isAndroidDownload(download: ProjectLandingDownload) {
+  return normalizePlatform(download.platform) === 'android'
 }
 
 function normalizeStatus(status: string | undefined, url: string | undefined) {

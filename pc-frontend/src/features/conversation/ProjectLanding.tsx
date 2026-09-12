@@ -17,7 +17,6 @@ import type { Channel, Project, ProjectLanding as ProjectLandingData, ProjectLan
 import ProjectLandingDownloads, {
   firstLandingDownload,
   isLandingDownloadEnabled,
-  landingDownloadUrl,
 } from './ProjectLandingDownloads'
 import QuantPaperLaunch from './QuantPaperLaunch'
 import styles from './ProjectLanding.module.css'
@@ -172,7 +171,7 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
         </section>
       </div>
 
-      <ProjectLandingDownloads downloads={downloads} />
+      <ProjectLandingDownloads downloads={downloads} projectId={project.id} projectRole={project.role} />
     </div>
   )
 }
@@ -269,7 +268,7 @@ function buildPrimaryAction({
 }): PrimaryAction {
   if (devChannel) return { icon: Rocket, title: '继续开发', detail: devChannel.description || '进入 AI 开发频道', label: devChannel.name, onClick: () => onSelectChannel(devChannel.id) }
   if (buildChannel) return { icon: PackageCheck, title: '查看交付', detail: buildChannel.description || '进入构建与安装包频道', label: buildChannel.name, onClick: () => onSelectChannel(buildChannel.id) }
-  if (firstDownload) return { icon: Download, title: '安装使用', detail: firstDownload.label || '下载可用客户端', label: '下载', onClick: () => openUrl(landingDownloadUrl(firstDownload)) }
+  if (firstDownload) return { icon: Download, title: '安装使用', detail: firstDownload.label || '下载可用客户端', label: '下载', onClick: () => document.getElementById('project-landing-downloads')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
   if (resources[0]) return { icon: ExternalLink, title: '打开项目', detail: '查看项目主页或外部入口', label: '打开', onClick: () => openUrl(resources[0].url) }
   return { icon: Wrench, title: '等待配置', detail: '项目入口会在频道或交付配置后出现', label: '未就绪', disabled: true, onClick: () => undefined }
 }

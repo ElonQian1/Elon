@@ -242,9 +242,14 @@ internal fun openProjectApkDownload(
         return
     }
     val officialQuant = OfficialQuantApkPolicy.appliesTo(projectId)
-    val token = if (officialQuant) null else AuthManager.token(activity)?.trim()
-    if (!officialQuant && token.isNullOrBlank()) {
-        Toast.makeText(activity, "请先登录后安装 APK", Toast.LENGTH_SHORT).show()
+    val token = AuthManager.token(activity)?.trim()
+    if (token.isNullOrBlank()) {
+        val message = if (officialQuant) {
+            "成功加入项目并登录后才能下载或更新量化 APK"
+        } else {
+            "请先登录后安装 APK"
+        }
+        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
         return
     }
     openProjectApkInstall(

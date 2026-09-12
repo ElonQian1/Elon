@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, Info, LayoutGrid, Loader2, LogIn, Search, Store, UsersRound } from 'lucide-react'
-import { api } from '../../api/client'
+import { api, getAuthToken } from '../../api/client'
+import { resolveApiUrl } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
+import {
+  downloadMemberProtectedProjectApk,
+  isMemberProtectedProjectApk,
+} from '../project-download/projectApkMemberDownload.js'
 import MarketplaceErpInstallDialog from './MarketplaceErpInstallDialog'
 import OfficialProjectPreviewDialog from './OfficialProjectPreviewDialog'
 import styles from './PlazaPage.module.css'
@@ -300,6 +305,25 @@ function ProjectCard({
   const requested = joinStatus === 'requested'
   const isOpen = project.join_mode === 'open'
   const isReadonly = project.join_mode === 'readonly'
+  const [apkDownloading, setApkDownloading] = useState(false)
+  const [apkDownloadError, setApkDownloadError] = useState('')
+  const protectedApk = isMemberProtectedProjectApk(project.id)
+
+  const downloadProtectedApk = async () => {
+    setApkDownloading(true)
+    setApkDownloadError('')
+    try {
+      await downloadMemberProtectedProjectApk({
+        projectId: project.id,
+        url: resolveApiUrl('/api/store/projects/yilong-quant/downloads/android'),
+        token: getAuthToken(),
+      })
+    } catch (downloadError) {
+      setApkDownloadError(downloadError instanceof Error ? downloadError.message : 'APK 下载失败，请重试')
+    } finally {
+      setApkDownloading(false)
+    }
+  }
 
   return (
     <article className={styles.card} data-testid="project-row" data-project-id={project.id}>
@@ -335,7 +359,18 @@ function ProjectCard({
             <span>{project.install_action.label}</span>
           </button>
         )}
-        {project.latest_apk_url && (
+        {project.latest_apk_url && protectedApk && (
+          <button
+            className={styles.apkBtn}
+            type="button"
+            disabled={apkDownloading}
+            onClick={downloadProtectedApk}
+          >
+            {apkDownloading ? <Loader2 size={14} className={styles.spin} aria-hidden="true" /> : <Download size={14} aria-hidden="true" />}
+            <span>{apkDownloading ? '下载中' : '下载'}</span>
+          </button>
+        )}
+        {project.latest_apk_url && !protectedApk && (
           <a
             href={project.latest_apk_url}
             className={styles.apkBtn}
@@ -346,6 +381,7 @@ function ProjectCard({
             <span>下载</span>
           </a>
         )}
+        {apkDownloadError && <span className={styles.requestedLabel} role="alert">{apkDownloadError}</span>}
         {alreadyJoined ? (
           <button className={styles.openBtn} type="button" onClick={() => onOpen(project)}>
             <LogIn size={14} aria-hidden="true" />

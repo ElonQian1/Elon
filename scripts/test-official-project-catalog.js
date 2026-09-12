@@ -61,7 +61,7 @@ assert.equal(quantProject.landing.downloads.windows.status, 'partial')
 assert.equal(quantProject.landing.windows_webview.schema, 'yilong.windows_webview_launch.v1')
 assert.equal(quantProject.landing.windows_webview.provider_id, 'binance')
 assert.equal(Object.hasOwn(quantProject.landing.windows_webview, 'url'), false)
-assert.equal(quantProject.landing.downloads.android.status, 'planned')
+assert.equal(quantProject.landing.downloads.android.status, 'available')
 assert.match(previewDialogSource, /WindowsExchangeWebviewLaunch/)
 for (const retiredField of ['url', 'version', 'version_code', 'source_git_sha', 'sha256', 'size_label']) {
   assert.equal(
@@ -70,9 +70,8 @@ for (const retiredField of ['url', 'version', 'version_code', 'source_git_sha', 
     `retired Android catalog entry must not keep ${retiredField}`,
   )
 }
-assert.match(quantProject.landing.downloads.android.note, /旧 0\.2\.0 \(2\) 已退出安装入口/)
-assert.match(quantProject.landing.downloads.android.note, /0\.5\.0 \(5\)/)
-assert.match(quantProject.landing.recent_updates[0], /退出安装和下载路径/)
+assert.match(quantProject.landing.downloads.android.note, /仅成功加入一龙量化项目并登录的成员/)
+assert.match(quantProject.landing.recent_updates[0], /匿名用户和未加入项目的账号不能取得 APK/)
 assert.ok(quantProject.landing.recent_updates.some((item) => /只读资产卡片/.test(item)))
 assert.match(quantProject.landing.summary, /可复现 BTC 基准研究组合/)
 assert.match(quantProject.landing.summary, /不是可申购基金/)
