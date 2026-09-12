@@ -19,6 +19,7 @@ internal data class ChatGptWebCanvasDocuments(
     val requestId: String, val path: String, val ticket: String, val scope: String,
     val documents: List<ChatGptWebCanvasDocument>, val unconfirmedWrite: Boolean,
     val history: ChatGptWebCanvasHistory? = null, val share: ChatGptWebCanvasShare? = null,
+    val exportFile: ChatGptWebCanvasExport? = null,
 ) {
     override fun toString() = "CanvasDocuments(count=${documents.size},unconfirmed=$unconfirmedWrite)"
     fun diagnostic() = JSONObject().put("request_id", requestId).put("document_count", documents.size)
@@ -76,7 +77,7 @@ internal object ChatGptWebCanvasDocumentProtocol {
         require(value.toString().length <= 2 * 1024 * 1024)
         val required = setOf("type", "version", "requestId", "path", "ticket", "scope", "documents", "unconfirmedWrite")
         val keys = value.keys().asSequence().toSet()
-        require(keys.containsAll(required) && keys.all { it in required || it == "history" || it == "share" })
+        require(keys.containsAll(required) && keys.all { it in required || it in setOf("history", "share", "exportFile") })
         require(value.opt("type") == "canvas_documents" && value.opt("version") == 1 && value.opt("unconfirmedWrite") is Boolean)
         val req = value.getString("requestId"); val owner = value.getString("path")
         val selected = value.getString("ticket"); val scope = value.getString("scope")
@@ -87,7 +88,9 @@ internal object ChatGptWebCanvasDocumentProtocol {
         require(documents.distinctBy { it.id }.size == documents.size)
         val history = if (value.has("history")) ChatGptWebCanvasManagementProtocol.history(value.getJSONObject("history"), documents) else null
         val share = if (value.has("share")) ChatGptWebCanvasManagementProtocol.share(value.getJSONObject("share"), documents) else null
-        ChatGptWebCanvasDocuments(req, owner, selected, scope, documents, value.getBoolean("unconfirmedWrite"), history, share)
+        val export = if (value.has("exportFile")) ChatGptWebCanvasExportProtocol.parse(value.getJSONObject("exportFile"), documents) else null
+        require(export == null || !value.getBoolean("unconfirmedWrite"))
+        ChatGptWebCanvasDocuments(req, owner, selected, scope, documents, value.getBoolean("unconfirmedWrite"), history, share, export)
     }.getOrNull()
 
     fun parseDocument(row: JSONObject): ChatGptWebCanvasDocument {
@@ -110,6 +113,7 @@ internal object ChatGptWebCanvasDocumentProtocol {
             "save" -> setOf("operation", "path", "ticket", "scope", "id", "content", "comments")
             "rename" -> setOf("operation", "path", "ticket", "scope", "id", "title")
             "dismiss_comment" -> setOf("operation", "path", "ticket", "scope", "id", "commentId")
+            "prepare_export" -> setOf("operation", "path", "ticket", "scope", "id", "format")
             "history" -> setOf("operation", "path", "ticket", "scope", "id", "beforeVersion")
             "restore" -> setOf("operation", "path", "ticket", "scope", "id", "historyTicket", "restoreVersion")
             "verify", "share_lookup", "share_create", "share_ack" -> setOf("operation", "path", "ticket", "scope", "id")
@@ -123,6 +127,7 @@ internal object ChatGptWebCanvasDocumentProtocol {
             if (operation == "save") parseComments(value.getJSONArray("comments"), text(value.opt("content")))
             if (operation == "rename") require(validTitle(value.opt("title") as? String ?: ""))
             if (operation == "dismiss_comment") require(id.matches(value.opt("commentId") as? String ?: ""))
+            if (operation == "prepare_export") require(value.opt("format") in setOf("pdf", "docx"))
             if (operation == "history") integer(value.opt("beforeVersion"), 1..9_007_199_254_740_991L)
             if (operation == "restore") {
                 require(token.matches(value.opt("historyTicket") as? String ?: ""))

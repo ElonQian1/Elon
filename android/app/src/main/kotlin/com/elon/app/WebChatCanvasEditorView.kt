@@ -26,6 +26,7 @@ internal class WebChatCanvasEditorView(
     history: () -> Unit,
     share: () -> Unit,
     rename: () -> Unit,
+    export: () -> Unit,
     private val dismissComment: (String) -> Unit,
     closed: () -> Unit,
 ) {
@@ -39,6 +40,7 @@ internal class WebChatCanvasEditorView(
     private val historyButton = actionIcon(R.drawable.ic_popup_history, "历史版本", "web-chat-canvas-editor-history", history)
     private val shareButton = actionIcon(R.drawable.ic_project_post_share, "分享画布", "web-chat-canvas-editor-share", share)
     private val renameButton = actionIcon(R.drawable.ic_project_action_rename, "重命名画布", "web-chat-canvas-editor-rename", rename)
+    private val exportButton = actionIcon(android.R.drawable.stat_sys_download_done, "导出画布", "web-chat-canvas-editor-export", export)
     private var replacing = false
     private var start = 0
     private var removed = 0
@@ -79,6 +81,7 @@ internal class WebChatCanvasEditorView(
             addView(renameButton, LinearLayout.LayoutParams(size, size))
             addView(historyButton, LinearLayout.LayoutParams(size, size))
             addView(shareButton, LinearLayout.LayoutParams(size, size))
+            addView(exportButton, LinearLayout.LayoutParams(size, size))
         })
         addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
     }
@@ -123,6 +126,8 @@ internal class WebChatCanvasEditorView(
         historyButton.isEnabled = !busy
         shareButton.isEnabled = !busy
         renameButton.isEnabled = !busy && writable
+        exportButton.visibility = if (draft.base.documentType == "document") android.view.View.VISIBLE else android.view.View.GONE
+        exportButton.isEnabled = !busy && writable
         body.isEnabled = !busy
         // A detached account/document draft remains selectable, but cannot be modified or saved.
         body.isFocusableInTouchMode = writable && !busy

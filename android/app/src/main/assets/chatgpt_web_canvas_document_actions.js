@@ -16,6 +16,7 @@
     const keys = op === 'list' ? ['operation', 'path', 'force'] :
       op === 'save' ? [...base, 'content', 'comments'] : op === 'rename' ? [...base, 'title'] :
       op === 'dismiss_comment' ? [...base, 'commentId'] : op === 'history' ? [...base, 'beforeVersion'] :
+      op === 'prepare_export' ? [...base, 'format'] :
       op === 'restore' ? [...base, 'historyTicket', 'restoreVersion'] :
       ['verify', 'share_lookup', 'share_create', 'share_ack'].includes(op) ? base : [];
     if (!keys.length || !input || typeof input !== 'object' || Array.isArray(input) ||
@@ -28,6 +29,7 @@
     if (op === 'rename' && (typeof input.title !== 'string' || !input.title || input.title !== input.title.trim() ||
         input.title.length > 512 || /[\u0000-\u001f\u007f]/.test(input.title))) throw Error();
     if (op === 'dismiss_comment' && (typeof input.commentId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(input.commentId))) throw Error();
+    if (op === 'prepare_export' && !['pdf', 'docx'].includes(input.format)) throw Error();
     if (op === 'history' && (!Number.isSafeInteger(input.beforeVersion) || input.beforeVersion < 1) ||
         op === 'restore' && (!TOKEN.test(input.historyTicket || '') || !Number.isSafeInteger(input.restoreVersion) || input.restoreVersion < 1)) throw Error();
     return input;
@@ -48,7 +50,8 @@
         if (result.ok) emit({ type: 'canvas_documents', version: 1, requestId: command.requestId,
           path: result.path, ticket: result.ticket, scope: result.scope,
           documents: result.documents, unconfirmedWrite: result.unconfirmedWrite,
-          ...(result.history ? { history: result.history } : {}), ...(result.share ? { share: result.share } : {}) });
+          ...(result.history ? { history: result.history } : {}), ...(result.share ? { share: result.share } : {}),
+          ...(result.exportFile ? { exportFile: result.exportFile } : {}) });
         respond(action, result.ok, /^canvas_(?:[a-z_]{1,64}|http_\d{3})$/.test(result.code) ? result.code : 'canvas_unavailable');
       }).catch(() => respond(action, false, 'canvas_write_unconfirmed'));
     } catch (_) { respond(action, false, 'canvas_unavailable'); }

@@ -24,12 +24,35 @@ internal class WebChatCanvasManagementCoordinator(
     private val restored: (ChatGptWebCanvasDocuments) -> Unit,
     private val renamed: (ChatGptWebCanvasDocuments) -> Unit,
     private val commentDismissed: (ChatGptWebCanvasDocuments) -> Unit,
+    private val exported: (ChatGptWebCanvasDocuments) -> Unit,
 ) {
     private var epoch = 0
     private var dialog: AlertDialog? = null
 
     fun showHistory() = prepare { value -> history(value, value.documents.first { it.id == draft.base.id }.documentVersion) }
     fun showShare() = prepare { value -> share(value, "share_lookup", false) }
+
+    fun showExport() {
+        cancel()
+        val run = epoch
+        if (draft.changed) {
+            dialog = AlertDialog.Builder(activity).setTitle("草稿尚未保存")
+                .setMessage("PDF 和 Word 导出使用官网已保存的版本。请先保存正文修改。")
+                .setPositiveButton("返回编辑", null).show()
+            return
+        }
+        if (draft.base.documentType != "document") return
+        dialog = AlertDialog.Builder(activity).setTitle("导出画布")
+            .setItems(arrayOf("PDF", "Word (.docx)")) { _, position ->
+                if (active(run)) prepare { value ->
+                    if (draft.changed || !draft.matches(value) || value.unconfirmedWrite) {
+                        state("官网版本已变化，请先核对，草稿已保留", false)
+                    } else request(draft.selection(value, "prepare_export").put("format", if (position == 0) "pdf" else "docx"),
+                        false, "正在准备导出", exported)
+                }
+            }.setNegativeButton("取消", null).show()
+        dialog?.listView?.contentDescription = "web-chat-canvas-export-formats"
+    }
 
     fun confirmDismissComment(id: String) {
         if (draft.base.comments.none { it.id == id }) return

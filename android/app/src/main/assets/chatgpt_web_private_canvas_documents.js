@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateCanvasDocuments = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -103,6 +103,36 @@
       return result(entry);
     }
     return result(remember(binding, await fetchDocuments(binding, deadline)));
+  }
+
+  function exportFile(binding, input) {
+    if (uncertain && sameSession(uncertain.binding)) fail('write_unconfirmed');
+    const { entry, document } = selected(binding, input);
+    const exporter = page.__elonChatGptPrivateCanvasExport;
+    if (!exporter?.register) fail('export_unavailable');
+    const value = exporter.register(page, binding, document, input.format, async generate => {
+      if (active) fail('busy');
+      active = true;
+      let prepared;
+      try {
+        if (uncertain && sameSession(uncertain.binding)) fail('write_unconfirmed');
+        const deadline = now() + 25000, owner = await context.capture(binding, document.id);
+        const checkOriginal = async () => {
+          const original = (await fetchDocuments(binding, deadline)).find(row => row.id === document.id);
+          if (!original || !policy.same(original, document)) fail('version_conflict');
+          context.check(owner);
+        };
+        await checkOriginal();
+        prepared = await generate(() => context.check(owner));
+        // This endpoint has no version parameter. Do not save a result if the source changed while rendering.
+        await checkOriginal();
+        return prepared;
+      } catch (error) {
+        try { await prepared?.response?.body?.cancel(); } catch (_) {}
+        throw error;
+      } finally { active = false; }
+    });
+    return { ...result(entry), exportFile: value };
   }
 
   async function save(binding, input, confirmed, deadline) {
@@ -300,12 +330,13 @@
     if (active) return { ok: false, code: 'canvas_busy', attempted: false };
     active = true;
     try {
-      if (!input || !['list', 'save', 'rename', 'dismiss_comment', 'verify', 'history', 'restore', 'share_lookup', 'share_create', 'share_ack'].includes(input.operation) || !policy ||
+      if (!input || !['list', 'save', 'rename', 'dismiss_comment', 'prepare_export', 'verify', 'history', 'restore', 'share_lookup', 'share_create', 'share_ack'].includes(input.operation) || !policy ||
           !page.__elonChatGptPrivateJsonRequest?.request || !page.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders) {
         fail('request_invalid');
       }
       const binding = bind(input.path, readSnapshot), deadline = now() + 18000;
       if (input.operation === 'list') return await read(binding, input.force === true, deadline);
+      if (input.operation === 'prepare_export') return exportFile(binding, input);
       if (input.operation === 'save') return await save(binding, input, confirmed, deadline);
       if (input.operation === 'rename') return await rename(binding, input, confirmed, deadline);
       if (input.operation === 'dismiss_comment') return await dismissComment(binding, input, confirmed, deadline);
@@ -321,5 +352,5 @@
     } finally { active = false; }
   }
 
-  return Object.freeze({ version: 5, run, busy: () => active });
+  return Object.freeze({ version: 6, run, busy: () => active });
 });

@@ -6,7 +6,7 @@
     ? require('./chatgpt_web_private_file_citation.js') : root?.__elonChatGptPrivateFileCitation;
   const raster = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_library_raster_policy.js') : root?.__elonChatGptPrivateLibraryRasterPolicy;
-  const exported = Object.freeze({ version: 33, create: root => factory(root, pointer, citation, raster) });
+  const exported = Object.freeze({ version: 34, create: root => factory(root, pointer, citation, raster) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -214,6 +214,7 @@
   function current(job) {
     return !disposed && active === job && !job.controller.signal.aborted &&
       (!job.entry.galleryCurrent || job.entry.galleryCurrent()) &&
+      (!job.entry.canvasCurrent || job.entry.canvasCurrent()) &&
       root.location.href === job.descriptor.href && root.__elonChatGptDocumentToken === job.entry.token &&
       identity() === job.entry.account && (Boolean(job.entry.sharedLibraryFileId) || job.byteTransfer || job.entry.expiresAt > Date.now());
   }
@@ -279,6 +280,19 @@
     // Standalone mounted files reuse materialization; neither route borrows the open chat's scope.
     entries.set(handle, { path: '/library', ...destination, name,
       mediaType: file.mime_type || '', account, token, expiresAt: Date.now() + 120000 });
+    while (entries.size > 800) entries.delete(entries.keys().next().value);
+    return handle;
+  }
+
+  function registerCanvasExport(path, file, prepare) {
+    const account = identity(), token = root.__elonChatGptDocumentToken;
+    if (disposed || !account || !token || !PATH.test(path) || root.location.pathname !== path ||
+        typeof prepare !== 'function' || !/^canvas-export-[A-Za-z0-9_-]{1,128}-(pdf|docx)$/.test(file?.id || '') ||
+        typeof file.name !== 'string' || file.name.length > 200 || /[\x00-\x1f\x7f\\/]/.test(file.name) ||
+        !['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.mediaType)) return '';
+    const handle = 'download_' + Array.from(root.crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
+    entries.set(handle, { path, name: file.name, mediaType: file.mediaType, account, token,
+      canvasPrepare: prepare, expiresAt: Date.now() + 120000 });
     while (entries.size > 800) entries.delete(entries.keys().next().value);
     return handle;
   }
@@ -356,6 +370,16 @@
     active = job;
     let timer = root.setTimeout(() => job.controller.abort(), 15000);
     try {
+      if (entry.canvasPrepare) {
+        entries.delete(descriptor.downloadHandle);
+        job.byteTransfer = true;
+        root.clearTimeout(timer);
+        timer = root.setTimeout(() => job.controller.abort(), 120000);
+        const detail = await root.__elonChatGptPrivateLibraryDownload.runPrepared(root, job, current, entry.canvasPrepare);
+        job.queued = true;
+        respond(ACTION, true, detail);
+        return;
+      }
       const request = root.__elonChatGptPrivateJsonRequest;
       const destination = entry.originalUrl ? { originalUrl: entry.originalUrl }
         : entry.sharedLibraryFileId ? { libraryDownloadId: entry.sharedLibraryFileId }
@@ -425,5 +449,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 33, register, registerLibraryFile, registerGalleryImage, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 34, register, registerLibraryFile, registerGalleryImage, registerCanvasExport, start, cancel, dispose, sourceDiagnostics });
 });

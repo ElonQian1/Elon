@@ -25,6 +25,7 @@ internal class WebChatCanvasDocumentsCoordinator(
     private var management: WebChatCanvasManagementCoordinator? = null
     private var draft: WebChatCanvasDraft? = null
     private var index: ChatGptWebCanvasDocuments? = null
+    private val downloads = WebChatFileDownloadDialog(activity, host, port)
 
     fun show(conversation: ChatGptWebConversation) {
         cancel()
@@ -131,11 +132,23 @@ internal class WebChatCanvasDocumentsCoordinator(
                 if (result.scope == editing.scope && !result.unconfirmedWrite && changed != null && editing.acceptCommentDismissal(changed)) {
                     editor?.render(if (editing.changed) "评论已忽略，正文草稿未保存" else "评论已忽略", allowed = true)
                 } else editor?.render("评论结果待核对，草稿已保留", allowed = false)
+            }, exported = { result ->
+                val export = result.exportFile
+                if (alive(run, owner) && !editing.changed && editing.matches(result) && !result.unconfirmedWrite &&
+                    export != null && export.documentId == editing.base.id) {
+                    val command = owner.downloadConversationFile(editing.path, export.file.id, export.file.downloadHandle)
+                    val requestId = command.requestId
+                    if (command.accepted && requestId != null) {
+                        editor?.render("版本 ${editing.base.documentVersion}")
+                        downloads.show(owner, requestId)
+                    } else editor?.render("暂时无法导出，请重试")
+                } else editor?.render("版本尚未确认，草稿已保留", allowed = false)
             })
         editor = WebChatCanvasEditorView(activity, editing,
             save = { save(owner, editing) }, check = { refresh(owner, editing) },
             history = { management?.showHistory() }, share = { management?.showShare() },
             rename = { management?.showRename() },
+            export = { management?.showExport() },
             dismissComment = { management?.confirmDismissComment(it) },
             closed = { if (run == epoch) cancel() })
         editor?.show()
@@ -271,6 +284,7 @@ internal class WebChatCanvasDocumentsCoordinator(
         stopPolling()
         dismissSheet()
         management?.cancel(); management = null
+        downloads.dismiss()
         val view = editor; editor = null; view?.dismiss()
     }
 

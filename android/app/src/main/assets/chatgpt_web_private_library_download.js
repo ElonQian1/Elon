@@ -164,12 +164,16 @@
     return transfer(root, job, current, null, url, true);
   }
 
-  async function transfer(root, job, current, validateSignedUrl, url, content) {
+  function runPrepared(root, job, current, prepare) {
+    return transfer(root, job, current, null, null, true, prepare);
+  }
+
+  async function transfer(root, job, current, validateSignedUrl, url, content, prepare) {
     if (job.descriptor.byteTransferVersion !== 1) throw new Error('download_bridge_unavailable');
     const bridge = root.elonChatGptFileDownload;
     if (!bridge?.postMessage) throw new Error('download_bridge_unavailable');
     const signal = job.controller.signal;
-    let reader, response, pending, total = 0, sequence = 0, emptyReads = 0;
+    let reader, response, pending, validateBytes, closed = false, total = 0, sequence = 0, emptyReads = 0;
     const previous = bridge.onmessage;
     function check() { if (signal.aborted || !current(job)) throw new Error('download_cancelled'); }
     function wait(promise, milliseconds) {
@@ -225,13 +229,23 @@
       check();
       // Official download anchors use ambient cookies. Keep identity and URLs in
       // the page; the native lease receives only bounded bytes and acknowledgements.
-      response = await wait(root.fetch(url, {
-        method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: content ? 'error' : 'follow', signal,
-      }), 8000);
+      if (prepare) {
+        const prepared = await wait(Promise.resolve(prepare(job, current)).then(value => {
+          if (closed || signal.aborted || !current(job)) {
+            try { Promise.resolve(value?.response?.body?.cancel()).catch(() => {}); } catch (_) {}
+            throw new Error('download_cancelled');
+          }
+          return value;
+        }), 20000);
+        response = prepared.response;
+        validateBytes = prepared.validateBytes;
+      } else response = await wait(root.fetch(url, {
+          method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: content ? 'error' : 'follow', signal,
+        }), 8000);
       check();
       if (response.status === 404) throw new Error('download_file_unavailable');
       if (!response.ok || response.status !== 200 || !response.body?.getReader) throw new Error('download_prepare_failed');
-      if (response.url !== url) {
+      if (!prepare && response.url !== url) {
         if (content) throw new Error('download_source_unsupported');
         // The official library anchor also redirects to same-origin estuary
         // content. Reuse its existing strict validator before accepting CDN URLs.
@@ -258,6 +272,7 @@
         check();
         if (next.done) break;
         if (!(next.value instanceof Uint8Array)) throw new Error('download_content_invalid');
+        validateBytes?.(next.value);
         emptyReads = next.value.byteLength ? 0 : emptyReads + 1;
         if (emptyReads > 16) throw new Error('download_content_invalid');
         if (total + next.value.byteLength > MAX_BYTES || expectedBytes >= 0 && total + next.value.byteLength > expectedBytes) {
@@ -272,14 +287,16 @@
         }
       }
       if (expectedBytes >= 0 && total !== expectedBytes) throw new Error('download_content_invalid');
+      validateBytes?.(new Uint8Array(), true);
       await packet('commit', { totalBytes: total }, 'saved');
       return 'download_saved';
     } finally {
+      closed = true;
       pending = null;
       if (bridge.onmessage === listener) bridge.onmessage = previous;
       try { await wait(reader ? reader.cancel() : response?.body?.cancel(), 1000); } catch (_) {}
       try { reader?.releaseLock(); } catch (_) {}
     }
   }
-  return Object.freeze({ version: 11, target, sharedReference, mountedTarget, catalogTarget, materialize, contentUrl, run, runContent });
+  return Object.freeze({ version: 12, target, sharedReference, mountedTarget, catalogTarget, materialize, contentUrl, run, runContent, runPrepared });
 });

@@ -114,6 +114,8 @@ internal class ChatGptWebMcpActions(
                     ?: return error(action, "invalid_conversation_path")
                 val index = observedAtDispatch.conversationFiles[ChatGptWebConversationPath.identity(path)]
                 val file = index?.files?.singleOrNull { it.id == args.optString("file_id") }
+                    ?: ChatGptWebCanvasExportProtocol.selected(observedAtDispatch.canvasDocuments, path,
+                        args.optString("file_id"), args.optString("download_handle"))
                     ?: return error(action, "download_selection_expired")
                 if (!ChatGptWebFileDownloadPolicy.HANDLE.matches(file.downloadHandle)) return error(action, "download_not_supported")
                 if (args.optString("download_handle") != file.downloadHandle) return error(action, "download_selection_expired")
