@@ -52,6 +52,31 @@ function fixture(options = {}) {
 
 const tick = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
 
+test('fresh text trial control uses the transaction owner in fresh and upgraded probes', () => {
+  for (const previous of [null, 24]) {
+    const f = fixture(), modes = [];
+    f.window.__elonChatGptFreshTextTransaction = { trialControl(mode) {
+      modes.push(mode); return { schema: 'elon.fresh_text_trial.v1', control: mode };
+    } };
+    const fetch = f.window.fetch;
+    if (previous) {
+      f.window.__elonChatGptPrivateResearchProbe = { ...f.probe, version: previous };
+      vm.runInNewContext(source, f.context);
+    }
+    for (const mode of ['start', 'state', 'end']) {
+      let value;
+      f.window.__elonChatGptPrivateResearchProbe.handle('private_protocol_probe',
+        { value: 'fresh_text_trial_' + mode }, (_, ok, detail) => {
+          assert.equal(ok, true); value = JSON.parse(detail);
+        });
+      assert.equal(value.control, mode);
+    }
+    assert.deepEqual(modes, ['start', 'state', 'end']);
+    assert.equal(f.requests.length, 0);
+    assert.equal(f.window.fetch, fetch);
+  }
+});
+
 test('tool admission probe reuses passive observations on fresh and upgraded surfaces', () => {
   const f = fixture();
   assert.deepEqual(JSON.parse(f.command('composer_tool_admission').detail), {
@@ -249,7 +274,7 @@ test('version 13 command upgrade preserves existing observers and other commands
   const existing = f.probe;
   f.window.__elonChatGptPrivateResearchProbe = { ...existing, version: 13 };
   vm.runInNewContext(source, f.context);
-  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 23);
+  assert.equal(f.window.__elonChatGptPrivateResearchProbe.version, 25);
   assert.equal(f.window.fetch, fetch);
   assert.equal(f.window.XMLHttpRequest.prototype.send, send);
   const answers = [];

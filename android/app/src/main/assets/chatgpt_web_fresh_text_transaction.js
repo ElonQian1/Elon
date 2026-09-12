@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -19,6 +19,8 @@
   });
   const records = new Map();
   let document = page.document, token = page.__elonChatGptDocumentToken, active = null, disposed = false;
+  let trial = null, last = null;
+  const now = options.now || Date.now;
   const knownCodes = new Set(['context_changed', 'context_invalid', 'command_invalid', 'scope_unsupported',
     'runtime_unavailable', 'identity_unavailable', 'context_unavailable', 'attachments_active', 'tools_active',
     'conversation_busy', 'parent_unavailable', 'prepare_unconfirmed', 'security_unavailable', 'security_invalid',
@@ -29,7 +31,7 @@
     if (document === page.document && token === page.__elonChatGptDocumentToken) return;
     active?.controller.abort();
     active?.stopBoundaryController.abort();
-    active = null; records.clear();
+    active = null; trial = null; last = null; records.clear();
     document = page.document; token = page.__elonChatGptDocumentToken;
   }
 
@@ -39,9 +41,35 @@
       try { if (active.stopConfirmed || active.recoveryConfirmed ||
         active.binding.reconciled(active.request.userMessageId, active.stopAcknowledged === true)) active = null; } catch (_) {}
     }
-    return { version: 3, transport: 'fresh_page_http_v1', pending: active !== null,
+    return { version: 4, transport: 'fresh_page_http_v1', pending: active !== null,
       phase: active?.phase || 'idle', dispatched: active?.dispatched === true,
       accepted: active?.accepted === true, code: active?.code || '', recovering: active?.recovering === true };
+  }
+
+  function trialArmed() {
+    if (trial && (now() >= trial.expiresAt || context.stamp() !== trial.stamp)) trial = null;
+    return trial !== null;
+  }
+
+  function trialControl(mode) {
+    state();
+    let control = 'state';
+    if (mode === 'start') {
+      const stamp = context.stamp();
+      control = disposed ? 'disposed' : active ? 'busy' :
+        page.__elonChatGptPrivateTextTransactionsEnabled !== true ? 'disabled' :
+          !stamp ? 'identity_unavailable' : 'armed';
+      if (control === 'armed' && !trialArmed()) trial = { stamp, expiresAt: now() + 120000 };
+    } else if (mode === 'end') {
+      trial = null; control = 'ended';
+    } else if (mode !== 'state') control = 'invalid_mode';
+    const armed = trialArmed();
+    const safeCode = value => /^[a-z_]{0,64}$/.test(value || '') ? value || '' : 'unknown';
+    return { schema: 'elon.fresh_text_trial.v1', version: 4, control, armed,
+      remaining_ms: armed ? Math.max(0, Math.min(120000, trial.expiresAt - now())) : 0,
+      attempts: records.size, pending: active !== null, phase: last?.phase || 'idle',
+      code: safeCode(last?.code), dispatched: last?.dispatched === true,
+      accepted: last?.accepted === true, reconciled: last?.recoveryConfirmed === true || last?.stopConfirmed === true };
   }
 
   function send(command) {
@@ -53,7 +81,8 @@
       { handled: true, completion: Promise.resolve({ status: 'rejected', code: 'request_id_conflict' }) };
     // A stopped/uncertain write still owns the ledger even if the trial is disabled.
     if (active) return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'busy' }) };
-    if (page.__elonChatGptFreshTextDispatchEnabled !== true || page.__elonChatGptPrivateTextTransactionsEnabled !== true) {
+    if (page.__elonChatGptFreshTextDispatchEnabled !== true && !trialArmed() ||
+        page.__elonChatGptPrivateTextTransactionsEnabled !== true) {
       return { handled: false, code: 'disabled' };
     }
     // Cold/unknown identity keeps the accepted sender; no UI-blocking import is
@@ -66,6 +95,7 @@
     // No eviction of write receipts within this document: exceeding this trial
     // budget requires a fresh document, not permission to reuse an old command ID.
     if (records.size >= 32) return { handled: false, code: 'trial_budget' };
+    trial = null;
     let resolve;
     const owner = { token, document, stamp, controller: new page.AbortController(), phase: 'preparing',
       stopBoundaryController: new page.AbortController(),
@@ -90,6 +120,7 @@
     records.set(command.requestId, { prompt: command.prompt, expectedDraft: command.expectedDraft,
       href: page.location.href, stamp, transaction });
     active = owner;
+    last = owner;
     function current() {
       return active === owner && !owner.controller.signal.aborted && owner.document === page.document &&
         owner.token === page.__elonChatGptDocumentToken && owner.binding?.current() === true &&
@@ -256,5 +287,5 @@
     page.removeEventListener?.('pageshow', resume);
     return true;
   }
-  return Object.freeze({ version: 3, send, state, cancel, stop, recover, dispose });
+  return Object.freeze({ version: 4, send, state, cancel, stop, recover, dispose, trialControl });
 });

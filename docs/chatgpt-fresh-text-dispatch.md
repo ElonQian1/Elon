@@ -13,6 +13,27 @@ This is not an accepted production transport or an Android HTTP implementation.
 Reuse these modules for subsequent work rather than repeating the audit or
 creating another native sender. The accepted runtime sender remains the default.
 
+## Controlled Production Acceptance
+
+The existing MCP protocol command now supports `fresh_text_trial_start`,
+`fresh_text_trial_state` and `fresh_text_trial_end`. Start permits exactly one
+fresh-dispatch attempt within 120 seconds, bound to the current document,
+account and route. It sends nothing by itself, does not modify the default flag,
+and does not extend the deadline on repeated starts. End removes only unused
+permission; it cannot cancel or release an unresolved write owner.
+
+The `elon.fresh_text_trial.v1` receipt distinguishes this owner from the older
+`private_text_v1` relay by attempt, dispatch, acceptance and reconciliation
+evidence. It exposes no message, account identifier, request body or credentials.
+The Android command receiver validates the same bounded schema.
+
+`scripts/smoke-chatgpt-fresh-text-dispatch.ps1` clicks the production native send
+button with a marked synthetic prompt, checks a unique user turn and native
+reply, then checks owner reconciliation before a follow-up. It reuses its owned
+fixture on subsequent runs and restores the original conversation/draft and
+screen-awake setting. This acceptance control is not a completion/default-enable
+claim; live results belong below after a real run.
+
 ## Implemented
 
 - `chatgpt_web_fresh_text_context.js` binds a personal authenticated account,

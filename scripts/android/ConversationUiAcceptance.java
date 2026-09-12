@@ -162,6 +162,11 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                 assertTrue("fixture_prompt_missing", fixtureInput.exists() && fixtureInput.getText()
                     .startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"));
                 click(description("web-chat-send")); break;
+            case "send_fresh_text_fixture":
+                UiObject freshInput = description("web-chat-composer-input:chatgpt_web");
+                assertTrue("fresh_fixture_prompt_missing", freshInput.exists() && freshInput.getText()
+                    .matches("ELON_FRESH_TEXT_ACCEPTANCE_V1 [a-z]+ [0-9]{13}\\. Reply exactly FRESH_[A-Z]+_[0-9]{13}\\."));
+                click(description("web-chat-send")); break;
             case "clear_image": click(description("\u5173\u95ed\u521b\u5efa\u56fe\u7247")); break;
             case "clear_search": click(description("\u5173\u95ed\u7f51\u9875\u641c\u7d22")); break;
             case "header": click(description("web-chat-page-actions:chatgpt_web")); break;

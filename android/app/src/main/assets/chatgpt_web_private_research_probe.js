@@ -62,11 +62,19 @@
     return JSON.stringify(window.__elonChatGptPrivateLibraryCatalog?.sourceDiagnostics?.() ||
       { schema: 'elon.library_sources.v1', observed: false, stale: false, total: 0, omitted: 0, groups: [] });
   }
+  function freshTextTrial(action, command, respond) {
+    if (action !== 'private_protocol_probe' || !['fresh_text_trial_start', 'fresh_text_trial_end',
+      'fresh_text_trial_state'].includes(command.value)) return false;
+    const detail = window.__elonChatGptFreshTextTransaction?.trialControl?.(command.value.slice(17));
+    respond(action, !!detail, detail ? JSON.stringify(detail) : 'protocol_probe_unavailable');
+    return true;
+  }
   if (existingProbe && Number(existingProbe.version) >= 13) {
-    if (Number(existingProbe.version) < 24) {
+    if (Number(existingProbe.version) < 25) {
       // Upgrade only the command surface; keep the existing network observers.
-      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 24,
+      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 25,
         handle(action, command, respond) {
+          if (freshTextTrial(action, command, respond)) return true;
           if (window.__elonChatGptTextBlockInventory?.handle(action, command, respond)) return true;
           if (action === 'private_protocol_probe' && command.value === 'composer_tool_admission') {
             respond(action, true, toolAdmissionDetail()); return true;
@@ -594,9 +602,10 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 24,
+    version: 25,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
+      if (freshTextTrial(action, command, respond)) return true;
       if (window.__elonChatGptTextBlockInventory?.handle(action, command, respond)) return true;
       if (action !== 'private_protocol_probe') return false;
       const mode = String(command.value || '');

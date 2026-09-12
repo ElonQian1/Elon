@@ -54,6 +54,7 @@ function fixture(options = {}) {
   const recovery = page.__elonChatGptFreshTextRecovery.create(page, { reconciliation, delays: [0, 0, 0],
     timeoutMs: options.reconcileTimeoutMs || 1000 });
   const api = transactionModule.create(page, { requests: requestModule, reconciliation, recovery,
+    now: options.now,
     context: { capture: options.capture || (async () => binding), stamp: () => current ? 'fixture-stamp' : 'changed' },
     prepareTimeoutMs: options.prepareTimeoutMs || 1000, openTimeoutMs: options.openTimeoutMs || 1000,
     streamTimeoutMs: options.streamTimeoutMs || 1000, reconcileTimeoutMs: options.reconcileTimeoutMs || 1000 });
@@ -63,6 +64,63 @@ function fixture(options = {}) {
   return { api, page, calls, binding, send, setCurrent: value => { current = value; },
     reconcile: () => { reconciled = true; }, draft: value => { if (value !== undefined) draft = value; return draft; } };
 }
+
+test('controlled trial allows one production dispatch without changing the default', async () => {
+  const f = fixture({ reconciliation: async () => true });
+  f.page.__elonChatGptFreshTextDispatchEnabled = false;
+  assert.equal(f.send().handled, false);
+  assert.equal(f.api.trialControl('start').armed, true);
+  assert.equal(f.calls.length, 0);
+  assert.equal((await f.send().completion).status, 'accepted');
+  await turn(); await turn();
+  const evidence = f.api.trialControl('state');
+  assert.equal(evidence.armed, false);
+  assert.equal(evidence.attempts, 1);
+  assert.equal(evidence.dispatched, true);
+  assert.equal(evidence.accepted, true);
+  assert.equal(evidence.reconciled, true);
+  assert.equal(f.page.__elonChatGptFreshTextDispatchEnabled, false);
+  assert.equal(f.send({ requestId: 'mcp_trial2' }).handled, false);
+  assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
+  assert.equal(JSON.stringify(evidence).includes(command.prompt), false);
+});
+
+test('trial is scoped to identity and route, expires without polling, and does not extend on repeated start', () => {
+  let clock = 1000;
+  const f = fixture({ now: () => clock });
+  f.page.__elonChatGptFreshTextDispatchEnabled = false;
+  assert.equal(f.api.trialControl('start').remaining_ms, 120000);
+  clock += 5000;
+  assert.equal(f.api.trialControl('start').remaining_ms, 115000);
+  f.setCurrent(false);
+  assert.equal(f.api.trialControl('state').armed, false);
+  f.setCurrent(true);
+  assert.equal(f.send().handled, false);
+  f.api.trialControl('start'); clock += 120001;
+  assert.equal(f.send().handled, false);
+  assert.equal(f.calls.length, 0);
+});
+
+test('ending a trial never cancels or replays its dispatched write', async () => {
+  const f = fixture(); f.page.__elonChatGptFreshTextDispatchEnabled = false;
+  f.api.trialControl('start');
+  assert.equal((await f.send().completion).status, 'accepted');
+  await turn();
+  const evidence = f.api.trialControl('end');
+  assert.equal(evidence.armed, false);
+  assert.equal(evidence.pending, true);
+  assert.equal(f.api.trialControl('start').control, 'busy');
+  assert.equal((await f.send({ requestId: 'mcp_trial2' }).completion).code, 'busy');
+  assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
+});
+
+test('document replacement clears trial permission and previous diagnostics', () => {
+  const f = fixture(); f.page.__elonChatGptFreshTextDispatchEnabled = false;
+  f.api.trialControl('start'); f.page.__elonChatGptDocumentToken = 'doc_replaced';
+  assert.equal(f.api.trialControl('state').armed, false);
+  assert.equal(f.send().handled, false);
+  assert.equal(f.calls.length, 0);
+});
 
 test('fresh request projects current plain text, not captured message/proof state', () => {
   const builder = requestModule.create({ crypto });
