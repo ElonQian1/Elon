@@ -125,6 +125,34 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     includes(body.calls, ['eQt', 'N1e']);
   });
 
+  await t.test('selected Search and Picture tools have distinct prepare, message and dispatch contracts', () => {
+    assert.equal(composer.exported.get('$g'), 'sR');
+    assert.deepEqual(composer.imports.get('j_'), { file: './' + assets.shared[0], name: 'uG' });
+    const hints = definition(shared, 'uG', true);
+    assert.match(shared.text.slice(hints.start, hints.end), /Search:`search`/);
+    assert.match(shared.text.slice(hints.start, hints.end), /PictureV2:`picture_v2`/);
+    const active = definition(composer, 'aR');
+    assert.match(composer.text.slice(active.start, active.end), /e\?\[e,\.\.\.r\]:r/);
+    const prepare = definition(composer, 'FB');
+    assert.match(composer.text.slice(prepare.start, prepare.end), /completionMetadata:\{systemHints:n,conversationMode:T\}/);
+    for (const name of ['CJ', 'SJ']) {
+      const node = definition(composer, name), source = composer.text.slice(node.start, node.end);
+      assert.match(source, /W\.length>0&&\{system_hints:W\}/);
+      assert.match(source, /me=ue\?MA\.CONVERSATION_COMPOSER_WEB_ICON:void 0/);
+      assert.match(source, /completionMetadata:\{conversationMode:le,systemHints:W,searchSource:me\}/);
+      assert.match(source, /systemHints\.filter\(t=>t===j_\.Search\?\(e=!0,!1\):!0\),e&&\(ke\.forceUseSearch=!0\)/);
+      assert.match(source, /ke\.enableMessageFollowups=!0/);
+    }
+    const transform = definition(conversation, 'Lht', true);
+    assert.match(conversation.text.slice(transform.start, transform.end), /forceUseSearch:t\.forceUseSearch\?\?\(e\.includes\(Au\.Search\)\?!0:void 0\)/);
+    const enumSource = definition(conversation, 'qin', true);
+    assert.match(conversation.text.slice(enumSource.start, enumSource.end), /CONVERSATION_COMPOSER_WEB_ICON=`conversation_composer_web_icon`/);
+    const dispatch = definition(composer, 'VZt'), body = definition(composer, 'AB');
+    assert.match(composer.text.slice(dispatch.start, dispatch.end), /THe\(e\.completionMetadata\)/);
+    assert.match(composer.text.slice(body.start, body.end), /force_use_search:MB\(e\.forceUseSearch\)/);
+    assert.match(composer.text.slice(body.start, body.end), /client_reported_search_source:e\.completionMetadata\?\.searchSource/);
+  });
+
   await t.test('dispatch consumes prepare ownership and handles stream handoff', () => {
     assert.equal([...composer.exported.values()].includes('VZt'), false);
     const dispatch = facts(definition(composer, 'VZt'));
