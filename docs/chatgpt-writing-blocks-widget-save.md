@@ -4,7 +4,7 @@
 
 - `code_status=implemented`
 - `verification_status=offline_verified`
-- `production_status=pending_grouped_build_acceptance`
+- `production_status=published_1701_device_acceptance_pending`
 
 ## 本批修复
 
@@ -53,6 +53,7 @@
   项目会话、空正文、CRLF、原始索引、邮件字段、身份及分支变化、本地编辑冲突、超时
   只读恢复、不重复 POST。旧 `:::writing` 与代码块测试一起通过。
 
-本批不单独编译/发布 APK。统一验收包需用受控 typed widget 在生产原生 UI 中编辑、
+本批随后随 [1701 集中包](reports/chatgpt-private-grouped-1701.md)构建、发布并安装。
+手机锁屏，生产验收待解锁；需用受控 typed widget 在生产原生 UI 中编辑、
 导出、显式保存一次并重开确认；同时验收尚未通过真机的项目保存。不得沿用 `1692`
 普通 `:::writing` 的验收结论，或把本项登记为 `completed`。

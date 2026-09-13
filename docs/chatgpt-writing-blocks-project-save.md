@@ -4,7 +4,10 @@
 
 - `code_status=implemented`
 - `verification_status=offline_verified`
-- `production_status=pending_grouped_build_acceptance`
+- `production_status=published_1701_device_acceptance_pending`
+
+已随 [1701 集中包](reports/chatgpt-private-grouped-1701.md)构建、发布并无损安装；
+手机锁屏，项目范围的生产 UI 验收待解锁，不因此标记 completed。
 
 这是既有原生编辑器与写作块保存的范围扩展，不新增编辑器或复制另一套传输。普通会话已通过 `1692` 的能力继续复用；本批不能继承它的项目验收结论。
 

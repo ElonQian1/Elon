@@ -100,6 +100,17 @@ cover its distinct path, then restore the prior conversation. Use
 one-command and does not enable the production default. Do not repeat the already
 accepted runtime test and label it independent HTTP acceptance.
 
+The candidate is now included in [grouped APK 1701](reports/chatgpt-private-grouped-1701.md),
+built, published and installed. The phone was locked; live retry remains pending.
+Use the existing `scripts/smoke-chatgpt-web-regenerate.ps1` with `-FreshHttp -NativeRetry`
+and the pinned device/hardware serial. This combines native button/receipt evidence
+with the versioned one-command trial, exactly one attempt, owned stream events and
+reconciled history. It retains a controlled unsent draft and restores only after
+the trial has no pending write and fixture cleanup is confirmed. Changed user drafts
+and unknown results are left intact. The default runtime registry is not overwritten
+by this candidate test. Offline cleanup and evidence contracts passed; this does not
+promote the candidate or prove native Stop.
+
 Projects, temporary/new contexts, attachments/tools, feedback retry, branch
 selection UI and composer-free initial ownership remain outside this candidate.
 Preserve their current paths; extend only from actual protocol evidence.
