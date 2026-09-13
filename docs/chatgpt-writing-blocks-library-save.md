@@ -1,7 +1,7 @@
 # Library-Linked Writing Block Save
 
 Capability: `android_chatgpt_writing_block_library_save_v1`.
-Status: `partial / offline_verified / source_only`, not `completed`.
+Status: `partial / offline_verified / published_1715_device_pending`, not `completed`.
 This extends the [existing native editor](chatgpt-writing-blocks-native.md),
 not the standalone Library editor or Canvas. Adapter 385; parser 6,
 policy 3, writing context 6, transport 3, library session 2 and Library read 1.
@@ -75,9 +75,10 @@ checks, runtime bindings, actual parser/context/transport with a synthetic
 Library store and HTTP, ordinary/project/widget regression, history and SSE.
 No real user content or credentials are stored in fixtures or receipts.
 
-No phone was connected during this batch. Android compilation, APK publication,
-and linked-document native save/return/reopen acceptance remain deferred to the
-grouped build. Offline success is not a live endpoint or device pass.
+The [1715 grouped verification](reports/chatgpt-private-grouped-1715.md) passed
+Release compilation and 58 Android tests. The published APK contains the exact
+current scripts. Linked-document native save/return/reopen acceptance remains
+deferred: no device was connected. Offline/package success is not a live pass.
 
 Missing/seed-only sessions can now prepare through the versioned read. Missing
 account/feature/runtime evidence, conflicting content, or unversioned replies

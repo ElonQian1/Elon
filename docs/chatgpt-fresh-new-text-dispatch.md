@@ -24,8 +24,10 @@ case. New-conversation production default remains disabled.
 The next source batch (`62d81aff3`, context 10 / transaction 20 / adapter 381)
 also starts that owned navigation on the first server-ID event, rather than
 waiting for stream completion, and coalesces concurrent finalization. Its 267
-targeted Node tests pass; Android packaging and device acceptance are deferred
-to the grouped round. The 1709 pending handoff remains unresolved and unreplayed.
+targeted Node tests pass. [Grouped APK 1715](reports/chatgpt-private-grouped-1715.md)
+now contains the exact current scripts; Release compilation and targeted Android
+tests passed. Device acceptance remains deferred. The 1709 pending handoff is
+still unresolved and unreplayed.
 
 ## Native Acceptance Failure On 1706
 

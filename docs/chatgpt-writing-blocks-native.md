@@ -4,7 +4,7 @@
 
 项目内自有会话写回的源码扩展见[项目写回批次](chatgpt-writing-blocks-project-save.md)：已实现并通过离线契约测试，待集中包真机验收，不能沿用普通会话的完成标记。
 
-2026-09-14 [库文件关联写回](chatgpt-writing-blocks-library-save.md)补齐可信文件库文档保存队列，并通过版本化私有读取加载尚未打开的文档；205 项离线测试通过，源码待集中构建和真机验收。账号、正文或版本未确认时仍可编辑/导出副本，不将其误标为整项写作块功能缺失。
+2026-09-14 [库文件关联写回](chatgpt-writing-blocks-library-save.md)补齐可信文件库文档保存队列，并通过版本化私有读取加载尚未打开的文档；205 项离线测试通过。[1715 集中包](reports/chatgpt-private-grouped-1715.md)已核验上线覆盖，Release 编译和58项 Android 测试通过，关联文档保存仍待真机验收。账号、正文或版本未确认时仍可编辑/导出副本，不将其误标为整项写作块功能缺失。
 
 2026-09-13 发布与验收：[本轮记录](reports/chatgpt-writing-blocks-release-20260913.md)。
 
