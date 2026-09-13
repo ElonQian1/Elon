@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 14, create: factory });
+  const api = Object.freeze({ version: 15, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -213,7 +213,8 @@
           // this boundary is uncertain even if fetch subsequently throws.
           owner.dispatched = true; owner.phase = 'dispatching';
           stoppedParent = null;
-          if (!stream.preparePrivateSend(command.prompt, owner.request.userMessageId)) throw Error('stream_unavailable');
+          if (!stream.preparePrivateSend(command.prompt, owner.request.userMessageId,
+              !!owner.binding.attachments && !command.prompt.trim())) throw Error('stream_unavailable');
           owner.sink = stream.beginPrivateStream({ conversationId: owner.binding.conversationId,
             userMessageId: owner.request.userMessageId, current: owner.stopCurrent,
             adoptConversation: owner.binding.newConversation ? (id, payload) =>
@@ -350,5 +351,5 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 14, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
+  return Object.freeze({ version: 15, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

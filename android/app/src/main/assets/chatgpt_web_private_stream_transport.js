@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 21) return;
+  if (existing && Number(existing.version) >= 22) return;
   if (existing && typeof existing.dispose === 'function') {
     try { existing.dispose(); }
     catch (_) { /* A stale transport must not block the upgraded observer. */ }
@@ -36,6 +36,7 @@
   let socketSuccessReported = false;
   let accessSignal = null;
   let privateUser = null;
+  let preparedUserId = '';
   let conversationGeneration = 0;
   let activeReader = null;
   let continuation = null;
@@ -97,6 +98,7 @@
     socketSuccessReported = false;
     session.reset();
     privateUser = null;
+    preparedUserId = '';
     notify();
   }
 
@@ -112,20 +114,23 @@
     socketSuccessReported = false;
     session.reset();
     privateUser = null;
+    preparedUserId = '';
     notify();
   }
 
-  function preparePrivateSend(prompt, userMessageId) {
+  function preparePrivateSend(prompt, userMessageId, attachmentOnly = false) {
     const text = String(prompt || '');
     const id = String(userMessageId || '');
-    if (!text.trim() || text.length > 20000 || !/^[A-Za-z0-9_-]{8,180}$/.test(id)) return false;
+    if (disposed || !text.trim() && attachmentOnly !== true || text.length > 20000 ||
+        !/^[A-Za-z0-9_-]{8,180}$/.test(id)) return false;
     prepareSend();
-    privateUser = Object.freeze({
+    preparedUserId = id;
+    privateUser = text.trim() ? Object.freeze({
       id,
       role: 'user',
       state: 'complete',
       content: [Object.freeze({ type: 'text', text })]
-    });
+    }) : null;
     notify();
     return true;
   }
@@ -137,6 +142,7 @@
 
   function finishPrivateSend() {
     ownedStream?.reset();
+    preparedUserId = '';
     if (!session.finish()) session.reset();
     notify();
     return true;
@@ -680,14 +686,17 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 21,
+    version: 22,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,
     mergeMessages: (messages, pathname) => session.merge(mergePrivateUser(messages), pathname),
     preparePrivateSend,
     beginPrivateStream: (binding) => {
-      if (disposed || privateUser?.id !== binding.userMessageId) return null;
+      // Stream ownership is not the optimistic text bubble: file-only sends
+      // have no bubble, and a snapshot may already have merged a text bubble.
+      if (disposed || !preparedUserId || preparedUserId !== binding?.userMessageId) return null;
+      preparedUserId = '';
       const generation = conversationGeneration, token = window.__elonChatGptDocumentToken;
       return ownedStream?.begin({ ...binding, current: () => !disposed &&
         generation === conversationGeneration && token === window.__elonChatGptDocumentToken && binding.current() });
@@ -715,6 +724,7 @@
       socketUnsubscribe = null;
       accessSignal = null;
       privateUser = null;
+      preparedUserId = '';
       session.reset();
       if (window.fetch === wrappedFetch) window.fetch = originalFetch;
     }

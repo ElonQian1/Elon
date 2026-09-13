@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const { fixture: attachmentsFixture, CID, PID } = require('./fixtures/chatgpt-fresh-text-attachments');
+const { install: installStream } = require('./fixtures/chatgpt-owned-stream-transport');
 const asset = name => require(path.join('..', 'android/app/src/main/assets', 'chatgpt_web_fresh_text_' + name));
 const turn = () => new Promise(resolve => setImmediate(resolve));
 const settled = async () => { for (let i = 0; i < 8; i++) await turn(); };
@@ -32,6 +33,9 @@ async function fixture(options = {}) {
     options.afterPost?.(f);
     if (options.responseLost) throw Error('synthetic-response-lost');
     yield { response: new Response(null, { headers: { 'content-type': 'text/event-stream' } }) };
+    const message = { id: '33333333-3333-4333-8333-333333333333', author: { role: 'assistant' },
+      status: 'finished_successfully', end_turn: true, content: { content_type: 'text', parts: ['Synthetic reply'] } };
+    yield { data: { conversation_id: CID, message } };
     yield { data: { type: 'message_stream_complete' } };
   })();
   function payload() {
@@ -54,9 +58,7 @@ async function fixture(options = {}) {
     const data = payload(); value.onConversationLoadedFromNetwork(data);
     if (value.shouldApplyResponse()) applied = data;
   };
-  page.__elonChatGptPrivateStreamTransport = {
-    preparePrivateSend: () => true, beginPrivateStream: () => ({ push() {}, finish() {} }), finishPrivateSend() {}
-  };
+  installStream(page);
   const reconciliation = asset('reconcile').create();
   const recovery = asset('recovery').create(page, { reconciliation, delays: [0], timeoutMs: 1000 });
   const api = asset('transaction').create(page, { context: f.api, requests: asset('request'),
@@ -88,6 +90,24 @@ test('attachment extension is opt-in and a one-command trial uses the actual pri
   assert.equal(f.send({ requestId: 'mcp_attach2' }), trial);
   assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
   assert.equal(f.api.dispose(), true);
+});
+
+test('file-only send crosses the real stream transport and reconciles without inventing a text bubble', async () => {
+  const f = await fixture({ enabled: true, history: false });
+  const send = f.send({ prompt: '' });
+  assert.equal((await send.completion).status, 'accepted');
+  await settled();
+  assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
+  assert.equal(f.posted().messages[0].content.content_type, 'multimodal_text');
+  assert.equal(f.posted().messages[0].content.parts.at(-1), '');
+  assert.equal(f.posted().messages[0].metadata.attachments.length, 3);
+  const transport = f.page.__elonChatGptPrivateStreamTransport;
+  assert.equal(transport.current('/c/' + CID).text, 'Synthetic reply');
+  assert.equal(transport.mergeMessages([], '/c/' + CID).some(item => item.role === 'user'), false);
+  assert.equal(f.files.files$().length, 0);
+  assert.equal(send.claimFallback(), false);
+  f.page.__elonChatGptDocumentToken = 'new-document'; f.api.state();
+  assert.equal(f.api.dispose(), true); transport.dispose();
 });
 
 test('HTTP acceptance retires submitted entries but preserves a file added after dispatch', async () => {

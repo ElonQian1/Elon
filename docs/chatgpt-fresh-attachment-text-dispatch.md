@@ -35,7 +35,7 @@ They are parsed without executing downloaded code.
 
 Binding v25 exposes only the reviewed `Ypt` export. The separate
 `chatgpt_web_fresh_text_attachments.js` module validates the formatter output;
-context v7, request v6, reconcile v5 and transaction v14 integrate the result.
+context v7, request v6, reconcile v5 and transaction v15 integrate the result.
 Asset injection remains in `ChatGptWebAdapterAssets`, not the large page adapter.
 
 ## Ownership And Delivery
@@ -73,14 +73,25 @@ post-dispatch uncertainty cannot fall back to another writer.
   zero failures/skips. Includes pinned public contracts, versioned bindings,
   fresh ordinary/tool/project/new/temporary sends, private attachment selection
   and composer/lease, and the existing runtime attachment submission path.
-- New integration tests compose the real ownership lease, context, request,
-  transaction, stream follower and history reconciler with a synthetic provider.
+- Integration tests compose the real ownership lease, context, request,
+  transaction, stream follower, stream transport/projection and history reconciler
+  with a synthetic provider.
   They check default-off/one-command trial, exact request metadata, duplicate
   command, later files, pre-dispatch selection change, lost response, missing
   history references and failed local cleanup. They are not live HTTP evidence.
 - The first integration run used a synthetic command ID longer than the native
   Long/base36 ledger permits. The fixture was corrected; production admission
   was not relaxed. Only the passing run counts.
+- Follow-up source audit found that transport v21 rejected empty text even with
+  a valid file lease; the initial transaction tests mocked that transport away.
+  Transport v22 now uses a one-use stream admission independent of the optimistic
+  text bubble. Transaction v15 explicitly admits file-only sends only after the
+  attachment lease was verified. Empty attachment-only sends never synthesize a
+  blank bubble. Snapshot merging cannot consume the stream admission, and reset,
+  finish and disposal invalidate it. The real transport replaces the mock in all
+  attachment transaction tests. `fresh-stream-admission-20260913-141543-065`:
+  12 Node tests passed, including the legacy transport suite. This remains offline
+  evidence, not production file-only acceptance.
 
 Enable only for grouped acceptance using the existing one-command
 `fresh_text_trial_start`, or explicit `__elonChatGptFreshTextAttachmentsEnabled`.
