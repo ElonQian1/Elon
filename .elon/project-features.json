@@ -19194,7 +19194,7 @@
       "id": "quant-public-https-v1",
       "title": "量化公开页面和行情原生HTTPS",
       "summary": "复用现有TLS与公开量化路由，保持账户和私有接口限制，显式启用后验证部署。",
-      "status": "in_progress",
+      "status": "implemented",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/quant-public-https-v1.md",
@@ -19231,15 +19231,114 @@
         "单一代理不透传凭据，配置非法/缺少TLS失败关闭",
         "正式构建部署、线上TLS及数据验收，APK消费另行验证"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_5428ea62cc4c45008df5911c9fa11494",
-        "agent_id": "codex-quant-grid",
-        "claimed_at_ms": 1789329365176,
-        "expires_at_ms": 1789343765176
-      },
+      "implementation_evidence": [
+        {
+          "path": "docs/quant-public-https-delivery.md",
+          "content_hash": "f22c60b00c81af1c2a40787bdf1342dd097e7b26f3c2ce5bf907f029c6d71dcc",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b633c4bac3e66626fffd179f984ef97f2569e2bd",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b5b78ed1730891cce39891797c922eca109e1b77",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/configure-quant-public-https.sh",
+          "content_hash": "cb7d98ddaef08884dbcd24901f9f3fb4404ef41f69988addabf8aec0c46f7ceb",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b633c4bac3e66626fffd179f984ef97f2569e2bd",
+            "head_blob_oid": "dc90ae94cdca4ab11e0d63bf00c5556b48ab328a",
+            "worktree_blob_oid": "dc90ae94cdca4ab11e0d63bf00c5556b48ab328a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/quant_public_https_config.py",
+          "content_hash": "18da07167daa20100327018beb2179e1fc4d17260a150842e5476ff29317e8e9",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b633c4bac3e66626fffd179f984ef97f2569e2bd",
+            "head_blob_oid": "136ff1021c3cd7beba5968ad5cca892c1c2a8a12",
+            "worktree_blob_oid": "136ff1021c3cd7beba5968ad5cca892c1c2a8a12",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test_quant_public_https_config.py",
+          "content_hash": "e384ea1b8d8821decf0f4eed80438a7447de0e29dac29688135c34a22f8c4714",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b633c4bac3e66626fffd179f984ef97f2569e2bd",
+            "head_blob_oid": "32ce6598cc356469319af7b4bc36268b03ab105e",
+            "worktree_blob_oid": "32ce6598cc356469319af7b4bc36268b03ab105e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/account_security/https/mod.rs",
+          "content_hash": "530d8b17a2e120898cd9fcbbe33b0b77bd8c50a95477b9aea8c0ada2148d5467",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b633c4bac3e66626fffd179f984ef97f2569e2bd",
+            "head_blob_oid": "b2c787afa8abf9de5c0177f4cd9c546a3be68b3a",
+            "worktree_blob_oid": "b2c787afa8abf9de5c0177f4cd9c546a3be68b3a",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/account_security/https/quant_public.rs",
+          "content_hash": "ba99a038caa9cdaa7e64b4ecf6a967130abad809e595ee74fa90c63fbad454c0",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b633c4bac3e66626fffd179f984ef97f2569e2bd",
+            "head_blob_oid": "bd4c22ce4e4b848b34fdfdb0f257721a0267eae9",
+            "worktree_blob_oid": "bd4c22ce4e4b848b34fdfdb0f257721a0267eae9",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/account_security/https/quant_public_tests.rs",
+          "content_hash": "eb55f3cb866776942f7651c49a907c06a41b71784f77dc924b384f88b346b091",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b633c4bac3e66626fffd179f984ef97f2569e2bd",
+            "head_blob_oid": "92fe965a35c217d63d29e112a81a23d8a9019318",
+            "worktree_blob_oid": "92fe965a35c217d63d29e112a81a23d8a9019318",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/tests/account-https-harness/src/lib.rs",
+          "content_hash": "3037aa047357ba62aa6e3ff7f6e3d143e9880bf86249c820f2596f2efbdc86a0",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "b633c4bac3e66626fffd179f984ef97f2569e2bd",
+            "head_blob_oid": "d7f3d7678e499bf902b62ae986b9d7ec19628ff9",
+            "worktree_blob_oid": "d7f3d7678e499bf902b62ae986b9d7ec19628ff9",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1789328234067,
-      "updated_at_ms": 1789329365223
+      "updated_at_ms": 1789330903566
     },
     {
       "id": "quant-public-project-preview-v1",
@@ -27800,26 +27899,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b1f4a5bc1f444ad38aebdc190d62439a",
-      "feature_id": "android-binance-create-visibility-v1",
-      "action": "claimed",
-      "actor": "codex-grid-visibility",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788889795299
-    },
-    {
-      "id": "feature_event_644c69943b324c7791b99d5144e129e5",
-      "feature_id": "android-binance-create-visibility-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-visibility",
-      "reason": "已复现浅色系统和深色窗口的样式错配；修复原生创建与授权页面。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788889865383
-    },
-    {
       "id": "feature_event_7f314ae8f421483a9eb7455f4a9453e9",
       "feature_id": "android-binance-create-visibility-v1",
       "action": "evidence_recorded",
@@ -29798,6 +29877,26 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1789329365223
+    },
+    {
+      "id": "feature_event_62dacfffcc6e43ab9d25d99373b7996f",
+      "feature_id": "quant-public-https-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789330903521
+    },
+    {
+      "id": "feature_event_d493212425114cea98f42b0bfe70badd",
+      "feature_id": "quant-public-https-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "Server 0.3.1745 published; 25 Rust and 4 Python tests passed; trusted HTTPS page/assets/fresh public candles and denial policy verified. Consumer APK and visual acceptance remain separate.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789330903566
     }
   ]
 }

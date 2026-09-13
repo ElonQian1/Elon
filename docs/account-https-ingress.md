@@ -55,7 +55,8 @@ Run the shell entry with `plan`, then `enable` and `verify`, followed by the HTT
 origin. `disable` rolls back the flag. Activation takes the official deployment
 lock and only changes this flag; failure restores it without replacing unrelated
 environment keys. Existing certificate issuance/reloading and listeners remain
-independent. See [requirements](requirements/quant-public-https-v1.md).
+independent. See [requirements](requirements/quant-public-https-v1.md) and
+[deployment evidence](quant-public-https-delivery.md).
 
 The public runtime remains the restricted anonymous product build. HTTPS does not
 enable personal Paper authorization or financial execution. Actual market data,

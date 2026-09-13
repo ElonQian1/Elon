@@ -2,7 +2,7 @@
 version_status: current
 reviewed_at: 2026-09-14
 decision_status: accepted
-implementation_status: in_progress
+implementation_status: implemented
 ---
 
 # 量化公开页面与行情的原生 HTTPS 接入
@@ -28,3 +28,5 @@ implementation_status: in_progress
 ## 实现计划
 
 新增独立 TLS 公开挂载及测试模块；原 TLS 入口仅配置校验和组装，已有公开路由仅调整可见性。配置启用与线上只读验收脚本独立交付，版本和工件由正式发布入口绑定。量化侧另行登记消费端 origin、界面说明和证据，不复制业务代理。
+
+2026-09-14：服务端 0.3.1745 已正式发布并启用；首页、资源、实际行情和拒绝规则通过线上验证。消费者网页和 APK 切换仍单独待交付，详见[发布证据](../quant-public-https-delivery.md)。
