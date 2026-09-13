@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 18, create: factory });
+  const api = Object.freeze({ version: 19, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -81,6 +81,10 @@
     } else if (mode !== 'state') control = 'invalid_mode';
     const armed = trialArmed();
     const safeCode = value => /^[a-z_]{0,64}$/.test(value || '') ? value || '' : 'unknown';
+    const observedOwner = last?.binding?.diagnostics?.();
+    const ownership = ['not_observed', 'document', 'document_token', 'route', 'runtime', 'account', 'registry',
+      'history_scope', 'server_id', 'project_scope', 'owned', 'context_error'];
+    const readiness = ['not_observed', 'identity', 'history_busy', 'ready', 'leaf_mismatch'];
     return { schema: 'elon.fresh_text_trial.v1', version: 7, control, armed,
       operation: last?.operation || '',
       remaining_ms: armed ? Math.max(0, Math.min(120000, trial.expiresAt - now())) : 0,
@@ -89,7 +93,9 @@
       accepted: last?.accepted === true, reconciled: last?.recoveryConfirmed === true || last?.stopConfirmed === true,
       parent_role: ['user', 'assistant'].includes(last?.binding?.parentRole) ? last.binding.parentRole : 'unknown',
       stream_events: last?.streamEvents || 0, event_types: Array.from(last?.eventTypes || []),
-      history: last?.historyCode || 'not_observed' };
+      history: last?.historyCode || 'not_observed',
+      owner: { ownership: ownership.includes(observedOwner?.ownership) ? observedOwner.ownership : 'not_observed',
+        reconciliation: readiness.includes(observedOwner?.reconciliation) ? observedOwner.reconciliation : 'not_observed' } };
   }
 
   function dispatch(command, operation) {

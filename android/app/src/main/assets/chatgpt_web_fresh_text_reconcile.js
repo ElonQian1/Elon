@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 9, create: factory });
+  const api = Object.freeze({ version: 10, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
@@ -171,6 +171,13 @@
     const report = code => { try { onObservation?.(code); } catch (_) {} };
     if (signal.aborted || !binding.canReconcile(request.userMessageId) ||
         typeof binding.runtime.textHydrateHistory !== 'function') { report('owner_changed'); return false; }
+    const firstRoute = binding.newConversation === true && binding.temporary !== true;
+    // The official first-response handler binds and navigates its server ID
+    // before reducing history into the tree. Hydrating while still on the empty
+    // home route can replace that route's composer and retire our captured owner.
+    if (firstRoute && (typeof binding.finalize !== 'function' ||
+        await binding.finalize(signal) !== true || signal.aborted ||
+        !binding.canReconcile(request.userMessageId))) { report('owner_changed'); return false; }
     report('reading');
     let verified = false, verifyNewParent = null;
     // BEn performs official fetch + tree reconciliation. Do not replace the
@@ -186,7 +193,7 @@
       shouldApplyResponse: () => verified && !signal.aborted && binding.canReconcile(request.userMessageId)
     });
     let done = !signal.aborted && verified && binding.reconciled(request.userMessageId, stopped, emptyStopped, verifyNewParent);
-    if (done && binding.finalize) done = await binding.finalize(signal) === true &&
+    if (done && binding.finalize && !firstRoute) done = await binding.finalize(signal) === true &&
       !signal.aborted && binding.reconciled(request.userMessageId, stopped, emptyStopped, verifyNewParent);
     if (verified) report(done ? 'reconciled' : signal.aborted || !binding.canReconcile(request.userMessageId)
       ? 'owner_changed' : 'store_not_reconciled');

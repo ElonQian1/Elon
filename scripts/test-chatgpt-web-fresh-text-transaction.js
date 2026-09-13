@@ -88,6 +88,21 @@ test('controlled trial allows one production dispatch without changing the defau
   assert.equal(JSON.stringify(evidence).includes(command.prompt), false);
 });
 
+test('trial ownership diagnostics publish only bounded guard labels', async () => {
+  const f = fixture({ reconciliation: async () => true });
+  f.binding.diagnostics = () => ({ ownership: 'route', reconciliation: 'leaf_mismatch',
+    privateValue: 'fixture-private-context' });
+  assert.equal((await f.send().completion).status, 'accepted');
+  await turn(); await turn();
+  const state = f.api.trialControl('state');
+  assert.deepEqual(state.owner, { ownership: 'route', reconciliation: 'leaf_mismatch' });
+  assert.equal(JSON.stringify(state).includes('fixture-private-context'), false);
+  f.binding.diagnostics = () => ({ ownership: CID, reconciliation: command.prompt });
+  assert.deepEqual(f.api.trialControl('state').owner,
+    { ownership: 'not_observed', reconciliation: 'not_observed' });
+  f.api.dispose();
+});
+
 test('tool trial admits only its single send and uses the dispatch security hints', async () => {
   for (const tool of ['search', 'picture_v2']) {
     const admissions = [];

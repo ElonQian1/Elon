@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 8, create: factory });
+  const api = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -225,15 +225,23 @@
       return !navigated && page.location.href === href && shared.textNavigationKey() === navigationKey &&
         binding.shared.getSharedProps().conversation === selected;
     }
+    let ownershipStage = 'not_observed', reconciliationStage = 'not_observed';
     function owns() {
       try {
-        return document === page.document && token === page.__elonChatGptDocumentToken && ownedRoute() &&
-          bindings.state().profile_id === PROFILE && account() === ownerAccount && registeredOwner() &&
-          (temporary ? shared.cX?.() === true && shared.uo(selected) === false && shared.textHistoryDisabled() === true &&
+        ownershipStage = 'document'; if (document !== page.document) return false;
+        ownershipStage = 'document_token'; if (token !== page.__elonChatGptDocumentToken) return false;
+        ownershipStage = 'route'; if (!ownedRoute()) return false;
+        ownershipStage = 'runtime'; if (bindings.state().profile_id !== PROFILE) return false;
+        ownershipStage = 'account'; if (account() !== ownerAccount) return false;
+        ownershipStage = 'registry'; if (!registeredOwner()) return false;
+        ownershipStage = 'history_scope';
+        if (!(temporary ? shared.cX?.() === true && shared.uo(selected) === false && shared.textHistoryDisabled() === true &&
             typeof tree()?.is_do_not_remember === 'boolean' : !newConversation || shared.cX?.() === false &&
-              shared.uo(selected) === false && shared.textHistoryDisabled() === false && tree()?.is_do_not_remember === false) &&
-          (selected.serverId$() ?? null) === serverId && scope(tree()) === snapshot.projectId;
-      } catch (_) { return false; }
+              shared.uo(selected) === false && shared.textHistoryDisabled() === false && tree()?.is_do_not_remember === false)) return false;
+        ownershipStage = 'server_id'; if ((selected.serverId$() ?? null) !== serverId) return false;
+        ownershipStage = 'project_scope'; if (scope(tree()) !== snapshot.projectId) return false;
+        ownershipStage = 'owned'; return true;
+      } catch (_) { ownershipStage = 'context_error'; return false; }
     }
     function current() {
       try { return owns() && JSON.stringify(read()) === fingerprint; } catch (_) { return false; }
@@ -250,6 +258,7 @@
     if (!current()) fail('context_changed');
     return Object.freeze({ ...snapshot, get conversationId() { return serverId; }, token, current, owns, shared, runtime: conversation,
       attachments,
+      diagnostics: () => ({ ownership: ownershipStage, reconciliation: reconciliationStage }),
       beforeDispatch() {
         if (!current()) fail('context_changed');
         if (newConversation) conversation.textRememberFirstModel(selected, snapshot.requestedDefaultModel ?? snapshot.model);
@@ -295,10 +304,13 @@
       },
       navigationReady: () => temporary || !newConversation || navigated,
       canReconcile(userMessageId) {
-        if (!serverId || !owns() || !historyAllowed()) return false;
+        reconciliationStage = 'identity'; if (!serverId || !owns()) return false;
+        reconciliationStage = 'history_busy'; if (!historyAllowed()) return false;
         const state = tree(), leaf = shared.HM.getCurrentMessage(state);
-        return leaf?.id === snapshot.parentId || leaf?.id === userMessageId ||
+        const ready = leaf?.id === snapshot.parentId || leaf?.id === userMessageId ||
           shared.HM.getParentPromptNode(state, leaf?.id)?.id === userMessageId;
+        reconciliationStage = ready ? 'ready' : 'leaf_mismatch';
+        return ready;
       },
       canStop(userMessageId) {
         return this.canReconcile(userMessageId);

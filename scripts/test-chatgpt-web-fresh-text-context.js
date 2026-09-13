@@ -4,6 +4,33 @@ const assert = require('node:assert/strict');
 const { fixture, CID, PID } = require('./fixtures/chatgpt-fresh-text-context');
 
 const PROJECT = 'g-p-' + 'a'.repeat(32);
+
+test('ownership diagnostics retain only the failed guard, not account or conversation values', async () => {
+  for (const [stage, change] of [
+    ['document', f => { f.page.document = {}; }],
+    ['document_token', f => { f.page.__elonChatGptDocumentToken = 'doc_changed'; }],
+    ['route', f => { f.page.location.href = 'https://chatgpt.com/c/' + PID; }],
+    ['runtime', f => { f.page.__elonChatGptPrivateRuntimeBindings.state = () => ({ profile_id: 'other' }); }],
+    ['account', f => { f.identity('private-identity-must-not-escape'); }],
+    ['registry', f => { f.shared.canvasConversations = () => []; }],
+    ['server_id', f => { f.selected.serverId$ = () => PID; f.shared.canvasConversations = () => [f.selected]; }]
+  ]) {
+    const f = fixture(), binding = await f.api.capture(f.node);
+    assert.equal(binding.canReconcile(PID), true);
+    assert.deepEqual(binding.diagnostics(), { ownership: 'owned', reconciliation: 'ready' });
+    change(f);
+    assert.equal(binding.owns(), false);
+    assert.equal(binding.diagnostics().ownership, stage === 'server_id' ? 'registry' : stage);
+    const json = JSON.stringify(binding.diagnostics());
+    for (const secret of [CID, PID, 'fixture-account', 'private-identity-must-not-escape', 'https://'])
+      assert.equal(json.includes(secret), false);
+  }
+  const f = fixture(), binding = await f.api.capture(f.node);
+  f.shared.Fl = () => true;
+  assert.equal(binding.canReconcile(PID), false);
+  assert.deepEqual(binding.diagnostics(), { ownership: 'owned', reconciliation: 'history_busy' });
+});
+
 function projectFixture(path = '/c/' + CID) {
   const f = fixture();
   f.tree.mode = { kind: 'gizmo_interaction', gizmo_id: PROJECT, gizmo: { name: 'fixture display only' } };

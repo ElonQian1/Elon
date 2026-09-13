@@ -14,6 +14,12 @@ projection, stop and history recovery. It does not add another sender or editor.
 New-conversation scope requires an explicit trial until grouped native acceptance.
 The accepted existing-conversation default is unchanged.
 
+Current follow-up: [first-route reconciliation evidence](reports/chatgpt-fresh-first-route-20260913.md).
+The 1708 pending fixture is now resolved by exact native/provider readback.
+One first-send trial on 1709 then failed with `owner_changed`, not the prior
+parent mismatch. Navigate-before-hydrate is offline-verified but not yet accepted
+on device; new-conversation production default remains disabled.
+
 ## Native Acceptance Failure On 1706
 
 `fresh-new-native-ui-20260913-183220-505` used the actual native composer and
@@ -256,7 +262,9 @@ decoder publishes text to the native session after identity binding.
 The stop request reads the acquired server ID, not the original null snapshot.
 Before the ID arrives, it cannot consume the one-shot stop conduit. Authoritative
 history must match the submitted user/parent/branch, project and privacy state.
-Only then may official hydration and navigation complete the transaction.
+For a non-temporary first send, owned server-route navigation now precedes
+history hydration, following the pinned first-response handler. The same
+identity/branch checks still guard history application and writer release.
 
 Delayed project navigation callbacks expire on cancellation, timeout, changed
 identity or route; a late result cannot pull the user back. Rejected navigation
@@ -274,7 +282,8 @@ startup, Android HTTP, WebView removal, or a measured thermal improvement.
   or skips, including pinned source contracts, binding compatibility and shared
   stream regressions. The real module composition covers first send plus a
   second existing-conversation send, stop/partial text, project association,
-  single ID adoption, SSE/v1 and history-before-navigation.
+  single ID adoption and SSE/v1. Its original history-before-navigation order
+  was superseded by the September 13 first-route follow-up linked above.
 - Failure cases cover missing server ID, wrong branch/root/privacy/identity,
   changed navigation entry, rejected/late navigation and duplicate native
   commands. Successfully applied history with failed navigation stays pending;

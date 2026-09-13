@@ -132,6 +132,25 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     includes(facts(definition(conversation, 'oQe')).properties, ['mapping', 'children', 'parent']);
   });
 
+  await t.test('official first response binds and navigates before reducing its message event', () => {
+    const handlers = [];
+    visit(definition(composer, 'C1t'), node => {
+      const label = node.arguments?.[1];
+      const name = label?.type === 'TemplateLiteral' && label.expressions.length === 0
+        ? label.quasis.map(part => part.value.cooked).join('') : label?.value;
+      if (node.type === 'CallExpression' && node.callee.name === 'ym' &&
+          name === 'handleResponse') handlers.push(node.arguments[2]);
+    });
+    assert.equal(handlers.length, 1);
+    const handler = handlers[0], text = composer.text.slice(handler.start, handler.end);
+    includes(facts(handler).calls, ['Kr', '_A']);
+    const bind = text.indexOf('Kr(this.conversation.id,t)'), navigate = text.indexOf('_A(ia,');
+    const reduce = text.indexOf('switch(HCt(');
+    assert.ok(bind >= 0 && navigate > bind && reduce > navigate);
+    assert.match(text, /this\.responseThreadId===void 0&&`conversationId`in e/);
+    assert.match(text, /h1t\(this\.requestHistoryEntryKey,this\.requestPathname,this\.conversation\.id\)/);
+  });
+
   await t.test('fresh request uses the reviewed security-aware client and header builder', () => {
     assert.equal(shared.exported.get('b4'), 'K');
     const client = facts(definition(shared, 'Sd'));

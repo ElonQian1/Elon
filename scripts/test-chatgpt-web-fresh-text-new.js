@@ -112,6 +112,40 @@ function paginatedHistory(project = false, hidden = true) {
   return value;
 }
 
+test('new first-turn routing settles before history hydration can retire the empty-home composer', async () => {
+  for (const project of [false, true]) {
+    const f = newFixture(project), binding = await f.api.capture(f.node, null, admission);
+    binding.adoptConversation(CID, { input_message: input }, UID);
+    const value = paginatedHistory(project), history = historyModule.create();
+    let reads = 0;
+    f.conversation.textHydrateHistory = async (_, options) => {
+      reads++;
+      assert.equal(binding.navigationReady(), true, 'owned route must settle before hydration');
+      assert.equal(f.navigations, 1);
+      options.onConversationLoadedFromNetwork(value);
+      assert.equal(options.shouldApplyResponse(), true);
+      applyHistory(f, value);
+    };
+    assert.equal(await history.reconcile(binding, { userMessageId: UID }, new AbortController().signal), true);
+    assert.equal(reads, 1); assert.equal(f.navigations, 1);
+  }
+});
+
+test('failed or cancelled first-turn navigation never starts the history loader', async () => {
+  for (const cancel of [false, true]) {
+    const f = newFixture(), binding = await f.api.capture(f.node, null, admission);
+    binding.adoptConversation(CID, { input_message: input }, UID);
+    const controller = new AbortController(); let reads = 0;
+    f.conversation.textNavigateConversation = () => {
+      if (cancel) controller.abort();
+      else f.page.location.href = 'https://chatgpt.com/c/' + AID;
+    };
+    f.conversation.textHydrateHistory = async () => { reads++; };
+    assert.equal(await historyModule.create().reconcile(binding, { userMessageId: UID }, controller.signal), false);
+    assert.equal(reads, 0);
+  }
+});
+
 test('complete provider pagination roots reconcile only their exact conversation and full message chain', async () => {
   for (const hidden of [false, true]) {
     const f = newFixture(), binding = await f.api.capture(f.node, null, admission);
@@ -177,7 +211,7 @@ test('a hidden ancestor cannot authorize a different or modified canonical histo
       applyHistory(f, value); mutate(f);
     };
     assert.equal(await historyModule.create().reconcile(binding, { userMessageId: UID }, new AbortController().signal), false);
-    assert.equal(f.navigations, 0);
+    assert.equal(f.navigations, 1, 'the owned server route is independent of accepting a modified history tree');
   }
 });
 
@@ -275,7 +309,7 @@ test('server identity adoption is single-owner, immutable and not authorized by 
   assert.equal(f.binds, 1);
 });
 
-test('official history precedes navigation; empty legacy root is normalized without accepting another parent', async () => {
+test('owned navigation precedes history; empty legacy root is normalized without accepting another parent', async () => {
   for (const project of [false, true]) for (const emptyRoot of [false, true]) {
     const f = newFixture(project), binding = await f.api.capture(f.node, null, admission);
     binding.adoptConversation(CID, { input_message: input }, UID);
@@ -288,7 +322,7 @@ test('official history precedes navigation; empty legacy root is normalized with
     }
     assert.equal(binding.navigationReady(), false);
     f.conversation.textHydrateHistory = async (id, options) => {
-      assert.equal(id, CID); assert.equal(f.navigations, 0);
+      assert.equal(id, CID); assert.equal(f.navigations, 1);
       options.onConversationLoadedFromNetwork(value);
       assert.equal(options.shouldApplyResponse(), true);
       applyHistory(f, value);
@@ -439,11 +473,11 @@ test('new private send binds, streams, hydrates and permits exactly one existing
   }
 });
 
-test('failed navigation retains the writer despite successfully applied history and cannot replay POST', async () => {
+test('failed navigation retains the writer without applying history or replaying POST', async () => {
   const r = await integration(true, { navigationFails: true });
-  for (let i = 0; i < 30 && !r.counts.apply; i++) await tick();
+  for (let i = 0; i < 30 && !r.api.state().dispatched; i++) await tick();
   await r.api.recover().completion;
-  assert.ok(r.counts.apply > 0); assert.equal(r.f.navigations, 0);
+  assert.equal(r.counts.apply, 0); assert.equal(r.f.navigations, 0);
   assert.equal(r.api.state().pending, true);
   assert.equal((await r.api.send({ ...r.command, requestId: 'mcp_2' }).completion).code, 'busy');
   assert.equal(r.counts.posts, 1); assert.equal(r.sent.claimFallback(), false);
