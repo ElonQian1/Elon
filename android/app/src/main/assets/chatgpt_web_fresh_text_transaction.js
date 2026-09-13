@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 11, create: factory });
+  const api = Object.freeze({ version: 12, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -44,7 +44,8 @@
     boundary();
     if (active?.dispatched && active.finished && !active.stopping && !active.recovering && !active.recoveryCompletion) {
       try { if (active.stopConfirmed || active.recoveryConfirmed ||
-        active.binding.reconciled(active.request.userMessageId, active.stopAcknowledged === true)) active = null; } catch (_) {}
+        active.binding.reconciled(active.request.userMessageId, active.stopAcknowledged === true) &&
+          active.binding.navigationReady?.() !== false) active = null; } catch (_) {}
     }
     return { version: 6, transport: 'fresh_page_http_v1', pending: active !== null,
       phase: active?.phase || 'idle', dispatched: active?.dispatched === true,
@@ -108,6 +109,7 @@
     const continuation = stoppedParent;
     const allowTools = page.__elonChatGptFreshTextToolsEnabled === true || trialArmed();
     const allowProjects = page.__elonChatGptFreshTextProjectsEnabled === true || trialArmed();
+    const allowNewConversations = page.__elonChatGptFreshTextNewConversationsEnabled === true || trialArmed();
     trial = null;
     let resolve;
     const owner = { token, document, stamp, controller: new page.AbortController(), phase: 'preparing',
@@ -165,7 +167,7 @@
 
     async function run() {
       timeout(options.prepareTimeoutMs || 15000, 'preparation_timeout');
-      owner.binding = await abortable(context.capture(command.composer, continuation, { allowTools, allowProjects }));
+      owner.binding = await abortable(context.capture(command.composer, continuation, { allowTools, allowProjects, allowNewConversations }));
       check();
       owner.request = requests.create(owner.binding, command);
       const { shared, runtime } = owner.binding;
@@ -194,13 +196,16 @@
         onBeforeRequestStart() {
           check();
           if (owner.dispatched) throw Error('preparation_consumed');
+          owner.binding.beforeDispatch?.();
           // The provider invokes fetch immediately after this hook. Crossing
           // this boundary is uncertain even if fetch subsequently throws.
           owner.dispatched = true; owner.phase = 'dispatching';
           stoppedParent = null;
           if (!stream.preparePrivateSend(command.prompt, owner.request.userMessageId)) throw Error('stream_unavailable');
           owner.sink = stream.beginPrivateStream({ conversationId: owner.binding.conversationId,
-            userMessageId: owner.request.userMessageId, current: owner.stopCurrent });
+            userMessageId: owner.request.userMessageId, current: owner.stopCurrent,
+            adoptConversation: owner.binding.newConversation ? (id, payload) =>
+              owner.binding.adoptConversation(id, payload, owner.request.userMessageId) : undefined });
           if (!owner.sink) throw Error('stream_unavailable');
           command.onDispatch?.();
           return {};
@@ -332,5 +337,5 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 11, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
+  return Object.freeze({ version: 12, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

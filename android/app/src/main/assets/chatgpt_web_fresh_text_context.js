@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -10,6 +10,7 @@
   const idPattern = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
   const projectPattern = /^g-p-[a-f0-9]{32}$/i;
   const routePattern = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9-]{36})$/i;
+  const newProjectPattern = /^\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?\/project$/i;
 
   function stamp() {
     try {
@@ -26,12 +27,17 @@
     if (bindings?.state?.().profile_id !== PROFILE) fail('runtime_unavailable');
     const token = page.__elonChatGptDocumentToken, href = page.location.href, document = page.document;
     const url = new URL(href);
-    const route = routePattern.exec(url.pathname);
+    const existingRoute = routePattern.exec(url.pathname);
+    const newRoute = url.pathname === '/' ? [url.pathname, null, null] : newProjectPattern.exec(url.pathname);
+    const route = existingRoute || newRoute;
     if (url.origin !== 'https://chatgpt.com' || url.search || url.hash || url.username || url.password ||
-        !route || !idPattern.test(route[2])) fail('scope_unsupported');
+        !route || !existingRoute && options.allowNewConversations !== true) fail('scope_unsupported');
     const submit = page.__elonChatGptPrivateTextRuntimeSubmit;
     const binding = submit?.captureConversation?.(composer);
-    if (!binding || binding.newThread || binding.temporary || binding.href !== href) fail('context_unavailable');
+    if (!binding || binding.temporary || binding.href !== href ||
+        (existingRoute ? binding.newThread || !idPattern.test(route[2]) : !binding.newThread || binding.serverId !== null)) {
+      fail('context_unavailable');
+    }
     const [shared, conversation, editor] = await Promise.all([
       bindings.load('shared'), bindings.load('conversation'), bindings.load('composer')
     ]);
@@ -50,6 +56,19 @@
         typeof conversation.textHydrateHistory !== 'function' ||
         typeof editor.Ng !== 'function') fail('runtime_unavailable');
     const selected = binding.conversation, tree = () => shared.XM(selected.id);
+    const newConversation = !existingRoute;
+    let serverId = binding.serverId, navigating = false, navigated = false, targetNavigationKey = null;
+    if (newConversation && (['textBindConversationId', 'textClientConversation', 'textResolvedConversationId',
+      'textNavigationKey', 'textNavigate', 'canvasQueryClient'].some(key => typeof shared[key] !== 'function') ||
+      ['textRequestedDefaultModel', 'textRememberFirstModel', 'textNavigateConversation']
+        .some(key => typeof conversation[key] !== 'function') ||
+      shared.textClientConversation(selected.id) !== true || shared.textResolvedConversationId(selected.id) != null)) {
+      fail('runtime_unavailable');
+    }
+    const navigationKey = newConversation ? shared.textNavigationKey() : null;
+    if (newConversation && (typeof navigationKey !== 'string' || !navigationKey || navigationKey.length > 256)) {
+      fail('context_unavailable');
+    }
     const selectedTool = editor.Ng(binding.controller)?.activeSystemHintType;
     let toolOwner = null;
     if (selectedTool !== null) {
@@ -66,7 +85,7 @@
     function registeredOwner() {
       const conversations = shared.canvasConversations?.();
       if (!Array.isArray(conversations) || conversations.length > 512) return false;
-      const matches = conversations.filter(item => item?.serverId$?.() === binding.serverId);
+      const matches = conversations.filter(item => serverId === null ? item?.id === selected.id : item?.serverId$?.() === serverId);
       return matches.length === 1 && matches[0] === selected;
     }
 
@@ -111,8 +130,9 @@
       if (!state || !registeredOwner() || props.conversation !== selected || props.composerController !== binding.controller ||
           props.isDisabled !== false || props.isConsumerLockdownModeLoadingForConversation !== false ||
           props.shouldBlockConsumerLockdownModeActionsForConversation !== false ||
-          props.structuredInputMessageId != null || selected.serverId$() !== binding.serverId ||
-          !idPattern.test(binding.serverId || '') || route[2] !== binding.serverId ||
+          props.structuredInputMessageId != null || (selected.serverId$() ?? null) !== binding.serverId ||
+          (newConversation ? serverId !== null || props.isNewThread !== true :
+            !idPattern.test(binding.serverId || '') || route[2] !== binding.serverId) ||
           shared.cX?.() !== false || shared.uo(selected) !== false ||
           conversation.textPrepareEnabled() !== true || conversation.textReviewAck(selected) != null) fail('scope_unsupported');
       const projectId = scope(state);
@@ -140,21 +160,46 @@
         (parent.status === 'finished_partial_completion' || parent.status === 'finished_successfully' && parent.end_turn === true);
       const confirmedStoppedUser = parent?.author?.role === 'user' && stoppedParent?.id === parent.id &&
         stoppedParent.current() === true;
-      if (!parent || parent.id !== props.currentLeafId || !idPattern.test(parent.id) ||
-          !(completedAssistant || confirmedStoppedUser) ||
+      const rootParent = newConversation && parent?.id === 'client-created-root' && parent.author?.role === 'root' &&
+        parent.content?.content_type === 'text' && Array.isArray(parent.content.parts) && parent.content.parts.length === 0 &&
+        shared.HM.getIsNewConversation?.(state) === true && shared.HM.getAllMessages?.(state)?.length === 1 &&
+        state.isLoading === false && state.is_do_not_remember === false && shared.textHistoryDisabled() === false;
+      if (!parent || parent.id !== props.currentLeafId ||
+          (newConversation ? !rootParent : !idPattern.test(parent.id) || !(completedAssistant || confirmedStoppedUser)) ||
           shared.textModelOverride()?.model_slug === model?.id) fail('parent_unavailable');
+      const requestedDefaultModel = newConversation ? conversation.textRequestedDefaultModel(selected, model?.id) ?? null : null;
+      if (requestedDefaultModel !== null && (typeof requestedDefaultModel !== 'string' ||
+          !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(requestedDefaultModel))) fail('context_invalid');
       return { conversationId: binding.serverId, parentId: parent.id, parentRole: parent.author.role, model: model?.id,
+        newConversation, requestedDefaultModel,
         tool: selectedTool, projectId, projectHeaders: projectHeaders(state, projectId),
         effort: conversation.yRt(selected).conversationThinkingEffort$() ?? null,
         serviceTier: conversation.l0(selected).getServiceTierForSubmission$() ?? null,
         historyDisabled: shared.textHistoryDisabled(), doNotRemember: state.is_do_not_remember === true };
     }
     const snapshot = read(), fingerprint = JSON.stringify(snapshot);
+    function ownedRoute() {
+      if (!newConversation) return page.location.href === href;
+      if (navigating && serverId) {
+        const currentUrl = new URL(page.location.href), target = routePattern.exec(currentUrl.pathname);
+        if (currentUrl.origin === url.origin && !currentUrl.search && !currentUrl.hash &&
+            !currentUrl.username && !currentUrl.password && target?.[2] === serverId &&
+            (!target[1] || target[1] === snapshot.projectId)) {
+          const key = shared.textNavigationKey();
+          if (!navigated) { navigated = true; targetNavigationKey = key; }
+          return typeof key === 'string' && !!key && key === targetNavigationKey;
+        }
+      }
+      return !navigated && page.location.href === href && shared.textNavigationKey() === navigationKey &&
+        binding.shared.getSharedProps().conversation === selected;
+    }
     function owns() {
       try {
-        return document === page.document && token === page.__elonChatGptDocumentToken && href === page.location.href &&
+        return document === page.document && token === page.__elonChatGptDocumentToken && ownedRoute() &&
           bindings.state().profile_id === PROFILE && account() === ownerAccount && registeredOwner() &&
-          selected.serverId$() === snapshot.conversationId && scope(tree()) === snapshot.projectId;
+          (!newConversation || shared.cX?.() === false && shared.uo(selected) === false &&
+            shared.textHistoryDisabled() === false && tree()?.is_do_not_remember === false) &&
+          (selected.serverId$() ?? null) === serverId && scope(tree()) === snapshot.projectId;
       } catch (_) { return false; }
     }
     function current() {
@@ -170,9 +215,52 @@
         !page.__elonChatGptCanvasDocumentActions?.generationPending?.();
     }
     if (!current()) fail('context_changed');
-    return Object.freeze({ ...snapshot, token, current, owns, shared, runtime: conversation,
+    return Object.freeze({ ...snapshot, get conversationId() { return serverId; }, token, current, owns, shared, runtime: conversation,
+      beforeDispatch() {
+        if (!current()) fail('context_changed');
+        if (newConversation) conversation.textRememberFirstModel(selected, snapshot.requestedDefaultModel ?? snapshot.model);
+      },
+      adoptConversation(id, payload, userMessageId) {
+        if (!owns() || !idPattern.test(id || '')) return false;
+        if (serverId !== null) return serverId === id;
+        const input = payload?.input_message || (payload?.message?.author?.role === 'user' ? payload.message : null);
+        const message = input || payload?.message;
+        // This callback is invoked only by this command's decoded HTTP/topic
+        // stream, never by passive observers or a directory response.
+        if (input && input.id !== userMessageId || !message && payload?.type !== 'resume_conversation_token' ||
+            message && (!idPattern.test(message.id || '') || !['user', 'assistant'].includes(message.author?.role))) return false;
+        if (shared.canvasConversations().some(item => item?.serverId$?.() === id) ||
+            shared.textResolvedConversationId(selected.id) != null) return false;
+        shared.textBindConversationId(selected.id, id);
+        serverId = id;
+        return owns() && shared.textResolvedConversationId(selected.id) === id;
+      },
+      async finalize(signal) {
+        if (!newConversation) return true;
+        if (signal.aborted || !owns() || !serverId) return false;
+        let active = true, navigationFailed = false;
+        try {
+          if (!navigated) {
+            navigating = true;
+            // Project route resolution may finish after the user leaves. Expire
+            // its callback with this attempt, not just with the page lifetime.
+            const navigate = (target, options) => {
+              if (active && !signal.aborted && owns()) shared.textNavigate(target, options);
+            };
+            Promise.resolve(conversation.textNavigateConversation(navigate, shared.canvasQueryClient(), serverId,
+              snapshot.projectId !== null, undefined, true)).catch(() => { navigationFailed = true; });
+          }
+          for (let attempt = 0; attempt < 30; attempt++) {
+            if (signal.aborted || navigationFailed || !owns()) return false;
+            if (navigated) return true;
+            await new Promise(resolve => page.setTimeout(resolve, 100));
+          }
+          return false;
+        } finally { active = false; }
+      },
+      navigationReady: () => !newConversation || navigated,
       canReconcile(userMessageId) {
-        if (!owns() || !historyAllowed()) return false;
+        if (!serverId || !owns() || !historyAllowed()) return false;
         const state = tree(), leaf = shared.HM.getCurrentMessage(state);
         return leaf?.id === snapshot.parentId || leaf?.id === userMessageId ||
           shared.HM.getParentPromptNode(state, leaf?.id)?.id === userMessageId;

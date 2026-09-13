@@ -1,14 +1,15 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateOwnedStream = api;
 })(typeof window === 'object' ? window : null, function (options) {
   'use strict';
   let owner = null;
   const active = () => !!owner && owner.current();
-  function begin({ conversationId, current }) {
-    if (!conversationId || typeof current !== 'function' || !current()) return null;
+  function begin({ conversationId, current, adoptConversation }) {
+    if ((!conversationId && (conversationId !== null || typeof adoptConversation !== 'function')) ||
+        typeof current !== 'function' || !current()) return null;
     const next = { current, failure: '', done: false };
     owner = next;
     options.session.begin();
@@ -16,7 +17,14 @@
     const decoder = options.policy.createSseDecoder(payload => {
       if (!owns()) { next.failure = 'context_changed'; return; }
       const id = options.conversationId(payload);
+      if (id && conversationId === null) {
+        try {
+          if (adoptConversation(id, payload) !== true) { next.failure = 'stream_owner_changed'; return; }
+          conversationId = id;
+        } catch (_) { next.failure = 'stream_owner_changed'; return; }
+      }
       if (id && id !== conversationId) { next.failure = 'stream_owner_changed'; return; }
+      if (!conversationId) return;
       options.report?.(payload);
       if (options.session.accept(payload)) { options.rich?.(payload); options.notify(); }
     }, ending => {
@@ -43,6 +51,7 @@
       },
       finish() {
         check();
+        if (!conversationId) throw Error('stream_owner_changed');
         decoder.push('data: [DONE]\n\n');
         check();
       }

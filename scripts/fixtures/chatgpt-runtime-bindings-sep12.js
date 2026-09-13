@@ -18,9 +18,12 @@ const expectedExports = {
 const extraExports = {
   shared: { attachmentUploadType: 'am', conversationStore: 'pY', canvasQueryClient: 'h2',
     textBusinessContext: 'JO', textProjectHeaders: 'iK', textLockedProjectId: 'Yr', textLockedChatPin: 'aK',
+    textBindConversationId: 'IP', textClientConversation: 'gY', textResolvedConversationId: 'QJ',
+    textNavigationKey: 'HK', textNavigate: 'KK',
     writingUpdateState: 'sY', writingTreeOwner: 'KJ' },
   conversation: { attachmentBaseLimit: 'W$t', attachmentMaxUploads: 'Z$t',
-    attachmentPendingCount: 'K$t', attachmentConfiguredLimit: 'U$t', canvasDirtyInit: 'Dvt', useCanvasDirty: 'Avt' },
+    attachmentPendingCount: 'K$t', attachmentConfiguredLimit: 'U$t', canvasDirtyInit: 'Dvt', useCanvasDirty: 'Avt',
+    textRequestedDefaultModel: 'Jsn', textRememberFirstModel: 'DDn', textNavigateConversation: 'qHt' },
   composer: { fh: 'Nh' }
 };
 const anchor = 'c2675c8c-o59yc0xo7p9m3q3o.js';

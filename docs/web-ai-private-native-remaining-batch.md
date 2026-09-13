@@ -29,9 +29,10 @@ reading/edit/export and ordinary save are accepted (1692; code export 1688).
 [Project save](chatgpt-writing-blocks-project-save.md) is offline-verified;
 temporary/library/typed-widget save remains incomplete.
 
-[Fresh tools](chatgpt-fresh-tool-text-dispatch.md) and
-[project sends](chatgpt-fresh-project-text-dispatch.md) are implemented/offline-verified.
-Group their APK/native acceptance; neither scope is promoted yet.
+[Fresh tools](chatgpt-fresh-tool-text-dispatch.md),
+[project sends](chatgpt-fresh-project-text-dispatch.md) and
+[new conversations](chatgpt-fresh-new-text-dispatch.md) are offline-verified;
+group APK/native acceptance. None of these extensions is promoted yet.
 
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
 three taps joined one 1077 ms read; native TXT saved 78 bytes. Supplemental/PCA

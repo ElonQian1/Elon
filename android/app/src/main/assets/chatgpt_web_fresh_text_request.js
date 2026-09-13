@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextRequest = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -10,19 +10,23 @@
   const fail = code => { throw Error(code); };
 
   function body(context) {
-    if (!UUID.test(context?.conversationId || '') || !UUID.test(context.parentId || '') ||
+    if (!context || (context.newConversation === true ? context.conversationId !== null ||
+        context.parentId !== 'client-created-root' || context.parentRole !== 'root' || context.historyDisabled || context.doNotRemember :
+        !UUID.test(context.conversationId || '') || !UUID.test(context.parentId || '')) ||
         !SLUG.test(context.model || '') || typeof context.historyDisabled !== 'boolean' ||
         typeof context.doNotRemember !== 'boolean' ||
         context.projectId != null && (typeof context.projectId !== 'string' ||
           !/^g-p-[a-f0-9]{32}$/i.test(context.projectId) || context.doNotRemember) ||
         context.effort != null && !SLUG.test(context.effort) ||
         context.serviceTier != null && !SLUG.test(context.serviceTier) ||
-        ![null, 'search', 'picture_v2'].includes(context.tool ?? null)) fail('context_invalid');
+        ![null, 'search', 'picture_v2'].includes(context.tool ?? null) ||
+        context.requestedDefaultModel != null && (context.newConversation !== true ||
+          typeof context.requestedDefaultModel !== 'string' || !SLUG.test(context.requestedDefaultModel))) fail('context_invalid');
     const date = new Date();
-    // Reviewed AB projection for an existing conversation with a plain text input.
+    // AB omits conversation_id for a root request; only the server assigns it.
     // No previous request body, proof, conduit or model override is copied.
     return {
-      action: 'next', conversation_id: context.conversationId,
+      action: 'next', ...(context.newConversation ? {} : { conversation_id: context.conversationId }),
       parent_message_id: context.parentId, model: context.model,
       client_prepare_state: 'none', timezone_offset_min: date.getTimezoneOffset(),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -51,6 +55,8 @@
     // The website prepares using the selected hint, but Search dispatch uses a
     // force flag. User metadata retains the selection for history/UI continuity.
     const dispatchBody = { ...preparedBody,
+      ...(context.requestedDefaultModel != null ? { requested_default_model: context.requestedDefaultModel,
+        one_off_model_override: true } : {}),
       ...(tool ? { enable_message_followups: true } : {}),
       ...(tool === 'search' ? { system_hints: [], force_use_search: true,
         client_reported_search_source: 'conversation_composer_web_icon' } : {}) };
@@ -67,9 +73,11 @@
         if (!Array.isArray(excludeAsyncTypes) || ![JSON.stringify([]), JSON.stringify(['pro_mode'])]
           .includes(JSON.stringify(excludeAsyncTypes))) fail('stop_scope_invalid');
         if (current() !== true) fail('context_changed');
+        const conversationId = context.conversationId;
+        if (!UUID.test(conversationId || '')) fail('stop_ownership_unavailable');
         stopConsumed = true;
         const conduit = stopConduit; stopConduit = null;
-        return { requestBody: { conversation_id: context.conversationId, exclude_async_types: [...excludeAsyncTypes] },
+        return { requestBody: { conversation_id: conversationId, exclude_async_types: [...excludeAsyncTypes] },
           additionalHeaders: { 'x-conduit-token': conduit, 'x-oai-turn-trace-id': turnId } };
       },
       consume(preparation, security, headersFromSecurity, current) {

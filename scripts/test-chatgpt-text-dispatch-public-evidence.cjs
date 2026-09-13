@@ -63,6 +63,42 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
   }
   const { conversation, composer, shared } = modules;
 
+  await t.test('new threads register the server identity without replacing the conversation object', () => {
+    assert.equal(shared.exported.get('IP'), 'H1e');
+    const bind = definition(shared, 'IP', true), text = shared.text.slice(bind.start, bind.end);
+    includes(facts(bind).properties, ['serverId$', 'set', 'conversations', 'newClientIdToServerId', 'setServerIdForNewThread']);
+    assert.match(text, /n=gj\(e\)/);
+    assert.match(text, /delete r\[e\],r\[t\]=n/);
+    assert.equal(shared.exported.get('gY'), 'Gx');
+    assert.equal(shared.exported.get('QJ'), 'qx');
+    assert.equal(shared.exported.get('HK'), 'ILe');
+    includes(facts(definition(shared, 'HK', true)).properties, ['__reactRouterDataRouter', 'location', 'key', 'history']);
+    for (const [local, name] of [['Kr', 'IP'], ['sh', 'gY'], ['gc', 'QJ'], ['xr', 'HK'], ['ia', 'KK']]) {
+      assert.deepEqual(composer.imports.get(local), { file: './' + assets.shared[0], name });
+    }
+    includes(facts(definition(composer, 'C1t')).properties, ['handleResponse', 'conversationId', 'responseThreadId', 'serverId$']);
+  });
+
+  await t.test('new requests retain the root parent, first model selection and official navigation', () => {
+    includes(facts(definition(shared, '_Pe')).strings, ['client-created-root']);
+    includes(facts(definition(shared, 'Cx')).strings, ['client-created-root']);
+    const project = definition(composer, 'AB'), body = composer.text.slice(project.start, project.end);
+    assert.match(body, /conversation_id:r/);
+    assert.match(body, /requested_default_model:e\.requestedDefaultModel/);
+    assert.match(body, /one_off_model_override:jB\(e\.oneOffModelOverride\|\|u\|\|e\.requestedDefaultModel!=null\)/);
+    for (const [local, name] of [['dTe', 'Jsn'], ['Lhe', 'DDn'], ['_A', 'qHt']]) {
+      assert.deepEqual(composer.imports.get(local), { file: './' + assets.conversation[0], name });
+      assert.ok(definition(conversation, name, true));
+    }
+    includes(facts(definition(conversation, 'qHt', true)).properties, ['getGizmoId', 'replace']);
+    const navigateGuard = definition(conversation, 'r_n');
+    assert.equal(conversation.text.slice(navigateGuard.start, navigateGuard.end), 'function r_n(e){return e!==SN}');
+    includes(facts(definition(composer, 'A1t')).calls, ['dTe', 'Lhe']);
+    // The history reader normalizes the legacy empty root only after its raw callback.
+    includes(facts(definition(conversation, 'oQe')).strings, ['', 'client-created-root']);
+    includes(facts(definition(conversation, 'oQe')).properties, ['mapping', 'children', 'parent']);
+  });
+
   await t.test('fresh request uses the reviewed security-aware client and header builder', () => {
     assert.equal(shared.exported.get('b4'), 'K');
     const client = facts(definition(shared, 'Sd'));

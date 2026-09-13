@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 22, create: factory });
+  const api = Object.freeze({ version: 23, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -28,6 +28,8 @@
       textTopic: undefined,
       textBusinessContext: undefined, textProjectHeaders: undefined,
       textLockedProjectId: undefined, textLockedChatPin: undefined,
+      textBindConversationId: undefined, textClientConversation: undefined, textResolvedConversationId: undefined,
+      textNavigationKey: undefined, textNavigate: undefined,
       writingUpdateState: undefined, writingTreeOwner: undefined },
     conversation: { AGt: 'uKt', J5t: 'O7t', Nrn: 'Cin', yRt: '$Rt', Grn: 'Fin',
       vRt: 'QRt', p8t: 'q8t', l0: 'E0', M1t: 'f0t', Rdn: 'Ofn', Rrn: 'Oin',
@@ -37,7 +39,8 @@
       attachmentPendingCount: undefined, attachmentConfiguredLimit: undefined,
       canvasDirtyInit: undefined, useCanvasDirty: undefined,
       textSecurity: undefined, textStream: undefined, textPrepareEnabled: undefined, textReviewAck: undefined,
-      textHydrateHistory: undefined },
+      textHydrateHistory: undefined, textRequestedDefaultModel: undefined,
+      textRememberFirstModel: undefined, textNavigateConversation: undefined },
     composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC', Ng: 'Yg', Bg: 'n_', fh: 'Oh' },
     react: { reactApi: undefined, reactDom: undefined, reactRoot: undefined,
       intlInit: undefined, intlProvider: undefined }
@@ -119,6 +122,8 @@
       conversationStore: 'pY', canvasQueryClient: 'h2', canvasConversations: 'MP', useCanvasSendBlocked: 'tP',
       textApi: 'b4', textSecurityHeaders: 'ac', textHistoryDisabled: 'xJ', textModelOverride: 'Pc', textTopic: 'ej',
       textBusinessContext: 'JO', textProjectHeaders: 'iK', textLockedProjectId: 'Yr', textLockedChatPin: 'aK',
+      textBindConversationId: 'IP', textClientConversation: 'gY', textResolvedConversationId: 'QJ',
+      textNavigationKey: 'HK', textNavigate: 'KK',
       writingUpdateState: 'sY', writingTreeOwner: 'KJ' },
     conversation: { AGt: 'gJt', J5t: 'rnn', Nrn: 'Wsn', yRt: 'iVt', Grn: 'ncn',
       vRt: 'rVt', p8t: 'Sen', l0: 'z2', M1t: 'P4t', Rdn: 'Ggn', Rrn: 'Ysn',
@@ -128,7 +133,8 @@
       attachmentPendingCount: 'K$t', attachmentConfiguredLimit: 'U$t',
       canvasDirtyInit: 'Dvt', useCanvasDirty: 'Avt',
       textSecurity: 'VKt', textStream: 'jGt', textPrepareEnabled: 'FKt', textReviewAck: 'MKt',
-      textHydrateHistory: 'BEn' },
+      textHydrateHistory: 'BEn', textRequestedDefaultModel: 'Jsn',
+      textRememberFirstModel: 'DDn', textNavigateConversation: 'qHt' },
     composer: { Ih: 'ig', t_: 'x_', AS: 'ZS', VS: 'cC', Ng: '$g', Bg: 'o_', fh: 'Nh' },
     react: { reactApi: 'zn', reactDom: 'Wt', reactRoot: 'Ut', intlInit: 'In', intlProvider: 'An' }
   };
@@ -301,8 +307,8 @@
 
   function state() {
     const p = profile();
-    return { version: 22, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 23, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 22, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 23, observed, load, peek, temporary, tools, state });
 });

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
@@ -10,6 +10,8 @@
   function conversationMatches(payload, binding) {
     const projectId = binding.projectId ?? null;
     return payload?.conversation_id === binding.conversationId && (payload.gizmo_id ?? null) === projectId &&
+      (binding.newConversation !== true || payload.is_do_not_remember === false &&
+        payload.is_temporary_chat !== true && payload.shared_project_conversation_owner == null) &&
       (projectId === null || /^g-p-[a-f0-9]{32}$/i.test(projectId) &&
         payload.is_do_not_remember === false && payload.shared_project_conversation_owner == null);
   }
@@ -19,7 +21,7 @@
         !payload.mapping || Array.isArray(payload.mapping)) return false;
     const mapping = payload.mapping, user = ownsKey(mapping, userMessageId) && mapping[userMessageId];
     if (user?.id !== userMessageId || user.message?.id !== userMessageId ||
-        user.message.author?.role !== 'user' || user.parent !== binding.parentId) return false;
+        user.message.author?.role !== 'user' || !parentMatches(payload, binding, user)) return false;
     let id = payload.current_node;
     const leaf = ownsKey(mapping, id) && mapping[id]?.message;
     if (!leaf || leaf.id !== id || !(leaf.author?.role === 'assistant' ||
@@ -35,6 +37,16 @@
       id = node.parent;
     }
     return false;
+  }
+
+  function parentMatches(payload, binding, user) {
+    if (user.parent === binding.parentId) return true;
+    // hy's raw callback precedes oQe's legacy empty-root normalization. This
+    // exception cannot authorize another UUID parent or a non-root message.
+    const root = payload.mapping?.[''];
+    return binding.newConversation === true && binding.parentId === 'client-created-root' &&
+      user.parent === '' && ownsKey(payload.mapping, '') && root?.id === '' && !root.parent &&
+      (root.message == null || root.message.author?.role === 'root') && root.children?.includes(user.id) === true;
   }
 
   function ownsResponse(payload, binding, userMessageId, stopped = false, emptyStopped = false) {
@@ -54,7 +66,7 @@
     const user = payload.mapping?.[userMessageId];
     if (!user || user.id !== userMessageId || user.message?.id !== userMessageId ||
         user.message?.author?.role !== 'user') return 'user_missing';
-    if (user.parent !== binding.parentId) return 'parent_mismatch';
+    if (!parentMatches(payload, binding, user)) return 'parent_mismatch';
     const owned = branch(payload, binding, userMessageId);
     if (!owned) return 'branch_mismatch';
     if (ownsKey(payload, 'async_status') && owned.asyncStatus !== null && owned.asyncStatus !== 4) return 'server_active';
@@ -89,7 +101,9 @@
       },
       shouldApplyResponse: () => verified && !signal.aborted && binding.canReconcile(request.userMessageId)
     });
-    const done = !signal.aborted && verified && binding.reconciled(request.userMessageId, stopped, emptyStopped);
+    let done = !signal.aborted && verified && binding.reconciled(request.userMessageId, stopped, emptyStopped);
+    if (done && binding.finalize) done = await binding.finalize(signal) === true &&
+      !signal.aborted && binding.reconciled(request.userMessageId, stopped, emptyStopped);
     if (verified) report(done ? 'reconciled' : signal.aborted || !binding.canReconcile(request.userMessageId)
       ? 'owner_changed' : 'store_not_reconciled');
     return done;
