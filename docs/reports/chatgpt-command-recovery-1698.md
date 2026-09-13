@@ -74,3 +74,21 @@ The reproduced same-route readiness regression is fixed and device verified.
 No stopped-turn follow-up or forced missing-bridge live acceptance was performed
 in this final read-only check. Those broader Goal items remain open; existing
 Writing Block/code-block acceptance is unchanged.
+
+## Stopped-Turn Follow-Up On 1699
+
+The existing installed 1699 package passed
+`fresh-text-stop-followup-1699-20260913-101739-823` in 42.1 seconds. No rebuild
+or experimental permit was used. Production native buttons performed one send,
+Stop, and one follow-up in the owned test conversation; there were zero seed
+sends and two candidate clicks. Each turn had one unique user message, used the
+fresh HTTP path and reconciled with provider history. Native streaming stopped;
+the follow-up response matched. Conversation and keep-awake state were restored.
+
+The stopped turn had an assistant parent, so this accepts the partial-answer
+branch only. Its incomplete response is intentional, not a response-match pass.
+The follow-up was observed after 6479 ms (12089 ms total), including automation
+and reconciliation overhead; this is not a network first-token benchmark.
+Stopping before any assistant message, forced missing-bridge recovery and real
+network-loss recovery remain unverified. Do not repeat the accepted branch
+without new regression evidence.

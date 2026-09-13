@@ -6,6 +6,12 @@
 
 能力 ID：`android_chatgpt_text_block_local_editor_export_v1`，`completed / production_verified`，生产入口默认启用，代码块与真实 Writing Block 均已实测，不重复研究。
 
+## 生产入口
+
+在普通好友聊天的写作块或代码块中打开正文，使用原生编辑器的编辑、复制、恢复和导出按钮；符合归属条件的写作块另有显式“保存到官网”。`ChatGptSocialImageContentController.open` 的 `textBlock` 分支直接连接 `WebChatTextBlockEditor`，不经过旧测试页或官网编辑页面。
+
+2026-09-13 按主线 `e59433b7e` 复核：上述实现和 1688/1692 的验收范围仍在，后续 1699 的会话状态修复没有移除它们。此次复核为代码及既有验收证据检查，不是一次新的导出或云保存测试。本地编辑/导出不等待只读官网票据准备；只有实际云保存及其结果核对期间限制修改。不能将项目等变体的写回缺口误记为整项功能尚未实现。
+
 ## 本轮范围
 
 - 普通好友聊天“一龙 AI → ChatGPT”中，完整写作块和代码块提供原生正文入口。
