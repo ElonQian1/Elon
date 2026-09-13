@@ -65,7 +65,9 @@ This source batch and the shared request-sequence correction shipped together
 in 1698. Cold/return receipts took 152/685 ms including MCP automation, preserving
 the conversation, draft and page generation. The stop/follow-up test still failed
 before sending: reopening the unchanged current route filtered out the full
-snapshot needed to restore native readiness. See the
+snapshot needed to restore native readiness. That separate readiness regression
+is fixed and device verified in 1699 (two same-route opens, no reload or sends).
+See the
 [1698 acceptance and same-route correction](reports/chatgpt-command-recovery-1698.md).
 Do not repeat accepted Writing Block editing/export/save or ordinary fresh-text
 send scopes without regression.

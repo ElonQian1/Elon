@@ -55,6 +55,22 @@ command-delivery, Writing Block save/parser, private-stream and fresh-text wirin
 regression passed 122 tests with no skips in
 `chatgpt-same-route-regression-20260913-095933-238`.
 
-The same-route correction is source verified and awaiting the next package and
-one targeted device reopen. The broader Goal and stopped-turn follow-up
-acceptance remain open. Existing Writing Block/code-block acceptance is unchanged.
+## Same-Route Release And Acceptance
+
+- APK 1.1.1699 / code 1699, source `ff73d8b2cc0b2df51f9f5c53140cec5068f2377c`.
+- APK SHA-256: `e793daa388ea41ef502c4577e7f31fdd999d3734d7dda5321d0dbcf9072751f9`.
+- Release Kotlin/Java compilation, packaging, publication and unattended Xiaomi
+  installation passed in `chatgpt-same-route-release-20260913-100240-636`
+  (478.6 seconds). Online metadata and installed version were independently checked.
+- Two consecutive same-route opens on production `social_ai` with adapter 376
+  reported both native and page composer ready in 269/189 ms, including MCP
+  overhead. Page generation, message count and draft were unchanged; zero sends
+  and keep-awake restoration passed. No reload or voice action was performed.
+- An initial read-only probe aborted on an invalid harness parameter after an
+  accepted open. It was corrected before these measurements; that harness error
+  is not an application failure or a passed sample.
+
+The reproduced same-route readiness regression is fixed and device verified.
+No stopped-turn follow-up or forced missing-bridge live acceptance was performed
+in this final read-only check. Those broader Goal items remain open; existing
+Writing Block/code-block acceptance is unchanged.
