@@ -358,6 +358,31 @@ test('a rejected asynchronous project route never reports successful navigation'
   assert.equal(binding.navigationReady(), false); assert.equal(f.navigations, 0);
 });
 
+test('first-response navigation and history finalization share one pending route request', async () => {
+  const f = newFixture(true), binding = await f.api.capture(f.node, null, admission);
+  binding.adoptConversation(CID, { input_message: input }, UID);
+  let navigate, requests = 0;
+  f.conversation.textNavigateConversation = callback => { requests++; navigate = callback; };
+  const signal = new AbortController().signal;
+  const first = binding.finalize(signal), history = binding.finalize(signal);
+  assert.equal(requests, 1);
+  navigate('/g/' + PROJECT + '/c/' + CID, { replace: true });
+  assert.equal(await first, true); assert.equal(await history, true);
+  assert.equal(f.navigations, 1);
+});
+
+test('a cancelled navigation waiter cannot report another waiter success', async () => {
+  const f = newFixture(true), binding = await f.api.capture(f.node, null, admission);
+  binding.adoptConversation(CID, { input_message: input }, UID);
+  let navigate, requests = 0;
+  f.conversation.textNavigateConversation = callback => { requests++; navigate = callback; };
+  const controller = new AbortController(), first = binding.finalize(new AbortController().signal);
+  const cancelled = binding.finalize(controller.signal); controller.abort();
+  navigate('/g/' + PROJECT + '/c/' + CID, { replace: true });
+  assert.equal(await first, true); assert.equal(await cancelled, false);
+  assert.equal(requests, 1); assert.equal(f.navigations, 1);
+});
+
 test('the owned v1 decoder binds the first server id before publishing native text', async () => {
   const f = newFixture(), binding = await f.api.capture(f.node, null, admission);
   const session = policy.createSession({ now: Date.now });
@@ -417,6 +442,12 @@ async function integration(project = false, settings = {}) {
     yield { response: { ok: true, headers: { get: () => 'text/event-stream' } } };
     if (settings.lostBeforeId) throw Error('synthetic connection lost');
     yield { data: { conversation_id: CID, input_message: user } };
+    if (first && settings.retireUnnavigatedHome) {
+      counts.firstEventNavigations = f.navigations;
+      // A server-bound thread must leave the empty-home surface before the next
+      // asynchronous event can replace that surface's conversation provider.
+      if (f.navigations === 0) f.props.conversation = {};
+    }
     yield { data: { conversation_id: CID, message: { ...answer, status: 'in_progress', end_turn: false,
       content: { content_type: 'text', parts: ['Synthetic'] } } } };
     if (settings.stop) await pause;
@@ -439,6 +470,13 @@ async function integration(project = false, settings = {}) {
     f.conversation.textNavigateConversation = async () => { throw Error('synthetic navigation failed'); };
     page.setTimeout = (callback, delay) => setTimeout(callback, delay === 100 ? 0 : delay);
   }
+  if (settings.delayedNavigation) {
+    const navigate = f.conversation.textNavigateConversation;
+    f.conversation.textNavigateConversation = (...args) => {
+      counts.navigationRequests = (counts.navigationRequests || 0) + 1;
+      f.completeNavigation = () => navigate(...args);
+    };
+  }
   const api = transactionModule.create(page, { context: f.api, reconcileTimeoutMs: 1000 });
   const command = { requestId: 'mcp_1', prompt: 'Synthetic first turn', expectedDraft: '', composer: f.node,
     readDraft: () => draft, onDispatch() {}, onSettled() {} };
@@ -448,6 +486,31 @@ async function integration(project = false, settings = {}) {
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 5));
 async function settled(api) { for (let i = 0; i < 80 && api.state().pending; i++) await tick(); }
+
+test('the first owned server event navigates before later stream events can retire the home owner', async () => {
+  for (const project of [false, true]) {
+    const r = await integration(project, { retireUnnavigatedHome: true });
+    await settled(r.api);
+    assert.equal(r.counts.firstEventNavigations, 1);
+    assert.equal(r.api.state().pending, false);
+    assert.equal(r.session.current(new URL(r.f.page.location.href).pathname).text, 'Synthetic answer');
+    assert.deepEqual([r.counts.posts, r.counts.apply, r.f.binds, r.f.navigations], [1, 1, 1, 1]);
+    assert.equal(r.api.dispose(), true);
+  }
+});
+
+test('delayed project navigation does not block native streaming or duplicate its route request', async () => {
+  const r = await integration(true, { delayedNavigation: true });
+  for (let i = 0; i < 30 && r.api.state().phase !== 'reconciling'; i++) await tick();
+  assert.equal(r.session.current('/').text, 'Synthetic answer');
+  assert.equal(r.api.state().pending, true); assert.equal(r.counts.apply, 0);
+  assert.equal(r.counts.navigationRequests, 1);
+  r.f.completeNavigation();
+  await settled(r.api);
+  assert.equal(r.api.state().pending, false);
+  assert.deepEqual([r.counts.posts, r.counts.apply, r.f.navigations, r.counts.navigationRequests], [1, 1, 1, 1]);
+  assert.equal(r.api.dispose(), true);
+});
 
 test('new private send binds, streams, hydrates and permits exactly one existing-conversation follow-up', async () => {
   for (const project of [false, true]) for (const injectedParents of [false, true, 'paginated']) {

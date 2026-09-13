@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 19, create: factory });
+  const api = Object.freeze({ version: 20, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -233,8 +233,14 @@
           owner.sink = stream.beginPrivateStream({ conversationId: owner.binding.conversationId,
             userMessageId: owner.request.userMessageId, current: owner.stopCurrent,
             observePayload: owner.binding.observePayload,
-            adoptConversation: owner.binding.newConversation ? (id, payload) =>
-              owner.binding.adoptConversation(id, payload, owner.request.userMessageId) : undefined });
+            adoptConversation: owner.binding.newConversation ? (id, payload) => {
+              const adopted = owner.binding.adoptConversation(id, payload, owner.request.userMessageId);
+              // Match the official first-response handler: bind and begin its
+              // owned route before publishing this event, not after stream end.
+              // Failure is reconciled without retrying the already-sent POST.
+              if (adopted) void owner.binding.finalize?.(owner.controller.signal)?.catch(() => {});
+              return adopted;
+            } : undefined });
           if (!owner.sink) throw Error('stream_unavailable');
           command.onDispatch?.();
           return {};

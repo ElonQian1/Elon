@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 9, create: factory });
+  const api = Object.freeze({ version: 10, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -62,7 +62,7 @@
         typeof conversation.textHydrateHistory !== 'function' ||
         typeof editor.Ng !== 'function') fail('runtime_unavailable');
     const selected = binding.conversation, tree = () => shared.XM(selected.id);
-    let serverId = binding.serverId, navigating = false, navigated = false, targetNavigationKey = null;
+    let serverId = binding.serverId, navigating = false, navigated = false, targetNavigationKey = null, navigationTask = null;
     if (newConversation && (['textBindConversationId', 'textClientConversation', 'textResolvedConversationId',
       ...(temporary ? [] : ['textNavigate', 'canvasQueryClient'])].some(key => typeof shared[key] !== 'function') ||
       ['textRequestedDefaultModel', 'textRememberFirstModel', ...(temporary ? [] : ['textNavigateConversation'])]
@@ -255,6 +255,30 @@
         !page.__elonChatGptPrivateStopRuntime?.state?.().pending &&
         !page.__elonChatGptCanvasDocumentActions?.generationPending?.();
     }
+    async function finalizeRoute(signal) {
+      if (temporary) return !signal.aborted && !!serverId && owns();
+      if (!newConversation) return true;
+      if (signal.aborted || !owns() || !serverId) return false;
+      let active = true, navigationFailed = false;
+      try {
+        if (!navigated) {
+          navigating = true;
+          // Project route resolution may finish after the user leaves. Expire
+          // its callback with this attempt, not just with the page lifetime.
+          const navigate = (target, options) => {
+            if (active && !signal.aborted && owns()) shared.textNavigate(target, options);
+          };
+          Promise.resolve(conversation.textNavigateConversation(navigate, shared.canvasQueryClient(), serverId,
+            snapshot.projectId !== null, undefined, true)).catch(() => { navigationFailed = true; });
+        }
+        for (let attempt = 0; attempt < 30; attempt++) {
+          if (signal.aborted || navigationFailed || !owns()) return false;
+          if (navigated) return true;
+          await new Promise(resolve => page.setTimeout(resolve, 100));
+        }
+        return false;
+      } finally { active = false; }
+    }
     if (!current()) fail('context_changed');
     return Object.freeze({ ...snapshot, get conversationId() { return serverId; }, token, current, owns, shared, runtime: conversation,
       attachments,
@@ -278,29 +302,15 @@
         serverId = id;
         return owns() && shared.textResolvedConversationId(selected.id) === id;
       },
-      async finalize(signal) {
-        if (temporary) return !signal.aborted && !!serverId && owns();
-        if (!newConversation) return true;
-        if (signal.aborted || !owns() || !serverId) return false;
-        let active = true, navigationFailed = false;
-        try {
-          if (!navigated) {
-            navigating = true;
-            // Project route resolution may finish after the user leaves. Expire
-            // its callback with this attempt, not just with the page lifetime.
-            const navigate = (target, options) => {
-              if (active && !signal.aborted && owns()) shared.textNavigate(target, options);
-            };
-            Promise.resolve(conversation.textNavigateConversation(navigate, shared.canvasQueryClient(), serverId,
-              snapshot.projectId !== null, undefined, true)).catch(() => { navigationFailed = true; });
-          }
-          for (let attempt = 0; attempt < 30; attempt++) {
-            if (signal.aborted || navigationFailed || !owns()) return false;
-            if (navigated) return true;
-            await new Promise(resolve => page.setTimeout(resolve, 100));
-          }
-          return false;
-        } finally { active = false; }
+      finalize(signal) {
+        if (signal.aborted) return Promise.resolve(false);
+        if (!navigationTask) {
+          const task = finalizeRoute(signal);
+          navigationTask = task;
+          const clear = () => { if (navigationTask === task) navigationTask = null; };
+          void task.then(clear, clear);
+        }
+        return navigationTask.then(value => !signal.aborted && value);
       },
       navigationReady: () => temporary || !newConversation || navigated,
       canReconcile(userMessageId) {
