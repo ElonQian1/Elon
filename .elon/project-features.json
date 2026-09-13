@@ -2393,7 +2393,7 @@
       "id": "android-binance-initialization-diagnostics-v1",
       "title": "币安网页初始化诊断",
       "summary": "现有主APK WebView输出有界脚本错误及挂载状态，定位真实私有读取启动失败",
-      "status": "implemented",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/android-binance-initialization-diagnostics-v1.md",
@@ -2490,6 +2490,19 @@
           }
         },
         {
+          "path": "docs/reports/android-binance-initialization-diagnostics-v1.md",
+          "content_hash": "6df070a722f013a5e66640ce88f8b2f7687b6d1eb5317bf49dba6025bd7e5926",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "398d88a89e9bc2764d9a4457ee7211ea666f3327",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e37a34969135d2d0bd0f407c3e08d24f9631f11d",
+            "state": "untracked"
+          }
+        },
+        {
           "path": "scripts/test-binance-grid-create.ps1",
           "content_hash": "c919c2544eb11d5fdc967dc29fe202fe024c5bc45eb7f026455e3c3d02d055c2",
           "locator": "",
@@ -2504,7 +2517,7 @@
         }
       ],
       "created_at_ms": 1789290614766,
-      "updated_at_ms": 1789291076699
+      "updated_at_ms": 1789292221802
     },
     {
       "id": "android-binance-manage-reconnect-v1",
@@ -27069,36 +27082,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_42d5b0d14b504505ba625b0cb228c15b",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788841770647
-    },
-    {
-      "id": "feature_event_46423fc40a114aa4a2260b6c3a5012ff",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "claim_released",
-      "actor": "codex-binance-host",
-      "reason": "用户明确已互换 Win 与手机账号，更新需求中的固定设备账号安排后继续原只读范围。",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1788842878273
-    },
-    {
-      "id": "feature_event_4c4db61eb26e46438430532b68d7229f",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-binance-host",
-      "reason": "用户明确互换两端账号；需求改为按实际认证角色隔离，原本人只读、精确 UID 和撤销边界不变。",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1788843022830
-    },
-    {
       "id": "feature_event_a49f254b9b8f4fed8fea0e914ea96d34",
       "feature_id": "android-binance-host-read-v1",
       "action": "transitioned",
@@ -29067,6 +29050,36 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789291076699
+    },
+    {
+      "id": "feature_event_f2a4474cf44f422f8f0dbd03bff116d8",
+      "feature_id": "android-binance-initialization-diagnostics-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789292217822
+    },
+    {
+      "id": "feature_event_5ba2ef06c995441ba7a93dd051038749",
+      "feature_id": "android-binance-initialization-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "102项原生与适配器回归通过；正式1705已安装并取得结构化诊断。网格列表与详情成功，创建预览仍待修复",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1789292219789
+    },
+    {
+      "id": "feature_event_f8e15e8848af49b3bb8383018acf8d74",
+      "feature_id": "android-binance-initialization-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "仅初始化诊断切片已发布及装机，不代表整体网格目标完成",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1789292221802
     }
   ]
 }
