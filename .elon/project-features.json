@@ -2071,85 +2071,85 @@
       "implementation_evidence": [
         {
           "path": "android/app/src/main/AndroidManifest.xml",
-          "content_hash": "2f3bbca55372970c5161ad168323213d7b8f64f4ca8d36644a6063e09583232d",
+          "content_hash": "ac73f86a9ef5acfb448a23ba27c692d0240cd666b76966f94e8a26b8be5c1a57",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
-            "head_blob_oid": "28588bf3ce113c4c5771f6ae19438836861d4fb0",
+            "head_commit": "45d3826b09fc97ff99d6085193773ef7da476e4f",
+            "head_blob_oid": "af1b1b9d5840f012db111b22933a936afd214acf",
             "worktree_blob_oid": "af1b1b9d5840f012db111b22933a936afd214acf",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostEvents.kt",
-          "content_hash": "0ff40709865ee3df1c1e9e8c35207a611e3a62cc77137f2992b6fda7a6162555",
+          "content_hash": "a5ef28c41629facbd92da9738caca6871dd587de1810f914e51cd436e472d5de",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
-            "head_blob_oid": "b146fe2a619f83499c0cb07b9145d284b5dceaef",
+            "head_commit": "45d3826b09fc97ff99d6085193773ef7da476e4f",
+            "head_blob_oid": "a708d948caf98b283a42001c14ae5e1a18e02c2b",
             "worktree_blob_oid": "a708d948caf98b283a42001c14ae5e1a18e02c2b",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostLifecycleService.kt",
-          "content_hash": "364f9acbaa7d5be81cd8ad3d54731b3f39cf54a6c5bc2eeb33bd97694d7e2dd8",
+          "content_hash": "82659de9f1c97320e8af4d33abf5aab37e18c3bb72fbc3e9783db02e7f89fdad",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
-            "head_blob_oid": "",
+            "head_commit": "45d3826b09fc97ff99d6085193773ef7da476e4f",
+            "head_blob_oid": "284b9e6f13bb8cb71d0879621616e682c89ec4c4",
             "worktree_blob_oid": "284b9e6f13bb8cb71d0879621616e682c89ec4c4",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/reports/android-binance-host-lifecycle-20260913.md",
-          "content_hash": "6d3af52b07d777777b668a9bdc458a28f76a5e537a09e7ce7d195dfd43e4f977",
+          "content_hash": "8009dd0bd72ebaa7a1b5de31a09a67d9f83faa94188e9ebc1517dbefa0f95c25",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "61630c6b0822a69102617a0a26155e8a81675c5e",
-            "state": "untracked"
-          }
-        },
-        {
-          "path": "scripts/test-binance-grid-create.ps1",
-          "content_hash": "e2c663308ee75b2b567ebba3674dbdb6d5a86c885474a4c5a382fab18523da6b",
-          "locator": "",
-          "evidence_kind": "test",
-          "git_identity": {
-            "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
-            "head_blob_oid": "eb70e4989abce01a303a42a9527e5484e8b0f739",
-            "worktree_blob_oid": "f678a1ea78423206c3d6ae4a9eefe11dc3bb71ca",
+            "head_commit": "45d3826b09fc97ff99d6085193773ef7da476e4f",
+            "head_blob_oid": "61630c6b0822a69102617a0a26155e8a81675c5e",
+            "worktree_blob_oid": "a81ce2a597bcf012a64367690a0491d2ccb6171d",
             "state": "tracked_modified"
           }
         },
         {
-          "path": "scripts/test-binance-host-lifecycle.cjs",
-          "content_hash": "98e8986a3f97dd27ebbfe7c52b6199c72f6d9859ba35689313615ddc4a5945bb",
+          "path": "scripts/test-binance-grid-create.ps1",
+          "content_hash": "0419935fa875a00ff97cd0ed65c71fcde5578d38b4cf92a050bcb9e46314750c",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
-            "head_blob_oid": "",
+            "head_commit": "45d3826b09fc97ff99d6085193773ef7da476e4f",
+            "head_blob_oid": "f678a1ea78423206c3d6ae4a9eefe11dc3bb71ca",
+            "worktree_blob_oid": "f678a1ea78423206c3d6ae4a9eefe11dc3bb71ca",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-binance-host-lifecycle.cjs",
+          "content_hash": "49652ca2d6777de143070f6de2b6ee4327a6ccffafce0ee1ed4ff61778abb693",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "45d3826b09fc97ff99d6085193773ef7da476e4f",
+            "head_blob_oid": "1d0e3fb435dfed925a3ed79f41d2b57b5af4172b",
             "worktree_blob_oid": "1d0e3fb435dfed925a3ed79f41d2b57b5af4172b",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1789272647705,
-      "updated_at_ms": 1789283366316
+      "updated_at_ms": 1789284784124
     },
     {
       "id": "android-binance-host-read-v1",
@@ -26952,16 +26952,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_f5693c0ac6aa4a3da033bbeb220d195c",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "claimed",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788836103793
-    },
-    {
       "id": "feature_event_acb0f50a119a44faa6d6caae27354d85",
       "feature_id": "android-binance-host-read-v1",
       "action": "transitioned",
@@ -28950,6 +28940,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789283366316
+    },
+    {
+      "id": "feature_event_e8f94f73d8284853913b7ac25b3833ce",
+      "feature_id": "android-binance-host-lifecycle-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789284784124
     }
   ]
 }
