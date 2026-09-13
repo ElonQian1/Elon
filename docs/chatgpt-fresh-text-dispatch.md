@@ -205,9 +205,40 @@ released; it cannot grant it to another active writer. Diagnostics v6 expose onl
 The combined 158 JavaScript cases passed in
 `fresh-text-continuation-20260913-075939-380`, including actual transaction,
 stop/history modules, both parent variants, a pre-dispatch interruption and no
-second stop request. Android validation and grouped production acceptance are
-pending. `-StopThenFollowup` reuses native send/stop buttons and records the
-observed parent role rather than assuming the server stopped before first text.
+second stop request. Release Kotlin/Java checks and all six targeted Android
+receipt tests passed in `fresh-text-lifecycle-android-20260913-080014-059`.
+`-StopThenFollowup` reuses native send/stop buttons and records the observed
+parent role rather than assuming the server stopped before first text.
+
+### Lifecycle Release And Acceptance Boundary
+
+- APK **1.1.1697** / code **1697**, source
+  `ec8e8448a15a658aff4a7fe17357fa5a7a0e8305`, was published and installed in place
+  on the existing Xiaomi. Metadata and installed version were independently
+  checked. APK SHA-256:
+  `367e7c38ac6c52ba1f3aeb4e7d30875ec5f736ee79857b8571fc0a6db2320c72`.
+- `fresh-text-lifecycle-release-20260913-080628-430` passed in 489.7 seconds.
+  The optional worktree-cleanup warning did not prevent publication or verified
+  installation; the required task finish is still separate.
+- `fresh-text-stop-followup-native-1697-20260913-081521-650` **did not pass**.
+  The single seed click received no matching reply within 90 seconds. It stopped
+  at `stage=seed`, with `candidate_clicks=0`; neither the new stop/follow-up
+  behavior nor its parent role was exercised. The original conversation/draft
+  and awake setting were restored. The seed was not replayed.
+- A later read-only attempt to locate/reuse an earlier marked fixture also
+  timed out during navigation. Observed state became `bridge=connecting`,
+  `page_generation=3`, with timed-out navigation receipts. The final UI was
+  returned to `conversation_home`; this does not prove the diagnostic navigation
+  completed its original-route restoration.
+- One in-APK network check returned ChatGPT HTTP 200 in 635 ms and Google HTTP
+  204 in 276 ms. This rules out calling the observation a total network outage,
+  but does not prove private endpoints or the WebView runtime were healthy.
+  No root cause or lifecycle regression is established by this incomplete run.
+
+The lifecycle changes remain source/Android-tested and released, **not device
+verified**. Resolve the preparation/navigation failure before another targeted
+stop/follow-up attempt. Do not repeat successful 1695/1696 cases or claim a live
+user-only-parent result from the offline tests.
 
 ## Not Completed
 
