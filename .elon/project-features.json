@@ -4001,20 +4001,20 @@
         },
         {
           "path": "docs/delivery/android-okx-history-20260914.md",
-          "content_hash": "6be766292b22d2f26358a061cffbe74e1f9ea4d43e3981a6a4c5cebb310293b5",
+          "content_hash": "36c94c4b90dc5353545ab6188d7f767fee888d284ec2d78b4e73cabb0c41cb42",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "cb728cc28a18670125ea8577585a0e149318431d",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "16fa4416cdacfb49cff7803a46ad8fd83eadc6ab",
-            "state": "untracked"
+            "head_commit": "c00060c6db7beda42c3aa704b3b94730126fa3f1",
+            "head_blob_oid": "16fa4416cdacfb49cff7803a46ad8fd83eadc6ab",
+            "worktree_blob_oid": "b57c5df783a01574204cb45cd8fdfad41ee9b569",
+            "state": "tracked_modified"
           }
         }
       ],
       "created_at_ms": 1789317411734,
-      "updated_at_ms": 1789318522010
+      "updated_at_ms": 1789319334004
     },
     {
       "id": "android-okx-read-host-v1",
@@ -27603,16 +27603,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_1d7062d4225e4f4cb84cb483968a34e0",
-      "feature_id": "android-binance-grid-create-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-create",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1788861931729
-    },
-    {
       "id": "feature_event_eab93ff5c4994fac8bd62a305c402c6f",
       "feature_id": "android-binance-grid-manage-v1",
       "action": "evidence_recorded",
@@ -29601,6 +29591,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789318522010
+    },
+    {
+      "id": "feature_event_57a5bca4173c44b2a445b315ece73024",
+      "feature_id": "android-okx-history-read-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789319334004
     }
   ]
 }
