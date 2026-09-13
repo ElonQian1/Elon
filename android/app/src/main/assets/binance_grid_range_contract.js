@@ -16,7 +16,7 @@
       if(d.trailingUp!==false || d.trailingDown!==false || !['ARITH','GEO'].includes(d.gridType) ||
         !['LONG','SHORT','NEUTRAL'].includes(d.direction))return null;
       for(const key of ['stopTpPnl','stopSlPnl']) {
-        if(d[key]!=null && (scalar(d[key])===null || !price(scalar(d[key])) || scaled(scalar(d[key]))!==0n))return null;
+        if(d[key]!=null && d[key]!=='' && (scalar(d[key])===null || !price(scalar(d[key])) || scaled(scalar(d[key]))!==0n))return null;
       }
       const lower=scalar(d.gridLowerLimit),upper=scalar(d.gridUpperLimit),count=d.gridCount;
       if(!price(lower) || !price(upper) || scaled(lower)<=0n || scaled(lower)>=scaled(upper) ||
@@ -25,7 +25,7 @@
       const preserved={tpslCps:typeof d.tpslCps==='boolean'?d.tpslCps:d.cps};
       for(const key of ['stopUpperLimit','stopLowerLimit','trailingUpLimitPrice','trailingDownLimitPrice']) {
         if(!Object.prototype.hasOwnProperty.call(d,key))continue;
-        if(d[key]===null){preserved[key]=null;continue;}
+        if(d[key]===null || d[key]===''){preserved[key]=d[key];continue;}
         const value=scalar(d[key]);if(!price(value))return null;preserved[key]=value;
       }
       return {lower,upper,count,grid_type:d.gridType,direction:d.direction,preserved};

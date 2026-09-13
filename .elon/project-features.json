@@ -3457,6 +3457,137 @@
       "updated_at_ms": 1788983543981
     },
     {
+      "id": "android_binance_range_empty_stops_v1",
+      "title": "币安区间兼容未设置的保护字段",
+      "summary": "保留空保护的私有载荷形状，并在既有跨APK投影中输出null",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/android-binance-range-empty-stops-v1.md",
+        "content_hash": "456bc2e957d2f31341d91a54f61c046ca60fb3b45406687574056b3fee498048",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "e620a37d4593c816b43f4f812f263aaf8cb2bab3",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_range_contract.js",
+        "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageCommandDraft.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceRange.kt",
+        "android/app/src/test/kotlin/com/elon/app/grid/manage/BinanceManageCommandDraftTest.kt",
+        "android/app/src/test/kotlin/com/elon/app/grid/manage/BinanceRangeTest.kt",
+        "scripts/test-binance-grid-manage-adapter.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "空/null/缺失保护可区分，非法值与真实保护及追踪限制不放宽",
+        "Kotlin/JS和量化投影一致，正式装机只读准备通过"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/binance_grid_range_contract.js",
+          "content_hash": "d6bd3ae01a67c1fad6abe7c5e06eddffec291bc950180ff5506b5abdc07666d2",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
+            "head_blob_oid": "64d6353fb32b032fd75299447a95aabbff2585a6",
+            "worktree_blob_oid": "d65c044520963ded297740edeb4f5f2c84aed6cf",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageCommandDraft.kt",
+          "content_hash": "ccfe1294d8432595cc2467c8b49e91bf29249911675dd914960b57358969d990",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
+            "head_blob_oid": "dc890717aa8bfe532c2f8339dc653436ba4900c4",
+            "worktree_blob_oid": "f37ff22284ce80ccf8b2135cd61dbc706da62552",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceRange.kt",
+          "content_hash": "62b69680a28cd5e6e4b6306261d1f2fbf5fef0e8d8339eecba600c89e67d4dcf",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
+            "head_blob_oid": "5b4d895d78aefc2ddc428273366d2fa8355828a0",
+            "worktree_blob_oid": "7510cd762a78799c9719300d31028042c2d764a1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/manage/BinanceManageCommandDraftTest.kt",
+          "content_hash": "a75a3844f775bbe42c1ef25097fb9da8dce1a9449a50bbe58b61e01319b2459a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
+            "head_blob_oid": "d5498f0b0b9d98278252af75188b5d9956ee7161",
+            "worktree_blob_oid": "bada3360b1aab1f174bc3458b74cc2a1686252d8",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/manage/BinanceRangeTest.kt",
+          "content_hash": "4ceb71756c4f79a5811a12ba7952abc823ca2f99543f7354fe789b120c1decf8",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
+            "head_blob_oid": "6af49dcbb0ec1407f4a541bdfabac9b52849749e",
+            "worktree_blob_oid": "30dd0365436eae182b9b34dd31526d250b2e608d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/reports/android-binance-range-empty-stops-20260913.md",
+          "content_hash": "6aec53e5480b21c903deeac7fdf7f8235cd5ec9b60eef10466eac60ab19548c8",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ab188f5af0eaf275420c3b15d9ec356a169c496d",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-manage-adapter.cjs",
+          "content_hash": "8927220291b145a567c24d5835d06cfdc5a2f2adbc5c8ebc8f9d78980dad312f",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
+            "head_blob_oid": "8152c8a853aa1c5ec9272e343366c0cd2f709184",
+            "worktree_blob_oid": "83e19b44940325399b1badcd26884c3b1a698a46",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1789267087504,
+      "updated_at_ms": 1789267410591
+    },
+    {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
       "title": "A2 Map/Lock dynamic quotient authority V1",
       "summary": "Freeze the typed exact-partition contract that maps every verified Map/Lock static included leaf into one auditable dynamic execution class, derives Qmap/Qlock mechanically, and requires one process-isolated Windows record per frozen class without opening production effects.",
@@ -26706,56 +26837,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_46f0a05a9f844314b99cd534dee82823",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "claimed",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788824996613
-    },
-    {
-      "id": "feature_event_994a537e78e14dcdba1f88ad0dbd7d56",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-read",
-      "reason": "Reproduced phone authorization rejection; add bounded clock skew acceptance and real-device evidence",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788825064438
-    },
-    {
-      "id": "feature_event_d34812c897954d3fa43b7af4c19a8504",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788825632996
-    },
-    {
-      "id": "feature_event_5471a0b43694490098c6f371a3721201",
-      "feature_id": "private-grid-read-bridge-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-read",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788827163625
-    },
-    {
-      "id": "feature_event_428514641d864d238a1f706e80c990e8",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "registered",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788829139503
-    },
-    {
       "id": "feature_event_f8e78ec199024e37a9eacac0ea0bfdd0",
       "feature_id": "android-binance-host-read-v1",
       "action": "claimed",
@@ -28704,6 +28785,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789212293258
+    },
+    {
+      "id": "feature_event_a9aa198d7e05441fa693857de8e90811",
+      "feature_id": "android_binance_range_empty_stops_v1",
+      "action": "registered",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789267087504
+    },
+    {
+      "id": "feature_event_d49308b70c4947cfb67fba45a17cf1a4",
+      "feature_id": "android_binance_range_empty_stops_v1",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789267087569
+    },
+    {
+      "id": "feature_event_09fda675af1144d985fc58ffcc4175f6",
+      "feature_id": "android_binance_range_empty_stops_v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "已用真实历史字段形状复现并修正，开始原生检查",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789267087606
+    },
+    {
+      "id": "feature_event_c866a8dec0444e9bb017a33b45abf2b1",
+      "feature_id": "android_binance_range_empty_stops_v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789267410544
+    },
+    {
+      "id": "feature_event_ceafca9fafe24d1ea1a7deeb9b2d1356",
+      "feature_id": "android_binance_range_empty_stops_v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "12组适配器和97项原生测试通过，正式发布/手机准备待验",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789267410591
     }
   ]
 }

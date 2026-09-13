@@ -51,6 +51,15 @@ class BinanceManageCommandDraftTest {
         assertEquals("10",(value["range"] as Map<*,*>)["count"])
         assertFalse(StrictJson.encode(value).contains(account))
     }
+    @Test fun emptyStopsUseExistingNullableProjectionAndReadableSummary() {
+        val current=snapshot.copy(range=range.copy(preserved=mapOf("tpslCps" to true,"stopLowerLimit" to "","stopUpperLimit" to "")))
+        val detail=BinanceManageCommandView.detail(current)["range"] as Map<*,*>
+        assertNull(detail["stop_lower"]);assertNull(detail["stop_upper"])
+        assertEquals("1",detail["lower"]);assertEquals("2",detail["upper"])
+        val state=BinanceManageState{0L};state.prepare(account,doc,"close",false,current)
+        assertTrue(BinanceManageCommandView.summary(state).contains("原价格止盈止损：未设置 / 未设置"))
+        assertEquals("",state.snapshot!!.range!!.preserved["stopLowerLimit"])
+    }
     @Test fun permitBindsSummaryAccountDocumentAndOperationOnce() {
         var now=0L;val permit=BinanceCreatePermit{now}
         val s=BinanceManageState{now};s.prepare(account,doc,"investment",false,snapshot,"10")

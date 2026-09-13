@@ -38,6 +38,7 @@ internal data class BinanceManageCommandDraft(val id: String, val action: String
 }
 
 internal object BinanceManageCommandView {
+    private fun stopPrice(value:Any?)=value?.takeUnless {it==""}
     fun mode(cps: Boolean) = if(cps) "按市价平仓" else "保留仓位，由本人处理"
     fun action(value: String) = when(value) {
         "settings" -> "修改终止时仓位处理"; "close" -> "结束网格"
@@ -48,7 +49,7 @@ internal object BinanceManageCommandView {
         "id" to s.id, "symbol" to s.symbol, "status" to s.status, "cps" to s.cps, "cos" to s.cos,
         "investment" to s.investment?.invested(), "range" to s.range?.let {
             mapOf("lower" to it.lower,"upper" to it.upper,"count" to it.count.toString(),
-                "stop_lower" to it.preserved["stopLowerLimit"],"stop_upper" to it.preserved["stopUpperLimit"])
+                "stop_lower" to stopPrice(it.preserved["stopLowerLimit"]),"stop_upper" to stopPrice(it.preserved["stopUpperLimit"]))
         }).apply {
             if(version>=3)put("protection",s.protection?.publicDetail(s.investment))
             if(version>=4)put("trailing",s.trailingRules?.let{rules->s.trailing?.publicDetail(rules)})
@@ -58,7 +59,7 @@ internal object BinanceManageCommandView {
         append("${s.symbol} · 策略 ${s.id}\n当前状态：${s.status}\n终止时：${mode(s.cps)}\n")
         append("取消合约委托：${if(s.cos) "是，请核对作用范围" else "否，需本人核对委托"}\n")
         s.investment?.let { append("参考累计投入：${it.invested()} USDT\n") }
-        s.range?.let { append("当前区间：${it.lower} ～ ${it.upper} · ${it.count} 格\n原价格止盈止损：${it.preserved["stopLowerLimit"] ?: "未设置"} / ${it.preserved["stopUpperLimit"] ?: "未设置"}\n") }
+        s.range?.let { append("当前区间：${it.lower} ～ ${it.upper} · ${it.count} 格\n原价格止盈止损：${stopPrice(it.preserved["stopLowerLimit"]) ?: "未设置"} / ${stopPrice(it.preserved["stopUpperLimit"]) ?: "未设置"}\n") }
         s.protection?.let {append("当前保护：${if(it.current().mode=="CLEAR")"未设置止盈止损" else it.current().description()}\n")}
         s.trailing?.let {append("当前停止追踪价：上移 ${it.upPrice.ifEmpty{"未设置"}} / 下移 ${it.downPrice.ifEmpty{"未设置"}}\n")}
         if(state.status != "prepared") return@buildString

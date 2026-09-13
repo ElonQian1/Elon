@@ -27,6 +27,16 @@ class BinanceRangeTest {
         fails{BinanceRangeSnapshot.parse(parsed+("preserved" to mapOf("tpslCps" to "true")))}
         fails{BinanceRangeSnapshot.parse(parsed+("preserved" to mapOf("tpslCps" to true,"strategyId" to "999")))}
     }
+    @Test fun optionalEmptyPricesRemainDistinctFromNullAndMissing() {
+        val preserved=mapOf("tpslCps" to false,"stopUpperLimit" to "","stopLowerLimit" to null,"trailingUpLimitPrice" to "")
+        val input=StrictJson.parse(StrictJson.encode(mapOf("lower" to "1","upper" to "2","count" to 10,
+            "grid_type" to "ARITH","direction" to "LONG","preserved" to preserved)),2048)
+        assertEquals(preserved,BinanceRangeSnapshot.parse(input).preserved)
+        for(bad in listOf(" ","1e2","NaN",true,1,listOf(1))) {
+            fails{BinanceRangeSnapshot.parse(input+("preserved" to mapOf("tpslCps" to false,"stopUpperLimit" to bad)))}
+        }
+        fails{BinanceRangeSnapshot.parse(input+("lower" to ""))}
+    }
     @Test fun requiresChangedRangeVerifiedFundingAndMatchingAccount() {
         val s=BinanceManageState{0L}
         fails{s.prepare(account,document,"range",false,snapshot.copy(range=null),rangeDraft=draft)}

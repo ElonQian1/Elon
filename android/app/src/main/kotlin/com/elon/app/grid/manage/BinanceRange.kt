@@ -53,7 +53,7 @@ internal data class BinanceRangeSnapshot(val lower:String,val upper:String,val c
             val direction=v["direction"] as String;require(direction in setOf("LONG","SHORT","NEUTRAL"))
             val source=v["preserved"] as? Map<*,*> ?: error("原止盈止损设置缺失")
             require(source["tpslCps"] is Boolean && source.keys.all{it in setOf("tpslCps","stopUpperLimit","stopLowerLimit","trailingUpLimitPrice","trailingDownLimitPrice")})
-            val preserved=source.entries.associate{(key,value)->key as String to if(key=="tpslCps" || value==null)value else BinanceRange.price(value)}
+            val preserved=source.entries.associate{(key,value)->key as String to if(key=="tpslCps" || value==null || value=="")value else BinanceRange.price(value)}
             return BinanceRangeSnapshot(lower,upper,BinanceRange.count(v["count"]),gridType,direction,preserved)
         }
     }

@@ -119,6 +119,31 @@ test('range preserves omitted versus null stops and the official tpslCps fallbac
   const body=JSON.parse(h.writes()[0].init.body);assert.equal('stopUpperLimit' in body,false);assert.equal(body.stopLowerLimit,null);
   assert.equal(body.tpslCps,false);assert.equal(body.updateRangeCps,true);assert.equal(body.investmentDelta,'20.5');
 });
+
+test('range accepts unset PnL stops and preserves observed empty optional prices',async()=>{
+  for(const absent of ['',null,0,'0.00']) {
+    const h=fixture();Object.assign(h.detail,{stopTpPnl:absent,stopSlPnl:absent,stopUpperLimit:'',stopLowerLimit:'',
+      trailingUpLimitPrice:null,trailingDownLimitPrice:'',tpslCps:null});
+    await prepareRange(h);assert.equal(h.events.at(-1).kind,'prepared');assert.equal(h.writes().length,0);
+    h.api.submit(token,attempt);await tick();assert.equal(h.writes().length,1);
+    const body=JSON.parse(h.writes()[0].init.body);
+    assert.equal(body.stopUpperLimit,'');assert.equal(body.stopLowerLimit,'');
+    assert.equal(body.trailingUpLimitPrice,null);assert.equal(body.trailingDownLimitPrice,'');
+    assert.equal(body.tpslCps,false);assert.equal('stopTpPnl' in body,false);assert.equal('stopSlPnl' in body,false);
+  }
+});
+
+test('empty stops do not hide invalid values or changes after preparing a range',async()=>{
+  for(const bad of [' ', 'NaN', '1e-2', [], {}, true, -1, 0.1]) {
+    for(const key of ['stopTpPnl','stopUpperLimit']) {
+      const h=fixture();h.detail[key]=bad;await prepareRange(h);
+      assert.equal(h.events.at(-1).code,'range_unavailable');assert.equal(h.writes().length,0);
+    }
+  }
+  const h=fixture();h.detail.stopUpperLimit='';await prepareRange(h);
+  assert.equal(h.events.at(-1).kind,'prepared');h.detail.stopUpperLimit='3';
+  h.api.submit(token,attempt);await tick();assert.equal(h.events.at(-1).kind,'not_sent');assert.equal(h.writes().length,0);
+});
 test('investment uses the V2 entry and sends only explicit margin delta once',async()=>{
   const h=fixture();await h.observe();
   assert.equal(h.api.prepare(token,attempt,hash,'123','investment',false),false);
