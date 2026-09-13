@@ -77,3 +77,38 @@ test('reviewed official writing save uses original message ownership, not a libr
   assert.doesNotMatch(save, /gizmo_id|project_id|conversation_mode|primary_assistant/);
   assert.match(save, /if\(o==null\)return await c\(\),!0/);
 });
+
+test('reviewed typed widgets share message-scoped persistence with reference-list indexes and merged metadata', {
+  skip: !directory && 'Requires retained public assets; never evaluates downloaded JavaScript.'
+}, () => {
+  const inspect = (file, hash) => {
+    const source = fs.readFileSync(path.join(directory, file), 'utf8');
+    assert.equal(crypto.createHash('sha256').update(source).digest('hex'), hash);
+    return parseSource(source);
+  };
+  const writing = inspect('a965fc59-fzrm5l4zirdbhwph.js', '752c85e9623229704c208167584c5b7a6e8f18410e6258713d2de7d483a62e19');
+  const conversation = inspect('conversation-small-h1dtzoris1y9588z.js', 'da08c64c132306779e09ba89cac64fa560b120e7560ffdc29b3ce5a0b8ccd67e');
+  const shared = inspect('4813494d-gf2h57w5fiay19bd.js', '6c015001732054f4143ef1922609407c540967762109dcd128bbf56706889c3e');
+  const definition = (module, name) => {
+    const nodes = module.definitions.get(name); assert.equal(nodes?.length, 1, name);
+    return module.text.slice(nodes[0].start, nodes[0].end);
+  };
+  assert.equal(conversation.exported.get('Is'), 'Gza');
+  for (const fragment of ['category===`writing_block`', 'typeof e.data.content==`string`'])
+    assert.ok(definition(conversation, 'Gza').includes(fragment));
+  assert.deepEqual(writing.imports.get('Rt'), { file: './conversation-small-h1dtzoris1y9588z.js', name: 'Is' });
+  for (const fragment of ['metadata?.content_references', 'r.type===`client_defined_widget`', 'Rt(r)', 'r.data.id===t', 'return e'])
+    assert.ok(definition(writing, 'nl').includes(fragment), fragment);
+  assert.ok(definition(conversation, 'WBa').includes('writingBlock:{...t.data,index:e}'));
+  const content = definition(writing, 'al');
+  assert.ok(content.indexOf('n?.content!=null') < content.indexOf('n.type===`client_defined_widget`'));
+  for (const fragment of ['metadata?.writing_blocks?.[o]', 'recipient:m??null,cc:g??null,bcc:v??null,subject:p??null',
+    '...h??{},...H?.metadata??{}', 'X=rc(Ae)', 'persistWritingBlock:X'])
+    assert.ok(definition(writing, 'pc').includes(fragment), fragment);
+  for (const fragment of ['JSON.parse(e)', 'Array.isArray(t)', 'typeof r!=`string`'])
+    assert.ok(definition(conversation, 'Qza').includes(fragment), fragment);
+  assert.ok(definition(conversation, 'Zza').includes('decodeURIComponent(e)'));
+  const variants = definition(shared, shared.exported.get('vQ'));
+  for (const name of ['standard', 'document', 'email', 'creative', 'chat_message', 'social_post', 'slides'])
+    assert.ok(variants.includes('`' + name + '`'), name);
+});

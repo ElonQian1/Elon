@@ -19,7 +19,7 @@
 - 普通好友聊天“一龙 AI → ChatGPT”中，完整写作块和代码块提供原生正文入口。
 - 历史私有响应与现有 SSE 投影共用 `chatgpt_web_text_blocks.js`；兼容既有 DOM 代码块。
 - 写作块读取 `:::writing{...}` 与 `metadata.writing_blocks[id].content`，后者可以覆盖旧正文，包括空字符串。
-- 另支持已核对的 `client_defined_widget / writing_block / data.content` 结构；不会把普通 Markdown 或未知 widget 叫作 Writing Block。
+- 另支持已核对的 `client_defined_widget / writing_block / data.content` 结构，并合并保存后的 metadata（含空内容）；不会把普通 Markdown 或未知 widget 叫作 Writing Block。[typed widget 保存扩展](chatgpt-writing-blocks-widget-save.md)已离线验证，待集中包验收。
 - 原生编辑器直接打开已读取内容，不打开官网，不等 composer，不切会话、不发消息。
 - 提供编辑副本、复制、恢复原文、文件名选择和导出。退出未导出的编辑需要确认。
 - 写作块导出真实 UTF-8 Markdown / 文本；代码复用现有语言扩展名表，未知语言导出 `.txt`。不伪造 PDF / DOCX。
@@ -57,7 +57,7 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 
 ## 官网写回源代码批次
 
-2026-09-13 `android_chatgpt_writing_block_save_v1` 的普通独立会话范围已 `completed / production_verified`，随现有官网写入开关默认启用。范围限定具有明确 provider ID、variant、源消息 ID 的完整 `:::writing` 块。项目自有会话的写回扩展已进入源码待验收；临时会话、共享会话副本、库文件联动、typed widget、无明确 ID/variant 的块仍不允许写回，不能把普通会话通过扩大为所有变体完成。界面中的源 ID 只是后台核对提示，范围或归属核对不通过时仍可编辑/导出副本。
+2026-09-13 `android_chatgpt_writing_block_save_v1` 的普通独立会话范围已 `completed / production_verified`，随现有官网写入开关默认启用。已验收范围限定具有明确 provider ID、variant、源消息 ID 的完整 `:::writing` 块。项目自有会话与 typed widget 的写回扩展已进入源码待验收；临时会话、共享会话副本、库文件联动、无明确 ID/variant 的块仍不允许写回，不能把普通会话通过扩大为所有变体完成。界面中的源 ID 只是后台核对提示，范围或归属核对不通过时仍可编辑/导出副本。
 
 - 官方 `a965fc59-fzrm5l4zirdbhwph.js`，SHA-256 `752c85e9623229704c208167584c5b7a6e8f18410e6258713d2de7d483a62e19` 的 `nc`：POST `/conversation/message/writing-blocks`，携带 `conversation_id`、`message_id`、字符串 `index`、`id`、`writing_block`、`updated_at`；块内保存 content / index / variant / metadata / title / id。
 - 页面同源请求仅由既有身份层提供请求头，数据不离开设备。原生缓存中的源 ID 只是定位提示，不能代替当前页面、账号、分支和服务器正文校验。
@@ -84,4 +84,4 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 ## 完成与剩余
 
 代码块本机链路在 `1.1.1688` 完成；Writing Block 本机编辑/导出、普通会话官网保存及原生回显在 `1.1.1692` 完成。早期 `1690/1691` 失败与后续修正均保留在发布报告，不能将早期失败改写为通过，也不再重复已通过范围。
-项目自有会话写回已补源码，尚待集中包真机验收；临时会话、共享会话副本、库文件联动、typed widget 等扩展写回仍有实现缺口。代码块保持本机编辑和文件导出，不执行代码或伪造官网代码保存；PDF/DOCX 导出未实现。
+项目自有会话与 typed widget 写回已补源码，尚待集中包真机验收；临时会话、共享会话副本、库文件联动等扩展写回仍有实现缺口。代码块保持本机编辑和文件导出，不执行代码或伪造官网代码保存；PDF/DOCX 导出未实现。

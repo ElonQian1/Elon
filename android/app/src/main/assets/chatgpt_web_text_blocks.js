@@ -74,6 +74,44 @@
       lineCount: value.content.split('\n').length, textBlock: value };
   }
 
+  function widgetSource(message, data, saved, index, id, content) {
+    const object = value => value && typeof value === 'object' && !Array.isArray(value);
+    const variant = saved?.variant ?? data.variant;
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(data.id || '') ||
+        !/^[A-Za-z0-9_-]{1,128}$/.test(message.id || '') || message.author?.role !== 'assistant' ||
+        message.clientMetadata?.writingBlockOwners || data.library_file_id != null || saved?.library_file_id != null ||
+        !['standard', 'document', 'email', 'creative', 'chat_message', 'social_post', 'slides'].includes(variant) ||
+        saved != null && (!object(saved) || saved.id != null && saved.id !== id ||
+          saved.index != null && String(saved.index) !== String(index))) return null;
+    let initial = {};
+    if (data.metadata != null) {
+      // The official widget accepts JSON or URI-encoded JSON string metadata.
+      if (typeof data.metadata !== 'string' || data.metadata.length > 16384) return null;
+      let decoded = data.metadata;
+      try { decoded = decodeURIComponent(decoded); } catch (_) {}
+      let parsed;
+      for (const value of [data.metadata, decoded]) {
+        try {
+          const candidate = JSON.parse(value);
+          if (object(candidate) && Object.values(candidate).every(item => typeof item === 'string')) {
+            parsed = candidate; break;
+          }
+        } catch (_) {}
+      }
+      if (!parsed) return null;
+      initial = parsed;
+    }
+    if (saved?.metadata != null && !object(saved.metadata)) return null;
+    for (const key of ['recipient', 'cc', 'bcc', 'subject'])
+      if (data[key] != null && (typeof data[key] !== 'string' || data[key].length > 16384)) return null;
+    const metadata = { recipient: data.recipient ?? null, cc: data.cc ?? null,
+      bcc: data.bcc ?? null, subject: data.subject ?? null, ...initial, ...saved?.metadata };
+    const title = saved?.title ?? data.title ?? '';
+    if (typeof title !== 'string' || title.length > 512 || JSON.stringify(metadata).length > 16384) return null;
+    return { id, messageId: message.id, index, variant, title, metadata, content,
+      locallyEdited: saved?.locallyEdited === true, representation: 'widget' };
+  }
+
   function project(message, includeWriteSources = false) {
     const content = message && message.content;
     if (!content || content.content_type !== 'text' || !Array.isArray(content.parts) ||
@@ -132,17 +170,27 @@
     }
     let text = raw;
     for (const edit of edits.reverse()) text = text.slice(0, edit.start) + edit.text + text.slice(edit.end);
-    // The official widget representation is also used without a :::writing wrapper.
-    for (const [index, reference] of (Array.isArray(message.metadata?.content_references)
-      ? message.metadata.content_references.slice(0, 64) : []).entries()) {
-      if (parts.length >= MAX_BLOCKS) break;
+    // Widget indexes belong to the original reference list, not the filtered card list.
+    const references = Array.isArray(message.metadata?.content_references) ? message.metadata.content_references : [];
+    if (references.length > 64) ambiguousWriting = true;
+    for (const [index, reference] of references.slice(0, 64).entries()) {
       if (reference?.type !== 'client_defined_widget' || reference.category !== 'writing_block' ||
           typeof reference.data?.content !== 'string') continue;
       const data = reference.data;
       const id = token(data.id) || 'writing-reference-' + index;
+      writingIds.set(id, (writingIds.get(id) || 0) + 1);
       if (parts.some(item => item.textBlock.id === id)) continue;
-      const value = part(block('writing', id, data.title || data.subject || '', '', data.content, finished));
-      if (value) parts.push(value);
+      if (parts.length >= MAX_BLOCKS) { ambiguousWriting = true; continue; }
+      const saved = token(data.id) && own(message.metadata?.writing_blocks, data.id);
+      const current = saved && typeof saved.content === 'string' ? saved.content : data.content;
+      const value = block('writing', id, saved?.title ?? data.title ?? data.subject ?? '', '', current, finished);
+      if (!value) continue;
+      const source = finished && widgetSource(message, data, saved || null, index, id, current);
+      if (source) {
+        value.sourceMessageId = message.id;
+        if (includeWriteSources) writeSources.push(source);
+      }
+      parts.push(part(value));
     }
     const canOwn = id => !ambiguousWriting && scanned >= lines.length && writingIds.get(id) === 1;
     for (const row of parts) if (!canOwn(row.textBlock.id)) delete row.textBlock.sourceMessageId;
@@ -178,5 +226,5 @@
     } catch (_) { return null; }
   }
 
-  return { version: 2, project, domCode, runtimeProjection, MAX_CONTENT };
+  return { version: 3, project, domCode, runtimeProjection, MAX_CONTENT };
 });
