@@ -17,10 +17,10 @@ private HTTP implementation, not Android HTTP and not removal of the WebView
 identity/runtime layer. Reuse these modules; do not repeat the completed audit.
 Other contexts retain the established sender before any independent dispatch.
 
-The September 13 [Search/Create Image extension](chatgpt-fresh-tool-text-dispatch.md)
-is implemented and offline-tested, but not yet released/device-accepted or
-default-enabled. Reuse that source batch; the completion scope above remains
-ordinary existing personal plain text.
+The September 13 [Search/Create Image](chatgpt-fresh-tool-text-dispatch.md) and
+[owned project](chatgpt-fresh-project-text-dispatch.md) extensions are implemented
+and offline-tested, but not yet released/device-accepted or default-enabled.
+Reuse these batches; the completed scope remains existing personal plain text.
 
 ## Accepted Scope And Promotion
 
