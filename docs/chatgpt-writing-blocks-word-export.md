@@ -33,6 +33,21 @@
 
 本机 Word 能打开合成文件仅证明文件互操作，不替代手机原生菜单、下载目录和文件分享验收。
 
+## 手机验收入口
+
+`scripts/smoke-chatgpt-web-text-block-ui.ps1` 已增加显式 `-WritingFormat docx`，复用原生产编辑器的语义按钮操作，不新增测试页面或重编 APK。必须指定既有受控写作块和 `-RequiredKinds writing_block`；不创建会话、不发送消息、不写官网。既有样本模式不再需要误导性的 `-CreateFixture` 开关，新建样本仍必须显式提供该开关。
+
+验收先核对原样本身份与正文摘要，要求原生聊天及语音均空闲；仅把本机编辑副本换成仓库合成 Markdown。必须实际选中 Word 格式，不允许缺少选项时改选 TXT。原生回执区分源正文摘要和 ZIP 文件摘要，不能用纯文本摘要冒充 Word 文件一致性。
+
+从手机下载目录只读取本次随机命名的合成导出，核对传输前后完整 SHA-256，再以禁用 DTD/外部解析的有界 ZIP/XML 读取验证实际文件：10 段文字逐字匹配、中文/Unicode、制表符/空行/代码缩进、标题/粗斜体、表格、列表编号及内部关系。随后检查分享选择器并取消，恢复原文、重开确认、恢复原会话与屏幕常亮设置。结果仅包含摘要和计数，不输出正文；校验器只针对该受控样本，不宣称覆盖整个 OOXML 标准或手机阅读器视觉。
+
+工具验证：`writing-docx-acceptance-final-20260914-074258-223` 的 59 项离线检查通过，`writing-docx-native-ui-compile-20260914-074002-231` 的 Java 编译通过，D8 生成并检查 `classes.dex` 通过。首轮新增的损坏编号样本揭示校验缺口，补齐后通过。这些检查验证验收工具，不是重新运行生产导出编码器，也不是手机验收；当前仍因设备离线延期。
+
+```powershell
+& ./scripts/smoke-chatgpt-web-text-block-ui.ps1 -DeviceSerial $serial -ExpectedHardwareSerial $hardware `
+    -ExistingFixturePath $ownedWritingPath -RequiredKinds writing_block -WritingFormat docx
+```
+
 ## 2026-09-13 验证
 
 - 源码提交 `9e48db58f`，没有更改 provider adapter 或云保存协议。

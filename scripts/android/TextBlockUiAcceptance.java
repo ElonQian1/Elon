@@ -112,6 +112,18 @@ public final class TextBlockUiAcceptance extends UiAutomatorTestCase {
                 click(desc("web-chat-text-block-edit"));
                 setText(body(), original + "\nELON_LOCAL_EDIT_V1\n");
                 result.put("body", inspect()); break;
+            case "edit_docx_fixture":
+                guarded();
+                String encoded = getParams().getString("source_base64", "");
+                assertTrue("invalid_docx_fixture", encoded.length() > 0 && encoded.length() < 16384);
+                byte[] replacementBytes = android.util.Base64.decode(encoded, android.util.Base64.DEFAULT);
+                String replacement = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(replacementBytes)).toString();
+                assertTrue("invalid_docx_fixture", replacement.startsWith("# " + MARKER + "\n") &&
+                    replacement.endsWith("ELON_LOCAL_EDIT_V1") && replacement.length() < 8192);
+                click(desc("web-chat-text-block-edit"));
+                setText(body(), replacement);
+                assertEquals("docx_fixture_not_applied", hash(replacement), hash(fixture()));
+                result.put("body", inspect()); break;
             case "history":
                 String edited = guarded();
                 String originalHash = getParams().getString("original_hash", "");
@@ -150,12 +162,11 @@ public final class TextBlockUiAcceptance extends UiAutomatorTestCase {
                 String stem = getParams().getString("stem", "");
                 String extension = getParams().getString("extension", "txt");
                 assertTrue("invalid_fixture_file", stem.matches("elon-block-acceptance-[a-f0-9]{16}"));
-                assertTrue("invalid_export_extension", extension.matches("md|py|txt"));
+                assertTrue("invalid_export_extension", extension.matches("md|py|txt|docx"));
                 click(desc("web-chat-text-block-export"));
                 assertTrue("export_format_dialog_missing", text("\u5bfc\u51fa\u526f\u672c").waitForExists(3000));
-                if (!new UiObject(new UiSelector().packageName(APP).textContains("(." + extension + ")")).exists()) {
-                    extension = "txt";
-                }
+                assertTrue("requested_export_format_missing",
+                    new UiObject(new UiSelector().packageName(APP).textContains("(." + extension + ")")).exists());
                 click(new UiObject(new UiSelector().packageName(APP).textContains("(." + extension + ")")));
                 setText(desc("web-chat-text-block-file-name"), stem);
                 click(text("\u5bfc\u51fa"));
@@ -163,7 +174,9 @@ public final class TextBlockUiAcceptance extends UiAutomatorTestCase {
                 while (!"\u526f\u672c\u5df2\u5bfc\u51fa".equals(desc("web-chat-text-block-status").getText()) &&
                     android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(100);
                 assertTrue("native_export_unconfirmed", "\u526f\u672c\u5df2\u5bfc\u51fa".equals(desc("web-chat-text-block-status").getText()));
-                result.put("exported", true).put("sha256", hash(exported)).put("extension", extension); break;
+                result.put("exported", true).put("source_sha256", hash(exported)).put("extension", extension);
+                if (!extension.equals("docx")) result.put("sha256", hash(exported));
+                break;
             case "cancel_export":
                 assertTrue("export_format_dialog_missing", text("\u5bfc\u51fa\u526f\u672c").exists());
                 click(text("\u53d6\u6d88")); result.put("body", inspect()); break;

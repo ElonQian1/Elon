@@ -1,0 +1,16 @@
+{
+  "schema": "elon.text_block_docx_fixture.v1",
+  "source": "# ELON_TEXT_BLOCK_ACCEPTANCE_V1\n\n\u4e2d\u6587\u4e0e Unicode \ud83d\ude00. **Bold** and *italic*.\n\n3. First\n4. Second\n\n| Item | Count |\n| --- | ---: |\n| Alpha | 2 |\n\n```python\n  first\n\tsecond\n\n<&> \ud83d\ude00\n```\n\nELON_LOCAL_EDIT_V1",
+  "paragraphs": [
+    "ELON_TEXT_BLOCK_ACCEPTANCE_V1",
+    "\u4e2d\u6587\u4e0e Unicode \ud83d\ude00. Bold and italic.",
+    "First",
+    "Second",
+    "Item",
+    "Count",
+    "Alpha",
+    "2",
+    "  first\n\tsecond\n\n<&> \ud83d\ude00\n",
+    "ELON_LOCAL_EDIT_V1"
+  ]
+}

@@ -3,15 +3,21 @@
 param(
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
-    [Parameter(Mandatory)][switch]$CreateFixture,
+    [switch]$CreateFixture,
     [string]$ExistingFixturePath='',
     [ValidateSet('code','writing_block')][string[]]$RequiredKinds=@('writing_block','code'),
+    [ValidateSet('md','txt','docx')][string]$WritingFormat='md',
     [switch]$ReturnHome,
     [string]$Adb='D:/Android/sdk/platform-tools/adb.exe'
 )
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
 . (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
+. (Join-Path $PSScriptRoot 'chatgpt-text-block-docx-evidence.ps1')
+if(-not $CreateFixture -and -not $ExistingFixturePath){throw 'fixture_creation_required'}
+if($WritingFormat -ceq 'docx' -and (-not $ExistingFixturePath -or $RequiredKinds.Count -ne 1 -or
+    $RequiredKinds[0] -cne 'writing_block')){throw 'docx_requires_existing_writing_fixture'}
+$docxFixture=if($WritingFormat -ceq 'docx'){Get-ChatGptTextBlockDocxFixture}else{$null}
 $r=New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial -ExpectedHardwareSerial $ExpectedHardwareSerial
 $report=[ordered]@{schema='elon.text_block_ui.v1';passed=$false;required_kinds=$RequiredKinds;stage='prepare';sent=0;blocks=@();restored=$false;awake_restored=$false;cloud_writes=0;private_content_exported=$false}
 $origin=$null; $changed=$false; $opened=$false; $resetHash=''; $fixturePath=''
@@ -25,7 +31,6 @@ function Ui([string]$Step,[hashtable]$Parameters=@{}) {
 }
 function Stage([string]$Name) { $report.stage=$Name; Write-Host "TEXT_BLOCK_STAGE=$Name" }
 try {
-    if(-not $CreateFixture){throw 'fixture_creation_required'}
     Assert-ChatGptWebSmokeTrustedDevice -Runtime $r
     if(-not (Get-ChatGptWebSmokeUserReadiness -Runtime $r).ready){throw 'device_locked'}
     $origin=Main; $before=Web
@@ -33,6 +38,7 @@ try {
     if($origin.active_surface -ne 'social_ai' -or $origin.social_chat.web_chat_provider_id -ne 'chatgpt_web' -or
         $origin.input.has_text -ne $false -or -not $before.authenticated -or $before.streaming -or $before.dictation_active -or
         [int]$before.input.official_draft_length -ne 0){throw 'idle_native_chat_required'}
+    if($docxFixture -and $before.private_voice_native_research.phase -cne 'idle'){throw 'idle_native_voice_required'}
     Assert-ChatGptWebSmokeAdapterVersion -State $before -ExpectedAdapterVersion (Resolve-ChatGptWebSmokeExpectedAdapterVersion)
     Start-ChatGptWebSmokeAwakeLease -Runtime $r|Out-Null
     $changed=$true
@@ -78,19 +84,32 @@ try {
         $selector="web-chat-message-part:chatgpt_web:${messageKey}:$($item.index):$($item.part.type)"
         $opened=$true
         $original=(Ui open @{selector=$selector}).body
-        $edited=(Ui edit @{expected_hash=$original.sha256}).body
+        $edited=if($docxFixture){(Ui edit_docx_fixture @{expected_hash=$original.sha256;source_base64=$docxFixture.source_base64}).body}
+            else{(Ui edit @{expected_hash=$original.sha256}).body}
         $resetHash=$edited.sha256
+        if($docxFixture -and $edited.sha256 -cne $docxFixture.source_sha256){throw 'docx_fixture_not_applied'}
         $history=Ui history @{expected_hash=$edited.sha256;original_hash=$original.sha256}
         if(-not $history.undo -or -not $history.redo){throw 'native_history_unconfirmed'}
         $stem='elon-block-acceptance-'+[Guid]::NewGuid().ToString('N').Substring(0,16)
-        $extension=if($item.part.type -eq 'writing_block'){'md'}else{'py'}
+        $extension=if($item.part.type -eq 'writing_block'){$WritingFormat}else{'py'}
         $export=Ui export @{expected_hash=$edited.sha256;stem=$stem;extension=$extension}
-        $extension=$export.extension
+        if($export.extension -cne $extension){throw 'export_format_mismatch'}
         $names=Invoke-ChatGptWebSmokeAdb -Runtime $r -Arguments @('shell','find','/sdcard/Download','-maxdepth','1','-name',"elon-*-$stem.$extension") -Label 'locate owned block export'
         $paths=@($names.Trim() -split "`r?`n" | Where-Object {$_})
         if($paths.Count -ne 1 -or $paths[0] -cnotmatch "^/sdcard/Download/elon-[a-f0-9-]+-$stem\.$extension`$"){throw 'owned_export_missing'}
         $checksum=Invoke-ChatGptWebSmokeAdb -Runtime $r -Arguments @('shell','sha256sum',$paths[0]) -Label 'verify owned export bytes'
-        if(($checksum -split '\s+')[0] -cne $export.sha256){throw 'export_bytes_mismatch'}
+        $fileHash=($checksum -split '\s+')[0]
+        $docxEvidence=$null
+        if($docxFixture){
+            Assert-ChatGptDocxExportReceipt $export $docxFixture
+            $size=Invoke-ChatGptWebSmokeAdb -Runtime $r -Arguments @('shell','stat','-c','%s',$paths[0]) -Label 'check owned Word size'
+            if($size.Trim() -cnotmatch '^[0-9]+$' -or [long]$size -gt 1048576){throw 'docx_file_boundary'}
+            $output=Join-Path (Split-Path -Parent $PSScriptRoot) ".ai-tmp/$stem"
+            New-Item -ItemType Directory -Force -Path $output|Out-Null
+            $local=Join-Path $output 'export.docx'
+            Invoke-ChatGptWebSmokeAdb -Runtime $r -Arguments @('pull',$paths[0],$local) -Label 'read owned Word export'|Out-Null
+            $docxEvidence=Assert-ChatGptDocxExportFile -Path $local -ExpectedFileHash $fileHash -Fixture $docxFixture
+        }elseif($fileHash -cne $export.sha256){throw 'export_bytes_mismatch'}
         $actions=Ui export_actions @{expected_hash=$edited.sha256}
         if(-not $actions.export_actions_available){throw 'native_export_actions_missing'}
         $share=Ui share_export @{expected_hash=$edited.sha256}
@@ -102,7 +121,7 @@ try {
         $reopened=(Ui open @{selector=$selector}).body; $opened=$true
         if($reopened.sha256 -cne $original.sha256){throw 'local_copy_changed_source'}
         Ui close|Out-Null; $opened=$false
-        $report.blocks+=@{kind=$item.part.type;native_editor=$true;edited=$true;undo=$history.undo;redo=$history.redo;export_extension=$extension;export_bytes_match=$true;export_actions_available=$actions.export_actions_available;share_picker_opened=$share.share_picker_opened;reset=$true;source_unchanged=$true}
+        $report.blocks+=@{kind=$item.part.type;native_editor=$true;edited=$true;undo=$history.undo;redo=$history.redo;export_extension=$extension;export_bytes_match=$true;docx=$docxEvidence;export_actions_available=$actions.export_actions_available;share_picker_opened=$share.share_picker_opened;reset=$true;source_unchanged=$true}
     }
     $kinds=@($report.blocks|ForEach-Object kind)
     if(@($RequiredKinds|Where-Object {$_ -notin $kinds}).Count){throw 'provider_variant_sample_missing'}
