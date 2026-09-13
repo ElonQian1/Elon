@@ -44,6 +44,10 @@ public final class DirectoryUiAcceptance extends UiAutomatorTestCase {
         }
         assertFalse("directory_still_loading", status.getText().startsWith("\u6b63\u5728\u8bfb\u53d6"));
         assertFalse("directory_failed", description("web-chat-directory-retry").exists());
+        // The status text changes before ListView publishes its new child nodes.
+        boolean empty = status.getText().startsWith("\u672c\u9875\u6ca1\u6709");
+        if (!empty) new UiObject(new UiSelector().packageName(APP)
+            .descriptionStartsWith("web-chat-directory-conversation:")).waitForExists(2000);
         JSONArray rows = new JSONArray();
         for (int index = 0; index < 8; index++) {
             UiObject row = new UiObject(new UiSelector().packageName(APP)
@@ -54,6 +58,7 @@ public final class DirectoryUiAcceptance extends UiAutomatorTestCase {
             rows.put(id);
         }
         System.out.println("DIRECTORY_UI_RESULT=" + new JSONObject().put("conversation_ids", rows)
+            .put("empty_page", empty)
             .put("next_enabled", description("\u4e0b\u4e00\u9875").isEnabled())
             .put("previous_enabled", description("\u4e0a\u4e00\u9875").isEnabled()).toString());
     }

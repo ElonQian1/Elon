@@ -189,8 +189,31 @@ booleans and classes only, never IDs, content or cursors.
 pagination case. `fresh-pagination-final-regression-20260913-205108-289`
 passed 306 tests with zero failures or skips, including the pinned pagination
 constructor and normal/project first-send plus follow-up composition.
-Adapter 379 is prepared for the next grouped release. New-conversation
-production default remains disabled until native acceptance succeeds.
+New-conversation production default remains disabled until native acceptance succeeds.
+
+`fresh-pagination-release-20260913-205445-095` published and installed
+`1.1.1709 / 1709`, source `08339aa2a`, adapter 379, in 449.8 seconds. APK SHA-256:
+`97d9da026d2bca7398db61baf3ea5b7e53c01e28928c8a963ef9e9890bf108a0`.
+The pending handoff was copied and byte-verified before upgrading; it is still
+retained and blocks another fresh acceptance send. No cookies or app data were cleared.
+
+Read-only lookup on 1709 did not resolve that handoff. In landscape, the native
+directory reported more pages but exposed no list rows. A bounded row-layout
+wait alone did not fix this. A temporary portrait lease exposed eight rows;
+none matched the exact pending user ID and prompt. These bounded misses do
+not prove the message is absent from the server. The native directory's
+landscape layout is a separate remaining UI gap; the acceptance harness now
+waits for list-child publication and distinguishes an explicitly empty page.
+
+`fresh-pagination-portrait-acceptance-20260913-210825-330` restored rotation
+and the awake lease, but its temporary wrapper then failed to import the
+runtime helper in the parent scope. This is a harness error, not a private
+request failure. It had sent no new candidate or follow-up. The lookup itself
+had already failed to match the handoff, so fixing the import alone would not
+authorize another send. The 1709 repair is offline-verified and installed,
+not a new native first-send pass. Continue with bounded read-only fixture
+resolution, then one first-send/follow-up case; do not replay the old prompt
+or assume the first eight visible rows are the complete provider directory.
 
 Only the retained, hash-pinned `web_20260912` public sources are parsed; downloaded
 bundles are not executed. `test-chatgpt-text-dispatch-public-evidence.cjs` records
