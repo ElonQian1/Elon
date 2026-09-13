@@ -17,6 +17,9 @@ private HTTP implementation, not Android HTTP and not removal of the WebView
 identity/runtime layer. Reuse these modules; do not repeat the completed audit.
 Other contexts retain the established sender before any independent dispatch.
 
+The [early-stop propagation fix](chatgpt-fresh-early-stop.md) is source-tested and
+awaiting the next grouped release; it is not covered by the older device results.
+
 The September 13 [Search/Create Image](chatgpt-fresh-tool-text-dispatch.md) and
 [owned project](chatgpt-fresh-project-text-dispatch.md) extensions are implemented
 and offline-tested, but not yet released/device-accepted or default-enabled.

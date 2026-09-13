@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
@@ -67,6 +67,20 @@
       stopped && owned.leaf.status === 'finished_partial_completion';
   }
 
+  function awaitingUser(payload, binding, userMessageId) {
+    // The request can precede its history row. Only an unchanged completed
+    // parent is a propagation gap; another branch is never a reason to wait.
+    if (binding.operation === 'regenerate' || binding.newConversation === true ||
+        !conversationMatches(payload, binding) || !payload.mapping || Array.isArray(payload.mapping) ||
+        ownsKey(payload.mapping, userMessageId) || payload.current_node !== binding.parentId ||
+        !ownsKey(payload, 'async_status') || ![null, 3, 4].includes(payload.async_status)) return false;
+    const parent = ownsKey(payload.mapping, binding.parentId) && payload.mapping[binding.parentId];
+    return parent?.id === binding.parentId && parent.message?.id === binding.parentId &&
+      parent.message.author?.role === 'assistant' &&
+      (parent.message.status === 'finished_successfully' && parent.message.end_turn === true ||
+        parent.message.status === 'finished_partial_completion');
+  }
+
   function rejection(payload, binding, userMessageId, stopped, emptyStopped) {
     if (!payload) return 'payload_missing';
     if (!conversationMatches(payload, binding)) return 'conversation_mismatch';
@@ -115,5 +129,5 @@
       ? 'owner_changed' : 'store_not_reconciled');
     return done;
   }
-  return Object.freeze({ reconcile, ownsResponse, branch, read });
+  return Object.freeze({ reconcile, ownsResponse, branch, read, awaitingUser });
 });

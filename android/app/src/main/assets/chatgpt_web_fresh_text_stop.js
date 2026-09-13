@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextStop = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -25,9 +25,16 @@
       check();
       const { shared } = owner.binding;
       if (typeof shared.$3 !== 'function' || typeof shared.textApi?.safePost !== 'function') throw Error('stop_unavailable');
-      const payload = await wait(history.read(owner.binding, owner.request, controller.signal));
-      check();
-      const source = history.branch(payload, owner.binding, owner.request.userMessageId);
+      let payload, source;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        check();
+        payload = await wait(history.read(owner.binding, owner.request, controller.signal));
+        check();
+        source = history.branch(payload, owner.binding, owner.request.userMessageId);
+        if (source || owner.stopAttempted || attempt === 2 ||
+            history.awaitingUser?.(payload, owner.binding, owner.request.userMessageId) !== true) break;
+        await wait(new Promise(resolve => page.setTimeout(resolve, 200)));
+      }
       if (!source) throw Error('stop_owner_unconfirmed');
       const terminal = history.ownsResponse(payload, owner.binding, owner.request.userMessageId, true);
       if (!terminal && !owner.stopAttempted) {

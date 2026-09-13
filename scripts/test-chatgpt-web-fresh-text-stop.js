@@ -142,9 +142,93 @@ test('stop before any assistant text uses the owned user leaf and requires serve
   }
 });
 
-for (const empty of [false, true]) test('owned stop and follow-up cross the real transaction with ' + (empty ? 'user-only' : 'partial assistant') + ' history', async () => {
+function delayedUserFixture(options = {}) {
+  let reads = 0;
+  const f = fixture({ ...options, read: async () => {
+    reads++;
+    if (reads === (options.visibleAt ?? 2)) {
+      const uid = f.owner.request.userMessageId;
+      f.payload.mapping[uid] = { id: uid, parent: PID, message: { id: uid, author: { role: 'user' } } };
+      f.payload.current_node = uid;
+    }
+    await options.afterRead?.(f, reads);
+  }, post: async () => {
+    f.payload.async_status = null;
+    if (options.loseStop) throw Error('synthetic lost stop acknowledgement');
+  } });
+  f.payload.current_node = PID;
+  f.payload.mapping = { [PID]: { id: PID, parent: null, message: { id: PID,
+    author: { role: 'assistant' }, status: 'finished_successfully', end_turn: true } } };
+  return { ...f, reads: () => reads };
+}
+
+test('early stop waits briefly for this submitted user before one server stop', async () => {
+  const f = delayedUserFixture();
+  const first = f.api.stop(f.owner);
+  assert.equal(f.api.stop(f.owner), first);
+  assert.deepEqual(await first, { status: 'accepted', code: 'stopped' });
+  assert.equal(f.calls.filter(c => c.url === '/stop_conversation').length, 1);
+  assert.equal(f.reads(), 3);
+  assert.equal(f.owner.stopAcknowledged, true);
+  assert.equal(f.owner.stopConfirmed, true);
+});
+
+test('early stop leaves an absent submitted user unconfirmed after bounded reads', async () => {
+  const f = delayedUserFixture({ visibleAt: 99 });
+  assert.equal((await f.api.stop(f.owner)).code, 'stop_owner_unconfirmed');
+  assert.equal(f.reads(), 3);
+  assert.equal(f.calls.filter(c => c.url).length, 0);
+});
+
+test('an early stop with a lost acknowledgement cannot release the user-only writer', async () => {
+  const f = delayedUserFixture({ loseStop: true });
+  assert.equal((await f.api.stop(f.owner)).code, 'stop_unconfirmed');
+  assert.equal((await f.api.stop(f.owner)).code, 'stop_reconciliation_pending');
+  assert.equal(f.calls.filter(c => c.url).length, 1);
+  assert.notEqual(f.owner.stopConfirmed, true);
+});
+
+for (const change of [
+  f => { f.payload.conversation_id = PID; },
+  f => { f.payload.current_node = AID; },
+  f => { f.payload.mapping[PID].message.author.role = 'tool'; },
+  f => { f.payload.mapping[PID].message.status = 'in_progress'; },
+  f => { f.payload.async_status = 5; },
+  f => { delete f.payload.async_status; },
+  f => { f.binding.operation = 'regenerate'; }
+]) test('unrelated or unsupported history is not an early-send propagation wait', async () => {
+  const f = delayedUserFixture(); change(f);
+  assert.equal((await f.api.stop(f.owner)).status, 'unknown');
+  assert.equal(f.reads(), 1);
+  assert.equal(f.calls.filter(c => c.url).length, 0);
+});
+
+test('owner change while awaiting the submitted user never sends a stop', async () => {
+  const f = delayedUserFixture({ afterRead(f, count) { if (count === 2) f.current(false); } });
+  assert.equal((await f.api.stop(f.owner)).code, 'context_changed');
+  assert.equal(f.calls.filter(c => c.url).length, 0);
+});
+
+test('timeout during propagation leaves no late stop or released writer', async () => {
+  const f = delayedUserFixture({ visibleAt: 99 });
+  const api = stopModule.create(f.page, { reconciliation: history, timeoutMs: 20 });
+  assert.equal((await api.stop(f.owner)).code, 'stop_timeout');
+  await new Promise(resolve => setTimeout(resolve, 220));
+  assert.equal(f.reads(), 1);
+  assert.equal(f.calls.filter(c => c.url).length, 0);
+  assert.notEqual(f.owner.stopConfirmed, true);
+});
+
+for (const mode of ['partial assistant', 'user-only', 'propagating user']) test('owned stop and follow-up cross the real transaction with ' + mode + ' history', async () => {
+  const empty = mode !== 'partial assistant', delayed = mode === 'propagating user';
+  let historyReads = 0, pendingUser;
   const transaction = require(assets + 'chatgpt_web_fresh_text_transaction');
-  const f = fixture({ post: async () => {
+  const f = fixture({ read: () => {
+    if (delayed && ++historyReads === 2) {
+      f.payload.mapping[pendingUser.id] = pendingUser;
+      f.payload.current_node = pendingUser.id;
+    }
+  }, post: async () => {
     f.payload.async_status = null;
     if (empty) delete f.payload.mapping[AID];
     else f.payload.mapping[AID].message.status = 'finished_partial_completion';
@@ -168,9 +252,14 @@ for (const empty of [false, true]) test('owned stop and follow-up cross the real
       return;
     }
     sentId = uid;
-    f.payload.mapping[uid] = { id: uid, parent: PID, message: { id: uid, author: { role: 'user' } } };
-    if (empty) f.payload.current_node = uid;
-    else f.payload.mapping[AID].parent = uid;
+    pendingUser = { id: uid, parent: PID, message: { id: uid, author: { role: 'user' } } };
+    if (delayed) {
+      f.payload.mapping = { [PID]: { id: PID, message: { id: PID, author: { role: 'assistant' },
+        status: 'finished_successfully', end_turn: true } } };
+      f.payload.current_node = PID;
+    } else f.payload.mapping[uid] = pendingUser;
+    if (empty && !delayed) f.payload.current_node = uid;
+    else if (!empty) f.payload.mapping[AID].parent = uid;
     yield { response: new Response(null, { headers: { 'content-type': 'text/event-stream' } }) };
     await streamWait;
   })();
