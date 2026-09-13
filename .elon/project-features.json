@@ -555,20 +555,20 @@
         },
         {
           "path": "docs/delivery/android-binance-command-handoff-20260913.md",
-          "content_hash": "21bca1daafeff0560cd9df8a163216312ece8cfecb99d658dfc4c8e75bd2cf3c",
+          "content_hash": "ef2fa92a5caa4dc1c0232989ac3f019f1453e5433adbb73622a1542e1b429d98",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0f4a5f96eecdfa66e2378d5c0cded3572368e425",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "ffd3a9b889851575a6f09ec6812c9da31b75fd28",
-            "state": "untracked"
+            "head_commit": "c06beb9aff527b24b7de605719e2c62e56deb7db",
+            "head_blob_oid": "ffd3a9b889851575a6f09ec6812c9da31b75fd28",
+            "worktree_blob_oid": "144ccdac673149b1b93b6a5f30b61523a4d7fc77",
+            "state": "tracked_modified"
           }
         }
       ],
       "created_at_ms": 1789311761227,
-      "updated_at_ms": 1789312678076
+      "updated_at_ms": 1789313621049
     },
     {
       "id": "android-binance-create-economics-v1",
@@ -27443,16 +27443,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_c7bbea06745e40c188f94b33837c3a9c",
-      "feature_id": "android-binance-grid-create-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-create",
-      "reason": "代码与离线回归完成；发布和用户真实下单独立验收，不升级为 verified。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788857698500
-    },
-    {
       "id": "feature_event_341269f4e52a437aa0416253245520dc",
       "feature_id": "android-binance-grid-create-v1",
       "action": "transitioned",
@@ -29441,6 +29431,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789312678076
+    },
+    {
+      "id": "feature_event_d3880ee63ddd474ca5a9395a79c16bd5",
+      "feature_id": "android-binance-command-handoff-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789313621049
     }
   ]
 }
