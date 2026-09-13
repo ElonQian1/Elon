@@ -4,7 +4,7 @@
 既有结构化读取、Markdown / 文本 / 代码源文件导出、显式官网保存保持原链路。
 
 能力 ID：`android_chatgpt_writing_block_docx_export_v1`。
-状态：已实现，Android 编译及离线验证通过；桌面 Word 文件互操作通过，手机验收待设备可用。正式包发布结果在本批次结束时补充。
+状态：已实现并发布 `1.1.1712`，Android 编译及离线验证通过；桌面 Word 文件互操作通过，手机验收待设备可用。`production_status=published_1712_device_acceptance_pending`，不标记手机验收 completed。
 
 ## 用户入口
 
@@ -41,3 +41,8 @@
 - `writing-word-interoperability-20260913-225035-976`：17 秒，Microsoft Word 只读打开生产编码器生成的合成文件，识别 1 个表格、3 个列表项、14 个段落、1 页；未启动文档修复，未保存回输入文件。渲染页已检查中文、Unicode、编号、表格和代码缩进，未见截断或重叠。
 - 标准 `render_docx.py` 因本机未安装 LibreOffice 失败；实际渲染采用本机 Word 输出检查用 PDF，再用 Poppler 转图。这不代表 APK 已实现 PDF 导出。
 - 本轮设备检查为无线 ADB 未连接，未执行手机导出；不重复此前 1706 已验收的 Markdown / 代码源文件流程，也不将其作为新 DOCX 菜单的验收结果。
+
+## 发布
+
+`writing-word-release-20260913-230213-451` 在 528.9 秒内完成正式 APK 构建和发布；版本 `1.1.1712 / 1712`，源码 `8c4f7013748814f0b69b4f9013fb760ff892c5fc`，APK SHA-256 `0fa4ac7c6a37adb89f35ff8823401e77153c18b079fb3add8270b7fd8fd65cea`。
+随后独立读取远端 `app/version.json`，版本、源码和摘要一致。发布脚本自动尝试白名单手机安装时无线 ADB 连接超时，最终为 `APK_ADB_DEPLOY_STATUS=verification_deferred`；没有安装成功或新功能真机验收的结论。
