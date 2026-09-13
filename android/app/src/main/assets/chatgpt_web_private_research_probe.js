@@ -70,10 +70,11 @@
     return true;
   }
   if (existingProbe && Number(existingProbe.version) >= 13) {
-    if (Number(existingProbe.version) < 25) {
+    if (Number(existingProbe.version) < 26) {
       // Upgrade only the command surface; keep the existing network observers.
-      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 25,
+      window.__elonChatGptPrivateResearchProbe = Object.freeze({ ...existingProbe, version: 26,
         handle(action, command, respond) {
+          if (window.__elonChatGptHistoryParentDiagnostic?.handle(window, action, command, respond)) return true;
           if (freshTextTrial(action, command, respond)) return true;
           if (window.__elonChatGptTextBlockInventory?.handle(action, command, respond)) return true;
           if (action === 'private_protocol_probe' && command.value === 'composer_tool_admission') {
@@ -602,9 +603,10 @@
   }
 
   window.__elonChatGptPrivateResearchProbe = Object.freeze({
-    version: 25,
+    version: 26,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
+      if (window.__elonChatGptHistoryParentDiagnostic?.handle(window, action, command, respond)) return true;
       if (freshTextTrial(action, command, respond)) return true;
       if (window.__elonChatGptTextBlockInventory?.handle(action, command, respond)) return true;
       if (action !== 'private_protocol_probe') return false;

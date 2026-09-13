@@ -159,7 +159,7 @@ async function run(enabled, extensions = {}) {
   const enabled = await run(true);
   assert.equal(enabled.requests.length, 6);
   assert.equal(enabled.events.length, 19);
-  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 24);
+  assert.equal(enabled.window.__elonChatGptPrivateResearchProbe.version, 26);
   assert.equal(
     enabled.window.__elonChatGptPrivateResearchProbe
       .copyRequestContext('conversation_content').Authorization,

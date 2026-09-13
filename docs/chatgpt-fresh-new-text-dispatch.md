@@ -49,7 +49,25 @@ a harness error corrected to use main draft-presence plus the provider draft.
 
 Focused script tests cover 15 negative send proofs, six identity cases and
 nine cleanup cases; the existing retry/trial contract suite also passes.
-This acceptance-tooling batch changes no Android source and builds no new APK.
+That acceptance-tooling batch changed no Android source and built no new APK.
+
+### Read-Only Parent Diagnostics
+
+The follow-up adapter 377 adds `chatgpt_private_protocol_probe` mode
+`history_parent`. It reads only the current ordinary conversation through the
+reviewed runtime history loader with `shouldApplyResponse=false`. No composer
+capture, send, replay, navigation or manual tree update is performed by the probe.
+The five-second, single-flight read is bound to document, route, runtime profile
+and account; owner changes discard the result. Existing network observers remain
+unchanged when the command surface upgrades.
+
+Only an allowlisted description of the latest user turn's ancestor chain crosses
+the bridge: roles, ID categories (not IDs), structural equality/child-link checks,
+hidden flags and bounded counts. Node and Android tests cover rejected scopes,
+cycles, broken/missing links, late callbacks, timeout and private-field rejection.
+This is diagnostic infrastructure, **not** evidence that an unexpected parent is
+valid. New first-send admission and reconciliation stay unchanged pending the real
+parent sample. Device validation of this diagnostic is still pending.
 
 ## Evidence
 
