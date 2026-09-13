@@ -4,11 +4,13 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.webkit.CookieManager
+import android.webkit.ConsoleMessage
 import android.webkit.SslErrorHandler
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebChromeClient
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import java.net.URI
@@ -52,6 +54,14 @@ internal fun createBinanceHostWebView(context: Context, runtime: BinanceHostRunt
             listOf("binance_grid_read_diagnostics.js", "binance_grid_reports_adapter.js", "binance_grid_read_adapter.js", "binance_grid_range_contract.js", "binance_grid_protection_contract.js", "binance_grid_trailing_rules.js", "binance_grid_trailing_contract.js", "binance_grid_create_rules.js", "binance_grid_create_economics.js", "binance_grid_create_reference.js", "binance_grid_create_funds.js", "binance_grid_create_adapter.js").joinToString("\n") { asset ->
                 context.assets.open(asset).bufferedReader().use { it.readText() }
             }, setOf(BinanceHostRuntime.ORIGIN))
+        webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+                    runtime.scriptDiagnostics.record(message.message(), message.sourceId(), message.lineNumber())
+                }
+                return true
+            }
+        }
         webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = !binanceHostNavigation(request.url.toString())
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) = runtime.pageStarted(url)

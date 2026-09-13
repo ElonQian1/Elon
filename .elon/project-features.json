@@ -2390,6 +2390,123 @@
       "updated_at_ms": 1788844625711
     },
     {
+      "id": "android-binance-initialization-diagnostics-v1",
+      "title": "币安网页初始化诊断",
+      "summary": "现有主APK WebView输出有界脚本错误及挂载状态，定位真实私有读取启动失败",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/android-binance-initialization-diagnostics-v1.md",
+        "content_hash": "2e2261e61fc9bf89d4453d305e5587b0945e0709b78c26e61d45c99696f43389",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "face23e9b7d01ba3c4d9376e89f8318740af69dd",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "0d2e1f8fecaff050cf1b3c6be7502732d728d5dd",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostRuntime.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostWebView.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceScriptDiagnostics.kt",
+        "android/app/src/main/kotlin/com/elon/app/mcp/McpBinanceHostStatus.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "错误类型和公开位置有界且不输出认证及网页内容",
+        "原网格合同与诊断测试通过",
+        "正式安装后MCP取得当前页面证据，真实业务状态分报"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostRuntime.kt",
+          "content_hash": "9e553ae3a2f6bde79a43b42d76403c6e343733b96104811a169f7f3c6707f194",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "face23e9b7d01ba3c4d9376e89f8318740af69dd",
+            "head_blob_oid": "35aa6eb75e857628b1f42fa072d1549110b64adb",
+            "worktree_blob_oid": "50e6d79c32e533c4786a2c09cb7127e3fdf553cb",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostWebView.kt",
+          "content_hash": "5fd5b4f6ad99665954aadb8eda503129ab9edd3f6895155a992b4b39288ef212",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "face23e9b7d01ba3c4d9376e89f8318740af69dd",
+            "head_blob_oid": "e3a2eb0941ddf5dc546541142dda7f701184fb2d",
+            "worktree_blob_oid": "b251781e025c43fb91778eaaded0a05bfe4f19ea",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceScriptDiagnostics.kt",
+          "content_hash": "b663dbe8305f8ba2f6437e6d47104bcd3ac16203541ffc671defa87b60fb0238",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "face23e9b7d01ba3c4d9376e89f8318740af69dd",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6f814fbeee88c60d49ee625fdd4075e176010cb2",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/mcp/McpBinanceHostStatus.kt",
+          "content_hash": "99cd436e1d8baa3ce359d8022e9b5d7e5dbc661a1f1c73e70f3f76ce3b850c34",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "face23e9b7d01ba3c4d9376e89f8318740af69dd",
+            "head_blob_oid": "e0f6b25598d7b6e88c2bcf76881528d6c4c8e636",
+            "worktree_blob_oid": "8b3c0849b6daf0730a24433a5c9bf220a6abd253",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/host/BinanceScriptDiagnosticsTest.kt",
+          "content_hash": "bac1cc0a0db40e25cd1d416cf4e3e31f454ee20b84f50c508154f3173e1203d9",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "face23e9b7d01ba3c4d9376e89f8318740af69dd",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6782c9aa8e67129c3ab575c8c1f728e576517f0a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-create.ps1",
+          "content_hash": "c919c2544eb11d5fdc967dc29fe202fe024c5bc45eb7f026455e3c3d02d055c2",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "face23e9b7d01ba3c4d9376e89f8318740af69dd",
+            "head_blob_oid": "f678a1ea78423206c3d6ae4a9eefe11dc3bb71ca",
+            "worktree_blob_oid": "ed3a8ff80d8906cd25884c08d911a119c7bf35ab",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1789290614766,
+      "updated_at_ms": 1789291076699
+    },
+    {
       "id": "android-binance-manage-reconnect-v1",
       "title": "币安管理页过期恢复",
       "summary": "恢复过期后已销毁的官方WebView与Host会话，共用原生/MCP重连路径，连接优先布局和样式。",
@@ -26952,56 +27069,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_acb0f50a119a44faa6d6caae27354d85",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-host",
-      "reason": "身份隔离与会话恢复已通过离线验证，继续构建和手机验收。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788836103815
-    },
-    {
-      "id": "feature_event_2cfd1ded931d46fcaa754fa7c7088884",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788836263810
-    },
-    {
-      "id": "feature_event_61a17edf43254ddea4d7f95710840e55",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788837521207
-    },
-    {
-      "id": "feature_event_3433ad6bc3154585831ad4845f29e8eb",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788838324978
-    },
-    {
-      "id": "feature_event_f812967c16ba4d41b75e672d448ef2fa",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788840212012
-    },
-    {
       "id": "feature_event_42d5b0d14b504505ba625b0cb228c15b",
       "feature_id": "android-binance-host-read-v1",
       "action": "evidence_recorded",
@@ -28950,6 +29017,56 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1789284784124
+    },
+    {
+      "id": "feature_event_395f15afa5b643a0a4f65566523e3abb",
+      "feature_id": "android-binance-initialization-diagnostics-v1",
+      "action": "registered",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789290614766
+    },
+    {
+      "id": "feature_event_c41566bb267e4332a6da52a7a9cfa1d5",
+      "feature_id": "android-binance-initialization-diagnostics-v1",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789290614814
+    },
+    {
+      "id": "feature_event_4f50eb514c624d20bb6fdcaa815067b7",
+      "feature_id": "android-binance-initialization-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789290614859
+    },
+    {
+      "id": "feature_event_0006ab34833d4497bdcd95de87343a4d",
+      "feature_id": "android-binance-initialization-diagnostics-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789291076651
+    },
+    {
+      "id": "feature_event_3534789850b645cf8b44b8e04c4af9ee",
+      "feature_id": "android-binance-initialization-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "有界诊断及既有合同回归通过；正式包与设备取证待本批发布后进行",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789291076699
     }
   ]
 }

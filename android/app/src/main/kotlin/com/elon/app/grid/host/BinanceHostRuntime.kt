@@ -21,6 +21,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     val reports = BinanceGridReports(SystemClock::elapsedRealtime, System::currentTimeMillis)
     val document = WebBridgeDocumentSession()
     val diagnostics = BinanceHostDiagnostics()
+    val scriptDiagnostics = BinanceScriptDiagnostics()
     val readRecovery = BinanceReadRecovery(SystemClock::elapsedRealtime)
     var view: WebView? = null; private set
     var status = "请先连接币安"; private set
@@ -138,6 +139,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         state.unavailable()
         reports.clear()
         diagnostics.clear()
+        scriptDiagnostics.clear()
         pagePhase = "loading"; adapterBound = false
         status = if (url.startsWith("https://accounts.binance.com/")) "请在币安官方页面登录或验证" else "正在等待币安网格响应"
         notifyChanged()
@@ -226,6 +228,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         handler.removeCallbacks(freshnessExpiry); pendingReferenceReads.clear()
         readRecovery.reset(); lastResumeRefresh = 0L
         diagnostics.clear()
+        scriptDiagnostics.clear()
         pagePhase = "closed"; adapterBound = false
         view?.let { (it.parent as? android.view.ViewGroup)?.removeView(it); it.stopLoading(); it.destroy() }
         view = null; status = message; notifyChanged()

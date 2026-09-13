@@ -21,6 +21,14 @@ internal fun mcpBinanceHostStatus(context: Context): JSONObject = runCatching {
                 .put("reload_used", host.readRecovery.reloadUsed)
                 .put("reload_count", host.readRecovery.reloadCount))
             .put("page_diagnostics", JSONObject(host.diagnostics.facts))
+            .put("page_console", JSONObject(host.scriptDiagnostics.facts()))
+            .put("page_view", JSONObject()
+                .put("attached", host.view?.isAttachedToWindow == true)
+                .put("shown", host.view?.isShown == true)
+                .put("width", (host.view?.width ?: 0).coerceIn(0, 10000))
+                .put("height", (host.view?.height ?: 0).coerceIn(0, 10000))
+                .put("visibility", host.view?.visibility ?: -1)
+                .put("window_visibility", host.view?.windowVisibility ?: -1))
             .put("diagnostics_observed_at_ms", host.diagnostics.observedAt)
             .put("page_origin", when {
                 host.view?.url?.startsWith("${BinanceHostRuntime.ORIGIN}/") == true -> "binance"
