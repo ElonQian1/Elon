@@ -130,6 +130,39 @@ test('verified existing-conversation scope is enabled by default but preserves b
   assert.equal(g.send().handled, false); assert.equal(g.calls.length, 0);
 });
 
+test('one-use project trial preserves project body and page-only headers through actual dispatch', async () => {
+  const admissions = [];
+  let f;
+  f = fixture({ reconciliation: async () => true, capture: async (_, __, options) => {
+    admissions.push(options.allowProjects);
+    if (!options.allowProjects) throw Error('scope_unsupported');
+    return f.binding;
+  } });
+  f.binding.projectId = 'g-p-' + 'a'.repeat(32);
+  f.binding.projectHeaders = { 'x-openai-locked-chats-pin': 'fixture-private-pin' };
+  const first = f.send();
+  assert.equal((await first.completion).status, 'unavailable');
+  assert.equal(first.claimFallback(), true); assert.equal(f.calls.length, 0);
+  await turn();
+  assert.equal(f.api.trialControl('start').armed, true);
+  assert.equal((await f.send({ requestId: 'mcp_projecttrial' }).completion).status, 'accepted');
+  await turn(); await turn();
+  const prepared = f.calls.find(c => c.kind === 'prepare').value;
+  const sent = f.calls.find(c => c.kind === 'stream_setup').value;
+  assert.equal(prepared.requestBody.conversation_mode.gizmo_id, f.binding.projectId);
+  assert.deepEqual(prepared.requestBody.conversation_mode, sent.body.conversation_mode);
+  assert.equal(prepared.additionalHeaders['x-openai-locked-chats-pin'], 'fixture-private-pin');
+  assert.equal(sent.headers['x-openai-locked-chats-pin'], 'fixture-private-pin');
+  assert.equal(prepared.disableAutomaticRetry, true);
+  assert.equal((await f.send({ requestId: 'mcp_afterproject' }).completion).status, 'unavailable');
+  assert.deepEqual(admissions, [false, true, false]);
+  assert.equal(f.calls.filter(c => c.kind === 'post').length, 1);
+  const evidence = JSON.stringify(f.api.trialControl('state'));
+  for (const secret of ['fixture-private-pin', f.binding.projectId, command.prompt]) assert.equal(evidence.includes(secret), false);
+  assert.equal(f.page.__elonChatGptFreshTextProjectsEnabled, undefined);
+  f.api.dispose();
+});
+
 test('current independent writer remains visible before text and during reconciliation, not in another conversation', async () => {
   const history = deferred(), f = fixture({ reconciliation: () => history.promise });
   assert.equal(f.api.hasCurrentWriter(), false);

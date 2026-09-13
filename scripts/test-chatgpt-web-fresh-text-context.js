@@ -42,6 +42,158 @@ function fixture() {
     identity: value => { identity = value; }, api: contextModule.create(page) };
 }
 
+const PROJECT = 'g-p-' + 'a'.repeat(32);
+function projectFixture(path = '/c/' + CID) {
+  const f = fixture();
+  f.tree.mode = { kind: 'gizmo_interaction', gizmo_id: PROJECT, gizmo: { name: 'fixture display only' } };
+  f.tree.isLoading = false; f.tree.is_do_not_remember = false;
+  f.shared.HM.getGizmoId = state => state.mode.gizmo_id;
+  f.shared.HM.getConversationTurns = () => [];
+  f.shared.textBusinessContext = () => null;
+  f.shared.canvasQueryClient = () => 'fixture-query-client';
+  f.shared.textLockedChatPin = () => undefined;
+  f.shared.textLockedProjectId = () => null;
+  f.shared.textProjectHeaders = () => undefined;
+  f.page.location.href = f.binding.href = 'https://chatgpt.com' + path;
+  return f;
+}
+
+test('owned project is admitted only explicitly, on both canonical and project routes', async () => {
+  for (const path of ['/c/' + CID, '/g/' + PROJECT + '/c/' + CID, '/g/' + PROJECT + '-fixture/c/' + CID]) {
+    const f = projectFixture(path);
+    await assert.rejects(f.api.capture(f.node), /scope_unsupported/);
+    const binding = await f.api.capture(f.node, null, { allowProjects: true });
+    assert.equal(binding.projectId, PROJECT);
+    assert.equal(binding.current(), true);
+    assert.equal(binding.owns(), true);
+    assert.deepEqual(binding.projectHeaders, {});
+    f.node.isConnected = false;
+    assert.equal(binding.current(), true, 'later DOM layout is not the dispatch owner');
+  }
+});
+
+test('project scope rejects foreign, incomplete, temporary and business-agent contexts', async () => {
+  for (const mutate of [
+    f => { f.page.location.href = f.binding.href = 'https://chatgpt.com/g/g-p-' + 'b'.repeat(32) + '/c/' + CID; },
+    f => { f.tree.mode.gizmo_id = 'g-custom'; }, f => { f.tree.mode.kind = 'gizmo_test'; },
+    f => { f.tree.mode.unknown = true; }, f => { f.tree.isLoading = true; },
+    f => { delete f.tree.isLoading; }, f => { f.tree.is_do_not_remember = true; },
+    f => { f.tree.sharedProjectConversationOwner = {}; }, f => { f.tree.contextScopes = [{}]; },
+    f => { f.tree.continuingFromSharedProjectConversationId = CID; },
+    f => { f.shared.textBusinessContext = () => ({ businessAgentId: 'fixture' }); },
+    f => { f.shared.textBusinessContext = () => undefined; },
+    f => { f.shared.textLockedChatPin = undefined; },
+    f => { f.shared.HM.getGizmoId = () => null; },
+    f => { f.shared.SV.isPersonalWorkspace = () => false; },
+    f => { f.shared.textProjectHeaders = () => ({ authorization: 'not-allowed' }); }
+  ]) {
+    const f = projectFixture(); mutate(f);
+    await assert.rejects(f.api.capture(f.node, null, { allowProjects: true }));
+  }
+});
+
+test('project move or owner restrictions after capture stop writes and history apply', async () => {
+  for (const mutate of [
+    f => { f.tree.mode.gizmo_id = 'g-p-' + 'b'.repeat(32); },
+    f => { f.tree.sharedProjectConversationOwner = {}; },
+    f => { f.tree.is_do_not_remember = true; },
+    f => { f.shared.SV.isPersonalWorkspace = () => false; },
+    f => { f.tree.mode = { kind: 'primary_assistant' }; }
+  ]) {
+    const f = projectFixture(), binding = await f.api.capture(f.node, null, { allowProjects: true });
+    mutate(f);
+    assert.equal(binding.current(), false); assert.equal(binding.owns(), false);
+    assert.equal(binding.canReconcile('fixture-user'), false);
+    assert.equal(binding.canStop('fixture-user'), false);
+  }
+  const f = fixture(), binding = await f.api.capture(f.node, null, { allowProjects: true });
+  f.tree.mode = { kind: 'gizmo_interaction', gizmo_id: PROJECT };
+  assert.equal(binding.owns(), false, 'ordinary chat cannot become a project behind an owned send');
+});
+
+test('project headers use current page helpers and change invalidates a prepared request', async () => {
+  const f = projectFixture(), calls = [];
+  let pin = 'fixture-authorized-pin';
+  f.shared.textBusinessContext = value => { calls.push(value); return null; };
+  f.shared.textLockedProjectId = query => { assert.equal(query, 'fixture-query-client'); return PROJECT; };
+  f.shared.textLockedChatPin = () => pin;
+  f.shared.textProjectHeaders = (project, locked, value) => {
+    assert.equal(project, PROJECT); assert.equal(locked, PROJECT); assert.equal(value, pin);
+    return { 'x-openai-locked-chats-pin': value };
+  };
+  const binding = await f.api.capture(f.node, null, { allowProjects: true });
+  assert.deepEqual(calls[0], { turns: [], gizmoId: PROJECT, conversationId: CID });
+  assert.equal(Object.isFrozen(binding.projectHeaders), true);
+  assert.equal(binding.current(), true);
+  pin = 'fixture-changed-pin';
+  assert.equal(binding.current(), false);
+  assert.equal(binding.owns(), true, 'post-dispatch read-only recovery retains its original scope');
+});
+
+test('project tools reuse the existing selected-tool admission without changing scope', async () => {
+  const f = projectFixture(); f.hints.activeSystemHintType = 'search';
+  await assert.rejects(f.api.capture(f.node, null, { allowProjects: true }), /tools_active/);
+  const binding = await f.api.capture(f.node, null, { allowProjects: true, allowTools: true });
+  assert.equal(binding.projectId, PROJECT); assert.equal(binding.tool, 'search');
+});
+
+test('real project modules compose from ownership to one POST and authoritative history', async () => {
+  const f = projectFixture('/g/' + PROJECT + '/c/' + CID), calls = [];
+  const asset = name => require('../android/app/src/main/assets/chatgpt_web_fresh_text_' + name);
+  const events = new EventTarget();
+  f.page.document = new EventTarget(); f.page.document.visibilityState = 'visible';
+  Object.assign(f.page, { crypto: require('node:crypto'), AbortController, setTimeout, clearTimeout,
+    addEventListener: events.addEventListener.bind(events), removeEventListener: events.removeEventListener.bind(events),
+    __elonChatGptPrivateTextTransactionsEnabled: true,
+    __elonChatGptFreshTextProjectsEnabled: true, __elonChatGptFreshTextStream: asset('stream') });
+  f.page.location.origin = 'https://chatgpt.com';
+  let sent;
+  f.shared.textApi.safePost = async (_, options) => {
+    calls.push('prepare'); assert.equal(options.requestBody.conversation_mode.gizmo_id, PROJECT);
+    return { conduit_token: 'fixture-conduit' };
+  };
+  f.shared.textSecurityHeaders = () => ({ 'OpenAI-Sentinel-Chat-Requirements-Token': 'fixture' });
+  f.shared.textTopic = () => { throw Error('unexpected handoff'); };
+  f.conversation.textSecurity = () => ({ chatReq: { token: 'fixture-fresh' } });
+  f.conversation.textStream = (_, options) => (async function* () {
+    options.onBeforeRequestStart(); calls.push('post'); sent = options.body;
+    yield { response: new Response(null, { headers: { 'content-type': 'text/event-stream' } }) };
+    yield { data: { type: 'done' } };
+  })();
+  f.page.__elonChatGptPrivateStreamTransport = { preparePrivateSend: () => true,
+    beginPrivateStream: () => ({ push() {}, finish() {} }), finishPrivateSend: () => calls.push('finish') };
+  f.conversation.textHydrateHistory = async (_, options) => {
+    calls.push('history');
+    const uid = sent.messages[0].id, aid = '44444444-4444-4444-8444-444444444444';
+    const payload = { conversation_id: CID, gizmo_id: PROJECT, is_do_not_remember: false,
+      current_node: aid, async_status: null, mapping: {
+        [uid]: { id: uid, parent: PID, message: { id: uid, author: { role: 'user' } } },
+        [aid]: { id: aid, parent: uid, message: { id: aid, author: { role: 'assistant' },
+          status: 'finished_successfully', end_turn: true } }
+      } };
+    options.onConversationLoadedFromNetwork(payload);
+    assert.equal(options.shouldApplyResponse(), true);
+    f.parent.id = aid;
+    f.shared.HM.getNodeIfExists = (_, id) => payload.mapping[id];
+    f.shared.HM.getParentNode = () => ({ id: PID });
+    f.shared.HM.getParentPromptNode = () => ({ id: uid });
+  };
+  const reconciliation = asset('reconcile').create();
+  const recovery = asset('recovery').create(f.page, { reconciliation, delays: [0], timeoutMs: 1000 });
+  const api = asset('transaction').create(f.page, { context: f.api, requests: asset('request'),
+    receipts: asset('receipts'), reconciliation, recovery });
+  const result = api.send({ requestId: 'mcp_project1', prompt: 'Synthetic project fixture',
+    expectedDraft: '', composer: f.node, readDraft: () => '', clearDraft() {} });
+  assert.equal(result.handled, true);
+  const receipt = await result.completion;
+  assert.equal(receipt.status, 'accepted', JSON.stringify(receipt));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(api.state().pending, false);
+  assert.deepEqual(calls, ['prepare', 'post', 'history', 'finish']);
+  assert.equal(api.trialControl('state').reconciled, true);
+  assert.equal(api.dispose(), true);
+});
+
 test('capture does not use submitComposer or isComposerSubmissionReady', async () => {
   const f = fixture();
   Object.defineProperty(f.props, 'isComposerSubmissionReady', { get() { throw Error('must not read'); } });

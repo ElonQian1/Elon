@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -8,6 +8,8 @@
   const PROFILE = 'web_20260912';
   const fail = code => { throw Error(code); };
   const idPattern = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+  const projectPattern = /^g-p-[a-f0-9]{32}$/i;
+  const routePattern = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9-]{36})$/i;
 
   function stamp() {
     try {
@@ -24,8 +26,9 @@
     if (bindings?.state?.().profile_id !== PROFILE) fail('runtime_unavailable');
     const token = page.__elonChatGptDocumentToken, href = page.location.href, document = page.document;
     const url = new URL(href);
+    const route = routePattern.exec(url.pathname);
     if (url.origin !== 'https://chatgpt.com' || url.search || url.hash || url.username || url.password ||
-        !/^\/c\/[a-f0-9-]{36}$/i.test(url.pathname)) fail('scope_unsupported');
+        !route || !idPattern.test(route[2])) fail('scope_unsupported');
     const submit = page.__elonChatGptPrivateTextRuntimeSubmit;
     const binding = submit?.captureConversation?.(composer);
     if (!binding || binding.newThread || binding.temporary || binding.href !== href) fail('context_unavailable');
@@ -67,15 +70,52 @@
       return matches.length === 1 && matches[0] === selected;
     }
 
+    function scope(state) {
+      if (!state || shared.wV?.(shared.SV?.isPersonalWorkspace) !== true) fail('scope_unsupported');
+      const projectId = shared.HM.getGizmoId(state) ?? null;
+      if (projectId === null) {
+        if (route[1] || state.mode?.kind !== 'primary_assistant' || state.mode.gizmo_id != null) fail('scope_unsupported');
+        return null;
+      }
+      if (options.allowProjects !== true || typeof projectId !== 'string' || !projectPattern.test(projectId) ||
+          route[1] && route[1] !== projectId || state.mode?.kind !== 'gizmo_interaction' ||
+          state.mode.gizmo_id !== projectId ||
+          Object.keys(state.mode).some(key => !['kind', 'gizmo_id', 'gizmo'].includes(key)) ||
+          state.isLoading !== false || state.is_do_not_remember !== false ||
+          state.sharedProjectConversationOwner != null || state.continuingFromSharedProjectConversationId != null ||
+          state.contextScopes != null && (!Array.isArray(state.contextScopes) || state.contextScopes.length)) fail('scope_unsupported');
+      return projectId;
+    }
+
+    function projectHeaders(state, projectId) {
+      if (projectId === null) return Object.freeze({});
+      if (['textBusinessContext', 'textProjectHeaders', 'textLockedProjectId', 'textLockedChatPin', 'canvasQueryClient']
+        .some(key => typeof shared[key] !== 'function') ||
+          typeof shared.HM.getConversationTurns !== 'function') fail('runtime_unavailable');
+      if (shared.textBusinessContext({ turns: shared.HM.getConversationTurns(state),
+        gizmoId: projectId, conversationId: binding.serverId }) !== null) fail('scope_unsupported');
+      // Match OB: reuse the current account's authorized project PIN only inside
+      // the page. No credential or project instruction is copied into native UI.
+      const headers = shared.textProjectHeaders(projectId,
+        shared.textLockedProjectId(shared.canvasQueryClient()), shared.textLockedChatPin());
+      if (headers === undefined) return Object.freeze({});
+      if (!headers || typeof headers !== 'object' || Array.isArray(headers) ||
+          Object.keys(headers).length !== 1 || typeof headers['x-openai-locked-chats-pin'] !== 'string' ||
+          !headers['x-openai-locked-chats-pin'] || headers['x-openai-locked-chats-pin'].length > 65536 ||
+          /[\r\n]/.test(headers['x-openai-locked-chats-pin'])) fail('scope_unsupported');
+      return Object.freeze({ 'x-openai-locked-chats-pin': headers['x-openai-locked-chats-pin'] });
+    }
+
     function read() {
       const state = tree(), props = binding.shared.getSharedProps();
       if (!state || !registeredOwner() || props.conversation !== selected || props.composerController !== binding.controller ||
           props.isDisabled !== false || props.isConsumerLockdownModeLoadingForConversation !== false ||
           props.shouldBlockConsumerLockdownModeActionsForConversation !== false ||
           props.structuredInputMessageId != null || selected.serverId$() !== binding.serverId ||
-          !idPattern.test(binding.serverId || '') || shared.HM.getGizmoId(state) != null ||
-          state.mode?.kind !== 'primary_assistant' || shared.cX?.() !== false || shared.uo(selected) !== false ||
+          !idPattern.test(binding.serverId || '') || route[2] !== binding.serverId ||
+          shared.cX?.() !== false || shared.uo(selected) !== false ||
           conversation.textPrepareEnabled() !== true || conversation.textReviewAck(selected) != null) fail('scope_unsupported');
+      const projectId = scope(state);
       if (['continuingFromSharedConversationId', 'continuingFromSharedProjectConversationId', 'continuingFromSharedPostId',
         'forkFromSharedPost', 'branchingFromMessageId', 'branchingFromConversationId', 'continuationBranch',
         'hideFromHistory', 'conversationOrigin'].some(key => state[key] != null && state[key] !== false) ||
@@ -104,16 +144,18 @@
           !(completedAssistant || confirmedStoppedUser) ||
           shared.textModelOverride()?.model_slug === model?.id) fail('parent_unavailable');
       return { conversationId: binding.serverId, parentId: parent.id, parentRole: parent.author.role, model: model?.id,
-        tool: selectedTool,
+        tool: selectedTool, projectId, projectHeaders: projectHeaders(state, projectId),
         effort: conversation.yRt(selected).conversationThinkingEffort$() ?? null,
         serviceTier: conversation.l0(selected).getServiceTierForSubmission$() ?? null,
         historyDisabled: shared.textHistoryDisabled(), doNotRemember: state.is_do_not_remember === true };
     }
     const snapshot = read(), fingerprint = JSON.stringify(snapshot);
     function owns() {
-      return document === page.document && token === page.__elonChatGptDocumentToken && href === page.location.href &&
-        bindings.state().profile_id === PROFILE && account() === ownerAccount && registeredOwner() &&
-        selected.serverId$() === snapshot.conversationId;
+      try {
+        return document === page.document && token === page.__elonChatGptDocumentToken && href === page.location.href &&
+          bindings.state().profile_id === PROFILE && account() === ownerAccount && registeredOwner() &&
+          selected.serverId$() === snapshot.conversationId && scope(tree()) === snapshot.projectId;
+      } catch (_) { return false; }
     }
     function current() {
       try { return owns() && JSON.stringify(read()) === fingerprint; } catch (_) { return false; }
