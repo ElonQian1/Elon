@@ -109,6 +109,46 @@ test('project removal during the preflight read cancels before POST', async () =
   assert.equal((await h.save(prepared.ticket)).ok, false); assert.equal(h.state.posts.length, 0);
 });
 
+for (const project of [false, true]) {
+  function pendingWriter() {
+    const h = harness(project ? projectPath : plainPath);
+    if (!project) { h.state.thread.projectId = null; h.state.payload.gizmo_id = null; }
+    h.state.sending = false;
+    h.page.__elonChatGptFreshTextTransaction = { state: () => ({ pending: h.state.sending }) };
+    return h;
+  }
+  test(`fresh text writer prevents concurrent block preparation (${project ? 'project' : 'personal'})`, async () => {
+    const h = pendingWriter(); h.state.sending = true;
+    assert.equal((await h.prepare()).ok, false);
+    assert.equal(h.state.requests.length, 0);
+    h.state.sending = false;
+    assert.equal((await h.prepare()).code, 'writing_ready');
+    assert.equal(h.state.posts.length, 0);
+  });
+  for (const timing of ['before_save', 'during_read', 'after_post', 'inside_update'])
+    test(`fresh text writer suspends block save at ${timing} (${project ? 'project' : 'personal'})`, async () => {
+      const h = pendingWriter(), prepared = await h.prepare();
+      assert.equal(prepared.code, 'writing_ready');
+      const sent = ['after_post', 'inside_update'].includes(timing);
+      if (timing === 'before_save') h.state.sending = true;
+      if (timing === 'during_read') h.state.afterRequest = method => { if (method === 'GET') h.state.sending = true; };
+      if (timing === 'after_post') h.state.afterRequest = method => { if (method === 'POST') h.state.sending = true; };
+      if (timing === 'inside_update') h.state.beforeUpdate = () => { h.state.sending = true; };
+      const first = await h.save(prepared.ticket);
+      assert.notEqual(first.code, 'writing_saved');
+      assert.equal(first.pending === true, sent);
+      assert.equal(h.state.posts.length, sent ? 1 : 0);
+      assert.equal(h.state.updates, 0);
+      await h.save(prepared.ticket);
+      assert.equal(h.state.posts.length, sent ? 1 : 0);
+      h.state.sending = false; h.state.afterRequest = () => {}; h.state.beforeUpdate = () => {};
+      // Only a readback may finish a dispatched save; a rejected preflight may be explicitly retried.
+      const recovered = sent ? await h.verify(prepared.ticket) : await h.save(prepared.ticket);
+      assert.equal(recovered.code, 'writing_saved');
+      assert.equal(h.state.posts.length, 1); assert.equal(h.state.updates, 1);
+    });
+}
+
 test('project change after POST preserves uncertain write and never replays it', async () => {
   const h = harness(), prepared = await h.prepare();
   h.state.afterRequest = method => { if (method === 'POST') h.state.thread.projectId = other; };

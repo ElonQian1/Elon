@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptWritingBlockContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -69,6 +69,7 @@
           shared.Fl(shared.HM.getRequestId(state())) === false &&
           !page.__elonChatGptPrivateTextRuntimeSubmit?.state?.().pending &&
           !page.__elonChatGptPrivateTextTransactionRelay?.state?.().active &&
+          !page.__elonChatGptFreshTextTransaction?.state?.().pending &&
           !page.__elonChatGptPrivateRegenerateRuntime?.state?.().pending &&
           !page.__elonChatGptPrivateConversationDelete?.busy?.() &&
           page.__elonChatGptPrivateConversationMutation?.state?.().state !== 'busy';
