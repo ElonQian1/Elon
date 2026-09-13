@@ -1,5 +1,20 @@
 #requires -Version 7.0
 
+function Get-ChatGptFreshPendingObservedPath {
+    param([AllowNull()]$Web, [string]$Prompt, [string]$UserMessageId)
+    if ($UserMessageId -cnotmatch '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' -or
+        $Prompt -cnotmatch '^ELON_FRESH_TEXT_ACCEPTANCE_V1 first (?<stamp>\d{13})\. Reply exactly FRESH_FIRST_\k<stamp>\.$' -or
+        $Web.surface -cne 'chatgpt_web' -or $Web.authenticated -isnot [bool] -or !$Web.authenticated -or
+        [string]$Web.conversation.url -cnotmatch '^https://chatgpt\.com(?<path>/c/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$') {
+        return ''
+    }
+    $path = $Matches.path
+    $users = @($Web.conversation.messages | Where-Object role -CEQ 'user')
+    if ($users.Count -ne 1 -or $users[0].id -cne $UserMessageId -or $users[0].content -cne $Prompt) { return '' }
+    # This is a read-only lookup hint, not terminal response or native UI proof.
+    return $path
+}
+
 function Test-ChatGptFreshPendingReadback {
     param([AllowNull()]$Pending, [AllowNull()]$Web, [AllowNull()]$Main)
     if ($Pending.schema -cne 'elon.fresh_text_pending.v1' -or $Pending.source -cne 'native_fixture' -or

@@ -33,7 +33,7 @@ if (Test-Path -LiteralPath $pendingFile) {
 }
 $originPath = ''; $originDraft = ''; $opened = $false; $restored = $false; $awakeRestored = $false
 $awaitingResult = $false; $trialRequested = $false; $ownedNavigation = $false; $expectedPath = ''
-$lastPrompt = ''; $lastUserId = ''; $clickAcknowledged = $false
+$lastPrompt = ''; $lastUserId = ''; $lastObservedPath = ''; $clickAcknowledged = $false
 $report = [ordered]@{ schema = 'elon.fresh_text_ui.v1'; passed = $false; stage = 'opening';
     new_conversation = [bool]$NewConversation; seed_sends = 0; candidate_clicks = 0; cases = @();
     restored = $false; awake_restored = $false; write_unconfirmed = $false }
@@ -62,7 +62,7 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
     $started = [DateTimeOffset]::UtcNow
     # A lost click acknowledgement must not permit replay, navigation or draft cleanup.
     $script:awaitingResult = $true
-    $script:lastPrompt = $prompt; $script:lastUserId = ''; $script:clickAcknowledged = $false
+    $script:lastPrompt = $prompt; $script:lastUserId = ''; $script:lastObservedPath = ''; $script:clickAcknowledged = $false
     if ($Candidate) { $report.candidate_clicks++ } else { $report.seed_sends++ }
     Write-Host "FRESH_TEXT_PROGRESS kind=$Kind phase=native_click_requested"
     Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass ConversationUiAcceptance `
@@ -84,6 +84,9 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
         $users = @($messages | Where-Object { $_.role -eq 'user' -and $_.content -eq $prompt })
         $webUsers = @($web.conversation.messages | Where-Object { $_.role -ceq 'user' -and $_.content -ceq $prompt })
         if ($webUsers.Count -eq 1) { $script:lastUserId = [string]$webUsers[0].id }
+        if ($NewFirst -and !$script:lastObservedPath) {
+            $script:lastObservedPath = Get-ChatGptFreshPendingObservedPath -Web $web -Prompt $prompt -UserMessageId $script:lastUserId
+        }
         $matched = @($messages | Where-Object {
             $_.role -eq 'friend' -and (([string]$_.content -replace '\\([_-])', '$1').Contains($marker))
         }).Count -gt 0
@@ -217,9 +220,13 @@ try {
         $awakeRestored = Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime
         if ($awaitingResult) {
             # Local-only controlled fixture receipt survives worktree cleanup. It is not a replay instruction.
+            if (!$lastObservedPath) {
+                $lastObservedPath = Get-ChatGptFreshPendingObservedPath -Web $lastWeb -Prompt $lastPrompt -UserMessageId $lastUserId
+            }
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pendingFile) | Out-Null
             @{schema='elon.fresh_text_pending.v1';source='native_fixture';new_conversation=[bool]$NewConversation;
                 origin_path=$originPath;prompt=$lastPrompt;user_message_id=$lastUserId;
+                observed_path=$lastObservedPath;readback_completed=$false;
                 click_acknowledged=$clickAcknowledged;trial=$report.last_trial;replay_allowed=$false;
                 created_at=[DateTimeOffset]::UtcNow.ToString('o')} | ConvertTo-Json -Depth 6 |
                 Set-Content -LiteralPath $pendingFile -Encoding utf8

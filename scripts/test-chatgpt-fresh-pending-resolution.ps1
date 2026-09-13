@@ -19,6 +19,42 @@ Assert ($selected.Count -eq 2) 'unique_owned_normal_routes'
 Assert ($selected[0].id -ceq $recent.id) 'activity_first'
 Assert ($selected[1].id -ceq $old.id) 'undated_not_dropped'
 Assert (@(Select-FreshPendingCandidates $p @($old,$recent) 1).Count -eq 1) 'bounded'
+$observed=$p|ConvertTo-Json|ConvertFrom-Json
+$observed | Add-Member observed_path $old.path
+$direct=@(Select-FreshPendingCandidates $observed @() 20)
+Assert ($direct.Count -eq 1 -and $direct[0].path -ceq $old.path) 'observed_route_without_directory'
+$ordered=@(Select-FreshPendingCandidates $observed @($recent,$old,$old) 20)
+Assert ($ordered.Count -eq 2 -and $ordered[0].path -ceq $old.path) 'observed_before_dates_deduplicated'
+foreach ($change in @(
+    {param($p) $p.observed_path='https://chatgpt.com'+$p.observed_path},
+    {param($p) $p.observed_path+='?different=1'},
+    {param($p) $p.observed_path='/g/project/c/other'},
+    {param($p) $p.observed_path='/c/foreign'},
+    {param($p) $p.observed_path=@($p.observed_path)},
+    {param($p) $p.observed_path=$true})) {
+    $invalid=$observed|ConvertTo-Json|ConvertFrom-Json
+    & $change $invalid
+    Assert (!(Test-FreshPendingFixture $invalid)) 'reject_invalid_observed_route'
+}
+$directoryCalls=0
+function Invoke-ChatGptWebSmokeAction {
+    param($Runtime, $Action, $Arguments)
+    if ($Action -cne 'chatgpt_get_conversations' -or $Arguments.offset -ne 0) { throw 'unexpected_directory_request' }
+    $script:directoryCalls++
+    @{control_ok=$true;offset=0;has_more=$false;conversations=@($recent,$old)}
+}
+$queue=@{candidates=@(Select-FreshPendingCandidates $observed @() 20);index=0;directory_loaded=$false}
+$report=@{directory_reads=0}
+$candidate=Get-FreshPendingNextCandidate -Queue $queue -Pending $observed -Report $report -Limit 20
+Assert ($candidate.path -ceq $old.path -and $directoryCalls -eq 0) 'direct_before_any_directory_request'
+$candidate=Get-FreshPendingNextCandidate -Queue $queue -Pending $observed -Report $report -Limit 20
+Assert ($candidate.path -ceq $recent.path -and $directoryCalls -eq 1) 'catalogue_only_after_direct_miss'
+Assert ($null -eq (Get-FreshPendingNextCandidate -Queue $queue -Pending $observed -Report $report -Limit 20)) 'catalogue_ends'
+Assert ($directoryCalls -eq 1 -and $report.directory_reads -eq 1) 'catalogue_not_reloaded'
+$queue=@{candidates=@(Select-FreshPendingCandidates $observed @() 1);index=0;directory_loaded=$false}
+Get-FreshPendingNextCandidate -Queue $queue -Pending $observed -Report $report -Limit 1 | Out-Null
+Assert ($null -eq (Get-FreshPendingNextCandidate -Queue $queue -Pending $observed -Report $report -Limit 1)) 'direct_counts_toward_limit'
+Assert ($directoryCalls -eq 1) 'limit_prevents_directory_read'
 foreach($field in @('schema','source','new_conversation','replay_allowed','user_message_id','prompt')) {
     $badPending=$p|ConvertTo-Json|ConvertFrom-Json
     $badPending.$field='invalid'

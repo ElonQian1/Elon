@@ -29,6 +29,11 @@ now contains the exact current scripts; Release compilation and targeted Android
 tests passed. Device acceptance remains deferred. The 1709 pending handoff is
 still unresolved and unreplayed.
 
+The [observed-route handoff](chatgpt-fresh-pending-observed-route.md) now retains
+an exact provider route for future uncertain first sends and checks it before
+reading directory pages. This tooling is offline-verified only; it does not
+resolve the old handoff or change the disabled new-conversation default.
+
 ## Native Acceptance Failure On 1706
 
 `fresh-new-native-ui-20260913-183220-505` used the actual native composer and

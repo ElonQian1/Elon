@@ -129,4 +129,29 @@ foreach ($change in $readbackCases) {
     $f = ReadbackFixture; & $change $f
     if (Test-ChatGptFreshPendingReadback -Pending $f.pending -Web $f.web -Main $f.main) { throw 'unverified_pending_readback_accepted' }
 }
-Write-Output "FRESH_TEXT_SEND_EVIDENCE=passed send_negative_cases=$($cases.Count) continuity_cases=6 cleanup_cases=9 readback_negative_cases=$($readbackCases.Count)"
+$f = ReadbackFixture
+$observedPath = Get-ChatGptFreshPendingObservedPath $f.web $f.pending.prompt $f.pending.user_message_id
+if ($observedPath -cne $path) { throw 'exact_observed_route_rejected' }
+$f.web.streaming = $true; $f.web.conversation.messages = @($f.web.conversation.messages[0])
+if ((Get-ChatGptFreshPendingObservedPath $f.web $f.pending.prompt $f.pending.user_message_id) -cne $path) {
+    throw 'in_progress_observed_route_lost'
+}
+$f.pending.readback_completed = $false
+if (Test-ChatGptFreshPendingReadback $f.pending $f.web $f.main) { throw 'observed_route_cannot_prove_completion' }
+$observedCases = @(
+    {param($f) $f.web.surface='google_web'}, {param($f) $f.web.authenticated='true'},
+    {param($f) $f.web.conversation.url=$f.web.conversation.url.Replace('chatgpt.com','chatgptXcom')},
+    {param($f) $f.web.conversation.url+='?other=1'}, {param($f) $f.web.conversation.url+='/'},
+    {param($f) $f.web.conversation.messages[0].id='other'},
+    {param($f) $f.web.conversation.messages[0].content='other'},
+    {param($f) $f.web.conversation.messages+=@{role='user';id='later';content='other'}},
+    {param($f) $f.pending.user_message_id='invalid'},
+    {param($f) $f.pending.prompt=$f.pending.prompt.Replace('FIRST_1780000000000','FIRST_1780000000001')}
+)
+foreach ($change in $observedCases) {
+    $f = ReadbackFixture; & $change $f
+    if (Get-ChatGptFreshPendingObservedPath $f.web $f.pending.prompt $f.pending.user_message_id) { throw 'unproven_observed_route_accepted' }
+}
+if (!$source.Contains('observed_path=$lastObservedPath;readback_completed=$false;') -or
+    !$source.Contains('$script:lastObservedPath = Get-ChatGptFreshPendingObservedPath')) { throw 'observed_handoff_not_wired' }
+Write-Output "FRESH_TEXT_SEND_EVIDENCE=passed send_negative_cases=$($cases.Count) continuity_cases=6 cleanup_cases=9 readback_negative_cases=$($readbackCases.Count) observed_negative_cases=$($observedCases.Count)"

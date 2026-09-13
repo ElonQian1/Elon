@@ -19,6 +19,8 @@ function Test-FreshPendingFixture {
         $Pending.new_conversation -is [bool] -and $Pending.new_conversation -and
         $Pending.replay_allowed -is [bool] -and !$Pending.replay_allowed -and
         [string]$Pending.user_message_id -cmatch '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' -and
+        ($null -eq $Pending.observed_path -or ($Pending.observed_path -is [string] -and
+            ($Pending.observed_path -ceq '' -or $Pending.observed_path -cmatch '^/c/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$'))) -and
         [string]$Pending.prompt -cmatch '^ELON_FRESH_TEXT_ACCEPTANCE_V1 first (?<stamp>\d{13})\. Reply exactly FRESH_FIRST_\k<stamp>\.$'
 }
 
@@ -28,13 +30,47 @@ function Select-FreshPendingCandidates {
     # Dates narrow the read-only search; only exact message identity can resolve it.
     $day = ([DateTimeOffset]$Pending.created_at).ToLocalTime().ToString('yyyy-MM-dd')
     $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    $ordered = @($Conversations | Where-Object { $day -in $_.activity_dates }) +
+    $observed = if ($Pending.observed_path) {
+        @([pscustomobject]@{id=$Pending.observed_path.Substring(3);path=$Pending.observed_path;project_id=$null})
+    } else { @() }
+    $ordered = @($observed) + @($Conversations | Where-Object { $day -in $_.activity_dates }) +
         @($Conversations | Where-Object { $day -notin $_.activity_dates })
     $valid = foreach ($row in $ordered) {
         if (!$row.project_id -and [string]$row.id -cmatch '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' -and
             [string]$row.path -ceq ('/c/' + $row.id) -and $seen.Add([string]$row.id)) { $row }
     }
     @($valid | Select-Object -First $Limit)
+}
+
+function Get-FreshPendingDirectoryCandidates {
+    param($Runtime, $Pending, [Collections.IDictionary]$Report, [int]$Limit)
+    $all = @(); $offset = 0
+    for ($pageIndex = 0; $pageIndex -lt 8; $pageIndex++) {
+        $Report.directory_reads++
+        $page = Invoke-ChatGptWebSmokeAction -Runtime $Runtime -Action chatgpt_get_conversations -Arguments @{limit=50;offset=$offset}
+        if ($page.control_ok -ne $true -or $page.offset -ne $offset) { throw 'directory_cache_page_invalid' }
+        $all += @($page.conversations)
+        $Report.cache_has_more = $page.has_more -eq $true
+        if (!$page.has_more) { break }
+        if ($page.next_offset -le $offset) { throw 'directory_cache_cursor_stalled' }
+        $offset = $page.next_offset
+    }
+    $Report.cached_count = $all.Count
+    Select-FreshPendingCandidates $Pending $all $Limit
+}
+
+function Get-FreshPendingNextCandidate {
+    param($Queue, $Runtime, $Pending, [Collections.IDictionary]$Report, [int]$Limit)
+    if ($Queue.index -ge $Limit) { return $null }
+    if ($Queue.index -ge $Queue.candidates.Count -and !$Queue.directory_loaded) {
+        $seenPaths = @($Queue.candidates | ForEach-Object path)
+        $Queue.candidates += @(Get-FreshPendingDirectoryCandidates -Runtime $Runtime -Pending $Pending -Report $Report -Limit $Limit |
+            Where-Object { $_.path -cnotin $seenPaths })
+        $Queue.directory_loaded = $true
+    }
+    $Report.candidates = $Queue.candidates.Count
+    if ($Queue.index -ge $Queue.candidates.Count) { return $null }
+    return $Queue.candidates[$Queue.index++]
 }
 
 function Test-FreshPendingReadOnlyIdle {
@@ -57,7 +93,7 @@ $pending = Get-Content -LiteralPath $file -Raw | ConvertFrom-Json
 if (!(Test-FreshPendingFixture $pending)) { throw 'invalid_pending_fixture' }
 $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
 $origin = ''; $expected = ''; $opened = $false
-$report = [ordered]@{schema='elon.fresh_pending_resolution.v1'; matched=$false; cached_count=0;
+$report = [ordered]@{schema='elon.fresh_pending_resolution.v1'; matched=$false; cached_count=0; directory_reads=0;
     cache_has_more=$false; candidates=0; inspected=0; exact_user_seen=$false; restored=$false;
     left_resolved_open=$false; awake_restored=$false; sends=0}
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $r
@@ -68,20 +104,10 @@ try {
     $web = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state
     $trial = Invoke-ChatGptFreshTrial -Runtime $r -Mode state
     if (!(Test-FreshPendingReadOnlyIdle $web $main $trial)) { throw 'pending_resolution_not_idle' }
-    $all = @(); $offset = 0
-    for ($pageIndex = 0; $pageIndex -lt 8; $pageIndex++) {
-        $page = Invoke-ChatGptWebSmokeAction -Runtime $r -Action chatgpt_get_conversations -Arguments @{limit=50;offset=$offset}
-        if ($page.control_ok -ne $true -or $page.offset -ne $offset) { throw 'directory_cache_page_invalid' }
-        $all += @($page.conversations)
-        $report.cache_has_more = $page.has_more -eq $true
-        if (!$page.has_more) { break }
-        if ($page.next_offset -le $offset) { throw 'directory_cache_cursor_stalled' }
-        $offset = $page.next_offset
-    }
-    $report.cached_count = $all.Count
-    $candidates = @(Select-FreshPendingCandidates $pending $all $MaxCandidates)
-    $report.candidates = $candidates.Count
-    foreach ($candidate in $candidates) {
+    $queue = @{candidates=@(Select-FreshPendingCandidates $pending @() $MaxCandidates);index=0;directory_loaded=$false}
+    while ($report.inspected -lt $MaxCandidates) {
+        $candidate = Get-FreshPendingNextCandidate -Queue $queue -Runtime $r -Pending $pending -Report $report -Limit $MaxCandidates
+        if ($null -eq $candidate) { break }
         $main = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state -MainState
         $web = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state
         $trial = Invoke-ChatGptFreshTrial -Runtime $r -Mode state
