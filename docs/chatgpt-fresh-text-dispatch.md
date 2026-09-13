@@ -17,6 +17,11 @@ private HTTP implementation, not Android HTTP and not removal of the WebView
 identity/runtime layer. Reuse these modules; do not repeat the completed audit.
 Other contexts retain the established sender before any independent dispatch.
 
+The September 14 [private input readiness batch](chatgpt-private-text-input-memory.md)
+adds actual in-memory draft ownership when the composer DOM is absent. It keeps
+private-text and DOM readiness separate; device acceptance of that boundary is
+pending and does not change the accepted scopes below.
+
 The [early-stop propagation fix](chatgpt-fresh-early-stop.md) is source-tested and
 awaiting the next grouped release; it is not covered by the older device results.
 
