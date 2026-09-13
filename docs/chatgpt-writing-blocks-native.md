@@ -72,8 +72,9 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 
 ## 代码与验证
 
-- 2026-09-13 补充修复：文本包装写作块的标题改为按“已保存标题 → 原始标题 → 主题”仅在缺失时回退，显式空标题不再恢复旧值；与 typed widget、云保存源一致。`writing-title-baseline-20260913-155439-927` 先复现失败；`writing-title-verified-20260913-155619-942` 的 70 项回归通过、0 失败/跳过，覆盖历史、SSE、原生入口与保留的官网源码契约。本修复仅完成源码和离线验证，未重新打包或真机验收；不扩大上述已验收范围。
-- 2026-09-13 补齐独立私有文字事务的保存互斥：发送/重试/停止后对账尚未结束时，不准备或提交写作块云保存，也不抢先更新官网消息树；本机编辑和导出不受影响。已提交但结果未确认的保存继续保留票据，文字事务结束后仅回读核对、不重发 POST。`writing-fresh-writer-baseline-20260913-162116-418` 复现旧实现误报 `writing_saved`；`writing-fresh-writer-verified-20260913-162138-233` 的 76 项测试通过、0 失败/跳过，新增普通及项目会话下准备、保存前、回读中、提交后和单节点更新内的竞争测试。本修复待集中包和设备验收，不扩大已完成范围。
+- 2026-09-13 补充修复：文本包装写作块的标题改为按“已保存标题 → 原始标题 → 主题”仅在缺失时回退，显式空标题不再恢复旧值；与 typed widget、云保存源一致。`writing-title-baseline-20260913-155439-927` 先复现失败；`writing-title-verified-20260913-155619-942` 的 70 项回归通过、0 失败/跳过，覆盖历史、SSE、原生入口与保留的官网源码契约。随后随下述 1703 集中包发布，尚无该边界用例的新真机验收；不扩大上述已验收范围。
+- 2026-09-13 补齐独立私有文字事务的保存互斥：发送/重试/停止后对账尚未结束时，不准备或提交写作块云保存，也不抢先更新官网消息树；本机编辑和导出不受影响。已提交但结果未确认的保存继续保留票据，文字事务结束后仅回读核对、不重发 POST。`writing-fresh-writer-baseline-20260913-162116-418` 复现旧实现误报 `writing_saved`；`writing-fresh-writer-verified-20260913-162138-233` 的 76 项测试通过、0 失败/跳过，新增普通及项目会话下准备、保存前、回读中、提交后和单节点更新内的竞争测试。已发布安装，竞争场景的设备验收仍待补充，不扩大已完成范围。
+- 集中包 `1.1.1703 / 1703`：源码 `de0ac885734eb8e2ab09ec70f8b722c40c749067`，APK SHA-256 `d3fef7b26b85920276b4369ca41ea1ebbd7718dc312541401c4d8203b51f6364`。`writing-block-guard-release-20260913-162501-430` 在 512.3 秒内构建、发布和远端文件校验通过，并无损安装小米；没有清 Cookie 或应用数据。本轮没有重复普通写作块已通过的 1692 用例，也没有将安装成功当成项目或 typed widget 写回验收。
 - 解析：`android/app/src/main/assets/chatgpt_web_text_blocks.js`。
 - 原生模型：`WebChatTextBlock.kt`；原生编辑与导出：`WebChatTextBlockEditor.kt`、`WebChatTextBlockExport.kt`。
 - 定向测试：`scripts/test-chatgpt-web-text-blocks.cjs`、`scripts/test-chatgpt-writing-block-public-evidence.cjs`、`WebChatTextBlockTest.kt`。
