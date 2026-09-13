@@ -7,6 +7,35 @@ import org.junit.Test
 class WebChatTextBlockUiContractTest {
     private fun editor() = File("src/main/kotlin/com/elon/app/WebChatTextBlockEditor.kt").readText()
 
+    @Test fun undoRedoStayLocalAndToolbarCanScrollOnSmallDisplays() {
+        val source = editor()
+        assertTrue(source.contains("HorizontalScrollView(activity)"))
+        assertTrue(source.contains("history.record(start, removed,"))
+        assertTrue(source.contains("if (!restoring) history.record"))
+        assertTrue(source.contains("history.undo(body.text.toString())"))
+        assertTrue(source.contains("history.redo(body.text.toString())"))
+        assertTrue(source.contains("undo.isEnabled = block.complete && !working && history.canUndo"))
+        assertTrue(source.contains("redo.isEnabled = block.complete && !working && history.canRedo"))
+        assertTrue(source.contains("history.clear()"))
+    }
+
+    @Test fun exportedFileIsAnExplicitReadOnlyOpenOrShareActionNotAnAutomaticLaunch() {
+        val source = editor()
+        assertTrue(source.contains("exportedFile = result.getOrNull()"))
+        assertTrue(source.contains("val previous = exportedFile"))
+        assertTrue(source.contains("WebChatTextBlockExportActions.open(activity, previous, share = index == 1)"))
+        val actions = File("src/main/kotlin/com/elon/app/WebChatTextBlockExportActions.kt").readText()
+        assertTrue(actions.contains("it.scheme == \"content\""))
+        assertTrue(actions.contains("Intent.ACTION_VIEW"))
+        assertTrue(actions.contains("Intent.ACTION_SEND"))
+        assertTrue(actions.contains("Intent.FLAG_GRANT_READ_URI_PERMISSION"))
+        assertTrue(actions.contains("ClipData.newRawUri"))
+        assertFalse(actions.contains("FLAG_GRANT_WRITE_URI_PERMISSION"))
+        val export = File("src/main/kotlin/com/elon/app/WebChatTextBlockExport.kt").readText()
+        assertTrue(export.indexOf("target.publish()") < export.indexOf("return Result("))
+        assertTrue(export.contains("ChatGptWebFileByteStorage.open(context, ownership) { savedUri = it }"))
+    }
+
     @Test fun readOnlyCloudPreparationDoesNotDisableLocalEditingOrClosing() {
         val source = editor()
         assertTrue(source.contains("val working = saving || (cloud?.busy == true && cloud.pending)"))

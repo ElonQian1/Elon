@@ -60,6 +60,21 @@ class WebChatTextBlockTest {
         assertEquals("draft.md", WebChatTextBlockExport.name("draft.md", format))
     }
 
+    @Test fun exportBytesPreserveUnicodeLineEndingsAndEmptyDocuments() {
+        for (content in listOf("", "  text\r\n\r\n\t\uD83D\uDE00\u4E2D\u6587  \r\n", "\uFEFFtext", "\u0000")) {
+            assertEquals(content, WebChatTextBlockExport.bytes(content).toString(Charsets.UTF_8))
+        }
+    }
+
+    @Test fun invalidUnicodeIsRejectedInsteadOfSilentlyReplacedInExport() {
+        for (content in listOf("\uD800", "\uDC00", "before\uD800after")) {
+            assertThrows(java.nio.charset.CharacterCodingException::class.java) { WebChatTextBlockExport.bytes(content) }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            WebChatTextBlockExport.bytes("x".repeat(WebChatTextBlock.MAX_CONTENT + 1))
+        }
+    }
+
     @Test fun cachedSnapshotRestoresBodyWithoutGrantingProviderWriteAuthority() {
         val original = block()
         val part = ChatGptWebMessagePart("writing_block", "Draft", textBlock = original)

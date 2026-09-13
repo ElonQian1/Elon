@@ -9,6 +9,7 @@ import android.text.TextWatcher
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -29,6 +30,9 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
     private var editing = false
     private var saving = false
     private var exported: String? = null
+    private var exportedFile: WebChatTextBlockExport.Result? = null
+    private val history = WebChatTextBlockEditHistory()
+    private var restoring = false
     private var child: AlertDialog? = null
     private val body = EditText(activity).apply {
         setText(block.content)
@@ -48,8 +52,13 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
             } else null
         })
         addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            private var removed = ""
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
+                removed = if (restoring) "" else s?.subSequence(start, start + count)?.toString().orEmpty()
+            }
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!restoring) history.record(start, removed, s?.subSequence(start, start + count)?.toString().orEmpty())
+            }
             override fun afterTextChanged(s: Editable?) = render()
         })
     }
@@ -66,6 +75,8 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
         activity.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(title, body.text.toString()))
         Toast.makeText(activity, "已复制", Toast.LENGTH_SHORT).show()
     }
+    private val undo = icon(R.drawable.ic_chat_image_tool_undo, "撤销修改", "undo") { restoreHistory(true) }
+    private val redo = icon(R.drawable.ic_chat_image_tool_redo, "重做修改", "redo") { restoreHistory(false) }
     private val reset = icon(R.drawable.ic_popup_history, "恢复原文", "reset") {
         child = AlertDialog.Builder(activity).setTitle("恢复原文？").setMessage("本机尚未导出的修改将被替换。")
             .setPositiveButton("恢复") { _, _ -> body.setText(block.content) }.setNegativeButton("取消", null).show()
@@ -76,10 +87,14 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
         orientation = LinearLayout.VERTICAL
         setPadding(dp(16), dp(8), dp(16), dp(16))
         addView(status, LinearLayout.LayoutParams(-1, -2))
-        addView(LinearLayout(activity).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            for (button in listOf(edit, copy, reset, export, cloudSave)) addView(button, LinearLayout.LayoutParams(dp(48), dp(48)))
-            cloudSave.visibility = if (cloud != null) android.view.View.VISIBLE else android.view.View.GONE
+        addView(HorizontalScrollView(activity).apply {
+            contentDescription = "web-chat-text-block-toolbar"
+            addView(LinearLayout(activity).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                for (button in listOf(edit, undo, redo, copy, reset, export, cloudSave))
+                    addView(button, LinearLayout.LayoutParams(dp(48), dp(48)))
+                cloudSave.visibility = if (cloud != null) android.view.View.VISIBLE else android.view.View.GONE
+            })
         })
         addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
     }).setNegativeButton("返回", null).create()
@@ -100,7 +115,7 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
         }
         dialog.setCanceledOnTouchOutside(false)
         dialog.setCancelable(false)
-        dialog.setOnDismissListener { cloud?.close(); child?.dismiss() }
+        dialog.setOnDismissListener { cloud?.close(); child?.dismiss(); history.clear() }
         dialog.show()
     }
 
@@ -121,6 +136,8 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
         // Preparing a cloud ticket is read-only and must not block local work.
         val working = saving || (cloud?.busy == true && cloud.pending)
         edit.isEnabled = block.complete && !working
+        undo.isEnabled = block.complete && !working && history.canUndo
+        redo.isEnabled = block.complete && !working && history.canRedo
         reset.isEnabled = body.text.toString() != block.content && !working
         export.isEnabled = block.complete && !working
         body.isEnabled = !working
@@ -129,6 +146,17 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
         cloudSave.setImageResource(if (cloud?.pending == true || cloud?.ready == false) R.drawable.ic_side_menu_refresh else android.R.drawable.ic_menu_save)
         TooltipCompat.setTooltipText(cloudSave, if (cloud?.pending == true) "核对保存结果" else if (cloud?.ready == false) "核对官网" else "保存到官网")
         edit.isSelected = editing
+    }
+
+    private fun restoreHistory(backward: Boolean) {
+        val change = if (backward) history.undo(body.text.toString()) else history.redo(body.text.toString())
+        if (change == null) { render(); return }
+        restoring = true
+        try {
+            body.text.replace(change.start, change.start + change.before.length, change.after)
+            body.setSelection(change.start + change.after.length)
+        } finally { restoring = false }
+        render()
     }
 
     private fun saveCloud() {
@@ -142,8 +170,15 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
 
     private fun chooseExport() {
         val formats = WebChatTextBlockExport.formats(block)
-        child = AlertDialog.Builder(activity).setTitle("导出副本").setItems(formats.map { it.label }.toTypedArray()) { _, index ->
-            val format = formats[index]
+        val previous = exportedFile
+        val actions = if (previous == null) emptyList() else listOf("打开上次导出的文件", "分享上次导出的文件")
+        child = AlertDialog.Builder(activity).setTitle("导出副本")
+            .setItems((actions + formats.map { it.label }).toTypedArray()) { _, index ->
+            if (previous != null && index < actions.size) {
+                WebChatTextBlockExportActions.open(activity, previous, share = index == 1)
+                return@setItems
+            }
+            val format = formats[index - actions.size]
             val fileName = EditText(activity).apply { setSingleLine(true); setText(title); contentDescription = "web-chat-text-block-file-name" }
             child = AlertDialog.Builder(activity).setTitle("文件名").setView(fileName)
                 .setPositiveButton("导出") { _, _ ->
@@ -156,10 +191,10 @@ internal class WebChatTextBlockEditor(private val activity: AppCompatActivity, p
                             runCatching { WebChatTextBlockExport.save(activity.applicationContext, block, content, stem, format) }
                         }
                         saving = false
-                        if (result.isSuccess) exported = content
+                        if (result.isSuccess) { exported = content; exportedFile = result.getOrNull() }
                         if (dialog.isShowing) {
                             render()
-                            Toast.makeText(activity, if (result.isSuccess) "副本已导出" else "导出失败，修改仍保留", Toast.LENGTH_LONG).show()
+                            Toast.makeText(activity, if (result.isSuccess) "副本已导出到下载目录" else "导出失败，修改仍保留", Toast.LENGTH_LONG).show()
                         }
                     }
                 }.setNegativeButton("取消", null).show()

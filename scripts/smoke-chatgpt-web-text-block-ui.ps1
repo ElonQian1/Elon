@@ -80,6 +80,8 @@ try {
         $original=(Ui open @{selector=$selector}).body
         $edited=(Ui edit @{expected_hash=$original.sha256}).body
         $resetHash=$edited.sha256
+        $history=Ui history @{expected_hash=$edited.sha256;original_hash=$original.sha256}
+        if(-not $history.undo -or -not $history.redo){throw 'native_history_unconfirmed'}
         $stem='elon-block-acceptance-'+[Guid]::NewGuid().ToString('N').Substring(0,16)
         $extension=if($item.part.type -eq 'writing_block'){'md'}else{'py'}
         $export=Ui export @{expected_hash=$edited.sha256;stem=$stem;extension=$extension}
@@ -89,6 +91,8 @@ try {
         if($paths.Count -ne 1 -or $paths[0] -cnotmatch "^/sdcard/Download/elon-[a-f0-9-]+-$stem\.$extension`$"){throw 'owned_export_missing'}
         $checksum=Invoke-ChatGptWebSmokeAdb -Runtime $r -Arguments @('shell','sha256sum',$paths[0]) -Label 'verify owned export bytes'
         if(($checksum -split '\s+')[0] -cne $export.sha256){throw 'export_bytes_mismatch'}
+        $actions=Ui export_actions @{expected_hash=$edited.sha256}
+        if(-not $actions.export_actions_available){throw 'native_export_actions_missing'}
         $reset=(Ui reset @{expected_hash=$edited.sha256}).body
         if($reset.sha256 -cne $original.sha256){throw 'native_reset_mismatch'}
         $resetHash=''
@@ -96,7 +100,7 @@ try {
         $reopened=(Ui open @{selector=$selector}).body; $opened=$true
         if($reopened.sha256 -cne $original.sha256){throw 'local_copy_changed_source'}
         Ui close|Out-Null; $opened=$false
-        $report.blocks+=@{kind=$item.part.type;native_editor=$true;edited=$true;export_extension=$extension;export_bytes_match=$true;reset=$true;source_unchanged=$true}
+        $report.blocks+=@{kind=$item.part.type;native_editor=$true;edited=$true;undo=$history.undo;redo=$history.redo;export_extension=$extension;export_bytes_match=$true;export_actions_available=$actions.export_actions_available;reset=$true;source_unchanged=$true}
     }
     $kinds=@($report.blocks|ForEach-Object kind)
     if(@($RequiredKinds|Where-Object {$_ -notin $kinds}).Count){throw 'provider_variant_sample_missing'}

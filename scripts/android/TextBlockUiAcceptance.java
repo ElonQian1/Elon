@@ -30,6 +30,10 @@ public final class TextBlockUiAcceptance extends UiAutomatorTestCase {
         AccessibilityNodeInfo value = node(target);
         try {
             assertTrue("native_control_disabled", value.isEnabled());
+            if (!value.isVisibleToUser()) {
+                value.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.getId());
+                value.recycle(); value = node(target);
+            }
             assertTrue("native_control_hidden", value.isVisibleToUser());
             for (int depth = 0; !value.isClickable() && depth < 4; depth++) {
                 AccessibilityNodeInfo parent = value.getParent();
@@ -108,6 +112,23 @@ public final class TextBlockUiAcceptance extends UiAutomatorTestCase {
                 click(desc("web-chat-text-block-edit"));
                 setText(body(), original + "\nELON_LOCAL_EDIT_V1\n");
                 result.put("body", inspect()); break;
+            case "history":
+                String edited = guarded();
+                String originalHash = getParams().getString("original_hash", "");
+                assertTrue("original_hash_required", originalHash.matches("[a-f0-9]{64}"));
+                click(desc("web-chat-text-block-undo"));
+                assertEquals("undo_body_mismatch", originalHash, hash(fixture()));
+                click(desc("web-chat-text-block-redo"));
+                assertEquals("redo_body_mismatch", hash(edited), hash(fixture()));
+                result.put("undo", true).put("redo", true).put("body", inspect()); break;
+            case "export_actions":
+                String current = guarded();
+                click(desc("web-chat-text-block-export"));
+                assertTrue("export_open_missing", text("\u6253\u5f00\u4e0a\u6b21\u5bfc\u51fa\u7684\u6587\u4ef6").waitForExists(3000));
+                assertTrue("export_share_missing", text("\u5206\u4eab\u4e0a\u6b21\u5bfc\u51fa\u7684\u6587\u4ef6").exists());
+                click(text("\u53d6\u6d88"));
+                assertEquals("export_menu_changed_body", hash(current), hash(fixture()));
+                result.put("export_actions_available", true).put("body", inspect()); break;
             case "reset":
                 guarded(); click(desc("web-chat-text-block-reset"));
                 click(text("\u6062\u590d")); result.put("body", inspect()); break;
