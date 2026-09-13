@@ -63,6 +63,39 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
   }
   const { conversation, composer, shared } = modules;
 
+  await t.test('ordinary regeneration reuses its user parent and prepares a fresh variant without a new user message', () => {
+    const source = (module, name, exported = false) => {
+      const node = definition(module, name, exported); return module.text.slice(node.start, node.end);
+    };
+    assert.deepEqual(composer.imports.get('nS'), { file: './' + assets.conversation[0], name: 'Iht' });
+    assert.equal(conversation.exported.get('Iht'), 'Wdr');
+    const retry = source(conversation, 'Iht', true);
+    includes(facts(definition(conversation, 'Iht', true)).properties, ['getParentPromptNode', 'getVariantIds',
+      'Variant', 'variantPurpose', 'parentMessageId', 'appendMessages', 'thinkingEffort', 'enableMessageFollowups']);
+    assert.match(retry, /parentMessageId:p\.id/);
+    assert.match(retry, /variantPurpose:h\?`comparison_implicit`:`none`/);
+    assert.match(retry, /enableMessageFollowups=!0/);
+    assert.match(source(conversation, 'Vdr'), /variantIdsCount:e.*e===1/);
+    assert.match(source(conversation, 'Udr'), /!n\|\|!Bdr\(t\)\|\|Sdr\(e\?\?\[\]\)!=="default"\?e:/);
+    assert.match(source(conversation, 'Bdr'), /forceDisableFeatures\?\.includes\(`memory`\)===!0/);
+    assert.match(source(conversation, 'xvt'), /metadata\?\.thinking_effort/);
+    assert.match(source(composer, 'oGn'), /requestedModelId:.*\.value/);
+    assert.deepEqual(composer.imports.get('EQe'), { file: './' + assets.conversation[0], name: 'azt' });
+    assert.equal(conversation.exported.get('azt'), 'zwn');
+    assert.match(source(conversation, 'azt', true), /e\.serverId\$\(\)!=null&&r!==void 0\)return r/);
+    assert.match(source(composer, 'A1t'), /N==null&&V!=null/);
+    assert.match(source(composer, 'A1t'), /defaultThinkingEffort/);
+    const body = source(composer, 'AB');
+    assert.match(body, /action:e\.completionType/);
+    assert.match(body, /e\.messages\.length>0\?e\.messages\.map\(eQt\):void 0/);
+    assert.match(body, /variant_purpose:e\.completionMetadata\?\.variantPurpose/);
+    assert.match(body, /enable_message_followups:e\.enableMessageFollowups/);
+    const prepare = source(composer, 'FB');
+    assert.match(prepare, /else if\(i\.isRegen\)_=Wn\.getParentPromptNode\(s\)\?\.id/);
+    assert.match(prepare, /completionType:Ul\.Next/);
+    assert.match(prepare, /messages:\[\]/);
+  });
+
   await t.test('new threads register the server identity without replacing the conversation object', () => {
     assert.equal(shared.exported.get('IP'), 'H1e');
     const bind = definition(shared, 'IP', true), text = shared.text.slice(bind.start, bind.end);
