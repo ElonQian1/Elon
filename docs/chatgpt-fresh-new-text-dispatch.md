@@ -21,6 +21,12 @@ parent mismatch. Navigate-before-hydrate is offline-verified and installed in
 1711, but exact pending recovery was interrupted before another native first-send
 case. New-conversation production default remains disabled.
 
+The next source batch (`62d81aff3`, context 10 / transaction 20 / adapter 381)
+also starts that owned navigation on the first server-ID event, rather than
+waiting for stream completion, and coalesces concurrent finalization. Its 267
+targeted Node tests pass; Android packaging and device acceptance are deferred
+to the grouped round. The 1709 pending handoff remains unresolved and unreplayed.
+
 ## Native Acceptance Failure On 1706
 
 `fresh-new-native-ui-20260913-183220-505` used the actual native composer and

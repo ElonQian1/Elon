@@ -107,3 +107,34 @@ diagnostics contain only booleans. Script-only changes need no new APK.
 Next: resolve the preserved 1709 handoff read-only on a stable production surface,
 then one native first-send/follow-up case. Normal and project scopes need separate
 acceptance. No 1711 first-send pass or default enablement is claimed.
+
+## First-Event Navigation Source Follow-Up
+
+`62d81aff3` closes a further order mismatch in the same pinned `C1t.handleResponse`
+contract: the official handler begins navigation when it first binds the server
+conversation ID, before reducing that event, not merely before final history
+hydration. The independent transaction now starts its existing guarded `finalize`
+at exact ID adoption, before publishing the owned stream payload. Navigation
+does not await or block later stream events. Context 10 coalesces concurrent
+first-event/history finalization into one pending route request; each waiter's
+cancellation still prevents a successful result. Transaction is 20, adapter 381;
+the diagnostic wire remains 8. Temporary chats still do not navigate.
+
+`fresh-first-event-baseline-20260913-233241-730` reproduced two failures: a second
+finalizer started a duplicate route request, and first-event handling had not
+navigated before a synthetic empty-home owner replacement. The existing pinned
+AST test verifies the official bind/navigation/event ordering without executing
+downloaded website code. `fresh-first-event-full-regression-20260913-233631-850`
+passed 267 Node tests in 14.2 seconds, zero failures/skips, including independent
+first/follow-up sends, delayed project navigation with native streaming,
+cancellation, stop, temporary privacy, owned-stream and writing-save regressions.
+
+This proves the source-level order repair, not the exact cause of the previous
+device `owner_changed`. The preserved 1709 fixture was not sent, modified or
+resolved. One bounded ADB availability query returned no connected devices;
+there was no phone action. Per the requested batch workflow, this commit is
+code-pushed only: no new Android build, installation, release or device pass.
+New-conversation default stays disabled until exact read-only pending resolution
+and the native first-send/follow-up acceptance above. Initial context acquisition
+still needs the committed official composer; this change does not claim to
+remove that separate DOM ownership dependency.
