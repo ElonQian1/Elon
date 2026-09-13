@@ -112,6 +112,27 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     assert.equal(conversation.exported.get('MKt'), 'Xun');
   });
 
+  await t.test('temporary requests preserve separate privacy fields, personalization gate and non-navigation', () => {
+    const source = (module, name, exported = false) => {
+      const node = definition(module, name, exported); return module.text.slice(node.start, node.end);
+    };
+    for (const [local, name] of [['ev', 'wJ'], ['Cs', 'OJ'], ['Wm', 'f2'], ['dv', 'xJ']]) {
+      assert.deepEqual(composer.imports.get(local), { file: './' + assets.shared[0], name });
+    }
+    assert.match(source(shared, 'wJ', true), /account\?\.structure/);
+    assert.match(source(shared, 'wJ', true), /PERSONAL.*WORKSPACE.*690794452/);
+    assert.match(source(shared, 'OJ', true), /yS\(\)\?sg\(SS\):!1/);
+    assert.match(source(shared, 'f2', true), /\.untracked\(e\)/);
+    assert.match(source(shared, 'TJ', true), /searchParams\.get\(mS\)===`true`/);
+    const body = source(composer, 'AB');
+    assert.match(body, /history_and_training_disabled:jB\(e\.historyDisabled\)/);
+    assert.match(body, /r==null&&e\.historyDisabled===!0&&n!=null&&ev\(\)\?\{temporary_chat_requests_personalization:Wm\(\(\)=>Cs\(n\)\)\}:\{\}/);
+    assert.match(body, /is_do_not_remember:jB\(e\.isDoNotRemember\)/);
+    assert.match(source(composer, 'FB'), /s\?\.is_do_not_remember===!0\|\|c\.config\?\.startDoNotRemember===!0/);
+    assert.match(source(composer, 'FB'), /historyDisabled:y/);
+    assert.ok(source(composer, 'C1t').includes('!this.isHistoryAndTrainingDisabled&&mn(e?.mode)&&fi()){da('));
+  });
+
   await t.test('fresh integrity material has an exported website provider', () => {
     const fresh = facts(definition(conversation, 'VKt', true));
     includes(fresh.properties, ['chatReq', 'turnstileToken', 'proofToken', 'force_login',

@@ -20,6 +20,7 @@ const extraExports = {
     textBusinessContext: 'JO', textProjectHeaders: 'iK', textLockedProjectId: 'Yr', textLockedChatPin: 'aK',
     textBindConversationId: 'IP', textClientConversation: 'gY', textResolvedConversationId: 'QJ',
     textNavigationKey: 'HK', textNavigate: 'KK',
+    textTemporaryPersonalizationEnabled: 'wJ', textTemporaryPersonalization: 'OJ', textReadUntracked: 'f2',
     writingUpdateState: 'sY', writingTreeOwner: 'KJ' },
   conversation: { attachmentBaseLimit: 'W$t', attachmentMaxUploads: 'Z$t',
     attachmentPendingCount: 'K$t', attachmentConfiguredLimit: 'U$t', canvasDirtyInit: 'Dvt', useCanvasDirty: 'Avt',

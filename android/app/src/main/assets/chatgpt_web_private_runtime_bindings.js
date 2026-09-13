@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 23, create: factory });
+  const api = Object.freeze({ version: 24, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -30,6 +30,7 @@
       textLockedProjectId: undefined, textLockedChatPin: undefined,
       textBindConversationId: undefined, textClientConversation: undefined, textResolvedConversationId: undefined,
       textNavigationKey: undefined, textNavigate: undefined,
+      textTemporaryPersonalizationEnabled: undefined, textTemporaryPersonalization: undefined, textReadUntracked: undefined,
       writingUpdateState: undefined, writingTreeOwner: undefined },
     conversation: { AGt: 'uKt', J5t: 'O7t', Nrn: 'Cin', yRt: '$Rt', Grn: 'Fin',
       vRt: 'QRt', p8t: 'q8t', l0: 'E0', M1t: 'f0t', Rdn: 'Ofn', Rrn: 'Oin',
@@ -124,6 +125,7 @@
       textBusinessContext: 'JO', textProjectHeaders: 'iK', textLockedProjectId: 'Yr', textLockedChatPin: 'aK',
       textBindConversationId: 'IP', textClientConversation: 'gY', textResolvedConversationId: 'QJ',
       textNavigationKey: 'HK', textNavigate: 'KK',
+      textTemporaryPersonalizationEnabled: 'wJ', textTemporaryPersonalization: 'OJ', textReadUntracked: 'f2',
       writingUpdateState: 'sY', writingTreeOwner: 'KJ' },
     conversation: { AGt: 'gJt', J5t: 'rnn', Nrn: 'Wsn', yRt: 'iVt', Grn: 'ncn',
       vRt: 'rVt', p8t: 'Sen', l0: 'z2', M1t: 'P4t', Rdn: 'Ggn', Rrn: 'Ysn',
@@ -307,8 +309,8 @@
 
   function state() {
     const p = profile();
-    return { version: 23, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 24, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 23, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 24, observed, load, peek, temporary, tools, state });
 });
