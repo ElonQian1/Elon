@@ -28,7 +28,14 @@
       cursor = node.parent;
     }
     if (!user) return empty('user_missing');
-    const value = { ...empty('observed'), user_found: true };
+    const pagination = payload.__paginatedConversationPage;
+    const paginatedRoot = UUID.test(payload.conversation_id || '') ? 'paginated-root:' + payload.conversation_id : null;
+    const value = { ...empty('observed'), user_found: true, pagination: {
+      present: object(pagination) === true, complete: object(pagination) === true && pagination.cursor === null,
+      root_owned: !!paginatedRoot && own(mapping, paginatedRoot) === true,
+      current_leaf_matches: object(pagination) === true && pagination.serverCurrentLeafId === payload.current_node
+    } };
+    const nodeKind = id => paginatedRoot && id === paginatedRoot ? 'paginated_root' : kind(id);
     seen.clear();
     cursor = user.id;
     while (value.nodes.length < 16) {
@@ -40,7 +47,7 @@
       if (!object(node)) { value.terminal = 'invalid_node'; break; }
       const parent = own(mapping, node.parent) ? mapping[node.parent] : null;
       const content = node.message?.content?.content_type;
-      value.nodes.push({ role: role(node.message), id_kind: kind(cursor), parent_kind: kind(node.parent),
+      value.nodes.push({ role: role(node.message), id_kind: nodeKind(cursor), parent_kind: nodeKind(node.parent),
         node_id_matches: node.id === cursor, message_id_matches: node.message?.id === cursor,
         hidden: node.message?.metadata?.is_visually_hidden_from_conversation === true,
         content_kind: ['text', 'multimodal_text', 'code', 'execution_output', 'user_editable_context',
@@ -110,5 +117,5 @@
       () => respond(action, false, JSON.stringify(empty('read_failed'))));
     return true;
   }
-  return Object.freeze({ version: 1, describe, inspect, handle });
+  return Object.freeze({ version: 2, describe, inspect, handle });
 });

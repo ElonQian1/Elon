@@ -98,6 +98,48 @@ function injectedHistory(project = false) {
   return value;
 }
 
+function paginatedHistory(project = false, hidden = true) {
+  const value = hidden ? injectedHistory(project) : payload(project), rootId = 'paginated-root:' + CID;
+  const oldRoot = hidden ? 'synthetic-server-root' : ROOT, root = value.mapping[oldRoot];
+  delete value.mapping[oldRoot];
+  value.mapping[rootId] = { ...root, id: rootId, parent: '' };
+  value.mapping[root.children[0]].parent = rootId;
+  const messages = []; let id = value.current_node;
+  while (id !== rootId) { messages.push(value.mapping[id].message); id = value.mapping[id].parent; }
+  messages.forEach((message, index) => { value.mapping[message.id].children = index ? [messages[index - 1].id] : []; });
+  value.__paginatedConversationPage = { cursor: null, oldestMessageId: messages.at(-1).id,
+    messagesLeafToRoot: messages, serverCurrentLeafId: value.current_node };
+  return value;
+}
+
+test('complete provider pagination roots reconcile only their exact conversation and full message chain', async () => {
+  for (const hidden of [false, true]) {
+    const f = newFixture(), binding = await f.api.capture(f.node, null, admission);
+    binding.adoptConversation(CID, { input_message: input }, UID);
+    const value = paginatedHistory(false, hidden), history = historyModule.create();
+    assert.equal(history.ownsResponse(value, binding, UID), true);
+    f.conversation.textHydrateHistory = async (_, options) => {
+      options.onConversationLoadedFromNetwork(value);
+      assert.equal(options.shouldApplyResponse(), true); applyHistory(f, value);
+    };
+    assert.equal(await history.reconcile(binding, { userMessageId: UID }, new AbortController().signal), true);
+    for (const mutate of [
+      p => { delete p.__paginatedConversationPage; },
+      p => { p.__paginatedConversationPage.cursor = 'synthetic-older-page'; },
+      p => { delete p.__paginatedConversationPage.cursor; },
+      p => { p.__paginatedConversationPage.oldestMessageId = AID; },
+      p => { p.__paginatedConversationPage.serverCurrentLeafId = UID; },
+      p => { p.__paginatedConversationPage.messagesLeafToRoot.reverse(); },
+      p => { p.__paginatedConversationPage.messagesLeafToRoot.push(input); },
+      p => { p.__paginatedConversationPage.messagesLeafToRoot = []; },
+      p => { p.mapping[UID].parent = 'paginated-root:' + AID; }
+    ]) {
+      const changed = paginatedHistory(false, hidden); mutate(changed);
+      assert.equal(history.ownsResponse(changed, binding, UID), false);
+    }
+  }
+});
+
 test('an owned first turn reconciles through the observed hidden system ancestor and exact canonical root', async () => {
   for (const project of [false, true]) {
     const f = newFixture(project), binding = await f.api.capture(f.node, null, admission);
@@ -347,7 +389,8 @@ async function integration(project = false, settings = {}) {
     yield { data: { conversation_id: CID, message: answer } };
   };
   f.conversation.textHydrateHistory = async (_, options) => {
-    const data = settings.injectedParents ? injectedHistory(project) : payload(project);
+    const data = settings.injectedParents === 'paginated' ? paginatedHistory(project) :
+      settings.injectedParents ? injectedHistory(project) : payload(project);
     if (counts.posts === 2) {
       data.mapping[UID2] = { id: UID2, parent: AID, message: { ...input, id: UID2 } };
       data.mapping[AID2] = { id: AID2, parent: UID2, message: { ...response, id: AID2 } };
@@ -373,7 +416,7 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 5));
 async function settled(api) { for (let i = 0; i < 80 && api.state().pending; i++) await tick(); }
 
 test('new private send binds, streams, hydrates and permits exactly one existing-conversation follow-up', async () => {
-  for (const project of [false, true]) for (const injectedParents of [false, true]) {
+  for (const project of [false, true]) for (const injectedParents of [false, true, 'paginated']) {
     const r = await integration(project, { injectedParents }); r.setDraft('a later unsent draft');
     await settled(r.api);
     assert.equal(r.api.state().pending, false);

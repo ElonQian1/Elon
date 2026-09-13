@@ -322,6 +322,21 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     includes(facts(definition(shared, 'sUt')).properties, ['project_id']);
   });
 
+  await t.test('initial pagination constructs a conversation-bound root with complete-page metadata', () => {
+    const source = (module, name, exported = false) => {
+      const node = definition(module, name, exported); return module.text.slice(node.start, node.end);
+    };
+    assert.deepEqual(conversation.imports.get('g_e'), { file: './' + assets.shared[0], name: 'mi' });
+    assert.equal(shared.exported.get('mi'), 'qHt');
+    assert.match(source(shared, 'mi', true), /s=`paginated-root:\$\{t\}`/);
+    assert.match(source(shared, 'mi', true), /d=RHt\(u,s\),f=\{\.\.\.c,serverCurrentLeafId:a\.current_node\}/);
+    assert.match(source(shared, 'GHt'), /cursor:t,messagesLeafToRoot:e/);
+    assert.match(source(shared, 'GHt'), /oldestMessageId:e\.at\(-1\)\?\.id\?\?null/);
+    assert.equal(source(shared, 'WHt'), 'function WHt(e){return e.has_previous_page?e.start_cursor:null}');
+    assert.match(source(shared, 'RHt'), /i=\{\[t\]:\{id:t,parent:``,children:r\[0\]\?\[r\[0\]\.id\]:\[\]\}\}/);
+    assert.match(source(shared, 'RHt'), /i\[n\.id\]=\{id:n\.id,message:n,parent:a,children:o\?\[o\]:\[\]\}/);
+  });
+
   await t.test('server stop uses this prepared conduit, observed gates and explicit async exclusions', () => {
     const node = definition(conversation, 'xWt', true), stop = facts(node);
     includes(stop.strings, ['/stop_conversation', 'x-conduit-token', 'x-oai-turn-trace-id',

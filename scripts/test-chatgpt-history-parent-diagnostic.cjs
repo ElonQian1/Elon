@@ -64,6 +64,23 @@ test('reports broken child links, inconsistent IDs, and unknown roles without ad
   assert.equal(result.nodes[1].node_id_matches, false);
   assert.equal(result.nodes[1].role, 'other');
 });
+
+test('reports owned pagination roots and incomplete pages without exposing their identifiers', () => {
+  const payload = tree(), rootId = 'paginated-root:' + ID;
+  payload.mapping[rootId] = { ...payload.mapping[''], id: rootId, parent: '' };
+  delete payload.mapping['']; payload.mapping[SYSTEM].parent = rootId;
+  payload.__paginatedConversationPage = { cursor: null, serverCurrentLeafId: ANSWER };
+  const result = api.describe(payload);
+  assert.deepEqual(result.pagination, { present: true, complete: true, root_owned: true, current_leaf_matches: true });
+  assert.equal(result.nodes[1].parent_kind, 'paginated_root');
+  assert.equal(result.nodes[2].id_kind, 'paginated_root');
+  assert.doesNotMatch(JSON.stringify(result), /paginated-root:|123e4567|not-for-diagnostics/);
+  payload.__paginatedConversationPage.cursor = 'private-cursor';
+  assert.equal(api.describe(payload).pagination.complete, false);
+  payload.conversation_id = USER;
+  assert.equal(api.describe(payload).nodes[2].id_kind, 'other');
+  assert.equal(api.describe(payload).pagination.root_owned, false);
+});
 test('missing, cyclic and oversized ancestor chains are bounded', () => {
   const payload = tree();
   payload.mapping[SYSTEM].parent = 'missing';

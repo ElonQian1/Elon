@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 8, create: factory });
+  const api = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
@@ -56,20 +56,40 @@
       newParentVerifier(payload, binding, user) !== null;
   }
 
+  function completePagination(payload, rootId) {
+    const page = payload.__paginatedConversationPage, messages = page?.messagesLeafToRoot;
+    if (!page || page.cursor !== null || page.serverCurrentLeafId !== payload.current_node ||
+        !Array.isArray(messages) || !messages.length || messages.length > 4096 ||
+        messages[0]?.id !== payload.current_node || page.oldestMessageId !== messages.at(-1)?.id ||
+        payload.mapping[rootId]?.children?.[0] !== page.oldestMessageId) return false;
+    const seen = new Set([rootId]);
+    return messages.every((message, index) => {
+      if (!message || typeof message.id !== 'string' || seen.has(message.id) ||
+          !ownsKey(payload.mapping, message.id)) return false;
+      seen.add(message.id);
+      const node = payload.mapping[message.id], child = messages[index - 1]?.id;
+      return node?.id === message.id && node.message === message &&
+        node.parent === (messages[index + 1]?.id ?? rootId) && Array.isArray(node.children) &&
+        node.children.length === (index === 0 ? 0 : 1) && (index === 0 || node.children[0] === child);
+    });
+  }
+
   function newParentVerifier(payload, binding, user) {
     if (binding.newConversation !== true || binding.operation === 'regenerate' ||
         binding.parentId !== 'client-created-root' || !user) return null;
     const mapping = payload.mapping, chain = [], seen = new Set([user.id]);
+    const paginatedRoot = 'paginated-root:' + binding.conversationId;
     let cursor = user.parent, child = user.id;
     while (chain.length < 8) {
-      if (typeof cursor !== 'string' || !/^[A-Za-z0-9_-]{1,160}$/.test(cursor) ||
+      if (typeof cursor !== 'string' || !/^[A-Za-z0-9_-]{1,160}$/.test(cursor) && cursor !== paginatedRoot ||
           seen.has(cursor) || !ownsKey(mapping, cursor)) return null;
       seen.add(cursor);
       const node = mapping[cursor];
       if (!node || node.id !== cursor || !Array.isArray(node.children) ||
           node.children.length !== 1 || node.children[0] !== child) return null;
       const root = node.message == null;
-      if (root ? chain.length === 0 || node.parent !== '' || ownsKey(mapping, '') :
+      if (root ? node.parent !== '' || ownsKey(mapping, '') ||
+          (cursor === paginatedRoot ? !completePagination(payload, paginatedRoot) : chain.length === 0) :
           !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(cursor) ||
           node.message.id !== cursor || node.message.author?.role !== 'system' ||
           node.message.metadata?.is_visually_hidden_from_conversation !== true ||

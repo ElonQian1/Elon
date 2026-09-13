@@ -152,6 +152,46 @@ permit a new test, and the previous message is never resent.
 
 ## Evidence
 
+### Pagination Repair After 1708
+
+`fresh-parent-release-20260913-202803-661` built, published and installed
+`1.1.1708 / 1708`, source `13ece716a`, in 481.2 seconds. APK SHA-256:
+`71b5f3577bdd95036308969a5274e2e5a736de5cfb30e51414eb6b16c7c72cce`.
+Before the new trial, the previously resolved fixture passed exact live
+provider/native readback with adapter 378. The original handoff was archived.
+
+`fresh-parent-native-first-followup-20260913-203835-433` then failed after
+105.9 seconds: one native first-send click, accepted private HTTP, 31 owned
+stream events, but history still reported `parent_mismatch`. No follow-up
+was sent, no replay occurred, and the awake setting was restored. A new
+pending handoff preserves the exact submitted user/prompt and prior route.
+Complete native reply/identity and restoration were not verified. A later
+read-only recovery preflight rejected `unresolved_active_writer` before
+opening the directory; do not treat message counts as exact reply proof.
+
+Further inspection of the same pinned shared bundle found the missing
+contract: export `mi/qHt` creates `paginated-root:${clientThreadId}` and
+`RHt` constructs a linear mapping from `messagesLeafToRoot`. The prior
+generic root identifier filter rejected its colon. The earlier diagnostic
+classified this as `other`; it did not prove an arbitrary server root.
+This source evidence explains a concrete uncovered shape, not a new device pass.
+
+Reconcile v9 recognizes only the exact current conversation's pagination
+root. Its private page metadata must have `cursor === null`, matching server
+leaf and oldest message, and a unique complete message list with matching
+mapping objects, parents and children. Missing metadata, an older-page cursor,
+another root, duplicates, reordered messages and inconsistent edges fail
+closed. The canonical-tree verification still runs afterward. The history
+diagnostic now distinguishes owned pagination roots and completeness using
+booleans and classes only, never IDs, content or cursors.
+
+`fresh-pagination-parent-baseline-20260913-204658-771` reproduced the missing
+pagination case. `fresh-pagination-final-regression-20260913-205108-289`
+passed 306 tests with zero failures or skips, including the pinned pagination
+constructor and normal/project first-send plus follow-up composition.
+Adapter 379 is prepared for the next grouped release. New-conversation
+production default remains disabled until native acceptance succeeds.
+
 Only the retained, hash-pinned `web_20260912` public sources are parsed; downloaded
 bundles are not executed. `test-chatgpt-text-dispatch-public-evidence.cjs` records
 the shared/conversation/composer hashes and asserts these contracts:
