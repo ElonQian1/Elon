@@ -3460,7 +3460,7 @@
       "id": "android_binance_range_empty_stops_v1",
       "title": "币安区间兼容未设置的保护字段",
       "summary": "保留空保护的私有载荷形状，并在既有跨APK投影中输出null",
-      "status": "implemented",
+      "status": "released",
       "priority": "p0",
       "requirement": {
         "path": "docs/requirements/android-binance-range-empty-stops-v1.md",
@@ -3499,10 +3499,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
-            "head_blob_oid": "64d6353fb32b032fd75299447a95aabbff2585a6",
+            "head_commit": "ba7724b21c6e6223e496d8d75c98bae01b060f15",
+            "head_blob_oid": "d65c044520963ded297740edeb4f5f2c84aed6cf",
             "worktree_blob_oid": "d65c044520963ded297740edeb4f5f2c84aed6cf",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -3512,10 +3512,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
-            "head_blob_oid": "dc890717aa8bfe532c2f8339dc653436ba4900c4",
+            "head_commit": "ba7724b21c6e6223e496d8d75c98bae01b060f15",
+            "head_blob_oid": "f37ff22284ce80ccf8b2135cd61dbc706da62552",
             "worktree_blob_oid": "f37ff22284ce80ccf8b2135cd61dbc706da62552",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -3525,10 +3525,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
-            "head_blob_oid": "5b4d895d78aefc2ddc428273366d2fa8355828a0",
+            "head_commit": "ba7724b21c6e6223e496d8d75c98bae01b060f15",
+            "head_blob_oid": "7510cd762a78799c9719300d31028042c2d764a1",
             "worktree_blob_oid": "7510cd762a78799c9719300d31028042c2d764a1",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -3538,10 +3538,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
-            "head_blob_oid": "d5498f0b0b9d98278252af75188b5d9956ee7161",
+            "head_commit": "ba7724b21c6e6223e496d8d75c98bae01b060f15",
+            "head_blob_oid": "bada3360b1aab1f174bc3458b74cc2a1686252d8",
             "worktree_blob_oid": "bada3360b1aab1f174bc3458b74cc2a1686252d8",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -3551,23 +3551,23 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
-            "head_blob_oid": "6af49dcbb0ec1407f4a541bdfabac9b52849749e",
+            "head_commit": "ba7724b21c6e6223e496d8d75c98bae01b060f15",
+            "head_blob_oid": "30dd0365436eae182b9b34dd31526d250b2e608d",
             "worktree_blob_oid": "30dd0365436eae182b9b34dd31526d250b2e608d",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/reports/android-binance-range-empty-stops-20260913.md",
-          "content_hash": "6aec53e5480b21c903deeac7fdf7f8235cd5ec9b60eef10466eac60ab19548c8",
+          "content_hash": "6010fbe707c9f5df8afb0392c7d1e3eb5870304efd7b90041aba35c0968296a6",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "ab188f5af0eaf275420c3b15d9ec356a169c496d",
-            "state": "untracked"
+            "head_commit": "ba7724b21c6e6223e496d8d75c98bae01b060f15",
+            "head_blob_oid": "ab188f5af0eaf275420c3b15d9ec356a169c496d",
+            "worktree_blob_oid": "ce6c5e009c2f417947f1344b293caf5eba2d0ce2",
+            "state": "tracked_modified"
           }
         },
         {
@@ -3577,15 +3577,15 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "065ef101699f12af856e2a477ef10bc095347712",
-            "head_blob_oid": "8152c8a853aa1c5ec9272e343366c0cd2f709184",
+            "head_commit": "ba7724b21c6e6223e496d8d75c98bae01b060f15",
+            "head_blob_oid": "83e19b44940325399b1badcd26884c3b1a698a46",
             "worktree_blob_oid": "83e19b44940325399b1badcd26884c3b1a698a46",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1789267087504,
-      "updated_at_ms": 1789267410591
+      "updated_at_ms": 1789268778268
     },
     {
       "id": "backend-a2-map-lock-dynamic-quotient-authority-v1",
@@ -26837,36 +26837,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_f8e78ec199024e37a9eacac0ea0bfdd0",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "claimed",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788829162163
-    },
-    {
-      "id": "feature_event_cf2cee497ab148e69fcd57437a16ff89",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788829538981
-    },
-    {
-      "id": "feature_event_9bb6d642099c42d1b9215b43a06e2ff2",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788831010372
-    },
-    {
       "id": "feature_event_cfe17a84eb9646628a8f6e8a1602d19f",
       "feature_id": "android-binance-host-read-v1",
       "action": "evidence_recorded",
@@ -28835,6 +28805,36 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789267410591
+    },
+    {
+      "id": "feature_event_3fa167d2fe674dbfb4d01af5b463b77f",
+      "feature_id": "android_binance_range_empty_stops_v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789268778176
+    },
+    {
+      "id": "feature_event_79c6a269815342a2b18f984ac2f11768",
+      "feature_id": "android_binance_range_empty_stops_v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "主1700正式发布与无线安装摘要一致；当前量化0746区间带入、不变提示和变更只读准备通过，草稿已清理；真实交易不属于本解析修复验收",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1789268778225
+    },
+    {
+      "id": "feature_event_9543d19314854a2fbbe137586a6ef471",
+      "feature_id": "android_binance_range_empty_stops_v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "主1700正式发布与无线安装摘要一致；当前量化0746区间带入、不变提示和变更只读准备通过，草稿已清理；真实交易不属于本解析修复验收",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1789268778268
     }
   ]
 }
