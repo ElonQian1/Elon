@@ -69,6 +69,34 @@ test('request contract rejects extra scope, malformed text and path; accepts emp
     { ...input, content: 'a'.repeat(120001) }, { ...input, cookie: 'x' }, { ...input, id: '../file' }])
     assert.throws(() => policy.parse(JSON.stringify(changed)));
 });
+
+test('invalid text-wrapper ownership cannot prepare or dispatch a cloud write', async () => {
+  for (const change of [
+    saved => { saved.id = 'other-block'; },
+    saved => { saved.index = '3'; },
+    saved => { saved.variant = 'unreviewed'; },
+    saved => { saved.library_file_id = ''; }
+  ]) {
+    const h = harness();
+    change(h.state.payload.mapping[messageId].message.metadata.writing_blocks['block-a']);
+    const prepared = await h.prepare();
+    assert.equal(prepared.ok, false);
+    assert.equal(prepared.code, 'writing_selection_unavailable');
+    assert.equal(h.state.posts.length, 0);
+  }
+});
+
+test('ownership drift after preparation is rejected without writing or losing the source', async () => {
+  const h = harness(), prepared = await h.prepare();
+  assert.equal(prepared.code, 'writing_ready');
+  h.state.payload.mapping[messageId].message.metadata.writing_blocks['block-a'].index = '2';
+  const before = JSON.stringify(h.state.payload);
+  const saved = await h.save(prepared.ticket);
+  assert.equal(saved.ok, false);
+  assert.equal(saved.code, 'writing_selection_unavailable');
+  assert.equal(h.state.posts.length, 0);
+  assert.equal(JSON.stringify(h.state.payload), before);
+});
 test('truncated block catalogs and duplicate oversized blocks grant no save ownership', () => {
   const message = payload().mapping[messageId].message;
   const literal = message.content.parts[0];

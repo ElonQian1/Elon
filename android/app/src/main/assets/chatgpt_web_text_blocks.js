@@ -10,6 +10,8 @@
   const MAX_BLOCKS = 16;
   const own = (value, key) => value && Object.prototype.hasOwnProperty.call(value, key) ? value[key] : undefined;
   const token = value => typeof value === 'string' && /^[A-Za-z0-9_.:+#-]{1,160}$/.test(value) ? value : '';
+  const object = value => value && typeof value === 'object' && !Array.isArray(value);
+  const variants = new Set(['standard', 'document', 'email', 'creative', 'chat_message', 'social_post', 'slides']);
 
   function attributes(value) {
     const result = Object.create(null);
@@ -74,15 +76,20 @@
       lineCount: value.content.split('\n').length, textBlock: value };
   }
 
+  function sourceOwned(message, data, saved, index, id, variant) {
+    // Display identity is not write authority. Both provider representations obey the same checks.
+    return typeof data.id === 'string' && data.id === id && /^[A-Za-z0-9_-]{1,128}$/.test(data.id) &&
+      typeof message.id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(message.id) && message.author?.role === 'assistant' &&
+      !message.clientMetadata?.writingBlockOwners && data.library_file_id == null && saved?.library_file_id == null &&
+      variants.has(variant) && (saved == null || object(saved) &&
+        (saved.id == null || saved.id === id) && (saved.index == null ||
+          (typeof saved.index === 'string' || typeof saved.index === 'number') && String(saved.index) === String(index)) &&
+        (saved.metadata == null || object(saved.metadata)));
+  }
+
   function widgetSource(message, data, saved, index, id, content) {
-    const object = value => value && typeof value === 'object' && !Array.isArray(value);
     const variant = saved?.variant ?? data.variant;
-    if (!/^[A-Za-z0-9_-]{1,128}$/.test(data.id || '') ||
-        !/^[A-Za-z0-9_-]{1,128}$/.test(message.id || '') || message.author?.role !== 'assistant' ||
-        message.clientMetadata?.writingBlockOwners || data.library_file_id != null || saved?.library_file_id != null ||
-        !['standard', 'document', 'email', 'creative', 'chat_message', 'social_post', 'slides'].includes(variant) ||
-        saved != null && (!object(saved) || saved.id != null && saved.id !== id ||
-          saved.index != null && String(saved.index) !== String(index))) return null;
+    if (!sourceOwned(message, data, saved, index, id, variant)) return null;
     let initial = {};
     if (data.metadata != null) {
       // The official widget accepts JSON or URI-encoded JSON string metadata.
@@ -101,7 +108,6 @@
       if (!parsed) return null;
       initial = parsed;
     }
-    if (saved?.metadata != null && !object(saved.metadata)) return null;
     for (const key of ['recipient', 'cc', 'bcc', 'subject'])
       if (data[key] != null && (typeof data[key] !== 'string' || data[key].length > 16384)) return null;
     const metadata = { recipient: data.recipient ?? null, cc: data.cc ?? null,
@@ -141,19 +147,16 @@
       let value;
       if (open) {
         const language = open.info.split(/\s/)[0];
-        value = block('code', 'code-' + codeIndex++, '', language, original, end >= 0 || finished);
+        value = block('code', 'code-' + codeIndex++, '', language, original, finished);
       } else {
         const id = token(attrs.id) || 'writing-' + writingIndex;
         writingIndex++;
-        const metadata = token(attrs.id) && own(message.metadata?.writing_blocks, attrs.id);
+        const metadata = token(attrs.id) ? own(message.metadata?.writing_blocks, attrs.id) : undefined;
         const saved = metadata && typeof metadata.content === 'string' ? metadata.content : original;
-        value = block('writing', id, metadata?.title ?? attrs.title ?? attrs.subject ?? '', '', saved, end >= 0);
+        value = block('writing', id, metadata?.title ?? attrs.title ?? attrs.subject ?? '', '', saved, end >= 0 && finished);
         const variant = metadata?.variant ?? attrs.variant;
         // Only explicit provider IDs on original messages can authorize a later read-check-save.
-        if (value && end >= 0 && finished && token(attrs.id) &&
-            /^[A-Za-z0-9_-]{1,128}$/.test(message.id || '') &&
-            message.author?.role === 'assistant' && !message.clientMetadata?.writingBlockOwners &&
-            !metadata?.library_file_id && typeof variant === 'string' && /^[A-Za-z0-9_-]{1,48}$/.test(variant)) {
+        if (value && end >= 0 && finished && sourceOwned(message, attrs, metadata, writingIndex - 1, id, variant)) {
           value.sourceMessageId = message.id;
           if (includeWriteSources) writeSources.push({ id, messageId: message.id, index: writingIndex - 1,
             variant, title: metadata?.title ?? attrs.title ?? attrs.subject ?? '',
@@ -181,11 +184,11 @@
       writingIds.set(id, (writingIds.get(id) || 0) + 1);
       if (parts.some(item => item.textBlock.id === id)) continue;
       if (parts.length >= MAX_BLOCKS) { ambiguousWriting = true; continue; }
-      const saved = token(data.id) && own(message.metadata?.writing_blocks, data.id);
+      const saved = token(data.id) ? own(message.metadata?.writing_blocks, data.id) : undefined;
       const current = saved && typeof saved.content === 'string' ? saved.content : data.content;
       const value = block('writing', id, saved?.title ?? data.title ?? data.subject ?? '', '', current, finished);
       if (!value) continue;
-      const source = finished && widgetSource(message, data, saved || null, index, id, current);
+      const source = finished && widgetSource(message, data, saved, index, id, current);
       if (source) {
         value.sourceMessageId = message.id;
         if (includeWriteSources) writeSources.push(source);
@@ -226,5 +229,5 @@
     } catch (_) { return null; }
   }
 
-  return { version: 4, project, domCode, runtimeProjection, MAX_CONTENT };
+  return { version: 5, project, domCode, runtimeProjection, MAX_CONTENT };
 });
