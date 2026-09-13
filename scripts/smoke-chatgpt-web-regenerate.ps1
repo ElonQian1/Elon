@@ -31,6 +31,7 @@ $freshResult = $null
 $freshTrialRequested = $false
 $freshCleanupConfirmed = $false
 $retryDraft = ''
+$seedAwaitingReply = $false
 
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
@@ -213,6 +214,11 @@ try {
         [string]$origin.conversation.url,
         '(?:/g/g-p-[A-Za-z0-9_-]{1,160})?/c/[A-Za-z0-9_-]{1,160}'
     ).Value
+    if ($FreshHttp) {
+        $preflight = Invoke-ChatGptFreshTrial -Runtime $runtime -Mode state
+        if ($preflight.version -notin @(6, 7) -or $preflight.pending -isnot [bool] -or $preflight.pending -or
+            $preflight.armed -isnot [bool] -or $preflight.armed) { throw 'Fresh diagnostic preflight is not idle.' }
+    }
     $originCaptured = $true
 
     if ($UseExistingProbe) {
@@ -252,6 +258,7 @@ try {
         $beforeMain = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state -MainState
         $previousSendAt = [long]$beforeMain.social_chat.web_chat_last_send_command.observed_at_ms
         Assert-ChatGptRegenerateForeground -Runtime $runtime
+        $seedAwaitingReply = $true
         Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action "send_input" | Out-Null
         $sent = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec $ReadyTimeoutSec -MainState `
             -RequireChatGptForeground `
@@ -285,6 +292,7 @@ try {
     if ($null -eq $initialAssistant -or [string]$initialAssistant.state -ne "completed") {
         throw "Initial ChatGPT regenerate probe did not produce a completed assistant message."
     }
+    $seedAwaitingReply = $false
     $initialDigest = Get-ContentDigest -Value (
         Normalize-ChatGptProbeReply ([string]$initialAssistant.content)
     )
@@ -367,7 +375,9 @@ try {
         cleared_app_data = $false
     }
 } finally {
-    if ($FreshHttp) {
+    if ($seedAwaitingReply) {
+        Write-Warning 'Probe send is unconfirmed; retain its conversation for read-only reconciliation, without replay.'
+    } elseif ($FreshHttp) {
         $freshCleanupConfirmed = Close-ChatGptFreshRetryTrial -Runtime $runtime -Baseline $initialReply `
             -TrialRequested $freshTrialRequested -Draft $retryDraft
     }
@@ -391,7 +401,7 @@ try {
             catch { Write-Warning 'Protocol capture stop not confirmed; its bounded expiry remains active.' }
         }
     }
-    if ($originCaptured -and -not $originRestored -and (!$FreshHttp -or $freshCleanupConfirmed)) {
+    if ($originCaptured -and -not $originRestored -and !$seedAwaitingReply -and (!$FreshHttp -or $freshCleanupConfirmed)) {
         try {
             if (Test-WebChatNativeChatSurfaceForeground -Runtime $runtime) {
                 Write-Output "CHATGPT_REGENERATE_PROGRESS phase=restore_origin"

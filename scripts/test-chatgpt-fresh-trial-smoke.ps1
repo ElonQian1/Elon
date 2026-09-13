@@ -18,13 +18,18 @@ function Fixture {
 }
 $good = Fixture
 if (!(Test-ChatGptFreshRetryEvidence -Before $good.before -After $good.after -Receipt $good.receipt)) { throw 'Valid fresh evidence rejected.' }
+foreach ($version in @(6, 7)) {
+    $f = Fixture; $f.after.version = $version
+    if (!(Test-ChatGptFreshRetryEvidence -Before $f.before -After $f.after -Receipt $f.receipt)) { throw 'Reviewed receipt version rejected.' }
+}
 $cases = @(
     {param($f) $f.after.operation='send'}, {param($f) $f.after.attempts=2}, {param($f) $f.after.attempts=4},
     {param($f) $f.after.attempts='3'}, {param($f) $f.after.accepted='true'},
     {param($f) $f.after.dispatched=$false}, {param($f) $f.after.accepted=$false},
     {param($f) $f.after.reconciled=$false}, {param($f) $f.after.pending=$true},
     {param($f) $f.after.parent_role='assistant'}, {param($f) $f.after.stream_events=0},
-    {param($f) $f.after.version=5}, {param($f) $f.before.armed=$false},
+    {param($f) $f.after.version=5}, {param($f) $f.after.version=8}, {param($f) $f.after.version='7'},
+    {param($f) $f.before.armed=$false},
     {param($f) $f.before.pending=$true}, {param($f) $f.receipt.status='failed'},
     {param($f) $f.receipt.result.detail='official_runtime_v1:regenerate_observed'}
 )
@@ -61,6 +66,16 @@ foreach($fragment in @('Test-ChatGptFreshRetryEvidence -Before $freshBefore', '-
     'if (!$FreshHttp)', 'fresh_http_confirmed')) {
     if (!$source.Contains($fragment)) { throw "Fresh native wiring missing: $fragment" }
 }
+$preflight = $source.IndexOf('$preflight = Invoke-ChatGptFreshTrial')
+$newConversation = $source.IndexOf('-Action "chatgpt_new_conversation"', $preflight)
+$seedGuard = $source.IndexOf('$seedAwaitingReply = $true')
+$seedSend = $source.IndexOf('-Action "send_input"', $seedGuard)
+$seedSettled = $source.IndexOf('$seedAwaitingReply = $false', $seedGuard)
+$completeReply = $source.IndexOf('Initial ChatGPT regenerate probe did not produce a completed assistant message.')
+if ($preflight -lt 0 -or $newConversation -lt $preflight -or $seedGuard -lt $newConversation -or
+    $seedSend -lt $seedGuard -or $seedSettled -lt $completeReply -or
+    !$source.Contains('-and !$seedAwaitingReply -and (!$FreshHttp -or $freshCleanupConfirmed)') -or
+    !$source.Contains('if ($seedAwaitingReply) {')) { throw 'Uncertain seed guard wiring missing.' }
 $cleanupState = $baseline
 $endState = [pscustomobject]@{pending=$false;armed=$false}
 $cleanupWrites = 0

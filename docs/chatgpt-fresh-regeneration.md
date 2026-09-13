@@ -101,7 +101,8 @@ one-command and does not enable the production default. Do not repeat the alread
 accepted runtime test and label it independent HTTP acceptance.
 
 The candidate is now included in [grouped APK 1701](reports/chatgpt-private-grouped-1701.md),
-built, published and installed. The phone was locked; live retry remains pending.
+built, published and installed. The initial phone check was locked; live retry
+remains pending for the reasons below.
 Use the existing `scripts/smoke-chatgpt-web-regenerate.ps1` with `-FreshHttp -NativeRetry`
 and the pinned device/hardware serial. This combines native button/receipt evidence
 with the versioned one-command trial, exactly one attempt, owned stream events and
@@ -110,6 +111,35 @@ the trial has no pending write and fixture cleanup is confirmed. Changed user dr
 and unknown results are left intact. The default runtime registry is not overwritten
 by this candidate test. Offline cleanup and evidence contracts passed; this does not
 promote the candidate or prove native Stop.
+
+## Trial Wire Compatibility
+
+The unlocked 1701 attempt `fresh-retry-native-1701-20260913-160727-147`
+stopped during the controlled seed send, before tapping native retry. Its send
+receipt was `private_text_v1:unknown:reconciliation_pending`; later diagnostics
+returned `invalid_protocol_evidence`. Neither result proves a successful retry
+or a rejected server write. No seed replay or retry was performed.
+
+The diagnostic failure had a concrete cross-layer cause: JavaScript emitted
+`operation` in its version 6 receipt, while Kotlin accepted only the earlier
+version 6 field set. The transaction now emits version 7, which requires the
+reviewed operation enum. Kotlin also accepts both shipped version 6 shapes and
+version 5, without accepting unknown fields, types, operations or versions.
+Pending older writers remain readable and are not replaced during reinjection.
+
+A shared synthetic fixture now checks actual JavaScript transaction output and
+the actual Android command-receipt parser against the same seven states. The
+`fresh-trial-wire-node-20260913-164317-160` run passed 51 tests with zero
+failures/skips; `fresh-trial-wire-android-20260913-164350-233` passed all eight
+focused Release JVM tests with zero failures/errors/skips. The smoke contract
+also passed 18 negative, three native-identity, two draft and nine cleanup cases.
+
+Fresh acceptance checks that diagnostic state is readable and idle before any
+fixture navigation or seed write. If a seed is not confirmed, the script keeps
+that conversation for read-only reconciliation instead of restoring away or
+resending. That ordering is covered by the smoke wiring test, not claimed as a
+new device recovery test. This fix changes diagnostic compatibility and test
+safety, not request construction or the production regeneration default.
 
 Projects, temporary/new contexts, attachments/tools, feedback retry, branch
 selection UI and composer-free initial ownership remain outside this candidate.

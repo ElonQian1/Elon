@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 17, create: factory });
+  const api = Object.freeze({ version: 18, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -48,7 +48,7 @@
         active.binding.reconciled(active.request.userMessageId, active.stopAcknowledged === true) &&
           active.binding.navigationReady?.() !== false) && retireAttachments(active)) active = null; } catch (_) {}
     }
-    return { version: 6, transport: 'fresh_page_http_v1', pending: active !== null,
+    return { version: 7, transport: 'fresh_page_http_v1', pending: active !== null,
       operation: active?.operation || '',
       phase: active?.phase || 'idle', dispatched: active?.dispatched === true,
       accepted: active?.accepted === true, code: active?.code || '', recovering: active?.recovering === true };
@@ -81,7 +81,7 @@
     } else if (mode !== 'state') control = 'invalid_mode';
     const armed = trialArmed();
     const safeCode = value => /^[a-z_]{0,64}$/.test(value || '') ? value || '' : 'unknown';
-    return { schema: 'elon.fresh_text_trial.v1', version: 6, control, armed,
+    return { schema: 'elon.fresh_text_trial.v1', version: 7, control, armed,
       operation: last?.operation || '',
       remaining_ms: armed ? Math.max(0, Math.min(120000, trial.expiresAt - now())) : 0,
       attempts: records.attempts(), pending: active !== null, phase: last?.phase || 'idle',
@@ -361,7 +361,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 17, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 18, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

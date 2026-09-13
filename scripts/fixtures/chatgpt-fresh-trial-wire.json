@@ -1,0 +1,30 @@
+{
+  "common": {
+    "schema": "elon.fresh_text_trial.v1",
+    "version": 7,
+    "control": "state",
+    "armed": false,
+    "operation": "",
+    "remaining_ms": 0,
+    "attempts": 0,
+    "pending": false,
+    "phase": "idle",
+    "code": "",
+    "dispatched": false,
+    "accepted": false,
+    "reconciled": false,
+    "parent_role": "unknown",
+    "stream_events": 0,
+    "event_types": [],
+    "history": "not_observed"
+  },
+  "cases": {
+    "idle": {},
+    "armed": { "control": "armed", "armed": true, "remaining_ms": 120000 },
+    "send_preparing": { "operation": "send", "attempts": 1, "pending": true, "phase": "preparing" },
+    "send_rejected": { "operation": "send", "attempts": 1, "phase": "rejected", "code": "context_unavailable" },
+    "regenerate_preparing": { "operation": "regenerate", "attempts": 2, "pending": true, "phase": "preparing" },
+    "regenerate_rejected": { "operation": "regenerate", "attempts": 2, "phase": "rejected", "code": "context_unavailable" },
+    "ended": { "control": "ended", "operation": "regenerate", "attempts": 2, "phase": "rejected", "code": "context_unavailable" }
+  }
+}

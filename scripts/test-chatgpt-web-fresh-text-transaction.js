@@ -185,7 +185,7 @@ test('more than 32 default sends stay independent and retired commands cannot re
     assert.equal(f.api.state().pending, false);
   }
   assert.equal(f.api.trialControl('state').attempts, 48);
-  assert.equal(f.api.trialControl('state').version, 6);
+  assert.equal(f.api.trialControl('state').version, 7);
   assert.equal(f.send({ requestId: 'mcp_' + (48).toString(36) }), latest);
   f.page.__elonChatGptFreshTextDispatchEnabled = false;
   const replay = f.send({ requestId: 'mcp_1' });
