@@ -1,0 +1,16 @@
+const {readFileSync}=require('node:fs');
+const {resolve}=require('node:path');
+const assert=require('node:assert/strict');
+const root=resolve(__dirname,'..');
+const read=p=>readFileSync(resolve(root,p),'utf8');
+const service=read('android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostLifecycleService.kt').replace(/\/\*[\s\S]*?\*\//g,'');
+const manifest=read('android/app/src/main/AndroidManifest.xml');
+const provider=read('android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostProvider.kt');
+const events=read('android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostEvents.kt');
+assert.match(manifest,/<service android:name="\.grid\.host\.BinanceHostLifecycleService"\s+android:exported="true"\s*\/>/);
+assert.match(events,/putString\("lifecycle_service",BinanceHostLifecycleService.SCHEMA\)/);
+assert.match(service,/stopSelf\(startId\)/);assert.match(service,/START_NOT_STICKY/);
+assert.doesNotMatch(service,/BinanceHostRuntime|WebView|ContentResolver|onTransact|startForeground|loadUrl|grant\(/);
+assert.match(service,/intent\.extras == null \|\| intent\.extras!!\.isEmpty/);
+assert.match(provider,/if \(!BinanceHostCaller.ipc\(owner\)\) throw SecurityException/);
+console.log('BINANCE_HOST_LIFECYCLE_CONTRACT=passed BUSINESS_AUTHORITY_UNCHANGED=true');

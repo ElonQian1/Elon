@@ -1,6 +1,8 @@
 param([switch]$AdapterOnly)
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+& node (Join-Path $PSScriptRoot 'test-binance-host-lifecycle.cjs')
+if ($LASTEXITCODE -ne 0) { throw 'Binance host lifecycle boundary failed' }
 foreach ($name in @('test-binance-grid-create-adapter.cjs','test-binance-grid-create-funds.cjs','test-binance-grid-create-reference.cjs','test-binance-grid-create-economics.cjs','test-binance-grid-manage-adapter.cjs','test-binance-grid-protection-contract.cjs','test-binance-grid-trailing-rules.cjs','test-binance-grid-trailing-contract.cjs','test-binance-grid-trailing-adapter.cjs','test-binance-grid-read-session.cjs','test-binance-grid-read-diagnostics.cjs','test-binance-grid-read-adapter.cjs')) {
     & node (Join-Path $PSScriptRoot $name)
     if ($LASTEXITCODE -ne 0) { throw "Binance adapter contract failed: $name" }

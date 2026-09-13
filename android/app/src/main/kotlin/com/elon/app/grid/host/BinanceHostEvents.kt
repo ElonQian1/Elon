@@ -30,7 +30,8 @@ internal class BinanceHostEvents(private val handler: Handler, private val membe
     fun call(method:String,uid:Int,extras:Bundle):Bundle {
         if(method=="events_capabilities_v1") {
             require(extras.isEmpty)
-            return Bundle().apply {putString("schema",SCHEMA);putString("status","supported")}
+            return Bundle().apply {putString("schema",SCHEMA);putString("status","supported")
+                putString("lifecycle_service",BinanceHostLifecycleService.SCHEMA)}
         }
         val id=extras.getString("subscription").orEmpty();require(ID.matches(id))
         if(method=="events_unsubscribe_v1") {

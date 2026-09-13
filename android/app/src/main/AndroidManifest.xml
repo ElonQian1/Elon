@@ -87,6 +87,8 @@
         <provider android:name=".grid.host.BinanceHostProvider"
             android:authorities="${applicationId}.binance-host"
             android:exported="true" android:grantUriPermissions="false" />
+        <service android:name=".grid.host.BinanceHostLifecycleService"
+            android:exported="true" />
 
         <activity
             android:name=".MainActivity"

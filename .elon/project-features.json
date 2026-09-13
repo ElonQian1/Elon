@@ -2037,6 +2037,121 @@
       "updated_at_ms": 1788880049013
     },
     {
+      "id": "android-binance-host-lifecycle-v1",
+      "title": "量化前台绑定币安宿主生命周期",
+      "summary": "固定无业务服务随量化前台绑定，替代调试保活依赖；旧Provider权限保持",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/android-binance-host-lifecycle-v1.md",
+        "content_hash": "37ae5d93ae0dd6a3b174d7a232ec00bf17f939892e45da7d91cb4fb3904d2847",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "81df56f9701ab578cedf3d7f65fb3081f9a152c0",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/AndroidManifest.xml",
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostEvents.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostLifecycleService.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "固定绑定合同及权限边界测试通过，服务没有网站或交易命令",
+        "原签名发布安装后，在无临时调试保活下核验原页更新恢复，失败保留待验"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/AndroidManifest.xml",
+          "content_hash": "2f3bbca55372970c5161ad168323213d7b8f64f4ca8d36644a6063e09583232d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
+            "head_blob_oid": "28588bf3ce113c4c5771f6ae19438836861d4fb0",
+            "worktree_blob_oid": "af1b1b9d5840f012db111b22933a936afd214acf",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostEvents.kt",
+          "content_hash": "0ff40709865ee3df1c1e9e8c35207a611e3a62cc77137f2992b6fda7a6162555",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
+            "head_blob_oid": "b146fe2a619f83499c0cb07b9145d284b5dceaef",
+            "worktree_blob_oid": "a708d948caf98b283a42001c14ae5e1a18e02c2b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostLifecycleService.kt",
+          "content_hash": "364f9acbaa7d5be81cd8ad3d54731b3f39cf54a6c5bc2eeb33bd97694d7e2dd8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "284b9e6f13bb8cb71d0879621616e682c89ec4c4",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/reports/android-binance-host-lifecycle-20260913.md",
+          "content_hash": "6d3af52b07d777777b668a9bdc458a28f76a5e537a09e7ce7d195dfd43e4f977",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "61630c6b0822a69102617a0a26155e8a81675c5e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-create.ps1",
+          "content_hash": "e2c663308ee75b2b567ebba3674dbdb6d5a86c885474a4c5a382fab18523da6b",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
+            "head_blob_oid": "eb70e4989abce01a303a42a9527e5484e8b0f739",
+            "worktree_blob_oid": "f678a1ea78423206c3d6ae4a9eefe11dc3bb71ca",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-binance-host-lifecycle.cjs",
+          "content_hash": "98e8986a3f97dd27ebbfe7c52b6199c72f6d9859ba35689313615ddc4a5945bb",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "fee43c4b491711ea4a77ac5b98a7c90afe5fcdd3",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1d0e3fb435dfed925a3ed79f41d2b57b5af4172b",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1789272647705,
+      "updated_at_ms": 1789283366316
+    },
+    {
       "id": "android-binance-host-read-v1",
       "title": "主 APK 托管币安网格只读会话",
       "summary": "主 APK 官方 WebView 持有本人币安登录，量化 APK 经同机限时授权读取；Win 负责研究，保留旧云快照。",
@@ -26837,56 +26952,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_cfe17a84eb9646628a8f6e8a1602d19f",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788832595800
-    },
-    {
-      "id": "feature_event_6a47e586fec5466086bd8ffa8bdce9eb",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "claim_released",
-      "actor": "codex-binance-host",
-      "reason": "按用户确定的主子账户分工重新绑定完善后的需求，随即继续认领。",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788836102944
-    },
-    {
-      "id": "feature_event_973cbcd5a60e4e278cc555bfa743f490",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "requirement_rebound",
-      "actor": "codex-binance-host",
-      "reason": "加入用户确定的账号分工，明确身份校验、详情代次与撤销确认；保持只读范围。",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788836103730
-    },
-    {
-      "id": "feature_event_3f34fc7c5e0f47ffad4fd6f1784f3658",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-host",
-      "reason": "用户已授权继续完善本模块，范围保持本人只读。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788836103754
-    },
-    {
-      "id": "feature_event_cee635ade02641a6ae0353d98df8a205",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-host",
-      "reason": "用户已授权继续完善本模块，范围保持本人只读。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788836103774
-    },
-    {
       "id": "feature_event_f5693c0ac6aa4a3da033bbeb220d195c",
       "feature_id": "android-binance-host-read-v1",
       "action": "claimed",
@@ -28835,6 +28900,56 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1789268778268
+    },
+    {
+      "id": "feature_event_136e3e9327b04d8c8aa086496466ba1e",
+      "feature_id": "android-binance-host-lifecycle-v1",
+      "action": "registered",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789272647705
+    },
+    {
+      "id": "feature_event_b070ebb90ff14638a7ed7d7567386e2a",
+      "feature_id": "android-binance-host-lifecycle-v1",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789272662625
+    },
+    {
+      "id": "feature_event_b28048f85e8c49589a6a31aa1afbe958",
+      "feature_id": "android-binance-host-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "复现后按固定前台绑定合同实现",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789272662697
+    },
+    {
+      "id": "feature_event_8215ed46b1bf4e9bb6f5d1d61bedae0a",
+      "feature_id": "android-binance-host-lifecycle-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789283366252
+    },
+    {
+      "id": "feature_event_c59969fe886349caa3ea37905f8f1737",
+      "feature_id": "android-binance-host-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "固定服务与能力声明、97项回归通过；无调试服务装机恢复待验收",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789283366316
     }
   ]
 }
