@@ -26,9 +26,8 @@ published/installed and native-send accepted. Reuse this completed UI fix.
 only. The current model declined creation; stop repeating prompts. Original
 writes/exports need an owned sample. [Writing Blocks](chatgpt-writing-blocks-native.md)
 reading/edit/export and ordinary save are accepted (1692; editor undo/redo/share 1706).
-[Project save](chatgpt-writing-blocks-project-save.md) and
-[typed-widget save](chatgpt-writing-blocks-widget-save.md) are offline-verified;
-temporary/library save remains incomplete.
+[Project/typed saves](chatgpt-writing-blocks-native.md) are offline-verified.
+[Linked-library save](chatgpt-writing-blocks-library-save.md) is partial/offline-only; temporary/shared writes remain open.
 
 [Fresh tools](chatgpt-fresh-tool-text-dispatch.md),
 [project sends](chatgpt-fresh-project-text-dispatch.md),

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateWritingBlocks) {
     root.__elonChatGptPrivateWritingBlocks = factory(root);
@@ -37,7 +37,7 @@
   }
   async function read(entry, deadline) {
     const payload = await request(entry, 'GET', null, deadline);
-    return policy.source(payload, entry.binding.id, entry.source.messageId, entry.source.id, parser, entry.binding.projectId);
+    return policy.source(payload, entry.binding.id, entry.source.messageId, entry.source.id, parser, entry.binding.projectId, true);
   }
   async function verify(entry, deadline) {
     const expected = entry.pending;
@@ -76,6 +76,8 @@
         const fresh = await read(entry, deadline);
         if (fresh.content !== input.content) fail('version_conflict');
         binding.local(fresh);
+        if (fresh.libraryFileId && typeof binding.prepareSource !== 'function') fail('runtime_unavailable');
+        await binding.prepareSource?.(fresh, deadline);
         entry.source = fresh;
         if (existing) entries.delete(existing.ticket);
         if (entries.size >= 16) {
@@ -96,17 +98,23 @@
       const fresh = await read(entry, deadline);
       if (!policy.same(fresh, entry.source)) fail('version_conflict');
       entry.binding.local(fresh);
+      if (fresh.libraryFileId && typeof entry.binding.transact !== 'function') fail('runtime_unavailable');
       if (fresh.content === input.content) return result(entry, 'writing_saved');
       const expected = { ...fresh, content: input.content };
-      try {
-        await request(entry, 'POST', policy.body(entry.binding.id, fresh, input.content, new Date(now()).toISOString()),
-          deadline, () => { entry.pending = expected; });
-      } catch (error) {
-        // A rejected HTTP response is known; a timeout/transport error can still have committed.
-        if (/^http_(400|401|403|404|409|422|429)$/.test(error?.message || '')) { entry.pending = null; throw error; }
-        throw error;
-      }
-      return await verify(entry, deadline);
+      const operation = async () => {
+        try {
+          await request(entry, 'POST', policy.body(entry.binding.id, fresh, input.content, new Date(now()).toISOString()),
+            deadline, () => { entry.pending = expected; });
+        } catch (error) {
+          // A rejected HTTP response is known; a timeout/transport error can still have committed.
+          if (/^http_(400|401|403|404|409|422|429)$/.test(error?.message || '')) entry.pending = null;
+          throw error;
+        }
+        return verify(entry, deadline);
+      };
+      return fresh.libraryFileId
+        ? await entry.binding.transact(expected, operation, deadline, () => !!entry.pending)
+        : await operation();
     } catch (error) {
       if (entry?.pending) return result(entry, 'writing_write_unconfirmed');
       const reason = String(error?.message || '');
@@ -141,5 +149,5 @@
     }).catch(() => respond(action, false, 'writing_unavailable'));
     return true;
   }
-  return Object.freeze({ version: 2, handle, run });
+  return Object.freeze({ version: 3, handle, run });
 });

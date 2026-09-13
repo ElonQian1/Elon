@@ -78,8 +78,8 @@ test('malformed stored values cannot be laundered into an absent save record', (
   }
 });
 
-test('unsupported original variants and library-linked wrappers remain local-only', () => {
-  for (const attributes of ['variant="unreviewed"', 'variant="standard" library_file_id="libfile_sample"']) {
+test('unsupported original variants and invalid library identities remain local-only', () => {
+  for (const attributes of ['variant="unreviewed"', 'variant="standard" library_file_id="unconfirmed"']) {
     const input = message(); input.metadata = {};
     input.content.parts = [':::writing{id="block-1" ' + attributes + '}\nBody\n:::'];
     const projected = blocks.project(input, true);

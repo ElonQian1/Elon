@@ -47,21 +47,28 @@ test('explicit provider ownership is retained without exposing write metadata in
   message.content.parts = [':::writing{id="block-a"}\nbody\n:::']; message.metadata = {};
   assert.equal(parser.project(message).parts[0].textBlock.sourceMessageId, undefined);
   message.metadata = { writing_blocks: { 'block-a': { variant: 'standard', library_file_id: 'libfile_a' } } };
-  assert.equal(parser.project(message).parts[0].textBlock.sourceMessageId, undefined);
+  assert.equal(parser.project(message).parts[0].textBlock.sourceMessageId, messageId);
+  assert.equal(parser.project(message, true, true).writeSources[0].libraryFileId, 'libfile_a');
 });
-test('branch, duplicates, streaming, promoted library and unknown ownership reject writes', () => {
+test('branch, duplicates, streaming and unknown ownership reject writes', () => {
   for (const mutate of [
     p => { p.current_node = 'missing'; },
     p => { p.mapping[messageId].parent = messageId; },
     p => { p.mapping[messageId].message.status = 'in_progress'; },
     p => { p.mapping[messageId].message.clientMetadata = { writingBlockOwners: {} }; },
     p => { p.mapping[messageId].message.content.parts[0] += '\n:::writing{id="block-a" variant="standard"}\nother\n:::'; },
-    p => { p.mapping[messageId].message.metadata.writing_blocks['block-a'].library_file_id = 'libfile_a'; },
     p => { p.mapping[messageId].message.metadata.writing_blocks['block-a'].locallyEdited = true; },
     p => { p.is_do_not_remember = true; },
     p => { p.mapping[messageId].message.author.role = 'user'; }
   ]) { const p = payload(); mutate(p); assert.throws(() => policy.source(p, conversationId, messageId, 'block-a', parser)); }
 });
+test('linked sources cannot prepare through an ordinary context without library ownership', async () => {
+  const h = harness();
+  h.state.payload.mapping[messageId].message.metadata.writing_blocks['block-a'].library_file_id = 'libfile_a';
+  assert.equal((await h.prepare()).code, 'writing_runtime_unavailable');
+  assert.equal(h.state.posts.length, 0);
+});
+
 test('request contract rejects extra scope, malformed text and path; accepts empty body', () => {
   const input = { operation: 'prepare', path, messageId, id: 'block-a', content: '' };
   assert.deepEqual(policy.parse(JSON.stringify(input)), input);

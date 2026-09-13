@@ -7,6 +7,38 @@ const crypto = require('node:crypto');
 const { parseSource } = require('./analyze-chatgpt-runtime-contracts.cjs');
 const directory = process.env.CHATGPT_PUBLIC_RUNTIME_DIR;
 
+test('linked writing shares the official library session queue and acknowledgement, not the standalone file PATCH', {
+  skip: !directory && 'Requires retained public assets; never evaluates downloaded JavaScript.'
+}, () => {
+  const inspect = (file, hash) => {
+    const text = fs.readFileSync(path.join(directory, file), 'utf8');
+    assert.equal(crypto.createHash('sha256').update(text).digest('hex'), hash);
+    return parseSource(text);
+  };
+  const definition = (index, name) => {
+    const nodes = index.definitions.get(name); assert.equal(nodes?.length, 1, name);
+    return index.text.slice(nodes[0].start, nodes[0].end);
+  };
+  const writing = inspect('a965fc59-fzrm5l4zirdbhwph.js', '752c85e9623229704c208167584c5b7a6e8f18410e6258713d2de7d483a62e19');
+  const conversation = inspect('conversation-small-h1dtzoris1y9588z.js', 'da08c64c132306779e09ba89cac64fa560b120e7560ffdc29b3ce5a0b8ccd67e');
+  const preview = inspect('560eefd0-d3e3qb2j1xlsfaom.js', '1c5ae9d0063fec37d5a0773e7c83aaf31cd13d717ee8ea21269cb5df48132d64');
+  assert.deepEqual(writing.imports.get('Gn'), { file: './conversation-small-h1dtzoris1y9588z.js', name: 'uDt' });
+  assert.equal(conversation.exported.get('uDt'), 'xZn');
+  assert.match(definition(conversation, 'xZn'), /wi\(\(\)=>vZn\(\)\)/);
+  const save = definition(writing, 'nc');
+  for (const fragment of ['libraryFileId:o=r.library_file_id', 'enqueueSave', 'getSessionSnapshot', 'beginSave',
+    'completeSaveSuccess', 'completeSaveError', 'safePost(`/conversation/message/writing-blocks`'])
+    assert.ok(save.includes(fragment), fragment);
+  assert.doesNotMatch(save, /safePatch|expected_current_version/);
+  const session = definition(conversation, 'vZn');
+  for (const fragment of ['hasPendingEditorChanges', 'r.draftContent!==t.content', 'r.inFlightSaveSequence!=null',
+    't.saveSequence!==i.latestIssuedSaveSequence', 'a!==t.submittedContent', 'expectedCurrentVersion:r.baseVersionNumber??null'])
+    assert.ok(session.includes(fragment), fragment);
+  assert.match(definition(preview, preview.exported.get('a')), /acknowledgeLocalSave/);
+  for (const fragment of ['getQueryCache().findAll', '`file-preview`', '`file-preview-contents`', 'invalidateQueries'])
+    assert.ok(definition(preview, 'l').includes(fragment), fragment);
+});
+
 test('reviewed public source resolves writing delimiters against message metadata', {
   skip: !directory && 'Requires retained public assets; never evaluates downloaded JavaScript.'
 }, () => {

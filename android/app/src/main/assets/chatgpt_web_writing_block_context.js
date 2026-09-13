@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptWritingBlockContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -75,10 +75,23 @@
           page.__elonChatGptPrivateConversationMutation?.state?.().state !== 'busy';
       } catch (_) { return false; }
     }
-    let guardedSource;
+    let guardedSource, library;
+    async function prepareSource(source, deadline) {
+      if (!source.libraryFileId) return;
+      if (!page.__elonChatGptWritingLibrarySession) fail('runtime_unavailable');
+      library ||= page.__elonChatGptWritingLibrarySession.create(page, { bindings, shared, current });
+      await library.capture(source, deadline);
+    }
+    async function transact(expected, operation, deadline, wasDispatched) {
+      if (!library || !guardedSource?.libraryFileId || !localMatches(guardedSource)) fail('web_edit_pending');
+      return library.write(guardedSource, expected, async () => {
+        if (!localMatches(guardedSource)) fail('web_edit_pending');
+        return operation();
+      }, deadline, wasDispatched);
+    }
     function messageMatches(message, source) {
       if (!source || message?.id !== source.messageId) return false;
-      const rows = page.__elonChatGptTextBlocks.project(message, true)?.writeSources?.filter(row => row.id === source.id) || [];
+      const rows = page.__elonChatGptTextBlocks.project(message, true, true)?.writeSources?.filter(row => row.id === source.id) || [];
       return rows.length === 1 && policy.same(rows[0], source);
     }
     function localMatches(source) {
@@ -95,6 +108,7 @@
       try {
         if (!current() || Date.now() >= deadline || !guardedSource ||
             !policy.same({ ...source, content: guardedSource.content }, guardedSource)) return false;
+        if (source.libraryFileId && (!library || !library.confirm(source, deadline))) return false;
         if (!localMatches(source)) {
           if (!localMatches(guardedSource)) return false;
           // The official writing action updates one node through the observable tree owner.
@@ -115,7 +129,7 @@
       } catch (_) { return false; }
     }
     if (!current()) fail('context_changed');
-    return { ...binding, current, local, reconcile };
+    return { ...binding, current, local, prepareSource, transact, reconcile };
   }
   return Object.freeze({ capture });
 });

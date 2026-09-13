@@ -38,7 +38,7 @@
     if (op !== 'verify') text(input.content);
     return input;
   }
-  function source(payload, conversationId, messageId, id, parser, projectId = null) {
+  function source(payload, conversationId, messageId, id, parser, projectId = null, allowLibraryWrites = false) {
     if (!payload || payload.conversation_id !== conversationId || !payload.mapping || Array.isArray(payload.mapping) ||
         payload.is_do_not_remember !== false || payload.is_temporary_chat === true ||
         projectId !== null && !PROJECT.test(projectId) || (payload.gizmo_id ?? null) !== projectId ||
@@ -58,7 +58,7 @@
       nodeId = node.parent;
     }
     if (nodeId || !found) fail('branch_unconfirmed');
-    const sources = parser.project(found, true)?.writeSources?.filter(row => row.id === id) || [];
+    const sources = parser.project(found, true, allowLibraryWrites === true)?.writeSources?.filter(row => row.id === id) || [];
     if (sources.length !== 1) fail('selection_unavailable');
     const value = sources[0];
     if (value.locallyEdited || typeof value.title !== 'string' || value.title.length > 512 ||
@@ -78,5 +78,5 @@
       writing_block: { content: text(content), index: String(source.index), variant: source.variant,
         metadata: source.metadata, title: source.title, id: source.id }, updated_at: updatedAt };
   }
-  return { version: 2, parse, source, same, body, route, PATH, PROJECT, TICKET };
+  return { version: 3, parse, source, same, body, route, PATH, PROJECT, TICKET };
 });

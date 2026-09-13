@@ -12,6 +12,11 @@
   const token = value => typeof value === 'string' && /^[A-Za-z0-9_.:+#-]{1,160}$/.test(value) ? value : '';
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
   const variants = new Set(['standard', 'document', 'email', 'creative', 'chat_message', 'social_post', 'slides']);
+  function libraryId(data, saved) {
+    const ids = [data.library_file_id, saved?.library_file_id].filter(value => value != null);
+    if (!ids.length) return null;
+    return ids.every(value => typeof value === 'string' && /^libfile[_-][A-Za-z0-9_-]{1,152}$/.test(value) && value === ids[0]) ? ids[0] : false;
+  }
 
   function attributes(value) {
     const result = Object.create(null);
@@ -80,7 +85,7 @@
     // Display identity is not write authority. Both provider representations obey the same checks.
     return typeof data.id === 'string' && data.id === id && /^[A-Za-z0-9_-]{1,128}$/.test(data.id) &&
       typeof message.id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(message.id) && message.author?.role === 'assistant' &&
-      !message.clientMetadata?.writingBlockOwners && data.library_file_id == null && saved?.library_file_id == null &&
+      !message.clientMetadata?.writingBlockOwners && libraryId(data, saved) !== false &&
       variants.has(variant) && (saved == null || object(saved) &&
         (saved.id == null || saved.id === id) && (saved.index == null ||
           (typeof saved.index === 'string' || typeof saved.index === 'number') && String(saved.index) === String(index)) &&
@@ -115,10 +120,11 @@
     const title = saved?.title ?? data.title ?? '';
     if (typeof title !== 'string' || title.length > 512 || JSON.stringify(metadata).length > 16384) return null;
     return { id, messageId: message.id, index, variant, title, metadata, content,
-      locallyEdited: saved?.locallyEdited === true, representation: 'widget' };
+      locallyEdited: saved?.locallyEdited === true, representation: 'widget',
+      ...(libraryId(data, saved) ? { libraryFileId: libraryId(data, saved) } : {}) };
   }
 
-  function project(message, includeWriteSources = false) {
+  function project(message, includeWriteSources = false, allowLibraryWrites = false) {
     const content = message && message.content;
     if (!content || content.content_type !== 'text' || !Array.isArray(content.parts) ||
         content.parts.some(value => typeof value !== 'string')) return null;
@@ -160,7 +166,8 @@
           value.sourceMessageId = message.id;
           if (includeWriteSources) writeSources.push({ id, messageId: message.id, index: writingIndex - 1,
             variant, title: metadata?.title ?? attrs.title ?? attrs.subject ?? '',
-            metadata: metadata?.metadata ?? {}, content: saved, locallyEdited: metadata?.locallyEdited === true });
+            metadata: metadata?.metadata ?? {}, content: saved, locallyEdited: metadata?.locallyEdited === true,
+            ...(libraryId(attrs, metadata) ? { libraryFileId: libraryId(attrs, metadata) } : {}) });
         }
         // Only replace complete, supported blocks. Incomplete wrappers remain visible and read-only.
         if (value && end >= 0) edits.push({ start: lines[i].start, end: lines[end].end,
@@ -197,7 +204,9 @@
     }
     const canOwn = id => !ambiguousWriting && scanned >= lines.length && writingIds.get(id) === 1;
     for (const row of parts) if (!canOwn(row.textBlock.id)) delete row.textBlock.sourceMessageId;
-    return { text, parts, ...(includeWriteSources ? { writeSources: writeSources.filter(row => canOwn(row.id)) } : {}) };
+    // Old resident writers may share a newly injected parser. Linked writes require explicit protocol opt-in.
+    return { text, parts, ...(includeWriteSources ? { writeSources: writeSources.filter(row =>
+      canOwn(row.id) && (!row.libraryFileId || allowLibraryWrites === true)) } : {}) };
   }
 
   function domCode(content, language, index) {
@@ -229,5 +238,5 @@
     } catch (_) { return null; }
   }
 
-  return { version: 5, project, domCode, runtimeProjection, MAX_CONTENT };
+  return { version: 6, project, domCode, runtimeProjection, MAX_CONTENT };
 });

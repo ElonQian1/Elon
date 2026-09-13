@@ -25,7 +25,7 @@ const extraExports = {
   conversation: { attachmentBaseLimit: 'W$t', attachmentMaxUploads: 'Z$t',
     attachmentPendingCount: 'K$t', attachmentConfiguredLimit: 'U$t', canvasDirtyInit: 'Dvt', useCanvasDirty: 'Avt',
     textRequestedDefaultModel: 'Jsn', textRememberFirstModel: 'DDn', textNavigateConversation: 'qHt',
-    textSerializeAttachments: 'Ypt', textResolveRequestedModel: 'azt' },
+    textSerializeAttachments: 'Ypt', textResolveRequestedModel: 'azt', writingLibrarySessions: 'uDt' },
   composer: { fh: 'Nh' }
 };
 const anchor = 'c2675c8c-o59yc0xo7p9m3q3o.js';
