@@ -12,6 +12,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
+. (Join-Path $PSScriptRoot 'chatgpt-fresh-trial-smoke.ps1')
 . (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1
@@ -22,22 +23,7 @@ $report = [ordered]@{ schema = 'elon.fresh_text_ui.v1'; passed = $false; stage =
     seed_sends = 0; candidate_clicks = 0; cases = @(); restored = $false; awake_restored = $false }
 
 function Trial([string]$Mode) {
-    $result = Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action chatgpt_private_protocol_probe `
-        -Arguments @{ mode = "fresh_text_trial_$Mode" }
-    $id = [string]$result.command_receipt.request_id
-    if (-not $id) { throw 'trial_receipt_missing' }
-    $until = [DateTimeOffset]::UtcNow.AddSeconds(12)
-    do {
-        $state = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state
-        $receipt = @($state.command_requests | Where-Object { $_.request_id -eq $id }) | Select-Object -Last 1
-        if ($receipt.result.detail) {
-            try { $value = [string]$receipt.result.detail | ConvertFrom-Json } catch { throw 'trial_receipt_invalid' }
-            if ($value.schema -ne 'elon.fresh_text_trial.v1') { throw 'trial_schema_invalid' }
-            return $value
-        }
-        Start-Sleep -Milliseconds 200
-    } while ([DateTimeOffset]::UtcNow -lt $until)
-    throw 'trial_receipt_timeout'
+    Invoke-ChatGptFreshTrial -Runtime $runtime -Mode $Mode
 }
 
 function Native-Send([string]$Kind, [bool]$Candidate) {

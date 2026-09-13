@@ -5,7 +5,8 @@ function Test-ChatGptRegeneratedReplyIdentity {
         [AllowNull()]$Receipt,
         [bool]$IdentityChanged,
         [bool]$ContentChanged,
-        [bool]$RequireOfficialRuntime
+        [bool]$RequireOfficialRuntime,
+        [bool]$FreshHttpConfirmed = $false
     )
     if ($Receipt.expected_web_action -ne 'regenerate_response' -or
         $Receipt.status -ne 'succeeded' -or $Receipt.result.ok -ne $true) { return $false }
@@ -13,7 +14,8 @@ function Test-ChatGptRegeneratedReplyIdentity {
     if ($RequireOfficialRuntime -and !$official) { return $false }
     # The runtime proves a new provider variant and its original parent. A
     # native turn row is a display identity and may survive that replacement.
-    return $IdentityChanged -or ($official -and $ContentChanged)
+    $fresh = $FreshHttpConfirmed -and $Receipt.result.detail -ceq 'private_text_v1:regenerate_accepted'
+    return $IdentityChanged -or (($official -or $fresh) -and $ContentChanged)
 }
 
 function Assert-ChatGptRegenerateForeground {
@@ -40,7 +42,7 @@ function Get-ChatGptNativeRetryAdmission {
 }
 
 function Get-ChatGptRegenerateDocumentContinuity {
-    param([AllowNull()]$Baseline, [AllowNull()]$Current)
+    param([AllowNull()]$Baseline, [AllowNull()]$Current, [AllowEmptyString()][string]$ExpectedDraft = '')
 
     if ($Current.surface -ne 'chatgpt_web') { return 'surface_unavailable' }
     if ($Current.bridge_state -ne 'ready') { return 'bridge_unavailable' }
@@ -56,7 +58,8 @@ function Get-ChatGptRegenerateDocumentContinuity {
         return 'conversation_changed'
     }
     if ($Current.streaming -isnot [bool] -or $Current.streaming) { return 'reply_active' }
-    if ($null -eq $Current.input.text_length -or $Current.input.text_length -ne 0) { return 'draft_present' }
+    if ($null -eq $Current.input.text_length -or $Current.input.text_length -ne $ExpectedDraft.Length -or
+        ($ExpectedDraft.Length -gt 0 -and [string]$Current.input.text -cne $ExpectedDraft)) { return 'draft_present' }
     if (@($Current.conversation.attachments).Count) { return 'attachment_present' }
     $before = @($Baseline.conversation.messages | Where-Object { $_.role -in @('user', 'assistant') })
     $after = @($Current.conversation.messages | Where-Object { $_.role -in @('user', 'assistant') })

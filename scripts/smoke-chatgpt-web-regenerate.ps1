@@ -11,6 +11,7 @@ param(
     [ValidateRange(0, 9999)][int]$ExpectedAdapterVersion = 0,
     [switch]$NativeRetry,
     [switch]$RequireOfficialRuntime,
+    [switch]$FreshHttp,
     [switch]$UseCurrentNativeSurface,
     [switch]$UseExistingProbe,
     [switch]$CaptureProtocol
@@ -21,6 +22,15 @@ $ErrorActionPreference = "Stop"
 $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $ExpectedAdapterVersion
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1")
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-reply-state.ps1")
+. (Join-Path $PSScriptRoot 'chatgpt-fresh-trial-smoke.ps1')
+if ($FreshHttp -and (!$NativeRetry -or $RequireOfficialRuntime)) {
+    throw 'Fresh HTTP acceptance requires NativeRetry and cannot require the legacy runtime.'
+}
+$freshBefore = $null
+$freshResult = $null
+$freshTrialRequested = $false
+$freshCleanupConfirmed = $false
+$retryDraft = ''
 
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
@@ -88,7 +98,7 @@ function Assert-RetryDocument {
         [string]$live.receipt.result.detail -cnotmatch '^model_runtime_context:[a-z_]+$') {
         throw 'Regenerate acceptance deferred before write: page_ack_unconfirmed.'
     }
-    $reason = Get-ChatGptRegenerateDocumentContinuity -Baseline $Baseline -Current $live.state
+    $reason = Get-ChatGptRegenerateDocumentContinuity -Baseline $Baseline -Current $live.state -ExpectedDraft $retryDraft
     if ($reason -ne 'ready') { throw "Regenerate acceptance deferred before write: $reason." }
     # This proves document continuity, not private-runtime availability or a successful retry.
     Write-Output "CHATGPT_REGENERATE_PROGRESS phase=live_document_confirmed generation=$($live.state.page_generation)"
@@ -141,8 +151,15 @@ function Wait-RegeneratedReply {
                 ($streamingObserved -or $identityChanged -or $contentChanged)
             ) {
                 $officialRuntime = [string]$lastReceipt.result.detail -eq 'official_runtime_v1:regenerate_observed'
+                $freshConfirmed = $false
+                if ($FreshHttp) {
+                    $script:freshResult = Invoke-ChatGptFreshTrial -Runtime $runtime -Mode state
+                    $freshConfirmed = Test-ChatGptFreshRetryEvidence -Before $freshBefore -After $script:freshResult -Receipt $lastReceipt
+                    if (!$freshConfirmed) { throw 'Retry did not confirm independent fresh HTTP reconciliation.' }
+                    if ([string]$state.input.text -cne $retryDraft) { throw 'Fresh retry changed the unsent draft.' }
+                }
                 if (!(Test-ChatGptRegeneratedReplyIdentity -Receipt $lastReceipt -IdentityChanged $identityChanged `
-                    -ContentChanged $contentChanged -RequireOfficialRuntime ([bool]$RequireOfficialRuntime))) {
+                    -ContentChanged $contentChanged -RequireOfficialRuntime ([bool]$RequireOfficialRuntime) -FreshHttpConfirmed $freshConfirmed)) {
                     throw 'Retry did not confirm a new variant in the requested transport and native UI.'
                 }
                 return [pscustomobject]@{
@@ -151,6 +168,7 @@ function Wait-RegeneratedReply {
                     assistant_identity_changed = $identityChanged
                     assistant_content_changed = $contentChanged
                     official_runtime_confirmed = $officialRuntime
+                    fresh_http_confirmed = $freshConfirmed
                 }
             }
         }
@@ -276,6 +294,15 @@ try {
             -Arguments @{mode='start'} | Out-Null
         $protocolCaptureStarted = $true
     }
+    if ($FreshHttp) {
+        $retryDraft = 'ELON_RETRY_UNSENT_DRAFT_V1'
+        Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action set_input_text -Arguments @{text=$retryDraft} | Out-Null
+        Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec 20 -RequireChatGptForeground `
+            -Description 'unsent retry draft' -Predicate { param($s) [string]$s.input.text -ceq $retryDraft }.GetNewClosure() | Out-Null
+        $freshTrialRequested = $true
+        $freshBefore = Invoke-ChatGptFreshTrial -Runtime $runtime -Mode start
+        if ($freshBefore.armed -ne $true -or $freshBefore.pending -ne $false) { throw 'Fresh retry trial did not arm.' }
+    }
     if ($NativeRetry) {
         Assert-ChatGptRegenerateForeground -Runtime $runtime
         $priorRetryIds = @($initialReply.command_requests | ForEach-Object { [string]$_.request_id })
@@ -332,12 +359,18 @@ try {
         regenerated_messages = 1
         native_retry_button = [bool]$NativeRetry
         official_runtime_confirmed = [bool]$regenerated.official_runtime_confirmed
+        fresh_http_confirmed = [bool]$regenerated.fresh_http_confirmed
+        unsent_draft_preserved = [bool]$FreshHttp
         original_user_turn_preserved = $true
         private_content_emitted = $false
         cleared_cookies = $false
         cleared_app_data = $false
     }
 } finally {
+    if ($FreshHttp) {
+        $freshCleanupConfirmed = Close-ChatGptFreshRetryTrial -Runtime $runtime -Baseline $initialReply `
+            -TrialRequested $freshTrialRequested -Draft $retryDraft
+    }
     if ($protocolCaptureStarted) {
         try {
             $capture = Invoke-ReceiptAction -Action chatgpt_private_protocol_probe -ExpectedAction private_protocol_probe `
@@ -358,7 +391,7 @@ try {
             catch { Write-Warning 'Protocol capture stop not confirmed; its bounded expiry remains active.' }
         }
     }
-    if ($originCaptured -and -not $originRestored) {
+    if ($originCaptured -and -not $originRestored -and (!$FreshHttp -or $freshCleanupConfirmed)) {
         try {
             if (Test-WebChatNativeChatSurfaceForeground -Runtime $runtime) {
                 Write-Output "CHATGPT_REGENERATE_PROGRESS phase=restore_origin"
@@ -375,8 +408,10 @@ try {
 }
 
 if (!$originRestored) { throw 'Native regenerate acceptance did not restore the original conversation.' }
-Register-ChatGptWebVerificationCases -Runtime $runtime `
-    -CaseIds @("reversible/regenerate_response") `
-    -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
+if (!$FreshHttp) {
+    Register-ChatGptWebVerificationCases -Runtime $runtime `
+        -CaseIds @("reversible/regenerate_response") `
+        -ExpectedAdapterVersion $ExpectedAdapterVersion | Out-Null
+}
 $result | ConvertTo-Json -Depth 4
 Write-Output "CHATGPT_WEB_REGENERATE_ACCEPTANCE=passed"
