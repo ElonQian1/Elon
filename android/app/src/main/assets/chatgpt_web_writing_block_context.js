@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptWritingBlockContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -81,6 +81,7 @@
       if (!page.__elonChatGptWritingLibrarySession) fail('runtime_unavailable');
       library ||= page.__elonChatGptWritingLibrarySession.create(page, { bindings, shared, current });
       await library.capture(source, deadline);
+      if (!localMatches(source)) fail('web_edit_pending');
     }
     async function transact(expected, operation, deadline, wasDispatched) {
       if (!library || !guardedSource?.libraryFileId || !localMatches(guardedSource)) fail('web_edit_pending');

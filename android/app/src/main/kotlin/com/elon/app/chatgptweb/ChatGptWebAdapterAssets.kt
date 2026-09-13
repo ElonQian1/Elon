@@ -107,7 +107,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_private_canvas_export.js",
         "chatgpt_web_private_canvas_generation.js",
         "chatgpt_web_private_canvas_documents.js", "chatgpt_web_canvas_document_actions.js",
-        "chatgpt_web_writing_block_policy.js", "chatgpt_web_writing_library_session.js",
+        "chatgpt_web_writing_block_policy.js", "chatgpt_web_writing_library_read.js", "chatgpt_web_writing_library_session.js",
         "chatgpt_web_writing_block_context.js", "chatgpt_web_private_writing_blocks.js",
         "chatgpt_web_private_shared_links.js",
         "chatgpt_web_private_project_conversation_share.js",

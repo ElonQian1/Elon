@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 27, create: factory });
+  const api = Object.freeze({ version: 28, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -31,7 +31,8 @@
       textBindConversationId: undefined, textClientConversation: undefined, textResolvedConversationId: undefined,
       textNavigationKey: undefined, textNavigate: undefined,
       textTemporaryPersonalizationEnabled: undefined, textTemporaryPersonalization: undefined, textReadUntracked: undefined,
-      writingUpdateState: undefined, writingTreeOwner: undefined },
+      writingUpdateState: undefined, writingTreeOwner: undefined,
+      writingLibraryAccount: undefined, writingLibraryReadHeaders: undefined },
     conversation: { AGt: 'uKt', J5t: 'O7t', Nrn: 'Cin', yRt: '$Rt', Grn: 'Fin',
       vRt: 'QRt', p8t: 'q8t', l0: 'E0', M1t: 'f0t', Rdn: 'Ofn', Rrn: 'Oin',
       win: 'man', Ein: 'gan', ay: 'Sy', iy: 'xy', ry: 'by', Jrn: 'Rin', Hrn: 'Min',
@@ -127,7 +128,7 @@
       textBindConversationId: 'IP', textClientConversation: 'gY', textResolvedConversationId: 'QJ',
       textNavigationKey: 'HK', textNavigate: 'KK',
       textTemporaryPersonalizationEnabled: 'wJ', textTemporaryPersonalization: 'OJ', textReadUntracked: 'f2',
-      writingUpdateState: 'sY', writingTreeOwner: 'KJ' },
+      writingUpdateState: 'sY', writingTreeOwner: 'KJ', writingLibraryAccount: 'vK', writingLibraryReadHeaders: 'BT' },
     conversation: { AGt: 'gJt', J5t: 'rnn', Nrn: 'Wsn', yRt: 'iVt', Grn: 'ncn',
       vRt: 'rVt', p8t: 'Sen', l0: 'z2', M1t: 'P4t', Rdn: 'Ggn', Rrn: 'Ysn',
       win: 'Fcn', Ein: 'Lcn', ay: 'ub', iy: 'lb', ry: 'cb', Jrn: 'acn', Hrn: '$sn',
@@ -311,8 +312,8 @@
 
   function state() {
     const p = profile();
-    return { version: 27, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 28, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 27, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 28, observed, load, peek, temporary, tools, state });
 });

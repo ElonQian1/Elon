@@ -7,6 +7,50 @@ const crypto = require('node:crypto');
 const { parseSource } = require('./analyze-chatgpt-runtime-contracts.cjs');
 const directory = process.env.CHATGPT_PUBLIC_RUNTIME_DIR;
 
+test('versioned Library hydration follows the reviewed account-scoped text read and official stale/local-change guards', {
+  skip: !directory && 'Requires retained public assets; never evaluates downloaded JavaScript.'
+}, () => {
+  const inspect = (file, hash) => {
+    const text = fs.readFileSync(path.join(directory, file), 'utf8');
+    assert.equal(crypto.createHash('sha256').update(text).digest('hex'), hash);
+    return parseSource(text);
+  };
+  const definition = (index, name) => {
+    const nodes = index.definitions.get(name); assert.equal(nodes?.length, 1, name);
+    return index.text.slice(nodes[0].start, nodes[0].end);
+  };
+  const conversation = inspect('conversation-small-h1dtzoris1y9588z.js', 'da08c64c132306779e09ba89cac64fa560b120e7560ffdc29b3ce5a0b8ccd67e');
+  const shared = inspect('4813494d-gf2h57w5fiay19bd.js', '6c015001732054f4143ef1922609407c540967762109dcd128bbf56706889c3e');
+  assert.equal(conversation.exported.get('lxt'), 'A5n');
+  const read = definition(conversation, 'A5n');
+  for (const fragment of ['safeGet(`/files/library/shared/files/{library_file_id}/text`',
+    'parameters:{path:{library_file_id:e.libraryFileId}}', 'return vB(e),k5n(r,e)']) assert.ok(read.includes(fragment), fragment);
+  // The official legacy fallback has content but no revision, so it is not used for native write admission.
+  assert.ok(read.includes('{source:`legacy`,libraryFileId:e.libraryFileId,content:a}'));
+  for (const fragment of ['vB(e)', 'Qe(e.accountId)', 'additionalHeaders:', 'no-cache, no-store',
+    'disableAutomaticRetry:!0', 'signal:t']) assert.ok(definition(conversation, 'D5n').includes(fragment), fragment);
+  for (const fragment of ['Bu()??as()', 't?.id!==e.accountId', 't.normalizedAccountUserId!==e.accountUserId'])
+    assert.ok(definition(conversation, 'vB').includes(fragment), fragment);
+  for (const [local, name] of [['Bu', 'vK'], ['as', 'bK'], ['Qe', 'BT']])
+    assert.deepEqual(conversation.imports.get(local), { file: './4813494d-gf2h57w5fiay19bd.js', name });
+  assert.match(definition(shared, shared.exported.get('vK')), /sg\(sw\)/);
+  assert.match(definition(shared, shared.exported.get('BT')), /encodeURIComponent\(t\)/);
+  assert.ok(definition(conversation, 'bk').includes('features.includes(Kn.LibrarySharedContentAvailable)===!0'));
+  assert.ok(definition(shared, shared.exported.get('Iq')).includes('LibrarySharedContentAvailable=`library_shared_content_available`'));
+  for (const fragment of ['library_file_id!==t.libraryFileId', 'typeof n.content!=`string`',
+    'Number.isSafeInteger(n.current_version)', 'n.current_version<0', 'n.content_backing_kind!==`habitat`',
+    'n.content_backing_kind!==`sediment`']) assert.ok(definition(conversation, 'k5n').includes(fragment), fragment);
+  const store = conversation.definitions.get('vZn')[0];
+  const hydrate = store.body.body.find(node => node.type === 'FunctionDeclaration' && node.id?.name === 'p');
+  assert.ok(hydrate);
+  const body = conversation.text.slice(hydrate.start, hydrate.end);
+  for (const fragment of ['skipped_stale_version', 'skipped_local_changes', 's?.inFlightSaveSequence!=null',
+    's?.hasPendingEditorChanges===!0', 'baseVersionNumber:ER(s,t.content,t.versionNumber)', 'hydratedFromLibrary:!0'])
+    assert.ok(body.includes(fragment), fragment);
+  assert.ok(definition(conversation, 'vZn').includes('hydrateSessionFromLibrary:p'));
+  assert.match(definition(conversation, 'ER'), /return n\?\?/);
+});
+
 test('linked writing shares the official library session queue and acknowledgement, not the standalone file PATCH', {
   skip: !directory && 'Requires retained public assets; never evaluates downloaded JavaScript.'
 }, () => {

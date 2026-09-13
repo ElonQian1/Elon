@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptWritingLibrarySession = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -50,8 +50,14 @@
       'completeSaveError', 'acknowledgeLocalSave', 'enqueueSave'])
       if (typeof store?.[name] !== 'function') fail('runtime_unavailable');
     if (typeof client?.getQueryCache !== 'function' || typeof client.invalidateQueries !== 'function') fail('runtime_unavailable');
-    const session = store.getSessionSnapshot(source.libraryFileId);
-    // A conversation seed can be stale after editing in Library. Never promote it into write authority.
+    let session = store.getSessionSnapshot(source.libraryFileId);
+    if (!clean(session, source) && (session == null || session.hydratedFromLibrary === false) &&
+        page.__elonChatGptWritingLibraryRead) {
+      await page.__elonChatGptWritingLibraryRead.hydrate(page, options, source, store, deadline);
+      check(deadline);
+      session = store.getSessionSnapshot(source.libraryFileId);
+    }
+    // Reading must establish authority; never promote a conversation seed directly.
     if (!clean(session, source)) fail('web_edit_pending');
     captured = { id: source.libraryFileId, store, client, stamp: stamp(session) };
     currentSession();
