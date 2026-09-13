@@ -1,0 +1,64 @@
+#requires -Version 7.0
+
+function Test-ChatGptFreshTextIdle {
+    param([AllowNull()]$State)
+    return $State.schema -ceq 'elon.fresh_text_trial.v1' -and
+        ($State.version -is [int] -or $State.version -is [long]) -and $State.version -eq 7 -and
+        $State.pending -is [bool] -and !$State.pending -and
+        $State.armed -is [bool] -and !$State.armed
+}
+
+function Test-ChatGptFreshSendEvidence {
+    param([AllowNull()]$Before, [AllowNull()]$After, [AllowNull()]$Receipt, [switch]$UseDefault)
+    foreach ($value in @($Before.armed, $Before.pending, $After.dispatched, $After.accepted,
+            $After.reconciled, $After.pending, $Receipt.result.ok)) {
+        if ($value -isnot [bool]) { return $false }
+    }
+    foreach ($value in @($Before.version, $After.version, $Before.attempts, $After.attempts, $After.stream_events)) {
+        if (($value -isnot [int] -and $value -isnot [long]) -or $value -lt 0) { return $false }
+    }
+    return $Before.schema -ceq 'elon.fresh_text_trial.v1' -and $After.schema -ceq 'elon.fresh_text_trial.v1' -and
+        $Before.version -eq 7 -and $After.version -eq 7 -and !$Before.pending -and
+        ($UseDefault -or $Before.armed) -and $After.operation -ceq 'send' -and
+        $After.attempts -eq ($Before.attempts + 1) -and $After.dispatched -and $After.accepted -and
+        $After.reconciled -and !$After.pending -and $After.stream_events -gt 0 -and
+        $After.history -ceq 'reconciled' -and
+        $Receipt.expected_web_action -ceq 'send_prompt' -and $Receipt.status -ceq 'succeeded' -and
+        $Receipt.result.ok -and $Receipt.result.detail -ceq 'private_text_v1:accepted'
+}
+
+function Test-ChatGptFreshSendContinuity {
+    param([AllowNull()]$Before, [AllowNull()]$After, [AllowNull()]$Main,
+        [Parameter(Mandatory)][string]$Prompt, [switch]$NewConversation)
+    $path = [string]$Main.social_chat.web_chat_conversation_path
+    if ($path -cnotmatch '^/c/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$' -or
+        [string]$After.conversation.url -cne "https://chatgpt.com$path") { return $false }
+    if ($NewConversation) {
+        if (@($Before.conversation.messages).Count -ne 0 -or
+            [string]$Before.conversation.url -notmatch '^https://chatgpt.com/?(?:\?[^#]*)?$') { return $false }
+    } elseif ([string]$Before.conversation.url -cne [string]$After.conversation.url) { return $false }
+    $users = @($After.conversation.messages | Where-Object { $_.role -ceq 'user' })
+    $sent = @($users | Where-Object { [string]$_.content -ceq $Prompt })
+    if ($sent.Count -ne 1 -or !$sent[0].id) { return $false }
+    $prior = @($Before.conversation.messages | Where-Object { $_.role -ceq 'user' })
+    if ($users.Count -ne $prior.Count + 1) { return $false }
+    foreach ($old in $prior) {
+        if (!$old.id -or @($users | Where-Object { $_.id -ceq $old.id -and $_.content -ceq $old.content }).Count -ne 1) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Test-ChatGptFreshTextRestoreSafe {
+    param([bool]$AwaitingResult, [AllowNull()]$Trial, [AllowNull()]$Main, [AllowNull()]$Web, [string]$ExpectedPath)
+    return !$AwaitingResult -and (Test-ChatGptFreshTextIdle $Trial) -and
+        $Main.active_surface -ceq 'social_ai' -and $Main.social_chat.web_chat_provider_id -ceq 'chatgpt_web' -and
+        $Main.social_chat.web_chat_streaming -is [bool] -and !$Main.social_chat.web_chat_streaming -and
+        [string]$Main.social_chat.web_chat_conversation_path -ceq $ExpectedPath -and
+        $Main.input.has_text -is [bool] -and !$Main.input.has_text -and
+        $Web.surface -ceq 'chatgpt_web' -and $Web.streaming -is [bool] -and !$Web.streaming -and
+        ($ExpectedPath -ceq '' -and $Web.conversation.url -cmatch '^https://chatgpt.com/?$' -or
+            $ExpectedPath -cne '' -and $Web.conversation.url -ceq "https://chatgpt.com$ExpectedPath") -and
+        $Web.input.text -is [string] -and $Web.input.text -ceq ''
+}

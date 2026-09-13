@@ -25,18 +25,18 @@ published/installed and native-send accepted. Reuse this completed UI fix.
 [1682 Canvas](reports/chatgpt-canvas-provider-boundary-1682.md) accepts listing
 only. The current model declined creation; stop repeating prompts. Original
 writes/exports need an owned sample. [Writing Blocks](chatgpt-writing-blocks-native.md)
-reading/edit/export and ordinary save are accepted (1692; code export 1688).
+reading/edit/export and ordinary save are accepted (1692; editor undo/redo/share 1706).
 [Project save](chatgpt-writing-blocks-project-save.md) and
 [typed-widget save](chatgpt-writing-blocks-widget-save.md) are offline-verified;
 temporary/library save remains incomplete.
 
 [Fresh tools](chatgpt-fresh-tool-text-dispatch.md),
 [project sends](chatgpt-fresh-project-text-dispatch.md),
-[new conversations](chatgpt-fresh-new-text-dispatch.md),
 [temporary sends/cache guard](chatgpt-fresh-temporary-text-dispatch.md),
 [owned attachment sends](chatgpt-fresh-attachment-text-dispatch.md) and
 [fresh regeneration](chatgpt-fresh-regeneration.md) are
 offline-verified; group APK/native acceptance. None is promoted yet.
+[New first send](chatgpt-fresh-new-text-dispatch.md) failed on 1706: `parent_mismatch`; no replay.
 
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
 three taps joined one 1077 ms read; native TXT saved 78 bytes. Supplemental/PCA

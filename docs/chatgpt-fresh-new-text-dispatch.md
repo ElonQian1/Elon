@@ -1,7 +1,7 @@
 ---
 capability_id: android_chatgpt_fresh_new_conversation_text_dispatch_v1
-implementation_status: implemented
-verification_status: offline_verified
+implementation_status: partial
+verification_status: failed
 production_default: false
 scope: authenticated_new_personal_or_owned_project_text
 ---
@@ -13,6 +13,43 @@ It reuses its request ledger, security-aware page HTTP, stream decoder, native
 projection, stop and history recovery. It does not add another sender or editor.
 New-conversation scope requires an explicit trial until grouped native acceptance.
 The accepted existing-conversation default is unchanged.
+
+## Native Acceptance Failure On 1706
+
+`fresh-new-native-ui-20260913-183220-505` used the actual native composer and
+Send button on the installed release 1.1.1706, with the one-command trial armed.
+There was no runtime seed: exactly one new-conversation candidate was sent.
+The private request was dispatched and accepted; 31 owned stream events arrived,
+including input-message, handoff and stream-complete events. History then stayed
+at `parent_mismatch`, with `pending=true` and no confirmed reconciliation. The
+native reply/follow-up/restoration case therefore **failed**, not completed.
+
+The concrete gap is first-send parent ownership in authoritative history and
+subsequent runtime-tree reconciliation. Current checks accept a direct
+`client-created-root` parent or its reviewed legacy empty-root equivalent. The
+actual rejected parent shape has not yet been inspected. Do not assume hidden
+system ancestors, accept arbitrary UUID parents, or loosen branch checks merely
+to retire the writer. Existing-conversation success does not prove this scope.
+
+The pending controlled fixture is retained locally at
+`$GIT_COMMON_DIR/ai-acceptance-fixtures/fresh-text-pending.json`; it contains no
+credentials and is not committed or printed. Use read-only resolution first,
+not another send. The original route was not preserved by this failed run and
+must not be guessed. No conversation navigation, draft clearing, replay,
+WebView reload or APK replacement followed the failed write. The awake lease
+was restored. Production 1706 has no app WebView debugging socket, so direct
+CDP inspection was unavailable; its debugging/login policy was not changed.
+
+The canonical smoke now has `-NewConversation`, rejects outstanding handoffs,
+and requires private send receipts, owned stream events, history reconciliation,
+native/server route agreement and unchanged prior user identities. An ambiguous
+click/result blocks cleanup and saves a local handoff. Default new-conversation
+scope stays disabled. The earlier `origin_not_idle` attempt sent nothing; it was
+a harness error corrected to use main draft-presence plus the provider draft.
+
+Focused script tests cover 15 negative send proofs, six identity cases and
+nine cleanup cases; the existing retry/trial contract suite also passes.
+This acceptance-tooling batch changes no Android source and builds no new APK.
 
 ## Evidence
 
@@ -69,7 +106,7 @@ Initial ownership still uses the committed composer host. Subsequent ownership
 checks use memory, not send-button availability. This is not composer-free cold
 startup, Android HTTP, WebView removal, or a measured thermal improvement.
 
-## Verification And Next Acceptance
+## Offline Evidence And Next Acceptance
 
 - `fresh-new-full-regression-20260913-124605-020`: 270 tests passed, zero failures
   or skips, including pinned source contracts, binding compatibility and shared
@@ -91,7 +128,7 @@ or explicit `__elonChatGptFreshTextNewConversationsEnabled === true`. Projects
 and tools additionally require their existing admissions. No production flag
 is silently changed by source tests.
 
-Group with project/tools/Writing Blocks pending acceptance. From the actual
+Resolve the recorded parent mismatch before repeating native acceptance. From the actual
 production native UI, start one controlled new ordinary conversation, send,
 verify one server conversation and complete native reply, then follow up in the
 same conversation. Accept a project root separately and restore prior state.

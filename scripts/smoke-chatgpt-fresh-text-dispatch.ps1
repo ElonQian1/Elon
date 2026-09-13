@@ -8,25 +8,34 @@ param(
     [switch]$OnlyStop,
     [switch]$UseDefault,
     [switch]$FirstOnly,
-    [switch]$StopThenFollowup
+    [switch]$StopThenFollowup,
+    [switch]$NewConversation
 )
 $ErrorActionPreference = 'Stop'
+if ($NewConversation -and ($OnlyStop -or $StopThenFollowup)) { throw 'new_conversation_stop_scope_not_supported' }
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-fresh-trial-smoke.ps1')
+. (Join-Path $PSScriptRoot 'chatgpt-fresh-text-smoke-evidence.ps1')
 . (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1
 $runtime.mcp_bootstrapped = $true
 $fixtureFile = Join-Path (Split-Path -Parent $PSScriptRoot) '.ai-tmp/fresh-text-fixture.json'
+$commonGit = [IO.Path]::GetFullPath((& git -C (Split-Path -Parent $PSScriptRoot) rev-parse --git-common-dir).Trim())
+$pendingFile = Join-Path $commonGit 'ai-acceptance-fixtures/fresh-text-pending.json'
+if (Test-Path -LiteralPath $pendingFile) { throw 'pending_fresh_fixture_requires_readonly_resolution' }
 $originPath = ''; $originDraft = ''; $opened = $false; $restored = $false; $awakeRestored = $false
+$awaitingResult = $false; $trialRequested = $false; $ownedNavigation = $false; $expectedPath = ''
+$lastPrompt = ''; $lastUserId = ''; $clickAcknowledged = $false
 $report = [ordered]@{ schema = 'elon.fresh_text_ui.v1'; passed = $false; stage = 'opening';
-    seed_sends = 0; candidate_clicks = 0; cases = @(); restored = $false; awake_restored = $false }
+    new_conversation = [bool]$NewConversation; seed_sends = 0; candidate_clicks = 0; cases = @();
+    restored = $false; awake_restored = $false; write_unconfirmed = $false }
 
 function Trial([string]$Mode) {
     Invoke-ChatGptFreshTrial -Runtime $runtime -Mode $Mode
 }
 
-function Native-Send([string]$Kind, [bool]$Candidate) {
+function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) {
     $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     $marker = "FRESH_$($Kind.ToUpperInvariant())_$stamp"
     $prompt = "ELON_FRESH_TEXT_ACCEPTANCE_V1 $Kind $stamp. Reply exactly $marker."
@@ -34,27 +43,43 @@ function Native-Send([string]$Kind, [bool]$Candidate) {
     if ($stop) { $prompt = "ELON_FRESH_TEXT_ACCEPTANCE_V1 stop $stamp. Write a numbered list of 1000 simple English words. Do not summarize." }
     Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass CanvasUiAcceptance `
         -Step focus_composer -ResultPrefix CANVAS_UI_RESULT | Out-Null
+    $baseline = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state
+    if ($baseline.input.text -isnot [string] -or $baseline.input.text -cne '' -or
+        $baseline.streaming -isnot [bool] -or $baseline.streaming) { throw 'send_baseline_not_idle' }
+    if ($NewFirst -and ($baseline.authenticated -ne $true -or @($baseline.conversation.messages).Count -ne 0 -or
+        [string]$baseline.conversation.url -cnotmatch '^https://chatgpt.com/?$')) { throw 'new_first_scope_not_empty_personal_chat' }
+    $priorReceiptIds = @($baseline.command_requests | ForEach-Object { [string]$_.request_id })
+    if ($Candidate -and !$UseDefault) { $script:trialRequested = $true }
     $before = if ($Candidate) { Trial $(if ($UseDefault) { 'state' } else { 'start' }) } else { $null }
     if ($Candidate -and -not $UseDefault -and $before.armed -ne $true) { throw "trial_not_armed:$($before.control)" }
     $started = [DateTimeOffset]::UtcNow
+    # A lost click acknowledgement must not permit replay, navigation or draft cleanup.
+    $script:awaitingResult = $true
+    $script:lastPrompt = $prompt; $script:lastUserId = ''; $script:clickAcknowledged = $false
+    if ($Candidate) { $report.candidate_clicks++ } else { $report.seed_sends++ }
+    Write-Host "FRESH_TEXT_PROGRESS kind=$Kind phase=native_click_requested"
     Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass ConversationUiAcceptance `
         -Step send_fresh_text_fixture -ResultPrefix CONVERSATION_UI_RESULT `
         -Parameters @{ prompt_b64=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($prompt)) } | Out-Null
-    if ($Candidate) { $report.candidate_clicks++ } else { $report.seed_sends++ }
+    $script:clickAcknowledged = $true
+    Write-Host "FRESH_TEXT_PROGRESS kind=$Kind phase=native_click_acknowledged"
     $until = $started.AddSeconds($TimeoutSec)
     $firstReplyMs = $null; $matched = $false; $diagnostic = $null
     do {
         $main = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state -MainState
+        $web = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state
+        $receipts = @($web.command_requests | Where-Object {
+            $_.expected_web_action -ceq 'send_prompt' -and $_.request_id -notin $priorReceiptIds
+        })
+        if ($receipts.Count -gt 1) { throw 'multiple_send_receipts' }
+        $receipt = $receipts | Select-Object -Last 1
         $messages = @($main.social_chat.messages)
         $users = @($messages | Where-Object { $_.role -eq 'user' -and $_.content -eq $prompt })
+        $webUsers = @($web.conversation.messages | Where-Object { $_.role -ceq 'user' -and $_.content -ceq $prompt })
+        if ($webUsers.Count -eq 1) { $script:lastUserId = [string]$webUsers[0].id }
         $matched = @($messages | Where-Object {
             $_.role -eq 'friend' -and (([string]$_.content -replace '\\([_-])', '$1').Contains($marker))
         }).Count -gt 0
-        if (-not $Candidate -and $users.Count -eq 1 -and
-            [string]$main.social_chat.web_chat_conversation_path -match '^/c/[a-f0-9-]{36}$') {
-            @{path=[string]$main.social_chat.web_chat_conversation_path} | ConvertTo-Json -Compress |
-                Set-Content -LiteralPath $fixtureFile -Encoding utf8
-        }
         if ($users.Count -eq 1 -and $matched -and $null -eq $firstReplyMs) {
             $firstReplyMs = [long]([DateTimeOffset]::UtcNow - $started).TotalMilliseconds
         }
@@ -63,7 +88,7 @@ function Native-Send([string]$Kind, [bool]$Candidate) {
             $diagnostic = Trial 'state'
             $report.last_trial = $diagnostic
             if ($diagnostic.phase -eq 'rejected') { throw "fresh_rejected:$($diagnostic.code)" }
-            if ($diagnostic.attempts -ne ($before.attempts + 1)) { throw 'fresh_route_not_used' }
+            if ($diagnostic.attempts -gt ($before.attempts + 1)) { throw 'multiple_fresh_attempts' }
             if ($stop) { $report.stop_native_streaming = $main.social_chat.web_chat_streaming -eq $true }
             if ($stop -and -not $stopClicked -and $diagnostic.accepted -and $diagnostic.pending) {
                 Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass ConversationUiAcceptance `
@@ -72,11 +97,21 @@ function Native-Send([string]$Kind, [bool]$Candidate) {
                 $report.stop_clicked = $true
             }
         }
-        if (($matched -or ($stop -and $stopClicked)) -and $users.Count -eq 1 -and $main.social_chat.web_chat_streaming -ne $true -and
-            (-not $Candidate -or ($diagnostic.dispatched -and $diagnostic.accepted -and
-                $diagnostic.reconciled -and -not $diagnostic.pending))) {
+        $freshConfirmed = $Candidate -and (Test-ChatGptFreshSendEvidence -Before $before -After $diagnostic `
+            -Receipt $receipt -UseDefault:$UseDefault)
+        $continuity = Test-ChatGptFreshSendContinuity -Before $baseline -After $web -Main $main `
+            -Prompt $prompt -NewConversation:$NewFirst
+        if (($matched -or ($stop -and $stopClicked)) -and $users.Count -eq 1 -and
+            $main.social_chat.web_chat_streaming -is [bool] -and !$main.social_chat.web_chat_streaming -and
+            $web.streaming -is [bool] -and !$web.streaming -and $continuity -and
+            (!$Candidate -or $freshConfirmed)) {
+            $script:awaitingResult = $false
+            $script:expectedPath = [string]$main.social_chat.web_chat_conversation_path
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $fixtureFile) | Out-Null
+            @{path=$script:expectedPath} | ConvertTo-Json -Compress | Set-Content -LiteralPath $fixtureFile -Encoding utf8
             return [ordered]@{ kind=$Kind; native_button=$true; unique_user=$true; reply_matched=$matched; stop_clicked=$stopClicked;
-                fresh_http=$Candidate; reconciled=(!$Candidate -or $diagnostic.reconciled);
+                fresh_http=$freshConfirmed; reconciled=(!$Candidate -or $diagnostic.reconciled);
+                new_first=$NewFirst; conversation_identity_verified=$continuity; receipt_verified=(!$Candidate -or $freshConfirmed);
                 parent_role=$(if ($diagnostic) { $diagnostic.parent_role } else { 'unknown' });
                 reply_observed_ms=$firstReplyMs; total_ms=[long]([DateTimeOffset]::UtcNow - $started).TotalMilliseconds }
         }
@@ -91,11 +126,21 @@ Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
     $origin = Open-WebChatNativeChatSurface -Runtime $runtime -ProviderId chatgpt_web -TimeoutSec $TimeoutSec
     $opened = $true; $originPath = [string]$origin.social_chat.web_chat_conversation_path
-    $originDraft = [string]$origin.input.text
-    Trial 'end' | Out-Null
-    if (Test-Path -LiteralPath $fixtureFile) {
+    $originWeb = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state
+    $originDraft = [string]$originWeb.input.text
+    $expectedPath = $originPath
+    $preflight = Trial 'state'
+    if (!(Test-ChatGptFreshTextIdle $preflight)) { throw 'existing_trial_or_write_pending' }
+    if ($originWeb.input.text -isnot [string] -or $originDraft -cne '' -or
+        $origin.input.has_text -isnot [bool] -or $origin.input.has_text -or
+        $originWeb.dictation_active -ne $false -or $originWeb.private_voice_native_research.phase -cne 'idle' -or
+        $origin.social_chat.web_chat_streaming -isnot [bool] -or $origin.social_chat.web_chat_streaming) {
+        throw 'origin_not_idle'
+    }
+    if (!$NewConversation -and (Test-Path -LiteralPath $fixtureFile)) {
         $saved = Get-Content -LiteralPath $fixtureFile -Raw | ConvertFrom-Json
         if ($saved.path -notmatch '^/c/[a-f0-9-]{36}$') { throw 'fixture_path_invalid' }
+        $ownedNavigation = $true; $expectedPath = [string]$saved.path
         Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action open_web_chat_conversation `
             -Arguments @{conversation_path=$saved.path} | Out-Null
         Wait-ChatGptWebSmokeState -Runtime $runtime -MainState -TimeoutSec $TimeoutSec -Description 'owned text fixture' -Predicate {
@@ -109,22 +154,21 @@ try {
             -not ([string]$_.content).StartsWith('ELON_FRESH_TEXT_ACCEPTANCE_V1 ')
         }).Count) { throw 'fixture_content_not_owned' }
     } else {
+        $ownedNavigation = $true; $expectedPath = ''
         Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action start_new_web_chat_conversation | Out-Null
         Wait-ChatGptWebSmokeState -Runtime $runtime -MainState -TimeoutSec $TimeoutSec -Description 'new native text fixture' -Predicate {
             param($state)
-            $state.social_chat.web_chat_composer_ready -eq $true -and $state.social_chat.message_count -eq 0
+            $state.social_chat.web_chat_composer_ready -eq $true -and $state.social_chat.message_count -eq 0 -and
+                [string]$state.social_chat.web_chat_conversation_path -eq ''
         } | Out-Null
-        $report.stage = 'seed'; Write-Output 'FRESH_TEXT_STAGE=seed'
-        $report.cases += Native-Send 'seed' $false
-        $fixture = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state -MainState
-        $path = [string]$fixture.social_chat.web_chat_conversation_path
-        if ($path -notmatch '^/c/[a-f0-9-]{36}$') { throw 'fixture_route_missing' }
-        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $fixtureFile) | Out-Null
-        @{path=$path} | ConvertTo-Json -Compress | Set-Content -LiteralPath $fixtureFile -Encoding utf8
+        if (!$NewConversation) {
+            $report.stage = 'seed'; Write-Output 'FRESH_TEXT_STAGE=seed'
+            $report.cases += Native-Send 'seed' $false $true
+        }
     }
     foreach ($kind in $(if ($StopThenFollowup) { @('stop','followup') } elseif ($OnlyStop) { @('stop') } elseif ($FirstOnly) { @('first') } else { @('first','followup') })) {
         $report.stage = $kind; Write-Output "FRESH_TEXT_STAGE=$kind"
-        $report.cases += Native-Send $kind $true
+        $report.cases += Native-Send $kind $true ($NewConversation -and $kind -eq 'first')
     }
     $report.passed = $true; $report.stage = 'complete'
 } catch {
@@ -132,16 +176,41 @@ try {
     if ($_.Exception.Message -match '^Semantic UI acceptance failed: ([a-z_]+)$') { $report.error = $Matches[1] }
     $report.failure_line = $_.InvocationInfo.ScriptLineNumber
 } finally {
-    if ($opened) {
-        try { Trial 'end' | Out-Null } catch {}
-        if ($originPath) { $restored = Restore-WebChatNativeConversation -Runtime $runtime -ProviderId chatgpt_web -ConversationPath $originPath }
-        if ($restored) {
-            Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action set_input_text -Arguments @{text=$originDraft} | Out-Null
-            Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action show_conversation_home | Out-Null
+    try {
+        if ($opened -and $ownedNavigation) {
+            $end = Trial $(if ($trialRequested) { 'end' } else { 'state' })
+            $lastMain = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state -MainState
+            $lastWeb = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state
+            if (Test-ChatGptFreshTextRestoreSafe -AwaitingResult $awaitingResult -Trial $end -Main $lastMain -Web $lastWeb -ExpectedPath $expectedPath) {
+                if ($originPath) {
+                    $restored = Restore-WebChatNativeConversation -Runtime $runtime -ProviderId chatgpt_web -ConversationPath $originPath
+                } elseif ($expectedPath -eq '') { $restored = $true }
+                else {
+                    Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action start_new_web_chat_conversation | Out-Null
+                    Wait-ChatGptWebSmokeState -Runtime $runtime -MainState -TimeoutSec 20 -Description 'original empty chat' -Predicate {
+                        param($s) $s.social_chat.message_count -eq 0 -and [string]$s.social_chat.web_chat_conversation_path -eq ''
+                    } | Out-Null
+                    $restored = $true
+                }
+                if ($restored) { Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action show_conversation_home | Out-Null }
+            } else { $report.cleanup_deferred = $true }
+        } elseif ($opened) { $restored = $true }
+    } catch { $report.cleanup_deferred = $true }
+    finally {
+        $awakeRestored = Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime
+        if ($awaitingResult) {
+            # Local-only controlled fixture receipt survives worktree cleanup. It is not a replay instruction.
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pendingFile) | Out-Null
+            @{schema='elon.fresh_text_pending.v1';source='native_fixture';new_conversation=[bool]$NewConversation;
+                origin_path=$originPath;prompt=$lastPrompt;user_message_id=$lastUserId;
+                click_acknowledged=$clickAcknowledged;trial=$report.last_trial;replay_allowed=$false;
+                created_at=[DateTimeOffset]::UtcNow.ToString('o')} | ConvertTo-Json -Depth 6 |
+                Set-Content -LiteralPath $pendingFile -Encoding utf8
+            $report.pending_fixture_saved = $true
         }
+        $report.restored = $restored; $report.awake_restored = [bool]$awakeRestored
+        $report.write_unconfirmed = $awaitingResult
+        $report | ConvertTo-Json -Depth 5 -Compress
     }
-    $awakeRestored = Stop-ChatGptWebSmokeAwakeLease -Runtime $runtime
-    $report.restored = $restored; $report.awake_restored = [bool]$awakeRestored
-    $report | ConvertTo-Json -Depth 5 -Compress
 }
 if (-not $report.passed -or -not $restored -or -not $awakeRestored) { throw 'fresh_text_acceptance_incomplete' }
