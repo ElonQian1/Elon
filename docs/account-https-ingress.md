@@ -39,6 +39,28 @@ lifetime at 60 seconds. Writes use existing bounded process-local abuse storage,
 60 per socket peer/minute and 240 globally/minute, independent of forwarded headers.
 This is a single-process guard, not a distributed rate-limit claim.
 
+### Optional public quant attachment
+
+`QUANT_PUBLIC_HTTPS_ENABLED=true` separately mounts the existing credential-free
+`/quant/` page, hashed assets and fixed public quant API routes on this same TLS
+listener. It defaults off and requires account TLS; invalid values fail startup.
+The account policy above is unchanged, including query rejection. Public quant
+requests strip Cookie/Authorization, retain the original API allowlist and add
+bounded paths/queries, HSTS and `X-Yilong-Quant-Transport: https-public-v1`.
+Private quant, account-admin, node and execution routes are not added.
+
+After publishing the matching server code, deploy `configure-quant-public-https.sh`,
+`quant_public_https_config.py` and the existing `account_https_target.py` together.
+Run the shell entry with `plan`, then `enable` and `verify`, followed by the HTTPS
+origin. `disable` rolls back the flag. Activation takes the official deployment
+lock and only changes this flag; failure restores it without replacing unrelated
+environment keys. Existing certificate issuance/reloading and listeners remain
+independent. See [requirements](requirements/quant-public-https-v1.md).
+
+The public runtime remains the restricted anonymous product build. HTTPS does not
+enable personal Paper authorization or financial execution. Actual market data,
+APK origin selection, installation and browser acceptance are separate checks.
+
 ## Production rollout
 
 Use the normal `publish-server.ps1 -SkipPcFrontend` workflow for committed code.

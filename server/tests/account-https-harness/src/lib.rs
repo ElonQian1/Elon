@@ -11,3 +11,10 @@ mod config;
 mod federated_auth_idempotency;
 #[path = "../../../src/account_security/https/policy.rs"]
 mod policy;
+#[path = "../../../src/router/quant_http_preview.rs"]
+pub mod quant_http_preview;
+#[path = "../../../src/account_security/https/quant_public.rs"]
+mod quant_public;
+mod router {
+    pub(crate) use crate::quant_http_preview;
+}

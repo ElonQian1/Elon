@@ -62,7 +62,7 @@ impl PublicQuantEndpoint {
     }
 }
 
-pub(super) fn routes<S>(data_dir: &Path) -> Router<S>
+pub(crate) fn routes<S>(data_dir: &Path) -> Router<S>
 where
     S: Clone + Send + Sync + 'static,
 {

@@ -11,10 +11,16 @@ use crate::types::AppState;
 
 mod config;
 mod policy;
+mod quant_public;
 mod transport;
 
 pub(crate) async fn serve(legacy_app: Router, state: Arc<AppState>) -> Result<()> {
-    let Some(config) = config::Config::from_env()? else {
+    let config = config::Config::from_env()?;
+    let public_quant = quant_public::enabled(
+        std::env::var("QUANT_PUBLIC_HTTPS_ENABLED").ok().as_deref(),
+        config.is_some(),
+    )?;
+    let Some(config) = config else {
         return crate::node_endpoint_transport::serve(legacy_app, state).await;
     };
     // Fail before starting legacy ingress if explicitly enabled TLS cannot bind.
@@ -34,9 +40,10 @@ pub(crate) async fn serve(legacy_app: Router, state: Arc<AppState>) -> Result<()
             &state.public_url,
         ))
         .with_state(state.clone());
+    let app = quant_public::attach(policy::protect(app), &state.data_dir, public_quant);
     tokio::try_join!(
         crate::node_endpoint_transport::serve(legacy_app, state),
-        server.serve(policy::protect(app)),
+        server.serve(app),
     )?;
     Ok(())
 }

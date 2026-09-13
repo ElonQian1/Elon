@@ -19191,6 +19191,57 @@
       "updated_at_ms": 1786625470065
     },
     {
+      "id": "quant-public-https-v1",
+      "title": "量化公开页面和行情原生HTTPS",
+      "summary": "复用现有TLS与公开量化路由，保持账户和私有接口限制，显式启用后验证部署。",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/quant-public-https-v1.md",
+        "content_hash": "e70a218ffff762de0b1f2cbf62801ee707cd8da98ea3741bebd497da51584c12",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "5c3d23677c0a7a7d9449ea192bef2104039c4e23",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "3bf31d656e69278d7793052ffd5989535d7c4007",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "scripts/configure-quant-public-https.sh",
+        "scripts/quant_public_https_config.py",
+        "scripts/test_quant_public_https_config.py",
+        "server/src/account_security/https/mod.rs",
+        "server/src/account_security/https/quant_public.rs",
+        "server/src/account_security/https/quant_public_tests.rs",
+        "server/src/router.rs",
+        "server/src/router/quant_http_preview.rs",
+        "server/tests/account-https-harness/Cargo.lock",
+        "server/tests/account-https-harness/Cargo.toml",
+        "server/tests/account-https-harness/src/lib.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "公开页面与行情共用TLS，原账户限制和私有路径拒绝不变",
+        "单一代理不透传凭据，配置非法/缺少TLS失败关闭",
+        "正式构建部署、线上TLS及数据验收，APK消费另行验证"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_5428ea62cc4c45008df5911c9fa11494",
+        "agent_id": "codex-quant-grid",
+        "claimed_at_ms": 1789329365176,
+        "expires_at_ms": 1789343765176
+      },
+      "created_at_ms": 1789328234067,
+      "updated_at_ms": 1789329365223
+    },
+    {
       "id": "quant-public-project-preview-v1",
       "title": "一龙量化交易加入前公开预览 V1",
       "summary": "让用户无需登录或加入项目即可从官方目录读取净化后的量化项目能力、Paper-only 风险边界和客户端下载计划；不公开任意项目 landing 或执行任何写操作。",
@@ -27749,156 +27800,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b06e9f32bdd146b6a7b932fcec67d33d",
-      "feature_id": "android-binance-grid-read-debug-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-read-debug",
-      "reason": "最终44项原生及全部JS回归通过，页面关闭后的独立只读恢复已编码；正式发布与真机验收继续。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788868965400
-    },
-    {
-      "id": "feature_event_b6e568880763453691a21faaa2b241ca",
-      "feature_id": "android-binance-grid-read-debug-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-read-debug",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1788869940596
-    },
-    {
-      "id": "feature_event_cfdb12c71b3642ff9918d623b9826335",
-      "feature_id": "android-binance-grid-read-debug-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-read-debug",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1788879968726
-    },
-    {
-      "id": "feature_event_2414dff6bfd2459b944983fcbc2b8375",
-      "feature_id": "android-binance-grid-manage-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-manage",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1788879974224
-    },
-    {
-      "id": "feature_event_52af55349c964a9e9a8d50aa7073e4f0",
-      "feature_id": "android-binance-grid-read-debug-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-read-debug",
-      "reason": "正式1.1.1577无线安装哈希已核验；同一手机子账户1个网格，后台与原生管理页真实详情verified且detail_current；量化授权、列表、详情与未提交返回通过。原44项原生及JS回归证据保持当前；真实交易不属于只读验收。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788880020806
-    },
-    {
-      "id": "feature_event_65d057d201464f4aa03fa5b8d305879a",
-      "feature_id": "android-binance-grid-read-debug-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-read-debug",
-      "reason": "既有官方发布1.1.1577已无线安装并核验base.apk原签名工件哈希；只读工具和双APK真实验收完成。源码871485d06b185766204d130a5fa02e379d433db2，本批仅补设备证据。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788880049013
-    },
-    {
-      "id": "feature_event_a8e88381fb624c3996cfa415b82310cf",
-      "feature_id": "android-binance-manage-reconnect-v1",
-      "action": "registered",
-      "actor": "codex-grid-usability",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788883029996
-    },
-    {
-      "id": "feature_event_a0ca87ef894c4b85ad7dde7489aae003",
-      "feature_id": "android-binance-manage-reconnect-v1",
-      "action": "claimed",
-      "actor": "codex-grid-usability",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788883030078
-    },
-    {
-      "id": "feature_event_37f29a9edf404abaabc951850022bb60",
-      "feature_id": "android-binance-manage-reconnect-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-usability",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788883030160
-    },
-    {
-      "id": "feature_event_dabb827a4d3b494aab9142c9d2a24b19",
-      "feature_id": "android-binance-manage-reconnect-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-usability",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788884149545
-    },
-    {
-      "id": "feature_event_b0a70cfc5f7c4533a71e192547154a0e",
-      "feature_id": "android-binance-manage-reconnect-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-usability",
-      "reason": "49 native regressions and existing JS suite passed; official phone acceptance pending.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788884149598
-    },
-    {
-      "id": "feature_event_0ae58589a48240ef9950e503d5a8792a",
-      "feature_id": "android-binance-manage-reconnect-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-usability",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1788885452703
-    },
-    {
-      "id": "feature_event_f15f23e3369a4a48b0ed8a10264893c9",
-      "feature_id": "android-binance-manage-reconnect-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-usability",
-      "reason": "49 native regressions passed; installed official 1580, management reload and detail read verified on phone; automatic visual gate remains deferred.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788885564820
-    },
-    {
-      "id": "feature_event_070db9c3641c41a1becfa15828c2c26b",
-      "feature_id": "android-binance-manage-reconnect-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-usability",
-      "reason": "Official 1.1.1580 published and installed; online APK fingerprint matches, read-only workflow verified. No trade submitted.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788885567487
-    },
-    {
-      "id": "feature_event_dbf1ce7efbb545b3abdb8262692f4ee3",
-      "feature_id": "android-binance-create-visibility-v1",
-      "action": "registered",
-      "actor": "codex-grid-visibility",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788889701114
-    },
-    {
       "id": "feature_event_b1f4a5bc1f444ad38aebdc190d62439a",
       "feature_id": "android-binance-create-visibility-v1",
       "action": "claimed",
@@ -29747,6 +29648,156 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1789324188988
+    },
+    {
+      "id": "feature_event_4891b048334c4331ab3b95bb3aa0f763",
+      "feature_id": "quant-public-https-v1",
+      "action": "registered",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789328234067
+    },
+    {
+      "id": "feature_event_fceaf4fa33b84de19452f3607fe23b80",
+      "feature_id": "quant-public-https-v1",
+      "action": "claimed",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789328234106
+    },
+    {
+      "id": "feature_event_bc9f78de9e3d41cc97bc34dcbd945e55",
+      "feature_id": "quant-public-https-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789328234149
+    },
+    {
+      "id": "feature_event_c6dd450c4af74c348c283156d8132bd0",
+      "feature_id": "quant-public-https-v1",
+      "action": "claim_released",
+      "actor": "codex-quant-grid",
+      "reason": "补充现有HTTPS独立测试工程的依赖和生产路由接入路径，业务范围不变",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1789328575281
+    },
+    {
+      "id": "feature_event_b3edcf9413c64d69b681a9a2e127aaed",
+      "feature_id": "quant-public-https-v1",
+      "action": "metadata_updated",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1789328575324
+    },
+    {
+      "id": "feature_event_afb7df1ab9d94d1480a4d2b0962fad19",
+      "feature_id": "quant-public-https-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "复用现有测试工程验证已接受的同一HTTPS范围",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1789328575365
+    },
+    {
+      "id": "feature_event_ee1db681f4344206a844e88bedd5e115",
+      "feature_id": "quant-public-https-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "复用现有测试工程验证已接受的同一HTTPS范围",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1789328575409
+    },
+    {
+      "id": "feature_event_393cb10a61a14bc8a2690d17ec748a9f",
+      "feature_id": "quant-public-https-v1",
+      "action": "claimed",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789328575451
+    },
+    {
+      "id": "feature_event_7cd45069eff64d6b8d02c7094094f819",
+      "feature_id": "quant-public-https-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789328575489
+    },
+    {
+      "id": "feature_event_b544222208874fbe8f388b58fd9658a7",
+      "feature_id": "quant-public-https-v1",
+      "action": "claim_released",
+      "actor": "codex-quant-grid",
+      "reason": "补齐单字段配置更新与回退测试的文件认领，业务范围不变",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1789329365003
+    },
+    {
+      "id": "feature_event_45c47ca625f2432b979d35c86c3a075d",
+      "feature_id": "quant-public-https-v1",
+      "action": "metadata_updated",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "proposed",
+      "at_ms": 1789329365045
+    },
+    {
+      "id": "feature_event_99493c3982334e3a81b65362009e1220",
+      "feature_id": "quant-public-https-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "按既定HTTPS启用/回退要求补齐交付脚本",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1789329365083
+    },
+    {
+      "id": "feature_event_87aee7cc982a4407b61e583dde9c71d6",
+      "feature_id": "quant-public-https-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "按既定HTTPS启用/回退要求补齐交付脚本",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1789329365130
+    },
+    {
+      "id": "feature_event_6ed1dbdd0efd4d9fb861c3e7dd38ab1e",
+      "feature_id": "quant-public-https-v1",
+      "action": "claimed",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789329365177
+    },
+    {
+      "id": "feature_event_161d7f2a904e4db5a095d12b214b9c5d",
+      "feature_id": "quant-public-https-v1",
+      "action": "transitioned",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789329365223
     }
   ]
 }
