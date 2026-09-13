@@ -1,6 +1,6 @@
 # Fresh Text Recovery Wakeup
 
-Status: `implemented / offline_verified / grouped_release_pending`.
+Status: `implemented / offline_verified / published_1716_device_pending`.
 This repairs lifecycle recovery within the existing private sender. It does not
 promote fresh first-send, tool, project, attachment or temporary scopes.
 
@@ -51,9 +51,11 @@ Base: `31ac20d25a2acc5fe54ec59f217c2be974597f66`.
   offline, document replacement, stop/recovery boundaries, stream handoff,
   new/temporary contexts, regeneration and attachment non-regression.
 
-ADB reported no connected devices. This source batch has not been Android-built,
-published, installed or tested against a real network loss. The already verified
-1715 APK predates it. Include one pending-turn foreground/network-return check in
-the next grouped native UI acceptance, preserving the existing unresolved-first-
-send fixture rather than replaying it. Explicit refresh remains available after
-the automatic budget is exhausted; the budget is not reset by event storms.
+The [1716 grouped release](reports/chatgpt-private-grouped-recovery-20260914.md)
+includes this fix and passed Release compilation/package verification. USB and
+wireless ADB were unavailable; installation and real network-loss acceptance
+remain deferred. The 1715 APK predates this fix and must not be used to accept it.
+Include one pending-turn foreground/network-return check in the next native UI
+round, preserving the existing unresolved-first-send fixture rather than
+replaying it. Explicit refresh remains available after the automatic budget is
+exhausted; the budget is not reset by event storms.

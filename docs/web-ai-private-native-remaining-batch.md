@@ -1,6 +1,6 @@
 # Remaining private-native batch
 
-Current implementation audit: 2026-09-13. This is a work list, not a declaration
+Current implementation audit: 2026-09-14. This is a work list, not a declaration
 that every private protocol has been reproduced. Reuse completed capabilities in
 [the capability matrix](web-ai-private-transport-capability-matrix.md).
 Operation admission and remaining composer dependencies: [readiness policy](chatgpt-operation-readiness.md).
@@ -27,7 +27,7 @@ only. The current model declined creation; stop repeating prompts. Original
 writes/exports need an owned sample. [Writing Blocks](chatgpt-writing-blocks-native.md)
 reading/edit/export and ordinary save are accepted (1692; editor undo/redo/share 1706).
 [Project/typed saves](chatgpt-writing-blocks-native.md) are offline-verified.
-[Linked-library save](chatgpt-writing-blocks-library-save.md) is partial/offline-only; temporary/shared writes remain open.
+[Linked-library save](chatgpt-writing-blocks-library-save.md) shipped in 1715, device-pending; temporary/shared writes remain open.
 
 [Fresh tools](chatgpt-fresh-tool-text-dispatch.md),
 [project sends](chatgpt-fresh-project-text-dispatch.md),
@@ -35,7 +35,7 @@ reading/edit/export and ordinary save are accepted (1692; editor undo/redo/share
 [owned attachment sends](chatgpt-fresh-attachment-text-dispatch.md) and
 [fresh regeneration](chatgpt-fresh-regeneration.md) are
 offline-verified; group APK/native acceptance. None is promoted yet.
-[New first send](chatgpt-fresh-new-text-dispatch.md) failed on 1706: `parent_mismatch`; no replay.
+[New first send](chatgpt-fresh-new-text-dispatch.md): 1709 `owner_changed`; no replay. Fixes in 1716, still trial-only.
 
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
 three taps joined one 1077 ms read; native TXT saved 78 bytes. Supplemental/PCA
