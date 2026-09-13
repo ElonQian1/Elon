@@ -129,6 +129,19 @@ public final class TextBlockUiAcceptance extends UiAutomatorTestCase {
                 click(text("\u53d6\u6d88"));
                 assertEquals("export_menu_changed_body", hash(current), hash(fixture()));
                 result.put("export_actions_available", true).put("body", inspect()); break;
+            case "share_export":
+                String shareBody = guarded();
+                click(desc("web-chat-text-block-export"));
+                click(text("\u5206\u4eab\u4e0a\u6b21\u5bfc\u51fa\u7684\u6587\u4ef6"));
+                long shareDeadline = android.os.SystemClock.elapsedRealtime() + 5000;
+                while (APP.equals(getUiDevice().getCurrentPackageName()) &&
+                    android.os.SystemClock.elapsedRealtime() < shareDeadline) Thread.sleep(100);
+                boolean pickerOpened = !APP.equals(getUiDevice().getCurrentPackageName());
+                if (pickerOpened) getUiDevice().pressBack();
+                assertTrue("share_picker_missing", pickerOpened);
+                assertTrue("editor_not_restored", body().waitForExists(5000));
+                assertEquals("share_changed_body", hash(shareBody), hash(fixture()));
+                result.put("share_picker_opened", true).put("file_sent", false).put("body", inspect()); break;
             case "reset":
                 guarded(); click(desc("web-chat-text-block-reset"));
                 click(text("\u6062\u590d")); result.put("body", inspect()); break;

@@ -93,6 +93,8 @@ try {
         if(($checksum -split '\s+')[0] -cne $export.sha256){throw 'export_bytes_mismatch'}
         $actions=Ui export_actions @{expected_hash=$edited.sha256}
         if(-not $actions.export_actions_available){throw 'native_export_actions_missing'}
+        $share=Ui share_export @{expected_hash=$edited.sha256}
+        if(-not $share.share_picker_opened -or $share.file_sent){throw 'native_share_picker_unconfirmed'}
         $reset=(Ui reset @{expected_hash=$edited.sha256}).body
         if($reset.sha256 -cne $original.sha256){throw 'native_reset_mismatch'}
         $resetHash=''
@@ -100,7 +102,7 @@ try {
         $reopened=(Ui open @{selector=$selector}).body; $opened=$true
         if($reopened.sha256 -cne $original.sha256){throw 'local_copy_changed_source'}
         Ui close|Out-Null; $opened=$false
-        $report.blocks+=@{kind=$item.part.type;native_editor=$true;edited=$true;undo=$history.undo;redo=$history.redo;export_extension=$extension;export_bytes_match=$true;export_actions_available=$actions.export_actions_available;reset=$true;source_unchanged=$true}
+        $report.blocks+=@{kind=$item.part.type;native_editor=$true;edited=$true;undo=$history.undo;redo=$history.redo;export_extension=$extension;export_bytes_match=$true;export_actions_available=$actions.export_actions_available;share_picker_opened=$share.share_picker_opened;reset=$true;source_unchanged=$true}
     }
     $kinds=@($report.blocks|ForEach-Object kind)
     if(@($RequiredKinds|Where-Object {$_ -notin $kinds}).Count){throw 'provider_variant_sample_missing'}
@@ -116,8 +118,13 @@ try {
     try {
         if(-not (Test-WebChatNativeChatSurfaceForeground -Runtime $r)){throw 'foreground_changed_skip_cleanup'}
         if($opened){
-            if($report.ui_step -eq 'export'){try{Ui cancel_export|Out-Null}catch{}}
-            if($resetHash){Ui reset @{expected_hash=$resetHash}|Out-Null}; Ui close|Out-Null
+            if($report.ui_step -in @('export','export_actions','share_export')){try{Ui cancel_export|Out-Null}catch{}}
+            if($resetHash){
+                $cleanupBody=(Ui inspect).body
+                if($cleanupBody.sha256 -ceq $resetHash){Ui reset @{expected_hash=$resetHash}|Out-Null}
+                elseif($cleanupBody.sha256 -cne $original.sha256){throw 'local_edit_cleanup_owner_changed'}
+            }
+            Ui close|Out-Null
         }
         $current=Main
         if($changed -and $current.input.has_text){
