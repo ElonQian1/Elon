@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 22) return;
+  if (existing && Number(existing.version) >= 23) return;
   if (existing && typeof existing.dispose === 'function') {
     try { existing.dispose(); }
     catch (_) { /* A stale transport must not block the upgraded observer. */ }
@@ -135,8 +135,12 @@
     return true;
   }
 
-  function preparePrivateRegeneration() {
+  function preparePrivateRegeneration(userMessageId) {
+    if (disposed || userMessageId !== undefined &&
+        (typeof userMessageId !== 'string' || !/^[A-Za-z0-9_-]{8,180}$/.test(userMessageId))) return false;
     prepareSend();
+    // Legacy runtime observation needs no owned sink; a fresh variant does.
+    if (userMessageId !== undefined) preparedUserId = userMessageId;
     return true;
   }
 
@@ -686,7 +690,7 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 22,
+    version: 23,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,

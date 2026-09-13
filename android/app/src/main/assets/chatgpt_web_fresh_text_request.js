@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextRequest = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -47,8 +47,13 @@
   }
 
   function create(context, command) {
+    const regenerate = context?.operation === 'regenerate';
+    if (context?.operation != null && !regenerate || regenerate && (context.newConversation || context.temporary ||
+        context.projectId != null || context.attachments || context.tool || context.parentRole !== 'user' ||
+        !['comparison_implicit', 'none'].includes(context.variantPurpose))) fail('scope_unsupported');
     if (!/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || '') ||
-        typeof command.prompt !== 'string' || !command.prompt.trim() && !context?.attachments || command.prompt.length > 20000) fail('command_invalid');
+        typeof command.prompt !== 'string' || (regenerate ? command.prompt !== '' : !command.prompt.trim() && !context?.attachments) ||
+        command.prompt.length > 20000) fail('command_invalid');
     const commonBody = body(context);
     const attachmentMessage = context.attachments?.message(command.prompt, context);
     const preparedBody = { ...commonBody,
@@ -63,12 +68,13 @@
     // The website prepares using the selected hint, but Search dispatch uses a
     // force flag. User metadata retains the selection for history/UI continuity.
     const dispatchBody = { ...commonBody,
+      ...(regenerate ? { action: 'variant', variant_purpose: context.variantPurpose, enable_message_followups: true } : {}),
       ...(context.requestedDefaultModel != null ? { requested_default_model: context.requestedDefaultModel,
         one_off_model_override: true } : {}),
       ...(tool || attachmentMessage ? { enable_message_followups: true } : {}),
       ...(tool === 'search' ? { system_hints: [], force_use_search: true,
         client_reported_search_source: 'conversation_composer_web_icon' } : {}) };
-    const userMessageId = page.crypto.randomUUID(), turnId = page.crypto.randomUUID();
+    const userMessageId = regenerate ? context.parentId : page.crypto.randomUUID(), turnId = page.crypto.randomUUID();
     if (!UUID.test(userMessageId) || !UUID.test(turnId)) fail('identifier_invalid');
     let consumed = false, stopConduit = null, stopConsumed = false;
     return Object.freeze({ userMessageId, turnId,
@@ -106,12 +112,12 @@
         return {
           headers: { ...headers, ...projectHeaders, 'x-conduit-token': conduit, 'x-oai-turn-trace-id': turnId },
           body: { ...dispatchBody, conversation_mode: { ...dispatchBody.conversation_mode },
-            system_hints: [...dispatchBody.system_hints], client_prepare_state: 'success', messages: [{
+            system_hints: [...dispatchBody.system_hints], client_prepare_state: 'success', ...(regenerate ? {} : { messages: [{
             id: userMessageId, author: { role: 'user' }, create_time: Date.now() / 1000,
             content: attachmentMessage?.content || { content_type: 'text', parts: [command.prompt] },
             ...(tool || attachmentMessage ? { metadata: { ...attachmentMessage?.metadata,
               ...(tool ? { system_hints: [tool] } : {}) } } : {})
-          }] }
+          }] }) }
         };
       }
     });

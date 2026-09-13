@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
@@ -25,6 +25,7 @@
     if (user?.id !== userMessageId || user.message?.id !== userMessageId ||
         user.message.author?.role !== 'user' || !parentMatches(payload, binding, user) ||
         binding.attachments && !binding.attachments.matchesHistory(user.message)) return false;
+    if (binding.operation === 'regenerate' && binding.matchesOriginalUser?.(user.message) !== true) return false;
     let id = payload.current_node;
     const leaf = ownsKey(mapping, id) && mapping[id]?.message;
     if (!leaf || leaf.id !== id || !(leaf.author?.role === 'assistant' ||
@@ -43,6 +44,8 @@
   }
 
   function parentMatches(payload, binding, user) {
+    if (binding.operation === 'regenerate') return user.id === binding.parentId &&
+      typeof binding.historyParentId === 'string' && user.parent === binding.historyParentId;
     if (user.parent === binding.parentId) return true;
     // hy's raw callback precedes oQe's legacy empty-root normalization. This
     // exception cannot authorize another UUID parent or a non-root message.
@@ -55,6 +58,7 @@
   function ownsResponse(payload, binding, userMessageId, stopped = false, emptyStopped = false) {
     const owned = branch(payload, binding, userMessageId);
     if (!owned) return false;
+    if (binding.operation === 'regenerate' && binding.isOwnedResponse?.(owned.leaf) !== true) return false;
     // Reviewed provider async enum: 3 streaming, 4 completed but unread.
     if (ownsKey(payload, 'async_status') && owned.asyncStatus !== null && owned.asyncStatus !== 4) return false;
     if (stopped && owned.asyncStatus !== null && owned.asyncStatus !== 4) return false;

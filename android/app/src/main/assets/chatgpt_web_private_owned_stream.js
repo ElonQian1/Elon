@@ -1,13 +1,13 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateOwnedStream = api;
 })(typeof window === 'object' ? window : null, function (options) {
   'use strict';
   let owner = null;
   const active = () => !!owner && owner.current();
-  function begin({ conversationId, current, adoptConversation }) {
+  function begin({ conversationId, current, adoptConversation, observePayload }) {
     if ((!conversationId && (conversationId !== null || typeof adoptConversation !== 'function')) ||
         typeof current !== 'function' || !current()) return null;
     const next = { current, failure: '', done: false };
@@ -15,6 +15,7 @@
     options.session.begin();
     const owns = () => owner === next && current();
     const decoder = options.policy.createSseDecoder(payload => {
+      if (next.failure) return;
       if (!owns()) { next.failure = 'context_changed'; return; }
       const id = options.conversationId(payload);
       if (id && conversationId === null) {
@@ -25,6 +26,10 @@
       }
       if (id && id !== conversationId) { next.failure = 'stream_owner_changed'; return; }
       if (!conversationId) return;
+      if (observePayload) {
+        try { if (observePayload(payload) !== true) { next.failure = 'stream_owner_changed'; return; } }
+        catch (_) { next.failure = 'stream_owner_changed'; return; }
+      }
       options.report?.(payload);
       if (options.session.accept(payload)) { options.rich?.(payload); options.notify(); }
     }, ending => {

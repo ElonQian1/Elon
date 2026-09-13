@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 15, create: factory });
+  const api = Object.freeze({ version: 16, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -11,6 +11,7 @@
   'use strict';
   options ||= {};
   const context = options.context || page.__elonChatGptFreshTextContext.create(page);
+  const regeneration = options.regeneration || page.__elonChatGptFreshRegenerateContext?.create(page, context);
   const requests = (options.requests || page.__elonChatGptFreshTextRequest).create(page);
   const reconciliation = options.reconciliation || page.__elonChatGptFreshTextReconcile.create();
   const stopping = options.stopping || page.__elonChatGptFreshTextStop?.create(page, { reconciliation });
@@ -48,6 +49,7 @@
           active.binding.navigationReady?.() !== false) && retireAttachments(active)) active = null; } catch (_) {}
     }
     return { version: 6, transport: 'fresh_page_http_v1', pending: active !== null,
+      operation: active?.operation || '',
       phase: active?.phase || 'idle', dispatched: active?.dispatched === true,
       accepted: active?.accepted === true, code: active?.code || '', recovering: active?.recovering === true };
   }
@@ -80,6 +82,7 @@
     const armed = trialArmed();
     const safeCode = value => /^[a-z_]{0,64}$/.test(value || '') ? value || '' : 'unknown';
     return { schema: 'elon.fresh_text_trial.v1', version: 6, control, armed,
+      operation: last?.operation || '',
       remaining_ms: armed ? Math.max(0, Math.min(120000, trial.expiresAt - now())) : 0,
       attempts: records.attempts(), pending: active !== null, phase: last?.phase || 'idle',
       code: safeCode(last?.code), dispatched: last?.dispatched === true,
@@ -89,18 +92,19 @@
       history: last?.historyCode || 'not_observed' };
   }
 
-  function send(command) {
+  function dispatch(command, operation) {
     if (disposed) return { handled: false, code: 'disposed' };
     state();
     const previous = records.get(command?.requestId);
-    if (previous) return previous.prompt === command.prompt && previous.expectedDraft === command.expectedDraft &&
+    if (previous) return previous.operation === operation && previous.prompt === command.prompt && previous.expectedDraft === command.expectedDraft &&
       previous.href === page.location.href && previous.stamp === context.stamp() ? previous.transaction :
       { handled: true, completion: Promise.resolve({ status: 'rejected', code: 'request_id_conflict' }) };
     if (records.retired(command?.requestId)) return { handled: true,
       completion: Promise.resolve({ status: 'rejected', code: 'request_retired' }) };
     // A stopped/uncertain write still owns the ledger even if the trial is disabled.
     if (active) return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'busy' }) };
-    if (page.__elonChatGptFreshTextDispatchEnabled === false && !trialArmed() ||
+    const regenerate = operation === 'regenerate';
+    if ((regenerate ? page.__elonChatGptFreshRegenerationEnabled !== true : page.__elonChatGptFreshTextDispatchEnabled === false) && !trialArmed() ||
         page.__elonChatGptPrivateTextTransactionsEnabled !== true) {
       return { handled: false, code: 'disabled' };
     }
@@ -109,9 +113,9 @@
     const stamp = context.stamp();
     if (!stamp) return { handled: false, code: 'identity_unavailable' };
     if (!/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || '') || typeof command.prompt !== 'string' ||
-        !command.prompt.trim() && page.__elonChatGptFreshTextAttachmentsEnabled !== true && !trialArmed() ||
+        !regenerate && !command.prompt.trim() && page.__elonChatGptFreshTextAttachmentsEnabled !== true && !trialArmed() ||
         command.prompt.length > 20000 || typeof command.expectedDraft !== 'string' ||
-        command.expectedDraft && command.expectedDraft !== command.prompt) return { handled: false, code: 'invalid_command' };
+        !regenerate && command.expectedDraft && command.expectedDraft !== command.prompt) return { handled: false, code: 'invalid_command' };
     const admission = records.admit(command.requestId);
     if (admission) return { handled: true, completion: Promise.resolve({ status: 'rejected', code: admission }) };
     if (stoppedParent && !stoppedParent.current()) stoppedParent = null;
@@ -123,7 +127,7 @@
     const allowAttachments = page.__elonChatGptFreshTextAttachmentsEnabled === true || trialArmed();
     trial = null;
     let resolve;
-    const owner = { token, document, stamp, controller: new page.AbortController(), phase: 'preparing',
+    const owner = { operation, token, document, stamp, controller: new page.AbortController(), phase: 'preparing',
       streamEvents: 0, eventTypes: new Set(), historyCode: 'not_observed',
       stopBoundaryController: new page.AbortController(),
       dispatched: false, accepted: false, finished: false, settled: false, fallback: false };
@@ -144,7 +148,7 @@
         return true;
       }
     });
-    records.set(command.requestId, { prompt: command.prompt, expectedDraft: command.expectedDraft,
+    records.set(command.requestId, { operation, prompt: command.prompt, expectedDraft: command.expectedDraft,
       href: page.location.href, stamp, transaction,
       retirable: () => owner.finished && !owner.stopping && !owner.recovering && !owner.recoveryCompletion &&
         (!owner.dispatched || (owner.stopConfirmed === true || owner.recoveryConfirmed === true) && retireAttachments(owner)) });
@@ -178,8 +182,10 @@
 
     async function run() {
       timeout(options.prepareTimeoutMs || 15000, 'preparation_timeout');
-      owner.binding = await abortable(context.capture(command.composer, continuation,
-        { allowTools, allowProjects, allowNewConversations, allowTemporary, allowAttachments }));
+      if (regenerate && !regeneration) throw Error('runtime_unavailable');
+      owner.binding = await abortable(regenerate ? regeneration.capture(command) :
+        context.capture(command.composer, continuation,
+          { allowTools, allowProjects, allowNewConversations, allowTemporary, allowAttachments }));
       check();
       owner.request = requests.create(owner.binding, command);
       const { shared, runtime } = owner.binding;
@@ -196,7 +202,8 @@
       check();
       const request = owner.request.consume(prepared, security, shared.textSecurityHeaders, current);
       const stream = page.__elonChatGptPrivateStreamTransport;
-      if (typeof stream?.preparePrivateSend !== 'function' || typeof stream.beginPrivateStream !== 'function' ||
+      if (typeof stream?.[regenerate ? 'preparePrivateRegeneration' : 'preparePrivateSend'] !== 'function' ||
+          typeof stream.beginPrivateStream !== 'function' ||
           !page.__elonChatGptFreshTextStream) throw Error('stream_unavailable');
       timeout(options.openTimeoutMs || 15000, 'stream_open_timeout');
       // DM, not its retrying MGt wrapper, retains official auth and response
@@ -213,10 +220,13 @@
           // this boundary is uncertain even if fetch subsequently throws.
           owner.dispatched = true; owner.phase = 'dispatching';
           stoppedParent = null;
-          if (!stream.preparePrivateSend(command.prompt, owner.request.userMessageId,
-              !!owner.binding.attachments && !command.prompt.trim())) throw Error('stream_unavailable');
+          const ready = regenerate ? stream.preparePrivateRegeneration(owner.request.userMessageId) :
+            stream.preparePrivateSend(command.prompt, owner.request.userMessageId,
+              !!owner.binding.attachments && !command.prompt.trim());
+          if (!ready) throw Error('stream_unavailable');
           owner.sink = stream.beginPrivateStream({ conversationId: owner.binding.conversationId,
             userMessageId: owner.request.userMessageId, current: owner.stopCurrent,
+            observePayload: owner.binding.observePayload,
             adoptConversation: owner.binding.newConversation ? (id, payload) =>
               owner.binding.adoptConversation(id, payload, owner.request.userMessageId) : undefined });
           if (!owner.sink) throw Error('stream_unavailable');
@@ -250,7 +260,7 @@
           retireAttachments(owner);
           timeout(options.streamTimeoutMs || 600000, 'stream_timeout');
           // Draft cleanup must never delay or change acceptance of the write.
-          try { if (owner.binding.owns() && command.readDraft() === command.expectedDraft && command.expectedDraft) command.clearDraft?.(); } catch (_) {}
+          try { if (!regenerate && owner.binding.owns() && command.readDraft() === command.expectedDraft && command.expectedDraft) command.clearDraft?.(); } catch (_) {}
           receipt({ status: 'accepted', code: 'accepted', current: owner.binding.owns() });
         }
       }
@@ -304,7 +314,7 @@
           owner.token === page.__elonChatGptDocumentToken && owner.binding.owns()) {
         owner.phase = receipt.status === 'accepted' ? 'completed' : 'uncertain';
         owner.code = receipt.status === 'accepted' ? '' : receipt.code;
-        if (owner.stopConfirmed === true && owner.stopAcknowledged === true) {
+        if (owner.operation === 'send' && owner.stopConfirmed === true && owner.stopAcknowledged === true) {
           const binding = owner.binding, id = owner.request.userMessageId;
           stoppedParent = { id, current() {
             try { return binding.reconciled(id, true, true) === true; } catch (_) { return false; }
@@ -351,5 +361,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 15, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
+  return Object.freeze({ version: 16, send: command => dispatch(command, 'send'),
+    regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
+    state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });
