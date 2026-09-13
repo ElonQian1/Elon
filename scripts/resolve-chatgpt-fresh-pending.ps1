@@ -84,14 +84,28 @@ try {
     foreach ($candidate in $candidates) {
         $main = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state -MainState
         $web = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state
+        $trial = Invoke-ChatGptFreshTrial -Runtime $r -Mode state
         if (!(Test-FreshPendingReadOnlyIdle $web $main $trial) -or
-            [string]$main.social_chat.web_chat_conversation_path -cne $expected) { throw 'pending_resolution_context_changed' }
+            [string]$main.social_chat.web_chat_conversation_path -cne $expected) {
+            $report.context = [ordered]@{native_surface=($main.active_surface -ceq 'social_ai');
+                native_route=([string]$main.social_chat.web_chat_conversation_path -ceq $expected);
+                bridge_ready=($web.bridge_state -ceq 'ready');adapter_current=($web.adapter_current -eq $true);
+                authenticated=($web.authenticated -eq $true);trial_idle=(Test-ChatGptFreshTextIdle $trial);
+                idle=(Test-FreshPendingReadOnlyIdle $web $main $trial)}
+            throw 'pending_resolution_context_changed'
+        }
         $expected = [string]$candidate.path
         Invoke-ChatGptWebSmokeAction -Runtime $r -Action open_web_chat_conversation -Arguments @{conversation_path=$expected} | Out-Null
         $web = Wait-ChatGptWebSmokeState -Runtime $r -TimeoutSec 15 -Description 'read-only pending fixture lookup' -Predicate {
             param($s) $s.conversation.url -ceq ('https://chatgpt.com' + $expected) -and
                 $s.streaming -eq $false -and $s.conversation.message_count -gt 0
         }
+        Wait-ChatGptWebSmokeState -Runtime $r -TimeoutSec 15 -MainState -Description 'native pending lookup route' -Predicate {
+            param($s) $s.active_surface -ceq 'social_ai' -and
+                $s.social_chat.web_chat_provider_id -ceq 'chatgpt_web' -and
+                $s.social_chat.web_chat_conversation_path -ceq $expected -and
+                $s.social_chat.web_chat_streaming -eq $false
+        } | Out-Null
         $report.inspected++
         $exact = @($web.conversation.messages | Where-Object { $_.role -ceq 'user' -and
             $_.id -ceq $pending.user_message_id -and $_.content -ceq $pending.prompt }).Count -eq 1
@@ -131,6 +145,7 @@ try {
                 elseif ($origin) { $report.restored = Restore-WebChatNativeConversation -Runtime $r -ProviderId chatgpt_web -ConversationPath $origin }
             }
         }
+    } catch { $report.restoration_error = 'restoration_unconfirmed'
     } finally { $report.awake_restored = Stop-ChatGptWebSmokeAwakeLease -Runtime $r }
     Write-Output ($report | ConvertTo-Json -Compress -Depth 5)
 }

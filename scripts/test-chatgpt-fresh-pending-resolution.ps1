@@ -34,4 +34,9 @@ foreach ($field in @('streaming','dictation_active')) {
 }
 $trial.pending=$true; Assert (!(Test-FreshPendingReadOnlyIdle $web $main $trial)) 'pending_writer'
 $trial.pending=$false; $web.input.text='draft'; Assert (!(Test-FreshPendingReadOnlyIdle $web $main $trial)) 'user_draft'
+$source=Get-Content (Join-Path $PSScriptRoot 'resolve-chatgpt-fresh-pending.ps1') -Raw
+$wait=$source.IndexOf("-MainState -Description 'native pending lookup route'")
+$inspect=$source.IndexOf('$report.inspected++')
+Assert ($wait -gt 0 -and $inspect -gt $wait) 'native_route_before_inspection'
+Assert ($source.Contains("catch { `$report.restoration_error = 'restoration_unconfirmed'")) 'restoration_failure_preserves_report'
 Write-Output "FRESH_PENDING_RESOLUTION_TESTS=passed count=$passed"

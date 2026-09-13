@@ -74,7 +74,36 @@ checks. This caught the missing Android wire-contract update before packaging.
 and all nine `ChatGptWebFreshTextTrialTest` cases, with zero failures, errors or
 skips. The command completed in 330.7 seconds.
 
-Next: preserve the unresolved 1709 handoff byte-for-byte, publish one candidate,
-resolve it read-only, then one native first-send/follow-up case. Normal and
-project scopes need separate acceptance. No device pass or default enablement
-is claimed by the offline tests.
+## Release And Deferred Device Case
+
+`fresh-first-route-release-20260913-220513-565` published `1.1.1711 / 1711`
+from `502c54a45` and nondestructively installed it on the approved Xiaomi in
+480.6 seconds. APK SHA-256:
+`3391a3e34b5f4253f2d09017800ccba3e4bb12dca004d168f445fab4fea05ef8`.
+The unresolved 1709 handoff was copied and byte-verified before the upgrade.
+No Cookie or app data clearing, voice action or proxy change occurred.
+
+Read-only recovery on 1711 did not resolve the handoff. The first run stopped
+after one cached candidate at `pending_resolution_context_changed`; waiting for
+the native route, not only the cached provider route, was added to the harness.
+The next run reached an adapter-generation transition, and the final bounded
+run `fresh-first-route-pending-bridge-settle-20260913-221656-062` inspected two
+candidates but again stopped on changed context. None matched the exact fixture.
+No new send/follow-up or replay occurred. The awake lease was restored; the
+original conversation restoration was not confirmed. These are interrupted
+read-only lookups, not native first-send results or proof of missing server data.
+
+A subsequent read observed the app's home surface, and the next diagnostic
+could not start the APK MCP debug service within its timeout. The bounded
+foreground query completed with WeChat foreground. Device work stopped instead
+of repeatedly reclaiming the screen. The exact guard in the earlier context
+change was not captured, so do not attribute it solely to native render lag.
+
+The harness now refreshes its write-idle proof on every candidate, waits for
+native route publication, uses the existing pre-dispatch-ready helper for the
+trial probe, and preserves its report even if restoration fails. Changed-context
+diagnostics contain only booleans. Script-only changes need no new APK.
+
+Next: resolve the preserved 1709 handoff read-only on a stable production surface,
+then one native first-send/follow-up case. Normal and project scopes need separate
+acceptance. No 1711 first-send pass or default enablement is claimed.

@@ -2,8 +2,8 @@
 
 function Invoke-ChatGptFreshTrial {
     param([Parameter(Mandatory)]$Runtime, [ValidateSet('start','state','end')][string]$Mode = 'state')
-    $result = Invoke-ChatGptWebSmokeAction -Runtime $Runtime -Action chatgpt_private_protocol_probe `
-        -Arguments @{mode="fresh_text_trial_$Mode"}
+    $result = Invoke-ChatGptWebSmokeReadyAction -Runtime $Runtime -Action chatgpt_private_protocol_probe `
+        -Arguments @{mode="fresh_text_trial_$Mode"} -TimeoutSec 12
     $id = [string]$result.command_receipt.request_id
     if (!$id) { throw 'fresh_trial_receipt_missing' }
     $until = [DateTimeOffset]::UtcNow.AddSeconds(12)

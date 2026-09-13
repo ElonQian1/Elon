@@ -17,8 +17,9 @@ The accepted existing-conversation default is unchanged.
 Current follow-up: [first-route reconciliation evidence](reports/chatgpt-fresh-first-route-20260913.md).
 The 1708 pending fixture is now resolved by exact native/provider readback.
 One first-send trial on 1709 then failed with `owner_changed`, not the prior
-parent mismatch. Navigate-before-hydrate is offline-verified but not yet accepted
-on device; new-conversation production default remains disabled.
+parent mismatch. Navigate-before-hydrate is offline-verified and installed in
+1711, but exact pending recovery was interrupted before another native first-send
+case. New-conversation production default remains disabled.
 
 ## Native Acceptance Failure On 1706
 
