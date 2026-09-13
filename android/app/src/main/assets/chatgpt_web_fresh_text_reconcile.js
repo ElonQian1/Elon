@@ -1,14 +1,21 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
   'use strict';
   const ownsKey = (object, key) => object && Object.prototype.hasOwnProperty.call(object, key);
 
+  function conversationMatches(payload, binding) {
+    const projectId = binding.projectId ?? null;
+    return payload?.conversation_id === binding.conversationId && (payload.gizmo_id ?? null) === projectId &&
+      (projectId === null || /^g-p-[a-f0-9]{32}$/i.test(projectId) &&
+        payload.is_do_not_remember === false && payload.shared_project_conversation_owner == null);
+  }
+
   function branch(payload, binding, userMessageId) {
-    if (!payload || payload.conversation_id !== binding.conversationId ||
+    if (!conversationMatches(payload, binding) ||
         !payload.mapping || Array.isArray(payload.mapping)) return false;
     const mapping = payload.mapping, user = ownsKey(mapping, userMessageId) && mapping[userMessageId];
     if (user?.id !== userMessageId || user.message?.id !== userMessageId ||
@@ -43,7 +50,7 @@
 
   function rejection(payload, binding, userMessageId, stopped, emptyStopped) {
     if (!payload) return 'payload_missing';
-    if (payload.conversation_id !== binding.conversationId) return 'conversation_mismatch';
+    if (!conversationMatches(payload, binding)) return 'conversation_mismatch';
     const user = payload.mapping?.[userMessageId];
     if (!user || user.id !== userMessageId || user.message?.id !== userMessageId ||
         user.message?.author?.role !== 'user') return 'user_missing';

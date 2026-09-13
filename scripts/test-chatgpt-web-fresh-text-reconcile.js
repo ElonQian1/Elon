@@ -80,6 +80,28 @@ test('same-owner check happens before any history request', async () => {
   assert.equal(f.calls.length, 0);
 });
 
+test('project history must retain the owned project and non-shared non-temporary scope', async () => {
+  const projectId = 'g-p-' + 'a'.repeat(32);
+  for (const [expected, mutate] of [
+    [true, () => {}],
+    [false, p => { p.gizmo_id = 'g-p-' + 'b'.repeat(32); }],
+    [false, p => { delete p.gizmo_id; }],
+    [false, p => { p.shared_project_conversation_owner = {}; }],
+    [false, p => { p.is_do_not_remember = true; }],
+    [false, p => { delete p.is_do_not_remember; }]
+  ]) {
+    const f = fixture(); f.binding.projectId = projectId;
+    Object.assign(f.payload, { gizmo_id: projectId, is_do_not_remember: false });
+    mutate(f.payload);
+    assert.equal(Boolean(api.branch(f.payload, f.binding, UID)), expected);
+    assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal), expected);
+    assert.equal(f.applied(), expected);
+  }
+  const f = fixture(); f.payload.gizmo_id = projectId;
+  assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal), false,
+    'ordinary owner cannot consume a conversation moved into a project');
+});
+
 test('stopped partial history requires an explicit idle server status, not EOF or an omitted field', async () => {
   for (const status of [undefined, 3, 5, null, 4]) {
     const f = fixture(); f.payload.async_status = status;
