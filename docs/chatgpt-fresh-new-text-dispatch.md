@@ -35,9 +35,10 @@ The pending controlled fixture is retained locally at
 `$GIT_COMMON_DIR/ai-acceptance-fixtures/fresh-text-pending.json`; it contains no
 credentials and is not committed or printed. Use read-only resolution first,
 not another send. The original route was not preserved by this failed run and
-must not be guessed. No conversation navigation, draft clearing, replay,
-WebView reload or APK replacement followed the failed write. The awake lease
-was restored. Production 1706 has no app WebView debugging socket, so direct
+must not be guessed. At the end of the 1706 failure batch, no conversation
+navigation, draft clearing, replay, WebView reload or APK replacement had
+followed the failed write. The awake lease was restored. Production 1706 has no
+app WebView debugging socket, so direct
 CDP inspection was unavailable; its debugging/login policy was not changed.
 
 The canonical smoke now has `-NewConversation`, rejects outstanding handoffs,
@@ -66,8 +67,46 @@ the bridge: roles, ID categories (not IDs), structural equality/child-link check
 hidden flags and bounded counts. Node and Android tests cover rejected scopes,
 cycles, broken/missing links, late callbacks, timeout and private-field rejection.
 This is diagnostic infrastructure, **not** evidence that an unexpected parent is
-valid. New first-send admission and reconciliation stay unchanged pending the real
-parent sample. Device validation of this diagnostic is still pending.
+valid. New first-send admission and reconciliation stay unchanged pending the
+exact failed turn's parent sample.
+
+The diagnostic was published and nondestructively installed as `1.1.1707 / 1707`,
+source `1c102939b0e6d9021151c46ed542ff0f70611099`, APK SHA-256
+`9462278fb42c3997554516da4be53616df6a834eb174244bad640a1c999da6a8`.
+`history-parent-release-20260913-192436-603` completed build, publication,
+remote manifest/hash verification and Xiaomi installation in 472.3 seconds.
+`history-parent-node-20260913-191727-956` passed 36 tests; the focused release
+JVM run `history-parent-jvm-20260913-191729-314` passed 19 tests. Neither suite
+had failures or skips. A prior Node run only required updating an existing
+probe-version assertion to 26; that fixture mismatch was not a device failure.
+
+The first current-history read, `current-history-parent-probe-20260913-193341-368`,
+returned a bounded timeout. The warm read
+`current-history-parent-probe-warm-20260913-193435-837` returned `observed` and
+the allowlisted structural chain. It included hidden system ancestors and an
+unclassified root with an empty parent. This was a **different conversation**,
+not the pending first-send fixture; it does not authorize relaxing root or
+branch ownership checks and is not a first-send acceptance pass.
+
+Read-only navigation after the 1707 upgrade inspected three current-day cached
+candidates; none matched both the pending user-message ID and exact controlled
+prompt. An initially rejected third navigation succeeded after the previous
+navigation settled; it was not proof of a deleted conversation. The later
+provider directory status reported stale data and `directory_timeout`, despite
+the native cache remaining usable. Therefore the bounded cache miss does not
+prove that the accepted request was absent from the server. Its pending receipt
+is retained, no message was resent, and the original route remains unknown.
+
+The separate native first-page lookup did not execute: its external semantic
+runner rejected `foreground_mismatch` while WeChat was foreground. The runner
+diagnostic initially omitted `ComparisonFailure`, hiding that specific reason;
+`fresh-native-directory-runner-detail-20260913-195552-074` identified it. This
+is an acceptance-tool failure, not evidence that the first-page private read
+failed. The awake setting was restored and no write or replay was attempted.
+The pending fixture lacks the accepted server conversation ID, so rebuilding
+the page-local writer cannot recover that ID. A future acceptance handoff must
+preserve exact accepted ownership locally before replacing a pending page;
+do not guess a conversation from title or activity date.
 
 ## Evidence
 
