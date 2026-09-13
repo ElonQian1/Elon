@@ -48,6 +48,12 @@ internal sealed class OkxReadRequest(val path: String) {
             if (after.isEmpty()) "" else "&after=$after") {
         companion object { fun of(after: String) = History(if (after.isEmpty()) "" else OkxReadProtocol.id(after)) }
     }
+    class Records private constructor(query:OkxRecordQuery):OkxReadRequest(
+        if(query.kind=="positions")"/api/v5/tradingBot/grid/positions?algoOrdType=contract_grid&algoId=${query.id}"
+        else "/api/v5/tradingBot/grid/sub-orders?algoOrdType=contract_grid&algoId=${query.id}&type=${if(query.kind=="orders")"live" else "filled"}&limit=50"+
+            if(query.after.isEmpty())"" else "&after=${query.after}") {
+        companion object {fun of(query:OkxRecordQuery)=Records(query)}
+    }
     override fun toString() = "OkxReadRequest(fixed GET)"
 }
 

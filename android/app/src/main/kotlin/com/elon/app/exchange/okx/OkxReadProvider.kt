@@ -16,10 +16,11 @@ class OkxReadProvider : ContentProvider() {
             require(arg == null)
             val data = extras ?: Bundle()
             val keys = when (method) {
-                "capabilities_v1", "capabilities_v2", "resume_v1" -> emptySet()
+                "capabilities_v1", "capabilities_v2", "capabilities_v3", "resume_v1" -> emptySet()
                 "read_v1", "revoke_v1" -> setOf("grant")
                 "detail_v1" -> setOf("grant", "id")
                 "history_v1" -> setOf("grant", "after")
+                "records_v1" -> setOf("grant","kind","id","symbol","after")
                 else -> throw IllegalArgumentException("METHOD_UNSUPPORTED")
             }
             require(data.keySet() == keys)
@@ -30,9 +31,11 @@ class OkxReadProvider : ContentProvider() {
                 when (method) {
                     "capabilities_v1" -> { putString("status", "supported"); putString("environment", "live") }
                     "capabilities_v2" -> { putString("status", "supported"); putString("environment", "live"); putString("history_schema", OkxHistoryPage.SCHEMA) }
+                    "capabilities_v3" -> {putString("status","supported");putString("environment","live");putString("history_schema",OkxHistoryPage.SCHEMA);putString("records_schema",OkxRecordsPage.SCHEMA)}
                     "resume_v1" -> putString("grant", host.resume())
                     "revoke_v1" -> { host.revoke(grant); putString("status", "revoked") }
                     "history_v1" -> putString("result", host.history(grant, data.getString("after") ?: error("AFTER_MISSING")))
+                    "records_v1" -> putString("result",host.records(grant,data.getString("kind") ?: error("KIND_MISSING"),data.getString("id") ?: error("ID_MISSING"),data.getString("symbol") ?: error("SYMBOL_MISSING"),data.getString("after") ?: error("AFTER_MISSING")))
                     else -> putString("result", host.read(grant, if (method == "detail_v1") data.getString("id") ?: error("ID_MISSING") else null))
                 }
             }

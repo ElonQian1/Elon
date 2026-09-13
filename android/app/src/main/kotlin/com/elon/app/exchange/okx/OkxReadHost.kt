@@ -61,7 +61,8 @@ internal class OkxReadHost(private val vault: OkxAccessVault, private val captur
     }
     fun read(grant: String, id: String?): String = readBound(grant, id, null)
     fun history(grant: String, after: String): String = readBound(grant, null, after)
-    private fun readBound(grant: String, id: String?, historyAfter: String?): String = exclusive {
+    fun records(grant:String,kind:String,id:String,symbol:String,after:String)=readBound(grant,null,null,OkxRecordQuery(kind,id,symbol,after))
+    private fun readBound(grant: String, id: String?, historyAfter: String?, recordQuery:OkxRecordQuery?=null): String = exclusive {
         val captured = synchronized(lock) { access(grant) }
         val credentials = captured.saved.credentials
         fun verifyAccount() {
@@ -73,8 +74,9 @@ internal class OkxReadHost(private val vault: OkxAccessVault, private val captur
             synchronized(lock) { valid(captured) }
         }
         verifyAccount()
+        val records=recordQuery?.let{OkxRecordsReader(gateway).read(credentials,it,System.currentTimeMillis())}
         val history = historyAfter?.let { OkxHistoryReader(gateway).read(credentials, it) }
-        val rows = history?.rows ?: if (id == null) OkxPendingReader(gateway, elapsed).read(credentials) else {
+        val rows = if(records!=null)emptyList() else history?.rows ?: if (id == null) OkxPendingReader(gateway, elapsed).read(credentials) else {
             val request = OkxReadRequest.Detail.of(id)
             OkxReadProtocol.rows(gateway.get(credentials, request), 1).also {
                 if (it.size != 1 || it.single()["algoId"] != id) okxFail(OkxReadFailure.INVALID_RESPONSE)
@@ -86,7 +88,8 @@ internal class OkxReadHost(private val vault: OkxAccessVault, private val captur
         synchronized(lock) {
             valid(captured)
             val nextRevision = ++revision
-            history?.encode(captured.saved.account, captured.generation, nextRevision, now, bots)
+            records?.encode(captured.saved.account,captured.generation,nextRevision,now)
+                ?: history?.encode(captured.saved.account, captured.generation, nextRevision, now, bots)
                 ?: OkxReadProjection.encode(captured.saved.account, captured.generation, nextRevision, now, bots, id)
         }
     }
