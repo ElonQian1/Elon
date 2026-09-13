@@ -255,7 +255,7 @@
     return Array.from(new Set(capabilities));
   }
 
-  function snapshot() {
+  function snapshot(force) {
     if (disposed) return;
     const composer = findComposer();
     const pageKind = optional('unknown', () => layoutAdapter && typeof layoutAdapter.pageKind === 'function'
@@ -332,7 +332,7 @@
     };
     if (privateReadAloudAdapter) privateReadAloudAdapter.addSnapshotFields(event);
     const fingerprint = JSON.stringify(event);
-    if (fingerprint !== lastSnapshot) {
+    if (force === true || fingerprint !== lastSnapshot) {
       lastSnapshot = fingerprint;
       emitEvent(event);
     }
@@ -657,7 +657,7 @@
       invalidatePrivateTextContext();
       const path = String(command.value || '');
       const navigate = () => conversationAdapter.openConversation(path, respond);
-      if (path === location.pathname && !location.search && !location.hash) snapshot();
+      if (path === location.pathname && !location.search && !location.hash) snapshot(true);
       if (privateTransport && privateTransport.conversationPrefetchEnabled === true &&
           typeof privateTransport.prefetchConversation === 'function') {
         privateTransport.prefetchConversation(path, emitEvent, null);

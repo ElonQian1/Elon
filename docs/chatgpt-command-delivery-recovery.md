@@ -1,8 +1,9 @@
 # ChatGPT Page Command Delivery Recovery
 
-Status: implemented and offline verified; not yet packaged or accepted
-on a device. This is a shared native-to-page delivery boundary, not another
-private sender or a new provider protocol.
+Status: published and installed in APK 1.1.1698. Cold and background-return
+read-only commands passed on the production native surface. Forced missing-bridge
+repair is offline verified, not device exercised. This is a shared native-to-page
+delivery boundary, not another private sender or a new provider protocol.
 
 ## Observed Failure And Source Gap
 
@@ -60,11 +61,14 @@ delivery controller has 15 of those tests; the remaining suites cover handshake
 and existing native Writing Block/code-block behavior. Source-size and document
 modularity checks passed. No new device pass is implied by these offline tests.
 
-This source batch joins the prior shared request-sequence correction in the
-next grouped APK. First acceptance should check one production native
-background/return and one read-only command receipt before retrying the pending
-stop/follow-up scenario. Do not repeat the already accepted Writing Block
-editing/export/save or ordinary fresh-text send scopes without regression.
+This source batch and the shared request-sequence correction shipped together
+in 1698. Cold/return receipts took 152/685 ms including MCP automation, preserving
+the conversation, draft and page generation. The stop/follow-up test still failed
+before sending: reopening the unchanged current route filtered out the full
+snapshot needed to restore native readiness. See the
+[1698 acceptance and same-route correction](reports/chatgpt-command-recovery-1698.md).
+Do not repeat accepted Writing Block editing/export/save or ordinary fresh-text
+send scopes without regression.
 
 Implementation: `ChatGptWebCommandDelivery.kt`, `chatgpt_web_command_delivery.js`
 and `ChatGptWebPageAdapter.kt`. Tests:

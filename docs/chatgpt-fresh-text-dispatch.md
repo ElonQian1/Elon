@@ -269,8 +269,10 @@ failures or skips) passed in
 The first compile attempt rejected access to the ledger's private default ID
 factory; the corrected optional injection preserves the ledger default without
 exposing or duplicating it. Only the corrected run is counted as passed.
-This follow-on is source-verified and queued for the next grouped APK release;
-no new installation or live send acceptance is claimed for the shared sequence.
+This follow-on shipped in APK 1.1.1698 with page-command recovery. Cold and
+background-return read-only commands passed; stop/follow-up still stopped before
+sending at the same-route readiness boundary. No live send acceptance is claimed
+for the shared sequence. See [the 1698 record](reports/chatgpt-command-recovery-1698.md).
 
 ## Not Completed
 
