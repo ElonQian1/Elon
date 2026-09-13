@@ -22,6 +22,10 @@ adds actual in-memory draft ownership when the composer DOM is absent. It keeps
 private-text and DOM readiness separate; device acceptance of that boundary is
 pending and does not change the accepted scopes below.
 
+The September 14 [recovery wakeup fix](chatgpt-fresh-recovery-wakeup.md) retains
+foreground/online events through cooldown and in-flight read failure. It is
+source-tested, awaiting grouped release/device acceptance; no text POST is replayed.
+
 The [early-stop propagation fix](chatgpt-fresh-early-stop.md) is source-tested and
 awaiting the next grouped release; it is not covered by the older device results.
 

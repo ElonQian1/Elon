@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextRecovery = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -10,19 +10,64 @@
   const now = options.now || Date.now;
   const delays = options.delays || [0, 400, 1200];
   const unknown = code => ({ status: 'unknown', code });
+  const foregroundOnline = () => page.document.visibilityState !== 'hidden' && page.navigator?.onLine !== false;
+
+  function cancelScheduled(owner) {
+    if (!owner) return;
+    owner.recoveryResumeRequested = false;
+    owner.recoveryWakeup?.cancel();
+  }
+
+  function requestAutomatic(owner) {
+    if (!foregroundOnline() || !owner.dispatched || !owner.finished || owner.stopping ||
+        owner.stopConfirmed || owner.recoveryConfirmed || (owner.autoRecoveryCount || 0) >= 3) return;
+    if (owner.recoveryJob) owner.recoveryResumeRequested = true;
+    else scheduleAutomatic(owner);
+  }
+
+  function scheduleAutomatic(owner) {
+    if (owner.recoveryWakeup || owner.stopBoundary?.aborted || typeof options.onAutomaticReady !== 'function') return;
+    let timer;
+    function cancel() {
+      page.clearTimeout(timer);
+      owner.stopBoundary?.removeEventListener('abort', cancel);
+      if (owner.recoveryWakeup?.cancel === cancel) owner.recoveryWakeup = null;
+    }
+    owner.recoveryWakeup = { cancel };
+    owner.stopBoundary?.addEventListener('abort', cancel, { once: true });
+    // Retain one observed resume event through cooldown, not a polling loop.
+    timer = page.setTimeout(() => {
+      cancel();
+      try {
+        if (foregroundOnline() && owner.dispatched && owner.finished && !owner.stopping &&
+            !owner.stopConfirmed && !owner.recoveryConfirmed && !owner.stopBoundary?.aborted &&
+            (owner.autoRecoveryCount || 0) < 3 && owner.stopCurrent() &&
+            owner.binding.canReconcile(owner.request.userMessageId)) options.onAutomaticReady();
+      } catch (_) {}
+    }, Math.max(1, owner.nextAutoRecoveryAt - now()));
+  }
 
   function recover(owner, automatic = false) {
-    if (owner.recoveryJob) return owner.recoveryJob;
+    if (owner.recoveryJob) {
+      if (automatic) requestAutomatic(owner);
+      return owner.recoveryJob;
+    }
     if (!owner.dispatched || !owner.finished || owner.stopping) return Promise.resolve(unknown('recovery_not_ready'));
-    if (automatic && (page.document.visibilityState === 'hidden' ||
-        (owner.autoRecoveryCount || 0) >= 3 || now() < (owner.nextAutoRecoveryAt || 0))) {
+    if (automatic && (!foregroundOnline() || (owner.autoRecoveryCount || 0) >= 3)) {
+      cancelScheduled(owner);
       return Promise.resolve(unknown('recovery_deferred'));
     }
     try {
       if (!owner.stopCurrent() || !owner.binding.canReconcile(owner.request.userMessageId)) {
+        cancelScheduled(owner);
         return Promise.resolve(unknown('context_changed'));
       }
-    } catch (_) { return Promise.resolve(unknown('context_changed')); }
+    } catch (_) { cancelScheduled(owner); return Promise.resolve(unknown('context_changed')); }
+    if (automatic && now() < (owner.nextAutoRecoveryAt || 0)) {
+      scheduleAutomatic(owner);
+      return Promise.resolve(unknown('recovery_deferred'));
+    }
+    cancelScheduled(owner);
     if (automatic) owner.autoRecoveryCount = (owner.autoRecoveryCount || 0) + 1;
     owner.nextAutoRecoveryAt = now() + (options.cooldownMs ?? 10000);
     owner.recovering = true;
@@ -30,6 +75,10 @@
       owner.recovering = false;
       owner.recoveryJob = null;
       owner.recoveryController = null;
+      if (owner.recoveryResumeRequested) {
+        owner.recoveryResumeRequested = false;
+        requestAutomatic(owner);
+      }
     });
     return owner.recoveryJob;
   }
@@ -79,5 +128,5 @@
       controller.abort();
     }
   }
-  return Object.freeze({ recover });
+  return Object.freeze({ recover, requestAutomatic, cancelScheduled });
 });

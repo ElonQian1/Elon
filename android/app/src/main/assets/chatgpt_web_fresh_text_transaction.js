@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 21, create: factory });
+  const api = Object.freeze({ version: 22, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -16,7 +16,8 @@
   const reconciliation = options.reconciliation || page.__elonChatGptFreshTextReconcile.create();
   const stopping = options.stopping || page.__elonChatGptFreshTextStop?.create(page, { reconciliation });
   const recovery = options.recovery || page.__elonChatGptFreshTextRecovery?.create(page, {
-    reconciliation, timeoutMs: options.reconcileTimeoutMs || 15000
+    reconciliation, timeoutMs: options.reconcileTimeoutMs || 15000,
+    onAutomaticReady: () => recover(true)
   });
   const records = (options.receipts || page.__elonChatGptFreshTextReceipts).create();
   let document = page.document, token = page.__elonChatGptDocumentToken, active = null, disposed = false;
@@ -46,7 +47,9 @@
     if (active?.dispatched && active.finished && !active.stopping && !active.recovering && !active.recoveryCompletion) {
       try { if ((active.stopConfirmed || active.recoveryConfirmed ||
         active.binding.reconciled(active.request.userMessageId, active.stopAcknowledged === true) &&
-          active.binding.navigationReady?.() !== false) && retireAttachments(active)) active = null; } catch (_) {}
+          active.binding.navigationReady?.() !== false) && retireAttachments(active)) {
+        recovery?.cancelScheduled?.(active); active = null;
+      } } catch (_) {}
     }
     return { version: 7, transport: 'fresh_page_http_v1', pending: active !== null,
       operation: active?.operation || '',
@@ -322,6 +325,7 @@
       return { handled: true, completion: Promise.resolve({ status: 'accepted', code: 'cancelled_before_dispatch' }) };
     }
     if (!stopping) return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'server_stop_unconfirmed' }) };
+    recovery?.cancelScheduled?.(owner);
     owner.recoveryController?.abort();
     owner.phase = 'stopping';
     const completion = stopping.stop(owner).then(receipt => {
@@ -344,7 +348,10 @@
     state();
     const owner = active;
     if (!owner || !recovery || disposed) return { handled: false };
-    if (owner.recoveryCompletion) return { handled: true, completion: owner.recoveryCompletion };
+    if (owner.recoveryCompletion) {
+      if (automatic) recovery.requestAutomatic?.(owner);
+      return { handled: true, completion: owner.recoveryCompletion };
+    }
     const completion = recovery.recover(owner, automatic).then(receipt => {
       if (active !== owner || owner.stopping || owner.stopConfirmed || !owner.stopCurrent()) return receipt;
       if (receipt.status === 'accepted') {
@@ -360,23 +367,26 @@
     owner.recoveryCompletion = completion;
     return { handled: true, completion };
   }
-  const visibility = () => { if (page.document.visibilityState !== 'hidden') recover(true); };
+  const suspend = () => recovery?.cancelScheduled?.(active);
+  const visibility = () => { if (page.document.visibilityState !== 'hidden') recover(true); else suspend(); };
   const resume = () => recover(true);
   const eventDocument = page.document;
   eventDocument.addEventListener?.('visibilitychange', visibility);
   page.addEventListener?.('online', resume);
+  page.addEventListener?.('offline', suspend);
   page.addEventListener?.('pageshow', resume);
   function dispose() {
     if (active) return false;
     disposed = true;
     eventDocument.removeEventListener?.('visibilitychange', visibility);
     page.removeEventListener?.('online', resume);
+    page.removeEventListener?.('offline', suspend);
     page.removeEventListener?.('pageshow', resume);
     return true;
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 21, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 22, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

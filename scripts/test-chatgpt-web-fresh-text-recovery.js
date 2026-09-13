@@ -110,3 +110,72 @@ test('runtime errors are bounded and never leaked in recovery receipts', async (
   assert.deepEqual(result, { status: 'unknown', code: 'history_unavailable' });
   assert.equal(f.calls.length, 1); assert.notEqual(f.owner.recoveryConfirmed, true);
 });
+
+test('cooldown wakeups merge and an unsuccessful wakeup does not start polling', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
+  let wakeups = 0;
+  const f = fixture({ now: Date.now, onAutomaticReady: () => { wakeups++; f.api.recover(f.owner, true); } });
+  await f.api.recover(f.owner, true);
+  for (let i = 0; i < 5; i++) assert.equal((await f.api.recover(f.owner, true)).code, 'recovery_deferred');
+  const scheduled = f.owner.recoveryWakeup;
+  assert.ok(scheduled); assert.equal(f.owner.autoRecoveryCount, 1);
+  t.mock.timers.tick(10000); await tick();
+  assert.equal(wakeups, 1); assert.equal(f.calls.length, 6);
+  assert.equal(f.owner.recoveryWakeup, null); assert.equal(f.owner.autoRecoveryCount, 2);
+  t.mock.timers.tick(60000); await tick(); assert.equal(wakeups, 1);
+  await f.api.recover(f.owner, true);
+  assert.equal(f.owner.autoRecoveryCount, 3);
+  await f.api.recover(f.owner, true);
+  assert.equal(f.owner.recoveryWakeup, null); assert.equal(f.calls.length, 9);
+});
+
+test('offline automatic recovery neither reads nor consumes retry budget', async () => {
+  const f = fixture(); f.page.navigator = { onLine: false };
+  assert.equal((await f.api.recover(f.owner, true)).code, 'recovery_deferred');
+  assert.equal(f.calls.length, 0); assert.equal(f.owner.autoRecoveryCount, undefined);
+  f.page.navigator.onLine = true;
+  await f.api.recover(f.owner, true); assert.equal(f.calls.length, 3);
+});
+
+test('delayed wakeup rechecks visibility, network, ownership, stop and completion', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
+  for (const change of [f => { f.page.document.visibilityState = 'hidden'; },
+    f => { f.page.navigator = { onLine: false }; }, f => f.current(false),
+    f => { f.owner.stopping = true; }, f => { f.owner.stopConfirmed = true; },
+    f => { f.owner.recoveryConfirmed = true; }, f => f.boundary.abort()]) {
+    let wakeups = 0;
+    const f = fixture({ now: Date.now, onAutomaticReady: () => { wakeups++; } });
+    await f.api.recover(f.owner, true); await f.api.recover(f.owner, true);
+    change(f); t.mock.timers.tick(10000); await tick();
+    assert.equal(wakeups, 0); assert.equal(f.calls.length, 3);
+    assert.equal(f.owner.recoveryWakeup, null);
+  }
+});
+
+test('manual recovery or explicit suspension removes the pending automatic wakeup', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
+  for (const manual of [false, true]) {
+    let wakeups = 0;
+    const f = fixture({ now: Date.now, onAutomaticReady: () => { wakeups++; } });
+    await f.api.recover(f.owner, true); await f.api.recover(f.owner, true);
+    assert.ok(f.owner.recoveryWakeup);
+    if (manual) await f.api.recover(f.owner); else f.api.cancelScheduled(f.owner);
+    assert.equal(f.owner.recoveryWakeup, null);
+    t.mock.timers.tick(10000); await tick(); assert.equal(wakeups, 0);
+    assert.equal(f.calls.length, manual ? 6 : 3);
+  }
+});
+
+test('suspension clears a resume queued behind an in-flight read', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
+  const pending = deferred(); let wakeups = 0;
+  const f = fixture({ now: Date.now, reconcile: () => pending.promise,
+    onAutomaticReady: () => { wakeups++; } });
+  const job = f.api.recover(f.owner, true);
+  f.api.requestAutomatic(f.owner); assert.equal(f.owner.recoveryResumeRequested, true);
+  f.api.cancelScheduled(f.owner);
+  pending.resolve(false); await job;
+  t.mock.timers.tick(10000); await tick();
+  assert.equal(f.owner.recoveryResumeRequested, false);
+  assert.equal(f.owner.recoveryWakeup, undefined); assert.equal(wakeups, 0);
+});

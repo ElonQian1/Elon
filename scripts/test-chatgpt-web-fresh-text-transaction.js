@@ -54,8 +54,10 @@ function fixture(options = {}) {
   page.__elonChatGptPrivateStreamTransport.beginPrivateStream = () => ({ push() {}, finish() {} });
   const reconciliation = { reconcile: options.reconciliation || (async () => false) };
   const recovery = page.__elonChatGptFreshTextRecovery.create(page, { reconciliation, delays: [0, 0, 0],
-    timeoutMs: options.reconcileTimeoutMs || 1000 });
-  const api = transactionModule.create(page, { requests: requestModule, reconciliation, recovery,
+    timeoutMs: options.reconcileTimeoutMs || 1000, now: options.now,
+    onAutomaticReady: () => api.recover(true) });
+  const api = transactionModule.create(page, { requests: requestModule, reconciliation,
+    recovery: options.productionRecovery ? undefined : recovery,
     receipts: asset('chatgpt_web_fresh_text_receipts'),
     now: options.now,
     context: { capture: options.capture || (async () => binding), stamp: () => current ? 'fixture-stamp' : 'changed' },
@@ -583,6 +585,102 @@ test('online/pageshow events coalesce while recovering; idle and disposed owners
   assert.equal(f.api.dispose(), true);
   f.page.dispatchEvent(new Event('online')); f.page.document.dispatchEvent(new Event('visibilitychange'));
   assert.equal(reads, 1); assert.equal(f.send({ requestId: 'mcp_disposed' }).handled, false);
+});
+
+test('online during cooldown schedules one later history read and unlocks follow-up without replay', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
+  let available = false, reads = 0;
+  const f = fixture({ now: Date.now, reconciliation: async () => {
+    reads++; if (available) f.reconcile(); return available;
+  } });
+  await f.send().completion; await turn();
+  assert.equal(reads, 3); assert.equal(f.api.state().pending, true);
+  available = true;
+  f.page.dispatchEvent(new Event('online'));
+  f.page.dispatchEvent(new Event('pageshow'));
+  f.page.document.dispatchEvent(new Event('visibilitychange'));
+  await turn(); assert.equal(reads, 3);
+  t.mock.timers.tick(9999); await turn(); assert.equal(reads, 3);
+  t.mock.timers.tick(1); await turn(); await turn();
+  assert.equal(reads, 4); assert.equal(f.api.state().pending, false);
+  assert.equal(f.calls.filter(c => c.kind === 'post').length, 1);
+  assert.equal(f.calls.filter(c => c.kind === 'finish_stream').length, 1);
+  assert.equal((await f.send({ requestId: 'mcp_online2' }).completion).status, 'accepted');
+  await turn(); assert.equal(f.calls.filter(c => c.kind === 'post').length, 2);
+  f.api.state(); f.api.dispose();
+});
+
+test('background and offline events cancel a delayed recovery until a new resume event', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
+  for (const mode of ['hidden', 'offline']) {
+    let available = false, reads = 0;
+    const f = fixture({ now: Date.now, reconciliation: async () => {
+      reads++; if (available) f.reconcile(); return available;
+    } });
+    f.page.navigator = { onLine: true };
+    await f.send().completion; await turn();
+    f.page.dispatchEvent(new Event('online')); await turn();
+    if (mode === 'hidden') {
+      f.page.document.visibilityState = 'hidden';
+      f.page.document.dispatchEvent(new Event('visibilitychange'));
+      f.page.document.visibilityState = 'visible';
+    } else {
+      f.page.navigator.onLine = false; f.page.dispatchEvent(new Event('offline'));
+      f.page.navigator.onLine = true;
+    }
+    available = true;
+    t.mock.timers.tick(10000); await turn();
+    assert.equal(reads, 3); assert.equal(f.api.state().pending, true);
+    f.page.dispatchEvent(new Event('pageshow')); await turn();
+    assert.equal(reads, 4); assert.equal(f.api.state().pending, false);
+    assert.equal(f.calls.filter(c => c.kind === 'post').length, 1);
+    f.api.dispose();
+  }
+});
+
+test('document replacement cancels a queued cooldown wakeup without a later read or native update', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
+  let reads = 0;
+  const f = fixture({ now: Date.now, reconciliation: async () => { reads++; return false; } });
+  await f.send().completion; await turn();
+  f.page.dispatchEvent(new Event('online')); await turn();
+  f.page.__elonChatGptDocumentToken = 'doc_changed'; f.api.state();
+  t.mock.timers.tick(10000); await turn();
+  assert.equal(reads, 3); assert.equal(f.api.state().pending, false);
+  assert.equal(f.calls.filter(c => c.kind === 'finish_stream').length, 0);
+  f.api.dispose();
+});
+
+test('online arriving during a failing read is retained until that job settles', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
+  const pending = deferred(); let reads = 0;
+  const f = fixture({ now: Date.now, reconciliation: async () => {
+    reads++; if (reads === 1) return pending.promise;
+    f.reconcile(); return true;
+  } });
+  await f.send().completion; await turn(); assert.equal(reads, 1);
+  f.page.dispatchEvent(new Event('online'));
+  f.page.dispatchEvent(new Event('pageshow'));
+  pending.reject(Error('synthetic connection lost')); await turn();
+  t.mock.timers.tick(10000); await turn(); await turn();
+  assert.equal(reads, 2); assert.equal(f.api.state().pending, false);
+  assert.equal(f.calls.filter(c => c.kind === 'post').length, 1);
+  f.api.dispose();
+});
+
+test('default production recovery wiring resumes once without an injected coordinator', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
+  let available = false, reads = 0;
+  const f = fixture({ productionRecovery: true, reconciliation: async () => {
+    reads++; if (!available) throw Error('synthetic unavailable history');
+    f.reconcile(); return true;
+  } });
+  await f.send().completion; await turn();
+  available = true; f.page.dispatchEvent(new Event('online')); await turn();
+  t.mock.timers.tick(10000); await turn(); await turn();
+  assert.equal(reads, 2); assert.equal(f.api.state().pending, false);
+  assert.equal(f.calls.filter(c => c.kind === 'post').length, 1);
+  f.api.dispose();
 });
 
 test('post-dispatch transport failure recovers through history without reusing prepare or security', async () => {
