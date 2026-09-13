@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
@@ -10,8 +10,10 @@
   function conversationMatches(payload, binding) {
     const projectId = binding.projectId ?? null;
     return payload?.conversation_id === binding.conversationId && (payload.gizmo_id ?? null) === projectId &&
-      (binding.newConversation !== true || payload.is_do_not_remember === false &&
-        payload.is_temporary_chat !== true && payload.shared_project_conversation_owner == null) &&
+      (binding.temporary === true ? projectId === null && payload.is_do_not_remember === true &&
+        payload.is_temporary_chat !== false && payload.shared_project_conversation_owner == null :
+        binding.newConversation !== true || payload.is_do_not_remember === false &&
+          payload.is_temporary_chat !== true && payload.shared_project_conversation_owner == null) &&
       (projectId === null || /^g-p-[a-f0-9]{32}$/i.test(projectId) &&
         payload.is_do_not_remember === false && payload.shared_project_conversation_owner == null);
   }

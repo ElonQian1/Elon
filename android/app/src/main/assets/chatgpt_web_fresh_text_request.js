@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextRequest = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -11,10 +11,14 @@
 
   function body(context) {
     if (!context || (context.newConversation === true ? context.conversationId !== null ||
-        context.parentId !== 'client-created-root' || context.parentRole !== 'root' || context.historyDisabled || context.doNotRemember :
+        context.parentId !== 'client-created-root' || context.parentRole !== 'root' ||
+          context.temporary !== true && (context.historyDisabled || context.doNotRemember) :
         !UUID.test(context.conversationId || '') || !UUID.test(context.parentId || '')) ||
         !SLUG.test(context.model || '') || typeof context.historyDisabled !== 'boolean' ||
         typeof context.doNotRemember !== 'boolean' ||
+        context.temporary === true && (context.historyDisabled !== true || context.projectId != null) ||
+        context.temporaryPersonalization != null && (context.temporary !== true || context.newConversation !== true ||
+          typeof context.temporaryPersonalization !== 'boolean') ||
         context.projectId != null && (typeof context.projectId !== 'string' ||
           !/^g-p-[a-f0-9]{32}$/i.test(context.projectId) || context.doNotRemember) ||
         context.effort != null && !SLUG.test(context.effort) ||
@@ -35,6 +39,7 @@
       system_hints: context.tool ? [context.tool] : [],
       supports_buffering: true, supported_encodings: ['v1'],
       ...(context.historyDisabled ? { history_and_training_disabled: true } : {}),
+      ...(context.temporaryPersonalization != null ? { temporary_chat_requests_personalization: context.temporaryPersonalization } : {}),
       ...(context.doNotRemember ? { is_do_not_remember: true } : {}),
       ...(context.effort != null ? { thinking_effort: context.effort } : {}),
       ...(context.serviceTier != null ? { service_tier: context.serviceTier } : {})

@@ -31,8 +31,9 @@ temporary/library/typed-widget save remains incomplete.
 
 [Fresh tools](chatgpt-fresh-tool-text-dispatch.md),
 [project sends](chatgpt-fresh-project-text-dispatch.md) and
-[new conversations](chatgpt-fresh-new-text-dispatch.md) are offline-verified;
-group APK/native acceptance. None of these extensions is promoted yet.
+[new conversations](chatgpt-fresh-new-text-dispatch.md) and
+[temporary sends/cache guard](chatgpt-fresh-temporary-text-dispatch.md) are
+offline-verified; group APK/native acceptance. None is promoted yet.
 
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
 three taps joined one 1077 ms read; native TXT saved 78 bytes. Supplemental/PCA

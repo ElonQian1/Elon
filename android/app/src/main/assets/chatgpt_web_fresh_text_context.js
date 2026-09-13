@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -27,23 +27,29 @@
     if (bindings?.state?.().profile_id !== PROFILE) fail('runtime_unavailable');
     const token = page.__elonChatGptDocumentToken, href = page.location.href, document = page.document;
     const url = new URL(href);
+    const temporary = url.pathname === '/' && url.search === '?temporary-chat=true';
     const existingRoute = routePattern.exec(url.pathname);
     const newRoute = url.pathname === '/' ? [url.pathname, null, null] : newProjectPattern.exec(url.pathname);
     const route = existingRoute || newRoute;
-    if (url.origin !== 'https://chatgpt.com' || url.search || url.hash || url.username || url.password ||
-        !route || !existingRoute && options.allowNewConversations !== true) fail('scope_unsupported');
+    if (url.origin !== 'https://chatgpt.com' || url.search && !temporary || url.hash || url.username || url.password ||
+        !route || temporary && options.allowTemporary !== true ||
+        !existingRoute && !temporary && options.allowNewConversations !== true) fail('scope_unsupported');
     const submit = page.__elonChatGptPrivateTextRuntimeSubmit;
     const binding = submit?.captureConversation?.(composer);
-    if (!binding || binding.temporary || binding.href !== href ||
-        (existingRoute ? binding.newThread || !idPattern.test(route[2]) : !binding.newThread || binding.serverId !== null)) {
+    const newConversation = binding?.newThread === true;
+    if (!binding || binding.temporary !== temporary || binding.href !== href ||
+        (temporary ? typeof binding.newThread !== 'boolean' ||
+          (newConversation ? binding.serverId !== null : !idPattern.test(binding.serverId || '')) :
+          existingRoute ? binding.newThread || !idPattern.test(route[2]) : !binding.newThread || binding.serverId !== null)) {
       fail('context_unavailable');
     }
+    if (newConversation && options.allowNewConversations !== true) fail('scope_unsupported');
     const [shared, conversation, editor] = await Promise.all([
       bindings.load('shared'), bindings.load('conversation'), bindings.load('composer')
     ]);
     if (document !== page.document || token !== page.__elonChatGptDocumentToken || href !== page.location.href) fail('context_changed');
     const afterLoad = submit.captureConversation(composer);
-    if (!afterLoad || ['token', 'account', 'conversation', 'controller', 'shared', 'files', 'serverId', 'href']
+    if (!afterLoad || ['token', 'account', 'conversation', 'controller', 'shared', 'files', 'serverId', 'href', 'newThread', 'temporary']
       .some(key => binding[key] !== afterLoad[key])) fail('context_changed');
     const identity = page.__elonChatGptPrivateModelContract?.create(page);
     const account = () => identity?.withRuntimeIdentity({}, shared)?.account;
@@ -56,17 +62,17 @@
         typeof conversation.textHydrateHistory !== 'function' ||
         typeof editor.Ng !== 'function') fail('runtime_unavailable');
     const selected = binding.conversation, tree = () => shared.XM(selected.id);
-    const newConversation = !existingRoute;
     let serverId = binding.serverId, navigating = false, navigated = false, targetNavigationKey = null;
     if (newConversation && (['textBindConversationId', 'textClientConversation', 'textResolvedConversationId',
-      'textNavigationKey', 'textNavigate', 'canvasQueryClient'].some(key => typeof shared[key] !== 'function') ||
-      ['textRequestedDefaultModel', 'textRememberFirstModel', 'textNavigateConversation']
+      ...(temporary ? [] : ['textNavigate', 'canvasQueryClient'])].some(key => typeof shared[key] !== 'function') ||
+      ['textRequestedDefaultModel', 'textRememberFirstModel', ...(temporary ? [] : ['textNavigateConversation'])]
         .some(key => typeof conversation[key] !== 'function') ||
       shared.textClientConversation(selected.id) !== true || shared.textResolvedConversationId(selected.id) != null)) {
       fail('runtime_unavailable');
     }
-    const navigationKey = newConversation ? shared.textNavigationKey() : null;
-    if (newConversation && (typeof navigationKey !== 'string' || !navigationKey || navigationKey.length > 256)) {
+    if ((newConversation || temporary) && typeof shared.textNavigationKey !== 'function') fail('runtime_unavailable');
+    const navigationKey = newConversation || temporary ? shared.textNavigationKey() : null;
+    if ((newConversation || temporary) && (typeof navigationKey !== 'string' || !navigationKey || navigationKey.length > 256)) {
       fail('context_unavailable');
     }
     const selectedTool = editor.Ng(binding.controller)?.activeSystemHintType;
@@ -92,6 +98,7 @@
     function scope(state) {
       if (!state || shared.wV?.(shared.SV?.isPersonalWorkspace) !== true) fail('scope_unsupported');
       const projectId = shared.HM.getGizmoId(state) ?? null;
+      if (temporary && projectId !== null) fail('scope_unsupported');
       if (projectId === null) {
         if (route[1] || state.mode?.kind !== 'primary_assistant' || state.mode.gizmo_id != null) fail('scope_unsupported');
         return null;
@@ -132,8 +139,10 @@
           props.shouldBlockConsumerLockdownModeActionsForConversation !== false ||
           props.structuredInputMessageId != null || (selected.serverId$() ?? null) !== binding.serverId ||
           (newConversation ? serverId !== null || props.isNewThread !== true :
-            !idPattern.test(binding.serverId || '') || route[2] !== binding.serverId) ||
-          shared.cX?.() !== false || shared.uo(selected) !== false ||
+            !idPattern.test(binding.serverId || '') || !temporary && route[2] !== binding.serverId ||
+              temporary && (props.isNewThread !== false || shared.HM.getIsNewConversation?.(state) !== false)) ||
+          shared.cX?.() !== temporary || shared.uo(selected) !== false ||
+          temporary && (typeof state.is_do_not_remember !== 'boolean' || shared.textHistoryDisabled() !== true) ||
           conversation.textPrepareEnabled() !== true || conversation.textReviewAck(selected) != null) fail('scope_unsupported');
       const projectId = scope(state);
       if (['continuingFromSharedConversationId', 'continuingFromSharedProjectConversationId', 'continuingFromSharedPostId',
@@ -163,15 +172,27 @@
       const rootParent = newConversation && parent?.id === 'client-created-root' && parent.author?.role === 'root' &&
         parent.content?.content_type === 'text' && Array.isArray(parent.content.parts) && parent.content.parts.length === 0 &&
         shared.HM.getIsNewConversation?.(state) === true && shared.HM.getAllMessages?.(state)?.length === 1 &&
-        state.isLoading === false && state.is_do_not_remember === false && shared.textHistoryDisabled() === false;
+        state.isLoading === false && typeof state.is_do_not_remember === 'boolean' &&
+        (temporary || state.is_do_not_remember === false) && shared.textHistoryDisabled() === temporary;
       if (!parent || parent.id !== props.currentLeafId ||
           (newConversation ? !rootParent : !idPattern.test(parent.id) || !(completedAssistant || confirmedStoppedUser)) ||
           shared.textModelOverride()?.model_slug === model?.id) fail('parent_unavailable');
       const requestedDefaultModel = newConversation ? conversation.textRequestedDefaultModel(selected, model?.id) ?? null : null;
       if (requestedDefaultModel !== null && (typeof requestedDefaultModel !== 'string' ||
           !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(requestedDefaultModel))) fail('context_invalid');
+      let temporaryPersonalization = null;
+      if (temporary && newConversation) {
+        if (['textTemporaryPersonalizationEnabled', 'textTemporaryPersonalization', 'textReadUntracked']
+          .some(key => typeof shared[key] !== 'function')) fail('runtime_unavailable');
+        const enabled = shared.textTemporaryPersonalizationEnabled();
+        if (typeof enabled !== 'boolean') fail('context_invalid');
+        if (enabled) {
+          temporaryPersonalization = shared.textReadUntracked(() => shared.textTemporaryPersonalization(selected.id));
+          if (typeof temporaryPersonalization !== 'boolean') fail('context_invalid');
+        }
+      }
       return { conversationId: binding.serverId, parentId: parent.id, parentRole: parent.author.role, model: model?.id,
-        newConversation, requestedDefaultModel,
+        newConversation, requestedDefaultModel, temporary, temporaryPersonalization,
         tool: selectedTool, projectId, projectHeaders: projectHeaders(state, projectId),
         effort: conversation.yRt(selected).conversationThinkingEffort$() ?? null,
         serviceTier: conversation.l0(selected).getServiceTierForSubmission$() ?? null,
@@ -179,6 +200,8 @@
     }
     const snapshot = read(), fingerprint = JSON.stringify(snapshot);
     function ownedRoute() {
+      if (temporary) return page.location.href === href && shared.textNavigationKey() === navigationKey &&
+        binding.shared.getSharedProps().conversation === selected;
       if (!newConversation) return page.location.href === href;
       if (navigating && serverId) {
         const currentUrl = new URL(page.location.href), target = routePattern.exec(currentUrl.pathname);
@@ -197,8 +220,9 @@
       try {
         return document === page.document && token === page.__elonChatGptDocumentToken && ownedRoute() &&
           bindings.state().profile_id === PROFILE && account() === ownerAccount && registeredOwner() &&
-          (!newConversation || shared.cX?.() === false && shared.uo(selected) === false &&
-            shared.textHistoryDisabled() === false && tree()?.is_do_not_remember === false) &&
+          (temporary ? shared.cX?.() === true && shared.uo(selected) === false && shared.textHistoryDisabled() === true &&
+            typeof tree()?.is_do_not_remember === 'boolean' : !newConversation || shared.cX?.() === false &&
+              shared.uo(selected) === false && shared.textHistoryDisabled() === false && tree()?.is_do_not_remember === false) &&
           (selected.serverId$() ?? null) === serverId && scope(tree()) === snapshot.projectId;
       } catch (_) { return false; }
     }
@@ -236,6 +260,7 @@
         return owns() && shared.textResolvedConversationId(selected.id) === id;
       },
       async finalize(signal) {
+        if (temporary) return !signal.aborted && !!serverId && owns();
         if (!newConversation) return true;
         if (signal.aborted || !owns() || !serverId) return false;
         let active = true, navigationFailed = false;
@@ -258,7 +283,7 @@
           return false;
         } finally { active = false; }
       },
-      navigationReady: () => !newConversation || navigated,
+      navigationReady: () => temporary || !newConversation || navigated,
       canReconcile(userMessageId) {
         if (!serverId || !owns() || !historyAllowed()) return false;
         const state = tree(), leaf = shared.HM.getCurrentMessage(state);

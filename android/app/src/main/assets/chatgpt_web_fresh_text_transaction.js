@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 12, create: factory });
+  const api = Object.freeze({ version: 13, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -110,6 +110,7 @@
     const allowTools = page.__elonChatGptFreshTextToolsEnabled === true || trialArmed();
     const allowProjects = page.__elonChatGptFreshTextProjectsEnabled === true || trialArmed();
     const allowNewConversations = page.__elonChatGptFreshTextNewConversationsEnabled === true || trialArmed();
+    const allowTemporary = page.__elonChatGptFreshTextTemporaryEnabled === true || trialArmed();
     trial = null;
     let resolve;
     const owner = { token, document, stamp, controller: new page.AbortController(), phase: 'preparing',
@@ -167,7 +168,8 @@
 
     async function run() {
       timeout(options.prepareTimeoutMs || 15000, 'preparation_timeout');
-      owner.binding = await abortable(context.capture(command.composer, continuation, { allowTools, allowProjects, allowNewConversations }));
+      owner.binding = await abortable(context.capture(command.composer, continuation,
+        { allowTools, allowProjects, allowNewConversations, allowTemporary }));
       check();
       owner.request = requests.create(owner.binding, command);
       const { shared, runtime } = owner.binding;
@@ -337,5 +339,5 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 12, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
+  return Object.freeze({ version: 13, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });
