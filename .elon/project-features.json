@@ -416,6 +416,161 @@
       "updated_at_ms": 1789111392093
     },
     {
+      "id": "android-binance-command-handoff-v1",
+      "title": "币安页面重建接续原命令结果",
+      "summary": "依据真实事件持有关系交接创建和管理会话，保留未决记录并清除旧确认，避免等待旧租约。",
+      "status": "implemented",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/android-binance-command-handoff-v1.md",
+        "content_hash": "ea436de53f24199cec064aa71c23dc0ab717672ffadab15cbb443c8f2686cfca",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "0f4a5f96eecdfa66e2378d5c0cded3572368e425",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "5a7663601011df2a816cdd9da400a5fa219e390e",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "android-session-host",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateCommands.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostRuntime.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageCommands.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "实际命令服务重建恢复和旧命令拒绝通过",
+        "原未决状态及日志回调保留且准备失效",
+        "正式主包发布，双包设备验收分别记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/build.gradle",
+          "content_hash": "e586da56d35d2fef4da751c93763ce56349ba3346e69b67e91aa094aad0e914b",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0f4a5f96eecdfa66e2378d5c0cded3572368e425",
+            "head_blob_oid": "ca76e0a2210ded06fcde84d08c636002ef83db12",
+            "worktree_blob_oid": "08908e0d084911628ebc1776ae3b34ec9d49b195",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceCreateCommands.kt",
+          "content_hash": "6de038d17f6ebab9d154abbddb2e5421010a18e06d8ae2d1054b17a5d8d2df01",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0f4a5f96eecdfa66e2378d5c0cded3572368e425",
+            "head_blob_oid": "ccc367c09ab408c792be80a96e0d480cd30d903c",
+            "worktree_blob_oid": "0644fc714808dea4fe88ca9a5882f99fa494b1c9",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceCommandHandoff.kt",
+          "content_hash": "0ce23204a6f902444a7242bacbc21280646ed4fe60d92a99f6c70a7734936e71",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0f4a5f96eecdfa66e2378d5c0cded3572368e425",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0ec41ad23ddfd6fa189f759c0c1d4078f77939d9",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceHostRuntime.kt",
+          "content_hash": "98110055bccf281cd7993015a9b860b3792818e4cb27c40f6641b3313b7e9b4c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0f4a5f96eecdfa66e2378d5c0cded3572368e425",
+            "head_blob_oid": "50e6d79c32e533c4786a2c09cb7127e3fdf553cb",
+            "worktree_blob_oid": "2000a8674346233df85565bb0ac27ea090aea473",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/manage/BinanceManageCommands.kt",
+          "content_hash": "54ab2242675a8b3ca9b76cbcf76e5e876a23fb40173fbd568a1bf55c4449e79f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0f4a5f96eecdfa66e2378d5c0cded3572368e425",
+            "head_blob_oid": "8642e697cbb8f526ce655fa77f1764fdca9e474c",
+            "worktree_blob_oid": "f352907301fa75eb16d94d34200dfe8522b0a15a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/host/BinanceCommandFixture.kt",
+          "content_hash": "781455d352e74d1528e5e01b42c9f31ce669cb9f849c3032896a5744c2759a40",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0f4a5f96eecdfa66e2378d5c0cded3572368e425",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4bdef7c89d089831e6fc5314b230ceed0d602d13",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/host/BinanceCommandHandoffTest.kt",
+          "content_hash": "4293597d4de8f22dc98ae1a26a78f0a9c9efee2ae8f5a0e4fdf7f8e7aec716dd",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0f4a5f96eecdfa66e2378d5c0cded3572368e425",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "01efc59db545cca5b8b70026d06e7b9b358e5d31",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/gradle.properties",
+          "content_hash": "05b4d89b0aa5d987b4e38463b3707ff25dee1d2d837046191afb04c2680902b7",
+          "locator": "",
+          "evidence_kind": "configuration",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0f4a5f96eecdfa66e2378d5c0cded3572368e425",
+            "head_blob_oid": "17abba48ddb2a1926c11d8a3508eebfc6111d697",
+            "worktree_blob_oid": "b96149084d400e6299fb907a0f7de3748cf2e79c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/delivery/android-binance-command-handoff-20260913.md",
+          "content_hash": "21bca1daafeff0560cd9df8a163216312ece8cfecb99d658dfc4c8e75bd2cf3c",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0f4a5f96eecdfa66e2378d5c0cded3572368e425",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ffd3a9b889851575a6f09ec6812c9da31b75fd28",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1789311761227,
+      "updated_at_ms": 1789312678076
+    },
+    {
       "id": "android-binance-create-economics-v1",
       "title": "创建网格经济参数只读参考",
       "summary": "V2参考在动态范围和最低投入基础上提供手续费后利润和每笔数量，保留V1合同和会话隔离。",
@@ -27288,56 +27443,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_31c0c2fddcbd4b65840bc0bae3ac7f3d",
-      "feature_id": "android-binance-grid-create-v1",
-      "action": "registered",
-      "actor": "codex-binance-create",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788855780561
-    },
-    {
-      "id": "feature_event_46b5799f9a23496b981761b1dd5ea29c",
-      "feature_id": "android-binance-grid-create-v1",
-      "action": "claimed",
-      "actor": "codex-binance-create",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788855814296
-    },
-    {
-      "id": "feature_event_6d5d41e4df5b4ea1b731f106d836fd60",
-      "feature_id": "android-binance-grid-create-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-create",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788855836024
-    },
-    {
-      "id": "feature_event_2edd1291a483469fabeb14e263d3d38a",
-      "feature_id": "android-binance-grid-create-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-create",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788857645652
-    },
-    {
-      "id": "feature_event_8bf92e50f6bb491f912d57e8ebd80f4b",
-      "feature_id": "android-binance-grid-create-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-create",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788857698403
-    },
-    {
       "id": "feature_event_c7bbea06745e40c188f94b33837c3a9c",
       "feature_id": "android-binance-grid-create-v1",
       "action": "transitioned",
@@ -29286,6 +29391,56 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1789307173524
+    },
+    {
+      "id": "feature_event_04f7522725624803b964967327a589fe",
+      "feature_id": "android-binance-command-handoff-v1",
+      "action": "registered",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789311761227
+    },
+    {
+      "id": "feature_event_422c251e87c54640ae49ff5777dbd79d",
+      "feature_id": "android-binance-command-handoff-v1",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789311761266
+    },
+    {
+      "id": "feature_event_26e945cd25d84380b23ac44185646e5b",
+      "feature_id": "android-binance-command-handoff-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "补当前固定open命令的重建接续，保留所有真实交易边界。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789311761309
+    },
+    {
+      "id": "feature_event_53dcbcb2f7324a90a0ab2f78ca44a81e",
+      "feature_id": "android-binance-command-handoff-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789312678013
+    },
+    {
+      "id": "feature_event_cb5a2f74e168404fa0226fb74d176961",
+      "feature_id": "android-binance-command-handoff-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "177项相关回归含10项真实命令交接通过；正式发布及手机实读另列待验，未做交易。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789312678076
     }
   ]
 }

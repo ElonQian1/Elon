@@ -43,6 +43,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         com.elon.app.grid.create.BinanceCreateCommands.membershipChanged()
         com.elon.app.grid.manage.BinanceManageCommands.membershipChanged()
         if(captured!=null){deadline=SystemClock.elapsedRealtime()+900_000;armExpiry()}
+        events.changed("state")
     }
     private fun notifyChanged(){onChanged?.invoke();events.changed("state");events.changed("read")}
     fun referenceObserved(raw:String) {

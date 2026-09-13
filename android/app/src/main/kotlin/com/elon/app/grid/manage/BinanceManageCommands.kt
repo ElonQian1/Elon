@@ -49,7 +49,14 @@ internal class BinanceManageCommands private constructor(context: Context, priva
         require(extras.keySet() == fields && fields.all { extras.get(it) is String })
         val id = extras.getString("operation").orEmpty(); require(Regex("[a-f0-9]{64}").matches(id))
         if(method == "manage_open_v2") {
-            if(operation.isNotEmpty() && operation != id) return short("busy","已有管理流程，请回原页面处理")
+            if(operation.isNotEmpty() && operation != id) {
+                val adopted=com.elon.app.grid.host.BinanceCommandHandoff.adopt("manage",operation,id,host.events) {
+                    permit.clear();preparation="";digest="";note=""
+                    if(!state.unresolved){session?.cancel();selected=""}
+                }
+                if(!adopted)return short("busy","已有管理流程，请回原页面处理")
+                operation=id
+            }
             if(operation.isEmpty()) {
                 version=requestedVersion
                 if(!BinanceCreateSlot.shared.acquire(this)) return short("busy","创建或管理连接正在使用中")

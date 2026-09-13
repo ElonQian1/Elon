@@ -59,7 +59,15 @@ internal class BinanceCreateCommands private constructor(private val context: Co
         val id = extras.getString("operation") ?: error("OPERATION_MISSING")
         require(Regex("[a-f0-9]{64}").matches(id))
         if (method == "create_open_v2") {
-            if (operation.isNotEmpty() && operation != id) return unavailable("busy", "另一创建流程正在进行，请返回原流程处理")
+            if (operation.isNotEmpty() && operation != id) {
+                val adopted=com.elon.app.grid.host.BinanceCommandHandoff.adopt("create",operation,id,host.events) {
+                    permit.clear();preparation="";digest="";note=""
+                    if(!attempt.unresolved){generation++;validating=false;session?.cancelPreparation()}
+                    referenceV2.close();funds.close()
+                }
+                if(!adopted)return unavailable("busy", "另一创建流程正在进行，请返回原流程处理")
+                operation=id
+            }
             if (!ownsSlot) {
                 if (!BinanceCreateSlot.shared.acquire(this)) return unavailable("busy", "已有创建或管理操作占用连接")
                 ownsSlot = true; operation = id
