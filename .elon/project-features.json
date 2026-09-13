@@ -3702,6 +3702,212 @@
       "updated_at_ms": 1788983543981
     },
     {
+      "id": "android-okx-read-host-v1",
+      "title": "Android 欧易只读授权服务",
+      "summary": "主 APK 托管只读授权，量化复用列表和详情；不含交易执行，实际账号独立验收。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/android-okx-read-host-v1.md",
+        "content_hash": "58c111403a03d5166b16fd81839ceb785126951d047e0d02816d2c2837be28f3",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "cb5937614a50b109b1dfa0ead7dceb6256000ded",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/AndroidManifest.xml",
+        "android/app/src/main/kotlin/com/elon/app/exchange/okx"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "官方固定只读接口和用户授权",
+        "账号隔离、撤销及错误恢复",
+        "共享模型界面与真实发布验收分别记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/exchange/okx/OkxConnectActivity.kt",
+          "content_hash": "b42da06a5470cf8540d9947a49f1d6bc351b99a9d14eb6e5679c7230ddf30d25",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "75e5d62c9dff178b46583de7608ef29ca39caa98",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/exchange/okx/OkxCredentialVault.kt",
+          "content_hash": "15dc8fe0de18339f1a8e921c2500a6bbc6ff8362637d658670072a740c6878a3",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7a83179f7c84303c861e7bb10d8d9f6e41a5adf4",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/exchange/okx/OkxReadHost.kt",
+          "content_hash": "25c67b0645f9d4ac97facda04ff74035160ebe6365e629bc1f4e4f536e8bfd76",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "200315dde5cbc3546d668cebc4fbcc7c447bc278",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/exchange/okx/OkxReadProtocol.kt",
+          "content_hash": "f01b41711126ce610bcf0892b26ccd90ac6e6499ebc22d3ffa2719b97178b43c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8c503034d499c75467731d1148881324214efc68",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/exchange/okx/OkxReadProvider.kt",
+          "content_hash": "d7dd09706eb4e81242e63b60713c241123926a50e98e2b715ce3c1772b7efd57",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0ab6578cb641b18b4e94924ba77611ee8dc78cb5",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/exchange/okx/OkxReadTransport.kt",
+          "content_hash": "068a00fcf3df5883bb9cafc59e1070a6981da7d78d1670c4134b85d9504fb63f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3697f82c902e16a6b2fcade03515b17367fae99a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/exchange/okx/OkxVaultCipher.kt",
+          "content_hash": "7aedc200837193ec53c5ce19d879912b0da9a419183fef9e2730fa911c384ac3",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "24b2b0c46cbed9bed38e457e9356cbea67ba83eb",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/exchange/okx/OkxPendingReaderTest.kt",
+          "content_hash": "a40253c7103a7da5c3ae5f1e56a9fff78a9c19490d8d386ac7cb85dfb54b3837",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f27a138ec1fb3c9abcd2415c5a51c979699e4f69",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/exchange/okx/OkxReadHostTest.kt",
+          "content_hash": "038348f2a803a973bcd24d51e12b1a8342f5721fd1d3ba131bce0daa2f3e2368",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "adad9821f01e939ec73b3df2e0bc6061555f66bf",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/exchange/okx/OkxReadProjectionTest.kt",
+          "content_hash": "4a8c8344c4eac9ea8e8730ea9c493d64c0fcc4f618028697d8b32b691e434f64",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "14665b00d12c8019ddff03f232837250b655add7",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/exchange/okx/OkxReadProtocolTest.kt",
+          "content_hash": "68a84e9b6a6736a5675363dba6779325690409f4d6079082b97953c36657359b",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "92b34b7bef6df3532780331a9d80dc0d1a9849cb",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/exchange/okx/OkxVaultCipherTest.kt",
+          "content_hash": "d011c70dddd374dc3e27a80777d9910aad08eee6c63ed012f684a14fbc74baa8",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a6a9b9276aed063f09306e86a425e54847112cbc",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/delivery/android-okx-read-host-20260913.md",
+          "content_hash": "a8e6871f179a388937dff95f79c7349c2d5a3720b1602c04145ee37e33cb0454",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6787d90fa25cbb8f67359f2255a60874ef46c6a7",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7fe5c2c45a1dd3e491cb48fc3d1a50865e7c9620",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1789302799478,
+      "updated_at_ms": 1789305382609
+    },
+    {
       "id": "android_binance_range_empty_stops_v1",
       "title": "币安区间兼容未设置的保护字段",
       "summary": "保留空保护的私有载荷形状，并在既有跨APK投影中输出null",
@@ -27082,56 +27288,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a49f254b9b8f4fed8fea0e914ea96d34",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-host",
-      "reason": "用户明确互换两端账号；需求改为按实际认证角色隔离，原本人只读、精确 UID 和撤销边界不变。",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788843022929
-    },
-    {
-      "id": "feature_event_61357235abc74e9fa700faaa9e232f65",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-host",
-      "reason": "用户明确互换两端账号；需求改为按实际认证角色隔离，原本人只读、精确 UID 和撤销边界不变。",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788843022961
-    },
-    {
-      "id": "feature_event_2b6a50a98858401ba981c44d3c524e20",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "claimed",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788843022989
-    },
-    {
-      "id": "feature_event_651fe6f0e90149d2bd4c09079f51c7c0",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-host",
-      "reason": "手机子账户空列表、撤销和重连已实测；真实详情和完整分页仍待验。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788843044633
-    },
-    {
-      "id": "feature_event_4f1c5ad9d6fa4072976e43d410a12a7e",
-      "feature_id": "android-binance-host-read-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-host",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788843049916
-    },
-    {
       "id": "feature_event_6b6b7d0d66e54cc38b3cee9c36ae95b3",
       "feature_id": "android-binance-host-read-v1",
       "action": "evidence_recorded",
@@ -29080,6 +29236,56 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1789292221802
+    },
+    {
+      "id": "feature_event_b3854cd5909442b38252ea730127e6ad",
+      "feature_id": "android-okx-read-host-v1",
+      "action": "registered",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789302799478
+    },
+    {
+      "id": "feature_event_f273ea89e6404b77b6fe513137d4c409",
+      "feature_id": "android-okx-read-host-v1",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789302799517
+    },
+    {
+      "id": "feature_event_face78ecb7204042ab6836933c9877a9",
+      "feature_id": "android-okx-read-host-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "进入主 APK 只读服务与量化入口实现",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789302799554
+    },
+    {
+      "id": "feature_event_4f4d16f4b4f0464d9731b90cdb4c6031",
+      "feature_id": "android-okx-read-host-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789305382547
+    },
+    {
+      "id": "feature_event_576da865db4d48b49d64cd308a05993d",
+      "feature_id": "android-okx-read-host-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "只读代码与离线合同已实现；正式发布、装机、视觉和真实API账号独立待验",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789305382609
     }
   ]
 }

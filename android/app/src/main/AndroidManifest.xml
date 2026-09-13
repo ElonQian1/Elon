@@ -84,6 +84,12 @@
         <activity android:name=".grid.host.BinanceHostConnectActivity"
             android:exported="true" android:excludeFromRecents="true"
             android:allowTaskReparenting="false" />
+        <activity android:name=".exchange.okx.OkxConnectActivity"
+            android:exported="true" android:excludeFromRecents="true"
+            android:allowTaskReparenting="false" />
+        <provider android:name=".exchange.okx.OkxReadProvider"
+            android:authorities="${applicationId}.okx-read-host"
+            android:exported="true" android:grantUriPermissions="false" />
         <provider android:name=".grid.host.BinanceHostProvider"
             android:authorities="${applicationId}.binance-host"
             android:exported="true" android:grantUriPermissions="false" />

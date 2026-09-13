@@ -1,0 +1,107 @@
+{
+  "schema": "yilong.okx_host_read.v1",
+  "environment": "live",
+  "account": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "account_kind": "sub",
+  "generation": 7,
+  "revision": 1,
+  "observed_at_ms": 1800000000100,
+  "fresh_until_ms": 1800000060100,
+  "detail_id": null,
+  "complete": true,
+  "bots": [
+    {
+      "bot": {
+        "schema_version": "grid-center.v1",
+        "id": "1234567890123456789",
+        "strategy_host": "okx_hosted",
+        "execution_venue": "okx",
+        "environment": "live",
+        "instrument": {
+          "id": "BTC-USDT-SWAP",
+          "base_asset": "BTC",
+          "quote_asset": "USDT",
+          "settlement_asset": "USDT",
+          "market_kind": "linear_perpetual",
+          "quantity_unit": "contracts",
+          "contract_multiplier": {
+            "value": null,
+            "missing_reason": "not_reported"
+          }
+        },
+        "created_at_ms": {
+          "value": 1700000000000,
+          "missing_reason": null
+        },
+        "status": "running",
+        "status_reason": null,
+        "parameters": {
+          "direction": {
+            "value": "long",
+            "missing_reason": null
+          },
+          "spacing": {
+            "value": "arithmetic",
+            "missing_reason": null
+          },
+          "lower_price": {
+            "value": "60000",
+            "missing_reason": null
+          },
+          "upper_price": {
+            "value": "70000",
+            "missing_reason": null
+          },
+          "grid_count": {
+            "value": 20,
+            "missing_reason": null
+          },
+          "quantity_per_grid": {
+            "value": null,
+            "missing_reason": "not_reported"
+          },
+          "leverage": {
+            "value": "3",
+            "missing_reason": null
+          }
+        },
+        "metrics": {
+          "currency": "USDT",
+          "exchange_reported_profit": {
+            "value": null,
+            "missing_reason": "not_verified"
+          },
+          "realized_gross_pnl": {
+            "value": null,
+            "missing_reason": "not_reported"
+          },
+          "unrealized_gross_pnl": {
+            "value": null,
+            "missing_reason": "not_reported"
+          },
+          "reconciled_net_pnl": {
+            "value": null,
+            "missing_reason": "not_reconciled"
+          },
+          "fees": {
+            "value": null,
+            "missing_reason": "not_reported"
+          },
+          "funding_fees": {
+            "value": null,
+            "missing_reason": "not_reported"
+          }
+        },
+        "provenance": {
+          "observed_at_ms": 1800000000100,
+          "received_at_ms": 1800000000100,
+          "generation": 7,
+          "simulated": false,
+          "source_kind": "exchange_reported"
+        }
+      },
+      "provider_status": "RUNNING",
+      "detail_available": false
+    }
+  ]
+}
