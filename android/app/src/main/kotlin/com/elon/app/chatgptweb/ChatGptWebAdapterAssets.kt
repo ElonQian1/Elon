@@ -122,6 +122,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_runtime_generation_state.js",
         "chatgpt_web_private_regenerate_contract.js", "chatgpt_web_private_regenerate_runtime.js",
         "chatgpt_web_private_stop_runtime.js",
+        "chatgpt_web_fresh_text_attachments.js",
         "chatgpt_web_fresh_text_request.js", "chatgpt_web_fresh_text_context.js",
         "chatgpt_web_fresh_text_reconcile.js", "chatgpt_web_fresh_text_stop.js",
         "chatgpt_web_fresh_text_recovery.js", "chatgpt_web_fresh_text_stream.js",

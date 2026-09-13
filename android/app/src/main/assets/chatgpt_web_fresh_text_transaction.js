@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 13, create: factory });
+  const api = Object.freeze({ version: 14, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -43,13 +43,21 @@
   function state() {
     boundary();
     if (active?.dispatched && active.finished && !active.stopping && !active.recovering && !active.recoveryCompletion) {
-      try { if (active.stopConfirmed || active.recoveryConfirmed ||
+      try { if ((active.stopConfirmed || active.recoveryConfirmed ||
         active.binding.reconciled(active.request.userMessageId, active.stopAcknowledged === true) &&
-          active.binding.navigationReady?.() !== false) active = null; } catch (_) {}
+          active.binding.navigationReady?.() !== false) && retireAttachments(active)) active = null; } catch (_) {}
     }
     return { version: 6, transport: 'fresh_page_http_v1', pending: active !== null,
       phase: active?.phase || 'idle', dispatched: active?.dispatched === true,
       accepted: active?.accepted === true, code: active?.code || '', recovering: active?.recovering === true };
+  }
+
+  function retireAttachments(owner) {
+    if (!owner.binding?.attachments || owner.attachmentsRetired) return true;
+    if (!owner.accepted && !owner.stopConfirmed && !owner.recoveryConfirmed) return false;
+    try { owner.attachmentsRetired = owner.binding.attachments.consumeAccepted() === true; } catch (_) {}
+    if (!owner.attachmentsRetired) owner.code = 'attachment_cleanup_pending';
+    return owner.attachmentsRetired === true;
   }
 
   function trialArmed() {
@@ -101,7 +109,8 @@
     const stamp = context.stamp();
     if (!stamp) return { handled: false, code: 'identity_unavailable' };
     if (!/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || '') || typeof command.prompt !== 'string' ||
-        !command.prompt.trim() || command.prompt.length > 20000 || typeof command.expectedDraft !== 'string' ||
+        !command.prompt.trim() && page.__elonChatGptFreshTextAttachmentsEnabled !== true && !trialArmed() ||
+        command.prompt.length > 20000 || typeof command.expectedDraft !== 'string' ||
         command.expectedDraft && command.expectedDraft !== command.prompt) return { handled: false, code: 'invalid_command' };
     const admission = records.admit(command.requestId);
     if (admission) return { handled: true, completion: Promise.resolve({ status: 'rejected', code: admission }) };
@@ -111,6 +120,7 @@
     const allowProjects = page.__elonChatGptFreshTextProjectsEnabled === true || trialArmed();
     const allowNewConversations = page.__elonChatGptFreshTextNewConversationsEnabled === true || trialArmed();
     const allowTemporary = page.__elonChatGptFreshTextTemporaryEnabled === true || trialArmed();
+    const allowAttachments = page.__elonChatGptFreshTextAttachmentsEnabled === true || trialArmed();
     trial = null;
     let resolve;
     const owner = { token, document, stamp, controller: new page.AbortController(), phase: 'preparing',
@@ -137,7 +147,7 @@
     records.set(command.requestId, { prompt: command.prompt, expectedDraft: command.expectedDraft,
       href: page.location.href, stamp, transaction,
       retirable: () => owner.finished && !owner.stopping && !owner.recovering && !owner.recoveryCompletion &&
-        (!owner.dispatched || owner.stopConfirmed === true || owner.recoveryConfirmed === true) });
+        (!owner.dispatched || (owner.stopConfirmed === true || owner.recoveryConfirmed === true) && retireAttachments(owner)) });
     active = owner;
     last = owner;
     function current() {
@@ -169,7 +179,7 @@
     async function run() {
       timeout(options.prepareTimeoutMs || 15000, 'preparation_timeout');
       owner.binding = await abortable(context.capture(command.composer, continuation,
-        { allowTools, allowProjects, allowNewConversations, allowTemporary }));
+        { allowTools, allowProjects, allowNewConversations, allowTemporary, allowAttachments }));
       check();
       owner.request = requests.create(owner.binding, command);
       const { shared, runtime } = owner.binding;
@@ -236,6 +246,7 @@
           if (next.value.response.ok !== true ||
               !next.value.response.headers?.get('content-type')?.includes('text/event-stream')) throw Error('stream_unavailable');
           owner.accepted = true; owner.phase = 'streaming';
+          retireAttachments(owner);
           timeout(options.streamTimeoutMs || 600000, 'stream_timeout');
           // Draft cleanup must never delay or change acceptance of the write.
           try { if (owner.binding.owns() && command.readDraft() === command.expectedDraft && command.expectedDraft) command.clearDraft?.(); } catch (_) {}
@@ -339,5 +350,5 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 13, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
+  return Object.freeze({ version: 14, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

@@ -30,9 +30,10 @@ reading/edit/export and ordinary save are accepted (1692; code export 1688).
 temporary/library/typed-widget save remains incomplete.
 
 [Fresh tools](chatgpt-fresh-tool-text-dispatch.md),
-[project sends](chatgpt-fresh-project-text-dispatch.md) and
-[new conversations](chatgpt-fresh-new-text-dispatch.md) and
-[temporary sends/cache guard](chatgpt-fresh-temporary-text-dispatch.md) are
+[project sends](chatgpt-fresh-project-text-dispatch.md),
+[new conversations](chatgpt-fresh-new-text-dispatch.md),
+[temporary sends/cache guard](chatgpt-fresh-temporary-text-dispatch.md) and
+[owned attachment sends](chatgpt-fresh-attachment-text-dispatch.md) are
 offline-verified; group APK/native acceptance. None is promoted yet.
 
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):

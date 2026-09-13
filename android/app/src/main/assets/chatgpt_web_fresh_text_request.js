@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextRequest = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -48,8 +48,11 @@
 
   function create(context, command) {
     if (!/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || '') ||
-        typeof command.prompt !== 'string' || !command.prompt.trim() || command.prompt.length > 20000) fail('command_invalid');
-    const preparedBody = body(context);
+        typeof command.prompt !== 'string' || !command.prompt.trim() && !context?.attachments || command.prompt.length > 20000) fail('command_invalid');
+    const commonBody = body(context);
+    const attachmentMessage = context.attachments?.message(command.prompt, context);
+    const preparedBody = { ...commonBody,
+      ...(attachmentMessage ? { attachment_mime_types: [...context.attachments.mimeTypes] } : {}) };
     const suppliedHeaders = context.projectHeaders ?? {};
     if (typeof suppliedHeaders !== 'object' || Array.isArray(suppliedHeaders) ||
         Object.entries(suppliedHeaders).some(([key, value]) => context.projectId == null ||
@@ -59,10 +62,10 @@
     const tool = context.tool ?? null;
     // The website prepares using the selected hint, but Search dispatch uses a
     // force flag. User metadata retains the selection for history/UI continuity.
-    const dispatchBody = { ...preparedBody,
+    const dispatchBody = { ...commonBody,
       ...(context.requestedDefaultModel != null ? { requested_default_model: context.requestedDefaultModel,
         one_off_model_override: true } : {}),
-      ...(tool ? { enable_message_followups: true } : {}),
+      ...(tool || attachmentMessage ? { enable_message_followups: true } : {}),
       ...(tool === 'search' ? { system_hints: [], force_use_search: true,
         client_reported_search_source: 'conversation_composer_web_icon' } : {}) };
     const userMessageId = page.crypto.randomUUID(), turnId = page.crypto.randomUUID();
@@ -105,8 +108,9 @@
           body: { ...dispatchBody, conversation_mode: { ...dispatchBody.conversation_mode },
             system_hints: [...dispatchBody.system_hints], client_prepare_state: 'success', messages: [{
             id: userMessageId, author: { role: 'user' }, create_time: Date.now() / 1000,
-            content: { content_type: 'text', parts: [command.prompt] },
-            ...(tool ? { metadata: { system_hints: [tool] } } : {})
+            content: attachmentMessage?.content || { content_type: 'text', parts: [command.prompt] },
+            ...(tool || attachmentMessage ? { metadata: { ...attachmentMessage?.metadata,
+              ...(tool ? { system_hints: [tool] } : {}) } } : {})
           }] }
         };
       }

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -76,6 +76,13 @@
       fail('context_unavailable');
     }
     const selectedTool = editor.Ng(binding.controller)?.activeSystemHintType;
+    const selectedFiles = binding.files.files$(), readyFiles = binding.files.readyFiles$();
+    let attachments = null;
+    if (!Array.isArray(selectedFiles) || !Array.isArray(readyFiles)) fail('attachments_active');
+    if (selectedFiles.length || readyFiles.length) {
+      if (options.allowAttachments !== true || !page.__elonChatGptFreshTextAttachments) fail('attachments_active');
+      attachments = page.__elonChatGptFreshTextAttachments.capture(page, binding, conversation);
+    }
     let toolOwner = null;
     if (selectedTool !== null) {
       if (options.allowTools !== true || !['search', 'picture_v2'].includes(selectedTool)) fail('tools_active');
@@ -150,8 +157,9 @@
         'hideFromHistory', 'conversationOrigin'].some(key => state[key] != null && state[key] !== false) ||
           Object.keys(selected.config || {}).some(key => selected.config[key] != null && selected.config[key] !== false)) fail('scope_unsupported');
       const files = binding.files.files$(), ready = binding.files.readyFiles$();
-      if (!Array.isArray(files) || !Array.isArray(ready) || files.length || ready.length ||
-          binding.files.hasUploadInProgress$() !== false) fail('attachments_active');
+      if (!Array.isArray(files) || !Array.isArray(ready) || binding.files.hasUploadInProgress$() !== false ||
+          (attachments ? !attachments.current() || files.length !== selectedFiles.length || ready.length !== files.length
+            : files.length || ready.length)) fail('attachments_active');
       const hints = editor.Ng(binding.controller);
       if (hints?.locked !== false || hints.activeSystemHintType !== selectedTool ||
           !(hints.activeConnectorSystemHintTypes instanceof Set) || hints.activeConnectorSystemHintTypes.size ||
@@ -199,6 +207,7 @@
         historyDisabled: shared.textHistoryDisabled(), doNotRemember: state.is_do_not_remember === true };
     }
     const snapshot = read(), fingerprint = JSON.stringify(snapshot);
+    attachments?.prepare(snapshot);
     function ownedRoute() {
       if (temporary) return page.location.href === href && shared.textNavigationKey() === navigationKey &&
         binding.shared.getSharedProps().conversation === selected;
@@ -240,6 +249,7 @@
     }
     if (!current()) fail('context_changed');
     return Object.freeze({ ...snapshot, get conversationId() { return serverId; }, token, current, owns, shared, runtime: conversation,
+      attachments,
       beforeDispatch() {
         if (!current()) fail('context_changed');
         if (newConversation) conversation.textRememberFirstModel(selected, snapshot.requestedDefaultModel ?? snapshot.model);
@@ -300,6 +310,7 @@
         const state = tree(), user = shared.HM.getNodeIfExists(state, userMessageId);
         const parent = shared.HM.getParentNode(state, userMessageId);
         const leaf = shared.HM.getCurrentMessage(state);
+        if (attachments && !attachments.matchesHistory(user?.message)) return false;
         if (stopped && emptyStopped && user?.message?.author?.role === 'user' &&
             parent?.id === snapshot.parentId && leaf?.id === userMessageId && leaf.author?.role === 'user') return true;
         return user?.message?.author?.role === 'user' && parent?.id === snapshot.parentId &&

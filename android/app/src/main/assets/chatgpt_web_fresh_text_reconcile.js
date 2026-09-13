@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
@@ -23,7 +23,8 @@
         !payload.mapping || Array.isArray(payload.mapping)) return false;
     const mapping = payload.mapping, user = ownsKey(mapping, userMessageId) && mapping[userMessageId];
     if (user?.id !== userMessageId || user.message?.id !== userMessageId ||
-        user.message.author?.role !== 'user' || !parentMatches(payload, binding, user)) return false;
+        user.message.author?.role !== 'user' || !parentMatches(payload, binding, user) ||
+        binding.attachments && !binding.attachments.matchesHistory(user.message)) return false;
     let id = payload.current_node;
     const leaf = ownsKey(mapping, id) && mapping[id]?.message;
     if (!leaf || leaf.id !== id || !(leaf.author?.role === 'assistant' ||
