@@ -36,6 +36,8 @@ function fixture() {
   page.__elonChatGptPrivateRuntimeBindings = { state: () => ({ profile_id: 'web_20260912' }),
     peek: () => shared,
     load: async role => ({ shared, conversation, composer: { Ng: () => hints } })[role] };
+  page.__elonChatGptPrivateComposerToolContext = { capture: () => ({ ...binding, document: page.document,
+    account: identity, model: conversation.Nrn(selected).id, allowed: 'search,picture_v2' }) };
   return { page, node, selected, props, tree, parent, files, hints, shared, conversation, binding,
     identity: value => { identity = value; }, api: contextModule.create(page) };
 }
@@ -169,4 +171,62 @@ test('real history reconciliation rejects a writer that starts between network r
   const history = require('../android/app/src/main/assets/chatgpt_web_fresh_text_reconcile').create();
   assert.equal(await history.reconcile(binding, { userMessageId: uid }, new AbortController().signal), false);
   assert.equal(applies, 0);
+});
+
+for (const tool of ['search', 'picture_v2']) {
+  test(tool + ' needs explicit trial scope and existing account/model tool admission', async () => {
+    const f = fixture(); f.hints.activeSystemHintType = tool;
+    await assert.rejects(f.api.capture(f.node), /tools_active/);
+    const capture = f.page.__elonChatGptPrivateComposerToolContext.capture;
+    let admissions = 0;
+    f.page.__elonChatGptPrivateComposerToolContext.capture = () => { admissions++; return capture(); };
+    const owned = await f.api.capture(f.node, null, { allowTools: true });
+    assert.equal(owned.tool, tool); assert.equal(owned.current(), true); assert.equal(admissions, 1);
+    f.page.__elonChatGptPrivateComposerToolContext.capture = () => { throw Error('must not poll DOM'); };
+    f.node.isConnected = false;
+    assert.equal(owned.current(), true);
+    f.hints.activeSystemHintType = null;
+    assert.equal(owned.current(), false);
+  });
+}
+
+test('plain text does not acquire or depend on the tool menu', async () => {
+  const f = fixture(); delete f.page.__elonChatGptPrivateComposerToolContext;
+  const owned = await f.api.capture(f.node, null, { allowTools: true });
+  assert.equal(owned.tool, null); assert.equal(owned.current(), true);
+  f.hints.activeSystemHintType = 'search'; assert.equal(owned.current(), false);
+});
+
+test('tool admission does not bypass ownership, filtering, restrictions or busy state', async () => {
+  for (const mutate of [
+    f => { f.page.__elonChatGptPrivateComposerToolContext.capture = () => null; },
+    f => { f.hints.locked = true; },
+    f => { f.hints.activeConnectorSystemHintTypes.add('connector'); },
+    f => { f.hints.activeCustomAgentSystemHintType = 'agent'; },
+    f => { f.hints.coldStartCampaignCreativeId = 'campaign'; },
+    f => { f.hints.activeSystemHintType = 'canvas'; },
+    f => { f.hints.activeSystemHintType = 'tatertot'; },
+    f => { f.files.files$ = () => [{}]; },
+    f => { f.props.isDisabled = true; },
+    f => { f.shared.Fl = () => true; }
+  ]) {
+    const f = fixture(); f.hints.activeSystemHintType = 'search'; mutate(f);
+    await assert.rejects(f.api.capture(f.node, null, { allowTools: true }));
+  }
+  for (const field of ['controller', 'conversation', 'shared', 'serverId', 'href', 'token', 'account', 'document', 'model', 'allowed']) {
+    const f = fixture(); f.hints.activeSystemHintType = 'picture_v2';
+    const capture = f.page.__elonChatGptPrivateComposerToolContext.capture;
+    f.page.__elonChatGptPrivateComposerToolContext.capture = () => ({ ...capture(), [field]: 'different' });
+    await assert.rejects(f.api.capture(f.node, null, { allowTools: true }), /tools_active|context_changed/);
+  }
+});
+
+test('tool transactions freeze model and hint selection until actual dispatch', async () => {
+  for (const mutate of [f => { f.conversation.Nrn = () => ({ id: 'another-model' }); },
+    f => { f.hints.activeSystemHintType = 'picture_v2'; },
+    f => { f.hints.locked = true; }, f => { f.identity('another'); }]) {
+    const f = fixture(); f.hints.activeSystemHintType = 'search';
+    const owned = await f.api.capture(f.node, null, { allowTools: true });
+    mutate(f); assert.equal(owned.current(), false);
+  }
 });

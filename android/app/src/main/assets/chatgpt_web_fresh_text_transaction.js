@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 9, create: factory });
+  const api = Object.freeze({ version: 10, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -106,6 +106,7 @@
     if (admission) return { handled: true, completion: Promise.resolve({ status: 'rejected', code: admission }) };
     if (stoppedParent && !stoppedParent.current()) stoppedParent = null;
     const continuation = stoppedParent;
+    const allowTools = page.__elonChatGptFreshTextToolsEnabled === true || trialArmed();
     trial = null;
     let resolve;
     const owner = { token, document, stamp, controller: new page.AbortController(), phase: 'preparing',
@@ -163,7 +164,7 @@
 
     async function run() {
       timeout(options.prepareTimeoutMs || 15000, 'preparation_timeout');
-      owner.binding = await abortable(context.capture(command.composer, continuation));
+      owner.binding = await abortable(context.capture(command.composer, continuation, { allowTools }));
       check();
       owner.request = requests.create(owner.binding, command);
       const { shared, runtime } = owner.binding;
@@ -175,7 +176,7 @@
         disableAutomaticRetry: true
       }));
       check();
-      const security = await abortable(Promise.resolve(runtime.textSecurity({ systemHints: [] })));
+      const security = await abortable(Promise.resolve(runtime.textSecurity(owner.request.securityMetadata())));
       check();
       const request = owner.request.consume(prepared, security, shared.textSecurityHeaders, current);
       const stream = page.__elonChatGptPrivateStreamTransport;
@@ -329,5 +330,5 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 9, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
+  return Object.freeze({ version: 10, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

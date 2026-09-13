@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -19,7 +19,7 @@
     } catch (_) { return null; }
   }
 
-  async function capture(composer, stoppedParent) {
+  async function capture(composer, stoppedParent, options = {}) {
     const bindings = page.__elonChatGptPrivateRuntimeBindings;
     if (bindings?.state?.().profile_id !== PROFILE) fail('runtime_unavailable');
     const token = page.__elonChatGptDocumentToken, href = page.location.href, document = page.document;
@@ -47,6 +47,19 @@
         typeof conversation.textHydrateHistory !== 'function' ||
         typeof editor.Ng !== 'function') fail('runtime_unavailable');
     const selected = binding.conversation, tree = () => shared.XM(selected.id);
+    const selectedTool = editor.Ng(binding.controller)?.activeSystemHintType;
+    let toolOwner = null;
+    if (selectedTool !== null) {
+      if (options.allowTools !== true || !['search', 'picture_v2'].includes(selectedTool)) fail('tools_active');
+      // Reuse the account/model-filtered tool menu once for admission. The owned
+      // transaction subsequently observes the in-memory selection, not DOM layout.
+      toolOwner = page.__elonChatGptPrivateComposerToolContext?.capture(page, [
+        { hint: 'search', semantic: 'web_search' }, { hint: 'picture_v2', semantic: 'image_generation' }
+      ]);
+      if (!toolOwner || ['controller', 'conversation', 'shared', 'serverId', 'href', 'token', 'account']
+        .some(key => toolOwner[key] !== afterLoad[key]) || toolOwner.document !== document ||
+          !toolOwner.allowed?.split(',').includes(selectedTool)) fail('tools_active');
+    }
     function registeredOwner() {
       const conversations = shared.canvasConversations?.();
       if (!Array.isArray(conversations) || conversations.length > 512) return false;
@@ -71,7 +84,7 @@
       if (!Array.isArray(files) || !Array.isArray(ready) || files.length || ready.length ||
           binding.files.hasUploadInProgress$() !== false) fail('attachments_active');
       const hints = editor.Ng(binding.controller);
-      if (hints?.locked !== false || hints.activeSystemHintType !== null ||
+      if (hints?.locked !== false || hints.activeSystemHintType !== selectedTool ||
           !(hints.activeConnectorSystemHintTypes instanceof Set) || hints.activeConnectorSystemHintTypes.size ||
           hints.activeCustomAgentSystemHintType !== null || hints.coldStartCampaignCreativeId != null) fail('tools_active');
       const request = shared.HM.getRequestId(state), status = shared.Fx(selected);
@@ -82,6 +95,7 @@
           page.__elonChatGptPrivateStopRuntime?.state?.().pending ||
           page.__elonChatGptCanvasDocumentActions?.generationPending?.()) fail('conversation_busy');
       const parent = shared.HM.getCurrentMessage(state), model = conversation.Nrn(selected);
+      if (toolOwner && toolOwner.model !== model?.id) fail('context_changed');
       const completedAssistant = parent?.author?.role === 'assistant' &&
         (parent.status === 'finished_partial_completion' || parent.status === 'finished_successfully' && parent.end_turn === true);
       const confirmedStoppedUser = parent?.author?.role === 'user' && stoppedParent?.id === parent.id &&
@@ -90,6 +104,7 @@
           !(completedAssistant || confirmedStoppedUser) ||
           shared.textModelOverride()?.model_slug === model?.id) fail('parent_unavailable');
       return { conversationId: binding.serverId, parentId: parent.id, parentRole: parent.author.role, model: model?.id,
+        tool: selectedTool,
         effort: conversation.yRt(selected).conversationThinkingEffort$() ?? null,
         serviceTier: conversation.l0(selected).getServiceTierForSubmission$() ?? null,
         historyDisabled: shared.textHistoryDisabled(), doNotRemember: state.is_do_not_remember === true };

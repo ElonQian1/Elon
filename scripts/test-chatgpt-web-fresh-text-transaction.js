@@ -35,7 +35,7 @@ function fixture(options = {}) {
       return options.prepare ? options.prepare() : { conduit_token: 'fixture-conduit' };
     } }, textSecurityHeaders: headers, textTopic: () => { throw Error('unexpected_topic'); } },
     runtime: {
-      textSecurity: () => { calls.push({ kind: 'security' }); return options.security ? options.security() : security; },
+      textSecurity: metadata => { calls.push({ kind: 'security', metadata }); return options.security ? options.security() : security; },
       textStream: (url, value) => {
         calls.push({ kind: 'stream_setup', url, value });
         if (options.stream) return options.stream(value);
@@ -86,6 +86,36 @@ test('controlled trial allows one production dispatch without changing the defau
   assert.equal(f.send({ requestId: 'mcp_trial2' }).handled, false);
   assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
   assert.equal(JSON.stringify(evidence).includes(command.prompt), false);
+});
+
+test('tool trial admits only its single send and uses the dispatch security hints', async () => {
+  for (const tool of ['search', 'picture_v2']) {
+    const admissions = [];
+    let f;
+    f = fixture({ reconciliation: async () => true, capture: async (_, __, options) => {
+      admissions.push(options.allowTools);
+      if (!options.allowTools) throw Error('tools_active');
+      return f.binding;
+    } });
+    f.binding.tool = tool;
+    const first = f.send();
+    assert.equal((await first.completion).status, 'unavailable');
+    assert.equal(first.claimFallback(), true);
+    assert.equal(f.calls.filter(c => c.kind === 'prepare').length, 0);
+    await turn();
+    assert.equal(f.api.trialControl('start').armed, true);
+    assert.equal((await f.send({ requestId: 'mcp_trialtools' }).completion).status, 'accepted');
+    await turn(); await turn();
+    assert.equal(f.api.trialControl('state').reconciled, true);
+    assert.deepEqual(f.calls.find(c => c.kind === 'prepare').value.requestBody.system_hints, [tool]);
+    assert.deepEqual(f.calls.find(c => c.kind === 'security').metadata.systemHints, tool === 'search' ? [] : [tool]);
+    assert.deepEqual(f.calls.find(c => c.kind === 'stream_setup').value.body.messages[0].metadata.system_hints, [tool]);
+    assert.equal((await f.send({ requestId: 'mcp_aftertools' }).completion).status, 'unavailable');
+    assert.deepEqual(admissions, [false, true, false]);
+    assert.equal(f.calls.filter(c => c.kind === 'post').length, 1);
+    assert.equal(f.page.__elonChatGptFreshTextToolsEnabled, undefined);
+    f.api.dispose();
+  }
 });
 
 test('verified existing-conversation scope is enabled by default but preserves both explicit off switches', async () => {
