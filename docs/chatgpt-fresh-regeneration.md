@@ -141,6 +141,25 @@ resending. That ordering is covered by the smoke wiring test, not claimed as a
 new device recovery test. This fix changes diagnostic compatibility and test
 safety, not request construction or the production regeneration default.
 
+Grouped release `1.1.1704 / 1704`, source
+`face23e9b7d01ba3c4d9376e89f8318740af69dd`, was built, published and installed
+without clearing data. APK SHA-256:
+`53560e809616f5ccc9b6b8fe9e7e5578dd7a01b8e772cbea5af691720d453048`.
+The authoritative `fresh-trial-wire-release-20260913-165723-679` run completed
+successfully in 517.8 seconds; installed package metadata independently confirmed
+1704. The publisher's separate worktree-cleanup warning does not imply failed
+installation; task cleanup still uses the required finish contract.
+
+On Xiaomi, the first post-install production-surface readiness wait exceeded its
+40-second limit. A subsequent read-only check found native `social_ai/chat`,
+provider `chatgpt_web`, ready bridge/composer, retained authentication, adapter
+376 and no draft or stream. Without another reopen/reload, the actual native
+`fresh_text_trial_state` command returned valid version 7, idle, no pending writer
+and no armed trial. This confirms the diagnostic wire fix on the device, not a
+cold-start performance pass. Zero new messages, regenerate commands or trial
+arming were performed. Independent regeneration and its Stop case remain pending;
+the accepted runtime remains the default.
+
 Projects, temporary/new contexts, attachments/tools, feedback retry, branch
 selection UI and composer-free initial ownership remain outside this candidate.
 Preserve their current paths; extend only from actual protocol evidence.
