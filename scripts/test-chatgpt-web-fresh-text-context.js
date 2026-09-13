@@ -79,6 +79,30 @@ test('account switch during asynchronous binding load is rejected', async () => 
   await assert.rejects(f.api.capture(f.node), /context_changed/);
 });
 
+test('a user-only parent requires this sender confirmed stop and current branch proof', async () => {
+  const f = fixture(); f.parent.author.role = 'user'; f.parent.end_turn = false;
+  await assert.rejects(f.api.capture(f.node), /parent_unavailable/);
+  await assert.rejects(f.api.capture(f.node, { id: CID, current: () => true }), /parent_unavailable/);
+  await assert.rejects(f.api.capture(f.node, { id: PID, current: () => false }), /parent_unavailable/);
+  let valid = true;
+  const binding = await f.api.capture(f.node, { id: PID, current: () => valid });
+  assert.equal(binding.parentId, PID); assert.equal(binding.parentRole, 'user');
+  assert.equal(binding.current(), true);
+  valid = false; assert.equal(binding.current(), false);
+});
+
+test('stopped-user continuation never bypasses busy, identity, route or selected-parent checks', async () => {
+  for (const mutate of [f => { f.shared.Fl = () => true; },
+    f => { f.shared.Fx = () => ({ value: 3 }); },
+    f => { f.props.currentLeafId = CID; }, f => { f.page.location.href += '?temporary-chat=true'; }]) {
+    const f = fixture(); f.parent.author.role = 'user'; mutate(f);
+    await assert.rejects(f.api.capture(f.node, { id: PID, current: () => true }));
+  }
+  const f = fixture(); f.parent.author.role = 'user';
+  const binding = await f.api.capture(f.node, { id: PID, current: () => true });
+  f.identity('another'); assert.equal(binding.current(), false);
+});
+
 test('account, parent, model and document must still match before dispatch', async () => {
   for (const mutate of [f => f.identity('another'), f => { f.parent.id = CID; },
     f => { f.conversation.Nrn = () => ({ id: 'another-model' }); },

@@ -11,7 +11,7 @@ class ChatGptWebFreshTextTrialTest {
         .put("pending", false).put("phase", "completed").put("code", "")
         .put("dispatched", true).put("accepted", true).put("reconciled", true)
         .put("stream_events", 3).put("event_types", org.json.JSONArray(listOf("delta_encoding", "message")))
-        .put("history", "reconciled")
+        .put("history", "reconciled").put("parent_role", "assistant")
 
     @Test fun acceptsBoundedEvidenceThroughActualCommandReceiver() {
         val result = ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", sample().toString())
@@ -24,6 +24,7 @@ class ChatGptWebFreshTextTrialTest {
     @Test fun rejectsUnknownFieldsAndOutOfRangeCounters() {
         for (value in listOf(sample().put("content", "fixture"), sample().put("remaining_ms", 120001),
             sample().put("attempts", 65536), sample().put("code", "/c/fixture"), sample().put("version", 7),
+            sample().put("parent_role", "private_fixture"),
             sample().put("pending", "false"), sample().put("phase", "fixture"))) {
             assertEquals("invalid_protocol_evidence",
                 ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", value.toString()))
@@ -53,6 +54,7 @@ class ChatGptWebFreshTextTrialTest {
 
     @Test fun retainsVersionFiveReceiptsWhileAnOlderWriterIsStillActive() {
         val old = sample().put("version", 5).put("attempts", 32)
+        old.remove("parent_role")
         assertEquals(32, JSONObject(ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", old.toString())).getInt("attempts"))
         assertEquals("invalid_protocol_evidence", ChatGptWebPrivateProtocolEvidence.detail(
             "private_protocol_probe", old.put("attempts", 33).toString()))

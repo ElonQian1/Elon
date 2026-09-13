@@ -179,7 +179,7 @@ after claiming the same command once. Active writers, auth enforcement after
 capture, timeouts and ambiguous delivery cannot authorize an automatic replay.
 There is no periodic polling or second transcript store in these modules.
 
-## Not Completed
+## Lifecycle Follow-on Source Batch
 
 September 13 follow-on source batch: the experimental 32-send lifetime ceiling
 is replaced by 32 retained receipts and an exact retired-command sequence range.
@@ -189,10 +189,29 @@ their owner. Old commands outside the retained window are rejected, including
 when the private sender is disabled, rather than replayed through another sender.
 Diagnostics v6 count up to 65535 without limiting sends; the receiver also accepts
 bounded v5 receipts from an older active writer. The 92 focused JavaScript cases
-passed in `fresh-text-receipt-lifetime-20260913-075142-300`; Android validation and
-the grouped release are pending. This is not a repeated live-send stress test.
+passed in `fresh-text-receipt-lifetime-20260913-075142-300`. This is not a repeated
+live-send stress test.
 
-- Follow-up after a stopped user-only turn and extended stopped-turn variants.
+Context v2 and transaction v9 allow a user-only parent only after this exact
+sender received server stop acknowledgement and reconciled the same stopped
+branch. A bounded one-parent proof rechecks account, document, registry, parent
+and server-id ownership; it survives pre-dispatch unavailability but is removed
+on the next dispatch or document replacement. Partial-assistant follow-ups keep
+their real assistant parent. Reader cancellation alone grants no continuation.
+Stop completion can retain this proof even when the settled writer was already
+released; it cannot grant it to another active writer. Diagnostics v6 expose only
+`parent_role` so live user-only and partial-assistant results remain distinct.
+
+The combined 158 JavaScript cases passed in
+`fresh-text-continuation-20260913-075939-380`, including actual transaction,
+stop/history modules, both parent variants, a pre-dispatch interruption and no
+second stop request. Android validation and grouped production acceptance are
+pending. `-StopThenFollowup` reuses native send/stop buttons and records the
+observed parent role rather than assuming the server stopped before first text.
+
+## Not Completed
+
+- Live follow-up after a stopped user-only turn and extended stopped-turn variants.
   The ordinary completed-turn follow-up and native stop above are accepted;
   cancelling a reader alone still **does not** confirm server stop.
 - Live delayed-history/network-loss recovery, early handoff, anonymous SSE

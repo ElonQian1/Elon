@@ -7,10 +7,12 @@ internal object ChatGptWebFreshTextTrial {
     const val SCHEMA = "elon.fresh_text_trial.v1"
 
     fun sanitize(value: JSONObject): String {
-        require(value.keys().asSequence().toSet() == setOf("schema", "version", "control", "armed",
+        val fields = setOf("schema", "version", "control", "armed",
             "remaining_ms", "attempts", "pending", "phase", "code", "dispatched", "accepted", "reconciled",
-            "stream_events", "event_types", "history"))
+            "stream_events", "event_types", "history")
+        require(value.keys().asSequence().toSet() == if (value.opt("version") == 6) fields + "parent_role" else fields)
         require(value.opt("version") in setOf(5, 6))
+        if (value.opt("version") == 6) require(value.opt("parent_role") in setOf("user", "assistant", "unknown"))
         require(value.opt("control") in setOf("state", "armed", "ended", "busy", "disabled", "disposed",
             "identity_unavailable", "invalid_mode"))
         require(value.opt("phase") in setOf("idle", "preparing", "dispatching", "streaming", "reconciling",

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -19,7 +19,7 @@
     } catch (_) { return null; }
   }
 
-  async function capture(composer) {
+  async function capture(composer, stoppedParent) {
     const bindings = page.__elonChatGptPrivateRuntimeBindings;
     if (bindings?.state?.().profile_id !== PROFILE) fail('runtime_unavailable');
     const token = page.__elonChatGptDocumentToken, href = page.location.href, document = page.document;
@@ -82,11 +82,14 @@
           page.__elonChatGptPrivateStopRuntime?.state?.().pending ||
           page.__elonChatGptCanvasDocumentActions?.generationPending?.()) fail('conversation_busy');
       const parent = shared.HM.getCurrentMessage(state), model = conversation.Nrn(selected);
+      const completedAssistant = parent?.author?.role === 'assistant' &&
+        (parent.status === 'finished_partial_completion' || parent.status === 'finished_successfully' && parent.end_turn === true);
+      const confirmedStoppedUser = parent?.author?.role === 'user' && stoppedParent?.id === parent.id &&
+        stoppedParent.current() === true;
       if (!parent || parent.id !== props.currentLeafId || !idPattern.test(parent.id) ||
-          parent.author?.role !== 'assistant' || !(parent.status === 'finished_partial_completion' ||
-          parent.status === 'finished_successfully' && parent.end_turn === true) ||
+          !(completedAssistant || confirmedStoppedUser) ||
           shared.textModelOverride()?.model_slug === model?.id) fail('parent_unavailable');
-      return { conversationId: binding.serverId, parentId: parent.id, model: model?.id,
+      return { conversationId: binding.serverId, parentId: parent.id, parentRole: parent.author.role, model: model?.id,
         effort: conversation.yRt(selected).conversationThinkingEffort$() ?? null,
         serviceTier: conversation.l0(selected).getServiceTierForSubmission$() ?? null,
         historyDisabled: shared.textHistoryDisabled(), doNotRemember: state.is_do_not_remember === true };

@@ -7,7 +7,8 @@ param(
     [ValidateRange(30,180)][int]$TimeoutSec = 90,
     [switch]$OnlyStop,
     [switch]$UseDefault,
-    [switch]$FirstOnly
+    [switch]$FirstOnly,
+    [switch]$StopThenFollowup
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
@@ -90,6 +91,7 @@ function Native-Send([string]$Kind, [bool]$Candidate) {
                 $diagnostic.reconciled -and -not $diagnostic.pending))) {
             return [ordered]@{ kind=$Kind; native_button=$true; unique_user=$true; reply_matched=$matched; stop_clicked=$stopClicked;
                 fresh_http=$Candidate; reconciled=(!$Candidate -or $diagnostic.reconciled);
+                parent_role=$(if ($diagnostic) { $diagnostic.parent_role } else { 'unknown' });
                 reply_observed_ms=$firstReplyMs; total_ms=[long]([DateTimeOffset]::UtcNow - $started).TotalMilliseconds }
         }
         Start-Sleep -Seconds 1
@@ -134,7 +136,7 @@ try {
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $fixtureFile) | Out-Null
         @{path=$path} | ConvertTo-Json -Compress | Set-Content -LiteralPath $fixtureFile -Encoding utf8
     }
-    foreach ($kind in $(if ($OnlyStop) { @('stop') } elseif ($FirstOnly) { @('first') } else { @('first','followup') })) {
+    foreach ($kind in $(if ($StopThenFollowup) { @('stop','followup') } elseif ($OnlyStop) { @('stop') } elseif ($FirstOnly) { @('first') } else { @('first','followup') })) {
         $report.stage = $kind; Write-Output "FRESH_TEXT_STAGE=$kind"
         $report.cases += Native-Send $kind $true
     }

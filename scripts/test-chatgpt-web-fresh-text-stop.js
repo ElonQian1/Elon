@@ -142,9 +142,13 @@ test('stop before any assistant text uses the owned user leaf and requires serve
   }
 });
 
-test('owned stop crosses the real fresh transaction and releases only after server/history confirmation', async () => {
+for (const empty of [false, true]) test('owned stop and follow-up cross the real transaction with ' + (empty ? 'user-only' : 'partial assistant') + ' history', async () => {
   const transaction = require(assets + 'chatgpt_web_fresh_text_transaction');
-  const f = fixture();
+  const f = fixture({ post: async () => {
+    f.payload.async_status = null;
+    if (empty) delete f.payload.mapping[AID];
+    else f.payload.mapping[AID].message.status = 'finished_partial_completion';
+  } });
   Object.assign(f.page, { document: {}, location: { href: 'https://chatgpt.com/c/' + CID },
     __elonChatGptDocumentToken: 'doc_fresh_stop', __elonChatGptPrivateTextTransactionsEnabled: true,
     __elonChatGptFreshTextDispatchEnabled: true,
@@ -152,20 +156,32 @@ test('owned stop crosses the real fresh transaction and releases only after serv
     __elonChatGptPrivateStreamTransport: { preparePrivateSend: () => true,
       beginPrivateStream: () => ({ push() {}, finish() {} }) } });
   f.binding.shared.textTopic = () => { throw Error('unexpected_topic'); };
-  let release;
+  let release, sentId, captureCount = 0, postCount = 0;
   const streamWait = new Promise(resolve => { release = resolve; });
   f.binding.runtime.textSecurity = () => ({ chatReq: { token: 'fixture-security' } });
   f.binding.runtime.textStream = (_, init) => (async function* () {
     init.onBeforeRequestStart();
     const uid = init.body.messages[0].id;
+    if (++postCount === 2) {
+      assert.equal(init.body.parent_message_id, empty ? sentId : AID);
+      yield { response: new Response(null, { headers: { 'content-type': 'text/event-stream' } }) };
+      return;
+    }
+    sentId = uid;
     f.payload.mapping[uid] = { id: uid, parent: PID, message: { id: uid, author: { role: 'user' } } };
-    f.payload.mapping[AID].parent = uid;
+    if (empty) f.payload.current_node = uid;
+    else f.payload.mapping[AID].parent = uid;
     yield { response: new Response(null, { headers: { 'content-type': 'text/event-stream' } }) };
     await streamWait;
   })();
   const api = transaction.create(f.page, { requests: requestModule, reconciliation: history, stopping: f.api,
     receipts: require(assets + 'chatgpt_web_fresh_text_receipts'),
-    context: { capture: async () => f.binding, stamp: () => 'fixture-owner' } });
+    context: { capture: async (_, stoppedParent) => {
+      if (++captureCount === 1) { assert.equal(stoppedParent, null); return f.binding; }
+      assert.equal(stoppedParent.id, sentId); assert.equal(stoppedParent.current(), true);
+      if (captureCount === 2) throw Error('runtime_unavailable');
+      return { ...f.binding, parentId: empty ? sentId : AID, parentRole: empty ? 'user' : 'assistant' };
+    }, stamp: () => 'fixture-owner' } });
   const sent = api.send({ requestId: 'mcp_lifecycle', prompt: 'fixture', expectedDraft: '', readDraft: () => '' });
   assert.equal((await sent.completion).status, 'accepted');
   const stop = api.stop(); assert.equal(api.state().pending, true);
@@ -174,4 +190,13 @@ test('owned stop crosses the real fresh transaction and releases only after serv
   assert.equal(f.calls.filter(c => c.url === '/stop_conversation').length, 1);
   assert.equal(f.calls.filter(c => c.url === '/f/conversation/prepare').length, 1);
   release(); await tick(); assert.equal(api.state().pending, false);
+  const deferred = api.send({ requestId: 'mcp_deferred', prompt: 'Next fixture', expectedDraft: '', readDraft: () => '' });
+  assert.equal((await deferred.completion).status, 'unavailable'); await tick();
+  assert.equal(postCount, 1);
+  const next = api.send({ requestId: 'mcp_next', prompt: 'Next fixture', expectedDraft: '', readDraft: () => '' });
+  assert.equal((await next.completion).status, 'accepted');
+  await tick(); assert.equal(postCount, 2);
+  assert.equal(f.calls.filter(c => c.url === '/stop_conversation').length, 1);
+  assert.equal(f.calls.filter(c => c.url === '/f/conversation/prepare').length, 2);
+  assert.equal(api.trialControl('state').parent_role, empty ? 'user' : 'assistant');
 });

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 8, create: factory });
+  const api = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -19,7 +19,7 @@
   });
   const records = (options.receipts || page.__elonChatGptFreshTextReceipts).create();
   let document = page.document, token = page.__elonChatGptDocumentToken, active = null, disposed = false;
-  let trial = null, last = null;
+  let trial = null, last = null, stoppedParent = null;
   const now = options.now || Date.now;
   const eventTypes = new Set(['delta_encoding', 'message', 'input_message', 'message_stream_complete',
     'stream_handoff', 'resume_conversation_token', 'conversation_async_status', 'server_ste_metadata',
@@ -36,7 +36,7 @@
     if (document === page.document && token === page.__elonChatGptDocumentToken) return;
     active?.controller.abort();
     active?.stopBoundaryController.abort();
-    active = null; trial = null; last = null; records.clear();
+    active = null; trial = null; last = null; stoppedParent = null; records.clear();
     document = page.document; token = page.__elonChatGptDocumentToken;
   }
 
@@ -75,6 +75,7 @@
       attempts: records.attempts(), pending: active !== null, phase: last?.phase || 'idle',
       code: safeCode(last?.code), dispatched: last?.dispatched === true,
       accepted: last?.accepted === true, reconciled: last?.recoveryConfirmed === true || last?.stopConfirmed === true,
+      parent_role: ['user', 'assistant'].includes(last?.binding?.parentRole) ? last.binding.parentRole : 'unknown',
       stream_events: last?.streamEvents || 0, event_types: Array.from(last?.eventTypes || []),
       history: last?.historyCode || 'not_observed' };
   }
@@ -103,6 +104,8 @@
         command.expectedDraft && command.expectedDraft !== command.prompt) return { handled: false, code: 'invalid_command' };
     const admission = records.admit(command.requestId);
     if (admission) return { handled: true, completion: Promise.resolve({ status: 'rejected', code: admission }) };
+    if (stoppedParent && !stoppedParent.current()) stoppedParent = null;
+    const continuation = stoppedParent;
     trial = null;
     let resolve;
     const owner = { token, document, stamp, controller: new page.AbortController(), phase: 'preparing',
@@ -160,7 +163,7 @@
 
     async function run() {
       timeout(options.prepareTimeoutMs || 15000, 'preparation_timeout');
-      owner.binding = await abortable(context.capture(command.composer));
+      owner.binding = await abortable(context.capture(command.composer, continuation));
       check();
       owner.request = requests.create(owner.binding, command);
       const { shared, runtime } = owner.binding;
@@ -191,6 +194,7 @@
           // The provider invokes fetch immediately after this hook. Crossing
           // this boundary is uncertain even if fetch subsequently throws.
           owner.dispatched = true; owner.phase = 'dispatching';
+          stoppedParent = null;
           if (!stream.preparePrivateSend(command.prompt, owner.request.userMessageId)) throw Error('stream_unavailable');
           owner.sink = stream.beginPrivateStream({ conversationId: owner.binding.conversationId,
             userMessageId: owner.request.userMessageId, current: owner.stopCurrent });
@@ -274,9 +278,16 @@
     owner.recoveryController?.abort();
     owner.phase = 'stopping';
     const completion = stopping.stop(owner).then(receipt => {
-      if (active === owner) {
+      if ((active === owner || active === null) && owner.document === page.document &&
+          owner.token === page.__elonChatGptDocumentToken && owner.binding.owns()) {
         owner.phase = receipt.status === 'accepted' ? 'completed' : 'uncertain';
         owner.code = receipt.status === 'accepted' ? '' : receipt.code;
+        if (owner.stopConfirmed === true && owner.stopAcknowledged === true) {
+          const binding = owner.binding, id = owner.request.userMessageId;
+          stoppedParent = { id, current() {
+            try { return binding.reconciled(id, true, true) === true; } catch (_) { return false; }
+          } };
+        }
       }
       return receipt;
     });
@@ -318,5 +329,5 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 8, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
+  return Object.freeze({ version: 9, send, state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });
