@@ -29,6 +29,10 @@ structured reading, native editing/export and ordinary-message save-back are
 production-accepted on 1692 (code-block export: 1688). Reuse these completed scopes;
 project/temporary/library/typed-widget save-back remains incomplete.
 
+[Fresh Search/Create Image sends](chatgpt-fresh-tool-text-dispatch.md) are
+source-implemented with 140 regression and 11 public-contract checks. Group the
+next APK and native acceptance; these tool-bearing sends are not yet promoted.
+
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
 three taps joined one 1077 ms read; native TXT saved 78 bytes. Supplemental/PCA
 and URL-only cloud samples remain unverified; old setup blockers are stale.
