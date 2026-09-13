@@ -85,7 +85,7 @@
     const ownership = ['not_observed', 'document', 'document_token', 'route', 'runtime', 'account', 'registry',
       'history_scope', 'server_id', 'project_scope', 'owned', 'context_error'];
     const readiness = ['not_observed', 'identity', 'history_busy', 'ready', 'leaf_mismatch'];
-    return { schema: 'elon.fresh_text_trial.v1', version: 7, control, armed,
+    return { schema: 'elon.fresh_text_trial.v1', version: 8, control, armed,
       operation: last?.operation || '',
       remaining_ms: armed ? Math.max(0, Math.min(120000, trial.expiresAt - now())) : 0,
       attempts: records.attempts(), pending: active !== null, phase: last?.phase || 'idle',

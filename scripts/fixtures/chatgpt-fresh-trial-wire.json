@@ -1,7 +1,7 @@
 {
   "common": {
     "schema": "elon.fresh_text_trial.v1",
-    "version": 7,
+    "version": 8,
     "control": "state",
     "armed": false,
     "operation": "",
@@ -16,7 +16,8 @@
     "parent_role": "unknown",
     "stream_events": 0,
     "event_types": [],
-    "history": "not_observed"
+    "history": "not_observed",
+    "owner": { "ownership": "not_observed", "reconciliation": "not_observed" }
   },
   "cases": {
     "idle": {},

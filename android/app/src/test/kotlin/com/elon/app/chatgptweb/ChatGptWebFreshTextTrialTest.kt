@@ -35,6 +35,22 @@ class ChatGptWebFreshTextTrialTest {
         }
     }
 
+    @Test fun versionEightAcceptsOnlyBoundedOwnershipDiagnosticsAndPreservesOldReceipts() {
+        val owner = JSONObject().put("ownership", "route").put("reconciliation", "identity")
+        val current = sample().put("version", 8).put("owner", owner)
+        val output = JSONObject(ChatGptWebPrivateProtocolEvidence.detail("private_protocol_probe", current.toString()))
+        assertTrue(current.similar(output))
+        for (bad in listOf(JSONObject(owner.toString()).put("ownership", "private_fixture"),
+            JSONObject(owner.toString()).put("reconciliation", "private_fixture"),
+            JSONObject(owner.toString()).put("content", "private_fixture"),
+            JSONObject(owner.toString()).apply { remove("ownership") })) {
+            assertEquals("invalid_protocol_evidence", ChatGptWebPrivateProtocolEvidence.detail(
+                "private_protocol_probe", sample().put("version", 8).put("owner", bad).toString()))
+        }
+        assertEquals("invalid_protocol_evidence", ChatGptWebPrivateProtocolEvidence.detail(
+            "private_protocol_probe", sample().put("owner", owner).toString()))
+    }
+
     @Test fun rejectsUnknownFieldsAndOutOfRangeCounters() {
         for (value in listOf(sample().put("content", "fixture"), sample().put("remaining_ms", 120001),
             sample().put("attempts", 65536), sample().put("code", "/c/fixture"), sample().put("version", 8),

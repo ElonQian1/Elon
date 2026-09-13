@@ -11,12 +11,20 @@ internal object ChatGptWebFreshTextTrial {
             "remaining_ms", "attempts", "pending", "phase", "code", "dispatched", "accepted", "reconciled",
             "stream_events", "event_types", "history")
         val version = value.opt("version")
-        require(value.opt("schema") == SCHEMA && version in setOf(5, 6, 7))
+        require(value.opt("schema") == SCHEMA && version in setOf(5, 6, 7, 8))
         // Both v6 shapes shipped. Keep old active writers readable without weakening the v7 contract.
-        val hasOperation = version == 7 || version == 6 && value.has("operation")
+        val hasOperation = version in setOf(7, 8) || version == 6 && value.has("operation")
         val expected = fields + (if (version != 5) setOf("parent_role") else emptySet()) +
-            (if (hasOperation) setOf("operation") else emptySet())
+            (if (hasOperation) setOf("operation") else emptySet()) +
+            (if (version == 8) setOf("owner") else emptySet())
         require(value.keys().asSequence().toSet() == expected)
+        if (version == 8) {
+            val owner = value.getJSONObject("owner")
+            require(owner.keys().asSequence().toSet() == setOf("ownership", "reconciliation"))
+            require(owner.opt("ownership") in setOf("not_observed", "document", "document_token", "route", "runtime",
+                "account", "registry", "history_scope", "server_id", "project_scope", "owned", "context_error"))
+            require(owner.opt("reconciliation") in setOf("not_observed", "identity", "history_busy", "ready", "leaf_mismatch"))
+        }
         if (version != 5) require(value.opt("parent_role") in setOf("user", "assistant", "unknown"))
         if (hasOperation) require(value.opt("operation") in setOf("", "send", "regenerate"))
         require(value.opt("control") in setOf("state", "armed", "ended", "busy", "disabled", "disposed",

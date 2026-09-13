@@ -52,6 +52,9 @@ evidence, but the precise device `owner_changed` guard is not yet established.
 Context v9 and transaction v19 expose only bounded ownership/reconciliation
 guard labels in the existing trial diagnostic. They contain no account values,
 conversation IDs, URLs, tokens or message contents. Adapter version is 380.
+The diagnostic wire version is 8, with strict Android field validation and
+compatibility for shipped versions 5-7. Native acceptance readers accept the
+reviewed versions explicitly; unknown versions remain rejected.
 
 `fresh-first-route-full-regression-20260913-214627-175` passed 312 Node tests,
 zero failures/skips, including pinned-source AST evidence, actual module
@@ -61,6 +64,15 @@ passed 16 cases. Existing PowerShell send evidence passed 15 negative-send,
 six continuity, nine cleanup and 19 negative-readback cases. An earlier AST
 locator test missed a template-literal label; the locator was corrected without
 changing the pinned asset or weakening the operation-order assertions.
+
+The final cross-layer Node run, `fresh-first-route-wire-regression-20260913-215629-706`,
+passed 313 tests with zero failures/skips, including the actual transaction
+output against the same JSON fixtures consumed by Android. PowerShell also
+passed 18 negative retry proofs and the existing native identity/draft/cleanup
+checks. This caught the missing Android wire-contract update before packaging.
+`fresh-first-route-jvm-20260913-215655-901` passed Release Kotlin/Java compilation
+and all nine `ChatGptWebFreshTextTrialTest` cases, with zero failures, errors or
+skips. The command completed in 330.7 seconds.
 
 Next: preserve the unresolved 1709 handoff byte-for-byte, publish one candidate,
 resolve it read-only, then one native first-send/follow-up case. Normal and
