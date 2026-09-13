@@ -17,6 +17,7 @@ const expectedExports = {
 };
 const extraExports = {
   shared: { attachmentUploadType: 'am', conversationStore: 'pY', canvasQueryClient: 'h2',
+    textBusinessContext: 'JO', textProjectHeaders: 'iK', textLockedProjectId: 'Yr', textLockedChatPin: 'aK',
     writingUpdateState: 'sY', writingTreeOwner: 'KJ' },
   conversation: { attachmentBaseLimit: 'W$t', attachmentMaxUploads: 'Z$t',
     attachmentPendingCount: 'K$t', attachmentConfiguredLimit: 'U$t', canvasDirtyInit: 'Dvt', useCanvasDirty: 'Avt' },

@@ -163,6 +163,33 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     includes(dispatch.strings, ['x-conduit-token', '/f/conversation']);
   });
 
+  await t.test('project sends preserve mode and use account-owned locked-project headers', () => {
+    const source = (module, name, exported = false) => {
+      const node = definition(module, name, exported); return module.text.slice(node.start, node.end);
+    };
+    assert.deepEqual(composer.imports.get('wh'), { file: './' + assets.shared[0], name: 'i0' });
+    assert.equal(source(shared, 'i0', true), 'e=>e');
+    assert.match(source(composer, 'AB'), /conversation_mode:wh\(e\.completionMetadata\?\.conversationMode\)/);
+    assert.deepEqual(composer.imports.get('Dh'), { file: './' + assets.shared[0], name: 'iS' });
+    assert.match(source(shared, 'iS', true), /if\(`gizmo_id`in e\)return e\.gizmo_id/);
+    assert.match(source(composer, 'FB'), /conversationModeOverride\?\?s\?\.mode/);
+    includes(facts(definition(composer, 'FB')).properties, ['conversationMode', 'businessAgentContext', 'business_agent_id']);
+    assert.deepEqual(composer.imports.get('wi'), { file: './' + assets.shared[0], name: 'JO' });
+    includes(facts(definition(shared, 'JO', true)).properties, ['persistedContext', 'turns', 'gizmoId', 'conversationId']);
+    for (const name of ['CJ', 'SJ']) assert.match(source(composer, name), /delete ce\.gizmo/);
+    for (const [local, exported] of [['kee', 'aK'], ['hre', 'iK'], ['Hf', 'Yr'], ['fh', 'h2']]) {
+      assert.deepEqual(composer.imports.get(local), { file: './' + assets.shared[0], name: exported });
+    }
+    includes(facts(definition(composer, 'OB')).calls, ['kee', 'hre', 'Hf', 'fh', 'Dh']);
+    assert.match(source(shared, 'iK', true), /n==null\|\|e==null\|\|t==null\|\|e!==t/);
+    assert.match(source(shared, 'iK', true), /return vw\(n\)/);
+    assert.match(source(shared, 'mw'), /accountKey===pw\(\)\?e\.pin:null/);
+    assert.equal(source(shared, 'yw'), '`x-openai-locked-chats-pin`');
+    assert.match(source(shared, 'vw'), /\{\[yw\]:e\}/);
+    includes(facts(definition(shared, 'Yr', true)).properties, ['getQueryData']);
+    includes(facts(definition(shared, 'sUt')).properties, ['project_id']);
+  });
+
   await t.test('server stop uses this prepared conduit, observed gates and explicit async exclusions', () => {
     const node = definition(conversation, 'xWt', true), stop = facts(node);
     includes(stop.strings, ['/stop_conversation', 'x-conduit-token', 'x-oai-turn-trace-id',
