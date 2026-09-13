@@ -76,6 +76,12 @@ if ($preflight -lt 0 -or $newConversation -lt $preflight -or $seedGuard -lt $new
     $seedSend -lt $seedGuard -or $seedSettled -lt $completeReply -or
     !$source.Contains('-and !$seedAwaitingReply -and (!$FreshHttp -or $freshCleanupConfirmed)') -or
     !$source.Contains('if ($seedAwaitingReply) {')) { throw 'Uncertain seed guard wiring missing.' }
+$clickBegin = $source.IndexOf('phase=native_retry_click_requested')
+$clickAction = $source.IndexOf('-Step regenerate -Selector', [Math]::Max(0, $clickBegin))
+$clickAck = $source.IndexOf('phase=native_retry_click_acknowledged')
+$receiptWait = $source.IndexOf("-Description 'native retry dispatch'", [Math]::Max(0, $clickAck))
+if ($clickBegin -lt 0 -or $clickAction -lt $clickBegin -or $clickAck -lt $clickAction -or
+    $receiptWait -lt $clickAck) { throw 'Native retry click and receipt stages are not distinguishable.' }
 $cleanupState = $baseline
 $endState = [pscustomobject]@{pending=$false;armed=$false}
 $cleanupWrites = 0

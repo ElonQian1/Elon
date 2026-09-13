@@ -324,9 +324,11 @@ try {
         Assert-RetryDocument -Baseline $initialReply
         $stableId = ([string]$initialAssistant.id -replace '[^A-Za-z0-9_.:-]', '_')
         $stableId = $stableId.Substring(0, [Math]::Min(160, $stableId.Length))
+        Write-Output 'CHATGPT_REGENERATE_PROGRESS phase=native_retry_click_requested'
         & (Join-Path $PSScriptRoot 'invoke-conversation-ui-acceptance.ps1') `
             -DeviceSerial $DeviceSerial -ExpectedHardwareSerial $ExpectedHardwareSerial `
             -Step regenerate -Selector "web-chat-message-action:chatgpt_web:${stableId}:regenerate" | Out-Null
+        Write-Output 'CHATGPT_REGENERATE_PROGRESS phase=native_retry_click_acknowledged'
         $dispatched = Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec 20 -RequireChatGptForeground -Description 'native retry dispatch' -Predicate {
             param($s) @($s.command_requests | Where-Object {
                 $_.expected_web_action -eq 'regenerate_response' -and $_.request_id -notin $priorRetryIds
