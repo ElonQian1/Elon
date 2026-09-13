@@ -14,7 +14,7 @@ internal data class WebChatSnapshotCache(
 
 internal class WebChatSnapshotStore(
     context: Context,
-    providerKey: String,
+    private val providerKey: String,
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
     private val file = AtomicFile(File(context.noBackupFilesDir, fileName(providerKey)))
@@ -24,10 +24,12 @@ internal class WebChatSnapshotStore(
         if (bytes.size > WebChatSnapshotCachePolicy.MAX_FILE_BYTES) return null
         val cache = WebChatSnapshotCacheCodec.decode(bytes.toString(Charsets.UTF_8)) ?: return null
         if (!WebChatSnapshotCachePolicy.isUsable(cache.savedAtMs, nowMs())) return null
+        if (!WebChatSnapshotPrivacyPolicy.canPersist(providerKey, cache.snapshot.url)) return null
         return cache.snapshot
     }
 
     fun save(snapshot: ChatGptWebSnapshot) {
+        if (!WebChatSnapshotPrivacyPolicy.canPersist(providerKey, snapshot.url)) return
         val payload = WebChatSnapshotCacheCodec.encode(
             WebChatSnapshotCache(snapshot, nowMs()),
         ).toByteArray(Charsets.UTF_8)
