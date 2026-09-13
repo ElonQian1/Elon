@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 7, create: factory });
+  const api = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -303,17 +303,19 @@
       canStop(userMessageId) {
         return this.canReconcile(userMessageId);
       },
-      reconciled(userMessageId, stopped = false, emptyStopped = false) {
+      reconciled(userMessageId, stopped = false, emptyStopped = false, verifyNewParent = null) {
         if (!owns() || !historyAllowed()) return false;
         const status = shared.Fx(selected);
         if (status != null && status.value !== shared.v7.UNREAD) return false;
         const state = tree(), user = shared.HM.getNodeIfExists(state, userMessageId);
         const parent = shared.HM.getParentNode(state, userMessageId);
         const leaf = shared.HM.getCurrentMessage(state);
+        const parentMatches = parent?.id === snapshot.parentId || newConversation &&
+          typeof verifyNewParent === 'function' && verifyNewParent(shared.HM, state) === true;
         if (attachments && !attachments.matchesHistory(user?.message)) return false;
         if (stopped && emptyStopped && user?.message?.author?.role === 'user' &&
-            parent?.id === snapshot.parentId && leaf?.id === userMessageId && leaf.author?.role === 'user') return true;
-        return user?.message?.author?.role === 'user' && parent?.id === snapshot.parentId &&
+            parentMatches && leaf?.id === userMessageId && leaf.author?.role === 'user') return true;
+        return user?.message?.author?.role === 'user' && parentMatches &&
           leaf?.id !== snapshot.parentId && leaf?.id !== userMessageId &&
           leaf?.author?.role === 'assistant' && (leaf.status === 'finished_successfully' && leaf.end_turn === true ||
             stopped && leaf.status === 'finished_partial_completion') &&

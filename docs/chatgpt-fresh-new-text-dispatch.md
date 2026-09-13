@@ -24,12 +24,11 @@ including input-message, handoff and stream-complete events. History then stayed
 at `parent_mismatch`, with `pending=true` and no confirmed reconciliation. The
 native reply/follow-up/restoration case therefore **failed**, not completed.
 
-The concrete gap is first-send parent ownership in authoritative history and
-subsequent runtime-tree reconciliation. Current checks accept a direct
-`client-created-root` parent or its reviewed legacy empty-root equivalent. The
-actual rejected parent shape has not yet been inspected. Do not assume hidden
-system ancestors, accept arbitrary UUID parents, or loosen branch checks merely
-to retire the writer. Existing-conversation success does not prove this scope.
+The failure was first-send parent ownership in authoritative history and
+subsequent runtime-tree reconciliation. At that point the checks accepted only
+a direct `client-created-root` parent or its reviewed legacy empty-root
+equivalent. The rejected shape was then unknown; existing-conversation success
+did not prove this scope. The exact fixture was later resolved read-only, below.
 
 The pending controlled fixture is retained locally at
 `$GIT_COMMON_DIR/ai-acceptance-fixtures/fresh-text-pending.json`; it contains no
@@ -107,6 +106,49 @@ The pending fixture lacks the accepted server conversation ID, so rebuilding
 the page-local writer cannot recover that ID. A future acceptance handoff must
 preserve exact accepted ownership locally before replacing a pending page;
 do not guess a conversation from title or activity date.
+
+### Exact Fixture And Parent Repair
+
+`fresh-pending-native-head-ready-20260913-200528-018` opened the actual production
+native sidebar's complete-directory page using semantic controls. The first of
+eight visible candidates matched both the preserved user ID and exact controlled
+prompt. The completed answer was present. The read-only history diagnostic then
+observed that turn's `user -> hidden system -> message-less root` ancestry,
+with reciprocal single-child links and an empty parent on the server root.
+No new message or replay occurred. The local handoff now records its resolved
+path and completed readback; the user's pre-1706 route is still unknown.
+
+Context/reconcile v8 admits this first-turn shape only under the existing exact
+conversation, user, branch, project/privacy and active-owner checks. Before
+applying history, it verifies a bounded chain of hidden text-only system nodes
+ending at a message-less root, with matching node/message IDs, unique child
+links, no cycles and no hidden preceding user turn. An arbitrary UUID parent
+alone is still rejected. The verified chain captures structural IDs only.
+
+After official hydration, the same IDs, parent links and hidden system roles
+must exist in the canonical tree. The root must be its explicit root-role
+message with an empty `parentId`, as verified in the pinned `Cx` tree contract.
+Only that per-read verifier can authorize the canonical parent exception;
+calling `reconciled` without the verified read cannot do so. Navigation must
+still complete before the writer is released. Existing parent rules and all
+uncertain-write replay restrictions remain unchanged.
+
+The new fixture tests first reproduced the failure. Tests now cover ordinary
+and owned-project first-send plus follow-up, changed canonical parents, visible
+or non-system ancestors, broken/duplicate children, message-ID mismatch, cycles
+and root replacement. Source coverage does not itself verify either device
+scope. `fresh-parent-full-regression-20260913-201819-896` passed 303 Node tests,
+with zero failures or skips, including pinned public-tree contracts and existing
+writing-block save exclusions. `fresh-parent-recovery-contract-20260913-201555-411`
+passed the existing send/continuity/cleanup checks plus 19 rejected readback
+cases. Adapter 378 is prepared for the grouped release/native acceptance.
+
+The acceptance runner can retain a previously resolved local handoff rather
+than deleting it: before any fresh fixture, it requires current authenticated
+provider and native routes, the exact original user ID/prompt, a single user
+turn and the completed answer in both views. It archives the unchanged receipt
+before a later uncertain fixture can replace it. A stored boolean alone cannot
+permit a new test, and the previous message is never resent.
 
 ## Evidence
 

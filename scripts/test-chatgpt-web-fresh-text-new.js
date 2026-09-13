@@ -74,13 +74,93 @@ function payload(project = false, emptyRoot = false, parentId = ROOT) {
 }
 
 function applyHistory(f, data) {
-  f.nodes = data.mapping;
+  f.nodes = structuredClone(data.mapping);
   if (f.nodes['']) f.nodes = { ...f.nodes, [UID]: { ...f.nodes[UID], parent: ROOT } };
+  for (const row of Object.values(f.nodes)) {
+    row.parentId = row.parent ?? '';
+    row.message ??= { id: row.id, author: { role: 'root' }, content: { content_type: 'text', parts: [] } };
+  }
   f.leaf = f.nodes[data.current_node].message;
   f.messages = Object.values(f.nodes).map(row => row.message).filter(Boolean);
   f.props.currentLeafId = f.leaf.id; f.props.isNewThread = f.binding.newThread = false;
   f.binding.serverId = f.serverId;
 }
+
+function injectedHistory(project = false) {
+  const value = payload(project), systemId = '77777777-7777-4777-8777-777777777777';
+  delete value.mapping[ROOT];
+  value.mapping['synthetic-server-root'] = { id: 'synthetic-server-root', parent: '', children: [systemId], message: null };
+  value.mapping[systemId] = { id: systemId, parent: 'synthetic-server-root', children: [UID], message: {
+    id: systemId, author: { role: 'system' }, content: { content_type: 'text', parts: ['Synthetic context'] },
+    metadata: { is_visually_hidden_from_conversation: true }
+  } };
+  value.mapping[UID].parent = systemId;
+  return value;
+}
+
+test('an owned first turn reconciles through the observed hidden system ancestor and exact canonical root', async () => {
+  for (const project of [false, true]) {
+    const f = newFixture(project), binding = await f.api.capture(f.node, null, admission);
+    binding.adoptConversation(CID, { input_message: input }, UID);
+    const value = injectedHistory(project), history = historyModule.create();
+    assert.equal(history.ownsResponse(value, binding, UID), true);
+    f.conversation.textHydrateHistory = async (_, options) => {
+      options.onConversationLoadedFromNetwork(value);
+      assert.equal(options.shouldApplyResponse(), true);
+      applyHistory(f, value);
+    };
+    assert.equal(await history.reconcile(binding, { userMessageId: UID }, new AbortController().signal), true);
+    assert.equal(f.navigations, 1);
+    assert.equal(binding.reconciled(UID), false, 'no unverified standalone parent exception');
+  }
+});
+
+test('a hidden ancestor cannot authorize a different or modified canonical history chain', async () => {
+  for (const mutate of [
+    f => { f.nodes[UID].parent = AID; },
+    f => { f.nodes[f.nodes[UID].parent].message.metadata.is_visually_hidden_from_conversation = false; },
+    f => { f.nodes[f.nodes[UID].parent].message.author.role = 'user'; },
+    f => { f.nodes[f.nodes[UID].parent].message.id = AID; },
+    f => { f.nodes[f.nodes[UID].parent].parentId = ROOT; },
+    f => { f.nodes['synthetic-server-root'].children.push(AID); },
+    f => { f.nodes['synthetic-server-root'].message.author.role = 'assistant'; },
+    f => { f.nodes['synthetic-server-root'].parentId = AID; }
+  ]) {
+    const f = newFixture(), binding = await f.api.capture(f.node, null, admission);
+    binding.adoptConversation(CID, { input_message: input }, UID);
+    f.conversation.textHydrateHistory = async (_, options) => {
+      const value = injectedHistory();
+      options.onConversationLoadedFromNetwork(value);
+      assert.equal(options.shouldApplyResponse(), true);
+      applyHistory(f, value); mutate(f);
+    };
+    assert.equal(await historyModule.create().reconcile(binding, { userMessageId: UID }, new AbortController().signal), false);
+    assert.equal(f.navigations, 0);
+  }
+});
+
+test('first-send parent history rejects visible, unrelated, malformed or cyclic ancestors before applying', async () => {
+  for (const mutate of [
+    p => { p.mapping[p.mapping[UID].parent].message.author.role = 'user'; },
+    p => { p.mapping[p.mapping[UID].parent].message.author.role = 'developer'; },
+    p => { p.mapping[p.mapping[UID].parent].message.metadata = {}; },
+    p => { p.mapping[p.mapping[UID].parent].message.content.content_type = 'code'; },
+    p => { p.mapping[p.mapping[UID].parent].children = [AID]; },
+    p => { p.mapping[p.mapping[UID].parent].children.push(AID); },
+    p => { p.mapping[p.mapping[UID].parent].message.id = AID; },
+    p => { p.mapping[p.mapping[UID].parent].parent = UID; },
+    p => { p.mapping['synthetic-server-root'].id = ROOT; },
+    p => { p.mapping['synthetic-server-root'].parent = AID; },
+    p => { p.mapping['synthetic-server-root'].children = []; },
+    p => { p.mapping['synthetic-server-root'].message = response; },
+    p => { p.mapping[''] = { id: '', message: null }; }
+  ]) {
+    const f = newFixture(), binding = await f.api.capture(f.node, null, admission);
+    binding.adoptConversation(CID, { input_message: input }, UID);
+    const value = injectedHistory(); mutate(value);
+    assert.equal(historyModule.create().ownsResponse(value, binding, UID), false);
+  }
+});
 
 test('new personal/project roots require explicit admission and preserve selected model state', async () => {
   for (const project of [false, true]) {
@@ -267,7 +347,7 @@ async function integration(project = false, settings = {}) {
     yield { data: { conversation_id: CID, message: answer } };
   };
   f.conversation.textHydrateHistory = async (_, options) => {
-    const data = payload(project);
+    const data = settings.injectedParents ? injectedHistory(project) : payload(project);
     if (counts.posts === 2) {
       data.mapping[UID2] = { id: UID2, parent: AID, message: { ...input, id: UID2 } };
       data.mapping[AID2] = { id: AID2, parent: UID2, message: { ...response, id: AID2 } };
@@ -293,8 +373,8 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 5));
 async function settled(api) { for (let i = 0; i < 80 && api.state().pending; i++) await tick(); }
 
 test('new private send binds, streams, hydrates and permits exactly one existing-conversation follow-up', async () => {
-  for (const project of [false, true]) {
-    const r = await integration(project); r.setDraft('a later unsent draft');
+  for (const project of [false, true]) for (const injectedParents of [false, true]) {
+    const r = await integration(project, { injectedParents }); r.setDraft('a later unsent draft');
     await settled(r.api);
     assert.equal(r.api.state().pending, false);
     assert.deepEqual([r.counts.prepare, r.counts.posts, r.counts.apply, r.f.binds, r.f.navigations], [1, 1, 1, 1, 1]);

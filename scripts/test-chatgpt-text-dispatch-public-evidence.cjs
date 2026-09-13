@@ -212,6 +212,21 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     includes(apply.properties, ['existingCurrentLeafId', 'serverCurrentLeafId', 'setCurrentLeafId']);
   });
 
+  await t.test('canonical tree parents use parentId and explicit root-role messages', () => {
+    const tree = definition(shared, 'Cx');
+    assert.equal(tree.type, 'ClassExpression');
+    const method = name => {
+      const nodes = tree.body.body.filter(node => node.key?.name === name);
+      assert.equal(nodes.length, 1, name);
+      return shared.text.slice(nodes[0].start, nodes[0].end);
+    };
+    assert.match(method('createNode'), /return\{id:r,parentId:t,children:n,message:e\}/);
+    assert.match(method('createRootMessage'), /author:\{role:G\.Root\}/);
+    assert.match(method('createRootNode'), /e\.createNode\(r,``,n\)/);
+    assert.match(method('getParent'), /this\.getNode\(e\)\.parentId/);
+    assert.match(method('getNodeIfExists'), /return P\(bx,this\)\[e\]/);
+  });
+
   await t.test('stream transport also performs request and response integrity checks', () => {
     const stream = facts(definition(conversation, 'jGt', true));
     includes(stream.properties, ['expectedState', 'onBeforeRequestStart', 'headersToRemove',

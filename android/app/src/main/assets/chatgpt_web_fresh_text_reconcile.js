@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 7, create: factory });
+  const api = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
@@ -52,7 +52,49 @@
     const root = payload.mapping?.[''];
     return binding.newConversation === true && binding.parentId === 'client-created-root' &&
       user.parent === '' && ownsKey(payload.mapping, '') && root?.id === '' && !root.parent &&
-      (root.message == null || root.message.author?.role === 'root') && root.children?.includes(user.id) === true;
+      (root.message == null || root.message.author?.role === 'root') && root.children?.includes(user.id) === true ||
+      newParentVerifier(payload, binding, user) !== null;
+  }
+
+  function newParentVerifier(payload, binding, user) {
+    if (binding.newConversation !== true || binding.operation === 'regenerate' ||
+        binding.parentId !== 'client-created-root' || !user) return null;
+    const mapping = payload.mapping, chain = [], seen = new Set([user.id]);
+    let cursor = user.parent, child = user.id;
+    while (chain.length < 8) {
+      if (typeof cursor !== 'string' || !/^[A-Za-z0-9_-]{1,160}$/.test(cursor) ||
+          seen.has(cursor) || !ownsKey(mapping, cursor)) return null;
+      seen.add(cursor);
+      const node = mapping[cursor];
+      if (!node || node.id !== cursor || !Array.isArray(node.children) ||
+          node.children.length !== 1 || node.children[0] !== child) return null;
+      const root = node.message == null;
+      if (root ? chain.length === 0 || node.parent !== '' || ownsKey(mapping, '') :
+          !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(cursor) ||
+          node.message.id !== cursor || node.message.author?.role !== 'system' ||
+          node.message.metadata?.is_visually_hidden_from_conversation !== true ||
+          node.message.content?.content_type !== 'text') return null;
+      chain.push(Object.freeze({ id: cursor, parentId: node.parent, child, root }));
+      if (root) {
+        // Capture only structural identities before the official loader converts
+        // null-message roots into root-role messages with parentId, not parent.
+        Object.freeze(chain);
+        return (reader, state) => {
+          try {
+            return chain.every(expected => {
+              const current = reader.getNodeIfExists(state, expected.id), message = current?.message;
+              return current?.id === expected.id && current.parentId === expected.parentId &&
+                message?.id === expected.id && reader.getParentNode(state, expected.child)?.id === expected.id &&
+                Array.isArray(current.children) && current.children.length === 1 && current.children[0] === expected.child &&
+                (expected.root ? message.author?.role === 'root' : message.author?.role === 'system' &&
+                  message.metadata?.is_visually_hidden_from_conversation === true && message.content?.content_type === 'text');
+            });
+          } catch (_) { return false; }
+        };
+      }
+      child = cursor; cursor = node.parent;
+    }
+    return null;
   }
 
   function ownsResponse(payload, binding, userMessageId, stopped = false, emptyStopped = false) {
@@ -110,7 +152,7 @@
     if (signal.aborted || !binding.canReconcile(request.userMessageId) ||
         typeof binding.runtime.textHydrateHistory !== 'function') { report('owner_changed'); return false; }
     report('reading');
-    let verified = false;
+    let verified = false, verifyNewParent = null;
     // BEn performs official fetch + tree reconciliation. Do not replace the
     // website store, reload the document, or apply another branch's response.
     await binding.runtime.textHydrateHistory(binding.conversationId, {
@@ -118,13 +160,14 @@
       signal, skipIfExisting: false, source: 'native_fresh_text_v1',
       onConversationLoadedFromNetwork(payload) {
         verified = !signal.aborted && ownsResponse(payload, binding, request.userMessageId, stopped, emptyStopped);
+        verifyNewParent = verified ? newParentVerifier(payload, binding, payload.mapping?.[request.userMessageId]) : null;
         report(signal.aborted ? 'owner_changed' : rejection(payload, binding, request.userMessageId, stopped, emptyStopped));
       },
       shouldApplyResponse: () => verified && !signal.aborted && binding.canReconcile(request.userMessageId)
     });
-    let done = !signal.aborted && verified && binding.reconciled(request.userMessageId, stopped, emptyStopped);
+    let done = !signal.aborted && verified && binding.reconciled(request.userMessageId, stopped, emptyStopped, verifyNewParent);
     if (done && binding.finalize) done = await binding.finalize(signal) === true &&
-      !signal.aborted && binding.reconciled(request.userMessageId, stopped, emptyStopped);
+      !signal.aborted && binding.reconciled(request.userMessageId, stopped, emptyStopped, verifyNewParent);
     if (verified) report(done ? 'reconciled' : signal.aborted || !binding.canReconcile(request.userMessageId)
       ? 'owner_changed' : 'store_not_reconciled');
     return done;
