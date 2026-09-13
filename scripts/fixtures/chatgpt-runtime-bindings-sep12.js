@@ -24,7 +24,8 @@ const extraExports = {
     writingUpdateState: 'sY', writingTreeOwner: 'KJ' },
   conversation: { attachmentBaseLimit: 'W$t', attachmentMaxUploads: 'Z$t',
     attachmentPendingCount: 'K$t', attachmentConfiguredLimit: 'U$t', canvasDirtyInit: 'Dvt', useCanvasDirty: 'Avt',
-    textRequestedDefaultModel: 'Jsn', textRememberFirstModel: 'DDn', textNavigateConversation: 'qHt' },
+    textRequestedDefaultModel: 'Jsn', textRememberFirstModel: 'DDn', textNavigateConversation: 'qHt',
+    textSerializeAttachments: 'Ypt' },
   composer: { fh: 'Nh' }
 };
 const anchor = 'c2675c8c-o59yc0xo7p9m3q3o.js';

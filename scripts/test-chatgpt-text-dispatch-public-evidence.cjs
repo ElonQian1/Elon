@@ -133,6 +133,33 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     assert.ok(source(composer, 'C1t').includes('!this.isHistoryAndTrainingDisabled&&mn(e?.mode)&&fi()){da('));
   });
 
+  await t.test('ready-file serialization is exported separately from dispatch and carries every media reference', () => {
+    const source = (module, name, exported = false) => {
+      const node = definition(module, name, exported); return module.text.slice(node.start, node.end);
+    };
+    assert.deepEqual(composer.imports.get('Dqe'), { file: './' + assets.conversation[0], name: 'Ypt' });
+    assert.deepEqual(composer.imports.get('DS'), { file: './' + assets.conversation[0], name: 'Jpt' });
+    assert.equal(conversation.exported.get('Ypt'), 'nhr');
+    assert.match(source(conversation, 'Jpt', true), /Ls\(e\.readyFiles\$\).*nhr\(s,t,n,r,i,o\)/);
+    const serializer = source(conversation, 'Ypt', true);
+    assert.match(serializer, /e\.gizmoId==null\|\|e\.isProjectThread/);
+    assert.match(serializer, /let n=e\.fileSpec/);
+    for (const field of ['id:n.id', 'mime_type:n.mimeType', 'library_file_id:e.libraryFileId',
+      'file_token_size:n.fileTokenSize', 'library_persistence_result:n.libraryPersistenceResult',
+      'asset_pointer:ooe(n.id)', 'size_bytes:n.size', 'width:n.width', 'height:n.height']) {
+      assert.ok(serializer.includes(field), field);
+    }
+    assert.match(serializer, /u\.push\(t\?\?``\),c=\{content_type:an\.MultimodalText,parts:u\}/);
+    assert.deepEqual(conversation.imports.get('ooe'), { file: './' + assets.shared[0], name: 'Pm' });
+    assert.equal(source(shared, 'Pm', true), 'function YEt(e){return e.startsWith(`file_`)?`sediment://`+e:`file-service://`+e}');
+    assert.match(source(composer, 'fun'), /new Set\(e\.map\(e=>e\.fileSpec\?\.mimeType\?\?eB\(e\.file\)\)\.filter\(e=>!!e\)\.map\(e=>e\.toLowerCase\(\)\)\)/);
+    assert.match(source(composer, 'SJ'), /a\.length>0&&\{attachments:a\}/);
+    assert.match(source(shared, 'CZ', true), /typeof e==`string`\?\{content_type:Pl\.Text,parts:\[e\]\}:e/);
+    assert.match(source(composer, 'AB'), /attachment_mime_types:MB\(e\.attachmentMimeTypes\)/);
+    assert.match(source(composer, 'FB'), /attachmentMimeTypes:i\.attachmentMimeTypes/);
+    assert.equal(source(composer, 'eQt'), 'function eQt(e){let t=e;return e.clientMetadata&&(t={...e},delete t.clientMetadata),t}');
+  });
+
   await t.test('fresh integrity material has an exported website provider', () => {
     const fresh = facts(definition(conversation, 'VKt', true));
     includes(fresh.properties, ['chatReq', 'turnstileToken', 'proofToken', 'force_login',

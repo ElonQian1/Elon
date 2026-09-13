@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 24, create: factory });
+  const api = Object.freeze({ version: 25, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -41,7 +41,7 @@
       canvasDirtyInit: undefined, useCanvasDirty: undefined,
       textSecurity: undefined, textStream: undefined, textPrepareEnabled: undefined, textReviewAck: undefined,
       textHydrateHistory: undefined, textRequestedDefaultModel: undefined,
-      textRememberFirstModel: undefined, textNavigateConversation: undefined },
+      textRememberFirstModel: undefined, textNavigateConversation: undefined, textSerializeAttachments: undefined },
     composer: { Ih: 'Qh', t_: '__', AS: 'KS', VS: 'rC', Ng: 'Yg', Bg: 'n_', fh: 'Oh' },
     react: { reactApi: undefined, reactDom: undefined, reactRoot: undefined,
       intlInit: undefined, intlProvider: undefined }
@@ -136,7 +136,7 @@
       canvasDirtyInit: 'Dvt', useCanvasDirty: 'Avt',
       textSecurity: 'VKt', textStream: 'jGt', textPrepareEnabled: 'FKt', textReviewAck: 'MKt',
       textHydrateHistory: 'BEn', textRequestedDefaultModel: 'Jsn',
-      textRememberFirstModel: 'DDn', textNavigateConversation: 'qHt' },
+      textRememberFirstModel: 'DDn', textNavigateConversation: 'qHt', textSerializeAttachments: 'Ypt' },
     composer: { Ih: 'ig', t_: 'x_', AS: 'ZS', VS: 'cC', Ng: '$g', Bg: 'o_', fh: 'Nh' },
     react: { reactApi: 'zn', reactDom: 'Wt', reactRoot: 'Ut', intlInit: 'In', intlProvider: 'An' }
   };
@@ -309,8 +309,8 @@
 
   function state() {
     const p = profile();
-    return { version: 24, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 25, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 24, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 25, observed, load, peek, temporary, tools, state });
 });
