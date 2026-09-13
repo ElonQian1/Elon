@@ -205,6 +205,12 @@ internal class ChatGptWebObservedState(
         updatedAtMs = observedAtMs
     }
 
+    // Native sends and MCP commands share this session-lifetime sequence.
+    fun nextRequestId(): String {
+        check(nextCommandId < Long.MAX_VALUE) { "command_sequence_exhausted" }
+        return "mcp_${(++nextCommandId).toString(36)}"
+    }
+
     fun beginCommand(expectedAction: String): CommandRequest {
         return beginCommand(expectedAction, targetConversationPath = null)
     }
@@ -236,7 +242,7 @@ internal class ChatGptWebObservedState(
         if (expectedAction == ChatGptWebCanvasDocumentProtocol.ACTION) canvasDocuments = null
         if (expectedAction == ChatGptWebWritingBlockProtocol.ACTION) writingBlock = null
         val request = CommandRequest(
-            id = "mcp_${(++nextCommandId).toString(36)}",
+            id = nextRequestId(),
             expectedAction = expectedAction,
             status = CommandRequest.PENDING,
             startedAtMs = startedAt,

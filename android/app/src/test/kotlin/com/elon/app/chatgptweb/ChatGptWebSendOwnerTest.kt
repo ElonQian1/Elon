@@ -272,7 +272,9 @@ class ChatGptWebSendOwnerTest {
         var privateUploadCancellations = 0
         val privateRequestIds = mutableListOf<String>()
         var currentSnapshot = snapshot()
+        val observedState = ChatGptWebObservedState()
         val owner = ChatGptWebSendOwner(
+            nextRequestId = observedState::nextRequestId,
             transport = transport,
             snapshot = { currentSnapshot },
             stageUploads = { if (stageSucceeds) emptyList() else null },

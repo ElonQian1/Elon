@@ -240,6 +240,34 @@ verified**. Resolve the preparation/navigation failure before another targeted
 stop/follow-up attempt. Do not repeat successful 1695/1696 cases or claim a live
 user-only-parent result from the offline tests.
 
+## Shared Request Sequence
+
+September 13: native/social sends and attachment reservations now allocate from
+the existing `ChatGptWebObservedState` session sequence used by MCP commands.
+There is still one send owner and one receipt cache, not another transport.
+
+Previously the separate native `mcp_s<generation>` sequence overlapped the MCP
+`mcp_<base36 sequence>` namespace: native `mcp_s1` equals MCP command 1009.
+The retained-receipt watermark also interpreted native IDs as large MCP sequence
+numbers. The actual receipt module reproduced `request_retired` for a new
+`mcp_5` after 33 settled native IDs. This is a deterministic ownership bug;
+it is not evidence that it caused the earlier fixture/navigation timeout.
+
+The shared allocator survives document changes and send-owner replacement.
+Busy/not-ready native clicks allocate nothing; native sends do not fabricate
+pending MCP commands. Other providers keep their existing default allocator.
+Focused tests cover 2,400 mixed read/send IDs, owner recreation and attachments.
+The 53 JavaScript receipt/transaction/wiring tests passed with no skips in
+`web-chat-shared-sequence-receipts-js-20260913-085523-990`.
+Release Kotlin/Java compilation and 60 focused Android tests (six suites, no
+failures or skips) passed in
+`web-chat-shared-send-sequence-android-fixed-20260913-085336-935`.
+The first compile attempt rejected access to the ledger's private default ID
+factory; the corrected optional injection preserves the ledger default without
+exposing or duplicating it. Only the corrected run is counted as passed.
+This follow-on is source-verified and queued for the next grouped APK release;
+no new installation or live send acceptance is claimed for the shared sequence.
+
 ## Not Completed
 
 - Live follow-up after a stopped user-only turn and extended stopped-turn variants.

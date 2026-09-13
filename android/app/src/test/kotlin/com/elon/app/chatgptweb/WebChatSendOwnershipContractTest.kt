@@ -48,6 +48,8 @@ class WebChatSendOwnershipContractTest {
         )
 
         assertTrue(session.contains("private val sendOwner = ChatGptWebSendOwner("))
+        assertTrue(session.contains("ChatGptWebSendOwner(observedMcpState::nextRequestId,"))
+        assertTrue(owner.contains("requestIdFactory = { nextRequestId() }"))
         assertTrue(session.contains("sendOwner.dispatchSocial(prompt)"))
         assertTrue(session.contains("portFactory.createMcpPort("))
         assertTrue(session.contains("sendOwner = sendOwner"))

@@ -46,6 +46,7 @@ internal class WebChatSendCoordinator(
     private val removeCallbacks: (Runnable) -> Unit,
     private val onTerminalTimeout: (WebChatPendingSendState.TimeoutResult) -> Unit,
     private val confirmationTimeoutMs: Long = DEFAULT_CONFIRMATION_TIMEOUT_MS,
+    requestIdFactory: ((Long) -> String)? = null,
 ) {
     enum class DispatchOutcome {
         DISPATCHED,
@@ -77,7 +78,7 @@ internal class WebChatSendCoordinator(
         val commandId: String? = null,
     )
 
-    private val ledger = WebChatSendCommandLedger()
+    private val ledger = requestIdFactory?.let { WebChatSendCommandLedger(it) } ?: WebChatSendCommandLedger()
     private var watchdog: Runnable? = null
     private var baseline: SnapshotEvidence? = null
 

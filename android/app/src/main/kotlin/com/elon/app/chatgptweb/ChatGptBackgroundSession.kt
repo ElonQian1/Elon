@@ -146,7 +146,7 @@ internal class ChatGptBackgroundSession(
                 onRealtimeVoiceTranscript,
             )
         }
-    private val sendOwner = ChatGptWebSendOwner(
+    private val sendOwner = ChatGptWebSendOwner(observedMcpState::nextRequestId,
         transport = chatGptOfficialPageSendTransport(
             pageAdapter = { pageAdapter },
             snapshot = { latestSnapshot },

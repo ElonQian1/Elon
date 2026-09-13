@@ -53,6 +53,7 @@ internal fun chatGptOfficialPageSendTransport(
 )
 
 internal class ChatGptWebSendOwner(
+    nextRequestId: () -> String,
     transport: WebChatSendTransport,
     private val snapshot: () -> ChatGptWebSnapshot?,
     private val stageUploads: (List<PendingAttachment>) -> List<Uri>?,
@@ -77,6 +78,7 @@ internal class ChatGptWebSendOwner(
             onTerminalTimeout(it)
         },
         confirmationTimeoutMs = confirmationTimeoutMs,
+        requestIdFactory = { nextRequestId() },
     )
     private var origin: ChatGptWebSendOrigin? = null
     private var attachmentTracker: ChatGptWebAttachmentSendTracker? = null
