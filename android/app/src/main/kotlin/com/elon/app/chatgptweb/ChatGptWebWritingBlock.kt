@@ -14,7 +14,10 @@ internal object ChatGptWebWritingBlockProtocol {
     const val ACTION = "writing_block"
     private val identifier = Regex("[A-Za-z0-9_-]{1,128}")
     private val ticket = Regex("wb_[a-f0-9]{32}")
-    private val path = Regex("/c/[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}")
+    private val path = Regex(
+        "(?:/g/g-p-[a-fA-F0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?)?" +
+            "/c/[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}",
+    )
 
     fun parse(value: JSONObject): ChatGptWebWritingBlock? = runCatching {
         require(value.keys().asSequence().toSet() == setOf("type", "version", "requestId", "path", "ticket", "id", "messageId", "pending"))

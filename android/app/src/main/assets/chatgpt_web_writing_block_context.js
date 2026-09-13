@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptWritingBlockContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -9,10 +9,13 @@
   const identity = page.__elonChatGptPrivateConversationShareContract.create(page).identity;
   const policy = page.__elonChatGptWritingBlockPolicy;
   async function capture(input, snapshot) {
+    const route = policy.route(input.path);
+    if (!route) fail('context_unavailable');
     const binding = { path: input.path, href: page.location.href, document: page.document,
-      token: page.__elonChatGptDocumentToken, account: identity(), id: policy.PATH.exec(input.path)?.[1] };
+      token: page.__elonChatGptDocumentToken, account: identity(), id: route.id };
     const url = new URL(binding.href);
     if (url.origin !== 'https://chatgpt.com' || url.pathname !== input.path || url.search || url.hash ||
+        url.username || url.password ||
         !binding.account || !/^doc_[a-z0-9_]{3,80}$/.test(binding.token || '')) fail('context_unavailable');
     const bindings = page.__elonChatGptPrivateRuntimeBindings;
     if (bindings?.state?.().profile_id !== 'web_20260912') fail('runtime_unavailable');
@@ -23,20 +26,42 @@
     ]).finally(() => page.clearTimeout(timeout));
     if (typeof shared?.canvasConversations !== 'function' || typeof shared.XM !== 'function' ||
         typeof shared.HM?.getNodeIfExists !== 'function' || typeof shared.HM.getCurrentLeafId !== 'function' ||
-        typeof shared.HM.getRequestId !== 'function' || typeof shared.Fl !== 'function' ||
+        typeof shared.HM.getRequestId !== 'function' || typeof shared.HM.getGizmoId !== 'function' ||
+        typeof shared.Fl !== 'function' ||
         typeof shared.writingUpdateState !== 'function' ||
         typeof shared.writingTreeOwner?.updateTree !== 'function') fail('runtime_unavailable');
     const matches = shared.canvasConversations().filter(value => value?.serverId$?.() === binding.id);
     if (matches.length !== 1) fail('context_unavailable');
     const selected = matches[0];
     const state = () => shared.XM(selected.id);
+    binding.projectId = shared.HM.getGizmoId(state()) ?? null;
+    if (binding.projectId !== null && !policy.PROJECT.test(binding.projectId) ||
+        route.projectId !== null && route.projectId !== binding.projectId) fail('scope_unconfirmed');
+    function projectUser() {
+      const account = shared.mq?.();
+      return typeof shared.SV?.isPersonalWorkspace === 'function' && shared.H3?.() === true &&
+        shared.wV?.(shared.SV.isPersonalWorkspace) === true && account?.isWorkspaceAccount?.() === false &&
+        account?.isQuorum?.() === false && /^[A-Za-z0-9_-]{1,160}$/.test(account.normalizedAccountUserId || '')
+        ? account.normalizedAccountUserId : null;
+    }
+    binding.projectUser = binding.projectId === null ? null : projectUser();
+    function scopeCurrent() {
+      const thread = state();
+      if ((shared.HM.getGizmoId(thread) ?? null) !== binding.projectId) return false;
+      if (binding.projectId === null) return true;
+      return binding.projectUser !== null && projectUser() === binding.projectUser &&
+        thread?.isLoading === false && thread.is_do_not_remember === false &&
+        thread.sharedProjectConversationOwner == null && thread.continuingFromSharedProjectConversationId == null &&
+        (thread.contextScopes == null || Array.isArray(thread.contextScopes) && thread.contextScopes.length === 0);
+    }
+    if (!scopeCurrent()) fail('scope_unconfirmed');
     const leaf = shared.HM.getCurrentLeafId(state());
     function current() {
       try {
         const value = snapshot();
         return page.document === binding.document && page.location.href === binding.href &&
           page.__elonChatGptDocumentToken === binding.token && identity() === binding.account &&
-          bindings.state().profile_id === 'web_20260912' && selected.serverId$() === binding.id &&
+          bindings.state().profile_id === 'web_20260912' && selected.serverId$() === binding.id && scopeCurrent() &&
           shared.canvasConversations().filter(item => item?.serverId$?.() === binding.id).length === 1 &&
           shared.canvasConversations().includes(selected) && shared.HM.getCurrentLeafId(state()) === leaf &&
           value?.url === binding.href && value.streaming === false && !value.dictationActive &&

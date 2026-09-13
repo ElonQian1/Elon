@@ -155,9 +155,11 @@
 
   function runtimeProjection(page, messageId) {
     try {
-      const url = new URL(page.location.href), id = /^\/c\/([a-f0-9-]{36})$/.exec(url.pathname)?.[1];
+      const url = new URL(page.location.href);
+      const route = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.exec(url.pathname);
+      const id = route?.[2], projectId = route?.[1];
       const bindings = page.__elonChatGptPrivateRuntimeBindings;
-      if (url.origin !== 'https://chatgpt.com' || !id || url.search || url.hash ||
+      if (url.origin !== 'https://chatgpt.com' || !id || url.search || url.hash || url.username || url.password ||
           !/^doc_[a-z0-9_]{3,80}$/.test(page.__elonChatGptDocumentToken || '') ||
           bindings?.state?.().profile_id !== 'web_20260912' ||
           !page.__elonChatGptPrivateConversationShareContract?.create(page).identity()) return null;
@@ -165,7 +167,9 @@
       const shared = bindings.peek('shared');
       const owners = shared?.canvasConversations?.().filter(item => item?.serverId$?.() === id) || [];
       if (owners.length !== 1) return null;
-      const message = shared.HM.getNodeIfExists(shared.XM(owners[0].id), messageId)?.message;
+      const thread = shared.XM(owners[0].id);
+      if (projectId && shared.HM.getGizmoId?.(thread) !== projectId) return null;
+      const message = shared.HM.getNodeIfExists(thread, messageId)?.message;
       if (message?.id !== messageId || message.author?.role !== 'assistant' ||
           !/^(finished_successfully|completed|finished)$/.test(message.status || '')) return null;
       const value = project(message);
@@ -174,5 +178,5 @@
     } catch (_) { return null; }
   }
 
-  return { version: 1, project, domCode, runtimeProjection, MAX_CONTENT };
+  return { version: 2, project, domCode, runtimeProjection, MAX_CONTENT };
 });

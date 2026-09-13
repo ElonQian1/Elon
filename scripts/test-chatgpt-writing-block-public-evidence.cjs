@@ -72,4 +72,8 @@ test('reviewed official writing save uses original message ownership, not a libr
     'updated_at:s', 'safePost(`/conversation/message/writing-blocks`', 'authOption:f.SendIfAvailable'])
     assert.ok(save.includes(contract), contract);
   assert.doesNotMatch(save, /magic-edit|files\/library\/files/);
+  // Project conversations use the same message-scoped body; project identity is
+  // an admission guard, not an invented field in this endpoint's request.
+  assert.doesNotMatch(save, /gizmo_id|project_id|conversation_mode|primary_assistant/);
+  assert.match(save, /if\(o==null\)return await c\(\),!0/);
 });

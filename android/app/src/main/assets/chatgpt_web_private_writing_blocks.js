@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateWritingBlocks) {
     root.__elonChatGptPrivateWritingBlocks = factory(root);
@@ -37,7 +37,7 @@
   }
   async function read(entry, deadline) {
     const payload = await request(entry, 'GET', null, deadline);
-    return policy.source(payload, entry.binding.id, entry.source.messageId, entry.source.id, parser);
+    return policy.source(payload, entry.binding.id, entry.source.messageId, entry.source.id, parser, entry.binding.projectId);
   }
   async function verify(entry, deadline) {
     const expected = entry.pending;
@@ -141,5 +141,5 @@
     }).catch(() => respond(action, false, 'writing_unavailable'));
     return true;
   }
-  return Object.freeze({ version: 1, handle, run });
+  return Object.freeze({ version: 2, handle, run });
 });

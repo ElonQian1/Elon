@@ -6,10 +6,15 @@
 })(typeof window === 'object' ? window : null, function () {
   'use strict';
   const ID = /^[A-Za-z0-9_-]{1,128}$/;
-  const PATH = /^\/c\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i;
+  const PATH = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i;
+  const PROJECT = /^g-p-[a-f0-9]{32}$/i;
   const TICKET = /^wb_[a-f0-9]{32}$/;
   const own = (object, key) => object && Object.prototype.hasOwnProperty.call(object, key) ? object[key] : null;
   const fail = code => { throw Error('writing_' + code); };
+  function route(path) {
+    const match = typeof path === 'string' && PATH.exec(path);
+    return match ? { id: match[2], projectId: match[1] || null } : null;
+  }
   function text(value) {
     if (typeof value !== 'string' || value.length > 120000) fail('request_invalid');
     for (let i = 0; i < value.length; i++) {
@@ -33,9 +38,10 @@
     if (op !== 'verify') text(input.content);
     return input;
   }
-  function source(payload, conversationId, messageId, id, parser) {
+  function source(payload, conversationId, messageId, id, parser, projectId = null) {
     if (!payload || payload.conversation_id !== conversationId || !payload.mapping || Array.isArray(payload.mapping) ||
-        payload.is_do_not_remember !== false || payload.is_temporary_chat === true || payload.gizmo_id != null ||
+        payload.is_do_not_remember !== false || payload.is_temporary_chat === true ||
+        projectId !== null && !PROJECT.test(projectId) || (payload.gizmo_id ?? null) !== projectId ||
         payload.shared_project_conversation_owner != null) fail('scope_unconfirmed');
     let nodeId = payload.current_node;
     const seen = new Set();
@@ -72,5 +78,5 @@
       writing_block: { content: text(content), index: String(source.index), variant: source.variant,
         metadata: source.metadata, title: source.title, id: source.id }, updated_at: updatedAt };
   }
-  return { version: 1, parse, source, same, body, PATH, TICKET };
+  return { version: 2, parse, source, same, body, route, PATH, PROJECT, TICKET };
 });

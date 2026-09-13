@@ -203,7 +203,8 @@ async function contextHarness() {
     setTimeout, clearTimeout, AbortController, __elonChatGptTextBlocks: parser, __elonChatGptWritingBlockPolicy: policy,
     __elonChatGptPrivateConversationShareContract: { create: () => ({ identity: () => state.account }) } };
   const shared = { canvasConversations: () => [selected], XM: () => ({}), Fl: () => false,
-    HM: { getNodeIfExists: () => ({ message: state.message }), getCurrentLeafId: () => state.leaf, getRequestId: () => null },
+    HM: { getNodeIfExists: () => ({ message: state.message }), getCurrentLeafId: () => state.leaf,
+      getRequestId: () => null, getGizmoId: () => null },
     writingUpdateState(id, callback) { assert.equal(id, selected.id); state.beforeUpdate(); callback({}); },
     writingTreeOwner: { updateTree(_, callback) { callback({
       containsNode: id => id === messageId && !state.missing, getMaybeMessage: () => state.message,

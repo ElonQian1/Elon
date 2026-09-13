@@ -48,6 +48,19 @@ class ChatGptWebWritingBlockTest {
         assertNull(state.snapshot().writingBlock)
     }
 
+    @Test fun projectRequestsAndReceiptsRetainTheExactRoute() {
+        val project = "/g/g-p-" + "a".repeat(32)
+        for (route in listOf(project + path, "$project-example$path")) {
+            assertEquals(route, ChatGptWebWritingBlockProtocol.request(request().put("path", route))?.getString("path"))
+            assertEquals(route, ChatGptWebWritingBlockProtocol.parse(event("mcp_project").put("path", route))?.path)
+        }
+        for (route in listOf("$project/project", "$project/shared$path", "$project$path?temporary-chat=true",
+            "$project$path#block", "/g/g-custom$path", "$project/../$path", "$project-${"a".repeat(125)}$path")) {
+            assertNull(ChatGptWebWritingBlockProtocol.request(request().put("path", route)))
+            assertNull(ChatGptWebWritingBlockProtocol.parse(event("mcp_project").put("path", route)))
+        }
+    }
+
     @Test fun savingDoesNotUseTheComposerAdmissionGroup() {
         assertEquals(ChatGptWebOperationReadiness.Requirement.ACCOUNT_READ,
             ChatGptWebOperationReadiness.requirement("chatgpt_writing_block"))
