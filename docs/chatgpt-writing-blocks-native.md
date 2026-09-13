@@ -2,6 +2,8 @@
 
 状态：原生结构化读取、本机编辑与导出已完成；普通独立会话的显式官网保存已在 `1.1.1692` 通过生产 UI 验收。扩展写回类型仍受下述边界限制，不是 Canvas 完成标记。
 
+项目内自有会话写回的源码扩展见[项目写回批次](chatgpt-writing-blocks-project-save.md)：已实现并通过离线契约测试，待集中包真机验收，不能沿用普通会话的完成标记。
+
 2026-09-13 发布与验收：[本轮记录](reports/chatgpt-writing-blocks-release-20260913.md)。
 
 能力 ID：`android_chatgpt_text_block_local_editor_export_v1`，`completed / production_verified`，生产入口默认启用，代码块与真实 Writing Block 均已实测，不重复研究。
@@ -55,7 +57,7 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 
 ## 官网写回源代码批次
 
-2026-09-13 `android_chatgpt_writing_block_save_v1` 的普通独立会话范围已 `completed / production_verified`，随现有官网写入开关默认启用。范围限定具有明确 provider ID、variant、源消息 ID 的完整 `:::writing` 块；项目/临时会话、库文件联动、typed widget、无明确 ID/variant 的块不允许写回，不能把本范围通过扩大为所有变体完成。界面中的源 ID 只是后台核对提示，范围或归属核对不通过时仍可编辑/导出副本。
+2026-09-13 `android_chatgpt_writing_block_save_v1` 的普通独立会话范围已 `completed / production_verified`，随现有官网写入开关默认启用。范围限定具有明确 provider ID、variant、源消息 ID 的完整 `:::writing` 块。项目自有会话的写回扩展已进入源码待验收；临时会话、共享会话副本、库文件联动、typed widget、无明确 ID/variant 的块仍不允许写回，不能把普通会话通过扩大为所有变体完成。界面中的源 ID 只是后台核对提示，范围或归属核对不通过时仍可编辑/导出副本。
 
 - 官方 `a965fc59-fzrm5l4zirdbhwph.js`，SHA-256 `752c85e9623229704c208167584c5b7a6e8f18410e6258713d2de7d483a62e19` 的 `nc`：POST `/conversation/message/writing-blocks`，携带 `conversation_id`、`message_id`、字符串 `index`、`id`、`writing_block`、`updated_at`；块内保存 content / index / variant / metadata / title / id。
 - 页面同源请求仅由既有身份层提供请求头，数据不离开设备。原生缓存中的源 ID 只是定位提示，不能代替当前页面、账号、分支和服务器正文校验。
@@ -82,4 +84,4 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 ## 完成与剩余
 
 代码块本机链路在 `1.1.1688` 完成；Writing Block 本机编辑/导出、普通会话官网保存及原生回显在 `1.1.1692` 完成。早期 `1690/1691` 失败与后续修正均保留在发布报告，不能将早期失败改写为通过，也不再重复已通过范围。
-剩余为项目/临时会话、库文件联动、typed widget 等扩展写回协议；它们仍没有完整实现/验收。代码块保持本机编辑和文件导出，不执行代码或伪造官网代码保存；PDF/DOCX 导出未实现。
+项目自有会话写回已补源码，尚待集中包真机验收；临时会话、共享会话副本、库文件联动、typed widget 等扩展写回仍有实现缺口。代码块保持本机编辑和文件导出，不执行代码或伪造官网代码保存；PDF/DOCX 导出未实现。
