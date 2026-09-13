@@ -90,4 +90,37 @@ if ($guard -lt 0 -or $click -lt $guard -or $evidence -lt $click -or $settled -lt
     !$source.Contains('replay_allowed=$false') -or
     $source.Contains('Write-Output "FRESH_TEXT_PROGRESS') -or
     $source.Contains('-Action set_input_text')) { throw 'native_send_safety_wiring_changed' }
-Write-Output "FRESH_TEXT_SEND_EVIDENCE=passed send_negative_cases=$($cases.Count) continuity_cases=6 cleanup_cases=9"
+function ReadbackFixture {
+    $prompt = 'ELON_FRESH_TEXT_ACCEPTANCE_V1 first 1780000000000. Reply exactly FRESH_FIRST_1780000000000.'
+    $userId = '33333333-3333-4333-8333-333333333333'
+    @{
+        pending = @{schema='elon.fresh_text_pending.v1';source='native_fixture';new_conversation=$true;
+            replay_allowed=$false;readback_completed=$true;resolved_path=$path;user_message_id=$userId;prompt=$prompt}
+        web = @{surface='chatgpt_web';authenticated=$true;streaming=$false;conversation=@{url="https://chatgpt.com$path";
+            messages=@(@{id=$userId;role='user';content=$prompt},@{id='answer';role='assistant';state='completed';content='FRESH_FIRST_1780000000000'})}}
+        main = @{active_surface='social_ai';social_chat=@{web_chat_provider_id='chatgpt_web';web_chat_conversation_path=$path;
+            messages=@(@{role='friend';content='FRESH_FIRST_1780000000000'})}}
+    }
+}
+$f = ReadbackFixture
+if (!(Test-ChatGptFreshPendingReadback -Pending $f.pending -Web $f.web -Main $f.main)) { throw 'completed_pending_readback_rejected' }
+$readbackCases = @(
+    {param($f) $f.pending.readback_completed='true'}, {param($f) $f.pending.replay_allowed=$true},
+    {param($f) $f.pending.new_conversation=$false}, {param($f) $f.pending.source='unknown'},
+    {param($f) $f.pending.user_message_id='different'}, {param($f) $f.pending.prompt+='different'},
+    {param($f) $f.pending.prompt=$f.pending.prompt.Replace('FIRST_1780000000000','FIRST_1780000000001')},
+    {param($f) $f.web.authenticated=$false}, {param($f) $f.web.streaming=$true},
+    {param($f) $f.web.conversation.url+='?different'}, {param($f) $f.web.conversation.messages[0].id='different'},
+    {param($f) $f.web.conversation.messages[0].content='different'},
+    {param($f) $f.web.conversation.messages[1].state='streaming'},
+    {param($f) $f.web.conversation.messages[1].content='incomplete'},
+    {param($f) $f.web.conversation.messages+=@{role='user';id='later';content='later turn'}},
+    {param($f) $f.main.social_chat.messages=@()}, {param($f) $f.main.active_surface='conversation_home'},
+    {param($f) $f.main.social_chat.web_chat_conversation_path='different'},
+    {param($f) $f.main.social_chat.web_chat_provider_id='google_web'}
+)
+foreach ($change in $readbackCases) {
+    $f = ReadbackFixture; & $change $f
+    if (Test-ChatGptFreshPendingReadback -Pending $f.pending -Web $f.web -Main $f.main) { throw 'unverified_pending_readback_accepted' }
+}
+Write-Output "FRESH_TEXT_SEND_EVIDENCE=passed send_negative_cases=$($cases.Count) continuity_cases=6 cleanup_cases=9 readback_negative_cases=$($readbackCases.Count)"

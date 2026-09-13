@@ -23,7 +23,14 @@ $runtime.mcp_bootstrapped = $true
 $fixtureFile = Join-Path (Split-Path -Parent $PSScriptRoot) '.ai-tmp/fresh-text-fixture.json'
 $commonGit = [IO.Path]::GetFullPath((& git -C (Split-Path -Parent $PSScriptRoot) rev-parse --git-common-dir).Trim())
 $pendingFile = Join-Path $commonGit 'ai-acceptance-fixtures/fresh-text-pending.json'
-if (Test-Path -LiteralPath $pendingFile) { throw 'pending_fresh_fixture_requires_readonly_resolution' }
+$resolvedPending = $null; $pendingHash = $null
+if (Test-Path -LiteralPath $pendingFile) {
+    $resolvedPending = Get-Content -LiteralPath $pendingFile -Raw | ConvertFrom-Json
+    $pendingHash = (Get-FileHash -LiteralPath $pendingFile -Algorithm SHA256).Hash
+    if ($resolvedPending.readback_completed -isnot [bool] -or !$resolvedPending.readback_completed) {
+        throw 'pending_fresh_fixture_requires_readonly_resolution'
+    }
+}
 $originPath = ''; $originDraft = ''; $opened = $false; $restored = $false; $awakeRestored = $false
 $awaitingResult = $false; $trialRequested = $false; $ownedNavigation = $false; $expectedPath = ''
 $lastPrompt = ''; $lastUserId = ''; $clickAcknowledged = $false
@@ -131,6 +138,16 @@ try {
     $expectedPath = $originPath
     $preflight = Trial 'state'
     if (!(Test-ChatGptFreshTextIdle $preflight)) { throw 'existing_trial_or_write_pending' }
+    if ($resolvedPending) {
+        if (!(Test-ChatGptFreshPendingReadback -Pending $resolvedPending -Web $originWeb -Main $origin) -or
+            (Get-FileHash -LiteralPath $pendingFile -Algorithm SHA256).Hash -cne $pendingHash) {
+            throw 'pending_fresh_fixture_requires_readonly_resolution'
+        }
+        # Preserve the original handoff before any new fixture can replace it.
+        $archive = Join-Path (Split-Path -Parent $pendingFile) ('fresh-text-resolved-' + [Guid]::NewGuid().ToString('N') + '.json')
+        Copy-Item -LiteralPath $pendingFile -Destination $archive
+        $report.resolved_prior_fixture = $true
+    }
     if ($originWeb.input.text -isnot [string] -or $originDraft -cne '' -or
         $origin.input.has_text -isnot [bool] -or $origin.input.has_text -or
         $originWeb.dictation_active -ne $false -or $originWeb.private_voice_native_research.phase -cne 'idle' -or

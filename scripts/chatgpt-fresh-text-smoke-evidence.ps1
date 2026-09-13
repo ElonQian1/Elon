@@ -1,5 +1,30 @@
 #requires -Version 7.0
 
+function Test-ChatGptFreshPendingReadback {
+    param([AllowNull()]$Pending, [AllowNull()]$Web, [AllowNull()]$Main)
+    if ($Pending.schema -cne 'elon.fresh_text_pending.v1' -or $Pending.source -cne 'native_fixture' -or
+        $Pending.new_conversation -isnot [bool] -or !$Pending.new_conversation -or
+        $Pending.replay_allowed -isnot [bool] -or $Pending.replay_allowed -or
+        $Pending.readback_completed -isnot [bool] -or !$Pending.readback_completed -or
+        [string]$Pending.resolved_path -cnotmatch '^/c/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' -or
+        [string]$Pending.user_message_id -cnotmatch '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' -or
+        [string]$Pending.prompt -cnotmatch '^ELON_FRESH_TEXT_ACCEPTANCE_V1 first (?<stamp>\d{13})\. Reply exactly FRESH_FIRST_\k<stamp>\.$') { return $false }
+    $marker = 'FRESH_FIRST_' + $Matches.stamp
+    if ($Web.surface -cne 'chatgpt_web' -or $Web.authenticated -isnot [bool] -or !$Web.authenticated -or
+        $Web.streaming -isnot [bool] -or $Web.streaming -or
+        $Web.conversation.url -cne ('https://chatgpt.com' + $Pending.resolved_path) -or
+        $Main.active_surface -cne 'social_ai' -or $Main.social_chat.web_chat_provider_id -cne 'chatgpt_web' -or
+        $Main.social_chat.web_chat_conversation_path -cne $Pending.resolved_path) { return $false }
+    $users = @($Web.conversation.messages | Where-Object role -CEQ 'user')
+    if ($users.Count -ne 1 -or $users[0].id -cne $Pending.user_message_id -or
+        $users[0].content -cne $Pending.prompt) { return $false }
+    $answers = @($Web.conversation.messages | Where-Object { $_.role -ceq 'assistant' -and
+        $_.state -ceq 'completed' -and ([string]$_.content -replace '\\([_-])', '$1').Contains($marker) })
+    $native = @($Main.social_chat.messages | Where-Object { $_.role -ceq 'friend' -and
+        ([string]$_.content -replace '\\([_-])', '$1').Contains($marker) })
+    return $answers.Count -eq 1 -and $native.Count -eq 1
+}
+
 function Test-ChatGptFreshTextIdle {
     param([AllowNull()]$State)
     return $State.schema -ceq 'elon.fresh_text_trial.v1' -and
