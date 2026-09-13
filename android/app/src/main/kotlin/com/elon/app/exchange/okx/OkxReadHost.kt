@@ -59,7 +59,9 @@ internal class OkxReadHost(private val vault: OkxAccessVault, private val captur
         if (value.token != grant) okxFail(OkxReadFailure.AUTHORIZATION_REQUIRED)
         return value
     }
-    fun read(grant: String, id: String?): String = exclusive {
+    fun read(grant: String, id: String?): String = readBound(grant, id, null)
+    fun history(grant: String, after: String): String = readBound(grant, null, after)
+    private fun readBound(grant: String, id: String?, historyAfter: String?): String = exclusive {
         val captured = synchronized(lock) { access(grant) }
         val credentials = captured.saved.credentials
         fun verifyAccount() {
@@ -71,7 +73,8 @@ internal class OkxReadHost(private val vault: OkxAccessVault, private val captur
             synchronized(lock) { valid(captured) }
         }
         verifyAccount()
-        val rows = if (id == null) OkxPendingReader(gateway, elapsed).read(credentials) else {
+        val history = historyAfter?.let { OkxHistoryReader(gateway).read(credentials, it) }
+        val rows = history?.rows ?: if (id == null) OkxPendingReader(gateway, elapsed).read(credentials) else {
             val request = OkxReadRequest.Detail.of(id)
             OkxReadProtocol.rows(gateway.get(credentials, request), 1).also {
                 if (it.size != 1 || it.single()["algoId"] != id) okxFail(OkxReadFailure.INVALID_RESPONSE)
@@ -82,7 +85,9 @@ internal class OkxReadHost(private val vault: OkxAccessVault, private val captur
         val bots = rows.map { OkxReadProjection.bot(it, captured.generation, now, id != null) }
         synchronized(lock) {
             valid(captured)
-            OkxReadProjection.encode(captured.saved.account, captured.generation, ++revision, now, bots, id)
+            val nextRevision = ++revision
+            history?.encode(captured.saved.account, captured.generation, nextRevision, now, bots)
+                ?: OkxReadProjection.encode(captured.saved.account, captured.generation, nextRevision, now, bots, id)
         }
     }
     private fun <T> exclusive(action: () -> T): T {

@@ -58,4 +58,39 @@ class OkxReadHostTest {
         val result = StrictJson.parse(host.read(grant, null))
         assertEquals(3, accountCalls); assertEquals(true, result["complete"]); assertEquals(emptyList<Any>(), result["bots"])
     }
+    @Test fun historyUsesBothAccountChecksAndPreservesVersionOneReads() {
+        var accountCalls = 0
+        val paths = mutableListOf<String>()
+        val host = OkxReadHost(Vault(), { owner("alice") }, OkxReadGateway { _, request ->
+            paths.add(request.path)
+            if (request is OkxReadRequest.Account) { accountCalls++; account() } else """{"code":"0","data":[]}"""
+        }) { 0 }
+        val grant = host.approve(host.verify(credentials))
+        val page = StrictJson.parse(host.history(grant, "99"))
+        assertEquals(3, accountCalls); assertEquals("99", page["after"]); assertEquals(true, page["complete"])
+        assertEquals(OkxHistoryPage.SCHEMA, page["schema"])
+        assertTrue(paths.any { it.contains("orders-algo-history") && it.endsWith("after=99") })
+        assertEquals(OkxReadProtocol.SCHEMA, StrictJson.parse(host.read(grant, null))["schema"])
+    }
+    @Test fun historyCannotReturnAfterRevokeOrPlatformSessionRotation() {
+        var user = owner("alice")
+        var revoke: (() -> Unit)? = null
+        val host = OkxReadHost(Vault(), { user }, OkxReadGateway { _, request ->
+            if (request is OkxReadRequest.History) { revoke?.invoke(); """{"code":"0","data":[]}""" } else account()
+        }) { 0 }
+        var grant = host.approve(host.verify(credentials))
+        revoke = { host.revoke(grant) }
+        assertEquals(OkxReadFailure.CONNECTION_CHANGED, assertThrows(OkxReadException::class.java) { host.history(grant, "") }.reason)
+        grant = host.approve(host.verify(credentials))
+        revoke = { user = owner("alice", "changed") }
+        assertEquals(OkxReadFailure.CONNECTION_CHANGED, assertThrows(OkxReadException::class.java) { host.history(grant, "") }.reason)
+    }
+    @Test fun historyRejectsExchangeAccountChangeAfterPageWasRead() {
+        var uid = "100"
+        val host = OkxReadHost(Vault(), { owner("alice") }, OkxReadGateway { _, request ->
+            if (request is OkxReadRequest.History) { uid = "101"; """{"code":"0","data":[]}""" } else account(uid)
+        }) { 0 }
+        val grant = host.approve(host.verify(credentials))
+        assertEquals(OkxReadFailure.ACCOUNT_CHANGED, assertThrows(OkxReadException::class.java) { host.history(grant, "") }.reason)
+    }
 }

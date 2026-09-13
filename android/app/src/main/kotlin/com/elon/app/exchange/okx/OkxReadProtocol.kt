@@ -43,6 +43,11 @@ internal sealed class OkxReadRequest(val path: String) {
         "/api/v5/tradingBot/grid/orders-algo-details?algoOrdType=contract_grid&algoId=$id") {
         companion object { fun of(id: String) = Detail(OkxReadProtocol.id(id)) }
     }
+    class History private constructor(val after: String) : OkxReadRequest(
+        "/api/v5/tradingBot/grid/orders-algo-history?algoOrdType=contract_grid&instType=SWAP&limit=50" +
+            if (after.isEmpty()) "" else "&after=$after") {
+        companion object { fun of(after: String) = History(if (after.isEmpty()) "" else OkxReadProtocol.id(after)) }
+    }
     override fun toString() = "OkxReadRequest(fixed GET)"
 }
 

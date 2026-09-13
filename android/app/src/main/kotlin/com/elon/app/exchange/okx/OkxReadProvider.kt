@@ -16,9 +16,10 @@ class OkxReadProvider : ContentProvider() {
             require(arg == null)
             val data = extras ?: Bundle()
             val keys = when (method) {
-                "capabilities_v1", "resume_v1" -> emptySet()
+                "capabilities_v1", "capabilities_v2", "resume_v1" -> emptySet()
                 "read_v1", "revoke_v1" -> setOf("grant")
                 "detail_v1" -> setOf("grant", "id")
+                "history_v1" -> setOf("grant", "after")
                 else -> throw IllegalArgumentException("METHOD_UNSUPPORTED")
             }
             require(data.keySet() == keys)
@@ -28,8 +29,10 @@ class OkxReadProvider : ContentProvider() {
                 putString("schema", OkxReadProtocol.SCHEMA)
                 when (method) {
                     "capabilities_v1" -> { putString("status", "supported"); putString("environment", "live") }
+                    "capabilities_v2" -> { putString("status", "supported"); putString("environment", "live"); putString("history_schema", OkxHistoryPage.SCHEMA) }
                     "resume_v1" -> putString("grant", host.resume())
                     "revoke_v1" -> { host.revoke(grant); putString("status", "revoked") }
+                    "history_v1" -> putString("result", host.history(grant, data.getString("after") ?: error("AFTER_MISSING")))
                     else -> putString("result", host.read(grant, if (method == "detail_v1") data.getString("id") ?: error("ID_MISSING") else null))
                 }
             }

@@ -27,4 +27,10 @@ class OkxReadProjectionTest {
         val encoded = StrictJson.encode(projected)
         assertTrue(encoded.contains("\"status\":\"unknown\"")); assertTrue(encoded.contains("\"missing_reason\":\"not_verified\""))
     }
+    @Test fun officialStoppedStateIsKnownWithoutClaimingPositionsClosed() {
+        val encoded = StrictJson.encode(OkxReadProjection.bot(row + mapOf("state" to "stopped", "stopType" to "2"), 7, 1800000000100, false))
+        assertTrue(encoded.contains("\"status\":\"stopped\""))
+        assertTrue(encoded.contains("\"status_reason\":null"))
+        assertFalse(encoded.contains("closed")); assertFalse(encoded.contains("-13.375"))
+    }
 }
