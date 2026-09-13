@@ -45,10 +45,10 @@ class WebChatTextBlockTest {
     }
 
     @Test fun localExportsOfferRealTextFormatsAndReuseSourceLanguageExtensions() {
-        assertEquals(listOf("md", "txt"), WebChatTextBlockExport.formats(block()).map { it.extension })
+        assertEquals(listOf("md", "txt", "docx"), WebChatTextBlockExport.formats(block()).map { it.extension })
         assertEquals(listOf("py", "txt"), WebChatTextBlockExport.formats(block("code", "py")).map { it.extension })
         assertEquals(listOf("txt"), WebChatTextBlockExport.formats(block("code", "unknown")).map { it.extension })
-        assertFalse(WebChatTextBlockExport.formats(block()).any { it.key == "pdf" || it.key == "docx" })
+        assertFalse(WebChatTextBlockExport.formats(block()).any { it.key == "pdf" })
     }
 
     @Test fun exportNamesCannotEscapeTheDownloadDirectory() {

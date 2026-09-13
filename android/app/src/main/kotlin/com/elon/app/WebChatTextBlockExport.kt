@@ -18,7 +18,8 @@ internal object WebChatTextBlockExport {
         "c++" to "cpp", "c#" to "csharp", "cs" to "csharp", "yml" to "yaml", "kt" to "kotlin", "rs" to "rust")
 
     fun formats(block: WebChatTextBlock): List<ChatGptWebCanvasExportFormat> {
-        if (block.kind == "writing") return listOfNotNull(ChatGptWebCanvasExportFormats.find("document", "md"), text)
+        if (block.kind == "writing") return listOfNotNull(ChatGptWebCanvasExportFormats.find("document", "md"), text,
+            ChatGptWebCanvasExportFormats.find("document", "docx"))
         val language = block.language.lowercase().let { aliases[it] ?: it }
         return listOfNotNull(ChatGptWebCanvasExportFormats.find("code/$language", "source"), text).distinctBy { it.extension }
     }
@@ -35,11 +36,15 @@ internal object WebChatTextBlockExport {
         return ByteArray(encoded.remaining()).also { encoded.get(it) }
     }
 
+    fun bytes(block: WebChatTextBlock, content: String, format: ChatGptWebCanvasExportFormat): ByteArray {
+        require(block.complete && content.length <= WebChatTextBlock.MAX_CONTENT && format in formats(block))
+        return if (format.key == "docx") WebChatTextBlockDocx.bytes(content) else bytes(content)
+    }
+
     // This is a user-requested local export, not a provider download or cloud-save receipt.
     fun save(context: Context, block: WebChatTextBlock, content: String, stem: String,
         format: ChatGptWebCanvasExportFormat): Result {
-        require(block.complete && content.length <= WebChatTextBlock.MAX_CONTENT && format in formats(block))
-        val bytes = bytes(content)
+        val bytes = bytes(block, content, format)
         val ownership = ChatGptWebFileDownloadLease.Value(UUID.randomUUID().toString(), "local-text-block", 0,
             "", name(stem, format), format.mediaType, Long.MAX_VALUE)
         var savedUri: Uri? = null
