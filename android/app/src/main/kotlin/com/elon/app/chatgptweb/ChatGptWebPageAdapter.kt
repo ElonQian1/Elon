@@ -124,6 +124,29 @@ internal class ChatGptWebPageAdapter(
         }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val documentSession = WebBridgeDocumentSession()
+    private val commandDeliveryScript = context.assets.open("chatgpt_web_command_delivery.js").use {
+        it.reader(StandardCharsets.UTF_8).readText()
+    }
+    private val commandDelivery = ChatGptWebCommandDelivery(
+        binding = ::commandBinding,
+        invoke = { command, owner, allowed, result -> webView.post {
+            if (!allowed()) result("\"cancelled\"") else try {
+                webView.evaluateJavascript(
+                    "$commandDeliveryScript(${JSONObject.quote(command)},${JSONObject.quote(owner.token)},${JSONObject.quote(owner.href)})"
+                ) { result(it) }
+            } catch (_: Exception) { result(null) }
+        } },
+        repair = { owner, allowed, result -> webView.post {
+            if (!allowed()) result(false) else try {
+                webView.evaluateJavascript(
+                    "(function(){if(window.__elonChatGptDocumentToken!==${JSONObject.quote(owner.token)}||location.href!==${JSONObject.quote(owner.href)})return false;\n" +
+                        "$adapterScript\nreturn typeof window.__elonChatGptBridge?.command==='function';})()"
+                ) { result(it == "true") }
+            } catch (_: Exception) { result(false) }
+        } },
+        schedule = { task, delay -> mainHandler.postDelayed(task, delay) }, cancel = mainHandler::removeCallbacks,
+        observe = { code -> com.elon.app.DebugTraceStore.record("web_chat_command_delivery", mapOf("code" to code)) },
+    )
     private val nativeAttachments = ChatGptWebNativeAttachmentGateway(context, webView, documentSession::snapshot)
     internal val nativeDownloads = ChatGptWebFileDownloadGateway(context, webView, documentSession::snapshot)
     private val handshake = ChatGptWebBridgeHandshake(
@@ -219,6 +242,7 @@ internal class ChatGptWebPageAdapter(
     }
 
     fun onPageStarted(url: String) {
+        commandDelivery.invalidate()
         nativeAttachments.cancel()
         nativeDownloads.cancel()
         handshake.cancel()
@@ -243,6 +267,7 @@ internal class ChatGptWebPageAdapter(
     }
 
     fun onHostPaused() {
+        commandDelivery.invalidate()
         handshake.cancel()
         mainHandler.removeCallbacksAndMessages(null)
         webView.evaluateJavascript(
@@ -701,18 +726,20 @@ internal class ChatGptWebPageAdapter(
                 })
             }
             .toString()
-        val encoded = JSONObject.quote(command)
         // onWebExecutionRequested() can resume a WebView that Android just paused. Post the
         // command to the next UI turn so Chromium has resumed before evaluating JavaScript.
-        webView.post {
-            if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) {
-                return@post
+        commandDelivery.send(command) { code ->
+            if (requestId != null || action == "new_conversation" || action == "send_prompt") {
+                onEvent(ChatGptWebEvent.CommandResult(action, false,
+                    "网页连接尚未恢复，本次操作未发送，请重试。 [bridge_command:$code]", requestId))
             }
-            webView.evaluateJavascript(
-                "window.__elonChatGptBridge && window.__elonChatGptBridge.command($encoded);",
-                null,
-            )
         }
+    }
+
+    private fun commandBinding(): ChatGptWebCommandDelivery.Binding? {
+        if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return null
+        val document = documentSession.snapshot().takeIf { it.pageGeneration > 0 } ?: return null
+        return ChatGptWebCommandDelivery.Binding(document.documentToken, webView.url ?: return null)
     }
 
     private fun isAllowedOrigin(origin: Uri): Boolean =

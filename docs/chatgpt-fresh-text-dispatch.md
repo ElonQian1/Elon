@@ -242,6 +242,10 @@ user-only-parent result from the offline tests.
 
 ## Shared Request Sequence
 
+The subsequent [page command delivery recovery](chatgpt-command-delivery-recovery.md)
+addresses proven-unsent commands after a missing bridge; it does not retry an
+entered or ambiguous private write. Its release/device status is tracked there.
+
 September 13: native/social sends and attachment reservations now allocate from
 the existing `ChatGptWebObservedState` session sequence used by MCP commands.
 There is still one send owner and one receipt cache, not another transport.
