@@ -60,6 +60,37 @@ test('an empty saved block is authoritative, not a signal to restore old text', 
     { writing_blocks: { x: { content: '' } } })).parts[0].textBlock.content, '');
 });
 
+test('cleared writing titles stay cleared in history, stream and the cloud-save source', () => {
+  const input = message(':::writing{id="x" title="Old title" subject="Old subject" variant="email"}\nOld\n:::',
+    { writing_blocks: { x: { content: '', title: '', variant: 'email' } } });
+  const before = JSON.stringify(input);
+  const projected = blocks.project(input, true);
+  assert.equal(projected.parts[0].textBlock.title, '');
+  assert.equal(projected.writeSources[0].title, '');
+  assert.equal(projected.parts[0].textBlock.content, '');
+  const row = history.project({ messages: [input] })[0];
+  const frame = stream.assistantFrame({ message: input });
+  assert.equal(row.content.find(p => p.type === 'writing_block').textBlock.title, '');
+  assert.equal(frame.blockParts[0].textBlock.title, '');
+  assert.equal(JSON.stringify(input), before);
+});
+
+test('title fallback distinguishes an absent title from an explicitly empty one', () => {
+  for (const [attributes, saved, expected] of [
+    ['title="" subject="Subject"', undefined, ''],
+    ['subject="Subject"', undefined, 'Subject'],
+    ['title="Original" subject="Subject"', { title: null }, 'Original'],
+    ['title="Original"', { title: 'Updated' }, 'Updated'],
+    ['', undefined, '']
+  ]) {
+    const input = message(':::writing{id="x" variant="standard" ' + attributes + '}\nBody\n:::',
+      saved ? { writing_blocks: { x: saved } } : {});
+    const value = blocks.project(input, true);
+    assert.equal(value.parts[0].textBlock.title, expected);
+    assert.equal(value.writeSources[0].title, expected);
+  }
+});
+
 test('partial writing cannot become editable even after stream completion', () => {
   for (const state of ['in_progress', 'finished_successfully']) {
     const result = blocks.project(message(':::writing{id="x"}\nPartial', {}, state));

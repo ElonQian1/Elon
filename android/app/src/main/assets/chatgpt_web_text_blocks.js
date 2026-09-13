@@ -147,7 +147,7 @@
         writingIndex++;
         const metadata = token(attrs.id) && own(message.metadata?.writing_blocks, attrs.id);
         const saved = metadata && typeof metadata.content === 'string' ? metadata.content : original;
-        value = block('writing', id, metadata?.title || attrs.title || attrs.subject || '', '', saved, end >= 0);
+        value = block('writing', id, metadata?.title ?? attrs.title ?? attrs.subject ?? '', '', saved, end >= 0);
         const variant = metadata?.variant ?? attrs.variant;
         // Only explicit provider IDs on original messages can authorize a later read-check-save.
         if (value && end >= 0 && finished && token(attrs.id) &&
@@ -226,5 +226,5 @@
     } catch (_) { return null; }
   }
 
-  return { version: 3, project, domCode, runtimeProjection, MAX_CONTENT };
+  return { version: 4, project, domCode, runtimeProjection, MAX_CONTENT };
 });

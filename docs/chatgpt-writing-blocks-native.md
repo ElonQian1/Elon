@@ -72,6 +72,7 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 
 ## 代码与验证
 
+- 2026-09-13 补充修复：文本包装写作块的标题改为按“已保存标题 → 原始标题 → 主题”仅在缺失时回退，显式空标题不再恢复旧值；与 typed widget、云保存源一致。`writing-title-baseline-20260913-155439-927` 先复现失败；`writing-title-verified-20260913-155619-942` 的 70 项回归通过、0 失败/跳过，覆盖历史、SSE、原生入口与保留的官网源码契约。本修复仅完成源码和离线验证，未重新打包或真机验收；不扩大上述已验收范围。
 - 解析：`android/app/src/main/assets/chatgpt_web_text_blocks.js`。
 - 原生模型：`WebChatTextBlock.kt`；原生编辑与导出：`WebChatTextBlockEditor.kt`、`WebChatTextBlockExport.kt`。
 - 定向测试：`scripts/test-chatgpt-web-text-blocks.cjs`、`scripts/test-chatgpt-writing-block-public-evidence.cjs`、`WebChatTextBlockTest.kt`。
