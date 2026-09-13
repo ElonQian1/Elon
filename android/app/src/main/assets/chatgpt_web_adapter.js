@@ -304,20 +304,23 @@
       typeof privateStreamTransport.mergeMessages === 'function'
       ? privateStreamTransport.mergeMessages(domMessages, location.pathname)
       : domMessages);
+    const privateInput = optional(null, () => access.blocked !== true && !loginRequired &&
+      window.__elonChatGptPrivateTextInput?.snapshot(composer, () => scheduleSnapshot(true)));
     const event = {
       type: 'message_snapshot',
       title: cleanText(document.title.replace(/\s*[-|]\s*ChatGPT.*$/i, '')),
       url: location.origin + location.pathname,
-      draft: composerValue(composer).slice(0, 20000),
+      draft: (privateInput?.ready ? privateInput.draft : composerValue(composer)).slice(0, 20000),
       messages,
       observedMessageCount: Math.max(messages.length, Number(messageWindow.observedCount) || 0),
       messageWindowStart: Math.max(0, Number(messageWindow.startIndex) || 0),
-      authenticated: isAuthenticated(loginRequired, !!composer),
+      authenticated: privateInput?.ready === true || isAuthenticated(loginRequired, !!composer),
       pageKind,
       loginRequired,
       accessReason: access.reason || '',
       accessSource: access.source || '',
       composerReady: !!composer,
+      privateSendReady: privateInput?.ready === true,
       streaming,
       streamingStatus: cleanText(privateStream && privateStream.progressLabel).slice(0, 220),
       privateStreamObserved: privateStreamRevision > 0,
@@ -415,16 +418,10 @@
   }
 
   function setDraft(value, expectedDraft, respond) {
-    const composer = findComposer();
-    if (!composer) return respond('set_draft', false, '未找到输入框，请切换网页模式。');
-    if (comparableText(composerValue(composer)) !== comparableText(expectedDraft)) {
-      return respond('set_draft', false, '网页草稿已变化，请返回官网确认后重试。');
-    }
-    if (!setComposerValue(composer, value)) {
-      return respond('set_draft', false, '官方输入框未接受文本，请返回官网重试。');
-    }
-    respond('set_draft', true, '');
-    scheduleSnapshot();
+    const input = window.__elonChatGptPrivateTextInput;
+    if (!input) return respond('set_draft', false, '输入状态尚未就绪，请稍后重试。');
+    input.setCommand(value, expectedDraft, respond, { find: findComposer, read: composerValue,
+      write: setComposerValue, compare: comparableText, notify: scheduleSnapshot });
   }
 
   function startGoogleLogin(respond) {

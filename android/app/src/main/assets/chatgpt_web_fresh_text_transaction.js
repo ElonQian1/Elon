@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 20, create: factory });
+  const api = Object.freeze({ version: 21, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -149,7 +149,7 @@
         if (!owner.fallback || owner.fallbackClaimed || owner.dispatched || active && active !== owner ||
             owner.document !== page.document || owner.token !== page.__elonChatGptDocumentToken ||
             context.stamp() !== owner.stamp) return false;
-        if (command.readDraft() !== command.expectedDraft) return false;
+        if (readDraft() !== command.expectedDraft) return false;
         owner.fallbackClaimed = true;
         return true;
       }
@@ -160,10 +160,11 @@
         (!owner.dispatched || (owner.stopConfirmed === true || owner.recoveryConfirmed === true) && retireAttachments(owner)) });
     active = owner;
     last = owner;
+    const readDraft = () => owner.binding?.draft ? owner.binding.draft.read() : command.readDraft();
     function current() {
       return active === owner && !owner.controller.signal.aborted && owner.document === page.document &&
         owner.token === page.__elonChatGptDocumentToken && owner.binding?.current() === true &&
-        command.readDraft() === command.expectedDraft;
+        readDraft() === command.expectedDraft;
     }
     function check() { if (!current()) throw Error('context_changed'); }
     let deadline;
@@ -272,7 +273,9 @@
           retireAttachments(owner);
           timeout(options.streamTimeoutMs || 600000, 'stream_timeout');
           // Draft cleanup must never delay or change acceptance of the write.
-          try { if (!regenerate && owner.binding.owns() && command.readDraft() === command.expectedDraft && command.expectedDraft) command.clearDraft?.(); } catch (_) {}
+          try { if (!regenerate && owner.binding.owns() && readDraft() === command.expectedDraft && command.expectedDraft) {
+            if (owner.binding.draft) owner.binding.draft.clear(command.expectedDraft); else command.clearDraft?.();
+          } } catch (_) {}
           receipt({ status: 'accepted', code: 'accepted', current: owner.binding.owns() });
         }
       }
@@ -373,7 +376,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 18, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 21, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

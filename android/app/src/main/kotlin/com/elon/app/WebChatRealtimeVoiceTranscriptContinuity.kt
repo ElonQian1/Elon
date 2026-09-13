@@ -110,6 +110,7 @@ internal class WebChatRealtimeVoiceTranscriptContinuity {
     ): ChatGptWebSnapshot = retained.copy(
         authenticated = incoming.authenticated,
         composerReady = incoming.composerReady,
+        privateSendReady = incoming.privateSendReady,
         streaming = incoming.streaming,
         currentModel = incoming.currentModel.ifBlank { retained.currentModel },
         capabilities = incoming.capabilities,

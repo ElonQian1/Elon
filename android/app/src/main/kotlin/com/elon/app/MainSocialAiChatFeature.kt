@@ -369,7 +369,7 @@ internal class MainSocialAiChatFeature(
         return WebChatConsumerComposerStateResolver.resolve(
             provider = WebChatProviderRegistry.get(providerId()),
             state = controller.stateWireValue(),
-            composerReady = controller.composerReady(),
+            composerReady = controller.textInputReady(),
             attachmentSupported = controller.attachmentSupported(),
             warmSessionAvailable = controller.warmSessionAvailable(),
         ).submissionEnabled
@@ -654,7 +654,7 @@ internal class MainSocialAiChatFeature(
             val state = WebChatConsumerComposerStateResolver.resolve(
                 provider = provider,
                 state = controller.stateWireValue(),
-                composerReady = controller.composerReady(),
+                composerReady = controller.textInputReady(),
                 attachmentSupported = controller.attachmentSupported(),
                 warmSessionAvailable = controller.warmSessionAvailable(),
             )

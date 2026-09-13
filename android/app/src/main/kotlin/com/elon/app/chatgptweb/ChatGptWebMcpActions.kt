@@ -47,6 +47,7 @@ internal class ChatGptWebMcpActions(
             .put("page_kind", current?.pageKind ?: "unknown")
             .put("login_required", current?.loginRequired ?: false)
             .put("composer_ready", current?.composerReady ?: false)
+            .put("private_send_ready", current?.privateSendReady ?: false)
             .put("dictation_active", current?.dictationActive ?: false)
             .put("streaming", current?.streaming ?: false)
             .put("private_stream_observer", ChatGptWebPrivateMcpStatus.stream(current))

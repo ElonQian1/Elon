@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 20, create: factory });
+  const exported = Object.freeze({ version: 21, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -17,6 +17,9 @@
   const PROJECT = /^\/g\/g-p-[a-f0-9]{32}(?:-[A-Za-z0-9_-]{1,124})?\/project$/i;
   const ownerPath = page.__elonChatGptCommittedOwnerPath ||
     (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path') : null);
+  const ownerModule = page.__elonChatGptCommittedComposerOwner ||
+    (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_composer_owner') : null);
+  const memoryOwners = ownerModule?.create(page, storesFromAncestors, ownerPath);
   let active = null, captureCode = 'not_observed';
 
   function unavailable(code) {
@@ -79,6 +82,10 @@
   }
 
   function stores(node) {
+    return storesFromAncestors(committedAncestors(node));
+  }
+
+  function storesFromAncestors(ancestors) {
     const shared = new Set(), files = new Set();
     function accept(value) {
       const store = value?.store || value;
@@ -86,7 +93,6 @@
       if (typeof value?.files$ === 'function' && typeof value.readyFiles$ === 'function' &&
           typeof value.hasUploadInProgress$ === 'function') files.add(value);
     }
-    const ancestors = committedAncestors(node);
     if (!ancestors.length) return null;
     for (const fiber of ancestors) {
       accept(fiber.memoizedProps?.value);
@@ -106,14 +112,15 @@
       Array.from(page.document.querySelectorAll('link[rel="modulepreload"]')).some(node => node.href === RUNTIME_URL);
   }
 
-  function captureConversation(node, allowGuest = false) {
-    if (!node?.isConnected) return unavailable('composer_detached');
+  function captureConversation(node, allowGuest = false, allowMemory = false) {
+    if (!node?.isConnected && !allowMemory) return unavailable('composer_detached');
     if (!loaded()) return unavailable('runtime_not_observed');
     const token = page.__elonChatGptDocumentToken, account = identity(allowGuest), currentRoute = route();
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '')) return unavailable('document_unavailable');
     if (account === null) return unavailable('identity_unavailable');
     if (!currentRoute) return unavailable('route_unsupported');
-    const context = stores(node);
+    const context = node?.isConnected ? stores(node) :
+      memoryOwners?.locate(conversation => matchesRoute(conversation, currentRoute, null));
     if (!context) return null;
     const props = context.shared.getSharedProps();
     const conversation = props?.conversation, controller = props?.composerController;
@@ -130,6 +137,7 @@
         typeof host.canOpen$ !== 'function' || typeof host.tryOpen$ !== 'function' ||
         props.structuredInputMessageId !== null)) return unavailable('structured_host_unrecognized');
     return { ...context, ...currentRoute, token, account, guestProof, node, conversation, controller,
+      memoryOwner: !node?.isConnected,
       serverId: conversation.serverId$() || null, requestId: props.currentRequestId,
       structuredHost: host, newThread: props.isNewThread };
   }
@@ -166,13 +174,34 @@
     if (!runtime) { bindings.load('composer').catch(() => {}); return null; }
     if (typeof runtime.t_ !== 'function' || typeof runtime.AS !== 'function' || typeof runtime.VS !== 'function') return null;
     const view = runtime.t_(binding.controller);
-    if (view?.dom !== binding.node || view.isDestroyed ||
+    if (!view || !binding.memoryOwner && view.dom !== binding.node || view.isDestroyed ||
         typeof view.state?.doc?.toJSON !== 'function') return null;
     const doc = view.state.doc.toJSON();
     if (doc.type !== 'doc' || !Array.isArray(doc.content) || doc.content.length > 1000 ||
         !doc.content.every(p => p.type === 'paragraph' && !p.marks?.length &&
           (!p.content || p.content.every(t => t.type === 'text' && !t.marks?.length)))) return null;
     return { view, read: runtime.AS, replace: runtime.VS };
+  }
+
+  function capturePrivateConversation(node) {
+    const binding = captureConversation(node, false, true);
+    if (!binding || !binding.memoryOwner) return binding;
+    const editor = draftEditor(binding);
+    if (!editor) return unavailable('draft_unavailable');
+    const current = () => page.__elonChatGptDocumentToken === binding.token && identity() === binding.account &&
+      page.location.href === binding.href && binding.current() && draftEditor(binding)?.view === editor.view;
+    const read = () => {
+      if (!current()) return null;
+      const value = editor.read(editor.view.state.doc)?.content;
+      return typeof value === 'string' && value.length <= 20000 ? value : null;
+    };
+    if (read() === null) return unavailable('draft_unavailable');
+    const replace = (value, expected) => {
+      if (typeof value !== 'string' || value.length > 20000 || read() !== expected) return false;
+      editor.replace(editor.view, value, { scrollIntoView: false });
+      return read() === value;
+    };
+    return { ...binding, draft: Object.freeze({ read, replace, clear: expected => replace('', expected) }) };
   }
 
   function capture(node, previousAttachment, draftMode = false) {
@@ -331,5 +360,5 @@
       if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
     }
   } catch (_) {}
-  return Object.freeze({ version: 20, submit, captureConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 21, submit, captureConversation, capturePrivateConversation, state: () => ({ pending: active !== null }) });
 });

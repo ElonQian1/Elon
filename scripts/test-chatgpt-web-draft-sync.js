@@ -78,6 +78,8 @@ Object.defineProperty(InputElement.prototype, 'value', {
   set(value) { this._value = String(value); }
 });
 window.window = window;
+window.__elonChatGptPrivateTextInput = require('../android/app/src/main/assets/chatgpt_web_private_text_input')
+  .create(window, { context: { stamp: () => null } });
 
 const sandbox = {
   window,

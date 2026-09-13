@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 10, create: factory });
+  const api = Object.freeze({ version: 11, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -35,7 +35,8 @@
         !route || temporary && options.allowTemporary !== true ||
         !existingRoute && !temporary && options.allowNewConversations !== true) fail('scope_unsupported');
     const submit = page.__elonChatGptPrivateTextRuntimeSubmit;
-    const binding = submit?.captureConversation?.(composer);
+    const captureOwner = composer?.isConnected ? submit?.captureConversation : submit?.capturePrivateConversation;
+    const binding = captureOwner?.(composer);
     const newConversation = binding?.newThread === true;
     if (!binding || binding.temporary !== temporary || binding.href !== href ||
         (temporary ? typeof binding.newThread !== 'boolean' ||
@@ -48,7 +49,7 @@
       bindings.load('shared'), bindings.load('conversation'), bindings.load('composer')
     ]);
     if (document !== page.document || token !== page.__elonChatGptDocumentToken || href !== page.location.href) fail('context_changed');
-    const afterLoad = submit.captureConversation(composer);
+    const afterLoad = captureOwner(composer);
     if (!afterLoad || ['token', 'account', 'conversation', 'controller', 'shared', 'files', 'serverId', 'href', 'newThread', 'temporary']
       .some(key => binding[key] !== afterLoad[key])) fail('context_changed');
     const identity = page.__elonChatGptPrivateModelContract?.create(page);
@@ -244,7 +245,7 @@
       } catch (_) { ownershipStage = 'context_error'; return false; }
     }
     function current() {
-      try { return owns() && JSON.stringify(read()) === fingerprint; } catch (_) { return false; }
+      try { return owns() && (!binding.memoryOwner || binding.current()) && JSON.stringify(read()) === fingerprint; } catch (_) { return false; }
     }
     function historyAllowed() {
       const status = shared.Fx(selected);
@@ -281,7 +282,7 @@
     }
     if (!current()) fail('context_changed');
     return Object.freeze({ ...snapshot, get conversationId() { return serverId; }, token, current, owns, shared, runtime: conversation,
-      attachments,
+      attachments, draft: binding.draft,
       diagnostics: () => ({ ownership: ownershipStage, reconciliation: reconciliationStage }),
       beforeDispatch() {
         if (!current()) fail('context_changed');

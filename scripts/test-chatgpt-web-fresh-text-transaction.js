@@ -68,6 +68,33 @@ function fixture(options = {}) {
     reconcile: () => { reconciled = true; }, draft: value => { if (value !== undefined) draft = value; return draft; } };
 }
 
+test('independent HTTP uses owned memory draft when the DOM reader is absent', async () => {
+  const f = fixture({ reconciliation: async () => true });
+  assert.equal(f.api.version, transactionModule.version, 're-injection must not replace the current settled writer ledger');
+  let text = command.prompt, cleared = 0;
+  f.binding.draft = { read: () => text, clear(expected) {
+    assert.equal(text, expected); text = ''; cleared++; return true;
+  } };
+  const result = f.send({ composer: null, expectedDraft: text,
+    readDraft() { throw Error('DOM reader must not run'); }, clearDraft() { throw Error('DOM clear must not run'); } });
+  assert.equal((await result.completion).status, 'accepted');
+  assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
+  assert.equal(cleared, 1); assert.equal(text, '');
+  await turn(); await turn(); f.api.dispose();
+});
+
+test('memory draft changes during preparation stop before HTTP POST', async () => {
+  const gate = deferred(), f = fixture({ prepare: () => gate.promise });
+  let text = command.prompt;
+  f.binding.draft = { read: () => text, clear() { throw Error('must not clear'); } };
+  const result = f.send({ composer: null, expectedDraft: text });
+  await turn(); text = 'another synthetic draft'; gate.resolve({ conduit_token: 'fixture-conduit' });
+  assert.equal((await result.completion).status, 'rejected');
+  assert.equal(result.claimFallback(), false);
+  assert.equal(f.calls.filter(call => call.kind === 'post').length, 0);
+  f.api.dispose();
+});
+
 test('controlled trial allows one production dispatch without changing the default', async () => {
   const f = fixture({ reconciliation: async () => true });
   f.page.__elonChatGptFreshTextDispatchEnabled = false;

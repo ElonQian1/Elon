@@ -7,8 +7,10 @@ internal object WebChatSendContextPolicy {
         navigationPending: Boolean,
         selectedConversationPath: String?,
         observedConversationPath: String?,
+        allowPrivateText: Boolean = false,
     ): Boolean {
-        if (!sessionReady || snapshot?.composerReady != true || snapshot.streaming) return false
+        if (!sessionReady || snapshot == null || snapshot.streaming) return false
+        if (!(if (allowPrivateText) ChatGptWebAccessPolicy.canSendText(snapshot) else snapshot.composerReady)) return false
         if (navigationPending) return false
         return selectedConversationPath == observedConversationPath
     }

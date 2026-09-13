@@ -22,6 +22,7 @@ internal interface WebChatSocialController {
     fun adapterVersion(): Int
     fun authenticated(): Boolean
     fun composerReady(): Boolean
+    fun textInputReady(): Boolean = composerReady()
     fun warmSessionAvailable(): Boolean = false
     fun prewarm(): Boolean = false
     fun streaming(): Boolean

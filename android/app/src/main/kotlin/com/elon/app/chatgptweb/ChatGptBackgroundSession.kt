@@ -150,7 +150,7 @@ internal class ChatGptBackgroundSession(
         transport = chatGptOfficialPageSendTransport(
             pageAdapter = { pageAdapter },
             snapshot = { latestSnapshot },
-            ready = { canSend() && !realtimeVoiceBacking.conversationDeletion.isBusy() },
+            ready = { canSend(allowPrivateText = true) && !realtimeVoiceBacking.conversationDeletion.isBusy() },
         ),
         snapshot = { latestSnapshot },
         stageUploads = { attachments -> uploadStager.stage(attachments) },
@@ -308,7 +308,7 @@ internal class ChatGptBackgroundSession(
     fun presentationMode(): ChatGptWebPresentationMode = surfaceMode.mode()
     fun selectPresentationMode(mode: ChatGptWebPresentationMode): Boolean = surfaceMode.select(mode)
 
-    fun canSend(): Boolean = WebChatSendContextPolicy.allows(state == State.READY, latestSnapshot, conversationNavigation.hasPending(), currentConversationPath(), currentConversationPath())
+    fun canSend(allowPrivateText: Boolean = false): Boolean = WebChatSendContextPolicy.allows(state == State.READY, latestSnapshot, conversationNavigation.hasPending(), currentConversationPath(), currentConversationPath(), allowPrivateText)
 
     fun sendReady(): Boolean = sendOwner.isReady()
     fun pendingSendPrompt(): String? = sendOwner.prompt()
@@ -603,7 +603,7 @@ internal class ChatGptBackgroundSession(
                         recovery.onTerminal()
                         updateState(State.LOGIN_REQUIRED)
                     }
-                    ChatGptWebAccessPolicy.canChat(snapshot) -> {
+                    ChatGptWebAccessPolicy.canSendText(snapshot) -> {
                         conversationOpenRecovery.cancel()
                         newConversationRecovery.cancel()
                         conversationNavigation.complete()
@@ -614,7 +614,7 @@ internal class ChatGptBackgroundSession(
                             }
                         }
                         warmSessionAvailable = true
-                        pageAdapter?.markReady()
+                        if (snapshot.composerReady) pageAdapter?.markReady()
                         recovery.onReady()
                         updateState(State.READY)
                         forceConversationRefreshAfterVoice =

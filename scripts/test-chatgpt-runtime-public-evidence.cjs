@@ -52,12 +52,21 @@ test('reviewed public modules contain actual exports, not coincidentally named i
     return parseSource(source.toString('utf8'));
   };
   const react = inspect('2340486e-dyt4epctwx2pn2sj.js', 'bd1f145733f12933c92dd18fbb8e982601c65ef22a41dd2f898fc8f357857261');
+  assert.match(react.text, /Ot=`__reactContainer\$`\+Tt/);
+  assert.match(react.text, /\w+\[Ot\]=\w+\.current/);
   const editor = inspect('ac476d6c-foq8estmw3bbr7op.js', 'f341cbd1ebc80c14838f6bada429d1826a5a78577f094f5be452ca7663c3c895');
   const definition = (module, name) => {
     const nodes = module.definitions.get(module.exported.get(name));
     assert.equal(nodes?.length, 1, name + ' must resolve to one definition');
     return module.text.slice(nodes[0].start, nodes[0].end);
   };
+  assert.equal(parsed.composer.exported.get('x_'), 'IL');
+  assert.equal(definition(parsed.composer, 'x_'), 'AL(e=>kWt(e.conversation))');
+  assert.match(definition(parsed.composer, 'ZS'), /custom_symbol_offsets/);
+  assert.match(definition(parsed.composer, 'cC'), /schema:r/);
+  const owner = parsed.composer.definitions.get('dGt');
+  assert.equal(owner?.length, 1);
+  assert.match(parsed.composer.text.slice(owner[0].start, owner[0].end), /composerController:t,conversation:n/);
   assert.match(definition(conversation, 'Avt'), /dir\(\(\{timestamps:t\}\)/);
   assert.ok(definition(conversation, 'Dvt').includes('dir=at(Eu(()=>({userEdits:{},timestamps:{}})))'));
   assert.deepEqual(editor.imports.get('Le'), { file: './' + profile.files.conversation, name: 'Avt' });

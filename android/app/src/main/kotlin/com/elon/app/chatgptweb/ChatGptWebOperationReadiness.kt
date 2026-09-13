@@ -2,7 +2,7 @@ package com.elon.app.chatgptweb
 
 /** Admission only: individual commands still validate context, handles and confirmations. */
 internal object ChatGptWebOperationReadiness {
-    enum class Requirement { LOCAL, CACHED_DIRECTORY, DOCUMENT, DIRECTORY_READ, ACCOUNT_READ, ACCOUNT_MUTATION, COMPOSER }
+    enum class Requirement { LOCAL, CACHED_DIRECTORY, DOCUMENT, DIRECTORY_READ, ACCOUNT_READ, ACCOUNT_MUTATION, TEXT_INPUT, COMPOSER }
 
     private val groups = mapOf(
         Requirement.LOCAL to setOf(
@@ -31,9 +31,9 @@ internal object ChatGptWebOperationReadiness {
             // Their owners still protect current-chat drafts and share bindings before writes.
             "chatgpt_delete_conversation", "chatgpt_share_conversation", "chatgpt_mutate_library_file",
         ),
+        Requirement.TEXT_INPUT to setOf("set_input_text", "chatgpt_set_page_input_text", "send_input", "chatgpt_send_page_input"),
         // These still use the official composer/runtime transaction. Do not relax them implicitly.
         Requirement.COMPOSER to setOf(
-            "set_input_text", "chatgpt_set_page_input_text", "send_input", "chatgpt_send_page_input",
             "chatgpt_invoke_control", "chatgpt_set_control_text", "chatgpt_set_control_selected",
             "chatgpt_select_control_choice", "chatgpt_set_control_slider", "chatgpt_set_control_expanded",
             "chatgpt_new_conversation", "chatgpt_verify_private_stream_watchdog", "chatgpt_regenerate_response",
@@ -58,8 +58,10 @@ internal object ChatGptWebOperationReadiness {
         if (required == Requirement.LOCAL || required == Requirement.CACHED_DIRECTORY) return null
         // Preserve the existing admission for composer transactions, including its error contract.
         if (required == Requirement.COMPOSER && !bridgeReady) return "bridge_not_ready"
+        if (required == Requirement.TEXT_INPUT && !bridgeReady &&
+            snapshot?.let(ChatGptWebAccessPolicy::canSendText) != true) return "bridge_not_ready"
         if (!adapterCurrent) return "adapter_generation_not_ready"
-        if (required == Requirement.COMPOSER) return null
+        if (required == Requirement.COMPOSER || required == Requirement.TEXT_INPUT && bridgeReady) return null
         // A current manifest/command channel can arrive before the independent chat snapshot.
         // The page adapter still enforces the live WebView origin on every command.
         if (snapshot == null) return null

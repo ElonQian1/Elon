@@ -186,6 +186,7 @@ internal class ChatGptSocialChatController(
     override fun authenticated(): Boolean = session.currentSnapshot()?.authenticated == true
 
     override fun composerReady(): Boolean = session.currentSnapshot()?.composerReady == true
+    override fun textInputReady(): Boolean = session.currentSnapshot()?.let(com.elon.app.chatgptweb.ChatGptWebAccessPolicy::canSendText) == true
 
     override fun warmSessionAvailable(): Boolean = session.warmSessionAvailable()
 
