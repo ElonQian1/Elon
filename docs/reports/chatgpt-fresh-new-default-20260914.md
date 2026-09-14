@@ -51,5 +51,23 @@ default admission, explicit opt-out, composer absence and retained trial behavio
 The initial red test reproduced the disabled default; a test-only asynchronous
 cleanup assertion was corrected before the final green run.
 
-Release and an unarmed production-default check are pending at this source commit.
-The prior accepted trial is not mislabeled as an unarmed default check.
+## Published Default And Native Check
+
+`fresh-new-default-release-20260914-105429-868` passed Release compilation,
+publication, remote artifact verification and in-place Xiaomi installation in
+505.9 seconds. The artifact is **1.1.1721 / 1721**, source
+`dfd0072e45326a10d1f0d9daf570acd40b6b539e`, SHA-256
+`90129844e66e29abe4bc8627c9b191f86b2bad0ac0bffc934c4027f1a9ed6fdf`.
+
+`fresh-new-default-native-1721-20260914-110342-231` passed with
+`-NewConversation -UseDefault -FirstOnly`, without arming a trial. It performed
+one production native Send, no seed, and received one matching native answer.
+The one private receipt and 31 stream events completed with exact conversation
+continuity and reconciled history, `pending=false`. Original conversation and
+awake setting were restored; there were no ambiguous writes or probe timeouts.
+Reply observation was 7,123 ms and the send case was 12,187 ms, including UI/MCP
+overhead. This is default-routing evidence, not a network/performance benchmark.
+
+The accepted new personal plain-text scope is now **completed/default-enabled**.
+Do not repeat its first/follow-up research without current regression evidence.
+The extensions listed above remain separate open acceptance requirements.

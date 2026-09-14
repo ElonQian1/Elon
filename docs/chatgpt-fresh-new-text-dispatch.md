@@ -1,9 +1,10 @@
 ---
 capability_id: android_chatgpt_fresh_new_conversation_text_dispatch_v1
-implementation_status: partial
-verification_status: device_verified_personal_trial
-production_default: false
-scope: authenticated_new_personal_or_owned_project_text
+implementation_status: completed
+verification_status: production_ui_verified
+production_default: true
+scope: authenticated_new_personal_plain_text_with_composer
+pending_extensions: owned_project_text, temporary, tools, attachments, initial_composer_free
 ---
 
 # Fresh New-Conversation Dispatch
@@ -18,8 +19,8 @@ existing-conversation default is unchanged.
 Latest: [1720 complete personal first-send/follow-up and default promotion](reports/chatgpt-fresh-new-default-20260914.md).
 Both native sends, exact conversation continuity, single-answer display and
 restoration passed. Transaction 23 enables this personal scope with a bound
-composer; its release/default check is pending. The broader project scope is
-not promoted. The [earlier root/receipt repair](reports/chatgpt-fresh-canonical-root-20260914.md)
+composer; release 1721 and its unarmed native default check passed. The broader
+project scope is not promoted. The [earlier root/receipt repair](reports/chatgpt-fresh-canonical-root-20260914.md)
 is reused, not repeated. The timeline below is historical evidence.
 
 Earlier follow-up: [first-route reconciliation evidence](reports/chatgpt-fresh-first-route-20260913.md).

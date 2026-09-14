@@ -18,8 +18,8 @@ identity/runtime layer. Reuse these modules; do not repeat the completed audit.
 Other contexts retain the established sender before any independent dispatch.
 
 Current extension: [new personal first-send and follow-up](reports/chatgpt-fresh-new-default-20260914.md)
-passed production native-button acceptance on 1720. Its narrow default promotion
-is source-tested; release/default routing verification is recorded in that report.
+passed production native-button acceptance on 1720. Its narrow default is now
+published and independently native-verified on 1721; reuse the completed scope.
 
 The September 14 [private input readiness batch](chatgpt-private-text-input-memory.md)
 adds actual in-memory draft ownership when the composer DOM is absent. It keeps
