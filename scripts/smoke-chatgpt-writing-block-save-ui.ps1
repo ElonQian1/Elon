@@ -9,9 +9,11 @@ param(
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
 . (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
+. (Join-Path $PSScriptRoot 'chatgpt-writing-save-evidence.ps1')
 $r=New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial -ExpectedHardwareSerial $ExpectedHardwareSerial
 $report=[ordered]@{schema='elon.writing_save_ui.v1';passed=$false;stage='prepare';sent=0;cloud_write_attempts=0;restored=$false;awake_restored=$false;private_content_exported=$false}
 $opened=$false; $editedHash=''; $origin=$null; $changed=$false
+$beforeSave=@(); $saveEvidence=$null
 $prompt='ELON_EXTENDED_TOOL_ACCEPTANCE_V1: For a native block editor test, draft a short email in your editable writing block. Put the exact marker ELON_TEXT_BLOCK_ACCEPTANCE_V1 in the email body. Then add one separate Python fenced code block containing only print("ELON_TEXT_BLOCK_ACCEPTANCE_V1"). Do not use Canvas or execute anything.'
 function Main { Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state -MainState }
 function Web { Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state }
@@ -68,8 +70,12 @@ try {
     if(($sum -split '\s+')[0] -cne $export.sha256){throw 'export_bytes_mismatch'}
     $report.export_bytes_match=$true; $report.export_extension='md'
     Stage native_save
+    $beforeSave=@((Web).command_requests|ForEach-Object request_id)
     $report.cloud_write_attempts=1
     $saved=Ui save @{expected_hash=$editedHash}
+    $saveEvidence=Get-ChatGptWritingSaveEvidence -Web (Web) -BeforeRequestIds $beforeSave `
+        -ExpectedPath $ExistingFixturePath -ExpectedGeneration $generation -MessageId $item.message -PartIndex $item.index
+    if (!$saveEvidence.confirmed){throw 'cloud_save_receipt_unconfirmed'}
     $report.cloud_save_confirmed=$saved.saved
     Ui close|Out-Null; $opened=$false
     Stage reopen_saved
@@ -91,6 +97,14 @@ try {
 } finally {
     try {
         if(-not (Test-WebChatNativeChatSurfaceForeground -Runtime $r)){throw 'foreground_changed_skip_cleanup'}
+        if($report.cloud_write_attempts -gt 0){
+            $saveEvidence=Get-ChatGptWritingSaveEvidence -Web (Web) -BeforeRequestIds $beforeSave `
+                -ExpectedPath $ExistingFixturePath -ExpectedGeneration $generation -MessageId $item.message -PartIndex $item.index
+        }
+        if(!(Test-ChatGptWritingRestoreAllowed -WriteAttempted ($report.cloud_write_attempts -gt 0) -Evidence $saveEvidence)){
+            $report.recovery_required=$true
+            throw 'cloud_save_unconfirmed_preserve_editor'
+        }
         if($opened){
             if($editedHash -and $report.export_bytes_match){Ui discard_owned_local @{expected_hash=$editedHash}|Out-Null}
             else{Ui close|Out-Null}
