@@ -42,7 +42,7 @@ class HomeConversationHeaderContractTest {
         assertTrue(web.contains("free of standalone unread-filter and mark-all-read controls"))
         assertTrue(web.contains("className = 'home-filter-tabs'"))
         assertTrue(web.contains("['all', '全部', counts.all]"))
-        assertTrue(web.contains("['conversations', '对话', counts.conversations]"))
+        assertTrue(web.contains("['conversations', '群聊', counts.conversations]"))
         assertTrue(web.contains(".home-filter-tab.active { border-color: rgba(219,252,255,.3);"))
         assertTrue(web.contains(".home-filter-count { min-width: 20px; height: 18px;"))
         assertTrue(web.contains("min-height:192px"))

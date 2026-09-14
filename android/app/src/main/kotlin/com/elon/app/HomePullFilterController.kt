@@ -297,7 +297,7 @@ private class HomePullFilterIndicatorView(context: android.content.Context) : Vi
             HomeListFilterMode.All -> "下拉切换到全部"
             HomeListFilterMode.Projects -> "下拉切换到项目"
             HomeListFilterMode.Friends -> "下拉切换到好友"
-            HomeListFilterMode.Conversations -> "下拉切换到对话"
+            HomeListFilterMode.Conversations -> "下拉切换到群聊"
             HomeListFilterMode.Unread -> "下拉切换到未读"
         }
         progress = value.coerceIn(0f, 1f)

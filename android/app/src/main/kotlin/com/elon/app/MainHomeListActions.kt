@@ -272,7 +272,7 @@ internal class MainHomeListActions(
                 HomeListFilterMode.Projects -> "\u6682\u65e0\u9879\u76ee"
                 HomeListFilterMode.Friends -> "\u6682\u65e0\u597d\u53cb\u6216\u7fa4\u804a"
                 HomeListFilterMode.All -> ""
-                HomeListFilterMode.Conversations -> "\u6682\u65e0\u5bf9\u8bdd"
+                HomeListFilterMode.Conversations -> "暂无群聊"
                 HomeListFilterMode.Unread -> "\u6682\u65e0\u672a\u8bfb\u6d88\u606f"
             }
         }
@@ -532,7 +532,7 @@ internal class MainHomeListActions(
         HomeListFilterMode.Friends -> "好友"
         HomeListFilterMode.Projects -> "项目"
         HomeListFilterMode.All -> "全部"
-        HomeListFilterMode.Conversations -> "对话"
+        HomeListFilterMode.Conversations -> "群聊"
         HomeListFilterMode.Unread -> "未读"
     }
 

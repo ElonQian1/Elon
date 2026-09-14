@@ -64,7 +64,7 @@ internal class HomeConversationHeaderView(
             HomeListFilterMode.All to ("全部" to counts.all),
             HomeListFilterMode.Friends to ("好友" to counts.friends),
             HomeListFilterMode.Projects to ("项目" to counts.projects),
-            HomeListFilterMode.Conversations to ("对话" to counts.conversations)
+            HomeListFilterMode.Conversations to ("群聊" to counts.conversations)
         )
         addView(LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
