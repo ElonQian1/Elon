@@ -5,6 +5,7 @@ param(
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
     [Parameter(Mandatory)][switch]$CreateFixture,
     [switch]$VerifyFixtureWrites,
+    [switch]$SelectCanvasTool,
     [int]$ExpectedAdapterVersion = 359,
     [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe'
 )
@@ -15,7 +16,7 @@ $ErrorActionPreference = 'Stop'
 $r=New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial -ExpectedHardwareSerial $ExpectedHardwareSerial
 $report=[ordered]@{schema='elon.canvas_original_ui.v1';passed=$false;stage='prepare';sent_messages=0
     saves=0;restores=0;created_links=0;restored=$false;awake_restored=$false;content_exported=$false}
-$origin=$null; $changed=$false; $dialogs=$false; $prompt=''; $fixture=''; $initialHash=''
+$origin=$null; $changed=$false; $dialogs=$false; $prompt=''; $fixture=''; $initialHash=''; $canvasSelected=$false
 function Main { Get-ChatGptWebNativeChatState -Runtime $r }
 function Web { Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state }
 function Act([string]$Action,[hashtable]$Arguments=@{}) {
@@ -93,6 +94,20 @@ try {
         param($s) $s.composer_ready -eq $true -and $s.conversation.message_count -eq 0 -and ([uri]$s.conversation.url).AbsolutePath -eq '/'
     } | Out-Null
     $fixture='ELON_CANVAS_ACCEPTANCE_V1_' + [Guid]::NewGuid().ToString('N').Substring(0,8)
+    if ($SelectCanvasTool) {
+        Stage 'select_canvas_tool'
+        Menu 'tools' | Out-Null
+        Menu 'canvas' | Out-Null
+        $canvasSelected=$true
+        $toolDeadline=[DateTimeOffset]::UtcNow.AddSeconds(10)
+        do {
+            $toolState=Menu 'inspect'
+            if($toolState.canvas_active -ceq $true){break}
+            Start-Sleep -Milliseconds 400
+        } while([DateTimeOffset]::UtcNow -lt $toolDeadline)
+        if($toolState.canvas_active -cne $true){throw 'canvas_tool_not_selected'}
+        $report.canvas_tool_selected=$true
+    }
     $prompt="ELON_EXTENDED_TOOL_ACCEPTANCE_V1: Open a new canvas document titled $fixture. Put exactly these two lines in the canvas: $fixture followed by This is a disposable native editor test document. Use the canvas tool, not a code block in the chat. Do not browse, share, or create other files."
     Act 'set_input_text' @{text=$prompt} | Out-Null
     Ui 'focus_composer' | Out-Null
@@ -171,6 +186,7 @@ try {
         }
         $current=Main
         if ($prompt -and $current.input.has_text) { Ui 'clear_fixture_draft' | Out-Null }
+        if ($canvasSelected -and (Menu 'inspect').canvas_active -ceq $true) { Menu 'clear_canvas' | Out-Null }
         if ($changed -and $origin) {
             $report.restored=Restore-WebChatNativeConversation -Runtime $r -ProviderId chatgpt_web -ConversationPath $origin.social_chat.web_chat_conversation_path -TimeoutSec 60
         }

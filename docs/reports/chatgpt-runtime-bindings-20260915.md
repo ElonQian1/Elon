@@ -28,6 +28,17 @@ ordinary text, Search and Image modules.
   covering the native composer. The runner now dismisses only the app's known
   update sheet via "Later"; it does not accept any system authorization. Empty
   attempts sent zero messages; only the exact synthetic draft was removed.
+- After dismissing the sheet, one native request completed and the native
+  Canvas list opened, but the original textdocs endpoint returned zero documents
+  (`canvas-native-dismiss-update-1743-20260915-035458-059`). Explicit Canvas
+  selection was unavailable; private eligibility diagnostics confirmed
+  `canvas raw=0, menu=0, reason=raw_missing`. This is observed provider/model
+  capability data, not a missing DOM element. Save/restore device acceptance is
+  deferred until a genuine owned Canvas exists. No original document was edited
+  or shared, and the starting conversation was restored.
+- Adapter 408 routing regression: 570 passed, zero skips/failures, plus 22
+  attachment evidence cases and existing fresh/Canvas acceptance contracts;
+  `attachment-routing-final-regression-20260915-035310-069`.
 
 - All 100 consumed exports are resolved, including the 13 previously ambiguous
   wrappers. Hash-pinned public AST checks verify actual exports, import edges,
