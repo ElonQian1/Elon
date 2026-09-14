@@ -61,6 +61,8 @@ new/project/temporary scope flags. Its tool scope now matches the sender:
 personal existing-chat Search uses the accepted default unless explicitly
 disabled; other supported tool combinations require the explicit tool switch.
 The same context validates current account, model, tool eligibility and draft.
+Already-associated attachments follow the exact explicit attachment switch too;
+readiness reuses their current owned upload lease and does not consume files.
 This does not enable uploads, new composer-free sends or additional tool defaults.
 Unknown runtime, owner or draft means not ready, not that the website lacks the
 feature. Fully loading-free cold start is not claimed.
@@ -68,7 +70,7 @@ feature. Fully loading-free cold start is not claimed.
 At the initial checkpoint, transaction module and instance versions were both 21. The previously mismatched
 instance version could discard a settled receipt ledger on reinjection; matching
 versions preserve duplicate-command protection across same-document reinjection.
-That checkpoint used adapter 383; the current input module is 2, adapter 401.
+That checkpoint used adapter 383; the current input module is 3, adapter 402.
 
 ## Tool Scope And Pending-Owner Repair
 
@@ -92,6 +94,22 @@ Search HTTP acceptance is retained; its absent-composer UI boundary still needs
 one controlled production check after the device returns.
 
 ## Evidence And Acceptance Boundary
+
+The attachment follow-up fixes the omitted `allowAttachments` input scope,
+without changing attachment upload admission or independent-send defaults.
+It covers a missing text composer with an already-owned, mounted file-store
+owner, not fully DOM-free uploading. Switch changes invalidate cached readiness;
+account, model, file state, metadata and lease checks remain authoritative.
+`private-input-attachment-red-20260914-233530-421` reproduced four failures.
+The new fixture composes the production attachment composer/lease, fresh context,
+memory draft and input modules; it checks TXT/PDF/PNG readiness, no request or
+file consumption during editing, revoked ownership and exact sender/input scope
+parity. `private-input-grouped-regression-20260914-233724-894` passed 338 tests,
+zero failures/skips, and includes the prior
+tool/owner fix and the existing sender, attachment, default-scope and assembly
+regressions. These are synthetic offline checks, not real attachment HTTP
+acceptance. The next grouped release carries both input fixes; device checks
+remain deferred while USB and wireless ADB are unavailable.
 
 The retained September 12 public assets are parsed, never executed or used to
 export identity. `test-chatgpt-runtime-public-evidence.cjs` verifies their hashes

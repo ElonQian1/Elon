@@ -746,7 +746,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-        internal const val ADAPTER_VERSION = 401
+        internal const val ADAPTER_VERSION = 402
 
         private val ADAPTER_ASSETS = ChatGptWebAdapterAssets.names
         private const val BRIDGE_OBJECT = "elonChatGptNative"
