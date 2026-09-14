@@ -5430,10 +5430,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <svg viewBox="0 0 28 28" aria-hidden="true">
         <path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" d="M12.5 5.5a7 7 0 1 1 0 14a7 7 0 0 1 0-14Zm5.2 12.2 5 5"/>
       </svg>
-      <input id="friendSearchInput" placeholder="搜索账号/手机" autocomplete="off" />
+      <input id="friendSearchInput" placeholder="搜索完整手机号/账号/昵称" autocomplete="off" />
     </label>
     <div class="add-friend-section-row">
-      <h3 class="add-friend-section-title">推荐</h3>
+      <h3 class="add-friend-section-title" id="friendRecommendationTitle">推荐</h3>
       <div class="add-friend-scan-pill">
         <img alt="" src="/assets/ic_add_friend_scan.png"/>
         <span>扫一扫</span>
@@ -6323,6 +6323,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   const addFriendForm = $('addFriendForm');
   const friendSearchInput = $('friendSearchInput');
   const friendRecommendationList = $('friendRecommendationList');
+  const friendRecommendationTitle = $('friendRecommendationTitle');
   const addFriendResult = $('addFriendResult');
   const cancelAddFriendBtn = $('cancelAddFriendBtn');
 
@@ -6389,6 +6390,13 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   let projectArchive = null;
   let friends = [];
   let friendRecommendations = [];
+  let friendLookup = { query: '', user: null, message: '' };
+  let friendLookupRevision = 0;
+  let friendLookupTimer = null;
+  let friendLookupAbort = null;
+  let friendRecommendationsLoading = false;
+  let friendRecommendationsError = '';
+  let friendRecommendationsRevision = 0;
   let groups = [];
   let currentProject = null;
   let currentProjectSpaceLatestApkUrl = '';
@@ -10639,8 +10647,9 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     return '<svg viewBox="0 0 34 24" aria-hidden="true"><path fill="currentColor" d="M12 12a5 5 0 1 0 0-10a5 5 0 0 0 0 10Zm10-1a4 4 0 1 0 0-8a4 4 0 0 0 0 8ZM2 22c.8-4.8 4.5-7.5 10-7.5s9.2 2.7 10 7.5H2Zm17.5-7.2c3.7.5 6.2 2.8 6.9 7.2H32c-.6-4.2-3.7-6.6-8.3-6.6c-1.5 0-2.9.2-4.2.7Z"/></svg>';
   }
   function renderAddFriendRecommendations() {
-    const query = friendSearchInput.value.trim().toLowerCase();
-    const items = friendRecommendations.filter((item) => recommendationMatches(item, query));
+    const searching = !!friendLookup.query;
+    friendRecommendationTitle.textContent = searching ? '搜索结果' : '推荐';
+    const items = searching ? (friendLookup.user ? [friendLookup.user] : []) : friendRecommendations;
     friendRecommendationList.innerHTML = items.map((item) => {
       const id = escapeHtml(item.id || '');
       const name = escapeHtml(recommendationName(item));
@@ -10653,6 +10662,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
         ? `<span class="add-friend-mutual">${mutualFriendsIconSvg()}${mutualCount}名共同好友</span>`
         : '';
       const already = !!(item.already_friend || item.alreadyFriend);
+      const isSelf = !!item.is_self;
       return `<div class="add-friend-row">
         <div class="add-friend-avatar">${avatar}</div>
         <div class="add-friend-info">
@@ -10661,37 +10671,80 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
         </div>
         <div class="add-friend-side">
           ${mutual}
-          <button class="add-friend-add-btn" type="button" data-add-friend-id="${id}"${already ? ' disabled' : ''}>${already ? '已添加' : '添加'}</button>
+          <button class="add-friend-add-btn" type="button" data-add-friend-id="${id}"${already || isSelf ? ' disabled' : ''}>${isSelf ? '你自己' : already ? '已添加' : '添加'}</button>
         </div>
       </div>`;
     }).join('');
-    if (!friendRecommendations.length) {
-      addFriendResult.textContent = '正在加载推荐好友...';
-      addFriendResult.style.color = 'var(--ink-faint)';
-    } else if (!items.length) {
-      addFriendResult.textContent = '没有匹配的注册用户';
-      addFriendResult.style.color = 'var(--ink-faint)';
-    } else {
-      addFriendResult.textContent = '';
+    addFriendResult.style.color = 'var(--ink-faint)';
+    addFriendResult.textContent = searching ? friendLookup.message
+      : friendRecommendationsLoading ? '正在加载推荐好友...'
+      : friendRecommendationsError || (items.length ? '' : '暂无可推荐的注册用户');
+  }
+  function cancelFriendLookup() {
+    ++friendLookupRevision;
+    clearTimeout(friendLookupTimer);
+    friendLookupTimer = null;
+    if (friendLookupAbort) friendLookupAbort.abort();
+    friendLookupAbort = null;
+  }
+  function searchRegisteredFriend(immediate = false) {
+    cancelFriendLookup();
+    const revision = friendLookupRevision;
+    const query = friendSearchInput.value.trim();
+    friendLookup = { query, user: null, message: query ? '正在搜索...' : '' };
+    if (query.length < 2) {
+      if (query) friendLookup.message = '请输入完整手机号、账号或至少两个字的昵称';
+      renderAddFriendRecommendations();
+      return;
     }
+    renderAddFriendRecommendations();
+    const run = async () => {
+      const controller = new AbortController();
+      friendLookupAbort = controller;
+      try {
+        const res = await api('/api/me/friends/search?search_type=auto&query=' + encodeURIComponent(query), { signal: controller.signal });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '搜索失败，请重试');
+        if (revision !== friendLookupRevision) return;
+        if (!data.found) friendLookup.message = '未找到用户，请核对完整手机号或账号';
+        else if (!data.user || !data.user.id) friendLookup.message = '搜索结果异常，请重试';
+        else {
+          friendLookup.user = Object.assign({}, data.user, { already_friend: !!data.already_friend, is_self: !!data.is_self });
+          friendLookup.message = data.is_self ? '这是你自己的账号，不能添加自己' : '';
+        }
+      } catch (err) {
+        if (revision !== friendLookupRevision) return;
+        friendLookup.message = err.message || '搜索失败，请检查网络后重试';
+      }
+      if (revision === friendLookupRevision) renderAddFriendRecommendations();
+    };
+    if (immediate) run(); else friendLookupTimer = setTimeout(run, 300);
   }
   async function loadFriendRecommendations() {
+    const revision = ++friendRecommendationsRevision;
+    friendRecommendationsLoading = true;
+    friendRecommendationsError = '';
     addFriendResult.textContent = '正在加载推荐好友...';
     addFriendResult.style.color = 'var(--ink-faint)';
     try {
       const res = await api('/api/me/friends/recommendations');
       const data = await res.json().catch(() => ({}));
+      if (revision !== friendRecommendationsRevision) return;
       if (!res.ok) throw new Error(data.error || '推荐好友加载失败');
       friendRecommendations = Array.isArray(data.recommendations) ? data.recommendations : [];
+      friendRecommendationsLoading = false;
       renderAddFriendRecommendations();
     } catch (err) {
+      if (revision !== friendRecommendationsRevision) return;
+      friendRecommendationsLoading = false;
       friendRecommendations = [];
-      friendRecommendationList.innerHTML = '';
-      addFriendResult.textContent = (err && err.message) ? err.message : '推荐好友加载失败';
-      addFriendResult.style.color = '#F07884';
+      friendRecommendationsError = (err && err.message) ? err.message : '推荐好友加载失败';
+      renderAddFriendRecommendations();
     }
   }
   function openAddFriendDialog() {
+    cancelFriendLookup();
+    friendLookup = { query: '', user: null, message: '' };
     addFriendResult.textContent = '';
     friendSearchInput.value = '';
     friendRecommendations = [];
@@ -10702,6 +10755,8 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     setTimeout(() => friendSearchInput.focus(), 50);
   }
   function closeAddFriendDialog() {
+    cancelFriendLookup();
+    ++friendRecommendationsRevision;
     addFriendMask.classList.remove('active');
     setTopAddButtonExpanded(false);
   }
@@ -10783,16 +10838,17 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   });
   cancelAddFriendBtn.addEventListener('click', closeAddFriendDialog);
   addFriendMask.addEventListener('click', (e) => { if (e.target === addFriendMask) closeAddFriendDialog(); });
-  friendSearchInput.addEventListener('input', renderAddFriendRecommendations);
+  friendSearchInput.addEventListener('input', () => searchRegisteredFriend());
   addFriendForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    searchRegisteredFriend(true);
   });
   friendRecommendationList.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-add-friend-id]');
     if (!btn || btn.disabled) return;
     const userId = btn.getAttribute('data-add-friend-id') || '';
-    const target = friendRecommendations.find((item) => item.id === userId);
-    if (!target) return;
+    const target = friendLookup.query ? friendLookup.user : friendRecommendations.find((item) => item.id === userId);
+    if (!target || target.id !== userId || target.is_self) return;
     btn.disabled = true;
     addFriendResult.textContent = '正在添加...';
     addFriendResult.style.color = 'var(--ink-faint)';
@@ -10810,6 +10866,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       friendRecommendations = friendRecommendations.map((item) => (
         item.id === userId ? Object.assign({}, item, { already_friend: true }) : item
       ));
+      if (friendLookup.user && friendLookup.user.id === userId) friendLookup.user.already_friend = true;
       renderAddFriendRecommendations();
       addFriendResult.textContent = data.already_friend
         ? `已经是好友：${recommendationName(target)}`

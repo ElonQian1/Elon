@@ -8,6 +8,8 @@ import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.TypedValue
@@ -38,6 +40,10 @@ class AddFriendActivity : AppCompatActivity() {
     private lateinit var searchInput: EditText
     private lateinit var recommendationList: LinearLayout
     private lateinit var resultText: TextView
+    private lateinit var recommendationTitle: TextView
+    private lateinit var friendSearch: FriendSearchController
+    private var recommendationsLoading = true
+    private var recommendationsError = ""
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = elonColor(R.color.elon_bg_chrome)
@@ -49,7 +55,19 @@ class AddFriendActivity : AppCompatActivity() {
             return
         }
         setContentView(buildContent())
+        val handler = Handler(Looper.getMainLooper())
+        friendSearch = FriendSearchController(
+            schedule = { task, delay -> handler.postDelayed(task, delay); Unit },
+            unschedule = { handler.removeCallbacks(it) },
+            lookup = friendSearchLookup(this, http, { serverUrl }, handler),
+            publish = { renderRecommendations() }
+        )
         loadRecommendations()
+    }
+
+    override fun onDestroy() {
+        if (::friendSearch.isInitialized) friendSearch.close()
+        super.onDestroy()
     }
 
     private fun buildContent(): View {
@@ -109,7 +127,7 @@ class AddFriendActivity : AppCompatActivity() {
     }
     private fun searchBar(): LinearLayout {
         searchInput = EditText(this).apply {
-            hint = "搜索账号/手机"
+            hint = "搜索完整手机号/账号/昵称"
             setSingleLine(true)
             textSize = 16f
             imeOptions = EditorInfo.IME_ACTION_SEARCH
@@ -122,12 +140,13 @@ class AddFriendActivity : AppCompatActivity() {
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                    renderRecommendations()
+                    if (::friendSearch.isInitialized) friendSearch.update(s?.toString().orEmpty())
                 }
                 override fun afterTextChanged(s: Editable?) = Unit
             })
             setOnEditorActionListener { view, actionId, _ ->
                 if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                    friendSearch.update(text?.toString().orEmpty(), immediate = true)
                     hideKeyboard(view)
                     true
                 } else {
@@ -179,12 +198,13 @@ class AddFriendActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(TextView(this@AddFriendActivity).apply {
+            recommendationTitle = TextView(this@AddFriendActivity).apply {
                 text = "推荐"
                 includeFontPadding = false
                 textSize = 16f
                 setTextColor(elonColor(R.color.elon_text_primary))
-            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            }
+            addView(recommendationTitle, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(scanButton(), LinearLayout.LayoutParams(dp(88), dp(36)))
         }
     }
@@ -268,17 +288,18 @@ class AddFriendActivity : AppCompatActivity() {
 
     private fun addButton(item: AddFriendRecommendation): TextView {
         return TextView(this).apply {
-            text = if (item.alreadyFriend) "已添加" else "添加"
+            val canAdd = !item.alreadyFriend && !item.isSelf
+            text = if (item.isSelf) "你自己" else if (item.alreadyFriend) "已添加" else "添加"
             gravity = Gravity.CENTER
             includeFontPadding = false
             textSize = 16f
             setTypeface(typeface, Typeface.BOLD)
-            isEnabled = !item.alreadyFriend
-            alpha = if (item.alreadyFriend) 0.48f else 1f
+            isEnabled = canAdd
+            alpha = if (canAdd) 1f else 0.48f
             setTextColor(elonColor(R.color.elon_button_primary_text))
             background = roundedRect(elonColor(R.color.elon_button_primary_bg), 18)
-            isClickable = !item.alreadyFriend
-            isFocusable = !item.alreadyFriend
+            isClickable = canAdd
+            isFocusable = canAdd
             foreground = selectableForeground()
             setOnClickListener { addRecommendedFriend(item, this) }
         }
@@ -328,6 +349,8 @@ class AddFriendActivity : AppCompatActivity() {
                 }
             }
             runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                recommendationsLoading = false
                 result.fold(
                     onSuccess = {
                         recommendations.clear()
@@ -335,8 +358,8 @@ class AddFriendActivity : AppCompatActivity() {
                         renderRecommendations()
                     },
                     onFailure = {
-                        resultText.text = it.message ?: "推荐好友加载失败"
-                        resultText.setTextColor(elonColor(R.color.elon_status_danger))
+                        recommendationsError = it.message ?: "推荐好友加载失败"
+                        renderRecommendations()
                     }
                 )
             }
@@ -346,14 +369,10 @@ class AddFriendActivity : AppCompatActivity() {
     private fun renderRecommendations() {
         if (!::recommendationList.isInitialized) return
         recommendationList.removeAllViews()
-        val query = searchInput.text?.toString()?.trim()?.lowercase().orEmpty()
-        val items = recommendations.filter { item ->
-            query.isBlank() ||
-                item.name.lowercase().contains(query) ||
-                item.account.lowercase().contains(query) ||
-                item.phone.orEmpty().lowercase().contains(query) ||
-                item.id.lowercase().contains(query)
-        }
+        val search = if (::friendSearch.isInitialized) friendSearch.state else FriendSearchState()
+        val searching = search.query.isNotEmpty()
+        recommendationTitle.text = if (searching) "搜索结果" else "推荐"
+        val items = if (searching) listOfNotNull(search.user?.let(::parseRecommendation)) else recommendations
         items.forEach { item ->
             recommendationList.addView(recommendationRow(item), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -362,8 +381,10 @@ class AddFriendActivity : AppCompatActivity() {
         }
         resultText.setTextColor(elonColor(R.color.elon_text_tertiary))
         resultText.text = when {
+            searching -> search.message
+            recommendationsLoading -> "正在加载推荐好友..."
+            recommendationsError.isNotEmpty() -> recommendationsError
             recommendations.isEmpty() -> "暂无可推荐的注册用户"
-            items.isEmpty() -> "没有匹配的注册用户"
             else -> ""
         }
     }
@@ -391,12 +412,14 @@ class AddFriendActivity : AppCompatActivity() {
                 }
             }
             runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
                 result.fold(
                     onSuccess = { alreadyFriend ->
                         val index = recommendations.indexOfFirst { it.id == item.id }
                         if (index >= 0) {
                             recommendations[index] = recommendations[index].copy(alreadyFriend = true)
                         }
+                        friendSearch.markAdded(item.id)
                         setResult(RESULT_OK)
                         Toast.makeText(
                             this,
@@ -427,7 +450,8 @@ class AddFriendActivity : AppCompatActivity() {
             phone = phone,
             avatarDataUrl = json.optString("avatar_data_url", "").trim().takeIf { it.isNotEmpty() },
             mutualFriendCount = json.optInt("mutual_friend_count", 0).coerceAtLeast(0),
-            alreadyFriend = json.optBoolean("already_friend", false)
+            alreadyFriend = json.optBoolean("already_friend", false),
+            isSelf = json.optBoolean("is_self", false)
         )
     }
 
@@ -464,6 +488,7 @@ class AddFriendActivity : AppCompatActivity() {
         val phone: String?,
         val avatarDataUrl: String?,
         val mutualFriendCount: Int,
-        val alreadyFriend: Boolean
+        val alreadyFriend: Boolean,
+        val isSelf: Boolean = false
     )
 }
