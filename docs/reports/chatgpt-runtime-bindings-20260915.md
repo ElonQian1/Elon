@@ -1,20 +1,36 @@
 # September 15 Runtime Compatibility Investigation
 
-Status: bindings 29 / adapter 407 published as 1.1.1743; first-send and follow-up
-passed on Xiaomi. Adapter 408 adds the attachment routing correction discovered
-in grouped acceptance; adapter 409 repairs the model argument and pre-write
+Status: bindings 29 / adapter 409 published as 1.1.1746. First-send/follow-up and
+independent local attachment delivery passed on Xiaomi. Adapter 410 promotes the
+verified attachment scope, reusing the corrected model argument and pre-write
 handoff below. `web_20260915` uses its exact observed asset set.
 Reuse [accepted Writing Blocks 1723](../chatgpt-writing-blocks-native.md),
 ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
 
+- Release 1746, source `d3ac8a9b6`, SHA-256
+  `63228868f9cff05eb85fcc3dc09514f83c66fe157ef8b03a8cf911b0a829c557`,
+  built/published/installed without resetting login/data. The prior proven-unsent
+  synthetic draft/files were cleaned after replacement; no replay.
+- `fresh-attachment-native-1746-20260915-043457-109` passed: one native click,
+  one send receipt, private upload, independent fresh HTTP, 52 stream events,
+  complete native TXT/PDF/image facts, exact history, cards/draft cleared,
+  original view and awake settings restored. 64.788s includes upload and readback;
+  it is not a speed A/B. [Accepted scope and default](../chatgpt-fresh-attachment-text-dispatch.md)
+  are existing personal chats with local TXT/PDF/PNG and a nonempty prompt.
+  New/project/temporary/tool/library/other-MIME/file-only extensions stay gated.
+- Adapter 409's model/handoff regression passed 573 Node tests, with existing
+  attachment/fresh-text/Canvas acceptance-helper checks. The public source AST
+  audit passed all three tests with no skip. This closes the actual serializer
+  and no-dispatch fallback defects; do not repeat the successful synthetic send.
+
 - Release 1745 / adapter 408 built and installed. Its one native attachment
   trial was rejected before preparation/POST (`attachments_active`, dispatched
   false, zero stream events). The fallback saw a phantom active writer because
   the completion callback ran before `finally`. Read-only recovery proved the
   exact baseline unchanged, recorded a non-dispatched attempt and prohibited
-  replay. The unsent synthetic draft/files await replacement-install cleanup.
+  replay. The unsent synthetic draft/files were cleaned on replacement 1746.
 - Adapter 409 / transaction 29 releases that slot atomically in the single-use
   pre-dispatch fallback claim. It never releases a dispatched/uncertain writer.
   Disabled attachment extensions now decline synchronously, so normal users
@@ -24,8 +40,8 @@ ordinary text, Search and Image modules.
   Attachment module 3 now passes the current conversation's actual model object,
   verifies its ID and retains ready-file/model/selection revalidation. The
   six-argument Library guard is unchanged. New behavior tests and hash-pinned
-  AST assertions cover this contract; independent attachments are not promoted
-  until a real successful send, native reply and history readback.
+  AST assertions cover this contract; 1746 supplies the real successful send,
+  native reply and history readback for the narrowly promoted scope above.
 
 - Release 1743 (`0b00df6c389d09b1eeb0575b3686d39350623994`) was built, published
   and installed without data reset. First send and follow-up each used fresh
@@ -85,8 +101,8 @@ ordinary text, Search and Image modules.
   writing/runtime regression. Public-source and Canvas contract checks passed:
   `runtime-canvas-current-contracts-20260915-025816-108`.
 - Production Canvas mutation acceptance still needs a genuine owned Canvas,
-  not a Writing Block. First send with absent composer and independent
-  attachment dispatch also need device evidence on the new grouped package.
+  not a Writing Block. First send with a physically absent composer still needs
+  device evidence; its memory-owner tests and normal native first send pass.
 
 The sections below preserve the pre-implementation investigation and device
 baseline; their candidate lists are historical, not remaining mapping work.

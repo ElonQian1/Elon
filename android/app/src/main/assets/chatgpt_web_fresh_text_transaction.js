@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 29, create: factory });
+  const api = Object.freeze({ version: 30, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -117,7 +117,8 @@
         page.__elonChatGptPrivateTextTransactionsEnabled !== true) {
       return { handled: false, code: 'disabled' };
     }
-    if (command.requireNativeAttachment === true && page.__elonChatGptFreshTextAttachmentsEnabled !== true && !trialArmed()) {
+    if (command.requireNativeAttachment === true && page.__elonChatGptFreshTextAttachmentsEnabled !== true &&
+        page.__elonChatGptFreshTextPersonalAttachmentsEnabled === false && !trialArmed()) {
       return { handled: false, code: 'disabled' };
     }
     // Cold/unknown identity keeps the accepted sender; no UI-blocking import is
@@ -142,6 +143,8 @@
     const allowNewConversations = trialArmed() || page.__elonChatGptFreshTextNewConversationsEnabled !== false;
     const allowTemporary = page.__elonChatGptFreshTextTemporaryEnabled === true || trialArmed();
     const allowAttachments = page.__elonChatGptFreshTextAttachmentsEnabled === true || trialArmed();
+    // Verified 1746: existing personal chats, local TXT/PDF/PNG and a text prompt.
+    const allowPersonalAttachments = page.__elonChatGptFreshTextPersonalAttachmentsEnabled !== false;
     trial = null;
     let resolve;
     const owner = { operation, token, document, stamp, controller: new page.AbortController(), phase: 'preparing',
@@ -207,7 +210,7 @@
       owner.binding = await abortable(regenerate ? regeneration.capture(command) :
         context.capture(command.composer, continuation,
           { allowTools, allowPersonalSearch, allowPersonalImage, allowProjects, allowNewConversations, allowTemporary,
-            allowAttachments, requireNativeAttachment: command.requireNativeAttachment === true }));
+            allowAttachments, allowPersonalAttachments, requireNativeAttachment: command.requireNativeAttachment === true }));
       check();
       owner.request = requests.create(owner.binding, command);
       const { shared, runtime } = owner.binding;
@@ -398,7 +401,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 29, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 30, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

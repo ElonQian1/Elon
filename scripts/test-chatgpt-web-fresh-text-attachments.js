@@ -14,6 +14,25 @@ function consume(f, binding, prompt = command.prompt) {
   return { request, ...result };
 }
 
+test('personal attachment default excludes projects, tools, library and changed selections', async () => {
+  for (const change of [
+    f => { f.shared.HM.getGizmoId = () => 'g-p-' + 'a'.repeat(32); },
+    f => { f.tree.mode = { kind: 'gizmo_interaction' }; },
+    f => { f.hints.activeSystemHintType = 'search'; },
+    f => { f.selectedFiles[0].source = 'library'; },
+    f => { f.selectedFiles[0].libraryFileId = 'synthetic-library'; },
+    f => { f.selectedFiles[0].fileSpec.mimeType = 'image/jpeg'; },
+  ]) {
+    const f = await fixture(); change(f);
+    await assert.rejects(f.api.capture(f.node, null, { allowPersonalAttachments: true }), /attachments_active/);
+    assert.equal(f.files.files$().length, 3);
+  }
+  const f = await fixture(), binding = await f.api.capture(f.node, null, { allowPersonalAttachments: true });
+  assert.equal(binding.current(), true);
+  f.selectedFiles[0].source = 'library';
+  assert.equal(binding.current(), false);
+});
+
 test('verified personal tool defaults do not silently include attachment sends', async () => {
   for (const tool of ['search', 'picture_v2']) {
     const f = await fixture(); f.hints.activeSystemHintType = tool;

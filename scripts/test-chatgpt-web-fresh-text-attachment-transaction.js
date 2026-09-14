@@ -16,6 +16,7 @@ async function fixture(options = {}) {
   const { page, shared, conversation, files } = f;
   Object.assign(page, { crypto, AbortController, setTimeout, clearTimeout,
     __elonChatGptPrivateTextTransactionsEnabled: true, __elonChatGptFreshTextAttachmentsEnabled: options.enabled === true });
+  if (options.personal !== undefined) page.__elonChatGptFreshTextPersonalAttachmentsEnabled = options.personal;
   page.document.visibilityState = 'visible';
   page.__elonChatGptFreshTextStream = asset('stream');
   let posted, applied = null, missingReference = false;
@@ -70,8 +71,8 @@ async function fixture(options = {}) {
     readDraft: () => '', ...input }), posted: () => posted, missing: value => { missingReference = value; } });
 }
 
-test('attachment extension is opt-in and a one-command trial uses the actual private lease', async () => {
-  const f = await fixture();
+test('opted-out attachment extension can use the actual private lease in a one-command trial', async () => {
+  const f = await fixture({ personal: false });
   const before = f.send();
   assert.equal((await before.completion).status, 'unavailable');
   assert.equal(before.claimFallback(), true);
@@ -103,10 +104,35 @@ test('missing files cannot downgrade an attachment-only command to an ordinary f
 });
 
 test('disabled attachment-only extension declines synchronously without taking a writer slot', async () => {
-  const f = await fixture();
+  const f = await fixture({ personal: false });
   assert.equal(f.send({ requireNativeAttachment: true }).handled, false);
   assert.equal(f.api.state().pending, false); assert.equal(f.calls.length, 0);
   assert.equal(f.files.files$().length, 3); assert.equal(f.api.dispose(), true);
+});
+
+test('verified personal local files default to one fresh POST without a trial', async () => {
+  const f = await fixture();
+  assert.equal(f.api.trialControl('state').armed, false);
+  const result = f.send({ requireNativeAttachment: true });
+  assert.equal((await result.completion).status, 'accepted');
+  await settled();
+  assert.equal(f.api.trialControl('state').reconciled, true);
+  assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
+  assert.equal(f.files.files$().length, 0);
+  assert.equal(result.claimFallback(), false);
+  assert.equal(f.api.dispose(), true);
+});
+
+test('unverified JPEG and library scopes decline before any request and preserve files', async () => {
+  for (const options of [{ types: ['image/jpeg'] }, { mounted: true }]) {
+    const f = await fixture(options);
+    const count = f.files.files$().length;
+    const result = f.send({ requireNativeAttachment: true });
+    assert.equal((await result.completion).status, 'unavailable');
+    assert.equal(result.claimFallback(), true);
+    assert.equal(f.calls.length, 0); assert.equal(f.files.files$().length, count);
+    await settled(); assert.equal(f.api.dispose(), true);
+  }
 });
 
 test('file-only send crosses the real stream transport and reconciles without inventing a text bubble', async () => {

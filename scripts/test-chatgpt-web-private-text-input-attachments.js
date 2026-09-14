@@ -5,11 +5,12 @@ const { fixture: attachmentFixture } = require('./fixtures/chatgpt-fresh-text-at
 const { fixture: inputFixture } = require('./fixtures/chatgpt-private-text-input');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
-async function fixture(enabled) {
+async function fixture(enabled, personal = false) {
   const base = await attachmentFixture();
   base.page.__elonChatGptPrivateTransport = base.attachmentFixture.root.__elonChatGptPrivateTransport;
   const f = inputFixture(base);
   f.page.__elonChatGptFreshTextAttachmentsEnabled = enabled;
+  if (personal !== undefined) f.page.__elonChatGptFreshTextPersonalAttachmentsEnabled = personal;
   // The real attachment owner is mounted; the text composer is not.
   assert.equal(f.view.dom.isConnected, false);
   assert.equal(f.attachmentFixture.input.isConnected, true);
@@ -34,7 +35,7 @@ test('owned ready TXT PDF and PNG attachments no longer block an enabled memory 
   assert.equal(f.requests(), 0);
 });
 
-test('attachment input is not promoted by defaults, truthy values or tool admission', async () => {
+test('opted-out attachment input is not promoted by truthy extension flags or tool admission', async () => {
   for (const enabled of [undefined, false, 'true', 1]) {
     const f = await fixture(enabled);
     f.page.__elonChatGptFreshTextToolsEnabled = true;
@@ -46,6 +47,18 @@ test('attachment input is not promoted by defaults, truthy values or tool admiss
     assert.equal(f.consumed(), 0);
     assert.equal(f.requests(), 0);
   }
+});
+
+test('verified personal local files have memory-draft readiness by default without requests', async () => {
+  const f = await fixture(false);
+  delete f.page.__elonChatGptFreshTextPersonalAttachmentsEnabled;
+  f.api.snapshot(null); await tick();
+  assert.equal(f.api.snapshot(null).ready, true);
+  assert.equal(f.requests(), 0); assert.equal(f.consumed(), 0);
+  f.page.__elonChatGptFreshTextPersonalAttachmentsEnabled = false;
+  assert.equal(f.api.setDraft('must not write', f.draft()), false);
+  assert.equal(f.api.snapshot(null).ready, false);
+  await tick();
 });
 
 test('changing the explicit attachment switch retires stale readiness and cooldown', async () => {
@@ -89,7 +102,7 @@ test('input and sender apply identical scope switches with no mounted composer',
   const transaction = require('../android/app/src/main/assets/chatgpt_web_fresh_text_transaction');
   const requests = require('../android/app/src/main/assets/chatgpt_web_fresh_text_request');
   const receipts = require('../android/app/src/main/assets/chatgpt_web_fresh_text_receipts');
-  const names = ['Tools', 'Projects', 'NewConversations', 'Temporary', 'Attachments'];
+  const names = ['Tools', 'Projects', 'NewConversations', 'Temporary', 'Attachments', 'PersonalAttachments'];
   for (const enabled of [undefined, false, true]) {
     for (const selected of [null, ...names]) {
       const page = { document: {}, __elonChatGptDocumentToken: 'synthetic-scope',

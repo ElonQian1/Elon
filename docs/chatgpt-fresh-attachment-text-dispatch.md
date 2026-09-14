@@ -1,12 +1,33 @@
 ---
 capability_id: android_chatgpt_fresh_attachment_text_dispatch_v1
-implementation_status: implemented
-verification_status: offline_verified
-production_default: false
-scope: owned_ready_local_ordinary_library_and_materialized_mounted_files
+implementation_status: completed
+verification_status: production_ui_verified
+production_default: true
+scope: existing_personal_local_txt_pdf_png_with_prompt
+pending_extensions: new_conversation, project, temporary, tools, other_mime, file_only, library, mounted
 ---
 
 # Fresh Attachment Dispatch
+
+## Current Accepted Scope
+
+Release **1.1.1746**, adapter 409, source `d3ac8a9b6`, passed one production
+native Send with owned local TXT/PDF/PNG. Upload was private; the fresh independent
+HTTP request produced 52 stream events, full matching native file-content facts,
+exact history reconciliation, cleared cards/draft and restored view/awake state.
+No replay or official-runtime substitute counted. Total upload-to-readback was
+64.788s; this is functional evidence, not a latency improvement measurement.
+Evidence: `fresh-attachment-native-1746-20260915-043457-109`.
+
+Context 18 / transaction 30 / input 6 / adapter 410 promotes only that scope by
+default via `__elonChatGptFreshTextPersonalAttachmentsEnabled !== false`.
+Unverified scopes below retain the accepted sender. Explicit opt-out disables
+this default; it does not disable uploads. An uncertain dispatched write still
+cannot be replayed. Readiness and dispatch share the same scope rules.
+See [September 15 compatibility and release record](reports/chatgpt-runtime-bindings-20260915.md).
+
+The sections below retain protocol details and prior source-only evidence; their
+older trial-only statements apply to the pending extensions, not the accepted scope.
 
 September 13 extension of the [independent text sender](chatgpt-fresh-text-dispatch.md).
 It reuses accepted private uploads, the existing immutable attachment submission
@@ -16,7 +37,7 @@ The accepted ordinary plain-text default and runtime attachment sender remain.
 
 ## Reviewed Protocol
 
-Only the pinned `web_20260912` shared/conversation/composer bundles are admitted.
+The exact pinned `web_20260912` and `web_20260915` profiles are admitted.
 Their hashes and assertions live in `test-chatgpt-text-dispatch-public-evidence.cjs`.
 They are parsed without executing downloaded code.
 
@@ -93,9 +114,9 @@ post-dispatch uncertainty cannot fall back to another writer.
   12 Node tests passed, including the legacy transport suite. This remains offline
   evidence, not production file-only acceptance.
 
-Enable only for grouped acceptance using the existing one-command
+Enable pending extensions only for grouped acceptance using the existing one-command
 `fresh_text_trial_start`, or explicit `__elonChatGptFreshTextAttachmentsEnabled`.
-The normal production attachment path is unchanged until acceptance succeeds.
+Unverified attachment scopes retain the accepted production attachment sender.
 
 Next grouped APK: attach controlled TXT/PDF/PNG files in the production native
 composer, send one turn, verify actual file-content recognition, streaming,

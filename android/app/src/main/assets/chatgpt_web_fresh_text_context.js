@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 17, create: factory });
+  const api = Object.freeze({ version: 18, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -81,8 +81,15 @@
     const selectedFiles = binding.files.files$(), readyFiles = binding.files.readyFiles$();
     let attachments = null;
     if (!Array.isArray(selectedFiles) || !Array.isArray(readyFiles)) fail('attachments_active');
+    const personalAttachmentsAllowed = state => options.allowPersonalAttachments === true &&
+      !newConversation && !temporary && !route[1] && selectedTool === null &&
+      shared.HM.getGizmoId(state) == null && state?.mode?.kind === 'primary_assistant' &&
+      selectedFiles.length > 0 && selectedFiles.length <= 9 && selectedFiles.every(file =>
+        file.source === 'local' && file.libraryFileId == null && file.mountedLibraryFileId == null &&
+        ['text/plain', 'application/pdf', 'image/png'].includes(file.fileSpec?.mimeType?.toLowerCase()));
     if (selectedFiles.length || readyFiles.length) {
-      if (options.allowAttachments !== true || !page.__elonChatGptFreshTextAttachments) fail('attachments_active');
+      if (options.allowAttachments !== true && !personalAttachmentsAllowed(tree()) ||
+          !page.__elonChatGptFreshTextAttachments) fail('attachments_active');
       attachments = page.__elonChatGptFreshTextAttachments.capture(page, binding, conversation);
     }
     if (options.requireNativeAttachment === true && !attachments) fail('attachments_active');
@@ -161,6 +168,7 @@
           temporary && (typeof state.is_do_not_remember !== 'boolean' || shared.textHistoryDisabled() !== true)) fail('scope_unsupported', 'base_privacy');
       if (conversation.textPrepareEnabled() !== true || conversation.textReviewAck(selected) != null) fail('scope_unsupported', 'base_prepare');
       const projectId = scope(state);
+      if (attachments && options.allowAttachments !== true && !personalAttachmentsAllowed(state)) fail('attachments_active');
       if (toolOwner && options.allowTools !== true && !personalToolAllowed(state)) fail('tools_active');
       if (['continuingFromSharedConversationId', 'continuingFromSharedProjectConversationId', 'continuingFromSharedPostId',
         'forkFromSharedPost', 'branchingFromMessageId', 'branchingFromConversationId', 'continuationBranch',

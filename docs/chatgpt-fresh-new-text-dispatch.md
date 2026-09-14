@@ -13,8 +13,9 @@ September 15 source extension: transaction 27 / input 5 / adapter 407 removes
 the mounted-composer condition from the default personal plain-text scope.
 The committed memory draft/controller is still mandatory. Actual owner-fixture
 tests pass with the editor DOM absent, including first response loss and the
-no-replay barrier. This extension is `implemented` / `offline_verified`, with
-grouped device acceptance pending; the frontmatter describes the earlier
+no-replay barrier. First send/follow-up passed on release 1743; that device run
+did not remove the official composer. The DOM-absent extension remains
+`implemented` / `offline_verified`; the frontmatter describes the narrower
 device-accepted scope. See [current compatibility batch](reports/chatgpt-runtime-bindings-20260915.md).
 
 September 13 extension of the [accepted independent sender](chatgpt-fresh-text-dispatch.md).

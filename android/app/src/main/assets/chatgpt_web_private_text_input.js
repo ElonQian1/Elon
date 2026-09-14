@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateTextInput = factory(root);
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -17,7 +17,9 @@
       allowTools: page.__elonChatGptFreshTextToolsEnabled === true,
       allowPersonalSearch: page.__elonChatGptFreshTextToolsEnabled !== false,
       allowPersonalImage: page.__elonChatGptFreshTextToolsEnabled !== false,
-      allowAttachments: page.__elonChatGptFreshTextAttachmentsEnabled === true };
+      allowAttachments: page.__elonChatGptFreshTextAttachmentsEnabled === true,
+      allowPersonalAttachments: page.__elonChatGptFreshTextPersonalAttachmentsEnabled !== false,
+      requireNativeAttachment: false };
   }
 
   function stamp() {
@@ -95,5 +97,5 @@
     respond('set_draft', true, ''); io.notify();
   }
 
-  return Object.freeze({ version: 5, snapshot, setDraft, setCommand });
+  return Object.freeze({ version: 6, snapshot, setDraft, setCommand });
 });

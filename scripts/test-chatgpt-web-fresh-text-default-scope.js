@@ -36,7 +36,7 @@ async function admission({ composer = {}, enabled, trial = false } = {}) {
 test('defaults keep extended scopes off and expose separately gated personal Search and Image', async () => {
   assert.deepEqual(await admission(), { allowNewConversations: true, allowProjects: false,
     allowTools: false, allowPersonalSearch: true, allowPersonalImage: true, allowTemporary: false,
-    allowAttachments: false, requireNativeAttachment: false });
+    allowAttachments: false, allowPersonalAttachments: true, requireNativeAttachment: false });
 });
 
 test('new-conversation default admits committed memory owners without a composer element', async () => {
