@@ -64,11 +64,13 @@ function newFixture(project = false) {
   return f;
 }
 
-test('verified existing-personal Search default does not admit a new conversation', async () => {
-  const f = newFixture(); f.hints.activeSystemHintType = 'search';
-  await assert.rejects(f.api.capture(f.node, null,
-    { allowNewConversations: true, allowPersonalSearch: true }), /tools_active/);
-});
+for (const project of [false, true]) for (const tool of ['search', 'picture_v2']) {
+  test('existing Search default does not admit new ' + (project ? 'project ' : 'personal ') + tool, async () => {
+    const f = newFixture(project); f.hints.activeSystemHintType = tool;
+    await assert.rejects(f.api.capture(f.node, null,
+      { allowNewConversations: true, allowProjects: project, allowPersonalSearch: true }), /tools_active/);
+  });
+}
 
 function payload(project = false, emptyRoot = false, parentId = ROOT) {
   const root = emptyRoot ? '' : parentId;
@@ -456,6 +458,8 @@ test('the owned v1 decoder binds the first server id before publishing native te
 async function integration(project = false, settings = {}) {
   const f = newFixture(project), counts = { prepare: 0, posts: 0, apply: 0, stopped: 0, renders: 0 };
   const page = f.page; let draft = '', sequence = 0;
+  const tool = settings.tool || null;
+  f.hints.activeSystemHintType = tool;
   Object.assign(page, { AbortController, crypto: { randomUUID: () => [UID, AID, UID2, AID2][sequence++] },
     __elonChatGptPrivateTextTransactionsEnabled: true,
     __elonChatGptFreshTextNewConversationsEnabled: true, __elonChatGptFreshTextProjectsEnabled: project,
@@ -465,6 +469,7 @@ async function integration(project = false, settings = {}) {
     __elonChatGptFreshTextStop: require(assets + 'chatgpt_web_fresh_text_stop'),
     __elonChatGptFreshTextStream: require(assets + 'chatgpt_web_fresh_text_stream') });
   if (settings.acceptedDefault) delete page.__elonChatGptFreshTextNewConversationsEnabled;
+  if (tool) page.__elonChatGptFreshTextToolsEnabled = true;
   const session = policy.createSession({ now: Date.now });
   const owned = require(assets + 'chatgpt_web_private_owned_stream').create({ policy, session,
     conversationId: value => value.conversation_id || value.conversationId || '',
@@ -481,10 +486,17 @@ async function integration(project = false, settings = {}) {
     }
     counts.prepare++; assert.equal(path, '/f/conversation/prepare');
     assert.equal(options.requestBody.conversation_id, counts.prepare === 1 ? undefined : CID);
+    assert.deepEqual(options.requestBody.system_hints, tool ? [tool] : []);
+    assert.equal(options.requestBody.parent_message_id, counts.prepare === 1 ? ROOT : AID);
+    assert.equal(options.requestBody.conversation_mode.gizmo_id, project ? PROJECT : undefined);
     return { conduit_token: 'synthetic' };
   };
   f.shared.textSecurityHeaders = () => ({ 'openai-sentinel-chat-requirements-token': 'synthetic' });
-  f.conversation.textSecurity = () => ({ chatReq: { token: 'synthetic' } });
+  f.conversation.textSecurity = metadata => {
+    assert.deepEqual(metadata.systemHints, tool && tool !== 'search' ? [tool] : []);
+    assert.equal(metadata.conversationMode?.gizmo_id, project ? PROJECT : undefined);
+    return { chatReq: { token: 'synthetic' } };
+  };
   let release;
   const pause = new Promise(resolve => { release = resolve; });
   f.conversation.textStream = async function* (_, options) {
@@ -494,6 +506,11 @@ async function integration(project = false, settings = {}) {
     assert.equal(options.body.conversation_id, first ? undefined : CID);
     assert.equal(options.body.parent_message_id, first ? ROOT : AID);
     assert.equal(options.body.messages[0].id, user.id);
+    assert.deepEqual(options.body.system_hints, tool && tool !== 'search' ? [tool] : []);
+    assert.deepEqual(options.body.messages[0].metadata?.system_hints, tool ? [tool] : undefined);
+    assert.equal(options.body.force_use_search, tool === 'search' ? true : undefined);
+    assert.equal(options.body.requested_default_model, first ? 'fixture-default' : undefined);
+    assert.equal(options.body.conversation_mode.gizmo_id, project ? PROJECT : undefined);
     yield { response: { ok: true, headers: { get: () => 'text/event-stream' } } };
     if (settings.lostBeforeId) throw Error('synthetic connection lost');
     yield { data: { conversation_id: CID, input_message: user } };
@@ -589,6 +606,64 @@ test('personal default and project opt-in bind, stream, hydrate and permit one e
     assert.equal(r.f.nodes[UID2].parent, AID); assert.equal(r.f.leaf.id, AID2);
     assert.equal(r.api.dispose(), true);
   }
+});
+
+for (const project of [false, true]) for (const tool of ['search', 'picture_v2']) {
+  const scope = (project ? 'new project ' : 'new personal ') + tool;
+  test(scope + ' reuses one owned first-send and follow-up transaction', async () => {
+    const r = await integration(project, { tool, injectedParents: 'paginated', retireUnnavigatedHome: true });
+    await settled(r.api);
+    assert.equal(r.api.state().pending, false);
+    assert.deepEqual([r.counts.prepare, r.counts.posts, r.counts.apply, r.f.binds, r.f.navigations], [1, 1, 1, 1, 1]);
+    assert.equal(r.counts.firstEventNavigations, 1);
+    assert.equal(r.session.current(new URL(r.f.page.location.href).pathname).text, 'Synthetic answer');
+    r.f.binding.href = r.f.page.location.href;
+    const next = await r.f.api.capture(r.f.node, null, { allowProjects: project, allowTools: true });
+    assert.equal(next.newConversation, false); assert.equal(next.conversationId, CID);
+    assert.equal(next.parentId, AID); assert.equal(next.tool, tool);
+    assert.equal(r.api.send(r.command).handled, true);
+    assert.equal(r.counts.posts, 1);
+    const followup = r.api.send({ ...r.command, requestId: 'mcp_2', prompt: 'Synthetic follow up' });
+    assert.equal((await followup.completion).status, 'accepted');
+    await settled(r.api);
+    assert.equal(r.api.state().pending, false);
+    assert.deepEqual([r.counts.prepare, r.counts.posts, r.counts.apply, r.f.binds, r.f.navigations], [2, 2, 2, 1, 1]);
+    assert.equal(r.f.nodes[UID2].parent, AID); assert.equal(r.f.leaf.id, AID2);
+    assert.equal(r.api.dispose(), true);
+  });
+
+  test(scope + ' stops the acquired server conversation without a second send', async () => {
+    const r = await integration(project, { tool, stop: true });
+    for (let i = 0; i < 30 && !r.f.serverId; i++) await tick();
+    assert.equal((await r.api.stop().completion).status, 'accepted');
+    assert.equal(r.counts.stopped, 1); assert.equal(r.counts.posts, 1);
+    assert.equal(r.session.current('/c/' + CID).text, 'Synthetic');
+    r.release(); await settled(r.api);
+    assert.equal(r.api.state().pending, false);
+    assert.equal(r.api.dispose(), true);
+  });
+}
+
+for (const tool of ['search', 'picture_v2']) test('new project ' + tool + ' preserves uncertain navigation without replay', async () => {
+  const r = await integration(true, { tool, navigationFails: true });
+  await r.api.recover().completion;
+  assert.equal(r.api.state().pending, true);
+  assert.equal(r.counts.posts, 1); assert.equal(r.counts.apply, 0);
+  assert.equal((await r.api.send({ ...r.command, requestId: 'mcp_2' }).completion).code, 'busy');
+  assert.equal(r.sent.claimFallback(), false);
+  r.f.page.document = {}; r.api.state();
+  assert.equal(r.api.dispose(), true);
+});
+
+for (const tool of ['search', 'picture_v2']) test('new personal ' + tool + ' does not replay a lost first response', async () => {
+  const r = await integration(false, { tool, lostBeforeId: true });
+  await tick(); await tick();
+  assert.equal(r.api.state().pending, true);
+  assert.deepEqual([r.counts.posts, r.counts.apply, r.f.binds, r.f.navigations], [1, 0, 0, 0]);
+  assert.equal((await r.api.send({ ...r.command, requestId: 'mcp_2' }).completion).code, 'busy');
+  assert.equal(r.sent.claimFallback(), false);
+  r.f.page.document = {}; r.api.state();
+  assert.equal(r.api.dispose(), true);
 });
 
 test('failed navigation retains the writer without applying history or replaying POST', async () => {

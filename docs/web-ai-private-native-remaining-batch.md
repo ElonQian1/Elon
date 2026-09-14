@@ -37,6 +37,13 @@ reading/edit/export and ordinary save are accepted (1692; editor undo/redo/share
 1728 enables personal plain-text retry. Other scopes remain gated.
 [New personal first send](chatgpt-fresh-new-text-dispatch.md) is completed/default-enabled on 1721: native first/follow-up and unarmed default passed. Reuse it; new project/tool/file/temporary and initial composer-free scopes remain open.
 
+The [new-chat tool composition audit](chatgpt-fresh-tool-text-dispatch.md#new-conversation-composition-audit)
+confirms that new personal/owned-project Search and Picture requests already use
+the existing sender. Their combined first-send/follow-up/Stop and no-replay
+contracts are offline-verified, not a missing sender implementation. Live tool
+eligibility, generated output and native acceptance remain; do not duplicate the
+transport or broaden the accepted personal Search default.
+
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
 three taps joined one 1077 ms read; native TXT saved 78 bytes. Supplemental/PCA
 and URL-only cloud samples remain unverified; old setup blockers are stale.
@@ -70,7 +77,7 @@ Raster deletion is offline-only; [project raster reference/removal is accepted o
 | Ordinary new-chat text + PNG + PDF attachments | Completed on 1598 | Project/temporary/other-format variants remain separate |
 | File library navigation, saved download, single library attachment, rename/soft-delete/upload-copy | Earlier scopes through 1591 reused; native TXT/PNG/PDF Download buttons and saved bytes passed on 1612 | [Mounted catalogue download](chatgpt-private-library-mounted-download.md) (244 checks) and [mounted attachment preparation](chatgpt-private-mounted-library-attachment.md) (196 checks) are included in installed 1639; device acceptance pending. Large-transfer/cancel/crash cases, other special sources, folder writes and attachment scopes remain |
 | Personal sharing/list/revoke and deletion | Reuse [1644](reports/chatgpt-private-acceptance-1644.md), [Canvas 1673](reports/chatgpt-canvas-shared-links-20260911.md) and [1677 source/return](reports/chatgpt-canvas-production-1675-20260912.md) | Original Canvas sample unavailable; no creation retries on the current model. Editor/writes, disposable revoke and other sharing scopes remain unverified |
-| Text submit/stream/stop/follow-up | Personal independent HTTP: [existing 1696](chatgpt-fresh-text-dispatch.md), [new 1721](reports/chatgpt-fresh-new-default-20260914.md), completed/default-enabled. [Stop/follow-up 1699](reports/chatgpt-command-recovery-1698.md#stopped-turn-follow-up-on-1699) and [runtime retry 1644](reports/chatgpt-regeneration-store-20260911.md#normal-1644-acceptance) accepted; reuse | Independent retry, pre-answer Stop, tool/file/project/temporary, initial composer-free and network-loss recovery remain |
+| Text submit/stream/stop/follow-up | Personal independent HTTP: [existing 1696](chatgpt-fresh-text-dispatch.md), [new 1721](reports/chatgpt-fresh-new-default-20260914.md), completed/default-enabled. [Stop/follow-up 1699](reports/chatgpt-command-recovery-1698.md#stopped-turn-follow-up-on-1699), [runtime retry 1644](reports/chatgpt-regeneration-store-20260911.md#normal-1644-acceptance) and [independent personal plain-text retry 1726/1728](chatgpt-fresh-regeneration.md) accepted; reuse | Retry outside accepted personal plain text, pre-answer Stop, tool/file/project/temporary, initial composer-free and network-loss recovery remain |
 | Project attachments | Native TXT/PNG/PDF upload/send/content reading passed on 1614; read-isolation fix is installed and file-index verified on 1649 | Idle membership query itself is not separately device-verified; do not rebuild or repeat file-index acceptance for it |
 | Model/effort/tool combinations | Reuse [models and Image/Search](reports/chatgpt-composer-state-20260910.md). [Instant native roundtrip passed on 1673](reports/chatgpt-tool-admission-20260912.md) | Study/Canvas absent in raw hints for both tested levels, not our filtering; neither tool accepted. Other contexts, preference persistence and full Canvas editing remain |
 | Latest cursor image gallery and creation | Gallery entry/page/viewer passed on 1620; full native Create Image passed on 1644. Ordinary original-image Download completed/default-enabled on 1654: one saved 662,362-byte PNG, 1254 x 1254, native decode and state restoration passed | [Original-download evidence and boundaries](reports/chatgpt-gallery-original-download-20260911.md#normal-1654-acceptance). Project/shared/mounted/watermarked sources, other formats and model/account scopes remain. Thumbnail efficiency/thermal work remains deferred |
@@ -237,87 +244,10 @@ every private transport or a reason to repeat already-verified capabilities.
 
 ## Grouped release
 
-### Current 1542 through 1544 acceptance
-
-The [current report](reports/chatgpt-grouped-release-20260907.md) records unified
-compilation/tests, three replacement installations, actual private attachment
-association and file-content reply, the file-index regression/fix, and the
-remaining download-source rejection and 1544 same-origin candidate awaiting
-an unlocked-phone saved-byte check. Keep the Goal active and Google deferred;
-the complete ChatGPT acceptance gate has not passed.
-
-### Earlier 1541 acceptance
-
-On 2026-09-06 after the handset returned, the grouped Release production and
-unit-test compilation passed all **33 tests across seven attachment suites**,
-with zero failures, errors or skipped cases. The latest focused Node run passed
-96 cases. These are targeted checks, not a full regression or thermal A/B.
-
-`publish-apk.ps1` published `v1.1.1541` (code `1541`) from `ac2f1662f` and verified
-the remote APK size and SHA-256:
-`15e20f7cda24e0bfc2a9b7c67fb2884141c2d159cddec95463328488f4a0ef4a`.
-The whitelisted postflight installed it on Xiaomi 14 Pro using replacement
-installation and read back build 1541. Cookies and application data were kept.
-Both ChatGPT and Google returned HTTP 200 in the APK network check before the
-grouped acceptance. No accelerator configuration or core was changed.
-
-The production social-AI chat successfully staged and removed the fixed text
-fixture, then sent it **once**. The native attachment state reached `completed`,
-pending count became zero, and the assistant reply contained both the unique
-request marker and the fixture's first line, which was not supplied in the
-prompt. The initial assertion stopped on a PowerShell closure failing to resolve
-its named helper, not an APK upload failure. Capturing the helper scriptblock
-fixed that boundary; the contract test now executes the real predicate across
-a module boundary. Resuming the persisted `reply_requested` checkpoint verified
-the existing reply without dispatching another message. The fixture was removed,
-the production acceptance case registered, and the phone returned to its original
-conversation-home surface. No microphone was used.
-
-This proves the production file-delivery workflow, **not** which upload route
-ran: its private-association receipt was not retained, and the latest command
-had already advanced to send/skin state. Do not count it as integrated private
-upload, image, PDF, project or saved-download acceptance. Collect existing
-semantic receipts during the next scoped check; do not repeat protocol research
-or rebuild the unchanged APK merely to recover that missing evidence.
-
-### Earlier 1540 checkpoint
-
-On 2026-09-06, `publish-apk.ps1` built and published `v1.1.1540` (code `1540`)
-from `ccc76ed37e31364f02c03af333a13a63b30c4bdf`. Remote version, size and SHA-256
-were verified. APK SHA-256:
-`ef29913013d10a170e16a1ce7d8a2648377495edabeb3f0c6fb62c26eb67755c`.
-The standard whitelisted-device postflight used `adb install -r` and read back
-build `1540` on Xiaomi 14 Pro. Cookies and application data were preserved.
-
-Installation is not production UI or protocol acceptance. MCP health initially
-responded after the update, but later health calls timed out and a plain ADB
-process query returned `error: closed`. Both existing command helpers experienced
-failures at different times, so there is no confirmed helper-specific defect.
-No protocol-capture lease, synthetic upload, new message, or microphone test was
-started in that initial installation round. Browser navigation also timed out;
-it supplied no protocol evidence.
-
-The resumed round reconnected the same handset. Its accelerator `1.0.139 (140)`
-crashed on a missing JNI restore method; the accelerator owner fixed and
-installed `1.0.140 (141)` without this task changing proxy code or settings.
-After network recovery, one new synthetic attachment attempt through production
-`send_input` completed and produced a native streaming acknowledgement. The
-capture observed HTTP 200 reservation JSON and official conversation SSE. It
-did not establish the complete upload/finalize protocol or independent private
-dispatch. The probe was cleared and the UI restored to conversation home with
-an empty draft and no pending attachment; details and limits are in the
-[recovered-network capture](chatgpt-private-protocol-evidence.md#recovered-network-capture).
-
-The candidates implemented the narrow prepare/upload/finalize and
-composer-association contract and are now included in 1541 above. Continue the
-remaining route-specific acceptance with bounded production MCP commands; do not
-implement the same transport again.
-The [reservation regression](chatgpt-private-protocol-evidence.md#reservation-completion-regression)
-invalidates generic HTTP completion as upload proof; include that correction in
-the grouped candidate before accepting attachment delivery. First confirm a healthy transport and preserve the current
-draft, conversation and voice state. Do not rebuild this unchanged candidate,
-add another probe framework, guess an endpoint, or repeatedly restart the app
-because the debugging connection is unavailable. The Goal is not complete.
+The [1540-1544 delivery checkpoints](reports/chatgpt-private-native-release-checkpoints.md)
+retain historical build, installation, upload-provenance and recovery evidence.
+They are not current task instructions or current acceptance gaps. The status map
+above and linked capability reports supersede those old checkpoints.
 
 ## Offline lifecycle checkpoint
 

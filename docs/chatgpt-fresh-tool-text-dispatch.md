@@ -99,3 +99,31 @@ Restore the original conversation, draft and tool selection afterward. Promote
 each passed scope separately; do not widen to new chats, attachments, projects,
 temporary chats, Study/Canvas or unobserved model-specific overrides. A failure
 after dispatch is reconciled read-only, never resent as an acceptance retry.
+
+## New-Conversation Composition Audit
+
+September 14, source `aec6b09c2`: new personal and owned-project Search/Picture
+requests are already implemented by the existing context, request, transaction,
+stream and history modules. They do not need another sender. Both new-conversation
+and selected-tool admission must be explicitly enabled; the verified existing
+personal Search default does not admit these combinations.
+
+The pinned public-source AST checks confirm that the same reviewed `AB` body
+projection carries the new root/model fields and selected-tool metadata. Search
+is transformed only for final dispatch/security, while Picture keeps its hint.
+`fresh-new-tool-contract-20260914-224225-893` passed 115 tests, zero skipped.
+Fifteen added cases in the existing first-send suite cover the unpromoted default
+boundaries, personal/project first-send and follow-up, acquired-ID Stop, failed
+project navigation and loss of the first response before a server ID arrives.
+They verify one preparation/POST per command, exact root/parent/mode/hint fields,
+one server-ID adoption/navigation, retained native stream text, and no uncertain
+write replay. This is evidence for composition of existing code, not a new API.
+
+The integration fixture supplies synthetic identity, permission, HTTP and history
+responses. It uses the actual context/request/transaction/stream/reconciliation
+modules, but a synthetic text answer even for the Picture hint. It does not prove
+live account eligibility, generated-image output, source citations, initial
+composer-free behavior or production UI acceptance. Those remain device cases.
+No Android source, default or APK changed in this test/documentation batch; 1737
+already contains the audited implementation. Device ADB was unavailable, so no
+request, installation, credential change or fixture-ledger mutation was made.
