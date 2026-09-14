@@ -4,6 +4,11 @@ Status: `implemented / offline_verified / published_1716_device_pending`.
 This repairs lifecycle recovery within the existing private sender. It does not
 promote fresh first-send, tool, project, attachment or temporary scopes.
 
+Latest: [September 15 active-read suspension](reports/chatgpt-fresh-recovery-suspend-20260915.md)
+also cancels an automatic read already in flight, not just its queued wakeup.
+The implementation/evidence below remains the original wakeup fix; do not
+interpret it as acceptance of cold process recreation or network-loss recovery.
+
 ## Reproduced Gap
 
 A completed HTTP reader can retain an unresolved writer until terminal history

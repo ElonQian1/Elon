@@ -79,7 +79,7 @@ test('production assembly loads the regeneration scope before the shared ledger'
   assert.ok(scope < names.indexOf('chatgpt_web_fresh_text_transaction.js'));
   const page = { __elonChatGptTextTransactionOrchestrator: { version: 11 } };
   vm.runInNewContext(source, { window: page });
-  assert.equal(page.__elonChatGptTextTransactionOrchestrator.version, 12);
+  assert.equal(page.__elonChatGptTextTransactionOrchestrator.version, 13);
 });
 
 test('read-only admission uses the same native target without sending, draft changes or streaming', async () => {

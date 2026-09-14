@@ -746,3 +746,35 @@ test('document change retires an in-flight recovery; late results cannot update 
   pending.resolve(true); await turn();
   assert.equal(f.calls.filter(c => c.kind === 'finish_stream').length, 0);
 });
+
+test('foreground and network return resume suspended in-flight history with one original POST', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
+  for (const mode of ['hidden', 'offline']) {
+    const pending = deferred(); let reads = 0, readSignal;
+    const f = fixture({ now: Date.now, reconciliation: async (_binding, _request, signal) => {
+      reads++;
+      if (reads === 1) { readSignal = signal; return pending.promise; }
+      f.reconcile(); return true;
+    } });
+    f.page.navigator = { onLine: true };
+    await f.send().completion; await turn();
+    if (mode === 'hidden') {
+      f.page.document.visibilityState = 'hidden';
+      f.page.document.dispatchEvent(new Event('visibilitychange'));
+      f.page.document.visibilityState = 'visible';
+      f.page.document.dispatchEvent(new Event('visibilitychange'));
+    } else {
+      f.page.navigator.onLine = false; f.page.dispatchEvent(new Event('offline'));
+      f.page.navigator.onLine = true; f.page.dispatchEvent(new Event('online'));
+    }
+    assert.equal(readSignal.aborted, true);
+    pending.resolve(true); await turn();
+    assert.equal(f.api.state().pending, true);
+    assert.equal(f.calls.filter(c => c.kind === 'finish_stream').length, 0);
+    t.mock.timers.tick(10000); await turn(); await turn();
+    assert.equal(reads, 2); assert.equal(f.api.state().pending, false);
+    assert.equal(f.calls.filter(c => c.kind === 'post').length, 1);
+    assert.equal(f.calls.filter(c => c.kind === 'finish_stream').length, 1);
+    f.api.dispose();
+  }
+});

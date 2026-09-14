@@ -179,3 +179,51 @@ test('suspension clears a resume queued behind an in-flight read', async t => {
   assert.equal(f.owner.recoveryResumeRequested, false);
   assert.equal(f.owner.recoveryWakeup, undefined); assert.equal(wakeups, 0);
 });
+
+test('automatic history recovery stops between reads when visibility or network is lost', async () => {
+  for (const mode of ['hidden', 'offline']) {
+    const f = fixture({ reconcile: async () => {
+      if (mode === 'hidden') f.page.document.visibilityState = 'hidden';
+      else f.page.navigator = { onLine: false };
+      return false;
+    } });
+    assert.equal((await f.api.recover(f.owner, true)).code, 'recovery_deferred');
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.calls[0][2].aborted, true);
+    assert.notEqual(f.owner.recoveryConfirmed, true);
+  }
+});
+
+test('suspension aborts an automatic read and a queued resume rereads without accepting its late result', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
+  const pending = deferred(); let wakeups = 0;
+  const f = fixture({ now: Date.now, reconcile: () => f.calls.length === 1 ? pending.promise : true,
+    onAutomaticReady: () => { wakeups++; f.api.recover(f.owner, true); } });
+  const first = f.api.recover(f.owner, true);
+  f.api.suspend(f.owner);
+  assert.equal(f.calls[0][2].aborted, true);
+  f.api.requestAutomatic(f.owner);
+  assert.equal((await first).code, 'recovery_deferred');
+  pending.resolve(true); await tick();
+  assert.notEqual(f.owner.recoveryConfirmed, true);
+  assert.equal(f.calls.length, 1);
+  t.mock.timers.tick(10000); await tick();
+  assert.equal(wakeups, 1); assert.equal(f.calls.length, 2);
+  assert.equal(f.owner.recoveryConfirmed, true);
+  assert.equal(f.owner.suspendRecovery, null);
+});
+
+test('suspension does not cancel an explicit manual history check', async () => {
+  const pending = deferred(), f = fixture({ reconcile: () => pending.promise });
+  const job = f.api.recover(f.owner);
+  f.api.suspend(f.owner);
+  assert.equal(f.calls[0][2].aborted, false);
+  pending.resolve(true);
+  assert.equal((await job).status, 'accepted');
+});
+
+test('an already-cancelled document cannot start a history read', async () => {
+  const f = fixture(); f.boundary.abort();
+  assert.equal((await f.api.recover(f.owner)).code, 'context_changed');
+  assert.equal(f.calls.length, 0);
+});

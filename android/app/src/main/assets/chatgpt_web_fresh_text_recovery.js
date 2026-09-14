@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextRecovery = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -16,6 +16,12 @@
     if (!owner) return;
     owner.recoveryResumeRequested = false;
     owner.recoveryWakeup?.cancel();
+  }
+
+  function suspend(owner) {
+    cancelScheduled(owner);
+    // Suspend only automatic readback, never the submitted write or a manual check.
+    owner?.suspendRecovery?.();
   }
 
   function requestAutomatic(owner) {
@@ -58,7 +64,7 @@
       return Promise.resolve(unknown('recovery_deferred'));
     }
     try {
-      if (!owner.stopCurrent() || !owner.binding.canReconcile(owner.request.userMessageId)) {
+      if (owner.stopBoundary?.aborted || !owner.stopCurrent() || !owner.binding.canReconcile(owner.request.userMessageId)) {
         cancelScheduled(owner);
         return Promise.resolve(unknown('context_changed'));
       }
@@ -71,7 +77,7 @@
     if (automatic) owner.autoRecoveryCount = (owner.autoRecoveryCount || 0) + 1;
     owner.nextAutoRecoveryAt = now() + (options.cooldownMs ?? 10000);
     owner.recovering = true;
-    owner.recoveryJob = run(owner).finally(() => {
+    owner.recoveryJob = run(owner, automatic).finally(() => {
       owner.recovering = false;
       owner.recoveryJob = null;
       owner.recoveryController = null;
@@ -83,7 +89,7 @@
     return owner.recoveryJob;
   }
 
-  async function run(owner) {
+  async function run(owner, automatic) {
     const controller = new page.AbortController();
     owner.recoveryController = controller;
     let deadline, pause, rejectAbort;
@@ -91,25 +97,30 @@
     function abort(code) { rejectAbort(Error(code)); controller.abort(); }
     const boundary = () => abort('context_changed');
     const aborted = () => rejectAbort(Error('recovery_cancelled'));
+    if (automatic) owner.suspendRecovery = () => abort('recovery_deferred');
     owner.stopBoundary?.addEventListener('abort', boundary, { once: true });
     controller.signal.addEventListener('abort', aborted, { once: true });
     deadline = page.setTimeout(() => abort('reconciliation_timeout'), options.timeoutMs || 15000);
     const wait = value => Promise.race([value, cancelled]);
     function current() {
-      return !controller.signal.aborted && !owner.stopping && owner.stopCurrent() &&
+      return !controller.signal.aborted && !owner.stopBoundary?.aborted && !owner.stopping && owner.stopCurrent() &&
         owner.binding.canReconcile(owner.request.userMessageId);
+    }
+    function check() {
+      if (!current()) throw Error('context_changed');
+      if (automatic && !foregroundOnline()) throw Error('recovery_deferred');
     }
     try {
       for (const delay of delays) {
-        if (!current()) return unknown('context_changed');
+        check();
         if (delay) await wait(new Promise(resolve => { pause = page.setTimeout(resolve, delay); }));
-        if (!current()) return unknown('context_changed');
+        check();
         // Re-read the same submitted message, never send or recreate it. Stop
         // delivery uncertainty only permits a partial result with terminal history.
         const stopped = owner.stopAttempted === true;
         const done = await wait(history.reconcile(owner.binding, owner.request, controller.signal,
           stopped, stopped && owner.stopAcknowledged === true, code => { owner.historyCode = code; }));
-        if (!current()) return unknown('context_changed');
+        check();
         if (done) {
           owner.recoveryConfirmed = true;
           return { status: 'accepted', code: 'history_reconciled' };
@@ -117,16 +128,17 @@
       }
       return unknown('history_reconciliation_pending');
     } catch (error) {
-      return unknown(['context_changed', 'reconciliation_timeout', 'recovery_cancelled'].includes(error?.message)
+      return unknown(['context_changed', 'reconciliation_timeout', 'recovery_cancelled', 'recovery_deferred'].includes(error?.message)
         ? error.message : 'history_unavailable');
     } finally {
       page.clearTimeout(deadline);
       page.clearTimeout(pause);
+      owner.suspendRecovery = null;
       owner.stopBoundary?.removeEventListener('abort', boundary);
       controller.signal.removeEventListener('abort', aborted);
       // Even a runtime helper ignoring cancellation cannot apply a late response.
       controller.abort();
     }
   }
-  return Object.freeze({ recover, requestAutomatic, cancelScheduled });
+  return Object.freeze({ recover, requestAutomatic, cancelScheduled, suspend });
 });

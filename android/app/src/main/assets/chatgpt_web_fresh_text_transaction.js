@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 30, create: factory });
+  const api = Object.freeze({ version: 31, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -382,7 +382,7 @@
     owner.recoveryCompletion = completion;
     return { handled: true, completion };
   }
-  const suspend = () => recovery?.cancelScheduled?.(active);
+  const suspend = () => recovery?.suspend?.(active);
   const visibility = () => { if (page.document.visibilityState !== 'hidden') recover(true); else suspend(); };
   const resume = () => recover(true);
   const eventDocument = page.document;
@@ -401,7 +401,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 30, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 31, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });
