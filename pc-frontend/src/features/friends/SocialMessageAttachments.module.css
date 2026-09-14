@@ -1,0 +1,20 @@
+.avatarImage { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.attachments { display: flex; flex-direction: column; gap: 8px; max-width: 100%; margin-top: 4px; }
+.attachments:empty { display: none; }
+.imageButton { display: block; align-self: flex-start; padding: 0; border: 0; border-radius: 10px; background: #30323a; overflow: hidden; cursor: zoom-in; max-width: 100%; }
+.image { display: block; max-width: min(320px, 100%); max-height: 300px; min-width: 80px; min-height: 60px; object-fit: contain; }
+.audio { padding: 10px 12px; border: 1px solid rgba(46,168,97,.32); border-radius: 10px; background: rgba(46,168,97,.12); max-width: 100%; color: var(--text, #eee); }
+.audio strong { display: block; font-size: 13px; margin-bottom: 6px; }
+.audio audio { display: block; width: 280px; max-width: 100%; height: 42px; }
+.audio p { white-space: pre-wrap; margin: 8px 0 0; font-size: 13px; }
+.file { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; background: #30323a; color: var(--text, #eee); text-decoration: none; }
+.file span { overflow-wrap: anywhere; }
+.unavailable { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px; color: var(--text-muted, #aaa); font-size: 13px; }
+.unavailable button, .preview button { border: 0; padding: 5px 8px; border-radius: 6px; color: inherit; background: #30323a; cursor: pointer; }
+.unavailable a, .preview a { color: #8bceab; }
+.preview { width: min(960px, 90vw); max-height: 90vh; margin: auto; padding: 16px; border: 1px solid #555; border-radius: 12px; background: #202126; color: #eee; }
+.preview::backdrop { background: rgba(0,0,0,.8); }
+.preview header { display: flex; gap: 16px; align-items: center; margin-bottom: 14px; }
+.preview header strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.preview header a { white-space: nowrap; }
+.preview img { display: block; max-width: 100%; max-height: 72vh; margin: auto; object-fit: contain; }

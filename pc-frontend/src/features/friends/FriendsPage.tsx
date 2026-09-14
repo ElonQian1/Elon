@@ -8,6 +8,9 @@ import WorkspaceFeatureNav from '../shell/WorkspaceFeatureNav'
 import MarkdownContent from '../markdown/MarkdownContent'
 import MessageActions, { messageActionsHostClassName, messageCopySourceId } from '../message-actions/MessageActions'
 import styles from './FriendsPage.module.css'
+import SocialAvatar from './SocialAvatar'
+import SocialMessageAttachments from './SocialMessageAttachments'
+import type { SocialMessage } from './socialMessageTypes'
 
 interface Friend {
   id: string
@@ -38,19 +41,6 @@ interface FriendGroup {
   last_message?: string
   last_message_at?: string
   unread_count?: number
-}
-
-interface SocialMessage {
-  id: string
-  sender_user_id: string
-  sender_name?: string
-  content: string
-  created_at: string
-  outgoing: boolean
-  recalled_at?: string | null
-  recalled_by?: string | null
-  recalledAt?: string | null
-  recalledBy?: string | null
 }
 
 interface SearchResult {
@@ -344,7 +334,9 @@ export default function FriendsPage() {
       >
         <div className={styles.friendAvatarWrap}>
           <div className={[styles.friendAvatar, item.kind === 'group' ? styles.groupAvatar : ''].join(' ')}>
-            {avatarInitial(item.title, item.kind === 'group' ? '群' : '友')}
+            {item.kind === 'friend'
+              ? <SocialAvatar userId={item.id} name={item.title} avatar={item.friend?.avatar_data_url} />
+              : avatarInitial(item.title, '群')}
           </div>
           {item.kind === 'friend' && (
             <div className={styles.onlineDot} data-status={item.presenceStatus ?? 'offline'} />
@@ -505,7 +497,9 @@ export default function FriendsPage() {
           {activeItem ? (
             <div className={styles.topbarFriend}>
               <div className={[styles.topbarAvatar, activeItem.kind === 'group' ? styles.groupAvatar : ''].join(' ')}>
-                {avatarInitial(activeItem.title, activeItem.kind === 'group' ? '群' : '友')}
+                {activeItem.kind === 'friend'
+                  ? <SocialAvatar userId={activeItem.id} name={activeItem.title} avatar={activeItem.friend?.avatar_data_url} />
+                  : avatarInitial(activeItem.title, '群')}
               </div>
               <div>
                 <strong>{activeItem.title}</strong>
@@ -546,19 +540,25 @@ export default function FriendsPage() {
               : (activeItem?.kind === 'group'
                 ? (m.sender_name ?? '群成员')
                 : activeItem?.title ?? '对方')
+            const senderAvatar = isMe ? me?.avatar_data_url
+              : activeItem?.kind === 'group'
+                ? activeItem.group?.members?.find(member => member.id === m.sender_user_id)?.avatar_data_url
+                : activeItem?.friend?.avatar_data_url
             return (
               <div key={m.id ?? i} className={[styles.msgRow, messageActionsHostClassName, isMe ? styles.ownRow : ''].join(' ')}>
                 <div className={styles.avatar}>
-                  {avatarInitial(senderName, isMe ? '我' : activeItem?.kind === 'group' ? '群' : '友')}
+                  <SocialAvatar userId={m.sender_user_id} name={senderName} avatar={senderAvatar} />
                 </div>
                 <div className={styles.msgBody}>
                   <div className={styles.msgMeta}>
                     <strong>{senderName}</strong>
                     <span>{formatTime(m.created_at)}</span>
                   </div>
-                  {hasMarkdown
+                  {content && (hasMarkdown
                     ? <div id={copySourceId} className={styles.msgContent}><MarkdownContent content={content} copy={false} /></div>
-                    : <div id={copySourceId} className={styles.msgContent}>{content}</div>}
+                    : <div id={copySourceId} className={styles.msgContent}>{content}</div>)}
+                  {!recalled && <SocialMessageAttachments attachments={m.attachments} />}
+                  {content && (
                   <MessageActions
                     content={content}
                     messageKey={messageActionKey}
@@ -566,6 +566,7 @@ export default function FriendsPage() {
                     richCopySourceId={copySourceId}
                     align={isMe ? 'right' : 'left'}
                   />
+                  )}
                 </div>
               </div>
             )
