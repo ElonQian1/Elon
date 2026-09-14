@@ -67,6 +67,7 @@
 }
 
 .downloadCard {
+  text-decoration: none;
   min-height: 94px;
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr) auto;
@@ -76,6 +77,8 @@
   text-align: left;
   transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
 }
+
+.variantAction { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 
 .downloadCard:hover:not(:disabled) {
   transform: translateY(-1px);

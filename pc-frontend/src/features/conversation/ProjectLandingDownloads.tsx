@@ -3,6 +3,8 @@ import type { LucideIcon } from 'lucide-react'
 import { Apple, Download, FileText, Globe2, Laptop, Monitor, Smartphone, Terminal } from 'lucide-react'
 import { getAuthToken } from '../../api/client'
 import { resolveApiUrl } from '../../api/runtime'
+import { cloudResourceUrl } from '../../lib/cloudResourceUrl'
+import ProjectDownloadLink from '../project-download/ProjectDownloadLink'
 import {
   downloadMemberProtectedProjectApk,
   isMemberProtectedProjectApk,
@@ -38,11 +40,7 @@ export default function ProjectLandingDownloads({
     isLandingDownloadEnabled(download) && !(lockedForVisitor && isAndroidDownload(download)),
   ).length
 
-  const openDownload = async (url: string, protectedApk: boolean) => {
-    if (!protectedApk) {
-      openUrl(url)
-      return
-    }
+  const downloadProtectedApk = async () => {
     setDownloading(true)
     setDownloadError('')
     try {
@@ -86,7 +84,7 @@ export default function ProjectLandingDownloads({
                 memberProtected={isMemberProtectedProjectApk(projectId) && isAndroidDownload(download)}
                 locked={lockedForVisitor && isAndroidDownload(download)}
                 downloading={downloading}
-                onOpen={openDownload}
+                onOpen={downloadProtectedApk}
               />
             ))}
         </div>
@@ -107,7 +105,7 @@ function DownloadCard({
   memberProtected: boolean
   locked: boolean
   downloading: boolean
-  onOpen: (url: string, protectedApk: boolean) => void
+  onOpen: () => void
 }) {
   const platform = normalizePlatform(download.platform)
   const meta = PLATFORM_META[platform] ?? {
@@ -143,14 +141,16 @@ function DownloadCard({
                   <small>{[variant.arch, variant.version, variantSizeLabel(variant)].filter(Boolean).join(' · ') || statusLabel(variantStatus, variantEnabled)}</small>
                   {variant.note && <em>{variant.note}</em>}
                 </span>
-                <button
+                <ProjectDownloadLink
                   className={styles.variantAction}
-                  type="button"
-                  disabled={!variantEnabled}
-                  onClick={() => variant.url && onOpen(variant.url, memberProtected)}
+                  url={variant.url}
+                  enabled={variantEnabled}
+                  memberProtected={memberProtected}
+                  platform={platform}
+                  onMemberDownload={onOpen}
                 >
                   {locked ? '加入后下载' : downloading && memberProtected ? '下载中' : variantEnabled ? '下载' : statusLabel(variantStatus, false)}
-                </button>
+                </ProjectDownloadLink>
               </div>
             )
           })}
@@ -160,15 +160,17 @@ function DownloadCard({
   }
 
   return (
-    <button
+    <ProjectDownloadLink
       className={[
         styles.downloadCard,
         styles[`status_${statusClass(status)}`] ?? '',
         enabled ? '' : styles.downloadDisabled,
       ].join(' ')}
-      type="button"
-      disabled={!enabled}
-      onClick={() => download.url && onOpen(download.url, memberProtected)}
+      url={download.url}
+      enabled={enabled}
+      memberProtected={memberProtected}
+      platform={platform}
+      onMemberDownload={onOpen}
     >
       <span className={styles.platformBadge}><Icon size={19} aria-hidden="true" /></span>
       <span className={styles.downloadCopy}>
@@ -177,13 +179,13 @@ function DownloadCard({
         {download.note && <em>{download.note}</em>}
       </span>
       <span className={styles.downloadStatus}>{locked ? '加入后下载' : downloading && memberProtected ? '下载中' : statusLabel(status, enabled)}</span>
-    </button>
+    </ProjectDownloadLink>
   )
 }
 
 export function isLandingDownloadEnabled(download: ProjectLandingDownload) {
   const status = normalizeStatus(download.status, download.url)
-  if (download.url && (ACTIVE_STATUSES.has(status) || !PASSIVE_STATUSES.has(status))) return true
+  if (cloudResourceUrl(download.url) && (ACTIVE_STATUSES.has(status) || !PASSIVE_STATUSES.has(status))) return true
   return !!landingDownloadUrl(download)
 }
 
@@ -193,13 +195,13 @@ export function firstLandingDownload(downloads: ProjectLandingDownload[]) {
 
 export function landingDownloadUrl(download: ProjectLandingDownload) {
   const status = normalizeStatus(download.status, download.url)
-  if (download.url && (ACTIVE_STATUSES.has(status) || !PASSIVE_STATUSES.has(status))) return download.url
+  if (cloudResourceUrl(download.url) && (ACTIVE_STATUSES.has(status) || !PASSIVE_STATUSES.has(status))) return download.url
   return download.variants?.find(isVariantEnabled)?.url || ''
 }
 
 function isVariantEnabled(variant: NonNullable<ProjectLandingDownload['variants']>[number]) {
   const status = normalizeStatus(variant.status, variant.url)
-  return !!variant.url && (ACTIVE_STATUSES.has(status) || !PASSIVE_STATUSES.has(status))
+  return !!cloudResourceUrl(variant.url) && (ACTIVE_STATUSES.has(status) || !PASSIVE_STATUSES.has(status))
 }
 
 function normalizePlatform(platform?: string) {
@@ -247,8 +249,4 @@ function formatDownloadBytes(value: string | number | undefined) {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${bytes} B`
-}
-
-function openUrl(url: string) {
-  window.open(url, '_blank', 'noopener')
 }
