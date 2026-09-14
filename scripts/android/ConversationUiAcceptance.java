@@ -108,6 +108,34 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                 .put("max", range.getMax()).put("current", range.getCurrent());
         } finally { info.recycle(); }
     }
+    private JSONObject activeToolControls() throws Exception {
+        UiObject chip = new UiObject(new UiSelector().packageName(APP).descriptionMatches(
+            "\u5df2\u542f\u7528(\u7f51\u9875\u641c\u7d22|\u521b\u5efa\u56fe\u7247|\u5b66\u4e60\u4e0e\u7814\u7a76|\u753b\u5e03)"));
+        JSONObject result = new JSONObject().put("chip", chip.exists())
+            .put("clear_search", description("\u5173\u95ed\u7f51\u9875\u641c\u7d22").exists())
+            .put("clear_image", description("\u5173\u95ed\u521b\u5efa\u56fe\u7247").exists());
+        if (!chip.exists()) return result;
+        JSONArray children = new JSONArray();
+        java.lang.reflect.Method method = UiObject.class.getDeclaredMethod("findAccessibilityNodeInfo", long.class);
+        method.setAccessible(true);
+        AccessibilityNodeInfo info = (AccessibilityNodeInfo) method.invoke(chip, 1000L);
+        assertNotNull("tool_chip_missing", info);
+        try {
+            for (int i = 0; i < Math.min(info.getChildCount(), 8); i++) {
+                AccessibilityNodeInfo child = info.getChild(i);
+                if (child == null) continue;
+                try {
+                    android.graphics.Rect bounds = new android.graphics.Rect();
+                    child.getBoundsInScreen(bounds);
+                    children.put(new JSONObject().put("clickable", child.isClickable())
+                        .put("visible", child.isVisibleToUser()).put("enabled", child.isEnabled())
+                        .put("width", bounds.width()).put("height", bounds.height())
+                        .put("is_clear", String.valueOf(child.getContentDescription()).startsWith("\u5173\u95ed")));
+                } finally { child.recycle(); }
+            }
+        } finally { info.recycle(); }
+        return result.put("children", children);
+    }
     private void setModelLevel() throws Exception {
         UiObject slider = description("web-chat-model-level-slider");
         assertTrue("model_level_slider_missing", slider.waitForExists(5000));
@@ -279,6 +307,7 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             default: fail("unsupported_step");
         }
         JSONObject result = new JSONObject().put("step", step)
+            .put("active_tool_controls", activeToolControls())
             .put("composer_input", description("web-chat-composer-input:chatgpt_web").exists())
             .put("tool_fixture_input", description("web-chat-composer-input:chatgpt_web").exists() &&
                 description("web-chat-composer-input:chatgpt_web").getText().startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"))

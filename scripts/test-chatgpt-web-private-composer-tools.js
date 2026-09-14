@@ -12,6 +12,49 @@ const CID = '00000000-0000-0000-0000-000000000001';
 const flush = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
 const toolContext = require(path.join(assets, 'chatgpt_web_private_composer_tool_context.js'));
 
+for (const input of [null, { isConnected: false }, { isConnected: true }]) {
+  test('tool selection uses its committed owner when the text input is absent or unrelated: ' + JSON.stringify(input), async () => {
+    const f = fixture({ current: true });
+    let inputReads = 0;
+    f.page.document.querySelector = selector => {
+      if (selector === '#prompt-textarea') { inputReads++; return input; }
+      return selector === '#composer-plus-btn' ? f.node : null;
+    };
+    assert.equal(f.list(), true);
+    await flush();
+    assert.equal(toolContext.state(f.page), 'ready');
+    assert.equal(f.results.at(-1)[1], true);
+    f.pick(f.choice('image_generation').id);
+    assert.equal(f.state.activeSystemHintType, 'picture_v2');
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.fallbacks, 0);
+    assert.equal(inputReads, 0, 'tool ownership must not depend on the editor DOM');
+  });
+}
+
+test('a ready text input does not authorize a detached tool trigger', () => {
+  const f = fixture();
+  const input = { ...f.node };
+  f.node.isConnected = false;
+  f.page.document.querySelector = selector => selector === '#prompt-textarea' ? input :
+    selector === '#composer-plus-btn' ? f.node : null;
+  assert.equal(f.list(), false);
+  assert.equal(toolContext.state(f.page), 'composer_detached');
+  assert.equal(f.calls.length, 0);
+});
+
+test('tool-owned context still rejects a missing file store without consulting another editor', () => {
+  const f = fixture();
+  const input = { ...f.node };
+  f.node.__reactFiber$fixture = { return: f.ancestor };
+  f.ancestor.child = f.node.__reactFiber$fixture;
+  f.page.document.querySelector = selector => selector === '#prompt-textarea' ? input :
+    selector === '#composer-plus-btn' ? f.node : null;
+  assert.equal(f.list(), false);
+  assert.equal(toolContext.state(f.page), 'conversation_unavailable');
+  assert.equal(f.calls.length, 0);
+});
+
 test('tool admission diagnostics explain missing hints without exporting page or account data', async () => {
   const f = fixture();
   assert.deepEqual(toolContext.diagnostics(f.page), { schema: 'elon.composer_tool_admission.v1', observed: false, items: [] });

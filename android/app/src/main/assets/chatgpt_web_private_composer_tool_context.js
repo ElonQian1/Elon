@@ -1,7 +1,7 @@
 (function (root, capture) {
   'use strict';
   const observations = new WeakMap();
-  const api = Object.freeze({ version: 4,
+  const api = Object.freeze({ version: 5,
     capture(page, tools) {
       let items = [];
       const record = code => {
@@ -31,14 +31,15 @@
   const spec = page.__elonChatGptPrivateRuntimeBindings?.tools?.();
   const ownerPath = page.__elonChatGptCommittedOwnerPath ||
     (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path') : null);
-  const input = page.document.querySelector('#prompt-textarea');
-  const context = page.__elonChatGptPrivateTextRuntimeSubmit?.captureConversation?.(input, true);
   // The menu trigger can replace the DOM id while retaining the official test id.
   const node = page.document.querySelector('#composer-plus-btn') ||
     page.document.querySelector('[data-testid="composer-plus-btn"]');
   if (!spec) return unavailable('runtime_unavailable');
-  if (!context) return unavailable('conversation_unavailable');
   if (!node?.isConnected) return unavailable('composer_detached');
+  // Bind the tool and conversation to one committed host. The text editor may
+  // be unmounted or replaced without invalidating this owner's tool state.
+  const context = page.__elonChatGptPrivateTextRuntimeSubmit?.captureConversation?.(node, true);
+  if (!context) return unavailable('conversation_unavailable');
   const key = Object.keys(node).find(name => name.startsWith('__reactFiber$'));
   const owners = ownerPath?.resolve(node[key])?.ancestors?.filter(fiber => fiber.type?.name === spec.owner) || [];
   if (owners.length !== 1) return unavailable('owner_unavailable');
