@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshRegenerateContext = api;
 })(typeof window === 'object' ? window : null, function (page, baseContext) {
@@ -22,8 +22,10 @@
         owner.message.id !== base.parentId) fail('context_changed', 'owner');
     if (typeof runtime.textResolveRequestedModel !== 'function' || typeof shared.canvasQueryClient !== 'function' ||
         ['getNodeIfExists', 'getParentNode'].some(key => typeof shared.HM[key] !== 'function')) fail('runtime_unavailable', 'resolver');
-    const model = await runtime.textResolveRequestedModel({ conversation: owner.conversation,
+    const resolvedModel = await runtime.textResolveRequestedModel({ conversation: owner.conversation,
       queryClient: shared.canvasQueryClient(), requestedModelId: owner.modelSlug });
+    // A1t uses requestedModelId when the optional work-model resolution is null.
+    const model = resolvedModel ?? owner.modelSlug;
     if (model !== owner.modelSlug || !SLUG.test(model || '') || shared.textModelOverride()?.model_slug === model) fail('scope_unsupported', 'model');
     const tree = () => shared.XM(owner.conversation.id);
     const user = () => shared.HM.getNodeIfExists(tree(), owner.parentId);
@@ -57,7 +59,8 @@
     function effort() {
       const selected = owner.model.menu.modelsData?.models?.get(model);
       if (!selected) fail('context_unavailable', 'effort');
-      const value = owner.message.metadata?.thinking_effort ?? selected.defaultThinkingEffort ?? null;
+      const value = owner.message.metadata?.thinking_effort ??
+        (resolvedModel != null ? selected.defaultThinkingEffort : null) ?? null;
       if (value != null && !SLUG.test(value)) fail('context_invalid', 'effort');
       return value;
     }

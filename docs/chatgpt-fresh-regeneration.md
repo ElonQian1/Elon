@@ -20,6 +20,9 @@ default-off, not production-verified; see the
 [grouped report](reports/chatgpt-writing-grouped-acceptance-20260914.md).
 The [read-only admission probe](reports/chatgpt-fresh-retry-admission-20260914.md)
 isolates the rejecting predicate without replaying a write or relaxing its scope.
+Build 1724 located the rejection at model resolution. The same report records
+the source-backed null-resolution correction (adapter 393), verified offline
+but awaiting corrected APK acceptance; the production default is unchanged.
 
 September 13 source candidate. The existing native regenerate button now has a
 gated independent request path through the same fresh-text ledger, prepare/proof

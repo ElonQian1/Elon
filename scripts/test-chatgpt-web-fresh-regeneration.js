@@ -17,6 +17,28 @@ test('ordinary retry captures the actual committed menu but never invokes its ca
   assert.equal(binding.owns(), true, 'post-dispatch ownership does not depend on rendered buttons');
 });
 
+for (const resolved of [null, undefined]) test('ordinary retry retains its requested model when the optional work resolver returns ' + resolved, async () => {
+  const f = fixture();
+  f.conversation.textResolveRequestedModel = () => resolved;
+  const binding = await f.capture();
+  assert.equal(binding.model, 'fixture-model');
+  assert.equal(binding.effort, 'high');
+  assert.equal(binding.current(), true);
+  assert.equal(f.retry.calls.length, 0);
+});
+
+test('ordinary retry without reply effort does not borrow a work-model default', async () => {
+  const f = fixture();
+  f.conversation.textResolveRequestedModel = () => null;
+  delete f.parent.metadata.thinking_effort;
+  const binding = await f.capture();
+  assert.equal(binding.effort, null);
+  f.retry.modelMenu.modelsData.models.get('fixture-model').defaultThinkingEffort = 'medium';
+  assert.equal(binding.current(), true);
+  f.parent.metadata.thinking_effort = 'high';
+  assert.equal(binding.current(), false);
+});
+
 for (const [stage, change] of [
   ['ready', () => {}],
   ['base_composer', f => { f.props.isDisabled = true; }],

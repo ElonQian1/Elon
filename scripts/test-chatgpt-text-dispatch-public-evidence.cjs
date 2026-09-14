@@ -95,7 +95,14 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     assert.match(source(composer, 'oGn'), /requestedModelId:.*\.value/);
     assert.deepEqual(composer.imports.get('EQe'), { file: './' + assets.conversation[0], name: 'azt' });
     assert.equal(conversation.exported.get('azt'), 'zwn');
+    assert.match(source(conversation, 'azt', true), /if\(!Ra\(e\)\)return null/);
+    assert.deepEqual(conversation.imports.get('Ra'), { file: './' + assets.shared[0], name: 'Vs' });
     assert.match(source(conversation, 'azt', true), /e\.serverId\$\(\)!=null&&r!==void 0\)return r/);
+    const submit = source(composer, 'A1t');
+    assert.match(submit, /M=D,N=O/);
+    assert.match(submit, /EQe\(\{conversation:j,queryClient:R,requestedModelId:M\}\)/);
+    assert.match(submit, /V=Cte\(B\)\?await B:B/);
+    assert.match(submit, /let he=V\?\?M\?\?Wm\(\(\)=>KT\(i\)\.id\)/);
     assert.match(source(composer, 'A1t'), /N==null&&V!=null/);
     assert.match(source(composer, 'A1t'), /defaultThinkingEffort/);
     const body = source(composer, 'AB');
