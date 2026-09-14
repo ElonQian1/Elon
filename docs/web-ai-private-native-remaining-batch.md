@@ -20,16 +20,16 @@ functional completeness, not a gate for this phase.
 
 ## Current Status Map
 
-[1683 collapsed composer](reports/chatgpt-collapsed-composer-20260912.md) is
-published/installed and native-send accepted. Reuse this completed UI fix.
-[1682 Canvas](reports/chatgpt-canvas-provider-boundary-1682.md) accepts listing
-only. The current model declined creation; stop repeating prompts. Original
-writes/exports need an owned sample. [Writing Blocks](chatgpt-writing-blocks-native.md)
+[Collapsed composer](reports/chatgpt-collapsed-composer-20260912.md): accepted; reuse.
+[Canvas](reports/chatgpt-canvas-provider-boundary-1682.md): listing accepted;
+creation declined. Do not repeat prompts; writes/exports need an owned sample.
+[Writing Blocks](chatgpt-writing-blocks-native.md)
 reading/edit/export and ordinary save are accepted (1692; editor undo/redo/share 1706).
 [Project/typed saves](chatgpt-writing-blocks-native.md) are offline-verified.
 [Library](chatgpt-writing-blocks-library-save.md): 1715, device-pending; [temporary](chatgpt-writing-blocks-temporary-save.md): offline-verified; shared writes open.
 
-[Fresh tools](chatgpt-fresh-tool-text-dispatch.md),
+[Search](chatgpt-fresh-search-text-dispatch.md): verified, 1731 default.
+[Other tools](chatgpt-fresh-tool-text-dispatch.md),
 [project sends](chatgpt-fresh-project-text-dispatch.md),
 [temporary sends/cache guard](chatgpt-fresh-temporary-text-dispatch.md),
 [owned attachment sends](chatgpt-fresh-attachment-text-dispatch.md): offline-verified.

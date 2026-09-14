@@ -54,7 +54,22 @@ and ordering cancellation confirmation before restoring the original view.
 `fresh-search-final-scope-guards-20260914-193349-451` (1.8 seconds, zero skips).
 Only [existing-personal Search](../chatgpt-fresh-search-text-dispatch.md) gains
 default admission. The Image, new-tool, project, temporary and attachment scopes
-are not promoted. APK release evidence will be appended after publication.
+are not promoted.
+
+## Released Default
+
+`fresh-search-default-release-20260914-193852-096` passed in 468.6 seconds.
+APK `1.1.1731 / 1731`, source `e97e6fffe`, adapter 396, 40,479,563 bytes;
+SHA-256 `0f81fcd08f2ae3a4801aed92033f9375eaae5226c6b645bf8d9cc49cda27b6aa`.
+The release entrypoint published it and verified an unattended Xiaomi update.
+No Cookies, login state or application data were cleared.
+
+Both changed JavaScript assets match their source hashes inside the release APK.
+Post-install production MCP confirmed adapter 396/current, authenticated, composer
+ready, not streaming and voice idle. This check sent zero messages; it is not a
+second Search sample or an Image pass. The native runner also compiled and ran
+its read-only inspection; the unique Image draft click remains untested because
+the final candidate preflight stopped before that step.
 
 [Writing Blocks](../chatgpt-writing-blocks-native.md) are reused unchanged:
 native read/edit/export and ordinary cloud save are accepted; special cloud-save
