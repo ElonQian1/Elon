@@ -3,6 +3,7 @@ capability_id: android_chatgpt_private_text_input_memory_v1
 implementation_status: implemented
 verification_status: offline_verified
 device_verification: deferred
+delivery_status: published_1738_device_pending
 ---
 
 # Private Text Input Readiness
@@ -87,7 +88,7 @@ zero failures/skips, including production context/runtime/draft composition,
 default scope, tool checks, sender transactions and complete adapter assembly.
 Entitlement and HTTP fixtures are synthetic, not provider acceptance.
 
-This follow-up is source-only for the next grouped Android build. USB reported
+At that checkpoint the follow-up was source-only for a grouped build. USB reported
 no device; the bounded wireless connection timed out and mDNS found no service.
 No APK was replaced, no message was sent and no device pass is claimed. Existing
 Search HTTP acceptance is retained; its absent-composer UI boundary still needs
@@ -108,8 +109,27 @@ parity. `private-input-grouped-regression-20260914-233724-894` passed 338 tests,
 zero failures/skips, and includes the prior
 tool/owner fix and the existing sender, attachment, default-scope and assembly
 regressions. These are synthetic offline checks, not real attachment HTTP
-acceptance. The next grouped release carries both input fixes; device checks
+acceptance. The grouped release below carries both input fixes; device checks
 remain deferred while USB and wireless ADB are unavailable.
+
+## Grouped Release 1738
+
+- Published `1.1.1738 / 1738`, adapter 402, from source
+  `a99b023e172377d367b28d24f3d6427315750aa8`. This includes the tool/owner-wait
+  repair `e33f5cb01` and the attachment input-scope fix, not a second sender.
+- `private-input-grouped-release-20260914-234038-289` completed in 551.1 seconds;
+  Release Kotlin/Java, vital lint and packaging passed. The server confirmed the
+  assigned manifest version and remote APK SHA-256/size.
+- APK SHA-256:
+  `7e45cabaaeba886bdf6dc6a7595449be57b2de482ee0541d80e314e012927178`.
+- USB had no device and wireless ADB timed out. Publication succeeded with
+  `APK_ADB_DEPLOY_STATUS=verification_deferred`; no install or native UI pass is
+  claimed. Reuse this artifact for the pending existing-Search/memory-input and
+  independent Image/attachment acceptance; do not rebuild just for acceptance.
+- Experimental send scopes are unchanged. Only a real controlled pass may
+  promote them; fixture parity is not provider eligibility or latency evidence.
+
+## Earlier Evidence
 
 The retained September 12 public assets are parsed, never executed or used to
 export identity. `test-chatgpt-runtime-public-evidence.cjs` verifies their hashes
@@ -134,7 +154,8 @@ modules; it does not make requests or operate on a user's conversation.
   `private-input-native-envelope-20260914-010515-939` (114 seconds). The other
   46 unchanged policy/protocol/asset tests retain their earlier passed result.
 
-No APK packaging, publication or fresh device acceptance belongs to this batch.
+Those initial source checkpoints did not package or publish an APK; the later
+grouped release above does. Fresh device acceptance remains outstanding.
 The accepted existing-personal HTTP scope remains accepted; absence-of-composer
 readiness is a separate pending device case. Before a later new write, resolve
 the existing uncertain fresh-send fixture by read-only reconciliation; do not
