@@ -2,11 +2,30 @@
 
 Status: bindings 29 / adapter 407 published as 1.1.1743; first-send and follow-up
 passed on Xiaomi. Adapter 408 adds the attachment routing correction discovered
-in grouped acceptance. `web_20260915` uses its exact observed asset set.
+in grouped acceptance; adapter 409 repairs the model argument and pre-write
+handoff below. `web_20260915` uses its exact observed asset set.
 Reuse [accepted Writing Blocks 1723](../chatgpt-writing-blocks-native.md),
 ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
+
+- Release 1745 / adapter 408 built and installed. Its one native attachment
+  trial was rejected before preparation/POST (`attachments_active`, dispatched
+  false, zero stream events). The fallback saw a phantom active writer because
+  the completion callback ran before `finally`. Read-only recovery proved the
+  exact baseline unchanged, recorded a non-dispatched attempt and prohibited
+  replay. The unsent synthetic draft/files await replacement-install cleanup.
+- Adapter 409 / transaction 29 releases that slot atomically in the single-use
+  pre-dispatch fallback claim. It never releases a dispatched/uncertain writer.
+  Disabled attachment extensions now decline synchronously, so normal users
+  retain the accepted attachment sender without candidate preparation overhead.
+- The serializer's third argument was incorrectly a model slug. Exact public
+  source traces `zmt` -> `p_r` -> imported shared `im` -> `model.product_features`.
+  Attachment module 3 now passes the current conversation's actual model object,
+  verifies its ID and retains ready-file/model/selection revalidation. The
+  six-argument Library guard is unchanged. New behavior tests and hash-pinned
+  AST assertions cover this contract; independent attachments are not promoted
+  until a real successful send, native reply and history readback.
 
 - Release 1743 (`0b00df6c389d09b1eeb0575b3686d39350623994`) was built, published
   and installed without data reset. First send and follow-up each used fresh

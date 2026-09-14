@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, capture: factory });
+  const api = Object.freeze({ version: 3, capture: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextAttachments = api;
 })(typeof window === 'object' ? window : null, function (page, binding, runtime) {
@@ -60,10 +60,13 @@
   }
   function serialize(prompt, context) {
     if (!current()) throw Error('context_changed');
+    const model = runtime.Nrn?.(binding.conversation);
+    if (!model || typeof model !== 'object' || model.id !== context.model) return fail();
     // The sixth argument is an editor's active library context. It is not part
     // of this native ready-file lease; Sep 15 can append it as an extra file.
     // Keep it absent so the serializer cannot silently add unselected content.
-    const raw = runtime.textSerializeAttachments(files, prompt, context.model, mode(context), context.tool ?? null, undefined);
+    // The provider reads model.product_features, not a model slug.
+    const raw = runtime.textSerializeAttachments(files, prompt, model, mode(context), context.tool ?? null, undefined);
     if (!raw || !Array.isArray(raw.attachments) || raw.attachments.length > files.length) return fail();
     const result = copy({ content: raw.content, attachments: raw.attachments });
     const represented = new Set();

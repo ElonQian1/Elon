@@ -564,6 +564,18 @@ test('pre-dispatch fallback is once-only and cannot cross an account change', as
   assert.equal(f.calls.length, 0);
 });
 
+test('pre-dispatch completion hands off the writer before the finally microtask', async () => {
+  const f = fixture({ capture: async () => { throw Error('attachments_active'); } });
+  const result = f.send();
+  await result.completion.then(receipt => {
+    assert.equal(receipt.status, 'unavailable');
+    assert.equal(result.claimFallback(), true);
+    assert.equal(f.api.state().pending, false, 'the existing sender must not see a phantom writer');
+    assert.equal(result.claimFallback(), false);
+  });
+  assert.equal(f.calls.length, 0); await turn(); assert.equal(f.api.dispose(), true);
+});
+
 test('unsupported plain-text context preserves the accepted sender, but another writer does not', async () => {
   for (const code of ['attachments_active', 'tools_active', 'parent_unavailable', 'identity_unavailable', 'conversation_busy']) {
     const f = fixture({ capture: async () => { throw Error(code); } });

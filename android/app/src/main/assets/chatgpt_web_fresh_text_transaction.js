@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 28, create: factory });
+  const api = Object.freeze({ version: 29, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -117,6 +117,9 @@
         page.__elonChatGptPrivateTextTransactionsEnabled !== true) {
       return { handled: false, code: 'disabled' };
     }
+    if (command.requireNativeAttachment === true && page.__elonChatGptFreshTextAttachmentsEnabled !== true && !trialArmed()) {
+      return { handled: false, code: 'disabled' };
+    }
     // Cold/unknown identity keeps the accepted sender; no UI-blocking import is
     // started merely to discover whether the independent candidate is eligible.
     const stamp = context.stamp();
@@ -159,6 +162,9 @@
             context.stamp() !== owner.stamp) return false;
         if (readDraft() !== command.expectedDraft) return false;
         owner.fallbackClaimed = true;
+        // completion callbacks can run before run().finally(). Hand the slot
+        // over atomically, only after proving that no request was dispatched.
+        if (active === owner) active = null;
         return true;
       }
     });
@@ -392,7 +398,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 28, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 29, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

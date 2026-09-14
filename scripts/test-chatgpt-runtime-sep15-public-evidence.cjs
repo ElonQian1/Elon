@@ -64,6 +64,10 @@ test('Sep 15 actual namespace contracts and changed history/attachment semantics
   assert.match(attachments, /o!=null&&g&&o.fileId.length>0/);
   assert.match(attachments, /!c.some\(e=>e.mountedLibraryFileId===o.mountedLibraryFileId\)/);
   assert.match(attachments, /mounted_library_mime_type:o.mimeType/);
+  assert.match(attachments, /Rhe\(n,r,i\)/);
+  assert.deepEqual(modules.conversation.imports.get('Rhe'), { file: './' + profile.files.shared, name: 'im' });
+  assert.match(definition('shared', 'im'), /lX\(e,t\)/);
+  assert.match(definition('shared', 'am'), /e\?\.product_features/);
   const editor = definition('composer', 'Fh');
   assert.match(editor, /validateChatAttachment:\(e,t,n,r,i,a\)=>OB.validateChatAttachmentSize\(e,t\)/);
   assert.match(editor, /handleChatLibraryFileCount\(e,n,r,i,a\)/);

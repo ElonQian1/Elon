@@ -97,7 +97,7 @@ try {
     $expected=@(@{id=$seed.user_message_id;content=$seed.prompt})+@($tools.accepted|ForEach-Object {
         if($_.fresh_http -cne $true -or $_.tool_restored -cne $true -or $_.tool -cnotin @('web_search','image_generation')){throw 'tool_fixture_unconfirmed'}
         @{id=$_.user_message_id;content=$_.prompt}
-    })+@($ledger.resolved_attempts|ForEach-Object {
+    })+@($ledger.resolved_attempts|Where-Object {$null -ne $_}|ForEach-Object {
         if($_.readback_completed -cne $true -or $_.replay_allowed -cne $false -or
             $_.transport -cne 'official_runtime_v1' -or $_.prompt -cnotmatch '^ELON_FRESH_ATTACHMENT_ACCEPTANCE_V1 \d{13}\. ' -or
             $_.user_message_id -cnotmatch '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$'){throw 'prior_attachment_unconfirmed'}

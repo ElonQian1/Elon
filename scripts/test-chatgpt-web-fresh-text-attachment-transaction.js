@@ -102,6 +102,13 @@ test('missing files cannot downgrade an attachment-only command to an ordinary f
   await settled(); assert.equal(f.api.dispose(), true);
 });
 
+test('disabled attachment-only extension declines synchronously without taking a writer slot', async () => {
+  const f = await fixture();
+  assert.equal(f.send({ requireNativeAttachment: true }).handled, false);
+  assert.equal(f.api.state().pending, false); assert.equal(f.calls.length, 0);
+  assert.equal(f.files.files$().length, 3); assert.equal(f.api.dispose(), true);
+});
+
 test('file-only send crosses the real stream transport and reconciles without inventing a text bubble', async () => {
   const f = await fixture({ enabled: true, history: false });
   const send = f.send({ prompt: '' });

@@ -32,6 +32,20 @@ test('native attachment reservation cannot silently downgrade to text when files
   assert.ok(binding.attachments);
 });
 
+test('provider serialization receives the current model configuration, never its slug', async () => {
+  const f = await fixture(), model = { ...f.conversation.Nrn(f.selected),
+    product_features: { attachments: { type: 'retrieval' } } };
+  f.conversation.Nrn = () => model;
+  f.conversation.textSerializeAttachments = (files, prompt, currentModel, mode, tool, library) => {
+    assert.equal(currentModel, model); assert.equal(currentModel.id, model.id);
+    assert.equal(library, undefined);
+    return f.serialize(files, prompt);
+  };
+  const binding = await f.capture(); consume(f, binding);
+  f.conversation.Nrn = () => model.id;
+  assert.throws(() => binding.attachments.message('Synthetic question', { model: model.id }), /attachments_active/);
+});
+
 test('owned TXT/PDF/image selections use provider metadata and multimodal content in a fresh request', async () => {
   const f = await fixture(), binding = await f.capture(), sent = consume(f, binding);
   const prepared = sent.request.preparationBody(), message = sent.body.messages[0];
