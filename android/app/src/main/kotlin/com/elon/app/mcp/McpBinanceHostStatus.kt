@@ -49,6 +49,7 @@ internal fun mcpBinanceHostStatus(context: Context): JSONObject = runCatching {
             .put("read_debug_active", BinanceHostReadDebug.active(host))
             .put("wallet_summary", JSONObject()
                 .put("schema", com.elon.app.grid.wallet.BinanceWalletState.SCHEMA)
+                .put("permission", JSONObject(host.wallet.permissionFacts()))
                 .put("status", host.wallet.state.status)
                 .put("identity_verified", host.live() && host.wallet.state.identityFresh())
                 .put("request_pending", host.wallet.state.pending != null)

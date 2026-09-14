@@ -18,6 +18,10 @@ internal class BinanceWalletRuntime(context:Context,private val host:BinanceHost
     var onChanged:(()->Unit)?=null
     private fun changed(){onChanged?.invoke();host.events.changed("read")}
     private fun permitted()=host.live()&&consent.permits(host.owner(),state.account,state.accountKind)
+    /** No identity refresh, grant renewal, page launch or balance request. */
+    fun permissionFacts():Map<String,Any> = BinanceWalletPermissionFacts.describe(
+        consent.recorded(),host.live()&&state.identityFresh(),permitted(),
+        resumeGrant?.let(state::authorized)==true)
     fun clearSession() {
         timeout?.let(host.handler::removeCallbacks);timeout=null
         waitingIdentity=waitingIdentity || onChanged!=null || consent.recorded()

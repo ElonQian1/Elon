@@ -6165,6 +6165,96 @@
       "updated_at_ms": 1789377128211
     },
     {
+      "id": "binance-wallet-permission-diagnostics-v1",
+      "title": "钱包同意结果只读诊断",
+      "summary": "区分同意记录落盘、当前身份匹配和临时权限，避免idle被误判为未同意；不创建授权或资产请求。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/binance-wallet-permission-diagnostics-v1.md",
+        "content_hash": "78cfb5552de72ed112f27a9988910713dc77f4845c67d2b538e7bf1658b809a2",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "ad01da84c73a7fb3802f9be26e8e8f73841d68ce",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "f949793ddb93fec2144fca7ac1d1f6d40f0c4c4a",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/grid/wallet/BinanceWalletPermissionFacts.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/wallet/BinanceWalletRuntime.kt",
+        "android/app/src/main/kotlin/com/elon/app/mcp/McpBinanceHostStatus.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "固定schema及布尔事实无标识和凭据",
+        "只读、不打开页面、不续期或生成权限",
+        "所有状态与矛盾组合及钱包回归通过，正式MCP分开验收"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/wallet/BinanceWalletPermissionFacts.kt",
+          "content_hash": "77c830bd154a6360b729b4555cf42e6610d36c5d5ab37e8e6b4e8639505647d3",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad01da84c73a7fb3802f9be26e8e8f73841d68ce",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1c4e5b722908a29a2038051201b2910e58d9fca9",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/wallet/BinanceWalletRuntime.kt",
+          "content_hash": "62558592db81a3e3fc4cc77ad2d840cdc63f75700130c6b14f0b0d1680f42518",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad01da84c73a7fb3802f9be26e8e8f73841d68ce",
+            "head_blob_oid": "70387d1a745c9763f419167785b136e6ddb9d410",
+            "worktree_blob_oid": "c9e7653f1617df83d2a4a2bf2808eeebad01edc1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/mcp/McpBinanceHostStatus.kt",
+          "content_hash": "a0cbfb7904082da1a46ba9fc51ba40a2d185f1ed467ca416d0f6ded181b8c4f3",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad01da84c73a7fb3802f9be26e8e8f73841d68ce",
+            "head_blob_oid": "07ae5374fe1d62b1235e1d6007ccc5eb9f6a375b",
+            "worktree_blob_oid": "1d44131d93d8c6a67ff844133f370f52984b768a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/wallet/BinanceWalletPermissionFactsTest.kt",
+          "content_hash": "359a6f17b24365ae3df4cf9177c1ca523f74cc14545b83ad75be0769fc2253f7",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad01da84c73a7fb3802f9be26e8e8f73841d68ce",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6557c1d3488887f7c97101b2df79aa62a16c5b11",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1789381434074,
+      "updated_at_ms": 1789381881169
+    },
+    {
       "id": "binance_wallet_summary_host_v1",
       "title": "本人币安钱包概览授权接口",
       "summary": "复用主APK会话，独立钱包用途授权和固定USDT概览读取，保持账号隔离并通过事件通知量化。",
@@ -28196,56 +28286,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_2ea3cc70135c4f30ae0ff26361e11b3e",
-      "feature_id": "android-binance-grid-core-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-core",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788923474657
-    },
-    {
-      "id": "feature_event_b33aa3ecbc484a8ab9b640aff59102e1",
-      "feature_id": "android-binance-grid-core-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-core",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788925501253
-    },
-    {
-      "id": "feature_event_3ae55fcbf701460e8f0e60156b9560b9",
-      "feature_id": "android-binance-grid-core-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-core",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788936035500
-    },
-    {
-      "id": "feature_event_ff33e5bb4b594be8bcc03afb43ef70d3",
-      "feature_id": "android-binance-grid-core-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-core",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788936853648
-    },
-    {
-      "id": "feature_event_199fd8d27f344f548c4cfc1a03970da3",
-      "feature_id": "android-binance-grid-core-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-core",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788936942396
-    },
-    {
       "id": "feature_event_7a3cbdd550144d9781d06131f7abf471",
       "feature_id": "android-binance-report-recovery-v1",
       "action": "registered",
@@ -30194,6 +30234,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789377128211
+    },
+    {
+      "id": "feature_event_0d7f67bd0fa648eebcf737cffc15f7e6",
+      "feature_id": "binance-wallet-permission-diagnostics-v1",
+      "action": "registered",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789381434074
+    },
+    {
+      "id": "feature_event_5650a1db41d74b5a82f67b72500dbf00",
+      "feature_id": "binance-wallet-permission-diagnostics-v1",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789381434160
+    },
+    {
+      "id": "feature_event_7401deaa8e2a403dab0d234fb8bf0ff9",
+      "feature_id": "binance-wallet-permission-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "固定事实分类及MCP接线已完成，正在验证钱包和宿主回归",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789381481029
+    },
+    {
+      "id": "feature_event_6ca4ff3f1b7343f3bd3dc6103f31a5f7",
+      "feature_id": "binance-wallet-permission-diagnostics-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789381881055
+    },
+    {
+      "id": "feature_event_5d9cbd5b53bd4bf5b91167826d9deed7",
+      "feature_id": "binance-wallet-permission-diagnostics-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "钱包及宿主定向回归通过，发布与只读真机取证随后进行",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789381881169
     }
   ]
 }
