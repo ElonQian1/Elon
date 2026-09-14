@@ -1,13 +1,26 @@
 # September 15 Runtime Compatibility Investigation
 
-Status: bindings 29 / adapter 409 published as 1.1.1746. First-send/follow-up and
-independent local attachment delivery passed on Xiaomi. Adapter 410 promotes the
-verified attachment scope, reusing the corrected model argument and pre-write
+Status: bindings 29 / adapter 410 published and installed as 1.1.1747.
+First-send/follow-up and independent local attachment delivery passed on Xiaomi.
+The verified attachment scope is default-enabled, reusing the corrected model argument and pre-write
 handoff below. `web_20260915` uses its exact observed asset set.
 Reuse [accepted Writing Blocks 1723](../chatgpt-writing-blocks-native.md),
 ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
+
+- Final default release 1747, source `2c1944a0f38cb2ed1c1a4390dd09f33ae9105625`,
+  SHA-256 `7661a081b14c3bacb40b1b1df7246c31446d91289907de337861d617727f81db`,
+  passed Release build/checks and unattended replacement installation. Read-only
+  check `fresh-attachment-default-release-readonly-20260915-045045-654` confirmed
+  adapter 410, authenticated/ready native chat, no armed trial, pending write,
+  draft or attachment. Zero repeat sends. Cookies/data were not cleared.
+- Default-scope regression: 617 Node tests passed, no failures/skips, plus 22
+  attachment evidence cases and existing fresh/Canvas acceptance contracts;
+  `fresh-attachment-default-final-regression-20260915-044113-091`. Input readiness
+  and actual dispatch use the same allowlist and explicit opt-out. Project,
+  temporary, tool, library, new-chat, other-MIME and file-only extensions are
+  not included in this promotion.
 
 - Release 1746, source `d3ac8a9b6`, SHA-256
   `63228868f9cff05eb85fcc3dc09514f83c66fe157ef8b03a8cf911b0a829c557`,
@@ -200,8 +213,9 @@ Reproduce with `CHATGPT_AST_PARSER` set, using the existing analyzer's five
 arguments: old directory, new directory, full baseline fixture, observed anchor,
 output directory. Do not restart browser scraping or resend old fixtures.
 
-Next: publish one grouped APK, verify profile selection, then resume native
-first-send and one-send attachment acceptance. Use a genuine owned Canvas to
-verify edit/save/readback; do not count Writing Blocks as Canvas. The mappings
-above are implemented and must not be re-researched without regression evidence.
+Current next: use a genuine owned Canvas to verify edit/save/readback; do not
+count Writing Blocks as Canvas. A physically absent-composer first-send and
+special abnormal-recovery device case remain distinct from the accepted normal
+native first-send/follow-up. Current mappings and the accepted local attachment
+scope are published; do not re-research them or repeat their send without a regression.
 Keep the broad Goal active and distinguish compatibility from live acceptance.

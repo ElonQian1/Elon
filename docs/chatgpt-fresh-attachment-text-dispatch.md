@@ -21,6 +21,9 @@ Evidence: `fresh-attachment-native-1746-20260915-043457-109`.
 
 Context 18 / transaction 30 / input 6 / adapter 410 promotes only that scope by
 default via `__elonChatGptFreshTextPersonalAttachmentsEnabled !== false`.
+Default release **1.1.1747** was published and installed; its read-only native
+readiness/login/idle check passed with zero additional sends. The scoped default
+and existing recovery regression passed 617 Node tests with no failures/skips.
 Unverified scopes below retain the accepted sender. Explicit opt-out disables
 this default; it does not disable uploads. An uncertain dispatched write still
 cannot be replayed. Readiness and dispatch share the same scope rules.
