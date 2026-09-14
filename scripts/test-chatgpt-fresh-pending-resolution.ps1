@@ -70,7 +70,28 @@ foreach ($field in @('streaming','dictation_active')) {
 }
 $trial.pending=$true; Assert (!(Test-FreshPendingReadOnlyIdle $web $main $trial)) 'pending_writer'
 $trial.pending=$false; $web.input.text='draft'; Assert (!(Test-FreshPendingReadOnlyIdle $web $main $trial)) 'user_draft'
+$loaded=[pscustomobject]@{authenticated=$true;adapter_current=$true;bridge_state='ready';streaming=$false;
+    conversation=@{url=('https://chatgpt.com'+$old.path);message_count=2}}
+Assert (Test-FreshPendingLookupReady $loaded $old.path) 'settled_lookup'
+foreach($mutation in @(
+    {param($s) $s.authenticated=$false},
+    {param($s) $s.authenticated=$null},
+    {param($s) $s.adapter_current=$false},
+    {param($s) $s.bridge_state='loading'},
+    {param($s) $s.streaming=$true},
+    {param($s) $s.conversation.message_count=0},
+    {param($s) $s.conversation.url='https://chatgpt.com/c/foreign'})) {
+    $transition=$loaded|ConvertTo-Json|ConvertFrom-Json
+    & $mutation $transition
+    Assert (!(Test-FreshPendingLookupReady $transition $old.path)) 'unsettled_lookup'
+}
+Assert (!(Test-FreshPendingLookupReady $loaded '/c/foreign')) 'invalid_lookup_route'
+$loaded.authenticated=$false
+Assert (!(Test-FreshPendingLookupReady $loaded $old.path)) 'cached_messages_not_live_authority'
+$loaded.authenticated=$true
+Assert (Test-FreshPendingLookupReady $loaded $old.path) 'same_navigation_settles_without_replay'
 $source=Get-Content (Join-Path $PSScriptRoot 'resolve-chatgpt-fresh-pending.ps1') -Raw
+Assert ($source.Contains('param($s) Test-FreshPendingLookupReady $s $expected')) 'navigation_waits_for_current_authenticated_snapshot'
 $wait=$source.IndexOf("-MainState -Description 'native pending lookup route'")
 $inspect=$source.IndexOf('$report.inspected++')
 Assert ($wait -gt 0 -and $inspect -gt $wait) 'native_route_before_inspection'

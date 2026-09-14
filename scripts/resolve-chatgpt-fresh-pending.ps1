@@ -83,6 +83,15 @@ function Test-FreshPendingReadOnlyIdle {
         $Main.social_chat.web_chat_streaming -is [bool] -and !$Main.social_chat.web_chat_streaming
 }
 
+function Test-FreshPendingLookupReady {
+    param($Web, [string]$ExpectedPath)
+    return $ExpectedPath -cmatch '^/c/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' -and
+        $Web.conversation.url -ceq ('https://chatgpt.com' + $ExpectedPath) -and
+        $Web.authenticated -eq $true -and $Web.adapter_current -eq $true -and
+        $Web.bridge_state -ceq 'ready' -and $Web.streaming -eq $false -and
+        $Web.conversation.message_count -gt 0
+}
+
 if ($DefinitionsOnly) { return }
 $r = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1
 $r.mcp_bootstrapped = $true
@@ -123,8 +132,7 @@ try {
         $expected = [string]$candidate.path
         Invoke-ChatGptWebSmokeAction -Runtime $r -Action open_web_chat_conversation -Arguments @{conversation_path=$expected} | Out-Null
         $web = Wait-ChatGptWebSmokeState -Runtime $r -TimeoutSec 15 -Description 'read-only pending fixture lookup' -Predicate {
-            param($s) $s.conversation.url -ceq ('https://chatgpt.com' + $expected) -and
-                $s.streaming -eq $false -and $s.conversation.message_count -gt 0
+            param($s) Test-FreshPendingLookupReady $s $expected
         }
         Wait-ChatGptWebSmokeState -Runtime $r -TimeoutSec 15 -MainState -Description 'native pending lookup route' -Predicate {
             param($s) $s.active_surface -ceq 'social_ai' -and
