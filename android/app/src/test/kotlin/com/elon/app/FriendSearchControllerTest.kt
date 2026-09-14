@@ -44,7 +44,7 @@ class FriendSearchControllerTest {
         f.runScheduled()
         assertEquals(listOf("13900000052"), f.queries)
         f.replies.single()(f.found("usr_outside_first_50"))
-        assertEquals("usr_outside_first_50", f.controller.state.user?.optString("id"))
+        assertEquals("usr_outside_first_50", f.controller.state.users.singleOrNull()?.optString("id"))
         assertFalse(f.controller.state.loading)
     }
 
@@ -66,7 +66,7 @@ class FriendSearchControllerTest {
         f.replies[1](f.found("usr_second"))
         f.replies[0](f.found("usr_first"))
         f.replies[0](Result.failure(IOExceptionForTest()))
-        assertEquals("usr_second", f.controller.state.user?.optString("id"))
+        assertEquals("usr_second", f.controller.state.users.singleOrNull()?.optString("id"))
         assertEquals(1, f.cancellations)
     }
 
@@ -92,14 +92,14 @@ class FriendSearchControllerTest {
         f.controller.update("same name", immediate = true)
         f.replies[0](Result.failure(IllegalStateException("找到多个同名用户，请改用手机号")))
         assertTrue(f.controller.state.message.contains("多个同名用户"))
-        assertNull(f.controller.state.user)
+        assertTrue(f.controller.state.users.isEmpty())
         f.controller.update("13900000052", immediate = true)
         f.replies[1](Result.success(JSONObject().put("found", false)))
         assertTrue(f.controller.state.message.contains("未找到用户"))
         f.controller.update("13900000052", immediate = true)
         f.replies[2](f.found("usr_target"))
         f.controller.markAdded("usr_target")
-        assertTrue(f.controller.state.user!!.optBoolean("already_friend"))
+        assertTrue(f.controller.state.users.single().optBoolean("already_friend"))
     }
 
     @Test
@@ -107,11 +107,46 @@ class FriendSearchControllerTest {
         val f = Fixture()
         f.controller.update("self", immediate = true)
         f.replies[0](f.found("usr_self", self = true))
-        assertTrue(f.controller.state.user!!.optBoolean("is_self"))
+        assertTrue(f.controller.state.users.single().optBoolean("is_self"))
         assertTrue(f.controller.state.message.contains("不能添加自己"))
         f.controller.update("friend", immediate = true)
         f.replies[1](f.found("usr_friend", alreadyFriend = true))
-        assertTrue(f.controller.state.user!!.optBoolean("already_friend"))
+        assertTrue(f.controller.state.users.single().optBoolean("already_friend"))
+    }
+
+    @Test
+    fun sameNamesRemainSeparateAndOnlySelectedIdIsMarkedAdded() {
+        val f = Fixture()
+        f.controller.update("同名用户", immediate = true)
+        f.replies[0](Result.success(JSONObject("""{"results":[
+            {"id":"usr_first","nickname":"同名用户","account_hint":"手机尾号 1111","is_self":true},
+            {"id":"usr_second","nickname":"同名用户","account_hint":"手机尾号 9650"},
+            {"id":"usr_friend","nickname":"同名用户","already_friend":true}
+        ],"has_more":false}""")))
+        assertEquals(3, f.controller.state.users.size)
+        assertTrue(f.controller.state.message.contains("多个同名"))
+        assertEquals("手机尾号 9650", f.controller.state.users[1].optString("account_hint"))
+        f.controller.markAdded("usr_second")
+        assertFalse(f.controller.state.users[0].optBoolean("already_friend"))
+        assertTrue(f.controller.state.users[1].optBoolean("already_friend"))
+        assertTrue(f.controller.state.users[2].optBoolean("already_friend"))
+        f.controller.update("new query", immediate = true)
+        f.controller.markAdded("usr_second")
+        assertTrue(f.controller.state.users.isEmpty())
+    }
+
+    @Test
+    fun candidatesHandleTruncationEmptyAndMalformedResults() {
+        val f = Fixture()
+        listOf(
+            """{"results":[{"id":"usr_one"}],"has_more":true}""" to "完整手机号",
+            """{"results":[]}""" to "未找到用户",
+            """{"results":[{"id":null}]}""" to "搜索结果异常"
+        ).forEachIndexed { index, (body, expected) ->
+            f.controller.update("test query", immediate = true)
+            f.replies[index](Result.success(JSONObject(body)))
+            assertTrue(f.controller.state.message.contains(expected))
+        }
     }
 
     private class IOExceptionForTest : RuntimeException("old network error")

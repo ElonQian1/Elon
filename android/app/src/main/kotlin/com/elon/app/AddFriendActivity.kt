@@ -372,7 +372,7 @@ class AddFriendActivity : AppCompatActivity() {
         val search = if (::friendSearch.isInitialized) friendSearch.state else FriendSearchState()
         val searching = search.query.isNotEmpty()
         recommendationTitle.text = if (searching) "搜索结果" else "推荐"
-        val items = if (searching) listOfNotNull(search.user?.let(::parseRecommendation)) else recommendations
+        val items = if (searching) search.users.map(::parseRecommendation) else recommendations
         items.forEach { item ->
             recommendationList.addView(recommendationRow(item), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -440,7 +440,8 @@ class AddFriendActivity : AppCompatActivity() {
 
     private fun parseRecommendation(json: JSONObject): AddFriendRecommendation {
         val id = json.optString("id", "").trim()
-        val account = json.optString("account", "").trim().ifBlank { id }
+        val account = json.optString("account_hint", "").trim()
+            .ifBlank { json.optString("account", "").trim().ifBlank { id } }
         val phone = json.optString("phone", "").trim().takeIf { it.isNotEmpty() }
         val nickname = json.optString("nickname", "").trim().takeIf { it.isNotEmpty() }
         return AddFriendRecommendation(

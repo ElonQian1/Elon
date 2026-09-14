@@ -6390,7 +6390,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   let projectArchive = null;
   let friends = [];
   let friendRecommendations = [];
-  let friendLookup = { query: '', user: null, message: '' };
+  let friendLookup = { query: '', users: [], message: '' };
   let friendLookupRevision = 0;
   let friendLookupTimer = null;
   let friendLookupAbort = null;
@@ -10632,16 +10632,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     return (friend && (friend.nickname || friend.name || friend.account || friend.phone || friend.id)) || '朋友名称';
   }
   function recommendationAccount(friend) {
-    return (friend && (friend.account || friend.phone || friend.id)) || '';
-  }
-  function recommendationMatches(friend, query) {
-    if (!query) return true;
-    return [
-      recommendationName(friend),
-      recommendationAccount(friend),
-      friend && friend.phone,
-      friend && friend.id
-    ].some((value) => String(value || '').toLowerCase().includes(query));
+    return (friend && (friend.account_hint || friend.account || friend.phone || friend.id)) || '';
   }
   function mutualFriendsIconSvg() {
     return '<svg viewBox="0 0 34 24" aria-hidden="true"><path fill="currentColor" d="M12 12a5 5 0 1 0 0-10a5 5 0 0 0 0 10Zm10-1a4 4 0 1 0 0-8a4 4 0 0 0 0 8ZM2 22c.8-4.8 4.5-7.5 10-7.5s9.2 2.7 10 7.5H2Zm17.5-7.2c3.7.5 6.2 2.8 6.9 7.2H32c-.6-4.2-3.7-6.6-8.3-6.6c-1.5 0-2.9.2-4.2.7Z"/></svg>';
@@ -10649,7 +10640,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   function renderAddFriendRecommendations() {
     const searching = !!friendLookup.query;
     friendRecommendationTitle.textContent = searching ? '搜索结果' : '推荐';
-    const items = searching ? (friendLookup.user ? [friendLookup.user] : []) : friendRecommendations;
+    const items = searching ? friendLookup.users : friendRecommendations;
     friendRecommendationList.innerHTML = items.map((item) => {
       const id = escapeHtml(item.id || '');
       const name = escapeHtml(recommendationName(item));
@@ -10691,7 +10682,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     cancelFriendLookup();
     const revision = friendLookupRevision;
     const query = friendSearchInput.value.trim();
-    friendLookup = { query, user: null, message: query ? '正在搜索...' : '' };
+    friendLookup = { query, users: [], message: query ? '正在搜索...' : '' };
     if (query.length < 2) {
       if (query) friendLookup.message = '请输入完整手机号、账号或至少两个字的昵称';
       renderAddFriendRecommendations();
@@ -10702,16 +10693,18 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       const controller = new AbortController();
       friendLookupAbort = controller;
       try {
-        const res = await api('/api/me/friends/search?search_type=auto&query=' + encodeURIComponent(query), { signal: controller.signal });
+        const res = await api('/api/me/friends/search?search_type=auto&include_candidates=true&query=' + encodeURIComponent(query), { signal: controller.signal });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || '搜索失败，请重试');
         if (revision !== friendLookupRevision) return;
-        if (!data.found) friendLookup.message = '未找到用户，请核对完整手机号或账号';
-        else if (!data.user || !data.user.id) friendLookup.message = '搜索结果异常，请重试';
-        else {
-          friendLookup.user = Object.assign({}, data.user, { already_friend: !!data.already_friend, is_self: !!data.is_self });
-          friendLookup.message = data.is_self ? '这是你自己的账号，不能添加自己' : '';
-        }
+        const users = Array.isArray(data.results) ? data.results : !data.found ? []
+          : [Object.assign({}, data.user, { already_friend: !!data.already_friend, is_self: !!data.is_self })];
+        if (users.some((item) => !item || typeof item.id !== 'string' || !item.id.trim())) throw new Error('搜索结果异常，请重试');
+        friendLookup.users = [...new Map(users.map((item) => [item.id, item])).values()];
+        friendLookup.message = !users.length ? '未找到用户，请核对完整手机号或账号'
+          : data.has_more ? '同名用户较多，仅显示前20位，请用完整手机号或账号精确查找'
+          : users.length > 1 ? '找到多个同名用户，请核对头像和账号信息后添加'
+          : users[0].is_self ? '这是你自己的账号，不能添加自己' : '';
       } catch (err) {
         if (revision !== friendLookupRevision) return;
         friendLookup.message = err.message || '搜索失败，请检查网络后重试';
@@ -10744,7 +10737,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   }
   function openAddFriendDialog() {
     cancelFriendLookup();
-    friendLookup = { query: '', user: null, message: '' };
+    friendLookup = { query: '', users: [], message: '' };
     addFriendResult.textContent = '';
     friendSearchInput.value = '';
     friendRecommendations = [];
@@ -10847,8 +10840,9 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     const btn = e.target.closest('[data-add-friend-id]');
     if (!btn || btn.disabled) return;
     const userId = btn.getAttribute('data-add-friend-id') || '';
-    const target = friendLookup.query ? friendLookup.user : friendRecommendations.find((item) => item.id === userId);
-    if (!target || target.id !== userId || target.is_self) return;
+    const target = (friendLookup.query ? friendLookup.users : friendRecommendations).find((item) => item.id === userId);
+    if (!target || target.is_self || target.already_friend) return;
+    const revision = friendLookupRevision;
     btn.disabled = true;
     addFriendResult.textContent = '正在添加...';
     addFriendResult.style.color = 'var(--ink-faint)';
@@ -10866,13 +10860,15 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       friendRecommendations = friendRecommendations.map((item) => (
         item.id === userId ? Object.assign({}, item, { already_friend: true }) : item
       ));
-      if (friendLookup.user && friendLookup.user.id === userId) friendLookup.user.already_friend = true;
+      friendLookup.users.forEach((item) => { if (item.id === userId) item.already_friend = true; });
+      if (revision !== friendLookupRevision) return;
       renderAddFriendRecommendations();
       addFriendResult.textContent = data.already_friend
         ? `已经是好友：${recommendationName(target)}`
         : `已添加好友：${recommendationName(target)}`;
       addFriendResult.style.color = 'var(--accent)';
     } catch (err) {
+      if (revision !== friendLookupRevision) return;
       addFriendResult.textContent = (err && err.message) ? err.message : '添加失败';
       addFriendResult.style.color = '#F07884';
       btn.disabled = false;

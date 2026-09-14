@@ -14,7 +14,7 @@ import org.json.JSONObject
 internal data class FriendSearchState(
     val query: String = "",
     val loading: Boolean = false,
-    val user: JSONObject? = null,
+    val users: List<JSONObject> = emptyList(),
     val message: String = ""
 )
 
@@ -61,11 +61,9 @@ internal class FriendSearchController(
     }
 
     fun markAdded(userId: String) {
-        val user = state.user ?: return
-        if (user.optString("id") == userId) {
-            user.put("already_friend", true)
-            emit(state)
-        }
+        val user = state.users.find { it.optString("id") == userId } ?: return
+        user.put("already_friend", true)
+        emit(state)
     }
 
     fun close() {
@@ -87,16 +85,33 @@ internal class FriendSearchController(
     }
 
     private fun decode(query: String, data: JSONObject): FriendSearchState {
+        val candidates = data.optJSONArray("results")
+        if (candidates != null) {
+            val users = List(candidates.length()) { candidates.optJSONObject(it) }
+            if (users.any { it == null || it.isNull("id") || it.optString("id").isBlank() }) {
+                return FriendSearchState(query, message = "搜索结果异常，请重试")
+            }
+            val validUsers = users.filterNotNull().distinctBy { it.optString("id") }
+            val message = when {
+                validUsers.isEmpty() -> "未找到用户，请核对完整手机号或账号"
+                data.optBoolean("has_more") -> "同名用户较多，仅显示前20位，请用完整手机号或账号精确查找"
+                validUsers.size > 1 -> "找到多个同名用户，请核对头像和账号信息后添加"
+                validUsers.single().optBoolean("is_self") -> "这是你自己的账号，不能添加自己"
+                else -> ""
+            }
+            return FriendSearchState(query, users = validUsers, message = message)
+        }
+        // Older servers return one user; keep that deployment order compatible.
         if (!data.optBoolean("found")) {
             return FriendSearchState(query, message = "未找到用户，请核对完整手机号或账号")
         }
         val user = data.optJSONObject("user")
-        if (user == null || user.optString("id").isBlank()) {
+        if (user == null || user.isNull("id") || user.optString("id").isBlank()) {
             return FriendSearchState(query, message = "搜索结果异常，请重试")
         }
         val isSelf = data.optBoolean("is_self")
         user.put("is_self", isSelf).put("already_friend", data.optBoolean("already_friend"))
-        return FriendSearchState(query, user = user, message = if (isSelf) "这是你自己的账号，不能添加自己" else "")
+        return FriendSearchState(query, users = listOf(user), message = if (isSelf) "这是你自己的账号，不能添加自己" else "")
     }
 }
 
@@ -108,6 +123,7 @@ internal fun friendSearchLookup(
 ): (String, (Result<JSONObject>) -> Unit) -> (() -> Unit) = { query, complete ->
     val url = (serverUrl().trimEnd('/') + "/api/me/friends/search").toHttpUrl().newBuilder()
         .addQueryParameter("search_type", "auto")
+        .addQueryParameter("include_candidates", "true")
         .addQueryParameter("query", query)
         .build()
     val call = http.newCall(AuthManager.applyAuth(context, Request.Builder().url(url).get()).build())
