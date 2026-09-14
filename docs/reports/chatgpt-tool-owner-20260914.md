@@ -39,9 +39,34 @@ stale assertion was corrected, not the runtime behavior.
 The external semantic inspector now reports only bounded tool-control booleans
 and dimensions, never message text or credentials.
 
+## Release And Follow-up
+
+`tool-owner-release-20260914-202227-515` built, published and installed 1733
+(adapter 397), source `ce03609eb`, SHA-256
+`c4b752516e75a44432b7e297a1fcb2170860510f3f8fb379477fe4ec0d4ca21c`.
+The post-install production session was authenticated, idle and adapter-current.
+`fresh-image-1733-native-20260914-203403-630` then stopped before sending:
+the official trigger disappeared during navigation, producing `composer_detached`.
+The route and awake lease were restored; no pending write was created.
+
+Context v6 reuses the existing bounded committed-composer locator when the
+trigger is absent. The runtime-profile owner must be unique, committed to the
+current root, and share the current conversation/controller/stores. Restoring
+the same trigger does not invalidate an otherwise unchanged tool binding.
+This is a page-local official state command, not a new HTTP tool-selection API;
+it does not manufacture eligibility or bypass authentication. General native
+text-owner selection retains its prior behavior and limits.
+
+`tool-memory-owner-final-20260914-204044-626`: 322 tests passed, zero skipped.
+New tests cover an absent editor and trigger, same-owner DOM remount, duplicate
+profiled owners, and identity/route/model/profile/root/controller/permission drift.
+No writer or DOM fallback runs when an owned selection becomes stale.
+Versions: committed-owner locator 2, text-runtime capture 22, tool context 6,
+private tool selector 4, adapter 398.
+
 ## Remaining
 
-Release/device verification of context v5 and one actual independent Image send
+Release/device verification of context v6 and one actual independent Image send
 are pending. No Image default or completed marker is enabled from unit tests,
 menu admission, UI inspection or a pre-dispatch failure. Preserve the existing
 fixture ledger and reconcile uncertain writes read-only; do not repeat Search.

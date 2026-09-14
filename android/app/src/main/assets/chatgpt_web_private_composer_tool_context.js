@@ -1,7 +1,7 @@
 (function (root, capture) {
   'use strict';
   const observations = new WeakMap();
-  const api = Object.freeze({ version: 5,
+  const api = Object.freeze({ version: 6,
     capture(page, tools) {
       let items = [];
       const record = code => {
@@ -32,16 +32,18 @@
   const ownerPath = page.__elonChatGptCommittedOwnerPath ||
     (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path') : null);
   // The menu trigger can replace the DOM id while retaining the official test id.
-  const node = page.document.querySelector('#composer-plus-btn') ||
+  const trigger = page.document.querySelector('#composer-plus-btn') ||
     page.document.querySelector('[data-testid="composer-plus-btn"]');
   if (!spec) return unavailable('runtime_unavailable');
-  if (!node?.isConnected) return unavailable('composer_detached');
+  const node = trigger?.isConnected ? trigger : null;
   // Bind the tool and conversation to one committed host. The text editor may
   // be unmounted or replaced without invalidating this owner's tool state.
-  const context = page.__elonChatGptPrivateTextRuntimeSubmit?.captureConversation?.(node, true);
-  if (!context) return unavailable('conversation_unavailable');
-  const key = Object.keys(node).find(name => name.startsWith('__reactFiber$'));
-  const owners = ownerPath?.resolve(node[key])?.ancestors?.filter(fiber => fiber.type?.name === spec.owner) || [];
+  const context = page.__elonChatGptPrivateTextRuntimeSubmit?.captureConversation?.(node, true, true,
+    fiber => fiber.type?.name === spec.owner);
+  if (!context) return unavailable(node ? 'conversation_unavailable' : 'composer_detached');
+  const key = node && Object.keys(node).find(name => name.startsWith('__reactFiber$'));
+  const anchor = node ? node[key] : context.fiber;
+  const owners = ownerPath?.resolve(anchor)?.ancestors?.filter(fiber => fiber.type?.name === spec.owner) || [];
   if (owners.length !== 1) return unavailable('owner_unavailable');
   const owner = owners[0], props = owner.memoizedProps;
   if (props?.conversation !== context.conversation || props.composerController !== context.controller ||

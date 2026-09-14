@@ -99,7 +99,7 @@
     function current(binding) {
       try {
         const now = capture();
-        return !!now && Object.keys(binding).every(key => binding[key] === now[key]);
+        return !!now && Object.keys(binding).filter(key => key !== 'node').every(key => binding[key] === now[key]);
       } catch (_) { return false; }
     }
 
@@ -163,7 +163,7 @@
         if (namespaceDocument !== page.document || namespaceToken !== page.__elonChatGptDocumentToken) namespace = null;
         binding = capture();
         if (!binding || !loaded() || !namespace && Date.now() < cooldown ||
-            binding.node.getAttribute('aria-expanded') === 'true') return false;
+            binding.node?.getAttribute('aria-expanded') === 'true') return false;
       } catch (_) { return false; }
       const request = { binding, result };
       pending = request;
@@ -228,7 +228,7 @@
       return owned;
     }
 
-    return Object.freeze({ version: 3, requestPrivateOptions, selectPrivate, dismissPrivateOptions });
+    return Object.freeze({ version: 4, requestPrivateOptions, selectPrivate, dismissPrivateOptions });
   }
 
   let privateRuntime;

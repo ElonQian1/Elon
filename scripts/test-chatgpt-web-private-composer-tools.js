@@ -163,6 +163,67 @@ function fixture(options = {}) {
     get imports() { return imports; }, get fallbacks() { return fallbacks; }, get snapshots() { return snapshots; } };
 }
 
+function memoryToolFixture() {
+  const f = fixture({ current: true });
+  f.page.document.body = { children: [] };
+  f.page.document.__reactContainer$fixture = f.top;
+  f.top.stateNode.containerInfo = f.page.document;
+  f.top.return = null;
+  f.ancestor.dependencies = f.host.dependencies;
+  f.host.dependencies = null;
+  f.node.isConnected = false;
+  f.page.document.querySelector = () => null;
+  return f;
+}
+
+test('a committed tool owner remains usable with no editor or tool-button DOM', async () => {
+  const f = memoryToolFixture();
+  assert.equal(f.list(), true); await flush();
+  assert.equal(toolContext.state(f.page), 'ready');
+  f.pick(f.choice('image_generation').id);
+  assert.equal(f.state.activeSystemHintType, 'picture_v2');
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.fallbacks, 0);
+  assert.equal(f.timers.size, 0);
+});
+
+test('mounting the same owned tool trigger does not invalidate a private menu selection', async () => {
+  const f = memoryToolFixture();
+  assert.equal(f.list(), true); await flush();
+  const id = f.choice('image_generation').id;
+  f.node.isConnected = true;
+  f.page.document.querySelector = selector => selector === '#composer-plus-btn' ? f.node : null;
+  f.pick(id);
+  assert.equal(f.results.at(-1)[1], true);
+  assert.equal(f.state.activeSystemHintType, 'picture_v2');
+  assert.equal(f.calls.length, 1);
+});
+
+test('DOM-free tool admission rejects duplicate profiled owners even with shared stores', () => {
+  const f = memoryToolFixture();
+  f.ancestor.sibling = { ...f.ancestor, child: null };
+  assert.equal(f.list(), false);
+  assert.equal(f.calls.length, 0);
+});
+
+for (const [reason, change] of Object.entries({
+  route: f => { f.page.location.href = 'https://chatgpt.com/'; },
+  identity: f => { f.account = 'Bearer other-synthetic-account'; },
+  model: f => { f.props.currentModelId = 'other-model'; },
+  profile: f => { f.ancestor.type = { name: 'unrecognized' }; },
+  root: f => { f.top.stateNode.current = {}; },
+  controller: f => { f.props.composerController = { conversation: f.conversation }; },
+  permissions: f => { f.menu.availableSystemHints = []; }
+})) test('DOM-free tool selection rejects changed ' + reason + ' without another writer', async () => {
+  const f = memoryToolFixture();
+  assert.equal(f.list(), true); await flush();
+  const id = f.choice('image_generation').id;
+  change(f); f.pick(id);
+  assert.equal(f.results.at(-1)[1], false);
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.fallbacks, 0);
+});
+
 test('search and image selection use the existing official signal without autofocus or DOM polling', async () => {
   const f = fixture();
   assert.equal(f.list(), true); await flush();

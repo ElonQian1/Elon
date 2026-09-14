@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 21, create: factory });
+  const exported = Object.freeze({ version: 22, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -112,7 +112,7 @@
       Array.from(page.document.querySelectorAll('link[rel="modulepreload"]')).some(node => node.href === RUNTIME_URL);
   }
 
-  function captureConversation(node, allowGuest = false, allowMemory = false) {
+  function captureConversation(node, allowGuest = false, allowMemory = false, acceptsFiber) {
     if (!node?.isConnected && !allowMemory) return unavailable('composer_detached');
     if (!loaded()) return unavailable('runtime_not_observed');
     const token = page.__elonChatGptDocumentToken, account = identity(allowGuest), currentRoute = route();
@@ -120,7 +120,7 @@
     if (account === null) return unavailable('identity_unavailable');
     if (!currentRoute) return unavailable('route_unsupported');
     const context = node?.isConnected ? stores(node) :
-      memoryOwners?.locate(conversation => matchesRoute(conversation, currentRoute, null));
+      memoryOwners?.locate(conversation => matchesRoute(conversation, currentRoute, null), acceptsFiber);
     if (!context) return null;
     const props = context.shared.getSharedProps();
     const conversation = props?.conversation, controller = props?.composerController;
@@ -360,5 +360,5 @@
       if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
     }
   } catch (_) {}
-  return Object.freeze({ version: 21, submit, captureConversation, capturePrivateConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 22, submit, captureConversation, capturePrivateConversation, state: () => ({ pending: active !== null }) });
 });

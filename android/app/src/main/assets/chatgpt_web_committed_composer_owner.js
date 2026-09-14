@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptCommittedComposerOwner = api;
 })(typeof window === 'object' ? window : null, function (page, readStores, ownerPath) {
@@ -53,7 +53,7 @@
     return result;
   }
 
-  function locate(matches) {
+  function locate(matches, acceptsFiber) {
     try {
       const currentRoots = roots();
       if (!currentRoots) { cache = null; return null; }
@@ -61,6 +61,7 @@
       if (!found) { cache = null; return null; }
       let selected = null;
       for (const fiber of found) {
+        if (acceptsFiber && !acceptsFiber(fiber)) continue;
         const props = fiber.memoizedProps;
         if (!matches(props.conversation)) continue;
         const path = ownerPath?.resolve(fiber);
@@ -70,14 +71,14 @@
         const context = readStores(path.ancestors), live = context?.shared.getSharedProps();
         if (!context || live?.conversation !== props.conversation ||
             live.composerController !== props.composerController) return null;
-        if (selected && ['shared', 'files'].some(key => selected[key] !== context[key])) return null;
+        if (selected && (acceptsFiber || ['shared', 'files'].some(key => selected[key] !== context[key]))) return null;
         selected = { ...context, fiber, conversation: props.conversation, controller: props.composerController };
       }
       if (!selected || !sameRoots(currentRoots, roots())) return null;
       const document = page.document;
       return { ...selected, current: () => {
         if (document !== page.document) return false;
-        const next = locate(matches);
+        const next = locate(matches, acceptsFiber);
         return next !== null && ['shared', 'files', 'conversation', 'controller'].every(key => next[key] === selected[key]);
       } };
     } catch (_) { cache = null; return null; }
