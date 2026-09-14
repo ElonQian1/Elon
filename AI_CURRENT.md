@@ -8,7 +8,7 @@ reviewed_at: 2026-09-05
 
 ## 当前产品主链
 
-- [Writing Blocks：1723 已验收](docs/chatgpt-writing-blocks-native.md)
+- [Web AI 当前批次](docs/reports/chatgpt-runtime-bindings-20260915.md)
 
 - 网格UI归量化；[欧易历史分页](docs/delivery/android-okx-history-20260914.md)主1714已发，25项测试通过，实际账号/装机待验；[重建接续](docs/delivery/android-binance-command-handoff-20260913.md)实机待验。
 

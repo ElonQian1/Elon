@@ -457,6 +457,8 @@ test('the owned v1 decoder binds the first server id before publishing native te
 
 async function integration(project = false, settings = {}) {
   const f = newFixture(project), counts = { prepare: 0, posts: 0, apply: 0, stopped: 0, renders: 0 };
+  const native = settings.withoutComposer ? require('./fixtures/chatgpt-private-text-input').fixture(f) : null;
+  if (native) { f.props.isNewThread = true; native.draft(''); }
   const page = f.page; let draft = '', sequence = 0;
   const tool = settings.tool || null;
   f.hints.activeSystemHintType = tool;
@@ -550,14 +552,44 @@ async function integration(project = false, settings = {}) {
     };
   }
   const api = transactionModule.create(page, { context: f.api, reconcileTimeoutMs: 1000 });
-  const command = { requestId: 'mcp_1', prompt: 'Synthetic first turn', expectedDraft: '', composer: f.node,
-    readDraft: () => draft, onDispatch() {}, onSettled() {} };
+  if (native) {
+    native.api.snapshot(null);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(native.api.snapshot(null).ready, true, 'native input uses the same default admission as send');
+  }
+  const command = { requestId: 'mcp_1', prompt: 'Synthetic first turn', expectedDraft: '', composer: native ? null : f.node,
+    readDraft: () => native ? native.draft() : draft, onDispatch() {}, onSettled() {} };
   const sent = api.send(command); assert.equal((await sent.completion).status, 'accepted');
-  return { f, api, counts, session, sent, command, release, setDraft: value => { draft = value; } };
+  return { f, api, counts, session, sent, command, release, native,
+    setDraft: value => { if (native) native.draft(value); else draft = value; } };
 }
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 5));
 async function settled(api) { for (let i = 0; i < 80 && api.state().pending; i++) await tick(); }
+
+test('unmounted first-send uses the real committed owner and independent stream by default', async () => {
+  const r = await integration(false, { withoutComposer: true, acceptedDefault: true, injectedParents: 'paginated' });
+  await settled(r.api);
+  assert.equal(r.command.composer, null);
+  assert.equal(r.native.view.dom.isConnected, false);
+  assert.equal(r.api.state().pending, false);
+  assert.deepEqual([r.counts.prepare, r.counts.posts, r.counts.apply, r.f.binds, r.f.navigations], [1, 1, 1, 1, 1]);
+  assert.equal(r.session.current('/c/' + CID).text, 'Synthetic answer');
+  const next = r.api.send({ ...r.command, requestId: 'mcp_2', prompt: 'Synthetic follow up' });
+  assert.equal((await next.completion).status, 'accepted');
+  await settled(r.api);
+  assert.equal(r.counts.posts, 2); assert.equal(r.f.nodes[UID2].parent, AID);
+  r.api.dispose();
+});
+
+test('unmounted first-send with a lost response retains its writer and never replays', async () => {
+  const r = await integration(false, { withoutComposer: true, acceptedDefault: true, lostBeforeId: true });
+  await tick(); await tick();
+  assert.equal(r.counts.posts, 1); assert.equal(r.api.state().pending, true);
+  assert.equal((await r.api.send({ ...r.command, requestId: 'mcp_2' }).completion).code, 'busy');
+  assert.equal(r.sent.claimFallback(), false);
+  r.f.page.document = {}; r.api.state(); r.api.dispose();
+});
 
 test('the first owned server event navigates before later stream events can retire the home owner', async () => {
   for (const project of [false, true]) {

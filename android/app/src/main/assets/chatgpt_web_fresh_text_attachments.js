@@ -60,9 +60,10 @@
   }
   function serialize(prompt, context) {
     if (!current()) throw Error('context_changed');
-    // Reviewed Ypt/nhr is the ready-file serializer, not submitComposer. It
-    // reads model capabilities and returns content/metadata without dispatch.
-    const raw = runtime.textSerializeAttachments(files, prompt, context.model, mode(context), context.tool ?? null);
+    // The sixth argument is an editor's active library context. It is not part
+    // of this native ready-file lease; Sep 15 can append it as an extra file.
+    // Keep it absent so the serializer cannot silently add unselected content.
+    const raw = runtime.textSerializeAttachments(files, prompt, context.model, mode(context), context.tool ?? null, undefined);
     if (!raw || !Array.isArray(raw.attachments) || raw.attachments.length > files.length) return fail();
     const result = copy({ content: raw.content, attachments: raw.attachments });
     const represented = new Set();

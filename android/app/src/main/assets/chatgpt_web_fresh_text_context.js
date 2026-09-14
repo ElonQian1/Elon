@@ -1,11 +1,11 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 15, create: factory });
+  const api = Object.freeze({ version: 16, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
   'use strict';
-  const PROFILE = 'web_20260912';
+  const PROFILES = ['web_20260912', 'web_20260915'];
   const fail = (code, admissionStage) => { throw Object.assign(Error(code), { admissionStage }); };
   const idPattern = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
   const projectPattern = /^g-p-[a-f0-9]{32}$/i;
@@ -15,7 +15,7 @@
   function stamp() {
     try {
       const bindings = page.__elonChatGptPrivateRuntimeBindings;
-      if (bindings?.state?.().profile_id !== PROFILE) return null;
+      if (!PROFILES.includes(bindings?.state?.().profile_id)) return null;
       const shared = bindings.peek('shared');
       const account = page.__elonChatGptPrivateModelContract?.create(page).withRuntimeIdentity({}, shared)?.account;
       return account ? JSON.stringify([page.__elonChatGptDocumentToken, page.location.href, account]) : null;
@@ -24,7 +24,8 @@
 
   async function capture(composer, stoppedParent, options = {}) {
     const bindings = page.__elonChatGptPrivateRuntimeBindings;
-    if (bindings?.state?.().profile_id !== PROFILE) fail('runtime_unavailable');
+    const profile = bindings?.state?.().profile_id;
+    if (!PROFILES.includes(profile)) fail('runtime_unavailable');
     const token = page.__elonChatGptDocumentToken, href = page.location.href, document = page.document;
     const url = new URL(href);
     const temporary = url.pathname === '/' && url.search === '?temporary-chat=true';
@@ -239,7 +240,7 @@
         ownershipStage = 'document'; if (document !== page.document) return false;
         ownershipStage = 'document_token'; if (token !== page.__elonChatGptDocumentToken) return false;
         ownershipStage = 'route'; if (!ownedRoute()) return false;
-        ownershipStage = 'runtime'; if (bindings.state().profile_id !== PROFILE) return false;
+        ownershipStage = 'runtime'; if (bindings.state().profile_id !== profile) return false;
         ownershipStage = 'account'; if (account() !== ownerAccount) return false;
         ownershipStage = 'registry'; if (!registeredOwner()) return false;
         ownershipStage = 'history_scope';

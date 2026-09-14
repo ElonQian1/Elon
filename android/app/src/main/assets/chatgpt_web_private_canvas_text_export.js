@@ -28,6 +28,11 @@
   const PROFILE = 'web_20260912', MARKERS = Object.freeze(['contentReference', 'hiveTranscript']);
   const MODULES = Object.freeze(['conversation-small-h1dtzoris1y9588z.js', 'e5d54aa7-o5mtxxnk4j8zox9y.js',
     '1c4de3ec-ix5n1yyu8whxeib8.js', '6afb0137-dqge0sx8jli56ai8.js']);
+  const profiles = Object.freeze({
+    [PROFILE]: { modules: MODULES, init: 'IAn', namespace: 'LAn' },
+    web_20260915: { modules: ['conversation-small-c89mq7wpr5yt4chy.js', 'e5d54aa7-hupdur95y35b5iac.js',
+      '1c4de3ec-n5z38kp7mdcow2vj.js', '6afb0137-g283lmq2pqmv3jkl.js'], init: 'BMn', namespace: 'VMn' }
+  });
   const fail = code => { throw Error('download_' + code); };
 
   function describe(type, format) {
@@ -44,7 +49,7 @@
   }
 
   function create(page, options = {}) {
-    let loaded;
+    let loaded, loadedProfile;
     const profile = () => page.__elonChatGptPrivateRuntimeBindings?.state?.().profile_id;
     const load = options.loadRuntime || (url => import(url));
     function bounded(work) {
@@ -53,20 +58,22 @@
         new Promise((_, reject) => { timer = page.setTimeout(() => reject(Error('download_transfer_timeout')), options.timeoutMs || 1500); })
       ]).finally(() => page.clearTimeout(timer));
     }
-    function plugins() {
-      if (loaded) return loaded;
-      const attempt = bounded(Promise.all(MODULES.map(file =>
+    function plugins(ownerProfile, configuration, currentProfile) {
+      if (!currentProfile()) fail('source_unsupported');
+      if (loaded && loadedProfile === ownerProfile) return loaded;
+      const attempt = bounded(Promise.all(configuration.modules.map(file =>
         Promise.resolve().then(() => load('https://chatgpt.com/cdn/assets/' + file))))).then(([unified, remark, strip, hive]) => {
-        if (profile() !== PROFILE || typeof unified.IAn !== 'function' || typeof remark.n !== 'function' ||
+        if (!currentProfile() || typeof unified[configuration.init] !== 'function' || typeof remark.n !== 'function' ||
             typeof strip.t !== 'function' || typeof hive.i !== 'function') fail('source_unsupported');
-        unified.IAn(); remark.n(); strip.t(); hive.i();
-        const value = { unified: unified.LAn?.unified, remark: remark.r?.CANVAS_REMARK_PLUGINS,
+        unified[configuration.init](); remark.n(); strip.t(); hive.i();
+        const value = { unified: unified[configuration.namespace]?.unified, remark: remark.r?.CANVAS_REMARK_PLUGINS,
           strip: strip.r?.stripDirectivePlugin, hive: hive.r?.hiveLogDirectivePlugin };
         if (typeof value.unified !== 'function' || !Array.isArray(value.remark) ||
             typeof value.strip !== 'function' || typeof value.hive !== 'function') fail('source_unsupported');
         return value;
       });
       loaded = attempt;
+      loadedProfile = ownerProfile;
       attempt.catch(() => { if (loaded === attempt) loaded = null; });
       return attempt;
     }
@@ -76,19 +83,21 @@
       page.__elonChatGptPrivateCanvasDocumentPolicy.offsets(document.content);
       // The official G preserves plaintext verbatim unless a known directive requires its remark pipeline.
       if (format === 'source' || MARKERS.every(marker => !document.content.includes(marker))) return document.content;
-      if (profile() !== PROFILE) fail('source_unsupported');
-      const value = await plugins();
+      const ownerProfile = profile(), configuration = Object.hasOwn(profiles, ownerProfile) ? profiles[ownerProfile] : null;
+      const currentProfile = () => !!configuration && profile() === ownerProfile;
+      if (!currentProfile()) fail('source_unsupported');
+      const value = await plugins(ownerProfile, configuration, currentProfile);
       check();
-      if (profile() !== PROFILE) fail('source_unsupported');
+      if (!currentProfile()) fail('source_unsupported');
       const pipeline = value.unified();
       pipeline.use(value.hive).use(value.strip, { preserve: undefined }).use(value.remark);
       const result = String(await bounded(Promise.resolve().then(() => pipeline.process(document.content)))).trim();
       check();
-      if (profile() !== PROFILE) fail('source_unsupported');
+      if (!currentProfile()) fail('source_unsupported');
       page.__elonChatGptPrivateCanvasDocumentPolicy.offsets(result);
       return result;
     }
     return Object.freeze({ serialize });
   }
-  return Object.freeze({ version: 1, sourceTypes, describe, validFile, create });
+  return Object.freeze({ version: 2, sourceTypes, describe, validFile, create });
 });

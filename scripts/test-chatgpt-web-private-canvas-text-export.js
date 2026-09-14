@@ -13,7 +13,8 @@ function runtime(options = {}) {
     await options.process?.(); return { toString: () => options.result ?? '  converted\n' };
   } };
   const modules = [
-    { IAn: () => inits.push('unified'), LAn: { unified: () => pipeline } },
+    options.profile === 'web_20260915' ? { BMn: () => inits.push('unified'), VMn: { unified: () => pipeline } } :
+      { IAn: () => inits.push('unified'), LAn: { unified: () => pipeline } },
     { n: () => inits.push('remark'), r: { CANVAS_REMARK_PLUGINS: plugins.remark } },
     { t: () => inits.push('strip'), r: { stripDirectivePlugin: plugins.strip } },
     { i: () => inits.push('hive'), r: { hiveLogDirectivePlugin: plugins.hive } }
@@ -58,6 +59,32 @@ test('known Markdown directives use the exact ordered official pipeline, cached 
   assert.ok(r.loaded.every(url => url.startsWith('https://chatgpt.com/cdn/assets/')));
   assert.deepEqual(r.calls, [...Array(2)].flatMap(() => [[r.plugins.hive], [r.plugins.strip, { preserve: undefined }], [r.plugins.remark]]));
   assert.deepEqual(Buffer.concat(f.stored), Buffer.from('convertedconverted')); assert.equal(f.exports.length, 0);
+});
+test('Sep 15 marker export imports the matching pipeline and never mixes admitted profiles', async () => {
+  let profile = 'web_20260915';
+  let swap = false;
+  const r = runtime({ profile, process: () => { if (swap) profile = 'web_20260912'; } }), page = { setTimeout, clearTimeout,
+    __elonChatGptPrivateCanvasDocumentPolicy: policy,
+    __elonChatGptPrivateRuntimeBindings: { state: () => ({ profile_id: profile }) } };
+  const serializer = r.factory.create(page), document = { documentType: 'document', content: 'contentReference' };
+  assert.equal(await serializer.serialize(document, 'md', () => {}), 'converted');
+  assert.deepEqual(r.loaded.map(url => url.split('/').pop()), ['conversation-small-c89mq7wpr5yt4chy.js',
+    'e5d54aa7-hupdur95y35b5iac.js', '1c4de3ec-n5z38kp7mdcow2vj.js', '6afb0137-g283lmq2pqmv3jkl.js']);
+  swap = true;
+  await assert.rejects(serializer.serialize(document, 'md', () => {}), /source_unsupported/);
+  assert.equal(r.loaded.length, 4);
+});
+test('unknown cold-start runtime is not cached as permanently unsupported', async () => {
+  let profile = 'unknown';
+  const r = runtime({ profile: 'web_20260915' }), page = { setTimeout, clearTimeout,
+    __elonChatGptPrivateCanvasDocumentPolicy: policy,
+    __elonChatGptPrivateRuntimeBindings: { state: () => ({ profile_id: profile }) } };
+  const serializer = r.factory.create(page), document = { documentType: 'document', content: 'contentReference' };
+  await assert.rejects(serializer.serialize(document, 'md', () => {}), /source_unsupported/);
+  assert.equal(r.loaded.length, 0);
+  profile = 'web_20260915';
+  assert.equal(await serializer.serialize(document, 'md', () => {}), 'converted');
+  assert.equal(r.loaded.length, 4);
 });
 
 for (const mode of ['profile', 'missing', 'timeout', 'identity', 'page', 'version', 'cancel', 'invalid_result']) {

@@ -61,6 +61,34 @@ test('a failed save stays protected after cache GC and clears only after a newer
   f.check(); f.dispose();
   assert.equal(f.listeners.size, 0); assert.throws(f.check, /runtime_unavailable/);
 });
+test('restore failures survive GC and a confirmed later restore clears them', () => {
+  const f = fixture(), variables = { textdocId: ID, versionInt: 4, restoreFromVersionInt: 2 };
+  const error = mutation('error', { variables });
+  f.rows.push(mutation('pending', { variables }));
+  assert.throws(f.check, /web_edit_pending/);
+  f.rows.length = 0;
+  f.emit({ type: 'updated', mutation: error });
+  f.emit({ type: 'removed', mutation: error });
+  assert.throws(f.check, /web_edit_pending/);
+  f.emit({ type: 'updated', mutation: mutation('success', { variables, submittedAt: 1200, data: 4 }) });
+  assert.throws(f.check, /web_edit_pending/);
+  f.emit({ type: 'updated', mutation: mutation('success', { variables, submittedAt: 1300, data: 5 }) });
+  f.check();
+});
+test('a later ordinary save can acknowledge a failed restore on the same base', () => {
+  const f = fixture();
+  f.rows.push(mutation('error', { variables: { textdocId: ID, versionInt: 4, restoreFromVersionInt: 2 } }),
+    mutation('success', { submittedAt: 1100, data: 5 }));
+  f.check();
+});
+for (const variables of [{ versionInt: 4 }, { versionInt: 4, restoreFromVersionInt: 5 },
+  { versionInt: 4, restoreFromVersionInt: 2, lastVersion: 4 }]) {
+  test('unknown or mixed restore version ownership stays closed: ' + JSON.stringify(variables), () => {
+    const f = fixture();
+    f.rows.push(mutation('error', { variables: { textdocId: ID, ...variables } }));
+    assert.throws(f.check, /runtime_unavailable/);
+  });
+}
 for (const fault of ['uncommitted', 'hook_throw', 'bad_hook_result', 'cleanup_error', 'unknown_mutation', 'missing_owner']) {
   test('unknown observer state fails closed and cleans up: ' + fault, () => {
     const f = fixture();

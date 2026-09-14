@@ -1,10 +1,46 @@
 # September 15 Runtime Compatibility Investigation
 
-Status: research and acceptance tooling implemented; new runtime profile is
-**not admitted**. No new APK or successful independent attachment send is claimed.
-Reuse previous accepted Writing Blocks, ordinary text, Search and Image modules.
+Status: implementation and offline verification completed for bindings 29 /
+adapter 407. `web_20260915` is admitted through its exact observed asset set.
+Grouped release/device verification follows; no new device pass is claimed here.
+Reuse [accepted Writing Blocks 1723](../chatgpt-writing-blocks-native.md),
+ordinary text, Search and Image modules.
 
-## Device Boundary
+## Implemented Follow-Up
+
+- All 100 consumed exports are resolved, including the 13 previously ambiguous
+  wrappers. Hash-pinned public AST checks verify actual exports, import edges,
+  account selection, WEB prefix, real React factories and lazy live bindings.
+- New history hydration reads pending-message existence and respects the
+  existing account/conversation/abort/shouldApplyResponse guards. It never
+  resends a missing message. Attachment serialization explicitly omits the
+  sixth active-Library-context argument, so an unrelated mounted file cannot
+  enter the native ready-file selection. Consumed validation methods match.
+- Fresh text, writing context/library, original-image download and writing
+  prewarm accept the same exact profile. An operation cannot mix profiles.
+- New personal plain-text first sends now default to the committed in-memory
+  conversation/controller/draft owner even with no mounted composer element.
+  Login, runtime initialization and actual owner state are still required;
+  this is composer-DOM independent, not page-bootstrap independent.
+- Canvas reuses the existing native editor and single-POST/version-readback
+  save loop. Generation and directive-aware Markdown export use reviewed
+  September 15 modules. Unknown cold-start versions do not poison the export
+  cache; each operation captures its profile and rejects mid-operation changes.
+- Canvas's official restore mutation uses `versionInt`, not save's
+  `lastVersion`, despite sharing the persist queue. The observer now recognizes
+  both proven shapes, retains failures across GC and allows only a later
+  confirmed version to clear them. Unknown/mixed shapes remain blocked.
+- Targeted batch regression passed (771 cases, 4 optional skips), followed by
+  writing/runtime regression. Public-source and Canvas contract checks passed:
+  `runtime-canvas-current-contracts-20260915-025816-108`.
+- Production Canvas mutation acceptance still needs a genuine owned Canvas,
+  not a Writing Block. First send with absent composer and independent
+  attachment dispatch also need device evidence on the new grouped package.
+
+The sections below preserve the pre-implementation investigation and device
+baseline; their candidate lists are historical, not remaining mapping work.
+
+## Previous Device Boundary
 
 Normal APK 1739 / adapter 405 remains installed. Its source is
 `80d4674d12913b6b4b2aff29685bf343aa4fa94c`; Image default source `82cb5027c`
@@ -97,9 +133,8 @@ Reproduce with `CHATGPT_AST_PARSER` set, using the existing analyzer's five
 arguments: old directory, new directory, full baseline fixture, observed anchor,
 output directory. Do not restart browser scraping or resend old fixtures.
 
-Next: review the 13 ambiguous/changed contracts and their dependencies, add an
-exact versioned profile and public-contract tests, then update only consumers
-whose contracts are proven. `FreshTextContext` and `WritingBlockContext` also
-pin `web_20260912`; changing URLs alone will not admit these consumers. Publish
-one grouped APK, then resume the one-send native attachment acceptance. Keep
-the broad Goal active and distinguish source compatibility from live acceptance.
+Next: publish one grouped APK, verify profile selection, then resume native
+first-send and one-send attachment acceptance. Use a genuine owned Canvas to
+verify edit/save/readback; do not count Writing Blocks as Canvas. The mappings
+above are implemented and must not be re-researched without regression evidence.
+Keep the broad Goal active and distinguish compatibility from live acceptance.

@@ -1,12 +1,13 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, hydrate: factory });
+  const api = Object.freeze({ version: 2, hydrate: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptWritingLibraryRead = api;
 })(typeof window === 'object' ? window : null, async function (page, options, source, store, deadline) {
   'use strict';
   const fail = code => { throw Error('writing_' + code); };
   const now = options.now || Date.now, shared = options.shared, id = source.libraryFileId;
+  const profile = options.bindings.state().profile_id;
   function account() { return shared.writingLibraryAccount?.() ?? shared.mq?.(); }
   function scope(value) {
     return value && typeof value.id === 'string' && value.id.trim() === value.id &&
@@ -18,7 +19,7 @@
     if (!options.current()) fail('context_changed');
     if (now() >= deadline) fail('timeout');
     if (new URL(page.location.href).origin !== 'https://chatgpt.com' ||
-        options.bindings.state().profile_id !== 'web_20260912' ||
+        !['web_20260912', 'web_20260915'].includes(profile) || options.bindings.state().profile_id !== profile ||
         options.bindings.peek('shared') !== shared ||
         options.bindings.peek('conversation')?.writingLibrarySessions?.() !== store) fail('runtime_unavailable');
     const value = account();

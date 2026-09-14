@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 26, create: factory });
+  const api = Object.freeze({ version: 27, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -134,9 +134,9 @@
     const allowPersonalSearch = page.__elonChatGptFreshTextToolsEnabled !== false;
     const allowPersonalImage = page.__elonChatGptFreshTextToolsEnabled !== false;
     const allowProjects = page.__elonChatGptFreshTextProjectsEnabled === true || trialArmed();
-    // Only the native first-send path with a bound composer is production-verified.
-    const allowNewConversations = trialArmed() || page.__elonChatGptFreshTextNewConversationsEnabled === true ||
-      page.__elonChatGptFreshTextNewConversationsEnabled !== false && command.composer != null;
+    // The committed conversation and draft own first-send admission, not the
+    // editor DOM. Context capture still rejects missing or ambiguous owners.
+    const allowNewConversations = trialArmed() || page.__elonChatGptFreshTextNewConversationsEnabled !== false;
     const allowTemporary = page.__elonChatGptFreshTextTemporaryEnabled === true || trialArmed();
     const allowAttachments = page.__elonChatGptFreshTextAttachmentsEnabled === true || trialArmed();
     trial = null;
@@ -391,7 +391,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 26, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 27, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

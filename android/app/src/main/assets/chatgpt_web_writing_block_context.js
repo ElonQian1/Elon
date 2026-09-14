@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 7, create: factory });
+  const api = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptWritingBlockContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -18,7 +18,8 @@
         url.username || url.password ||
         !binding.account || !/^doc_[a-z0-9_]{3,80}$/.test(binding.token || '')) fail('context_unavailable');
     const bindings = page.__elonChatGptPrivateRuntimeBindings;
-    if (bindings?.state?.().profile_id !== 'web_20260912') fail('runtime_unavailable');
+    const profile = bindings?.state?.().profile_id;
+    if (!['web_20260912', 'web_20260915'].includes(profile)) fail('runtime_unavailable');
     let timeout;
     const shared = await Promise.race([
       bindings.load('shared'),
@@ -64,7 +65,7 @@
         const value = snapshot();
         return page.document === binding.document && page.location.href === binding.href &&
           page.__elonChatGptDocumentToken === binding.token && identity() === binding.account &&
-          bindings.state().profile_id === 'web_20260912' && selected.serverId$() === binding.id && scopeCurrent() &&
+          bindings.state().profile_id === profile && selected.serverId$() === binding.id && scopeCurrent() &&
           shared.canvasConversations().filter(item => item?.serverId$?.() === binding.id).length === 1 &&
           shared.canvasConversations().includes(selected) && shared.HM.getCurrentLeafId(state()) === leaf &&
           value?.url === url.origin + url.pathname && value.streaming === false && !value.dictationActive &&

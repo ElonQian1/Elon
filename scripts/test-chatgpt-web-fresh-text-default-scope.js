@@ -38,8 +38,8 @@ test('defaults keep extended scopes off and expose separately gated personal Sea
     allowTools: false, allowPersonalSearch: true, allowPersonalImage: true, allowTemporary: false, allowAttachments: false });
 });
 
-test('new-conversation default does not promote the composer-free scope', async () => {
-  assert.equal((await admission({ composer: null })).allowNewConversations, false);
+test('new-conversation default admits committed memory owners without a composer element', async () => {
+  assert.equal((await admission({ composer: null })).allowNewConversations, true);
 });
 
 test('explicit opt-out keeps new-conversation default disabled', async () => {

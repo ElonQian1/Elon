@@ -25,7 +25,7 @@
 
   function accountPolicy(runtime, shared) {
     try {
-      if (runtime?.state?.().profile_id !== 'web_20260912' || runtime.peek?.('shared') !== shared) return null;
+      if (!['web_20260912', 'web_20260915'].includes(runtime?.state?.().profile_id) || runtime.peek?.('shared') !== shared) return null;
       // Current lo/Xt use shared.bK (canonical mq), a pure session-store getter.
       // It is not a React hook and does not need a rendered composer or image.
       const account = shared?.mq?.();
@@ -42,7 +42,7 @@
     let pointer = assets.base, policyCurrent;
     if (assets.watermark) {
       const runtime = root.__elonChatGptPrivateRuntimeBindings;
-      if (runtime?.state?.().profile_id !== 'web_20260912') throw new Error('download_scope_unconfirmed');
+      if (!['web_20260912', 'web_20260915'].includes(runtime?.state?.().profile_id)) throw new Error('download_scope_unconfirmed');
       const shared = runtime.peek?.('shared') || await runtime.load?.('shared');
       if (!current(job)) throw new Error('download_cancelled');
       const policy = accountPolicy(runtime, shared);
@@ -59,5 +59,5 @@
     if (!current(job)) throw new Error('download_cancelled');
   }
 
-  return Object.freeze({ version: 1, target, prepare });
+  return Object.freeze({ version: 2, target, prepare });
 });

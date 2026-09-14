@@ -178,7 +178,8 @@ test('production menu and canonical assets route to native editor rather than sh
   const assets = read(dir + 'chatgptweb/ChatGptWebAdapterAssets.kt');
   for (const name of ['document_policy', 'edit_context', 'document_sharing', 'documents']) assert.match(assets, new RegExp('chatgpt_web_private_canvas_' + name + '\\.js'));
   assert.match(assets, /chatgpt_web_canvas_document_actions\.js/);
-  assert.match(read('android/app/src/main/assets/chatgpt_web_adapter.js'), /__elonChatGptCanvasDocumentActions\?\.handle\(action, command, respond, snapshot, emitEvent\)/);
+  const adapter = read('android/app/src/main/assets/chatgpt_web_adapter.js');
+  assert.match(adapter, /for \(const owner of \[[^\]]*window\.__elonChatGptCanvasDocumentActions[^\]]*\]\)\s*if \(owner\?\.handle\(action, command, respond, snapshot, emitEvent\)\) return;/);
 });
 
 test('history and sharing use the same canonical display channel and explicit mutation confirmation', async () => {

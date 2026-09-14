@@ -1,13 +1,15 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateCanvasGeneration = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
   'use strict';
   options ||= {};
-  const PROFILE = 'web_20260912';
-  const URL = 'https://chatgpt.com/cdn/assets/d3304073-k8khdx5ezvb9oyu8.js';
+  const MODULES = Object.freeze({
+    web_20260912: 'd3304073-k8khdx5ezvb9oyu8.js',
+    web_20260915: 'd3304073-nglhmqv6gfc20nrf.js'
+  });
   const fail = code => { throw Error('canvas_' + code); };
   const policy = page.__elonChatGptPrivateCanvasDocumentPolicy;
 
@@ -31,7 +33,8 @@
 
   async function prepare(binding, document, input, check) {
     const value = command(document, input), bindings = page.__elonChatGptPrivateRuntimeBindings;
-    if (page.__elonChatGptPrivateTextTransactionsEnabled !== true || bindings?.state?.().profile_id !== PROFILE) {
+    const profile = bindings?.state?.().profile_id, file = MODULES[profile];
+    if (page.__elonChatGptPrivateTextTransactionsEnabled !== true || !Object.hasOwn(MODULES, profile)) {
       fail('generation_unavailable');
     }
     if (page.__elonChatGptPrivateTextRuntimeSubmit?.state?.().pending ||
@@ -40,7 +43,7 @@
     const load = options.loadRuntime || (url => import(url));
     const [shared, runtime, generator] = await Promise.all([
       bindings.load('shared'), bindings.load('react'),
-      Promise.race([Promise.resolve().then(() => load(URL)), new Promise((_, reject) => {
+      Promise.race([Promise.resolve().then(() => load('https://chatgpt.com/cdn/assets/' + file)), new Promise((_, reject) => {
         timer = page.setTimeout(() => reject(Error('canvas_runtime_timeout')), options.timeoutMs || 1500);
       })]).finally(() => page.clearTimeout(timer))
     ]);
@@ -61,7 +64,7 @@
     if (typeof leaf !== 'string' || !leaf || !shared.HM.getNode(tree(), leaf)) fail('generation_owner_unavailable');
     function current() {
       check();
-      if (bindings.state().profile_id !== PROFILE || readIdentity() !== account || conversation.serverId$() !== binding.id ||
+      if (bindings.state().profile_id !== profile || readIdentity() !== account || conversation.serverId$() !== binding.id ||
           !shared.canvasConversations().includes(conversation)) fail('context_changed');
     }
     current();

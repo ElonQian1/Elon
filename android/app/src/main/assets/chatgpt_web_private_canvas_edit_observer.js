@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateCanvasEditObserver = api;
 })(typeof window === 'object' ? window : null, function (page, runtime, conversation, client) {
@@ -21,9 +21,20 @@
     const key = mutation?.options?.mutationKey;
     return Array.isArray(key) && key.length === 3 && key[0] === 'canvas' && key[1] === 'textdoc' && key[2] === 'persist';
   };
+  function baseVersion(variables) {
+    if (!variables || typeof variables !== 'object') return undefined;
+    const own = key => Object.prototype.hasOwnProperty.call(variables, key);
+    const valid = value => Number.isSafeInteger(value) && value >= 0;
+    if (own('lastVersion')) return !own('versionInt') && !own('restoreFromVersionInt') &&
+      valid(variables.lastVersion) ? variables.lastVersion : undefined;
+    // The official restore mutation shares the persist queue, but has a distinct payload.
+    return valid(variables.versionInt) && Number.isSafeInteger(variables.restoreFromVersionInt) &&
+      variables.restoreFromVersionInt > 0 && variables.restoreFromVersionInt <= variables.versionInt
+      ? variables.versionInt : undefined;
+  }
   function remember(mutation) {
     if (!isSave(mutation)) return;
-    const state = mutation.state, id = state?.variables?.textdocId, base = state?.variables?.lastVersion;
+    const state = mutation.state, id = state?.variables?.textdocId, base = baseVersion(state?.variables);
     if (typeof id !== 'string') { if (state?.status !== 'idle') uncertain = true; return; }
     if (state.status === 'error') {
       if (!Number.isSafeInteger(base) || !Number.isFinite(state.submittedAt)) { uncertain = true; return; }

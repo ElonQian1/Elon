@@ -4,7 +4,7 @@ const generation = require('../android/app/src/main/assets/chatgpt_web_private_c
 const policy = require('../android/app/src/main/assets/chatgpt_web_private_canvas_document_policy.js');
 const { fixture, ID } = require('./fixtures/chatgpt-web-private-canvas-documents.cjs');
 
-function runtimeFixture() {
+function runtimeFixture(profile = 'web_20260912') {
   let rendering = false, effects = [], unmounts = 0, mounted = 0, denied = false, account = 'synthetic-account';
   let leaf = 'original', invoked = 0, captured, document;
   const conversation = { id: 'conversation', serverId$: () => 'cid' }, rows = [conversation];
@@ -27,7 +27,7 @@ function runtimeFixture() {
     setTimeout, clearTimeout, __elonChatGptPrivateTextTransactionsEnabled: true,
     __elonChatGptPrivateCanvasDocumentPolicy: policy,
     __elonChatGptPrivateModelContract: { create: () => ({ withRuntimeIdentity: () => ({ account }) }) },
-    __elonChatGptPrivateRuntimeBindings: { state: () => ({ profile_id: 'web_20260912' }),
+    __elonChatGptPrivateRuntimeBindings: { state: () => ({ profile_id: profile }),
       load: async role => role === 'shared' ? shared : runtime } };
   const doc = { id: ID, content: 'A\u{1f600}BC', documentVersion: 4, documentType: 'document' };
   const input = { prompt: 'Rewrite synthetic selection', start: 1, end: 3 };
@@ -67,6 +67,16 @@ test('real hook contract receives original UTF-16 selection, version and explici
 test('whole-document edit omits selection metadata, never invents a range', async () => {
   const f = runtimeFixture(), ready = await f.prepare({ start: 3, end: 3 }); await ready.invoke(() => {});
   assert.equal(f.captured().value.sourceRange, undefined); assert.equal(f.captured().value.selectionMetadata, undefined);
+});
+test('Sep 15 Canvas generation uses the current module once and refuses a profile swap', async () => {
+  const f = runtimeFixture('web_20260915'), urls = [];
+  const service = generation.create(f.page, { loadRuntime: async url => { urls.push(url); return f.module; } });
+  const ready = await service.prepare({ id: 'cid' }, f.doc, f.input, () => {});
+  assert.deepEqual(urls, ['https://chatgpt.com/cdn/assets/d3304073-nglhmqv6gfc20nrf.js']);
+  await ready.invoke(() => {}); f.reply(); assert.equal(ready.settled(), true);
+  f.page.__elonChatGptPrivateRuntimeBindings.state = () => ({ profile_id: 'web_20260912' });
+  assert.throws(ready.validate, /context_changed/);
+  assert.equal(f.counts().invoked, 1);
 });
 
 test('accept-comment command derives immutable original text and UTF-16 anchor, not caller prompt', async () => {

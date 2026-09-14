@@ -1,5 +1,10 @@
 # Original Canvas Native Editor
 
+Latest source: [September 15 compatibility batch](chatgpt-runtime-bindings-20260915.md)
+reuses this editor/save loop, adds current generation/export bindings and fixes
+save-vs-restore queue recovery. Offline verification passed; genuine original
+Canvas mutation acceptance remains pending. The sections below are historical.
+
 - capability_id: `android_chatgpt_private_canvas_original_edit_v1`
 - code_status: `implemented`
 - verification_status: `offline_verified`
