@@ -1,6 +1,17 @@
 #requires -Version 7.0
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'chatgpt-fresh-text-smoke-evidence.ps1')
+$runner = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'android/ConversationUiAcceptance.java')
+if ($runner -notmatch 'public void testStep\(\) throws Exception \{\s*assertEquals\("foreground_package_mismatch", APP, getUiDevice\(\).getCurrentPackageName\(\)\);') {
+    throw 'foreground_guard_must_precede_all_ui_actions'
+}
+if (!(Test-ChatGptFreshClickNotDispatched 'Semantic UI acceptance failed: foreground_package_mismatch')) {
+    throw 'pre_action_guard_not_recognized'
+}
+foreach ($failure in @('fresh_trial_receipt_timeout', 'Missing semantic UI result.',
+    'Semantic UI acceptance failed: semantic_click_failed', 'Semantic UI acceptance failed: fresh_fixture_prompt_mismatch')) {
+    if (Test-ChatGptFreshClickNotDispatched $failure) { throw 'uncertain_click_must_not_be_replayable' }
+}
 foreach ($name in @('smoke-chatgpt-fresh-text-dispatch.ps1', 'chatgpt-fresh-text-smoke-evidence.ps1')) {
     $tokens = $null; $errors = $null
     [void][Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot $name), [ref]$tokens, [ref]$errors)
@@ -86,7 +97,11 @@ $source = Get-Content (Join-Path $PSScriptRoot 'smoke-chatgpt-fresh-text-dispatc
 $guard = $source.IndexOf('$script:awaitingResult = $true')
 $click = $source.IndexOf('-Step send_fresh_text_fixture')
 $evidence = $source.IndexOf('$freshConfirmed =')
-$settled = $source.IndexOf('$script:awaitingResult = $false')
+$settled = $source.IndexOf('$script:awaitingResult = $false', $evidence)
+if ($source -notmatch 'if \(Test-ChatGptFreshClickNotDispatched \$_\.Exception\.Message\) \{\s*\$script:awaitingResult = \$false' -or
+    [regex]::Matches($source, '\$script:awaitingResult = \$false').Count -ne 2) {
+    throw 'only_known_pre_action_guard_can_retire_an_unconfirmed_click'
+}
 if ($guard -lt 0 -or $click -lt $guard -or $evidence -lt $click -or $settled -lt $evidence -or
     !$source.Contains('if (!$NewConversation)') -or
     !$source.Contains("Native-Send 'seed' `$false `$true") -or

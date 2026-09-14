@@ -14,12 +14,13 @@ projection, stop and history recovery. It does not add another sender or editor.
 New-conversation scope requires an explicit trial until grouped native acceptance.
 The accepted existing-conversation default is unchanged.
 
-Latest: [1719 root repair and native follow-up](reports/chatgpt-fresh-canonical-root-20260914.md).
-The prior pending fixture was resolved without replay. On 1719, the first request
-and canonical reconciliation completed, but native receipt registration and
-stream-placeholder deduplication still failed full UI acceptance. Their native
-repair is being verified; first-send default remains disabled. The older
-timeline below is historical evidence.
+Latest: [1720 native repair and first-send readback](reports/chatgpt-fresh-canonical-root-20260914.md).
+Root reconciliation, native receipt registration and stream-placeholder
+deduplication are fixed and published. One 1720 native first-send was confirmed
+by exact zero-send readback after a diagnostic timeout. The complete first/follow-up
+recheck was interrupted before its first Send by a changed foreground app;
+follow-up remains deferred and
+first-send default is still disabled. The older timeline below is historical evidence.
 
 Earlier follow-up: [first-route reconciliation evidence](reports/chatgpt-fresh-first-route-20260913.md).
 The 1708 pending fixture is now resolved by exact native/provider readback.

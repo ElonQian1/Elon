@@ -67,5 +67,34 @@ requires exactly one native answer and retains bounded per-gate diagnostics.
 and Java and passed 48 Android tests, with zero failures/errors/skips.
 `fresh-native-smoke-evidence-20260914-095115-402` passed the receipt, continuity,
 cleanup and exact-readback guards. Source-size and document guards passed.
-Publication and first/follow-up acceptance remain. New-conversation default is
-still disabled. No temperature/power claim is made.
+## 1720 Release And Remaining Acceptance
+
+Release `1.1.1720`, source `72efc568e2b83d87802d43adc4817e9f0162c7a9`, is
+published, remotely hash-verified and installed in place on the same Xiaomi.
+APK SHA-256: `eda8284dda6e72edbd2549f5439d987939a8b001031254595b9e57f820dd63ec`.
+`fresh-native-ui-readback-20260914-100321-786` confirmed the prior exact fixture
+with one native answer and zero sends.
+
+`fresh-new-native-1720-20260914-100415-999` dispatched once through the native
+button. Its diagnostic query timed out before the runner could observe final
+state. A subsequent read-only query confirmed one user, one answer, the accepted
+native send receipt, 31 stream events, terminal history and `pending=false`.
+`fresh-native-1720-readback-20260914-100702-280` confirmed the exact fixture again
+with zero sends. This is first-send plus readback evidence, not a completed
+first/follow-up runner or latency benchmark.
+
+The next runner `fresh-new-native-1720-final-20260914-100734-431` was interrupted
+by a different foreground package at the Java test's first assertion, before
+reading the step, changing the draft or clicking Send. No further phone
+navigation was attempted. The generated empty-ID handoff was preserved locally
+and the exact previous verified-readback handoff restored; no message replay
+or user data operation occurred.
+
+The harness now retries only read-only state queries within the original send
+deadline. The proven pre-action foreground guard is separately classified as
+not sent; timeouts, missing acknowledgements and later UI errors remain unknown.
+The source-contract test pins that guard before all UI actions. Foreground
+changes defer restoration instead of taking over the other app.
+
+Follow-up acceptance remains deferred. New-conversation default is still
+disabled until that case passes. No temperature/power claim is made.

@@ -1,5 +1,10 @@
 #requires -Version 7.0
 
+function Test-ChatGptFreshClickNotDispatched {
+    param([string]$Failure)
+    return $Failure -ceq 'Semantic UI acceptance failed: foreground_package_mismatch'
+}
+
 function Get-ChatGptFreshPendingObservedPath {
     param([AllowNull()]$Web, [string]$Prompt, [string]$UserMessageId)
     if ($UserMessageId -cnotmatch '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$' -or

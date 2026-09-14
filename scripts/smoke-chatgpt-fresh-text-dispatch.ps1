@@ -36,7 +36,8 @@ $awaitingResult = $false; $trialRequested = $false; $ownedNavigation = $false; $
 $lastPrompt = ''; $lastUserId = ''; $lastObservedPath = ''; $clickAcknowledged = $false
 $report = [ordered]@{ schema = 'elon.fresh_text_ui.v1'; passed = $false; stage = 'opening';
     new_conversation = [bool]$NewConversation; seed_sends = 0; candidate_clicks = 0; cases = @();
-    restored = $false; awake_restored = $false; write_unconfirmed = $false }
+    restored = $false; awake_restored = $false; write_unconfirmed = $false;
+    state_probe_timeouts = 0; foreground_changed = $false; send_not_attempted = $false }
 
 function Trial([string]$Mode) {
     Invoke-ChatGptFreshTrial -Runtime $runtime -Mode $Mode
@@ -65,9 +66,19 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
     $script:lastPrompt = $prompt; $script:lastUserId = ''; $script:lastObservedPath = ''; $script:clickAcknowledged = $false
     if ($Candidate) { $report.candidate_clicks++ } else { $report.seed_sends++ }
     Write-Host "FRESH_TEXT_PROGRESS kind=$Kind phase=native_click_requested"
-    Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass ConversationUiAcceptance `
-        -Step send_fresh_text_fixture -ResultPrefix CONVERSATION_UI_RESULT `
-        -Parameters @{ prompt_b64=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($prompt)) } | Out-Null
+    try {
+        Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass ConversationUiAcceptance `
+            -Step send_fresh_text_fixture -ResultPrefix CONVERSATION_UI_RESULT `
+            -Parameters @{ prompt_b64=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($prompt)) } | Out-Null
+    } catch {
+        if (Test-ChatGptFreshClickNotDispatched $_.Exception.Message) {
+            $script:awaitingResult = $false
+            $report.foreground_changed = $true
+            $report.send_not_attempted = $true
+            if ($Candidate) { $report.candidate_clicks-- } else { $report.seed_sends-- }
+        }
+        throw
+    }
     $script:clickAcknowledged = $true
     Write-Host "FRESH_TEXT_PROGRESS kind=$Kind phase=native_click_acknowledged"
     $until = $started.AddSeconds($TimeoutSec)
@@ -96,7 +107,14 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
         }
         if ($users.Count -gt 1) { throw 'duplicate_user_message' }
         if ($Candidate) {
-            $diagnostic = Trial 'state'
+            try { $diagnostic = Trial 'state' }
+            catch {
+                if ($_.Exception.Message -cne 'fresh_trial_receipt_timeout') { throw }
+                # Only this read-only probe may be retried within the send's
+                # original deadline. Never dispatch or arm another write here.
+                $report.state_probe_timeouts = 1 + [int]$report.state_probe_timeouts
+                continue
+            }
             $report.last_trial = $diagnostic
             if ($diagnostic.phase -eq 'rejected') { throw "fresh_rejected:$($diagnostic.code)" }
             if ($diagnostic.attempts -gt ($before.attempts + 1)) { throw 'multiple_fresh_attempts' }
@@ -201,7 +219,9 @@ try {
     $report.failure_line = $_.InvocationInfo.ScriptLineNumber
 } finally {
     try {
-        if ($opened -and $ownedNavigation) {
+        if ($report.foreground_changed) {
+            $report.cleanup_deferred = $true
+        } elseif ($opened -and $ownedNavigation) {
             $end = Trial $(if ($trialRequested) { 'end' } else { 'state' })
             $lastMain = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state -MainState
             $lastWeb = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state
