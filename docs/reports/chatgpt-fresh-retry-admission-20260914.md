@@ -97,3 +97,64 @@ proxy or production transport-default code was changed.
   including ownership, stop/recovery, history and accepted runtime retry.
 - Zero failures or skips in both passing runs. Corrected APK/device verification
   remains pending; this is not an independent regeneration completion marker.
+
+## Corrected APK And Native Retry
+
+The preceding pending-APK statement describes the source batch. Correction
+`19e1166269086424946291366b6f203d5f42c85a` was subsequently published in
+`1.1.1725 / 1725`, adapter 393. APK SHA-256:
+`8b41f2103a12e3b5ea7cf46d7fe7e083046dabd513828a49351bdcd2ba8d985a`
+(40,470,683 bytes). `fresh-retry-model-release-synced-20260914-160328-292`
+passed Release compilation, packaging and publishing in 481.9 seconds.
+An earlier publish invocation stopped before build while its push was unfinished;
+the successful invocation followed completed push. No default flag was changed.
+
+`fresh-retry-model-install-native-20260914-161306-089` installed with `-r` and
+verified 1725 in nine seconds, without clearing data or forcing app shutdown.
+An earlier guard stopped before install on the home surface. The production
+ChatGPT entry was reopened by semantic MCP action before the successful install.
+
+`fresh-retry-model-admission-20260914-161340-346` returned `ready / ready` in
+1.9 seconds. Page generation/URL, native draft and messages were unchanged.
+This proves admission on the installed correction, not successful regeneration.
+
+The first native retry run stopped before writing because another app was in the
+foreground. After one authorized foreground transition,
+`fresh-retry-native-model-foreground-1725-20260914-161530-304` created one
+isolated test conversation, completed its seed send, then clicked the production
+native retry button once. Its receipt was `succeeded`, `ok=true`, with
+`private_text_v1:regenerate_accepted`. It nevertheless failed the complete
+acceptance after 182.9 seconds while waiting for a new reconciled reply.
+
+A subsequent bounded, read-only MCP state reported:
+
+- Operation `regenerate`, phase `reconciling`, code
+  `history_reconciliation_pending`.
+- Dispatched and accepted: true; reconciled: false; pending: true.
+- Owned stream events: 25; history result: `store_not_reconciled`.
+- Ownership: `owned`; reconciliation admission: `ready`.
+- Trial armed: false. Two trial attempts mean seed send plus one retry, not two
+  retry writes. The native surface still reports streaming.
+
+The pending ledger and controlled unsent draft were retained. No repeat retry,
+navigation, reload, replacement install or forced cleanup followed. The original
+conversation has not been restored because the test transaction is unresolved.
+No further phone acceptance should begin by replaying this request.
+
+## Remaining Reconciliation Investigation
+
+Read-only parsing of the same pinned public conversation asset shows that
+`BEn / gy` hydrates history through `fy`. Its tree-selection policy can retain an
+existing current leaf when the server's current reply is a sibling branch. The
+independent retry currently verifies an owned terminal server response but does
+not explicitly select that owned branch through an official state action.
+This is a source-backed candidate explanation for `store_not_reconciled`, not
+a claim that the exact live leaf mismatch has already been observed.
+
+The next scoped fix must preserve the account/document/conversation, original
+user, old-variant and owned-stream checks, and use a reviewed official tree
+transaction only after authoritative readback. Do not replace the whole store,
+relax ownership, add another writer or reload to manufacture a passing result.
+Writing Blocks reading, editing and export are a separate already-accepted
+capability; this retry failure does not reopen or invalidate those acceptance
+markers. The independent retry remains default-off and not production-verified.

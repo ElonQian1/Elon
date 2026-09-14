@@ -20,9 +20,14 @@ default-off, not production-verified; see the
 [grouped report](reports/chatgpt-writing-grouped-acceptance-20260914.md).
 The [read-only admission probe](reports/chatgpt-fresh-retry-admission-20260914.md)
 isolates the rejecting predicate without replaying a write or relaxing its scope.
-Build 1724 located the rejection at model resolution. The same report records
-the source-backed null-resolution correction (adapter 393), verified offline
-but awaiting corrected APK acceptance; the production default is unchanged.
+Build 1724 located the rejection at model resolution. Build 1725 (adapter 393)
+contains the source-backed null-resolution correction: read-only admission is
+ready, and one native retry dispatched successfully with 25 owned stream events.
+However, history/store reconciliation remains pending and the native surface
+still reports streaming. This is a failed end-to-end acceptance, not a completed
+retry capability. The trial is disarmed, its pending write is retained without
+replay, and the production default is unchanged. See the same report for evidence
+and the remaining branch-selection investigation.
 
 September 13 source candidate. The existing native regenerate button now has a
 gated independent request path through the same fresh-text ledger, prepare/proof
