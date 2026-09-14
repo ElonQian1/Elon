@@ -53,6 +53,80 @@ test('native draft mutation uses the exact official editor without focus or send
   assert.equal(f.api.snapshot(null).ready, false);
 });
 
+function toolInput(hint, enabled) {
+  const f = fixture();
+  f.hints.activeSystemHintType = hint;
+  f.page.__elonChatGptFreshTextToolsEnabled = enabled;
+  f.page.__elonChatGptPrivateComposerToolContext = { capture: () => {
+    const owner = f.runtime.capturePrivateConversation(null);
+    return owner && { ...owner, document: f.page.document,
+      model: f.conversation.Nrn(f.selected).id, allowed: 'search,picture_v2' };
+  } };
+  return f;
+}
+
+test('accepted personal Search keeps native input usable without composer DOM', async () => {
+  const f = toolInput('search');
+  f.api.snapshot(null); await tick();
+  assert.deepEqual(f.api.snapshot(null), { ready: true, draft: f.draft() });
+  assert.equal(f.api.setDraft('Synthetic Search draft', f.draft()), true);
+  assert.deepEqual(f.edits, ['Synthetic Search draft']);
+  assert.equal(f.hints.activeSystemHintType, 'search', 'editing must not reset the selected tool');
+});
+
+test('additional tool input follows the explicit sender switch, not preset visibility', async () => {
+  for (const enabled of [undefined, false, true]) {
+    const f = toolInput('picture_v2', enabled);
+    f.api.snapshot(null); await tick();
+    assert.equal(f.api.snapshot(null).ready, enabled === true);
+    assert.equal(f.api.setDraft('Synthetic picture draft', f.draft()), enabled === true);
+    assert.equal(f.edits.length, enabled === true ? 1 : 0);
+  }
+});
+
+test('disabled Search does not inherit the accepted default', async () => {
+  const f = toolInput('search', false);
+  f.api.snapshot(null); await tick();
+  assert.equal(f.api.snapshot(null).ready, false);
+  assert.equal(f.api.setDraft('must not write', f.draft()), false);
+  assert.equal(f.edits.length, 0);
+});
+
+test('turning off the tool switch revokes a cached native draft immediately', async () => {
+  const f = toolInput('search');
+  f.api.snapshot(null); await tick();
+  assert.equal(f.api.snapshot(null).ready, true);
+  f.page.__elonChatGptFreshTextToolsEnabled = false;
+  assert.equal(f.api.setDraft('must not write', f.draft()), false);
+  assert.equal(f.api.snapshot(null).ready, false);
+  assert.equal(f.edits.length, 0);
+  await tick();
+});
+
+test('a changed tool cannot reuse previously authorized Search input', async () => {
+  const f = toolInput('search');
+  f.api.snapshot(null); await tick();
+  assert.equal(f.api.snapshot(null).ready, true);
+  f.hints.activeSystemHintType = 'picture_v2';
+  assert.equal(f.api.setDraft('must not write', f.draft()), false);
+  assert.equal(f.api.snapshot(null).ready, false);
+  await tick();
+  assert.equal(f.api.snapshot(null).ready, false);
+  assert.equal(f.edits.length, 0);
+});
+
+test('tool capability or model mismatch cannot grant native input', async () => {
+  for (const field of ['allowed', 'model']) {
+    const f = toolInput('search');
+    const capture = f.page.__elonChatGptPrivateComposerToolContext.capture;
+    f.page.__elonChatGptPrivateComposerToolContext.capture = () => ({ ...capture(), [field]: 'not-matching' });
+    f.api.snapshot(null); await tick();
+    assert.equal(f.api.snapshot(null).ready, false);
+    assert.equal(f.api.setDraft('must not write', f.draft()), false);
+    assert.equal(f.edits.length, 0);
+  }
+});
+
 test('draft command preserves mounted DOM semantics and uses memory only when absent', async () => {
   const f = fixture(), receipts = [], signals = [], dom = {}, writes = [];
   const respond = (...args) => receipts.push(args);
@@ -174,4 +248,45 @@ test('timed-out or previous-account preparation cannot publish readiness later',
   stamp = 'another fixture owner'; finish(binding); await tick();
   assert.equal(notified, 0); assert.equal(api.snapshot(null).ready, false);
   finish(binding); await tick();
+});
+
+for (const boundary of ['account', 'scope', 'document']) {
+  test('pending input preparation yields immediately to a changed ' + boundary, async () => {
+    let stamp = 'first-owner', notified = 0, timerId = 0;
+    const jobs = [], timers = new Map();
+    const page = { document: {}, __elonChatGptPrivateTextTransactionsEnabled: true,
+      setTimeout(fn) { timers.set(++timerId, fn); return timerId; }, clearTimeout: id => timers.delete(id) };
+    const context = { stamp: () => stamp,
+      capture: () => new Promise(resolve => jobs.push(resolve)) };
+    const api = require('../android/app/src/main/assets/chatgpt_web_private_text_input').create(page, { context });
+    api.snapshot(null, () => { notified++; });
+    if (boundary === 'account') stamp = 'second-owner';
+    if (boundary === 'scope') page.__elonChatGptFreshTextToolsEnabled = true;
+    if (boundary === 'document') page.document = {};
+    api.snapshot(null, () => { notified++; });
+    assert.equal(jobs.length, 2, 'new owner does not wait for the old five-second deadline');
+    assert.equal(timers.size, 1, 'only the current capture retains a deadline');
+    jobs[0]({ current: () => true, draft: { read: () => 'old synthetic draft' } }); await tick();
+    assert.equal(notified, 0);
+    assert.equal(api.snapshot(null).ready, false);
+    assert.equal(jobs.length, 2, 'late completion must not retire the new capture');
+    jobs[1]({ current: () => true, draft: { read: () => 'current synthetic draft' } }); await tick();
+    assert.deepEqual(api.snapshot(null), { ready: true, draft: 'current synthetic draft' });
+    assert.equal(notified, 1); assert.equal(timers.size, 0);
+  });
+}
+
+test('disabling private input retires its local wait without publishing a late binding', async () => {
+  let resolve, notified = 0;
+  const timers = new Set();
+  const page = { document: {}, __elonChatGptPrivateTextTransactionsEnabled: true,
+    setTimeout(fn) { timers.add(fn); return fn; }, clearTimeout: timer => timers.delete(timer) };
+  const context = { stamp: () => 'fixture-owner', capture: () => new Promise(done => { resolve = done; }) };
+  const api = require('../android/app/src/main/assets/chatgpt_web_private_text_input').create(page, { context });
+  api.snapshot(null, () => { notified++; });
+  page.__elonChatGptPrivateTextTransactionsEnabled = false;
+  assert.equal(api.snapshot(null).ready, false);
+  assert.equal(timers.size, 0);
+  resolve({ current: () => true, draft: { read: () => 'must not publish' } }); await tick();
+  assert.equal(notified, 0); assert.equal(api.snapshot(null).ready, false);
 });

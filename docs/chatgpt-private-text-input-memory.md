@@ -20,9 +20,11 @@ change the HTTP protocol or promote additional send scopes.
   bounded child/sibling membership and reuses the committed ancestor resolver.
   Only a unique, matching conversation/controller/shared-store/files-store tuple
   is accepted. Ambiguous, stale, oversized or unrecognized trees are unavailable.
-- Candidate traversal is cached per document and committed root identity. Live
+- Candidate traversal rechecks the current committed children on each lookup;
+  root-object reuse cannot retain a negative or obsolete owner result. Live
   props, store ownership and route are rechecked before use. The maximum is four
-  roots, 8192 fibers, 512 siblings per parent and 64 composer candidates.
+  roots, 8192 fibers, 512 siblings per parent and 64 composer candidates. This
+  reuses the [1737 ownership repair](reports/chatgpt-tool-owner-20260914.md).
 - `capturePrivateConversation` reads the real controller's official editor via
   the version-mapped getter/serializer. It never constructs another editor owner
   or interprets an absent DOM element as an empty draft. Only complete plain-text
@@ -36,10 +38,14 @@ change the HTTP protocol or promote additional send scopes.
 ## Asynchronous Native Admission
 
 `chatgpt_web_private_text_input.js` prepares a read-only binding asynchronously:
-one in-flight capture, a five-second deadline and two-second failed-attempt
+one current-owner capture, a five-second deadline and two-second failed-attempt
 cooldown, driven by existing snapshots without a new polling timer. Successful
 capture schedules one snapshot; timeout or a previous owner cannot publish a
-late result. Cached state is validated on every use and is not saved to disk.
+late result. Identity, document or scope changes retire the old observer and
+its deadline immediately, without cancelling shared runtime loads. The next
+owner need not wait for the old capture; late callbacks cannot retire its wait
+or publish an old draft. Cached state is validated on every use and is not saved
+to disk.
 
 The adapter exposes `privateSendReady` separately from `composerReady`.
 `ChatGptWebAccessPolicy.canSendText`, the native consumer input and text MCP
@@ -51,14 +57,39 @@ copies the latest flag instead of retaining an old one.
 
 If the mounted composer is present, its existing draft behavior remains primary.
 The memory path observes the existing private-send switches and existing
-new/project/temporary scope flags; active tools/uploads are not broadened here.
+new/project/temporary scope flags. Its tool scope now matches the sender:
+personal existing-chat Search uses the accepted default unless explicitly
+disabled; other supported tool combinations require the explicit tool switch.
+The same context validates current account, model, tool eligibility and draft.
+This does not enable uploads, new composer-free sends or additional tool defaults.
 Unknown runtime, owner or draft means not ready, not that the website lacks the
 feature. Fully loading-free cold start is not claimed.
 
-Transaction module and instance versions are both 21. The previously mismatched
+At the initial checkpoint, transaction module and instance versions were both 21. The previously mismatched
 instance version could discard a settled receipt ledger on reinjection; matching
 versions preserve duplicate-command protection across same-document reinjection.
-Adapter version is 383.
+That checkpoint used adapter 383; the current input module is 2, adapter 401.
+
+## Tool Scope And Pending-Owner Repair
+
+The September 14 follow-up changes only the existing input-readiness module and
+adapter activation constant; no new sender or private endpoint is introduced.
+Previously input capture omitted `allowPersonalSearch` and `allowTools`, even
+when the independent sender could accept that state. A pending capture also
+blocked a new identity/scope for up to its five-second deadline.
+
+`private-input-tool-red-20260914-230815-020` reproduced four failed cases;
+`private-input-owner-red-20260914-231100-727` reproduced four owner-wait failures.
+After the repair, `private-input-scope-final-20260914-231136-888` passed 280 tests,
+zero failures/skips, including production context/runtime/draft composition,
+default scope, tool checks, sender transactions and complete adapter assembly.
+Entitlement and HTTP fixtures are synthetic, not provider acceptance.
+
+This follow-up is source-only for the next grouped Android build. USB reported
+no device; the bounded wireless connection timed out and mDNS found no service.
+No APK was replaced, no message was sent and no device pass is claimed. Existing
+Search HTTP acceptance is retained; its absent-composer UI boundary still needs
+one controlled production check after the device returns.
 
 ## Evidence And Acceptance Boundary
 

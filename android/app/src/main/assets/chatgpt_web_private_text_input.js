@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateTextInput = factory(root);
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -8,12 +8,14 @@
   options ||= {};
   const context = options.context || page.__elonChatGptFreshTextContext.create(page);
   const now = options.now || Date.now;
-  let cached = null, pending = null, retryAfter = 0, lastStamp = null;
+  let cached = null, pending = null, retryAfter = 0, lastStamp = null, lastDocument = page.document;
 
   function scope() {
     return { allowNewConversations: page.__elonChatGptFreshTextNewConversationsEnabled === true,
       allowProjects: page.__elonChatGptFreshTextProjectsEnabled === true,
-      allowTemporary: page.__elonChatGptFreshTextTemporaryEnabled === true };
+      allowTemporary: page.__elonChatGptFreshTextTemporaryEnabled === true,
+      allowTools: page.__elonChatGptFreshTextToolsEnabled === true,
+      allowPersonalSearch: page.__elonChatGptFreshTextToolsEnabled !== false };
   }
 
   function stamp() {
@@ -29,7 +31,12 @@
     const empty = { ready: false, draft: null };
     try {
       const currentStamp = enabled() ? stamp() : null;
-      if (currentStamp !== lastStamp) { cached = null; retryAfter = 0; lastStamp = currentStamp; }
+      if (currentStamp !== lastStamp || page.document !== lastDocument) {
+        cached = null; retryAfter = 0; lastStamp = currentStamp; lastDocument = page.document;
+        // Retire this observer only; shared runtime loads may have other consumers.
+        if (pending) page.clearTimeout(pending.timer);
+        pending = null;
+      }
       if (!currentStamp || composer) return empty;
       if (cached?.binding.current()) {
         const draft = cached.binding.draft?.read();
@@ -39,9 +46,9 @@
       // Capture validates actual account, parent, model, files, tools and the
       // official in-memory draft. No preparation request or submit is issued.
       if (!pending && now() >= retryAfter) {
-        const attempt = { document: page.document, stamp: currentStamp };
+        const attempt = { document: page.document, stamp: currentStamp, timer: null };
         pending = attempt;
-        const timer = page.setTimeout(() => {
+        attempt.timer = page.setTimeout(() => {
           if (pending !== attempt) return;
           pending = null; retryAfter = now() + 2000;
         }, 5000);
@@ -49,8 +56,8 @@
           if (pending === attempt && enabled() && page.document === attempt.document && stamp() === attempt.stamp &&
               binding.current() && typeof binding.draft?.read() === 'string') cached = { binding };
         }).catch(() => {}).finally(() => {
-          page.clearTimeout(timer);
           if (pending !== attempt) return;
+          page.clearTimeout(attempt.timer);
           pending = null;
           retryAfter = now() + 2000;
           if (cached && enabled() && page.document === attempt.document && stamp() === attempt.stamp) {
@@ -82,5 +89,5 @@
     respond('set_draft', true, ''); io.notify();
   }
 
-  return Object.freeze({ version: 1, snapshot, setDraft, setCommand });
+  return Object.freeze({ version: 2, snapshot, setDraft, setCommand });
 });
