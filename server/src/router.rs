@@ -41,6 +41,8 @@ pub(crate) mod quant_esk_allocation_receipt;
 #[path = "quant_esk_asset_projection.rs"]
 mod quant_esk_asset_projection;
 pub(crate) mod quant_http_preview;
+#[path = "quant_native_grid_access/mod.rs"]
+pub(crate) mod quant_native_grid_access;
 #[path = "quant_paper_access.rs"]
 pub(crate) mod quant_paper_access;
 #[path = "quant_paper_launch.rs"]

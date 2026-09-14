@@ -124,6 +124,7 @@
 | 代码归属与 legacy 迁移规则 | `docs/architecture/source-of-truth.md`、`docs/architecture/legacy-inventory.md`、`docs/architecture/feature-parity-matrix.md`、`scripts/check-source-ownership.ps1` |
 | 项目广场/项目主页脚本 | `server/src/assets/project_*.js` |
 | 一龙量化、ESK、Android 新版准入 | `docs/yilong-quant-integration.md`、`docs/requirements/official-quant-release-admission-v1.md` |
+| 原生模拟网格授权 | `docs/requirements/quant-native-grid-issuer-v1.md` |
 | ESK 单币服务支付、治理、团队利润参与及 QSHARE 会计边界 | `docs/decisions/esk-consumable-economic-participation-v1.md`、`docs/requirements/esk-consumable-economic-participation-v1.md`、`docs/decisions/esk-asset-naming-v1.md`、`docs/yilong-quant-integration.md` |
 | ESK 原生额度与卖回进度 | `docs/requirements/esk-platform-native-progress-v1.md` |
 | ESK Sui 离线地址候选证明 V1 | `docs/esk-sui-address-control-proof.md` |

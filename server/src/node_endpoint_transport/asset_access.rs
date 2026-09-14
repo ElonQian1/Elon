@@ -43,6 +43,7 @@ pub(crate) fn browser_routes(
 
 pub(crate) fn routes(public_url: &str) -> Router<Arc<AppState>> {
     access::routes()
+        .merge(crate::router::quant_native_grid_access::routes())
         .merge(crate::esk_asset::platform::game_access::routes())
         .merge(crate::esk_asset::platform::game_rewards::routes())
         .merge(crate::private_read_projection_api::routes())

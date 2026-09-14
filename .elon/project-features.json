@@ -19578,6 +19578,188 @@
       "updated_at_ms": 1786625470065
     },
     {
+      "id": "quant-native-grid-issuer-v1",
+      "title": "原生模拟网格个人授权签发",
+      "summary": "主账号真实会话签发独立yng1权限；与量化消费者互操作，不转换Paper或钱包权限。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/quant-native-grid-issuer-v1.md",
+        "content_hash": "c3f89a1fb181c03fbcdd4a52db6ada1c6b366c204fa98122d069d484ddfae9d4",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "f9172cf58c06b12e4b44993e97a4cf72533149ca",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "server/src/node_endpoint_transport/asset_access.rs",
+        "server/src/quant_native_grid_access",
+        "server/src/router.rs",
+        "server/tests/quant-native-grid-access-harness"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "真实会话事务复核与父期限限制，拒绝撤销、停用、静态凭据和越权输入",
+        "主签名与量化验证器的同一合成样例互操作",
+        "记录编译、路由、发布和后续客户端未完边界"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/delivery/quant-native-grid-issuer-20260914.md",
+          "content_hash": "e98b252d821ff84b982d8dc9fba3b0f3f7fedb0945924df974451fcc65be9665",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4ba001c71c8e9fbbee34f18a5ca21c1194157b09",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/node_endpoint_transport/asset_access.rs",
+          "content_hash": "ecb2202d08e07f6492b1c0c2160d5f80ea5bbefffa835ff26f66891385087ce3",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+            "head_blob_oid": "23c1586a01db1956c1617680deb85a6b6d281a53",
+            "worktree_blob_oid": "ac5ffb369e55268559072a545ca317eb0cc5fd9c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/quant_native_grid_access/http_tests.rs",
+          "content_hash": "c69f9cf8449dd5508504ac24edb762ba80cd27914670de61182d9e5c1f1ca56b",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "413bc98ecd5d0112291316724fe34b55feee0445",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/quant_native_grid_access/issue.rs",
+          "content_hash": "b5e332ed240e485ea00872cda5bd21fa7ca973a6b5796f427c393ab0e15b52bd",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "943934cb2648e8b57311122727628ab95b2cef9d",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/quant_native_grid_access/issue_tests.rs",
+          "content_hash": "d87871df8d2b289a4f650e3915938dbcaf330753e700761aef945bf2965cdd48",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4d476fe8c417b7512dfe0073cca5076f2b4de151",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/quant_native_grid_access/mod.rs",
+          "content_hash": "f52ac6af93b441ce6b74e12754983cddc8277d60d4b294d4a17ecae04cb86734",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "150c874b24be5839ed3499ab0f166376ee7fd2bd",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/quant_native_grid_access/model.rs",
+          "content_hash": "6ab920e38b220dcf0357ee2eebb3e77ae289b9ce27e1b93b54b56cb8ba0cee67",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7730bbf8f74184a1bae8f89cdad2e1cb7fd690e9",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/quant_native_grid_access/signer.rs",
+          "content_hash": "cee368ee93109000187a1adbc8305696af59ea565b8d30c519fa957d474769f9",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6b7389bf024a996caf14b6de4827a16a9bef0d49",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/quant_native_grid_access/signer_tests.rs",
+          "content_hash": "d289733d1a4b8c7d4f6e06b58f95bf074ee846256429efda25f64bc2bb551903",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6da5a427b07ef564e3136debe4d5183dc913cfd2",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/router.rs",
+          "content_hash": "5f77cd43598b76361e6fab61b9fbbfdd3caa5883af5c7692924523561b2982c9",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+            "head_blob_oid": "d807f0548d3bf81cb548a10f0ac5f41b4f8b4f44",
+            "worktree_blob_oid": "f5a5125215406660786d31052a517184764a82cb",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/tests/quant-native-grid-access-harness/fixtures/native-grid-grant-v1.json",
+          "content_hash": "607d6cf83ae03d9e2fbc475a6d7cd4360ce676d39c94c1e2f4e90061a9a8aba6",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "95c3ab918d1c13afbfc96a969b0dc31c203a7fab",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1789396248625,
+      "updated_at_ms": 1789397946053
+    },
+    {
       "id": "quant-public-https-v1",
       "title": "量化公开页面和行情原生HTTPS",
       "summary": "复用现有TLS与公开量化路由，保持账户和私有接口限制，显式启用后验证部署。",
@@ -28286,56 +28468,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_7a3cbdd550144d9781d06131f7abf471",
-      "feature_id": "android-binance-report-recovery-v1",
-      "action": "registered",
-      "actor": "codex-report-recovery",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788949182294
-    },
-    {
-      "id": "feature_event_fd9243bc746042bb91c1e237960523df",
-      "feature_id": "android-binance-report-recovery-v1",
-      "action": "claimed",
-      "actor": "codex-report-recovery",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788949199920
-    },
-    {
-      "id": "feature_event_800e974f1dd14cf1ab12ce96a2e0a354",
-      "feature_id": "android-binance-report-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex-report-recovery",
-      "reason": "量化真机记录读取失败复现后补读取兼容和诊断",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788949200085
-    },
-    {
-      "id": "feature_event_e04b9d2c104b4676a978f817df4c8a79",
-      "feature_id": "android-binance-report-recovery-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-report-recovery",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788950266769
-    },
-    {
-      "id": "feature_event_35ebb0a838fc40939ce979d1d87397ca",
-      "feature_id": "android-binance-report-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex-report-recovery",
-      "reason": "21项Node套件及8项Android定向测试通过；真机委托和持仓失败仍待新诊断定位",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788950266993
-    },
-    {
       "id": "feature_event_fbccb04b092145b7bf49e3f253e357c7",
       "feature_id": "android-binance-report-recovery-v1",
       "action": "evidence_recorded",
@@ -30284,6 +30416,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789381881169
+    },
+    {
+      "id": "feature_event_19203e286aff401cbbdcb85c6e2fac57",
+      "feature_id": "quant-native-grid-issuer-v1",
+      "action": "registered",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789396248627
+    },
+    {
+      "id": "feature_event_4d2513187ee24187b72d08c630107703",
+      "feature_id": "quant-native-grid-issuer-v1",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789396248725
+    },
+    {
+      "id": "feature_event_fd856e6b3dae492eba5810f4add30614",
+      "feature_id": "quant-native-grid-issuer-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "claimed",
+      "at_ms": 1789397925221
+    },
+    {
+      "id": "feature_event_8de479558ce5453b86f4fdc48236faab",
+      "feature_id": "quant-native-grid-issuer-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "11项生产源码SQL/签名测试和4项完整Store/Router测试通过；量化消费者互操作通过，正式配置和客户端待接线",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789397945935
+    },
+    {
+      "id": "feature_event_e1da6fdfec414cbd93aa1376fe2b7ee4",
+      "feature_id": "quant-native-grid-issuer-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "11项生产源码SQL/签名测试和4项完整Store/Router测试通过；量化消费者互操作通过，正式配置和客户端待接线",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789397946053
     }
   ]
 }

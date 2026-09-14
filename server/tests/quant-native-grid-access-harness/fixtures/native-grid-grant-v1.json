@@ -1,0 +1,22 @@
+{
+  "description": "SYNTHETIC ONLY. Public test seed is byte 7 repeated 32 times; subject secret is byte 11 repeated 32 times. Never configure production with these values.",
+  "public_key_base64url": "6kpsY-KcUgq-9VB7Ey7F-ZVHdq6-vnuSQh7qaRRG0iw",
+  "subject_ref": "ngu_7ec4716715610779186cc5fdf823147001bcc6ff",
+  "claims": {
+    "schema": "yilong.quant.native_grid_access_grant.v1",
+    "issuer": "yilong-main",
+    "audience": "yilong-quant-native-grid",
+    "environment": "native_paper",
+    "grant_id": "ngg_0123456789abcdef0123456789abcdef",
+    "subject_ref": "ngu_7ec4716715610779186cc5fdf823147001bcc6ff",
+    "key_id": "native-grid-test-key",
+    "scopes": [
+      "native_grid.read",
+      "native_grid.create",
+      "native_grid.control"
+    ],
+    "issued_at_unix": 1700000000,
+    "expires_at_unix": 1700000300
+  },
+  "access_token": "yng1.eyJzY2hlbWEiOiJ5aWxvbmcucXVhbnQubmF0aXZlX2dyaWRfYWNjZXNzX2dyYW50LnYxIiwiaXNzdWVyIjoieWlsb25nLW1haW4iLCJhdWRpZW5jZSI6InlpbG9uZy1xdWFudC1uYXRpdmUtZ3JpZCIsImVudmlyb25tZW50IjoibmF0aXZlX3BhcGVyIiwiZ3JhbnRfaWQiOiJuZ2dfMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWYiLCJzdWJqZWN0X3JlZiI6Im5ndV83ZWM0NzE2NzE1NjEwNzc5MTg2Y2M1ZmRmODIzMTQ3MDAxYmNjNmZmIiwia2V5X2lkIjoibmF0aXZlLWdyaWQtdGVzdC1rZXkiLCJzY29wZXMiOlsibmF0aXZlX2dyaWQucmVhZCIsIm5hdGl2ZV9ncmlkLmNyZWF0ZSIsIm5hdGl2ZV9ncmlkLmNvbnRyb2wiXSwiaXNzdWVkX2F0X3VuaXgiOjE3MDAwMDAwMDAsImV4cGlyZXNfYXRfdW5peCI6MTcwMDAwMDMwMH0.hRAWqyAO6dU7fHD5RyIVEvGO-zZ78sI60U8C1IXoOFpA6CxXzW-ct4BP0TxeKX-jR9hXA56o1OKIs2Mr-2jIDQ"
+}
