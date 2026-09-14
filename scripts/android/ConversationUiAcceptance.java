@@ -157,6 +157,18 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             case "canvas": click(description("web-chat-composer-tool:chatgpt_web:canvas")); break;
             case "clear_study": click(description("\u5173\u95ed\u5b66\u4e60\u4e0e\u7814\u7a76")); break;
             case "clear_canvas": click(description("\u5173\u95ed\u753b\u5e03")); break;
+            case "prepare_extended_tool_fixture":
+                UiObject toolInput = description("web-chat-composer-input:chatgpt_web");
+                if (!toolInput.exists()) {
+                    // The production composer starts collapsed; open only our synthetic draft.
+                    UiSelector preview = new UiSelector().packageName(APP).className("android.widget.TextView")
+                        .textStartsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1 ");
+                    assertFalse("fixture_preview_ambiguous", new UiObject(preview.instance(1)).exists());
+                    click(new UiObject(preview));
+                }
+                assertTrue("fixture_input_not_open", toolInput.waitForExists(3000));
+                assertTrue("fixture_prompt_missing", toolInput.getText().startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1 "));
+                break;
             case "send_extended_tool_fixture":
                 UiObject fixtureInput = description("web-chat-composer-input:chatgpt_web");
                 assertTrue("fixture_prompt_missing", fixtureInput.exists() && fixtureInput.getText()
@@ -263,6 +275,11 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             default: fail("unsupported_step");
         }
         JSONObject result = new JSONObject().put("step", step)
+            .put("composer_input", description("web-chat-composer-input:chatgpt_web").exists())
+            .put("tool_fixture_input", description("web-chat-composer-input:chatgpt_web").exists() &&
+                description("web-chat-composer-input:chatgpt_web").getText().startsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"))
+            .put("send_control", description("web-chat-send").exists())
+            .put("send_enabled", description("web-chat-send").exists() && description("web-chat-send").isEnabled())
             .put("reply_actions", replyActions)
             .put("refresh", refreshEvidence)
             .put("header_settings", text("\u804a\u5929\u8bbe\u7f6e").exists())

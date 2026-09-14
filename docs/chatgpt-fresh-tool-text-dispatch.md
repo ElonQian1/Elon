@@ -14,6 +14,11 @@ Search/Create Image controls still use their accepted sender unless the scoped
 candidate is explicitly admitted. No UI, transcript store or second send queue
 is added, and accepted plain-text defaults remain unchanged.
 
+[September 14 device preflight](reports/chatgpt-fresh-tool-preflight-20260914.md)
+passed on APK 1728. Search selection worked, but the external Send check stopped
+at a collapsed composer and no private request was observed. Sending remains
+unverified; the report records the pending fixture and non-replay recovery rule.
+
 September 14 acceptance-tooling batch: `chatgpt-fresh-tool-smoke-evidence.ps1`
 combines owned send continuity with completed Web output and matching native
 source-message parts. It rejects old replies placed after a new user turn,
