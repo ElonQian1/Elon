@@ -19614,15 +19614,54 @@
       "implementation_evidence": [
         {
           "path": "docs/delivery/quant-native-grid-issuer-20260914.md",
-          "content_hash": "e98b252d821ff84b982d8dc9fba3b0f3f7fedb0945924df974451fcc65be9665",
+          "content_hash": "1df1f2657c1834b3632fb29f38da7058bf8a56d6cc3efeeeede3cf6e05ce950e",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "4ba001c71c8e9fbbee34f18a5ca21c1194157b09",
+            "worktree_blob_oid": "53e358fc01d436e9f0289800d17d38d9ad7b9251",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/account_security/https/mod.rs",
+          "content_hash": "141f4e1bcff46dbaf920bc09d9c197d4e5bfc16aaf255db173b79c267c365e7d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "b2c787afa8abf9de5c0177f4cd9c546a3be68b3a",
+            "worktree_blob_oid": "b0a7cee1b958167867da0a4dc0df02b38e69b27a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/account_security/https/native_grid_tests.rs",
+          "content_hash": "9c86e654246b98a16100b8d3de796f41dcf042e50ccb078120aacc3ad5462937",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
             "head_blob_oid": "",
-            "worktree_blob_oid": "4ba001c71c8e9fbbee34f18a5ca21c1194157b09",
+            "worktree_blob_oid": "1af23c85cf7aa3f0e9dbbaaeca54d5d7623f9044",
             "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/account_security/https/policy.rs",
+          "content_hash": "027a990416cc6b97122e04929deb3574f369791a02d6d76c2d8ffc86e2612f94",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "2bb1f7ad18fd95fc533d0c2e2dd961759c14ca41",
+            "worktree_blob_oid": "89e82b7174dafe1cb030b5812e5a2f07d3787f9a",
+            "state": "tracked_modified"
           }
         },
         {
@@ -19632,23 +19671,23 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
-            "head_blob_oid": "23c1586a01db1956c1617680deb85a6b6d281a53",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "ac5ffb369e55268559072a545ca317eb0cc5fd9c",
             "worktree_blob_oid": "ac5ffb369e55268559072a545ca317eb0cc5fd9c",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/quant_native_grid_access/http_tests.rs",
-          "content_hash": "c69f9cf8449dd5508504ac24edb762ba80cd27914670de61182d9e5c1f1ca56b",
+          "content_hash": "afc30287e709aee9e3a21d1e53690f0633646029d4313c46d33c1493af785908",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "413bc98ecd5d0112291316724fe34b55feee0445",
-            "state": "untracked"
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "413bc98ecd5d0112291316724fe34b55feee0445",
+            "worktree_blob_oid": "9b152fa825dd26788187ee1c4c493438df5a4607",
+            "state": "tracked_modified"
           }
         },
         {
@@ -19658,10 +19697,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
-            "head_blob_oid": "",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "943934cb2648e8b57311122727628ab95b2cef9d",
             "worktree_blob_oid": "943934cb2648e8b57311122727628ab95b2cef9d",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -19671,10 +19710,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
-            "head_blob_oid": "",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "4d476fe8c417b7512dfe0073cca5076f2b4de151",
             "worktree_blob_oid": "4d476fe8c417b7512dfe0073cca5076f2b4de151",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -19684,10 +19723,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
-            "head_blob_oid": "",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "150c874b24be5839ed3499ab0f166376ee7fd2bd",
             "worktree_blob_oid": "150c874b24be5839ed3499ab0f166376ee7fd2bd",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -19697,10 +19736,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
-            "head_blob_oid": "",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "7730bbf8f74184a1bae8f89cdad2e1cb7fd690e9",
             "worktree_blob_oid": "7730bbf8f74184a1bae8f89cdad2e1cb7fd690e9",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -19710,10 +19749,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
-            "head_blob_oid": "",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "6b7389bf024a996caf14b6de4827a16a9bef0d49",
             "worktree_blob_oid": "6b7389bf024a996caf14b6de4827a16a9bef0d49",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -19723,10 +19762,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
-            "head_blob_oid": "",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "6da5a427b07ef564e3136debe4d5183dc913cfd2",
             "worktree_blob_oid": "6da5a427b07ef564e3136debe4d5183dc913cfd2",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -19736,28 +19775,28 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
-            "head_blob_oid": "d807f0548d3bf81cb548a10f0ac5f41b4f8b4f44",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "f5a5125215406660786d31052a517184764a82cb",
             "worktree_blob_oid": "f5a5125215406660786d31052a517184764a82cb",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "server/tests/quant-native-grid-access-harness/fixtures/native-grid-grant-v1.json",
-          "content_hash": "607d6cf83ae03d9e2fbc475a6d7cd4360ce676d39c94c1e2f4e90061a9a8aba6",
+          "content_hash": "fdeeee0e54bfa78dcc5165c376be2fd63bc7d8efd28c4b43dd66dbfa073b81f8",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c5379e4836ba46e76a87f1796f0336af8c35150b",
-            "head_blob_oid": "",
+            "head_commit": "564d9c909c69aeb5b236222278e352e9850f6053",
+            "head_blob_oid": "95c3ab918d1c13afbfc96a969b0dc31c203a7fab",
             "worktree_blob_oid": "95c3ab918d1c13afbfc96a969b0dc31c203a7fab",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1789396248625,
-      "updated_at_ms": 1789397946053
+      "updated_at_ms": 1789399764314
     },
     {
       "id": "quant-public-https-v1",
@@ -28468,56 +28507,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_fbccb04b092145b7bf49e3f253e357c7",
-      "feature_id": "android-binance-report-recovery-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-report-recovery",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1788952373153
-    },
-    {
-      "id": "feature_event_804d983eb1dc4fe88596063d1b7a7115",
-      "feature_id": "android-binance-report-recovery-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-report-recovery",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1788953331410
-    },
-    {
-      "id": "feature_event_fcd80f74d86b49d2b287b68bfcfc1204",
-      "feature_id": "android-binance-report-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex-report-recovery",
-      "reason": "23 Node tests and 8 Android tests pass; signed 1.1.1609 installed, real orders/matches/positions read and position quantity/entry displayed.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1788953333918
-    },
-    {
-      "id": "feature_event_69c70d3b5c4a44fca09eb0be63cd8d02",
-      "feature_id": "android-binance-report-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex-report-recovery",
-      "reason": "Official main APK 1.1.1609 published with matching server hash and installed using original signature; real read-only device acceptance passed.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1788953369678
-    },
-    {
-      "id": "feature_event_87145e1bb0774615bac7896a4f72f7fc",
-      "feature_id": "binance-grid-symbol-picker-v1",
-      "action": "registered",
-      "actor": "codex-grid-picker",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1788954666913
-    },
-    {
       "id": "feature_event_003ca2167c7844a39bb7d44fc666349a",
       "feature_id": "binance-grid-symbol-picker-v1",
       "action": "claimed",
@@ -30466,6 +30455,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789397946053
+    },
+    {
+      "id": "feature_event_9dd70cc3c14c45258cfac6358466771b",
+      "feature_id": "quant-native-grid-issuer-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "实际8443入口白名单漏项返回404，重新认领修复并补生产组装回归",
+      "from_status": "implemented",
+      "to_status": "ready",
+      "at_ms": 1789399572040
+    },
+    {
+      "id": "feature_event_bd75b3bfada141ddaa56ae8fd9a13346",
+      "feature_id": "quant-native-grid-issuer-v1",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789399572380
+    },
+    {
+      "id": "feature_event_d7f78107fcc940bdbe85cb77fc14c0e7",
+      "feature_id": "quant-native-grid-issuer-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "仅补实际账号HTTPS入口放行和全服务集成测试",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789399572442
+    },
+    {
+      "id": "feature_event_ff54734275a748d39cf249bc1d87417f",
+      "feature_id": "quant-native-grid-issuer-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789399764246
+    },
+    {
+      "id": "feature_event_44d11b10e10f42b3a0d05386772d4bda",
+      "feature_id": "quant-native-grid-issuer-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "17项完整服务测试通过；修复真实HTTPS白名单，正式签发及客户端仍保持部分完成",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789399764314
     }
   ]
 }

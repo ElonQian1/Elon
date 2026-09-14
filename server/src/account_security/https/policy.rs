@@ -19,6 +19,7 @@ pub(super) fn allowed(method: &Method, path: &str) -> bool {
                 | "/api/me/asset-access/grants"
                 | "/api/asset-access/me"
                 | "/api/asset-access/grids"
+                | "/api/me/quant/native-grid/access-grants"
         ),
         &Method::POST => {
             matches!(
@@ -32,6 +33,7 @@ pub(super) fn allowed(method: &Method, path: &str) -> bool {
                     | "/api/asset-access/token"
                     | "/api/asset-access/revoke"
                     | "/api/node/private-read-projections"
+                    | "/api/me/quant/native-grid/access-grants"
             ) || owner_grant_revoke_path(path)
         }
         &Method::PUT => path == "/api/auth/password",
@@ -92,6 +94,10 @@ fn throttle(request: &Request) -> Option<Response> {
         response
     })
 }
+
+#[cfg(test)]
+#[path = "native_grid_tests.rs"]
+mod native_grid_tests;
 
 #[cfg(test)]
 mod tests {

@@ -3,6 +3,7 @@ use super::Fixture;
 use crate::router::quant_native_grid_access::test_config;
 use axum::{
     body::{to_bytes, Body},
+    extract::ConnectInfo,
     http::{header, Request, StatusCode},
     Router,
 };
@@ -29,6 +30,9 @@ async fn send(
     let mut request = Request::builder()
         .method(method)
         .uri(path)
+        .extension(ConnectInfo(
+            "192.0.2.84:1234".parse::<std::net::SocketAddr>().unwrap(),
+        ))
         .header(header::CONTENT_TYPE, "application/json");
     for token in tokens {
         request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
@@ -50,6 +54,39 @@ async fn send(
     let value =
         serde_json::from_slice(&to_bytes(response.into_body(), 8192).await.unwrap()).unwrap();
     (status, value)
+}
+
+#[tokio::test]
+async fn quant_native_grid_http_account_https_uses_the_production_assembly() {
+    let f = Fixture::new();
+    let _config = test_config::set(true);
+    // Test with public Quant routes attached too: they must not consume account credentials.
+    let router = crate::account_security::https::routes(f.state.clone(), true);
+    for method in ["GET", "POST"] {
+        assert_eq!(
+            send(&router, method, PATH, &[], None, body().to_string())
+                .await
+                .0,
+            StatusCode::UNAUTHORIZED
+        );
+    }
+    let (status, readiness) =
+        send(&router, "GET", PATH, &[&f.user_token], None, String::new()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(readiness["enabled"], true);
+    let (status, grant) = send(
+        &router,
+        "POST",
+        PATH,
+        &[&f.user_token],
+        None,
+        body().to_string(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(grant["access_token"].as_str().unwrap().starts_with("yng1."));
+    drop(router);
+    f.cleanup();
 }
 
 #[tokio::test]

@@ -25,6 +25,16 @@ pub(crate) async fn serve(legacy_app: Router, state: Arc<AppState>) -> Result<()
     };
     // Fail before starting legacy ingress if explicitly enabled TLS cannot bind.
     let server = transport::Server::bind(config).await?;
+    let app = routes(state.clone(), public_quant);
+    tokio::try_join!(
+        crate::node_endpoint_transport::serve(legacy_app, state),
+        server.serve(app),
+    )?;
+    Ok(())
+}
+
+/// Share the exact TLS route assembly with integration tests, including ingress policy.
+pub(crate) fn routes(state: Arc<AppState>, public_quant: bool) -> Router {
     let app = Router::new()
         .route(
             "/health",
@@ -40,10 +50,5 @@ pub(crate) async fn serve(legacy_app: Router, state: Arc<AppState>) -> Result<()
             &state.public_url,
         ))
         .with_state(state.clone());
-    let app = quant_public::attach(policy::protect(app), &state.data_dir, public_quant);
-    tokio::try_join!(
-        crate::node_endpoint_transport::serve(legacy_app, state),
-        server.serve(app),
-    )?;
-    Ok(())
+    quant_public::attach(policy::protect(app), &state.data_dir, public_quant)
 }
