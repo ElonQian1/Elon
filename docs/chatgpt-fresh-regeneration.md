@@ -11,8 +11,8 @@ scope: existing_personal_plain_text_retry
 Current: [1726 native acceptance](reports/chatgpt-fresh-retry-native-1726.md)
 passed one isolated ordinary-text retry through the production button. The owned
 independent response reconciled, the unsent draft and original user turn stayed
-intact, and the original native conversation was restored. Source adapter 395
-promotes this verified scope by default; an explicit opt-out and pre-dispatch
+intact, and the original native conversation was restored. Release 1728 (adapter
+395) promotes this verified scope by default; an explicit opt-out and pre-dispatch
 runtime compatibility path remain. Project, attachment, feedback and tool retries
 are not covered by this completion marker. The dated failed trials below remain
 historical evidence, not the current capability status.

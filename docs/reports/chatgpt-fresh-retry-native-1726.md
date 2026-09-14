@@ -88,3 +88,29 @@ change.
 zero failures or skips. These cover default-on, explicit opt-out, sibling
 reconciliation, retained uncertain writes, draft/account/branch changes,
 stop/recovery and the still-gated project/temporary/tool send scopes.
+
+## Default Release 1728
+
+- `1.1.1728 / 1728`, adapter 395, transaction module v24.
+- Source `4dee6cdc05dd7892da804a8203d622d667a7be8d` includes the unrelated
+  mainline wallet update accepted by a non-conflicting rebase.
+- APK SHA-256 `29650f939300d3fc354b3fb614175e662496e8bbcaeae16b8920aa0bb2b9f46c`,
+  40,475,319 bytes; public manifest matched the canonical artifact.
+- `retry-default-module-wiring-20260914-172625-786`: 28 tests passed.
+- `retry-default-release-20260914-173038-291`: Release passed, 464.8 seconds.
+- `retry-default-install-ready-20260914-174120-736`: passed, 7.4 seconds.
+  The installer checked the exact artifact hash and its packaged module v24
+  opt-out condition, then used one `-r` replacement without clearing data.
+- Final MCP readback: authenticated native adapter 395, bridge ready, streaming
+  false, empty draft, pending false and trial disarmed; zero additional writes.
+
+Before the successful install, another delivery had installed build 1727 and
+left the activity unbound. The first guard stopped before installation. After
+one normal native-surface restore, a strict-mode/optional receipt-field mismatch
+also stopped before installation; the one-off wrapper now confines the existing
+polling helper to its usual non-strict scope. No application guard was relaxed.
+The actual media/draft/request/telephony guards passed before replacement.
+
+1728's unarmed default is proven by the packaged gate plus default-path unit
+tests; the real production-button HTTP/stream/reconciliation evidence is the
+1726 trial above. No second live generation was performed just for promotion.

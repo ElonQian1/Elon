@@ -34,7 +34,7 @@ reading/edit/export and ordinary save are accepted (1692; editor undo/redo/share
 [temporary sends/cache guard](chatgpt-fresh-temporary-text-dispatch.md),
 [owned attachment sends](chatgpt-fresh-attachment-text-dispatch.md): offline-verified.
 [Fresh retry](chatgpt-fresh-regeneration.md): 1726 native pass;
-395 enables personal plain-text retry. Other scopes remain gated.
+1728 enables personal plain-text retry. Other scopes remain gated.
 [New personal first send](chatgpt-fresh-new-text-dispatch.md) is completed/default-enabled on 1721: native first/follow-up and unarmed default passed. Reuse it; new project/tool/file/temporary and initial composer-free scopes remain open.
 
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
