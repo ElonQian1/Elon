@@ -6214,15 +6214,15 @@
         },
         {
           "path": "docs/reports/binance-wallet-host-20260914.md",
-          "content_hash": "728148d91a80d8f978b228d9e9de85da67ceb3b403a09530f327c10748af0f7a",
+          "content_hash": "d19a5e00ce75311ba587d755ddf3098cd6178ea52c6fa48dbfe1acab1cd3218b",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "530ba622e38ea974bacf0987720944ce91a12b4f",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "a7cd6b5d9480033f63e4f5711d0478ab6f4ce083",
-            "state": "untracked"
+            "head_commit": "bc44a70a677e7bcb58d8baa56043d6e8c291a313",
+            "head_blob_oid": "a7cd6b5d9480033f63e4f5711d0478ab6f4ce083",
+            "worktree_blob_oid": "a9228a8055d1a64b9992547671ca199dc40b7c5d",
+            "state": "tracked_modified"
           }
         },
         {
@@ -6253,7 +6253,7 @@
         }
       ],
       "created_at_ms": 1789353985933,
-      "updated_at_ms": 1789355312219
+      "updated_at_ms": 1789357017549
     },
     {
       "id": "compute-attempt-final-usage-fence-verification-v1",
@@ -28093,16 +28093,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a778fd4ebf234eaf970004a2f27508f5",
-      "feature_id": "android-binance-grid-core-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-core",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788897535104
-    },
-    {
       "id": "feature_event_dfb0cea3309348c392e7305cd4a8ef07",
       "feature_id": "android-binance-grid-core-v2",
       "action": "evidence_recorded",
@@ -30091,6 +30081,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789355312219
+    },
+    {
+      "id": "feature_event_30cd29378a164dbd847d102c4aa8f1d9",
+      "feature_id": "binance_wallet_summary_host_v1",
+      "action": "evidence_recorded",
+      "actor": "codex-quant-grid",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789357017549
     }
   ]
 }
