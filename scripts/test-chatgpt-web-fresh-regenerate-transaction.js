@@ -14,7 +14,8 @@ function fixture(options = {}) {
     historyId = options.historyId || AID, streamId = options.streamId || AID;
   Object.assign(page, { crypto, AbortController, setTimeout, clearTimeout,
     __elonChatGptPrivateTextTransactionsEnabled: true,
-    __elonChatGptFreshRegenerationEnabled: options.enabled !== false, __elonChatGptFreshTextStream: load('stream') });
+    __elonChatGptFreshTextStream: load('stream') });
+  if ('enabled' in options) page.__elonChatGptFreshRegenerationEnabled = options.enabled;
   page.document.visibilityState = 'visible';
   install(page);
   shared.textTopic = () => { throw Error('unexpected topic'); };
@@ -72,6 +73,7 @@ function fixture(options = {}) {
 
 test('private regeneration posts one variant, streams natively and reconciles the original user branch', async () => {
   const f = fixture(), sent = f.api.regenerate(f.command);
+  assert.equal(Object.hasOwn(f.page, '__elonChatGptFreshRegenerationEnabled'), false);
   assert.equal((await sent.completion).status, 'accepted');
   await settle();
   assert.equal(f.body().action, 'variant'); assert.equal('messages' in f.body(), false);
@@ -99,7 +101,7 @@ test('the real history sibling-preservation policy settles without a second POST
   f.close();
 });
 
-test('default-off leaves the accepted retry alone; a one-command trial does not enable the default', async () => {
+test('explicit opt-out leaves the accepted retry alone; a one-command trial does not change it', async () => {
   const f = fixture({ enabled: false });
   assert.equal(f.api.regenerate(f.command).handled, false); assert.equal(f.calls.length, 0);
   assert.equal(f.api.trialControl('start').armed, true);

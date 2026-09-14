@@ -1,8 +1,8 @@
 # Independent Retry Branch Reconciliation
 
-Status: source implemented and offline verified, queued for grouped Android
-build and native acceptance. Installed build 1725 is unchanged. The independent
-retry is still default-off and its previous device acceptance remains failed.
+Current: grouped build 1726 (adapter 394) is published and its native acceptance
+passed; see [device evidence](chatgpt-fresh-retry-native-1726.md). The earlier 1725
+result remains failed. The source-batch account below is retained as history.
 
 ## Evidence And Gap
 

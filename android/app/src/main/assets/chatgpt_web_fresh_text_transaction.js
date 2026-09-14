@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 23, create: factory });
+  const api = Object.freeze({ version: 24, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -113,7 +113,7 @@
     // A stopped/uncertain write still owns the ledger even if the trial is disabled.
     if (active) return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'busy' }) };
     const regenerate = operation === 'regenerate';
-    if ((regenerate ? page.__elonChatGptFreshRegenerationEnabled !== true : page.__elonChatGptFreshTextDispatchEnabled === false) && !trialArmed() ||
+    if ((regenerate ? page.__elonChatGptFreshRegenerationEnabled === false : page.__elonChatGptFreshTextDispatchEnabled === false) && !trialArmed() ||
         page.__elonChatGptPrivateTextTransactionsEnabled !== true) {
       return { handled: false, code: 'disabled' };
     }
@@ -388,7 +388,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 23, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 24, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });
