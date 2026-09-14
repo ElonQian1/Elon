@@ -193,6 +193,7 @@ gradle.taskGraph.whenReady { graph ->
 }
 
 android {
+    testOptions.unitTests.includeAndroidResources = true
     namespace 'com.elon.app'
     compileSdk 34
 

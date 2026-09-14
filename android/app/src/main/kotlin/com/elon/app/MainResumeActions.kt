@@ -60,11 +60,8 @@ internal class MainResumeActions(
 
     private fun startMcpDebugKeepAlive() {
         if (!McpDebugKeepAliveService.shouldAutoStart(activity)) return
-        val intent = Intent(activity, McpDebugKeepAliveService::class.java).apply {
-            action = McpDebugKeepAliveService.ACTION_START
-        }
         runCatching {
-            ContextCompat.startForegroundService(activity, intent)
+            McpDebugKeepAliveService.resumeIfEnabled(activity)
         }.onSuccess {
             DebugTraceStore.record("mcp_keepalive_auto_start_requested")
         }.onFailure { error ->

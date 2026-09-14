@@ -4536,6 +4536,7 @@
     .login-card .hint { font-size: 12px; color: var(--ink-faint); text-align: center; }
     #projectPlazaInlineRoot .project-plaza-results { gap: 38px; }
   </style>
+  <link rel="stylesheet" href="/assets/group_mentions.css" /><script src="/assets/group_mentions.js"></script>
 </head>
 <body data-ui-system="apk-orbital-metal-workbench-v1">
 
@@ -6406,6 +6407,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   let projectSpaceAnnouncementExpanded = false;
   let currentFriend = null;
   let currentGroup = null;
+  const groupMentions = globalThis.ElonGroupMentions.create({ input: messageInput, getGroup: () => currentGroup, getSelfId: () => currentUser?.id, api });
   let groupSummaryPosts = [];
   let groupSummaryRefreshTimer = null;
   let currentTab = 'chatPage';
@@ -8201,6 +8203,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
 
   function openGroupChat(group) {
     if (!group || !group.id) return;
+    groupMentions.close();
     if (socket) { try { socket.close(); } catch {} socket = null; }
     currentProject = null;
     currentFriend = null;
@@ -8429,6 +8432,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
         : (msg.content || '');
       appendBubble(kind, bubbleText, null, null, null, {
         createdAtMs: parseServerTime(msg.created_at) || Date.now(),
+        mentionTarget: chatKind === 'group' && !outgoing && !recalled ? { id: senderId, display_name: senderId === SOCIAL_AI_USER_ID ? 'EL' : msg.sender_name } : null,
         senderName: msg.sender_name || (chatKind === 'friend' ? friendDisplayName(contact) : ''),
         avatarDataUrl: avatarSource && (avatarSource.avatar_data_url || avatarSource.avatarDataUrl),
         avatarFallback: kind === 'user'
@@ -9505,6 +9509,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       }, 'chat-avatar'));
     }
     row.appendChild(bubble);
+    if (options.mentionTarget) groupMentions.bindAvatar(row.querySelector('.chat-avatar'), options.mentionTarget, currentGroup?.id);
     if (kind === 'user') {
       const avatar = document.createElement('span');
       avatar.className = 'chat-avatar user round';

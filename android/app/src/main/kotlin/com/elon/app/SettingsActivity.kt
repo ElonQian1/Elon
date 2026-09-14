@@ -41,6 +41,7 @@ class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
+        installChatNotificationSettings(this)
         supportActionBar?.apply {
             title = "AI 代理设置"
             setDisplayHomeAsUpEnabled(true)

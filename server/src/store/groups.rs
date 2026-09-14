@@ -8,6 +8,8 @@ use super::friend_messages::{attachments_to_json, message_preview_for_viewer, pa
 use super::message_recall::{ensure_message_recall_allowed, recalled_content};
 use super::{new_id, now, FriendGroupMemberPreview, FriendGroupMessage, FriendGroupProfile, Store};
 
+mod members;
+
 impl Store {
     pub fn list_friend_groups(&self, user_id: &str) -> Result<Vec<FriendGroupProfile>> {
         let conn = self.conn()?;

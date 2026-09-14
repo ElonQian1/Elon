@@ -19,20 +19,14 @@ class McpDebugControlReceiver : BroadcastReceiver() {
         var error: String? = null
         when (action) {
             ACTION_START -> {
-                val startIntent = Intent(context, McpDebugKeepAliveService::class.java).apply {
-                    this.action = McpDebugKeepAliveService.ACTION_START
-                }
                 val startError = runCatching {
-                    ContextCompat.startForegroundService(context, startIntent)
+                    McpDebugKeepAliveService.requestStart(context)
                 }.exceptionOrNull()
                 serviceStarted = startError == null
                 error = startError?.message ?: startError?.javaClass?.simpleName
             }
             ACTION_STOP -> {
-                val stopIntent = Intent(context, McpDebugKeepAliveService::class.java).apply {
-                    this.action = McpDebugKeepAliveService.ACTION_STOP
-                }
-                context.stopService(stopIntent)
+                McpDebugKeepAliveService.requestStop(context)
             }
         }
 

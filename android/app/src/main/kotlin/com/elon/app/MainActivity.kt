@@ -1058,7 +1058,7 @@ class MainActivity : AppCompatActivity() {
             },
             userId = { AuthManager.effectiveUserId(this) },
             clearPendingAttachments = { inputActions.pendingAttachmentActions.clearPendingAttachments(deleteFiles = false) },
-            collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
+            inputFocusActions = { inputActions.inputFocusActions },
             onGroupSummariesChanged = { groupActions.loadGroups() }
         )
     }

@@ -57,6 +57,7 @@ data class ChatMessage(
     var recalledBy: String? = null,
     var projectPostCard: ChatProjectPostCard? = null,
     var webChatMessage: WebChatProductionMessage? = null,
+    var senderUserId: String? = null,
 )
 
 class ChatAdapter(
@@ -74,6 +75,7 @@ class ChatAdapter(
     var onVoiceAttachmentLongPress: ((message: ChatMessage, attachment: ChatAttachment) -> Unit)? = null
     var onWebChatMessageAction: ((ChatMessage, WebChatMessageAction) -> Unit)? = null
     var onWebChatContentOpen: ((ChatMessage, WebChatProductionContentPart) -> Unit)? = null
+    var onSenderAvatarLongPress: ((ChatMessage) -> Unit)? = null
     private var cachedUserProfile: UserProfile? = null
     private var cachedUserBitmap: Bitmap? = null
     private var selectionMode = false
@@ -214,6 +216,7 @@ class ChatAdapter(
         bindSendStatus(holder, message)
         bindUserAvatar(holder.userAvatar)
         bindSenderAvatar(holder.friendAvatar, message)
+        bindGroupMentionAvatar(holder.friendAvatar ?: holder.itemView.findViewById(R.id.groupAiAvatar), message, onSenderAvatarLongPress)
         bindSelectionVisual(holder, message, projectCardBound, position)
         bindMessageActions(holder, message, projectCardBound)
         WebChatProductionMessageActionBinder.bind(holder.itemView, message, onWebChatMessageAction)

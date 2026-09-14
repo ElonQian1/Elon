@@ -42,6 +42,7 @@
         android:visibility="gone" />
 
     <ImageView
+        android:id="@+id/groupAiAvatar"
         android:layout_width="36dp"
         android:layout_height="36dp"
         android:contentDescription="@string/app_name"

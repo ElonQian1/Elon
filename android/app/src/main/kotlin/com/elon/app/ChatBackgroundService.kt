@@ -39,6 +39,8 @@ import androidx.core.content.ContextCompat
  *  - onDestroy 时不主动断 WS（应用本身仍可能在前台），仅释放服务自身的常驻通知。
  */
 class ChatBackgroundService : Service() {
+    private val summaryPoller by lazy { SocialSummaryPoller(this) }
+    private var foregroundStarted = false
 
     /** 网络恢复时立刻重连 WS（Doze 唤醒、WiFi 切换等场景）。*/
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -57,14 +59,30 @@ class ChatBackgroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        runCatching {
-            startForeground(NOTIFICATION_ID, buildNotification(this), foregroundServiceTypeOrZero())
+        if (intent?.action == ACTION_STOP) ChatBackgroundPrefs.setKeepAliveEnabled(this, false)
+        if (!isAllowed(this)) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        if (!foregroundStarted) runCatching {
+            val notification = buildNotification(this)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, foregroundServiceTypeOrZero())
+            } else startForeground(NOTIFICATION_ID, notification)
+            foregroundStarted = true
+            running = true
         }.onFailure { Log.w(TAG, "startForeground 失败: ${it.message}") }
+        if (!foregroundStarted) { stopSelf(); return START_NOT_STICKY }
         runCatching { (application as? ElonApplication)?.globalWs?.start(this) }
+        summaryPoller.start()
         return START_STICKY
     }
 
     override fun onDestroy() {
+        running = false
+        summaryPoller.stop()
+        stopForeground(STOP_FOREGROUND_REMOVE)
         unregisterNetworkCallback()
         super.onDestroy()
     }
@@ -97,10 +115,18 @@ class ChatBackgroundService : Service() {
         private const val TAG = "ChatBgService"
         private const val NOTIFICATION_ID = 91_001
         const val CHANNEL_ID = "chat_background_keepalive_v1"
+        const val ACTION_STOP = "com.elon.app.chat.STOP_BACKGROUND"
+        @Volatile private var running = false
+
+        internal fun isAllowed(context: Context) = AuthManager.isLoggedIn(context) && ChatBackgroundPrefs.isKeepAliveEnabled(context)
 
         /** 启动保活服务（已运行则立即返回）。仅在用户允许后台接收消息且已登录时调用。 */
         fun start(context: Context) {
             val ctx = context.applicationContext
+            ctx.stopService(Intent(ctx, ChatRealtimeService::class.java))
+            ctx.getSystemService(NotificationManager::class.java)?.cancel(2303)
+            if (!isAllowed(ctx)) { stop(ctx); return }
+            if (running) return
             val intent = Intent(ctx, ChatBackgroundService::class.java)
             runCatching {
                 ContextCompat.startForegroundService(ctx, intent)
@@ -110,7 +136,10 @@ class ChatBackgroundService : Service() {
         /** 停止保活服务。 */
         fun stop(context: Context) {
             val ctx = context.applicationContext
+            running = false
             runCatching { ctx.stopService(Intent(ctx, ChatBackgroundService::class.java)) }
+            runCatching { ctx.stopService(Intent(ctx, ChatRealtimeService::class.java)) }
+            ctx.getSystemService(NotificationManager::class.java)?.cancel(2303)
         }
 
         /** 创建保活通知通道（IMPORTANCE_LOW，无声音、无震动，避免打扰）。 */
@@ -144,9 +173,12 @@ class ChatBackgroundService : Service() {
             )
             return NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification_task_done)
-                .setContentTitle("一龙正在为你保持消息在线")
-                .setContentText("点击打开应用 · 可在设置中关闭后台保活")
+                .setContentTitle("正在后台接收消息")
+                .setContentText("好友和群聊消息在线 · 可在设置中关闭")
                 .setContentIntent(pendingIntent)
+                .addAction(0, "关闭后台收消息", PendingIntent.getService(context, NOTIFICATION_ID + 1,
+                    Intent(context, ChatBackgroundService::class.java).setAction(ACTION_STOP),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setSilent(true)

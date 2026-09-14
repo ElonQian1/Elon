@@ -29,7 +29,7 @@ internal class MainGroupChatActions(
     private val onProjectShareLongPress: (View, ChatMessage, ChatProjectShare) -> Unit,
     private val userId: () -> String,
     private val clearPendingAttachments: () -> Unit,
-    private val collapseInputComposer: () -> Unit,
+    private val inputFocusActions: () -> MainInputFocusActions,
     private val onGroupSummariesChanged: () -> Unit
 ) {
     private val messagesByGroup = linkedMapOf<String, MutableList<ChatMessage>>()
@@ -37,6 +37,7 @@ internal class MainGroupChatActions(
     private var activeGroup: AppGroup? = null
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
+    private val mentions by lazy { GroupMentionController(activity, binding.inputEdit, http, serverUrl, userId) { inputFocusActions().focusInputComposer() } }
     private val summaryPosts by lazy {
         MainGroupSummaryPosts(
             activity = activity,
@@ -57,6 +58,7 @@ internal class MainGroupChatActions(
 
     fun openGroup(group: AppGroup, animate: Boolean) {
         activeGroup = group
+        mentions.setGroup(group)
         val messages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
         val adapter = ChatAdapter(
             messages = messages,
@@ -65,6 +67,7 @@ internal class MainGroupChatActions(
             onProjectShareLongPress = onProjectShareLongPress
         )
         activeAdapter = adapter
+        adapter.onSenderAvatarLongPress = mentions::mentionSender
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter
         if (messages.isNotEmpty()) {
@@ -78,6 +81,7 @@ internal class MainGroupChatActions(
 
     fun closeGroupChat() {
         activeGroup = null
+        mentions.setGroup(null)
         activeAdapter = null
         summaryPosts.clear()
         stopPolling()
@@ -133,7 +137,7 @@ internal class MainGroupChatActions(
         binding.chatList.scrollToPosition(messages.lastIndex)
         binding.inputEdit.text.clear()
         clearPendingAttachments()
-        collapseInputComposer()
+        inputFocusActions().collapseInputComposer()
 
         thread {
             val result = runCatching {
@@ -176,7 +180,7 @@ internal class MainGroupChatActions(
         messages.add(pending)
         activeAdapter?.notifyItemInserted(messages.lastIndex)
         binding.chatList.scrollToPosition(messages.lastIndex)
-        collapseInputComposer()
+        inputFocusActions().collapseInputComposer()
 
         thread {
             val result = runCatching {
@@ -455,6 +459,7 @@ internal class MainGroupChatActions(
             senderLabel = if (outgoing || isElAssistant) null else senderName,
             id = json.optString("id").trim().takeIf { it.isNotEmpty() },
             senderAvatarDataUrl = senderAvatar,
+            senderUserId = senderUserId,
             createdAtMs = parseChatMessageCreatedAt(json.optString("created_at", "")) ?: 0L,
             recalledAt = json.cleanRecallString("recalled_at"),
             recalledBy = json.cleanRecallString("recalled_by")

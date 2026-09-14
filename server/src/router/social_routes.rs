@@ -8,8 +8,12 @@ use axum::routing::{delete, get, post};
 use axum::Router;
 use std::sync::Arc;
 
+mod group_members;
+
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
+    .route("/assets/group_mentions.js", get(group_members::script))
+    .route("/assets/group_mentions.css", get(group_members::styles))
     .route(
         "/api/me/friends",
         get(friend_api::list_friends).post(friend_api::add_friend_by_phone),
@@ -44,7 +48,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
     )
     .route(
         "/api/me/groups/:group_id/members",
-        post(friend_api::add_group_members),
+        get(group_members::list).post(friend_api::add_group_members),
     )
     .route(
         "/api/me/groups/:group_id/messages",

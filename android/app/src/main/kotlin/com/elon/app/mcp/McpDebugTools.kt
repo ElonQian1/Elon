@@ -112,29 +112,11 @@ internal fun mcpDebugKeepalive(context: Context, args: JSONObject): JSONObject {
     val action = args.optString("action", "status").lowercase(Locale.ROOT)
     when (action) {
         "start" -> {
-            context.getSharedPreferences("elon", Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean(McpDebugKeepAliveService.PREF_MANUAL_STOPPED, false)
-                .putBoolean(McpDebugKeepAliveService.PREF_ACTIVE, true)
-                .putLong(McpDebugKeepAliveService.PREF_STARTED_AT, System.currentTimeMillis())
-                .apply()
-            val intent = Intent(context, McpDebugKeepAliveService::class.java).apply {
-                this.action = McpDebugKeepAliveService.ACTION_START
-            }
-            ContextCompat.startForegroundService(context, intent)
+            McpDebugKeepAliveService.requestStart(context)
             DebugTraceStore.record("mcp_keepalive_requested", mapOf("action" to "start"))
         }
         "stop" -> {
-            context.getSharedPreferences("elon", Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean(McpDebugKeepAliveService.PREF_MANUAL_STOPPED, true)
-                .putBoolean(McpDebugKeepAliveService.PREF_ACTIVE, false)
-                .remove(McpDebugKeepAliveService.PREF_STARTED_AT)
-                .apply()
-            val intent = Intent(context, McpDebugKeepAliveService::class.java).apply {
-                this.action = McpDebugKeepAliveService.ACTION_STOP
-            }
-            context.stopService(intent)
+            McpDebugKeepAliveService.requestStop(context)
             DebugTraceStore.record("mcp_keepalive_requested", mapOf("action" to "stop"))
         }
         "status" -> Unit
