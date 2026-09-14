@@ -159,6 +159,39 @@ test('typed writing widgets work without a textual wrapper and unrelated widgets
   assert.equal(history.project({ messages: [input] })[0].content[0].type, 'writing_block');
 });
 
+test('provider writing IDs cannot collide with locally generated code IDs', () => {
+  const input = message('```python\nprint(1)\n```', { content_references: [{
+    type: 'client_defined_widget', category: 'writing_block',
+    data: { id: 'code-0', variant: 'standard', content: 'Writing body', title: 'Document' }
+  }] });
+  const before = JSON.stringify(input);
+  const projected = blocks.project(input, true);
+  assert.deepEqual(projected.parts.map(part => part.type), ['code', 'writing_block']);
+  assert.equal(projected.parts[0].textBlock.content, 'print(1)\n');
+  assert.equal(projected.parts[1].textBlock.content, 'Writing body');
+  assert.equal(projected.parts[1].textBlock.complete, true);
+  assert.equal(projected.parts[1].textBlock.sourceMessageId, input.id);
+  assert.deepEqual(projected.writeSources.map(source => [source.id, source.index]), [['code-0', 0]]);
+  const row = history.project({ messages: [input] })[0];
+  const frame = stream.assistantFrame({ message: input });
+  const nativeParts = row.content.filter(part => part.textBlock);
+  assert.deepEqual(nativeParts, frame.blockParts);
+  assert.deepEqual(nativeParts, projected.parts);
+  assert.equal(JSON.stringify(input), before);
+});
+
+test('duplicate writing IDs remain ambiguous even when a code block shares the ID', () => {
+  const reference = { type: 'client_defined_widget', category: 'writing_block',
+    data: { id: 'code-0', variant: 'standard', content: 'First' } };
+  const input = message('```js\nconst value = 1;\n```', { content_references: [reference,
+    { ...reference, data: { ...reference.data, content: 'Second' } }] });
+  const projected = blocks.project(input, true);
+  assert.deepEqual(projected.parts.map(part => part.type), ['code', 'writing_block']);
+  assert.equal(projected.parts[1].textBlock.content, 'First');
+  assert.equal(projected.parts[1].textBlock.sourceMessageId, undefined);
+  assert.deepEqual(projected.writeSources, []);
+});
+
 test('DOM snapshots reuse current structured writing state without imports, requests or composer access', () => {
   const id = '11111111-1111-4111-8111-111111111111';
   const input = message(':::writing{id="x" variant="standard"}\nOld\n:::\n```js\nlet x;\n```',

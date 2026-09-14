@@ -189,7 +189,8 @@
       const data = reference.data;
       const id = token(data.id) || 'writing-reference-' + index;
       writingIds.set(id, (writingIds.get(id) || 0) + 1);
-      if (parts.some(item => item.textBlock.id === id)) continue;
+      // Provider writing IDs and locally numbered code IDs are separate namespaces.
+      if (parts.some(item => item.textBlock.kind === 'writing' && item.textBlock.id === id)) continue;
       if (parts.length >= MAX_BLOCKS) { ambiguousWriting = true; continue; }
       const saved = token(data.id) ? own(message.metadata?.writing_blocks, data.id) : undefined;
       const current = saved && typeof saved.content === 'string' ? saved.content : data.content;
@@ -240,5 +241,5 @@
     } catch (_) { return null; }
   }
 
-  return { version: 7, project, domCode, runtimeProjection, MAX_CONTENT };
+  return { version: 8, project, domCode, runtimeProjection, MAX_CONTENT };
 });

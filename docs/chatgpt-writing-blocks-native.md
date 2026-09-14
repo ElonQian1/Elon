@@ -18,6 +18,8 @@
 
 2026-09-14 补齐[云保存验收的回执保护](reports/chatgpt-writing-save-acceptance-guard.md)：保存结果未确认时不自动关闭编辑器或切走会话；这是验收工具修正，不扩大特殊会话的完成范围。
 
+2026-09-14 修复[写作块与代码块 ID 碰撞导致漏显示](reports/chatgpt-writing-block-id-20260914.md)：官网写作块 ID 与本地代码编号分开去重，保留真实重复写作块的写回保护；118 项定向回归通过。
+
 项目内自有会话写回的源码扩展见[项目写回批次](chatgpt-writing-blocks-project-save.md)：已实现并通过离线契约测试，待集中包真机验收，不能沿用普通会话的完成标记。
 
 [临时会话写回](chatgpt-writing-blocks-temporary-save.md)已补源码及离线验证，限定官方确认的同一临时会话与非库文件块；不加入历史目录或改变隐私状态，真机验收仍待补。
