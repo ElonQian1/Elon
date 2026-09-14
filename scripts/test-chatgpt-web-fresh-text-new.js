@@ -21,6 +21,7 @@ const response = { id: AID, author: { role: 'assistant' }, status: 'finished_suc
 function newFixture(project = false) {
   const f = fixture();
   f.serverId = null; f.key = 'initial-key'; f.binds = 0; f.navigations = 0; f.remembered = [];
+  f.canonicalRootId = ROOT;
   f.selected.id = 'WEB:synthetic-owner'; f.selected.serverId$ = () => f.serverId;
   f.binding.serverId = null; f.binding.newThread = true; f.props.isNewThread = true;
   f.page.location.href = f.binding.href = 'https://chatgpt.com' + (project ? '/g/' + PROJECT + '/project' : '/');
@@ -30,7 +31,7 @@ function newFixture(project = false) {
   f.messages = [f.parent];
   Object.assign(f.shared.HM, { getCurrentMessage: () => f.leaf, getIsNewConversation: () => f.leaf.id === ROOT,
     getAllMessages: () => f.messages, getNodeIfExists: (_, id) => f.nodes?.[id],
-    getParentNode: (_, id) => ({ id: f.nodes?.[id]?.parent }),
+    getParentNode: (_, id) => f.nodes?.[f.nodes?.[id]?.parentId],
     getParentPromptNode: (_, id) => f.nodes?.[id]?.message?.author?.role === 'assistant'
       ? { id: f.nodes[id].parent } : null });
   Object.assign(f.shared, {
@@ -73,9 +74,25 @@ function payload(project = false, emptyRoot = false, parentId = ROOT) {
     } };
 }
 
-function applyHistory(f, data) {
+function applyHistory(f, data, retainPaginationRoot = true) {
   f.nodes = structuredClone(data.mapping);
-  if (f.nodes['']) f.nodes = { ...f.nodes, [UID]: { ...f.nodes[UID], parent: ROOT } };
+  // The reviewed paginated reducer updates an existing Cx tree in place using
+  // its current rootId; the response's synthetic pagination root is not added.
+  if (data.__paginatedConversationPage && retainPaginationRoot) {
+    const serverRoot = 'paginated-root:' + CID, root = f.nodes[serverRoot];
+    delete f.nodes[serverRoot];
+    f.nodes[f.canonicalRootId] = { ...root, id: f.canonicalRootId };
+    for (const row of Object.values(f.nodes)) {
+      if (row.parent === serverRoot) row.parent = f.canonicalRootId;
+    }
+  } else {
+    f.canonicalRootId = Object.values(f.nodes).find(row => !row.parent).id || ROOT;
+  }
+  if (f.nodes['']) {
+    f.nodes[ROOT] = { ...f.nodes[''], id: ROOT };
+    delete f.nodes[''];
+    f.nodes[UID].parent = ROOT;
+  }
   for (const row of Object.values(f.nodes)) {
     row.parentId = row.parent ?? '';
     row.message ??= { id: row.id, author: { role: 'root' }, content: { content_type: 'text', parts: [] } };
@@ -147,14 +164,14 @@ test('failed or cancelled first-turn navigation never starts the history loader'
 });
 
 test('complete provider pagination roots reconcile only their exact conversation and full message chain', async () => {
-  for (const hidden of [false, true]) {
+  for (const hidden of [false, true]) for (const retained of [false, true]) {
     const f = newFixture(), binding = await f.api.capture(f.node, null, admission);
     binding.adoptConversation(CID, { input_message: input }, UID);
     const value = paginatedHistory(false, hidden), history = historyModule.create();
     assert.equal(history.ownsResponse(value, binding, UID), true);
     f.conversation.textHydrateHistory = async (_, options) => {
       options.onConversationLoadedFromNetwork(value);
-      assert.equal(options.shouldApplyResponse(), true); applyHistory(f, value);
+      assert.equal(options.shouldApplyResponse(), true); applyHistory(f, value, retained);
     };
     assert.equal(await history.reconcile(binding, { userMessageId: UID }, new AbortController().signal), true);
     for (const mutate of [
@@ -171,6 +188,37 @@ test('complete provider pagination roots reconcile only their exact conversation
       const changed = paginatedHistory(false, hidden); mutate(changed);
       assert.equal(history.ownsResponse(changed, binding, UID), false);
     }
+  }
+});
+
+test('retained pagination roots do not authorize changed canonical identities or branches', async () => {
+  for (const mutate of [
+    f => { delete f.nodes[ROOT]; },
+    f => { f.nodes[ROOT].id = AID; },
+    f => { f.nodes[ROOT].message.id = AID; },
+    f => { f.nodes[ROOT].message.author.role = 'assistant'; },
+    f => { f.nodes[ROOT].parentId = AID; },
+    f => { f.nodes[ROOT].children.push(AID); },
+    f => { f.nodes[ROOT].children = [UID]; },
+    f => { f.nodes[f.nodes[UID].parentId].parentId = AID; },
+    f => { f.nodes[f.nodes[UID].parentId].message.metadata.is_visually_hidden_from_conversation = false; },
+    f => { f.nodes['paginated-root:' + CID] = { ...f.nodes[ROOT], id: 'paginated-root:' + CID }; },
+    f => {
+      f.nodes.otherRoot = { ...f.nodes[ROOT], id: 'otherRoot', message: { ...f.nodes[ROOT].message, id: 'otherRoot' } };
+      f.nodes[f.nodes[UID].parentId].parentId = 'otherRoot'; delete f.nodes[ROOT];
+    }
+  ]) {
+    const f = newFixture(), binding = await f.api.capture(f.node, null, admission);
+    binding.adoptConversation(CID, { input_message: input }, UID);
+    f.conversation.textHydrateHistory = async (_, options) => {
+      const value = paginatedHistory();
+      options.onConversationLoadedFromNetwork(value);
+      assert.equal(options.shouldApplyResponse(), true);
+      applyHistory(f, value); mutate(f);
+    };
+    assert.equal(await historyModule.create().reconcile(binding, { userMessageId: UID }, new AbortController().signal), false);
+    assert.equal(binding.reconciliationFailure(), 'store_parent_mismatch');
+    assert.equal(f.navigations, 1);
   }
 });
 
@@ -193,7 +241,7 @@ test('an owned first turn reconciles through the observed hidden system ancestor
 
 test('a hidden ancestor cannot authorize a different or modified canonical history chain', async () => {
   for (const mutate of [
-    f => { f.nodes[UID].parent = AID; },
+    f => { f.nodes[UID].parentId = AID; },
     f => { f.nodes[f.nodes[UID].parent].message.metadata.is_visually_hidden_from_conversation = false; },
     f => { f.nodes[f.nodes[UID].parent].message.author.role = 'user'; },
     f => { f.nodes[f.nodes[UID].parent].message.id = AID; },

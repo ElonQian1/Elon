@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 11, create: factory });
+  const api = Object.freeze({ version: 12, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
@@ -101,10 +101,16 @@
         Object.freeze(chain);
         return (reader, state) => {
           try {
+            // VHt hydrates paginated messages into the existing Cx root. Only
+            // this verified complete page may retain our original empty root;
+            // full-history roots and all non-root identities must still match.
+            const canonicalRoot = cursor === paginatedRoot && !reader.getNodeIfExists(state, cursor)
+              ? binding.parentId : cursor;
+            const canonicalId = id => id === cursor ? canonicalRoot : id;
             return chain.every(expected => {
-              const current = reader.getNodeIfExists(state, expected.id), message = current?.message;
-              return current?.id === expected.id && current.parentId === expected.parentId &&
-                message?.id === expected.id && reader.getParentNode(state, expected.child)?.id === expected.id &&
+              const id = canonicalId(expected.id), current = reader.getNodeIfExists(state, id), message = current?.message;
+              return current?.id === id && current.parentId === canonicalId(expected.parentId) &&
+                message?.id === id && reader.getParentNode(state, expected.child)?.id === id &&
                 Array.isArray(current.children) && current.children.length === 1 && current.children[0] === expected.child &&
                 (expected.root ? message.author?.role === 'root' : message.author?.role === 'system' &&
                   message.metadata?.is_visually_hidden_from_conversation === true && message.content?.content_type === 'text');

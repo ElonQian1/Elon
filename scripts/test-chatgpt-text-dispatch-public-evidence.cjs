@@ -246,6 +246,23 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     assert.match(method('getNodeIfExists'), /return P\(bx,this\)\[e\]/);
   });
 
+  await t.test('paginated hydration retains the existing canonical root instead of installing the response root', () => {
+    const source = (module, name) => {
+      const node = definition(module, name); return module.text.slice(node.start, node.end);
+    };
+    assert.deepEqual(conversation.imports.get('ppe'), { file: './' + assets.shared[0], name: 'eX' });
+    assert.equal(shared.exported.get('eX'), 'Cx');
+    assert.deepEqual(conversation.imports.get('$Se'), { file: './' + assets.shared[0], name: 'yi' });
+    assert.equal(shared.exported.get('yi'), 'VHt');
+    assert.match(source(conversation, 'fy'), /m!=null&&n\?\.tree instanceof ppe&&v==null/);
+    assert.match(source(conversation, 'fy'), /\$Se\(\{tree:n\.tree,messagesLeafToRoot:m\.messagesLeafToRoot/);
+    assert.match(source(conversation, 'fy'), /F=n\.tree,e=t\.serverCurrentLeafId/);
+    assert.match(source(shared, 'VHt'), /rootId:e\.rootId/);
+    assert.match(source(shared, 'VHt'), /s=o===-1\?e\.rootId:e\.getNode\(a\[o\]\.id\)\.parentId/);
+    assert.match(source(shared, 'VHt'), /e\.addMessage\(c\?\?s,t\)/);
+    assert.match(source(shared, 'VHt'), /e\.moveNode\(c,t\.id\)/);
+  });
+
   await t.test('stream transport also performs request and response integrity checks', () => {
     const stream = facts(definition(conversation, 'jGt', true));
     includes(stream.properties, ['expectedState', 'onBeforeRequestStart', 'headersToRemove',
