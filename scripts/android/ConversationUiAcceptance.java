@@ -216,7 +216,8 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                     java.nio.charset.StandardCharsets.UTF_8);
                 assertTrue("fresh_fixture_prompt_invalid", freshPrompt.matches(
                     "ELON_FRESH_TEXT_ACCEPTANCE_V1 [a-z]+ [0-9]{13}\\. Reply exactly FRESH_[A-Z]+_[0-9]{13}\\.") || freshPrompt.matches(
-                    "ELON_FRESH_TEXT_ACCEPTANCE_V1 stop [0-9]{13}\\. Write a numbered list of 1000 simple English words\\. Do not summarize\\."));
+                    "ELON_FRESH_TEXT_ACCEPTANCE_V1 stop [0-9]{13}\\. Write a numbered list of 1000 simple English words\\. Do not summarize\\.") || freshPrompt.matches(
+                    "ELON_FRESH_TEXT_ACCEPTANCE_V1 background [0-9]{13}\\. Write 30 numbered short English sentences\\. End with FRESH_[A-Z]+_[0-9]{13}\\."));
                 UiObject freshInput = description("web-chat-composer-input:chatgpt_web");
                 assertTrue("fresh_input_missing", freshInput.waitForExists(3000));
                 java.lang.reflect.Method finder = UiObject.class.getDeclaredMethod("findAccessibilityNodeInfo", long.class);

@@ -10,16 +10,21 @@ param(
     [switch]$FirstOnly,
     [switch]$StopThenFollowup,
     [switch]$NewConversation,
-    [switch]$ComposerUnavailable
+    [switch]$ComposerUnavailable,
+    [switch]$BackgroundResume
 )
 $ErrorActionPreference = 'Stop'
 if ($NewConversation -and ($OnlyStop -or $StopThenFollowup)) { throw 'new_conversation_stop_scope_not_supported' }
 if ($ComposerUnavailable -and (!$NewConversation -or !$FirstOnly -or !$UseDefault)) { throw 'composer_lease_requires_default_new_first' }
+if ($BackgroundResume -and (!$FirstOnly -or !$UseDefault -or $ComposerUnavailable -or $OnlyStop -or $StopThenFollowup)) {
+    throw 'background_resume_requires_single_default_send'
+}
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-fresh-trial-smoke.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-fresh-text-smoke-evidence.ps1')
 . (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-composer-dom-smoke.ps1')
+. (Join-Path $PSScriptRoot 'chatgpt-fresh-background-smoke.ps1')
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1
 $runtime.mcp_bootstrapped = $true
@@ -41,7 +46,7 @@ $composerLease = $null
 $report = [ordered]@{ schema = 'elon.fresh_text_ui.v1'; passed = $false; stage = 'opening';
     new_conversation = [bool]$NewConversation; seed_sends = 0; candidate_clicks = 0; cases = @();
     restored = $false; awake_restored = $false; write_unconfirmed = $false;
-    state_probe_timeouts = 0; foreground_changed = $false; send_not_attempted = $false }
+    state_probe_timeouts = 0; foreground_changed = $false; send_not_attempted = $false; background_resume = $null }
 
 function Trial([string]$Mode) {
     Invoke-ChatGptFreshTrial -Runtime $runtime -Mode $Mode
@@ -51,6 +56,9 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
     $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     $marker = "FRESH_$($Kind.ToUpperInvariant())_$stamp"
     $prompt = "ELON_FRESH_TEXT_ACCEPTANCE_V1 $Kind $stamp. Reply exactly $marker."
+    if ($BackgroundResume) {
+        $prompt = "ELON_FRESH_TEXT_ACCEPTANCE_V1 background $stamp. Write 30 numbered short English sentences. End with $marker."
+    }
     $stop = $Kind -eq 'stop'; $stopClicked = $false
     if ($stop) { $prompt = "ELON_FRESH_TEXT_ACCEPTANCE_V1 stop $stamp. Write a numbered list of 1000 simple English words. Do not summarize." }
     Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass CanvasUiAcceptance `
@@ -128,6 +136,11 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
             $report.last_trial = $diagnostic
             if ($diagnostic.phase -eq 'rejected') { throw "fresh_rejected:$($diagnostic.code)" }
             if ($diagnostic.attempts -gt ($before.attempts + 1)) { throw 'multiple_fresh_attempts' }
+            if ($BackgroundResume -and !$report.background_resume -and
+                (Test-ChatGptFreshBackgroundAdmission -Before $before -Current $diagnostic)) {
+                $report.background_resume = Invoke-ChatGptFreshBackgroundResume -Runtime $runtime
+                continue
+            }
             if ($stop) { $report.stop_native_streaming = $main.social_chat.web_chat_streaming -eq $true }
             if ($stop -and -not $stopClicked -and $diagnostic.accepted -and $diagnostic.pending) {
                 Invoke-AndroidSemanticAcceptance -Runtime $runtime -TestClass ConversationUiAcceptance `
@@ -233,10 +246,12 @@ try {
         $report.stage = $kind; Write-Output "FRESH_TEXT_STAGE=$kind"
         $report.cases += Native-Send $kind $true ($NewConversation -and $kind -eq 'first')
     }
+    if ($BackgroundResume -and !$report.background_resume.exercised) { throw 'background_active_window_not_observed' }
     $report.passed = $true; $report.stage = 'complete'
 } catch {
     $report.error = if ($_.Exception.Message -match '^[a-z_:]+$') { $_.Exception.Message } else { 'acceptance_failed' }
     if ($_.Exception.Message -match '^Semantic UI acceptance failed: ([a-z_]+)$') { $report.error = $Matches[1] }
+    if ($report.error -in @('foreground_package_mismatch','background_launcher_not_owned')) { $report.foreground_changed = $true }
     $report.failure_line = $_.InvocationInfo.ScriptLineNumber
 } finally {
     if ($composerLease) {
