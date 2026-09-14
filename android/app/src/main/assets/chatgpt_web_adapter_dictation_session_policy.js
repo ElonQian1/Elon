@@ -10,6 +10,22 @@
   const CANCEL_SIGNAL = /cancel dictation|cancel recording|discard recording|stop dictation|取消听写|取消录音|放弃录音/i;
   const SUBMIT_SIGNAL = /submit dictation|submit recording|confirm dictation|accept recording|done recording|提交听写|确认听写|完成听写|确认录音|完成录音/i;
 
+  function collectNodes(document) {
+    const seen = new Set();
+    const values = [];
+    Array.from(document.querySelectorAll(
+      'button, [role="button"], [tabindex], svg'
+    )).forEach((node) => {
+      const owner = node.closest && node.closest('button, [role="button"], [tabindex]');
+      const candidate = owner || node;
+      if (!seen.has(candidate)) {
+        seen.add(candidate);
+        values.push(candidate);
+      }
+    });
+    return values;
+  }
+
   function signal(node) {
     return [
       node && node.id,
@@ -91,7 +107,9 @@
       : () => false;
     const explicit = explicitControl(nodes, kind, isActionable, isVisible);
     if (explicit) return explicit;
-    const structural = structuralControls(
+    // Missing composer DOM and bottom-row geometry are not recording evidence.
+    // Use unlabeled controls only for a capture the caller actually observed.
+    const structural = options.captureActive === true && structuralControls(
       nodes,
       isActionable,
       isVisible,
@@ -106,5 +124,5 @@
     return !!(find('cancel', options) || find('submit', options));
   }
 
-  return Object.freeze({ active, find, signal });
+  return Object.freeze({ active, find, signal, collectNodes });
 });

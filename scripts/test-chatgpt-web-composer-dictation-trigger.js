@@ -172,6 +172,7 @@ async function runDictationTriggerTest() {
     getBoundingClientRect: () => ({ left: 340, top: 710, right: 390, bottom: 760, width: 50, height: 50 })
   };
   const sessionNodes = [sessionPlus, sessionCancel, sessionSubmit];
+  let sessionCaptureActive = false;
   const sessionSandbox = {
     document: {
       querySelector: () => null,
@@ -198,10 +199,14 @@ async function runDictationTriggerTest() {
       __elonChatGptDictationSessionPolicy: dictationSessionPolicy,
       __elonChatGptDictationRuntime: {
         createCaptureTracker: () => ({
-          arm() {}, finish() {}, active: () => false, pending: () => false,
+          arm() {}, finish() { sessionCaptureActive = false; },
+          active: () => sessionCaptureActive, pending: () => false,
           waitForActive: () => Promise.resolve(false), waitForInactive: () => Promise.resolve(true)
         }),
-        waitUntil: () => Promise.resolve(true)
+        waitUntil(predicate) {
+          sessionCaptureActive = false;
+          return Promise.resolve(predicate());
+        }
       }
     }
   };
@@ -210,11 +215,15 @@ async function runDictationTriggerTest() {
   sessionSandbox.window.location = sessionSandbox.location;
 
   runComposer(sessionSandbox);
+  assert.equal(sessionSandbox.window.__elonChatGptComposer.dictationActive(null), false,
+    'missing composer and round buttons cannot hide native Send without a recording');
+  sessionCaptureActive = true;
   assert.equal(sessionSandbox.window.__elonChatGptComposer.dictationActive(null), true);
   await sessionSandbox.window.__elonChatGptComposer.cancelDictation(
     (event) => sessionEvents.push(event),
     (...args) => sessionResults.push(args)
   );
+  sessionCaptureActive = true;
   await sessionSandbox.window.__elonChatGptComposer.submitDictation(
     (event) => sessionEvents.push(event),
     (...args) => sessionResults.push(args)
@@ -228,6 +237,7 @@ async function runDictationTriggerTest() {
 
   sessionEvents.length = 0;
   sessionResults.length = 0;
+  sessionCaptureActive = true;
   sessionSandbox.window.__elonChatGptActionTargetPolicy.actionPoint = () => null;
   assert.equal(sessionSandbox.window.__elonChatGptComposer.dictationActive(null), true);
   await sessionSandbox.window.__elonChatGptComposer.cancelDictation(

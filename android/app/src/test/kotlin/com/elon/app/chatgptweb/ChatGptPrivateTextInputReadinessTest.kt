@@ -44,6 +44,21 @@ class ChatGptPrivateTextInputReadinessTest {
         assertFalse(ChatGptWebTransientComposerReadiness.reconcile(page, page, true).composerReady)
     }
 
+    @Test fun previousDomReadinessCannotRelabelTheVerifiedPrivateEditorDuringMenusOrDictation() {
+        val previous = page.copy(composerReady = true, privateSendReady = false, currentModel = "Fast")
+        for (dictation in listOf(false, true)) {
+            val incoming = page.copy(dictationActive = dictation, currentModel = "")
+            val merged = ChatGptWebTransientComposerReadiness.reconcile(
+                previous, incoming, composerInteractionActive = !dictation,
+            )
+            assertFalse(merged.composerReady)
+            assertTrue(merged.privateSendReady)
+            assertTrue(ChatGptWebAccessPolicy.canSendText(merged))
+            assertFalse(ChatGptWebAccessPolicy.canChat(merged))
+            assertEquals("Fast", merged.currentModel)
+        }
+    }
+
     @Test fun protocolKeepsDomAndPrivateStateSeparateAndDropsReadinessOnContentOnlyEvents() {
         fun parse(extra: String) = (ChatGptWebProtocol.parse(
             """{"schema":"yilong.ai.ui.v1","event":{"type":"message_snapshot","composerReady":false,"authenticated":true,$extra}}""",

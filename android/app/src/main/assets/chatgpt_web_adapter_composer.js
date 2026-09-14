@@ -253,28 +253,13 @@
 
   function hasVisibleComposer() { return !!findPromptInput(); }
 
-  function dictationSessionNodes() {
-    const seen = new Set();
-    const values = [];
-    Array.from(document.querySelectorAll(
-      'button, [role="button"], [tabindex], svg'
-    )).forEach((node) => {
-      const owner = node.closest && node.closest('button, [role="button"], [tabindex]');
-      const candidate = owner || node;
-      if (!seen.has(candidate)) {
-        seen.add(candidate);
-        values.push(candidate);
-      }
-    });
-    return values;
-  }
-
   function dictationSessionOptions(composer) {
     return {
-      nodes: dictationSessionNodes(),
+      nodes: dictationSessionPolicy.collectNodes(document),
       isActionable,
       isVisible,
       composerPresent: !!composer || hasVisibleComposer(),
+      captureActive: dictationActions.captureActive() === true,
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight
     };

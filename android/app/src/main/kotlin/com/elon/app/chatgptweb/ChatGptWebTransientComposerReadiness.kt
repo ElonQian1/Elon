@@ -22,7 +22,9 @@ internal object ChatGptWebTransientComposerReadiness {
         if (ChatGptWebAccessPolicy.requiresLogin(incoming)) return incoming
         if (!sameConversationSurface(previous, incoming)) return incoming
         return incoming.copy(
-            composerReady = true,
+            // A verified private editor already keeps native text usable. Do not
+            // advertise the missing DOM editor to voice/attachment admission.
+            composerReady = !incoming.privateSendReady,
             currentModel = incoming.currentModel.ifBlank { previous.currentModel },
             capabilities = ChatGptWebCapabilities(
                 previous.capabilities.supported + incoming.capabilities.supported,
