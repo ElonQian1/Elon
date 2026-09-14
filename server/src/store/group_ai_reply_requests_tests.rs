@@ -1,6 +1,9 @@
 use super::*;
 use uuid::Uuid;
 
+#[path = "group_web_ai_requests_tests.rs"]
+mod web_cases;
+
 struct Fixture {
     store: Store,
     path: std::path::PathBuf,

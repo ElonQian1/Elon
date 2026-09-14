@@ -14,7 +14,7 @@ import com.elon.app.configureWebChatBackgroundSurface
 @SuppressLint("SetJavaScriptEnabled")
 internal fun createChatGptBackgroundWebView(
     activity: AppCompatActivity,
-    audioPermissionController: ChatGptWebAudioPermissionController,
+    audioPermissionController: ChatGptWebAudioPermissionController?,
     onPageProgress: (Int) -> Unit,
     onFileChooser: (ValueCallback<Array<Uri>>) -> Unit,
 ): WebView = WebView(activity).apply {
@@ -47,11 +47,14 @@ internal fun createChatGptBackgroundWebView(
         }
 
         override fun onPermissionRequest(request: PermissionRequest) {
-            activity.runOnUiThread { audioPermissionController.handle(request) }
+            activity.runOnUiThread {
+                if (audioPermissionController == null) request.deny()
+                else audioPermissionController.handle(request)
+            }
         }
 
         override fun onPermissionRequestCanceled(request: PermissionRequest) {
-            activity.runOnUiThread { audioPermissionController.cancel(request) }
+            activity.runOnUiThread { audioPermissionController?.cancel(request) }
         }
     }
 }

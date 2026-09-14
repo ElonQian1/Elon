@@ -11,6 +11,7 @@ use super::{new_id, now, FriendGroupMemberPreview, FriendGroupMessage, FriendGro
 mod members;
 #[path = "group_message_revisions.rs"]
 pub(crate) mod revisions;
+mod send;
 
 impl Store {
     pub fn list_friend_groups(&self, user_id: &str) -> Result<Vec<FriendGroupProfile>> {
@@ -255,53 +256,11 @@ impl Store {
         content: &str,
         attachments: Option<&[ProjectAttachmentRef]>,
     ) -> Result<FriendGroupMessage> {
-        self.ensure_group_member(user_id, group_id)?;
-        let content = content.trim();
-        let attachments_json = attachments_to_json(attachments)?;
-        if content.is_empty() && attachments_json.is_none() {
-            return Err(anyhow!("消息不能为空"));
-        }
-        if content.chars().count() > 4000 {
-            return Err(anyhow!("消息过长"));
-        }
-
-        let id = new_id("gmsg");
-        let created_at = now();
-        let conn = self.conn()?;
-        let sender_name = conn.query_row(
-            "SELECT COALESCE(nickname, email, phone, id)
-             FROM users
-             WHERE id = ?1",
-            params![user_id],
-            |row| row.get::<_, String>(0),
-        )?;
-        conn.execute(
-            "INSERT INTO friend_group_messages (
-                id, group_id, sender_user_id, content, attachments_json, created_at
-             )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![id, group_id, user_id, content, attachments_json, created_at],
-        )?;
-        conn.execute(
-            "UPDATE friend_groups SET updated_at = ?1 WHERE id = ?2",
-            params![created_at, group_id],
-        )?;
-        mark_group_messages_read(&conn, user_id, group_id)?;
-
-        Ok(FriendGroupMessage {
-            id,
-            group_id: group_id.to_string(),
-            sender_user_id: user_id.to_string(),
-            sender_name,
-            content: content.to_string(),
-            attachments: attachments.unwrap_or(&[]).to_vec(),
-            created_at,
-            outgoing: true,
-            recalled_at: None,
-            recalled_by: None,
-            revision: 1,
-            edited_at: None,
-        })
+        let mut conn = self.conn()?;
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let message = send::insert_message(&tx, user_id, group_id, content, attachments)?;
+        tx.commit()?;
+        Ok(message)
     }
 
     pub fn delete_friend_group_message(

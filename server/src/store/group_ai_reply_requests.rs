@@ -5,6 +5,8 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 use super::super::{new_id, now, FriendGroupMessage, Store, SOCIAL_AI_USER_ID};
 use super::{ensure_social_ai_user, SOCIAL_AI_DISPLAY_NAME};
+#[path = "group_web_ai_requests.rs"]
+pub(crate) mod web;
 
 pub(crate) fn migrate(conn: &Connection) -> Result<()> {
     conn.execute_batch(
@@ -43,8 +45,20 @@ impl Store {
              ON CONFLICT(group_id, trigger_message_id) DO NOTHING",
             params![id, group_id, trigger_message_id, user_id, now()],
         )?;
+        let fallback = if inserted == 0 {
+            tx.query_row("SELECT id FROM group_ai_reply_requests WHERE group_id=?1 AND trigger_message_id=?2 AND requester_id=?3 AND state='server_ready' AND engine='server_api'",
+                params![group_id,trigger_message_id,user_id], |r| r.get::<_,String>(0)).optional()?
+        } else {
+            None
+        };
+        if let Some(ref existing) = fallback {
+            tx.execute(
+                "UPDATE group_ai_reply_requests SET state='dispatched',updated_at=?1 WHERE id=?2",
+                params![now(), existing],
+            )?;
+        }
         tx.commit()?;
-        Ok((inserted == 1).then_some(id))
+        Ok(if inserted == 1 { Some(id) } else { fallback })
     }
 
     /// Inserting the shared message and completing the request are one transaction.
