@@ -18,6 +18,8 @@ acceptance subsequently reached a successful runtime retry, but independent
 HTTP still rejected with `scope_unsupported` before dispatch. It remains
 default-off, not production-verified; see the
 [grouped report](reports/chatgpt-writing-grouped-acceptance-20260914.md).
+The [read-only admission probe](reports/chatgpt-fresh-retry-admission-20260914.md)
+isolates the rejecting predicate without replaying a write or relaxing its scope.
 
 September 13 source candidate. The existing native regenerate button now has a
 gated independent request path through the same fresh-text ledger, prepare/proof

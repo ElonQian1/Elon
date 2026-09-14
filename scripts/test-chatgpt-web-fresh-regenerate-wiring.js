@@ -29,7 +29,8 @@ function fixture(result) {
     streamingPolicy: {}, streamingPolicyModule: { begin() { calls.push('begin'); } }
   });
   const respond = (...value) => receipts.push(value); respond.requestId = 'mcp_route1';
-  return { calls, receipts, run: () => api.regenerateResponse(respond, () => calls.push('dom')) };
+  return { calls, receipts, page, composer, turn, model,
+    inspect: () => api.inspectRegeneration(respond), run: () => api.regenerateResponse(respond, () => calls.push('dom')) };
 }
 
 test('native regenerate button routes to the single fresh ledger and retains its existing receipt', async () => {
@@ -76,7 +77,22 @@ test('production assembly loads the regeneration scope before the shared ledger'
   assert.ok(scope > names.indexOf('chatgpt_web_fresh_text_context.js'));
   assert.ok(scope > names.indexOf('chatgpt_web_private_regenerate_contract.js'));
   assert.ok(scope < names.indexOf('chatgpt_web_fresh_text_transaction.js'));
-  const page = { __elonChatGptTextTransactionOrchestrator: { version: 10 } };
+  const page = { __elonChatGptTextTransactionOrchestrator: { version: 11 } };
   vm.runInNewContext(source, { window: page });
-  assert.equal(page.__elonChatGptTextTransactionOrchestrator.version, 11);
+  assert.equal(page.__elonChatGptTextTransactionOrchestrator.version, 12);
+});
+
+test('read-only admission uses the same native target without sending, draft changes or streaming', async () => {
+  const f = fixture({ handled: false });
+  f.page.__elonChatGptFreshTextContext = { create: () => ({}) };
+  f.page.__elonChatGptFreshRegenerateContext = { create: () => ({ inspect: async command => {
+    assert.equal(command.composer, f.composer); assert.equal(command.turn, f.turn);
+    assert.equal(command.getModelTrigger(), f.model);
+    return { schema: 'elon.fresh_regenerate_admission.v1', code: 'scope_unsupported', stage: 'user_channel' };
+  } }) };
+  await f.inspect();
+  assert.deepEqual(f.calls, []);
+  assert.equal(f.receipts.length, 1); assert.equal(f.receipts[0][0], 'private_protocol_probe');
+  assert.equal(f.receipts[0][1], false);
+  assert.equal(JSON.parse(f.receipts[0][2]).stage, 'user_channel');
 });

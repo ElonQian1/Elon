@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptTextTransactionOrchestrator;
-  if (existing && Number(existing.version) >= 11) return;
+  if (existing && Number(existing.version) >= 12) return;
 
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
@@ -290,6 +290,23 @@
       return true;
     }
 
+    function regenerationTarget() {
+      const composer = options.findComposer();
+      return { composer, turn: options.messageAdapter?.lastAssistantTurn?.(),
+        getModelTrigger: () => window.__elonChatGptComposer?.modelTrigger?.(composer) };
+    }
+
+    let regenerationInspector = null;
+    function inspectRegeneration(respond) {
+      const module = window.__elonChatGptFreshRegenerateContext;
+      const base = window.__elonChatGptFreshTextContext;
+      if (!module?.create || !base?.create) return respond('private_protocol_probe', false, 'protocol_probe_unavailable');
+      regenerationInspector ||= module.create(window, base.create(window));
+      return regenerationInspector.inspect(regenerationTarget()).then(value =>
+        respond('private_protocol_probe', value.code === 'ready', JSON.stringify(value)),
+      () => respond('private_protocol_probe', false, 'protocol_probe_unavailable'));
+    }
+
     function regenerateResponse(respond, fallback) {
       if (window.__elonChatGptFreshTextTransaction?.state?.().pending) {
         return respond('regenerate_response', false, 'private_text_v1:unknown:reconciliation_pending');
@@ -308,8 +325,7 @@
       function existing() {
         const runtime = window.__elonChatGptPrivateRegenerateRuntime;
         const transaction = runtime?.regenerate({
-          requestId: respond.requestId || '', turn: options.messageAdapter?.lastAssistantTurn?.(),
-          getModelTrigger: () => window.__elonChatGptComposer?.modelTrigger?.(options.findComposer()),
+          requestId: respond.requestId || '', ...regenerationTarget(),
           beforeSubmit: begin
         });
         if (!transaction?.handled) return legacy();
@@ -326,12 +342,11 @@
           options.scheduleSnapshot(true);
         });
       }
-      const composer = options.findComposer(), expectedDraft = options.composerValue(composer) || '';
+      const target = regenerationTarget(), { composer } = target, expectedDraft = options.composerValue(composer) || '';
       const transaction = window.__elonChatGptFreshTextTransaction?.regenerate?.({
         requestId: respond.requestId || '', composer, expectedDraft,
         readDraft: () => options.composerValue(composer) || '',
-        turn: options.messageAdapter?.lastAssistantTurn?.(),
-        getModelTrigger: () => window.__elonChatGptComposer?.modelTrigger?.(composer),
+        ...target,
         onDispatch: begin, onSettled: () => options.scheduleSnapshot(true)
       });
       if (!transaction?.handled) return existing();
@@ -411,8 +426,8 @@
       }
     }
 
-    return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, stopPrivate, stopGeneration, refreshConversation });
+    return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, inspectRegeneration, stopPrivate, stopGeneration, refreshConversation });
   }
 
-  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 11, create });
+  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 12, create });
 })();

@@ -17,6 +17,47 @@ test('ordinary retry captures the actual committed menu but never invokes its ca
   assert.equal(binding.owns(), true, 'post-dispatch ownership does not depend on rendered buttons');
 });
 
+for (const [stage, change] of [
+  ['ready', () => {}],
+  ['base_composer', f => { f.props.isDisabled = true; }],
+  ['base_prepare', f => { f.conversation.textPrepareEnabled = () => false; }],
+  ['base_config', f => { f.selected.config.synthetic = true; }],
+  ['base_branch', f => { f.tree.conversationOrigin = 'synthetic'; }],
+  ['model', f => { f.conversation.textResolveRequestedModel = () => 'other-model'; }],
+  ['user_identity', f => { f.user.message.id = OTHER; }],
+  ['user_content', f => { f.user.message.content.parts = []; }],
+  ['user_parent', f => { delete f.user.parentId; }],
+  ['user_channel', f => { f.user.message.channel = 'final'; }],
+  ['user_recipient', f => { f.user.message.recipient = 'python'; }],
+  ['user_metadata', f => { f.user.message.metadata.system_hints = ['search']; }],
+  ['reply_metadata', f => { f.parent.metadata.map_search_parameters = {}; }]
+]) test('admission identifies ' + stage + ' without invoking a writer or exposing content', async () => {
+  const f = fixture(); change(f);
+  const value = await f.inspect();
+  assert.equal(value.stage, stage);
+  assert.equal(value.code, stage === 'ready' ? 'ready' : 'scope_unsupported');
+  assert.deepEqual(Object.keys(value).sort(), ['code', 'schema', 'stage']);
+  assert.equal(f.retry.calls.length, 0);
+  assert.doesNotMatch(JSON.stringify(value), /Synthetic|fixture|[a-f0-9]{8}-/);
+});
+
+test('admission is single-flight and bounded when a read-only model resolver stalls', async () => {
+  const f = fixture(); let timeout, clears = 0, resolves = 0;
+  f.page.setTimeout = callback => { timeout = callback; return 1; };
+  f.page.clearTimeout = () => { clears++; };
+  f.conversation.textResolveRequestedModel = () => { resolves++; return new Promise(() => {}); };
+  const a = f.inspect(), b = f.inspect(); assert.equal(a, b);
+  await new Promise(setImmediate); assert.equal(resolves, 1); timeout();
+  assert.equal((await a).code, 'timeout'); assert.equal(clears, 1);
+  assert.equal(f.retry.calls.length, 0);
+});
+
+test('admission does not export arbitrary exception data', async () => {
+  const f = fixture();
+  f.conversation.textResolveRequestedModel = () => { throw Object.assign(Error('private-content'), { admissionStage: 'private-header' }); };
+  assert.deepEqual(await f.inspect(), { schema: 'elon.fresh_regenerate_admission.v1', code: 'read_failed', stage: 'base_context' });
+});
+
 test('retry uses the reply effort or resolved model default, never the composer current tier', async () => {
   const f = fixture(); delete f.parent.metadata.thinking_effort;
   f.tree.variants.push(OTHER);

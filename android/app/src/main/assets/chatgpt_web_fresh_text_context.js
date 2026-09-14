@@ -1,12 +1,12 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 12, create: factory });
+  const api = Object.freeze({ version: 13, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
   'use strict';
   const PROFILE = 'web_20260912';
-  const fail = code => { throw Error(code); };
+  const fail = (code, admissionStage) => { throw Object.assign(Error(code), { admissionStage }); };
   const idPattern = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
   const projectPattern = /^g-p-[a-f0-9]{32}$/i;
   const routePattern = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9-]{36})$/i;
@@ -33,7 +33,7 @@
     const route = existingRoute || newRoute;
     if (url.origin !== 'https://chatgpt.com' || url.search && !temporary || url.hash || url.username || url.password ||
         !route || temporary && options.allowTemporary !== true ||
-        !existingRoute && !temporary && options.allowNewConversations !== true) fail('scope_unsupported');
+        !existingRoute && !temporary && options.allowNewConversations !== true) fail('scope_unsupported', 'base_route');
     const submit = page.__elonChatGptPrivateTextRuntimeSubmit;
     const captureOwner = composer?.isConnected ? submit?.captureConversation : submit?.capturePrivateConversation;
     const binding = captureOwner?.(composer);
@@ -44,7 +44,7 @@
           existingRoute ? binding.newThread || !idPattern.test(route[2]) : !binding.newThread || binding.serverId !== null)) {
       fail('context_unavailable');
     }
-    if (newConversation && options.allowNewConversations !== true) fail('scope_unsupported');
+    if (newConversation && options.allowNewConversations !== true) fail('scope_unsupported', 'base_new');
     const [shared, conversation, editor] = await Promise.all([
       bindings.load('shared'), bindings.load('conversation'), bindings.load('composer')
     ]);
@@ -104,11 +104,11 @@
     }
 
     function scope(state) {
-      if (!state || shared.wV?.(shared.SV?.isPersonalWorkspace) !== true) fail('scope_unsupported');
+      if (!state || shared.wV?.(shared.SV?.isPersonalWorkspace) !== true) fail('scope_unsupported', 'base_workspace');
       const projectId = shared.HM.getGizmoId(state) ?? null;
-      if (temporary && projectId !== null) fail('scope_unsupported');
+      if (temporary && projectId !== null) fail('scope_unsupported', 'base_project');
       if (projectId === null) {
-        if (route[1] || state.mode?.kind !== 'primary_assistant' || state.mode.gizmo_id != null) fail('scope_unsupported');
+        if (route[1] || state.mode?.kind !== 'primary_assistant' || state.mode.gizmo_id != null) fail('scope_unsupported', 'base_mode');
         return null;
       }
       if (options.allowProjects !== true || typeof projectId !== 'string' || !projectPattern.test(projectId) ||
@@ -117,7 +117,7 @@
           Object.keys(state.mode).some(key => !['kind', 'gizmo_id', 'gizmo'].includes(key)) ||
           state.isLoading !== false || state.is_do_not_remember !== false ||
           state.sharedProjectConversationOwner != null || state.continuingFromSharedProjectConversationId != null ||
-          state.contextScopes != null && (!Array.isArray(state.contextScopes) || state.contextScopes.length)) fail('scope_unsupported');
+          state.contextScopes != null && (!Array.isArray(state.contextScopes) || state.contextScopes.length)) fail('scope_unsupported', 'base_project');
       return projectId;
     }
 
@@ -142,21 +142,22 @@
 
     function read() {
       const state = tree(), props = binding.shared.getSharedProps();
-      if (!state || !registeredOwner() || props.conversation !== selected || props.composerController !== binding.controller ||
-          props.isDisabled !== false || props.isConsumerLockdownModeLoadingForConversation !== false ||
+      if (!state || !registeredOwner() || props.conversation !== selected || props.composerController !== binding.controller) fail('scope_unsupported', 'base_owner');
+      if (props.isDisabled !== false || props.isConsumerLockdownModeLoadingForConversation !== false ||
           props.shouldBlockConsumerLockdownModeActionsForConversation !== false ||
-          props.structuredInputMessageId != null || (selected.serverId$() ?? null) !== binding.serverId ||
+          props.structuredInputMessageId != null) fail('scope_unsupported', 'base_composer');
+      if ((selected.serverId$() ?? null) !== binding.serverId ||
           (newConversation ? serverId !== null || props.isNewThread !== true :
             !idPattern.test(binding.serverId || '') || !temporary && route[2] !== binding.serverId ||
-              temporary && (props.isNewThread !== false || shared.HM.getIsNewConversation?.(state) !== false)) ||
-          shared.cX?.() !== temporary || shared.uo(selected) !== false ||
-          temporary && (typeof state.is_do_not_remember !== 'boolean' || shared.textHistoryDisabled() !== true) ||
-          conversation.textPrepareEnabled() !== true || conversation.textReviewAck(selected) != null) fail('scope_unsupported');
+              temporary && (props.isNewThread !== false || shared.HM.getIsNewConversation?.(state) !== false))) fail('scope_unsupported', 'base_route_state');
+      if (shared.cX?.() !== temporary || shared.uo(selected) !== false ||
+          temporary && (typeof state.is_do_not_remember !== 'boolean' || shared.textHistoryDisabled() !== true)) fail('scope_unsupported', 'base_privacy');
+      if (conversation.textPrepareEnabled() !== true || conversation.textReviewAck(selected) != null) fail('scope_unsupported', 'base_prepare');
       const projectId = scope(state);
       if (['continuingFromSharedConversationId', 'continuingFromSharedProjectConversationId', 'continuingFromSharedPostId',
         'forkFromSharedPost', 'branchingFromMessageId', 'branchingFromConversationId', 'continuationBranch',
-        'hideFromHistory', 'conversationOrigin'].some(key => state[key] != null && state[key] !== false) ||
-          Object.keys(selected.config || {}).some(key => selected.config[key] != null && selected.config[key] !== false)) fail('scope_unsupported');
+        'hideFromHistory', 'conversationOrigin'].some(key => state[key] != null && state[key] !== false)) fail('scope_unsupported', 'base_branch');
+      if (Object.keys(selected.config || {}).some(key => selected.config[key] != null && selected.config[key] !== false)) fail('scope_unsupported', 'base_config');
       const files = binding.files.files$(), ready = binding.files.readyFiles$();
       if (!Array.isArray(files) || !Array.isArray(ready) || binding.files.hasUploadInProgress$() !== false ||
           (attachments ? !attachments.current() || files.length !== selectedFiles.length || ready.length !== files.length

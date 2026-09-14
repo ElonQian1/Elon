@@ -453,6 +453,10 @@
     const respond = (resultAction, ok, detail) => result(resultAction, ok, detail, requestId);
     respond.requestId = requestId;
     if (action === 'snapshot') return snapshot();
+    if (action === 'private_protocol_probe' && command.value === 'regeneration_admission') {
+      if (!textTransactionOrchestrator) return respond(action, false, 'protocol_probe_unavailable');
+      return textTransactionOrchestrator.inspectRegeneration(respond);
+    }
     if (window.__elonChatGptPrivateResearchProbe?.handle?.(action, command, respond)) return;
     if (window.__elonChatGptPrivateImageGallery?.handle(action, command, respond, emitEvent)) return;
     if (action === 'request_image_asset') {

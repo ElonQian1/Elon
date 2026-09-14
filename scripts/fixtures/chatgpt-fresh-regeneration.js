@@ -42,6 +42,7 @@ function fixture() {
   r.modelMenu.conversation = selected;
   r.modelMenu.modelsData.models.set('fixture-model', { id: 'fixture-model', defaultThinkingEffort: 'low' });
   Object.assign(page, {
+    setTimeout, clearTimeout,
     __elonChatGptPrivateModelContract: r.page.__elonChatGptPrivateModelContract,
     __elonChatGptPrivateRegenerateContract: contract,
     __elonChatGptFreshRegenerateContext: regeneration,
@@ -66,7 +67,8 @@ function fixture() {
     tree.leaf = value.current_node; f.props.currentLeafId = tree.leaf;
   }
   const api = regeneration.create(page, f.api);
-  return Object.assign(f, { retry: r, user, command, reply, history, apply, capture: () => api.capture(command) });
+  return Object.assign(f, { retry: r, user, command, reply, history, apply,
+    capture: () => api.capture(command), inspect: () => api.inspect(command) });
 }
 
 module.exports = { fixture, CID, PID, UID, ROOT, AID, OTHER };

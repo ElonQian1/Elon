@@ -6,6 +6,26 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ChatGptWebPrivateProtocolEvidenceTest {
+    @Test fun regenerationAdmissionKeepsOnlyKnownStagesAndCodes() {
+        assertTrue("regeneration_admission" in ChatGptWebPrivateProtocolEvidence.MODES)
+        fun source() = JSONObject().put("schema", "elon.fresh_regenerate_admission.v1")
+            .put("code", "scope_unsupported").put("stage", "user_parent")
+        assertEquals(source().toString(), detail(source()))
+        for (stage in listOf("ready", "timeout", "base_context", "base_composer", "base_config", "base_branch",
+            "user_identity", "user_content", "user_channel", "user_metadata", "reply_metadata")) {
+            val value = source().put("stage", stage)
+            assertEquals(value.toString(), detail(value))
+        }
+        for (value in listOf(source().put("code", "private-message"), source().put("stage", "private-value"),
+            source().put("stage", 1), source().put("content", "private"), source().apply { remove("code") })) {
+            assertEquals("invalid_protocol_evidence", detail(value))
+        }
+        val event = ChatGptWebProtocol.parse(JSONObject().put("type", "command_result")
+            .put("action", "private_protocol_probe").put("requestId", "mcp_admission1")
+            .put("ok", false).put("detail", source().toString()).toString()) as ChatGptWebEvent.CommandResult
+        assertEquals(source().toString(), event.detail)
+    }
+
     @Test fun downloadSourceAdmitsOnlyClosedStructuralEvidence() {
         assertTrue("file_download_source" in ChatGptWebPrivateProtocolEvidence.MODES)
         fun source() = JSONObject().put("schema", "elon.download_source.v1").put("observed", true)
