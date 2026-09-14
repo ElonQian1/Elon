@@ -20,6 +20,11 @@ Before '        Save-Ledger' 'Ui send_extended_tool_fixture'
 Before '$awaiting=$true' 'Ui send_extended_tool_fixture'
 Before 'Ui send_extended_tool_fixture' '$report.native_click_acknowledged=$true'
 Before 'if($awaiting){$report.write_unconfirmed=$true' 'if($trialRequested -and'
+Before '$clearBefore=Web' "Ui `$(if(`$Semantic -ceq 'web_search'){'clear_search'}"
+Before "throw 'tool_clear_unconfirmed'" '$report.restored=Restore-WebChatNativeConversation'
+Before '$clearItems=@(Refresh-Tools)' 'Test-ChatGptFreshToolCleared -Before'
+Before "throw 'existing_tool_selection_preserved'" 'Clear-NativeTool $inherited[0].semantic'
+Before 'Clear-NativeTool $ToolId' '$report.restored=Restore-WebChatNativeConversation'
 foreach($required in @('tool_fixture_requires_readonly_recovery','scope_already_verified_do_not_repeat',
     '[IO.FileShare]::None','Test-ChatGptFreshSendEvidence','Get-ChatGptFreshToolNativeEvidence',
     "`$web.conversation.url -cne ('https://chatgpt.com'+`$seed.resolved_path)",
@@ -39,4 +44,13 @@ foreach($required in @('fixture_preview_ambiguous','ELON_EXTENDED_TOOL_ACCEPTANC
 }
 if($prepare.Contains('web-chat-send')){throw 'fresh_tool_prepare_must_not_send'}
 $checks++
+foreach($required in @('textStartsWith(toolPrefix)','fixture_prefix_invalid','[0-9]{13}',
+    'toolInput.getText().startsWith(toolPrefix)')) {
+    if(!$prepare.Contains($required)){throw 'fresh_tool_unique_preview_guard_missing'}
+    $checks++
+}
+foreach($step in @('prepare_extended_tool_fixture','send_extended_tool_fixture')){
+    if(!$source.Contains("Ui $step @{fixture_prefix=`$prefix}")){throw 'fresh_tool_unique_prefix_not_wired'}
+    $checks++
+}
 Write-Output "FRESH_TOOL_DISPATCH_CONTRACT=passed checks=$checks"

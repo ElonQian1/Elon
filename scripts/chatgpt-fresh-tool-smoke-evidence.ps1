@@ -2,6 +2,37 @@
 . (Join-Path $PSScriptRoot 'chatgpt-fresh-text-smoke-evidence.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-tool-reply.ps1')
 
+function Test-ChatGptFreshToolClearReceipt {
+    param([AllowNull()]$Before, [AllowNull()]$After)
+    try {
+        if ($Before.page_generation -le 0 -or $After.page_generation -ne $Before.page_generation -or
+            $Before.conversation.url -cnotmatch '^https://chatgpt\.com/c/[a-f0-9-]+$' -or
+            $After.conversation.url -cne $Before.conversation.url -or
+            $After.streaming -isnot [bool] -or $After.streaming -or
+            $After.input.text -cne '') { return $false }
+        $prior = @($Before.command_requests | ForEach-Object request_id)
+        $receipts = @($After.command_requests | Where-Object {
+            $_.request_id -cnotin $prior -and $_.expected_web_action -ceq 'select_composer_tool'
+        })
+        return $receipts.Count -eq 1 -and $receipts[0].status -ceq 'succeeded' -and
+            $receipts[0].result.ok -is [bool] -and $receipts[0].result.ok
+    } catch { return $false }
+}
+
+function Test-ChatGptFreshToolCleared {
+    param([AllowNull()]$Before, [AllowNull()]$After, [AllowNull()][object[]]$Items,
+        [Parameter(Mandatory)][ValidateSet('web_search','image_generation')][string]$ToolId)
+    if (!(Test-ChatGptFreshToolClearReceipt -Before $Before -After $After)) { return $false }
+    try {
+        $target = @($Items | Where-Object semantic -CEQ $ToolId)
+        if ($target.Count -ne 1) { return $false }
+        foreach ($item in $Items) {
+            if ($item.selected -isnot [bool] -or $item.selected) { return $false }
+        }
+        return $true
+    } catch { return $false }
+}
+
 function Get-ChatGptFreshToolNativeEvidence {
     param([AllowNull()]$Baseline, [AllowNull()]$Web, [AllowNull()]$Main,
         [AllowNull()]$Native, [Parameter(Mandatory)][string]$Prompt,

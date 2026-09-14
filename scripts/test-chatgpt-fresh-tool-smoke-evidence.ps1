@@ -50,4 +50,47 @@ foreach ($case in @('other_route','streaming','native_streaming','unknown_stream
     }
     Check (!(Get-ChatGptFreshToolNativeEvidence @f).ready) $case
 }
+function Clear-Fixture {
+    $before=@{page_generation=1;conversation=@{url='https://chatgpt.com/c/11111111-1111-4111-8111-111111111111'};
+        command_requests=@(@{request_id='old'})}
+    $after=@{page_generation=1;conversation=$before.conversation.Clone();streaming=$false;input=@{text=''};
+        command_requests=@(@{request_id='clear';expected_web_action='select_composer_tool';status='succeeded';
+            result=@{ok=$true}})}
+    return @{Before=$before;After=$after;ToolId='web_search';Items=@(
+        @{semantic='web_search';selected=$false},@{semantic='image_generation';selected=$false})}
+}
+$f=Clear-Fixture
+Check (Test-ChatGptFreshToolCleared @f) 'clear_confirmed'
+$f.ToolId='image_generation'
+Check (Test-ChatGptFreshToolCleared @f) 'image_clear_confirmed'
+foreach($case in @('old_receipt','wrong_action','queued','failed','not_ok','string_ok','no_receipt',
+    'duplicate','selected','other_selected','missing_option','duplicate_option','unknown_selected',
+    'generation','route','streaming','unknown_streaming','draft')) {
+    $f=Clear-Fixture
+    switch($case){
+        'old_receipt' {$f.After.command_requests[0].request_id='old'}
+        'wrong_action' {$f.After.command_requests[0].expected_web_action='list_composer_tools'}
+        'queued' {$f.After.command_requests[0].status='queued'}
+        'failed' {$f.After.command_requests[0].status='failed'}
+        'not_ok' {$f.After.command_requests[0].result.ok=$false}
+        'string_ok' {$f.After.command_requests[0].result.ok='true'}
+        'no_receipt' {$f.After.command_requests=@()}
+        'duplicate' {$f.After.command_requests+=$f.After.command_requests[0].Clone()}
+        'selected' {$f.Items[0].selected=$true}
+        'other_selected' {$f.Items[1].selected=$true}
+        'missing_option' {$f.Items=@($f.Items[1])}
+        'duplicate_option' {$f.Items+=$f.Items[0].Clone()}
+        'unknown_selected' {$f.Items[0].Remove('selected')}
+        'generation' {$f.After.page_generation=2}
+        'route' {$f.After.conversation.url='https://chatgpt.com/'}
+        'streaming' {$f.After.streaming=$true}
+        'unknown_streaming' {$f.After.Remove('streaming')}
+        'draft' {$f.After.input.text='changed'}
+    }
+    Check (!(Test-ChatGptFreshToolCleared @f)) "clear_$case"
+}
+Set-StrictMode -Version Latest
+$f=Clear-Fixture
+$f.After=[pscustomobject]@{}
+Check (!(Test-ChatGptFreshToolCleared @f)) 'clear_missing_evidence_strict'
 Write-Output "FRESH_TOOL_EVIDENCE_TESTS=passed count=$count"

@@ -28,8 +28,8 @@ $report=[ordered]@{schema='elon.fresh_tool_ui.v1';tool=$ToolId;stage='preflight'
 function Web { Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state }
 function Main { Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state -MainState }
 function Act([string]$Action,[hashtable]$Arguments=@{}) { Invoke-ChatGptWebSmokeAction -Runtime $r -Action $Action -Arguments $Arguments }
-function Ui([string]$Step) {
-    Invoke-AndroidSemanticAcceptance -Runtime $r -TestClass ConversationUiAcceptance -Step $Step -ResultPrefix CONVERSATION_UI_RESULT
+function Ui([string]$Step,[hashtable]$Parameters=@{}) {
+    Invoke-AndroidSemanticAcceptance -Runtime $r -TestClass ConversationUiAcceptance -Step $Step -Parameters $Parameters -ResultPrefix CONVERSATION_UI_RESULT
 }
 function Trial([string]$Mode) { Invoke-ChatGptFreshTrial -Runtime $r -Mode $Mode }
 function Stage([string]$Name) { $report.stage=$Name; Write-Host "FRESH_TOOL_STAGE=$Name" }
@@ -62,6 +62,24 @@ function Refresh-Tools {
     Wait-ChatGptCommandReceipt -InvokeUiState { Web } -RequestId $d.command_receipt.request_id `
         -ExpectedAction dismiss_composer_menu -TimeoutSec 15 -PollIntervalSec 1|Out-Null
     return $items
+}
+function Clear-NativeTool([string]$Semantic) {
+    if($Semantic -cnotin @('web_search','image_generation')){throw 'unknown_tool_preserved'}
+    $clearBefore=Web
+    if(!(Idle (Main) $clearBefore) -or !(Test-WebChatNativeChatSurfaceForeground -Runtime $r) -or
+        $clearBefore.conversation.url -cne ('https://chatgpt.com'+$seed.resolved_path)){throw 'clear_context_changed'}
+    Ui $(if($Semantic -ceq 'web_search'){'clear_search'}else{'clear_image'})|Out-Null
+    $clearDeadline=[DateTimeOffset]::UtcNow.AddSeconds(20)
+    do {
+        $clearAfter=Web
+        if(Test-ChatGptFreshToolClearReceipt -Before $clearBefore -After $clearAfter){break}
+        Start-Sleep -Milliseconds 600
+    }while([DateTimeOffset]::UtcNow -lt $clearDeadline)
+    if(!(Test-ChatGptFreshToolClearReceipt -Before $clearBefore -After $clearAfter)){throw 'tool_clear_unconfirmed'}
+    $clearItems=@(Refresh-Tools)
+    if(!(Test-ChatGptFreshToolCleared -Before $clearBefore -After (Web) -Items $clearItems -ToolId $Semantic)){
+        throw 'tool_clear_unconfirmed'
+    }
 }
 function Assert-OwnedFixture($Web,$Main) {
     if ($Web.conversation.url -cne ('https://chatgpt.com'+$seed.resolved_path) -or
@@ -126,8 +144,14 @@ try {
     Assert-OwnedFixture $web $main
     $generation=$web.page_generation
     $items=@(Refresh-Tools)
-    if (@($items|Where-Object semantic -CEQ $ToolId).Count -ne 1 -or @($items|Where-Object selected -EQ $true).Count) {
-        throw 'tool_selection_unconfirmed'
+    if (@($items|Where-Object semantic -CEQ $ToolId).Count -ne 1) {throw 'tool_option_unconfirmed'}
+    $inherited=@($items|Where-Object selected -EQ $true)
+    if($inherited.Count){
+        $owned=@($ledger.accepted|Where-Object {$_.tool -ceq $inherited[0].semantic -and
+            $_.fresh_http -ceq $true -and $_.tool_restored -ceq $true})
+        if($PreflightOnly -or $inherited.Count -ne 1 -or $owned.Count -ne 1){throw 'existing_tool_selection_preserved'}
+        Clear-NativeTool $inherited[0].semantic
+        $report.fixture_inherited_tool_cleared=$true
     }
     if ($PreflightOnly) {Stage preflight_complete}
     else {
@@ -144,6 +168,7 @@ try {
         }while([DateTimeOffset]::UtcNow -lt $deadline)
         if($selection.Count -ne 1){throw 'native_tool_not_committed'}
         $stamp=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+        $prefix='ELON_EXTENDED_TOOL_ACCEPTANCE_V1 '+$(if($ToolId -ceq 'web_search'){'SEARCH_'}else{'IMAGE_'})+$stamp
         $prompt=if($ToolId -ceq 'web_search'){
             "ELON_EXTENDED_TOOL_ACCEPTANCE_V1 SEARCH_$stamp. Use web search to find the official OpenAI homepage. Give one sentence and a clickable source citation."
         }else{
@@ -153,7 +178,7 @@ try {
         $baseline=Wait-ChatGptWebSmokeState -Runtime $r -TimeoutSec 10 -Description 'owned tool prompt' -Predicate {
             param($s) $s.input.text -ceq $prompt -and !$s.streaming -and $s.page_generation -eq $generation
         }.GetNewClosure()
-        Ui prepare_extended_tool_fixture|Out-Null
+        Ui prepare_extended_tool_fixture @{fixture_prefix=$prefix}|Out-Null
         $prior=@($baseline.command_requests|ForEach-Object request_id)
         $trialRequested=$true
         $before=Trial start
@@ -164,7 +189,7 @@ try {
         Save-Ledger
         Stage native_send
         $awaiting=$true; $report.native_send_actions=1
-        Ui send_extended_tool_fixture|Out-Null
+        Ui send_extended_tool_fixture @{fixture_prefix=$prefix}|Out-Null
         $report.native_click_acknowledged=$true
         $started=[DateTimeOffset]::UtcNow
         $deadline=$started.AddSeconds($TimeoutSec)
@@ -226,7 +251,12 @@ try {
                 $web.streaming -cne $false -or ($null -ne $generation -and $web.page_generation -ne $generation)) {throw 'restore_context_changed'}
             if($prompt -and $web.input.text -ceq $prompt){Act set_input_text @{text=''}|Out-Null}
             elseif($web.input.text -cne ''){throw 'user_draft_preserved'}
-            if($selected){Ui $(if($ToolId -ceq 'web_search'){'clear_search'}else{'clear_image'})|Out-Null}
+            if($selected){
+                Clear-NativeTool $ToolId
+                $report.tool_restored=$true
+                $accepted=@($ledger.accepted|Where-Object {$_.tool -ceq $ToolId -and $_.prompt -ceq $prompt})
+                if($accepted.Count -eq 1){$accepted[0].tool_restored=$true; Save-Ledger}
+            }
             $report.restored=Restore-WebChatNativeConversation -Runtime $r -ProviderId chatgpt_web `
                 -ConversationPath $origin.social_chat.web_chat_conversation_path -TimeoutSec 35
         }else{$report.restored=$true}
