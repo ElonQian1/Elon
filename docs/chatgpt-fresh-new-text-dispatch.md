@@ -16,7 +16,7 @@ tests pass with the editor DOM absent, including first response loss and the
 no-replay barrier. First send/follow-up passed on release 1743; that device run
 did not remove the official composer. The [adapter 411 native acceptance](chatgpt-composer-unavailable-acceptance.md)
 then passed with no usable official composer through the entire first send and
-history readback. This verifies the default memory-owner route, not cold-page
+history readback; normal release 1748 is published and installed. This verifies the default memory-owner route, not cold-page
 bootstrap with all runtime/editor modules absent. See [current compatibility batch](reports/chatgpt-runtime-bindings-20260915.md).
 
 September 13 extension of the [accepted independent sender](chatgpt-fresh-text-dispatch.md).

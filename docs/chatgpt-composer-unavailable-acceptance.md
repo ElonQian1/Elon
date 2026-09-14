@@ -75,7 +75,10 @@ native composer flag was false before Send. All 77 lease samples had zero
 usable composer and zero invalid-owner observations. Reply observed at 7.305s;
 13.367s includes final readback, not an A/B claim. Original route, CSS and awake
 state restored; no unknown write remains. The production sender's existing
-default was used, not a trial arm. Normal release promotion follows this proof.
+default was used, not a trial arm. [Normal 1748](reports/chatgpt-runtime-bindings-20260915.md)
+is published and installed with the research flag off. Its native reopening,
+login, idle/no-pending state and disabled debugging socket passed read-only
+verification; no repeat send was needed.
 
 Offline regression: 57 Node tests, seven PowerShell evidence negatives and 15
 Android unit tests passed. Signed research Release build passed in 370.7s.

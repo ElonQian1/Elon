@@ -1,6 +1,6 @@
 # September 15 Runtime Compatibility Investigation
 
-Status: bindings 29 / adapter 410 published and installed as 1.1.1747.
+Status: bindings 29 / adapter 411 published and installed as 1.1.1748.
 First-send/follow-up and independent local attachment delivery passed on Xiaomi.
 The verified attachment scope is default-enabled, reusing the corrected model argument and pre-write
 handoff below. `web_20260915` uses its exact observed asset set.
@@ -9,6 +9,16 @@ ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
 
+- Normal release 1748 from `c83f5dddd232de858e0772f57cb709647f85bffb`, SHA-256
+  `e8a7ab3fdecc235b7756a01074ab76a6bcee497bbd94a0a300fe21b84f2ce1e1`, passed
+  build, remote hash/version verification and unattended Xiaomi replacement.
+  `composer-free-411-production-publish-20260915-060340-983` passed in 419.5s.
+  Research is disabled; conversation prefetch retains its enabled default.
+  Post-install native reopening/read-only verification confirmed adapter 411,
+  authenticated/ready, no draft/stream/dictation/armed trial/pending write and
+  no app WebView debugging socket. Zero repeat messages and no data/Cookie reset.
+  An initial probe before native binding timed out; opening the production chat
+  then passed. This was not another send or a Canvas mutation acceptance.
 - Adapter 411 closes a native no-composer admission regression: unlabeled
   dictation controls require actual capture; verified private-editor readiness
   no longer becomes cached DOM readiness. `c10f1613d` implements the fix.
@@ -17,7 +27,7 @@ ordinary text, Search and Image modules.
   request/answer, 31 stream events, exact history, 77 valid no-composer samples,
   original route/CSS/awake restoration. The existing production default was
   used. No-usable-composer first send is now verified; a cold page with no
-  initialized runtime is a different boundary. Normal release follows.
+  initialized runtime is a different boundary. Normal 1748 includes this fix.
 - Targeted fix regression: 57 Node cases, seven PowerShell negative proofs and
   15 Android unit tests passed. Research signed Release build passed in 370.7s.
   The earlier failed UI attempt dispatched nothing; its exact synthetic draft
