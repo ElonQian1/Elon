@@ -61,7 +61,8 @@ internal object ChatGptWebPrivateProtocolEvidence {
                 "resolver", "model", "user_identity", "user_content", "user_parent", "user_channel", "user_recipient",
                 "user_metadata", "reply_metadata", "effort", "current", "base_route", "base_new", "base_owner", "base_composer",
                 "base_route_state", "base_privacy", "base_prepare", "base_workspace", "base_project", "base_mode", "base_branch", "base_config",
-                "project_business", "project_headers"))
+                "project_business", "project_headers", "project_route", "project_mode", "project_loading",
+                "project_privacy", "project_shared", "project_scopes"))
             return value.toString()
         }
         if (value.opt("schema") == ChatGptWebHistoryParentDiagnostic.SCHEMA) return ChatGptWebHistoryParentDiagnostic.sanitize(value)

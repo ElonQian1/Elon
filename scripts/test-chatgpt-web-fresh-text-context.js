@@ -105,6 +105,23 @@ test('project scope rejects foreign, incomplete, temporary and business-agent co
   }
 });
 
+test('ordinary GLOBAL project context is admitted but special and malformed scopes remain blocked', async () => {
+  for (const scopes of [undefined, null, [], ['GLOBAL'], ['GLOBAL', 'GLOBAL']]) {
+    const f = projectFixture(); f.tree.contextScopes = scopes;
+    const binding = await f.api.capture(f.node, null, { allowProjects: true });
+    assert.equal(binding.projectId, PROJECT);
+    assert.equal(binding.current(), true);
+    f.tree.contextScopes = ['GLOBAL', 'HEALTH'];
+    assert.equal(binding.current(), false);
+    assert.equal(binding.owns(), false);
+  }
+  for (const scopes of ['GLOBAL', {}, [null], new Array(1), ['global'], ['LOCKED_CHATS'],
+    ['GLOBAL', 'HEALTH'], ['GLOBAL', 'UNKNOWN']]) {
+    const f = projectFixture(); f.tree.contextScopes = scopes;
+    await assert.rejects(f.api.capture(f.node, null, { allowProjects: true }), /scope_unsupported/);
+  }
+});
+
 test('project move or owner restrictions after capture stop writes and history apply', async () => {
   for (const mutate of [
     f => { f.tree.mode.gizmo_id = 'g-p-' + 'b'.repeat(32); },

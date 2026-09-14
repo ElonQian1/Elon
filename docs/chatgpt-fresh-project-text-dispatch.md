@@ -12,7 +12,8 @@ September 15 native acceptance on 1749 verified the owned project fixture but
 the independent sender rejected `scope_unsupported` before POST. The existing
 official-runtime fallback produced exactly one reply. Do not enable the project
 default or repeat that message. [Admission follow-up](reports/chatgpt-fresh-project-admission-20260915.md)
-adds a read-only probe to identify the actual failed guard; it is not another sender.
+records the installed 1750 read-only `base_project` rejection and the next
+ordinary `GLOBAL` scope fix. It is not another sender or a successful HTTP proof.
 
 September 13 source extension of [the accepted plain-text sender](chatgpt-fresh-text-dispatch.md).
 It reuses its queue, native stream, owned stop and history recovery. It does not

@@ -181,6 +181,10 @@ class ChatGptWebPrivateProtocolEvidenceTest {
         val value = JSONObject().put("schema", "elon.fresh_text_admission.v1")
             .put("code", "scope_unsupported").put("stage", "project_business")
         assertEquals("project_business", JSONObject(detail(value)).getString("stage"))
+        for (stage in listOf("project_route", "project_mode", "project_loading", "project_privacy",
+            "project_shared", "project_scopes")) {
+            assertEquals(stage, JSONObject(detail(value.put("stage", stage))).getString("stage"))
+        }
         assertEquals("invalid_protocol_evidence", detail(value.put("content", "private response")))
         value.remove("content")
         assertEquals("invalid_protocol_evidence", detail(value.put("stage", "private header")))

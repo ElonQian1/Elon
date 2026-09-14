@@ -1,6 +1,6 @@
 # September 15 Runtime Compatibility Investigation
 
-Status: bindings 29 / adapter 412 published and installed as 1.1.1749.
+Status: bindings 29 / adapter 413 published and installed as 1.1.1750.
 First-send/follow-up and independent local attachment delivery passed on Xiaomi.
 The verified attachment scope is default-enabled, reusing the corrected model argument and pre-write
 handoff below. `web_20260915` uses its exact observed asset set.
@@ -12,7 +12,9 @@ ordinary text, Search and Image modules.
 - [Project admission follow-up](chatgpt-fresh-project-admission-20260915.md):
   native project send reached the independent sender but was rejected before
   POST; the existing runtime fallback replied once. Project default remains
-  off. A read-only guard probe is implemented; package validation is pending.
+  off. The installed 1750 read-only probe reports `base_project`. Adapter 414
+  corrects the public-contract mismatch for ordinary GLOBAL contexts and
+  separates remaining project guards; Android/package validation is pending.
 
 - [1749 recovery follow-up](chatgpt-fresh-recovery-suspend-20260915.md) cancels
   automatic history reads on background/offline suspension without replaying

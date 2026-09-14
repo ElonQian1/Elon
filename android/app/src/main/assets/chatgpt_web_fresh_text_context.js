@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 19, create: factory });
+  const api = Object.freeze({ version: 20, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -125,13 +125,17 @@
         if (route[1] || state.mode?.kind !== 'primary_assistant' || state.mode.gizmo_id != null) fail('scope_unsupported', 'base_mode');
         return null;
       }
-      if (options.allowProjects !== true || typeof projectId !== 'string' || !projectPattern.test(projectId) ||
-          route[1] && route[1] !== projectId || state.mode?.kind !== 'gizmo_interaction' ||
-          state.mode.gizmo_id !== projectId ||
-          Object.keys(state.mode).some(key => !['kind', 'gizmo_id', 'gizmo'].includes(key)) ||
-          state.isLoading !== false || state.is_do_not_remember !== false ||
-          state.sharedProjectConversationOwner != null || state.continuingFromSharedProjectConversationId != null ||
-          state.contextScopes != null && (!Array.isArray(state.contextScopes) || state.contextScopes.length)) fail('scope_unsupported', 'base_project');
+      if (options.allowProjects !== true || typeof projectId !== 'string' || !projectPattern.test(projectId)) fail('scope_unsupported', 'base_project');
+      if (route[1] && route[1] !== projectId) fail('scope_unsupported', 'project_route');
+      if (state.mode?.kind !== 'gizmo_interaction' || state.mode.gizmo_id !== projectId ||
+          Object.keys(state.mode).some(key => !['kind', 'gizmo_id', 'gizmo'].includes(key))) fail('scope_unsupported', 'project_mode');
+      if (state.isLoading !== false) fail('scope_unsupported', 'project_loading');
+      if (state.is_do_not_remember !== false) fail('scope_unsupported', 'project_privacy');
+      if (state.sharedProjectConversationOwner != null || state.continuingFromSharedProjectConversationId != null) fail('scope_unsupported', 'project_shared');
+      // Official hydration retains GLOBAL on ordinary projects. Restricted scopes
+      // still require their own transport contract; sparse arrays are not evidence.
+      if (state.contextScopes != null && (!Array.isArray(state.contextScopes) ||
+          Array.from(state.contextScopes).some(value => value !== 'GLOBAL'))) fail('scope_unsupported', 'project_scopes');
       return projectId;
     }
 
@@ -381,7 +385,8 @@
       'context_changed', 'context_invalid', 'attachments_active', 'tools_active', 'conversation_busy', 'parent_unavailable'];
     const stages = ['base_route', 'base_new', 'base_owner', 'base_composer', 'base_route_state', 'base_privacy',
       'base_prepare', 'base_workspace', 'base_project', 'base_mode', 'base_branch', 'base_config',
-      'project_business', 'project_headers'];
+      'project_business', 'project_headers', 'project_route', 'project_mode', 'project_loading',
+      'project_privacy', 'project_shared', 'project_scopes'];
     let timer;
     // Inspect the same owner as a send, without arming a trial or creating a request.
     inspection = Promise.race([capture(composer, null, {

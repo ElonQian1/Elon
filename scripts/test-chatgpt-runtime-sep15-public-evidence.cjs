@@ -42,6 +42,13 @@ test('Sep 15 actual namespace contracts and changed history/attachment semantics
   assert.equal(definition('shared', 'VK'), 'function cw(){return rg(Cw)}');
   assert.equal(definition('shared', 'Cw', true), 'J(()=>sw(Sw().data))');
   assert.match(definition('shared', 'sw', true), /accountItems.find\(t=>t.id===e.currentAccountId\)/);
+  const ordinaryScope = definition('shared', '$2', true);
+  assert.ok(ordinaryScope.includes('l?.contextScopes?.some(e=>e!==`GLOBAL`)'));
+  assert.ok(ordinaryScope.includes('s.context_scopes?.some(e=>e!==`GLOBAL`)'));
+  const hydration = [...modules.conversation.definitions.values()].flat().map(node =>
+    modules.conversation.text.slice(node.start, node.end));
+  assert.ok(hydration.some(body => body.includes('j=t.context_scopes,M=j&&j.length>0?Array.from(j):void 0') &&
+    body.includes('contextScopes:y==null?M??n?.contextScopes??null:M??null')));
   assert.equal(definition('conversation', 'tOt'), 'zd(()=>v$n())');
   assert.match(definition('conversation', 'v$n', true), /cleanTtlMs/);
   assert.match(definition('conversation', 'v$n', true), /hydrateSessionFromLibrary/);

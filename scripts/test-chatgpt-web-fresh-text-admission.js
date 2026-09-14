@@ -55,4 +55,18 @@ test('project-specific read failures retain only their allowlisted stages', asyn
   f.shared.textBusinessContext = () => null;
   f.shared.textProjectHeaders = () => ({ authorization: 'must-not-export' });
   assert.equal((await f.api.inspect(f.node)).stage, 'project_headers');
+  f.shared.textProjectHeaders = () => undefined;
+  const cases = [
+    ['mode', { kind: 'foreign', gizmo_id: project }, 'project_mode'],
+    ['isLoading', true, 'project_loading'], ['is_do_not_remember', true, 'project_privacy'],
+    ['sharedProjectConversationOwner', {}, 'project_shared'],
+    ['contextScopes', ['GLOBAL', 'HEALTH'], 'project_scopes']
+  ];
+  for (const [key, value, stage] of cases) {
+    const previous = f.tree[key]; f.tree[key] = value;
+    assert.equal((await f.api.inspect(f.node)).stage, stage);
+    f.tree[key] = previous;
+  }
+  f.tree.contextScopes = ['GLOBAL'];
+  assert.equal((await f.api.inspect(f.node)).code, 'ready');
 });
