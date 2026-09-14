@@ -80,6 +80,62 @@ class WebChatSnapshotWindowMergerTest {
         }
     }
 
+    @Test
+    fun officialMessageReplacesItsExactStreamAliasWithoutKeepingADuplicateTail() {
+        val id = "11111111-1111-4111-8111-111111111111"
+        val user = message("u1", "fixture question")
+        val stream = message("private-stream:$id", "FIXTURE_ANSWER")
+        val official = message(id, "FIXTURE\\_ANSWER")
+        for (old in listOf(listOf(user, stream), listOf(user, official, stream))) {
+            val merged = WebChatSnapshotWindowMerger.merge(
+                snapshot(old, observed = old.size), snapshot(listOf(user, official), observed = 2), true,
+            )
+            assertEquals(listOf("u1", id), merged.messages.map { it.id })
+            assertEquals(official.content, merged.messages.last().content)
+        }
+    }
+
+    @Test
+    fun subsequentStreamSnapshotKeepsTheCanonicalIdentity() {
+        val id = "11111111-1111-4111-8111-111111111111"
+        val user = message("u1", "fixture question")
+        val merged = WebChatSnapshotWindowMerger.merge(
+            snapshot(listOf(user, message(id, "partial")), observed = 2),
+            snapshot(listOf(user, message("private-stream:$id", "complete")), observed = 2), true,
+        )
+        assertEquals(listOf("u1", id), merged.messages.map { it.id })
+        assertEquals("complete", merged.messages.last().content)
+    }
+
+    @Test
+    fun matchingTextDoesNotMergeDifferentProviderMessagesOrPlaceholderSentinels() {
+        val id = "11111111-1111-4111-8111-111111111111"
+        val other = "22222222-2222-4222-8222-222222222222"
+        for (alias in listOf("private-stream:$other", "private-stream:assistant")) {
+            val cached = listOf(message("u1", "fixture"), message(alias, "same answer"))
+            val incoming = listOf(message("u1", "fixture"), message(id, "same answer"))
+            val merged = WebChatSnapshotWindowMerger.merge(
+                snapshot(cached, observed = 2), snapshot(incoming, observed = 2), true,
+            )
+            assertEquals(setOf("u1", id, alias), merged.messages.map { it.id }.toSet())
+        }
+    }
+
+    @Test
+    fun exactStreamIdentityPreservesWritingBlockStructureWhenCanonicalDomArrives() {
+        val id = "11111111-1111-4111-8111-111111111111"
+        val block = ChatGptWebMessagePart("writing_block", "Draft", textBlock =
+            WebChatTextBlock("writing-a", "writing", "Draft", "", "body", true, id))
+        val dom = ChatGptWebMessagePart("code", "Code", textBlock =
+            WebChatTextBlock("code-0", "code", "", "", "body", true))
+        val merged = WebChatSnapshotWindowMerger.merge(
+            snapshot(listOf(message("private-stream:$id", "body").copy(parts = listOf(block))), observed = 1),
+            snapshot(listOf(message(id, "body").copy(parts = listOf(dom))), observed = 1), true,
+        )
+        assertEquals(id, merged.messages.single().id)
+        assertEquals(block, merged.messages.single().parts.single())
+    }
+
     private fun snapshot(
         messages: List<ChatGptWebMessage>,
         start: Int = 0,

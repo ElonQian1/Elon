@@ -39,10 +39,10 @@ internal object WebChatSnapshotWindowMerger {
         incoming: List<ChatGptWebMessage>,
     ): List<ChatGptWebMessage>? {
         val previousIndex = previous.mapIndexedNotNull { index, message ->
-            message.id.takeIf(String::isNotBlank)?.let { it to index }
+            messageKey(message)?.let { it to index }
         }.toMap()
         val common = incoming.mapIndexedNotNull { incomingIndex, message ->
-            previousIndex[message.id]?.let { previousPosition ->
+            previousIndex[messageKey(message)]?.let { previousPosition ->
                 Match(previousPosition, incomingIndex)
             }
         }
@@ -52,7 +52,11 @@ internal object WebChatSnapshotWindowMerger {
         val first = common.first()
         val last = common.last()
         val enriched = incoming.map { message ->
-            WebChatTextBlockContinuity.merge(previousIndex[message.id]?.let(previous::get), message)
+            val old = previousIndex[messageKey(message)]?.let(previous::get)
+            val current = if (old != null && isStreamAlias(message) && !isStreamAlias(old)) {
+                message.copy(id = old.id)
+            } else message
+            WebChatTextBlockContinuity.merge(old?.copy(id = current.id), current)
         }
         return deduplicated(previous.take(first.previous) + enriched + previous.drop(last.previous + 1))
     }
@@ -76,14 +80,33 @@ internal object WebChatSnapshotWindowMerger {
     }
 
     private fun deduplicated(messages: List<ChatGptWebMessage>): List<ChatGptWebMessage> {
-        val seen = linkedSetOf<String>()
-        return messages.filter { message ->
-            val id = message.id.takeIf(String::isNotBlank) ?: return@filter true
-            seen.add(id)
+        val positions = mutableMapOf<String, Int>()
+        val result = mutableListOf<ChatGptWebMessage>()
+        messages.forEach { message ->
+            val key = messageKey(message)
+            val position = key?.let(positions::get)
+            if (position == null) {
+                if (key != null) positions[key] = result.size
+                result.add(message)
+            } else if (isStreamAlias(result[position]) && !isStreamAlias(message)) {
+                result[position] = message
+            }
         }
+        return result
     }
+
+    // A stream placeholder carries the exact provider message UUID. Text is
+    // deliberately not used: separate turns can have identical answers.
+    private fun messageKey(message: ChatGptWebMessage): String? =
+        message.id.takeIf(String::isNotBlank)?.let { id ->
+            message.role + ":" + if (isStreamAlias(message)) id.removePrefix("private-stream:") else id
+        }
+
+    private fun isStreamAlias(message: ChatGptWebMessage): Boolean =
+        message.role == "assistant" && STREAM_ALIAS.matches(message.id)
 
     private data class Match(val previous: Int, val incoming: Int)
 
     private const val MAX_MESSAGES = 80
+    private val STREAM_ALIAS = Regex("private-stream:[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}")
 }
