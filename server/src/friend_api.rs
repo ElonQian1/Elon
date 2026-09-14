@@ -28,6 +28,7 @@ use crate::{
 
 #[derive(Deserialize)]
 pub struct FriendSearchQuery {
+    pub include_candidates: Option<bool>,
     pub phone: Option<String>,
     pub query: Option<String>,
     pub search_type: Option<String>,
@@ -208,6 +209,16 @@ pub async fn search_friend_by_phone(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
     let search_text = friend_search_text(query.phone.as_deref(), query.query.as_deref());
+    if query.include_candidates.unwrap_or(false) {
+        return match state.store.search_friend_candidates(
+            &user.id,
+            query.search_type.as_deref(),
+            &search_text,
+        ) {
+            Ok(result) => Json(result).into_response(),
+            Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+        };
+    }
     match state
         .store
         .search_friend(&user.id, query.search_type.as_deref(), &search_text)

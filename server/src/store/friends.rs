@@ -1,6 +1,10 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
+#[path = "friend_candidates.rs"]
+mod friend_candidates;
+use friend_candidates::{search_candidates, CandidateField, FriendCandidates};
+
 use super::friend_messages::message_preview_for_viewer;
 use super::{
     normalize_account, now, AddFriendResult, FriendProfile, FriendRecommendation,
@@ -9,6 +13,47 @@ use super::{
 };
 
 impl Store {
+    pub fn search_friend_candidates(
+        &self,
+        user_id: &str,
+        search_type: Option<&str>,
+        query: &str,
+    ) -> Result<FriendCandidates> {
+        let query = query.trim();
+        if query.is_empty() {
+            return Err(anyhow!("请输入搜索内容"));
+        }
+        let search_type = FriendSearchType::from_input(search_type)?;
+        let conn = self.conn()?;
+        let (field, value) = match search_type {
+            FriendSearchType::Phone => (CandidateField::Phone, normalize_phone(query)?),
+            FriendSearchType::Email => (CandidateField::Email, normalize_email(query)?),
+            FriendSearchType::AccountId => (CandidateField::AccountId, normalize_account(query)?),
+            FriendSearchType::Auto if query.contains('@') => {
+                (CandidateField::Email, normalize_email(query)?)
+            }
+            FriendSearchType::Auto if query.to_ascii_lowercase().starts_with("usr_") => {
+                (CandidateField::AccountId, normalize_account(query)?)
+            }
+            FriendSearchType::Auto if looks_like_phone(query) => {
+                let result = search_candidates(
+                    &conn,
+                    user_id,
+                    CandidateField::Phone,
+                    &normalize_phone(query)?,
+                )?;
+                if !result.results.is_empty() {
+                    return Ok(result);
+                }
+                (CandidateField::Nickname, query.to_string())
+            }
+            FriendSearchType::Auto | FriendSearchType::Nickname => {
+                (CandidateField::Nickname, query.to_string())
+            }
+        };
+        search_candidates(&conn, user_id, field, &value)
+    }
+
     pub fn search_friend(
         &self,
         user_id: &str,
