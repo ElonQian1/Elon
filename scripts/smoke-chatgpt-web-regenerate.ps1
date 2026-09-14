@@ -23,6 +23,7 @@ $ExpectedAdapterVersion = Resolve-ChatGptWebSmokeExpectedAdapterVersion $Expecte
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-evidence.ps1")
 . (Join-Path $PSScriptRoot "chatgpt-web-smoke-reply-state.ps1")
 . (Join-Path $PSScriptRoot 'chatgpt-fresh-trial-smoke.ps1')
+. (Join-Path $PSScriptRoot 'chatgpt-fresh-text-smoke-evidence.ps1')
 if ($FreshHttp -and (!$NativeRetry -or $RequireOfficialRuntime)) {
     throw 'Fresh HTTP acceptance requires NativeRetry and cannot require the legacy runtime.'
 }
@@ -36,6 +37,7 @@ $seedAwaitingReply = $false
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec $PollIntervalSec
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
+if ($UseCurrentNativeSurface) { $runtime.mcp_bootstrapped = $true }
 
 function Get-ContentDigest {
     param([AllowEmptyString()][string]$Value)
@@ -216,8 +218,7 @@ try {
     ).Value
     if ($FreshHttp) {
         $preflight = Invoke-ChatGptFreshTrial -Runtime $runtime -Mode state
-        if ($preflight.version -notin @(6, 7) -or $preflight.pending -isnot [bool] -or $preflight.pending -or
-            $preflight.armed -isnot [bool] -or $preflight.armed) { throw 'Fresh diagnostic preflight is not idle.' }
+        if (!(Test-ChatGptFreshTextIdle $preflight)) { throw 'Fresh diagnostic preflight is not idle.' }
     }
     $originCaptured = $true
 

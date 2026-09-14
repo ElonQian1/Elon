@@ -63,6 +63,9 @@ foreach ($required in @(
     'official_runtime_v1:regenerate_observed',
     'Retry changed the original user turn.',
     'Retry conversation changed.',
+    "'chatgpt-fresh-text-smoke-evidence.ps1'",
+    'Test-ChatGptFreshTextIdle $preflight',
+    'if ($UseCurrentNativeSurface) { $runtime.mcp_bootstrapped = $true }',
     'original_user_turn_preserved = $true',
     'regenerated_assistant_completed = $true',
     'original_conversation_restored = $true',
@@ -83,6 +86,7 @@ foreach ($required in @(
 }
 
 foreach ($forbidden in @(
+    '$preflight.version -notin @(6, 7)',
     "chatgpt_remove_attachment",
     "chatgpt_delete",
     "removeAllCookies",

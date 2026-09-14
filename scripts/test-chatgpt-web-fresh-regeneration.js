@@ -34,7 +34,9 @@ for (const [name, change] of [
   ['hidden feedback retry', f => { f.user.message.metadata.is_contextual_retry_user_message = true; }],
   ['map result', f => { f.parent.metadata.map_search_parameters = {}; }],
   ['missing catalog', f => { f.retry.modelMenu.modelsData.models.clear(); }],
-  ['invalid ancestor', f => { f.user.parent = 'unreviewed-root'; }]
+  ['invalid ancestor', f => { f.user.parentId = 'unreviewed-root'; }],
+  ['non-string ancestor', f => { f.user.parentId = [ROOT]; }],
+  ['wire-shaped runtime node', f => { f.user.parent = f.user.parentId; delete f.user.parentId; }]
 ]) test(name + ' does not guess an independent regeneration contract', async () => {
   const f = fixture(); change(f);
   await assert.rejects(f.capture(), /context_|scope_/);
@@ -47,6 +49,20 @@ test('branch and account changes invalidate admission before writing', async () 
   f.user.message.content.parts[0] = 'Synthetic original prompt'; assert.equal(binding.current(), true);
   f.tree.variants.push(OTHER); assert.equal(binding.current(), false); f.tree.variants.pop();
   f.retry.identity.accountId = OTHER; assert.equal(binding.owns(), false);
+});
+
+test('runtime parentId and wire parent stay separate across history reconciliation', async () => {
+  const f = fixture(), binding = await f.capture();
+  assert.equal(f.user.parentId, ROOT); assert.equal('parent' in f.user, false);
+  const snapshot = f.history();
+  assert.equal(snapshot.mapping[UID].parent, ROOT);
+  assert.equal('parentId' in snapshot.mapping[UID], false);
+  f.apply(snapshot);
+  assert.equal(f.tree.nodes[UID].parentId, ROOT);
+  assert.equal('parent' in f.tree.nodes[UID], false);
+  assert.equal(binding.canReconcile(UID), true);
+  f.tree.nodes[UID].parentId = OTHER;
+  assert.equal(binding.canReconcile(UID), false, 'runtime reparenting invalidates the owned prompt');
 });
 
 test('fresh variant prepares action next, dispatches variant and never creates a second user message', async () => {
@@ -76,7 +92,7 @@ test('history requires a new reply observed in this exact owned stream, not mere
   assert.equal(binding.observePayload({ message: f.reply() }), true);
   assert.equal(history.ownsResponse(f.history(), binding, UID), true);
   assert.equal(history.ownsResponse(f.history(OTHER), binding, UID), false);
-  const wrong = f.history(); wrong.mapping[UID] = { ...f.user, parent: OTHER };
+  const wrong = f.history(); wrong.mapping[UID].parent = OTHER;
   assert.equal(history.ownsResponse(wrong, binding, UID), false);
   const changed = structuredClone(f.history());
   changed.mapping[UID].message.content.parts = ['Edited elsewhere'];

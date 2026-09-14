@@ -13,21 +13,21 @@ function fixture() {
   const { page, shared, tree, selected, parent, conversation } = f;
   Object.assign(parent, { content: { content_type: 'text', parts: ['Synthetic previous answer'] },
     metadata: { thinking_effort: 'high' } });
-  const user = { id: UID, parent: ROOT, message: { id: UID, author: { role: 'user' },
+  const user = { id: UID, parentId: ROOT, message: { id: UID, author: { role: 'user' },
     content: { content_type: 'text', parts: ['Synthetic original prompt'] }, metadata: {} } };
   tree.leaf = PID; tree.variants = [PID];
-  tree.nodes = { [ROOT]: { id: ROOT, parent: null, message: { id: ROOT, author: { role: 'root' } } },
-    [UID]: user, [PID]: { id: PID, parent: UID, message: parent } };
+  tree.nodes = { [ROOT]: { id: ROOT, parentId: null, message: { id: ROOT, author: { role: 'root' } } },
+    [UID]: user, [PID]: { id: PID, parentId: UID, message: parent } };
   Object.assign(shared.HM, {
     getCurrentLeafId: t => t.leaf, getCurrentMessage: t => t.nodes[t.leaf]?.message,
     getVariantIds: t => t.variants, getNode: (t, id) => t.nodes[id], getNodeIfExists: (t, id) => t.nodes[id],
-    getParentNode: (t, id) => t.nodes[t.nodes[id]?.parent],
+    getParentNode: (t, id) => t.nodes[t.nodes[id]?.parentId],
     getParentPromptNode(t, id) {
       const seen = new Set();
       while (id && !seen.has(id)) {
         seen.add(id); const node = t.nodes[id];
         if (node?.message?.author?.role === 'user') return node;
-        id = node?.parent;
+        id = node?.parentId;
       }
       return null;
     }
@@ -55,10 +55,16 @@ function fixture() {
   const reply = (id = AID, status = 'finished_successfully') => ({ id, author: { role: 'assistant' }, status,
     end_turn: status === 'finished_successfully', content: { content_type: 'text', parts: ['Synthetic regenerated answer'] } });
   function history(id = AID) {
+    const mapping = Object.fromEntries(Object.entries(tree.nodes).map(([key, { parentId, ...node }]) =>
+      [key, { ...node, parent: parentId }]));
     return { conversation_id: CID, current_node: id, async_status: null,
-      mapping: { ...tree.nodes, [id]: { id, parent: UID, message: reply(id) } } };
+      mapping: { ...mapping, [id]: { id, parent: UID, message: reply(id) } } };
   }
-  function apply(value) { tree.nodes = value.mapping; tree.leaf = value.current_node; f.props.currentLeafId = tree.leaf; }
+  function apply(value) {
+    tree.nodes = Object.fromEntries(Object.entries(value.mapping).map(([key, { parent, ...node }]) =>
+      [key, { ...node, parentId: parent }]));
+    tree.leaf = value.current_node; f.props.currentLeafId = tree.leaf;
+  }
   const api = regeneration.create(page, f.api);
   return Object.assign(f, { retry: r, user, command, reply, history, apply, capture: () => api.capture(command) });
 }

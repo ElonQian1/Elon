@@ -63,6 +63,19 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
   }
   const { conversation, composer, shared } = modules;
 
+  await t.test('runtime tree nodes expose parentId, unlike history mapping parent', () => {
+    const tree = definition(shared, 'Cx');
+    const method = name => {
+      const nodes = tree.body.body.filter(node => node.key?.name === name);
+      assert.equal(nodes.length, 1, 'missing tree method: ' + name);
+      return shared.text.slice(nodes[0].start, nodes[0].end);
+    };
+    assert.equal(method('getParent'), 'getParent(e){let t=this.getNode(e).parentId;return this.getNode(t)}');
+    assert.equal(method('getNodeIfExists'), 'getNodeIfExists(e){return P(bx,this)[e]}');
+    assert.match(method('getNode'), /let t=this\.getNodeIfExists\(e\);if\(t\)return t/);
+    includes(facts(definition(conversation, 'oQe')).properties, ['mapping', 'parent']);
+  });
+
   await t.test('ordinary regeneration reuses its user parent and prepares a fresh variant without a new user message', () => {
     const source = (module, name, exported = false) => {
       const node = definition(module, name, exported); return module.text.slice(node.start, node.end);

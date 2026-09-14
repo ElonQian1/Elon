@@ -8,6 +8,12 @@ scope: existing_personal_plain_text_retry
 
 # Fresh Regeneration
 
+September 14: [runtime-parent correction](reports/chatgpt-fresh-retry-parent-20260914.md)
+reproduces and fixes a runtime `parentId` / history `parent` field mismatch.
+The 1721 native retry attempt failed before independent dispatch, then the runtime
+path became uncertain. Adapter 390 is source-only pending grouped build and
+read-only recovery of that attempt; this capability remains unverified/default-off.
+
 September 13 source candidate. The existing native regenerate button now has a
 gated independent request path through the same fresh-text ledger, prepare/proof
 provider, owned stream, stop and history recovery. It does not call the website's

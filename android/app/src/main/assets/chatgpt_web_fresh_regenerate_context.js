@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshRegenerateContext = api;
 })(typeof window === 'object' ? window : null, function (page, baseContext) {
@@ -34,7 +34,8 @@
         original.message.content.parts.length > 128 ||
         !original.message.content.parts.every(part => typeof part === 'string' && part.length <= 40000) ||
         original.message.content.parts.reduce((size, part) => size + part.length, 0) > 40000 ||
-        !(UUID.test(original.parent || '') || original.parent === 'client-created-root' || original.parent === '') ||
+        typeof original.parentId !== 'string' ||
+        !(UUID.test(original.parentId) || original.parentId === 'client-created-root' || original.parentId === '') ||
         original.message.channel != null || original.message.recipient != null && original.message.recipient !== 'all') fail('scope_unsupported');
     const metadata = original.message.metadata || {};
     if (['attachments', 'system_hints', 'contextual_retry_message', 'is_contextual_retry_user_message',
@@ -48,7 +49,8 @@
         'is_visually_hidden_from_conversation', 'is_visually_hidden_reasoning_group', 'debug_internal_only']
         .map(key => { const value = message?.metadata?.[key];
           return value == null || value === false || Array.isArray(value) && !value.length ? null : value; })]);
-    const originalUser = userSignature(original.message), historyParentId = original.parent;
+    // Official in-memory nodes use parentId; only the history response uses parent.
+    const originalUser = userSignature(original.message), historyParentId = original.parentId;
     const variants = new Set(owner.variants), observed = new Set();
     function effort() {
       const selected = owner.model.menu.modelsData?.models?.get(model);
@@ -61,7 +63,7 @@
     function owns() { return base.owns() && contract.ownerCurrent(owner); }
     function sameUser() {
       const value = user();
-      return value?.parent === historyParentId && value.id === owner.parentId && userSignature(value.message) === originalUser;
+      return value?.parentId === historyParentId && value.id === owner.parentId && userSignature(value.message) === originalUser;
     }
     function current() {
       try {
