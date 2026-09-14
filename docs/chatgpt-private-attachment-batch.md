@@ -72,6 +72,10 @@ Sender v27, policy v5, adapter 403 are source-only for the next grouped build;
 this precheck has not been built or accepted on a device. Existing 1598 upload
 acceptance is unchanged and does not prove these new quota cases.
 
+Delivery update: [grouped APK 1739](reports/chatgpt-private-grouped-1739.md) now
+includes these assets with adapter 405. Release build, publication and Xiaomi
+update passed; the cached-quota boundary cases are still not device-accepted.
+
 ## Protocol evidence
 
 The already inspected public composer asset, SHA-256

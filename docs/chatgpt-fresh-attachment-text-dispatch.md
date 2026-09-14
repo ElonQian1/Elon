@@ -152,3 +152,8 @@ No Android build, APK publication, or live provider/device acceptance is claimed
 for this source batch. USB and wireless discovery were empty. Grouped acceptance
 must still verify real mounted selection/content recognition, a single server
 turn and native selected-card cleanup; successful ordinary uploads do not prove it.
+
+Delivery update: [grouped APK 1739](reports/chatgpt-private-grouped-1739.md) includes
+formatter v2 and passed Release build, publication, byte-level asset verification
+and Xiaomi update. Production binding/readiness passed with zero sends; mounted
+file-content recognition and independent attachment acceptance remain pending.
