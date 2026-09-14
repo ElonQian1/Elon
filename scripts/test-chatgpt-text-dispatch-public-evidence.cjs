@@ -234,10 +234,15 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     assert.match(serializer, /e\.gizmoId==null\|\|e\.isProjectThread/);
     assert.match(serializer, /let n=e\.fileSpec/);
     for (const field of ['id:n.id', 'mime_type:n.mimeType', 'library_file_id:e.libraryFileId',
+      'mounted_library_file_id:e.mountedLibraryFileId', 'mounted_library_mime_type:e.mountedLibraryMimeType',
+      'library_provider:e.libraryProvider', 'library_entrypoint:e.libraryEntrypoint', 'preview_file:e.previewFile',
       'file_token_size:n.fileTokenSize', 'library_persistence_result:n.libraryPersistenceResult',
       'asset_pointer:ooe(n.id)', 'size_bytes:n.size', 'width:n.width', 'height:n.height']) {
       assert.ok(serializer.includes(field), field);
     }
+    assert.equal(source(conversation, 'Gk'), 'function Gk(e){return U4t(e)&&e.requiresMountedLibraryMaterialization!==!0}');
+    assert.match(source(conversation, 'U4t'), /e\.fileId===e\.mountedLibraryFileId/);
+    assert.match(serializer, /if\(Gk\(e\)\)\{.*?;return\}/);
     assert.match(serializer, /u\.push\(t\?\?``\),c=\{content_type:an\.MultimodalText,parts:u\}/);
     assert.deepEqual(conversation.imports.get('ooe'), { file: './' + assets.shared[0], name: 'Pm' });
     assert.equal(source(shared, 'Pm', true), 'function YEt(e){return e.startsWith(`file_`)?`sediment://`+e:`file-service://`+e}');

@@ -3,7 +3,7 @@ capability_id: android_chatgpt_fresh_attachment_text_dispatch_v1
 implementation_status: implemented
 verification_status: offline_verified
 production_default: false
-scope: owned_ready_local_and_ordinary_library_files
+scope: owned_ready_local_ordinary_library_and_materialized_mounted_files
 ---
 
 # Fresh Attachment Dispatch
@@ -103,9 +103,52 @@ selected-card cleanup, later-file preservation and exactly one server user turn.
 Check file-only send and preserve the previous conversation/login. No APK or
 device test was performed in this source batch.
 
-Shared library references, mounted files and context connectors remain excluded
-from this formatter wrapper and retain their existing paths. Ordinary library
+Shared library references, unresolved mounted references and context connectors
+remain excluded from this formatter wrapper and retain their existing paths. Ordinary library
 metadata is supported in source but needs its own real sample. New, project,
 temporary and tool combinations require their separate gates and grouped
 acceptance; their prior runtime success is not independent HTTP acceptance.
 Thermal measurements remain deferred until private functional acceptance.
+
+## Materialized Mounted Files
+
+September 15 source extension: formatter v2 / adapter 405 admits ready mounted
+files already prepared by the existing private Library attachment owner. It does
+not materialize at send time, fetch file bytes, reupload, or create another sender.
+The existing attachment trial/explicit flag still controls admission; this is not
+a default promotion or live acceptance of mounted selection.
+
+The pinned `nhr` formatter carries both the backing `file_id` and original
+`mounted_library_file_id`, source MIME, provider, entrypoint and optional preview.
+Its `Gk/U4t` branch excludes live mounted references whose backing ID equals their
+mounted ID. The wrapper now distinguishes that unresolved shape from the ordinary
+backing file returned by the existing materialization API. Provider/type checks
+reuse `mountedTarget`, not a second provider-ID parser.
+
+Requests preserve the exact leased provenance and preview. A materialized file
+may have size zero when the remote size is unknown; that does not loosen local
+upload validation or claim that a metadata-only File contains downloaded bytes.
+Images retain the existing prepared dimensions; no new measured-dimension claim
+is made. A formatter that drops mounted metadata cannot send a bare image pointer
+instead. Uncertain history requires the backing ID plus the original mounted ID
+and source MIME before cleanup; it cannot silently confirm an unrelated copy.
+
+The integrated tests use the existing Library selection, quota policy, actual
+materialization module, immutable composer lease, independent request, transaction,
+stream transport and history recovery with a synthetic provider. They cover
+Drive/Box/Dropbox/SharePoint IDs, Drive document export, unknown size, preview,
+mixed local/mounted and mounted-only empty-text sends, one-command trial, exact
+cleanup, changed ownership and response loss without either POST being replayed.
+Early fixture setup failures were not production failures; after composing the
+existing Library fixture, the unmodified sender reproduced five admission failures.
+
+`mounted-fresh-final-20260915-005441-073`: 207 targeted Node tests passed, zero
+failures/skips, 13.4 seconds. This includes pinned public-source hash/AST assertions,
+existing runtime attachment send/immutable lease regressions and independent
+production command wiring. It is synthetic integration and protocol evidence,
+not server acceptance or proof of actual file-content recognition.
+
+No Android build, APK publication, or live provider/device acceptance is claimed
+for this source batch. USB and wireless discovery were empty. Grouped acceptance
+must still verify real mounted selection/content recognition, a single server
+turn and native selected-card cleanup; successful ordinary uploads do not prove it.

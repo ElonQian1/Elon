@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, capture: factory });
+  const api = Object.freeze({ version: 2, capture: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextAttachments = api;
 })(typeof window === 'object' ? window : null, function (page, binding, runtime) {
@@ -13,14 +13,27 @@
       typeof runtime.textSerializeAttachments !== 'function') return fail();
   const idPattern = /^[A-Za-z0-9_-]{1,160}$/;
   const pointer = id => (id.startsWith('file_') ? 'sediment://' : 'file-service://') + id;
+  function materialized(file) {
+    if (file.mountedLibraryFileId == null) return file.mountedLibraryMimeType == null;
+    // The existing library producer owns materialization. Fresh sends only
+    // serialize its backing file, never the unresolved mounted-reference variant.
+    if (file.source !== 'library' || !/^file[_-][A-Za-z0-9_-]{1,155}$/.test(file.fileId || '') ||
+        file.libraryFileId != null || file.libraryArtifactType != null ||
+        typeof file.libraryProvider !== 'string' || file.libraryEntrypoint !== 'composer_library_picker' ||
+        typeof file.mountedLibraryMimeType !== 'string' || !file.mountedLibraryMimeType) return false;
+    return !!page.__elonChatGptPrivateLibraryDownload?.mountedTarget?.({ source: file.source,
+      name: file.fileSpec?.name, mime_type: file.fileSpec?.mimeType,
+      mounted_library_file_id: file.mountedLibraryFileId, mounted_library_mime_type: file.mountedLibraryMimeType,
+      library_provider: file.libraryProvider });
+  }
   if (new Set(files.map(file => file.fileId)).size !== files.length || files.some(file => {
     const spec = file.fileSpec;
     return file.status !== 'ready' || !['local', 'library'].includes(file.source) ||
       !idPattern.test(file.fileId || '') || spec?.id !== file.fileId ||
       typeof spec.name !== 'string' || !spec.name.trim() || spec.name.length > 512 ||
-      !Number.isSafeInteger(spec.size) || spec.size < 1 ||
+      !Number.isSafeInteger(spec.size) || spec.size < (file.mountedLibraryFileId == null ? 1 : 0) ||
       typeof spec.mimeType !== 'string' || !/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i.test(spec.mimeType) ||
-      file.sharedLibraryFileReference != null || file.mountedLibraryFileId != null ||
+      file.sharedLibraryFileReference != null || file.requiresMountedLibraryMaterialization === true || !materialized(file) ||
       spec.contextConnectorInfo != null;
   })) return fail();
   const mimeTypes = Object.freeze([...new Set(files.map(file => file.fileSpec.mimeType.toLowerCase()))]);
@@ -57,9 +70,14 @@
       const file = files.find(file => file.fileId === item?.id), spec = file?.fileSpec;
       if (!spec || represented.has(item.id) || item.name !== spec.name || item.size !== spec.size ||
           item.mime_type !== spec.mimeType || item.library_file_id !== file.libraryFileId ||
+          item.mounted_library_file_id !== file.mountedLibraryFileId ||
+          item.mounted_library_mime_type !== file.mountedLibraryMimeType ||
+          file.mountedLibraryFileId != null && (item.library_provider !== file.libraryProvider ||
+            item.library_entrypoint !== file.libraryEntrypoint || JSON.stringify(item.preview_file) !== JSON.stringify(file.previewFile)) ||
           item.source !== file.source) return fail();
       represented.add(item.id);
     }
+    if (files.some(file => file.mountedLibraryFileId != null && !represented.has(file.fileId))) return fail();
     if (typeof result.content === 'string') {
       if (result.content !== prompt) return fail();
     } else {
@@ -94,8 +112,9 @@
     if (!prepared) return false;
     const metadata = message?.metadata?.attachments ?? [], parts = message?.content?.parts ?? [];
     if (!Array.isArray(metadata) || !Array.isArray(parts)) return false;
-    return files.every(file => metadata.some(item => item?.id === file.fileId) ||
-      images.has(pointer(file.fileId)) && parts.some(part => part?.content_type === 'image_asset_pointer' &&
+    return files.every(file => metadata.some(item => item?.id === file.fileId && (file.mountedLibraryFileId == null ||
+      item.mounted_library_file_id === file.mountedLibraryFileId && item.mounted_library_mime_type === file.mountedLibraryMimeType)) ||
+      file.mountedLibraryFileId == null && images.has(pointer(file.fileId)) && parts.some(part => part?.content_type === 'image_asset_pointer' &&
         part.asset_pointer === pointer(file.fileId)));
   }
   return Object.freeze({ mimeTypes, current, prepare, message, matchesHistory,

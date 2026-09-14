@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const path = require('node:path');
-const { fixture: attachmentsFixture, CID, PID } = require('./fixtures/chatgpt-fresh-text-attachments');
+const { fixture: attachmentsFixture, appendMounted, CID, PID } = require('./fixtures/chatgpt-fresh-text-attachments');
 const { install: installStream } = require('./fixtures/chatgpt-owned-stream-transport');
 const asset = name => require(path.join('..', 'android/app/src/main/assets', 'chatgpt_web_fresh_text_' + name));
 const turn = () => new Promise(resolve => setImmediate(resolve));
@@ -11,7 +11,8 @@ const settled = async () => { for (let i = 0; i < 8; i++) await turn(); };
 const command = { requestId: 'mcp_attach1', prompt: 'Synthetic attachment question', expectedDraft: '' };
 
 async function fixture(options = {}) {
-  const f = await attachmentsFixture(), calls = [];
+  const f = await attachmentsFixture(options.types, { library: options.mounted === true }), calls = [];
+  const mounted = options.mounted ? await appendMounted(f) : null;
   const { page, shared, conversation, files } = f;
   Object.assign(page, { crypto, AbortController, setTimeout, clearTimeout,
     __elonChatGptPrivateTextTransactionsEnabled: true, __elonChatGptFreshTextAttachmentsEnabled: options.enabled === true });
@@ -40,7 +41,8 @@ async function fixture(options = {}) {
   })();
   function payload() {
     const user = structuredClone(posted.messages[0]), id = crypto.randomUUID();
-    if (missingReference) user.metadata.attachments.shift();
+    if (missingReference === 'mounted') delete user.metadata.attachments.at(-1).mounted_library_file_id;
+    else if (missingReference) user.metadata.attachments.shift();
     return { conversation_id: CID, current_node: id, mapping: {
       [PID]: { id: PID, parent: null, message: f.parent },
       [user.id]: { id: user.id, parent: PID, message: user },
@@ -64,7 +66,7 @@ async function fixture(options = {}) {
   const api = asset('transaction').create(page, { context: f.api, requests: asset('request'),
     receipts: asset('receipts'), recovery, reconciliation,
     prepareTimeoutMs: 1000, openTimeoutMs: 1000, streamTimeoutMs: 1000 });
-  return Object.assign(f, { api, calls, files, send: input => api.send({ ...command, composer: f.node,
+  return Object.assign(f, { api, calls, files, mounted, send: input => api.send({ ...command, composer: f.node,
     readDraft: () => '', ...input }), posted: () => posted, missing: value => { missingReference = value; } });
 }
 
@@ -187,5 +189,51 @@ test('matching text IDs without all file references cannot reconcile or release 
   await settled();
   assert.equal(f.api.state().pending, false); assert.equal(f.files.files$().length, 0);
   assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
+  assert.equal(f.api.dispose(), true);
+});
+
+test('mounted selection reaches independent HTTP/SSE through the existing one-command trial and exact cleanup', async () => {
+  const f = await fixture({ mounted: true });
+  const blocked = f.send();
+  assert.equal((await blocked.completion).status, 'unavailable');
+  assert.equal(blocked.claimFallback(), true); assert.equal(f.calls.length, 0);
+  await settled();
+  assert.equal(f.api.trialControl('start').armed, true);
+  const sent = f.send({ requestId: 'mcp_mounttrial' });
+  assert.equal((await sent.completion).status, 'accepted');
+  await settled();
+  assert.equal(f.posted().messages[0].metadata.attachments.at(-1).mounted_library_file_id, f.mounted.source.id);
+  assert.equal(f.mounted.calls.length, 1); assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
+  assert.equal(f.files.files$().length, 0); assert.equal(f.api.state().pending, false);
+  assert.equal(f.api.trialControl('state').reconciled, true);
+  assert.equal(f.page.__elonChatGptFreshTextAttachmentsEnabled, false);
+  assert.equal(f.send({ requestId: 'mcp_mounttrial' }), sent);
+  assert.equal(f.api.dispose(), true);
+});
+
+test('lost mounted response cannot be confirmed from backing ID alone and recovers without either write replay', async () => {
+  const f = await fixture({ enabled: true, mounted: true, responseLost: true }); f.missing('mounted');
+  const sent = f.send();
+  assert.equal((await sent.completion).status, 'unknown');
+  await settled();
+  assert.equal(f.api.state().pending, true); assert.equal(f.files.files$().length, 4);
+  assert.equal(f.api.trialControl('state').history, 'branch_mismatch');
+  assert.equal(sent.claimFallback(), false);
+  f.missing(false);
+  assert.equal((await f.api.recover().completion).status, 'accepted');
+  await settled();
+  assert.equal(f.api.state().pending, false); assert.equal(f.files.files$().length, 0);
+  assert.equal(f.mounted.calls.length, 1); assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
+  assert.equal(f.api.dispose(), true);
+});
+
+test('mounted-only empty-text send uses the real stream admission and keeps the file reference', async () => {
+  const f = await fixture({ enabled: true, mounted: true, types: [] });
+  assert.equal((await f.send({ prompt: '' }).completion).status, 'accepted');
+  await settled();
+  assert.deepEqual(f.posted().messages[0].content, { content_type: 'text', parts: [''] });
+  assert.equal(f.posted().messages[0].metadata.attachments.length, 1);
+  assert.equal(f.files.files$().length, 0); assert.equal(f.api.state().pending, false);
+  assert.equal(f.mounted.calls.length, 1); assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
   assert.equal(f.api.dispose(), true);
 });
