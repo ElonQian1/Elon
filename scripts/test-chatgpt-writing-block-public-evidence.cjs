@@ -93,6 +93,9 @@ test('reviewed public source resolves writing delimiters against message metadat
   const definition = name => index.definitions.get(name).map(d => source.slice(d.start, d.end)).join('\n');
   assert.equal(definition('Uy'), '`writing`');
   assert.ok(definition('rje').includes('^:::${Uy}'));
+  // The legacy replacement parser is narrower than local quoted-header support.
+  // Extending local display must not silently extend provider save ownership.
+  assert.ok(definition('rje').includes('([^}]*)'));
   assert.ok(definition('$Ae').includes('t[p]?.content'));
   assert.ok(definition('mje').includes('metadata.writing_blocks'));
   assert.ok(definition('ije').includes('fence.length'));

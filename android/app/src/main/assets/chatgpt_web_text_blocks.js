@@ -142,10 +142,13 @@
     for (let i = 0; i < lines.length && parts.length < MAX_BLOCKS; i++) {
       scanned = i + 1;
       const open = fence(lines[i].line);
-      const writing = !open && lines[i].line.match(/^ {0,3}:::writing\{([^}]*)\}\s*$/);
+      const writing = !open && lines[i].line.match(/^ {0,3}:::writing\{([^\r\n]*)\}\s*$/);
       if (!open && !writing) continue;
       const attrs = writing && attributes(writing[1]);
       if (writing && !attrs) { ambiguousWriting = true; continue; }
+      // Quoted braces are local read/export compatibility. The reviewed legacy
+      // save parser stops at the first brace, so its message indexes are unproven.
+      if (writing && writing[1].includes('}')) ambiguousWriting = true;
       if (writing) writingIds.set(attrs.id, (writingIds.get(attrs.id) || 0) + 1);
       const end = open ? fenceEnd(lines, i, open) : writingEnd(lines, i);
       const bodyEnd = end < 0 ? raw.length : lines[end].start;
@@ -241,5 +244,5 @@
     } catch (_) { return null; }
   }
 
-  return { version: 8, project, domCode, runtimeProjection, MAX_CONTENT };
+  return { version: 9, project, domCode, runtimeProjection, MAX_CONTENT };
 });
