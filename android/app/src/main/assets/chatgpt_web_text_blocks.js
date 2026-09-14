@@ -218,14 +218,16 @@
       const url = new URL(page.location.href);
       const route = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.exec(url.pathname);
       const id = route?.[2], projectId = route?.[1];
+      const temporary = url.href === 'https://chatgpt.com/?temporary-chat=true';
       const bindings = page.__elonChatGptPrivateRuntimeBindings;
-      if (url.origin !== 'https://chatgpt.com' || !id || url.search || url.hash || url.username || url.password ||
+      if (url.origin !== 'https://chatgpt.com' || !temporary && (!id || url.search) || url.hash || url.username || url.password ||
           !/^doc_[a-z0-9_]{3,80}$/.test(page.__elonChatGptDocumentToken || '') ||
           bindings?.state?.().profile_id !== 'web_20260912' ||
           !page.__elonChatGptPrivateConversationShareContract?.create(page).identity()) return null;
       // Only read an already loaded, reviewed module. Rendering must never fetch or wait.
       const shared = bindings.peek('shared');
-      const owners = shared?.canvasConversations?.().filter(item => item?.serverId$?.() === id) || [];
+      const owners = temporary ? [page.__elonChatGptWritingBlockPolicy?.temporaryOwner(page, shared)].filter(Boolean) :
+        shared?.canvasConversations?.().filter(item => item?.serverId$?.() === id) || [];
       if (owners.length !== 1) return null;
       const thread = shared.XM(owners[0].id);
       if (projectId && shared.HM.getGizmoId?.(thread) !== projectId) return null;
@@ -238,5 +240,5 @@
     } catch (_) { return null; }
   }
 
-  return { version: 6, project, domCode, runtimeProjection, MAX_CONTENT };
+  return { version: 7, project, domCode, runtimeProjection, MAX_CONTENT };
 });

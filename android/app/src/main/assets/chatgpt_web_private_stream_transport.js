@@ -4,7 +4,7 @@
   if (window.__elonChatGptPrivateStreamObserverEnabled !== true) return;
   if (location.origin !== 'https://chatgpt.com') return;
   const existing = window.__elonChatGptPrivateStreamTransport;
-  if (existing && Number(existing.version) >= 23) return;
+  if (existing && Number(existing.version) >= 24) return;
   if (existing && typeof existing.dispose === 'function') {
     try { existing.dispose(); }
     catch (_) { /* A stale transport must not block the upgraded observer. */ }
@@ -690,11 +690,23 @@
   }
 
   window.__elonChatGptPrivateStreamTransport = Object.freeze({
-    version: 23,
+    version: 24,
     enabled: true,
     current: (pathname) => session.current(pathname),
     access: currentAccess,
     mergeMessages: (messages, pathname) => session.merge(mergePrivateUser(messages), pathname),
+    reconcileTemporaryWritingBlock: (message, conversationId, current) => {
+      if (disposed || location.href !== 'https://chatgpt.com/?temporary-chat=true' ||
+          typeof current !== 'function' || current() !== true || message?.author?.role !== 'assistant' ||
+          !/^(finished_successfully|completed|finished)$/.test(message.status || '')) return false;
+      const latest = session.current(location.pathname);
+      if (!latest || latest.id !== message.id) return true;
+      if (latest.conversationId !== conversationId || latest.state !== 'completed') return false;
+      // A confirmed edit supersedes this completed stream copy, never a running reply.
+      if (!session.accept({ message, conversation_id: conversationId })) return false;
+      notify();
+      return current() === true;
+    },
     preparePrivateSend,
     beginPrivateStream: (binding) => {
       // Stream ownership is not the optimistic text bubble: file-only sends

@@ -151,6 +151,8 @@ test('reviewed official writing save uses original message ownership, not a libr
   // Project conversations use the same message-scoped body; project identity is
   // an admission guard, not an invented field in this endpoint's request.
   assert.doesNotMatch(save, /gizmo_id|project_id|conversation_mode|primary_assistant/);
+  // Temporary privacy belongs to the conversation. Saving a block must not issue a history/privacy mutation.
+  assert.doesNotMatch(save, /is_do_not_remember|is_temporary_chat|temporary-chat|history_and_training/);
   assert.match(save, /if\(o==null\)return await c\(\),!0/);
 });
 

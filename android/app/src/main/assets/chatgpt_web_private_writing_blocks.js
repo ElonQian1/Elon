@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptPrivateWritingBlocks) {
     root.__elonChatGptPrivateWritingBlocks = factory(root);
@@ -37,7 +37,8 @@
   }
   async function read(entry, deadline) {
     const payload = await request(entry, 'GET', null, deadline);
-    return policy.source(payload, entry.binding.id, entry.source.messageId, entry.source.id, parser, entry.binding.projectId, true);
+    return policy.source(payload, entry.binding.id, entry.source.messageId, entry.source.id, parser,
+      entry.binding.projectId, true, entry.binding.temporary === true);
   }
   async function verify(entry, deadline) {
     const expected = entry.pending;
@@ -141,7 +142,10 @@
     job.promise.then(value => {
       if (value.code === 'writing_saved' && !value.pending && !job.refreshed) {
         job.refreshed = true;
-        try { page.__elonChatGptPrivateTransport.prefetchConversation(value.path, emit, null); } catch (_) {}
+        try {
+          if (value.path === policy.TEMPORARY_PATH) snapshot(true);
+          else page.__elonChatGptPrivateTransport.prefetchConversation(value.path, emit, null);
+        } catch (_) {}
       }
       if (value.ok) emit({ type: 'writing_block', version: 1, requestId: command.requestId,
         path: value.path, ticket: value.ticket, id: value.id, messageId: value.messageId, pending: value.pending });
@@ -149,5 +153,5 @@
     }).catch(() => respond(action, false, 'writing_unavailable'));
     return true;
   }
-  return Object.freeze({ version: 3, handle, run });
+  return Object.freeze({ version: 4, handle, run });
 });

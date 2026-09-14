@@ -9,11 +9,34 @@
   const PATH = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i;
   const PROJECT = /^g-p-[a-f0-9]{32}$/i;
   const TICKET = /^wb_[a-f0-9]{32}$/;
+  const TEMPORARY_PATH = '/?temporary-chat=true';
   const own = (object, key) => object && Object.prototype.hasOwnProperty.call(object, key) ? object[key] : null;
   const fail = code => { throw Error('writing_' + code); };
   function route(path) {
+    if (path === TEMPORARY_PATH) return { id: null, projectId: null, temporary: true };
     const match = typeof path === 'string' && PATH.exec(path);
     return match ? { id: match[2], projectId: match[1] || null } : null;
+  }
+  function temporaryOwner(page, shared) {
+    try {
+      if (page.location.href !== 'https://chatgpt.com' + TEMPORARY_PATH || shared.cX?.() !== true ||
+          typeof shared.SV?.isPersonalWorkspace !== 'function' || shared.wV?.(shared.SV.isPersonalWorkspace) !== true) return null;
+      const owners = shared.canvasConversations?.();
+      if (!Array.isArray(owners) || owners.length > 512) return null;
+      const matches = owners.filter(owner => page.__elonChatGptTemporaryChat?.ownsSelectedConversation?.(owner) === true);
+      if (matches.length !== 1) return null;
+      const owner = matches[0], state = shared.XM(owner.id);
+      if (!PATH.test('/c/' + owner.serverId$()) || shared.uo?.(owner) !== false ||
+          shared.HM?.getIsNewConversation?.(state) !== false || shared.HM.getGizmoId?.(state) !== null ||
+          state?.isLoading !== false || state.is_do_not_remember !== true ||
+          state.mode?.kind !== 'primary_assistant' || state.mode.gizmo_id != null ||
+          state.sharedProjectConversationOwner != null ||
+          ['continuingFromSharedConversationId', 'continuingFromSharedProjectConversationId', 'continuingFromSharedPostId',
+            'forkFromSharedPost', 'branchingFromMessageId', 'branchingFromConversationId', 'continuationBranch']
+            .some(key => state[key] != null && state[key] !== false) ||
+          state.contextScopes != null && (!Array.isArray(state.contextScopes) || state.contextScopes.length)) return null;
+      return owner;
+    } catch (_) { return null; }
   }
   function text(value) {
     if (typeof value !== 'string' || value.length > 120000) fail('request_invalid');
@@ -33,14 +56,15 @@
       op === 'save' ? ['operation', 'path', 'ticket', 'content'] : op === 'verify' ? ['operation', 'path', 'ticket'] : [];
     if (!keys.length || !input || Array.isArray(input) ||
         Object.keys(input).length !== keys.length || Object.keys(input).some(key => !keys.includes(key)) ||
-        typeof input.path !== 'string' || !PATH.test(input.path)) fail('request_invalid');
+        typeof input.path !== 'string' || !route(input.path)) fail('request_invalid');
     if (op === 'prepare' ? !ID.test(input.messageId || '') || !ID.test(input.id || '') : !TICKET.test(input.ticket || '')) fail('request_invalid');
     if (op !== 'verify') text(input.content);
     return input;
   }
-  function source(payload, conversationId, messageId, id, parser, projectId = null, allowLibraryWrites = false) {
+  function source(payload, conversationId, messageId, id, parser, projectId = null, allowLibraryWrites = false, temporary = false) {
     if (!payload || payload.conversation_id !== conversationId || !payload.mapping || Array.isArray(payload.mapping) ||
-        payload.is_do_not_remember !== false || payload.is_temporary_chat === true ||
+        payload.is_do_not_remember !== temporary ||
+        (temporary ? projectId !== null || payload.is_temporary_chat === false : payload.is_temporary_chat === true) ||
         projectId !== null && !PROJECT.test(projectId) || (payload.gizmo_id ?? null) !== projectId ||
         payload.shared_project_conversation_owner != null) fail('scope_unconfirmed');
     let nodeId = payload.current_node;
@@ -61,7 +85,7 @@
     const sources = parser.project(found, true, allowLibraryWrites === true)?.writeSources?.filter(row => row.id === id) || [];
     if (sources.length !== 1) fail('selection_unavailable');
     const value = sources[0];
-    if (value.locallyEdited || typeof value.title !== 'string' || value.title.length > 512 ||
+    if (temporary && value.libraryFileId || value.locallyEdited || typeof value.title !== 'string' || value.title.length > 512 ||
         !value.metadata || typeof value.metadata !== 'object' || Array.isArray(value.metadata) ||
         JSON.stringify(value.metadata).length > 16384) fail('selection_unavailable');
     text(value.content);
@@ -78,5 +102,5 @@
       writing_block: { content: text(content), index: String(source.index), variant: source.variant,
         metadata: source.metadata, title: source.title, id: source.id }, updated_at: updatedAt };
   }
-  return { version: 3, parse, source, same, body, route, PATH, PROJECT, TICKET };
+  return { version: 4, parse, source, same, body, route, temporaryOwner, TEMPORARY_PATH, PATH, PROJECT, TICKET };
 });

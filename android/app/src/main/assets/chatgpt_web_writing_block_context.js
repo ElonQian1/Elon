@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptWritingBlockContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -12,9 +12,9 @@
     const route = policy.route(input.path);
     if (!route) fail('context_unavailable');
     const binding = { path: input.path, href: page.location.href, document: page.document,
-      token: page.__elonChatGptDocumentToken, account: identity(), id: route.id };
+      token: page.__elonChatGptDocumentToken, account: identity(), id: route.id, temporary: route.temporary === true };
     const url = new URL(binding.href);
-    if (url.origin !== 'https://chatgpt.com' || url.pathname !== input.path || url.search || url.hash ||
+    if (url.origin !== 'https://chatgpt.com' || url.pathname + url.search !== input.path || url.hash ||
         url.username || url.password ||
         !binding.account || !/^doc_[a-z0-9_]{3,80}$/.test(binding.token || '')) fail('context_unavailable');
     const bindings = page.__elonChatGptPrivateRuntimeBindings;
@@ -30,9 +30,11 @@
         typeof shared.Fl !== 'function' ||
         typeof shared.writingUpdateState !== 'function' ||
         typeof shared.writingTreeOwner?.updateTree !== 'function') fail('runtime_unavailable');
-    const matches = shared.canvasConversations().filter(value => value?.serverId$?.() === binding.id);
+    const matches = binding.temporary ? [policy.temporaryOwner(page, shared)].filter(Boolean) :
+      shared.canvasConversations().filter(value => value?.serverId$?.() === binding.id);
     if (matches.length !== 1) fail('context_unavailable');
     const selected = matches[0];
+    binding.id = selected.serverId$();
     const state = () => shared.XM(selected.id);
     binding.projectId = shared.HM.getGizmoId(state()) ?? null;
     if (binding.projectId !== null && !policy.PROJECT.test(binding.projectId) ||
@@ -47,6 +49,7 @@
     binding.projectUser = binding.projectId === null ? null : projectUser();
     function scopeCurrent() {
       const thread = state();
+      if (binding.temporary && policy.temporaryOwner(page, shared) !== selected) return false;
       if ((shared.HM.getGizmoId(thread) ?? null) !== binding.projectId) return false;
       if (binding.projectId === null) return true;
       return binding.projectUser !== null && projectUser() === binding.projectUser &&
@@ -64,7 +67,7 @@
           bindings.state().profile_id === 'web_20260912' && selected.serverId$() === binding.id && scopeCurrent() &&
           shared.canvasConversations().filter(item => item?.serverId$?.() === binding.id).length === 1 &&
           shared.canvasConversations().includes(selected) && shared.HM.getCurrentLeafId(state()) === leaf &&
-          value?.url === binding.href && value.streaming === false && !value.dictationActive &&
+          value?.url === url.origin + url.pathname && value.streaming === false && !value.dictationActive &&
           !value.dictationCaptureActive && !value.dictationCapturePending &&
           shared.Fl(shared.HM.getRequestId(state())) === false &&
           !page.__elonChatGptPrivateTextRuntimeSubmit?.state?.().pending &&
@@ -126,6 +129,8 @@
           }));
         }
         local(source);
+        if (binding.temporary && page.__elonChatGptPrivateStreamTransport?.reconcileTemporaryWritingBlock?.(
+          shared.HM.getNodeIfExists(state(), source.messageId)?.message, binding.id, current) !== true) return false;
         return true;
       } catch (_) { return false; }
     }

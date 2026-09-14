@@ -66,4 +66,21 @@ class ChatGptWebWritingBlockTest {
             ChatGptWebOperationReadiness.requirement("chatgpt_writing_block"))
         assertNull(ChatGptWebOperationReadiness.rejection("chatgpt_writing_block", null, true, false))
     }
+
+    @Test fun temporaryPathIsExplicitAndDoesNotBroadenGeneralConversationNavigation() {
+        val route = ChatGptWebWritingBlockProtocol.TEMPORARY_PATH
+        assertEquals(route, ChatGptWebWritingBlockProtocol.request(request().put("path", route))?.getString("path"))
+        assertEquals(route, ChatGptWebWritingBlockProtocol.parse(event("mcp_temp").put("path", route))?.path)
+        for (url in listOf("https://chatgpt.com/", "https://chatgpt.com$route")) {
+            assertEquals(route, ChatGptWebWritingBlockProtocol.pathFromUrl(url))
+            assertNull(ChatGptWebConversationPath.fromUrl(url))
+        }
+        assertEquals(path, ChatGptWebWritingBlockProtocol.pathFromUrl("https://chatgpt.com$path"))
+        for (url in listOf("https://chatgpt.com/?temporary-chat=false", "https://chatgpt.com$route&x=1",
+            "https://chatgpt.com$route#block", "https://chatgpt.com$path?temporary-chat=true",
+            "https://other.example$route", "http://chatgpt.com/", "https://user@chatgpt.com/",
+            "https://chatgpt.com:8443/", "https://chatgpt.com/%2F", "https://chatgpt.com/share/abc")) {
+            assertNull(url, ChatGptWebWritingBlockProtocol.pathFromUrl(url))
+        }
+    }
 }

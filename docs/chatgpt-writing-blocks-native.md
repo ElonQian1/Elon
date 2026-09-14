@@ -4,6 +4,8 @@
 
 项目内自有会话写回的源码扩展见[项目写回批次](chatgpt-writing-blocks-project-save.md)：已实现并通过离线契约测试，待集中包真机验收，不能沿用普通会话的完成标记。
 
+[临时会话写回](chatgpt-writing-blocks-temporary-save.md)已补源码及离线验证，限定官方确认的同一临时会话与非库文件块；不加入历史目录或改变隐私状态，真机验收仍待补。
+
 2026-09-14 [库文件关联写回](chatgpt-writing-blocks-library-save.md)补齐可信文件库文档保存队列，并通过版本化私有读取加载尚未打开的文档；205 项离线测试通过。[1715 集中包](reports/chatgpt-private-grouped-1715.md)已核验上线覆盖，Release 编译和58项 Android 测试通过，关联文档保存仍待真机验收。账号、正文或版本未确认时仍可编辑/导出副本，不将其误标为整项写作块功能缺失。
 
 2026-09-13 发布与验收：[本轮记录](reports/chatgpt-writing-blocks-release-20260913.md)。
@@ -63,7 +65,7 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 
 ## 官网写回源代码批次
 
-2026-09-13 `android_chatgpt_writing_block_save_v1` 的普通独立会话范围已 `completed / production_verified`，随现有官网写入开关默认启用。已验收范围限定具有明确 provider ID、variant、源消息 ID 的完整 `:::writing` 块。项目自有会话、typed widget 与符合上方库文件协调条件的写回扩展已进入源码待验收；临时会话、共享会话副本、库文件归属未确认、无明确 ID/variant 的块仍不允许写回，不能把普通会话通过扩大为所有变体完成。界面中的源 ID 只是后台核对提示，范围或归属核对不通过时仍可编辑/导出副本。
+2026-09-13 `android_chatgpt_writing_block_save_v1` 的普通独立会话范围已 `completed / production_verified`，随现有官网写入开关默认启用。已验收范围限定具有明确 provider ID、variant、源消息 ID 的完整 `:::writing` 块。项目自有会话、typed widget、符合上方库文件协调条件及已确认临时会话的写回扩展已进入源码待验收；共享会话副本、库文件归属未确认、无明确 ID/variant 的块仍不允许写回，不能把普通会话通过扩大为所有变体完成。界面中的源 ID 只是后台核对提示，范围或归属核对不通过时仍可编辑/导出副本。
 
 - 官方 `a965fc59-fzrm5l4zirdbhwph.js`，SHA-256 `752c85e9623229704c208167584c5b7a6e8f18410e6258713d2de7d483a62e19` 的 `nc`：POST `/conversation/message/writing-blocks`，携带 `conversation_id`、`message_id`、字符串 `index`、`id`、`writing_block`、`updated_at`；块内保存 content / index / variant / metadata / title / id。
 - 页面同源请求仅由既有身份层提供请求头，数据不离开设备。原生缓存中的源 ID 只是定位提示，不能代替当前页面、账号、分支和服务器正文校验。
@@ -100,4 +102,4 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 ## 完成与剩余
 
 代码块本机链路在 `1.1.1688` 完成；Writing Block 本机编辑/导出、普通会话官网保存及原生回显在 `1.1.1692` 完成。早期 `1690/1691` 失败与后续修正均保留在发布报告，不能将早期失败改写为通过，也不再重复已通过范围。
-项目自有会话、typed widget 与已确认库文件关联写回已补源码，尚待集中包真机验收；临时会话、共享会话副本和缺少可信文件库会话等扩展写回仍有实现缺口。代码块保持本机编辑和文件导出，不执行代码或伪造官网代码保存；DOCX 本机导出已在 1718 真机验证完成，[本机 PDF 副本](chatgpt-writing-blocks-pdf-export.md)已实现，尚待集中包真机验收。
+项目自有会话、typed widget、已确认库文件关联及临时会话写回已补源码，尚待集中包真机验收；共享会话副本和缺少可信文件库会话等扩展写回仍有实现缺口。代码块保持本机编辑和文件导出，不执行代码或伪造官网代码保存；DOCX 本机导出已在 1718 真机验证完成，[本机 PDF 副本](chatgpt-writing-blocks-pdf-export.md)已实现，尚待集中包真机验收。

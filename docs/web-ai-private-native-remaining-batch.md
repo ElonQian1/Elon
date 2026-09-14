@@ -27,7 +27,7 @@ only. The current model declined creation; stop repeating prompts. Original
 writes/exports need an owned sample. [Writing Blocks](chatgpt-writing-blocks-native.md)
 reading/edit/export and ordinary save are accepted (1692; editor undo/redo/share 1706).
 [Project/typed saves](chatgpt-writing-blocks-native.md) are offline-verified.
-[Linked-library save](chatgpt-writing-blocks-library-save.md) shipped in 1715, device-pending; temporary/shared writes remain open.
+[Library](chatgpt-writing-blocks-library-save.md): 1715, device-pending; [temporary](chatgpt-writing-blocks-temporary-save.md): offline-verified; shared writes open.
 
 [Fresh tools](chatgpt-fresh-tool-text-dispatch.md),
 [project sends](chatgpt-fresh-project-text-dispatch.md),

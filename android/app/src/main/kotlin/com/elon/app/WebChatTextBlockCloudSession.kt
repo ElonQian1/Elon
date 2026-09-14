@@ -2,15 +2,15 @@ package com.elon.app
 
 import android.os.SystemClock
 import android.view.View
-import com.elon.app.chatgptweb.ChatGptWebConversationPath
 import com.elon.app.chatgptweb.ChatGptWebWritingBlock
+import com.elon.app.chatgptweb.ChatGptWebWritingBlockProtocol
 import org.json.JSONObject
 
 internal class WebChatTextBlockCloudSession(
     private val host: View, private val port: () -> WebChatConsumerPort?, private val block: WebChatTextBlock,
 ) {
     private val owner = port()
-    private val path = owner?.state()?.pageUrl?.let(ChatGptWebConversationPath::fromUrl)
+    private val path = ChatGptWebWritingBlockProtocol.pathFromUrl(owner?.state()?.pageUrl)
     private var selection: ChatGptWebWritingBlock? = null
     private var task: Runnable? = null
     private var submitted: String? = null
@@ -44,7 +44,7 @@ internal class WebChatTextBlockCloudSession(
     }
 
     private fun current() = !closed && owner != null && port() === owner && owner.state().adapterCurrent &&
-        ChatGptWebConversationPath.fromUrl(owner.state().pageUrl) == path
+        path != null && ChatGptWebWritingBlockProtocol.pathFromUrl(owner.state().pageUrl) == path
 
     private fun execute(request: JSONObject, confirmed: Boolean, message: String) {
         if (busy) return
