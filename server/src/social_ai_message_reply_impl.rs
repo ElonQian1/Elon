@@ -36,8 +36,8 @@ pub(super) async fn reply_to_selected_group_message(
     group_id: String,
     selected_message_id: String,
     selected: SocialAiHistoryMessage,
+    request_id: &str,
 ) -> Result<()> {
-    let recipient_user_ids = state.store.friend_group_member_ids(&user_id, &group_id)?;
     let history = state
         .store
         .list_recent_group_messages_for_social_ai(&user_id, &group_id, 50)?;
@@ -74,7 +74,8 @@ pub(super) async fn reply_to_selected_group_message(
     .await;
     let message = state
         .store
-        .insert_group_social_ai_reply(&group_id, &reply)?;
+        .complete_group_ai_reply(&user_id, request_id, &reply)?;
+    let recipient_user_ids = state.store.friend_group_member_ids(&user_id, &group_id)?;
     crate::external_app_context_feedback::spawn_generated_answer_feedback(
         Arc::clone(&state),
         user_id,

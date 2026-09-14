@@ -278,7 +278,7 @@ mod realtime_close_events;
 #[cfg(test)]
 mod realtime_close_events_tests;
 pub(crate) mod route_c_budget;
-mod social_ai_messages;
+pub(crate) mod social_ai_messages;
 mod social_ai_pending;
 mod social_ai_selected;
 mod store_types;

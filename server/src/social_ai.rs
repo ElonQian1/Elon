@@ -209,19 +209,23 @@ fn spawn_group_pending_reply(
     if !contains_el_mention(&pending.trigger_content) {
         return;
     }
-    let key = format!("group:{group_id}:{}", pending.trigger_message_id);
-    if !mark_in_flight(&key) {
-        return;
-    }
     let trigger_message_id = pending.trigger_message_id;
-    info!(
-        "group @EL reply queued: user_id={} group_id={} trigger_message_id={}",
-        user_id, group_id, trigger_message_id
-    );
+    let request_id =
+        match state
+            .store
+            .claim_group_ai_reply(&user_id, &group_id, &trigger_message_id)
+        {
+            Ok(Some(id)) => id,
+            Ok(None) => return,
+            Err(error) => {
+                warn!("group AI ownership failed: {}", error);
+                return;
+            }
+        };
     tokio::spawn(async move {
-        let result = reply_to_group(state, user_id, group_id).await;
-        clear_in_flight(&key);
+        let result = reply_to_group(Arc::clone(&state), user_id, group_id, &request_id).await;
         if let Err(error) = result {
+            let _ = state.store.mark_group_ai_reply_indeterminate(&request_id);
             warn!("group @EL reply failed: {}", error);
         } else {
             info!(
@@ -287,8 +291,12 @@ async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result
     Ok(reply)
 }
 
-async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String) -> Result<()> {
-    let recipient_user_ids = state.store.friend_group_member_ids(&user_id, &group_id)?;
+async fn reply_to_group(
+    state: Arc<AppState>,
+    user_id: String,
+    group_id: String,
+    request_id: &str,
+) -> Result<()> {
     let history = state
         .store
         .list_recent_group_messages_for_social_ai(&user_id, &group_id, 50)?;
@@ -333,7 +341,8 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
     };
     let message = state
         .store
-        .insert_group_social_ai_reply(&group_id, &reply)?;
+        .complete_group_ai_reply(&user_id, request_id, &reply)?;
+    let recipient_user_ids = state.store.friend_group_member_ids(&user_id, &group_id)?;
     crate::external_app_context_feedback::spawn_generated_answer_feedback(
         Arc::clone(&state),
         user_id,

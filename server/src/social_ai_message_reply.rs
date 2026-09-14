@@ -73,20 +73,30 @@ pub(crate) fn spawn_group_reply_for_message(
     if selected.content.trim().is_empty() {
         return Err(anyhow!("这条消息没有可供 AI 回复的文本内容"));
     }
-    let key = format!("group-selected:{group_id}:{message_id}");
-    if !mark_in_flight(&key) {
-        return Ok(());
-    }
+    let Some(request_id) = state
+        .store
+        .claim_group_ai_reply(&user_id, &group_id, &message_id)?
+    else {
+        return Err(anyhow!(
+            "这条消息已有 AI 回复请求，未重复发送。请查看原回复或等待原请求完成。"
+        ));
+    };
     info!(
         "group selected-message AI reply queued: user_id={} group_id={} message_id={}",
         user_id, group_id, message_id
     );
     tokio::spawn(async move {
-        let result =
-            reply_to_selected_group_message(state, user_id, group_id, message_id.clone(), selected)
-                .await;
-        clear_in_flight(&key);
+        let result = reply_to_selected_group_message(
+            Arc::clone(&state),
+            user_id,
+            group_id,
+            message_id.clone(),
+            selected,
+            &request_id,
+        )
+        .await;
         if let Err(error) = result {
+            let _ = state.store.mark_group_ai_reply_indeterminate(&request_id);
             warn!("group selected-message AI reply failed: {}", error);
         } else {
             info!(
