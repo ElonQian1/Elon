@@ -4,10 +4,6 @@ import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import javax.xml.parsers.DocumentBuilderFactory
-import javax.xml.transform.OutputKeys
-import javax.xml.transform.TransformerFactory
-import javax.xml.transform.dom.DOMSource
-import javax.xml.transform.stream.StreamResult
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 
@@ -47,11 +43,7 @@ internal object WebChatTextBlockDocx {
             ZipOutputStream(output).use { zip ->
                 for ((path, xml) in parts) {
                     zip.putNextEntry(ZipEntry(path).apply { time = 0 })
-                    val transformer = TransformerFactory.newInstance().newTransformer().apply {
-                        setOutputProperty(OutputKeys.ENCODING, "UTF-8")
-                        setOutputProperty(OutputKeys.STANDALONE, "yes")
-                    }
-                    transformer.transform(DOMSource(xml), StreamResult(zip))
+                    WebChatTextBlockXml.write(xml, zip)
                     zip.closeEntry()
                 }
             }

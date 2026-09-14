@@ -4,7 +4,7 @@
 既有结构化读取、Markdown / 文本 / 代码源文件导出、显式官网保存保持原链路。
 
 能力 ID：`android_chatgpt_writing_block_docx_export_v1`。
-状态：已实现并发布 `1.1.1712`，Android 编译及离线验证通过；桌面 Word 文件互操作通过，手机验收待设备可用。`production_status=published_1712_device_acceptance_pending`，不标记手机验收 completed。
+状态：已实现并发布；1717 手机验收发现补充 Unicode 字符的 XML 编码问题，[修复与证据](reports/chatgpt-writing-docx-unicode-20260914.md)已补齐。修正后的生产编码器已在 Android 运行环境及桌面 Word 验证通过，等待修复包的生产 UI 复验，不把旧包验收标为 completed。
 
 ## 用户入口
 
@@ -27,6 +27,7 @@
 ## 模块
 
 - `WebChatTextBlockDocx.kt`：字符校验、OOXML 包装及文档样式。
+- `WebChatTextBlockXml.kt`：使用标准 XML Pull 序列化生成的 OOXML，保留完整 Unicode 字符及命名空间。
 - `WebChatTextBlockMarkdown.kt`：CommonMark 到 Word 正文、表格与列表的转换。
 - `WebChatTextBlockExport.kt`：复用已有格式选择及字节存储，仅追加 DOCX 编码分支。
 - `WebChatTextBlockDocxTest.kt`：生产编码器的包结构、字符、样式、编号、边界和合成互操作样本。

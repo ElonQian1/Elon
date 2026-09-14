@@ -36,6 +36,7 @@ function Read-ChatGptDocxXml {
         $settings.XmlResolver=$null;$settings.MaxCharactersInDocument=524288
         $reader=[Xml.XmlReader]::Create($memory,$settings)
         try {$doc=[Xml.XmlDocument]::new();$doc.XmlResolver=$null;$doc.Load($reader);return ,$doc}
+        catch {throw 'docx_xml_invalid'}
         finally {$reader.Dispose()}
     } finally {$memory.Dispose();$stream.Dispose()}
 }

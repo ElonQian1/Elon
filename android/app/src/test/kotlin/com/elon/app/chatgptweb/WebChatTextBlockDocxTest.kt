@@ -1,5 +1,6 @@
 package com.elon.app.chatgptweb
 
+import android.app.Application
 import com.elon.app.WebChatTextBlock
 import com.elon.app.WebChatTextBlockDocx
 import com.elon.app.WebChatTextBlockExport
@@ -9,10 +10,15 @@ import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.w3c.dom.Node
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], manifest = Config.NONE, application = Application::class)
 class WebChatTextBlockDocxTest {
     private val word = WebChatTextBlockDocx.WORD
     private val format = ChatGptWebCanvasExportFormats.find("document", "docx")!!
@@ -90,6 +96,19 @@ class WebChatTextBlockDocxTest {
         assertEquals(4, parsed.elements("br").size)
         assertEquals("Consolas", parsed.elements("rFonts").single().getAttributeNS(word, "ascii"))
         assertTrue(parsed.elements("t").all { it.getAttributeNS("http://www.w3.org/XML/1998/namespace", "space") == "preserve" })
+    }
+
+    @Test fun supplementaryCharactersStayWholeInXmlRatherThanSurrogateReferences() {
+        val points = listOf(0x10000, 0x1F600, 0x20000, 0x10FFFF)
+        val text = points.joinToString(" ") { String(Character.toChars(it)) } + " <&> \u4E2D\u6587"
+        val entries = parts(bytes(text))
+        entries.values.forEach { xml(it) }
+        assertEquals(text, xml(entries.getValue("word/document.xml")).visible())
+        val serialized = entries.getValue("word/document.xml").toString(Charsets.UTF_8)
+        for (character in text.filter { Character.isSurrogate(it) }) {
+            assertFalse(serialized.contains("&#${character.code};"))
+            assertFalse(serialized.contains("&#x${character.code.toString(16)};", ignoreCase = true))
+        }
     }
 
     @Test fun orderedAndNestedListsHaveIndependentNativeNumbering() {

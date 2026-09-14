@@ -93,6 +93,16 @@ $result=Verify $valid
 Assert ($result.package_valid -and $result.content_matches -and $result.paragraphs -eq 10 -and
     $result.tables -eq 1 -and $result.list_items -eq 2) 'complete_sample'
 Assert ($result.PSObject.Properties.Name -notcontains 'content' -and $result.PSObject.Properties.Name -notcontains 'paragraph_text') 'summary_without_body'
+$supplementary=[char]::ConvertFromUtf32(0x1F600)
+$parts=PackageParts
+$parts['word/document.xml']=$parts['word/document.xml'].Replace($supplementary,'&#55357;&#56832;')
+$brokenSurrogates=Archive $parts
+$reason=''
+try {Verify $brokenSurrogates|Out-Null}catch{$reason=$_.Exception.Message}
+Assert ($reason -ceq 'docx_xml_invalid') 'android_surrogate_references_report_xml_failure'
+$parts=PackageParts
+$parts['word/document.xml']=$parts['word/document.xml'].Replace($supplementary,'&#128512;')
+Assert ((Verify (Archive $parts)).content_matches) 'valid_scalar_reference_preserves_content'
 Reject {Assert-ChatGptDocxExportFile $valid ('0'*64) $fixture} 'file_hash_checked'
 $case=0
 foreach($change in @(
