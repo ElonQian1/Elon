@@ -18,5 +18,5 @@ assert.doesNotMatch(entry[1], /量化 0\.4\.0|旧版入口|兼容入口/);
 assert.doesNotMatch(entry[1], /<(?:script|form|input|button)\b|\bon(?:click|submit)\s*=/i);
 assert.doesNotMatch(web, /READ_ESK_PLATFORM_PROGRESS|yilong\.esk\.platform_android_progress\.v1/,
   'Browser must not imitate the OS-authenticated native progress exchange');
-assert.match(entry[1], /href="\/app\/ElonSpeed-latest\.apk"/);
+assert.match(entry[1], /href="\/app\/ElonAI-latest\.apk"/);
 console.log('ESK formal progress explanatory Web/native boundary passed (no browser IPC or private writes)');

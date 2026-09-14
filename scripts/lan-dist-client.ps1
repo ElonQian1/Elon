@@ -19,7 +19,7 @@
     {
       "project_id":     "elon",
       "artifact_id":    "user-apk",
-      "file_path":      "D:\\...\\ElonSpeed-latest.apk",
+      "file_path":      "D:\\...\\ElonAI-latest.apk",
       "version_code":   42,
       "server_reg_url": "http://43.139.149.158:8080/app/lan-peer/register",
       "ttl_minutes":    120,

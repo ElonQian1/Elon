@@ -106,6 +106,9 @@ $deployScript = New-ElonApkAtomicDeployScript -ApkStage '/tmp/app.apk' -JsonStag
     -ReleaseSha $head -ExpectedServerSha $head -ExpectedSha256 ('a' * 64)
 Assert-True ($deployScript.Contains("awk '{print `$1}'")) 'APK staging hash command lost its shell field expression.'
 Assert-True ($deployScript.Contains('EXPECTED_HASH=' + "'" + ('a' * 64) + "'")) 'APK expected hash was not injected.'
+Assert-True ($deployScript.Contains('mv "$APK_STAGE" "$APP_DIR/ElonSpeed-latest.apk"')) 'Both public aliases must follow the stable storage key used by older publishers.'
+Assert-True (-not $deployScript.Contains('__APK_STORAGE_NAME__')) 'Unresolved APK storage placeholder.'
+Assert-True ((Get-ElonApkDownloadUrl 'https://example.test/') -eq 'https://example.test/app/ElonAI-latest.apk') 'Main-app download must use the canonical public brand.'
 
 $serverPublisher = Get-Content -LiteralPath (Join-Path $repoRoot 'scripts\publish-server.ps1') -Raw
 Assert-True (-not $serverPublisher.Contains("-Phase 'pc_frontend' -Status 'skipped'")) `

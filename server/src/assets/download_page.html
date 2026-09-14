@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#101010" />
-  <title>一龙 APK 下载</title>
+  <title>一龙 AI APK 下载</title>
   <style>
     :root {
       color-scheme: dark;
@@ -135,9 +135,9 @@
 <body>
   <main>
     <header class="brand">
-      <img src="data:image/png;base64,__BRAND_PNG_B64__" alt="一龙" />
+      <img src="data:image/png;base64,__BRAND_PNG_B64__" alt="一龙 AI" />
       <div>
-        <h1>一龙 APK 下载</h1>
+        <h1>一龙 AI APK 下载</h1>
         <div class="sub">每次升级后仍使用同一个固定 APK 下载地址</div>
       </div>
     </header>
@@ -152,7 +152,7 @@
     </section>
 
     <section class="section">
-      <textarea id="promoText" readonly>我正在用「一龙」云端 APK 开发平台，手机里直接提需求，云端帮你改代码、打包并生成安装包。
+      <textarea id="promoText" readonly>我正在用「一龙 AI」云端 APK 开发平台，手机里直接提需求，云端帮你改代码、打包并生成安装包。
 
 下载地址：__APK_URL__</textarea>
       <div class="actions">
@@ -216,7 +216,7 @@
 
       document.getElementById('shareBtn').addEventListener('click', async () => {
         if (navigator.share) {
-          await navigator.share({ title: '一龙 APK 下载', text: promoText.value, url: apkUrl });
+          await navigator.share({ title: '一龙 AI APK 下载', text: promoText.value, url: apkUrl });
         } else {
           await copyText(promoText.value);
           toast('当前浏览器不支持系统分享，已复制推广语');

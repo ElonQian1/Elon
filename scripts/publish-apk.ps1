@@ -861,7 +861,7 @@ if ($null -eq $serverShaBeforeUpload) { $serverShaBeforeUpload = "" }
 
 # ── Step 5: 生成 version.json ─────────────────────────────────────────────────
 
-$downloadUrl = "$ServerUrl/app/ElonSpeed-latest.apk"
+$downloadUrl = Get-ElonApkDownloadUrl -ServerUrl $ServerUrl
 $versionJson = @{
     versionCode = $newCode
     versionName = $versionName
@@ -910,7 +910,7 @@ if (-not $Force) {
                 Write-Host "   原因：服务器已有完全相同的版本（同 build 号 + 同 SHA），无需重复发布。" -ForegroundColor Yellow
             }
             Write-Host "   处理：代码已合并，发布交给最新主线；本次本机编译的 APK 作废，服务器分配的 build $newCode 槽位将释放回 in-flight 列表。" -ForegroundColor Yellow
-            Write-Host "   如需本机验证已发布的新版 APK，直接下载 $ServerUrl/app/ElonSpeed-latest.apk。" -ForegroundColor Yellow
+            Write-Host "   如需本机验证已发布的新版 APK，直接下载 $downloadUrl。" -ForegroundColor Yellow
             Write-Host "   如确要覆盖（不推荐）：重跑加 -Force。" -ForegroundColor Yellow
             Write-ApkPublishStatus -ApkReleaseStatus "superseded_by_newer_main" -Message "代码已合并，发布交给最新主线。"
             Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow

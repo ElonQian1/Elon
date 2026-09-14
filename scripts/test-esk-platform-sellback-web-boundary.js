@@ -17,7 +17,7 @@ for (const label of [
   '新版子 APK 尚待正式签名、上传与双 APK 联调',
 ]) assert.ok(content.includes(label), `Missing truthful boundary: ${label}`)
 
-assert.match(content, /href="\/app\/ElonSpeed-latest\.apk"/)
+assert.match(content, /href="\/app\/ElonAI-latest\.apk"/)
 assert.doesNotMatch(content, /<(?:form|input|button|script)\b/i,
   'This entry describes native functionality; it must not impersonate an authorized web write surface')
 assert.doesNotMatch(content, /\bon(?:click|submit)\s*=/i)

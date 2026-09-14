@@ -23,6 +23,7 @@ def signingValue = { name, fallback = "" ->
 }
 
 def repoRootDir = rootProject.projectDir.parentFile
+def appBranding = new groovy.json.JsonSlurper().parse(new File(repoRootDir, "server/src/assets/app_branding.json"), "UTF-8")
 def projectIconMetadataFile = new File(repoRootDir, ".elon/project-icon.json")
 def projectIconGeneratedResDir = layout.buildDirectory.dir("generated/res/projectIcon/main")
 def projectIconEnabled = projectIconMetadataFile.exists()
@@ -206,6 +207,8 @@ android {
 
     defaultConfig {
         applicationId "com.elon.app"
+        resValue "string", "app_name", appBranding.displayName
+        buildConfigField "String", "APP_APK_DOWNLOAD_PATH", groovy.json.JsonOutput.toJson("/app/${appBranding.apkFileName}".toString())
         minSdk 26
         targetSdk 34
         versionCode 462

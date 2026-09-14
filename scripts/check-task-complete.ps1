@@ -48,6 +48,7 @@ $ServerUrl = "http://43.139.149.158:8080"
 
 . (Join-Path $PSScriptRoot "direct-network.ps1")
 . (Join-Path $PSScriptRoot "android-task-provenance.ps1")
+. (Join-Path $PSScriptRoot 'app-branding.ps1')
 
 Set-ElonProjectDirectNetwork
 Set-Location $RepoRoot
@@ -284,7 +285,7 @@ if ($Kind -eq "AndroidFeature") {
 
     try {
         $apkHeadParams = @{
-            Uri = "$ServerUrl/app/ElonSpeed-latest.apk"
+            Uri = (Get-ElonApkDownloadUrl -ServerUrl $ServerUrl)
             Method = "Head"
             TimeoutSec = 10
             UseBasicParsing = $true
@@ -294,7 +295,7 @@ if ($Kind -eq "AndroidFeature") {
     } catch {
         try {
             $apkGetParams = @{
-                Uri = "$ServerUrl/app/ElonSpeed-latest.apk"
+                Uri = (Get-ElonApkDownloadUrl -ServerUrl $ServerUrl)
                 Method = "Get"
                 Headers = @{ Range = "bytes=0-0" }
                 TimeoutSec = 10
@@ -321,7 +322,7 @@ if ($Kind -eq "AndroidFeature") {
     Write-Host "  version:     v$($remoteVersion.versionName) (build $($remoteVersion.versionCode))"
     Write-Host "  APK gitSha:  $remoteGitSha"
     Write-Host "  APK_PROVENANCE_STATUS=$($provenance.CoverageReason)"
-    Write-Host "  download:    $ServerUrl/app/ElonSpeed-latest.apk"
+    Write-Host "  download:    $(Get-ElonApkDownloadUrl -ServerUrl $ServerUrl)"
     exit 0
 }
 

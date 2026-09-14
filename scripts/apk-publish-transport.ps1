@@ -1,3 +1,5 @@
+. (Join-Path $PSScriptRoot 'app-branding.ps1')
+
 function Get-ElonFileSha256 {
     param([Parameter(Mandatory)] [string]$Path)
 
@@ -18,7 +20,7 @@ function Assert-RemoteApkArtifact {
     )
 
     $options = Get-ElonApkSshOptions
-    $artifactPath = "$ServerDir/ElonSpeed-latest.apk"
+    $artifactPath = "$ServerDir/$ElonApkStorageFileName"
     $command = 'printf ''%s %s'' "$(sha256sum ''__APK_PATH__'' | awk ''{print $1}'')" "$(stat -c %s ''__APK_PATH__'')"'
     $command = $command.Replace('__APK_PATH__', $artifactPath)
     $result = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Label 'verify remote APK' `
@@ -64,7 +66,7 @@ function Publish-ApkStaged {
         [int]$Attempt = 1
     )
 
-    $apkStage = "$ServerDir/ElonSpeed-latest.apk.$ReleaseSha.tmp"
+    $apkStage = "$ServerDir/$ElonApkStorageFileName.$ReleaseSha.tmp"
     $jsonStage = "$ServerDir/version.json.$ReleaseSha.tmp"
     $sshOptions = Get-ElonApkSshOptions
     $scpOptions = Get-ElonApkScpOptions
@@ -135,13 +137,14 @@ function New-ElonApkAtomicDeployScript {
         '    echo "APK_STAGE_HASH_MISMATCH actual=$ACTUAL_HASH expected=$EXPECTED_HASH" >&2'
         '    exit 43'
         '  fi'
-        '  mv "$APK_STAGE" "$APP_DIR/ElonSpeed-latest.apk"'
+        '  mv "$APK_STAGE" "$APP_DIR/__APK_STORAGE_NAME__"'
         '  mv "$JSON_STAGE" "$APP_DIR/version.json"'
         '  printf ''%s\n'' "$NEW_SHA" > "$SHA_FILE"'
         ') 9>"$LOCK_FILE"'
     ) -join "`n"
     $template.
         Replace('__APP_DIR__', $ServerDir).
+        Replace('__APK_STORAGE_NAME__', $ElonApkStorageFileName).
         Replace('__EXPECTED__', $ExpectedServerSha).
         Replace('__NEW_SHA__', $ReleaseSha).
         Replace('__APK_STAGE__', $ApkStage).

@@ -189,7 +189,7 @@ pub async fn favicon() -> impl IntoResponse {
 
 pub async fn download_page(State(state): State<Arc<AppState>>) -> Html<String> {
     let public_url = state.public_url.trim_end_matches('/');
-    let apk_url = format!("{public_url}/app/ElonSpeed-latest.apk");
+    let apk_url = crate::app_update::distribution::download_url(public_url);
     let page_url = format!("{public_url}/app/download");
     Html(
         DOWNLOAD_HTML_TEMPLATE
@@ -387,8 +387,8 @@ const DOWNLOAD_HTML_TEMPLATE: &str = include_str!("assets/download_page.html");
 /// PWA manifest.json —— 让 iOS/Android 浏览器把网页识别为可安装应用。
 pub async fn pwa_manifest() -> impl IntoResponse {
     let body = r##"{
-  "name": "一龙 · 云端开发",
-  "short_name": "一龙",
+  "name": "__APP_DISPLAY_NAME__",
+  "short_name": "__APP_DISPLAY_NAME__",
   "description": "用自然语言开发你的 App",
   "start_url": "/",
   "display": "standalone",
@@ -414,7 +414,10 @@ pub async fn pwa_manifest() -> impl IntoResponse {
             (header::CONTENT_TYPE, "application/manifest+json"),
             (header::CACHE_CONTROL, "public, max-age=86400"),
         ],
-        body,
+        body.replace(
+            "__APP_DISPLAY_NAME__",
+            &crate::app_update::distribution::BRANDING.display_name,
+        ),
     )
 }
 

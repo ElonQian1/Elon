@@ -136,7 +136,7 @@ class EskPlatformWiringTest {
             .findAll(web).toList()
         assertEquals(1, section.size)
         listOf("本网页暂不读取正式私有余额", "Paper 模拟资产不包含正式登记数量", "当前 HTTP 不可用",
-            "href=\"/app/ElonSpeed-latest.apk\"").forEach { assertTrue(section.single().value.contains(it)) }
+            "href=\"/app/ElonAI-latest.apk\"").forEach { assertTrue(section.single().value.contains(it)) }
         assertFalse(section.single().value.contains("<script"))
         assertTrue(section.single().value.contains("<a class=\"profile-row\""))
         assertTrue(web.contains("min-height: 76px;"))

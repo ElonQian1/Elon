@@ -112,7 +112,7 @@ class MainActivity : AppCompatActivity() {
                 ?: AuthManager.token(this)
         }
     }
-    private val apkDownloadUrl: String get() = "$serverUrl/app/ElonSpeed-latest.apk"
+    private val apkDownloadUrl: String get() = "$serverUrl${BuildConfig.APP_APK_DOWNLOAD_PATH}"
     private val apkDownloadPageUrl: String get() = "$serverUrl/app/download"
     private var homeRows: MainHomeRows? = null
     private var stageHintShimmer: MainStageHintShimmer? = null

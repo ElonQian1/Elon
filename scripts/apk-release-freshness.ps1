@@ -31,7 +31,7 @@ function Test-ElonApkInputPath {
     param([Parameter(Mandatory)][string]$Path)
 
     return (
-        $Path -match '^android/' -or
+        $Path -match '^android/' -or $Path -eq 'server/src/assets/app_branding.json' -or
         $Path -match '^scripts/(?:chatgpt-web-smoke-|smoke-chatgpt-web-).+\.ps1$'
     )
 }

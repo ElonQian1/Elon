@@ -37,6 +37,15 @@ try {
     git -C $root commit --quiet -m 'D ChatGPT Web evidence input'
     $shaD = (git -C $root rev-parse HEAD).Trim()
 
+    New-Item -ItemType Directory -Path (Join-Path $root 'server/src/assets') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $root 'server/src/assets/app_branding.json') -Value '{}' -Encoding UTF8
+    git -C $root add server/src/assets/app_branding.json
+    git -C $root commit --quiet -m 'E app branding input'
+    $shaE = (git -C $root rev-parse HEAD).Trim()
+    $brandingChanged = Get-ElonApkInputCoverage -RepoRoot $root -CandidateSha $shaE -DeployedSha $shaD
+    Assert-True (-not $brandingChanged.Covered) 'Shared branding changes must require a new APK'
+    Assert-True ($brandingChanged.ChangedPaths -contains 'server/src/assets/app_branding.json') 'Branding input diff evidence'
+
     $docsOnly = Get-ElonApkInputCoverage -RepoRoot $root -CandidateSha $shaB -DeployedSha $shaA
     Assert-True $docsOnly.Covered 'docs-only descendants must reuse the deployed APK'
     Assert-True ($docsOnly.Reason -eq 'same_android_inputs') 'docs-only coverage reason'

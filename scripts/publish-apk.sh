@@ -70,6 +70,7 @@ is_local_apk_deploy() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 . "$SCRIPT_DIR/release-publish-lease.sh"
+. "$SCRIPT_DIR/app-branding.sh"
 ANDROID_DIR="$REPO_ROOT/android"
 GRADLE_PATH="$ANDROID_DIR/app/build.gradle"
 APK_DIR="$ANDROID_DIR/app/build/outputs/apk/release"
@@ -83,7 +84,6 @@ RELEASE_FINISHED=0
 ORIGINAL_GRADLE_CONTENT=""
 BUILD_BASE_SHA=""
 
-# ── JSON 辅助 ─────────────────────────────────────────────────
 json_get() {
   # json_get <json_string> <key>
   echo "$1" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('$2',''))" 2>/dev/null || echo ""
@@ -323,7 +323,7 @@ assert_remote_apk_manifest_version() {
   local tmp_apk
 
   tmp_apk=$(mktemp /tmp/elon-remote-apk.XXXXXX.apk)
-  if ! curl -sS --noproxy '*' -f -L --max-time 120 -o "$tmp_apk" "$SERVER_URL/app/ElonSpeed-latest.apk"; then
+  if ! curl -sS --noproxy '*' -f -L --max-time 120 -o "$tmp_apk" "$SERVER_URL/app/$APK_FILE_NAME"; then
     rm -f "$tmp_apk"
     complete_release "false" "" 0 "" "failed to download remote apk for manifest validation"
     echo -e "${RED}❌ 下载线上 APK 校验包体失败${NC}" >&2
@@ -431,7 +431,7 @@ apk_runtime_unchanged_since() {
   [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || return 1
   git -C "$REPO_ROOT" merge-base --is-ancestor "$base_sha" "$BUILD_BASE_SHA" 2>/dev/null || return 1
   git -C "$REPO_ROOT" diff --quiet "$base_sha" "$BUILD_BASE_SHA" -- \
-    android/app/src/main android/app/build.gradle android/build.gradle android/settings.gradle
+    android/app/src/main android/app/build.gradle android/build.gradle android/settings.gradle server/src/assets/app_branding.json
 }
 
 is_git_ancestor() {
@@ -457,7 +457,7 @@ remote_advance_safe_for_apk() {
   [[ -n "$changed" ]] || return 0
   while IFS= read -r p; do
     [[ -n "$p" ]] || continue
-    if [[ "$p" == android/* || "$p" == scripts/publish-apk* ]]; then
+    if [[ "$p" == android/* || "$p" == scripts/publish-apk* || "$p" == server/src/assets/app_branding.json ]]; then
       return 1
     fi
   done <<< "$changed"
@@ -508,7 +508,7 @@ if [[ "$FORCE" == "0" && -n "$DEPLOYED_APK_SHA" ]]; then
     LIVE_NAME=$(json_get "$LIVE_VERSION" "versionName")
     LIVE_CODE=$(json_get_int "$LIVE_VERSION" "versionCode")
     echo -e "${GREEN}   ✅ APK 运行代码未变化，复用线上发布版 v${LIVE_NAME} (build ${LIVE_CODE})${NC}"
-    echo -e "${GREEN}   下载: $SERVER_URL/app/ElonSpeed-latest.apk${NC}"
+    echo -e "${GREEN}   下载: $SERVER_URL/app/$APK_FILE_NAME${NC}"
     print_publish_status "published" "synced" "not_attempted" "APK 已发布；当前 Android 运行代码未变化，复用线上版本。"
     echo -e "${GRAY}      如需强制重新打包：bash scripts/publish-apk.sh --force --changelog=\"$CHANGELOG\"${NC}"
     exit 0
@@ -575,7 +575,7 @@ if [[ "$FORCE" == "0" ]] && live_apk_includes_build_base; then
   LIVE_NAME=$(json_get "$LIVE_VERSION" "versionName")
   LIVE_CODE=$(json_get_int "$LIVE_VERSION" "versionCode")
   echo -e "${GREEN}   ✅ 线上 APK 已包含本次源码，复用 v${LIVE_NAME} (build ${LIVE_CODE})${NC}"
-  echo -e "${GREEN}   下载: $SERVER_URL/app/ElonSpeed-latest.apk${NC}"
+  echo -e "${GREEN}   下载: $SERVER_URL/app/$APK_FILE_NAME${NC}"
   complete_release "false" "" 0 "" "live apk already includes build base"
   print_publish_status "published" "synced" "not_attempted" "APK 已发布；线上 APK 已包含本次源码。"
   exit 0
@@ -682,8 +682,7 @@ if [[ "$FORCE" == "0" ]]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# Step 5: 生成 version.json
-# ═══════════════════════════════════════════════════════════════
+# 生成 version.json 并原子发布
 TMP_JSON=$(mktemp /tmp/elon-version.XXXXXX.json)
 trap "rm -f '$TMP_JSON'; $(trap -p EXIT | sed 's/trap -- //' | sed "s/ EXIT//")" EXIT
 
@@ -692,7 +691,7 @@ import json
 print(json.dumps({
   'versionCode': $NEW_CODE,
   'versionName': '$NEW_NAME',
-  'downloadUrl': '$SERVER_URL/app/ElonSpeed-latest.apk',
+  'downloadUrl': '$SERVER_URL/app/$APK_FILE_NAME',
   'changelog': $(python3 -c "import json; print(json.dumps('$CHANGELOG'))"),
   'forceUpdate': False,
   'fileSize': $FILE_SIZE,
@@ -712,7 +711,7 @@ else
   echo -e "${GRAY}   部署模式: 远程 SSH/SCP${NC}"
 fi
 
-APK_STAGE="$SERVER_DIR/ElonSpeed-latest.apk.${SHA_FULL}.tmp"
+APK_STAGE="$SERVER_DIR/$APK_STORAGE_NAME.${SHA_FULL}.tmp"
 JSON_STAGE="$SERVER_DIR/version.json.${SHA_FULL}.tmp"
 
 if is_local_apk_deploy; then
@@ -752,7 +751,7 @@ SHA_FILE="$APP_DIR/.apk-deployed-sha"
     echo "APK_DEPLOY_CAS_MISMATCH current=$CURRENT expected=$EXPECTED" >&2
     exit 42
   fi
-  mv "$APK_STAGE" "$APP_DIR/ElonSpeed-latest.apk"
+  mv "$APK_STAGE" "$APP_DIR/__APK_STORAGE_NAME__"
   mv "$JSON_STAGE" "$APP_DIR/version.json"
   printf '%s\n' "$NEW_SHA" > "$SHA_FILE"
 ) 9>"$LOCK_FILE"
@@ -760,6 +759,7 @@ BASH_EOF
 )
 
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__APP_DIR__/$SERVER_DIR}"
+REMOTE_SCRIPT="${REMOTE_SCRIPT//__APK_STORAGE_NAME__/$APK_STORAGE_NAME}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__EXPECTED__/$SERVER_SHA_BEFORE}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__NEW_SHA__/$SHA_FULL}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__APK_STAGE__/$APK_STAGE}"
@@ -840,7 +840,7 @@ echo -e "${CYAN}${SEP}${NC}"
 echo -e "${GREEN}✅ 发布完成！${NC}"
 echo -e "   版本: v${NEW_NAME} (build ${NEW_CODE}) — 服务器分配，未写入 git"
 echo -e "   SHA:  ${SHA_SHORT} (源代码提交，无新增版本号提交)"
-echo -e "   下载: $SERVER_URL/app/ElonSpeed-latest.apk"
+echo -e "   下载: $SERVER_URL/app/$APK_FILE_NAME"
 print_publish_status "published"
 echo -e "${CYAN}${SEP}${NC}"
 

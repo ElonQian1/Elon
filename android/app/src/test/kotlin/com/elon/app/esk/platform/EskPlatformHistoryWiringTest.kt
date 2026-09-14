@@ -81,7 +81,7 @@ class EskPlatformHistoryWiringTest {
         val section = Regex("<section\\b[^>]*id=\"profileEskPlatformEntry\"[^>]*>[\\s\\S]*?</section>")
             .find(read("server/src/assets/web_page.html"))!!.value
         listOf("查看完整审核流水", "本网页暂不读取正式私有余额", "当前 HTTP 不可用",
-            "href=\"/app/ElonSpeed-latest.apk\"").forEach { assertTrue(it, section.contains(it)) }
+            "href=\"/app/ElonAI-latest.apk\"").forEach { assertTrue(it, section.contains(it)) }
         assertFalse(section.contains("/api/me/assets/esk/platform/history"))
     }
 
