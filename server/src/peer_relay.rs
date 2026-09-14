@@ -308,7 +308,7 @@ pub async fn relay_apk(
             );
             headers.insert(
                 header::CONTENT_DISPOSITION,
-                r#"attachment; filename="ElonSpeed-latest.apk""#.parse().unwrap(),
+                crate::app_update::distribution::content_disposition(),
             );
             headers.insert(
                 header::CONTENT_LENGTH,
@@ -348,7 +348,7 @@ pub async fn version_json(State(state): State<Arc<AppState>>) -> impl IntoRespon
 
     let public_url = state.public_url.trim_end_matches('/');
     json["downloadUrl"] =
-        serde_json::Value::String(format!("{public_url}/app/ElonSpeed-latest.apk"));
+        serde_json::Value::String(crate::app_update::distribution::download_url(public_url));
     json["downloadPageUrl"] = serde_json::Value::String(format!("{public_url}/app/download"));
 
     // 注入 mirrors：优先注入 LAN PC 种子（priority=10），再注入手机P2P中继（priority=5）

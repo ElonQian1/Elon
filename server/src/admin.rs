@@ -383,7 +383,7 @@ pub async fn list_sessions(State(state): State<Arc<AppState>>, headers: HeaderMa
             "total": sessions.len(),
             "require_login": state.require_login,
             "min_apk_version_code": state.min_apk_version_code,
-            "platform_apk_url": format!("{}/app/ElonSpeed-latest.apk", state.public_url),
+            "platform_apk_url": crate::app_update::distribution::download_url(&state.public_url),
         }))
         .into_response(),
         Err(e) => (

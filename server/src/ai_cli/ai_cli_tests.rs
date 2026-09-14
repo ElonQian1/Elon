@@ -471,8 +471,5 @@ fn pc_apk_filename_is_sanitized() {
         safe_pc_apk_filename(r"C:\tmp\outputs\app-debug.apk"),
         "app-debug.apk"
     );
-    assert_eq!(
-        safe_pc_apk_filename("not-an-apk.txt"),
-        "ElonSpeed-latest.apk"
-    );
+    assert_eq!(safe_pc_apk_filename("not-an-apk.txt"), "app-latest.apk");
 }

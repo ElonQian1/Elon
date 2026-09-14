@@ -322,7 +322,7 @@ fn parse_pc_apk_relay_output(output: &str) -> Result<Option<PcApkRelayOutput>> {
         .lines()
         .find_map(|line| line.trim().strip_prefix("ELON_APK_NAME:"))
         .map(safe_pc_apk_filename)
-        .unwrap_or_else(|| "ElonSpeed-latest.apk".to_string());
+        .unwrap_or_else(|| "app-latest.apk".to_string());
     let payload = output[begin_index + "ELON_APK_BASE64_BEGIN".len()..end_index]
         .lines()
         .map(str::trim)
@@ -392,7 +392,7 @@ pub(crate) fn safe_pc_apk_filename(raw: &str) -> String {
     if safe.to_ascii_lowercase().ends_with(".apk") && !safe.is_empty() {
         safe
     } else {
-        "ElonSpeed-latest.apk".to_string()
+        "app-latest.apk".to_string()
     }
 }
 

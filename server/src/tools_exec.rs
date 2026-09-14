@@ -153,8 +153,9 @@ pub async fn build_project_via_agent(
     .await?;
     if target == "android" {
         return Ok(format!(
-            "android 构建成功（PC agent）\n##APK_FILE:ElonSpeed-latest.apk\n\n{}",
-            &output[..output.len().min(500)]
+            "android 构建成功（PC agent）\n##APK_FILE:{apk_name}\n\n{}",
+            &output[..output.len().min(500)],
+            apk_name = crate::app_update::distribution::BRANDING.apk_file_name
         ));
     }
     Ok(format!(

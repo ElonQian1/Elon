@@ -11,6 +11,9 @@ use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, sync::LazyLock};
 use tokio::sync::broadcast;
 
+#[path = "app_distribution.rs"]
+pub(crate) mod distribution;
+
 use crate::{
     realtime_metrics::{self, RealtimeChannel},
     types::AppState,
@@ -105,8 +108,7 @@ async fn latest_update_event(state: &AppState) -> anyhow::Result<String> {
     let public_url = state.public_url.trim_end_matches('/');
 
     json["type"] = serde_json::Value::String("app_update_available".into());
-    json["downloadUrl"] =
-        serde_json::Value::String(format!("{public_url}/app/ElonSpeed-latest.apk"));
+    json["downloadUrl"] = serde_json::Value::String(distribution::download_url(public_url));
     json["downloadPageUrl"] = serde_json::Value::String(format!("{public_url}/app/download"));
 
     Ok(serde_json::to_string(&json)?)

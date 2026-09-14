@@ -79,7 +79,6 @@ pub fn build_app(state: Arc<AppState>) -> Router {
 
     // 应用自身 APK 更新文件目录（由发布脚本部署后填充）
     let app_dir = state.data_dir.join("app");
-    let latest_apk = app_dir.join("ElonSpeed-latest.apk");
 
     // PC 新前端 dist 目录（由发布脚本构建并上传后填充）
     // /pc 是主路由；/pc-next 保留为向后兼容别名。
@@ -671,7 +670,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         // version.json 动态生成（注入在线 seeder 的 mirrors 字段）
         .route("/app/version.json", get(peer_relay::version_json))
-        .route_service("/app/ElonSpeed-latest.apk", ServeFile::new(latest_apk))
+        .merge(app_update::distribution::routes(&app_dir))
         // ── P2P 同WiFi 中继 ──────────────────────────────────────────────
         // Seeder 设备连接 WS 注册自己为种子
         .route("/app/peer/ws", get(peer_relay::peer_ws_handler))
