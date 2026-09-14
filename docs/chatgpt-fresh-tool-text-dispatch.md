@@ -9,15 +9,17 @@ scope: authenticated_existing_personal_text_search_or_picture_v2
 # Fresh Tool Text Dispatch
 
 September 13 source batch extending [the accepted plain-text sender](chatgpt-fresh-text-dispatch.md).
-This is not completion or promotion of tool-bearing sends. Existing production
-Search/Create Image controls still use their accepted sender unless the scoped
-candidate is explicitly admitted. No UI, transcript store or second send queue
-is added, and accepted plain-text defaults remain unchanged.
+Current scope: [existing-personal Search](chatgpt-fresh-search-text-dispatch.md)
+has a real native/independent-HTTP pass and narrowly scoped default admission.
+Image and other combinations remain candidates, so this combined capability is
+not wholly complete. No UI, transcript store or second send queue is added;
+accepted plain-text defaults remain unchanged.
 
 [September 14 device preflight](reports/chatgpt-fresh-tool-preflight-20260914.md)
-passed on APK 1728. Search selection worked, but the external Send check stopped
-at a collapsed composer and no private request was observed. Sending remains
-unverified; the report records the pending fixture and non-replay recovery rule.
+passed on APK 1728. Its collapsed-composer stop and pending fixture were later
+resolved without a send replay. The [subsequent device report](reports/chatgpt-fresh-tool-device-20260914.md)
+records the actual Search pass, confirmed cleanup and remaining Image preflight
+failures; the earlier report remains historical evidence.
 
 September 14 acceptance-tooling batch: `chatgpt-fresh-tool-smoke-evidence.ps1`
 combines owned send continuity with completed Web output and matching native
@@ -89,10 +91,9 @@ existing sender exactly once before any independent preparation or dispatch.
 
 ## Remaining Acceptance
 
-On the grouped APK, use one owned existing personal conversation, select Search
-with the real native control, arm one trial and click the native Send button.
-Require a unique user turn, actual Search result/references, fresh-owner delivery
-and terminal-history reconciliation. Repeat once for Create Image, requiring the
+Reuse the completed existing-personal Search scope; do not repeat its sample.
+For Create Image, resolve the observed tool-host ownership precondition first,
+then perform one native send in the owned fixture, requiring the
 native generated-image result and matching history, not just HTTP acceptance.
 Restore the original conversation, draft and tool selection afterward. Promote
 each passed scope separately; do not widen to new chats, attachments, projects,

@@ -162,6 +162,32 @@ test('tool trial admits only its single send and uses the dispatch security hint
   }
 });
 
+test('personal Search defaults on without arming extended tool admission; explicit off still wins', async () => {
+  for (const enabled of [undefined, false]) {
+    let f;
+    f = fixture({ reconciliation: async () => true, capture: async (_, __, options) => {
+      assert.equal(options.allowTools, false);
+      assert.equal(options.allowPersonalSearch, enabled !== false);
+      if (!options.allowPersonalSearch) throw Error('tools_active');
+      return f.binding;
+    } });
+    if (enabled !== undefined) f.page.__elonChatGptFreshTextToolsEnabled = enabled;
+    f.binding.tool = 'search';
+    const transaction = f.send();
+    assert.equal((await transaction.completion).status, enabled === false ? 'unavailable' : 'accepted');
+    await turn(); await turn();
+    assert.equal(f.calls.filter(c => c.kind === 'post').length, enabled === false ? 0 : 1);
+    if (enabled === false) assert.equal(transaction.claimFallback(), true);
+    else {
+      const body = f.calls.find(c => c.kind === 'stream_setup').value.body;
+      assert.equal(body.force_use_search, true);
+      assert.equal(f.api.trialControl('state').reconciled, true);
+    }
+    assert.equal(f.api.trialControl('state').armed, false);
+    f.api.dispose();
+  }
+});
+
 test('verified existing-conversation scope is enabled by default but preserves both explicit off switches', async () => {
   const f = fixture({ reconciliation: async () => true });
   delete f.page.__elonChatGptFreshTextDispatchEnabled;

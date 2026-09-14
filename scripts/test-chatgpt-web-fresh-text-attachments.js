@@ -14,6 +14,12 @@ function consume(f, binding, prompt = command.prompt) {
   return { request, ...result };
 }
 
+test('verified personal Search default does not silently include attachment sends', async () => {
+  const f = await fixture(); f.hints.activeSystemHintType = 'search';
+  await assert.rejects(f.api.capture(f.node, null,
+    { allowAttachments: true, allowPersonalSearch: true }), /tools_active/);
+});
+
 test('owned TXT/PDF/image selections use provider metadata and multimodal content in a fresh request', async () => {
   const f = await fixture(), binding = await f.capture(), sent = consume(f, binding);
   const prepared = sent.request.preparationBody(), message = sent.body.messages[0];

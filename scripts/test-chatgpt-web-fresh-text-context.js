@@ -355,6 +355,43 @@ for (const tool of ['search', 'picture_v2']) {
   });
 }
 
+test('verified personal Search admission does not enable other tool or conversation scopes', async () => {
+  const f = fixture(); f.hints.activeSystemHintType = 'search';
+  const owned = await f.api.capture(f.node, null, { allowPersonalSearch: true });
+  assert.equal(owned.tool, 'search'); assert.equal(owned.current(), true);
+  for (const tool of ['picture_v2', 'canvas', 'tatertot']) {
+    f.hints.activeSystemHintType = tool;
+    await assert.rejects(f.api.capture(f.node, null, { allowPersonalSearch: true }), /tools_active/);
+  }
+  for (const path of ['/c/' + CID, '/g/' + PROJECT + '/c/' + CID]) {
+    const project = projectFixture(path); project.hints.activeSystemHintType = 'search';
+    await assert.rejects(project.api.capture(project.node, null,
+      { allowPersonalSearch: true, allowProjects: true }), /tools_active/);
+  }
+  const drift = projectFixture(); drift.tree.mode = { kind: 'primary_assistant' };
+  drift.hints.activeSystemHintType = 'search';
+  const bound = await drift.api.capture(drift.node, null, { allowPersonalSearch: true, allowProjects: true });
+  drift.tree.mode = { kind: 'gizmo_interaction', gizmo_id: PROJECT };
+  assert.equal(bound.current(), false, 'explicit project flag cannot widen the default Search owner after admission');
+});
+
+test('default Search still requires account/model tool permission and stable ownership', async () => {
+  for (const mutate of [
+    f => { f.page.__elonChatGptPrivateComposerToolContext.capture = () => null; },
+    f => { f.shared.SV.isPersonalWorkspace = () => false; },
+    f => { f.hints.activeConnectorSystemHintTypes.add('connector'); },
+    f => { f.props.isDisabled = true; },
+    f => { f.files.files$ = () => [{}]; }
+  ]) {
+    const f = fixture(); f.hints.activeSystemHintType = 'search'; mutate(f);
+    await assert.rejects(f.api.capture(f.node, null, { allowPersonalSearch: true }));
+  }
+  const f = fixture(); f.hints.activeSystemHintType = 'search';
+  const owned = await f.api.capture(f.node, null, { allowPersonalSearch: true });
+  f.hints.activeSystemHintType = 'picture_v2';
+  assert.equal(owned.current(), false);
+});
+
 test('plain text does not acquire or depend on the tool menu', async () => {
   const f = fixture(); delete f.page.__elonChatGptPrivateComposerToolContext;
   const owned = await f.api.capture(f.node, null, { allowTools: true });

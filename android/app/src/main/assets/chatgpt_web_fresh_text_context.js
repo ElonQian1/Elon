@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 13, create: factory });
+  const api = Object.freeze({ version: 14, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -85,8 +85,11 @@
       attachments = page.__elonChatGptFreshTextAttachments.capture(page, binding, conversation);
     }
     let toolOwner = null;
+    const personalSearchAllowed = state => options.allowPersonalSearch === true && selectedTool === 'search' &&
+      !newConversation && !temporary && !attachments && !route[1] &&
+      shared.HM.getGizmoId(state) == null && state?.mode?.kind === 'primary_assistant';
     if (selectedTool !== null) {
-      if (options.allowTools !== true || !['search', 'picture_v2'].includes(selectedTool)) fail('tools_active');
+      if (options.allowTools !== true && !personalSearchAllowed(tree()) || !['search', 'picture_v2'].includes(selectedTool)) fail('tools_active');
       // Reuse the account/model-filtered tool menu once for admission. The owned
       // transaction subsequently observes the in-memory selection, not DOM layout.
       toolOwner = page.__elonChatGptPrivateComposerToolContext?.capture(page, [
@@ -154,6 +157,7 @@
           temporary && (typeof state.is_do_not_remember !== 'boolean' || shared.textHistoryDisabled() !== true)) fail('scope_unsupported', 'base_privacy');
       if (conversation.textPrepareEnabled() !== true || conversation.textReviewAck(selected) != null) fail('scope_unsupported', 'base_prepare');
       const projectId = scope(state);
+      if (toolOwner && options.allowTools !== true && !personalSearchAllowed(state)) fail('tools_active');
       if (['continuingFromSharedConversationId', 'continuingFromSharedProjectConversationId', 'continuingFromSharedPostId',
         'forkFromSharedPost', 'branchingFromMessageId', 'branchingFromConversationId', 'continuationBranch',
         'hideFromHistory', 'conversationOrigin'].some(key => state[key] != null && state[key] !== false)) fail('scope_unsupported', 'base_branch');

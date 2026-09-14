@@ -64,6 +64,12 @@ function newFixture(project = false) {
   return f;
 }
 
+test('verified existing-personal Search default does not admit a new conversation', async () => {
+  const f = newFixture(); f.hints.activeSystemHintType = 'search';
+  await assert.rejects(f.api.capture(f.node, null,
+    { allowNewConversations: true, allowPersonalSearch: true }), /tools_active/);
+});
+
 function payload(project = false, emptyRoot = false, parentId = ROOT) {
   const root = emptyRoot ? '' : parentId;
   return { conversation_id: CID, gizmo_id: project ? PROJECT : null, is_do_not_remember: false,

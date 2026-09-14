@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 24, create: factory });
+  const api = Object.freeze({ version: 25, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -130,6 +130,8 @@
     if (stoppedParent && !stoppedParent.current()) stoppedParent = null;
     const continuation = stoppedParent;
     const allowTools = page.__elonChatGptFreshTextToolsEnabled === true || trialArmed();
+    // Only the existing personal Search scope has a real independent-send pass.
+    const allowPersonalSearch = page.__elonChatGptFreshTextToolsEnabled !== false;
     const allowProjects = page.__elonChatGptFreshTextProjectsEnabled === true || trialArmed();
     // Only the native first-send path with a bound composer is production-verified.
     const allowNewConversations = trialArmed() || page.__elonChatGptFreshTextNewConversationsEnabled === true ||
@@ -197,7 +199,7 @@
       if (regenerate && !regeneration) throw Error('runtime_unavailable');
       owner.binding = await abortable(regenerate ? regeneration.capture(command) :
         context.capture(command.composer, continuation,
-          { allowTools, allowProjects, allowNewConversations, allowTemporary, allowAttachments }));
+          { allowTools, allowPersonalSearch, allowProjects, allowNewConversations, allowTemporary, allowAttachments }));
       check();
       owner.request = requests.create(owner.binding, command);
       const { shared, runtime } = owner.binding;
@@ -388,7 +390,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 24, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 25, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });
