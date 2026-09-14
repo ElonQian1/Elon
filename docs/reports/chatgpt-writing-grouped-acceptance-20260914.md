@@ -115,3 +115,23 @@ checks. The test closed its trial, cleared only its exact synthetic draft and
 restored the prior view; the subsequent state was idle with no draft. No retry
 was replayed. Next work is a read-only diagnosis of the rejected owner/context,
 not another blind send or promotion to default.
+
+## Follow-Up Source Audit
+
+The native editor, export worker, cloud-save session, block parser, writing
+context and Library queue were inspected at source baseline `344c69fad`. This
+did not establish a new product defect or expand any accepted cloud-save scope.
+The current overview still called the already accepted PDF copy "pending";
+that stale summary and the `AI_CURRENT.md` version pointer were corrected.
+Existing acceptance evidence above was reused, not rerun or relabeled.
+
+The wireless handset responded to a bounded hardware-identity read and a
+telephony read reported idle. APK MCP startup timed out at 8.4 seconds; one
+bounded MainActivity recovery attempt timed out at 5.5 seconds. A bounded
+logcat read also timed out. These observations do not establish a crash, ANR,
+network-provider failure, or expired login. A timed-out activity launch is not
+proof that the activity never opened. No trusted production UI state was
+obtained, so no write/save test, message, microphone session, installation,
+force-stop, reboot or data/Cookie clearing was attempted in this follow-up.
+Variant cloud-save acceptance and the read-only retry diagnostic remain
+pending; no extra APK is required for this documentation-only correction.
