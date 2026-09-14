@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Summary content uses the APK dark palette even when Android is in light mode. -->
+    <style name="Theme.Elon.GroupSummaryDialog" parent="Theme.AppCompat.Dialog.Alert">
+        <item name="android:colorBackground">@color/elon_surface_float</item>
+        <item name="colorAccent">@color/elon_text_accent</item>
+        <item name="android:textColorPrimary">@color/elon_text_primary</item>
+        <item name="android:textColorSecondary">@color/elon_text_secondary</item>
+        <item name="android:textColorLink">@color/elon_text_accent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

@@ -8384,9 +8384,9 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   function openGroupSummaryDialog(post, sources) {
     const dlg = document.createElement('div');
     dlg.className = 'modal-mask active';
-    dlg.innerHTML = `<div class="modal" style="max-width:680px">
+    dlg.innerHTML = `<div class="modal group-summary-dialog" style="max-width:680px;color:var(--ink)">
       <h2></h2>
-      <div class="modal-pre" style="white-space:pre-wrap;max-height:58vh;overflow:auto"></div>
+      <div class="modal-pre" style="background:transparent;border:0;color:var(--ink);font-size:15px;max-height:58vh;padding:0"></div>
       <div class="hint-text"></div>
       <div class="actions">
         <button class="btn-cancel" type="button" data-close>关闭</button>

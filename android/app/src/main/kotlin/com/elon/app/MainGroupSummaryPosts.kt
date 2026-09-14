@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
@@ -13,6 +12,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.view.ContextThemeWrapper
 import com.elon.app.databinding.ActivityMainBinding
 import io.noties.markwon.Markwon
 import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
@@ -28,6 +28,9 @@ internal class MainGroupSummaryPosts(
     private val onPostsChanged: () -> Unit
 ) {
     private val handler = Handler(Looper.getMainLooper())
+    private val dialogContext by lazy {
+        ContextThemeWrapper(activity, R.style.Theme_Elon_GroupSummaryDialog)
+    }
     private var activeGroup: AppGroup? = null
     private var posts: List<GroupSummaryPost> = emptyList()
     private var loading = false
@@ -52,12 +55,12 @@ internal class MainGroupSummaryPosts(
 
     fun showPosts(group: AppGroup? = activeGroup) {
         val target = group ?: return
-        val column = LinearLayout(activity).apply {
+        val column = LinearLayout(dialogContext).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(8), 0, dp(8))
         }
-        val scroll = ScrollView(activity).apply { addView(column) }
-        val dialog = AlertDialog.Builder(activity)
+        val scroll = summaryScroll(column)
+        val dialog = AlertDialog.Builder(activity, R.style.Theme_Elon_GroupSummaryDialog)
             .setTitle("${target.name} · AI 总结帖")
             .setView(scroll)
             .setNegativeButton("生成总结帖", null)
@@ -213,15 +216,15 @@ internal class MainGroupSummaryPosts(
 
     private fun showPostDetail(post: GroupSummaryPost) {
         val group = activeGroup ?: return
-        val status = TextView(activity).apply {
+        val status = TextView(dialogContext).apply {
             text = "正在读取总结帖..."
-            setTextColor(activity.elonColor(R.color.elon_text_placeholder))
+            setTextColor(activity.elonColor(R.color.elon_text_secondary))
             textSize = 14f
             gravity = Gravity.CENTER
             setPadding(dp(18), dp(36), dp(18), dp(36))
         }
-        val scroll = ScrollView(activity).apply { addView(status) }
-        val dialog = AlertDialog.Builder(activity)
+        val scroll = summaryScroll(status)
+        val dialog = AlertDialog.Builder(activity, R.style.Theme_Elon_GroupSummaryDialog)
             .setTitle(post.title)
             .setView(scroll)
             .setNeutralButton(if (post.isPinned) "取消置顶" else "置顶", null)
@@ -285,12 +288,12 @@ internal class MainGroupSummaryPosts(
     }
 
     private fun detailView(detail: GroupSummaryPostDetail): LinearLayout {
-        val column = LinearLayout(activity).apply {
+        val column = LinearLayout(dialogContext).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(14), dp(18), dp(18))
         }
         column.addView(textBlock(detail.post.stripMeta(), quiet = true))
-        val summary = TextView(activity).apply {
+        val summary = TextView(dialogContext).apply {
             setTextColor(activity.elonColor(R.color.elon_text_primary))
             textSize = 15f
             setLineSpacing(dp(3).toFloat(), 1f)
@@ -308,7 +311,7 @@ internal class MainGroupSummaryPosts(
     }
 
     private fun postRow(post: GroupSummaryPost, onClick: () -> Unit): View {
-        return LinearLayout(activity).apply {
+        return LinearLayout(dialogContext).apply {
             orientation = LinearLayout.VERTICAL
             background = roundedBg(activity.elonColor(R.color.elon_surface_header), dp(16))
             setPadding(dp(16), dp(14), dp(16), dp(14))
@@ -318,16 +321,16 @@ internal class MainGroupSummaryPosts(
             )
             lp.setMargins(dp(12), dp(6), dp(12), dp(6))
             layoutParams = lp
-            addView(TextView(activity).apply {
+            addView(TextView(dialogContext).apply {
                 text = "${if (post.isPinned) "置顶" else "总结"} · ${post.title}"
                 setTextColor(activity.elonColor(R.color.elon_text_primary))
                 textSize = 16f
                 typeface = Typeface.DEFAULT_BOLD
                 maxLines = 1
             })
-            addView(TextView(activity).apply {
+            addView(TextView(dialogContext).apply {
                 text = post.stripMeta()
-                setTextColor(activity.elonColor(R.color.elon_text_placeholder))
+                setTextColor(activity.elonColor(R.color.elon_text_secondary))
                 textSize = 13f
                 setPadding(0, dp(8), 0, 0)
             })
@@ -336,7 +339,7 @@ internal class MainGroupSummaryPosts(
     }
 
     private fun sectionTitle(text: String): TextView {
-        return TextView(activity).apply {
+        return TextView(dialogContext).apply {
             this.text = text
             setTextColor(activity.elonColor(R.color.elon_text_primary))
             textSize = 16f
@@ -346,10 +349,10 @@ internal class MainGroupSummaryPosts(
     }
 
     private fun textBlock(text: String, quiet: Boolean = false): TextView {
-        return TextView(activity).apply {
+        return TextView(dialogContext).apply {
             this.text = text
             setTextColor(
-                activity.elonColor(if (quiet) R.color.elon_text_placeholder else R.color.elon_text_primary)
+                activity.elonColor(if (quiet) R.color.elon_text_secondary else R.color.elon_text_primary)
             )
             textSize = if (quiet) 13f else 15f
             setLineSpacing(dp(3).toFloat(), 1f)
@@ -373,10 +376,17 @@ internal class MainGroupSummaryPosts(
         GroupSummaryPostsApi.updatePinned(activity, http, serverUrl, group, postId, pinned)
     }
 
+    private fun summaryScroll(content: View): ScrollView = ScrollView(dialogContext).apply {
+        setBackgroundColor(activity.elonColor(R.color.elon_surface_float))
+        isVerticalFadingEdgeEnabled = false
+        isHorizontalFadingEdgeEnabled = false
+        addView(content)
+    }
+
     private fun markwon(): Markwon {
-        return Markwon.builder(activity)
+        return Markwon.builder(dialogContext)
             .usePlugin(StrikethroughPlugin.create())
-            .usePlugin(TablePlugin.create(activity))
+            .usePlugin(TablePlugin.create(dialogContext))
             .build()
     }
 
