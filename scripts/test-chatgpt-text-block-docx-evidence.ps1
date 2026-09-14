@@ -144,10 +144,15 @@ $java=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'android/TextBlockUiAcce
 Assert ($java.Contains('md|py|txt|docx') -and $java.Contains('requested_export_format_missing') -and
     -not $java.Contains('extension = "txt";')) 'exact_native_format_no_substitution'
 Assert ($java.Contains('edit_docx_fixture') -and $java.Contains('source_sha256') -and
-    $java.Contains('if (!extension.equals("docx"))')) 'source_hash_not_zip_hash'
+    $java.Contains('if (!extension.equals("docx") && !extension.equals("pdf"))')) 'source_hash_not_document_hash'
 $smoke=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'smoke-chatgpt-web-text-block-ui.ps1') -Raw
 Assert ($smoke.IndexOf("throw 'docx_requires_existing_writing_fixture'") -lt $smoke.IndexOf('New-ChatGptWebSmokeRuntime') -and
     $smoke.Contains("throw 'fixture_creation_required'") -and $smoke.Contains("throw 'idle_native_voice_required'")) 'fixture_and_idle_guards'
+Assert ($java.Contains('md|py|txt|docx|pdf') -and $smoke.Contains("'docx','pdf'")) 'pdf_format_admitted'
+Assert ($java.Contains('extension.equals("pdf") ? text("PDF")') -and
+    $java.Contains('click(format);')) 'pdf_matches_production_label'
+Assert ($smoke.Contains("throw 'pdf_export_bytes_mismatch'") -and
+    $smoke.Contains('parser_verified=$false') -and $smoke.Contains("'%PDF-'")) 'pdf_bytes_not_parser_claim'
 foreach($file in @('smoke-chatgpt-web-text-block-ui.ps1','chatgpt-text-block-docx-evidence.ps1')){
     $errors=$null;$tokens=$null
     [Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot $file),[ref]$tokens,[ref]$errors)|Out-Null

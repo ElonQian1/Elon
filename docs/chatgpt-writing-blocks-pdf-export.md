@@ -1,11 +1,21 @@
 ---
 capability_id: android_chatgpt_writing_block_pdf_export_v1
 implementation_status: implemented
-verification_status: offline_verified
-delivery_status: source_only
+verification_status: production_verified
+delivery_status: published
+completion_status: completed
+acceptance_scope: native_pdf_copy_export
 ---
 
 # Writing Block PDF Copy
+
+Grouped build **1723** is published and installed. Production native PDF copy
+export, saved bytes, parser/visual inspection and source/view restoration passed
+after an interrupted run and correction of a test-only label matcher. See the
+[grouped delivery report](reports/chatgpt-writing-grouped-acceptance-20260914.md).
+The exact Unicode extraction limitation below remains; external phone-reader
+opening was not tested. Reuse this completed export scope without re-testing
+unless a current regression appears. Earlier source-only notes are historical.
 
 This extends the existing production native Writing Block editor with an
 explicit PDF export option. It is a **local document copy**, not the provider's

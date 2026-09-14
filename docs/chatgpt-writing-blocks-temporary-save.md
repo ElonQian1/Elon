@@ -1,8 +1,9 @@
 # Temporary Writing Block Save
 
-Status: implemented / offline verified; device acceptance pending. This extends
+Status: implemented / offline verified; published in 1723, device acceptance pending. This extends
 the existing `android_chatgpt_writing_block_save_v1` scope, not its completed
-ordinary-conversation acceptance. No APK was built or installed for this batch.
+ordinary-conversation acceptance. The later [grouped APK delivery](reports/chatgpt-writing-grouped-acceptance-20260914.md)
+does not count as temporary-conversation UI acceptance.
 
 ## Scope And Evidence
 

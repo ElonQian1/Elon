@@ -1,7 +1,7 @@
 ---
 capability_id: android_chatgpt_fresh_regeneration_v1
 implementation_status: implemented
-verification_status: offline_verified
+verification_status: failed
 production_default: false
 scope: existing_personal_plain_text_retry
 ---
@@ -11,8 +11,13 @@ scope: existing_personal_plain_text_retry
 September 14: [runtime-parent correction](reports/chatgpt-fresh-retry-parent-20260914.md)
 reproduces and fixes a runtime `parentId` / history `parent` field mismatch.
 The 1721 native retry attempt failed before independent dispatch, then the runtime
-path became uncertain. Adapter 390 is source-only pending grouped build and
-read-only recovery of that attempt; this capability remains unverified/default-off.
+path became uncertain. Its correction is included in grouped build 1723 (adapter
+391). Read-only checks established a stable current fixture without replaying
+the old write; its historical outcome is not claimed. Corrected native retry
+acceptance subsequently reached a successful runtime retry, but independent
+HTTP still rejected with `scope_unsupported` before dispatch. It remains
+default-off, not production-verified; see the
+[grouped report](reports/chatgpt-writing-grouped-acceptance-20260914.md).
 
 September 13 source candidate. The existing native regenerate button now has a
 gated independent request path through the same fresh-text ledger, prepare/proof

@@ -162,12 +162,13 @@ public final class TextBlockUiAcceptance extends UiAutomatorTestCase {
                 String stem = getParams().getString("stem", "");
                 String extension = getParams().getString("extension", "txt");
                 assertTrue("invalid_fixture_file", stem.matches("elon-block-acceptance-[a-f0-9]{16}"));
-                assertTrue("invalid_export_extension", extension.matches("md|py|txt|docx"));
+                assertTrue("invalid_export_extension", extension.matches("md|py|txt|docx|pdf"));
                 click(desc("web-chat-text-block-export"));
                 assertTrue("export_format_dialog_missing", text("\u5bfc\u51fa\u526f\u672c").waitForExists(3000));
-                assertTrue("requested_export_format_missing",
-                    new UiObject(new UiSelector().packageName(APP).textContains("(." + extension + ")")).exists());
-                click(new UiObject(new UiSelector().packageName(APP).textContains("(." + extension + ")")));
+                UiObject format = extension.equals("pdf") ? text("PDF") :
+                    new UiObject(new UiSelector().packageName(APP).textContains("(." + extension + ")"));
+                assertTrue("requested_export_format_missing", format.exists());
+                click(format);
                 setText(desc("web-chat-text-block-file-name"), stem);
                 click(text("\u5bfc\u51fa"));
                 long deadline = android.os.SystemClock.elapsedRealtime() + 5000;
@@ -175,7 +176,7 @@ public final class TextBlockUiAcceptance extends UiAutomatorTestCase {
                     android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(100);
                 assertTrue("native_export_unconfirmed", "\u526f\u672c\u5df2\u5bfc\u51fa".equals(desc("web-chat-text-block-status").getText()));
                 result.put("exported", true).put("source_sha256", hash(exported)).put("extension", extension);
-                if (!extension.equals("docx")) result.put("sha256", hash(exported));
+                if (!extension.equals("docx") && !extension.equals("pdf")) result.put("sha256", hash(exported));
                 break;
             case "cancel_export":
                 assertTrue("export_format_dialog_missing", text("\u5bfc\u51fa\u526f\u672c").exists());
