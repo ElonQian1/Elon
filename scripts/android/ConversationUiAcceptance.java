@@ -231,6 +231,21 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                 } finally { edit.recycle(); }
                 assertEquals("fresh_fixture_prompt_mismatch", freshPrompt, freshInput.getText());
                 click(description("web-chat-send")); break;
+            case "send_fresh_attachment_fixture":
+                String attachmentPrompt = new String(android.util.Base64.decode(
+                    getParams().getString("prompt_b64", ""), android.util.Base64.DEFAULT),
+                    java.nio.charset.StandardCharsets.UTF_8);
+                assertTrue("attachment_fixture_prompt_invalid", attachmentPrompt.matches(
+                    "ELON_FRESH_ATTACHMENT_ACCEPTANCE_V1 [0-9]{13}\\. Read all three attached test files\\. Reply in English: quote the exact first line from each document, then describe the shapes in the image, including their counts and colors\\. If an attachment is unavailable, say so instead of guessing\\."));
+                UiObject attachmentInput = description("web-chat-composer-input:chatgpt_web");
+                if (!attachmentInput.exists()) {
+                    UiSelector preview = new UiSelector().packageName(APP).className("android.widget.TextView").text(attachmentPrompt);
+                    assertFalse("fixture_preview_ambiguous", new UiObject(preview.instance(1)).exists());
+                    click(new UiObject(preview));
+                }
+                assertTrue("attachment_input_missing", attachmentInput.waitForExists(3000));
+                assertEquals("attachment_fixture_prompt_mismatch", attachmentPrompt, attachmentInput.getText());
+                click(description("web-chat-send")); break;
             case "stop_fresh_text_fixture": click(description("web-chat-stop-generation")); break;
             case "clear_image": click(description("\u5173\u95ed\u521b\u5efa\u56fe\u7247")); break;
             case "clear_search": click(description("\u5173\u95ed\u7f51\u9875\u641c\u7d22")); break;

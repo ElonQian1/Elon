@@ -83,9 +83,10 @@ function compareSymbol(old, current, name, localOnly = false) {
     definitions: nodes?.length || 0, candidates: found };
 }
 
-function roleFiles(sources) {
+function roleFiles(sources, includeReact = false) {
   const files = {};
-  for (const [role, prefix] of Object.entries(roles)) {
+  const requested = includeReact ? { ...roles, react: '2340486e-' } : roles;
+  for (const [role, prefix] of Object.entries(requested)) {
     const matches = sources.filter(source => typeof source === 'string' &&
       new RegExp('^\\./' + prefix + '[A-Za-z0-9_-]+\\.js$').test(source));
     if (matches.length !== 1) throw Error('anchor_role_ambiguous:' + role);
@@ -108,11 +109,11 @@ function symbols(data) {
 }
 
 function analyze({ oldDir, newDir, prior, anchor }) {
-  const root = readModule(newDir, anchor), files = roleFiles(root.parsed.sources);
+  const root = readModule(newDir, anchor), files = roleFiles(root.parsed.sources, !!prior.files.react);
   const report = { schema: 'elon.public_runtime_comparison.v1', advisory_only: true,
     anchor: { name: anchor, sha256: root.sha256, bytes: root.bytes }, files: {}, roles: {}, owners: {} };
   const indexes = {};
-  for (const role of Object.keys(roles)) {
+  for (const role of Object.keys(files)) {
     const old = readModule(oldDir, prior.files[role]), current = readModule(newDir, files[role]);
     report.files[role] = { old: { name: old.name, sha256: old.sha256 },
       current: { name: current.name, sha256: current.sha256, bytes: current.bytes } };

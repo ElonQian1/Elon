@@ -2,6 +2,12 @@
 
 ## Status
 
+September 15: normal 1739 now observes a newer website build not admitted by
+resolver 28. Independent attachment acceptance stopped before upload/send.
+The [current compatibility investigation](reports/chatgpt-runtime-bindings-20260915.md)
+records all 100 consumed contracts, actual source changes and remaining review.
+Earlier device passes below do not certify this newly observed build.
+
 Version 13 adds the phone-observed September 11 build using 58 inspected export
 contracts, retaining all earlier profiles. The live `runtime_not_observed`
 fallback and 536 passing focused/adjacent checks are recorded in
