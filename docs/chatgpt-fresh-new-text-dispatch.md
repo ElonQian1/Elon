@@ -3,8 +3,8 @@ capability_id: android_chatgpt_fresh_new_conversation_text_dispatch_v1
 implementation_status: completed
 verification_status: production_ui_verified
 production_default: true
-scope: authenticated_new_personal_plain_text_with_composer
-pending_extensions: owned_project_text, temporary, tools, attachments, initial_composer_free
+scope: authenticated_new_personal_plain_text_with_memory_owner
+pending_extensions: owned_project_text, temporary, tools, attachments, cold_page_bootstrap
 ---
 
 # Fresh New-Conversation Dispatch
@@ -14,9 +14,10 @@ the mounted-composer condition from the default personal plain-text scope.
 The committed memory draft/controller is still mandatory. Actual owner-fixture
 tests pass with the editor DOM absent, including first response loss and the
 no-replay barrier. First send/follow-up passed on release 1743; that device run
-did not remove the official composer. The DOM-absent extension remains
-`implemented` / `offline_verified`; the frontmatter describes the narrower
-device-accepted scope. See [current compatibility batch](reports/chatgpt-runtime-bindings-20260915.md).
+did not remove the official composer. The [adapter 411 native acceptance](chatgpt-composer-unavailable-acceptance.md)
+then passed with no usable official composer through the entire first send and
+history readback. This verifies the default memory-owner route, not cold-page
+bootstrap with all runtime/editor modules absent. See [current compatibility batch](reports/chatgpt-runtime-bindings-20260915.md).
 
 September 13 extension of the [accepted independent sender](chatgpt-fresh-text-dispatch.md).
 It reuses its request ledger, security-aware page HTTP, stream decoder, native

@@ -9,6 +9,19 @@ ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
 
+- Adapter 411 closes a native no-composer admission regression: unlabeled
+  dictation controls require actual capture; verified private-editor readiness
+  no longer becomes cached DOM readiness. `c10f1613d` implements the fix.
+  [Composer-unavailable native acceptance](../chatgpt-composer-unavailable-acceptance.md)
+  passed on local research 1747 from `4633785ee`: one Send, one independent
+  request/answer, 31 stream events, exact history, 77 valid no-composer samples,
+  original route/CSS/awake restoration. The existing production default was
+  used. No-usable-composer first send is now verified; a cold page with no
+  initialized runtime is a different boundary. Normal release follows.
+- Targeted fix regression: 57 Node cases, seven PowerShell negative proofs and
+  15 Android unit tests passed. Research signed Release build passed in 370.7s.
+  The earlier failed UI attempt dispatched nothing; its exact synthetic draft
+  was safely removed and its external ledger archived without replay permission.
 - Final default release 1747, source `2c1944a0f38cb2ed1c1a4390dd09f33ae9105625`,
   SHA-256 `7661a081b14c3bacb40b1b1df7246c31446d91289907de337861d617727f81db`,
   passed Release build/checks and unattended replacement installation. Read-only
@@ -114,8 +127,8 @@ ordinary text, Search and Image modules.
   writing/runtime regression. Public-source and Canvas contract checks passed:
   `runtime-canvas-current-contracts-20260915-025816-108`.
 - Production Canvas mutation acceptance still needs a genuine owned Canvas,
-  not a Writing Block. First send with a physically absent composer still needs
-  device evidence; its memory-owner tests and normal native first send pass.
+  not a Writing Block. No-usable-composer first send subsequently passed on
+  adapter 411 above; cold-bootstrap and network-loss recovery remain separate.
 
 The sections below preserve the pre-implementation investigation and device
 baseline; their candidate lists are historical, not remaining mapping work.
@@ -214,8 +227,8 @@ arguments: old directory, new directory, full baseline fixture, observed anchor,
 output directory. Do not restart browser scraping or resend old fixtures.
 
 Current next: use a genuine owned Canvas to verify edit/save/readback; do not
-count Writing Blocks as Canvas. A physically absent-composer first-send and
-special abnormal-recovery device case remain distinct from the accepted normal
-native first-send/follow-up. Current mappings and the accepted local attachment
+count Writing Blocks as Canvas. Cold-bootstrap and special abnormal-recovery
+device cases remain distinct from the accepted native no-usable-composer
+first send. Current mappings and the accepted local attachment
 scope are published; do not re-research them or repeat their send without a regression.
 Keep the broad Goal active and distinguish compatibility from live acceptance.

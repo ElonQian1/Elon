@@ -44,8 +44,8 @@ memory editor; do not claim a DOM-unmount or cold-bootstrap acceptance from this
 The lease's offline tests cover CSS restoration, timeout, route continuity,
 document replacement, lost style, wrong owner, production-build rejection,
 origin/endpoint restrictions and selector parity. The existing native send
-evidence tests are reused. Device acceptance is pending; record its result here
-before broadening the capability's verified scope.
+evidence tests are reused. Device acceptance passed below; reuse it unless a
+current regression changes this scope.
 
 ### Native Admission Regression
 
@@ -62,4 +62,20 @@ explicitly labeled official dictation controls remain supported. Native transien
 readiness retains model/capability metadata without relabeling a verified private
 editor as a ready DOM composer. Policy/integration tests cover both real recording
 and the idle no-composer layout. This fix does not change private dictation,
-work-mode dictation or realtime voice. Device revalidation remains required.
+work-mode dictation or realtime voice.
+
+### Accepted On Adapter 411
+
+`fresh-new-composer-unavailable-native-411-20260915-060014-013` passed on Xiaomi,
+using local research 1.1.1747 built from `4633785ee`, SHA-256
+`7c2d8834d15ae85c0a1faea86d6754130099137b81e00c6639f196e9ab143446`.
+One production native Send, zero seed/replay, one exact user/answer and receipt;
+31 private stream events, confirmed history and conversation identity. The
+native composer flag was false before Send. All 77 lease samples had zero
+usable composer and zero invalid-owner observations. Reply observed at 7.305s;
+13.367s includes final readback, not an A/B claim. Original route, CSS and awake
+state restored; no unknown write remains. The production sender's existing
+default was used, not a trial arm. Normal release promotion follows this proof.
+
+Offline regression: 57 Node tests, seven PowerShell evidence negatives and 15
+Android unit tests passed. Signed research Release build passed in 370.7s.
