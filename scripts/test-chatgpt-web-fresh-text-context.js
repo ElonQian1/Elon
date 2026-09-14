@@ -355,27 +355,28 @@ for (const tool of ['search', 'picture_v2']) {
   });
 }
 
-test('verified personal Search admission does not enable other tool or conversation scopes', async () => {
-  const f = fixture(); f.hints.activeSystemHintType = 'search';
-  const owned = await f.api.capture(f.node, null, { allowPersonalSearch: true });
-  assert.equal(owned.tool, 'search'); assert.equal(owned.current(), true);
-  for (const tool of ['picture_v2', 'canvas', 'tatertot']) {
+for (const [hint, flag] of [['search', 'allowPersonalSearch'], ['picture_v2', 'allowPersonalImage']]) {
+test('verified personal ' + hint + ' admission does not enable other tool or conversation scopes', async () => {
+  const f = fixture(); f.hints.activeSystemHintType = hint;
+  const owned = await f.api.capture(f.node, null, { [flag]: true });
+  assert.equal(owned.tool, hint); assert.equal(owned.current(), true);
+  for (const tool of ['search', 'picture_v2', 'canvas', 'tatertot'].filter(value => value !== hint)) {
     f.hints.activeSystemHintType = tool;
-    await assert.rejects(f.api.capture(f.node, null, { allowPersonalSearch: true }), /tools_active/);
+    await assert.rejects(f.api.capture(f.node, null, { [flag]: true }), /tools_active/);
   }
   for (const path of ['/c/' + CID, '/g/' + PROJECT + '/c/' + CID]) {
-    const project = projectFixture(path); project.hints.activeSystemHintType = 'search';
+    const project = projectFixture(path); project.hints.activeSystemHintType = hint;
     await assert.rejects(project.api.capture(project.node, null,
-      { allowPersonalSearch: true, allowProjects: true }), /tools_active/);
+      { [flag]: true, allowProjects: true }), /tools_active/);
   }
   const drift = projectFixture(); drift.tree.mode = { kind: 'primary_assistant' };
-  drift.hints.activeSystemHintType = 'search';
-  const bound = await drift.api.capture(drift.node, null, { allowPersonalSearch: true, allowProjects: true });
+  drift.hints.activeSystemHintType = hint;
+  const bound = await drift.api.capture(drift.node, null, { [flag]: true, allowProjects: true });
   drift.tree.mode = { kind: 'gizmo_interaction', gizmo_id: PROJECT };
-  assert.equal(bound.current(), false, 'explicit project flag cannot widen the default Search owner after admission');
+  assert.equal(bound.current(), false, 'explicit project flag cannot widen the default personal tool owner after admission');
 });
 
-test('default Search still requires account/model tool permission and stable ownership', async () => {
+test('default ' + hint + ' still requires account/model tool permission and stable ownership', async () => {
   for (const mutate of [
     f => { f.page.__elonChatGptPrivateComposerToolContext.capture = () => null; },
     f => { f.shared.SV.isPersonalWorkspace = () => false; },
@@ -383,14 +384,15 @@ test('default Search still requires account/model tool permission and stable own
     f => { f.props.isDisabled = true; },
     f => { f.files.files$ = () => [{}]; }
   ]) {
-    const f = fixture(); f.hints.activeSystemHintType = 'search'; mutate(f);
-    await assert.rejects(f.api.capture(f.node, null, { allowPersonalSearch: true }));
+    const f = fixture(); f.hints.activeSystemHintType = hint; mutate(f);
+    await assert.rejects(f.api.capture(f.node, null, { [flag]: true }));
   }
-  const f = fixture(); f.hints.activeSystemHintType = 'search';
-  const owned = await f.api.capture(f.node, null, { allowPersonalSearch: true });
-  f.hints.activeSystemHintType = 'picture_v2';
+  const f = fixture(); f.hints.activeSystemHintType = hint;
+  const owned = await f.api.capture(f.node, null, { [flag]: true });
+  f.hints.activeSystemHintType = hint === 'search' ? 'picture_v2' : 'search';
   assert.equal(owned.current(), false);
 });
+}
 
 test('plain text does not acquire or depend on the tool menu', async () => {
   const f = fixture(); delete f.page.__elonChatGptPrivateComposerToolContext;

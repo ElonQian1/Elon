@@ -14,10 +14,12 @@ function consume(f, binding, prompt = command.prompt) {
   return { request, ...result };
 }
 
-test('verified personal Search default does not silently include attachment sends', async () => {
-  const f = await fixture(); f.hints.activeSystemHintType = 'search';
-  await assert.rejects(f.api.capture(f.node, null,
-    { allowAttachments: true, allowPersonalSearch: true }), /tools_active/);
+test('verified personal tool defaults do not silently include attachment sends', async () => {
+  for (const tool of ['search', 'picture_v2']) {
+    const f = await fixture(); f.hints.activeSystemHintType = tool;
+    await assert.rejects(f.api.capture(f.node, null,
+      { allowAttachments: true, allowPersonalSearch: true, allowPersonalImage: true }), /tools_active/);
+  }
 });
 
 test('owned TXT/PDF/image selections use provider metadata and multimodal content in a fresh request', async () => {

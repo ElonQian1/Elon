@@ -33,9 +33,9 @@ async function admission({ composer = {}, enabled, trial = false } = {}) {
   }
 }
 
-test('defaults keep extended scopes off and expose the separately gated personal Search admission', async () => {
+test('defaults keep extended scopes off and expose separately gated personal Search and Image', async () => {
   assert.deepEqual(await admission(), { allowNewConversations: true, allowProjects: false,
-    allowTools: false, allowPersonalSearch: true, allowTemporary: false, allowAttachments: false });
+    allowTools: false, allowPersonalSearch: true, allowPersonalImage: true, allowTemporary: false, allowAttachments: false });
 });
 
 test('new-conversation default does not promote the composer-free scope', async () => {

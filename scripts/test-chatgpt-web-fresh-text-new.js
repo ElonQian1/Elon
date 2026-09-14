@@ -65,10 +65,10 @@ function newFixture(project = false) {
 }
 
 for (const project of [false, true]) for (const tool of ['search', 'picture_v2']) {
-  test('existing Search default does not admit new ' + (project ? 'project ' : 'personal ') + tool, async () => {
+  test('existing personal tool defaults do not admit new ' + (project ? 'project ' : 'personal ') + tool, async () => {
     const f = newFixture(project); f.hints.activeSystemHintType = tool;
     await assert.rejects(f.api.capture(f.node, null,
-      { allowNewConversations: true, allowProjects: project, allowPersonalSearch: true }), /tools_active/);
+      { allowNewConversations: true, allowProjects: project, allowPersonalSearch: true, allowPersonalImage: true }), /tools_active/);
   });
 }
 

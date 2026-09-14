@@ -15,11 +15,11 @@ const input = { id: UID, author: { role: 'user' }, content: { content_type: 'tex
 const answer = { id: AID, author: { role: 'assistant' }, status: 'finished_successfully', end_turn: true,
   content: { content_type: 'text', parts: ['Synthetic answer'] } };
 
-test('verified personal Search default does not widen temporary conversation admission', async () => {
-  for (const isNew of [false, true]) {
-    const f = temporaryFixture(isNew); f.hints.activeSystemHintType = 'search';
+test('verified personal tool defaults do not widen temporary conversation admission', async () => {
+  for (const isNew of [false, true]) for (const tool of ['search', 'picture_v2']) {
+    const f = temporaryFixture(isNew); f.hints.activeSystemHintType = tool;
     await assert.rejects(f.api.capture(f.node, null,
-      { allowTemporary: true, allowNewConversations: true, allowPersonalSearch: true }), /tools_active/);
+      { allowTemporary: true, allowNewConversations: true, allowPersonalSearch: true, allowPersonalImage: true }), /tools_active/);
   }
 });
 

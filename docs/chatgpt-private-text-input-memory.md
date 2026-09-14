@@ -3,7 +3,7 @@ capability_id: android_chatgpt_private_text_input_memory_v1
 implementation_status: implemented
 verification_status: offline_verified
 device_verification: deferred
-delivery_status: published_1738_device_pending
+delivery_status: published_1739_image_scope_source_only
 ---
 
 # Private Text Input Readiness
@@ -59,14 +59,25 @@ copies the latest flag instead of retaining an old one.
 If the mounted composer is present, its existing draft behavior remains primary.
 The memory path observes the existing private-send switches and existing
 new/project/temporary scope flags. Its tool scope now matches the sender:
-personal existing-chat Search uses the accepted default unless explicitly
+personal existing-chat Search and Image use the accepted default unless explicitly
 disabled; other supported tool combinations require the explicit tool switch.
 The same context validates current account, model, tool eligibility and draft.
 Already-associated attachments follow the exact explicit attachment switch too;
 readiness reuses their current owned upload lease and does not consume files.
-This does not enable uploads, new composer-free sends or additional tool defaults.
+This does not enable uploads, new composer-free sends or extended tool defaults.
 Unknown runtime, owner or draft means not ready, not that the website lacks the
 feature. Fully loading-free cold start is not claimed.
+
+September 15: the [Image transport pass](reports/chatgpt-fresh-image-device-20260915.md)
+adds the same narrow personal-Image default to input v4 and transaction v26.
+Invalidated successful personal tool bindings permit one immediate asynchronous
+recapture, so Search/Image changes do not inherit the previous two-second wait.
+The old binding is revoked before editing; current identity, tool permission and
+draft must pass again. Failed attempts still back off, and attachment/new/project/
+temporary bindings keep their previous retry policy. Existing single-flight and
+late-result guards remain. The 315 targeted tests passed with zero skips.
+These default/refresh edits are source-only pending grouped release; installed
+1739's ordinary composer-ready device check is not an absent-DOM UI acceptance.
 
 At the initial checkpoint, transaction module and instance versions were both 21. The previously mismatched
 instance version could discard a settled receipt ledger on reinjection; matching

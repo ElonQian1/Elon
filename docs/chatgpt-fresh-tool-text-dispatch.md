@@ -1,19 +1,22 @@
 ---
 capability_id: android_chatgpt_fresh_tool_text_dispatch_v1
-implementation_status: implemented
-verification_status: offline_verified
-production_default: false
+implementation_status: completed
+verification_status: device_verified
+production_default: true
+delivery_status: image_default_source_only_next_grouped_release
 scope: authenticated_existing_personal_text_search_or_picture_v2
 ---
 
 # Fresh Tool Text Dispatch
 
 September 13 source batch extending [the accepted plain-text sender](chatgpt-fresh-text-dispatch.md).
-Current scope: [existing-personal Search](chatgpt-fresh-search-text-dispatch.md)
-has a real native/independent-HTTP pass and narrowly scoped default admission.
-Image and other combinations remain candidates, so this combined capability is
-not wholly complete. No UI, transcript store or second send queue is added;
-accepted plain-text defaults remain unchanged.
+Current scope: existing-personal [Search](chatgpt-fresh-search-text-dispatch.md)
+and [Image](reports/chatgpt-fresh-image-device-20260915.md) each have a real
+native/independent-HTTP pass. This exact combined scope is complete; reuse it.
+Source defaults now admit both, while the installed 1739 still needs a one-shot
+trial for Image. The default change awaits the next grouped release. New chats,
+projects, temporary chats and attachments are not included. No UI, transcript
+store or second send queue is added; accepted plain-text defaults are unchanged.
 
 [September 14 device preflight](reports/chatgpt-fresh-tool-preflight-20260914.md)
 passed on APK 1728. Its collapsed-composer stop and pending fixture were later
@@ -70,7 +73,9 @@ attempt; uncertain writes cannot replay through the established sender.
 The existing `fresh_text_trial_start` permits one candidate command for at most
 120 seconds on the current document/account/route. It is consumed once, not a
 persistent default. The page-local `__elonChatGptFreshTextToolsEnabled === true`
-can explicitly admit this source scope; it is unset in production. The overall
+can explicitly admit extended combinations; it is unset in production. Context
+v15 and transaction v26 separately admit accepted existing-personal Search and
+Image unless this switch is explicitly false. The overall
 private-transaction switch still applies. Failed pre-admission can claim the
 existing sender exactly once before any independent preparation or dispatch.
 
@@ -91,14 +96,13 @@ existing sender exactly once before any independent preparation or dispatch.
 
 ## Remaining Acceptance
 
-Reuse the completed existing-personal Search scope; do not repeat its sample.
-For Create Image, resolve the observed tool-host ownership precondition first,
-then perform one native send in the owned fixture, requiring the
-native generated-image result and matching history, not just HTTP acceptance.
-Restore the original conversation, draft and tool selection afterward. Promote
-each passed scope separately; do not widen to new chats, attachments, projects,
-temporary chats, Study/Canvas or unobserved model-specific overrides. A failure
-after dispatch is reconciled read-only, never resent as an acceptance retry.
+Reuse completed existing-personal Search and Image; do not repeat either sample
+without current regression evidence. Their actual native output and matching
+history are accepted, not just HTTP status. Keep new chats, attachments, projects,
+temporary chats, Study/Canvas and unobserved model-specific overrides separately
+gated. A failure after dispatch is reconciled read-only, never resent as an
+acceptance retry. Image's default-routing source awaits grouped publication;
+its trial transport pass does not prove a new APK is installed.
 
 ## New-Conversation Composition Audit
 

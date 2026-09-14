@@ -1,6 +1,6 @@
 # Remaining private-native batch
 
-Current implementation audit: 2026-09-14. This is a work list, not a declaration
+Current implementation audit: 2026-09-15. This is a work list, not a declaration
 that every private protocol has been reproduced. Reuse completed capabilities in
 [the capability matrix](web-ai-private-transport-capability-matrix.md).
 Operation admission and remaining composer dependencies: [readiness policy](chatgpt-operation-readiness.md).
@@ -29,7 +29,9 @@ reading/edit/export and ordinary save are accepted (1692; editor undo/redo/share
 [Library](chatgpt-writing-blocks-library-save.md): 1715, device-pending; [temporary](chatgpt-writing-blocks-temporary-save.md): offline-verified; shared writes open.
 
 [Search](chatgpt-fresh-search-text-dispatch.md): verified, 1731 default.
-[Other tools](chatgpt-fresh-tool-text-dispatch.md),
+[Image](reports/chatgpt-fresh-image-device-20260915.md): existing-personal independent
+send accepted on 1739; default source ready for grouped release. Reuse both passes.
+[Extended tool combinations](chatgpt-fresh-tool-text-dispatch.md),
 [project sends](chatgpt-fresh-project-text-dispatch.md),
 [temporary sends/cache guard](chatgpt-fresh-temporary-text-dispatch.md),
 [owned attachment sends](chatgpt-fresh-attachment-text-dispatch.md): offline-verified.
@@ -42,7 +44,7 @@ confirms that new personal/owned-project Search and Picture requests already use
 the existing sender. Their combined first-send/follow-up/Stop and no-replay
 contracts are offline-verified, not a missing sender implementation. Live tool
 eligibility, generated output and native acceptance remain; do not duplicate the
-transport or broaden the accepted personal Search default.
+transport or broaden the accepted existing-personal Search/Image defaults.
 
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
 three taps joined one 1077 ms read; native TXT saved 78 bytes. Supplemental/PCA

@@ -74,13 +74,13 @@ test('accepted personal Search keeps native input usable without composer DOM', 
   assert.equal(f.hints.activeSystemHintType, 'search', 'editing must not reset the selected tool');
 });
 
-test('additional tool input follows the explicit sender switch, not preset visibility', async () => {
+test('accepted personal Image input defaults on and still respects explicit opt-out', async () => {
   for (const enabled of [undefined, false, true]) {
     const f = toolInput('picture_v2', enabled);
     f.api.snapshot(null); await tick();
-    assert.equal(f.api.snapshot(null).ready, enabled === true);
-    assert.equal(f.api.setDraft('Synthetic picture draft', f.draft()), enabled === true);
-    assert.equal(f.edits.length, enabled === true ? 1 : 0);
+    assert.equal(f.api.snapshot(null).ready, enabled !== false);
+    assert.equal(f.api.setDraft('Synthetic picture draft', f.draft()), enabled !== false);
+    assert.equal(f.edits.length, enabled !== false ? 1 : 0);
   }
 });
 
@@ -103,15 +103,34 @@ test('turning off the tool switch revokes a cached native draft immediately', as
   await tick();
 });
 
-test('a changed tool cannot reuse previously authorized Search input', async () => {
+for (const [from, to] of [['search', 'picture_v2'], ['picture_v2', 'search']]) {
+test(`a changed tool cannot reuse previously authorized ${from} input`, async () => {
+  const f = toolInput(from);
+  f.api.snapshot(null); await tick();
+  assert.equal(f.api.snapshot(null).ready, true);
+  f.hints.activeSystemHintType = to;
+  assert.equal(f.api.setDraft('must not write', f.draft()), false);
+  assert.equal(f.api.snapshot(null).ready, false);
+  await tick();
+  assert.equal(f.api.snapshot(null).ready, true, 'each tool requires its own fresh capability and owner check');
+  assert.equal(f.edits.length, 0);
+});
+}
+
+test('failed recheck after a successful tool owner still backs off without repeated runtime loads', async () => {
   const f = toolInput('search');
   f.api.snapshot(null); await tick();
   assert.equal(f.api.snapshot(null).ready, true);
   f.hints.activeSystemHintType = 'picture_v2';
-  assert.equal(f.api.setDraft('must not write', f.draft()), false);
+  f.page.__elonChatGptPrivateComposerToolContext.capture = () => null;
   assert.equal(f.api.snapshot(null).ready, false);
   await tick();
-  assert.equal(f.api.snapshot(null).ready, false);
+  const loaded = f.loads.length;
+  for (let n = 0; n < 20; n++) assert.equal(f.api.snapshot(null).ready, false);
+  await tick();
+  assert.equal(f.loads.length, loaded);
+  f.advance(2000); f.api.snapshot(null); await tick();
+  assert.ok(f.loads.length > loaded);
   assert.equal(f.edits.length, 0);
 });
 

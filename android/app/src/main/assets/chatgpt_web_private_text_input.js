@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateTextInput = factory(root);
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -16,6 +16,7 @@
       allowTemporary: page.__elonChatGptFreshTextTemporaryEnabled === true,
       allowTools: page.__elonChatGptFreshTextToolsEnabled === true,
       allowPersonalSearch: page.__elonChatGptFreshTextToolsEnabled !== false,
+      allowPersonalImage: page.__elonChatGptFreshTextToolsEnabled !== false,
       allowAttachments: page.__elonChatGptFreshTextAttachmentsEnabled === true };
   }
 
@@ -43,6 +44,10 @@
         const draft = cached.binding.draft?.read();
         if (typeof draft === 'string') return { ready: true, draft };
       }
+      // Recheck accepted personal tools promptly; failed captures still back off.
+      const previous = cached?.binding;
+      if (previous && !previous.newConversation && !previous.temporary && !previous.projectId &&
+          !previous.attachments && ['search', 'picture_v2'].includes(previous.tool)) retryAfter = 0;
       cached = null;
       // Capture validates actual account, parent, model, files, tools and the
       // official in-memory draft. No preparation request or submit is issued.
@@ -90,5 +95,5 @@
     respond('set_draft', true, ''); io.notify();
   }
 
-  return Object.freeze({ version: 3, snapshot, setDraft, setCommand });
+  return Object.freeze({ version: 4, snapshot, setDraft, setCommand });
 });
