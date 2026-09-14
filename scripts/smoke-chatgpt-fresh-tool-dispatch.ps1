@@ -29,6 +29,7 @@ function Web { Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state }
 function Main { Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state -MainState }
 function Act([string]$Action,[hashtable]$Arguments=@{}) { Invoke-ChatGptWebSmokeAction -Runtime $r -Action $Action -Arguments $Arguments }
 function Ui([string]$Step,[hashtable]$Parameters=@{}) {
+    $report.control_step=$Step
     Invoke-AndroidSemanticAcceptance -Runtime $r -TestClass ConversationUiAcceptance -Step $Step -Parameters $Parameters -ResultPrefix CONVERSATION_UI_RESULT
 }
 function Trial([string]$Mode) { Invoke-ChatGptFreshTrial -Runtime $r -Mode $Mode }
@@ -150,6 +151,7 @@ try {
         $owned=@($ledger.accepted|Where-Object {$_.tool -ceq $inherited[0].semantic -and
             $_.fresh_http -ceq $true -and $_.tool_restored -ceq $true})
         if($PreflightOnly -or $inherited.Count -ne 1 -or $owned.Count -ne 1){throw 'existing_tool_selection_preserved'}
+        Stage inherited_tool_clear
         Clear-NativeTool $inherited[0].semantic
         $report.fixture_inherited_tool_cleared=$true
     }
