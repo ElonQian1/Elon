@@ -16,6 +16,28 @@ import org.junit.Test
 
 class ChatGptWebSendOwnerTest {
     @Test
+    fun actualTransportDispatchRecordsTheNativeIdButReservationDoesNot() {
+        val state = ChatGptWebObservedState()
+        val port = FakeOfficialPageSendCommandPort()
+        var mounted = true
+        val transport = chatGptOfficialPageSendTransport(
+            pageAdapter = { if (mounted) port else null },
+            snapshot = { snapshot() }, ready = { true }, recordDispatch = state::observeSendDispatch,
+        )
+        val id = state.nextRequestId()
+        val command = WebChatSendCommand(id, "fixture", WebChatSendAuthority.OFFICIAL_PAGE, 1L)
+        assertTrue(state.snapshot().commandRequests.isEmpty())
+        mounted = false
+        assertEquals(WebChatTransportDispatchResult.REJECTED, transport.dispatch(command))
+        assertTrue(state.snapshot().commandRequests.isEmpty())
+        mounted = true
+        assertEquals(WebChatTransportDispatchResult.QUEUED, transport.dispatch(command))
+        assertEquals(id, state.snapshot().commandRequests.single().id)
+        state.accept(ChatGptWebEvent.CommandResult("send_prompt", true, "private_text_v1:accepted", id))
+        assertEquals(WebChatTransportDispatchResult.REJECTED, transport.dispatch(command))
+    }
+
+    @Test
     fun officialTransportChecksTheObservedPageDraftBeforeReplacingIt() {
         val port = FakeOfficialPageSendCommandPort()
         val transport = chatGptOfficialPageSendTransport(

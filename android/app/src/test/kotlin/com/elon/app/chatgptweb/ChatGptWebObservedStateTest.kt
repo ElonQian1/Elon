@@ -8,6 +8,36 @@ import org.junit.Test
 
 class ChatGptWebObservedStateTest {
     @Test
+    fun nativeSendPublishesItsExistingIdAndRetainsTheReceipt() {
+        val state = ChatGptWebObservedState()
+        val id = state.nextRequestId()
+        assertTrue(state.snapshot().commandRequests.isEmpty())
+        assertTrue(state.observeSendDispatch(id))
+        assertTrue(state.observeSendDispatch(id))
+        assertEquals(id, state.snapshot().commandRequests.single().id)
+        state.accept(ChatGptWebEvent.CommandResult("send_prompt", true, "private_text_v1:accepted", id))
+        repeat(20) { state.accept(ChatGptWebEvent.CommandResult("private_protocol_probe", true, "fixture")) }
+        val receipt = state.snapshot().commandRequests.single()
+        assertEquals(ChatGptWebObservedState.CommandRequest.SUCCEEDED, receipt.status)
+        assertEquals("private_text_v1:accepted", receipt.result?.detail)
+        assertFalse(state.observeSendDispatch(id))
+    }
+
+    @Test
+    fun nativeSendDoesNotDuplicateMcpOrAcceptUnallocatedAndOtherActionIds() {
+        val state = ChatGptWebObservedState()
+        val mcp = state.beginCommand("send_prompt")
+        assertTrue(state.observeSendDispatch(mcp.id))
+        assertEquals(1, state.snapshot().commandRequests.size)
+        val other = state.beginCommand("set_draft")
+        assertFalse(state.observeSendDispatch(other.id))
+        for (id in listOf("mcp_0", "mcp_99999", "mcp_01", "other_1", "mcp_-1")) {
+            assertFalse(state.observeSendDispatch(id))
+        }
+        assertEquals(2, state.snapshot().commandRequests.size)
+    }
+
+    @Test
     fun retainsNavigationComposerAndCommandObservations() {
         val state = ChatGptWebObservedState()
         state.accept(ChatGptWebEvent.ConversationList(

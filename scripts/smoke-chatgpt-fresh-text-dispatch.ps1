@@ -87,9 +87,10 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
         if ($NewFirst -and !$script:lastObservedPath) {
             $script:lastObservedPath = Get-ChatGptFreshPendingObservedPath -Web $web -Prompt $prompt -UserMessageId $script:lastUserId
         }
-        $matched = @($messages | Where-Object {
+        $answerCount = @($messages | Where-Object {
             $_.role -eq 'friend' -and (([string]$_.content -replace '\\([_-])', '$1').Contains($marker))
-        }).Count -gt 0
+        }).Count
+        $matched = $answerCount -eq 1
         if ($users.Count -eq 1 -and $matched -and $null -eq $firstReplyMs) {
             $firstReplyMs = [long]([DateTimeOffset]::UtcNow - $started).TotalMilliseconds
         }
@@ -111,6 +112,9 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
             -Receipt $receipt -UseDefault:$UseDefault)
         $continuity = Test-ChatGptFreshSendContinuity -Before $baseline -After $web -Main $main `
             -Prompt $prompt -NewConversation:$NewFirst
+        $report.last_checks = [ordered]@{ native_user_count=$users.Count; native_answer_count=$answerCount;
+            receipt_count=$receipts.Count; fresh_receipt=$freshConfirmed; continuity=$continuity;
+            native_streaming=$main.social_chat.web_chat_streaming; web_streaming=$web.streaming }
         if (($matched -or ($stop -and $stopClicked)) -and $users.Count -eq 1 -and
             $main.social_chat.web_chat_streaming -is [bool] -and !$main.social_chat.web_chat_streaming -and
             $web.streaming -is [bool] -and !$web.streaming -and $continuity -and

@@ -148,8 +148,8 @@ internal class ChatGptBackgroundSession(
         }
     private val sendOwner = ChatGptWebSendOwner(observedMcpState::nextRequestId,
         transport = chatGptOfficialPageSendTransport(
-            pageAdapter = { pageAdapter },
-            snapshot = { latestSnapshot },
+            pageAdapter = { pageAdapter }, snapshot = { latestSnapshot },
+            recordDispatch = observedMcpState::observeSendDispatch,
             ready = { canSend(allowPrivateText = true) && !realtimeVoiceBacking.conversationDeletion.isBusy() },
         ),
         snapshot = { latestSnapshot },

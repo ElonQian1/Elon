@@ -215,6 +215,16 @@ internal class ChatGptWebObservedState(
         return beginCommand(expectedAction, targetConversationPath = null)
     }
 
+    fun observeSendDispatch(requestId: String): Boolean {
+        commandRequests.firstOrNull { it.id == requestId }?.let {
+            return it.expectedAction == "send_prompt" && it.status == CommandRequest.PENDING
+        }
+        val sequence = requestId.removePrefix("mcp_").toLongOrNull(36) ?: return false
+        if (sequence !in 1..nextCommandId || requestId != "mcp_${sequence.toString(36)}") return false
+        beginCommand("send_prompt", targetConversationPath = null, requestId = requestId)
+        return true
+    }
+
     fun beginOpenConversationCommand(path: String): CommandRequest {
         val normalized = requireNotNull(ChatGptWebConversationPath.normalize(path)) {
             "Invalid ChatGPT conversation path"
@@ -237,12 +247,13 @@ internal class ChatGptWebObservedState(
         expectedAction: String,
         targetConversationPath: String?,
         startedAt: Long = nowMs(),
+        requestId: String = nextRequestId(),
     ): CommandRequest {
         if (expectedAction == ChatGptWebCanvasContent.ACTION) canvasContent = null
         if (expectedAction == ChatGptWebCanvasDocumentProtocol.ACTION) canvasDocuments = null
         if (expectedAction == ChatGptWebWritingBlockProtocol.ACTION) writingBlock = null
         val request = CommandRequest(
-            id = nextRequestId(),
+            id = requestId,
             expectedAction = expectedAction,
             status = CommandRequest.PENDING,
             startedAtMs = startedAt,

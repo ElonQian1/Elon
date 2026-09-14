@@ -36,11 +36,13 @@ internal fun chatGptOfficialPageSendTransport(
     pageAdapter: () -> ChatGptOfficialPageSendCommandPort?,
     snapshot: () -> ChatGptWebSnapshot?,
     ready: () -> Boolean,
+    recordDispatch: (String) -> Boolean = { true },
 ): WebChatSendTransport = OfficialPageWebChatSendTransport(
     ready = ready,
     sendPrompt = send@ { prompt, requestId, privateTextTransactionAllowed ->
         val adapter = pageAdapter() ?: return@send false
         val current = snapshot() ?: return@send false
+        if (!recordDispatch(requestId)) return@send false
         adapter.sendPrompt(
             prompt,
             current.draft,
