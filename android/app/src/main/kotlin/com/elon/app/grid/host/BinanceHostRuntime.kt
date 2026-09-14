@@ -18,6 +18,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     val events=BinanceHostEvents(handler,::membershipChanged)
     val pendingReferenceReads=linkedMapOf<String,()->Unit>()
     val state = BinanceHostState(SystemClock::elapsedRealtime, System::currentTimeMillis)
+    val wallet by lazy { com.elon.app.grid.wallet.BinanceWalletRuntime(context,this) }
     val reports = BinanceGridReports(SystemClock::elapsedRealtime, System::currentTimeMillis)
     val document = WebBridgeDocumentSession()
     val diagnostics = BinanceHostDiagnostics()
@@ -31,7 +32,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     var onCreateObservation: ((String) -> Unit)? = null
     private var captured: EskPlatformSession? = null
     private val consent = BinanceHostConsent(context)
-    private val sessions = EskPlatformSessionStore(context) { handler.post { consent.clear(); invalidate("主账号已变化，请重新连接") } }
+    private val sessions = EskPlatformSessionStore(context) { handler.post { consent.clear(); wallet.disconnect(); invalidate("主账号已变化，请重新连接") } }
     private val preferences = context.getSharedPreferences("binance_host_owner_v1", Context.MODE_PRIVATE)
     private var deadline = 0L
     private var resumeToken: String? = null
@@ -96,7 +97,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
             }
         }
     }
-    private fun owner() = captured?.userId?.let(BinanceHostState::digest)
+    fun owner() = captured?.userId?.let(BinanceHostState::digest)
     fun readConsentCurrent() = live() && state.fresh() && consent.permits(owner(),state.account,state.accountKind)
     fun grant(continuous: Boolean = false): String {
         require(live())
@@ -136,6 +137,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     }
     fun pageStarted(url: String) {
         document.beginPage()
+        wallet.clearSession()
         readRecovery.pageStarted()
         state.unavailable()
         reports.clear()
@@ -151,7 +153,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         val token = document.ensurePage().documentToken
         view?.evaluateJavascript("window.__elonBinanceReadV1?.bind(${StrictJson.encode(token)})") { value ->
             if (value == "true" && live() && document.snapshot().documentToken == token) {
-                adapterBound = true; inspectPage(); recoverConnection(); notifyChanged()
+                adapterBound = true; inspectPage(); recoverConnection(); wallet.documentReady(); notifyChanged()
             }
         }
     }
@@ -163,6 +165,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     fun observed(raw: String) {
         if (!live()) return invalidate("登录或授权已失效")
         val event = runCatching { StrictJson.parse(raw) }.getOrNull() ?: return fail("响应格式暂不支持")
+        if(event["schema"]==com.elon.app.grid.wallet.BinanceWalletState.OBSERVATION){wallet.observed(event);return}
         if (event["schema"] == "yilong.binance_report_observation.v1") {
             if (document.accept(event["token"] as? String ?: "") != null) {
                 runCatching { reports.accept(event) }.onFailure { reports.fail(event["request"] as? String ?: "") }; events.changed("reports")
@@ -174,6 +177,10 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
             return
         }
         if (event["schema"] != "yilong.binance_observation.v1" || document.accept(event["token"] as? String ?: "") == null) return
+        if(event["kind"]=="identity")runCatching {
+            wallet.observeAccount(event["account"] as String,event["account_kind"] as String)
+            wallet.contextObserved()
+        }.onFailure {wallet.clearSession()}
         val previousAccount = state.account
         runCatching { state.accept(raw) }.onFailure { fail("未取得可验证的本人网格响应，请在官网打开网格列表") }
             .onSuccess {
@@ -223,9 +230,10 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         readContinuous(token)
         return reports.reply(request, state.account, state.accountKind)
     }
-    fun fail(message: String) { state.unavailable(); status = message; notifyChanged() }
+    fun fail(message: String) { state.unavailable(); wallet.clearSession(); status = message; notifyChanged() }
     fun invalidate(message: String) {
         captured = null; state.unavailable(); reports.clear(); handler.removeCallbacks(expiry)
+        wallet.clearSession()
         handler.removeCallbacks(freshnessExpiry); pendingReferenceReads.clear()
         readRecovery.reset(); lastResumeRefresh = 0L
         diagnostics.clear()

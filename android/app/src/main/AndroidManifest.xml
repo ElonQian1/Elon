@@ -90,6 +90,8 @@
         <provider android:name=".exchange.okx.OkxReadProvider"
             android:authorities="${applicationId}.okx-read-host"
             android:exported="true" android:grantUriPermissions="false" />
+        <activity android:name=".grid.wallet.BinanceWalletConsentActivity"
+            android:exported="true" android:excludeFromRecents="true" />
         <provider android:name=".grid.host.BinanceHostProvider"
             android:authorities="${applicationId}.binance-host"
             android:exported="true" android:grantUriPermissions="false" />

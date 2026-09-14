@@ -10,6 +10,7 @@
   let token = '', sequence = 0, latestList = 0, listFloor = 0, listEpoch = 0, current = null;
   let identitySequence = 0, latestIdentity = 0, account = null;
   let detailHeaders = null;
+  let identityHeaders = null;
   let listContext = null, refreshing = false;
   const known = new Set();
   const details = new Map();
@@ -22,6 +23,13 @@
     emit: event => { if (token) window.ElonBinanceRead?.postMessage(JSON.stringify({...event, token})); }
   });
   delete window.__elonBinanceReportsFactoryV1;
+  const wallet = window.__elonBinanceWalletFactoryV1?.({
+    fetch:(url,init)=>originalFetch.call(window,url,init),
+    context:()=>{const headers=identityHeaders||detailHeaders;return headers?{headers}:null;},
+    prove:headers=>proveIdentity(headers),
+    emit:event=>{if(token)window.ElonBinanceRead?.postMessage(JSON.stringify({...event,token}));}
+  });
+  delete window.__elonBinanceWalletFactoryV1;
   const diagnostic = window.__elonBinanceDiagnosticsV1;
   function scalar(value, pattern) {
     const text = typeof value === 'string' ? value : Number.isSafeInteger(value) ? String(value) : '';
@@ -167,7 +175,7 @@
     diagnostic?.response(t.kind, status);
     if (!relevant(t)) return;
       const data = body(status, text);
-      if (t.kind === 'identity') { applyIdentity(t.seq, data); return; }
+      if (t.kind === 'identity') { identityHeaders=t.headers;applyIdentity(t.seq, data);return; }
       if (t.kind === 'list') {
         if (!Array.isArray(data) || data.length > 500) throw new Error('list_invalid');
         const rows = data.map(row);
@@ -234,9 +242,11 @@
     } catch (_) { /* Unknown encoding cannot be replayed. */ }
   }
   window.__elonBinanceReadV1 = Object.freeze({
+    wallet(query) { return !!token && wallet?.query(query) === true; },
     report(query) { return !!token && reports?.query(query) === true; },
     bind(value) {
       if (!/^doc_[a-z0-9_]{3,80}$/.test(value)) return;
+      if(token && token!==value)wallet?.reset();
       token = value;
       if (current) { const pending = current; current = null; emit(pending); }
       return true;

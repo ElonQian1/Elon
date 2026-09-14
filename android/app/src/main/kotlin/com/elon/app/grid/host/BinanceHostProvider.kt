@@ -15,6 +15,9 @@ class BinanceHostProvider : ContentProvider() {
         val uid=android.os.Binder.getCallingUid()
         return runCatching {
             require(arg == null && extras != null)
+            if(method in com.elon.app.grid.wallet.BinanceWalletCommands.methods)return@runCatching BinanceHostRuntime.onMain(owner) {
+                com.elon.app.grid.wallet.BinanceWalletCommands.dispatch(it,method,extras)
+            }
             if(method in BinanceHostEvents.methods)return@runCatching BinanceHostRuntime.onMain(owner) {
                 it.events.call(method,uid,extras)
             }

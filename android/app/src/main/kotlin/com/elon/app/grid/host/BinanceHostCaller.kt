@@ -22,7 +22,11 @@ internal object BinanceHostCaller {
         require(activity.packageName == "com.elon.app" && activity.callingPackage == OfficialQuantApkPolicy.PACKAGE_NAME)
         val nativeLogin = activity is BinanceHostConnectActivity && caller.className in setOf(
             "com.elon.quant.grids.create.NativeGridCreateActivity", "com.elon.quant.grids.manage.NativeGridManageActivity")
-        require(caller.packageName == activity.callingPackage && (caller.className == ACTIVITY || nativeLogin))
+        val walletConsent=activity is com.elon.app.grid.wallet.BinanceWalletConsentActivity&&
+            caller.className=="com.elon.quant.wallet.HostedWalletActivity"
+        val correctEntry=if(activity is com.elon.app.grid.wallet.BinanceWalletConsentActivity)walletConsent
+            else caller.className == ACTIVITY || nativeLogin
+        require(caller.packageName == activity.callingPackage && correctEntry)
         val info = activity.packageManager.getApplicationInfo(caller.packageName, 0)
         trusted(activity, info.uid)
     }.getOrDefault(false)

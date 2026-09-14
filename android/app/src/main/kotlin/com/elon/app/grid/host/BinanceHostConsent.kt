@@ -4,17 +4,19 @@ import android.content.Context
 import com.elon.app.privateaccess.StrictJson
 
 /** Remembered permission, not a credential or a cached identity proof. */
-internal class BinanceHostConsent(context: Context) {
-    private val file = android.util.AtomicFile(java.io.File(context.noBackupFilesDir, "binance-read-consent-v2.json"))
+internal class BinanceHostConsent(context: Context, private val purpose:String="grid.read") {
+    init { require(purpose in setOf("grid.read","wallet_summary_read")) }
+    private val file = android.util.AtomicFile(java.io.File(context.noBackupFilesDir,
+        if(purpose=="grid.read")"binance-read-consent-v2.json" else "binance-wallet-consent-v1.json"))
     private fun read(): String? = runCatching {
         require(file.baseFile.length() in 1..2048)
         file.openRead().use { String(it.readBytes(), Charsets.UTF_8) }
     }.getOrNull()
     fun recorded() = read() != null
     fun permits(owner: String?, account: String?, kind: String): Boolean =
-        matches(read(), owner, account, kind)
+        matches(read(), owner, account, kind,purpose)
     fun approve(owner: String, account: String, kind: String) {
-        val raw = encode(owner, account, kind)
+        val raw = encode(owner, account, kind,purpose)
         val output = file.startWrite()
         try { output.write(raw.toByteArray(Charsets.UTF_8)); file.finishWrite(output) }
         catch (error: Exception) { file.failWrite(output); throw error }
@@ -22,14 +24,15 @@ internal class BinanceHostConsent(context: Context) {
     fun clear() { file.delete(); check(!file.baseFile.exists()) }
 
     companion object {
-        fun encode(owner: String, account: String, kind: String): String {
+        fun encode(owner: String, account: String, kind: String,purpose:String="grid.read"): String {
+            require(purpose in setOf("grid.read","wallet_summary_read"))
             require(listOf(owner, account).all { Regex("[0-9a-f]{64}").matches(it) })
             require(kind in setOf("primary", "sub", "unknown"))
             return StrictJson.encode(mapOf("schema" to "binance.read.consent.v2", "owner" to owner,
-                "account" to account, "kind" to kind, "consumer" to "com.elon.quant", "purpose" to "grid.read"))
+                "account" to account, "kind" to kind, "consumer" to "com.elon.quant", "purpose" to purpose))
         }
-        fun matches(raw: String?, owner: String?, account: String?, kind: String): Boolean =
+        fun matches(raw: String?, owner: String?, account: String?, kind: String,purpose:String="grid.read"): Boolean =
             if (raw == null || owner == null || account == null) false
-            else runCatching { raw == encode(owner, account, kind) }.getOrDefault(false)
+            else runCatching { raw == encode(owner, account, kind,purpose) }.getOrDefault(false)
     }
 }
