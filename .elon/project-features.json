@@ -17145,6 +17145,235 @@
       "updated_at_ms": 1786638099721
     },
     {
+      "id": "group-message-revisions-v1",
+      "title": "群聊文字编辑与完整修改记录",
+      "summary": "APK、Windows、网页支持本人编辑群聊文字、公开修改标记与追加式版本历史，保护草稿和并发保存。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/group-message-revisions.md",
+        "content_hash": "5ae8975093645f54f103c0bfc736a91724356990817d673e4613014dafeeba23",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "52f488c0ac49aba9b81ef3605157fe677c99e0f8",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "bf25b71ad76208302445e93d707c771acf3e41b8",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "",
+      "tags": [],
+      "task_paths": [],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "三端编辑入口与完整历史，保持原发送时间和附件",
+        "作者和群成员权限、撤回、跨群访问、并发冲突和事务回滚验证",
+        "后端、PC、APK构建通过并发布，分别报告设备验收"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/GroupMessageRevisionController.kt",
+          "content_hash": "2ed155dc9a5d767cc9a57287681b889f1244d7b0fe7fdb8b62bafe3dd6df7a22",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "ef330aba51f7ed7520630654799b8349f08026a2",
+            "worktree_blob_oid": "ef330aba51f7ed7520630654799b8349f08026a2",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/MainGroupChatActions.kt",
+          "content_hash": "4686d6a10e3e6c6c7add7eb7d4f7f5f1db728b9dd78ba05424165c6480001b21",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "e3e5aba8b8c2e7ff11346073211aaa2411504d46",
+            "worktree_blob_oid": "e3e5aba8b8c2e7ff11346073211aaa2411504d46",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/GroupMessageRevisionTest.kt",
+          "content_hash": "c4bd80f6c416c6b0be7ad68efa0ae1d16b7ca505d2e00362cca970555f4beef8",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "0c36d07e4a461d4f38c1dc682289e42b6b15407b",
+            "worktree_blob_oid": "0c36d07e4a461d4f38c1dc682289e42b6b15407b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/reports/group-message-revisions-validation.md",
+          "content_hash": "7f87288f8ab97bdd630e7572f75c6310f3796cd1e88760656d7b6d5fa0ccb946",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "4b41af68f9179950ea7fc89553612218155942c2",
+            "worktree_blob_oid": "5e48e66d3d951317a9e7e40e1d8829e2a31e12b2",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/GroupMessageRevisionActions.tsx",
+          "content_hash": "e4a1ef0ecfba98c7a34e2f7edc75f67cb119168a8bd0b5721ce0c4d3d8753e08",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "a51fc9c1ae9bfe2bbdbf7573f81cce0ddc55dee6",
+            "worktree_blob_oid": "a51fc9c1ae9bfe2bbdbf7573f81cce0ddc55dee6",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/useGroupMessageRefresh.ts",
+          "content_hash": "f38b85f3a5012193b04c8f45e29e56fdab7f5d02af216b62be4a3b0b369d9720",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "ca5259f4ef3b1051e05d00b10132b9c241779787",
+            "worktree_blob_oid": "ca5259f4ef3b1051e05d00b10132b9c241779787",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-group-message-revisions-ui.cjs",
+          "content_hash": "cfcdcca9dde05caea358fe3efefd55c8badeb3d21579c76e6c728fedcfaefed7",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "023da11c2f63a2f8e9be388889e39c62b56ab8f9",
+            "worktree_blob_oid": "359868b879e79b82afead31629cc60f55cdda65c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-group-message-revisions.cjs",
+          "content_hash": "f760dc5ab8e68af7ef0154d47fdab97a12e0a9928d205060640a07a669b5f99a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "fda7b1649dcbbfabffff1464612519382f5f7b9e",
+            "worktree_blob_oid": "fda7b1649dcbbfabffff1464612519382f5f7b9e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/assets/group_message_revisions.js",
+          "content_hash": "6bc89b125b9333985399d96d5f1348e4e8285ae75ca743b84e44e37e00c87353",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "412bef05359eb35e99d12c4064fd31c8afd3af9c",
+            "worktree_blob_oid": "412bef05359eb35e99d12c4064fd31c8afd3af9c",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/assets/web_page.html",
+          "content_hash": "ec5e288e6117dffc1a8e56fbf823921c442ec14878318d0795435feb4618fbf0",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "bf0dc9934a43c6c22d256d4761b927f7c377d63d",
+            "worktree_blob_oid": "bf0dc9934a43c6c22d256d4761b927f7c377d63d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/friend_api/message_revisions.rs",
+          "content_hash": "35cf5ec9f927d8d704334142829d706806296e94498c32e0640c9c18c04c3106",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "bb6ebbe9c35c5a234f76332facb250400ef4e046",
+            "worktree_blob_oid": "bb6ebbe9c35c5a234f76332facb250400ef4e046",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/group_message_revisions.rs",
+          "content_hash": "37557e3a1ac6c68550856c83ca3d8714e0bd3acc2154f67f119656524ab459ba",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "07aba7fa3123ed178530ad26566a783a5939948d",
+            "worktree_blob_oid": "07aba7fa3123ed178530ad26566a783a5939948d",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/group_message_revisions/tests.rs",
+          "content_hash": "b5d1eda81fd3cd522b6d5e2a2d4ffeff9660bcdb2a0d67c7ea11bffe4023a22b",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "ea49d86c8b603990ea096da40c11c7956df1ae66",
+            "worktree_blob_oid": "ea49d86c8b603990ea096da40c11c7956df1ae66",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store/groups.rs",
+          "content_hash": "40de6d1e50e0cea8f4e4ca387dfeeb6ad812cbf12a17ef096ea6c030365ea184",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "95dc5d261ec6d74ebd05e9bc836c0c0fb20b6933",
+            "worktree_blob_oid": "95dc5d261ec6d74ebd05e9bc836c0c0fb20b6933",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/store_migrations/group_message_revisions.rs",
+          "content_hash": "3e9c0849c0150e7e422d1f36342fc6c725e76688b5af3ed1bee3c55f68e58399",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "11954d0227ddc87ea7e4e9bd2a5571313479d107",
+            "head_blob_oid": "6ce32b58bc132d0817fc0706e6b228daca410c38",
+            "worktree_blob_oid": "6ce32b58bc132d0817fc0706e6b228daca410c38",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1789411581680,
+      "updated_at_ms": 1789414108498
+    },
+    {
       "id": "merchant-erp-open-commerce-runtime-bridge-v1",
       "title": "通用 ERP 开放商业商户运行时桥 V1",
       "summary": "把通用 ERP 能力编译为签名商户运行时绑定，以能力合同统一动作确认、平台幂等键和标准订单业务回执。",
@@ -28507,66 +28736,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_003ca2167c7844a39bb7d44fc666349a",
-      "feature_id": "binance-grid-symbol-picker-v1",
-      "action": "claimed",
-      "actor": "codex-grid-picker",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788954667032
-    },
-    {
-      "id": "feature_event_951349c724a34484bf7387ea7ba71966",
-      "feature_id": "binance-grid-symbol-picker-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-picker",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788955074134
-    },
-    {
-      "id": "feature_event_4a39f0c18edd4aa18c0236cfeb611a4e",
-      "feature_id": "binance-grid-symbol-picker-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-picker",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788956127441
-    },
-    {
-      "id": "feature_event_30631245807d4dac9b6d5d4f8caf7d29",
-      "feature_id": "binance-grid-symbol-picker-v1",
-      "action": "transitioned",
-      "actor": "codex-grid-picker",
-      "reason": "Native picker, source-driven category and ticker model integrated; final 24 Release tests and compile passed; live data and visual acceptance remain separate.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1788956127643
-    },
-    {
-      "id": "feature_event_a16579ad51754102b4f18dba88f3731e",
-      "feature_id": "binance-grid-symbol-picker-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid-picker",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1788957062311
-    },
-    {
-      "id": "feature_event_fabb0e9f46fa4b1d9cdb5590c52f1746",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "registered",
-      "actor": "codex-ui-boundary",
-      "reason": "",
-      "from_status": "",
-      "to_status": "accepted",
-      "at_ms": 1788957938152
-    },
-    {
       "id": "feature_event_653dcb151a07445a84413e55510ad2d6",
       "feature_id": "android-exchange-session-host-v2",
       "action": "transitioned",
@@ -30505,6 +30674,66 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789399764314
+    },
+    {
+      "id": "feature_event_7ae8f37cf5bd43bf90b966959a3a6fd9",
+      "feature_id": "group-message-revisions-v1",
+      "action": "registered",
+      "actor": "codex-group-message-revisions",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789411581680
+    },
+    {
+      "id": "feature_event_46e362aa79d64d93a3017701cb2ecccf",
+      "feature_id": "group-message-revisions-v1",
+      "action": "claimed",
+      "actor": "codex-group-message-revisions",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789411609505
+    },
+    {
+      "id": "feature_event_f0048b249d4b4fe08a9281fc34376928",
+      "feature_id": "group-message-revisions-v1",
+      "action": "transitioned",
+      "actor": "codex-group-message-revisions",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789412271854
+    },
+    {
+      "id": "feature_event_fc15cd3dec7446f883c2bee7ddd83feb",
+      "feature_id": "group-message-revisions-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-group-message-revisions",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789414092784
+    },
+    {
+      "id": "feature_event_da6178b7aa1a4ec5840e0a7527af2689",
+      "feature_id": "group-message-revisions-v1",
+      "action": "transitioned",
+      "actor": "codex-group-message-revisions",
+      "reason": "三端实现、完整修订测试、并发权限测试、PC/PWA交互和合并后APK与服务端编译检查通过；设备视觉验收单独延期。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789414108381
+    },
+    {
+      "id": "feature_event_3d32da6fe0f7425a86a81258997273a3",
+      "feature_id": "group-message-revisions-v1",
+      "action": "transitioned",
+      "actor": "codex-group-message-revisions",
+      "reason": "三端实现、完整修订测试、并发权限测试、PC/PWA交互和合并后APK与服务端编译检查通过；设备视觉验收单独延期。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1789414108498
     }
   ]
 }

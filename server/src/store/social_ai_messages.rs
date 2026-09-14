@@ -231,6 +231,8 @@ impl Store {
             outgoing: false,
             recalled_at: None,
             recalled_by: None,
+            revision: 1,
+            edited_at: None,
         })
     }
 }

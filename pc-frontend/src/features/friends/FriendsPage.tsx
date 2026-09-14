@@ -11,6 +11,8 @@ import styles from './FriendsPage.module.css'
 import SocialAvatar from './SocialAvatar'
 import SocialMessageAttachments from './SocialMessageAttachments'
 import type { SocialMessage } from './socialMessageTypes'
+import GroupMessageRevisionActions from './GroupMessageRevisionActions'
+import useGroupMessageRefresh from './useGroupMessageRefresh'
 
 interface Friend {
   id: string
@@ -116,6 +118,10 @@ export default function FriendsPage() {
 
   const feedRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const conversationKey = `${activeConversation?.kind}:${activeConversation?.id}`
+  const currentConversation = useRef(conversationKey)
+  currentConversation.current = conversationKey
+  const revisionNotice = useGroupMessageRefresh(activeConversation?.kind === 'group' ? activeConversation.id : null, messages, setMessages)
 
   useEffect(() => { loadSocialConversations() }, [me?.id])
 
@@ -141,7 +147,7 @@ export default function FriendsPage() {
 
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
-  }, [messages])
+  }, [messages[messages.length - 1]?.id])
 
   useEffect(() => {
     writeLocalPreference(DISPLAY_MODE_STORAGE_KEY, displayMode)
@@ -202,6 +208,8 @@ export default function FriendsPage() {
   }
 
   async function selectConversation(item: ConversationItem) {
+    const selectedKey = `${item.kind}:${item.id}`
+    currentConversation.current = selectedKey
     setActiveConversation({ kind: item.kind, id: item.id })
     setMessages([])
     setMessagesLoading(true)
@@ -211,10 +219,11 @@ export default function FriendsPage() {
         ? `/api/me/friends/${encodeURIComponent(item.id)}/messages?limit=80`
         : `/api/me/groups/${encodeURIComponent(item.id)}/messages?limit=120`
       const data = await api.get<{ messages?: SocialMessage[] }>(endpoint)
+      if (currentConversation.current !== selectedKey) return
       setMessages(data.messages ?? [])
       void loadSocialConversations()
     } catch { /* ignore */ }
-    finally { setMessagesLoading(false) }
+    finally { if (currentConversation.current === selectedKey) setMessagesLoading(false) }
   }
 
   function activeTitle() {
@@ -558,6 +567,7 @@ export default function FriendsPage() {
                     ? <div id={copySourceId} className={styles.msgContent}><MarkdownContent content={content} copy={false} /></div>
                     : <div id={copySourceId} className={styles.msgContent}>{content}</div>)}
                   {!recalled && <SocialMessageAttachments attachments={m.attachments} />}
+                  {activeConversation?.kind === 'group' && <GroupMessageRevisionActions key={`${activeConversation.id}:${m.id}`} groupId={activeConversation.id} message={m} own={isMe} onSaved={edited => { if (currentConversation.current === conversationKey) setMessages(previous => previous.map(row => row.id === edited.id ? { ...row, ...edited } : row)) }} />}
                   {content && (
                   <MessageActions
                     content={content}
@@ -590,6 +600,7 @@ export default function FriendsPage() {
             </button>
           </form>
         )}
+        {revisionNotice && <p className={styles.hint} role="status">{revisionNotice}</p>}
         {error && <p className={styles.sendError}>{error}</p>}
       </div>
     </div>

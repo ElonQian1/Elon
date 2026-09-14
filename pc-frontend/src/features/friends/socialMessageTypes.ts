@@ -22,4 +22,6 @@ export interface SocialMessage {
   recalled_by?: string | null
   recalledAt?: string | null
   recalledBy?: string | null
+  revision?: number
+  edited_at?: string | null
 }

@@ -54,6 +54,8 @@ pub struct GroupMessagePush {
     pub created_at: String,
     #[serde(skip_serializing)]
     pub recipient_user_ids: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revision: Option<i64>,
 }
 
 impl FriendMessagePush {
@@ -125,6 +127,25 @@ pub fn publish_group_message(message: &FriendGroupMessage, recipient_user_ids: V
         sender_name: Some(message.sender_name.clone()),
         created_at: message.created_at.clone(),
         recipient_user_ids,
+        revision: Some(message.revision),
     };
     let _ = GROUP_EVENT_TX.send(event);
+}
+
+pub(crate) fn publish_group_message_edit(
+    edit: &crate::store::groups::revisions::MessageEdit,
+    actor: &str,
+    recipient_user_ids: Vec<String>,
+) {
+    let _ = GROUP_EVENT_TX.send(GroupMessagePush {
+        event_type: "group_message_edited",
+        group_id: edit.group_id.clone(),
+        from_user_id: actor.into(),
+        message_id: edit.id.clone(),
+        content: edit.content.clone(),
+        sender_name: None,
+        created_at: edit.edited_at.clone().unwrap_or_default(),
+        recipient_user_ids,
+        revision: Some(edit.revision),
+    });
 }

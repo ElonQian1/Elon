@@ -34,7 +34,8 @@ internal class MainActionPopups(
     private val requestAiReply: (ChatMessage) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?,
-    private val showStoreDialog: () -> Unit
+    private val showStoreDialog: () -> Unit,
+    private val groupRevisionActions: (ChatMessage) -> List<TopAction> = { emptyList() }
 ) {
     fun showHomeActionPopup(anchor: View, tab: TextView) {
         val actions = if (tab == binding.tabProject) {
@@ -89,6 +90,7 @@ internal class MainActionPopups(
     fun showMessageActionPopup(anchor: View, message: ChatMessage, text: String) {
         val hasText = text.isNotBlank()
         val actions = mutableListOf<TopAction>()
+        actions.addAll(groupRevisionActions(message))
         if (hasText) {
             actions.add(TopAction("复制", R.drawable.ic_msg_copy) { shareActions().copyMessageText(text) })
             actions.add(TopAction("转发", R.drawable.ic_msg_forward) { shareActions().forwardMessageText(text) })

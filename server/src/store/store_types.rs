@@ -194,6 +194,8 @@ pub struct FriendGroupMessage {
     pub outgoing: bool,
     pub recalled_at: Option<String>,
     pub recalled_by: Option<String>,
+    pub revision: i64,
+    pub edited_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -1331,7 +1331,7 @@ class MainActivity : AppCompatActivity() {
             showGitProjectDialog = ::showGitProjectDialog,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() }, showCreateGroupDialog = { groupActions.showCreateGroupDialog() }, showAddFriendDialog = { friendActions.showAddFriendDialog() },
             openSettings = { quickCommandActions.openSettings() },
-            canRecallMessage = { message -> canRecallPopupMessage(message, friendChatActions, groupChatActions, projectSpaceController, messageActions) },
+            canRecallMessage = { message -> canRecallPopupMessage(message, friendChatActions, groupChatActions, projectSpaceController, messageActions) }, groupRevisionActions = { groupChatActions.revisionActions(it) },
             recallMessage = { message -> recallPopupMessage(message, friendChatActions, groupChatActions, projectSpaceController, messageActions) },
             deleteMessage = { message -> deletePopupMessage(message, friendChatActions, groupChatActions, projectSpaceController, messageActions) },
             startMultiSelect = { message -> messageSelectionActions.startSelection(message) },

@@ -43,6 +43,7 @@ mod compute_external_pool_adapter_upstream_transport_target;
 mod compute_external_pool_adapter_vulnerability_reattestation;
 mod compute_external_pool_provider_activation_candidate;
 mod compute_platform_reference_price_curve;
+mod group_message_revisions;
 #[cfg(test)]
 mod migration_tests;
 mod migrations_v17_v34;
@@ -395,6 +396,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (292, "第一方游戏账号授权与动作观测", crate::esk_asset::platform::game_access::migration::migration_v292),
     (293, "游戏收益证明与已备付奖励预算", crate::esk_asset::platform::game_rewards::migration::migration_v293),
     (294, "群聊 AI 回复持久化请求归属", crate::store::social_ai_messages::requests::migrate),
+    (295, "群聊消息追加式修订历史", group_message_revisions::migrate),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

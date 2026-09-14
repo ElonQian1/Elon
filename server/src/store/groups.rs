@@ -9,6 +9,8 @@ use super::message_recall::{ensure_message_recall_allowed, recalled_content};
 use super::{new_id, now, FriendGroupMemberPreview, FriendGroupMessage, FriendGroupProfile, Store};
 
 mod members;
+#[path = "group_message_revisions.rs"]
+pub(crate) mod revisions;
 
 impl Store {
     pub fn list_friend_groups(&self, user_id: &str) -> Result<Vec<FriendGroupProfile>> {
@@ -207,18 +209,18 @@ impl Store {
         let sql = if after.is_some() {
             "SELECT m.id, m.group_id, m.sender_user_id,
                     COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                    m.content, m.attachments_json, m.created_at, m.recalled_at, m.recalled_by
+                    m.content, m.attachments_json, m.created_at, m.recalled_at, m.recalled_by, m.revision, m.edited_at
              FROM friend_group_messages m
              JOIN users u ON u.id = m.sender_user_id
              WHERE m.group_id = ?1 AND m.created_at > ?2
              ORDER BY m.created_at ASC
              LIMIT ?3"
         } else {
-            "SELECT id, group_id, sender_user_id, sender_name, content, attachments_json, created_at, recalled_at, recalled_by
+            "SELECT id, group_id, sender_user_id, sender_name, content, attachments_json, created_at, recalled_at, recalled_by, revision, edited_at
              FROM (
                  SELECT m.id, m.group_id, m.sender_user_id,
                         COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                        m.content, m.attachments_json, m.created_at, m.recalled_at, m.recalled_by
+                        m.content, m.attachments_json, m.created_at, m.recalled_at, m.recalled_by, m.revision, m.edited_at
                  FROM friend_group_messages m
                  JOIN users u ON u.id = m.sender_user_id
                  WHERE m.group_id = ?1
@@ -297,6 +299,8 @@ impl Store {
             outgoing: true,
             recalled_at: None,
             recalled_by: None,
+            revision: 1,
+            edited_at: None,
         })
     }
 
@@ -582,6 +586,8 @@ fn row_to_group_message(
         outgoing: sender_user_id == user_id,
         recalled_at,
         recalled_by,
+        revision: row.get(9)?,
+        edited_at: row.get(10)?,
         sender_user_id,
     })
 }

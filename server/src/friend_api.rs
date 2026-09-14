@@ -9,6 +9,8 @@
 //!   POST /api/me/friends/:friend_id/messages     → 发送消息给好友
 //!   DELETE /api/me/project-share-messages/:project_id → 撤回自己发出的项目卡片
 
+pub(crate) mod message_revisions;
+
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},

@@ -38,6 +38,25 @@ internal class MainGroupChatActions(
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
     private val mentions by lazy { GroupMentionController(activity, binding.inputEdit, http, serverUrl, userId) { inputFocusActions().focusInputComposer() } }
+    private val revisions by lazy { GroupMessageRevisionController(activity, http, serverUrl, { activeGroup?.id == it }, ::applyRevision) }
+
+    fun revisionActions(message: ChatMessage): List<TopAction> {
+        val group = activeGroup ?: return emptyList()
+        if (messagesByGroup[group.id]?.none { it.id == message.id } != false) return emptyList()
+        return revisions.actions(group.id, message)
+    }
+
+    private fun applyRevision(groupId: String, edited: JSONObject) {
+        val messages = messagesByGroup[groupId] ?: return
+        val index = messages.indexOfFirst { it.id == edited.optString("id") }
+        if (index < 0) return
+        val message = messages[index]
+        if (!message.recalledAt.isNullOrBlank() || message.revision > edited.optLong("revision", 1)) return
+        message.content = edited.optString("content")
+        message.revision = edited.optLong("revision", 1)
+        message.editedAt = edited.optString("edited_at").takeIf { it != "null" && it.isNotBlank() }
+        if (activeGroup?.id == groupId) activeAdapter?.notifyMessageUpdated(index)
+    }
     private val summaryPosts by lazy {
         MainGroupSummaryPosts(
             activity = activity,
@@ -57,6 +76,7 @@ internal class MainGroupChatActions(
     }
 
     fun openGroup(group: AppGroup, animate: Boolean) {
+        revisions.close()
         activeGroup = group
         mentions.setGroup(group)
         val messages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
@@ -68,6 +88,7 @@ internal class MainGroupChatActions(
         )
         activeAdapter = adapter
         adapter.onSenderAvatarLongPress = mentions::mentionSender
+        adapter.onMessageHistory = { revisions.history(group.id, it) }
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter
         if (messages.isNotEmpty()) {
@@ -80,6 +101,7 @@ internal class MainGroupChatActions(
     }
 
     fun closeGroupChat() {
+        revisions.close()
         activeGroup = null
         mentions.setGroup(null)
         activeAdapter = null
@@ -318,11 +340,12 @@ internal class MainGroupChatActions(
             activity.runOnUiThread {
                 if (activeGroup?.id != group.id) return@runOnUiThread
                 result.onSuccess { remoteMessages ->
-                    val mergedMessages = remoteMessages.withMissingImageAnnotationsFromCurrent(currentMessages)
+                    val mergedMessages = mergeGroupMessageRevisions(currentMessages, remoteMessages.withMissingImageAnnotationsFromCurrent(currentMessages))
                     val changed = currentMessages.size != mergedMessages.size ||
                         currentMessages.zip(mergedMessages).any { (current, incoming) ->
                             current.role != incoming.role ||
                             current.content != incoming.content ||
+                                current.revision != incoming.revision ||
                                 current.senderLabel != incoming.senderLabel ||
                                 current.senderAvatarDataUrl != incoming.senderAvatarDataUrl ||
                                 current.attachments != incoming.attachments ||
@@ -331,6 +354,7 @@ internal class MainGroupChatActions(
                     }
                     currentMessages.clear()
                     currentMessages.addAll(mergedMessages)
+                    revisions.onMessagesChanged(mergedMessages)
                     if (scrollToBottom && currentMessages.isNotEmpty()) {
                         binding.chatList.jumpToLatestMessageBeforeNextDraw()
                     }
@@ -462,6 +486,8 @@ internal class MainGroupChatActions(
             senderUserId = senderUserId,
             createdAtMs = parseChatMessageCreatedAt(json.optString("created_at", "")) ?: 0L,
             recalledAt = json.cleanRecallString("recalled_at"),
+            revision = json.optLong("revision", 1).coerceAtLeast(1),
+            editedAt = json.cleanRecallString("edited_at"),
             recalledBy = json.cleanRecallString("recalled_by")
         )
     }

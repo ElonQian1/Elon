@@ -1,0 +1,22 @@
+.group-revision-actions { display:flex; gap:12px; margin-top:6px; }
+.group-revision-actions button { min-height:48px; font:inherit; font-size:12px; padding:6px 0; background:none; border:0; color:inherit; text-decoration:underline; cursor:pointer; }
+.group-revision-dialog { width:min(600px, calc(100vw - 32px)); max-height:85dvh; padding:0; border:1px solid var(--line, rgba(108,120,132,.32)); border-radius:16px; background:var(--popup-panel-bg, #171c22); color:var(--ink, #f0f0ee); box-shadow:0 24px 80px #0008; color-scheme:dark; }
+.group-revision-dialog::backdrop { background:#0009; }
+.group-revision-dialog header,.group-revision-dialog footer { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 20px; }
+.group-revision-dialog footer { justify-content:flex-end; border-top:1px solid var(--line, rgba(108,120,132,.32)); }
+.group-revision-dialog h2 { font-size:18px; margin:0; }
+.group-revision-dialog h3 { font-size:15px; margin:0 0 4px; }
+.group-revision-dialog button { border:1px solid var(--metal-edge, rgba(123,135,147,.40)); border-radius:8px; background:var(--secondary-btn, #171c22); color:inherit; padding:10px 12px; font:inherit; cursor:pointer; }
+.group-revision-dialog button:disabled { opacity:.55; cursor:default; }
+.group-revision-dialog :focus-visible { outline:2px solid var(--link, #b4c5e3); outline-offset:3px; }
+.group-revision-body { padding:0 20px 20px; max-height:60dvh; overflow:auto; }
+.group-revision-body textarea { display:block; width:100%; box-sizing:border-box; resize:vertical; color:inherit; background:var(--input-pill-bg, #12161c); border:1px solid var(--metal-edge, rgba(123,135,147,.40)); border-radius:8px; padding:12px; font:inherit; line-height:1.6; margin-top:8px; }
+.group-revision-hint,.group-revision-dialog time { color:var(--ink-soft, #b9bdc7); font-size:13px; line-height:1.6; }
+.group-revision-dialog article { padding:16px 0; border-bottom:1px solid var(--line, rgba(108,120,132,.32)); }
+.group-revision-dialog pre { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; line-height:1.65; }
+.group-revision-dialog details p { white-space:pre-wrap; overflow-wrap:anywhere; }
+.group-revision-dialog del { color:var(--danger, #e07b84); }
+.group-revision-dialog ins { color:var(--success, #67bea0); }
+.group-revision-conflict { border:1px solid var(--warning, #d2b572); padding:12px; border-radius:8px; }
+.group-revision-dialog [hidden] { display:none; }
+.group-revision-notice { position:fixed; z-index:10000; bottom:90px; left:50%; transform:translateX(-50%); max-width:calc(100vw - 48px); padding:10px 16px; background:var(--secondary-btn, #171c22); color:#f0f0ee; border:1px solid var(--metal-edge, rgba(123,135,147,.40)); border-radius:10px; font-size:13px; pointer-events:none; }

@@ -162,7 +162,7 @@ mod group_ai_governance;
 mod group_summary;
 #[cfg(test)]
 mod group_summary_tests;
-mod groups;
+pub(crate) mod groups;
 mod join_requests;
 mod message_recall;
 mod native_sessions;

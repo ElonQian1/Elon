@@ -62,6 +62,7 @@ impl Store {
              FROM friend_group_messages candidate
              WHERE candidate.group_id = ?1
                AND candidate.sender_user_id != ?2
+               AND candidate.revision = 1
                AND candidate.recalled_at IS NULL
                AND LOWER(REPLACE(candidate.content, '＠', '@')) LIKE '%@el%'
                AND NOT EXISTS (

@@ -66,6 +66,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         "/api/me/groups/:group_id/messages/:message_id/ai-reply",
         post(friend_api::request_group_ai_reply),
     )
+    .merge(friend_api::message_revisions::routes())
     .route(
         "/api/me/groups/:group_id/ai-docs",
         get(group_summary_api::list_group_ai_documents)

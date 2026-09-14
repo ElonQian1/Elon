@@ -19,6 +19,7 @@
   <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
   <link rel="stylesheet" href="/assets/federated_auth.css" />
   <link rel="stylesheet" href="/assets/account_security.css" />
+  <link rel="stylesheet" href="/assets/group_message_revisions.css" /><script src="/assets/group_message_revisions.js"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -8107,7 +8108,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     setBusy(false);
   }
 
-  function stopContactPolling() {
+  function stopContactPolling() { window.ElonGroupMessageRevisions.reset();
     if (friendPollTimer) {
       clearInterval(friendPollTimer);
       friendPollTimer = null;
@@ -8249,7 +8250,6 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     renderContactMessages(data.messages || [], 'group', group, scrollToBottom);
     await loadSocialChats();
   }
-
   function renderGroupSummaryLoading() {
     if (!groupSummaryStrip) return;
     groupSummaryStrip.classList.remove('hidden');
@@ -8257,7 +8257,6 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     groupSummaryMeta.textContent = '正在读取群聊总结帖...';
     groupSummaryAction.textContent = '查看';
   }
-
   function renderGroupSummaryError(message) {
     if (!groupSummaryStrip) return;
     groupSummaryStrip.classList.remove('hidden');
@@ -8265,7 +8264,6 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     groupSummaryMeta.textContent = message || '加载总结帖失败';
     groupSummaryAction.textContent = '重试';
   }
-
   function renderGroupSummaryStrip(post, hidden) {
     if (!groupSummaryStrip) return;
     groupSummaryStrip.classList.toggle('hidden', !!hidden);
@@ -8415,8 +8413,9 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   }
 
   function renderContactMessages(messages, chatKind, contact, scrollToBottom) {
-    chatList.innerHTML = '';
+    const previousScroll = chatList.scrollTop; chatList.innerHTML = '';
     lastChatTimelineMs = 0;
+    if (chatKind === 'group') messages = window.ElonGroupMessageRevisions.reconcile(contact.id, messages);
     messages.forEach((msg) => {
       const outgoing = !!msg.outgoing;
       const senderId = msg.sender_user_id || '';
@@ -8430,7 +8429,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       const bubbleText = recalled
         ? (outgoing ? '你撤回了一条消息' : (msg.sender_name ? `${msg.sender_name} 撤回了一条消息` : '对方撤回了一条消息'))
         : (msg.content || '');
-      appendBubble(kind, bubbleText, null, null, null, {
+      const bubble = appendBubble(kind, bubbleText, null, null, null, {
         createdAtMs: parseServerTime(msg.created_at) || Date.now(),
         mentionTarget: chatKind === 'group' && !outgoing && !recalled ? { id: senderId, display_name: senderId === SOCIAL_AI_USER_ID ? 'EL' : msg.sender_name } : null,
         senderName: msg.sender_name || (chatKind === 'friend' ? friendDisplayName(contact) : ''),
@@ -8438,9 +8437,9 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
         avatarFallback: kind === 'user'
           ? ((currentUser && (currentUser.nickname || currentUser.account)) || '我')
           : (msg.sender_name || (chatKind === 'friend' ? friendDisplayName(contact) : groupDisplayName(contact))),
-      });
+      }); if (chatKind === 'group') window.ElonGroupMessageRevisions.mount(bubble, contact.id, msg, api, () => currentGroup?.id === contact.id ? loadGroupMessages(false) : Promise.resolve());
     });
-    if (scrollToBottom !== false) chatList.scrollTop = chatList.scrollHeight;
+    if (scrollToBottom !== false) chatList.scrollTop = chatList.scrollHeight; else chatList.scrollTop = previousScroll;
   }
 
   async function sendFriendMessage(text) {
@@ -9518,7 +9517,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     }
     block.appendChild(row);
     chatList.appendChild(block);
-    chatList.scrollTop = chatList.scrollHeight;
+    chatList.scrollTop = chatList.scrollHeight; return bubble;
   }
 
   // ====== WebSocket ======
@@ -9628,6 +9627,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
 
   function handleAppEvent(data) {
     if (!data || !data.type) return;
+    if (data.type === 'group_message_edited') { if (currentGroup?.id === data.groupId) loadGroupMessages(false).catch(() => {}); return; }
     if (data.type === 'friend_message') {
       loadSocialChats().catch(() => {});
       if (currentFriend && data.fromUserId === currentFriend.id) {
