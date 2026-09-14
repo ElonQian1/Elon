@@ -66,9 +66,12 @@ Local editing/export remains independently available when cloud preparation fail
   this batch: 186 Node tests. Source size and document guards also passed.
 - Protocol, policy and context versions are 1 (wire unchanged), 4 and 7;
   writer 4, text-block parser 7, stream observer 24, APK adapter 391.
-- Kotlin route/receipt tests have been added. Their grouped Android compilation
-  and execution are pending; Node success is not a Kotlin or production UI pass.
-- Phone discovery returned no device. Live temporary history accessibility,
+- Kotlin route/receipt tests passed in the grouped Release compilation and
+  51-test run `writing-grouped-native-tests-20260914-132807-441` (315.2 seconds,
+  zero failures/errors/skips), including six writing-protocol tests. This is
+  not a production UI pass and no APK was built or installed for that run.
+- Initial phone discovery returned no device; the later grouped run found an
+  online handset with an unsent draft, which was left untouched. Live temporary history accessibility,
   native edit/save/reopen and history/Library non-insertion still need one
   controlled acceptance case. Do not reuse ordinary save 1692 as proof.
 - Shared-copy writing remains outside this scope. The completed local editor,

@@ -2,6 +2,7 @@ package com.elon.acceptance;
 
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.pdf.PdfRenderer;
 import android.os.ParcelFileDescriptor;
 import com.elon.app.WebChatTextBlockPdf;
@@ -55,6 +56,11 @@ public final class TextBlockPdfAcceptance {
         require(args.length == 1 && args[0].matches("/data/local/tmp/elon-pdf-[a-f0-9]{32}"), "invalid_output_directory");
         File directory = new File(args[0]);
         require(directory.isDirectory(), "missing_output_directory");
+        // app_process is not forked from the preloaded app zygote. Never do this in the APK.
+        if (Typeface.DEFAULT == null) {
+            Typeface.class.getDeclaredMethod("loadPreinstalledSystemFontMap").invoke(null);
+        }
+        require(Typeface.DEFAULT != null, "system_fonts_not_initialized");
         StringBuilder document = new StringBuilder("# Export fixture\n\n**Bold**, *italic*, ~~removed~~ and \u4e2d\u6587.\n\n" +
             "3. First item\n4. Second item\n\n> A quoted paragraph.\n\n" +
             "```python\n    value = '\u4e2d\u6587'\n\n    return value\n```\n\n" +

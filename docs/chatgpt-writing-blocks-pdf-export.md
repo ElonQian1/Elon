@@ -73,3 +73,44 @@ standard logged-command wrapper with `-DeviceSerial <online-device>` (without
 Phone production-menu selection, saved-file reading and external PDF-viewer
 acceptance remain deferred to the grouped APK round. Do not inherit the Word
 1718 device result or mark this extension production-verified from compilation.
+
+## Android Device Evidence, 2026-09-14
+
+`writing-grouped-native-tests-20260914-132807-441` compiled current Release
+Kotlin/Java and passed 51 focused tests, zero failures/errors/skips, in 315.2 s.
+The source baseline was `6cf138510`; this includes temporary-writing route and
+receipt tests, PDF layout, Word, local edit history and native block contracts.
+No APK was assembled, published or installed in this acceptance batch.
+
+The first Android 16 shell-runner attempt
+`writing-pdf-device-native-20260914-133338-584` aborted with an uninitialized
+default typeface, before PDF acceptance. Unlike an app process forked from
+Zygote, this `app_process` runner had not loaded its system font map. The runner
+now calls `Typeface.loadPreinstalledSystemFontMap` only when `DEFAULT` is null,
+then requires an initialized default. This is test-only reflection, never APK
+code. The initialization and native assertion are documented in AOSP
+[Typeface.java](https://android.googlesource.com/platform/frameworks/base.git/+/master/graphics/java/android/graphics/Typeface.java)
+and [Typeface.cpp](https://android.googlesource.com/platform/frameworks/base/+/master/libs/hwui/hwui/Typeface.cpp).
+
+`writing-pdf-device-native-fixed-20260914-133524-917` passed all four cases on
+Xiaomi Android 16 in 17.4 s. Payload SHA-256:
+`3dd8198ac03fedc01f7695360c6bb8d5a9a3d6633aa3368b0016eb3899a7f275`.
+Actual `PdfRenderer` checks accepted seven sample pages, nonblank body pixels,
+portrait/landscape A4, an empty one-page document and tall-cell continuation.
+The first-page PNG was visually inspected; headings, lists, code, Chinese and
+table cells were visible without overlap. Independent `pypdf` extraction found
+all 160 numbered paragraphs exactly once and in order.
+
+Exact Unicode extraction **did not pass**: the rendered U+6587 character maps
+to compatibility character U+2F42 in this device's PDF text, and `fi` may become
+the U+FB01 ligature. NFKC normalization recovers the two expected Chinese strings,
+but that is not code-point identity or a fix. Treat PDF as a validated visual
+copy, not an exact plain-text round trip. Exact-copy workflows retain Markdown,
+TXT and source-file exports. The production menu and external reader still need
+acceptance; no complete/default promotion is inferred from this runner.
+
+Synthetic evidence is retained outside worktrees under the Git common directory
+at `ai-research-artifacts/writing-pdf-native-20260914-133524/`: `sample.pdf`
+(61,236 bytes), SHA-256
+`42d35a3e9748d3609f25106b55b4743371e5130d8161214577f34664c11ed8d5`, and
+`preview.png`. No private conversation, draft, login or app state was modified.
