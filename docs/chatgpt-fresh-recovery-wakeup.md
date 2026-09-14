@@ -1,6 +1,7 @@
 # Fresh Text Recovery Wakeup
 
-Status: `implemented / offline_verified / published_1716_device_pending`.
+Status: `implemented / published_1749 / background_device_verified`;
+actual network-loss recovery remains device-pending.
 This repairs lifecycle recovery within the existing private sender. It does not
 promote fresh first-send, tool, project, attachment or temporary scopes.
 

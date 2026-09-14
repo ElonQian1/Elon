@@ -1,6 +1,6 @@
 # September 15 Runtime Compatibility Investigation
 
-Status: bindings 29 / adapter 411 published and installed as 1.1.1748.
+Status: bindings 29 / adapter 412 published and installed as 1.1.1749.
 First-send/follow-up and independent local attachment delivery passed on Xiaomi.
 The verified attachment scope is default-enabled, reusing the corrected model argument and pre-write
 handoff below. `web_20260915` uses its exact observed asset set.
@@ -8,6 +8,12 @@ Reuse [accepted Writing Blocks 1723](../chatgpt-writing-blocks-native.md),
 ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
+
+- [1749 recovery follow-up](chatgpt-fresh-recovery-suspend-20260915.md) cancels
+  automatic history reads on background/offline suspension without replaying
+  the original write. Native background/resume acceptance passed with one Send,
+  one answer, 42 stream events and exact history. Real network-loss/process
+  recreation and original Canvas save remain separate pending acceptances.
 
 - Normal release 1748 from `c83f5dddd232de858e0772f57cb709647f85bffb`, SHA-256
   `e8a7ab3fdecc235b7756a01074ab76a6bcee497bbd94a0a300fe21b84f2ce1e1`, passed

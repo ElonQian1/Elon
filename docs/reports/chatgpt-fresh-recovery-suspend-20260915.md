@@ -1,6 +1,8 @@
 # Fresh History Recovery Suspension
 
-Status: implemented / offline_verified; production/device acceptance pending.
+Status: implemented / published_1749; background round trip device-verified.
+The active-read cancellation race is offline-verified; actual network-loss and
+process-recreation acceptance remain pending.
 Base: `f8499a86554b670c457a24b2105ce7a71580f701`. Adapter 412,
 recovery 3 and transaction 31 extend the existing sender; no new transport.
 
@@ -40,6 +42,33 @@ evidence, not a diagnosis of an earlier unspecified phone incident.
   accepted source was already 13; the assertion now checks the actual version.
 - Xiaomi production baseline 1748 / adapter 411 was authenticated, idle, on the
   native social AI page, without a draft, active voice/dictation or pending trial.
+
+## Release And Native Acceptance
+
+- Normal release **1.1.1749**, adapter 412, source
+  `4767962b62608facb08d9e2f8efb72eb847a9e7d`, SHA-256
+  `3715d581a98ea644e0f9d77b99bf59f6db923f3bd98977ab107ca7f8f20104e1`.
+  `fresh-recovery-412-production-publish-20260915-063537-102` passed in 469s,
+  including Release build, remote verification and unattended Xiaomi replacement.
+  Read-only native reopening verified adapter 412 and preserved login/idle state.
+- `android_chatgpt_fresh_text_background_resume_v1`: completed / device_verified,
+  using the existing production default, not a trial-enabled sender.
+  `fresh-text-native-background-1749-20260915-064414-658` passed in 39.3s:
+  one native Send, zero seed/replay, one user, one answer and one request receipt.
+  The private send was observed accepted and streaming before Home. Xiaomi's
+  launcher was foreground for three seconds; native return retained the same
+  app process. All 42 stream events and exact history/identity were reconciled.
+- Native reply observed in 15.657s and send/readback completed in 22.761s,
+  including the deliberate background pause and diagnostic calls. These are
+  acceptance timings, not evidence of a latency or thermal improvement.
+- Original conversation/awake settings restored, no unresolved write or armed
+  trial. The prior completed fixture ledger was verified and archived, not replayed.
+  No microphone, Cookie, app-data, proxy or personal-document changes.
+- Background admission helper passed 13 negative/positive cases. Existing send
+  evidence and native Canvas acceptance contracts also passed. The helper refuses
+  to reclaim foreground if another app replaces the launcher during the pause.
+- Publisher LAN-firewall and generic worktree-cleanup warnings were separate
+  from verified upload/install success; no shared firewall or cleanup code changed.
 
 ## Remaining Boundaries
 
