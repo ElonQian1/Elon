@@ -14,6 +14,14 @@ Search/Create Image controls still use their accepted sender unless the scoped
 candidate is explicitly admitted. No UI, transcript store or second send queue
 is added, and accepted plain-text defaults remain unchanged.
 
+September 14 acceptance-tooling batch: `chatgpt-fresh-tool-smoke-evidence.ps1`
+combines owned send continuity with completed Web output and matching native
+source-message parts. It rejects old replies placed after a new user turn,
+truncated context, unknown streaming state, and changed conversation/provider.
+`fresh-tools-evidence-old-reply-baseline-20260914-180822-683` reproduced the old
+reply false positive; `fresh-tools-evidence-verified-20260914-181109-416` passed
+18 synthetic checks. No tool request was sent on a device and no defaults changed.
+
 ## Evidence And Request Shape
 
 Only the retained `web_20260912` public assets are parsed; downloaded website
