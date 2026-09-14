@@ -141,3 +141,14 @@ and adapter 400 replace the old locator closure on normal reinjection without
 interrupting an active send. `committed-owner-cache-tests-20260914-221710-081`
 passed 339 tests, zero skipped. Device recovery and independent Image dispatch
 still require the updated APK; no heat or latency improvement is claimed yet.
+
+`committed-owner-cache-release-20260914-222147-713` built and published
+APK 1737 / adapter 400, source `c5379e4836ba46e76a87f1796f0336af8c35150b`,
+SHA-256 `2373126d488fbef754c7bdaf821afe636704261f2e66b3673a9ae11752cd2da9`.
+Release Kotlin/Java, lint, packaging and remote APK hash verification passed;
+the logged publication finished in 557.8s. The device was absent from ADB/mDNS,
+and the publisher also recorded `VERIFICATION_DEFERRED=real_device_unavailable`.
+No install or production UI pass is claimed. The existing tool fixture still
+contains exactly one accepted Search and no pending write; no Image request was
+sent in this batch. Postflight's unrelated worktree `Branch` cleanup warning
+does not change publication success; task cleanup remains owned by finish.
