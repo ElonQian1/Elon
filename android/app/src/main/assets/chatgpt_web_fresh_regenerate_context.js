@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshRegenerateContext = api;
 })(typeof window === 'object' ? window : null, function (page, baseContext) {
@@ -21,6 +21,7 @@
     if (!owner || owner.cid !== base.conversationId || owner.token !== base.token ||
         owner.message.id !== base.parentId) fail('context_changed', 'owner');
     if (typeof runtime.textResolveRequestedModel !== 'function' || typeof shared.canvasQueryClient !== 'function' ||
+        typeof shared.writingUpdateState !== 'function' || typeof shared.writingTreeOwner?.setCurrentLeafId !== 'function' ||
         ['getNodeIfExists', 'getParentNode'].some(key => typeof shared.HM[key] !== 'function')) fail('runtime_unavailable', 'resolver');
     const resolvedModel = await runtime.textResolveRequestedModel({ conversation: owner.conversation,
       queryClient: shared.canvasQueryClient(), requestedModelId: owner.modelSlug });
@@ -66,8 +67,8 @@
     }
     const thinkingEffort = effort();
     function owns() { return base.owns() && contract.ownerCurrent(owner); }
-    function sameUser() {
-      const value = user();
+    function sameUser(state = tree()) {
+      const value = shared.HM.getNodeIfExists(state, owner.parentId);
       return value?.parentId === historyParentId && value.id === owner.parentId && userSignature(value.message) === originalUser;
     }
     function current() {
@@ -84,6 +85,11 @@
       return message?.author?.role === 'assistant' && UUID.test(message.id || '') &&
         observed.has(message.id) && !variants.has(message.id);
     }
+    const terminal = (message, stopped) => message?.status === 'finished_successfully' && message.end_turn === true ||
+      stopped && message?.status === 'finished_partial_completion';
+    const settled = () => { const status = shared.Fx(owner.conversation);
+      return status == null || status.value === shared.v7.UNREAD; };
+    let storeStage = 'store_not_reconciled';
     if (!current()) fail('context_changed', 'current');
     return Object.freeze({ ...base, operation: 'regenerate', model, effort: thinkingEffort, serviceTier: null,
       parentId: owner.parentId, parentRole: 'user', historyParentId,
@@ -102,15 +108,46 @@
         observed.add(message.id);
         return true;
       },
-      canReconcile(id) { return id === owner.parentId && owns() && sameUser() && base.canReconcile(id); },
+      canReconcile(id) {
+        if (id !== owner.parentId || !owns() || !sameUser()) return false;
+        const leaf = shared.HM.getCurrentMessage(tree());
+        return (leaf?.id === owner.message.id || isOwnedResponse(leaf)) && base.canReconcile(id);
+      },
       canStop(id) { return this.canReconcile(id); },
+      reconciliationFailure: () => storeStage,
+      selectVerifiedReply(id, replyId, stopped = false) {
+        try {
+          storeStage = 'store_owner_changed'; if (!this.canReconcile(id)) return false;
+          storeStage = 'store_status_unsettled'; if (!settled()) return false;
+          const eligible = state => {
+            const selected = shared.HM.getCurrentLeafId(state);
+            const reply = shared.HM.getNodeIfExists(state, replyId)?.message;
+            return (selected === owner.message.id || selected === replyId) && sameUser(state) &&
+              reply?.id === replyId && isOwnedResponse(reply) && terminal(reply, stopped) &&
+              shared.HM.getParentPromptNode(state, replyId)?.id === owner.parentId;
+          };
+          storeStage = 'store_leaf_mismatch'; if (!eligible(tree())) return false;
+          if (shared.HM.getCurrentLeafId(tree()) !== replyId) {
+            // fy may preserve the old sibling. Reuse the reviewed sY/KJ state
+            // transaction only after this request's terminal history is verified.
+            shared.writingUpdateState(owner.conversation.id, state => {
+              if (this.canReconcile(id) && settled() && eligible(state) &&
+                  shared.HM.getCurrentLeafId(state) === owner.message.id) {
+                shared.writingTreeOwner.setCurrentLeafId(state, replyId);
+              }
+            });
+          }
+          return this.reconciled(id, stopped);
+        } catch (_) { return false; }
+      },
       reconciled(id, stopped = false) {
-        if (!this.canReconcile(id)) return false;
-        const status = shared.Fx(owner.conversation), leaf = shared.HM.getCurrentMessage(tree());
-        return (status == null || status.value === shared.v7.UNREAD) && isOwnedResponse(leaf) &&
-          (leaf.status === 'finished_successfully' && leaf.end_turn === true ||
-            stopped && leaf.status === 'finished_partial_completion') &&
-          shared.HM.getParentPromptNode(tree(), leaf.id)?.id === owner.parentId;
+        storeStage = 'store_owner_changed'; if (!this.canReconcile(id)) return false;
+        storeStage = 'store_status_unsettled'; if (!settled()) return false;
+        const leaf = shared.HM.getCurrentMessage(tree());
+        storeStage = 'store_leaf_mismatch'; if (!isOwnedResponse(leaf) || !terminal(leaf, stopped)) return false;
+        storeStage = 'store_prompt_mismatch';
+        if (shared.HM.getParentPromptNode(tree(), leaf.id)?.id !== owner.parentId) return false;
+        storeStage = 'reconciled'; return true;
       }
     });
   }

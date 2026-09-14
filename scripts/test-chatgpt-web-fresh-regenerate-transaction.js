@@ -53,7 +53,7 @@ function fixture(options = {}) {
       payload.async_status = stopped ? null : 3;
     }
     request.onConversationLoadedFromNetwork(payload);
-    if (request.shouldApplyResponse()) f.apply(payload);
+    if (request.shouldApplyResponse()) f.apply(payload, options.preserveLeaf === true);
   };
   const reconciliation = load('reconcile').create();
   const recovery = load('recovery').create(page, { reconciliation, delays: [0], timeoutMs: 1000, cooldownMs: 0 });
@@ -83,6 +83,19 @@ test('private regeneration posts one variant, streams natively and reconciles th
   assert.equal(Object.values(f.tree.nodes).filter(n => n.message?.author?.role === 'user').length, 1);
   assert.equal(f.api.regenerate(f.command), sent);
   assert.equal((await f.api.send({ ...f.command, prompt: f.draft() }).completion).code, 'request_id_conflict');
+  f.close();
+});
+
+test('the real history sibling-preservation policy settles without a second POST or runtime retry', async () => {
+  const f = fixture({ preserveLeaf: true });
+  assert.equal((await f.api.regenerate(f.command).completion).status, 'accepted');
+  await settle();
+  assert.equal(f.api.state().pending, false);
+  assert.equal(f.tree.leaf, AID);
+  assert.deepEqual(f.branchSelections, [AID]);
+  assert.equal(f.calls.filter(c => c.kind === 'post').length, 1);
+  assert.equal(f.retry.calls.length, 0);
+  assert.equal(f.draft(), 'Synthetic unsent draft');
   f.close();
 });
 

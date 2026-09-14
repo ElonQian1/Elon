@@ -123,6 +123,8 @@ test('runtime parentId and wire parent stay separate across history reconciliati
   f.apply(snapshot);
   assert.equal(f.tree.nodes[UID].parentId, ROOT);
   assert.equal('parent' in f.tree.nodes[UID], false);
+  assert.equal(binding.canReconcile(UID), false, 'history alone cannot authorize an unobserved sibling');
+  assert.equal(binding.observePayload({ message: f.reply() }), true);
   assert.equal(binding.canReconcile(UID), true);
   f.tree.nodes[UID].parentId = OTHER;
   assert.equal(binding.canReconcile(UID), false, 'runtime reparenting invalidates the owned prompt');

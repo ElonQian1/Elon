@@ -116,6 +116,23 @@ test('pinned text-dispatch boundaries remain distinct from independent HTTP deli
     assert.match(prepare, /messages:\[\]/);
   });
 
+  await t.test('history preserves sibling selection and the official tree action notifies a leaf-only change', () => {
+    const source = (module, name, exported = false) => {
+      const node = definition(module, name, exported); return module.text.slice(node.start, node.end);
+    };
+    assert.equal(conversation.exported.get('BEn'), 'gy');
+    includes(facts(definition(conversation, 'gy')).calls, ['fy']);
+    const hydrate = source(conversation, 'fy');
+    assert.match(hydrate, /let t=n\?\.tree.currentLeafId/);
+    assert.match(hydrate, /F.getBranchFromLeaf\(e\).some\(e=>e.id===t\)/);
+    assert.match(hydrate, /I=L\?\?\(r\|\|v!=null&&t===v.currentLeafId\|\|!t\|\|!F.containsNode\(t\)\?e:t\),F.setCurrentLeafId\(I\)/);
+    assert.equal(shared.exported.get('sY'), 'Zx');
+    assert.equal(source(shared, 'sY', true), 'function Zx(e,t){iS(n=>{let r=Yx(e,n);r&&t(r)})}');
+    assert.equal(shared.exported.get('KJ'), 'sS');
+    assert.match(source(shared, 'KJ', true), /setCurrentLeafId\(e,t\)\{sS.updateTree\(e,\(\)=>t\)\}/);
+    assert.match(source(shared, 'KJ', true), /updateTree\(e,t\)\{let n=t\(e.tree,Z.getCurrentLeafId\(e\)\);e._treeVersion\+\+,n&&e.tree.setCurrentLeafId\(n\)\}/);
+  });
+
   await t.test('new threads register the server identity without replacing the conversation object', () => {
     assert.equal(shared.exported.get('IP'), 'H1e');
     const bind = definition(shared, 'IP', true), text = shared.text.slice(bind.start, bind.end);

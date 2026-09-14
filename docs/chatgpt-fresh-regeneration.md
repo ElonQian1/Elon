@@ -29,6 +29,13 @@ retry capability. The trial is disarmed, its pending write is retained without
 replay, and the production default is unchanged. See the same report for evidence
 and the remaining branch-selection investigation.
 
+The [branch reconciliation source correction](reports/chatgpt-fresh-retry-branch-20260914.md)
+now reuses the reviewed official leaf-only state transaction after verified
+history. It covers the loader preserving an old sibling and rechecks ownership
+before application and inside the transaction. Context v5/reconciler v13,
+adapter 394, are queued for grouped build and native acceptance; they do not
+change the failed 1725 device result or the production default.
+
 September 13 source candidate. The existing native regenerate button now has a
 gated independent request path through the same fresh-text ledger, prepare/proof
 provider, owned stream, stop and history recovery. It does not call the website's
@@ -78,6 +85,9 @@ a new answer. Old variants are rejected before native projection. A new variant
 created on another device cannot settle this command just because it appears in
 history. Reconciliation requires the original user branch and a terminal owned
 reply, then uses the existing official history/store hydration without reload.
+If hydration preserves the original reply, the reviewed conversation-scoped
+state action selects only that verified owned leaf. Another selected sibling
+blocks reconciliation instead of being silently overridden.
 
 Regenerate and send share one command ledger. Duplicate command IDs cannot write
 twice, and a send cannot reuse a regenerate receipt. A pre-dispatch compatibility

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 12, create: factory });
+  const api = Object.freeze({ version: 13, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
@@ -185,7 +185,7 @@
         await binding.finalize(signal) !== true || signal.aborted ||
         !binding.canReconcile(request.userMessageId))) { report('owner_changed'); return false; }
     report('reading');
-    let verified = false, verifyNewParent = null;
+    let verified = false, verifyNewParent = null, verifiedReplyId = null;
     // BEn performs official fetch + tree reconciliation. Do not replace the
     // website store, reload the document, or apply another branch's response.
     await binding.runtime.textHydrateHistory(binding.conversationId, {
@@ -193,12 +193,15 @@
       signal, skipIfExisting: false, source: 'native_fresh_text_v1',
       onConversationLoadedFromNetwork(payload) {
         verified = !signal.aborted && ownsResponse(payload, binding, request.userMessageId, stopped, emptyStopped);
+        verifiedReplyId = verified && binding.operation === 'regenerate' ? payload.current_node : null;
         verifyNewParent = verified ? newParentVerifier(payload, binding, payload.mapping?.[request.userMessageId]) : null;
         report(signal.aborted ? 'owner_changed' : rejection(payload, binding, request.userMessageId, stopped, emptyStopped));
       },
       shouldApplyResponse: () => verified && !signal.aborted && binding.canReconcile(request.userMessageId)
     });
-    let done = !signal.aborted && verified && binding.reconciled(request.userMessageId, stopped, emptyStopped, verifyNewParent);
+    const selected = !signal.aborted && verified && (binding.operation !== 'regenerate' ||
+      binding.selectVerifiedReply?.(request.userMessageId, verifiedReplyId, stopped) === true);
+    let done = selected && binding.reconciled(request.userMessageId, stopped, emptyStopped, verifyNewParent);
     if (done && binding.finalize && !firstRoute) done = await binding.finalize(signal) === true &&
       !signal.aborted && binding.reconciled(request.userMessageId, stopped, emptyStopped, verifyNewParent);
     if (verified) report(done ? 'reconciled' : signal.aborted || !binding.canReconcile(request.userMessageId)

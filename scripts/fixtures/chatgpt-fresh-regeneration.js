@@ -34,6 +34,11 @@ function fixture() {
   });
   for (const key of ['H3', 'F5', 'mq']) shared[key] = r.modules.shared[key];
   shared.canvasQueryClient = () => ({});
+  const branchSelections = [];
+  shared.writingUpdateState = (id, change) => { if (id === selected.id) change(tree); };
+  shared.writingTreeOwner = { setCurrentLeafId(state, id) {
+    branchSelections.push(id); state.leaf = id; f.props.currentLeafId = id;
+  } };
   conversation.f8t = r.modules.conversation.f8t;
   conversation.textResolveRequestedModel = ({ requestedModelId }) => requestedModelId;
   Object.assign(r.menu, { conversation: selected, lastMessage: parent });
@@ -61,13 +66,14 @@ function fixture() {
     return { conversation_id: CID, current_node: id, async_status: null,
       mapping: { ...mapping, [id]: { id, parent: UID, message: reply(id) } } };
   }
-  function apply(value) {
+  function apply(value, preserveLeaf = false) {
     tree.nodes = Object.fromEntries(Object.entries(value.mapping).map(([key, { parent, ...node }]) =>
       [key, { ...node, parentId: parent }]));
-    tree.leaf = value.current_node; f.props.currentLeafId = tree.leaf;
+    if (!preserveLeaf) tree.leaf = value.current_node;
+    f.props.currentLeafId = tree.leaf;
   }
   const api = regeneration.create(page, f.api);
-  return Object.assign(f, { retry: r, user, command, reply, history, apply,
+  return Object.assign(f, { retry: r, user, command, reply, history, apply, branchSelections,
     capture: () => api.capture(command), inspect: () => api.inspect(command) });
 }
 

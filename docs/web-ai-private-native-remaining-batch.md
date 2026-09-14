@@ -32,9 +32,9 @@ reading/edit/export and ordinary save are accepted (1692; editor undo/redo/share
 [Fresh tools](chatgpt-fresh-tool-text-dispatch.md),
 [project sends](chatgpt-fresh-project-text-dispatch.md),
 [temporary sends/cache guard](chatgpt-fresh-temporary-text-dispatch.md),
-[owned attachment sends](chatgpt-fresh-attachment-text-dispatch.md) and
-[fresh regeneration](chatgpt-fresh-regeneration.md) are
-offline-verified; group APK/native acceptance. None is promoted yet.
+[owned attachment sends](chatgpt-fresh-attachment-text-dispatch.md): offline-verified.
+[Fresh retry](chatgpt-fresh-regeneration.md): 1725 reconciliation failed;
+394 fix awaits grouped acceptance. None is promoted.
 [New personal first send](chatgpt-fresh-new-text-dispatch.md) is completed/default-enabled on 1721: native first/follow-up and unarmed default passed. Reuse it; new project/tool/file/temporary and initial composer-free scopes remain open.
 
 Reuse [1666 source/file acceptance](chatgpt-private-context-source-files.md#grouped-android-and-device-evidence):
