@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 
 const MAX_CANDIDATES: usize = 20;
@@ -25,6 +25,35 @@ pub struct FriendCandidate {
 pub struct FriendCandidates {
     pub results: Vec<FriendCandidate>,
     pub has_more: bool,
+}
+
+/// Account registration stores non-email login names in users.phone as well.
+/// Match their canonical login value before falling back to a display name.
+pub(super) fn text_login_account_id(conn: &Connection, query: &str) -> Result<Option<String>> {
+    let account = query.trim().to_ascii_lowercase();
+    if account.len() < 3 {
+        return Ok(None);
+    }
+    conn.query_row(
+        "SELECT id FROM users WHERE phone = ?1
+         AND status = 'active' AND password_hash != 'device-user'",
+        params![account],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+/// Auto search after phone, email and internal account-ID routing.
+pub(super) fn search_text_candidates(
+    conn: &Connection,
+    viewer_id: &str,
+    query: &str,
+) -> Result<FriendCandidates> {
+    match text_login_account_id(conn, query)? {
+        Some(id) => search_candidates(conn, viewer_id, CandidateField::AccountId, &id),
+        None => search_candidates(conn, viewer_id, CandidateField::Nickname, query.trim()),
+    }
 }
 
 /// Exact matches only. Raw phone/email values never leave this query boundary.

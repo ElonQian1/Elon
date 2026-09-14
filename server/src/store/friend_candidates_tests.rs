@@ -1,5 +1,97 @@
 use super::*;
 
+#[test]
+fn text_login_accounts_are_found_even_when_the_display_name_differs() {
+    let conn = fixture();
+    conn.execute_batch(
+        "INSERT INTO users(id,phone,nickname) VALUES
+         ('usr_login','tester1999','Display Name'),
+         ('usr_same_name','another-account','tester1999');",
+    )
+    .unwrap();
+    for query in ["tester1999", "TESTER1999", "  tester1999  "] {
+        let found = search_text_candidates(&conn, "viewer", query).unwrap();
+        assert_eq!(found.results.len(), 1);
+        assert_eq!(
+            found.results[0].id, "usr_login",
+            "login identity takes priority over another user's nickname"
+        );
+        assert_eq!(found.results[0].nickname, "Display Name");
+        assert_eq!(
+            text_login_account_id(&conn, query).unwrap().as_deref(),
+            Some("usr_login")
+        );
+        assert!(!serde_json::to_string(&found)
+            .unwrap()
+            .contains("tester1999"));
+    }
+    let explicit_name =
+        search_candidates(&conn, "viewer", CandidateField::Nickname, "tester1999").unwrap();
+    assert_eq!(explicit_name.results[0].id, "usr_same_name");
+}
+
+#[test]
+fn text_account_misses_fall_back_to_nicknames_without_partial_account_matches() {
+    let conn = fixture();
+    assert_eq!(
+        search_text_candidates(&conn, "usr_self", "同名用户")
+            .unwrap()
+            .results
+            .len(),
+        3
+    );
+    conn.execute(
+        "INSERT INTO users(id,phone,nickname) VALUES ('usr_short', 'other-login', 'ab')",
+        [],
+    )
+    .unwrap();
+    assert_eq!(
+        search_text_candidates(&conn, "viewer", "ab")
+            .unwrap()
+            .results[0]
+            .id,
+        "usr_short"
+    );
+    assert!(search_text_candidates(&conn, "viewer", "testacc")
+        .unwrap()
+        .results
+        .is_empty());
+    assert!(search_text_candidates(&conn, "viewer", "missing1999")
+        .unwrap()
+        .results
+        .is_empty());
+}
+
+#[test]
+fn inactive_and_device_login_accounts_stay_hidden_and_search_does_not_add_friends() {
+    let conn = fixture();
+    conn.execute(
+        "UPDATE users SET phone='inactive1999' WHERE id='usr_inactive'",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "UPDATE users SET phone='device1999' WHERE id='usr_device'",
+        [],
+    )
+    .unwrap();
+    for query in ["inactive1999", "device1999"] {
+        assert!(text_login_account_id(&conn, query).unwrap().is_none());
+        assert!(search_text_candidates(&conn, "viewer", query)
+            .unwrap()
+            .results
+            .is_empty());
+    }
+    let found = search_text_candidates(&conn, "usr_self", "testaccount").unwrap();
+    assert!(found.results[0].already_friend);
+    let own = search_text_candidates(&conn, "usr_old", "testaccount").unwrap();
+    assert!(own.results[0].is_self);
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM user_friends", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(count, 1);
+}
+
 fn fixture() -> Connection {
     let conn = Connection::open_in_memory().unwrap();
     conn.execute_batch(

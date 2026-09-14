@@ -3,7 +3,10 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 #[path = "friend_candidates.rs"]
 mod friend_candidates;
-use friend_candidates::{search_candidates, CandidateField, FriendCandidates};
+use friend_candidates::{
+    search_candidates, search_text_candidates, text_login_account_id, CandidateField,
+    FriendCandidates,
+};
 
 use super::friend_messages::message_preview_for_viewer;
 use super::{
@@ -47,9 +50,8 @@ impl Store {
                 }
                 (CandidateField::Nickname, query.to_string())
             }
-            FriendSearchType::Auto | FriendSearchType::Nickname => {
-                (CandidateField::Nickname, query.to_string())
-            }
+            FriendSearchType::Auto => return search_text_candidates(&conn, user_id, query),
+            FriendSearchType::Nickname => (CandidateField::Nickname, query.to_string()),
         };
         search_candidates(&conn, user_id, field, &value)
     }
@@ -516,6 +518,8 @@ fn search_profile_auto(conn: &rusqlite::Connection, query: &str) -> Result<Optio
         if let Some(profile) = search_profile_by_column(conn, "phone", &normalize_phone(query)?)? {
             return Ok(Some(profile));
         }
+    } else if let Some(id) = text_login_account_id(conn, query)? {
+        return search_profile_by_column(conn, "id", &id);
     }
 
     search_profile_by_nickname(conn, query)
