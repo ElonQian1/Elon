@@ -23,7 +23,12 @@ internal class BinanceWalletState(private val elapsed:()->Long,private val epoch
     private val grants=mutableMapOf<String,Long>()
     val walletCount get()=wallets.size
     val identifying get()=pending!=null&&pendingKind=="identify"
-    fun identityFresh()=account!=null && elapsed()-identityAt in 0 until 300_000
+    fun identityRemainingMs():Long {
+        if(account==null)return 0
+        val age=elapsed()-identityAt
+        return if(age in 0 until 300_000)300_000-age else 0
+    }
+    fun identityFresh()=identityRemainingMs()>0
     fun bind(raw:String,kind:String):Boolean {
         require(Regex("[0-9]{1,20}").matches(raw) && kind in setOf("primary","sub","unknown"))
         val next=BinanceHostState.digest(raw);val changed=account!=next || accountKind!=kind

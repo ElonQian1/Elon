@@ -11,6 +11,12 @@ class BinanceWalletStateTest {
     private val state=BinanceWalletState({time},{1_700_000_000_000+time})
     private val request="d".repeat(64)
     private fun bind()=state.bind("123","sub")
+    @Test fun identityDeadlineMatchesFreshnessIncludingClockRollback() {
+        assertEquals(0L,state.identityRemainingMs());bind();assertEquals(300_000L,state.identityRemainingMs())
+        time+=299_999;assertTrue(state.identityFresh());assertEquals(1L,state.identityRemainingMs())
+        time++;assertFalse(state.identityFresh());assertEquals(0L,state.identityRemainingMs())
+        bind();time--;assertFalse(state.identityFresh());assertEquals(0L,state.identityRemainingMs())
+    }
     private fun event(kind:String="wallet",account:String="123",rows:List<Any?> = listOf(mapOf("type" to "FUTURE","active" to true,"balance" to "1.23000000000000000001")))=mapOf(
         "schema" to BinanceWalletState.OBSERVATION,"request" to request,"token" to "doc_fixture_1","kind" to kind,
         "account" to account,"account_kind" to "sub","quote_asset" to "USDT","wallets" to rows)
