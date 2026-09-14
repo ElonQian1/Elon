@@ -9,14 +9,17 @@ param(
     [switch]$UseDefault,
     [switch]$FirstOnly,
     [switch]$StopThenFollowup,
-    [switch]$NewConversation
+    [switch]$NewConversation,
+    [switch]$ComposerUnavailable
 )
 $ErrorActionPreference = 'Stop'
 if ($NewConversation -and ($OnlyStop -or $StopThenFollowup)) { throw 'new_conversation_stop_scope_not_supported' }
+if ($ComposerUnavailable -and (!$NewConversation -or !$FirstOnly -or !$UseDefault)) { throw 'composer_lease_requires_default_new_first' }
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-fresh-trial-smoke.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-fresh-text-smoke-evidence.ps1')
 . (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
+. (Join-Path $PSScriptRoot 'chatgpt-composer-dom-smoke.ps1')
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1
 $runtime.mcp_bootstrapped = $true
@@ -34,6 +37,7 @@ if (Test-Path -LiteralPath $pendingFile) {
 $originPath = ''; $originDraft = ''; $opened = $false; $restored = $false; $awakeRestored = $false
 $awaitingResult = $false; $trialRequested = $false; $ownedNavigation = $false; $expectedPath = ''
 $lastPrompt = ''; $lastUserId = ''; $lastObservedPath = ''; $clickAcknowledged = $false
+$composerLease = $null
 $report = [ordered]@{ schema = 'elon.fresh_text_ui.v1'; passed = $false; stage = 'opening';
     new_conversation = [bool]$NewConversation; seed_sends = 0; candidate_clicks = 0; cases = @();
     restored = $false; awake_restored = $false; write_unconfirmed = $false;
@@ -60,6 +64,11 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
     if ($Candidate -and !$UseDefault) { $script:trialRequested = $true }
     $before = if ($Candidate) { Trial $(if ($UseDefault) { 'state' } else { 'start' }) } else { $null }
     if ($Candidate -and -not $UseDefault -and $before.armed -ne $true) { throw "trial_not_armed:$($before.control)" }
+    if ($composerLease) {
+        Assert-ChatGptComposerDomUnavailable (Invoke-ChatGptComposerDomLease -Lease $composerLease -Action state)
+        if ($baseline.composer_ready -ne $false -or $baseline.private_send_ready -ne $true) { throw 'composer_lease_private_readiness_missing' }
+        $report.composer_unavailable_before_click = $true
+    }
     $started = [DateTimeOffset]::UtcNow
     # A lost click acknowledgement must not permit replay, navigation or draft cleanup.
     $script:awaitingResult = $true
@@ -137,6 +146,11 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
             $main.social_chat.web_chat_streaming -is [bool] -and !$main.social_chat.web_chat_streaming -and
             $web.streaming -is [bool] -and !$web.streaming -and $continuity -and
             (!$Candidate -or $freshConfirmed)) {
+            if ($composerLease) {
+                $leaseState = Invoke-ChatGptComposerDomLease -Lease $composerLease -Action state
+                Assert-ChatGptComposerDomUnavailable $leaseState
+                $report.composer_lease = $leaseState
+            }
             $script:awaitingResult = $false
             $script:expectedPath = [string]$main.social_chat.web_chat_conversation_path
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $fixtureFile) | Out-Null
@@ -208,6 +222,12 @@ try {
             $report.cases += Native-Send 'seed' $false $true
         }
     }
+    if ($ComposerUnavailable) {
+        $composerLease = Start-ChatGptComposerDomLease -Runtime $runtime
+        Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec 20 -Description 'private sender without usable composer' -Predicate {
+            param($s) $s.composer_ready -eq $false -and $s.private_send_ready -eq $true
+        } | Out-Null
+    }
     foreach ($kind in $(if ($StopThenFollowup) { @('stop','followup') } elseif ($OnlyStop) { @('stop') } elseif ($FirstOnly) { @('first') } else { @('first','followup') })) {
         $report.stage = $kind; Write-Output "FRESH_TEXT_STAGE=$kind"
         $report.cases += Native-Send $kind $true ($NewConversation -and $kind -eq 'first')
@@ -218,6 +238,11 @@ try {
     if ($_.Exception.Message -match '^Semantic UI acceptance failed: ([a-z_]+)$') { $report.error = $Matches[1] }
     $report.failure_line = $_.InvocationInfo.ScriptLineNumber
 } finally {
+    if ($composerLease) {
+        try { $report.composer_restored = Stop-ChatGptComposerDomLease -Runtime $runtime -Lease $composerLease }
+        catch { $report.composer_restored = $false }
+        if (!$report.composer_restored) { $report.passed = $false }
+    }
     try {
         if ($report.foreground_changed) {
             $report.cleanup_deferred = $true
