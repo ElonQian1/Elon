@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 22, create: factory });
+  const api = Object.freeze({ version: 23, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -131,7 +131,9 @@
     const continuation = stoppedParent;
     const allowTools = page.__elonChatGptFreshTextToolsEnabled === true || trialArmed();
     const allowProjects = page.__elonChatGptFreshTextProjectsEnabled === true || trialArmed();
-    const allowNewConversations = page.__elonChatGptFreshTextNewConversationsEnabled === true || trialArmed();
+    // Only the native first-send path with a bound composer is production-verified.
+    const allowNewConversations = trialArmed() || page.__elonChatGptFreshTextNewConversationsEnabled === true ||
+      page.__elonChatGptFreshTextNewConversationsEnabled !== false && command.composer != null;
     const allowTemporary = page.__elonChatGptFreshTextTemporaryEnabled === true || trialArmed();
     const allowAttachments = page.__elonChatGptFreshTextAttachmentsEnabled === true || trialArmed();
     trial = null;
@@ -386,7 +388,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 22, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 23, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

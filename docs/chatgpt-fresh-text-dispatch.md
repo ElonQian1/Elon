@@ -17,6 +17,10 @@ private HTTP implementation, not Android HTTP and not removal of the WebView
 identity/runtime layer. Reuse these modules; do not repeat the completed audit.
 Other contexts retain the established sender before any independent dispatch.
 
+Current extension: [new personal first-send and follow-up](reports/chatgpt-fresh-new-default-20260914.md)
+passed production native-button acceptance on 1720. Its narrow default promotion
+is source-tested; release/default routing verification is recorded in that report.
+
 The September 14 [private input readiness batch](chatgpt-private-text-input-memory.md)
 adds actual in-memory draft ownership when the composer DOM is absent. It keeps
 private-text and DOM readiness separate; device acceptance of that boundary is

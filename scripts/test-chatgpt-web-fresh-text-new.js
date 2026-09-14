@@ -458,6 +458,7 @@ async function integration(project = false, settings = {}) {
     __elonChatGptFreshTextRecovery: require(assets + 'chatgpt_web_fresh_text_recovery'),
     __elonChatGptFreshTextStop: require(assets + 'chatgpt_web_fresh_text_stop'),
     __elonChatGptFreshTextStream: require(assets + 'chatgpt_web_fresh_text_stream') });
+  if (settings.acceptedDefault) delete page.__elonChatGptFreshTextNewConversationsEnabled;
   const session = policy.createSession({ now: Date.now });
   const owned = require(assets + 'chatgpt_web_private_owned_stream').create({ policy, session,
     conversationId: value => value.conversation_id || value.conversationId || '',
@@ -560,9 +561,9 @@ test('delayed project navigation does not block native streaming or duplicate it
   assert.equal(r.api.dispose(), true);
 });
 
-test('new private send binds, streams, hydrates and permits exactly one existing-conversation follow-up', async () => {
+test('personal default and project opt-in bind, stream, hydrate and permit one existing-conversation follow-up', async () => {
   for (const project of [false, true]) for (const injectedParents of [false, true, 'paginated']) {
-    const r = await integration(project, { injectedParents }); r.setDraft('a later unsent draft');
+    const r = await integration(project, { injectedParents, acceptedDefault: !project }); r.setDraft('a later unsent draft');
     await settled(r.api);
     assert.equal(r.api.state().pending, false);
     assert.deepEqual([r.counts.prepare, r.counts.posts, r.counts.apply, r.f.binds, r.f.navigations], [1, 1, 1, 1, 1]);
