@@ -122,3 +122,22 @@ a focused same-root/new-child regression check, not an assumed live root cause.
 One actual independent Image send remains pending. No Image default/completed
 marker is enabled from menu admission alone. Preserve the fixture ledger and
 reconcile uncertain writes read-only; do not repeat the accepted Search send.
+
+## Reused Root Regression
+
+Six focused tests reproduce stale candidate reuse when two commits return to
+the same HostRoot: previously empty trees never recover, replaced owners remain
+unavailable, and newly conflicting owners can be ignored by an existing binding.
+Both DOM-free tool selection and native text input are affected. The pre-fix
+run `committed-owner-cache-red-20260914-221605-089` passed 117 and failed exactly
+these six tests; this is a confirmed code defect, not yet proof of the device
+`composer_detached` cause.
+
+Locator 3 now traverses current committed child membership on demand instead
+of treating root identity as a commit revision. Existing root/node/sibling
+bounds, exact stores, identity, route and permission guards remain. No polling,
+runtime reload, request replay or extra network request is added. Runtime 23
+and adapter 400 replace the old locator closure on normal reinjection without
+interrupting an active send. `committed-owner-cache-tests-20260914-221710-081`
+passed 339 tests, zero skipped. Device recovery and independent Image dispatch
+still require the updated APK; no heat or latency improvement is claimed yet.

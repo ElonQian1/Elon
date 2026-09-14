@@ -206,6 +206,48 @@ test('DOM-free tool admission rejects duplicate profiled owners even with shared
   assert.equal(f.calls.length, 0);
 });
 
+function commitToolRootAgain(f, child) {
+  const alternate = { stateNode: f.top.stateNode, return: null };
+  f.top.alternate = alternate; alternate.alternate = f.top;
+  f.top.stateNode.current = alternate;
+  f.top.child = child;
+  f.top.stateNode.current = f.top;
+}
+
+test('DOM-free tools recover after two commits reuse a previously empty root', async () => {
+  const f = memoryToolFixture(); f.top.child = null;
+  assert.equal(f.list(), false);
+  commitToolRootAgain(f, f.ancestor);
+  assert.equal(f.list(), true); await flush();
+  assert.equal(toolContext.state(f.page), 'ready');
+  assert.ok(f.choice('image_generation'));
+  assert.equal(f.calls.length, 0);
+});
+
+test('DOM-free tools resolve a replacement owner under a reused HostRoot', async () => {
+  const f = memoryToolFixture();
+  assert.equal(f.list(), true); await flush();
+  const next = { ...f.ancestor, child: null };
+  commitToolRootAgain(f, next);
+  assert.equal(f.list(), true); await flush();
+  f.pick(f.choice('image_generation').id);
+  assert.equal(f.state.activeSystemHintType, 'picture_v2');
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.fallbacks, 0);
+});
+
+test('DOM-free tool selection rejects a duplicate introduced after menu capture', async () => {
+  const f = memoryToolFixture();
+  assert.equal(f.list(), true); await flush();
+  const id = f.choice('image_generation').id;
+  f.ancestor.sibling = { ...f.ancestor, child: null };
+  commitToolRootAgain(f, f.ancestor);
+  f.pick(id);
+  assert.equal(f.results.at(-1)[1], false);
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.state.activeSystemHintType, null);
+});
+
 for (const [reason, change] of Object.entries({
   route: f => { f.page.location.href = 'https://chatgpt.com/'; },
   identity: f => { f.account = 'Bearer other-synthetic-account'; },

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 22, create: factory });
+  const exported = Object.freeze({ version: 23, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -360,5 +360,5 @@
       if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
     }
   } catch (_) {}
-  return Object.freeze({ version: 22, submit, captureConversation, capturePrivateConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 23, submit, captureConversation, capturePrivateConversation, state: () => ({ pending: active !== null }) });
 });

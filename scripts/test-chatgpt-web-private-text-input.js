@@ -115,6 +115,40 @@ test('retained initial HostRoot field follows the new committed tree', () => {
   assert.equal(binding?.draft.read(), f.draft(), 'bailout return pointer can retain the old parent');
 });
 
+function commitInputRootAgain(f, child) {
+  const alternate = { stateNode: f.root.stateNode, return: null };
+  f.root.alternate = alternate; alternate.alternate = f.root;
+  f.root.stateNode.current = alternate;
+  f.root.child = child;
+  f.root.stateNode.current = f.root;
+}
+
+test('private input rediscovers an owner after a negative lookup and HostRoot reuse', () => {
+  const f = fixture(); f.root.child = null;
+  assert.equal(f.runtime.capturePrivateConversation(null), null);
+  commitInputRootAgain(f, f.fiber);
+  assert.equal(f.runtime.capturePrivateConversation(null)?.draft.read(), f.draft());
+});
+
+test('private input rediscovers a replacement owner after HostRoot reuse', () => {
+  const f = fixture();
+  assert.equal(f.runtime.capturePrivateConversation(null)?.draft.read(), f.draft());
+  commitInputRootAgain(f, { ...f.fiber });
+  assert.equal(f.runtime.capturePrivateConversation(null)?.draft.read(), f.draft());
+});
+
+test('cached input refuses a new conflicting file owner after HostRoot reuse', async () => {
+  const f = fixture(); f.api.snapshot(null); await tick();
+  assert.equal(f.api.snapshot(null).ready, true);
+  f.fiber.sibling = { ...f.fiber, dependencies: { firstContext: { memoizedValue: f.binding.shared,
+    next: { memoizedValue: { ...f.files } } } } };
+  commitInputRootAgain(f, f.fiber);
+  assert.equal(f.api.setDraft('must not write', f.draft()), false);
+  assert.equal(f.edits.length, 0);
+  assert.equal(f.api.snapshot(null).ready, false);
+  await tick();
+});
+
 test('rich input, overlong drafts and unmapped runtime are not mistaken for empty text', () => {
   for (const change of [f => { f.draft('x'.repeat(20001)); },
     f => { f.view.state.doc.toJSON = () => ({ type: 'doc', content: [{ type: 'image' }] }); },

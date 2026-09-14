@@ -1,12 +1,10 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptCommittedComposerOwner = api;
 })(typeof window === 'object' ? window : null, function (page, readStores, ownerPath) {
   'use strict';
-  let cache = null;
-
   function roots() {
     const document = page.document, body = document?.body;
     const children = Array.from(body?.children || []);
@@ -31,7 +29,8 @@
   }
 
   function candidates(currentRoots) {
-    if (cache?.document === page.document && sameRoots(cache.roots, currentRoots)) return cache.candidates;
+    // HostRoot objects alternate and can be reused after two commits. Their
+    // identity cannot validate cached owners or a previously empty subtree.
     const result = [], visited = new Set(), stack = [...currentRoots.values()];
     while (stack.length) {
       const fiber = stack.pop();
@@ -49,16 +48,15 @@
         siblings.add(child); stack.push(child);
       }
     }
-    cache = { document: page.document, roots: currentRoots, candidates: result };
     return result;
   }
 
   function locate(matches, acceptsFiber) {
     try {
       const currentRoots = roots();
-      if (!currentRoots) { cache = null; return null; }
+      if (!currentRoots) return null;
       const found = candidates(currentRoots);
-      if (!found) { cache = null; return null; }
+      if (!found) return null;
       let selected = null;
       for (const fiber of found) {
         if (acceptsFiber && !acceptsFiber(fiber)) continue;
@@ -81,7 +79,7 @@
         const next = locate(matches, acceptsFiber);
         return next !== null && ['shared', 'files', 'conversation', 'controller'].every(key => next[key] === selected[key]);
       } };
-    } catch (_) { cache = null; return null; }
+    } catch (_) { return null; }
   }
 
   return Object.freeze({ locate });
