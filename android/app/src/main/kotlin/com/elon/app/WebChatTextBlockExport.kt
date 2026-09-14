@@ -19,7 +19,7 @@ internal object WebChatTextBlockExport {
 
     fun formats(block: WebChatTextBlock): List<ChatGptWebCanvasExportFormat> {
         if (block.kind == "writing") return listOfNotNull(ChatGptWebCanvasExportFormats.find("document", "md"), text,
-            ChatGptWebCanvasExportFormats.find("document", "docx"))
+            ChatGptWebCanvasExportFormats.find("document", "docx"), ChatGptWebCanvasExportFormats.find("document", "pdf"))
         val language = block.language.lowercase().let { aliases[it] ?: it }
         return listOfNotNull(ChatGptWebCanvasExportFormats.find("code/$language", "source"), text).distinctBy { it.extension }
     }
@@ -38,7 +38,11 @@ internal object WebChatTextBlockExport {
 
     fun bytes(block: WebChatTextBlock, content: String, format: ChatGptWebCanvasExportFormat): ByteArray {
         require(block.complete && content.length <= WebChatTextBlock.MAX_CONTENT && format in formats(block))
-        return if (format.key == "docx") WebChatTextBlockDocx.bytes(content) else bytes(content)
+        return when (format.key) {
+            "docx" -> WebChatTextBlockDocx.bytes(content)
+            "pdf" -> WebChatTextBlockPdf.bytes(content)
+            else -> bytes(content)
+        }
     }
 
     // This is a user-requested local export, not a provider download or cloud-save receipt.
