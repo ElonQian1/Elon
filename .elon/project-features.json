@@ -17148,7 +17148,7 @@
       "id": "group-message-revisions-v1",
       "title": "群聊文字编辑与完整修改记录",
       "summary": "APK、Windows、网页支持本人编辑群聊文字、公开修改标记与追加式版本历史，保护草稿和并发保存。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/group-message-revisions.md",
@@ -17371,7 +17371,7 @@
         }
       ],
       "created_at_ms": 1789411581680,
-      "updated_at_ms": 1789414108498
+      "updated_at_ms": 1789415272360
     },
     {
       "id": "merchant-erp-open-commerce-runtime-bridge-v1",
@@ -28736,16 +28736,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_653dcb151a07445a84413e55510ad2d6",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "transitioned",
-      "actor": "codex-ui-boundary",
-      "reason": "用户要求继续完成长期原生创建链路",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788967752005
-    },
-    {
       "id": "feature_event_78c77231d6fb437084a9401bd9a71796",
       "feature_id": "android-exchange-session-host-v2",
       "action": "claimed",
@@ -30734,6 +30724,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1789414108498
+    },
+    {
+      "id": "feature_event_f008a0e6623b47fbba2de4ea12d6cec0",
+      "feature_id": "group-message-revisions-v1",
+      "action": "transitioned",
+      "actor": "codex-group-message-revisions",
+      "reason": "后端 0.3.1752、PC/PWA 及 APK 1.1.1744 已发布，来源提交 3ef6654dc7c18c7871618f408808aca655d2d983 一致；健康、资源哈希和版本清单核对通过，真机视觉验收延期。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1789415272360
     }
   ]
 }
