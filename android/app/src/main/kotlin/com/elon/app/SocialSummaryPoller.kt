@@ -108,6 +108,7 @@ internal class SocialSummaryPoller(
         val editor = prefs.edit()
 
         friends.forEach { summary ->
+            ChatMessageNotifications.rememberConversationName(appContext, "friend", summary.id, summary.name)
             if (shouldNotifyFriend(summary, initialized, now)) {
                 ChatMessageNotifications.showFriendMessage(
                     context = appContext,
@@ -123,6 +124,7 @@ internal class SocialSummaryPoller(
         }
 
         groups.forEach { summary ->
+            ChatMessageNotifications.rememberConversationName(appContext, "group", summary.id, summary.name)
             if (shouldNotifyGroup(summary, initialized, now)) {
                 ChatMessageNotifications.showGroupMessage(
                     context = appContext,
