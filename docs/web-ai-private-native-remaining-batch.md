@@ -21,8 +21,10 @@ functional completeness, not a gate for this phase.
 ## Current Status Map
 
 [Collapsed composer](reports/chatgpt-collapsed-composer-20260912.md): accepted; reuse.
-[Canvas](reports/chatgpt-canvas-provider-boundary-1682.md): listing accepted;
-creation declined. Do not repeat prompts; writes/exports need an owned sample.
+[Canvas](reports/chatgpt-runtime-bindings-20260915.md): current protocol, native
+edit/save/readback/conflict handling are implemented; real original-Canvas
+save/restore acceptance still needs an owned sample. Current creation/eligibility
+attempts did not supply one. Do not repeat prompts or count Writing Blocks as Canvas.
 [Writing Blocks](chatgpt-writing-blocks-native.md)
 reading/edit/export and ordinary save are accepted (1692; editor undo/redo/share 1706).
 [Project/typed saves](chatgpt-writing-blocks-native.md) are offline-verified.
@@ -30,14 +32,22 @@ reading/edit/export and ordinary save are accepted (1692; editor undo/redo/share
 
 [Search](chatgpt-fresh-search-text-dispatch.md): verified, 1731 default.
 [Image](reports/chatgpt-fresh-image-device-20260915.md): existing-personal independent
-send accepted on 1739; default source ready for grouped release. Reuse both passes.
+send accepted on 1739; default shipped in the Sep15 grouped release. Reuse both passes.
+[Owned attachment sends](chatgpt-fresh-attachment-text-dispatch.md): existing
+personal local TXT/PDF/PNG with a nonempty prompt passed native independent HTTP,
+stream/readback and cleanup on 1746; default enabled in normal 1747 / adapter 410.
+New/project/temporary/tool combinations, other MIME, file-only and Library/mounted
+attachments are separate extension scopes, not missing ordinary sender code.
 [Extended tool combinations](chatgpt-fresh-tool-text-dispatch.md),
 [project sends](chatgpt-fresh-project-text-dispatch.md),
-[temporary sends/cache guard](chatgpt-fresh-temporary-text-dispatch.md),
-[owned attachment sends](chatgpt-fresh-attachment-text-dispatch.md): offline-verified.
+[temporary sends/cache guard](chatgpt-fresh-temporary-text-dispatch.md): offline-verified.
 [Fresh retry](chatgpt-fresh-regeneration.md): 1726 native pass;
 1728 enables personal plain-text retry. Other scopes remain gated.
-[New personal first send](chatgpt-fresh-new-text-dispatch.md) is completed/default-enabled on 1721: native first/follow-up and unarmed default passed. Reuse it; new project/tool/file/temporary and initial composer-free scopes remain open.
+[New personal first send](chatgpt-fresh-new-text-dispatch.md) is completed/default-enabled:
+latest Sep15 mapping passed native first/follow-up on 1743. Reuse it; new
+project/tool/file/temporary and initial composer-free scopes remain separate.
+[Composer-unavailable acceptance](chatgpt-composer-unavailable-acceptance.md)
+tests the existing memory owner, without replacing the production sender.
 
 The [new-chat tool composition audit](chatgpt-fresh-tool-text-dispatch.md#new-conversation-composition-audit)
 confirms that new personal/owned-project Search and Picture requests already use
@@ -79,7 +89,7 @@ Raster deletion is offline-only; [project raster reference/removal is accepted o
 | Ordinary new-chat text + PNG + PDF attachments | Completed on 1598 | Project/temporary/other-format variants remain separate |
 | File library navigation, saved download, single library attachment, rename/soft-delete/upload-copy | Earlier scopes through 1591 reused; native TXT/PNG/PDF Download buttons and saved bytes passed on 1612 | [Mounted catalogue download](chatgpt-private-library-mounted-download.md) (244 checks) and [mounted attachment preparation](chatgpt-private-mounted-library-attachment.md) (196 checks) are included in installed 1639; device acceptance pending. Large-transfer/cancel/crash cases, other special sources, folder writes and attachment scopes remain |
 | Personal sharing/list/revoke and deletion | Reuse [1644](reports/chatgpt-private-acceptance-1644.md), [Canvas 1673](reports/chatgpt-canvas-shared-links-20260911.md) and [1677 source/return](reports/chatgpt-canvas-production-1675-20260912.md) | Original Canvas sample unavailable; no creation retries on the current model. Editor/writes, disposable revoke and other sharing scopes remain unverified |
-| Text submit/stream/stop/follow-up | Personal independent HTTP: [existing 1696](chatgpt-fresh-text-dispatch.md), [new 1721](reports/chatgpt-fresh-new-default-20260914.md), completed/default-enabled. [Stop/follow-up 1699](reports/chatgpt-command-recovery-1698.md#stopped-turn-follow-up-on-1699), [runtime retry 1644](reports/chatgpt-regeneration-store-20260911.md#normal-1644-acceptance) and [independent personal plain-text retry 1726/1728](chatgpt-fresh-regeneration.md) accepted; reuse | Retry outside accepted personal plain text, pre-answer Stop, tool/file/project/temporary, initial composer-free and network-loss recovery remain |
+| Text submit/stream/stop/follow-up | Personal independent HTTP: existing/new plain text, existing Search/Image and existing local TXT/PDF/PNG with prompt are accepted/default-enabled through 1747. Reuse [Stop/follow-up 1699](reports/chatgpt-command-recovery-1698.md#stopped-turn-follow-up-on-1699), [runtime retry 1644](reports/chatgpt-regeneration-store-20260911.md#normal-1644-acceptance) and [independent plain-text retry 1726/1728](chatgpt-fresh-regeneration.md) | Retry outside personal plain text, pre-answer Stop, combined new/tool/file/project/temporary scopes, initial composer-free and network-loss recovery remain |
 | Project attachments | Native TXT/PNG/PDF upload/send/content reading passed on 1614; read-isolation fix is installed and file-index verified on 1649 | Idle membership query itself is not separately device-verified; do not rebuild or repeat file-index acceptance for it |
 | Model/effort/tool combinations | Reuse [models and Image/Search](reports/chatgpt-composer-state-20260910.md). [Instant native roundtrip passed on 1673](reports/chatgpt-tool-admission-20260912.md) | Study/Canvas absent in raw hints for both tested levels, not our filtering; neither tool accepted. Other contexts, preference persistence and full Canvas editing remain |
 | Latest cursor image gallery and creation | Gallery entry/page/viewer passed on 1620; full native Create Image passed on 1644. Ordinary original-image Download completed/default-enabled on 1654: one saved 662,362-byte PNG, 1254 x 1254, native decode and state restoration passed | [Original-download evidence and boundaries](reports/chatgpt-gallery-original-download-20260911.md#normal-1654-acceptance). Project/shared/mounted/watermarked sources, other formats and model/account scopes remain. Thumbnail efficiency/thermal work remains deferred |

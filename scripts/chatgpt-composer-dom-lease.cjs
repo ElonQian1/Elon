@@ -19,6 +19,26 @@ function pageOperation(action, nonce, version, selectors) {
     return current.restore();
   }
   if (!eligible) throw new Error('composer_lease_identity_unavailable');
+  if (action === 'diagnose') {
+    if (current?.nonce !== nonce) throw new Error('composer_lease_missing');
+    return (async () => {
+      const context = window.__elonChatGptFreshTextContext?.create(window);
+      const result = { lease: current.state(), stamp: !!context?.stamp(), memory_owner: false,
+        private_ready: false, code: 'not_observed', stage: '' };
+      try {
+        const binding = window.__elonChatGptPrivateTextRuntimeSubmit?.capturePrivateConversation(null);
+        result.memory_owner = !!binding;
+        result.draft_readable = typeof binding?.draft?.read() === 'string';
+        const captured = await context.capture(null, null, { allowNewConversations: true });
+        result.private_ready = captured.current() && typeof captured.draft?.read() === 'string';
+        result.code = 'captured';
+      } catch (error) {
+        result.code = /^[a-z_]+$/.test(error.message) ? error.message : 'capture_exception';
+        result.stage = /^[a-z_]+$/.test(error.admissionStage || '') ? error.admissionStage : '';
+      }
+      return result;
+    })();
+  }
   if (action === 'state') {
     if (current?.nonce !== nonce) throw new Error('composer_lease_missing');
     return current.state();
@@ -106,7 +126,7 @@ function evaluate(url, expression) {
 
 async function run(endpointValue, action, nonce, version) {
   const endpoint = endpointUrl(endpointValue);
-  if (!['hide', 'state', 'restore'].includes(action) || !/^[a-f0-9]{32}$/.test(nonce) ||
+  if (!['hide', 'state', 'diagnose', 'restore'].includes(action) || !/^[a-f0-9]{32}$/.test(nonce) ||
       !Number.isInteger(version) || version < 1) throw new Error('composer_cdp_arguments_invalid');
   const response = await fetch(new URL('json', endpoint), { signal: AbortSignal.timeout(4000), redirect: 'error' });
   if (!response.ok) throw new Error('composer_cdp_listing_failed');

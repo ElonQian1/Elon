@@ -21,14 +21,16 @@ function Start-ChatGptComposerDomLease {
         Assert-ChatGptComposerDomUnavailable -State $state
         return $lease
     } catch {
-        Stop-ChatGptComposerDomLease -Runtime $Runtime -Lease $lease | Out-Null
-        throw
+        $failure = $_
+        try { Stop-ChatGptComposerDomLease -Runtime $Runtime -Lease $lease | Out-Null } catch { }
+        throw $failure
     }
 }
 
 function Invoke-ChatGptComposerDomLease {
-    param([Parameter(Mandatory)]$Lease, [ValidateSet('hide','state','restore')][string]$Action)
-    $result = Invoke-ElonNativeCommand -FilePath (Get-Command node.exe -CommandType Application).Source `
+    param([Parameter(Mandatory)]$Lease, [ValidateSet('hide','state','diagnose','restore')][string]$Action)
+    $node = Get-Command node.exe -CommandType Application | Select-Object -First 1
+    $result = Invoke-ElonNativeCommand -FilePath $node.Source `
         -ArgumentList @((Join-Path $PSScriptRoot 'chatgpt-composer-dom-lease.cjs'), $Lease.endpoint,
             $Action, $Lease.nonce, [string]$Lease.version) -TimeoutSeconds 30 -Label "composer lease $Action"
     Assert-ElonNativeCommand -Result $result -FailureMessage "composer_lease_${Action}_failed"

@@ -66,8 +66,9 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
     if ($Candidate -and -not $UseDefault -and $before.armed -ne $true) { throw "trial_not_armed:$($before.control)" }
     if ($composerLease) {
         Assert-ChatGptComposerDomUnavailable (Invoke-ChatGptComposerDomLease -Lease $composerLease -Action state)
-        if ($baseline.composer_ready -ne $false -or $baseline.private_send_ready -ne $true) { throw 'composer_lease_private_readiness_missing' }
+        if ($baseline.private_send_ready -ne $true) { throw 'composer_lease_private_readiness_missing' }
         $report.composer_unavailable_before_click = $true
+        $report.native_composer_ready_before_click = $baseline.composer_ready
     }
     $started = [DateTimeOffset]::UtcNow
     # A lost click acknowledgement must not permit replay, navigation or draft cleanup.
@@ -225,7 +226,7 @@ try {
     if ($ComposerUnavailable) {
         $composerLease = Start-ChatGptComposerDomLease -Runtime $runtime
         Wait-ChatGptWebSmokeState -Runtime $runtime -TimeoutSec 20 -Description 'private sender without usable composer' -Predicate {
-            param($s) $s.composer_ready -eq $false -and $s.private_send_ready -eq $true
+            param($s) $s.private_send_ready -eq $true
         } | Out-Null
     }
     foreach ($kind in $(if ($StopThenFollowup) { @('stop','followup') } elseif ($OnlyStop) { @('stop') } elseif ($FirstOnly) { @('first') } else { @('first','followup') })) {
