@@ -52,7 +52,9 @@ internal object ChatGptWebFreshTextTrial {
         }
         require(value.opt("history") in setOf("not_observed", "reading", "owner_changed", "payload_missing",
             "conversation_mismatch", "user_missing", "parent_mismatch", "branch_mismatch", "server_active",
-            "verified", "not_terminal", "store_not_reconciled", "reconciled"))
+            "verified", "not_terminal", "store_not_reconciled", "reconciled", "store_owner_changed",
+            "store_history_busy", "store_status_unsettled", "store_attachments_mismatch", "store_user_missing",
+            "store_parent_mismatch", "store_leaf_mismatch", "store_prompt_mismatch"))
         require(value.getBoolean("armed") || value.getLong("remaining_ms") == 0L)
         return value.toString()
     }

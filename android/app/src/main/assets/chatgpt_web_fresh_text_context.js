@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 11, create: factory });
+  const api = Object.freeze({ version: 12, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -226,7 +226,7 @@
       return !navigated && page.location.href === href && shared.textNavigationKey() === navigationKey &&
         binding.shared.getSharedProps().conversation === selected;
     }
-    let ownershipStage = 'not_observed', reconciliationStage = 'not_observed';
+    let ownershipStage = 'not_observed', reconciliationStage = 'not_observed', storeStage = 'store_not_reconciled';
     function owns() {
       try {
         ownershipStage = 'document'; if (document !== page.document) return false;
@@ -314,6 +314,7 @@
         return navigationTask.then(value => !signal.aborted && value);
       },
       navigationReady: () => temporary || !newConversation || navigated,
+      reconciliationFailure: () => storeStage,
       canReconcile(userMessageId) {
         reconciliationStage = 'identity'; if (!serverId || !owns()) return false;
         reconciliationStage = 'history_busy'; if (!historyAllowed()) return false;
@@ -327,22 +328,31 @@
         return this.canReconcile(userMessageId);
       },
       reconciled(userMessageId, stopped = false, emptyStopped = false, verifyNewParent = null) {
-        if (!owns() || !historyAllowed()) return false;
+        storeStage = 'store_owner_changed'; if (!owns()) return false;
+        storeStage = 'store_history_busy'; if (!historyAllowed()) return false;
         const status = shared.Fx(selected);
+        storeStage = 'store_status_unsettled';
         if (status != null && status.value !== shared.v7.UNREAD) return false;
         const state = tree(), user = shared.HM.getNodeIfExists(state, userMessageId);
         const parent = shared.HM.getParentNode(state, userMessageId);
         const leaf = shared.HM.getCurrentMessage(state);
         const parentMatches = parent?.id === snapshot.parentId || newConversation &&
           typeof verifyNewParent === 'function' && verifyNewParent(shared.HM, state) === true;
+        storeStage = 'store_attachments_mismatch';
         if (attachments && !attachments.matchesHistory(user?.message)) return false;
+        storeStage = 'store_user_missing'; if (user?.message?.author?.role !== 'user') return false;
+        storeStage = 'store_parent_mismatch'; if (!parentMatches) return false;
         if (stopped && emptyStopped && user?.message?.author?.role === 'user' &&
-            parentMatches && leaf?.id === userMessageId && leaf.author?.role === 'user') return true;
-        return user?.message?.author?.role === 'user' && parentMatches &&
-          leaf?.id !== snapshot.parentId && leaf?.id !== userMessageId &&
+            parentMatches && leaf?.id === userMessageId && leaf.author?.role === 'user') {
+          storeStage = 'reconciled'; return true;
+        }
+        storeStage = 'store_leaf_mismatch';
+        if (!(leaf?.id !== snapshot.parentId && leaf?.id !== userMessageId &&
           leaf?.author?.role === 'assistant' && (leaf.status === 'finished_successfully' && leaf.end_turn === true ||
-            stopped && leaf.status === 'finished_partial_completion') &&
-          shared.HM.getParentPromptNode(state, leaf.id)?.id === userMessageId;
+            stopped && leaf.status === 'finished_partial_completion'))) return false;
+        storeStage = 'store_prompt_mismatch';
+        if (shared.HM.getParentPromptNode(state, leaf.id)?.id !== userMessageId) return false;
+        storeStage = 'reconciled'; return true;
       }
     });
   }

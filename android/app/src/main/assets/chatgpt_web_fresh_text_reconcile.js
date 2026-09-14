@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 10, create: factory });
+  const api = Object.freeze({ version: 11, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
@@ -196,7 +196,7 @@
     if (done && binding.finalize && !firstRoute) done = await binding.finalize(signal) === true &&
       !signal.aborted && binding.reconciled(request.userMessageId, stopped, emptyStopped, verifyNewParent);
     if (verified) report(done ? 'reconciled' : signal.aborted || !binding.canReconcile(request.userMessageId)
-      ? 'owner_changed' : 'store_not_reconciled');
+      ? 'owner_changed' : binding.reconciliationFailure?.() || 'store_not_reconciled');
     return done;
   }
   return Object.freeze({ reconcile, ownsResponse, branch, read, awaitingUser });

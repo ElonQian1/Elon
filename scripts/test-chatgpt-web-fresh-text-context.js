@@ -5,6 +5,31 @@ const { fixture, CID, PID } = require('./fixtures/chatgpt-fresh-text-context');
 
 const PROJECT = 'g-p-' + 'a'.repeat(32);
 
+test('store reconciliation retains the exact failing predicate without treating it as success', async () => {
+  const UID = '33333333-3333-4333-8333-333333333333';
+  const AID = '44444444-4444-4444-8444-444444444444';
+  for (const [expected, mutate] of [
+    ['store_owner_changed', f => { f.page.document = {}; }],
+    ['store_history_busy', f => { f.shared.Fl = () => true; }],
+    ['store_status_unsettled', f => { f.shared.Fx = () => ({ value: 3 }); }],
+    ['store_user_missing', f => { f.shared.HM.getNodeIfExists = () => null; }],
+    ['store_parent_mismatch', f => { f.shared.HM.getParentNode = () => ({ id: 'different' }); }],
+    ['store_leaf_mismatch', f => { f.shared.HM.getCurrentMessage = () => f.parent; }],
+    ['store_prompt_mismatch', f => { f.shared.HM.getParentPromptNode = () => null; }]
+  ]) {
+    const f = fixture(), binding = await f.api.capture(f.node);
+    Object.assign(f.shared.HM, {
+      getCurrentMessage: () => ({ id: AID, author: { role: 'assistant' }, status: 'finished_successfully', end_turn: true }),
+      getNodeIfExists: () => ({ message: { id: UID, author: { role: 'user' } } }),
+      getParentNode: () => ({ id: PID }), getParentPromptNode: () => ({ id: UID })
+    });
+    assert.equal(binding.reconciled(UID), true);
+    mutate(f);
+    assert.equal(binding.reconciled(UID), false);
+    assert.equal(binding.reconciliationFailure(), expected);
+  }
+});
+
 test('ownership diagnostics retain only the failed guard, not account or conversation values', async () => {
   for (const [stage, change] of [
     ['document', f => { f.page.document = {}; }],

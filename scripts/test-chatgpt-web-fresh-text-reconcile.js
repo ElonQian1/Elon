@@ -30,6 +30,20 @@ test('owned completed branch hydrates the existing official store without editor
   assert.equal(f.calls[0].options.skipIfExisting, false);
 });
 
+test('verified HTTP history reports a store failure without claiming reconciliation', async () => {
+  const f = fixture(), observations = [];
+  f.binding.reconciled = () => false;
+  f.binding.reconciliationFailure = () => 'store_parent_mismatch';
+  assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal, false, false,
+    code => observations.push(code)), false);
+  assert.deepEqual(observations, ['reading', 'verified', 'store_parent_mismatch']);
+  delete f.binding.reconciliationFailure;
+  observations.length = 0;
+  assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal, false, false,
+    code => observations.push(code)), false);
+  assert.equal(observations.at(-1), 'store_not_reconciled');
+});
+
 test('history diagnostics locate mismatch without weakening ownership or exporting the payload', async () => {
   for (const [expected, mutate] of [
     ['conversation_mismatch', p => { p.conversation_id = 'private_fixture'; }],

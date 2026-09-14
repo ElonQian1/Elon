@@ -35,6 +35,16 @@ class ChatGptWebFreshTextTrialTest {
         }
     }
 
+    @Test fun acceptsOnlyStructuralStoreFailureReasons() {
+        for (reason in listOf("store_owner_changed", "store_history_busy", "store_status_unsettled",
+            "store_attachments_mismatch", "store_user_missing", "store_parent_mismatch", "store_leaf_mismatch",
+            "store_prompt_mismatch")) {
+            val value = sample().put("history", reason).put("reconciled", false).put("pending", true)
+            assertEquals(reason, JSONObject(ChatGptWebPrivateProtocolEvidence.detail(
+                "private_protocol_probe", value.toString())).getString("history"))
+        }
+    }
+
     @Test fun versionEightAcceptsOnlyBoundedOwnershipDiagnosticsAndPreservesOldReceipts() {
         val owner = JSONObject().put("ownership", "route").put("reconciliation", "identity")
         val current = sample().put("version", 8).put("owner", owner)

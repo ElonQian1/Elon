@@ -22,6 +22,25 @@ class ChatGptWebHistoryParentDiagnosticTest {
             .put("nodes", JSONArray()).put("terminal", "not_observed")
         assertEquals("timeout", JSONObject(detail(value)).getString("code"))
     }
+    @Test fun acceptsCurrentPaginationDescriptorAndRetainsLegacyShape() {
+        val value = fixture().put("pagination", JSONObject().put("present", true).put("complete", true)
+            .put("root_owned", true).put("current_leaf_matches", true))
+        value.getJSONArray("nodes").getJSONObject(0).put("parent_kind", "paginated_root")
+        assertEquals(value.toString(), detail(value))
+        assertEquals(fixture().toString(), detail(fixture()))
+        for (key in listOf("present", "complete", "root_owned", "current_leaf_matches")) {
+            val invalid = JSONObject(value.toString())
+            invalid.getJSONObject("pagination").put(key, "true")
+            assertEquals("invalid_protocol_evidence", detail(invalid))
+        }
+        val extra = JSONObject(value.toString())
+        extra.getJSONObject("pagination").put("cursor", "private")
+        assertEquals("invalid_protocol_evidence", detail(extra))
+        val inconsistent = JSONObject(value.toString())
+        inconsistent.getJSONObject("pagination").put("present", false)
+        assertEquals("invalid_protocol_evidence", detail(inconsistent))
+        assertEquals("invalid_protocol_evidence", detail(value.put("pagination", "private")))
+    }
     @Test fun rejectsContentAndIdsAtEveryLevel() {
         for (key in listOf("content", "id", "parent", "token")) {
             assertEquals("invalid_protocol_evidence", detail(fixture().put(key, "private")))
