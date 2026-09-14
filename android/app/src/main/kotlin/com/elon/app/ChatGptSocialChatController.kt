@@ -59,7 +59,10 @@ internal class ChatGptSocialChatController(
         host = binding.chatListFrame,
         onSnapshot = ::renderSnapshot,
         onStateChanged = ::renderState,
-        onComposerOptions = ::showModelOptions,
+        onComposerControls = { section, options ->
+            if (section == "model") showModelOptions(options)
+            onComposerStateChanged()
+        },
         onCommandResult = ::handleCommandResult,
         onSendTerminalTimeout = ::handlePendingSendTimeout,
         onAttachmentSendChanged = ::handleAttachmentSendUpdate,

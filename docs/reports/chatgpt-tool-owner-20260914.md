@@ -66,7 +66,27 @@ private tool selector 4, adapter 398.
 
 ## Remaining
 
-Release/device verification of context v6 and one actual independent Image send
-are pending. No Image default or completed marker is enabled from unit tests,
-menu admission, UI inspection or a pre-dispatch failure. Preserve the existing
-fixture ledger and reconcile uncertain writes read-only; do not repeat Search.
+Context v6 shipped with Writing Block parser 8 in APK 1734 / adapter 399,
+source `724392dcb`. `fresh-image-1734-native-20260914-211441-484` passed tool
+context and native Image selection but stopped before sending. Added diagnostic
+stages preserve the original control step and script filename across cleanup.
+`fresh-image-1734-stages-20260914-211837-656` then identified a missing native
+`clear_search` control despite the private catalog confirming selected Search.
+Neither attempt sent a request or left a pending write; route/awake state restored.
+
+`tool-projection-readonly-20260914-212654-122` reproduced the projection gap:
+the catalog changed from empty to selected Search, but the chip/close control
+remained absent after both list and dismiss receipts. No tool mutation or send.
+The session only notified the native model-menu callback for ComposerControls;
+tool changes waited for a later message snapshot, which may be deduplicated.
+The callback now carries the section and immediately refreshes the native
+composer for all sections, while only model options enter the model popup.
+No polling, reload, protocol gate relaxation or extra write was introduced.
+
+`composer-state-notification-tests-20260914-213200-597`: 100 tests passed,
+zero skipped. The source contract also verifies canonical-state commit before
+notification, all-section delivery, model behavior and selected-state retention.
+Release/device verification of the notification fix and one actual independent
+Image send remain pending. No Image default/completed marker is enabled from
+menu admission alone. Preserve the fixture ledger and reconcile uncertain writes
+read-only; do not repeat the accepted Search send.

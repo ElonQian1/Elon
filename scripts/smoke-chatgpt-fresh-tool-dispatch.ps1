@@ -176,12 +176,15 @@ try {
         }else{
             "ELON_EXTENDED_TOOL_ACCEPTANCE_V1 IMAGE_$stamp. Create one simple image of a solid black circle centered on a white background. No text."
         }
+        Stage native_draft
         Act set_input_text @{text=$prompt}|Out-Null
         $baseline=Wait-ChatGptWebSmokeState -Runtime $r -TimeoutSec 10 -Description 'owned tool prompt' -Predicate {
             param($s) $s.input.text -ceq $prompt -and !$s.streaming -and $s.page_generation -eq $generation
         }.GetNewClosure()
+        Stage native_composer_expand
         Ui prepare_extended_tool_fixture @{fixture_prefix=$prefix}|Out-Null
         $prior=@($baseline.command_requests|ForEach-Object request_id)
+        Stage private_trial_start
         $trialRequested=$true
         $before=Trial start
         if ($before.armed -cne $true -or $before.pending -cne $false){throw 'trial_not_armed'}
@@ -230,11 +233,17 @@ try {
     $report.error=if($message -cmatch '^[a-z_]+$'){$message}else{'tool_acceptance_failed'}
     if($message -cmatch '^Semantic UI acceptance failed: ([a-z_]+)$'){$report.error=$Matches[1]}
     $report.error_line=$_.InvocationInfo.ScriptLineNumber
+    $report.error_file=[IO.Path]::GetFileName($_.InvocationInfo.ScriptName)
+    $report.exception_type=$_.Exception.GetType().Name
+    $report.failure_control_step=$report.control_step
     if($navigated -and !$awaiting){
         try{
             $web=Web
+            $main=Main
             $report.failure_context=@{adapter_current=$web.adapter_current;composer_ready=$web.composer_ready;
-                bridge_state=$web.bridge_state;same_generation=($web.page_generation -eq $generation)}
+                bridge_state=$web.bridge_state;same_generation=($web.page_generation -eq $generation);
+                native_has_draft=$main.input.has_text;web_draft_matches=($prompt -and $web.input.text -ceq $prompt);
+                official_has_draft=($web.input.official_draft_length -gt 0)}
             $d=Act chatgpt_private_protocol_probe @{mode='composer_tool_context'}
             $v=Wait-ChatGptCommandReceipt -InvokeUiState { Web } -RequestId $d.command_receipt.request_id `
                 -ExpectedAction private_protocol_probe -TimeoutSec 10 -PollIntervalSec 1

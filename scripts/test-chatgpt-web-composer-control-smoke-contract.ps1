@@ -52,3 +52,21 @@ if ($script -match "send_input|ProbeMarker|Reply only with") {
     throw "Composer control smoke must not send ChatGPT messages."
 }
 Write-Output "CHATGPT_WEB_COMPOSER_CONTROL_SMOKE_CONTRACT=passed"
+
+$kotlin = Join-Path $PSScriptRoot '../android/app/src/main/kotlin/com/elon/app'
+$session = Get-Content (Join-Path $kotlin 'chatgptweb/ChatGptBackgroundSession.kt') -Raw
+$controller = Get-Content (Join-Path $kotlin 'ChatGptSocialChatController.kt') -Raw
+$observed = Get-Content (Join-Path $kotlin 'chatgptweb/ChatGptWebObservedState.kt') -Raw
+if ($session -notmatch '(?s)private fun handleEvent\(event: ChatGptWebEvent\).*?observedMcpState.accept\(event\).*?when \(event\)') {
+    throw 'Composer observers must receive the already committed canonical state.'
+}
+if ($session -notmatch '(?s)is ChatGptWebEvent.ComposerControls -> \{\s+composerOptionInteraction.release\(\)\s+composerOptionRequests.complete\(event.section\)\s+onComposerControls\(event.section, event.options\)\s+\}') {
+    throw 'All composer sections must notify native controls without waiting for a message snapshot.'
+}
+if ($controller -notmatch 'onComposerControls = \{ section, options ->\s+if \(section == "model"\) showModelOptions\(options\)\s+onComposerStateChanged\(\)\s+\}') {
+    throw 'Native composer notification must preserve model handling and refresh tools directly.'
+}
+if ($observed -notmatch 'is ChatGptWebEvent.ComposerControls -> \{\s+composerSections = composerSections \+ \(event.section to event.options\)') {
+    throw 'Composer sections must retain their canonical selected state, including cleared selections.'
+}
+Write-Output 'CHATGPT_WEB_COMPOSER_STATE_NOTIFICATION_CONTRACT=passed'

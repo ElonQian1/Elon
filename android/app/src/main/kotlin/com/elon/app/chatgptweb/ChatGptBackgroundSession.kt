@@ -22,7 +22,7 @@ internal class ChatGptBackgroundSession(
     private val host: FrameLayout,
     private val onSnapshot: (ChatGptWebSnapshot) -> Unit,
     private val onStateChanged: (State, String?) -> Unit,
-    private val onComposerOptions: (List<ChatGptWebComposerOption>) -> Unit,
+    private val onComposerControls: (String, List<ChatGptWebComposerOption>) -> Unit,
     private val onCommandResult: (ChatGptWebEvent.CommandResult, ChatGptWebSendReceipt?) -> Unit,
     private val onSendTerminalTimeout: (WebChatPendingSendState.TimeoutResult) -> Unit,
     private val onAttachmentSendChanged: (ChatGptWebAttachmentSendUpdate) -> Unit,
@@ -640,7 +640,7 @@ internal class ChatGptBackgroundSession(
             is ChatGptWebEvent.ComposerControls -> {
                 composerOptionInteraction.release()
                 composerOptionRequests.complete(event.section)
-                if (event.section == "model") onComposerOptions(event.options)
+                onComposerControls(event.section, event.options)
             }
             is ChatGptWebEvent.CommandResult -> {
                 chatGptComposerSectionForAction(event.action)?.let { section ->
