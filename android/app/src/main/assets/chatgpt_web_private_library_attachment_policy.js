@@ -1,7 +1,7 @@
 (function (root, prepare) {
   'use strict';
   const states = new WeakMap();
-  const api = Object.freeze({ version: 4,
+  const api = Object.freeze({ version: 5,
     prepare(page, binding) {
       const document = page.document, token = page.__elonChatGptDocumentToken;
       return prepare(page, binding, code => states.set(page, { document, token, code }));
@@ -9,6 +9,10 @@
     prepareUpload(page, binding) {
       const document = page.document, token = page.__elonChatGptDocumentToken;
       return prepare(page, binding, code => states.set(page, { document, token, code }), true);
+    },
+    prepareCachedUpload(page, binding) {
+      const document = page.document, token = page.__elonChatGptDocumentToken;
+      return prepare(page, binding, code => states.set(page, { document, token, code }), true, true);
     },
     state(page) {
       const value = states.get(page);
@@ -18,7 +22,7 @@
   });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateLibraryAttachmentPolicy = api;
-})(typeof window === 'object' ? window : null, async function (page, binding, report, localUpload) {
+})(typeof window === 'object' ? window : null, async function (page, binding, report, localUpload, cachedOnly) {
   'use strict';
   const runtime = page.__elonChatGptPrivateRuntimeBindings;
   const ownerPath = page.__elonChatGptCommittedOwnerPath ||
@@ -26,14 +30,14 @@
   const document = page.document, token = page.__elonChatGptDocumentToken;
   const reject = code => { report(code); return null; };
   let namespace;
-  try { namespace = runtime?.peek('composer') || await runtime?.load('composer'); }
+  try { namespace = runtime?.peek('composer') || (cachedOnly ? null : await runtime?.load('composer')); }
   catch (_) { return reject('runtime_unavailable'); }
   if (typeof namespace?.fh?.validateChatAttachment !== 'function') return reject('validator_unavailable');
   let conversation, shared;
   if (localUpload) {
     try {
-      conversation = runtime.peek('conversation') || await runtime.load('conversation');
-      shared = runtime.peek('shared') || await runtime.load('shared');
+      conversation = runtime.peek('conversation') || (cachedOnly ? null : await runtime.load('conversation'));
+      shared = runtime.peek('shared') || (cachedOnly ? null : await runtime.load('shared'));
     } catch (_) { return reject('runtime_unavailable'); }
     if (!['attachmentBaseLimit', 'attachmentMaxUploads', 'attachmentPendingCount', 'attachmentConfiguredLimit']
       .every(key => typeof conversation?.[key] === 'function') ||

@@ -49,8 +49,28 @@ remote deletion. An explicit retry can create new remote artifacts.
 
 Nine is the existing host selection bound, not an assertion of the account's
 current upload quota. Model/account limits and server rejection still apply.
-The bridge does not set `skipChatAttachmentLimits` or reset rate limits. A
-dedicated early read of the current official count/quota is not implemented.
+The bridge does not set `skipChatAttachmentLimits` or reset rate limits.
+
+## Cached initial quota precheck (2026-09-15)
+
+Initial local uploads now reuse the official quota validator already verified in
+[Library/local append](chatgpt-private-library-local-append.md). Cached confirmed
+count, type or account quota rejection stops the batch before native byte reads
+and remote uploads. It is checked again during preparation, before each write.
+This is the existing sender, not another upload transport.
+
+The initial precheck never imports modules, opens menus or fetches quota. Missing
+runtime/menu evidence or a menu disappearing during preparation is not a quota
+rejection: existing upload, ownership and server checks remain authoritative.
+Appending to a nonempty attachment collection retains its stricter existing
+admission contract. No account limits are reset or bypassed.
+
+`initial-upload-limit-regression-20260915-001318-789` passed 170 targeted tests,
+zero failures/skips, including first-batch rejection, image limits, missing cached
+evidence, a changing quota, and existing batch/project/Library/runtime submission.
+Sender v27, policy v5, adapter 403 are source-only for the next grouped build;
+this precheck has not been built or accepted on a device. Existing 1598 upload
+acceptance is unchanged and does not prove these new quota cases.
 
 ## Protocol evidence
 

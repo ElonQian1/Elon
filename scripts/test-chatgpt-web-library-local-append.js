@@ -16,7 +16,9 @@ function fixture(options = {}) {
   f.root.__elonChatGptPrivateRuntimeBindings.peek = role => cached[role];
   f.root.__elonChatGptPrivateRuntimeBindings.load = async role => cached[role];
   f.props.isFileUploadEnabled = true;
-  let fallbacks = 0, attempt = 0;
+  let fallbacks = 0, attempt = 0, imports = 0;
+  const load = f.root.__elonChatGptPrivateRuntimeBindings.load;
+  f.root.__elonChatGptPrivateRuntimeBindings.load = async role => { imports++; return load(role); };
   const sender = senderModule.create(f.root, { composer: f.composer,
     source: { read: async descriptor => {
       reads.push(descriptor); await options.onRead?.(f);
@@ -43,8 +45,81 @@ function fixture(options = {}) {
       value => changes.push(value), () => { fallbacks++; });
   }
   return { ...f, sender, start, uploads, reads, replies, changes, cached, conversation,
-    fallbacks: () => fallbacks };
+    fallbacks: () => fallbacks, imports: () => imports };
 }
+
+test('first local batch rejects a confirmed quota before native reads or uploads', async () => {
+  for (const options of [{ remaining: 1 }, { perTurn: 1 }, { remaining: 0 }]) {
+    const f = fixture(options);
+    await f.start(2);
+    assert.equal(f.replies.at(-1)?.[1], false);
+    assert.match(f.replies.at(-1)?.[2], /附件数量或大小/);
+    assert.equal(f.reads.length, 0);
+    assert.equal(f.uploads.length, 0);
+    assert.equal(f.imports(), 0);
+    assert.equal(f.fallbacks(), 0);
+    assert.deepEqual(f.store.files$(), []);
+  }
+});
+
+test('first image batch respects the existing official type-specific limit', async () => {
+  const f = fixture();
+  await f.start(5, 'image/png');
+  assert.equal(f.replies.at(-1)?.[1], false);
+  assert.equal(f.reads.length, 0);
+  assert.equal(f.uploads.length, 0);
+  assert.equal(f.imports(), 0);
+});
+
+test('first batch remains usable when cached quota evidence is unavailable', async () => {
+  for (const change of [
+    f => { delete f.cached.composer; },
+    f => { delete f.cached.conversation; },
+    f => { delete f.cached.shared; },
+    f => { f.root.__elonChatGptPrivateRuntimeBindings.tools = () => null; },
+    f => { delete f.props.maxLibraryAttachmentCount; },
+    f => { f.conversation.attachmentConfiguredLimit = () => NaN; },
+  ]) {
+    const f = fixture(); change(f);
+    await f.start(2);
+    assert.equal(f.replies.at(-1)?.[1], true);
+    assert.equal(f.uploads.length, 2);
+    assert.equal(f.store.files$().length, 2);
+    assert.equal(f.imports(), 0, 'quota observation must not load runtime modules');
+    assert.equal(f.fallbacks(), 0);
+  }
+});
+
+test('a vanished quota menu during the initial upload does not invalidate the upload owner', async () => {
+  const f = fixture({ onRead() { f.root.__elonChatGptPrivateRuntimeBindings.tools = () => null; } });
+  await f.start(2);
+  assert.equal(f.replies.at(-1)?.[1], true);
+  assert.equal(f.uploads.length, 2);
+  assert.equal(f.store.files$().length, 2);
+  assert.equal(f.fallbacks(), 0);
+});
+
+test('a confirmed quota change during the first native read stops before a remote write', async () => {
+  const f = fixture({ onRead() { f.conversation.attachmentMaxUploads = () => 0; } });
+  await f.start();
+  assert.equal(f.replies.at(-1)?.[1], false);
+  assert.match(f.replies.at(-1)?.[2], /附件数量或大小/);
+  assert.equal(f.reads.length, 1);
+  assert.equal(f.uploads.length, 0);
+  assert.equal(f.fallbacks(), 0);
+  assert.deepEqual(f.store.files$(), []);
+});
+
+test('initial quota observation preserves implicit unlimited banner semantics', async () => {
+  const f = fixture();
+  f.props.maxLibraryAttachmentCount = undefined;
+  f.props.maxTotalLibraryAttachmentCount = undefined;
+  await f.start(2);
+  assert.equal(f.replies.at(-1)?.[1], true);
+  assert.equal(f.uploads.length, 2);
+  assert.equal(f.store.files$().length, 2);
+  assert.equal(f.imports(), 0);
+});
 
 test('Library then a local batch keeps exact original entries and one complete submit lease', async () => {
   const f = fixture(); await f.attach(f.source(1));

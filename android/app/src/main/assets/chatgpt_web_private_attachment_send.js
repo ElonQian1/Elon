@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 26, create: factory });
+  const exported = Object.freeze({ version: 27, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -95,12 +95,20 @@
         (append ? append.current() : composer.available());
       // One low-frequency guard only while an explicit upload is in flight.
       timer = root.setInterval(() => { if (!current()) cancel(); }, 500);
-      const admit = append ? await root.__elonChatGptPrivateLibraryAttachmentPolicy?.prepareUpload(root, binding) : () => true;
+      const policy = root.__elonChatGptPrivateLibraryAttachmentPolicy;
+      let admit = null;
+      if (append) admit = await policy?.prepareUpload(root, binding);
+      else {
+        // Initial uploads reuse cached evidence, never wait for quota modules or a menu.
+        try { admit = await policy?.prepareCachedUpload?.(root, binding); } catch (_) {}
+      }
       const validate = files => {
         if (!current()) throw new Error('context_changed');
-        if (!admit) throw new Error('attachment_policy_unconfirmed');
-        if (!admit(files)) throw new Error(root.__elonChatGptPrivateLibraryAttachmentPolicy?.state(root) === 'attachment_limit'
-          ? 'attachment_limit' : 'attachment_policy_unconfirmed');
+        if (!admit) { if (append) throw new Error('attachment_policy_unconfirmed'); return; }
+        if (admit(files)) return;
+        const limited = policy?.state(root) === 'attachment_limit';
+        // Unknown initial quota is not a rejection; existing upload/server checks still apply.
+        if (limited || append) throw new Error(limited ? 'attachment_limit' : 'attachment_policy_unconfirmed');
       };
       validate(descriptors);
       // Compatibility selection for unknown/unsupported scope precedes byte reads
@@ -164,7 +172,7 @@
     return true;
   }
 
-  return Object.freeze({ version: 26, start, cancel, suspend, remove,
+  return Object.freeze({ version: 27, start, cancel, suspend, remove,
     attachLibrary: (command, respond, changed) => {
       selections?.cancel();
       return library ? library.attach(command, respond, changed) : respond('attach_library_file', false, 'library_not_ready');
