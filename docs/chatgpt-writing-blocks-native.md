@@ -10,6 +10,8 @@
 
 能力 ID：`android_chatgpt_text_block_local_editor_export_v1`，`completed / production_verified`，生产入口默认启用，代码块与真实 Writing Block 均已实测，不重复研究。
 
+Word 扩展 `android_chatgpt_writing_block_docx_export_v1` 已在 `1.1.1718` 完成生产 UI 验收。手机实测发现并修复 Android XML 转换器拆分 Unicode 字符导致文档损坏的问题；现在使用标准 XML Pull 序列化，保留既有编辑器和导出存储链路。详见 [Word 导出](chatgpt-writing-blocks-word-export.md)。
+
 ## 生产入口
 
 在普通好友聊天的写作块或代码块中打开正文，使用原生编辑器的编辑、复制、恢复和导出按钮；符合归属条件的写作块另有显式“保存到官网”。`ChatGptSocialImageContentController.open` 的 `textBlock` 分支直接连接 `WebChatTextBlockEditor`，不经过旧测试页或官网编辑页面。
@@ -98,4 +100,4 @@ DOM 外层气泡只作为容器，优先采用其同角色、非临时且唯一�
 ## 完成与剩余
 
 代码块本机链路在 `1.1.1688` 完成；Writing Block 本机编辑/导出、普通会话官网保存及原生回显在 `1.1.1692` 完成。早期 `1690/1691` 失败与后续修正均保留在发布报告，不能将早期失败改写为通过，也不再重复已通过范围。
-项目自有会话、typed widget 与已确认库文件关联写回已补源码，尚待集中包真机验收；临时会话、共享会话副本和缺少可信文件库会话等扩展写回仍有实现缺口。代码块保持本机编辑和文件导出，不执行代码或伪造官网代码保存；DOCX 本机导出已补实现，验证状态见专项文档，PDF 未实现。
+项目自有会话、typed widget 与已确认库文件关联写回已补源码，尚待集中包真机验收；临时会话、共享会话副本和缺少可信文件库会话等扩展写回仍有实现缺口。代码块保持本机编辑和文件导出，不执行代码或伪造官网代码保存；DOCX 本机导出已在 1718 真机验证完成，PDF 未实现。

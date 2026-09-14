@@ -52,5 +52,26 @@ and separately tests valid scalar references and the observed invalid pair.
   and failed on Android's unmocked XML factory, not on document content; the
   corrected test runtime reuses existing project dependencies.
 
-The encoder probe is not the final APK UI recheck. Record that separately after
-the corrected package is installed; do not relabel the 1717 failure as success.
+The encoder probe is distinct from the final APK UI recheck below. The 1717
+failure remains recorded as a failure.
+
+## Published APK and Production UI Recheck
+
+`writing-docx-unicode-release-20260914-085255-576` passed in 412.2s: Release
+build, publish, remote verification and non-destructive Xiaomi installation.
+Version `1.1.1718 / 1718`, source
+`c05b807e75bff32e67a283e2a583c58f67e4bd48`, APK SHA-256
+`e2ee4705ba6f8b332a8f6abf79bd06dcf5bb89e3bfb7819d1a61cf84b3dbc740`.
+An independent manifest and installed-package check confirmed the version.
+
+`writing-docx-production-ui-1718-20260914-090031-496` passed in 49.7s using the
+same existing controlled Writing Block in the production native chat UI:
+open, edit, undo/redo, choose DOCX, publish to Downloads, verify ZIP/XML and
+exact content, open/share menu, open and cancel the system share chooser,
+restore the original text, close/reopen and restore the conversation/awake state.
+The actual exported file has the same `2941e4f7...c97311b` SHA-256 listed above.
+There were 0 chat sends, 0 cloud writes and 0 files sent to third parties.
+
+`android_chatgpt_writing_block_docx_export_v1` is now
+`completed / production_verified`. This does not expand project, typed widget
+or library-linked cloud-save acceptance and does not implement PDF export.

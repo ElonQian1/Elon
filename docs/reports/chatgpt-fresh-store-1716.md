@@ -51,3 +51,10 @@ Do not infer the exact store failure before receiving the new reason code.
 Writing Blocks remains a separate production capability; its existing verified
 local editor/export and ordinary cloud-save paths must not be reimplemented
 because this experimental first-send acceptance failed.
+
+The diagnostic update was published and installed as 1717. Before resuming
+Writing Blocks acceptance, `fresh-1716-readonly-resolution-20260914-083331-873`
+confirmed the existing pending fixture in 11.5s: one inspected candidate,
+exact user/native response readback, 0 sends, awake state restored and the
+confirmed conversation left open. The fixture is resolved without replay;
+the independent first-send store reconciliation itself is still not accepted.

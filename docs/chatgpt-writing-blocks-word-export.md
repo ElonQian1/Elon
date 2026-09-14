@@ -4,7 +4,7 @@
 既有结构化读取、Markdown / 文本 / 代码源文件导出、显式官网保存保持原链路。
 
 能力 ID：`android_chatgpt_writing_block_docx_export_v1`。
-状态：已实现并发布；1717 手机验收发现补充 Unicode 字符的 XML 编码问题，[修复与证据](reports/chatgpt-writing-docx-unicode-20260914.md)已补齐。修正后的生产编码器已在 Android 运行环境及桌面 Word 验证通过，等待修复包的生产 UI 复验，不把旧包验收标为 completed。
+状态：`completed / production_verified`，`production_status=published_1718_device_verified`。1717 手机验收发现补充 Unicode 字符的 XML 编码问题，已修复并在 `1.1.1718` 生产原生 UI 验收通过；[修复与证据](reports/chatgpt-writing-docx-unicode-20260914.md)保留失败及复验结果。已有能力直接复用，无新回归不重复实现或扩大测试。
 
 ## 用户入口
 
@@ -42,7 +42,7 @@
 
 从手机下载目录只读取本次随机命名的合成导出，核对传输前后完整 SHA-256，再以禁用 DTD/外部解析的有界 ZIP/XML 读取验证实际文件：10 段文字逐字匹配、中文/Unicode、制表符/空行/代码缩进、标题/粗斜体、表格、列表编号及内部关系。随后检查分享选择器并取消，恢复原文、重开确认、恢复原会话与屏幕常亮设置。结果仅包含摘要和计数，不输出正文；校验器只针对该受控样本，不宣称覆盖整个 OOXML 标准或手机阅读器视觉。
 
-工具验证：`writing-docx-acceptance-final-20260914-074258-223` 的 59 项离线检查通过，`writing-docx-native-ui-compile-20260914-074002-231` 的 Java 编译通过，D8 生成并检查 `classes.dex` 通过。首轮新增的损坏编号样本揭示校验缺口，补齐后通过。这些检查验证验收工具，不是重新运行生产导出编码器，也不是手机验收；当前仍因设备离线延期。
+工具验证：`writing-docx-acceptance-final-20260914-074258-223` 的 59 项离线检查通过，`writing-docx-native-ui-compile-20260914-074002-231` 的 Java 编译通过，D8 生成并检查 `classes.dex` 通过。首轮新增的损坏编号样本揭示校验缺口，补齐后通过。这些检查仅验证验收工具；后续真实手机结果见下方，不将其混为一次验证。
 
 ```powershell
 & ./scripts/smoke-chatgpt-web-text-block-ui.ps1 -DeviceSerial $serial -ExpectedHardwareSerial $hardware `
@@ -59,6 +59,8 @@
 - 本轮设备检查为无线 ADB 未连接，未执行手机导出；不重复此前 1706 已验收的 Markdown / 代码源文件流程，也不将其作为新 DOCX 菜单的验收结果。
 
 ## 发布
+
+最新修复包 `1.1.1718 / 1718`，源码 `c05b807e75bff32e67a283e2a583c58f67e4bd48`，APK SHA-256 `e2ee4705ba6f8b332a8f6abf79bd06dcf5bb89e3bfb7819d1a61cf84b3dbc740`，已发布并无损安装小米。`writing-docx-production-ui-1718-20260914-090031-496` 在 49.7 秒内通过完整生产编辑器路径：既有受控块、原生编辑、撤销/重做、选择 Word、真实导出与 ZIP/XML/正文校验、打开/分享菜单、分享选择器取消、恢复原文和重开、原会话及常亮状态恢复。聊天发送 0、官网写入 0、发送文件给第三方 0；导出文件与此前 Android 编码器及桌面 Word 验证的文件摘要一致。
 
 `writing-word-release-20260913-230213-451` 在 528.9 秒内完成正式 APK 构建和发布；版本 `1.1.1712 / 1712`，源码 `8c4f7013748814f0b69b4f9013fb760ff892c5fc`，APK SHA-256 `0fa4ac7c6a37adb89f35ff8823401e77153c18b079fb3add8270b7fd8fd65cea`。
 随后独立读取远端 `app/version.json`，版本、源码和摘要一致。发布脚本自动尝试白名单手机安装时无线 ADB 连接超时，最终为 `APK_ADB_DEPLOY_STATUS=verification_deferred`；没有安装成功或新功能真机验收的结论。
