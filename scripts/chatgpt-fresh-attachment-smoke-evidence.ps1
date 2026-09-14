@@ -6,8 +6,8 @@ function Test-ChatGptFreshMediaFacts {
     $plain=$Text.Replace('\_', '_').Replace('**', '').Replace('`', '')
     return $plain.Contains('ELON_CHATGPT_ATTACHMENT_FIXTURE_V1=ready') -and
         $plain.Contains('ELON_PRIVATE_PDF_FIXTURE_V1=ready') -and
-        $plain -match '(?is)\b(three|3)\s+blue\s+squares?\b' -and
-        $plain -match '(?is)\b(one|1|a)\s+red\s+circle\b'
+        $plain -match '(?is)\b(three|3)\s+(?:solid\s+)?blue\s+squares?\b' -and
+        $plain -match '(?is)\b(one|1|a)\s+(?:solid\s+)?red\s+circle\b'
 }
 
 function Test-ChatGptFreshAttachmentNativeEvidence {

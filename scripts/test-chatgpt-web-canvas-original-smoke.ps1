@@ -17,7 +17,7 @@ foreach($source in @($original,$content)){
 foreach($guard in @('[Parameter(Mandatory)][switch]$CreateFixture','if ($VerifyFixtureWrites)',
     'canvas_fixture_not_created','canvas_fixture_body_unconfirmed','saved_native_body_mismatch',
     'history_body_mismatch','restore_native_body_mismatch','Restore-WebChatNativeConversation','fixture_prompt_mismatch',
-    '$receipt.observed_at_ms -gt $Since','Get-ChatGptWebToolReplyEvidence',
+    '$receipt.observed_at_ms -gt $Since','Get-ChatGptWebToolReplyEvidence','private_text_v1:accepted',
     "Ui 'focus_composer'","Ui 'clear_fixture_draft'","Ui 'cancel_restore'","Ui 'cancel_create'")){
     if(-not $original.Contains($guard)){throw "missing_canvas_fixture_guard:$guard"}
 }

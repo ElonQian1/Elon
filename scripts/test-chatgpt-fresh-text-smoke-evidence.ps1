@@ -125,6 +125,8 @@ function ReadbackFixture {
 }
 $f = ReadbackFixture
 if (!(Test-ChatGptFreshPendingReadback -Pending $f.pending -Web $f.web -Main $f.main)) { throw 'completed_pending_readback_rejected' }
+$f.web.conversation.messages += @{role='user';id='later';content='later turn'}
+if (!(Test-ChatGptFreshPendingReadback $f.pending $f.web $f.main)) { throw 'resolved_followup_readback_rejected' }
 $readbackCases = @(
     {param($f) $f.pending.readback_completed='true'}, {param($f) $f.pending.replay_allowed=$true},
     {param($f) $f.pending.new_conversation=$false}, {param($f) $f.pending.source='unknown'},
@@ -135,7 +137,9 @@ $readbackCases = @(
     {param($f) $f.web.conversation.messages[0].content='different'},
     {param($f) $f.web.conversation.messages[1].state='streaming'},
     {param($f) $f.web.conversation.messages[1].content='incomplete'},
-    {param($f) $f.web.conversation.messages+=@{role='user';id='later';content='later turn'}},
+    {param($f) $f.web.conversation.messages+=@{role='user';id='duplicate';content=$f.pending.prompt}},
+    {param($f) $f.web.conversation.messages+=@{role='user';id=$f.pending.user_message_id;content='different'}},
+    {param($f) $f.web.conversation.messages=@($f.web.conversation.messages[0],@{role='user';id='later';content='later turn'},$f.web.conversation.messages[1])},
     {param($f) $f.main.social_chat.messages=@()}, {param($f) $f.main.active_surface='conversation_home'},
     {param($f) $f.main.social_chat.web_chat_conversation_path='different'},
     {param($f) $f.main.social_chat.web_chat_provider_id='google_web'}

@@ -36,7 +36,8 @@ function Wait-FixtureReply([long]$Since) {
         $m=Main; $w=Web; $receipt=$m.social_chat.web_chat_last_send_command
         if($receipt.observed_at_ms -gt $Since -and $receipt.ok -ne $true){throw 'fixture_send_unconfirmed'}
         if($receipt.observed_at_ms -gt $Since -and $receipt.ok -eq $true -and
-            ([string]$receipt.detail).StartsWith('official_runtime_v1:') -and -not $w.streaming -and
+            (([string]$receipt.detail).StartsWith('official_runtime_v1:') -or
+                [string]$receipt.detail -ceq 'private_text_v1:accepted') -and -not $w.streaming -and
             -not $m.social_chat.web_chat_streaming){
             $anchor=@($w.conversation.messages|Where-Object role -eq user)|Select-Object -Last 1
             if($anchor.id){
@@ -80,6 +81,7 @@ try {
         -not $before.authenticated -or $before.streaming -or $before.dictation_active -or $origin.input.has_text -or
         [int]$before.input.official_draft_length -gt 0) { throw 'idle_native_chat_required' }
     Assert-ChatGptWebSmokeAdapterVersion -State $before -ExpectedAdapterVersion $ExpectedAdapterVersion
+    Ui 'dismiss_update' | Out-Null
     Start-ChatGptWebSmokeAwakeLease -Runtime $r | Out-Null
     Stage 'create_fixture'
     $changed=$true
@@ -92,8 +94,8 @@ try {
     } | Out-Null
     $fixture='ELON_CANVAS_ACCEPTANCE_V1_' + [Guid]::NewGuid().ToString('N').Substring(0,8)
     $prompt="ELON_EXTENDED_TOOL_ACCEPTANCE_V1: Open a new canvas document titled $fixture. Put exactly these two lines in the canvas: $fixture followed by This is a disposable native editor test document. Use the canvas tool, not a code block in the chat. Do not browse, share, or create other files."
-    Ui 'focus_composer' | Out-Null
     Act 'set_input_text' @{text=$prompt} | Out-Null
+    Ui 'focus_composer' | Out-Null
     $since=[long](Main).social_chat.web_chat_last_send_command.observed_at_ms
     Ui 'send_fixture' | Out-Null
     $report.sent_messages=1

@@ -22,6 +22,16 @@ test('verified personal tool defaults do not silently include attachment sends',
   }
 });
 
+test('native attachment reservation cannot silently downgrade to text when files disappear', async () => {
+  const empty = await fixture([]);
+  await assert.rejects(empty.api.capture(empty.node, null,
+    { allowAttachments: true, requireNativeAttachment: true }), /attachments_active/);
+  const ready = await fixture();
+  const binding = await ready.api.capture(ready.node, null,
+    { allowAttachments: true, requireNativeAttachment: true });
+  assert.ok(binding.attachments);
+});
+
 test('owned TXT/PDF/image selections use provider metadata and multimodal content in a fresh request', async () => {
   const f = await fixture(), binding = await f.capture(), sent = consume(f, binding);
   const prepared = sent.request.preparationBody(), message = sent.body.messages[0];

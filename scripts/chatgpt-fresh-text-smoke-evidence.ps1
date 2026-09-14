@@ -35,10 +35,19 @@ function Test-ChatGptFreshPendingReadback {
         $Web.conversation.url -cne ('https://chatgpt.com' + $Pending.resolved_path) -or
         $Main.active_surface -cne 'social_ai' -or $Main.social_chat.web_chat_provider_id -cne 'chatgpt_web' -or
         $Main.social_chat.web_chat_conversation_path -cne $Pending.resolved_path) { return $false }
-    $users = @($Web.conversation.messages | Where-Object role -CEQ 'user')
-    if ($users.Count -ne 1 -or $users[0].id -cne $Pending.user_message_id -or
-        $users[0].content -cne $Pending.prompt) { return $false }
-    $answers = @($Web.conversation.messages | Where-Object { $_.role -ceq 'assistant' -and
+    $messages = @($Web.conversation.messages)
+    $users = @($messages | Where-Object { $_.role -ceq 'user' -and $_.id -ceq $Pending.user_message_id })
+    if ($users.Count -ne 1 -or $users[0].content -cne $Pending.prompt -or
+        @($messages | Where-Object { $_.role -ceq 'user' -and $_.content -ceq $Pending.prompt }).Count -ne 1) { return $false }
+    # A resolved historical fixture may have later follow-ups; only its original turn proves readback.
+    $turn = @(); $inside = $false
+    foreach ($message in $messages) {
+        if ($message.role -ceq 'user') {
+            if ($inside) { break }
+            $inside = $message.id -ceq $Pending.user_message_id
+        } elseif ($inside) { $turn += $message }
+    }
+    $answers = @($turn | Where-Object { $_.role -ceq 'assistant' -and
         $_.state -ceq 'completed' -and ([string]$_.content -replace '\\([_-])', '$1').Contains($marker) })
     $native = @($Main.social_chat.messages | Where-Object { $_.role -ceq 'friend' -and
         ([string]$_.content -replace '\\([_-])', '$1').Contains($marker) })

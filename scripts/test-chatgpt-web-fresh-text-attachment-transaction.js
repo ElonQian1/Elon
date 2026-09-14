@@ -78,7 +78,7 @@ test('attachment extension is opt-in and a one-command trial uses the actual pri
   assert.equal(f.calls.length, 0); assert.equal(f.files.files$().length, 3);
   await settled();
   assert.equal(f.api.trialControl('start').armed, true);
-  const trial = f.send({ requestId: 'mcp_attach2' });
+  const trial = f.send({ requestId: 'mcp_attach2', requireNativeAttachment: true });
   assert.equal((await trial.completion).status, 'accepted');
   await settled();
   assert.equal(f.api.state().pending, false);
@@ -92,6 +92,14 @@ test('attachment extension is opt-in and a one-command trial uses the actual pri
   assert.equal(f.send({ requestId: 'mcp_attach2' }), trial);
   assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
   assert.equal(f.api.dispose(), true);
+});
+
+test('missing files cannot downgrade an attachment-only command to an ordinary fresh POST', async () => {
+  const f = await fixture({ types: [], enabled: true });
+  const result = f.send({ requireNativeAttachment: true });
+  assert.equal((await result.completion).status, 'unavailable');
+  assert.equal(f.calls.length, 0); assert.equal(result.claimFallback(), true);
+  await settled(); assert.equal(f.api.dispose(), true);
 });
 
 test('file-only send crosses the real stream transport and reconciles without inventing a text bubble', async () => {

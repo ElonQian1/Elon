@@ -116,6 +116,11 @@ public final class CanvasUiAcceptance extends UiAutomatorTestCase {
         assertTrue("history_preview_missing", description("web-chat-canvas-history-content").waitForExists(5000));
     }
     private UiObject composerPreview() throws Exception {
+        UiSelector owned = new UiSelector().packageName(APP).className("android.widget.TextView")
+            .textStartsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1");
+        assertFalse("fixture_preview_ambiguous", new UiObject(owned.instance(1)).exists());
+        UiObject current = new UiObject(owned);
+        if (current.exists()) return current;
         UiObject panel = new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/inputLayout"));
         UiObject fixture = panel.getChild(new UiSelector().className("android.widget.TextView").clickable(true)
             .textStartsWith("ELON_EXTENDED_TOOL_ACCEPTANCE_V1"));
@@ -144,6 +149,11 @@ public final class CanvasUiAcceptance extends UiAutomatorTestCase {
         String step = getParams().getString("step", "inspect");
         JSONObject result = new JSONObject().put("step", step).put("content_exported", false);
         switch (step) {
+            case "dismiss_update":
+                UiObject updateTitle = text("\u53d1\u73b0\u65b0\u7248\u672c");
+                boolean updateVisible = updateTitle.exists();
+                if (updateVisible) click(text("\u7a0d\u540e\u63d0\u9192"));
+                result.put("update_dismissed", updateVisible); break;
             case "inspect_composer": result.put("composer", inspectComposer()); break;
             case "probe_composer_focus":
                 result.put("before", inspectComposer());

@@ -18,6 +18,13 @@ function Fixture {
 }
 $f=Fixture
 Check (Test-ChatGptFreshAttachmentNativeEvidence @f) 'matched_new_turn'
+foreach($text in @('3 solid blue squares and 1 solid red circle', 'three blue squares and one red circle')) {
+    Check (Test-ChatGptFreshMediaFacts ('ELON_CHATGPT_ATTACHMENT_FIXTURE_V1=ready; ELON_PRIVATE_PDF_FIXTURE_V1=ready; '+$text)) 'exact_count_variant'
+}
+foreach($text in @('2 solid blue squares and 1 solid red circle', '3 solid blue squares and 2 solid red circles',
+    '3 files, blue squares and 1 red circle', '3 blue squares and red circle')) {
+    Check (!(Test-ChatGptFreshMediaFacts ('ELON_CHATGPT_ATTACHMENT_FIXTURE_V1=ready; ELON_PRIVATE_PDF_FIXTURE_V1=ready; '+$text))) 'wrong_or_unbound_count'
+}
 foreach($case in @('old_reply','old_native_reply','missing_pdf','missing_image','native_missing_fact','streaming',
     'unknown_streaming','native_streaming','native_truncated','user_truncated','wrong_source','later_user','duplicate_user','other_provider','other_route')) {
     $f=Fixture

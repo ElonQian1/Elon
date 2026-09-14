@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 16, create: factory });
+  const api = Object.freeze({ version: 17, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -85,6 +85,7 @@
       if (options.allowAttachments !== true || !page.__elonChatGptFreshTextAttachments) fail('attachments_active');
       attachments = page.__elonChatGptFreshTextAttachments.capture(page, binding, conversation);
     }
+    if (options.requireNativeAttachment === true && !attachments) fail('attachments_active');
     let toolOwner = null;
     const personalToolAllowed = state =>
       (options.allowPersonalSearch === true && selectedTool === 'search' ||

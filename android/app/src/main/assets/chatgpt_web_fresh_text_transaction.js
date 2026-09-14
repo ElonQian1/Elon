@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 27, create: factory });
+  const api = Object.freeze({ version: 28, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -200,7 +200,8 @@
       if (regenerate && !regeneration) throw Error('runtime_unavailable');
       owner.binding = await abortable(regenerate ? regeneration.capture(command) :
         context.capture(command.composer, continuation,
-          { allowTools, allowPersonalSearch, allowPersonalImage, allowProjects, allowNewConversations, allowTemporary, allowAttachments }));
+          { allowTools, allowPersonalSearch, allowPersonalImage, allowProjects, allowNewConversations, allowTemporary,
+            allowAttachments, requireNativeAttachment: command.requireNativeAttachment === true }));
       check();
       owner.request = requests.create(owner.binding, command);
       const { shared, runtime } = owner.binding;
@@ -391,7 +392,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 27, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 28, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

@@ -1,12 +1,33 @@
 # September 15 Runtime Compatibility Investigation
 
-Status: implementation and offline verification completed for bindings 29 /
-adapter 407. `web_20260915` is admitted through its exact observed asset set.
-Grouped release/device verification follows; no new device pass is claimed here.
+Status: bindings 29 / adapter 407 published as 1.1.1743; first-send and follow-up
+passed on Xiaomi. Adapter 408 adds the attachment routing correction discovered
+in grouped acceptance. `web_20260915` uses its exact observed asset set.
 Reuse [accepted Writing Blocks 1723](../chatgpt-writing-blocks-native.md),
 ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
+
+- Release 1743 (`0b00df6c389d09b1eeb0575b3686d39350623994`) was built, published
+  and installed without data reset. First send and follow-up each used fresh
+  HTTP, reconciled exact identity/history and rendered native replies. Two
+  clicks, zero replay; observed replies 13.463s / 10.236s, not a latency A/B.
+- Attachment upload plus native reply worked, but that send used the accepted
+  official runtime, not fresh HTTP. The attachment reservation accidentally
+  disabled both fresh owned-file requests and the unsafe captured-text template.
+  Adapter 408 separates these: fresh requests require the native file lease;
+  captured-text fallback stays prohibited. Disappeared files cannot become a
+  plain-text send. The extension remains trial-gated pending physical proof.
+- Its synthetic answer used `3 solid blue squares` / `1 solid red circle`.
+  Evidence now accepts that exact variant, still rejecting wrong/missing counts.
+  Read-only recovery confirmed the native response and closed the external
+  pending ledger with transport `official_runtime_v1`; no resend, no fresh pass.
+  Later owned attempts must retain this exact baseline and use a new prompt.
+- Canvas acceptance initially stopped before Send: `semantic_control_missing`.
+  A screenshot established that an unrelated release 1744 update sheet was
+  covering the native composer. The runner now dismisses only the app's known
+  update sheet via "Later"; it does not accept any system authorization. Empty
+  attempts sent zero messages; only the exact synthetic draft was removed.
 
 - All 100 consumed exports are resolved, including the 13 previously ambiguous
   wrappers. Hash-pinned public AST checks verify actual exports, import edges,

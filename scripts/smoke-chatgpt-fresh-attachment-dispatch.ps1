@@ -97,11 +97,17 @@ try {
     $expected=@(@{id=$seed.user_message_id;content=$seed.prompt})+@($tools.accepted|ForEach-Object {
         if($_.fresh_http -cne $true -or $_.tool_restored -cne $true -or $_.tool -cnotin @('web_search','image_generation')){throw 'tool_fixture_unconfirmed'}
         @{id=$_.user_message_id;content=$_.prompt}
+    })+@($ledger.resolved_attempts|ForEach-Object {
+        if($_.readback_completed -cne $true -or $_.replay_allowed -cne $false -or
+            $_.transport -cne 'official_runtime_v1' -or $_.prompt -cnotmatch '^ELON_FRESH_ATTACHMENT_ACCEPTANCE_V1 \d{13}\. ' -or
+            $_.user_message_id -cnotmatch '^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$'){throw 'prior_attachment_unconfirmed'}
+        @{id=$_.user_message_id;content=$_.prompt}
     })
     $users=@($web.conversation.messages|Where-Object role -CEQ user)
     if($users.Count -ne $expected.Count){throw 'fixture_user_count_changed'}
     for($i=0;$i -lt $users.Count;$i++){if($users[$i].id -cne $expected[$i].id -or $users[$i].content -cne $expected[$i].content){throw 'fixture_user_changed'}}
-    if(@($web.conversation.messages|Where-Object {Test-ChatGptFreshMediaFacts ([string]$_.content)}).Count){throw 'fixture_contains_answer_facts'}
+    # Previous resolved attempts stay in the exact baseline; only new IDs after
+    # this command can satisfy reply evidence. Never replay the previous prompt.
     Stage transport_admission
     $trialRequested=$true;$before=Trial start
     $report.trial_control=if($before.control -cmatch '^[a-z_]{1,64}$'){$before.control}else{'unknown'}

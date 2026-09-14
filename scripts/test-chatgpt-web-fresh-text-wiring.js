@@ -11,7 +11,8 @@ function fixture(fresh) {
   const results = [], calls = [];
   const page = { __elonChatGptFreshTextTransaction: fresh,
     __elonChatGptPrivateStreamTransport: { finishPrivateSend: () => calls.push('finish_stream') },
-    __elonChatGptPrivateTextRuntimeSubmit: { submit() {
+    __elonChatGptPrivateTextRuntimeSubmit: { version: 2, submit(command) {
+      calls.push(command.requireNativeAttachment ? 'attachment_owner' : 'text_owner');
       calls.push('official'); return { handled: true, completion: Promise.resolve({ status: 'accepted' }) };
     } } };
   vm.runInNewContext(source, { window: page });
@@ -36,6 +37,34 @@ test('disabled candidate preserves the accepted production text sender', async (
   f.api.sendPrompt('fixture', '', f.respond, true); await tick();
   assert.equal(f.calls.filter(c => c === 'official').length, 1);
   assert.equal(f.results[0][1], true);
+});
+
+test('native attachment reservation reaches fresh HTTP with explicit ownership, never the text template', async () => {
+  const f = fixture({ state: () => ({ pending: false }), send(command) {
+    assert.equal(command.requireNativeAttachment, true);
+    return { handled: true, completion: Promise.resolve({ status: 'accepted' }) };
+  } });
+  f.api.sendPrompt('fixture', '', f.respond, false); await tick();
+  assert.equal(f.calls.includes('official'), false);
+  assert.deepEqual(f.results[0], ['send_prompt', true, 'private_text_v1:accepted']);
+});
+
+test('unavailable attachment extension preserves the attachment requirement on runtime fallback', async () => {
+  let attempts = 0;
+  const f = fixture({ state: () => ({ pending: false }), send(command) {
+    assert.equal(command.requireNativeAttachment, true); attempts++;
+    return { handled: true, completion: Promise.resolve({ status: 'unavailable' }), claimFallback: () => true };
+  } });
+  f.api.sendPrompt('fixture', '', f.respond, false); await tick(); await tick();
+  assert.equal(attempts, 1); assert.equal(f.calls.filter(c => c === 'official').length, 1);
+  assert.equal(f.calls.includes('attachment_owner'), true);
+});
+
+test('unknown attachment write cannot invoke a second sender', async () => {
+  const f = fixture({ state: () => ({ pending: false }), send: () => ({ handled: true,
+    completion: Promise.resolve({ status: 'unknown', code: 'timeout' }) }) });
+  f.api.sendPrompt('fixture', '', f.respond, false); await tick();
+  assert.equal(f.calls.includes('official'), false); assert.equal(f.results[0][1], false);
 });
 test('unknown independent write cannot fall through to official send', async () => {
   const f = fixture({ state: () => ({ pending: false }), send: () => ({ handled: true,
