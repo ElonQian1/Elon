@@ -83,9 +83,13 @@ function Test-ChatGptFreshSendEvidence {
 
 function Test-ChatGptFreshSendContinuity {
     param([AllowNull()]$Before, [AllowNull()]$After, [AllowNull()]$Main,
-        [Parameter(Mandatory)][string]$Prompt, [switch]$NewConversation)
+        [Parameter(Mandatory)][string]$Prompt, [switch]$NewConversation, [string]$ProjectId = '')
     $path = [string]$Main.social_chat.web_chat_conversation_path
-    if ($path -cnotmatch '^/c/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$' -or
+    $validPath = if ($ProjectId) {
+        !$NewConversation -and $ProjectId -cmatch '^g-p-[a-f0-9]{32}$' -and $path -cmatch
+            ('^/g/' + [regex]::Escape($ProjectId) + '(?:-[A-Za-z0-9_-]{1,124})?/c/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$')
+    } else { $path -cmatch '^/c/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$' }
+    if (!$validPath -or
         [string]$After.conversation.url -cne "https://chatgpt.com$path") { return $false }
     if ($NewConversation) {
         if (@($Before.conversation.messages).Count -ne 0 -or

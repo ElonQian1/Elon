@@ -11,9 +11,13 @@ param(
     [switch]$StopThenFollowup,
     [switch]$NewConversation,
     [switch]$ComposerUnavailable,
-    [switch]$BackgroundResume
+    [switch]$BackgroundResume,
+    [switch]$ExistingProjectFixture
 )
 $ErrorActionPreference = 'Stop'
+if ($ExistingProjectFixture -and ($NewConversation -or $ComposerUnavailable -or $BackgroundResume -or $OnlyStop -or $StopThenFollowup)) {
+    throw 'project_fixture_requires_existing_text_scope'
+}
 if ($NewConversation -and ($OnlyStop -or $StopThenFollowup)) { throw 'new_conversation_stop_scope_not_supported' }
 if ($ComposerUnavailable -and (!$NewConversation -or !$FirstOnly -or !$UseDefault)) { throw 'composer_lease_requires_default_new_first' }
 if ($BackgroundResume -and (!$FirstOnly -or !$UseDefault -or $ComposerUnavailable -or $OnlyStop -or $StopThenFollowup)) {
@@ -25,6 +29,7 @@ if ($BackgroundResume -and (!$FirstOnly -or !$UseDefault -or $ComposerUnavailabl
 . (Join-Path $PSScriptRoot 'invoke-android-semantic-acceptance.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-composer-dom-smoke.ps1')
 . (Join-Path $PSScriptRoot 'chatgpt-fresh-background-smoke.ps1')
+. (Join-Path $PSScriptRoot 'chatgpt-fresh-project-smoke.ps1')
 $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1
 $runtime.mcp_bootstrapped = $true
@@ -43,6 +48,7 @@ $originPath = ''; $originDraft = ''; $opened = $false; $restored = $false; $awak
 $awaitingResult = $false; $trialRequested = $false; $ownedNavigation = $false; $expectedPath = ''
 $lastPrompt = ''; $lastUserId = ''; $lastObservedPath = ''; $clickAcknowledged = $false
 $composerLease = $null
+$projectId = ''
 $report = [ordered]@{ schema = 'elon.fresh_text_ui.v1'; passed = $false; stage = 'opening';
     new_conversation = [bool]$NewConversation; seed_sends = 0; candidate_clicks = 0; cases = @();
     restored = $false; awake_restored = $false; write_unconfirmed = $false;
@@ -81,7 +87,8 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
     $started = [DateTimeOffset]::UtcNow
     # A lost click acknowledgement must not permit replay, navigation or draft cleanup.
     $script:awaitingResult = $true
-    $script:lastPrompt = $prompt; $script:lastUserId = ''; $script:lastObservedPath = ''; $script:clickAcknowledged = $false
+    $script:lastPrompt = $prompt; $script:lastUserId = ''
+    $script:lastObservedPath = if ($projectId) { $expectedPath } else { '' }; $script:clickAcknowledged = $false
     if ($Candidate) { $report.candidate_clicks++ } else { $report.seed_sends++ }
     Write-Host "FRESH_TEXT_PROGRESS kind=$Kind phase=native_click_requested"
     try {
@@ -152,7 +159,7 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
         $freshConfirmed = $Candidate -and (Test-ChatGptFreshSendEvidence -Before $before -After $diagnostic `
             -Receipt $receipt -UseDefault:$UseDefault)
         $continuity = Test-ChatGptFreshSendContinuity -Before $baseline -After $web -Main $main `
-            -Prompt $prompt -NewConversation:$NewFirst
+            -Prompt $prompt -NewConversation:$NewFirst -ProjectId $projectId
         $report.last_checks = [ordered]@{ native_user_count=$users.Count; native_answer_count=$answerCount;
             receipt_count=$receipts.Count; fresh_receipt=$freshConfirmed; continuity=$continuity;
             native_streaming=$main.social_chat.web_chat_streaming; web_streaming=$web.streaming }
@@ -184,7 +191,11 @@ function Native-Send([string]$Kind, [bool]$Candidate, [bool]$NewFirst = $false) 
 Assert-ChatGptWebSmokeTrustedDevice -Runtime $runtime
 Start-ChatGptWebSmokeAwakeLease -Runtime $runtime | Out-Null
 try {
-    $origin = Open-WebChatNativeChatSurface -Runtime $runtime -ProviderId chatgpt_web -TimeoutSec $TimeoutSec
+    $origin = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state -MainState
+    if ($origin.active_surface -cne 'social_ai' -or $origin.social_chat.web_chat_provider_id -cne 'chatgpt_web' -or
+        $origin.social_chat.interaction_mode -cne 'chat' -or !(Test-WebChatNativeChatSurfaceForeground -Runtime $runtime)) {
+        $origin = Open-WebChatNativeChatSurface -Runtime $runtime -ProviderId chatgpt_web -TimeoutSec $TimeoutSec
+    }
     $opened = $true; $originPath = [string]$origin.social_chat.web_chat_conversation_path
     $originWeb = Invoke-ChatGptWebSmokeMcp -Runtime $runtime -Tool ui_state
     $originDraft = [string]$originWeb.input.text
@@ -207,7 +218,23 @@ try {
         $origin.social_chat.web_chat_streaming -isnot [bool] -or $origin.social_chat.web_chat_streaming) {
         throw 'origin_not_idle'
     }
-    if (!$NewConversation -and (Test-Path -LiteralPath $fixtureFile)) {
+    if ($ExistingProjectFixture) {
+        foreach ($candidate in @(Find-ChatGptFreshProjectFixture -Runtime $runtime)) {
+            $projectId = [string]$candidate.project_id
+            $ownedNavigation = $true; $expectedPath = [string]$candidate.path
+            $lastObservedPath = $expectedPath
+            Invoke-ChatGptWebSmokeAction -Runtime $runtime -Action open_web_chat_conversation `
+                -Arguments @{conversation_path=$expectedPath} | Out-Null
+            try {
+                Assert-ChatGptFreshProjectFixture -Runtime $runtime -Path $expectedPath -ProjectId $projectId
+                $report.project_fixture_verified = $true
+                break
+            } catch {
+                if ($_.Exception.Message -cne 'project_synthetic_fixture_unconfirmed') { throw }
+            }
+        }
+        if (!$report.project_fixture_verified) { throw 'project_synthetic_fixture_unconfirmed' }
+    } elseif (!$NewConversation -and (Test-Path -LiteralPath $fixtureFile)) {
         $saved = Get-Content -LiteralPath $fixtureFile -Raw | ConvertFrom-Json
         if ($saved.path -notmatch '^/c/[a-f0-9-]{36}$') { throw 'fixture_path_invalid' }
         $ownedNavigation = $true; $expectedPath = [string]$saved.path
@@ -247,6 +274,9 @@ try {
         $report.cases += Native-Send $kind $true ($NewConversation -and $kind -eq 'first')
     }
     if ($BackgroundResume -and !$report.background_resume.exercised) { throw 'background_active_window_not_observed' }
+    if ($ExistingProjectFixture) {
+        $report.project_membership_verified = Confirm-ChatGptFreshProjectMembership -Runtime $runtime -Path $expectedPath -ProjectId $projectId
+    }
     $report.passed = $true; $report.stage = 'complete'
 } catch {
     $report.error = if ($_.Exception.Message -match '^[a-z_:]+$') { $_.Exception.Message } else { 'acceptance_failed' }
@@ -291,6 +321,7 @@ try {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pendingFile) | Out-Null
             @{schema='elon.fresh_text_pending.v1';source='native_fixture';new_conversation=[bool]$NewConversation;
                 origin_path=$originPath;prompt=$lastPrompt;user_message_id=$lastUserId;
+                project_id=$projectId;expected_path=$expectedPath;
                 observed_path=$lastObservedPath;readback_completed=$false;
                 click_acknowledged=$clickAcknowledged;trial=$report.last_trial;replay_allowed=$false;
                 created_at=[DateTimeOffset]::UtcNow.ToString('o')} | ConvertTo-Json -Depth 6 |

@@ -30,6 +30,7 @@ function fixture(result) {
   });
   const respond = (...value) => receipts.push(value); respond.requestId = 'mcp_route1';
   return { calls, receipts, page, composer, turn, model,
+    inspectText: () => api.inspectAdmission('fresh_text_admission', respond),
     inspect: () => api.inspectRegeneration(respond), run: () => api.regenerateResponse(respond, () => calls.push('dom')) };
 }
 
@@ -79,7 +80,7 @@ test('production assembly loads the regeneration scope before the shared ledger'
   assert.ok(scope < names.indexOf('chatgpt_web_fresh_text_transaction.js'));
   const page = { __elonChatGptTextTransactionOrchestrator: { version: 11 } };
   vm.runInNewContext(source, { window: page });
-  assert.equal(page.__elonChatGptTextTransactionOrchestrator.version, 13);
+  assert.equal(page.__elonChatGptTextTransactionOrchestrator.version, 14);
 });
 
 test('read-only admission uses the same native target without sending, draft changes or streaming', async () => {
@@ -95,4 +96,16 @@ test('read-only admission uses the same native target without sending, draft cha
   assert.equal(f.receipts.length, 1); assert.equal(f.receipts[0][0], 'private_protocol_probe');
   assert.equal(f.receipts[0][1], false);
   assert.equal(JSON.parse(f.receipts[0][2]).stage, 'user_channel');
+});
+
+test('fresh-send admission uses the current composer without calling any writer', async () => {
+  const f = fixture({ handled: false });
+  f.page.__elonChatGptFreshTextContext = { create: () => ({ inspect: async composer => {
+    assert.equal(composer, f.composer);
+    return { schema: 'elon.fresh_text_admission.v1', code: 'scope_unsupported', stage: 'base_config' };
+  } }) };
+  await f.inspectText();
+  assert.deepEqual(f.calls, []);
+  assert.equal(f.receipts.length, 1);
+  assert.equal(JSON.parse(f.receipts[0][2]).stage, 'base_config');
 });

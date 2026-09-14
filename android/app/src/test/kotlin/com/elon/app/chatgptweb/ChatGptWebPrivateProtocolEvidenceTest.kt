@@ -176,6 +176,16 @@ class ChatGptWebPrivateProtocolEvidenceTest {
         assertEquals("invalid_protocol_evidence", parse("raw secret").detail)
     }
 
+    @Test fun freshAdmissionRemainsStructuralAndAvailableWithoutTrialArming() {
+        assertTrue("fresh_text_admission" in ChatGptWebPrivateProtocolEvidence.MODES)
+        val value = JSONObject().put("schema", "elon.fresh_text_admission.v1")
+            .put("code", "scope_unsupported").put("stage", "project_business")
+        assertEquals("project_business", JSONObject(detail(value)).getString("stage"))
+        assertEquals("invalid_protocol_evidence", detail(value.put("content", "private response")))
+        value.remove("content")
+        assertEquals("invalid_protocol_evidence", detail(value.put("stage", "private header")))
+    }
+
     @Test fun toolContextAllowsOnlyBoundedDiagnosticCodes() {
         assertTrue("composer_tool_context" in ChatGptWebPrivateProtocolEvidence.MODES)
         for (code in listOf("not_observed", "ready", "cache_unavailable", "model_unavailable")) {

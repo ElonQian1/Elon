@@ -8,7 +8,8 @@ internal object ChatGptWebPrivateProtocolEvidence {
     val MODES = setOf("start", "read", "stop", "clear", "runtime_assets", "composer_tool_context",
         "stop_runtime_context", "stop_runtime_owner", "directory_refresh", "model_runtime_context", "document_state",
         "library_attachment_policy", "file_download_source", "library_sources", "composer_tool_admission", "text_block_inventory",
-        "fresh_text_trial_start", "fresh_text_trial_end", "fresh_text_trial_state", "history_parent", "regeneration_admission")
+        "fresh_text_trial_start", "fresh_text_trial_end", "fresh_text_trial_state", "history_parent", "regeneration_admission",
+        "fresh_text_admission")
     private val libraryPolicyCodes = setOf("not_observed", "runtime_unavailable", "validator_unavailable", "document_changed",
         "runtime_changed", "limits_bypassed", "composer_detached", "owner_unavailable", "store_mismatch",
         "scope_mismatch", "model_mismatch", "limits_missing", "limits_invalid", "ready", "attachment_limit", "validator_error")
@@ -51,7 +52,7 @@ internal object ChatGptWebPrivateProtocolEvidence {
     private fun sanitize(raw: String): String {
         require(raw.length <= 12000)
         val value = JSONObject(raw)
-        if (value.opt("schema") == "elon.fresh_regenerate_admission.v1") {
+        if (value.opt("schema") in setOf("elon.fresh_regenerate_admission.v1", "elon.fresh_text_admission.v1")) {
             require(value.keys().asSequence().toSet() == setOf("schema", "code", "stage"))
             require(value.opt("code") in setOf("ready", "timeout", "read_failed", "scope_unsupported", "runtime_unavailable",
                 "identity_unavailable", "context_unavailable", "context_changed", "context_invalid", "attachments_active",
@@ -59,7 +60,8 @@ internal object ChatGptWebPrivateProtocolEvidence {
             require(value.opt("stage") in setOf("ready", "timeout", "base_context", "contract", "menu", "base_scope", "owner",
                 "resolver", "model", "user_identity", "user_content", "user_parent", "user_channel", "user_recipient",
                 "user_metadata", "reply_metadata", "effort", "current", "base_route", "base_new", "base_owner", "base_composer",
-                "base_route_state", "base_privacy", "base_prepare", "base_workspace", "base_project", "base_mode", "base_branch", "base_config"))
+                "base_route_state", "base_privacy", "base_prepare", "base_workspace", "base_project", "base_mode", "base_branch", "base_config",
+                "project_business", "project_headers"))
             return value.toString()
         }
         if (value.opt("schema") == ChatGptWebHistoryParentDiagnostic.SCHEMA) return ChatGptWebHistoryParentDiagnostic.sanitize(value)

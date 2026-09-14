@@ -300,6 +300,16 @@
     }
 
     let regenerationInspector = null;
+    let freshTextInspector = null;
+    function inspectAdmission(mode, respond) {
+      if (mode === 'regeneration_admission') return inspectRegeneration(respond);
+      const module = window.__elonChatGptFreshTextContext;
+      if (mode !== 'fresh_text_admission' || !module?.create) return respond('private_protocol_probe', false, 'protocol_probe_unavailable');
+      freshTextInspector ||= module.create(window);
+      return freshTextInspector.inspect(options.findComposer()).then(value =>
+        respond('private_protocol_probe', value.code === 'ready', JSON.stringify(value)),
+      () => respond('private_protocol_probe', false, 'protocol_probe_unavailable'));
+    }
     function inspectRegeneration(respond) {
       const module = window.__elonChatGptFreshRegenerateContext;
       const base = window.__elonChatGptFreshTextContext;
@@ -429,8 +439,8 @@
       }
     }
 
-    return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, inspectRegeneration, stopPrivate, stopGeneration, refreshConversation });
+    return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, inspectRegeneration, inspectAdmission, stopPrivate, stopGeneration, refreshConversation });
   }
 
-  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 13, create });
+  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 14, create });
 })();

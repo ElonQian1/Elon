@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 18, create: factory });
+  const api = Object.freeze({ version: 19, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -141,7 +141,7 @@
         .some(key => typeof shared[key] !== 'function') ||
           typeof shared.HM.getConversationTurns !== 'function') fail('runtime_unavailable');
       if (shared.textBusinessContext({ turns: shared.HM.getConversationTurns(state),
-        gizmoId: projectId, conversationId: binding.serverId }) !== null) fail('scope_unsupported');
+        gizmoId: projectId, conversationId: binding.serverId }) !== null) fail('scope_unsupported', 'project_business');
       // Match OB: reuse the current account's authorized project PIN only inside
       // the page. No credential or project instruction is copied into native UI.
       const headers = shared.textProjectHeaders(projectId,
@@ -150,7 +150,7 @@
       if (!headers || typeof headers !== 'object' || Array.isArray(headers) ||
           Object.keys(headers).length !== 1 || typeof headers['x-openai-locked-chats-pin'] !== 'string' ||
           !headers['x-openai-locked-chats-pin'] || headers['x-openai-locked-chats-pin'].length > 65536 ||
-          /[\r\n]/.test(headers['x-openai-locked-chats-pin'])) fail('scope_unsupported');
+          /[\r\n]/.test(headers['x-openai-locked-chats-pin'])) fail('scope_unsupported', 'project_headers');
       return Object.freeze({ 'x-openai-locked-chats-pin': headers['x-openai-locked-chats-pin'] });
     }
 
@@ -373,5 +373,25 @@
       }
     });
   }
-  return Object.freeze({ capture, stamp });
+  let inspection = null;
+  function inspect(composer) {
+    if (inspection) return inspection;
+    const result = (code, stage) => ({ schema: 'elon.fresh_text_admission.v1', code, stage });
+    const codes = ['scope_unsupported', 'runtime_unavailable', 'identity_unavailable', 'context_unavailable',
+      'context_changed', 'context_invalid', 'attachments_active', 'tools_active', 'conversation_busy', 'parent_unavailable'];
+    const stages = ['base_route', 'base_new', 'base_owner', 'base_composer', 'base_route_state', 'base_privacy',
+      'base_prepare', 'base_workspace', 'base_project', 'base_mode', 'base_branch', 'base_config',
+      'project_business', 'project_headers'];
+    let timer;
+    // Inspect the same owner as a send, without arming a trial or creating a request.
+    inspection = Promise.race([capture(composer, null, {
+      allowProjects: true, allowNewConversations: true, allowTemporary: true
+    }).then(() => result('ready', 'ready'), error => result(
+      codes.includes(error?.message) ? error.message : 'read_failed',
+      stages.includes(error?.admissionStage) ? error.admissionStage : 'base_context')),
+    new Promise(resolve => { timer = page.setTimeout(() => resolve(result('timeout', 'timeout')), 5000); })])
+      .finally(() => { page.clearTimeout(timer); inspection = null; });
+    return inspection;
+  }
+  return Object.freeze({ capture, stamp, inspect });
 });

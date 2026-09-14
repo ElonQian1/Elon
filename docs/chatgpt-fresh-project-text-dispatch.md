@@ -1,12 +1,18 @@
 ---
 capability_id: android_chatgpt_fresh_project_text_dispatch_v1
 implementation_status: implemented
-verification_status: offline_verified
+verification_status: device_failed
 production_default: false
 scope: authenticated_existing_personal_owned_project_text
 ---
 
 # Fresh Project Text Dispatch
+
+September 15 native acceptance on 1749 verified the owned project fixture but
+the independent sender rejected `scope_unsupported` before POST. The existing
+official-runtime fallback produced exactly one reply. Do not enable the project
+default or repeat that message. [Admission follow-up](reports/chatgpt-fresh-project-admission-20260915.md)
+adds a read-only probe to identify the actual failed guard; it is not another sender.
 
 September 13 source extension of [the accepted plain-text sender](chatgpt-fresh-text-dispatch.md).
 It reuses its queue, native stream, owned stop and history recovery. It does not

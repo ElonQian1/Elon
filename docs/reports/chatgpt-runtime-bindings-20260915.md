@@ -9,6 +9,11 @@ ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
 
+- [Project admission follow-up](chatgpt-fresh-project-admission-20260915.md):
+  native project send reached the independent sender but was rejected before
+  POST; the existing runtime fallback replied once. Project default remains
+  off. A read-only guard probe is implemented; package validation is pending.
+
 - [1749 recovery follow-up](chatgpt-fresh-recovery-suspend-20260915.md) cancels
   automatic history reads on background/offline suspension without replaying
   the original write. Native background/resume acceptance passed with one Send,
