@@ -186,7 +186,9 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
             case "clear_study": click(description("\u5173\u95ed\u5b66\u4e60\u4e0e\u7814\u7a76")); break;
             case "clear_canvas": click(description("\u5173\u95ed\u753b\u5e03")); break;
             case "prepare_extended_tool_fixture":
-                String toolPrefix = getParams().getString("fixture_prefix", "");
+                String toolPrefix = new String(android.util.Base64.decode(
+                    getParams().getString("fixture_prefix_b64", ""), android.util.Base64.DEFAULT),
+                    java.nio.charset.StandardCharsets.UTF_8);
                 assertTrue("fixture_prefix_invalid", toolPrefix.matches("ELON_EXTENDED_TOOL_ACCEPTANCE_V1 (SEARCH|IMAGE)_[0-9]{13}"));
                 UiObject toolInput = description("web-chat-composer-input:chatgpt_web");
                 if (!toolInput.exists()) {
@@ -200,7 +202,9 @@ public final class ConversationUiAcceptance extends UiAutomatorTestCase {
                 assertTrue("fixture_prompt_missing", toolInput.getText().startsWith(toolPrefix));
                 break;
             case "send_extended_tool_fixture":
-                String sendToolPrefix = getParams().getString("fixture_prefix", "");
+                String sendToolPrefix = new String(android.util.Base64.decode(
+                    getParams().getString("fixture_prefix_b64", ""), android.util.Base64.DEFAULT),
+                    java.nio.charset.StandardCharsets.UTF_8);
                 assertTrue("fixture_prefix_invalid", sendToolPrefix.matches("ELON_EXTENDED_TOOL_ACCEPTANCE_V1 (SEARCH|IMAGE)_[0-9]{13}"));
                 UiObject fixtureInput = description("web-chat-composer-input:chatgpt_web");
                 assertTrue("fixture_prompt_missing", fixtureInput.exists() && fixtureInput.getText()

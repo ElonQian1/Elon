@@ -86,7 +86,39 @@ No polling, reload, protocol gate relaxation or extra write was introduced.
 `composer-state-notification-tests-20260914-213200-597`: 100 tests passed,
 zero skipped. The source contract also verifies canonical-state commit before
 notification, all-section delivery, model behavior and selected-state retention.
-Release/device verification of the notification fix and one actual independent
-Image send remain pending. No Image default/completed marker is enabled from
-menu admission alone. Preserve the fixture ledger and reconcile uncertain writes
-read-only; do not repeat the accepted Search send.
+The notification fix shipped in APK 1735 / adapter 399, source `b684822f5`,
+SHA-256 `cb460a943959d5090f63a5569afa18de293d073f48943035a901013de354549e`.
+`composer-state-notification-release-20260914-213450-651` completed Release
+Kotlin/Java, lint, package, publication, remote hash and Xiaomi update in 528.1s.
+Postflight warned about unrelated worktree cleanup (`Branch` property); the
+release and device install passed, with task cleanup still handled by finish.
+
+`tool-projection-1735-20260914-214406-797` first failed a post-install list
+receipt. `tool-projection-1735-warm-20260914-214656-858` then passed the same
+read-only native projection: selected Search immediately showed its chip and
+enabled, visible close child after list, retained after dismiss. Before the fix
+the same sequence left both missing. Route/awake state restored; zero writes.
+This verifies notification, not cold-start ownership recovery or Image sending.
+
+`fresh-image-1735-native-20260914-214807-447` passed inherited Search clearing,
+native Image selection and draft synchronization, then failed at
+`prepare_extended_tool_fixture` in the native command runner. A read-only A/B
+isolated the harness fault: the space-containing `fixture_prefix` failed in the
+ADB shell argument boundary, while the same prefix Base64-encoded passed.
+Both preparation and send now transport `fixture_prefix_b64`, decode UTF-8 on
+device, and retain the exact synthetic-prefix, uniqueness and native-input guards.
+37 dispatch-contract checks and 39 evidence checks passed; the updated Java/Dex
+runner compiled and executed the encoded read-only inspection on device.
+This harness-only correction does not require another APK.
+
+`fresh-image-1735-encoded-20260914-215212-784` encountered
+`composer_tool_context:composer_detached` during preparation before any native
+send or HTTP dispatch. Both Image attempts restored tools when selected, original
+route and awake state; no pending write was created. Do not repeat the entire
+acceptance to hide this remaining navigation/committed-owner restoration issue.
+Investigate that boundary first; the root-identity candidate cache also deserves
+a focused same-root/new-child regression check, not an assumed live root cause.
+
+One actual independent Image send remains pending. No Image default/completed
+marker is enabled from menu admission alone. Preserve the fixture ledger and
+reconcile uncertain writes read-only; do not repeat the accepted Search send.

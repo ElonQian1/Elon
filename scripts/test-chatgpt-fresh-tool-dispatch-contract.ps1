@@ -50,7 +50,24 @@ foreach($required in @('textStartsWith(toolPrefix)','fixture_prefix_invalid','[0
     $checks++
 }
 foreach($step in @('prepare_extended_tool_fixture','send_extended_tool_fixture')){
-    if(!$source.Contains("Ui $step @{fixture_prefix=`$prefix}")){throw 'fresh_tool_unique_prefix_not_wired'}
+    if(!$source.Contains("Ui $step @{fixture_prefix_b64=`$prefixEncoded}")){throw 'fresh_tool_unique_prefix_not_wired'}
+    $checks++
+}
+if(!$source.Contains('[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($prefix))') -or
+    $source.Contains('@{fixture_prefix=$prefix}') -or $java.Contains('getString("fixture_prefix",')) {
+    throw 'fresh_tool_shell_spaced_argument'
+}
+$checks++
+if([regex]::Matches($java,'getParams\(\).getString\("fixture_prefix_b64", ""\), android.util.Base64.DEFAULT\),\s+java.nio.charset.StandardCharsets.UTF_8').Count -ne 2){
+    throw 'fresh_tool_prefix_decode_missing'
+}
+$checks++
+foreach($kind in @('SEARCH','IMAGE')){
+    $sample="ELON_EXTENDED_TOOL_ACCEPTANCE_V1 ${kind}_0000000000000"
+    $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($sample))
+    if($encoded -match '\s' -or [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded)) -cne $sample){
+        throw 'fresh_tool_prefix_roundtrip_failed'
+    }
     $checks++
 }
 Write-Output "FRESH_TOOL_DISPATCH_CONTRACT=passed checks=$checks"

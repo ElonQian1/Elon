@@ -171,6 +171,7 @@ try {
         if($selection.Count -ne 1){throw 'native_tool_not_committed'}
         $stamp=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
         $prefix='ELON_EXTENDED_TOOL_ACCEPTANCE_V1 '+$(if($ToolId -ceq 'web_search'){'SEARCH_'}else{'IMAGE_'})+$stamp
+        $prefixEncoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($prefix))
         $prompt=if($ToolId -ceq 'web_search'){
             "ELON_EXTENDED_TOOL_ACCEPTANCE_V1 SEARCH_$stamp. Use web search to find the official OpenAI homepage. Give one sentence and a clickable source citation."
         }else{
@@ -182,7 +183,7 @@ try {
             param($s) $s.input.text -ceq $prompt -and !$s.streaming -and $s.page_generation -eq $generation
         }.GetNewClosure()
         Stage native_composer_expand
-        Ui prepare_extended_tool_fixture @{fixture_prefix=$prefix}|Out-Null
+        Ui prepare_extended_tool_fixture @{fixture_prefix_b64=$prefixEncoded}|Out-Null
         $prior=@($baseline.command_requests|ForEach-Object request_id)
         Stage private_trial_start
         $trialRequested=$true
@@ -194,7 +195,7 @@ try {
         Save-Ledger
         Stage native_send
         $awaiting=$true; $report.native_send_actions=1
-        Ui send_extended_tool_fixture @{fixture_prefix=$prefix}|Out-Null
+        Ui send_extended_tool_fixture @{fixture_prefix_b64=$prefixEncoded}|Out-Null
         $report.native_click_acknowledged=$true
         $started=[DateTimeOffset]::UtcNow
         $deadline=$started.AddSeconds($TimeoutSec)
