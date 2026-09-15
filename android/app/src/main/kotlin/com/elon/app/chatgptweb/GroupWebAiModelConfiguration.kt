@@ -83,6 +83,7 @@ internal class GroupWebAiModelConfiguration(
     private var pending: String? = null
     private var closing = false
     private var finished = false
+    private val pendingControls = mutableListOf<ChatGptWebEvent>()
 
     fun start() {
         if (path.isEmpty()) { finished = true; onReady(); return }
@@ -98,17 +99,30 @@ internal class GroupWebAiModelConfiguration(
             if (closing) { finished = true; onReady(); return }
             index++
             controls.clear()
+            // The private adapter emits the new catalog before its command receipt.
+            pendingControls.forEach(controls::accept)
+            pendingControls.clear()
             if (index == path.size) {
                 closing = true
                 pending = UUID.randomUUID().toString()
                 port.dismiss(requireNotNull(pending))
             } else {
-                port.collect()
-                port.manifest()
+                selectNext()
+                if (pending == null) { port.collect(); port.manifest() }
             }
             return
         }
+        if (pending != null && !closing &&
+            (event is ChatGptWebEvent.ComposerControls || event is ChatGptWebEvent.UiManifest)) {
+            pendingControls.removeAll { it::class == event::class }
+            pendingControls.add(event)
+            return
+        }
         controls.accept(event)
+        selectNext()
+    }
+
+    private fun selectNext() {
         if (pending != null || closing) return
         val option = path.getOrNull(index)?.let(controls::resolve) ?: return
         pending = UUID.randomUUID().toString()

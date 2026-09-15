@@ -71,6 +71,24 @@ class GroupAiConfigurationTest {
         assertEquals(1, port.writes)
     }
 
+    @Test fun privateSubmenuCatalogMayArriveBeforeCommandReceipt() {
+        val port = FakePort()
+        var ready = 0
+        val config = GroupWebAiModelConfiguration(port,
+            listOf(GroupAiModelChoice("高级", true), GroupAiModelChoice("高")), { ready++ }, { fail() })
+        config.start()
+        config.event(options(option("advanced", "高级", true)))
+        val parentRequest = requireNotNull(port.request)
+        config.event(options(option("private-high", "高")))
+        assertEquals("select:advanced", port.action)
+        config.event(ack(parentRequest))
+        assertEquals("select:private-high", port.action)
+        assertEquals(0, ready)
+        config.event(ack(requireNotNull(port.request)))
+        config.event(ack(requireNotNull(port.request)))
+        assertEquals(1, ready)
+    }
+
     @Test fun changedRangeCannotSilentlySelectDifferentLevel() {
         val controls = GroupWebAiModelControls()
         controls.accept(range(3))

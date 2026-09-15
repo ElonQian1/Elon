@@ -32,6 +32,7 @@ internal class GroupAiModelPicker(
     private var ready = false
     private var closed = false
     private var failed = false
+    private val pendingControls = mutableListOf<ChatGptWebEvent>()
     private val deadline = Runnable { unavailable() }
 
     fun show() {
@@ -52,7 +53,10 @@ internal class GroupAiModelPicker(
 
     private fun render() {
         val live = controls.displayed
-        if (live.isNotEmpty()) cache.composerOptions(provider, section(), live)
+        if (live.isNotEmpty()) {
+            cache.composerOptions(provider, section(), live)
+            if (pendingSubmenu == null && command == null) handler.removeCallbacks(deadline)
+        }
         displayed = live.ifEmpty { cached() }
         popup?.update(marked(displayed), configuration.label)
     }
@@ -65,7 +69,10 @@ internal class GroupAiModelPicker(
             return
         }
         if (failed) { unavailable(); return }
+        if (pendingSubmenu != null) return
         pendingSubmenu = choice
+        handler.removeCallbacks(deadline)
+        handler.postDelayed(deadline, 40_000)
         openPending()
     }
 
@@ -96,13 +103,20 @@ internal class GroupAiModelPicker(
             }
             pendingSubmenu = null
             controls.clear()
+            pendingControls.forEach(controls::accept)
+            pendingControls.clear()
             render()
-            session?.adapter?.collectModelOptions()
+            if (controls.displayed.isEmpty()) session?.adapter?.collectModelOptions()
             session?.adapter?.requestUiManifest()
             return
         }
-        // Controls observed before an acknowledged submenu switch belong to its parent.
-        if (command != null) return
+        if (command != null) {
+            if (event is ChatGptWebEvent.ComposerControls || event is ChatGptWebEvent.UiManifest) {
+                pendingControls.removeAll { it::class == event::class }
+                pendingControls.add(event)
+            }
+            return
+        }
         controls.accept(event)
         if (event is ChatGptWebEvent.ComposerControls || event is ChatGptWebEvent.UiManifest) {
             render()
