@@ -99,7 +99,8 @@ createRoot(document.getElementById('root')).render(React.createElement(App));</s
     await page.evaluate(() => { Object.defineProperty(document,'hidden',{configurable:true,value:false}); window.dispatchEvent(new Event('online')) })
     await seen('网络恢复补齐')
     holdMessages = true; await sync(); await choose('测试好友')
-    for (const route of held.splice(0)) await route.fulfill({ json: { messages: [makeMessage('stale','不应串入当前会话')] } }).catch(() => {})
+    // Only release the previous group's request as stale. The new friend request is current.
+    for (const route of held.splice(0)) if (route.request().url().includes('/groups/')) await route.fulfill({ json: { messages: [makeMessage('stale','不应串入当前会话')] } }).catch(() => {})
     assert.equal(await text('不应串入当前会话').count(), 0)
     holdMessages = false; await sync(); await seen('私聊即时更新')
     failSend = true; await page.locator('textarea').fill('失败要保留的草稿'); await page.locator('textarea').press('Enter')
@@ -132,6 +133,9 @@ createRoot(document.getElementById('root')).render(React.createElement(App));</s
     assert.deepEqual(cacheChecks, { corrupt: null, pending: 0, quota: false })
     assert.deepEqual(errors, [])
     console.log('PASS PC chat: failed/partial lists, realtime friend updates, per-chat drafts, cached reload, timeout, stale OPEN reconnect, edits, background unread, online recovery, stale responses, send failure, permission denial, account/logout isolation, corrupt/quota cache')
+  } catch (error) {
+    console.error('PC_CHAT_RECOVERY_FAILURE', error)
+    throw error
   } finally {
     await browser?.close(); await server.close(); await fs.rm(fixture, { force: true })
   }

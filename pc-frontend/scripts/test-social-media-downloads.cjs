@@ -67,7 +67,7 @@ assert.doesNotMatch(render(DownloadLink, { ...props, platform: 'web', url: '/pc'
 assert.match(render(DownloadLink, { ...props, enabled: false, url: '/pending.apk' }), /<button[^>]+disabled=""/)
 assert.match(render(DownloadLink, { ...props, memberProtected: true, url: '/api/store/projects/yilong-quant/downloads/android' }), /<button/)
 assert.doesNotMatch(render(DownloadLink, { ...props, memberProtected: true, url: '/api/store/projects/yilong-quant/downloads/android' }), /<a /)
-const friendsSource = fs.readFileSync(path.join(sourceRoot, 'features/friends/FriendsPage.tsx'), 'utf8')
+const friendsSource = fs.readFileSync(path.join(sourceRoot, 'features/friends/SocialConversation.tsx'), 'utf8')
 assert.match(friendsSource, /!recalled && <SocialMessageAttachments attachments=\{m.attachments\}/, 'recalled attachments must not remain visible')
 assert.match(friendsSource, /<SocialAvatar userId=\{m.sender_user_id\}/, 'all senders, including those outside the nine-member preview, need avatar lookup')
 console.log('PASS: social image/audio/file rendering, avatar lookup, recall gating, cloud resource resolution and popup-free download links')

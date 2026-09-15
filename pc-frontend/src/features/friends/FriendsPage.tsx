@@ -1,21 +1,16 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { ChevronDown, ChevronRight, Layers, List } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { clean, formatTime } from '../../lib/utils'
 import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import WorkspaceFeatureNav from '../shell/WorkspaceFeatureNav'
-import MarkdownContent from '../markdown/MarkdownContent'
-import MessageActions, { messageActionsHostClassName, messageCopySourceId } from '../message-actions/MessageActions'
 import styles from './FriendsPage.module.css'
 import SocialAvatar from './SocialAvatar'
-import SocialMessageAttachments from './SocialMessageAttachments'
-import type { SocialMessage, Friend, FriendGroup } from './socialMessageTypes'
-import GroupMessageRevisionActions from './GroupMessageRevisionActions'
+import type { Friend, FriendGroup } from './socialMessageTypes'
 import useSocialChat from './useSocialChat'
+import SocialConversation from './SocialConversation'
 import ArticleWorkspace from '../articles/ArticleWorkspace'
-import ArticleMessage from '../articles/ArticleMessage'
-import { articleReference } from '../articles/articleApi'
 
 interface SearchResult {
   user: Friend
@@ -72,8 +67,6 @@ function FriendsPageContent() {
   const { friends, groups, setFriends, activeConversation, messages, setMessages, messagesLoading,
     input, setInput, selectConversation, loadSocialConversations, revisionNotice,
     listStatus, messageError, cacheWarning, retry } = useSocialChat(me!.id)
-  const [sending, setSending] = useState(false)
-  const [error, setError] = useState('')
   const [displayMode, setDisplayMode] = useState<ConversationDisplayMode>(() => readConversationDisplayMode())
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSection, boolean>>(
     () => readCollapsedSections(),
@@ -85,11 +78,6 @@ function FriendsPageContent() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
 
-  const feedRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const conversationKey = `${activeConversation?.kind}:${activeConversation?.id}`
-  const currentConversation = useRef(conversationKey)
-  currentConversation.current = conversationKey
 
   useEffect(() => {
     function onPresence(event: PresenceEvent) {
@@ -111,9 +99,6 @@ function FriendsPageContent() {
     return () => window.removeEventListener('elon:presence', onPresence as EventListener)
   }, [])
 
-  useEffect(() => {
-    if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
-  }, [messages[messages.length - 1]?.id])
 
   useEffect(() => {
     writeLocalPreference(DISPLAY_MODE_STORAGE_KEY, displayMode)
@@ -164,67 +149,6 @@ function FriendsPageContent() {
     ? allConversationItems.find((item) => item.kind === activeConversation.kind && item.id === activeConversation.id)
     : undefined
 
-  function activeTitle() {
-    return activeItem?.title ?? '会话'
-  }
-
-  const autoResize = useCallback(() => {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = '46px'
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
-    el.style.overflowY = el.scrollHeight > 120 ? 'auto' : 'hidden'
-  }, [])
-
-  async function handleSend(e: React.FormEvent | React.KeyboardEvent) {
-    e.preventDefault()
-    const text = input.trim()
-    if (!text || sending || !activeConversation) return
-    setInput('')
-    setError('')
-    if (textareaRef.current) textareaRef.current.style.height = '46px'
-    setSending(true)
-    const current = activeConversation
-    const optimistic: SocialMessage = {
-      id: `tmp-${Date.now()}`,
-      sender_user_id: me?.id ?? '',
-      sender_name: me?.nickname ?? me?.account ?? '我',
-      content: text,
-      created_at: new Date().toISOString(),
-      outgoing: true,
-    }
-    setMessages((prev) => [...prev, optimistic])
-    try {
-      const endpoint = current.kind === 'friend'
-        ? `/api/me/friends/${encodeURIComponent(current.id)}/messages`
-        : `/api/me/groups/${encodeURIComponent(current.id)}/messages`
-      const res = await api.post<{ message?: SocialMessage }>(
-        endpoint,
-        { content: text },
-      )
-      if (res.message) {
-        setMessages((prev) => {
-          const received = prev.find(m => m.id === res.message!.id) ?? res.message!
-          return prev.filter(m => m.id !== received.id).map(m => m.id === optimistic.id ? received : m)
-        })
-      }
-      void loadSocialConversations()
-    } catch (err) {
-      if (currentConversation.current === `${current.kind}:${current.id}`) setError((err as { message?: string }).message ?? '发送失败')
-      setInput(previous => previous && previous !== text ? `${text}\n${previous}` : text)
-      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
-    } finally {
-      setSending(false)
-    }
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend(e)
-    }
-  }
-
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault()
     const q = searchQ.trim()
@@ -233,7 +157,7 @@ function FriendsPageContent() {
     setSearchResults([])
     try {
       const data = await api.get<FriendSearchResponse>(
-        `/api/me/friends/search?q=${encodeURIComponent(q)}`,
+        `/api/me/friends/search?phone=${encodeURIComponent(q)}`,
       )
       if (data.results) {
         setSearchResults(data.results)
@@ -475,82 +399,11 @@ function FriendsPageContent() {
           {activeItem?.kind === 'group' && <ArticleWorkspace key={activeItem.id} groupId={activeItem.id} groups={groups} />}
         </header>
 
-        <div className={styles.feed} ref={feedRef}>
-          {!activeConversation && (
-            <div className={styles.welcome}>
-              <p>从左侧选择一位好友或群聊开始聊天</p>
-            </div>
-          )}
-          {messageError && <p className={styles.syncStatus} role="status">{messageError} <button type="button" className={styles.syncRetry} onClick={retry}>重试</button></p>}
-          {messagesLoading && <p className={styles.hint}>读取消息…</p>}
-          {messages.map((m, i) => {
-            const isMe = m.outgoing || m.sender_user_id === me?.id
-            const recalled = !!clean(m.recalled_at ?? m.recalledAt ?? '')
-            const content = recalled
-              ? (isMe ? '你撤回了一条消息' : (activeItem?.kind === 'group' && m.sender_name ? `${m.sender_name} 撤回了一条消息` : '对方撤回了一条消息'))
-              : displayMessageContentOrAttachment(m.content)
-            const hasMarkdown = !isMe && /[#*`\[\]>|]/.test(content)
-            const messageActionKey = m.id || `${activeConversation?.kind ?? 'chat'}:${activeConversation?.id ?? 'unknown'}:${m.created_at}:${i}`
-            const messageStorageScope = `friends:${activeConversation?.kind ?? 'chat'}:${activeConversation?.id ?? 'unknown'}`
-            const copySourceId = messageCopySourceId(messageStorageScope, messageActionKey)
-            const senderName = isMe
-              ? (me?.nickname ?? me?.account ?? '我')
-              : (activeItem?.kind === 'group'
-                ? (m.sender_name ?? '群成员')
-                : activeItem?.title ?? '对方')
-            const senderAvatar = isMe ? me?.avatar_data_url
-              : activeItem?.kind === 'group'
-                ? activeItem.group?.members?.find(member => member.id === m.sender_user_id)?.avatar_data_url
-                : activeItem?.friend?.avatar_data_url
-            return (
-              <div key={m.id ?? i} className={[styles.msgRow, messageActionsHostClassName, isMe ? styles.ownRow : ''].join(' ')}>
-                <div className={styles.avatar}>
-                  <SocialAvatar userId={m.sender_user_id} name={senderName} avatar={senderAvatar} />
-                </div>
-                <div className={styles.msgBody}>
-                  <div className={styles.msgMeta}>
-                    <strong>{senderName}</strong>
-                    <span>{formatTime(m.created_at)}</span>
-                  </div>
-                  {content && (articleReference(content) ? <ArticleMessage content={content} /> : hasMarkdown
-                    ? <div id={copySourceId} className={styles.msgContent}><MarkdownContent content={content} copy={false} /></div>
-                    : <div id={copySourceId} className={styles.msgContent}>{content}</div>)}
-                  {!recalled && <SocialMessageAttachments attachments={m.attachments} />}
-                  {activeConversation?.kind === 'group' && !articleReference(content) && <GroupMessageRevisionActions key={`${activeConversation.id}:${m.id}`} groupId={activeConversation.id} message={m} own={isMe} onSaved={edited => { if (currentConversation.current === conversationKey) setMessages(previous => previous.map(row => row.id === edited.id ? { ...row, ...edited } : row)) }} />}
-                  {content && !articleReference(content) && (
-                  <MessageActions
-                    content={content}
-                    messageKey={messageActionKey}
-                    storageScope={messageStorageScope}
-                    richCopySourceId={copySourceId}
-                    align={isMe ? 'right' : 'left'}
-                  />
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {activeConversation && (
-          <form className={styles.composer} onSubmit={handleSend}>
-            <textarea
-              ref={textareaRef}
-              className={styles.composerInput}
-              value={input}
-              onChange={(e) => { setInput(e.target.value); autoResize() }}
-              onKeyDown={handleKeyDown}
-              placeholder={`发送消息到 ${activeTitle()}…`}
-              disabled={sending}
-              rows={1}
-            />
-            <button className={styles.sendBtn} type="submit" disabled={!input.trim() || sending}>
-              {sending ? '…' : '发送'}
-            </button>
-          </form>
-        )}
+        {activeConversation ? <SocialConversation conversation={activeConversation} title={activeItem?.title ?? '会话'} me={me!}
+          friend={activeItem?.friend} group={activeItem?.group} messages={messages} setMessages={setMessages} input={input} setInput={setInput}
+          targets={allConversationItems} loading={messagesLoading} error={messageError} retry={retry} onSent={() => void loadSocialConversations()} />
+          : <div className={styles.welcome}><p>从左侧选择一位好友或群聊开始聊天</p></div>}
         {revisionNotice && <p className={styles.hint} role="status">{revisionNotice}</p>}
-        {error && <p className={styles.sendError}>{error}</p>}
       </div>
     </div>
   )

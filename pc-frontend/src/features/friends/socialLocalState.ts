@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { cloudBaseUrl, isLocalWorkbench } from '../../api/runtime'
 import { useAuthStore } from '../../store/auth'
 import type { ActiveConversation, SocialMessage } from './socialMessageTypes'
@@ -23,16 +23,15 @@ export function useSocialLocalState(userId: string) {
   const key = `${PREFIX}${encodeURIComponent(isLocalWorkbench() ? cloudBaseUrl() : location.origin)}:${encodeURIComponent(userId)}`
   const [value, setValue] = useState(() => load(key))
   const [error, setError] = useState('')
+  const model = useRef(value)
   const update = useCallback((change: (old: LocalState) => LocalState) => {
     if (useAuthStore.getState().user?.id !== userId) return
-    setValue(old => {
-      const next = change(old)
-      try {
-        const text = JSON.stringify(next)
-        if (text.length > 1_500_000) throw new Error('收藏已满，请先取消部分收藏')
-        localStorage.setItem(key, text); setError(''); return next
-      } catch { setError('本机存储失败，操作未保存；请减少收藏或检查可用空间'); return old }
-    })
+    const next = change(model.current)
+    try {
+      const text = JSON.stringify(next)
+      if (text.length > 1_500_000) throw new Error('收藏已满，请先取消部分收藏')
+      localStorage.setItem(key, text); model.current = next; setValue(next); setError('')
+    } catch { setError('本机存储失败，操作未保存；请减少收藏或检查可用空间') }
   }, [key, userId])
   const save = (items: SavedSocialMessage[]) => update(old => {
     const incoming = new Set(items.map(v => localMessageKey(v.conversation, v.message.id)))

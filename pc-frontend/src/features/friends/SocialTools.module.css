@@ -11,7 +11,7 @@
 .menu button { display: block; text-align: left; width: 100%; padding: 7px 12px; border: 0; color: inherit; background: transparent; border-radius: 4px; }
 .menu button:hover, .menu button:focus-visible { background: #35404d; }
 .menu button:disabled { color: #9ca8b5; cursor: default; }
-.dialog { width: min(680px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #505b67; border-radius: 12px; background: #171c22; color: #f2f5f7; }
+.dialog { width: min(680px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid #505b67; border-radius: 12px; background: #171c22; color: #f2f5f7; }
 .dialog::backdrop { background: #0009; }
 .dialog header, .dialog footer { padding: 14px 18px; display: flex; gap: 10px; align-items: center; justify-content: space-between; border-bottom: 1px solid #37404b; }
 .dialog h2 { margin: 0; font-size: 18px; }
@@ -31,3 +31,9 @@
 .compose .toolbar { border: 0; padding-bottom: 0; }
 .status { padding: 0 12px 8px; }
 :is(.toolbar,.buttons,.dialog,.menu) button:focus-visible { outline: 2px solid #85bdf5; outline-offset: 2px; }
+
+.conversation { display: flex; flex-direction: column; min-height: 0; flex: 1; position: relative; }
+.feed { flex: 1; min-height: 0; }
+.latest { align-self: center; color: #fff; background: #266646; border: 1px solid #76ac8e; border-radius: 16px; padding: 6px 16px; cursor: pointer; }
+.conversation [data-message-id]:focus-visible { outline: 2px solid #85bdf5; outline-offset: -2px; }
+.conversation [data-message-id] blockquote { color: #c7d9cd; border-color: #82b396; }

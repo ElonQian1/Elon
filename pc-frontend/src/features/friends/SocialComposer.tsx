@@ -21,6 +21,8 @@ export default function SocialComposer({ conversation, title, me, input, setInpu
   const textarea = useRef<HTMLTextAreaElement>(null)
   const chooser = useRef<HTMLInputElement>(null)
   const mounted = useRef(true)
+  const inFlight = useRef(new Set<string>())
+  const memberEpoch = useRef(0)
   const [quotes, setQuotes] = useState<Record<string, QuoteRequest | undefined>>({})
   const [busy, setBusy] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -37,23 +39,25 @@ export default function SocialComposer({ conversation, title, me, input, setInpu
   useEffect(() => {
     if (quote) { setQuotes(old => ({ ...old, [quote.conversation]: quote })); if (quote.conversation === key) textarea.current?.focus() }
   }, [quote])
-  useEffect(() => { setMembers(null); setMemberError(''); setMemberQuery('') }, [key])
+  useEffect(() => { memberEpoch.current++; setMembers(null); setMemberError(''); setMemberQuery('') }, [key])
   function showError(value: string, scope = key) { if (mounted.current) setErrors(old => ({ ...old, [scope]: value })) }
   function addFiles(files: File[]) { showError(media.add(conversation, files)) }
   async function loadMembers() {
+    const request = ++memberEpoch.current
     setMembers([]); setMemberLoading(true); setMemberError('')
     try {
       const data = await socialRequest<{ members: Member[]; ai_members?: Member[] }>(`/api/me/groups/${encodeURIComponent(conversation.id)}/members`)
-      if (currentKey.current === key && mounted.current) setMembers([...data.members, ...(data.ai_members ?? [])].filter((m, i, all) => m.id !== me.id && all.findIndex(x => x.id === m.id) === i))
-    } catch (error) { if (currentKey.current === key && mounted.current) setMemberError((error as Error).message) }
-    finally { if (currentKey.current === key && mounted.current) setMemberLoading(false) }
+      if (currentKey.current === key && mounted.current && memberEpoch.current === request) setMembers([...data.members, ...(data.ai_members ?? [])].filter((m, i, all) => m.id !== me.id && all.findIndex(x => x.id === m.id) === i))
+    } catch (error) { if (currentKey.current === key && mounted.current && memberEpoch.current === request) setMemberError((error as Error).message) }
+    finally { if (currentKey.current === key && mounted.current && memberEpoch.current === request) setMemberLoading(false) }
   }
   async function send(event: React.FormEvent) {
     event.preventDefault()
     const text = input.trim()
-    if (sending || blocked || (!text && !files.length)) return
+    if (inFlight.current.has(key) || sending || blocked || (!text && !files.length)) return
     const content = pendingQuote ? `${quoteText(pendingQuote.message, pendingQuote.author)}\n\n${text}` : text
     if (Array.from(content).length > 4000) { showError('正文与引用合计不能超过 4000 字，请精简后发送'); return }
+    inFlight.current.add(key)
     const capturedFiles = [...files]
     const attachments = capturedFiles.map(file => file.attachment!)
     const id = `tmp-${crypto.randomUUID()}`
@@ -77,7 +81,7 @@ export default function SocialComposer({ conversation, title, me, input, setInpu
         setInput(old => old && old !== content ? `${content}\n${old}` : content)
         setMessages(old => old.filter(m => m.id !== id))
       }
-    } finally { if (mounted.current) setBusy(old => ({ ...old, [key]: false })) }
+    } finally { inFlight.current.delete(key); if (mounted.current) setBusy(old => ({ ...old, [key]: false })) }
   }
   return <section className={styles.compose} aria-label="消息编辑器" onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault() }}
     onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); addFiles(Array.from(event.dataTransfer.files)) } }}>
@@ -101,7 +105,7 @@ export default function SocialComposer({ conversation, title, me, input, setInpu
       <button type="submit" className={pageStyles.sendBtn} disabled={sending || blocked || (!input.trim() && !files.length)}>{sending ? '发送中…' : '发送'}</button>
     </form>
     {errors[key] && <p className={`${styles.error} ${styles.status}`} role="alert">{errors[key]}</p>}
-    {members && <SocialDialog title="选择要 @ 的群成员" onClose={() => setMembers(null)}>
+    {members && <SocialDialog title="选择要 @ 的群成员" onClose={() => { memberEpoch.current++; setMembers(null) }}>
       <input aria-label="查找群成员" placeholder="查找群成员" value={memberQuery} onChange={event => setMemberQuery(event.target.value)} />
       {memberLoading && <p role="status">正在读取群成员…</p>}{memberError && <p className={styles.error} role="alert">{memberError} <button type="button" onClick={() => void loadMembers()}>重试</button></p>}
       {members.filter(m => m.display_name.toLowerCase().includes(memberQuery.toLowerCase())).map(member => <div className={styles.item} key={member.id}><button type="button" onClick={() => { setInput(old => `${old}${old && !/\s$/.test(old) ? ' ' : ''}@${member.display_name} `); setMembers(null); textarea.current?.focus() }}>{member.display_name}</button></div>)}

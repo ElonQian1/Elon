@@ -333,13 +333,15 @@ button.sectionHeader:focus-visible {
 
 /* ── 聊天区 ── */
 .chat {
-  display: grid;
-  grid-template-rows: 58px minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   background: #242529;
 }
 
 .topbar {
+  min-height: 58px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   padding: 0 16px;
@@ -437,7 +439,7 @@ button.sectionHeader:focus-visible {
   min-height: 46px;
   max-height: 120px;
   resize: none;
-  overflow-y: hidden;
+  overflow-y: auto;
   border: 0;
   border-radius: 8px;
   outline: none;

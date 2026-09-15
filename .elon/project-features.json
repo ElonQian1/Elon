@@ -21227,7 +21227,7 @@
       "id": "social-chat-desktop-parity-v1",
       "title": "Windows 社交消息操作与聊天工作流补齐",
       "summary": "统一消息菜单、引用撤回转发、附件发送和会话工具，保留修订审计及缓存同步",
-      "status": "in_progress",
+      "status": "verified",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/social-chat-desktop-remediation.md",
@@ -21256,15 +21256,114 @@
         "转发部分成功不重复提交，本机收藏与隐藏可恢复",
         "菜单键盘、暗色布局、原有同步及文章回归通过"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_319d1f4dd9734d30a74c0dd638408224",
-        "agent_id": "codex",
-        "claimed_at_ms": 1789460596124,
-        "expires_at_ms": 1789546996124
-      },
+      "implementation_evidence": [
+        {
+          "path": "docs/delivery/social-chat-desktop-parity-20260915.md",
+          "content_hash": "84ba310708655af3e5da56ab4b5eebfb2a4ce8ce13e1c98d8b29cc7be9518c2e",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "798180a6ea2a59e72cfcaa643c5f93de12838e88",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3bc47c2ede818f3d9c02f3955f83220f7d375c55",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/SocialComposer.tsx",
+          "content_hash": "3a609ed3607c4ce1f20bec3aa5cd95b3921cf2a211513bd3520b4d7982961b0b",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "798180a6ea2a59e72cfcaa643c5f93de12838e88",
+            "head_blob_oid": "aad69f9febaff0e77526528edb4894ac51b1977b",
+            "worktree_blob_oid": "6f2fd953c1df8b4d3f94c9c531c372b086e71970",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/SocialConversation.tsx",
+          "content_hash": "dc5e53dfb8ec6ccf074a3210e281064912cccfcfea7d59fd79d4804a4a5cb511",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "798180a6ea2a59e72cfcaa643c5f93de12838e88",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "77bc3c81c09c4150e5184a8132380f8e573f5530",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/SocialForwardDialog.tsx",
+          "content_hash": "bd77e931be5099046532fe5d3bb3982f09849cac510d4bc8003f10924afe4001",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "798180a6ea2a59e72cfcaa643c5f93de12838e88",
+            "head_blob_oid": "175b511881d7946f443a8cc5769912aae5ed7094",
+            "worktree_blob_oid": "175b511881d7946f443a8cc5769912aae5ed7094",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/SocialMessageMenu.tsx",
+          "content_hash": "5709a51f6288fbe5fae91d51949ab3d3b7cf231087755db8cffa2f3e4802d6b5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "798180a6ea2a59e72cfcaa643c5f93de12838e88",
+            "head_blob_oid": "c1f339d5d69ac9f4a365ea46a462f1b8e6cece61",
+            "worktree_blob_oid": "c1f339d5d69ac9f4a365ea46a462f1b8e6cece61",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-pc-social-chat-parity.cjs",
+          "content_hash": "fc72018dedbcdc7484092fe00c0d1bdd22e2aea4ed8cb8b7be30992f37fedbc0",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "798180a6ea2a59e72cfcaa643c5f93de12838e88",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "517102a71b352b711e7807e0f17b1a37422aa1ef",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-pc-social-chat-recovery.cjs",
+          "content_hash": "d9c78ea6e3993b9a38b0c0a4fa8572c50047bc905a110e5776a9ae52566093b2",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "798180a6ea2a59e72cfcaa643c5f93de12838e88",
+            "head_blob_oid": "070980ab28814bfcc1b682f1aba722323ab6efa0",
+            "worktree_blob_oid": "600c6db8a6829a202f8eace736d747793ff7352e",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-social-chat-operations.cjs",
+          "content_hash": "7e0c73bc3f69a9b8a8238b8efe49d4b44bfcb85378487c8c797eae09f7160ed8",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "798180a6ea2a59e72cfcaa643c5f93de12838e88",
+            "head_blob_oid": "97ee2db509826fafdb45972db13d162b1fa278c7",
+            "worktree_blob_oid": "97ee2db509826fafdb45972db13d162b1fa278c7",
+            "state": "tracked_clean"
+          }
+        }
+      ],
       "created_at_ms": 1789460596075,
-      "updated_at_ms": 1789460596170
+      "updated_at_ms": 1789462521369
     },
     {
       "id": "sqlite-safe-snapshot-v1",
@@ -28897,36 +28996,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8ff933014e6f4778b3d101bc83ea5615",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "claimed",
-      "actor": "codex-native-manage-v2",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788983383365
-    },
-    {
-      "id": "feature_event_562748190d3c4e8482009036986e53df",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "transitioned",
-      "actor": "codex-native-manage-v2",
-      "reason": "继续原生管理切片验证和交付",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788983383444
-    },
-    {
-      "id": "feature_event_1b806bada52b4c508e0250f253ea2b3d",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-native-manage-v2",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788983543903
-    },
-    {
       "id": "feature_event_b3beae04c90340af84bfb1de2c8718c1",
       "feature_id": "android-exchange-session-host-v2",
       "action": "claim_released",
@@ -30895,6 +30964,36 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1789460596170
+    },
+    {
+      "id": "feature_event_6fe3076613ba43388acd4aae1f1a571e",
+      "feature_id": "social-chat-desktop-parity-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789462499338
+    },
+    {
+      "id": "feature_event_8307717c764243128256dcafe9e9883e",
+      "feature_id": "social-chat-desktop-parity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "已接入实际聊天页面，保留文章卡片与原消息恢复能力",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789462510984
+    },
+    {
+      "id": "feature_event_9b8f5afcd15b477c9546b6800a33eca0",
+      "feature_id": "social-chat-desktop-parity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "真实 React 交互、缓存恢复、媒体下载、PC/PWA 修订与文章回归、ESLint 和生产构建通过",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1789462521369
     }
   ]
 }

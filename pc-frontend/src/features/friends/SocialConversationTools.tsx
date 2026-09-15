@@ -11,7 +11,7 @@ interface Summary { id: string; title: string; summary?: string; pinned_at?: str
 interface Hit { id: string; content: string; sender_name: string; created_at: string }
 interface Props {
   conversation: ActiveConversation; query: string; onQuery: (value: string) => void; messages: SocialMessage[]
-  selected: SavedSocialMessage[]; onClearSelection: () => void; onForward: (items: SavedSocialMessage[]) => void; onSave: (items: SavedSocialMessage[]) => void
+  selected: SavedSocialMessage[]; selectionMode?: boolean; onClearSelection: () => void; onForward: (items: SavedSocialMessage[]) => void; onSave: (items: SavedSocialMessage[]) => void
   favorites: SavedSocialMessage[]; onRemoveFavorite: (key: string) => void; hiddenCount: number; onRestore: () => void
 }
 
@@ -24,6 +24,8 @@ export default function SocialConversationTools(props: Props) {
   const [activePost, setActivePost] = useState<Summary | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [reload, setReload] = useState(0)
+  const [searched, setSearched] = useState(false)
   const [notice, setNotice] = useState('')
   const epoch = useRef(0)
   useEffect(() => { epoch.current++; setBusy(false); setPanel(null); setHits([]); setPosts([]); setActivePost(null); setError(''); setNotice(''); return () => { epoch.current++ } }, [conversation.kind, conversation.id])
@@ -35,10 +37,10 @@ export default function SocialConversationTools(props: Props) {
       .then(data => { if (!stopped) setPosts(data.posts.sort((a,b) => Number(!!b.pinned_at)-Number(!!a.pinned_at))) })
       .catch(failure => { if (!stopped) setError(failure.message) }).finally(() => { if (!stopped) setBusy(false) })
     return () => { stopped = true }
-  }, [panel, conversation.id])
+  }, [panel, conversation.id, reload])
   async function findMessages() {
     const request = ++epoch.current
-    setBusy(true); setError(''); setHits([])
+    setBusy(true); setError(''); setHits([]); setSearched(true)
     try {
       const data = await socialRequest<{ retrieval: { hits: { message: Hit }[] } }>(`/api/me/groups/${encodeURIComponent(conversation.id)}/messages/search`, {
         method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ query: search.trim(), limit: 40 }),
@@ -65,9 +67,9 @@ export default function SocialConversationTools(props: Props) {
       {conversation.kind === 'group' && <><button type="button" onClick={() => { setError(''); setPanel('search') }}>群历史检索</button><button type="button" onClick={() => { setActivePost(null); setPanel('summaries') }}>置顶 / 总结</button></>}
       {query && <span className={styles.hint}>当前 {props.messages.length} 条已加载消息；不是全部历史</span>}
     </div>
-    {!!selected.length && <div className={styles.toolbar} aria-label="多选消息操作"><strong>已选 {selected.length} 条</strong>
-      <button type="button" onClick={() => void copyTextToClipboard(selected.map(item => messageText(item.message)).join('\n\n')).then(ok => setNotice(ok ? '已复制所选消息' : '复制失败'))}>复制所选</button>
-      <button type="button" onClick={() => props.onForward(selected)}>转发所选</button><button type="button" onClick={() => props.onSave(selected)}>收藏所选</button><button type="button" onClick={props.onClearSelection}>退出多选</button>
+    {props.selectionMode && <div className={styles.toolbar} aria-label="多选消息操作"><strong>已选 {selected.length} 条</strong>
+      <button type="button" disabled={!selected.length} onClick={() => void copyTextToClipboard(selected.map(item => messageText(item.message)).join('\n\n')).then(ok => setNotice(ok ? '已复制所选消息' : '复制失败'))}>复制所选</button>
+      <button type="button" disabled={!selected.length} onClick={() => props.onForward(selected)}>转发所选</button><button type="button" disabled={!selected.length} onClick={() => props.onSave(selected)}>收藏所选</button><button type="button" onClick={props.onClearSelection}>退出多选</button>
     </div>}
     {notice && <p className={styles.hint} role="status">{notice}</p>}
     {panel && <SocialDialog title={panel === 'favorites' ? '本机收藏' : panel === 'search' ? '群历史检索' : '置顶与群聊总结'} onClose={() => { epoch.current++; setBusy(false); setPanel(null) }}>
@@ -79,12 +81,12 @@ export default function SocialConversationTools(props: Props) {
       {panel === 'search' && <><form onSubmit={event => { event.preventDefault(); if (search.trim()) void findMessages() }}>
         <label>关键词<input aria-label="群历史关键词" value={search} onChange={event => setSearch(event.target.value)} /></label><button type="submit" disabled={busy || !search.trim()}>搜索群历史</button></form>
         <p className={styles.hint}>从服务器检索群历史，最多显示 40 条匹配消息。</p>{hits.map(hit => <article className={styles.item} key={hit.id}><strong>{hit.sender_name}</strong><time> · {new Date(hit.created_at).toLocaleString()}</time><pre>{hit.content}</pre></article>)}
-        {!busy && !error && !hits.length && <p>输入关键词后查找匹配消息</p>}
+        {!busy && !error && !hits.length && <p>{searched ? '没有找到匹配消息' : '输入关键词后查找匹配消息'}</p>}
       </>}
       {panel === 'summaries' && (activePost ? <><button type="button" onClick={() => setActivePost(null)}>返回总结列表</button><h3>{activePost.title}</h3><MarkdownContent content={activePost.summary || '总结内容暂不可用'} copy={false} /></> : <>
         {!busy && !error && !posts.length && <p>群里还没有总结帖</p>}{posts.map(post => <article key={post.id} className={styles.item}><button type="button" disabled={busy} onClick={() => void showPost(post)}>{post.pinned_at ? '置顶 · ' : ''}{post.title}</button></article>)}
       </>)}
-      {busy && <p role="status">正在读取…</p>}{error && <p className={styles.error} role="alert">{error} {panel === 'summaries' && <button type="button" onClick={() => { setPanel(null); setTimeout(() => setPanel('summaries'), 0) }}>重试</button>}</p>}
+      {busy && <p role="status">正在读取…</p>}{error && <p className={styles.error} role="alert">{error} {panel === 'summaries' && <button type="button" onClick={() => { setReload(old => old + 1) }}>重试</button>}</p>}
     </SocialDialog>}
   </>
 }
