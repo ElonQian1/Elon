@@ -10688,8 +10688,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     const revision = friendLookupRevision;
     const query = friendSearchInput.value.trim();
     friendLookup = { query, users: [], message: query ? '正在搜索...' : '' };
-    if (query.length < 2) {
-      if (query) friendLookup.message = '请输入完整手机号、账号或至少两个字的昵称';
+    if (!query) {
       renderAddFriendRecommendations();
       return;
     }

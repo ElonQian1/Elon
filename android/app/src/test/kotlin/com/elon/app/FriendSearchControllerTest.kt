@@ -5,6 +5,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FriendSearchControllerTest {
+    @Test
+    fun oneAndTwoCharacterNamesAreSearchedAndOnlyBlankInputIsSkipped() {
+        val f = Fixture()
+        val queries = listOf("a", "中", "q@", "12")
+        queries.forEachIndexed { index, query ->
+            f.controller.update(" $query ", immediate = true)
+            assertEquals(query, f.queries.last())
+            f.replies[index](f.found("usr_short_$index"))
+            assertEquals("usr_short_$index", f.controller.state.users.single().optString("id"))
+        }
+        f.controller.update("   ")
+        f.runScheduled()
+        assertEquals(queries, f.queries)
+        assertEquals(FriendSearchState(), f.controller.state)
+    }
+
     private class Fixture {
         val scheduled = mutableListOf<Runnable>()
         val queries = mutableListOf<String>()

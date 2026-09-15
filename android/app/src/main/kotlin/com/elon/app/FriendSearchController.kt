@@ -37,8 +37,8 @@ internal class FriendSearchController(
         val requestRevision = ++revision
         cancelPending()
         val query = input.trim()
-        if (query.length < 2) {
-            emit(FriendSearchState(query, message = if (query.isEmpty()) "" else "请输入完整手机号、账号或至少两个字的昵称"))
+        if (query.isEmpty()) {
+            emit(FriendSearchState())
             return
         }
         emit(FriendSearchState(query, loading = true, message = "正在搜索..."))

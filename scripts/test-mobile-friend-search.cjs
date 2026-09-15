@@ -61,6 +61,22 @@ test('finds a user outside recommendations through the authenticated search API'
   assert.match(f.context.friendRecommendationList.innerHTML, /data-add-friend-id="usr_target"/);
 });
 
+test('one and two character names reach search while blank input clears results', async () => {
+  const f = fixture();
+  const queries = ['a', '中', 'q@', '12'];
+  for (const [index, query] of queries.entries()) {
+    f.search(` ${query} `);
+    assert.equal(f.requests.length, index + 1);
+    assert.ok(f.requests[index].url.endsWith('query=' + encodeURIComponent(query)));
+    await f.reply(index, { results: [{ id: `usr_short_${index}`, nickname: query }] });
+    assert.match(f.context.friendRecommendationList.innerHTML, new RegExp(`usr_short_${index}`));
+  }
+  f.search('   ', false);
+  f.runTimers();
+  assert.equal(f.requests.length, queries.length);
+  assert.equal(f.context.friendRecommendationList.innerHTML, '');
+});
+
 test('debounces typing and ignores stale responses after a newer query or clear', async () => {
   const f = fixture();
   f.search('fir', false);
