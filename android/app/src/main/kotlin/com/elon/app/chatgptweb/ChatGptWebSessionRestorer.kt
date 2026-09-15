@@ -8,6 +8,8 @@ internal class ChatGptWebSessionRestorer(context: Context) {
 
     fun restoreUrl(): String = stateStore.restoreUrl()
 
+    fun onDocument(pageGeneration: Long) = startupHistory.onDocument(pageGeneration)
+
     fun onPageReady(url: String) {
         stateStore.saveUrl(url)
     }

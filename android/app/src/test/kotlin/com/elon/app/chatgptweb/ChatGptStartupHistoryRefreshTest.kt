@@ -53,4 +53,48 @@ class ChatGptStartupHistoryRefreshTest {
         assertFalse(moved.take(snapshot))
         assertFalse(moved.take(project))
     }
+
+    @Test
+    fun newDocumentReadsItsOwnRouteAfterTheOldPageWasDestroyed() {
+        val refresh = ChatGptStartupHistoryRefresh(snapshot.url)
+        refresh.onDocument(1)
+        assertTrue(refresh.take(snapshot))
+        refresh.onDocument(2)
+        val next = snapshot.copy(url = "https://chatgpt.com/g/g-p-next/c/next")
+        assertFalse(refresh.take(next.copy(contentOnly = true)))
+        assertFalse(refresh.take(next.copy(authenticated = false)))
+        assertFalse(refresh.take(next.copy(privateSendReady = false)))
+        assertTrue(refresh.take(next))
+        repeat(10) {
+            refresh.onDocument(2)
+            refresh.onDocument(1)
+            assertFalse(refresh.take(next))
+        }
+    }
+
+    @Test
+    fun coldHomeAndReloadEachAdmitOneConfirmedDocumentRead() {
+        val refresh = ChatGptStartupHistoryRefresh("https://chatgpt.com/")
+        refresh.onDocument(1)
+        assertFalse(refresh.take(snapshot.copy(url = "https://chatgpt.com/")))
+        assertTrue(refresh.take(snapshot))
+        refresh.onDocument(2)
+        assertTrue(refresh.take(snapshot))
+        assertFalse(refresh.take(snapshot))
+    }
+
+    @Test
+    fun clearAndSameDocumentNavigationCannotRearmTheOldRead() {
+        val refresh = ChatGptStartupHistoryRefresh(snapshot.url)
+        refresh.onDocument(1)
+        assertFalse(refresh.take(snapshot.copy(privateSendReady = false)))
+        assertFalse(refresh.take(snapshot.copy(url = "https://chatgpt.com/c/other")))
+        assertFalse(refresh.take(snapshot))
+        refresh.clear()
+        refresh.onDocument(1)
+        assertFalse(refresh.take(snapshot))
+        refresh.onDocument(2)
+        assertFalse(refresh.take(snapshot.copy(url = snapshot.url + "?temporary-chat=true")))
+        assertTrue(refresh.take(snapshot))
+    }
 }

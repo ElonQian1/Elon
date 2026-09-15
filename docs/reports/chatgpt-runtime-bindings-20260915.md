@@ -1,6 +1,6 @@
 # September 15 Runtime Compatibility Investigation
 
-Status: bindings 30 / adapter 419 published and installed as 1.1.1756.
+Status: bindings 30 / adapter 420 published and installed as 1.1.1757.
 [Second-rollout compatibility](chatgpt-runtime-bindings-20260915-b.md) and one
 native independent existing-project Send passed on 1753; 1754 publishes the
 narrow default, with ready/idle read-only admission and successful restoration.
@@ -15,8 +15,9 @@ ordinary text, Search and Image modules.
 - [Current Writing projection and SPA recovery](chatgpt-spa-recovery-writing-20260915.md)
   closes a current-profile read omission and the reproduced stale startup-route
   pointer after process recreation. 1755 route recovery passed; 1756 adds one
-  asynchronous startup history read. Full-body acceptance exposed sparse DOM
-  snapshots erasing cached middle rows; adapter 420's merger fix is under verification.
+  asynchronous startup history read. Adapter 420 preserves a complete private
+  history through sparse DOM snapshots; a device read retained all 18 messages.
+  Automatic restoration still needs adapter 421's once-per-document rearm.
 
 - [Project admission follow-up](chatgpt-fresh-project-admission-20260915.md):
   GLOBAL, same-user owner and matching project config are corrected. After the

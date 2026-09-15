@@ -705,6 +705,7 @@ internal class ChatGptBackgroundSession(
     }
 
     private fun handleDocumentChanged(document: com.elon.app.WebBridgeDocumentSession.Snapshot) {
+        sessionRestorer.onDocument(document.pageGeneration)
         if (document.pageGeneration > observedMcpState.snapshot().pageGeneration) {
             latestSnapshot = latestSnapshot?.let(ChatGptWebSnapshotPresentation::revalidating)
             latestSnapshot?.let(onSnapshot)

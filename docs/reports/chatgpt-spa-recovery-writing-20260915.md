@@ -1,7 +1,7 @@
 # SPA Recovery And Current Writing Projection
 
-Status: normal 1756 / adapter 419 published; route recovery verified, full-body
-recovery not yet accepted. Sparse snapshot regression fix is under verification.
+Status: normal 1757 / adapter 420 published. Sparse snapshot retention was
+observed on device; automatic full-body recovery still needs the new-document fix.
 This extends the [September 15 compatibility batch](chatgpt-runtime-bindings-20260915.md),
 not another private sender or Canvas implementation.
 
@@ -119,8 +119,32 @@ The existing 80-message bound and cross-conversation isolation remain enforced.
 After moving the unchanged conversation ownership check out of the background
 entry into the merger, `sparse-history-ownership-regression-20260915-104758-178`
 passed 32 tests in 377.8s with zero failures/errors/skips. The source-size and
-document guards passed. Adapter 420 release and full-history device evidence
-remain pending.
+document guards passed. Normal 1757 / adapter 420 was built, published and installed
+in 570.2s from `dee80f0837127d85ea037e0f2eab0ee56c02b5ac`. SHA-256:
+`6aaea64f1bcb7b079e15cd83e4ce58eb2c11309f09da57bfb94ea04029f8207a`.
+
+## New Document Follow-Up
+
+`conversation-process-recovery-1757-20260915-110806-098` still stopped before
+restart: 14 native rows / 13 web messages, start 5 / observed 18. A bounded
+read-only protocol observation across navigation ended in a new document, so
+its empty records were not evidence that no GET had run. Repeating the read
+only after the same document was ready observed GET
+`/backend-api/conversations/{id}` status 200 and five consecutive complete
+18-message, zero-offset snapshots. The probe's response-shape cap reported
+`oversize`, not a transport failure. No new messages or private text were emitted;
+the original route and awake settings were restored.
+
+The pre-navigation read can be lost when a missing sidebar link requires a full
+document navigation. The session-scoped startup one-shot had already been used
+on the previous document. Adapter 421 rearms that same coordinator once per
+monotonically increasing bridge page generation, and binds it only to a confirmed
+live route. Repeated adapter-ready events, stale generations, cached previews,
+login/temporary states and same-document route changes cannot cause repeated
+reads or target the old conversation. No new transport, reload loop or send is
+added. `document-history-regression-20260915-111753-591` passed 35 Android tests
+in 377.6s with zero failures/errors/skips. Source-size and document guards passed;
+the signed release and automatic full-history acceptance are next.
 
 ## Boundaries
 
