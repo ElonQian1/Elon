@@ -226,7 +226,7 @@
       const bindings = page.__elonChatGptPrivateRuntimeBindings;
       if (url.origin !== 'https://chatgpt.com' || !temporary && (!id || url.search) || url.hash || url.username || url.password ||
           !/^doc_[a-z0-9_]{3,80}$/.test(page.__elonChatGptDocumentToken || '') ||
-          bindings?.state?.().profile_id !== 'web_20260912' ||
+          !['web_20260912', 'web_20260915', 'web_20260915_b'].includes(bindings?.state?.().profile_id) ||
           !page.__elonChatGptPrivateConversationShareContract?.create(page).identity()) return null;
       // Only read an already loaded, reviewed module. Rendering must never fetch or wait.
       const shared = bindings.peek('shared');
@@ -244,5 +244,5 @@
     } catch (_) { return null; }
   }
 
-  return { version: 9, project, domCode, runtimeProjection, MAX_CONTENT };
+  return { version: 10, project, domCode, runtimeProjection, MAX_CONTENT };
 });
