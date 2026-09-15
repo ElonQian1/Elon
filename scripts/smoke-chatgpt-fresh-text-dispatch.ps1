@@ -34,6 +34,7 @@ $runtime = New-ChatGptWebSmokeRuntime -Adb $Adb -DeviceSerial $DeviceSerial `
     -ExpectedHardwareSerial $ExpectedHardwareSerial -PollIntervalSec 1
 $runtime.mcp_bootstrapped = $true
 $fixtureFile = Join-Path (Split-Path -Parent $PSScriptRoot) '.ai-tmp/fresh-text-fixture.json'
+if ($ExistingProjectFixture) { $fixtureFile = Join-Path (Split-Path -Parent $PSScriptRoot) '.ai-tmp/fresh-project-text-fixture.json' }
 $commonGit = [IO.Path]::GetFullPath((& git -C (Split-Path -Parent $PSScriptRoot) rev-parse --git-common-dir).Trim())
 $pendingFile = Join-Path $commonGit 'ai-acceptance-fixtures/fresh-text-pending.json'
 $resolvedPending = $null; $pendingHash = $null
