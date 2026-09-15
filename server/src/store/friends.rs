@@ -116,9 +116,13 @@ impl Store {
         })
     }
 
-    pub fn list_friend_recommendations(&self, user_id: &str) -> Result<Vec<FriendRecommendation>> {
+    pub fn list_friend_recommendations(
+        &self,
+        user_id: &str,
+        online_user_ids: &[String],
+    ) -> Result<Vec<FriendRecommendation>> {
         let conn = self.conn()?;
-        recommendations::list_recommendations(&conn, user_id, SOCIAL_AI_USER_ID)
+        recommendations::list_recommendations(&conn, user_id, SOCIAL_AI_USER_ID, online_user_ids)
     }
 
     pub fn list_friends(&self, user_id: &str) -> Result<Vec<FriendProfile>> {

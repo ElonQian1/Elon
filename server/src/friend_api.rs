@@ -140,16 +140,20 @@ pub async fn list_friend_recommendations(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
     let limit = query.limit.unwrap_or(50).max(1).min(200) as usize;
-    match state.store.list_friend_recommendations(&user.id) {
-        Ok(mut recommendations) => {
+    let online_ids = state
+        .online_users
+        .read()
+        .await
+        .iter()
+        .filter(|(_, count)| **count > 0)
+        .map(|(id, _)| id.clone())
+        .collect::<Vec<_>>();
+    match state
+        .store
+        .list_friend_recommendations(&user.id, &online_ids)
+    {
+        Ok(recommendations) => {
             let total_count = recommendations.len();
-            let online = state.online_users.read().await;
-            for r in &mut recommendations {
-                r.is_online =
-                    r.already_friend && (r.id == SOCIAL_AI_USER_ID || online.contains_key(&r.id));
-            }
-            // 在线用户排在前面，离线用户在后面
-            recommendations.sort_by(|a, b| b.is_online.cmp(&a.is_online));
             let shown = recommendations.into_iter().take(limit).collect::<Vec<_>>();
             Json(serde_json::json!({
                 "recommendations": shown,

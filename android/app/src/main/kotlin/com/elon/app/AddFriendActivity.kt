@@ -44,6 +44,7 @@ class AddFriendActivity : AppCompatActivity() {
     private lateinit var friendSearch: FriendSearchController
     private var recommendationsLoading = true
     private var recommendationsError = ""
+    private var recommendationsRevision = 0
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = elonColor(R.color.elon_bg_chrome)
@@ -62,7 +63,11 @@ class AddFriendActivity : AppCompatActivity() {
             lookup = friendSearchLookup(this, http, { serverUrl }, handler),
             publish = { renderRecommendations() }
         )
-        loadRecommendations()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::friendSearch.isInitialized) loadRecommendations()
     }
 
     override fun onDestroy() {
@@ -72,6 +77,7 @@ class AddFriendActivity : AppCompatActivity() {
 
     private fun buildContent(): View {
         return LinearLayout(this).apply {
+            isFocusableInTouchMode = true
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(elonColor(R.color.elon_bg_app))
             addView(topBar(), LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(50)))
@@ -184,6 +190,9 @@ class AddFriendActivity : AppCompatActivity() {
                 minHeight = dp(24)
                 textSize = 13f
                 setTextColor(elonColor(R.color.elon_text_tertiary))
+                setOnClickListener {
+                    if (recommendationsError.isNotEmpty() && searchInput.text.isBlank()) loadRecommendations()
+                }
             }
             addView(resultText, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -220,7 +229,7 @@ class AddFriendActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
             addView(TextView(this@AddFriendActivity).apply {
-                text = item.name
+                text = item.displayName
                 includeFontPadding = false
                 maxLines = 1
                 textSize = 16f
@@ -330,26 +339,29 @@ class AddFriendActivity : AppCompatActivity() {
     }
 
     private fun loadRecommendations() {
-        resultText.text = "正在加载推荐好友..."
+        val revision = ++recommendationsRevision
+        recommendationsLoading = true
+        recommendationsError = ""
+        renderRecommendations()
         thread(name = "add-friend-recommendations") {
             val result = runCatching {
                 val request = AuthManager.applyAuth(
                     this,
                     Request.Builder()
-                        .url("$serverUrl/api/me/friends/recommendations")
+                        .url("$serverUrl/api/me/friends/recommendations?limit=200")
                         .get()
                 ).build()
                 http.newCall(request).execute().use { response ->
                     val body = response.body?.string().orEmpty()
                     if (!response.isSuccessful) error(readErrorMessage(body, "推荐好友加载失败"))
-                    val array = JSONObject(body).optJSONArray("recommendations") ?: org.json.JSONArray()
+                    val array = JSONObject(body).optJSONArray("recommendations") ?: error("推荐好友响应异常")
                     List(array.length()) { index ->
                         parseRecommendation(array.optJSONObject(index) ?: JSONObject())
                     }
                 }
             }
             runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (isFinishing || isDestroyed || revision != recommendationsRevision) return@runOnUiThread
                 recommendationsLoading = false
                 result.fold(
                     onSuccess = {
@@ -358,7 +370,7 @@ class AddFriendActivity : AppCompatActivity() {
                         renderRecommendations()
                     },
                     onFailure = {
-                        recommendationsError = it.message ?: "推荐好友加载失败"
+                        recommendationsError = "${it.message ?: "推荐好友加载失败"}，轻点重试"
                         renderRecommendations()
                     }
                 )
@@ -371,7 +383,7 @@ class AddFriendActivity : AppCompatActivity() {
         recommendationList.removeAllViews()
         val search = if (::friendSearch.isInitialized) friendSearch.state else FriendSearchState()
         val searching = search.query.isNotEmpty()
-        recommendationTitle.text = if (searching) "搜索结果" else "推荐"
+        recommendationTitle.text = if (searching) "搜索结果" else "推荐 · 在线优先"
         val items = if (searching) search.users.map(::parseRecommendation) else recommendations
         items.forEach { item ->
             recommendationList.addView(recommendationRow(item), LinearLayout.LayoutParams(

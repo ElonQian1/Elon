@@ -10,8 +10,11 @@ internal data class AddFriendRecommendation(
     val avatarDataUrl: String?,
     val mutualFriendCount: Int,
     val alreadyFriend: Boolean,
-    val isSelf: Boolean = false
-)
+    val isSelf: Boolean = false,
+    val isOnline: Boolean = false
+) {
+    val displayName: String get() = if (isOnline) "$name · 在线" else name
+}
 
 internal fun parseRecommendation(json: JSONObject): AddFriendRecommendation {
     val id = json.optString("id", "").trim()
@@ -27,6 +30,7 @@ internal fun parseRecommendation(json: JSONObject): AddFriendRecommendation {
         avatarDataUrl = json.optString("avatar_data_url", "").trim().takeIf { it.isNotEmpty() },
         mutualFriendCount = json.optInt("mutual_friend_count", 0).coerceAtLeast(0),
         alreadyFriend = json.optBoolean("already_friend", false),
-        isSelf = json.optBoolean("is_self", false)
+        isSelf = json.optBoolean("is_self", false),
+        isOnline = json.optBoolean("is_online", false)
     )
 }

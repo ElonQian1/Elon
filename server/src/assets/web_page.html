@@ -10644,11 +10644,11 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   }
   function renderAddFriendRecommendations() {
     const searching = !!friendLookup.query;
-    friendRecommendationTitle.textContent = searching ? '搜索结果' : '推荐';
+    friendRecommendationTitle.textContent = searching ? '搜索结果' : '推荐 · 在线优先';
     const items = searching ? friendLookup.users : friendRecommendations;
     friendRecommendationList.innerHTML = items.map((item) => {
       const id = escapeHtml(item.id || '');
-      const name = escapeHtml(recommendationName(item));
+      const name = escapeHtml(recommendationName(item) + (item.is_online ? ' · 在线' : ''));
       const account = escapeHtml(recommendationAccount(item));
       const avatar = item.avatar_data_url
         ? `<img src="${escapeHtml(item.avatar_data_url)}" alt="">`
@@ -10724,11 +10724,12 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     addFriendResult.textContent = '正在加载推荐好友...';
     addFriendResult.style.color = 'var(--ink-faint)';
     try {
-      const res = await api('/api/me/friends/recommendations');
+      const res = await api('/api/me/friends/recommendations?limit=200');
       const data = await res.json().catch(() => ({}));
       if (revision !== friendRecommendationsRevision) return;
       if (!res.ok) throw new Error(data.error || '推荐好友加载失败');
-      friendRecommendations = Array.isArray(data.recommendations) ? data.recommendations : [];
+      if (!Array.isArray(data.recommendations)) throw new Error('推荐好友响应异常');
+      friendRecommendations = data.recommendations;
       friendRecommendationsLoading = false;
       renderAddFriendRecommendations();
     } catch (err) {
@@ -10749,7 +10750,6 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     addFriendMask.classList.add('active');
     setTopAddButtonExpanded(true);
     loadFriendRecommendations();
-    setTimeout(() => friendSearchInput.focus(), 50);
   }
   function closeAddFriendDialog() {
     cancelFriendLookup();

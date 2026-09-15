@@ -6,7 +6,7 @@ const { test } = require('node:test');
 
 const page = fs.readFileSync(path.join(__dirname, '../server/src/assets/web_page.html'), 'utf8');
 const start = page.indexOf('  function recommendationName(');
-const end = page.indexOf('  async function loadFriendRecommendations()', start);
+const end = page.indexOf('  function setHomeActionMenuVisible(', start);
 assert(start > 0 && end > start);
 
 function fixture() {
@@ -15,7 +15,9 @@ function fixture() {
   let timer = 0;
   const context = vm.createContext({
     AbortController, encodeURIComponent,
-    friendSearchInput: { value: '' },
+    friendSearchInput: { value: '', focus: () => { context.focused = true; } },
+    addFriendMask: { classList: { add() {}, remove() {} } },
+    setTopAddButtonExpanded() {},
     friendRecommendationList: { innerHTML: '', addEventListener: (_, handler) => { context.addFriend = handler; } },
     friendRecommendationTitle: { textContent: '' },
     addFriendResult: { textContent: '', style: {} },
@@ -29,7 +31,7 @@ function fixture() {
     let friendRecommendations = [];
     let friendLookup = { query: '', users: [], message: '' };
     let friendLookupRevision = 0, friendLookupTimer = null, friendLookupAbort = null;
-    let friendRecommendationsLoading = false, friendRecommendationsError = '';
+    let friendRecommendationsLoading = false, friendRecommendationsError = '', friendRecommendationsRevision = 0;
     ${page.slice(start, end)}
   `, context);
   const clickStart = page.indexOf("  friendRecommendationList.addEventListener('click'");
@@ -38,6 +40,8 @@ function fixture() {
   vm.runInContext(page.slice(clickStart, clickEnd), context);
   return {
     context, requests,
+    open() { vm.runInContext('openAddFriendDialog()', context); },
+    close() { vm.runInContext('closeAddFriendDialog()', context); },
     search(query, immediate = true) {
       context.friendSearchInput.value = query;
       vm.runInContext(`searchRegisteredFriend(${immediate})`, context);
@@ -49,6 +53,64 @@ function fixture() {
     }
   };
 }
+
+test('opening without typing displays recommendations with online markers and keeps the keyboard closed', async () => {
+  const f = fixture();
+  f.open();
+  assert.match(f.requests[0].url, /^\/api\/me\/friends\/recommendations/);
+  await f.reply(0, { recommendations: [
+    { id: 'usr_online', nickname: 'Online User', is_online: true },
+    { id: 'usr_offline', nickname: 'Offline User', is_online: false }
+  ] });
+  f.runTimers();
+  assert.equal(f.context.focused, undefined);
+  assert.match(f.context.friendRecommendationTitle.textContent, /在线优先/);
+  assert.match(f.context.friendRecommendationList.innerHTML, /Online User · 在线/);
+  assert.doesNotMatch(f.context.friendRecommendationList.innerHTML, /Offline User · 在线/);
+  f.search('somebody');
+  await f.reply(1, { results: [] });
+  f.search('');
+  assert.match(f.context.friendRecommendationList.innerHTML, /Online User/);
+  assert.equal(f.requests.length, 2);
+});
+
+test('recommendation responses cannot overwrite search or reopen state', async () => {
+  const f = fixture();
+  f.open();
+  f.search('target');
+  await f.reply(1, { results: [{ id: 'usr_target', nickname: 'Target' }] });
+  await f.reply(0, { recommendations: [{ id: 'usr_rec', nickname: 'Recommendation' }] });
+  assert.match(f.context.friendRecommendationList.innerHTML, /Target/);
+  assert.doesNotMatch(f.context.friendRecommendationList.innerHTML, /Recommendation/);
+  f.close(); f.open(); f.close(); f.open();
+  await f.reply(3, { recommendations: [{ id: 'usr_new', nickname: 'Current' }] });
+  await f.reply(2, { recommendations: [{ id: 'usr_old', nickname: 'Stale' }] });
+  assert.match(f.context.friendRecommendationList.innerHTML, /Current/);
+  assert.doesNotMatch(f.context.friendRecommendationList.innerHTML, /Stale/);
+});
+
+test('recommendation errors are visible and reopening retries without a username', async () => {
+  const f = fixture(); f.open();
+  await f.reply(0, { error: '推荐好友加载失败' }, false);
+  assert.match(f.context.addFriendResult.textContent, /推荐好友加载失败/);
+  f.close(); f.open();
+  await f.reply(1, { recommendations: [{ id: 'usr_retry', nickname: 'Retry' }] });
+  assert.match(f.context.friendRecommendationList.innerHTML, /Retry/);
+});
+
+test('recommendation accounts and name fallback display the masked account hint', async () => {
+  const f = fixture(); f.open();
+  await f.reply(0, { recommendations: [
+    { id: 'usr_phone', account_hint: '手机尾号 9650', account: '手机尾号 9650', phone: null },
+    { id: 'usr_email', nickname: 'Email User', account_hint: '邮箱 p***e', account: '邮箱 p***e' }
+  ] });
+  assert.match(f.context.friendRecommendationList.innerHTML, /手机尾号 9650/);
+  assert.match(f.context.friendRecommendationList.innerHTML, /邮箱 p\*\*\*e/);
+  const adding = f.context.addFriend({ target: { closest: () => ({ disabled: false, getAttribute: () => 'usr_email' }) } });
+  assert.deepEqual(JSON.parse(f.requests[1].options.body), { search_type: 'account_id', query: 'usr_email' });
+  await f.reply(1, {}); await adding;
+  assert.match(f.context.friendRecommendationList.innerHTML, /usr_email" disabled>已添加/);
+});
 
 test('finds a user outside recommendations through the authenticated search API', async () => {
   const f = fixture();

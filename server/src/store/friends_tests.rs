@@ -54,7 +54,7 @@ fn recommendations_include_registered_users_with_relationship_context() {
         .expect("bob and carol should be friends");
 
     let recommendations = store
-        .list_friend_recommendations(&alice.id)
+        .list_friend_recommendations(&alice.id, &[])
         .expect("recommendations should load");
     let bob_row = recommendations
         .iter()

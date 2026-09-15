@@ -121,7 +121,7 @@ pub(super) fn search_candidates(
     Ok(FriendCandidates { results, has_more })
 }
 
-fn account_hint(phone: Option<&str>, email: Option<&str>, id: &str) -> String {
+pub(super) fn account_hint(phone: Option<&str>, email: Option<&str>, id: &str) -> String {
     if let Some(phone) = phone.filter(|value| !value.is_empty()) {
         // Older accounts can store a username in the phone column.
         if phone.chars().all(|ch| ch.is_ascii_digit() || ch == '+') && phone.len() >= 7 {
