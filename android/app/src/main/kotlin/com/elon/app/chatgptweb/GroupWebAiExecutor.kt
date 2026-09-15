@@ -1,12 +1,9 @@
 package com.elon.app.chatgptweb
 
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.view.ViewGroup
-import android.webkit.WebView
 import androidx.appcompat.app.AppCompatActivity
-import com.elon.app.beginWebChatBackgroundInteraction
+import com.elon.app.GroupAiConfiguration
 import java.util.UUID
 
 /** A separate document, sharing identity but never personal conversation/navigation state. */
@@ -16,10 +13,14 @@ internal class GroupWebAiExecutor(
     private val authorize: ((Boolean) -> Unit) -> Unit,
     private val onResult: (String) -> Unit,
     private val onFailure: (Boolean) -> Unit,
+    private val configuration: GroupAiConfiguration = GroupAiConfiguration(),
 ) {
     private val handler = Handler(Looper.getMainLooper())
-    private var webView: WebView? = null
-    private var adapter: ChatGptWebPageAdapter? = null
+    private var session: GroupWebAiSession? = null
+    private val adapter get() = session?.adapter
+    private var modelConfiguration: GroupWebAiModelConfiguration? = null
+    private var configured = false
+    private var lastSnapshot: ChatGptWebSnapshot? = null
     private var finished = false
     private var dispatching = false
     private var dispatched = false
@@ -28,28 +29,12 @@ internal class GroupWebAiExecutor(
 
     fun start() {
         handler.postDelayed(timeout, 60_000L)
-        val view = createChatGptBackgroundWebView(activity, null, {}, { it.onReceiveValue(null) })
-        webView = view
-        activity.findViewById<ViewGroup>(android.R.id.content).addView(view, 0,
-            ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        view.beginWebChatBackgroundInteraction()
-        view.settings.mediaPlaybackRequiresUserGesture = true
-        val bridge = ChatGptWebPageAdapter(activity, view, ::event, {})
-        adapter = bridge
-        view.webViewClient = ChatGptWebViewClient(
-            onPageStarted = { bridge.onPageStarted(it) },
-            onPageReady = { bridge.onPageReady(it) },
-            onBlockedNavigation = { fail() },
-            onPageError = { fail() },
-            rewriteAllowedMainFrameUrl = { null },
-        )
-        bridge.install()
-        ChatGptWebProxyController(activity).prepare {
-            if (!finished) view.loadUrl("https://chatgpt.com/?temporary-chat=true")
-        }
+        session = GroupWebAiSession(activity, ::event, ::fail).also { it.start() }
     }
 
     private fun event(event: ChatGptWebEvent) {
+        if (finished) return
+        modelConfiguration?.event(event)
         if (finished) return
         when (event) {
             is ChatGptWebEvent.Snapshot -> snapshot(event.value)
@@ -60,14 +45,18 @@ internal class GroupWebAiExecutor(
     }
 
     private fun snapshot(value: ChatGptWebSnapshot) {
+        lastSnapshot = value
         if (!dispatched) {
             if (value.loginRequired) { fail(); return }
-            if (dispatching || (!value.composerReady && !value.privateSendReady) || value.streaming) return
-            val uri = Uri.parse(value.url)
-            if (uri.host != "chatgpt.com" || uri.path !in listOf("", "/") ||
-                uri.getQueryParameter("temporary-chat") != "true" ||
-                value.messages.isNotEmpty() || value.draft.isNotBlank()
-            ) return
+            if (dispatching || !GroupWebAiSession.ready(value)) return
+            if (!configured) {
+                if (modelConfiguration == null) {
+                    modelConfiguration = GroupWebAiModelConfiguration(GroupAiModelPort.from(requireNotNull(adapter)), configuration.modelPath,
+                        onReady = { configured = true; lastSnapshot?.let(::snapshot) }, onFailure = ::fail)
+                    modelConfiguration?.start()
+                }
+                return
+            }
             dispatching = true
             // Once authorization is attempted, a lost response must never trigger paid fallback.
             authorize { permitted ->
@@ -97,12 +86,8 @@ internal class GroupWebAiExecutor(
     private fun finish() {
         finished = true
         handler.removeCallbacks(timeout)
-        adapter?.dispose()
-        adapter = null
-        webView?.stopLoading()
-        (webView?.parent as? ViewGroup)?.removeView(webView)
-        webView?.destroy()
-        webView = null
+        session?.close()
+        session = null
     }
 
     companion object {

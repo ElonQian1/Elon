@@ -1053,13 +1053,12 @@ class MainActivity : AppCompatActivity() {
             showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             onProjectShareAction = chatProjectShareActions::handleCardAction,
-            onProjectShareLongPress = { anchor, message, share ->
-                actionPopups.showProjectShareActionPopup(anchor, message, share)
-            },
+            onProjectShareLongPress = actionPopups::showProjectShareActionPopup,
             userId = { AuthManager.effectiveUserId(this) },
             clearPendingAttachments = { inputActions.pendingAttachmentActions.clearPendingAttachments(deleteFiles = false) },
             inputFocusActions = { inputActions.inputFocusActions },
-            onGroupSummariesChanged = { groupActions.loadGroups() }
+            onGroupSummariesChanged = { groupActions.loadGroups() },
+            aiComposer = GroupAiComposer.create(this, binding, inputActions, modelActions, serverUrl) { AuthManager.effectiveUserId(this) },
         )
     }
 

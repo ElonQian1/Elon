@@ -47,7 +47,7 @@ internal class GroupWebAiFeature(
 
     fun release() { busy = false }
 
-    fun prepare(group: AppGroup, messageId: String) = confirm(group) {
+    fun prepare(group: AppGroup, messageId: String, configuration: GroupAiConfiguration = GroupAiConfiguration()) = confirm(group) {
         val operation = UUID.randomUUID().toString()
         val owner = userId()
         thread {
@@ -56,28 +56,47 @@ internal class GroupWebAiFeature(
                     .getJSONObject("request")
             }
             activity.runOnUiThread {
-                result.onSuccess { execute(it, operation, owner) }
+                result.onSuccess { execute(it, operation, owner, configuration) }
                     .onFailure { release(); toast("创建 AI 请求失败，请稍后重试") }
             }
         }
     }
 
     /** Called on the existing message-upload worker; reservation and message are one transaction. */
-    fun send(group: AppGroup, payload: JSONObject): JSONObject {
+    fun send(group: AppGroup, payload: JSONObject, configuration: GroupAiConfiguration = GroupAiConfiguration()): JSONObject {
         val operation = UUID.randomUUID().toString()
         val owner = userId()
         val response = post("${base(group.id)}/web-ai/messages", payload.put("operation_id", operation))
         val request = response.getJSONObject("request")
-        activity.runOnUiThread { execute(request, operation, owner) }
+        activity.runOnUiThread { execute(request, operation, owner, configuration) }
         return response.getJSONObject("message")
     }
 
-    private fun execute(request: JSONObject, operation: String, owner: String) {
+    fun prepareWork(group: AppGroup, messageId: String) {
+        if (busy) { toast("群聊 AI 正在处理，请稍候"); return }
+        busy = true
+        val owner = userId()
+        thread {
+            val result = runCatching {
+                check(owner == userId())
+                post("${base(group.id)}/messages/${part(messageId)}/ai-reply", JSONObject())
+            }
+            activity.runOnUiThread {
+                release()
+                if (owner != userId()) return@runOnUiThread
+                toast(if (result.isSuccess) "工作 AI 正在回复" else "请求未确认，请先查看群消息，勿重复发送")
+                refresh(group.id)
+            }
+        }
+    }
+
+    private fun execute(request: JSONObject, operation: String, owner: String, configuration: GroupAiConfiguration) {
         if (activity.isDestroyed || userId() != owner) { release(); return }
         busy = true
         progress = Snackbar.make(root, "ChatGPT 正在处理群聊回复", Snackbar.LENGTH_INDEFINITE)
             .setAction("取消") { executor?.cancel() }.also { it.show() }
         executor = GroupWebAiExecutor(activity, request.getString("prompt"),
+            configuration = configuration,
             authorize = { ready ->
                 thread {
                     val result = runCatching {

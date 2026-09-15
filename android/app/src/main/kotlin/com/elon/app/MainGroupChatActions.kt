@@ -30,7 +30,8 @@ internal class MainGroupChatActions(
     private val userId: () -> String,
     private val clearPendingAttachments: () -> Unit,
     private val inputFocusActions: () -> MainInputFocusActions,
-    private val onGroupSummariesChanged: () -> Unit
+    private val onGroupSummariesChanged: () -> Unit,
+    private val aiComposer: GroupAiComposer,
 ) {
     private val messagesByGroup = linkedMapOf<String, MutableList<ChatMessage>>()
     private val pollHandler = Handler(Looper.getMainLooper())
@@ -98,6 +99,7 @@ internal class MainGroupChatActions(
             binding.chatList.jumpToLatestMessageBeforeNextDraw()
         }
         showFriendChat(group.name, animate)
+        aiComposer.open(group.id)
         summaryPosts.openGroup(group)
         loadMessages(group, silent = false, scrollToBottom = true)
         startPolling()
@@ -105,6 +107,7 @@ internal class MainGroupChatActions(
     }
 
     fun closeGroupChat() {
+        aiComposer.close()
         revisions.close()
         activeGroup = null
         mentions.setGroup(null)
@@ -144,11 +147,12 @@ internal class MainGroupChatActions(
         pollHandler.removeCallbacks(pollRunnable)
     }
 
-    fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>, webAiConfirmed: Boolean = false): Boolean {
+    fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>, webAiConfirmed: Boolean = false,
+        configuration: GroupAiConfiguration = aiComposer.configuration()): Boolean {
         val group = activeGroup ?: return false
-        if (GroupWebAiFeature.mentionsAi(rawText) && !webAiConfirmed) {
+        if (configuration.usesWebAi && GroupWebAiFeature.mentionsAi(rawText) && !webAiConfirmed) {
             webAi.confirm(group) {
-                if (activeGroup?.id == group.id && binding.inputEdit.text.toString().trim() == rawText.trim()) trySendMessage(rawText, pendingAttachments, true)
+                if (activeGroup?.id == group.id && binding.inputEdit.text.toString().trim() == rawText.trim()) trySendMessage(rawText, pendingAttachments, true, configuration)
                 else webAi.release()
             }
             return true
@@ -175,7 +179,7 @@ internal class MainGroupChatActions(
         thread {
             val result = runCatching {
                 val attachments = uploadGroupAttachments(group, attachmentsToSend)
-                postMessage(group, text, attachments, webAiConfirmed)
+                postMessage(group, text, attachments, webAiConfirmed, configuration)
             }
             activity.runOnUiThread {
                 if (result.isFailure && webAiConfirmed) webAi.release()
@@ -198,11 +202,12 @@ internal class MainGroupChatActions(
         return true
     }
 
-    fun trySendForwardedMessage(source: ChatMessage, webAiConfirmed: Boolean = false): Boolean {
+    fun trySendForwardedMessage(source: ChatMessage, webAiConfirmed: Boolean = false,
+        configuration: GroupAiConfiguration = aiComposer.configuration()): Boolean {
         val group = activeGroup ?: return false
-        if (GroupWebAiFeature.mentionsAi(source.content) && !webAiConfirmed) {
+        if (configuration.usesWebAi && GroupWebAiFeature.mentionsAi(source.content) && !webAiConfirmed) {
             webAi.confirm(group) {
-                if (activeGroup?.id == group.id) trySendForwardedMessage(source, true)
+                if (activeGroup?.id == group.id) trySendForwardedMessage(source, true, configuration)
                 else webAi.release()
             }
             return true
@@ -225,7 +230,7 @@ internal class MainGroupChatActions(
 
         thread {
             val result = runCatching {
-                postMessage(group, text, chatAttachmentRefsFromChatAttachments(attachments), webAiConfirmed)
+                postMessage(group, text, chatAttachmentRefsFromChatAttachments(attachments), webAiConfirmed, configuration)
             }
             activity.runOnUiThread {
                 if (result.isFailure && webAiConfirmed) webAi.release()
@@ -258,7 +263,9 @@ internal class MainGroupChatActions(
             Toast.makeText(activity, "这条消息没有可供 AI 回复的文本", Toast.LENGTH_SHORT).show()
             return
         }
-        webAi.prepare(group, messageId)
+        val configuration = aiComposer.configuration()
+        if (configuration.usesWebAi) webAi.prepare(group, messageId, configuration)
+        else webAi.prepareWork(group, messageId)
     }
 
     fun deleteCurrentMessage(message: ChatMessage, onDeleted: () -> Unit) {
@@ -418,12 +425,13 @@ internal class MainGroupChatActions(
         ) ?: error("附件上传失败")
     }
 
-    private fun postMessage(group: AppGroup, text: String, attachments: JsonArray, useWebAi: Boolean = false): ChatMessage {
+    private fun postMessage(group: AppGroup, text: String, attachments: JsonArray, useWebAi: Boolean = false,
+        configuration: GroupAiConfiguration = GroupAiConfiguration()): ChatMessage {
         val payloadJson = JSONObject().put("content", text)
         if (attachments.size() > 0) {
             payloadJson.put("attachments", JSONArray(attachments.toString()))
         }
-        if (useWebAi) return groupMessageFromJson(group, webAi.send(group, payloadJson))
+        if (useWebAi) return groupMessageFromJson(group, webAi.send(group, payloadJson, configuration))
         val payload = payloadJson.toString()
             .toRequestBody("application/json".toMediaType())
         val request = AuthManager.applyAuth(
