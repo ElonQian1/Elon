@@ -50,7 +50,7 @@
     if (trailing && (typeof p.trailingUp !== 'boolean' || typeof p.trailingDown !== 'boolean' ||
       typeof p.trailingStopUpperLimit !== 'boolean' || typeof p.trailingStopLowerLimit !== 'boolean')) return false;
     if (('trailingUpLimitPrice' in p && !p.trailingUp) || ('trailingDownLimitPrice' in p && !p.trailingDown)) return false;
-    return typeof p.symbol === 'string' && /^[A-Z0-9]{1,24}USDT$/.test(p.symbol) &&
+    return typeof p.symbol === 'string' && /^[A-Z0-9\u3400-\u4DBF\u4E00-\u9FFF]{1,24}USDT$(?![\s\S])/.test(p.symbol) &&
       ['LONG','SHORT','NEUTRAL'].includes(p.direction) && ['ISOLATED','CROSSED'].includes(p.marginType) &&
       ['ARITH','GEO'].includes(p.gridType) && ['gridLowerLimit','gridUpperLimit','gridInitialValue'].every(k => decimal(p[k])) &&
       Number.isInteger(p.leverage) && p.leverage >= 1 && p.leverage <= 125 &&
@@ -223,7 +223,7 @@
     await identity(p.account,h);
     if(v.code !== '000000' || v.success !== true || scalarId(d?.strategyId) !== p.strategy ||
       (d.rootUserId != null && scalarId(d.rootUserId) !== uid) ||
-      typeof d.symbol !== 'string' || !/^[A-Z0-9]{1,24}USDT$/.test(d.symbol) ||
+      typeof d.symbol !== 'string' || !/^[A-Z0-9\u3400-\u4DBF\u4E00-\u9FFF]{1,24}USDT$(?![\s\S])/.test(d.symbol) ||
       typeof d.strategyStatus !== 'string' || !/^[A-Z][A-Z0-9_]{0,63}$/.test(d.strategyStatus)) throw Error('detail_unverified');
     const flags=['cps','cos','sharing','trailingStopLowerLimit','trailingStopUpperLimit'];
     if(flags.some(k=>typeof d[k] !== 'boolean')) throw Error('settings_unavailable');

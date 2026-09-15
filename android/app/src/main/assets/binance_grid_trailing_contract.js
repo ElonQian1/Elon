@@ -45,7 +45,7 @@
   function body(id,s,input,rules) {
     const v=draft(input),p=s?.protection,t=s?.trailing;
     if(typeof id!=='string' || !/^[1-9][0-9]{0,15}$/.test(id) || !Number.isSafeInteger(Number(id)) ||
-      s.strategy_id!==id || !/^[A-Z0-9]{1,24}USDT$/.test(s.symbol) || s.provider_status!=='WORKING' ||
+      s.strategy_id!==id || !/^[A-Z0-9\u3400-\u4DBF\u4E00-\u9FFF]{1,24}USDT$(?![\s\S])/.test(s.symbol) || s.provider_status!=='WORKING' ||
       !v || !p || !t || p.trailing_up!==t.up || p.trailing_down!==t.down ||
       !window.__elonBinanceTrailingRulesV1?.validate(t,v,rules))throw Error('trailing_unavailable');
     if(keys.every(k=>v[k]===t[k]))throw Error('no_change');

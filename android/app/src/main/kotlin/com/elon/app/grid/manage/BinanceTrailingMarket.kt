@@ -1,5 +1,7 @@
 package com.elon.app.grid.manage
 
+import com.elon.app.grid.BinanceSymbols
+
 import com.elon.app.grid.create.BinanceGridMarket
 import com.elon.app.grid.create.BinanceGridQuote
 import com.elon.app.grid.create.BinanceGridRule
@@ -22,7 +24,7 @@ internal class BinanceTrailingMarket {
         val worker=ThreadPoolExecutor(1,1,30,TimeUnit.SECONDS,ArrayBlockingQueue(1),
             { job -> Thread(job,"binance-trailing-market").apply{isDaemon=true} },ThreadPoolExecutor.AbortPolicy())
         fun context(rule:BinanceGridRule,quote:BinanceGridQuote,ticker:BinanceSymbolTicker,now:Long):Map<String,Any> {
-            require(rule.symbol==quote.symbol && Regex("[A-Z0-9]{1,24}USDT").matches(rule.symbol))
+            require(rule.symbol==quote.symbol && Regex(BinanceSymbols.PATTERN).matches(rule.symbol))
             require(now-quote.observed in -5000..20000 && now-ticker.closeTime in -5000..20000) {"行情已过期，请重新读取后检查"}
             fun price(value:String?):String {
                 val raw=value ?: error("币安尚未返回完整合约规则")

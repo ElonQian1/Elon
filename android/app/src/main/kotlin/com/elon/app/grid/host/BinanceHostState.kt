@@ -1,5 +1,7 @@
 package com.elon.app.grid.host
 
+import com.elon.app.grid.BinanceSymbols
+
 import com.elon.app.privateaccess.StrictJson
 import java.math.BigDecimal
 import java.security.MessageDigest
@@ -112,7 +114,7 @@ internal class BinanceHostState(private val elapsed: () -> Long, private val epo
             require(field is String && Regex(pattern).matches(field)); return field
         }
         text("id", "[0-9]{1,20}"); text("account", "[0-9]{1,20}", true)
-        text("symbol", "[A-Z0-9]{1,24}USDT"); text("status", "[A-Z][A-Z0-9_]{0,63}")
+        text("symbol", BinanceSymbols.PATTERN); text("status", "[A-Z][A-Z0-9_]{0,63}")
         text("direction", "LONG|SHORT|NEUTRAL", true); text("spacing", "ARITH|GEO", true)
         val decimal = "(0|[1-9][0-9]{0,29})(\\.[0-9]{1,20})?"
         val lower = text("lower", decimal, true)?.let(::BigDecimal)

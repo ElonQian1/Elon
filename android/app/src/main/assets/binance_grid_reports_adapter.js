@@ -60,7 +60,7 @@
     function object(v) { if (!v || typeof v !== 'object' || Array.isArray(v)) throw Error('unsupported_object'); return v; }
     function history(v) {
       object(v);
-      return {id: scalar(v.strategyId, integer, true), symbol: scalar(v.symbol, /^[A-Z0-9]{1,24}USDT$/, true),
+      return {id: scalar(v.strategyId, integer, true), symbol: scalar(v.symbol, /^[A-Z0-9\u3400-\u4DBF\u4E00-\u9FFF]{1,24}USDT$(?![\s\S])/, true),
         status: scalar(v.strategyStatus, enumeration, true), direction: en(v.direction),
         lower: dec(v.gridLowerLimit), upper: dec(v.gridUpperLimit), count: num(v.gridCount), leverage: num(v.initialLeverage),
         profit: dec(v.gridProfit), matchedPnl: dec(v.matchedPnl), fundingFee: dec(v.fundingFee), fee: dec(v.fee),
@@ -103,9 +103,9 @@
       if (!q || Object.keys(q).sort().join(',') !== 'days,id,kind,page,request,symbol') return false;
       if (!/^[0-9a-f]{32}$/.test(q.request) || !['history','orders','matches','positions','funds'].includes(q.kind)) return false;
       if (!Number.isInteger(q.page) || q.page < 1 || q.page > 1000 || ![7,30,90].includes(q.days)) return false;
-      if (q.kind === 'history') return q.id === '' && (q.symbol === '' || /^[A-Z0-9]{1,24}USDT$/.test(q.symbol)) &&
+      if (q.kind === 'history') return q.id === '' && (q.symbol === '' || /^[A-Z0-9\u3400-\u4DBF\u4E00-\u9FFF]{1,24}USDT$(?![\s\S])/.test(q.symbol)) &&
         (q.page === 1 || historyWindows.has(q.days + ':' + q.symbol));
-      return /^[0-9]{1,20}$/.test(q.id) && /^[A-Z0-9]{1,24}USDT$/.test(q.symbol) &&
+      return /^[0-9]{1,20}$/.test(q.id) && /^[A-Z0-9\u3400-\u4DBF\u4E00-\u9FFF]{1,24}USDT$(?![\s\S])/.test(q.symbol) &&
         (port.known(q.id) || histories.get(q.id) === q.symbol) && (q.kind === 'matches' || q.page === 1);
     }
     return Object.freeze({

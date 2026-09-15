@@ -9,7 +9,7 @@
     const inputKeys=version===2?[...keys,'margin']:keys;
     return input && Object.keys(input).sort().join(',')===inputKeys.slice().sort().join(',') && inputKeys.every(k=>typeof input[k]==='string') &&
       (version===1 || input.margin==='' || decimal(input.margin)) &&
-      /^[A-Z0-9]{1,24}USDT$/.test(input.symbol) && ['LONG','SHORT','NEUTRAL'].includes(input.direction) &&
+      /^[A-Z0-9\u3400-\u4DBF\u4E00-\u9FFF]{1,24}USDT$(?![\s\S])/.test(input.symbol) && ['LONG','SHORT','NEUTRAL'].includes(input.direction) &&
       ['ISOLATED','CROSSED'].includes(input.marginType) && ['ARITH','GEO'].includes(input.spacing) &&
       ['trailingUp','trailingDown'].every(k=>['true','false'].includes(input[k])) &&
       decimal(input.lower) && decimal(input.upper) && Number(input.lower)<Number(input.upper) &&

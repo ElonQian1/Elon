@@ -69,7 +69,7 @@
     return {
       id: id(value.strategyId),
       account: value.rootUserId == null ? null : id(value.rootUserId),
-      symbol: scalar(value.symbol, /^[A-Z0-9]{1,24}USDT$/),
+      symbol: scalar(value.symbol, /^[A-Z0-9\u3400-\u4DBF\u4E00-\u9FFF]{1,24}USDT$(?![\s\S])/),
       status: scalar(value.strategyStatus, /^[A-Z][A-Z0-9_]{0,63}$/),
       direction: optional(value.direction, /^(LONG|SHORT|NEUTRAL)$/),
       spacing: optional(value.gridType, /^(ARITH|GEO)$/),

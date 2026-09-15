@@ -1,5 +1,7 @@
 package com.elon.app.grid.create
 
+import com.elon.app.grid.BinanceSymbols
+
 import java.util.Locale
 
 /** Selection metadata only. Membership always comes from the current exchange contract list. */
@@ -8,7 +10,7 @@ internal object BinanceSymbolCatalog {
     enum class Sort { NAME, VOLUME, GAIN, LOSS }
     val priceFields = setOf("lower", "upper", "triggerPrice", "stopLower", "stopUpper", "trailingUpPrice", "trailingDownPrice", "leverage")
     fun resetOnChange(previous: String, next: String) = if (previous.trim().equals(next.trim(), ignoreCase = true)) emptySet() else priceFields
-    fun valid(symbol: String) = Regex("[A-Z0-9]{1,24}USDT").matches(symbol)
+    fun valid(symbol: String) = Regex(BinanceSymbols.PATTERN).matches(symbol)
     fun query(raw: String) = raw.uppercase(Locale.ROOT).filterNot { it.isWhitespace() || it in "/-_" }.take(64)
     fun tags(value: Any?): List<String> = (value as? List<*>)?.take(16)?.mapNotNull {
         (it as? String)?.takeIf { tag -> Regex("[A-Za-z][A-Za-z0-9 _-]{0,39}").matches(tag) }?.uppercase(Locale.ROOT)

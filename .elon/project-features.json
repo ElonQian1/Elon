@@ -5686,6 +5686,118 @@
       "updated_at_ms": 1787461920923
     },
     {
+      "id": "binance-grid-chinese-symbols-v1",
+      "title": "币安网格中文合约兼容",
+      "summary": "主 APK 会话适配器保留官方中文合约身份",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/binance-grid-chinese-symbols.md",
+        "content_hash": "b6eef691c3db8fb15f8264b61491383eb1169376689d7e41cc1452487c124dab",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "2d43562fdf1d04e4f8ca05dd78ca363c016d5cf4",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "8b3c2994abcaa580e5bfe7561df93b195b9fda7e",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_create_adapter.js",
+        "android/app/src/main/assets/binance_grid_create_reference.js",
+        "android/app/src/main/assets/binance_grid_read_adapter.js",
+        "android/app/src/main/assets/binance_grid_reports_adapter.js",
+        "android/app/src/main/assets/binance_grid_trailing_contract.js",
+        "android/app/src/main/kotlin/com/elon/app/grid"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "中文网格可被解析且身份保留",
+        "URL 编码和危险输入拒绝",
+        "原授权、交易确认和账户隔离回归通过"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/binance_grid_read_adapter.js",
+          "content_hash": "458fb0301f2a63870fdde17324a0a9952516cbffdf5121ba28ec6215726e7045",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2d43562fdf1d04e4f8ca05dd78ca363c016d5cf4",
+            "head_blob_oid": "827461aaf573467513711e36d6b24136982cc601",
+            "worktree_blob_oid": "c7f208b982b3c122b5570cf1384dd0ed9fd3c0ee",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/BinanceSymbols.kt",
+          "content_hash": "850f6e44fe3dbcfd46bdf18ff7e7e196117bd2abef5fb66404100639dc2c71ed",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2d43562fdf1d04e4f8ca05dd78ca363c016d5cf4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6e4843357353cb6931fc4a8b4fc041285ef96eb0",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/BinanceChineseSymbolsTest.kt",
+          "content_hash": "bdee1578738cc45eed5b510fc716371a89d4f92f8ed8dc78bc9bbf043555f7d0",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2d43562fdf1d04e4f8ca05dd78ca363c016d5cf4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9a866e036bc5910e022ad92faf02732def3b4d3c",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "docs/binance-grid-chinese-symbols.md",
+          "content_hash": "2bcf4b0205627d26d13adf9dc3e0b708fd06c7b3146138e9403985c87f525512",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2d43562fdf1d04e4f8ca05dd78ca363c016d5cf4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7812d51bce25172e3c385c915eee5e7eca080144",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-chinese-symbols.cjs",
+          "content_hash": "6ac8ded5db734044c68273a25827653a3817030339be1cef058c058d97b34483",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "2d43562fdf1d04e4f8ca05dd78ca363c016d5cf4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3eaf5349b6e3fd4b8baa62887bc63f3087c5e890",
+            "state": "untracked"
+          }
+        }
+      ],
+      "claim": {
+        "claim_id": "claim_6191370e910043e39386002c82ede49c",
+        "agent_id": "quant-grid",
+        "claimed_at_ms": 1789487951024,
+        "expires_at_ms": 1789502351024
+      },
+      "created_at_ms": 1789487950958,
+      "updated_at_ms": 1789488354812
+    },
+    {
       "id": "binance-grid-observer-v1",
       "title": "币安网格被动观察工具",
       "summary": "复用已登录Chrome的独立MV3扩展，被动观察网格候选请求并导出有界脱敏结构；真实账号现场采样独立验收。",
@@ -29438,46 +29550,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a703e0516bac4e198001fdcb7e61303b",
-      "feature_id": "android-binance-strategy-funds-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789106352916
-    },
-    {
-      "id": "feature_event_68b65ed3a83542c8bc1d253fb1801643",
-      "feature_id": "android-binance-strategy-funds-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "Contract and offline tests passed; release, installation and actual account/UI acceptance are separate pending gates.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789106352984
-    },
-    {
-      "id": "feature_event_06b0d88aaab44474afef198e013ce566",
-      "feature_id": "android-binance-strategy-funds-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789107784904
-    },
-    {
-      "id": "feature_event_2217e498ea4540c99bb4b6f1979f28ae",
-      "feature_id": "android-binance-account-read-v3",
-      "action": "registered",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789108956714
-    },
-    {
       "id": "feature_event_6c6b9136b18a42b38852378b6e3cdad6",
       "feature_id": "android-binance-account-read-v3",
       "action": "claimed",
@@ -31436,6 +31508,46 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1789473285654
+    },
+    {
+      "id": "feature_event_e08a2dcbb54a4a4d90df49a50cda9146",
+      "feature_id": "binance-grid-chinese-symbols-v1",
+      "action": "registered",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789487950958
+    },
+    {
+      "id": "feature_event_cc2c8de7337d4ad6bfe2aa6daff8c1b3",
+      "feature_id": "binance-grid-chinese-symbols-v1",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789487951025
+    },
+    {
+      "id": "feature_event_ffa3096fff5a4ab19a9b11297a97adfb",
+      "feature_id": "binance-grid-chinese-symbols-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789487951091
+    },
+    {
+      "id": "feature_event_b03c5e2d1fd449e69f5f2784325438db",
+      "feature_id": "binance-grid-chinese-symbols-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789488354812
     }
   ]
 }

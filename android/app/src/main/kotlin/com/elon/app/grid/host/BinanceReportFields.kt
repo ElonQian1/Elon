@@ -1,11 +1,13 @@
 package com.elon.app.grid.host
 
+import com.elon.app.grid.BinanceSymbols
+
 /** Closed projection: source response extras and account identifiers never cross the APK boundary. */
 internal object BinanceReportFields {
     private const val DECIMAL = "-?(0|[1-9][0-9]{0,29})(\\.[0-9]{1,20})?"
     private const val INTEGER = "(0|[1-9][0-9]{0,19})"
     private const val ENUM = "[A-Z][A-Z0-9_]{0,63}"
-    private const val SYMBOL = "[A-Z0-9]{1,24}USDT"
+    private const val SYMBOL = BinanceSymbols.PATTERN
     private val history = mapOf("id" to INTEGER, "symbol" to SYMBOL, "status" to ENUM, "direction" to "LONG|SHORT|NEUTRAL",
         "lower" to DECIMAL, "upper" to DECIMAL, "count" to INTEGER, "leverage" to INTEGER, "profit" to DECIMAL,
         "matchedPnl" to DECIMAL, "fundingFee" to DECIMAL, "fee" to DECIMAL, "created" to INTEGER, "end" to INTEGER,

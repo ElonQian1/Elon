@@ -1,5 +1,7 @@
 package com.elon.app.grid.create
 
+import com.elon.app.grid.BinanceSymbols
+
 import java.math.BigDecimal
 
 /** Pure, bounded test draft. These limits are our input budget, not exchange trading rules. */
@@ -37,7 +39,7 @@ internal class BinanceGridDraft private constructor(val input: Map<String, Strin
         fun parse(values: Map<String, String>): BinanceGridDraft {
             require(values.keys.containsAll(KEYS) && values.keys.all { it in KEYS || it in BinanceCreateOptions.defaults }) { "参数字段不完整" }
             val input = values.mapValues { it.value.trim() }.toMutableMap()
-            require(Regex("[A-Z0-9]{1,24}USDT").matches(input.getValue("symbol"))) { "请填写 U 本位合约，例如 NEARUSDT" }
+            require(Regex(BinanceSymbols.PATTERN).matches(input.getValue("symbol"))) { "请填写 U 本位合约，例如 NEARUSDT" }
             val names = mapOf("direction" to "方向", "spacing" to "网格间距", "marginType" to "保证金模式", "autoInit" to "是否立即建仓", "closeOnStop" to "终止时仓位处理")
             fun choice(key: String, allowed: Set<String>) { require(input[key] in allowed) { "请选择${names[key] ?: key}" } }
             choice("direction", setOf("LONG", "SHORT", "NEUTRAL")); choice("spacing", setOf("ARITH", "GEO"))

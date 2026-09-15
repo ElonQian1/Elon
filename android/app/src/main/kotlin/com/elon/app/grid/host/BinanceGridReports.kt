@@ -1,5 +1,7 @@
 package com.elon.app.grid.host
 
+import com.elon.app.grid.BinanceSymbols
+
 import com.elon.app.privateaccess.StrictJson
 import com.elon.app.privateaccess.number
 
@@ -21,9 +23,9 @@ internal class BinanceReportQuery private constructor(val data: Map<String, Any?
             require(q.number("page") in 1..1000 && q.number("days") in setOf(7L,30L,90L))
             val id = q["id"] as? String ?: error("REPORT_SCOPE")
             val symbol = q["symbol"] as? String ?: error("REPORT_SCOPE")
-            if (q["kind"] == "history") require(id.isEmpty() && (symbol.isEmpty() || Regex("[A-Z0-9]{1,24}USDT").matches(symbol)))
+            if (q["kind"] == "history") require(id.isEmpty() && (symbol.isEmpty() || Regex(BinanceSymbols.PATTERN).matches(symbol)))
             else {
-                require(Regex("[0-9]{1,20}").matches(id) && Regex("[A-Z0-9]{1,24}USDT").matches(symbol))
+                require(Regex("[0-9]{1,20}").matches(id) && Regex(BinanceSymbols.PATTERN).matches(symbol))
                 require(q["kind"] == "matches" || q.number("page") == 1L)
             }
             return BinanceReportQuery(q)

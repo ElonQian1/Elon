@@ -1,5 +1,7 @@
 package com.elon.app.grid.manage
 
+import com.elon.app.grid.BinanceSymbols
+
 import com.elon.app.privateaccess.StrictJson
 
 internal data class BinanceManageSnapshot(val id: String, val symbol: String, val status: String,
@@ -12,7 +14,7 @@ internal data class BinanceManageSnapshot(val id: String, val symbol: String, va
             val base=setOf("strategy_id","symbol","provider_status","cps","cos","sharing","trailingStopLowerLimit","trailingStopUpperLimit")
             require(v.keys.containsAll(base) && v.keys.all{it in base+setOf("investment","range","protection","trailing","trailing_rules")})
             val id = v["strategy_id"] as String; require(validId(id))
-            val symbol = v["symbol"] as String; require(Regex("[A-Z0-9]{1,24}USDT").matches(symbol))
+            val symbol = v["symbol"] as String; require(Regex(BinanceSymbols.PATTERN).matches(symbol))
             val status = v["provider_status"] as String; require(Regex("[A-Z][A-Z0-9_]{0,63}").matches(status))
             return BinanceManageSnapshot(id,symbol,status,v["cps"] as Boolean,v["cos"] as Boolean,
                 v["sharing"] as Boolean,v["trailingStopLowerLimit"] as Boolean,v["trailingStopUpperLimit"] as Boolean,

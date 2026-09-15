@@ -1,5 +1,7 @@
 package com.elon.app.grid.create
 
+import com.elon.app.grid.BinanceSymbols
+
 import com.elon.app.privateaccess.StrictJson
 import java.math.BigDecimal
 import java.net.URL
@@ -30,13 +32,13 @@ internal class BinanceGridMarket {
         cached = parseRules(data); loadedAt = System.currentTimeMillis(); return cached
     }
     fun quote(symbol: String): BinanceGridQuote {
-        require(Regex("[A-Z0-9]{1,24}USDT").matches(symbol))
-        return parseQuote(get("/fapi/v1/premiumIndex?symbol=$symbol", 16_384), symbol, System.currentTimeMillis())
+        require(Regex(BinanceSymbols.PATTERN).matches(symbol))
+        return parseQuote(get("/fapi/v1/premiumIndex?symbol=${BinanceSymbols.encoded(symbol)}", 16_384), symbol, System.currentTimeMillis())
     }
     fun tickers(): Map<String, BinanceSymbolTicker> = BinanceSymbolTicker.parse(get("/fapi/v1/ticker/24hr", 4_194_304), System.currentTimeMillis())
     fun ticker(symbol:String):BinanceSymbolTicker {
-        require(Regex("[A-Z0-9]{1,24}USDT").matches(symbol))
-        val raw=get("/fapi/v1/ticker/24hr?symbol=$symbol",16_384)
+        require(Regex(BinanceSymbols.PATTERN).matches(symbol))
+        val raw=get("/fapi/v1/ticker/24hr?symbol=${BinanceSymbols.encoded(symbol)}",16_384)
         return BinanceSymbolTicker.parse("[$raw]",System.currentTimeMillis())[symbol]?.also {require(it.last!=null)}
             ?: error("当前合约最新价不可用")
     }
@@ -69,7 +71,7 @@ internal class BinanceGridMarket {
                 @Suppress("UNCHECKED_CAST") val data = item as? Map<String, Any?> ?: return@mapNotNull null
                 if (data["status"] != "TRADING" || data["contractType"] != "PERPETUAL" || data["quoteAsset"] != "USDT" || data["marginAsset"] != "USDT") return@mapNotNull null
                 val symbol = data["symbol"] as? String ?: return@mapNotNull null
-                if (!Regex("[A-Z0-9]{1,24}USDT").matches(symbol)) return@mapNotNull null
+                if (!Regex(BinanceSymbols.PATTERN).matches(symbol)) return@mapNotNull null
                 @Suppress("UNCHECKED_CAST") val filters = (data["filters"] as? List<*>)?.mapNotNull { it as? Map<String, Any?> }.orEmpty()
                 fun filter(type: String, key: String) = filters.find { it["filterType"] == type }?.get(key) as? String
                 val tick = filter("PRICE_FILTER", "tickSize") ?: return@mapNotNull null

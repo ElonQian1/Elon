@@ -1,5 +1,7 @@
 package com.elon.app.grid.create
 
+import com.elon.app.grid.BinanceSymbols
+
 import com.elon.app.grid.host.BinanceHostRuntime
 import com.elon.app.privateaccess.StrictJson
 import java.math.BigDecimal
@@ -106,7 +108,7 @@ internal object BinanceReferenceInput {
         val value=StrictJson.parse(raw,2048)
         require(value.keys==(if(version==2)keys+"margin" else keys) && value.values.all {it is String})
         val input=value.mapValues {it.value as String}
-        require(Regex("[A-Z0-9]{1,24}USDT").matches(input.getValue("symbol")))
+        require(Regex(BinanceSymbols.PATTERN).matches(input.getValue("symbol")))
         require(input["direction"] in setOf("LONG","SHORT","NEUTRAL") && input["spacing"] in setOf("ARITH","GEO"))
         require(input["marginType"] in setOf("ISOLATED","CROSSED"))
         require(listOf("trailingUp","trailingDown").all {input[it] in setOf("true","false")})
