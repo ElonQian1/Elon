@@ -16,6 +16,11 @@ function harness() {
   return {window,clock,state,calls,config,api,input,market,token,id,account,notifications};
 }
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
+test('current 150 leverage enters reference preparation while 201 stays outside the contract',async()=>{
+  const h=harness();h.input.leverage='150';assert.equal(h.api.start(h.token,h.id,h.account,h.input,h.market),true);await settle();
+  assert.equal(h.api.read(h.token,h.id,h.account).status,'ready');
+  const bad=harness();bad.input.leverage='201';assert.equal(bad.api.start(bad.token,bad.id,bad.account,bad.input,bad.market),false);
+});
 test('completion emits only request identity once; cancellation emits no stale notification',async()=>{
   const h=harness();h.api.start(h.token,h.id,h.account,h.input,h.market);await settle();
   assert.deepEqual(h.notifications,[{token:h.token,request:h.id}]);
@@ -66,7 +71,7 @@ test('latest draft wins, scope mismatches fail closed, and expired market values
 test('extra fields and arbitrary request details never enter the reference operation',()=>{
   const h=harness();for(const extra of [{url:'/trade'},{headers:{token:'secret'}},{script:'alert(1)'}])
     assert.equal(h.api.start(h.token,h.id,h.account,{...h.input,...extra},h.market),false);
-  for(const edit of [{lower:'0'},{lower:'3'},{count:'1e3'},{leverage:'126'},{trailingUp:'yes'},{symbol:'BTCUSD_PERP'}])
+  for(const edit of [{lower:'0'},{lower:'3'},{count:'1e3'},{leverage:'201'},{trailingUp:'yes'},{symbol:'BTCUSD_PERP'}])
     assert.equal(h.api.start(h.token,h.id,h.account,{...h.input,...edit},h.market),false);
   assert.deepEqual(h.calls,[]);
 });

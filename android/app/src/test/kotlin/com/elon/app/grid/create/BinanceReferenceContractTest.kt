@@ -13,7 +13,7 @@ class BinanceReferenceContractTest {
     @Test fun partialCountIsAllowedButUndocumentedFieldsAndInvalidNumbersAreNot() {
         assertEquals(input,BinanceReferenceInput.parse(StrictJson.encode(input)))
         assertEquals("",BinanceReferenceInput.parse(StrictJson.encode(input+("count" to "")))["count"])
-        for(edit in listOf("upper" to "1.1","lower" to "0","leverage" to "126","count" to "1e2","url" to "/trade","trailingUp" to "yes"))
+        for(edit in listOf("upper" to "1.1","lower" to "0","leverage" to "201","count" to "1e2","url" to "/trade","trailingUp" to "yes"))
             assertTrue(edit.toString(),runCatching {BinanceReferenceInput.parse(StrictJson.encode(input+edit))}.isFailure)
     }
     @Test fun resultMustMatchAccountSymbolRequestAndActualObservationTime() {

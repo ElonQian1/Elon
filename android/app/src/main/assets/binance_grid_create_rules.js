@@ -57,7 +57,7 @@
         !Number.isInteger(windowCount) || windowCount<1 || windowCount>10000 || typeof trailing!=='boolean' ||
         [qtyPrecision,pricePrecision].some(v=>!Number.isInteger(v)||v<0||v>20))return null;
       const l=d(lower),u=d(upper),lev=d(leverage),coefficient=d(adjust),notional=d(minNotional);
-      if(cmp(l,u)>=0 || cmp(lev,d('125'))>0 || cmp(coefficient,one)>0)return null;
+      if(cmp(l,u)>=0 || cmp(lev,d('200'))>0 || cmp(coefficient,one)>0)return null;
       const qty=max(d(minQty),divideUp(notional,l,qtyPrecision));
       if(trailing) {
         const n=add(d(count),one),value=max(mul(n,notional),mul(mul(mul(n,d(trailingCoef)),u),qty));

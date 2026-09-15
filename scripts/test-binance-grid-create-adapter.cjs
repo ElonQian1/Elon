@@ -57,6 +57,11 @@ function harness() {
   const prepare=async(body=payload())=>{await observe(); assert.equal(api.prepare('doc_test_123','a'.repeat(32),hash,body),true); await tick();};
   return {window,api,observe,prepare,calls,events,account,behavior,Xhr};
 }
+test('150 leverage drafts prepare without a write and 201 is rejected',async()=>{
+  const h=harness();await h.prepare({...payload(),leverage:150});
+  assert.equal(h.events.at(-1).kind,'prepared');assert.equal(h.calls.filter(c=>c.url===CREATE).length,0);
+  const bad=harness();await bad.observe();assert.equal(bad.api.prepare('doc_test_123','a'.repeat(32),hash,{...payload(),leverage:201}),false);
+});
 test('funds uses the captured ordinary and portfolio read requests without trade bodies',async()=>{
   for(const portfolio of [false,true]) {
     const h=harness();h.behavior.portfolio=portfolio;await h.observe();const funds=h.window.__elonBinanceCreateFundsV1;

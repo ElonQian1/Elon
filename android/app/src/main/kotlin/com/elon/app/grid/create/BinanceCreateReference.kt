@@ -118,7 +118,7 @@ internal object BinanceReferenceInput {
             require(Regex("(0|[1-9][0-9]{0,29})(\\.[0-9]{1,20})?").matches(text) && text.toBigDecimal()>BigDecimal.ZERO)
         }
         require(input.getValue("upper").toBigDecimal()>input.getValue("lower").toBigDecimal())
-        require(Regex("[1-9][0-9]{0,2}").matches(input.getValue("leverage")) && input.getValue("leverage").toInt() in 1..125)
+        require(Regex("[1-9][0-9]{0,2}").matches(input.getValue("leverage")) && input.getValue("leverage").toInt() in 1..200)
         val count=input.getValue("count")
         require(count.isEmpty() || Regex("[1-9][0-9]{0,4}").matches(count) && count.toInt()<=10000)
         return input

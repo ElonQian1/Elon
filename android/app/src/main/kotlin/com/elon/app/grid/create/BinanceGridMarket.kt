@@ -69,7 +69,7 @@ internal class BinanceGridMarket {
             require(symbols.size <= 10_000)
             return symbols.mapNotNull { item ->
                 @Suppress("UNCHECKED_CAST") val data = item as? Map<String, Any?> ?: return@mapNotNull null
-                if (data["status"] != "TRADING" || data["contractType"] != "PERPETUAL" || data["quoteAsset"] != "USDT" || data["marginAsset"] != "USDT") return@mapNotNull null
+                if (data["status"] != "TRADING" || data["contractType"] !in setOf("PERPETUAL", "TRADIFI_PERPETUAL") || data["quoteAsset"] != "USDT" || data["marginAsset"] != "USDT") return@mapNotNull null
                 val symbol = data["symbol"] as? String ?: return@mapNotNull null
                 if (!Regex(BinanceSymbols.PATTERN).matches(symbol)) return@mapNotNull null
                 @Suppress("UNCHECKED_CAST") val filters = (data["filters"] as? List<*>)?.mapNotNull { it as? Map<String, Any?> }.orEmpty()

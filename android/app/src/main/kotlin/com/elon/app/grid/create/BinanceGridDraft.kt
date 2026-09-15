@@ -55,7 +55,7 @@ internal class BinanceGridDraft private constructor(val input: Map<String, Strin
             fun integer(key: String, range: IntRange) {
                 require(Regex("[1-9][0-9]{0,4}").matches(input.getValue(key)) && input.getValue(key).toInt() in range) { "杠杆或格数超出本轮输入范围" }
             }
-            integer("leverage", 1..125); integer("count", 2..10000)
+            integer("leverage", 1..200); integer("count", 2..10000)
             if (values.keys.any { it in BinanceCreateOptions.defaults }) input.putAll(BinanceCreateOptions.normalize(values))
             return BinanceGridDraft(input.toMap())
         }

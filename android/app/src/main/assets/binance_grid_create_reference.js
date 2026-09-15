@@ -15,7 +15,7 @@
       decimal(input.lower) && decimal(input.upper) && Number(input.lower)<Number(input.upper) &&
       (input.triggerPrice==='' || decimal(input.triggerPrice)) &&
       (input.count==='' || /^[1-9][0-9]{0,4}$/.test(input.count) && Number(input.count)<=10000) &&
-      /^[1-9][0-9]{0,2}$/.test(input.leverage) && Number(input.leverage)<=125 &&
+      /^[1-9][0-9]{0,2}$/.test(input.leverage) && Number(input.leverage)<=200 &&
       market && Object.keys(market).sort().join(',')===(version===2?'last,mark,minNotional,minQty,observedAt,pricePrecision,qtyPrecision,tick':'mark,minNotional,minQty,observedAt,qtyPrecision,tick') &&
       (version===1 || int(market.pricePrecision,0,20) && (market.last==='' || decimal(market.last))) &&
       ['mark','minNotional','minQty','tick'].every(k=>decimal(market[k])) && int(market.qtyPrecision,0,20) &&

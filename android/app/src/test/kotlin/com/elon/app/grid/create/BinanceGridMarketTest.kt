@@ -6,6 +6,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class BinanceGridMarketTest {
+    @Test fun tradfiRulesPreserveFiltersAndAdmitCurrent150LeverageDraft() {
+        val raw="{\"symbols\":[${symbol("TSLAUSDT",contract="TRADIFI_PERPETUAL")},${symbol("XAUUSDT",contract="TRADIFI_PERPETUAL")},${symbol("BADUSDT",contract="UNKNOWN")},${symbol("OLDUSDT",status="SETTLING",contract="TRADIFI_PERPETUAL")},${symbol()}]}"
+        assertEquals(listOf("NEARUSDT","TSLAUSDT","XAUUSDT"),BinanceGridMarket.parseRules(raw).map {it.symbol})
+        val values=mapOf("symbol" to "BTCUSDT","direction" to "LONG","spacing" to "ARITH","marginType" to "ISOLATED","lower" to "50000","upper" to "60000","margin" to "100","leverage" to "150","count" to "10","autoInit" to "true","closeOnStop" to "true")
+        assertEquals("150",BinanceGridDraft.parse(values).input["leverage"])
+        try {BinanceGridDraft.parse(values+("leverage" to "201"));fail("201 leverage accepted")}catch(_:IllegalArgumentException){}
+    }
     private fun symbol(name: String = "NEARUSDT", status: String = "TRADING", contract: String = "PERPETUAL") =
         """{"symbol":"$name","status":"$status","contractType":"$contract","quoteAsset":"USDT","marginAsset":"USDT","filters":[{"filterType":"PRICE_FILTER","tickSize":"0.001"},{"filterType":"LOT_SIZE","minQty":"1"},{"filterType":"MIN_NOTIONAL","notional":"5"}]}"""
     @Test fun excludesUnavailableContractsAndAcceptsCatalogLargerThanPrivatePayloadLimit() {

@@ -6174,6 +6174,125 @@
       "updated_at_ms": 1788957062310
     },
     {
+      "id": "binance-grid-tradfi-rules-v1",
+      "title": "TradFi 规则目录和动态杠杆输入范围",
+      "summary": "支持量化合约分类及实际最大杠杆草稿",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/requirements/binance-grid-tradfi-rules-v1.md",
+        "content_hash": "6a12d1c192e80c959513d889175ba11c8f1e23ab0b3f4124fbee1ce6eb567df1",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "9311f2a5ccdebaeb85739fae06a32888685df197",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "a1366cbd5aeebfc72f27845f8ec2eac7073a259f",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceGridDraft.kt",
+        "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceGridMarket.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "TradFi 与普通永续规则兼容，支持150倍输入并拒绝201倍"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/binance_grid_create_adapter.js",
+          "content_hash": "051aecfe4d1a962bfc0d9ffcc8dcd453d64d6e33939c26500d46f6c120ec40b7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9311f2a5ccdebaeb85739fae06a32888685df197",
+            "head_blob_oid": "c13d5a39fa6bb0d7f35817cd211e0d10e5c7251d",
+            "worktree_blob_oid": "8681779e7d36a6d2293b2ce545a6e7de70cc0308",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceGridDraft.kt",
+          "content_hash": "647012178e6f58457e5af08ef0975a7c09b077d7eeaa0d65ffe2a2456654e7c7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9311f2a5ccdebaeb85739fae06a32888685df197",
+            "head_blob_oid": "f2665269cc0bb8c4fe53821f42d62704498b1ab2",
+            "worktree_blob_oid": "2e781bb8d6cd79d4c1c5e9456525d4b86057c8f7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/create/BinanceGridMarket.kt",
+          "content_hash": "ad1e0d776952e35f627ef60a5472127e5f6cc04cc1214d42511cc2e87aa05bc2",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9311f2a5ccdebaeb85739fae06a32888685df197",
+            "head_blob_oid": "9e490e159b27036a47af7c54b729e2b185a2b2fe",
+            "worktree_blob_oid": "24c02cd2684e9926e0d35f4039f80d31fcb6e8e5",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/create/BinanceGridMarketTest.kt",
+          "content_hash": "e73017d66c1d2044af544c0c07fa56f16c1fa826c88caff0a561498d2a4678c5",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9311f2a5ccdebaeb85739fae06a32888685df197",
+            "head_blob_oid": "775e6719ea2ec5887b72f2011e61a8f7be2229a9",
+            "worktree_blob_oid": "5fa62fb9c51092963af3ffaca23ed10137e69b53",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/delivery/android-grid-tradfi-rules-20260916.md",
+          "content_hash": "f6f6d8355ab655b57e202ade28580ab51c6da331960dcb3b6c5c0725b60c35ea",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9311f2a5ccdebaeb85739fae06a32888685df197",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9f01e41cd31bb0d99e3dfc986c986653bf7572d4",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-create-reference.cjs",
+          "content_hash": "7970533b16311628c27bbe19add3e0f1943bf8a8a5d9604aa6322a97cf474d0c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "9311f2a5ccdebaeb85739fae06a32888685df197",
+            "head_blob_oid": "102fd46e11638138fbb8c6bbfb31887525dfcc90",
+            "worktree_blob_oid": "08dc26450c874c6b8e775010b773bf63053d1965",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "claim": {
+        "claim_id": "claim_64e6bd9b4c5e45d4b73dfa53cd75a22e",
+        "agent_id": "quant-grid",
+        "claimed_at_ms": 1789490415458,
+        "expires_at_ms": 1789504815458
+      },
+      "created_at_ms": 1789490415365,
+      "updated_at_ms": 1789491021484
+    },
+    {
       "id": "binance-wallet-consent-recovery-v1",
       "title": "钱包授权过期后同账户确认恢复",
       "summary": "修复过期确认仍可点击但授权无响应；限定前台人工意图、同账户复核和有界事件恢复。",
@@ -29550,46 +29669,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_767f149123c04e95b84a27c3b088786f",
-      "feature_id": "android-binance-trailing-v4",
-      "action": "transitioned",
-      "actor": "codex-grid",
-      "reason": "量化 V4 合同已建立，当前主线无同名或重叠实现",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789117808934
-    },
-    {
-      "id": "feature_event_fc3d25b5beba4fcdb405497e88f08608",
-      "feature_id": "android-binance-trailing-v4",
-      "action": "evidence_recorded",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789119394537
-    },
-    {
-      "id": "feature_event_f0db9d7a5e3943859582dd91703b9916",
-      "feature_id": "android-binance-trailing-v4",
-      "action": "evidence_recorded",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789122362026
-    },
-    {
-      "id": "feature_event_867c14e3636044b4bd42f4fdd64b6f87",
-      "feature_id": "android-binance-trailing-v4",
-      "action": "evidence_recorded",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789122476720
-    },
-    {
       "id": "feature_event_76240eb190674b86a307c6df14757b80",
       "feature_id": "android-binance-create-reference-v1",
       "action": "registered",
@@ -31548,6 +31627,46 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1789489094279
+    },
+    {
+      "id": "feature_event_7bb8dc1a66004c898558280e10c53bf4",
+      "feature_id": "binance-grid-tradfi-rules-v1",
+      "action": "registered",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789490415365
+    },
+    {
+      "id": "feature_event_807f31115eaf45e1aa4ffbd4125c8c24",
+      "feature_id": "binance-grid-tradfi-rules-v1",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789490415458
+    },
+    {
+      "id": "feature_event_a474b003fa804412ae6106e27eb46c97",
+      "feature_id": "binance-grid-tradfi-rules-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789490727633
+    },
+    {
+      "id": "feature_event_d5b4f639e763486899f866fe32cf156e",
+      "feature_id": "binance-grid-tradfi-rules-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789491021484
     }
   ]
 }

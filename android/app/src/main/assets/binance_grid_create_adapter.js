@@ -53,7 +53,7 @@
     return typeof p.symbol === 'string' && /^[A-Z0-9\u3400-\u4DBF\u4E00-\u9FFF]{1,24}USDT$(?![\s\S])/.test(p.symbol) &&
       ['LONG','SHORT','NEUTRAL'].includes(p.direction) && ['ISOLATED','CROSSED'].includes(p.marginType) &&
       ['ARITH','GEO'].includes(p.gridType) && ['gridLowerLimit','gridUpperLimit','gridInitialValue'].every(k => decimal(p[k])) &&
-      Number.isInteger(p.leverage) && p.leverage >= 1 && p.leverage <= 125 &&
+      Number.isInteger(p.leverage) && p.leverage >= 1 && p.leverage <= 200 &&
       Number.isInteger(p.gridCount) && p.gridCount >= 2 && p.gridCount <= 10000 &&
       p.cos === true && typeof p.cps === 'boolean' &&
       (p.direction === 'NEUTRAL' ? !('autoInitPos' in p) : typeof p.autoInitPos === 'boolean') &&
@@ -209,7 +209,7 @@
     const adjustment=typeof d.totalAdjustmentAmount==='string'?d.totalAdjustmentAmount:Number.isSafeInteger(d.totalAdjustmentAmount)?String(d.totalAdjustmentAmount):null;
     const leverage=typeof d.initialLeverage==='string' && /^[1-9][0-9]{0,2}$/.test(d.initialLeverage)?Number(d.initialLeverage):d.initialLeverage;
     if(!decimal(value) || value.startsWith('-') || !/[1-9]/.test(value) || !decimal(adjustment) ||
-      !Number.isInteger(leverage) || leverage<1 || leverage>125) return null;
+      !Number.isInteger(leverage) || leverage<1 || leverage>200) return null;
     return {initial_value:value,initial_leverage:leverage,total_adjustment:adjustment};
   }
   function validInvestment(amount) {

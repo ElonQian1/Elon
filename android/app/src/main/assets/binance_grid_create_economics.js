@@ -28,7 +28,7 @@
         !/^[1-9][0-9]{0,4}$/.test(count) || Number(count)<2 || Number(count)>10000 ||
         [qtyPrecision,pricePrecision].some(v=>!Number.isInteger(v)||v<0||v>20) ||
         !Number.isInteger(windowCount) || windowCount<1 || windowCount>10000 || cmp(d(lower),d(upper))>=0 ||
-        cmp(d(leverage),d('125'))>0 || cmp(d(adjust),one)>0)return null;
+        cmp(d(leverage),d('200'))>0 || cmp(d(adjust),one)>0)return null;
       if(trailing)return window.__elonBinanceTrailingRulesV1.quoteQuantity(direction,margin,lower,upper,mark,trigger,count,
         leverage,adjust,qtyPrecision,pricePrecision,type,last,windowCount);
       return text(div(mul(mul(d(adjust),d(margin)),d(leverage)),
