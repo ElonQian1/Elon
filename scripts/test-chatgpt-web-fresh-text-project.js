@@ -7,7 +7,7 @@ const CID = '11111111-1111-4111-8111-111111111111';
 const PID = '22222222-2222-4222-8222-222222222222';
 const PROJECT = 'g-p-' + 'a'.repeat(32);
 const base = { conversationId: CID, parentId: PID, model: 'fixture-model',
-  historyDisabled: false, doNotRemember: false, projectId: PROJECT };
+  historyDisabled: false, doNotRemember: false, projectId: PROJECT, projectUserId: 'fixture-current-user' };
 const command = { requestId: 'mcp_project1', prompt: 'Synthetic project prompt' };
 const preparation = { conduit_token: 'fixture-conduit' };
 const security = { chatReq: { token: 'fixture-fresh' } };
@@ -28,6 +28,9 @@ for (const tool of [null, 'search', 'picture_v2']) {
     assert.deepEqual(sent.body.messages[0].content.parts, [command.prompt]);
     assert.equal('gizmo' in sent.body.conversation_mode, false);
     assert.equal('project_instructions' in sent.body, false);
+    assert.equal(JSON.stringify(sent).includes('fixture-current-user'), false);
+    assert.equal('continue_from_shared_project_conversation_id' in sent.body, false);
+    assert.equal('shared_project_conversation_owner_id' in sent.body, false);
     sent.body.conversation_mode.gizmo_id = 'changed';
     assert.deepEqual(request.preparationBody().conversation_mode, mode);
     assert.throws(() => request.consume(preparation, security, securityHeaders, () => true), /preparation_consumed/);

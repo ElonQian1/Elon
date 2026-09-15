@@ -141,6 +141,40 @@ test('project move or owner restrictions after capture stop writes and history a
   assert.equal(binding.owns(), false, 'ordinary chat cannot become a project behind an owned send');
 });
 
+test('self-owned project metadata and matching route config are not shared continuations', async () => {
+  const f = projectFixture();
+  f.tree.sharedProjectConversationOwner = { id: 'fixture-current-user', name: 'Fixture' };
+  f.tree.contextScopes = ['GLOBAL'];
+  f.selected.config = { urlGizmoId: PROJECT };
+  const binding = await f.api.capture(f.node, null, { allowProjects: true });
+  assert.equal(binding.projectUserId, 'fixture-current-user');
+  assert.equal(binding.current(), true);
+  f.tree.sharedProjectConversationOwner.id = 'fixture-other-user';
+  assert.equal(binding.current(), false); assert.equal(binding.owns(), false);
+  f.tree.sharedProjectConversationOwner.id = 'fixture-current-user';
+  f.selected.config.urlGizmoId = 'g-p-' + 'b'.repeat(32);
+  assert.equal(binding.current(), false);
+  f.selected.config.urlGizmoId = PROJECT;
+  delete f.tree.sharedProjectConversationOwner;
+  f.shared.mq = () => ({ normalizedAccountUserId: 'fixture-other-user' });
+  assert.equal(binding.current(), false); assert.equal(binding.owns(), false);
+});
+
+test('project owner admission requires the actual current user and rejects continuations', async () => {
+  for (const mutate of [
+    f => { f.tree.sharedProjectConversationOwner = { name: 'Unknown' }; },
+    f => { f.tree.sharedProjectConversationOwner.id = 'fixture-other-user'; },
+    f => { f.shared.mq = () => null; },
+    f => { f.shared.mq = () => ({ normalizedAccountUserId: 'fixture-other-user' }); },
+    f => { f.tree.continuingFromSharedProjectConversationId = CID; },
+    f => { f.selected.config = { urlGizmoId: PROJECT, sharedConversationId: CID }; }
+  ]) {
+    const f = projectFixture();
+    f.tree.sharedProjectConversationOwner = { id: 'fixture-current-user' }; mutate(f);
+    await assert.rejects(f.api.capture(f.node, null, { allowProjects: true }));
+  }
+});
+
 test('project headers use current page helpers and change invalidates a prepared request', async () => {
   const f = projectFixture(), calls = [];
   let pin = 'fixture-authorized-pin';

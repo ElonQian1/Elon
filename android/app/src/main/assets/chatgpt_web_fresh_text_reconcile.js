@@ -1,11 +1,19 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 13, create: factory });
+  const api = Object.freeze({ version: 14, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextReconcile = api;
 })(typeof window === 'object' ? window : null, function () {
   'use strict';
   const ownsKey = (object, key) => object && Object.prototype.hasOwnProperty.call(object, key);
+
+  function ordinaryProjectHistory(payload, binding) {
+    const owner = payload.owner, scopes = payload.context_scopes;
+    return (owner == null || typeof owner === 'object' && !Array.isArray(owner) &&
+      typeof owner.user_id === 'string' && /^[A-Za-z0-9_-]{1,160}$/.test(owner.user_id) &&
+      owner.user_id === binding.projectUserId) &&
+      (scopes == null || Array.isArray(scopes) && Array.from(scopes).every(value => value === 'GLOBAL'));
+  }
 
   function conversationMatches(payload, binding) {
     const projectId = binding.projectId ?? null;
@@ -15,7 +23,8 @@
         binding.newConversation !== true || payload.is_do_not_remember === false &&
           payload.is_temporary_chat !== true && payload.shared_project_conversation_owner == null) &&
       (projectId === null || /^g-p-[a-f0-9]{32}$/i.test(projectId) &&
-        payload.is_do_not_remember === false && payload.shared_project_conversation_owner == null);
+        payload.is_do_not_remember === false && payload.shared_project_conversation_owner == null &&
+        ordinaryProjectHistory(payload, binding));
   }
 
   function branch(payload, binding, userMessageId) {

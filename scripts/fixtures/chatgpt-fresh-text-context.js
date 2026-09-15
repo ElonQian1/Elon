@@ -18,6 +18,7 @@ function fixture() {
   const hints = { locked: false, activeSystemHintType: null, activeConnectorSystemHintTypes: new Set(),
     activeCustomAgentSystemHintType: null, coldStartCampaignCreativeId: null };
   const shared = { wV: fn => fn(), SV: { isPersonalWorkspace: () => true },
+    mq: () => ({ normalizedAccountUserId: 'fixture-current-user' }),
     textApi: { safePost() {} }, textSecurityHeaders() {}, textHistoryDisabled: () => false,
     textModelOverride: () => ({ model_slug: 'another-model' }), XM: () => tree,
     HM: { getGizmoId: () => null, getRequestId: () => null, getCurrentMessage: () => parent },

@@ -49,6 +49,14 @@ test('Sep 15 actual namespace contracts and changed history/attachment semantics
     modules.conversation.text.slice(node.start, node.end));
   assert.ok(hydration.some(body => body.includes('j=t.context_scopes,M=j&&j.length>0?Array.from(j):void 0') &&
     body.includes('contextScopes:y==null?M??n?.contextScopes??null:M??null')));
+  assert.ok(hydration.some(body => body.includes('r=o??t?.owner?.user_id??e?.id') &&
+    body.includes('sharedProjectConversationOwner:')));
+  assert.match(definition('composer', 'Hgn', true), /t=e\?\.sharedProjectConversationOwner\?\.id,n=Gl\(\)\?\.normalizedAccountUserId;if\(t!=null&&t!==n\)return null/);
+  assert.deepEqual(modules.composer.imports.get('Gl'), { file: './' + profile.files.shared, name: profile.expectedExports.shared.mq });
+  const requestBody = definition('composer', 'PQt', true);
+  assert.ok(requestBody.includes('e.sharedProjectConversationId&&e.sharedProjectConversationOwnerId?{continue_from_shared_project_conversation_id:e.sharedProjectConversationId,shared_project_conversation_owner_id:e.sharedProjectConversationOwnerId}:{conversation_id:i}'));
+  assert.ok([...modules.composer.definitions.values()].flat().some(node =>
+    modules.composer.text.slice(node.start, node.end).includes('M.config?.urlGizmoId===Se||e===Se')));
   assert.equal(definition('conversation', 'tOt'), 'zd(()=>v$n())');
   assert.match(definition('conversation', 'v$n', true), /cleanTtlMs/);
   assert.match(definition('conversation', 'v$n', true), /hydrateSessionFromLibrary/);

@@ -78,6 +78,22 @@ for (const [name, change] of [
   assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal), false);
   assert.equal(f.applied(), false);
 });
+test('project history verifies the current owner and ordinary scopes before applying', async () => {
+  for (const [accepted, owner, scopes] of [
+    [true, null, null], [true, { user_id: 'fixture-current-user' }, ['GLOBAL']],
+    [false, { user_id: 'fixture-other-user' }, ['GLOBAL']], [false, { name: 'Unknown' }, []],
+    [false, [], []], [false, 'fixture-current-user', []],
+    [false, null, ['GLOBAL', 'HEALTH']], [false, null, ['LOCKED_CHATS']],
+    [false, null, new Array(1)], [false, null, 'GLOBAL']
+  ]) {
+    const f = fixture(); f.binding.projectId = 'g-p-' + 'a'.repeat(32);
+    f.binding.projectUserId = 'fixture-current-user';
+    Object.assign(f.payload, { gizmo_id: f.binding.projectId, is_do_not_remember: false, owner, context_scopes: scopes });
+    assert.equal(await api.reconcile(f.binding, f.request, f.controller.signal), accepted);
+    assert.equal(f.applied(), accepted);
+  }
+});
+
 test('account/branch change or timeout between fetch and apply rejects a late snapshot', async () => {
   for (const mutate of [f => f.current(false), f => f.controller.abort()]) {
     const f = fixture();

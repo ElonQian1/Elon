@@ -12,8 +12,8 @@ September 15 native acceptance on 1749 verified the owned project fixture but
 the independent sender rejected `scope_unsupported` before POST. The existing
 official-runtime fallback produced exactly one reply. Do not enable the project
 default or repeat that message. [Admission follow-up](reports/chatgpt-fresh-project-admission-20260915.md)
-records the installed 1750 read-only `base_project` rejection and the next
-ordinary `GLOBAL` scope fix. It is not another sender or a successful HTTP proof.
+records the installed 1751 `project_shared` rejection, ordinary GLOBAL fix and
+the next same-user ownership correction. This is not yet a successful HTTP proof.
 
 September 13 source extension of [the accepted plain-text sender](chatgpt-fresh-text-dispatch.md).
 It reuses its queue, native stream, owned stop and history recovery. It does not
@@ -50,7 +50,9 @@ bundle hashes and AST checks are in `test-chatgpt-text-dispatch-public-evidence.
 Context v4 supports `/g/g-p-<32hex>[-slug]/c/<uuid>` and a plain `/c/<uuid>`
 route owning the same loaded project. It verifies route/server ID, unique
 registered conversation, personal workspace, project ID/mode, loaded history,
-non-temporary/non-shared state, selected parent/model and existing restrictions.
+non-temporary state, selected parent/model and existing restrictions. The Sep15
+update permits ordinary GLOBAL context and an explicit owner equal to the
+current account user, but never a foreign owner or a shared continuation.
 Unknown mode fields, custom GPTs, business agents, active connectors, attachments,
 continuations, configured handoffs and competing writers remain outside scope.
 

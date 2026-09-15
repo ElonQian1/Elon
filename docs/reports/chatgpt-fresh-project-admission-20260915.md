@@ -1,8 +1,8 @@
 # Project Send Admission Follow-Up
 
-Status: adapter 413 is published/installed as 1.1.1750; its read-only probe passed.
-Adapter 414 adds the evidence-backed ordinary GLOBAL-scope compatibility fix;
-its Android/package validation and post-install admission are pending.
+Status: adapter 414 is published/installed as 1.1.1751. Its read-only probe
+identifies `project_shared`. Adapter 415 corrects same-user ownership and
+matching project-route configuration; package/device acceptance is pending.
 Production project-independent sends remain disabled. Personal fresh text,
 composer-free first sends and local attachment defaults are unchanged.
 
@@ -61,6 +61,26 @@ The readonly stages now distinguish route/mode/loading/privacy/shared/scopes,
 so an unrelated remaining guard cannot be mislabeled as the GLOBAL defect.
 Project dispatch stays trial-only until an actual independent request succeeds.
 
+## Same-User Ownership Follow-Up
+
+The installed 1751 probe returned `scope_unsupported / project_shared`, not
+`ready`; zero Send clicks and successful route/awake restoration. The prior
+GLOBAL defect is real, but cannot be claimed as this fixture's sole cause.
+
+Public hydration `wy` constructs `sharedProjectConversationOwner` from the
+response's `owner.user_id`; presence alone does not mean a foreign owner.
+Composer `Hgn` compares its ID to the current account's `normalizedAccountUserId`
+via the already-mapped shared `mq` export. Serializer `PQt` emits a shared-project
+continuation only when both continuation ID and owner ID exist. A same-user
+owner without a continuation keeps the ordinary `conversation_id` request.
+
+Context v21 adopts that same-user comparison and fingerprints the current user
+inside the page only. Missing/foreign identity and real continuations remain
+blocked. `urlGizmoId` is admitted only when exactly equal to the validated
+project ID; other configured handoffs remain rejected. Reconcile v14 verifies
+the wire owner's user ID and ordinary scopes before applying project history.
+No owner ID, credential or shared-continuation field enters the fresh request.
+
 ## Verification
 
 - `fresh-project-admission-regression-20260915-072724-234`: 378 Node tests
@@ -77,11 +97,18 @@ Project dispatch stays trial-only until an actual independent request succeeds.
 - GLOBAL fix: `fresh-project-global-regression-20260915-075355-096` passed
   379 Node cases. Hash-pinned public-source AST checks passed all three cases
   with no skip (`fresh-project-global-public-contract-20260915-075400-018`).
-- Adapter 414 Android unit/Release/read-only admission remain pending.
+- Adapter 414: 13 Android unit tests passed; normal 1751 from `995b93ea5`
+  built/published/installed (`fresh-project-global-release-20260915-080034-607`,
+  433.1s). SHA-256: `d2c6cfdfd0e9c94c3d6aa1798b43367fde35afc3fde9316008677bd638d77101`.
+- Same-user regression: 382 Node cases passed
+  (`fresh-project-owner-regression-20260915-081436-520`). All three hash-pinned
+  public AST cases passed, no skip (`fresh-project-owner-public-contract-20260915-081507-570`).
+  The unchanged Kotlin validator reuses the 13 passing tests; only its adapter
+  version changes. Adapter 415 Release/read-only admission are pending.
 
 ## Remaining
 
-Read admission on adapter 414 before any new project send. Only if all actual
+Read admission on adapter 415 before any new project send. Only if all actual
 guards pass, perform one new scoped native acceptance, never replay the prior
 fallback-accepted message. Do not loosen project ownership for acceptance.
 Original editable Canvas acceptance still needs an actual eligible original

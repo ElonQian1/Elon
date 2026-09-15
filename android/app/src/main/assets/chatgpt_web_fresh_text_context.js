@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 20, create: factory });
+  const api = Object.freeze({ version: 21, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -117,6 +117,12 @@
       return matches.length === 1 && matches[0] === selected;
     }
 
+    function projectUserId() {
+      const user = shared.mq?.()?.normalizedAccountUserId;
+      if (typeof user !== 'string' || !/^[A-Za-z0-9_-]{1,160}$/.test(user)) fail('identity_unavailable', 'project_shared');
+      return user;
+    }
+
     function scope(state) {
       if (!state || shared.wV?.(shared.SV?.isPersonalWorkspace) !== true) fail('scope_unsupported', 'base_workspace');
       const projectId = shared.HM.getGizmoId(state) ?? null;
@@ -131,7 +137,10 @@
           Object.keys(state.mode).some(key => !['kind', 'gizmo_id', 'gizmo'].includes(key))) fail('scope_unsupported', 'project_mode');
       if (state.isLoading !== false) fail('scope_unsupported', 'project_loading');
       if (state.is_do_not_remember !== false) fail('scope_unsupported', 'project_privacy');
-      if (state.sharedProjectConversationOwner != null || state.continuingFromSharedProjectConversationId != null) fail('scope_unsupported', 'project_shared');
+      if (state.continuingFromSharedProjectConversationId != null ||
+          state.sharedProjectConversationOwner != null && (typeof state.sharedProjectConversationOwner !== 'object' ||
+            Array.isArray(state.sharedProjectConversationOwner) ||
+            state.sharedProjectConversationOwner.id !== projectUserId())) fail('scope_unsupported', 'project_shared');
       // Official hydration retains GLOBAL on ordinary projects. Restricted scopes
       // still require their own transport contract; sparse arrays are not evidence.
       if (state.contextScopes != null && (!Array.isArray(state.contextScopes) ||
@@ -177,7 +186,8 @@
       if (['continuingFromSharedConversationId', 'continuingFromSharedProjectConversationId', 'continuingFromSharedPostId',
         'forkFromSharedPost', 'branchingFromMessageId', 'branchingFromConversationId', 'continuationBranch',
         'hideFromHistory', 'conversationOrigin'].some(key => state[key] != null && state[key] !== false)) fail('scope_unsupported', 'base_branch');
-      if (Object.keys(selected.config || {}).some(key => selected.config[key] != null && selected.config[key] !== false)) fail('scope_unsupported', 'base_config');
+      if (Object.entries(selected.config || {}).some(([key, value]) => value != null && value !== false &&
+          !(projectId !== null && key === 'urlGizmoId' && value === projectId))) fail('scope_unsupported', 'base_config');
       const files = binding.files.files$(), ready = binding.files.readyFiles$();
       if (!Array.isArray(files) || !Array.isArray(ready) || binding.files.hasUploadInProgress$() !== false ||
           (attachments ? !attachments.current() || files.length !== selectedFiles.length || ready.length !== files.length
@@ -223,7 +233,8 @@
       }
       return { conversationId: binding.serverId, parentId: parent.id, parentRole: parent.author.role, model: model?.id,
         newConversation, requestedDefaultModel, temporary, temporaryPersonalization,
-        tool: selectedTool, projectId, projectHeaders: projectHeaders(state, projectId),
+        tool: selectedTool, projectId, projectUserId: projectId === null ? null : projectUserId(),
+        projectHeaders: projectHeaders(state, projectId),
         effort: conversation.yRt(selected).conversationThinkingEffort$() ?? null,
         serviceTier: conversation.l0(selected).getServiceTierForSubmission$() ?? null,
         historyDisabled: shared.textHistoryDisabled(), doNotRemember: state.is_do_not_remember === true };
@@ -262,6 +273,7 @@
               shared.uo(selected) === false && shared.textHistoryDisabled() === false && tree()?.is_do_not_remember === false)) return false;
         ownershipStage = 'server_id'; if ((selected.serverId$() ?? null) !== serverId) return false;
         ownershipStage = 'project_scope'; if (scope(tree()) !== snapshot.projectId) return false;
+        if (snapshot.projectId !== null && projectUserId() !== snapshot.projectUserId) return false;
         ownershipStage = 'owned'; return true;
       } catch (_) { ownershipStage = 'context_error'; return false; }
     }
