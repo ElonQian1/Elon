@@ -47,6 +47,7 @@ internal data class ChatGptWebSnapshot(
     val privateReadAloudContextId: String = "",
     val contentOnly: Boolean = false,
     val privateSendReady: Boolean = false,
+    val privateSendRecoveryState: String = "disabled",
 )
 
 internal data class ChatGptWebComposerOption(
@@ -268,6 +269,9 @@ internal object ChatGptWebProtocol {
                 .take(MAX_ID_LENGTH)
                 .takeIf(UI_CONTEXT_ID::matches)
                 .orEmpty(),
+            privateSendRecoveryState = ChatGptWebPendingWriteRecoveryState.parse(
+                event.optString("privateSendRecoveryState"),
+            ),
         )
     }
 

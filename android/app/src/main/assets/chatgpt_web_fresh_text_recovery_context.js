@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextRecoveryContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -56,6 +56,9 @@
         if (tree.continuingFromSharedConversationId != null || tree.continuingFromSharedProjectConversationId != null) return false;
         // Do not hydrate across a new official write that started during the read.
         const status = shared.Fx?.(selected);
+        const voiceState = page.__elonChatGptPrivateVoiceRelay?.state?.();
+        const voice = voiceState ? JSON.parse(voiceState) : null;
+        if (voice?.armed || voice?.inFlight || voice?.takeoverActive) return false;
         return shared.Fl?.(shared.HM.getRequestId?.(tree)) === false &&
           (status == null || status.value === shared.v7?.UNREAD) &&
           !page.__elonChatGptPrivateTextRuntimeSubmit?.state?.().pending &&
@@ -74,5 +77,17 @@
       temporary: false, historyDisabled: false, doNotRemember: false,
       runtime, owns, recoveryIdentity: () => owns() ? accountId : null });
   }
-  return Object.freeze({ capture });
+  function stamp() {
+    try {
+      const bindings = page.__elonChatGptPrivateRuntimeBindings;
+      if (!profiles.includes(bindings?.state?.().profile_id)) return null;
+      const shared = bindings.peek('shared');
+      const account = page.__elonChatGptPrivateModelContract?.create(page).withRuntimeIdentity({}, shared)?.account;
+      const owner = page.__elonChatGptPrivateTextRuntimeSubmit?.captureConversation?.(null, false, true);
+      return account && owner?.current?.() === true ? JSON.stringify([
+        account, owner.conversation.id, owner.serverId, owner.temporary, bindings.state().profile_id,
+      ]) : null;
+    } catch (_) { return null; }
+  }
+  return Object.freeze({ capture, stamp });
 });

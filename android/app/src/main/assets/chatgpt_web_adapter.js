@@ -334,6 +334,7 @@
       capabilities: optional([], () => detectCapabilities(composer))
     };
     if (privateReadAloudAdapter) privateReadAloudAdapter.addSnapshotFields(event);
+    optional(undefined, () => window.__elonChatGptFreshTextTransaction?.addRecoverySnapshotFields?.(event, () => scheduleSnapshot(true)));
     const fingerprint = JSON.stringify(event);
     if (force === true || fingerprint !== lastSnapshot) {
       lastSnapshot = fingerprint;

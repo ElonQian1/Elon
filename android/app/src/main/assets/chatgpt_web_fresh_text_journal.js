@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextJournal = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -118,18 +118,19 @@
     }
   }
 
-  async function reconcilePending(binding, signal) {
+  async function reconcilePending(binding, signal, onPending) {
     const owner = await identity(binding, signal);
     store ||= (options.store || page.__elonChatGptFreshTextJournalStore).create(options.storage || page.localStorage);
     const pending = store.list(owner.accountHash).filter(record =>
       record.conversationId === null || record.conversationId === binding.conversationId);
+    onPending?.(pending.length);
     for (const record of pending) await resolve(record, binding, owner, signal);
     return { owner, count: pending.length };
   }
 
-  async function recoverSelected(binding, signal) {
+  async function recoverSelected(binding, signal, onPending) {
     if (!binding || binding.temporary === true || binding.historyDisabled === true || binding.doNotRemember === true) return 0;
-    try { return (await reconcilePending(binding, signal)).count; }
+    try { return (await reconcilePending(binding, signal, onPending)).count; }
     catch (error) { code = safeCode(error); throw Error(code); }
   }
 

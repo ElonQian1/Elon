@@ -32,6 +32,23 @@ test('read-only context captures a committed conversation without editor, model 
   assert.equal(f.page.localStorage.length, 0);
 });
 
+test('recovery scope follows committed conversation and account without reading the editor', () => {
+  const f = fixture(), context = moduleApi.create(f.page), before = context.stamp();
+  assert.ok(before);
+  f.selected.id = 'fixture-new-selection'; assert.notEqual(context.stamp(), before);
+  f.identity(JSON.stringify(['other-user', 'other-account'])); assert.notEqual(context.stamp(), before);
+  assert.deepEqual(f.edits, []);
+});
+
+for (const phase of ['armed', 'inFlight', 'takeoverActive']) {
+  test(`native voice ${phase} defers text journal recovery without touching the media session`, async () => {
+    const f = fixture();
+    f.page.__elonChatGptPrivateVoiceRelay = { state: () => JSON.stringify({ [phase]: true }) };
+    await assert.rejects(f.capture(), /context_unavailable/);
+    assert.equal(f.page.localStorage.length, 0);
+  });
+}
+
 for (const [name, mutate] of [
   ['document', f => { f.page.document = {}; }],
   ['document token', f => { f.page.__elonChatGptDocumentToken = 'doc_replaced'; }],
@@ -45,6 +62,7 @@ for (const [name, mutate] of [
   ['project scope', f => { f.shared.HM.getGizmoId = () => project; }],
   ['privacy', f => { f.tree.is_do_not_remember = true; }],
   ['official request', f => { f.shared.Fl = () => true; }],
+  ['native voice relay', f => { f.page.__elonChatGptPrivateVoiceRelay = { state: () => JSON.stringify({ takeoverActive: true }) }; }],
   ['cancelled command', f => { f.controller.abort(); }],
 ]) {
   test(`${name} changes during runtime loading invalidate the recovery owner`, async () => {

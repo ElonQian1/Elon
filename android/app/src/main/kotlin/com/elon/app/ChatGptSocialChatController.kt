@@ -181,6 +181,8 @@ internal class ChatGptSocialChatController(
     override fun stateWireValue(): String = session.state().wireValue
 
     override fun stateDetail(): String? = latestStateDetail
+    override fun pendingWriteRecoveryState(): String =
+        session.currentSnapshot()?.privateSendRecoveryState ?: "disabled"
 
     override fun currentModel(): String = session.currentSnapshot()?.currentModel.orEmpty()
 

@@ -18,6 +18,7 @@ internal interface WebChatSocialController {
     fun currentMessages(): List<ChatMessage>
     fun stateWireValue(): String
     fun stateDetail(): String? = null
+    fun pendingWriteRecoveryState(): String = "disabled"
     fun currentModel(): String
     fun adapterVersion(): Int
     fun authenticated(): Boolean

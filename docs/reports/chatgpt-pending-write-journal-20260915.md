@@ -152,6 +152,42 @@ module/instance version mismatch; it was corrected before the final passing run.
 The candidate flag remains unchanged. No Android build, installation, POST replay
 or active-write process-kill device acceptance was performed for this follow-up.
 
+### Page-Entry Follow-Up
+
+Adapter 426 / fresh transaction 35 wires the existing journal into production
+snapshots, independently of Send and of `composerReady` / `privateSendReady`.
+The separate recovery-session module reuses the exact account/conversation
+history proof. It emits only an aggregate state through the canonical snapshot
+and the existing native composer status banner, never a fake assistant message.
+
+- An empty journal causes no history GET and no checking banner. A real pending
+  record changes the banner to checking; verified history removes the record.
+- Unknown results stay unconfirmed. Storage failures are unavailable, not an
+  empty ledger. The banner offers inspection, never an automatic Send retry.
+- Cold committed-owner mounting gets at most three attempts. Network/history
+  failures wait for an online/foreground event, with a 15-second cooldown that
+  survives network flapping. There is no idle history polling.
+- New writes cancel passive recovery before claiming ownership. Account, route,
+  document/token changes, suspension and disposal invalidate late callbacks.
+  Native voice relay setup/takeover defers history recovery without changing
+  media. Current send admission, Stop and voice/dictation routes are preserved.
+- The committed conversation is still required as an identity owner; this does
+  not infer a new server ID, fake first-send readiness or bypass unknown runtime
+  mappings. The feature remains an opt-in candidate until process-death proof.
+
+Verification: 507 focused JavaScript tests passed, including the full fresh-text,
+regeneration, private-input and pending-recovery wiring suites. Log:
+`pending-recovery-batch-final-20260915-160035-776`. Release Kotlin/Java compilation
+and 36 Android tests passed (protocol, asset manifest, production recovery policy
+and pending-write presentation), with no failures/errors/skips. Log:
+`pending-recovery-android-final-20260915-155750-818`, 279.7 seconds.
+The first JavaScript run found two fixture setup errors (new-root identity and
+fake-timer settling), both corrected. The first Android test compile found an
+incorrect test event property; main Release compilation had already passed.
+No APK publication, installation or microphone action is part of this batch.
+Separately released 1.1.1763 remains adapter 424 and excludes this candidate;
+that release is not evidence of installation or acceptance of adapter 426.
+
 ### Device Boundary
 
 The latest read-only MCP check confirms normal 1.1.1762 / adapter 421 installed,
@@ -164,14 +200,10 @@ Receipt: `conversation-process-recovery-1762-20260915-140845-230`.
 
 - No genuine active-send process-kill recovery has been accepted on a device.
   Existing idle process-recovery smoke is insufficient for that claim.
-- Reconciliation is triggered by the next native send intent, before new-send
-  admission; automatic startup projection of an unresolved-send badge is not
-  implemented in this batch.
-- Automatic startup recovery is not wired yet. If both `composerReady` and
-  `privateSendReady` are false, native transport admission can still prevent a
-  send intent from reaching this read-first path. This source fix does not prove
-  composer-less recovery through the native button; startup read scheduling and
-  its native status projection remain the next integration gap.
+- Reconciliation now also runs from production page snapshots and online/resume
+  events before any Send intent. Offline tests cover both readiness flags being
+  unavailable; actual process-death recovery and native banner rendering on a
+  device remain unaccepted. The normal Send safety gate was not loosened.
 - If a new conversation POST may have succeeded but its server ID was never
   observed, the record remains unresolved on the empty home route. Navigating to
   the correct recovered conversation permits exact user-ID proof; this module

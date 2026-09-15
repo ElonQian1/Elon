@@ -6,7 +6,8 @@ function fixture(options = {}) {
   Object.assign(page, { document: {}, __elonChatGptDocumentToken: 'doc_journal_test',
     location: { origin: 'https://chatgpt.com', href: 'https://chatgpt.com/c/' + uid(2) },
     __elonChatGptPrivateTextTransactionsEnabled: true, __elonChatGptFreshTextJournalEnabled: options.enabled !== false,
-    __elonChatGptFreshTextJournal: asset('journal'), __elonChatGptFreshTextStream: asset('stream') });
+    __elonChatGptFreshTextJournal: asset('journal'), __elonChatGptFreshTextStream: asset('stream'),
+    __elonChatGptFreshTextRecoverySession: asset('recovery_session') });
   Object.assign(binding, { model: 'fixture-model', effort: null, serviceTier: null,
     draft: { read: () => draft, clear: expected => { if (draft === expected) draft = ''; } },
     reconciled: () => options.reconciled === true, canReconcile: () => true,

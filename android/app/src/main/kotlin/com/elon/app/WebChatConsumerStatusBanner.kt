@@ -24,6 +24,7 @@ internal object WebChatConsumerRecoveryPolicy {
         detail: String? = null,
         hasConversationContent: Boolean = false,
         warmSessionAvailable: Boolean = false,
+        pendingWriteRecovery: String = "disabled",
     ): WebChatConsumerRecoveryState = when (state) {
         "loading" -> if (warmSessionAvailable) {
             hidden()
@@ -51,7 +52,7 @@ internal object WebChatConsumerRecoveryPolicy {
             retryLabel = "访客",
             officialLabel = "登录",
         )
-        else -> hidden()
+        else -> WebChatPendingWriteRecoveryPresentation.resolve(pendingWriteRecovery) ?: hidden()
     }
 
     private fun errorMessage(provider: WebChatProviderIdentity, detail: String?): String {
@@ -85,6 +86,7 @@ internal fun WebChatSocialController.consumerRecoveryState(
     detail = stateDetail(),
     hasConversationContent = currentMessages().any { it.webChatMessage != null },
     warmSessionAvailable = warmSessionAvailable(),
+    pendingWriteRecovery = pendingWriteRecoveryState(),
 )
 
 internal class WebChatConsumerStatusBanner(

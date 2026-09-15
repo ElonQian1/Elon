@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 34, create: factory });
+  const api = Object.freeze({ version: 35, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -24,6 +24,14 @@
   let journal = options.journal || null;
   let document = page.document, token = page.__elonChatGptDocumentToken, active = null, disposed = false;
   let trial = null, last = null, stoppedParent = null;
+  const pendingRecovery = page.__elonChatGptFreshTextRecoverySession?.create(page, {
+    context: recoveryContext,
+    stamp: () => recoveryContext?.stamp?.() ?? context.stamp(),
+    enabled: () => page.__elonChatGptFreshTextJournalEnabled === true &&
+      page.__elonChatGptPrivateTextTransactionsEnabled === true && !disposed,
+    hasWriter: () => active !== null,
+    journal: () => journal ||= page.__elonChatGptFreshTextJournal.create(page),
+  });
   const now = options.now || Date.now;
   const eventTypes = new Set(['delta_encoding', 'message', 'input_message', 'message_stream_complete',
     'stream_handoff', 'resume_conversation_token', 'conversation_async_status', 'server_ste_metadata',
@@ -40,6 +48,7 @@
 
   function boundary() {
     if (document === page.document && token === page.__elonChatGptDocumentToken) return;
+    pendingRecovery?.cancel();
     active?.controller.abort();
     active?.stopBoundaryController.abort();
     active = null; trial = null; last = null; stoppedParent = null; records.clear();
@@ -119,6 +128,7 @@
       completion: Promise.resolve({ status: 'rejected', code: 'request_retired' }) };
     // A stopped/uncertain write still owns the ledger even if the trial is disabled.
     if (active) return { handled: true, completion: Promise.resolve({ status: 'unknown', code: 'busy' }) };
+    pendingRecovery?.cancel();
     const regenerate = operation === 'regenerate';
     if ((regenerate ? page.__elonChatGptFreshRegenerationEnabled === false : page.__elonChatGptFreshTextDispatchEnabled === false) && !trialArmed() ||
         page.__elonChatGptPrivateTextTransactionsEnabled !== true) {
@@ -431,6 +441,7 @@
   function dispose() {
     if (active) return false;
     disposed = true;
+    pendingRecovery?.dispose();
     eventDocument.removeEventListener?.('visibilitychange', visibility);
     page.removeEventListener?.('online', resume);
     page.removeEventListener?.('offline', suspend);
@@ -439,7 +450,10 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 34, send: command => dispatch(command, 'send'),
+  const pendingRecoverySnapshot = onChange => { state(); return pendingRecovery?.snapshot(onChange) || 'disabled'; };
+  return Object.freeze({ version: 35, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
+    pendingRecoverySnapshot,
+    addRecoverySnapshotFields: (event, onChange) => { event.privateSendRecoveryState = pendingRecoverySnapshot(onChange); },
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

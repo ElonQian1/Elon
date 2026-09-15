@@ -132,6 +132,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_fresh_text_recovery.js", "chatgpt_web_fresh_text_stream.js",
         "chatgpt_web_fresh_text_journal_store.js", "chatgpt_web_fresh_text_journal.js",
         "chatgpt_web_fresh_text_recovery_context.js",
+        "chatgpt_web_fresh_text_recovery_session.js",
         "chatgpt_web_fresh_text_receipts.js", "chatgpt_web_fresh_text_transaction.js",
         "chatgpt_web_text_transaction_orchestrator.js",
         "chatgpt_web_attachment_transport_observer.js",
