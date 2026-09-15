@@ -58,6 +58,13 @@ function New-ElonMobilePwaRuntimeTemplate {
     $runtimeTemplate = $runtimeTemplate.Replace($themeStyleReference, $themeStyleBlock)
     $runtimeTemplate = $runtimeTemplate.Replace($cacheScriptReference, $cacheScriptBlock)
     $runtimeTemplate = $runtimeTemplate.Replace($scriptReference, $scriptBlock)
+    foreach ($name in @('social_chat_cache.js', 'social_chat_recovery.js', 'social_chat_view.js')) {
+        $reference = '<script src="/assets/' + $name + '"></script>'
+        if (-not $runtimeTemplate.Contains($reference)) { throw "Mobile PWA template is missing $name" }
+        $asset = [System.IO.File]::ReadAllText((Join-Path (Split-Path -Parent $TemplatePath) $name), $utf8)
+        if ($asset -match '(?i)</script\s*>') { throw "Mobile social script cannot be embedded safely: $name" }
+        $runtimeTemplate = $runtimeTemplate.Replace($reference, "<script data-elon-runtime-asset=`"/assets/$name`">`n$asset`n</script>")
+    }
     $outputDirectory = Split-Path -Parent $OutputPath
     if (-not [string]::IsNullOrWhiteSpace($outputDirectory)) {
         [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null

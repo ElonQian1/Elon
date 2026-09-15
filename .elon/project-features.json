@@ -17899,6 +17899,215 @@
       "updated_at_ms": 1786879547042
     },
     {
+      "id": "mobile-social-chat-recovery-v1",
+      "title": "APK 与 PWA 社交聊天缓存及前台恢复",
+      "summary": "补齐持久缓存和有界读取，修复待发阻断接收、恢复失效及重复全量渲染",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/mobile-social-chat-recovery.md",
+        "content_hash": "430ee166e3a810a8844b54321a32c9ccf1c0717b52f2cadec06202d429da26d6",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "7d0a8b63079c1d1d9ec42354335f92e842d352a9",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/MainFriendChatActions.kt",
+        "android/app/src/main/kotlin/com/elon/app/MainGroupChatActions.kt",
+        "server/src/assets/social_chat_recovery.js",
+        "server/src/assets/web_page.html"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "APK/PWA 缓存先显，短暂离线不清空",
+        "前台和联网恢复后自动收消息，待发不阻断读取",
+        "旧响应、权限、修订和账号隔离有回归",
+        "APK/PWA 正式发布并保留原聊天能力"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/MainFriendChatActions.kt",
+          "content_hash": "ab5f760a4278d404532427287f93b656a8750f92ac783fc95ac3e5bb911963dc",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "9a67ca8db0094ed02f8dafffb14020e58dd8fde7",
+            "worktree_blob_oid": "76361f84cad90eb2177c839236796183eb1b3951",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/MainGroupChatActions.kt",
+          "content_hash": "1dde61807145018246e053dfdca44e5d8ad0914415daa68913309c1c6b4a5319",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "d873590e359e370af04eac656903580ce1c01645",
+            "worktree_blob_oid": "9b93df25ad6274bc6a104cc204d1953ce668b92a",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/SocialChatMessageState.kt",
+          "content_hash": "fc8b1d777b1ab18f27be89eb7ae5584ca51e23a299c6e1e5aadd91d9dd27120d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6f083cbb4991961e218864032e8811692cab202c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/SocialChatReadChannel.kt",
+          "content_hash": "e7af3f3f8db998e048b5f8af89a202213f7808aa0f835f269dc371634a7bde79",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "39efb53a3252580b8868a1e8d5ad4976a77089d9",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/SocialChatSnapshotStore.kt",
+          "content_hash": "efbf020558673a596f4131f280dc6a644f00b4baa83cd4373b8347f08adb0fce",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "911bc28073a8015532c23f976f57eb034c762ddc",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/SocialChatReadChannelTest.kt",
+          "content_hash": "a19961b62138f4bff3063f761b62d3248cf6c2c13f176807793a75c718b65149",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c83a23b01af2d0170b7936aee8e2ddc4180f7be9",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/SocialChatRecoveryTest.kt",
+          "content_hash": "963d05ab86e9a15eeb0fb773b0daf40b49cd212247a86404ee30228500c0246f",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c9bb308961d70365b896e63fbc24d0d7d6e0cc8c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-mobile-social-browser.cjs",
+          "content_hash": "c62f1e331cb101dd7eda90235ad441a385cbed8043fd823e285ca165fdba2083",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2f3f7b2b5d7e89a6913d575d7364dafdecdc101b",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-mobile-social-recovery.cjs",
+          "content_hash": "8ca275296a0f71fd1d33a1f7e6ee2a4f81c7ae3283817cf96c2e053179dd4ffc",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bffe31ef91b6fae85c236c98cb186bfa2ce58dd9",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/assets/mobile_shell_worker.js",
+          "content_hash": "c1b3c30e6a6fbcee5871d85038c5ae0c7937e828485eb1d7945ddc428b17d5d7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9f80a045dd4132b1c3ba516dcbda66d955023ef1",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/assets/social_chat_cache.js",
+          "content_hash": "9790cd82fba1c4562c434df940ec5969fc6f597b54cdc029678ba46aecf476db",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b6f9510a5e3a61595e0918819c472dd43ef150dc",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/assets/social_chat_recovery.js",
+          "content_hash": "286d532e26a2505f54c153e90be4a0c79333ac5bc39cce8f5aa236a06526dcdf",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bd27b9f325a0e6c1f82caf57e6ff2545e77dc67b",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/assets/social_chat_view.js",
+          "content_hash": "787598b0b211eb7cdc17b26b2b7917fd051a5049bed56213e84acf09a459000f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "75fead0ae827603dc035d737ed9cb2f1f6b6e245",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1789463207303,
+      "updated_at_ms": 1789466337630
+    },
+    {
       "id": "node-status-runtime-identity-v1",
       "title": "节点状态压缩保留更新任务身份",
       "summary": "修复状态强压缩丢失活动身份导致更新验证失败；保留大小上限和缺失证据拒绝语义。",
@@ -28996,66 +29205,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_fe8ce1344bc2498cb531904589b0db84",
-      "feature_id": "android-binance-read-context-recovery-v1",
-      "action": "registered",
-      "actor": "codex-binance-read-recovery",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789022387759
-    },
-    {
-      "id": "feature_event_396c8f7f70f641da97da138b73a805e6",
-      "feature_id": "android-binance-read-context-recovery-v1",
-      "action": "claimed",
-      "actor": "codex-binance-read-recovery",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789022387835
-    },
-    {
-      "id": "feature_event_5bc231daa497425bbf6f4a5e8f580359",
-      "feature_id": "android-binance-read-context-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-read-recovery",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789022491612
-    },
-    {
-      "id": "feature_event_5664c5e552d541dca2eafa9fe0a95f4a",
-      "feature_id": "android-binance-read-context-recovery-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-binance-read-recovery",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789023488367
-    },
-    {
-      "id": "feature_event_b1b731b2a904400892b52ee636f14cf7",
-      "feature_id": "android-binance-read-context-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-read-recovery",
-      "reason": "106 Kotlin tests and readonly JS regression passed; official main APK 1.1.1633 installed; quant 0.7.6 resumed one fresh grid. Auto-reload branch tested by unit tests; no live fault injection.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789023488436
-    },
-    {
-      "id": "feature_event_6f84a1b428ae4652ae80c2a79263605c",
-      "feature_id": "android-binance-read-context-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-read-recovery",
-      "reason": "106 Kotlin tests and readonly JS regression passed; official main APK 1.1.1633 installed; quant 0.7.6 resumed one fresh grid. Auto-reload branch tested by unit tests; no live fault injection.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1789023488508
-    },
-    {
       "id": "feature_event_d0d4424099e448cdb41be0ffb65682d8",
       "feature_id": "android-binance-read-context-recovery-v1",
       "action": "transitioned",
@@ -30994,6 +31143,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1789462658299
+    },
+    {
+      "id": "feature_event_78d47ff97f28499fa9103f5d585f7b82",
+      "feature_id": "mobile-social-chat-recovery-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789463207304
+    },
+    {
+      "id": "feature_event_f8ae8f5b0d98442c8bddcefef256200f",
+      "feature_id": "mobile-social-chat-recovery-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789463207349
+    },
+    {
+      "id": "feature_event_cc46a7c6f49d4e4faf5765827001a80f",
+      "feature_id": "mobile-social-chat-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "已核对独立 APK/PWA 代码和前轮 PC 基线，修复读取缓存与生命周期缺口",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789463221272
+    },
+    {
+      "id": "feature_event_c4a70dbc944d4e0f8b5125c3d5c94b81",
+      "feature_id": "mobile-social-chat-recovery-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789465919623
+    },
+    {
+      "id": "feature_event_c329b0115f94427293ffb3b94f6fa648",
+      "feature_id": "mobile-social-chat-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "APK/PWA 缓存、恢复、权限和迟到响应处理已实现；发布验收继续执行",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789465919824
+    },
+    {
+      "id": "feature_event_372c00969c504f37a0a28a51164a76e3",
+      "feature_id": "mobile-social-chat-recovery-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789466337631
     }
   ]
 }

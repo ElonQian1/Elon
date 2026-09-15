@@ -48,33 +48,27 @@ internal class MainGroupActions(
     private val onGroupsChanged: () -> Unit,
     private val openGroup: (AppGroup) -> Unit
 ) {
+    private val reader = SocialChatReadChannel(activity, http, serverUrl)
+    private var hydratedOwner: String? = null
+
     fun loadGroups() {
+        val owner = AuthManager.userId(activity)
         if (!AuthManager.isLoggedIn(activity)) {
-            setGroups(emptyList())
-            onGroupsChanged()
+            reader.cancel(); setGroups(emptyList()); onGroupsChanged()
+
             return
         }
-        thread {
-            val result = runCatching {
-                val request = AuthManager.applyAuth(
-                    activity,
-                    Request.Builder().url("$serverUrl/api/me/groups").get()
-                ).build()
-                http.newCall(request).execute().use { response ->
-                    val body = response.body?.string().orEmpty()
-                    if (!response.isSuccessful) error(readErrorMessage(body, "加载群聊失败"))
-                    val array = JSONObject(body).optJSONArray("groups") ?: JSONArray()
-                    List(array.length()) { index ->
-                        parseGroup(array.optJSONObject(index) ?: JSONObject())
-                    }
-                }
-            }
-            activity.runOnUiThread {
-                result.onSuccess {
-                    setGroups(it)
-                    onGroupsChanged()
-                }
-            }
+        val hydrate = hydratedOwner != owner
+        hydratedOwner = owner
+        fun apply(rows: org.json.JSONArray) {
+
+            setGroups(List(rows.length()) { parseGroup(rows.getJSONObject(it)) })
+            onGroupsChanged()
+        }
+        reader.read("groups", "/api/me/groups", "groups", hydrate, ::apply, ::apply) { failure ->
+            if (failure.socialAccessDenied()) { setGroups(emptyList()); onGroupsChanged() }
+
+            if (hydrate && !failure.socialAccessDenied()) android.widget.Toast.makeText(activity, "会话同步暂时失败，将自动重试", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 

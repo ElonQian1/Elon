@@ -33,11 +33,16 @@ internal class MainGroupChatActions(
     private val onGroupSummariesChanged: () -> Unit,
     private val aiComposer: GroupAiComposer,
 ) {
+    private val reader = SocialChatReadChannel(activity, http, serverUrl) { key, rows ->
+        protectSocialChatRows(messagesByGroup[key.removePrefix("group:")].orEmpty(), rows)
+    }
+    private var owner = AuthManager.userId(activity)
     private val messagesByGroup = linkedMapOf<String, MutableList<ChatMessage>>()
     private val pollHandler = Handler(Looper.getMainLooper())
     private var activeGroup: AppGroup? = null
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
+    private var foreground = true
     private val webAi by lazy {
         GroupWebAiFeature(activity, binding.root, http, serverUrl, userId) { handleRealtimeMessage(it) }
     }
@@ -57,6 +62,7 @@ internal class MainGroupChatActions(
         if (index < 0) return
         val message = messages[index]
         if (!message.recalledAt.isNullOrBlank() || message.revision > edited.optLong("revision", 1)) return
+        reader.invalidate("group:$groupId")
         message.content = edited.optString("content")
         message.revision = edited.optLong("revision", 1)
         message.editedAt = edited.optString("edited_at").takeIf { it != "null" && it.isNotBlank() }
@@ -81,6 +87,7 @@ internal class MainGroupChatActions(
     }
 
     fun openGroup(group: AppGroup, animate: Boolean) {
+        ensureOwner(); foreground = true; reader.cancel()
         revisions.close()
         activeGroup = group
         mentions.setGroup(group)
@@ -109,6 +116,7 @@ internal class MainGroupChatActions(
     }
 
     fun closeGroupChat() {
+        showSocialChatStatus(binding, null)
         aiComposer.close()
         revisions.close()
         activeGroup = null
@@ -128,23 +136,31 @@ internal class MainGroupChatActions(
 
     fun clearCurrentMessages() {
         val group = activeGroup ?: return
+        reader.invalidate("group:${group.id}")
         messagesByGroup[group.id]?.clear()
         activeAdapter?.notifyDataSetChanged()
         onGroupSummariesChanged()
     }
 
     fun resumeIfActive() {
-        if (activeGroup != null) startPolling()
+        foreground = true
+        if (!ensureOwner()) return
+        val group = activeGroup ?: return
+        reader.cancel()
+        loadMessages(group, silent = false, scrollToBottom = false)
+        startPolling()
     }
 
     fun handleRealtimeMessage(groupId: String): Boolean {
         val group = activeGroup ?: return false
         if (group.id != groupId) return false
-        loadMessages(group, silent = true, scrollToBottom = true, allowPendingRefresh = true)
+        loadMessages(group, silent = true, scrollToBottom = false, allowPendingRefresh = true)
         return true
     }
 
     fun stopPolling() {
+        foreground = false
+        reader.cancel()
         polling = false
         pollHandler.removeCallbacks(pollRunnable)
     }
@@ -182,6 +198,7 @@ internal class MainGroupChatActions(
         clearPendingAttachments()
         inputFocusActions().collapseInputComposer()
 
+        val sendingSession = socialSession(activity)
         thread {
             val result = runCatching {
                 val attachments = uploadGroupAttachments(group, attachmentsToSend)
@@ -189,19 +206,19 @@ internal class MainGroupChatActions(
             }
             activity.runOnUiThread {
                 if (result.isFailure && webAiConfirmed) webAi.release()
-                if (activeGroup?.id != group.id) return@runOnUiThread
+                if (sendingSession != socialSession(activity)) return@runOnUiThread
                 result.onSuccess { sentMessage ->
                     sentMessage.withMissingImageAnnotationsFrom(localAttachments)
-                    val index = messages.indexOf(pending)
-                    if (index >= 0) {
-                        messages[index] = sentMessage
-                        activeAdapter?.notifyMessageUpdated(index)
+                    completeSocialChatSend(messages, pending, sentMessage)
+                    reader.invalidate("group:${group.id}")
+                    if (activeGroup?.id == group.id) {
+                        activeAdapter?.notifyDataSetChanged()
+                        loadMessages(group, silent = true, scrollToBottom = true, allowPendingRefresh = true)
                     }
-                    loadMessages(group, silent = true, scrollToBottom = true, allowPendingRefresh = true)
                 }.onFailure { error ->
                     pending.sendStatus = error.message ?: "发送失败"
                     val index = messages.indexOf(pending)
-                    if (index >= 0) activeAdapter?.notifyMessageUpdated(index)
+                    if (index >= 0 && activeGroup?.id == group.id) activeAdapter?.notifyMessageUpdated(index)
                 }
             }
         }
@@ -238,24 +255,25 @@ internal class MainGroupChatActions(
         binding.chatList.scrollToPosition(messages.lastIndex)
         inputFocusActions().collapseInputComposer()
 
+        val sendingSession = socialSession(activity)
         thread {
             val result = runCatching {
                 postMessage(group, text, chatAttachmentRefsFromChatAttachments(attachments), webAiConfirmed, configuration)
             }
             activity.runOnUiThread {
                 if (result.isFailure && webAiConfirmed) webAi.release()
-                if (activeGroup?.id != group.id) return@runOnUiThread
+                if (sendingSession != socialSession(activity)) return@runOnUiThread
                 result.onSuccess { sentMessage ->
-                    val index = messages.indexOf(pending)
-                    if (index >= 0) {
-                        messages[index] = sentMessage
-                        activeAdapter?.notifyMessageUpdated(index)
+                    completeSocialChatSend(messages, pending, sentMessage)
+                    reader.invalidate("group:${group.id}")
+                    if (activeGroup?.id == group.id) {
+                        activeAdapter?.notifyDataSetChanged()
+                        loadMessages(group, silent = true, scrollToBottom = true, allowPendingRefresh = true)
                     }
-                    loadMessages(group, silent = true, scrollToBottom = true, allowPendingRefresh = true)
                 }.onFailure { error ->
                     pending.sendStatus = error.message ?: "发送失败"
                     val index = messages.indexOf(pending)
-                    if (index >= 0) activeAdapter?.notifyMessageUpdated(index)
+                    if (index >= 0 && activeGroup?.id == group.id) activeAdapter?.notifyMessageUpdated(index)
                 }
             }
         }
@@ -298,6 +316,7 @@ internal class MainGroupChatActions(
                         val messages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
                         val index = messages.indexOfFirst { it.id == messageId }
                         if (index >= 0) {
+                            reader.invalidate("group:${group.id}")
                             markMessageRecalled(messages[index])
                             activeAdapter?.notifyMessageUpdated(index)
                         }
@@ -351,62 +370,36 @@ internal class MainGroupChatActions(
         scrollToBottom: Boolean,
         allowPendingRefresh: Boolean = false
     ) {
+        if (!foreground || !ensureOwner() || activeGroup?.id != group.id) return
         val currentMessages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
-        if (!allowPendingRefresh && currentMessages.any { it.sendStatus == SENDING_STATUS }) return
-        thread {
-            val result = runCatching { fetchMessages(group) }
-            activity.runOnUiThread {
-                if (activeGroup?.id != group.id) return@runOnUiThread
-                result.onSuccess { remoteMessages ->
-                    val mergedMessages = mergeGroupMessageRevisions(currentMessages, remoteMessages.withMissingImageAnnotationsFromCurrent(currentMessages))
-                    val changed = currentMessages.size != mergedMessages.size ||
-                        currentMessages.zip(mergedMessages).any { (current, incoming) ->
-                            current.role != incoming.role ||
-                            current.content != incoming.content ||
-                                current.revision != incoming.revision ||
-                                current.senderLabel != incoming.senderLabel ||
-                                current.senderAvatarDataUrl != incoming.senderAvatarDataUrl ||
-                                current.attachments != incoming.attachments ||
-                                current.recalledAt != incoming.recalledAt ||
-                                current.recalledBy != incoming.recalledBy
-                    }
-                    currentMessages.clear()
-                    currentMessages.addAll(mergedMessages)
-                    revisions.onMessagesChanged(mergedMessages)
-                    if (scrollToBottom && currentMessages.isNotEmpty()) {
-                        binding.chatList.jumpToLatestMessageBeforeNextDraw()
-                    }
-                    if (changed) activeAdapter?.notifyDataSetChanged()
-                    if (changed || !silent || allowPendingRefresh) {
-                        onGroupSummariesChanged()
-                    }
-                }.onFailure { error ->
-                    if (!silent) Toast.makeText(
-                        activity,
-                        error.message ?: "加载群聊消息失败",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
+        fun apply(rows: JSONArray) {
+            val remote = List(rows.length()) { groupMessageFromJson(group, rows.getJSONObject(it)) }
+            val merged = mergeSocialChatMessages(currentMessages, remote.withMissingImageAnnotationsFromCurrent(currentMessages))
+            val changed = currentMessages != merged
+            val follow = scrollToBottom || !binding.chatList.canScrollVertically(1)
+            currentMessages.clear(); currentMessages.addAll(merged)
+            revisions.onMessagesChanged(merged)
+            if (changed) activeAdapter?.notifyDataSetChanged()
+            if (follow && changed && currentMessages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
+            showSocialChatStatus(binding, if (currentMessages.isEmpty()) "还没有消息" else null)
+            if (changed || !silent || allowPendingRefresh) onGroupSummariesChanged()
         }
+        if (currentMessages.isEmpty()) showSocialChatStatus(binding, "正在同步群聊消息…")
+        reader.read("group:${group.id}", "/api/me/groups/${urlPart(group.id)}/messages?limit=120&preserve_unread=false", "messages",
+            hydrate = currentMessages.isEmpty(), cached = { if (it.length() > 0) apply(it) }, value = ::apply,
+            error = { failure ->
+                if (failure.socialAccessDenied()) { currentMessages.clear(); activeAdapter?.notifyDataSetChanged() }
+                if (currentMessages.isEmpty()) showSocialChatStatus(binding, "${if (failure.socialAccessDenied()) "无法访问此会话，请检查账号或成员权限" else "同步暂时失败"}\n点击重试") { loadMessages(group, false, false) }
+                else if (!silent) Toast.makeText(activity, "同步暂时失败，已保留现有消息，将自动重试", Toast.LENGTH_SHORT).show()
+            })
     }
 
-    private fun fetchMessages(group: AppGroup): List<ChatMessage> {
-        val request = AuthManager.applyAuth(
-            activity,
-            Request.Builder()
-                .url("$serverUrl/api/me/groups/${urlPart(group.id)}/messages?limit=120")
-                .get()
-        ).build()
-        http.newCall(request).execute().use { response ->
-            val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) error(readErrorMessage(body, "加载群聊消息失败"))
-            val array = JSONObject(body).optJSONArray("messages") ?: JSONArray()
-            return List(array.length()) { index ->
-                val json = array.optJSONObject(index) ?: JSONObject()
-                groupMessageFromJson(group, json)
-            }
-        }
+    private fun ensureOwner(): Boolean {
+        val next = AuthManager.userId(activity)
+        if (owner == next) return true
+        messagesByGroup.values.forEach { it.clear() }; messagesByGroup.clear()
+        activeAdapter?.notifyDataSetChanged(); closeGroupChat(); owner = next
+        return false
     }
 
     private fun uploadGroupAttachments(

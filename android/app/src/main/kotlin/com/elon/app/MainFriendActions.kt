@@ -35,46 +35,27 @@ internal class MainFriendActions(
 ) {
     private var sessionExpiredPromptShown = false
 
+    private val reader = SocialChatReadChannel(activity, http, serverUrl)
+    private var hydratedOwner: String? = null
+
     fun loadFriends() {
-        if (AuthManager.isSessionExpired(activity)) {
-            handleSessionExpired()
-            return
-        }
+        val owner = AuthManager.userId(activity)
         if (!AuthManager.isLoggedIn(activity)) {
-            setFriends(emptyList())
-            onFriendsChanged()
+            reader.cancel(); setFriends(emptyList()); onFriendsChanged()
+            if (AuthManager.isSessionExpired(activity)) handleSessionExpired()
             return
         }
-        thread {
-            val result = runCatching {
-                val builder = Request.Builder()
-                    .url("$serverUrl/api/me/friends")
-                    .get()
-                val request = AuthManager.applyAuth(activity, builder).build()
-                http.newCall(request).execute().use { response ->
-                    val body = response.body?.string().orEmpty()
-                    if (response.code == 401) {
-                        throw SessionExpiredException(
-                            readErrorMessage(body, "登录已过期，请重新登录")
-                        )
-                    }
-                    if (!response.isSuccessful) error(readErrorMessage(body, "加载好友失败"))
-                    val array = JSONObject(body).optJSONArray("friends") ?: org.json.JSONArray()
-                    List(array.length()) { index ->
-                        parseFriend(array.optJSONObject(index) ?: JSONObject())
-                    }
-                }
-            }
-            activity.runOnUiThread {
-                result.onSuccess {
-                    sessionExpiredPromptShown = false
-                    setFriends(it)
-                    onFriendsChanged()
-                }
-                result.exceptionOrNull()
-                    ?.takeIf { it is SessionExpiredException }
-                    ?.let { handleSessionExpired() }
-            }
+        val hydrate = hydratedOwner != owner
+        hydratedOwner = owner
+        fun apply(rows: org.json.JSONArray) {
+            sessionExpiredPromptShown = false
+            setFriends(List(rows.length()) { parseFriend(rows.getJSONObject(it)) })
+            onFriendsChanged()
+        }
+        reader.read("friends", "/api/me/friends", "friends", hydrate, ::apply, ::apply) { failure ->
+            if (failure.socialAccessDenied()) { setFriends(emptyList()); onFriendsChanged() }
+            if (failure is SocialChatReadError && failure.status == 401) handleSessionExpired()
+            if (hydrate && !failure.socialAccessDenied()) android.widget.Toast.makeText(activity, "会话同步暂时失败，将自动重试", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 

@@ -421,13 +421,9 @@ pub async fn pwa_manifest() -> impl IntoResponse {
     )
 }
 
-/// Service Worker —— 仅注册壳，暂不做离线缓存，只保证 PWA 安装条件满足。
+/// Public mobile shell cache; account data stays in the isolated social snapshot store.
 pub async fn service_worker() -> impl IntoResponse {
-    let body = r#"// 一龙 Service Worker
-// 当前仅作为 PWA 安装壳，不缓存任何请求。
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
-"#;
+    let body = include_str!("assets/mobile_shell_worker.js");
     (
         [
             (header::CONTENT_TYPE, "application/javascript"),

@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />
   <link rel="stylesheet" href="/assets/esk_exchange.css" />
   <link rel="stylesheet" href="/assets/ai_provider_accounts.css" />
+  <script src="/assets/social_chat_cache.js"></script><script src="/assets/social_chat_recovery.js"></script><script src="/assets/social_chat_view.js"></script>
   <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
   <link rel="stylesheet" href="/assets/federated_auth.css" />
   <link rel="stylesheet" href="/assets/account_security.css" />
@@ -6451,7 +6452,37 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   let codexCliOnly = false;
   let userByokApiEnabled = false;
   let lastChatTimelineMs = 0;
-  let friendPollTimer = null;
+  const socialCache = window.ElonSocialChatCache.create(localStorage);
+  const socialView = window.ElonSocialChatView.create({ list: chatList, append: appendBubble, api, user: () => currentUser,
+    time: parseServerTime, friendName: friendDisplayName, resetTimeline: () => { lastChatTimelineMs = 0; },
+    changed: id => { socialRecovery.invalidate('group', id); return currentGroup?.id === id ? loadGroupMessages(false) : Promise.resolve(); } });
+  const socialStatus = document.createElement('button');
+  socialStatus.type = 'button'; socialStatus.id = 'social-sync-status'; socialStatus.setAttribute('role', 'status'); socialStatus.hidden = true;
+  socialStatus.style.cssText = 'width:100%;padding:10px;background:var(--panel,#202124);color:var(--ink,#eee);border:0;text-align:center';
+  chatList.before(socialStatus);
+  const directoryStatus = socialStatus.cloneNode(false); directoryStatus.id = 'social-directory-status';
+  conversationList.before(directoryStatus);
+  const directoryFailures = new Set();
+  const socialRecovery = window.ElonSocialChatRecovery.create({ api, cache: socialCache, session: () => token, userId: () => currentUser?.id,
+    render: (...args) => socialView.render(...args), normalize: (key, rows) => key === 'group:' + currentGroup?.id ? window.ElonGroupMessageRevisions.reconcile(currentGroup.id, rows) : rows,
+    status: (text, retry) => { socialStatus.hidden = !text; socialStatus.textContent = text; socialStatus.onclick = retry || null; },
+    directory: (kind, rows) => {
+      directoryFailures.delete(kind); directoryStatus.hidden = !directoryFailures.size;
+      if (kind === 'friends') { friends = rows; if (currentFriend) currentFriend = rows.find(item => item.id === currentFriend.id) || currentFriend; }
+      else { groups = rows; if (currentGroup) currentGroup = rows.find(item => item.id === currentGroup.id) || currentGroup; }
+      if (currentTab === 'chatPage' && !isAnyChatActive()) renderConversationList(); updateChatTabBadge();
+    },
+    directoryError: kind => { directoryFailures.add(kind); directoryStatus.hidden = false; directoryStatus.textContent = '会话同步暂时失败 · 点击重试'; directoryStatus.onclick = () => socialRecovery.directories(); },
+    wake: () => { connectAppSocket(); if (currentGroup) loadGroupSummaryPosts(true).catch(() => {}); loadMe(token).catch(error => { if (error.authFailed) expireSocialSession(); }); },
+    denied: expireSocialSession,
+    accountChanged: () => { friends = []; groups = []; socialView.reset(); chatList.replaceChildren(); closeContactChat(); },
+  });
+  function expireSocialSession() {
+    socialRecovery.reset(); socialView.reset(); chatList.replaceChildren(); directoryStatus.hidden = true; token = ''; currentUser = null;
+    currentFriend = null; currentGroup = null; friends = []; groups = [];
+    localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('elon_token');
+    if (appSocket) { appSocket.close(); appSocket = null; } showLogin();
+  }
   let typingResetTimer = null;
   let lastTypingSentMs = 0;
   let projectHealthRequestSeq = 0;
@@ -8108,11 +8139,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     setBusy(false);
   }
 
-  function stopContactPolling() { window.ElonGroupMessageRevisions.reset();
-    if (friendPollTimer) {
-      clearInterval(friendPollTimer);
-      friendPollTimer = null;
-    }
+  function stopContactPolling() { window.ElonGroupMessageRevisions.reset(); socialRecovery.close(); socialView.reset();
     if (typingResetTimer) {
       clearTimeout(typingResetTimer);
       typingResetTimer = null;
@@ -8181,6 +8208,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   function openFriendChat(friend) {
     if (!friend || !friend.id) return;
     if (socket) { try { socket.close(); } catch {} socket = null; }
+    stopContactPolling();
     currentProject = null;
     currentGroup = null;
     currentFriend = friend;
@@ -8195,17 +8223,14 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     lastChatTimelineMs = 0;
     applyContactChatChrome();
     renderGroupSummaryStrip(null, true);
-    loadFriendMessages(true).catch((e) => appendBubble('error', e.message || '加载好友消息失败'));
-    stopContactPolling();
-    friendPollTimer = setInterval(() => {
-      if (currentFriend) loadFriendMessages(false).catch(() => {});
-    }, 3000);
+    socialRecovery.open('friend', friend);
   }
 
   function openGroupChat(group) {
     if (!group || !group.id) return;
     groupMentions.close();
     if (socket) { try { socket.close(); } catch {} socket = null; }
+    stopContactPolling();
     currentProject = null;
     currentFriend = null;
     currentGroup = group;
@@ -8222,34 +8247,10 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     applyContactChatChrome();
     renderGroupSummaryLoading();
     loadGroupSummaryPosts(false).catch((e) => renderGroupSummaryError(e.message || '加载总结帖失败'));
-    loadGroupMessages(true).catch((e) => appendBubble('error', e.message || '加载群聊消息失败'));
-    stopContactPolling();
-    friendPollTimer = setInterval(() => {
-      if (currentGroup) loadGroupMessages(false).catch(() => {});
-    }, 3000);
+    socialRecovery.open('group', group);
   }
-
-  async function loadFriendMessages(scrollToBottom) {
-    if (!currentFriend) return;
-    const friend = currentFriend;
-    const res = await api('/api/me/friends/' + encodeURIComponent(friend.id) + '/messages?limit=120');
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || '加载好友消息失败');
-    if (!currentFriend || currentFriend.id !== friend.id) return;
-    renderContactMessages(data.messages || [], 'friend', friend, scrollToBottom);
-    await loadSocialChats();
-  }
-
-  async function loadGroupMessages(scrollToBottom) {
-    if (!currentGroup) return;
-    const group = currentGroup;
-    const res = await api('/api/me/groups/' + encodeURIComponent(group.id) + '/messages?limit=120');
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || '加载群聊消息失败');
-    if (!currentGroup || currentGroup.id !== group.id) return;
-    renderContactMessages(data.messages || [], 'group', group, scrollToBottom);
-    await loadSocialChats();
-  }
+  async function loadFriendMessages(scrollToBottom) { if (currentFriend) return socialRecovery.refresh(scrollToBottom); }
+  async function loadGroupMessages(scrollToBottom) { if (currentGroup) return socialRecovery.refresh(scrollToBottom); }
   function renderGroupSummaryLoading() {
     if (!groupSummaryStrip) return;
     groupSummaryStrip.classList.remove('hidden');
@@ -8412,94 +8413,11 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     document.body.appendChild(dlg);
   }
 
-  function renderContactMessages(messages, chatKind, contact, scrollToBottom) {
-    const previousScroll = chatList.scrollTop; chatList.innerHTML = '';
-    lastChatTimelineMs = 0;
-    if (chatKind === 'group') messages = window.ElonGroupMessageRevisions.reconcile(contact.id, messages);
-    messages.forEach((msg) => {
-      const outgoing = !!msg.outgoing;
-      const senderId = msg.sender_user_id || '';
-      const kind = outgoing ? 'user' : senderId === SOCIAL_AI_USER_ID ? 'ai' : 'friend';
-      const avatarSource = chatKind === 'friend'
-        ? contact
-        : (Array.isArray(contact.members)
-          ? contact.members.find((member) => member.id === senderId)
-          : null);
-      const recalled = !!(msg.recalled_at || msg.recalledAt);
-      const bubbleText = recalled
-        ? (outgoing ? '你撤回了一条消息' : (msg.sender_name ? `${msg.sender_name} 撤回了一条消息` : '对方撤回了一条消息'))
-        : (msg.content || '');
-      const bubble = appendBubble(kind, bubbleText, null, null, null, {
-        createdAtMs: parseServerTime(msg.created_at) || Date.now(),
-        mentionTarget: chatKind === 'group' && !outgoing && !recalled ? { id: senderId, display_name: senderId === SOCIAL_AI_USER_ID ? 'EL' : msg.sender_name } : null,
-        senderName: msg.sender_name || (chatKind === 'friend' ? friendDisplayName(contact) : ''),
-        avatarDataUrl: avatarSource && (avatarSource.avatar_data_url || avatarSource.avatarDataUrl),
-        avatarFallback: kind === 'user'
-          ? ((currentUser && (currentUser.nickname || currentUser.account)) || '我')
-          : (msg.sender_name || (chatKind === 'friend' ? friendDisplayName(contact) : groupDisplayName(contact))),
-      }); if (!recalled) window.ElonArticles.mount(bubble, bubbleText, api, currentUser?.id); if (chatKind === 'group') window.ElonGroupMessageRevisions.mount(bubble, contact.id, msg, api, () => currentGroup?.id === contact.id ? loadGroupMessages(false) : Promise.resolve());
-    });
-    if (scrollToBottom !== false) chatList.scrollTop = chatList.scrollHeight; else chatList.scrollTop = previousScroll;
-  }
-
-  async function sendFriendMessage(text) {
-    const friend = currentFriend;
-    if (!friend) return;
-    appendBubble('user', text, null, null, null, {
-      avatarFallback: (currentUser && (currentUser.nickname || currentUser.account)) || '我',
-    });
-    const res = await api('/api/me/friends/' + encodeURIComponent(friend.id) + '/messages', {
-      method: 'POST',
-      body: JSON.stringify({ content: text })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || '发送失败');
-    if (currentFriend && currentFriend.id === friend.id) await loadFriendMessages(true);
-  }
-
-  async function sendGroupMessage(text) {
-    const group = currentGroup;
-    if (!group) return;
-    appendBubble('user', text, null, null, null, {
-      avatarFallback: (currentUser && (currentUser.nickname || currentUser.account)) || '我',
-    });
-    const res = await api('/api/me/groups/' + encodeURIComponent(group.id) + '/messages', {
-      method: 'POST',
-      body: JSON.stringify({ content: text })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || '发送失败');
-    if (currentGroup && currentGroup.id === group.id) await loadGroupMessages(true);
-  }
-
-  async function loadFriends() {
-    const res = await api('/api/me/friends');
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || '加载好友失败');
-    friends = data.friends || [];
-    if (currentFriend) {
-      currentFriend = friends.find((item) => item.id === currentFriend.id) || currentFriend;
-    }
-  }
-
-  async function loadGroups() {
-    const res = await api('/api/me/groups');
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || '加载群聊失败');
-    groups = data.groups || [];
-    if (currentGroup) {
-      currentGroup = groups.find((item) => item.id === currentGroup.id) || currentGroup;
-    }
-  }
-
-  async function loadSocialChats() {
-    await Promise.all([
-      loadFriends().catch((e) => console.warn('loadFriends failed:', e)),
-      loadGroups().catch((e) => console.warn('loadGroups failed:', e)),
-    ]);
-    if (currentTab === 'chatPage' && !isAnyChatActive()) renderConversationList();
-    updateChatTabBadge();
-  }
+  async function sendFriendMessage(text) { if (currentFriend) return socialRecovery.send('friend', currentFriend, text); }
+  async function sendGroupMessage(text) { if (currentGroup) return socialRecovery.send('group', currentGroup, text); }
+  async function loadFriends() { return socialRecovery.directory('friends'); }
+  async function loadGroups() { return socialRecovery.directory('groups'); }
+  async function loadSocialChats() { return socialRecovery.directories(); }
 
   // ====== 4阶段进度更新 ======
   const STAGE_ELS = () => [stagePlanText, stageCodeText, stageBuildText, stageDeliverText];
@@ -9601,42 +9519,36 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     });
   }
 
+  let appSocketRetry = null;
   function connectAppSocket() {
+    clearTimeout(appSocketRetry);
     if (appSocket) { try { appSocket.close(); } catch {} appSocket = null; }
-    if (!token) return;
-    const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-    const url = scheme + '://' + location.host + '/ws/app?token=' + encodeURIComponent(token);
-    try {
-      appSocket = new WebSocket(url);
-    } catch (e) {
-      console.warn('app websocket failed:', e);
-      return;
-    }
-    appSocket.addEventListener('message', (ev) => {
-      let data = null;
-      try { data = JSON.parse(ev.data); } catch { return; }
-      handleAppEvent(data);
-    });
-    appSocket.addEventListener('close', () => {
-      if (!token) return;
-      setTimeout(() => {
-        if (token && (!appSocket || appSocket.readyState === WebSocket.CLOSED)) connectAppSocket();
-      }, 5000);
-    });
+    if (!token || document.visibilityState === 'hidden') return;
+    const identity = token, scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+    const retry = () => { if (token === identity) appSocketRetry = setTimeout(connectAppSocket, 5000); };
+    let channel;
+    try { channel = new WebSocket(scheme + '://' + location.host + '/ws/app?token=' + encodeURIComponent(identity)); appSocket = channel; }
+    catch { retry(); return; }
+    const current = () => appSocket === channel && token === identity;
+    const watchdog = setTimeout(() => { if (current() && channel.readyState === WebSocket.CONNECTING) channel.close(); }, 12000);
+    channel.addEventListener('open', () => { clearTimeout(watchdog); if (current()) { socialRecovery.refresh(); loadSocialChats(); } });
+    channel.addEventListener('message', event => { if (!current()) return; let data; try { data = JSON.parse(event.data); } catch { return; } handleAppEvent(data); });
+    channel.addEventListener('close', () => { clearTimeout(watchdog); if (current()) { appSocket = null; retry(); } });
+    channel.addEventListener('error', () => { if (current()) channel.close(); });
   }
 
   function handleAppEvent(data) {
     if (!data || !data.type) return;
-    if (data.type === 'group_message_edited') { if (currentGroup?.id === data.groupId) loadGroupMessages(false).catch(() => {}); return; }
+    if (data.type === 'group_message_edited') { socialRecovery.invalidate('group', data.groupId); if (currentGroup?.id === data.groupId) loadGroupMessages(false).catch(() => {}); return; }
     if (data.type === 'friend_message') {
       loadSocialChats().catch(() => {});
       if (currentFriend && data.fromUserId === currentFriend.id) {
-        loadFriendMessages(true).catch(() => {});
+        loadFriendMessages(false).catch(() => {});
       }
     } else if (data.type === 'group_message') {
       loadSocialChats().catch(() => {});
       if (currentGroup && data.groupId === currentGroup.id) {
-        loadGroupMessages(true).catch(() => {});
+        loadGroupMessages(false).catch(() => {});
       }
     } else if (data.type === 'presence') {
       loadSocialChats().catch(() => {});
@@ -9806,16 +9718,13 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
 
   // ====== 加载用户/项目 ======
   async function loadMe(expectedToken) {
-    const res = await api('/api/me');
-    if (res.status === 401 || res.status === 403) {
-      const err = new Error('登录已过期');
-      err.authFailed = true;
-      throw err;
-    }
-    if (!res.ok) throw new Error('加载用户信息失败：HTTP ' + res.status);
-    const data = await res.json();
+    let data;
+    try { data = await socialRecovery.json('/api/me'); }
+    catch (error) { if (expectedToken && expectedToken !== token) return false; throw error; }
     if (expectedToken && expectedToken !== token) return false;
     currentUser = data.user;
+    if (!currentUser?.id) throw new Error('用户信息格式不正确');
+    const identity = token; socialCache.profile(identity, currentUser, () => token === identity).catch(() => {});
     syncWebSideMenuUser();
     profileAuthActionText.textContent = '退出登录';
     const name = currentUser.nickname || currentUser.account || '用户';
@@ -11791,6 +11700,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     const name = (currentUser && (currentUser.nickname || currentUser.account)) || '';
     const msg = name ? `确定退出账号「${name}」？退出后仍可重新登录恢复项目。` : '确定退出当前账号吗？';
     if (!window.confirm(msg)) return;
+    socialRecovery.reset(); socialView.reset(); chatList.replaceChildren(); directoryStatus.hidden = true;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem('elon_token');
     token = '';
@@ -12136,19 +12046,19 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   async function boot() {
     const bootToken = token;
     if (!bootToken) { showLogin(); return; }
-    try {
-      if (!await loadMe(bootToken) || token !== bootToken) return;
-    } catch (err) {
+    const cachedUser = await socialCache.profile(bootToken).catch(() => null);
+    if (token !== bootToken) return;
+    if (cachedUser?.id) { currentUser = cachedUser; startSession(); }
+    try { if (!await loadMe(bootToken) || token !== bootToken) return; }
+    catch (error) {
       if (token !== bootToken) return;
-      if (err && err.authFailed) {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem('elon_token');
-        token = '';
-      }
-      setLoginError((err && err.message) ? err.message : '加载失败，请重试');
-      showLogin();
-      return;
+      if (error.authFailed) { expireSocialSession(); setLoginError('登录已过期，请重新登录'); return; }
+      if (cachedUser?.id) return;
+      setLoginError(error.message || '加载失败，请重试'); showLogin(); return;
     }
+    if (!cachedUser?.id) startSession();
+  }
+  function startSession() {
     showApp();
     const requestedTab = pageParams.get('tab');
     const shouldOpenNewProject = pageParams.get('newProject') === '1';
@@ -12158,7 +12068,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     } else {
       switchTab(requestedTab === 'profile' ? 'profilePage' : 'chatPage');
     }
-    connectAppSocket();
+    socialRecovery.wake();
     // 后续数据加载失败不踢回登录页，仅在控制台告警
     Promise.all([
       loadProjects().catch((e) => console.warn('loadProjects failed:', e)),
@@ -12167,6 +12077,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     ]).then(() => loadAgents()).catch((e) => console.warn('loadAgents failed:', e));
   }
   setAuthMode(pageParams.get('auth') === 'register' ? 'register' : 'login');
+  globalThis.yilongEskExchangeBridge = { api, isLoggedIn, reloadAsset: loadProfileEskAsset };
   boot();
 })();
 
@@ -12334,13 +12245,10 @@ if (window.visualViewport) {
 })();
 // ===== Service Worker 注册（离线缓存 / PWA 壳） =====
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((e) => {
-      console.warn('SW registration failed:', e);
-    });
+  navigator.serviceWorker.register('/sw.js').catch((e) => {
+    console.warn('SW registration failed:', e);
   });
 }
-globalThis.yilongEskExchangeBridge = { api, isLoggedIn, reloadAsset: loadProfileEskAsset };
 </script>
 <script src="/assets/esk_exchange.js"></script>
 <script src="/assets/project_plaza_cache.js"></script>

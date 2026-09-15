@@ -35,11 +35,16 @@ internal class MainFriendChatActions(
     private val onFriendSummariesChanged: () -> Unit,
     private val onActiveFriendChanged: (AppFriend?) -> Unit = {},
 ) {
+    private val reader = SocialChatReadChannel(activity, http, serverUrl) { key, rows ->
+        protectSocialChatRows(messagesByFriend[key.removePrefix("friend:")].orEmpty(), rows)
+    }
+    private var owner = AuthManager.userId(activity)
     private val messagesByFriend = linkedMapOf<String, MutableList<ChatMessage>>()
     private val pollHandler = Handler(Looper.getMainLooper())
     private var activeFriend: AppFriend? = null
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
+    private var foreground = true
 
     // 正在输入提示：3秒无新事件后自动隐藏
     private val typingHandler = Handler(Looper.getMainLooper())
@@ -74,6 +79,7 @@ internal class MainFriendChatActions(
     }
 
     fun openFriend(friend: AppFriend, animate: Boolean) {
+        ensureOwner(); foreground = true; reader.cancel()
         activeFriend = friend
         val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
         val adapter = createAdapter(messages)
@@ -84,6 +90,7 @@ internal class MainFriendChatActions(
             binding.chatList.jumpToLatestMessageBeforeNextDraw()
         }
         savedFriendTitle = friend.name
+        binding.inputEdit.removeTextChangedListener(typingWatcher)
         binding.inputEdit.addTextChangedListener(typingWatcher)
         showFriendChat(friend.name, animate)
         onActiveFriendChanged(friend)
@@ -92,6 +99,7 @@ internal class MainFriendChatActions(
     }
 
     fun closeFriendChat() {
+        showSocialChatStatus(binding, null)
         binding.inputEdit.removeTextChangedListener(typingWatcher)
         typingHandler.removeCallbacks(hideTypingRunnable)
         typingShowing = false
@@ -114,6 +122,8 @@ internal class MainFriendChatActions(
         .orEmpty()
 
     fun rebindCurrentFriend() {
+        foreground = true
+        if (!ensureOwner()) return
         val friend = activeFriend ?: return
         val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
         val adapter = createAdapter(messages)
@@ -125,6 +135,7 @@ internal class MainFriendChatActions(
         binding.inputEdit.removeTextChangedListener(typingWatcher)
         binding.inputEdit.addTextChangedListener(typingWatcher)
         if (messages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
+        loadMessages(friend, silent = true, scrollToBottom = false)
         startPolling()
     }
 
@@ -137,19 +148,25 @@ internal class MainFriendChatActions(
 
     fun clearCurrentMessages() {
         val friend = activeFriend ?: return
+        reader.invalidate("friend:${friend.id}")
         messagesByFriend[friend.id]?.clear()
         activeAdapter?.notifyDataSetChanged()
         onFriendSummariesChanged()
     }
 
     fun resumeIfActive() {
-        if (activeFriend != null) startPolling()
+        foreground = true
+        if (!ensureOwner()) return
+        val friend = activeFriend ?: return
+        reader.cancel()
+        loadMessages(friend, silent = false, scrollToBottom = false)
+        startPolling()
     }
 
     fun handleRealtimeMessage(fromUserId: String): Boolean {
         val friend = activeFriend ?: return false
         if (friend.id != fromUserId) return false
-        loadMessages(friend, silent = true, scrollToBottom = true, allowPendingRefresh = true)
+        loadMessages(friend, silent = true, scrollToBottom = false, allowPendingRefresh = true)
         return true
     }
 
@@ -186,6 +203,8 @@ internal class MainFriendChatActions(
     }
 
     fun stopPolling() {
+        foreground = false
+        reader.cancel()
         polling = false
         pollHandler.removeCallbacks(pollRunnable)
     }
@@ -218,25 +237,26 @@ internal class MainFriendChatActions(
         clearPendingAttachments()
         collapseInputComposer()
 
+        val sendingSession = socialSession(activity)
         thread {
             val result = runCatching {
                 val attachments = uploadFriendAttachments(friend, attachmentsToSend)
                 postMessage(friend, text, attachments)
             }
             activity.runOnUiThread {
-                if (activeFriend?.id != friend.id) return@runOnUiThread
+                if (sendingSession != socialSession(activity)) return@runOnUiThread
                 result.onSuccess { sentMessage ->
                     sentMessage.withMissingImageAnnotationsFrom(localAttachments)
-                    val index = messages.indexOf(pending)
-                    if (index >= 0) {
-                        messages[index] = sentMessage
-                        activeAdapter?.notifyMessageUpdated(index)
+                    completeSocialChatSend(messages, pending, sentMessage)
+                    reader.invalidate("friend:${friend.id}")
+                    if (activeFriend?.id == friend.id) {
+                        activeAdapter?.notifyDataSetChanged()
+                        loadMessages(friend, silent = true, scrollToBottom = true, allowPendingRefresh = true)
                     }
-                    loadMessages(friend, silent = true, scrollToBottom = true, allowPendingRefresh = true)
                 }.onFailure { error ->
                     pending.sendStatus = error.message ?: "发送失败"
                     val index = messages.indexOf(pending)
-                    if (index >= 0) activeAdapter?.notifyMessageUpdated(index)
+                    if (index >= 0 && activeFriend?.id == friend.id) activeAdapter?.notifyMessageUpdated(index)
                 }
             }
         }
@@ -261,23 +281,24 @@ internal class MainFriendChatActions(
         binding.chatList.scrollToPosition(messages.lastIndex)
         collapseInputComposer()
 
+        val sendingSession = socialSession(activity)
         thread {
             val result = runCatching {
                 postMessage(friend, text, chatAttachmentRefsFromChatAttachments(attachments))
             }
             activity.runOnUiThread {
-                if (activeFriend?.id != friend.id) return@runOnUiThread
+                if (sendingSession != socialSession(activity)) return@runOnUiThread
                 result.onSuccess { sentMessage ->
-                    val index = messages.indexOf(pending)
-                    if (index >= 0) {
-                        messages[index] = sentMessage
-                        activeAdapter?.notifyMessageUpdated(index)
+                    completeSocialChatSend(messages, pending, sentMessage)
+                    reader.invalidate("friend:${friend.id}")
+                    if (activeFriend?.id == friend.id) {
+                        activeAdapter?.notifyDataSetChanged()
+                        loadMessages(friend, silent = true, scrollToBottom = true, allowPendingRefresh = true)
                     }
-                    loadMessages(friend, silent = true, scrollToBottom = true, allowPendingRefresh = true)
                 }.onFailure { error ->
                     pending.sendStatus = error.message ?: "发送失败"
                     val index = messages.indexOf(pending)
-                    if (index >= 0) activeAdapter?.notifyMessageUpdated(index)
+                    if (index >= 0 && activeFriend?.id == friend.id) activeAdapter?.notifyMessageUpdated(index)
                 }
             }
         }
@@ -337,6 +358,7 @@ internal class MainFriendChatActions(
                         val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
                         val index = messages.indexOfFirst { it.id == messageId }
                         if (index >= 0) {
+                            reader.invalidate("friend:${friend.id}")
                             markMessageRecalled(messages[index])
                             activeAdapter?.notifyMessageUpdated(index)
                         }
@@ -390,59 +412,36 @@ internal class MainFriendChatActions(
         scrollToBottom: Boolean,
         allowPendingRefresh: Boolean = false
     ) {
+        if (!foreground || !ensureOwner() || activeFriend?.id != friend.id) return
         val currentMessages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
-        if (!allowPendingRefresh && currentMessages.any { it.sendStatus == SENDING_STATUS }) return
-        thread {
-            val result = runCatching { fetchMessages(friend) }
-            activity.runOnUiThread {
-                if (activeFriend?.id != friend.id) return@runOnUiThread
-                result.onSuccess { remoteMessages ->
-                    val mergedMessages = remoteMessages.withMissingImageAnnotationsFromCurrent(currentMessages)
-                    val changed = currentMessages.size != mergedMessages.size ||
-                        currentMessages.zip(mergedMessages).any { (current, incoming) ->
-                            current.role != incoming.role ||
-                                current.content != incoming.content ||
-                                current.senderAvatarDataUrl != incoming.senderAvatarDataUrl ||
-                                current.attachments != incoming.attachments ||
-                                current.recalledAt != incoming.recalledAt ||
-                                current.recalledBy != incoming.recalledBy
-                    }
-                    currentMessages.clear()
-                    currentMessages.addAll(mergedMessages)
-                    if (scrollToBottom && currentMessages.isNotEmpty()) {
-                        binding.chatList.jumpToLatestMessageBeforeNextDraw()
-                    }
-                    if (changed) activeAdapter?.notifyDataSetChanged()
-                    if (changed || !silent || allowPendingRefresh) {
-                        onFriendSummariesChanged()
-                    }
-                }.onFailure { error ->
-                    if (!silent) Toast.makeText(
-                        activity,
-                        error.message ?: "加载好友消息失败",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
+        fun apply(rows: JSONArray) {
+            val remote = List(rows.length()) { friendMessageFromJson(friend, rows.getJSONObject(it)) }
+            val merged = mergeSocialChatMessages(currentMessages, remote.withMissingImageAnnotationsFromCurrent(currentMessages))
+            val changed = currentMessages != merged
+            val follow = scrollToBottom || !binding.chatList.canScrollVertically(1)
+            currentMessages.clear(); currentMessages.addAll(merged)
+
+            if (changed) activeAdapter?.notifyDataSetChanged()
+            if (follow && changed && currentMessages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
+            showSocialChatStatus(binding, if (currentMessages.isEmpty()) "还没有消息" else null)
+            if (changed || !silent || allowPendingRefresh) onFriendSummariesChanged()
         }
+        if (currentMessages.isEmpty()) showSocialChatStatus(binding, "正在同步好友消息…")
+        reader.read("friend:${friend.id}", "/api/me/friends/${urlPart(friend.id)}/messages?limit=120&preserve_unread=false", "messages",
+            hydrate = currentMessages.isEmpty(), cached = { if (it.length() > 0) apply(it) }, value = ::apply,
+            error = { failure ->
+                if (failure.socialAccessDenied()) { currentMessages.clear(); activeAdapter?.notifyDataSetChanged() }
+                if (currentMessages.isEmpty()) showSocialChatStatus(binding, "${if (failure.socialAccessDenied()) "无法访问此会话，请检查账号或成员权限" else "同步暂时失败"}\n点击重试") { loadMessages(friend, false, false) }
+                else if (!silent) Toast.makeText(activity, "同步暂时失败，已保留现有消息，将自动重试", Toast.LENGTH_SHORT).show()
+            })
     }
 
-    private fun fetchMessages(friend: AppFriend): List<ChatMessage> {
-        val request = AuthManager.applyAuth(
-            activity,
-            Request.Builder()
-                .url("$serverUrl/api/me/friends/${urlPart(friend.id)}/messages?limit=120")
-                .get()
-        ).build()
-        http.newCall(request).execute().use { response ->
-            val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) error(readErrorMessage(body, "加载好友消息失败"))
-            val array = JSONObject(body).optJSONArray("messages") ?: JSONArray()
-            return List(array.length()) { index ->
-                val json = array.optJSONObject(index) ?: JSONObject()
-                friendMessageFromJson(friend, json)
-            }
-        }
+    private fun ensureOwner(): Boolean {
+        val next = AuthManager.userId(activity)
+        if (owner == next) return true
+        messagesByFriend.values.forEach { it.clear() }; messagesByFriend.clear()
+        activeAdapter?.notifyDataSetChanged(); closeFriendChat(); owner = next
+        return false
     }
 
     private fun uploadFriendAttachments(

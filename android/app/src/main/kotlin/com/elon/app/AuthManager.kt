@@ -111,6 +111,7 @@ object AuthManager {
             remove(KEY_AUTH_NICKNAME)
             remove(KEY_AUTH_EXPIRES_AT)
         }.apply()
+        SocialChatSnapshotStore.clear(ctx)
         refreshGlobalWsAuth(ctx)
     }
 
