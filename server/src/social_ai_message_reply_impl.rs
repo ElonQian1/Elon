@@ -1,4 +1,5 @@
 use super::*;
+use crate::store::social_ai_messages::requests::work::GroupWorkAiOptions;
 
 pub(super) async fn reply_to_selected_friend_message(
     state: Arc<AppState>,
@@ -17,6 +18,7 @@ pub(super) async fn reply_to_selected_friend_message(
         &history,
         &selected,
         &selected_message_id,
+        None,
         None,
         None,
     )
@@ -38,6 +40,7 @@ pub(super) async fn reply_to_selected_group_message(
     selected: SocialAiHistoryMessage,
     request_id: &str,
 ) -> Result<()> {
+    let options = state.store.group_work_ai_options(&user_id, request_id)?;
     let history = state
         .store
         .list_recent_group_messages_for_social_ai(&user_id, &group_id, 50)?;
@@ -70,6 +73,7 @@ pub(super) async fn reply_to_selected_group_message(
         &selected_message_id,
         external_context.as_ref(),
         external_tool_results.as_ref(),
+        options.as_ref(),
     )
     .await;
     let message = state
@@ -100,6 +104,7 @@ pub(super) async fn selected_reply_or_fallback(
     selected_message_id: &str,
     external_context: Option<&Value>,
     external_tool_results: Option<&Value>,
+    work_options: Option<&GroupWorkAiOptions>,
 ) -> String {
     match build_selected_reply(
         state,
@@ -110,6 +115,7 @@ pub(super) async fn selected_reply_or_fallback(
         selected_message_id,
         external_context,
         external_tool_results,
+        work_options,
     )
     .await
     {
@@ -130,6 +136,7 @@ pub(super) async fn build_selected_reply(
     selected_message_id: &str,
     external_context: Option<&Value>,
     external_tool_results: Option<&Value>,
+    work_options: Option<&GroupWorkAiOptions>,
 ) -> Result<String> {
     let selected_content = selected.content.trim();
     if selected_content.is_empty() {
@@ -146,7 +153,7 @@ pub(super) async fn build_selected_reply(
     } else {
         format!("\n\n{}", external_context_block)
     };
-    let response = crate::social_ai_agents::call_social_chat_llm_with_fallback(
+    let response = crate::social_ai_agents::call_group_configured_llm(
         state,
         &[
             json!({
@@ -169,6 +176,7 @@ pub(super) async fn build_selected_reply(
         ],
         user_id,
         "social_ai_selected",
+        work_options,
     )
     .await?;
     let reply = response["choices"][0]["message"]["content"]

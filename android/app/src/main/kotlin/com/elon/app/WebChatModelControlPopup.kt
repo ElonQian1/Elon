@@ -36,6 +36,7 @@ internal object WebChatModelControlPopup {
         onOptionSelected: (WebChatConsumerOption) -> Unit,
         onProviderSwitch: () -> Unit,
         onDismissed: () -> Unit,
+        providerSwitchLabel: String = "切换网页 AI",
     ): WebChatModelControlPopupHandle? {
         if (activity.isFinishing || activity.isDestroyed || !anchor.isAttachedToWindow) return null
         val renderer = WebChatModelControlPopupRenderer(
@@ -44,6 +45,7 @@ internal object WebChatModelControlPopup {
             onOptionSelected = onOptionSelected,
             onProviderSwitch = onProviderSwitch,
             onDismissed = onDismissed,
+            providerSwitchLabel = providerSwitchLabel,
         )
         renderer.show(options, currentModel)
         return WebChatModelControlPopupHandle(renderer)
@@ -56,6 +58,7 @@ internal class WebChatModelControlPopupRenderer(
     private val onOptionSelected: (WebChatConsumerOption) -> Unit,
     private val onProviderSwitch: () -> Unit,
     private val onDismissed: () -> Unit,
+    private val providerSwitchLabel: String = "切换网页 AI",
 ) {
     private val popupWidth = dp(280)
     private val panel = LinearLayout(activity).apply {
@@ -131,7 +134,7 @@ internal class WebChatModelControlPopupRenderer(
         }
         panel.addView(divider())
         panel.addView(actionRow(
-            label = "切换网页 AI",
+            label = providerSwitchLabel,
             selector = PROVIDER_SWITCH_SELECTOR,
             showChevron = true,
         ) {

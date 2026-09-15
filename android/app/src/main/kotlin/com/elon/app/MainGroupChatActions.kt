@@ -150,6 +150,10 @@ internal class MainGroupChatActions(
     fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>, webAiConfirmed: Boolean = false,
         configuration: GroupAiConfiguration = aiComposer.configuration()): Boolean {
         val group = activeGroup ?: return false
+        if (!configuration.usesWebAi && GroupWebAiFeature.mentionsAi(rawText) && !webAiConfirmed) {
+            if (webAi.beginWork()) trySendMessage(rawText, pendingAttachments, true, configuration)
+            return true
+        }
         if (configuration.usesWebAi && GroupWebAiFeature.mentionsAi(rawText) && !webAiConfirmed) {
             webAi.confirm(group) {
                 if (activeGroup?.id == group.id && binding.inputEdit.text.toString().trim() == rawText.trim()) trySendMessage(rawText, pendingAttachments, true, configuration)
@@ -205,6 +209,10 @@ internal class MainGroupChatActions(
     fun trySendForwardedMessage(source: ChatMessage, webAiConfirmed: Boolean = false,
         configuration: GroupAiConfiguration = aiComposer.configuration()): Boolean {
         val group = activeGroup ?: return false
+        if (!configuration.usesWebAi && GroupWebAiFeature.mentionsAi(source.content) && !webAiConfirmed) {
+            if (webAi.beginWork()) trySendForwardedMessage(source, true, configuration)
+            return true
+        }
         if (configuration.usesWebAi && GroupWebAiFeature.mentionsAi(source.content) && !webAiConfirmed) {
             webAi.confirm(group) {
                 if (activeGroup?.id == group.id) trySendForwardedMessage(source, true, configuration)
@@ -265,7 +273,7 @@ internal class MainGroupChatActions(
         }
         val configuration = aiComposer.configuration()
         if (configuration.usesWebAi) webAi.prepare(group, messageId, configuration)
-        else webAi.prepareWork(group, messageId)
+        else webAi.prepareWork(group, messageId, configuration)
     }
 
     fun deleteCurrentMessage(message: ChatMessage, onDeleted: () -> Unit) {

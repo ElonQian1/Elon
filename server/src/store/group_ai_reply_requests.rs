@@ -7,6 +7,8 @@ use super::super::{new_id, now, FriendGroupMessage, Store, SOCIAL_AI_USER_ID};
 use super::{ensure_social_ai_user, SOCIAL_AI_DISPLAY_NAME};
 #[path = "group_web_ai_requests.rs"]
 pub(crate) mod web;
+#[path = "group_work_ai_options.rs"]
+pub(crate) mod work;
 
 pub(crate) fn migrate(conn: &Connection) -> Result<()> {
     conn.execute_batch(

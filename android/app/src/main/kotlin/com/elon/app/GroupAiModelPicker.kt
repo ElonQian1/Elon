@@ -38,7 +38,8 @@ internal class GroupAiModelPicker(
     fun show() {
         displayed = cached()
         popup = WebChatModelControlPopup.show(activity, anchor, marked(displayed), configuration.label,
-            onOptionSelected = ::choose, onProviderSwitch = switchProvider, onDismissed = ::close)
+            onOptionSelected = ::choose, onProviderSwitch = switchProvider, onDismissed = ::close,
+            providerSwitchLabel = "切换 AI")
         if (popup == null) return
         handler.postDelayed(deadline, 40_000)
         runCatching { session = GroupWebAiSession(activity, ::event, ::unavailable).also { it.start() } }

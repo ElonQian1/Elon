@@ -6,6 +6,31 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class GroupAiConfigurationTest {
+    @Test fun workAndWebSettingsSurviveIndependentEngineSwitches() {
+        val web = GroupAiConfiguration(modelPath = listOf(GroupAiModelChoice("高", rangeIndex = 2, rangeCount = 4)))
+        val work = web.copy(engine = GroupAiEngine.WORK, work = GroupWorkAiConfiguration("work-b", "Model B", false))
+        val restored = GroupAiConfigurationStore.decode(GroupAiConfigurationStore.encode(work))
+        assertEquals(work, restored)
+        assertEquals("Model B", restored.label)
+        assertEquals("高", restored.copy(engine = GroupAiEngine.CHATGPT).label)
+        assertEquals("work-b", restored.work.request().getString("agent"))
+        assertFalse(restored.work.request().getBoolean("allow_fallback"))
+        assertEquals(setOf("agent", "allow_fallback"), restored.work.request().keys().asSequence().toSet())
+    }
+
+    @Test fun legacyGroupConfigGetsWorkDefaultsWithoutLosingWebLevels() {
+        val restored = GroupAiConfigurationStore.decode(JSONObject("""{"engine":"CHATGPT","model_path":[{"label":"高"}]}"""))
+        assertEquals("高", restored.label)
+        assertNull(restored.work.agent)
+        assertTrue(restored.work.allowFallback)
+        assertTrue(restored.work.request().isNull("agent"))
+    }
+
+    @Test fun workModelCatalogIsBoundedAndDeduplicated() {
+        val rows = org.json.JSONArray("""[{"id":"a","label":"Model A","model":"v1"},{"id":"a","label":"duplicate"},{"id":""},null]""")
+        assertEquals(listOf(GroupWorkAiModel("a", "Model A", "v1")), GroupWorkAiModel.parse(rows))
+    }
+
     @Test fun configurationRoundTripAndScopeAreIndependent() {
         val config = GroupAiConfiguration(GroupAiEngine.WORK,
             listOf(GroupAiModelChoice("高级", true), GroupAiModelChoice("高", rangeIndex = 2, rangeCount = 4)))

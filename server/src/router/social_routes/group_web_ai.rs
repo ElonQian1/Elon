@@ -1,3 +1,4 @@
+use crate::store::social_ai_messages::requests::work::GroupWorkAiOptions;
 use crate::{
     project_auth::{auth_from_headers, json_error},
     project_ws_protocol::ProjectAttachmentRef,
@@ -24,6 +25,29 @@ pub(super) struct ActionRequest {
     #[serde(default)]
     action: String,
     content: Option<String>,
+    work_options: Option<GroupWorkAiOptions>,
+}
+
+pub(super) async fn work_models(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(group): Path<String>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(v) => v,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    if state
+        .store
+        .friend_group_member_ids(&user.id, &group)
+        .is_err()
+    {
+        return json_error(StatusCode::FORBIDDEN, "无法访问当前群聊");
+    }
+    let agents = crate::agent_fallback::server_api_agents_in_fallback_order(&state).await;
+    Json(serde_json::json!({"schema":1,"models":agents.iter().map(|a|
+        serde_json::json!({"id":a.name,"label":a.name,"model":a.model})).collect::<Vec<_>>()}))
+    .into_response()
 }
 
 pub(super) async fn send(
@@ -82,7 +106,24 @@ pub(super) async fn action(
         Ok(v) => v,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
+    if req.action == "work" {
+        let Some(options) = req.work_options.as_ref() else {
+            return json_error(StatusCode::BAD_REQUEST, "缺少工作 AI 设置");
+        };
+        if let Err(e) = crate::social_ai_agents::resolve_group_work_agent(&state, options).await {
+            return json_error(StatusCode::CONFLICT, e.to_string());
+        }
+    }
     let result = (|| -> anyhow::Result<_> {
+        if req.action == "work" {
+            return state.store.activate_group_work_ai(
+                &user.id,
+                &group,
+                &id,
+                &req.operation_id,
+                req.work_options.as_ref().expect("validated work options"),
+            );
+        }
         if req.action == "complete" {
             let current = state.store.group_web_ai_action(
                 &user.id,
@@ -121,7 +162,8 @@ pub(super) async fn action(
     })();
     match result {
         Ok(request) => {
-            if req.action == "fallback" && request.state == "server_ready" {
+            if matches!(req.action.as_str(), "fallback" | "work") && request.state == "server_ready"
+            {
                 if let Err(e) = crate::social_ai_message_reply::spawn_group_reply_for_message(
                     state.clone(),
                     user.id.clone(),

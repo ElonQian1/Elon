@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
 
+use crate::store::social_ai_messages::requests::work::GroupWorkAiOptions;
 use crate::{
     friend_events,
     store::{SocialAiHistoryMessage, SocialAiPendingMention, SOCIAL_AI_USER_ID},
@@ -253,7 +254,7 @@ async fn reply_to_friend(state: Arc<AppState>, user_id: String, friend_id: Strin
         return Ok(());
     }
     let reply =
-        social_ai_reply_or_fallback(&state, &user_id, "好友聊天", &history, None, None).await;
+        social_ai_reply_or_fallback(&state, &user_id, "好友聊天", &history, None, None, None).await;
     let messages = state
         .store
         .insert_friend_social_ai_reply(&user_id, &friend_id, &reply)?;
@@ -282,6 +283,7 @@ async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result
         &history,
         None,
         None,
+        None,
     )
     .await;
     let message = state
@@ -297,6 +299,7 @@ async fn reply_to_group(
     group_id: String,
     request_id: &str,
 ) -> Result<()> {
+    let options = state.store.group_work_ai_options(&user_id, request_id)?;
     let history = state
         .store
         .list_recent_group_messages_for_social_ai(&user_id, &group_id, 50)?;
@@ -333,6 +336,7 @@ async fn reply_to_group(
             &history,
             external_context.as_ref(),
             external_tool_results.as_ref(),
+            options.as_ref(),
         )
         .await;
         feedback_context = external_context;
@@ -365,6 +369,7 @@ async fn social_ai_reply_or_fallback(
     history: &[SocialAiHistoryMessage],
     external_context: Option<&Value>,
     external_tool_results: Option<&Value>,
+    work_options: Option<&GroupWorkAiOptions>,
 ) -> String {
     match build_reply(
         state,
@@ -373,6 +378,7 @@ async fn social_ai_reply_or_fallback(
         history,
         external_context,
         external_tool_results,
+        work_options,
     )
     .await
     {

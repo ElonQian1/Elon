@@ -13,6 +13,7 @@ mod group_members;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
+    .route("/api/me/groups/:group_id/ai/work-models", get(group_web_ai::work_models))
     .route("/api/me/groups/:group_id/web-ai/messages", post(group_web_ai::send))
     .route("/api/me/groups/:group_id/messages/:message_id/web-ai", post(group_web_ai::prepare))
     .route("/api/me/groups/:group_id/web-ai/requests/:request_id", post(group_web_ai::action))

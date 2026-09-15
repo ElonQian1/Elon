@@ -47,7 +47,17 @@ internal class GroupWebAiFeature(
 
     fun release() { busy = false }
 
+    fun beginWork(): Boolean {
+        if (busy) { toast("群聊 AI 正在处理，请稍候"); return false }
+        busy = true
+        return true
+    }
+
     fun prepare(group: AppGroup, messageId: String, configuration: GroupAiConfiguration = GroupAiConfiguration()) = confirm(group) {
+        prepareRequest(group, messageId, configuration)
+    }
+
+    private fun prepareRequest(group: AppGroup, messageId: String, configuration: GroupAiConfiguration) {
         val operation = UUID.randomUUID().toString()
         val owner = userId()
         thread {
@@ -72,26 +82,13 @@ internal class GroupWebAiFeature(
         return response.getJSONObject("message")
     }
 
-    fun prepareWork(group: AppGroup, messageId: String) {
-        if (busy) { toast("群聊 AI 正在处理，请稍候"); return }
-        busy = true
-        val owner = userId()
-        thread {
-            val result = runCatching {
-                check(owner == userId())
-                post("${base(group.id)}/messages/${part(messageId)}/ai-reply", JSONObject())
-            }
-            activity.runOnUiThread {
-                release()
-                if (owner != userId()) return@runOnUiThread
-                toast(if (result.isSuccess) "工作 AI 正在回复" else "请求未确认，请先查看群消息，勿重复发送")
-                refresh(group.id)
-            }
-        }
+    fun prepareWork(group: AppGroup, messageId: String, configuration: GroupAiConfiguration) {
+        if (beginWork()) prepareRequest(group, messageId, configuration)
     }
 
     private fun execute(request: JSONObject, operation: String, owner: String, configuration: GroupAiConfiguration) {
         if (activity.isDestroyed || userId() != owner) { release(); return }
+        if (!configuration.usesWebAi) { executeWork(request, operation, owner, configuration.work); return }
         busy = true
         progress = Snackbar.make(root, "ChatGPT 正在处理群聊回复", Snackbar.LENGTH_INDEFINITE)
             .setAction("取消") { executor?.cancel() }.also { it.show() }
@@ -145,6 +142,22 @@ internal class GroupWebAiFeature(
         val pending = preferences.getString(pendingKey(owner), null)?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return
         busy = true
         deliver(pending, owner)
+    }
+
+    private fun executeWork(request: JSONObject, operation: String, owner: String, options: GroupWorkAiConfiguration) {
+        thread {
+            val result = runCatching {
+                check(userId() == owner)
+                post("${base(request.getString("group_id"))}/web-ai/requests/${part(request.getString("id"))}",
+                    JSONObject().put("operation_id", operation).put("action", "work").put("work_options", options.request()))
+            }
+            activity.runOnUiThread {
+                release()
+                if (userId() != owner || activity.isDestroyed) return@runOnUiThread
+                toast(if (result.isSuccess) "工作 AI 正在回复" else "工作 AI 请求未确认，请先查看群消息或检查模型设置，勿重复发送")
+                refresh(request.getString("group_id"))
+            }
+        }
     }
 
     private fun deliver(pending: JSONObject, owner: String) {

@@ -20,8 +20,9 @@ internal data class GroupAiModelChoice(
 internal data class GroupAiConfiguration(
     val engine: GroupAiEngine = GroupAiEngine.CHATGPT,
     val modelPath: List<GroupAiModelChoice> = emptyList(),
+    val work: GroupWorkAiConfiguration = GroupWorkAiConfiguration(),
 ) {
-    val label: String get() = if (engine == GroupAiEngine.WORK) engine.label
+    val label: String get() = if (engine == GroupAiEngine.WORK) work.label
         else modelPath.lastOrNull()?.label?.let(WebChatModelControlPolicy::compactLabel) ?: "默认"
     val usesWebAi: Boolean get() = engine == GroupAiEngine.CHATGPT
 }
@@ -38,6 +39,17 @@ internal class GroupAiConfigurationStore(context: Context, server: String, owner
     fun save(group: String, config: GroupAiConfiguration) {
         prefs.edit().putString("$scope:${key(group)}", encode(config).toString()).apply()
     }
+
+    fun workModels(): List<GroupWorkAiModel> = runCatching {
+        GroupWorkAiModel.parse(JSONArray(prefs.getString("$scope:work_models", "[]")))
+    }.getOrDefault(emptyList())
+
+    fun saveWorkModels(models: List<GroupWorkAiModel>) {
+        prefs.edit().putString("$scope:work_models", JSONArray(models.map { it.stored() }).toString())
+            .putLong("$scope:work_models_synced", System.currentTimeMillis()).apply()
+    }
+
+    fun workModelsFresh(): Boolean = (System.currentTimeMillis() - prefs.getLong("$scope:work_models_synced", 0)) in 0..300_000
 
     fun catalog(): WebChatProductionInteractionCache = WebChatProductionInteractionCache(
         object : WebChatProductionInteractionSnapshotStorage {
@@ -56,6 +68,7 @@ internal class GroupAiConfigurationStore(context: Context, server: String, owner
             .digest(JSONArray(values.toList()).toString().toByteArray()).joinToString("") { "%02x".format(it) }
 
         fun encode(config: GroupAiConfiguration) = JSONObject().put("engine", config.engine.name)
+            .put("work", config.work.stored())
             .put("model_path", JSONArray().apply {
                 config.modelPath.take(6).forEach { choice ->
                     put(JSONObject().put("label", choice.label).put("submenu", choice.submenu)
@@ -76,6 +89,7 @@ internal class GroupAiConfigurationStore(context: Context, server: String, owner
             return GroupAiConfiguration(
                 GroupAiEngine.entries.firstOrNull { it.name == json.optString("engine") } ?: GroupAiEngine.CHATGPT,
                 choices,
+                GroupWorkAiConfiguration.decode(json.optJSONObject("work")),
             )
         }
     }

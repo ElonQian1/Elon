@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.view.View
+import android.app.Dialog
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -22,7 +23,8 @@ internal class GroupAiComposer(
     private var store: GroupAiConfigurationStore? = null
     private var config = GroupAiConfiguration()
     private var picker: GroupAiModelPicker? = null
-    private var menu: AlertDialog? = null
+    private var menu: Dialog? = null
+    private var workSettings: GroupWorkAiSettings? = null
     private var account = ""
     private var previousWidth = 0
     private var previousPlanVisibility = View.VISIBLE
@@ -33,6 +35,7 @@ internal class GroupAiComposer(
 
     fun open(id: String) {
         picker?.close()
+        workSettings?.close()
         menu?.dismiss()
         if (group == null) {
             previousWidth = views()?.modelButtonShell?.layoutParams?.width ?: dp(142)
@@ -77,10 +80,14 @@ internal class GroupAiComposer(
     private fun showSettings() {
         if (!valid()) return
         picker?.close()
+        workSettings?.close()
         val ui = views() ?: return
         if (!config.usesWebAi) {
-            menu = AlertDialog.Builder(activity).setTitle("工作 AI · 群聊默认配置")
-                .setItems(arrayOf("切换网页 AI")) { _, _ -> showProviders() }.show()
+            val expectedGroup = requireNotNull(group)
+            val expectedAccount = account
+            workSettings = GroupWorkAiSettings(activity, server, expectedGroup, requireNotNull(store),
+                current = { config.work }, valid = { valid() && group == expectedGroup && account == expectedAccount },
+                save = { save(config.copy(work = it)) }, switchAi = ::showProviders).also { it.show() }
             return
         }
         val expectedGroup = group
@@ -93,19 +100,28 @@ internal class GroupAiComposer(
     private fun showProviders() {
         if (!valid()) return
         val expectedGroup = group
-        menu = AlertDialog.Builder(activity).setTitle("切换 AI")
-            .setSingleChoiceItems(GroupAiEngine.entries.map { it.label }.toTypedArray(), config.engine.ordinal) { dialog, index ->
-                dialog.dismiss()
-                if (group != expectedGroup || !valid()) return@setSingleChoiceItems
-                val engine = GroupAiEngine.entries[index]
+        val expectedAccount = account
+        menu = ChatAiChoiceSheet.show(activity, "切换 AI", listOf(
+            ChatAiChoice(GroupAiEngine.CHATGPT.name, "ChatGPT", "模型与档位", R.drawable.ic_web_ai_chatgpt_avatar,
+                config.usesWebAi, "group-ai-provider:CHATGPT"),
+            ChatAiChoice(GroupAiEngine.WORK.name, "工作 AI", config.work.label, R.drawable.ic_msg_ai_reply,
+                !config.usesWebAi, "group-ai-provider:WORK")), onSelected = { id ->
+                if (group != expectedGroup || account != expectedAccount || !valid()) return@show
+                val engine = GroupAiEngine.valueOf(id)
                 if (engine == GroupAiEngine.WORK && config.engine != engine) {
                     menu = AlertDialog.Builder(activity).setTitle("使用工作 AI")
-                        .setMessage("群聊 AI 回复将使用原有服务端模型，可能计费。只改变这个群的 AI 通道。")
+                        .setMessage("群聊 AI 回复将使用所选服务端模型，可能计费。只改变这个群的 AI 通道。")
                         .setNegativeButton("取消", null).setPositiveButton("切换") { _, _ ->
-                            if (group == expectedGroup) save(config.copy(engine = engine))
+                            if (group == expectedGroup && account == expectedAccount && valid()) {
+                                save(config.copy(engine = engine))
+                                showSettings()
+                            }
                         }.show()
-                } else save(config.copy(engine = engine))
-            }.show()
+                } else {
+                    save(config.copy(engine = engine))
+                    showSettings()
+                }
+            })?.dialog
     }
 
     fun close() {
@@ -113,6 +129,8 @@ internal class GroupAiComposer(
         group = null
         picker?.close()
         picker = null
+        workSettings?.close()
+        workSettings = null
         menu?.dismiss()
         menu = null
         views()?.let { ui ->
@@ -128,7 +146,7 @@ internal class GroupAiComposer(
         refreshComposer()
     }
 
-    override fun onStop(owner: LifecycleOwner) { picker?.close(); menu?.dismiss() }
+    override fun onStop(owner: LifecycleOwner) { picker?.close(); workSettings?.close(); menu?.dismiss() }
     override fun onDestroy(owner: LifecycleOwner) { close() }
     private fun dp(value: Int) = (value * activity.resources.displayMetrics.density).toInt()
 

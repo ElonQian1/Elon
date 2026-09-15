@@ -27,6 +27,7 @@ pub(super) async fn build_reply(
     history: &[SocialAiHistoryMessage],
     external_context: Option<&Value>,
     external_tool_results: Option<&Value>,
+    work_options: Option<&crate::store::social_ai_messages::requests::work::GroupWorkAiOptions>,
 ) -> Result<String> {
     if history.is_empty() {
         return Ok(if scene == DIRECT_SOCIAL_AI_SCENE {
@@ -54,7 +55,7 @@ pub(super) async fn build_reply(
         },
     );
 
-    match crate::social_ai_agents::call_social_chat_llm_with_fallback(
+    match crate::social_ai_agents::call_group_configured_llm(
         state,
         &[
             json!({ "role": "system", "content": social_ai_prompt() }),
@@ -62,6 +63,7 @@ pub(super) async fn build_reply(
         ],
         user_id,
         "social_ai",
+        work_options,
     )
     .await
     {
@@ -94,7 +96,7 @@ pub(super) async fn build_reply(
                 external_tool_results,
             ))
         }
-        Err(api_err) if state.ai_cli.enabled => {
+        Err(api_err) if state.ai_cli.enabled && work_options.is_none() => {
             info!("social AI 无 API 代理，回退到本地 CLI: {}", api_err);
             build_reply_with_cli(state, user_id, &prompt_text).await
         }
