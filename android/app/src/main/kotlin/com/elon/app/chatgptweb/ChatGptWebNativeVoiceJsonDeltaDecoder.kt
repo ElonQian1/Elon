@@ -3,6 +3,13 @@ package com.elon.app.chatgptweb
 import org.json.JSONArray
 import org.json.JSONObject
 
+internal data class ChatGptWebNativeVoiceDeltaDiagnostics(
+    val rejectedCount: Int = 0,
+    val highestChannel: Int? = null,
+    val cachedChannels: Int = 0,
+    val lastRejection: String? = null,
+)
+
 /** Reconstructs the bounded JSON delta stream used by ChatGPT Web voice messages. */
 internal class ChatGptWebNativeVoiceJsonDeltaDecoder {
     private data class Delta(
@@ -14,6 +21,9 @@ internal class ChatGptWebNativeVoiceJsonDeltaDecoder {
     )
 
     private val valuesByChannel = LinkedHashMap<Int, Any?>()
+    private var rejectedCount = 0
+    private var highestChannel: Int? = null
+    private var lastRejection: String? = null
     private var previous = Delta(
         channel = 0,
         path = "",
@@ -23,25 +33,49 @@ internal class ChatGptWebNativeVoiceJsonDeltaDecoder {
     )
 
     fun apply(encoded: JSONObject): Any? {
-        val decoded = decode(encoded) ?: return null
+        val decoded = decode(encoded) ?: return reject("invalid_delta")
+        highestChannel = maxOf(highestChannel ?: decoded.channel, decoded.channel)
         previous = decoded
-        if (decoded.channel !in 0 until MAX_CHANNELS) return null
+        // Channels are provider identifiers, not indexes into our bounded cache.
+        if (decoded.channel !in valuesByChannel &&
+            !(decoded.path.isEmpty() && decoded.operation in setOf(OP_ADD, OP_REPLACE))) {
+            return reject("missing_channel_base")
+        }
         val holder = JSONObject().put(ROOT_KEY, copyJson(valuesByChannel[decoded.channel]))
-        if (!applyAtPath(holder, decoded.path, decoded)) return null
+        if (!applyAtPath(holder, decoded.path, decoded)) return reject("invalid_patch")
         val value = holder.opt(ROOT_KEY).takeUnless { it === JSONObject.NULL }
-        if (!withinResultLimit(value)) return null
+        if (!withinResultLimit(value)) return reject("result_limit")
+        valuesByChannel.remove(decoded.channel)
         valuesByChannel[decoded.channel] = copyJson(value)
+        while (valuesByChannel.size > MAX_CHANNELS) {
+            valuesByChannel.remove(valuesByChannel.keys.first())
+        }
         return copyJson(value)
     }
 
     fun reset() {
         valuesByChannel.clear()
+        rejectedCount = 0
+        highestChannel = null
+        lastRejection = null
         previous = Delta(0, "", OP_ADD, null, false)
+    }
+
+    fun diagnostics(): ChatGptWebNativeVoiceDeltaDiagnostics = ChatGptWebNativeVoiceDeltaDiagnostics(
+        rejectedCount, highestChannel, valuesByChannel.size, lastRejection,
+    )
+
+    private fun reject(reason: String): Nothing? {
+        if (rejectedCount < Int.MAX_VALUE) rejectedCount += 1
+        lastRejection = reason
+        return null
     }
 
     private fun decode(value: JSONObject): Delta? {
         if (value.length() > MAX_DELTA_KEYS) return null
-        val channel = integerField(value, "channel", "c") ?: previous.channel
+        val channel = if (value.has("channel") || value.has("c")) {
+            integerField(value, "channel", "c")?.takeIf { it >= 0 } ?: return null
+        } else previous.channel
         val path = stringField(value, "path", "p") ?: previous.path
         val operation = stringField(value, "op", "o") ?: previous.operation
         if (path.length > MAX_PATH_CHARS || operation !in OPERATIONS) return null
@@ -54,12 +88,13 @@ internal class ChatGptWebNativeVoiceJsonDeltaDecoder {
             channel = channel,
             path = path,
             operation = operation,
-            value = valueKey?.let(value::opt) ?: previous.value,
-            hasValue = valueKey != null || previous.hasValue,
+            value = valueKey?.let(value::opt),
+            hasValue = valueKey != null,
         )
     }
 
     private fun applyAtPath(holder: JSONObject, path: String, delta: Delta): Boolean {
+        if (!delta.hasValue && delta.operation != OP_REMOVE) return false
         val segments = parsePath(path) ?: return false
         var parent: Any = holder
         for (index in 0 until segments.lastIndex) {
@@ -204,6 +239,8 @@ internal class ChatGptWebNativeVoiceJsonDeltaDecoder {
             .firstOrNull(value::has)
             ?.let(value::opt)
             ?.let { it as? Number }
+            ?.toDouble()
+            ?.takeIf { it.isFinite() && it >= 0 && it <= Int.MAX_VALUE && it == it.toInt().toDouble() }
             ?.toInt()
 
     private fun stringField(value: JSONObject, longKey: String, shortKey: String): String? =

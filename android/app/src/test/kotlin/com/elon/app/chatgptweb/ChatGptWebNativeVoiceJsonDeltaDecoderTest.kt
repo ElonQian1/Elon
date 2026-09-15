@@ -68,20 +68,96 @@ class ChatGptWebNativeVoiceJsonDeltaDecoderTest {
     }
 
     @Test
-    fun rejectsUnknownOperationsAndOutOfRangeChannels() {
+    fun rejectsUnknownOperationsAndInvalidChannels() {
         val decoder = ChatGptWebNativeVoiceJsonDeltaDecoder()
 
         assertNull(decoder.apply(JSONObject().put("o", "execute").put("p", "")))
         assertNull(
             decoder.apply(
                 JSONObject()
-                    .put("c", 99)
+                    .put("c", -1)
                     .put("o", "add")
                     .put("p", "")
                     .put("v", "blocked"),
             ),
         )
     }
+
+    @Test
+    fun continuesAfterSixteenMessagesAndSearchToolChannels() {
+        val decoder = ChatGptWebNativeVoiceJsonDeltaDecoder()
+        repeat(40) { channel ->
+            val initial = decoder.apply(root(channel, "a")) as JSONObject
+            assertEquals("a", text(initial))
+            val appended = decoder.apply(
+                JSONObject().put("o", "append").put("p", "/message/content/parts/0").put("v", "b"),
+            ) as JSONObject
+            assertEquals("ab", text(appended))
+        }
+        decoder.apply(root(10001, "after search"))
+        val appended = decoder.apply(
+            JSONObject().put("o", "append").put("p", "/message/content/parts/0").put("v", " continues"),
+        ) as JSONObject
+        assertEquals("after search continues", text(appended))
+        assertEquals(10001, decoder.diagnostics().highestChannel)
+        assertEquals(16, decoder.diagnostics().cachedChannels)
+        assertEquals(0, decoder.diagnostics().rejectedCount)
+    }
+
+    @Test
+    fun cacheIsBoundedButRecentlyUpdatedChannelsSurvive() {
+        val decoder = ChatGptWebNativeVoiceJsonDeltaDecoder()
+        repeat(16) { decoder.apply(root(it, "a")) }
+        fun append(channel: Int) = decoder.apply(
+            JSONObject().put("c", channel).put("o", "append")
+                .put("p", "/message/content/parts/0").put("v", "b"),
+        )
+        append(0)
+        decoder.apply(root(16, "new"))
+        assertEquals("abb", text(append(0) as JSONObject))
+        // Missing bases cannot turn a late tool patch into a partial new message.
+        assertNull(append(1))
+        assertEquals("missing_channel_base", decoder.diagnostics().lastRejection)
+        assertEquals(1, decoder.diagnostics().rejectedCount)
+        decoder.apply(root(1, "restored"))
+        assertEquals("restoredb", text(append(1) as JSONObject))
+    }
+
+    @Test
+    fun omittedValueNeverReplaysThePreviousSubtitleChunk() {
+        val decoder = ChatGptWebNativeVoiceJsonDeltaDecoder()
+        decoder.apply(root(0, "a"))
+        decoder.apply(JSONObject().put("o", "append").put("p", "/message/content/parts/0").put("v", "b"))
+        assertNull(decoder.apply(JSONObject()))
+        assertEquals("abc", text(decoder.apply(JSONObject().put("v", "c")) as JSONObject))
+    }
+
+    @Test
+    fun rejectsFractionalOverflowAndNonNumericChannelWithoutChangingCurrentChannel() {
+        val decoder = ChatGptWebNativeVoiceJsonDeltaDecoder()
+        decoder.apply(root(Int.MAX_VALUE, "a"))
+        listOf<Any>(0.5, 4294967296L, "1", JSONObject.NULL).forEach { invalid ->
+            assertNull(decoder.apply(root(0, "wrong").put("c", invalid)))
+        }
+        val current = decoder.apply(
+            JSONObject().put("o", "append").put("p", "/message/content/parts/0").put("v", "b"),
+        ) as JSONObject
+        assertEquals("ab", text(current))
+    }
+
+    @Test
+    fun resetClearsDeltaDiagnostics() {
+        val decoder = ChatGptWebNativeVoiceJsonDeltaDecoder()
+        decoder.apply(root(100, "private text"))
+        decoder.apply(JSONObject().put("c", -1))
+        assertEquals(1, decoder.diagnostics().rejectedCount)
+        decoder.reset()
+        assertEquals(ChatGptWebNativeVoiceDeltaDiagnostics(), decoder.diagnostics())
+    }
+
+    private fun root(channel: Int, value: String): JSONObject = JSONObject()
+        .put("c", channel).put("o", "add").put("p", "")
+        .put("v", JSONObject().put("message", message(value)))
 
     private fun message(text: String): JSONObject = JSONObject()
         .put("id", "message_1")
