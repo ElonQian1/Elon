@@ -216,7 +216,7 @@ export async function streamPost(
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>(path),
+  get: <T>(path: string, options?: Pick<RequestInit, 'signal' | 'cache'>) => request<T>(path, options),
   getWithHeaders: <T>(path: string, headers: Record<string, string>) =>
     request<T>(path, { headers }),
   post: <T>(path: string, body: unknown) =>

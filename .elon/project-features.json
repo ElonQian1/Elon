@@ -19447,6 +19447,124 @@
       "updated_at_ms": 1786758085963
     },
     {
+      "id": "pc-social-chat-recovery-v1",
+      "title": "Windows 会话缓存与同步恢复",
+      "summary": "缓存优先显示、超时重试、前台与实时恢复，修复空白及停更",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/pc-social-chat-recovery.md",
+        "content_hash": "e73fddeebb93cb3bf82c28c9a65982c8cbfd1b0c1c760bef79a60b95ea012b45",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "1e7a64b8a2d8017f3506eb8fae200be93bb2908d",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "3f1282341b6a950fa8f59e40cec9d293a540ed8e",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "",
+      "tags": [],
+      "task_paths": [
+        "pc-frontend/src/api/client.ts",
+        "pc-frontend/src/features/friends",
+        "pc-frontend/src/features/notifications/useNotifications.ts",
+        "pc-frontend/src/store/auth.ts"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "缓存按账号隔离并在退出时清理",
+        "前台和断网恢复自动补齐好友与群聊",
+        "失败可见可重试且旧响应不串会话",
+        "交互回归及构建、发布身份验证通过"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/reports/pc-social-chat-recovery-validation.md",
+          "content_hash": "44cb58fd19f911398af67060178bc1ea8041dd71f3f81d3ce90a91b6e1724506",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1e7a64b8a2d8017f3506eb8fae200be93bb2908d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b322ec52a74e8b427c3705dc0ccaaaf92f73d19c",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/socialChatCache.ts",
+          "content_hash": "de1b9174fe7697eddb40f3e27a0b4fdd17486ab40d28e18bf1ae959b79878c43",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1e7a64b8a2d8017f3506eb8fae200be93bb2908d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f5981abfc0774209caa361f507733b2e78d35c88",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/socialRefreshLoop.ts",
+          "content_hash": "5773b434bcb9baa0494fc61c583f2e026c2a98e6c136d880d23caf923be850fe",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1e7a64b8a2d8017f3506eb8fae200be93bb2908d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2128495eb0ac301d127e83b6d22813a37ca77d96",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/useSocialChat.ts",
+          "content_hash": "a1c4bb0eb9adeeca3be715f15e7138f85d4eddd568f83ade0dfbabe5ca3e5e31",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1e7a64b8a2d8017f3506eb8fae200be93bb2908d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "39901d51d215d1eb999c47748d99d48fa9e7a02a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/notifications/useNotifications.ts",
+          "content_hash": "9c7212805efcf02032e9d8ac7728d9d051cdab843087a96ae655cd3fb623cf16",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1e7a64b8a2d8017f3506eb8fae200be93bb2908d",
+            "head_blob_oid": "6262de87255ff684d6019589a02df216ed6c6238",
+            "worktree_blob_oid": "e39fd47bc62dc59244667bb4df4e76b2c35a37e5",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-pc-social-chat-recovery.cjs",
+          "content_hash": "e8c3245703b2268b3772c9f92eeb6d3b8bbb971930c67f146e8b0a540fe75a54",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1e7a64b8a2d8017f3506eb8fae200be93bb2908d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "070980ab28814bfcc1b682f1aba722323ab6efa0",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1789456185467,
+      "updated_at_ms": 1789457124581
+    },
+    {
       "id": "private-grid-read-bridge-v1",
       "title": "本人网格只读投影传输",
       "summary": "Win 当前节点绑定本人账号的私密只读投影经可信 HTTPS 上送，量化 APK 经独立可撤销授权读取；不执行交易。",
@@ -28736,66 +28854,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_78c77231d6fb437084a9401bd9a71796",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "claimed",
-      "actor": "codex-ui-boundary",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788967752047
-    },
-    {
-      "id": "feature_event_5f18b5283ae0444e9784b95a2e185a77",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "transitioned",
-      "actor": "codex-ui-boundary",
-      "reason": "Implementing native create service slice; complete UI ownership migration remains in progress.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788970007366
-    },
-    {
-      "id": "feature_event_4a634fc5ac254a72ae73453c1ae0d1aa",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "evidence_recorded",
-      "actor": "codex-ui-boundary",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1788970329908
-    },
-    {
-      "id": "feature_event_b6104df72cb641108bd1986110ee9365",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "claim_released",
-      "actor": "codex-ui-boundary",
-      "reason": "Creation slice implemented and tested; full management migration and device acceptance remain. Release ownership for next bounded slice.",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1788970329959
-    },
-    {
-      "id": "feature_event_4b8eeac49adc4f758766c7f714be5137",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "claimed",
-      "actor": "codex-native-manage-v2",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1788981663959
-    },
-    {
-      "id": "feature_event_0e814697d0d64dfe825487782301d79a",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "transitioned",
-      "actor": "codex-native-manage-v2",
-      "reason": "Continue typed native management service with consent and one-use permit.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1788981664057
-    },
-    {
       "id": "feature_event_df0a226398484706ad76cd2bca46bbd9",
       "feature_id": "android-exchange-session-host-v2",
       "action": "claim_released",
@@ -30734,6 +30792,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1789415272360
+    },
+    {
+      "id": "feature_event_8fadd087cf7848b595b7983cd9c7d803",
+      "feature_id": "pc-social-chat-recovery-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789456185467
+    },
+    {
+      "id": "feature_event_7b8ef40d888f4521b28f11fce38cfda2",
+      "feature_id": "pc-social-chat-recovery-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789456236916
+    },
+    {
+      "id": "feature_event_ba693b9ec787488f8d167c918d5dab40",
+      "feature_id": "pc-social-chat-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789456304977
+    },
+    {
+      "id": "feature_event_89c09acae95f4a729288321ab79beea2",
+      "feature_id": "pc-social-chat-recovery-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789457097798
+    },
+    {
+      "id": "feature_event_e03ba36323ec40afabae859539102f6f",
+      "feature_id": "pc-social-chat-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "完整页面浏览器恢复与兼容回归、生产构建通过",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789457124518
+    },
+    {
+      "id": "feature_event_6de974a5e1e54ea78c32aa9568098bb4",
+      "feature_id": "pc-social-chat-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "隔离 Edge 页面恢复、缓存、权限、竞速与原能力回归通过",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1789457124581
     }
   ]
 }

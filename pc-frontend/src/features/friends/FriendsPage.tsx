@@ -10,40 +10,9 @@ import MessageActions, { messageActionsHostClassName, messageCopySourceId } from
 import styles from './FriendsPage.module.css'
 import SocialAvatar from './SocialAvatar'
 import SocialMessageAttachments from './SocialMessageAttachments'
-import type { SocialMessage } from './socialMessageTypes'
+import type { SocialMessage, Friend, FriendGroup } from './socialMessageTypes'
 import GroupMessageRevisionActions from './GroupMessageRevisionActions'
-import useGroupMessageRefresh from './useGroupMessageRefresh'
-
-interface Friend {
-  id: string
-  account: string
-  nickname?: string
-  avatar_data_url?: string
-  last_message?: string
-  last_message_at?: string
-  unread_count?: number
-  is_online?: boolean
-  presence_status?: string | null
-  custom_status?: string | null
-  activity?: string | null
-}
-
-interface FriendGroupMemberPreview {
-  id: string
-  display_name: string
-  avatar_data_url?: string
-}
-
-interface FriendGroup {
-  id: string
-  name: string
-  member_count?: number
-  members?: FriendGroupMemberPreview[]
-  created_at?: string
-  last_message?: string
-  last_message_at?: string
-  unread_count?: number
-}
+import useSocialChat from './useSocialChat'
 
 interface SearchResult {
   user: Friend
@@ -63,11 +32,6 @@ type ConversationKind = 'friend' | 'group'
 type ConversationDisplayMode = 'grouped' | 'active'
 type CollapsibleSection = 'friends' | 'groups'
 type PresenceStatus = 'online' | 'idle' | 'dnd' | 'offline'
-
-interface ActiveConversation {
-  kind: ConversationKind
-  id: string
-}
 
 interface ConversationItem {
   kind: ConversationKind
@@ -96,13 +60,15 @@ interface PresenceEvent extends CustomEvent {
 }
 
 export default function FriendsPage() {
+  const userId = useAuthStore(s => s.user?.id)
+  return userId ? <FriendsPageContent key={userId} /> : null
+}
+
+function FriendsPageContent() {
   const me = useAuthStore((s) => s.user)
-  const [friends, setFriends] = useState<Friend[]>([])
-  const [groups, setGroups] = useState<FriendGroup[]>([])
-  const [activeConversation, setActiveConversation] = useState<ActiveConversation | null>(null)
-  const [messages, setMessages] = useState<SocialMessage[]>([])
-  const [messagesLoading, setMessagesLoading] = useState(false)
-  const [input, setInput] = useState('')
+  const { friends, groups, setFriends, activeConversation, messages, setMessages, messagesLoading,
+    input, setInput, selectConversation, loadSocialConversations, revisionNotice,
+    listStatus, messageError, cacheWarning, retry } = useSocialChat(me!.id)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [displayMode, setDisplayMode] = useState<ConversationDisplayMode>(() => readConversationDisplayMode())
@@ -121,9 +87,6 @@ export default function FriendsPage() {
   const conversationKey = `${activeConversation?.kind}:${activeConversation?.id}`
   const currentConversation = useRef(conversationKey)
   currentConversation.current = conversationKey
-  const revisionNotice = useGroupMessageRefresh(activeConversation?.kind === 'group' ? activeConversation.id : null, messages, setMessages)
-
-  useEffect(() => { loadSocialConversations() }, [me?.id])
 
   useEffect(() => {
     function onPresence(event: PresenceEvent) {
@@ -198,34 +161,6 @@ export default function FriendsPage() {
     ? allConversationItems.find((item) => item.kind === activeConversation.kind && item.id === activeConversation.id)
     : undefined
 
-  async function loadSocialConversations() {
-    const [friendResult, groupResult] = await Promise.allSettled([
-      api.get<{ friends?: Friend[] }>('/api/me/friends'),
-      api.get<{ groups?: FriendGroup[] }>('/api/me/groups'),
-    ])
-    if (friendResult.status === 'fulfilled') setFriends(friendResult.value.friends ?? [])
-    if (groupResult.status === 'fulfilled') setGroups(groupResult.value.groups ?? [])
-  }
-
-  async function selectConversation(item: ConversationItem) {
-    const selectedKey = `${item.kind}:${item.id}`
-    currentConversation.current = selectedKey
-    setActiveConversation({ kind: item.kind, id: item.id })
-    setMessages([])
-    setMessagesLoading(true)
-    setError('')
-    try {
-      const endpoint = item.kind === 'friend'
-        ? `/api/me/friends/${encodeURIComponent(item.id)}/messages?limit=80`
-        : `/api/me/groups/${encodeURIComponent(item.id)}/messages?limit=120`
-      const data = await api.get<{ messages?: SocialMessage[] }>(endpoint)
-      if (currentConversation.current !== selectedKey) return
-      setMessages(data.messages ?? [])
-      void loadSocialConversations()
-    } catch { /* ignore */ }
-    finally { if (currentConversation.current === selectedKey) setMessagesLoading(false) }
-  }
-
   function activeTitle() {
     return activeItem?.title ?? '会话'
   }
@@ -265,11 +200,15 @@ export default function FriendsPage() {
         { content: text },
       )
       if (res.message) {
-        setMessages((prev) => prev.map((m) => m.id === optimistic.id ? res.message! : m))
+        setMessages((prev) => {
+          const received = prev.find(m => m.id === res.message!.id) ?? res.message!
+          return prev.filter(m => m.id !== received.id).map(m => m.id === optimistic.id ? received : m)
+        })
       }
       void loadSocialConversations()
     } catch (err) {
-      setError((err as { message?: string }).message ?? '发送失败')
+      if (currentConversation.current === `${current.kind}:${current.id}`) setError((err as { message?: string }).message ?? '发送失败')
+      setInput(previous => previous && previous !== text ? `${text}\n${previous}` : text)
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
     } finally {
       setSending(false)
@@ -413,9 +352,14 @@ export default function FriendsPage() {
       <aside className={styles.sidebar}>
         <div className={styles.sideHeader}>
           <span>会话</span>
-          <small>{friends.length} 好友 · {groups.length} 群聊</small>
+          <small>{friends.length || listStatus.friends === 'ready' ? friends.length : listStatus.friends === 'loading' ? '加载中' : '待同步'} 好友 · {groups.length || listStatus.groups === 'ready' ? groups.length : listStatus.groups === 'loading' ? '加载中' : '待同步'} 群聊</small>
         </div>
         <WorkspaceFeatureNav />
+        <div className={styles.syncStatus} role="status" aria-live="polite">
+          <span>{Object.values(listStatus).includes('error') ? '会话同步失败，已保留现有列表；将自动重试' : Object.values(listStatus).includes('loading') ? '正在同步会话…' : '会话已同步'}</span>
+          <button type="button" className={styles.syncRetry} onClick={retry}>重新同步</button>
+          {cacheWarning && <p>{cacheWarning}</p>}
+        </div>
 
         <form onSubmit={handleSearch} className={styles.searchForm}>
           <input
@@ -481,13 +425,13 @@ export default function FriendsPage() {
         </div>
 
         <div className={styles.friendList}>
-          {allConversationItems.length === 0 && (
+          {allConversationItems.length === 0 && Object.values(listStatus).every(status => status === 'ready') && (
             <p className={styles.hint}>暂无好友或群聊，搜索手机号添加好友</p>
           )}
           {displayMode === 'grouped' ? (
             <>
-              {renderConversationSection('friends', '好友会话', friendConversationItems, '暂无好友会话')}
-              {renderConversationSection('groups', '群聊', groupConversationItems, '暂无群聊')}
+              {renderConversationSection('friends', '好友会话', friendConversationItems, listStatus.friends === 'ready' ? '暂无好友会话' : listStatus.friends === 'loading' ? '正在加载好友…' : '好友列表暂不可用')}
+              {renderConversationSection('groups', '群聊', groupConversationItems, listStatus.groups === 'ready' ? '暂无群聊' : listStatus.groups === 'loading' ? '正在加载群聊…' : '群聊列表暂不可用')}
             </>
           ) : (
             <section className={styles.conversationSection}>
@@ -533,6 +477,7 @@ export default function FriendsPage() {
               <p>从左侧选择一位好友或群聊开始聊天</p>
             </div>
           )}
+          {messageError && <p className={styles.syncStatus} role="status">{messageError} <button type="button" className={styles.syncRetry} onClick={retry}>重试</button></p>}
           {messagesLoading && <p className={styles.hint}>读取消息…</p>}
           {messages.map((m, i) => {
             const isMe = m.outgoing || m.sender_user_id === me?.id

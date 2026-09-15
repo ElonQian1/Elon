@@ -3,6 +3,7 @@ import { dispatchRealtimeEvent } from '../realtime/realtimeBus'
 import { normalizeRealtimeEvent, REALTIME_SERVER_TYPES } from '../realtime/realtimeEvents'
 import { useAuthStore } from '../../store/auth'
 import { cloudWebSocketUrl } from '../../api/runtime'
+import { dispatchSocialMessage, notifySocialReconnect } from '../friends/socialRealtime'
 
 const MAX_RECONNECT_MS = 30_000
 
@@ -79,7 +80,7 @@ export function useNotifications(enabled = true) {
       s.connectedToken = token
       const ws = new WebSocket(makeWsUrl(token))
       s.socket = ws
-      ws.onopen = () => { s.reconnectDelay = 1200 }
+      ws.onopen = () => { s.reconnectDelay = 1200; notifySocialReconnect() }
       ws.onmessage = (ev) => handleMessage(ev.data)
       ws.onclose = () => { s.socket = null; if (token) scheduleReconnect() }
       ws.onerror = () => { ws.close() }
@@ -89,6 +90,7 @@ export function useNotifications(enabled = true) {
       let data: Record<string, unknown>
       try { data = JSON.parse(raw) } catch { return }
       if (!data) return
+      if (dispatchSocialMessage(data)) return
       if (data.type === REALTIME_SERVER_TYPES.projectMessageUpdated) {
         dispatchRealtime(data)
         return
@@ -219,11 +221,27 @@ export function useNotifications(enabled = true) {
     // 定期检测 token 变化后重连
     const interval = setInterval(connect, 2500)
     connect()
+    let lastResume = 0
+    function resumeConnection() {
+      if (document.hidden || Date.now() - lastResume < 1000) return
+      lastResume = Date.now()
+      // WebView can retain OPEN on a dead connection after sleep/network changes.
+      closeSocket()
+      connect()
+    }
+    window.addEventListener('focus', resumeConnection)
+    window.addEventListener('pageshow', resumeConnection)
+    window.addEventListener('online', resumeConnection)
+    document.addEventListener('visibilitychange', resumeConnection)
 
     return () => {
       clearInterval(interval)
       clearReconnectTimer()
       closeSocket()
+      window.removeEventListener('focus', resumeConnection)
+      window.removeEventListener('pageshow', resumeConnection)
+      window.removeEventListener('online', resumeConnection)
+      document.removeEventListener('visibilitychange', resumeConnection)
       if (s.titleTimer) clearTimeout(s.titleTimer)
       window.removeEventListener('pointerdown', prepareOnGesture)
       window.removeEventListener('keydown', prepareOnGesture)

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { api } from '../api/client'
 import { nodeApi } from '../features/node/localNodeApi'
 import { safeNodeAdminUrl } from '../lib/utils'
+import { clearSocialCaches } from '../features/friends/socialChatCache'
 
 const PWA_FORGET_PENDING_KEY = 'elon_pwa_credential_forget_pending'
 
@@ -89,6 +90,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
+        clearSocialCaches()
         set({ token: null, expiresAt: null, user: null })
         void forgetRememberedPwaCredential().catch(() => {
           // 本机节点离线不阻止退出；marker 会让下次打开 PC 网页时继续撤销。

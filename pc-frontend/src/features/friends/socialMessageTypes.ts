@@ -25,3 +25,30 @@ export interface SocialMessage {
   revision?: number
   edited_at?: string | null
 }
+
+export interface Friend {
+  id: string
+  account: string
+  nickname?: string
+  avatar_data_url?: string
+  last_message?: string
+  last_message_at?: string
+  unread_count?: number
+  is_online?: boolean
+  presence_status?: string | null
+  custom_status?: string | null
+  activity?: string | null
+}
+
+export interface FriendGroup {
+  id: string
+  name: string
+  member_count?: number
+  members?: { id: string; display_name: string; avatar_data_url?: string }[]
+  created_at?: string
+  last_message?: string
+  last_message_at?: string
+  unread_count?: number
+}
+
+export interface ActiveConversation { kind: 'friend' | 'group'; id: string }
