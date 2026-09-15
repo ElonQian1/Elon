@@ -12,21 +12,40 @@ ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
 
+- Grouped normal Release **1.1.1765 (1765)**, source
+  `c032b0573bf09185a5e9f171137f13e97911a449`, adapter **428**, is published and
+  replacement-installed on the trusted Xiaomi. Build/upload/remote verification
+  passed in `private-chat-grouped-release-20260915-171025-076` (522.2 seconds).
+  SHA-256: `aa17ec0ecbb370c58a9a31b27e1bd167d61df8c35b42bd5b2f11eb8fe8179900`;
+  package size 40,621,289 bytes. Package-manager readback confirmed the version.
+  Automatic installation was disabled only for this invocation; after the user
+  confirmed voice ended and MCP showed idle, `adb install -r` succeeded.
+  Production `social_ai` reopened with adapter current, bridge/authentication
+  ready, no login requirement and 10 native/10 backing messages. Voice remained
+  idle with zero frames/transcripts; no microphone or message was started.
+  Accepted conversation prefetch remains enabled; private research and the
+  pending-write journal remain disabled. No Cookie or application data was cleared.
+  This closes grouped compilation/publication/installation, not the pending
+  project retry, cold-module Send, process-kill journal or live search-caption
+  acceptances. The user was asked to exercise the blue realtime button; the white
+  dictation control is not under test.
+
 - [Existing project retry](chatgpt-fresh-project-retry-20260915.md): adapter 428
-  source candidate reuses independent prepare/variant/stream/Stop/history with
+  reuses independent prepare/variant/stream/Stop/history with
   the original user parent and exact project owner. 627 Node tests and the
-  current pinned public-source contract pass; grouped build/native trial remain
-  pending. No change to accepted ordinary retry or project Send defaults.
+  current pinned public-source contract pass; included in 1765, native trial
+  remains pending. No change to accepted ordinary retry or project Send defaults.
 
 - [Cold input preparation](chatgpt-cold-composer-owner-20260915.md): adapter 427
   source candidate removes the cold shared-identity module's circular readiness
   wait and rejects missing models before advertising native Send readiness.
   It reuses bounded observed-module imports and the current private sender;
-  grouped APK/device acceptance remains pending, with no new default scopes.
+  included in grouped APK 1765; cold-module Send acceptance remains pending,
+  with no new default scopes.
 
 - [Voice captions after search](chatgpt-voice-search-captions-20260915.md): current
   native preview gap confirmed; channel-identifier/cache-limit mismatch corrected,
-  with 34 passing Android tests; installed in normal 1761 and later 1762.
+  with 34 passing Android tests; installed in normal 1761, 1762 and now 1765.
   Production readiness was verified by MCP; exact live caption acceptance remains
   pending user participation, not installation or an ongoing ADB outage.
 

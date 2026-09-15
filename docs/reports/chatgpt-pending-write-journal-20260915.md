@@ -2,10 +2,16 @@
 capability_id: android_chatgpt_pending_write_journal_v1
 implementation_status: integrated_candidate
 verification_status: targeted_js_android_verified_device_pending
-delivery_status: source_only_grouped_release_pending
+delivery_status: normal_1765_published_installed_candidate_disabled
 ---
 
 # Pending Write Recovery
+
+Delivery update: grouped normal Release 1765 / adapter 428 compiled and was
+replacement-installed, with native readiness confirmed. The generated normal
+BuildConfig still has `CHATGPT_FRESH_TEXT_JOURNAL_ENABLED=false`; installation
+does not accept active-write process recovery or its banner. See the
+[grouped release receipt](chatgpt-runtime-bindings-20260915.md).
 
 ## Scope
 
@@ -190,7 +196,7 @@ that release is not evidence of installation or acceptance of adapter 426.
 
 ### Device Boundary
 
-The latest read-only MCP check confirms normal 1.1.1762 / adapter 421 installed,
+The earlier read-only MCP check confirmed normal 1.1.1762 / adapter 421 installed,
 authenticated and ready in the production native chat, with empty draft and
 idle voice/dictation/streaming. It does not contain this opt-in source follow-up.
 The existing idle-body recovery smoke then stopped before navigation/force-stop:
@@ -221,6 +227,6 @@ Receipt: `conversation-process-recovery-1762-20260915-140845-230`.
 - Attachment completion now requires the request's reference digest as well as
   exact user identity; this is not device acceptance of Library/mounted or
   expanded attachment combinations.
-- Normal APK release and device verification will be grouped with the remaining
-  batch. No additional APK was published for this candidate. Subtitle fix 1761
-  was separately installed; its live voice acceptance is still pending.
+- Normal APK 1765 now includes this candidate with its flag disabled. Grouped
+  build/install/readiness evidence is recorded above, not active-write durability.
+  The included subtitle fix still requires its live search-response acceptance.

@@ -2,7 +2,7 @@
 capability_id: android_chatgpt_realtime_voice_data_channel_transcript_v1
 implementation_status: regression_fix_implemented
 verification_status: targeted_android_tests_passed_device_pending
-delivery_status: included_in_installed_1762_voice_acceptance_pending
+delivery_status: included_in_installed_1765_voice_acceptance_pending
 ---
 
 # Voice Captions After Search
@@ -104,3 +104,12 @@ bridge ready, authenticated, no login requirement and native voice idle. Debug
 transport had recovered. No microphone was started and caption continuity is
 still not device-accepted; the subsequent safe restart smoke found the screen
 locked before any process stop.
+
+After the user again confirmed the call ended, grouped normal Release 1765 /
+adapter 428 was replacement-installed. Before installation, MCP confirmed idle
+voice; afterward production native chat became ready/authenticated with 10 native
+and 10 backing messages, zero voice frames/transcripts/rejections and no active
+audio. See the [grouped release receipt](chatgpt-runtime-bindings-20260915.md).
+The user was asked to start the blue realtime control and ask a search-requiring
+question. No new spoken sample or post-search caption continuity has yet been
+observed, so the exact live regression remains pending rather than passed.

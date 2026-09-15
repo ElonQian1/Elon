@@ -1,6 +1,10 @@
 # Cold composer owner preparation
 
 Date: 2026-09-15. Source-batch regression fix, not new device acceptance.
+Delivery update: included in grouped normal Release 1765 / adapter 428, published
+and replacement-installed. Production native readiness passed; a cold-module Send
+and latency improvement remain unaccepted. See the
+[grouped release receipt](chatgpt-runtime-bindings-20260915.md).
 Original correction: context 25 / adapter 424. The identity-cache follow-up below
 uses context 26, private input 8, transaction 36 and adapter 427. Both reuse the
 existing private sender and loader; their device acceptance is separate.
@@ -45,9 +49,9 @@ runtime submission. Logs remain under Git metadata:
 `fresh-cold-owner-green-20260915-150242-977` and
 `fresh-cold-owner-regression-20260915-150339-433`.
 
-No new APK build/install or device latency claim belongs to this fix. Include it
-in the next grouped release and verify one cold-module native send there. The
-installed 1762 search-caption fix still has its separate live acceptance pending;
+The original source batch did not build/install an APK or claim device latency.
+The subsequent grouped release above includes it; verify one cold-module native
+send there. The installed search-caption fix has separate live acceptance pending;
 this work does not replace that test or the pending process-recreation checks.
 
 ## Cold Identity Cache Follow-Up
@@ -94,7 +98,8 @@ now excludes that constructor baseline rather than changing production prewarm.
 errors, cancellations or skips, in 5.2 seconds. Coverage includes the new cold
 identity cases, fresh sends/retries, private input, runtime bindings, full asset
 assembly and pending-recovery wiring. This does not add 600 live provider samples.
-No Android build, APK publication, installation, cold-start latency claim or new
-live acceptance belongs to this follow-up. Accepted private-send defaults are unchanged.
+No separate Android build or live latency acceptance belonged to this source
+follow-up; the subsequent grouped release is recorded above. Accepted private-send
+defaults are unchanged.
 This closes cold shared-module preparation, not a completely uninitialized page
 without authenticated identity, a committed conversation or a reviewed runtime.

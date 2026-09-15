@@ -1,8 +1,8 @@
 ---
 capability_id: android_chatgpt_fresh_project_regeneration_v1
 implementation_status: implemented
-verification_status: offline_verified
-delivery_status: source_candidate_grouped_build_pending
+verification_status: offline_and_android_build_verified_native_retry_pending
+delivery_status: normal_1765_published_installed
 production_default: false
 scope: existing_owned_global_project_plain_text_retry
 ---
@@ -38,7 +38,7 @@ prepare/proof, private stream, native projection, Stop and verified history.
 History must match the project and user as well as the exact observed variant.
 Drafts are not cleared. Uncertain post-dispatch results cannot fall back or resend.
 
-Adapter 428 is the grouped source candidate. This new scope is enabled only by
+Adapter 428 is included in grouped normal Release 1765. This scope is enabled only by
 `__elonChatGptFreshRegenerationProjectsEnabled === true` or the existing one-command
 fresh trial. The read-only admission probe recognizes the armed trial without
 consuming it. Project Send's existing default cannot enable project retry, and
@@ -62,12 +62,15 @@ WebView identity layer. No audio/subtitle/dictation or proxy code changed.
 - The integration receipt can be `accepted` once the owned stream arrives while
   history remains pending. Tests separately assert pending state and refuse
   foreign-project history; receipt acceptance alone is not completion evidence.
-- Android compilation, grouped publication and native project Retry acceptance
-  remain pending. Use one harmless existing owned-project question, arm one trial,
+- Android compilation, grouped publication and replacement installation passed
+  on 1765; production native ready/idle was confirmed. See the
+  [grouped release receipt](chatgpt-runtime-bindings-20260915.md).
+  Native project Retry acceptance remains pending. Use one harmless existing
+  owned-project question, arm one trial,
   verify a single new assistant variant/no new user message and preserved draft,
   then restore the prior view. Promote only this scope after that real pass.
 - New-project, attachment/tool/feedback/temporary/restricted/shared-project retry
   and fully DOM-independent initial retry discovery are not covered here.
 
 Do not redo the implementation because native acceptance is pending. Reuse the
-existing trial, receipt, Stop and history tools in the next grouped APK.
+existing trial, receipt, Stop and history tools in installed 1765 or a successor.
