@@ -6258,15 +6258,15 @@
         },
         {
           "path": "docs/delivery/android-grid-tradfi-rules-20260916.md",
-          "content_hash": "f6f6d8355ab655b57e202ade28580ab51c6da331960dcb3b6c5c0725b60c35ea",
+          "content_hash": "ca5d9d5197b5173106ae61d79e547b2aca8d69c366a58dcaaa05c15f31f52d86",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "9311f2a5ccdebaeb85739fae06a32888685df197",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "9f01e41cd31bb0d99e3dfc986c986653bf7572d4",
-            "state": "untracked"
+            "head_commit": "cc84d32339a1503a45ff8da9b4f3defec39c0051",
+            "head_blob_oid": "9f01e41cd31bb0d99e3dfc986c986653bf7572d4",
+            "worktree_blob_oid": "770cf4d3bc274644b3b477ac401b9a1aea0c6a51",
+            "state": "tracked_modified"
           }
         },
         {
@@ -6290,7 +6290,7 @@
         "expires_at_ms": 1789504815458
       },
       "created_at_ms": 1789490415365,
-      "updated_at_ms": 1789491021484
+      "updated_at_ms": 1789491651611
     },
     {
       "id": "binance-wallet-consent-recovery-v1",
@@ -29669,16 +29669,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_76240eb190674b86a307c6df14757b80",
-      "feature_id": "android-binance-create-reference-v1",
-      "action": "registered",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789154665758
-    },
-    {
       "id": "feature_event_3e2d724fae1543158f3d2cc766683392",
       "feature_id": "android-binance-create-reference-v1",
       "action": "claimed",
@@ -31667,6 +31657,16 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1789491021484
+    },
+    {
+      "id": "feature_event_00f41b32edea4b5b893de87e4a7f317a",
+      "feature_id": "binance-grid-tradfi-rules-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789491651611
     }
   ]
 }
