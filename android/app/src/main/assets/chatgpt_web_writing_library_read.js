@@ -19,7 +19,7 @@
     if (!options.current()) fail('context_changed');
     if (now() >= deadline) fail('timeout');
     if (new URL(page.location.href).origin !== 'https://chatgpt.com' ||
-        !['web_20260912', 'web_20260915'].includes(profile) || options.bindings.state().profile_id !== profile ||
+        !['web_20260912', 'web_20260915', 'web_20260915_b'].includes(profile) || options.bindings.state().profile_id !== profile ||
         options.bindings.peek('shared') !== shared ||
         options.bindings.peek('conversation')?.writingLibrarySessions?.() !== store) fail('runtime_unavailable');
     const value = account();

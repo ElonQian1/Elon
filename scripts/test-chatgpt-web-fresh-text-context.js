@@ -5,6 +5,17 @@ const { fixture, CID, PID } = require('./fixtures/chatgpt-fresh-text-context');
 
 const PROJECT = 'g-p-' + 'a'.repeat(32);
 
+test('second Sep 15 profile captures personal and owned project state without weakening scope', async () => {
+  for (const project of [false, true]) {
+    const f = project ? projectFixture() : fixture();
+    f.page.__elonChatGptPrivateRuntimeBindings.state = () => ({ profile_id: 'web_20260915_b' });
+    const binding = await f.api.capture(f.node, null, { allowProjects: project });
+    assert.equal(binding.current(), true);
+    f.page.__elonChatGptPrivateRuntimeBindings.state = () => ({ profile_id: 'web_20260915' });
+    assert.equal(binding.current(), false, 'do not mix same-day runtime revisions');
+  }
+});
+
 test('store reconciliation retains the exact failing predicate without treating it as success', async () => {
   const UID = '33333333-3333-4333-8333-333333333333';
   const AID = '44444444-4444-4444-8444-444444444444';

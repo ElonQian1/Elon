@@ -1,11 +1,11 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 21, create: factory });
+  const api = Object.freeze({ version: 22, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
   'use strict';
-  const PROFILES = ['web_20260912', 'web_20260915'];
+  const PROFILES = ['web_20260912', 'web_20260915', 'web_20260915_b'];
   const fail = (code, admissionStage) => { throw Object.assign(Error(code), { admissionStage }); };
   const idPattern = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
   const projectPattern = /^g-p-[a-f0-9]{32}$/i;

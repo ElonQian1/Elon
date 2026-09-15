@@ -394,7 +394,7 @@
     recordPrivateOutcome('success', messages.length, result.elapsedMs);
     const bindings = window.__elonChatGptPrivateRuntimeBindings;
     const token = window.__elonChatGptDocumentToken;
-    if (['web_20260912', 'web_20260915'].includes(bindings?.state?.().profile_id) && token && writingRuntimePrimed !== token &&
+    if (['web_20260912', 'web_20260915', 'web_20260915_b'].includes(bindings?.state?.().profile_id) && token && writingRuntimePrimed !== token &&
         messages.some(message => message.content?.some(part => part.type === 'writing_block'))) {
       writingRuntimePrimed = token;
       try { bindings.load('shared').catch(() => {}); } catch (_) {}

@@ -68,11 +68,12 @@ test('whole-document edit omits selection metadata, never invents a range', asyn
   const f = runtimeFixture(), ready = await f.prepare({ start: 3, end: 3 }); await ready.invoke(() => {});
   assert.equal(f.captured().value.sourceRange, undefined); assert.equal(f.captured().value.selectionMetadata, undefined);
 });
-test('Sep 15 Canvas generation uses the current module once and refuses a profile swap', async () => {
-  const f = runtimeFixture('web_20260915'), urls = [];
+for (const [profile, file] of [['web_20260915', 'd3304073-nglhmqv6gfc20nrf.js'],
+  ['web_20260915_b', 'd3304073-i5jaxzkvtv1ju9nn.js']]) test(profile + ' Canvas generation refuses a profile swap', async () => {
+  const f = runtimeFixture(profile), urls = [];
   const service = generation.create(f.page, { loadRuntime: async url => { urls.push(url); return f.module; } });
   const ready = await service.prepare({ id: 'cid' }, f.doc, f.input, () => {});
-  assert.deepEqual(urls, ['https://chatgpt.com/cdn/assets/d3304073-nglhmqv6gfc20nrf.js']);
+  assert.deepEqual(urls, ['https://chatgpt.com/cdn/assets/' + file]);
   await ready.invoke(() => {}); f.reply(); assert.equal(ready.settled(), true);
   f.page.__elonChatGptPrivateRuntimeBindings.state = () => ({ profile_id: 'web_20260912' });
   assert.throws(ready.validate, /context_changed/);

@@ -1,8 +1,9 @@
 # Project Send Admission Follow-Up
 
-Status: adapter 414 is published/installed as 1.1.1751. Its read-only probe
-identifies `project_shared`. Adapter 415 corrects same-user ownership and
-matching project-route configuration; package/device acceptance is pending.
+Status: adapter 415 is published/installed as 1.1.1752. Before the next project
+acceptance, the official page changed again; its read-only admission returned
+`runtime_unavailable`. [Second-rollout compatibility](chatgpt-runtime-bindings-20260915-b.md)
+is implemented in adapter 416, pending release/device acceptance.
 Production project-independent sends remain disabled. Personal fresh text,
 composer-free first sends and local attachment defaults are unchanged.
 
@@ -104,11 +105,12 @@ No owner ID, credential or shared-continuation field enters the fresh request.
   (`fresh-project-owner-regression-20260915-081436-520`). All three hash-pinned
   public AST cases passed, no skip (`fresh-project-owner-public-contract-20260915-081507-570`).
   The unchanged Kotlin validator reuses the 13 passing tests; only its adapter
-  version changes. Adapter 415 Release/read-only admission are pending.
+  version changes. Adapter 415 Release passed and installed as 1752. Its
+  read-only admission found the new unsupported official anchor; zero sends.
 
 ## Remaining
 
-Read admission on adapter 415 before any new project send. Only if all actual
+Read admission on adapter 416 before any new project send. Only if all actual
 guards pass, perform one new scoped native acceptance, never replay the prior
 fallback-accepted message. Do not loosen project ownership for acceptance.
 Original editable Canvas acceptance still needs an actual eligible original

@@ -31,7 +31,9 @@
   const profiles = Object.freeze({
     [PROFILE]: { modules: MODULES, init: 'IAn', namespace: 'LAn' },
     web_20260915: { modules: ['conversation-small-c89mq7wpr5yt4chy.js', 'e5d54aa7-hupdur95y35b5iac.js',
-      '1c4de3ec-n5z38kp7mdcow2vj.js', '6afb0137-g283lmq2pqmv3jkl.js'], init: 'BMn', namespace: 'VMn' }
+      '1c4de3ec-n5z38kp7mdcow2vj.js', '6afb0137-g283lmq2pqmv3jkl.js'], init: 'BMn', namespace: 'VMn' },
+    web_20260915_b: { modules: ['conversation-small-newrvr7nrx5tnmp4.js', 'e5d54aa7-pdcracz6gqmo2bwj.js',
+      '1c4de3ec-e4l31n3azu0cqixl.js', '6afb0137-ol6cc2ldzctuty5j.js'], init: 'iNn', namespace: 'aNn' }
   });
   const fail = code => { throw Error('download_' + code); };
 

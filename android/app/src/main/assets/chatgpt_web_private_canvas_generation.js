@@ -8,7 +8,8 @@
   options ||= {};
   const MODULES = Object.freeze({
     web_20260912: 'd3304073-k8khdx5ezvb9oyu8.js',
-    web_20260915: 'd3304073-nglhmqv6gfc20nrf.js'
+    web_20260915: 'd3304073-nglhmqv6gfc20nrf.js',
+    web_20260915_b: 'd3304073-i5jaxzkvtv1ju9nn.js'
   });
   const fail = code => { throw Error('canvas_' + code); };
   const policy = page.__elonChatGptPrivateCanvasDocumentPolicy;

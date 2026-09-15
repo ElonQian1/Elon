@@ -19,7 +19,7 @@
         !binding.account || !/^doc_[a-z0-9_]{3,80}$/.test(binding.token || '')) fail('context_unavailable');
     const bindings = page.__elonChatGptPrivateRuntimeBindings;
     const profile = bindings?.state?.().profile_id;
-    if (!['web_20260912', 'web_20260915'].includes(profile)) fail('runtime_unavailable');
+    if (!['web_20260912', 'web_20260915', 'web_20260915_b'].includes(profile)) fail('runtime_unavailable');
     let timeout;
     const shared = await Promise.race([
       bindings.load('shared'),

@@ -1,6 +1,8 @@
 # September 15 Runtime Compatibility Investigation
 
-Status: bindings 29 / adapter 414 published and installed as 1.1.1751.
+Status: bindings 29 / adapter 415 published and installed as 1.1.1752.
+The page changed again during acceptance: [second-rollout compatibility](chatgpt-runtime-bindings-20260915-b.md)
+is implemented/offline verified as bindings 30 / adapter 416; release pending.
 First-send/follow-up and independent local attachment delivery passed on Xiaomi.
 The verified attachment scope is default-enabled, reusing the corrected model argument and pre-write
 handoff below. `web_20260915` uses its exact observed asset set.
@@ -15,7 +17,8 @@ ordinary text, Search and Image modules.
   off. Installed 1751 corrects ordinary GLOBAL contexts and identifies the
   remaining `project_shared` rejection without another Send. Adapter 415
   recognizes same-user owners and matching project-route config, and checks
-  owner/scopes on history apply. Its package/device acceptance is pending.
+  owner/scopes on history apply. Its 1752 package is installed, but the new
+  official rollout blocked admission before another Send; see the follow-up.
 
 - [1749 recovery follow-up](chatgpt-fresh-recovery-suspend-20260915.md) cancels
   automatic history reads on background/offline suspension without replaying
