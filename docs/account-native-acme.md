@@ -1,6 +1,6 @@
 # Rust 原生 IP 证书管理
 
-状态：代码实现与本地专项测试通过，生产签发与切换待验收。模块 `server/src/account_security/https/acme/`，与商业边缘网关的域名证书配置独立。
+状态：代码、专项测试、测试及正式环境签发、线上热切换、重启恢复均通过。2026-09-15部署于服务端v0.3.1760，旧续期定时器已停用。真实跨周期续期待运行到计划时间后验证。模块 `server/src/account_security/https/acme/`，与商业边缘网关的域名证书配置独立。详见[交付记录](delivery/article-square-native-acme-20260915.md)。
 
 服务器通过 `instant-acme 0.8.5`、rustls 和 rcgen 实现 ACME，不启动 Certbot、lego、Nginx 或其他证书进程。Let’s Encrypt 的 `shortlived` IP 证书有效期160小时；当前实现每5分钟检查，剩余48小时内续期。失败按15分钟起指数退避，最大间隔4小时；请求前保存重试时间，防止重启循环耗尽签发额度。单次申请最多10分钟。
 
@@ -26,6 +26,8 @@ ACCOUNT_ACME_STAGING=false
 `DATA_DIR/{staging|production}/{ip}/` 保存账号凭证 `account.json`、完整证书与私钥 `active.pem`、运行状态 `status.json`。Linux目录0700、文件0600；不要提交、共享或输出前两者。一个PEM同时保存证书链与私钥，写入临时文件、fsync后原子替换；读者读取同一份字节快照，避免续期时证书与私钥不匹配。
 
 启用前校验证书链、IP SAN、有效期及公私钥匹配。生产模式额外要求公共根信任；测试环境证书永远不会加载到业务HTTPS。TLS监听器60秒检查新证书，校验失败保留上一份可用TLS配置。旧证书路径不被覆盖；设置 `ACCOUNT_ACME_ENABLED=false` 并重启可恢复旧证书来源，但必须同时恢复旧续期任务。
+
+TLS-ALPN临时验证证书要求特殊的critical ACME扩展；通用WebPKI加载器会拒绝该扩展，因此只在验证端口使用专用证书resolver，并检查临时签名密钥的一致性。正式证书加载与公共根信任校验保持完整。脱敏状态码区分账号、订单、验证选择/监听/启动/校验、证书下载和启用阶段，并按白名单记录CA错误类型，不输出错误正文。专项测试使用真实TCP/TLS握手验证IP SAN、critical扩展、挑战摘要、签名及端口释放。
 
 ## 运维迁移顺序
 
