@@ -260,7 +260,8 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun finishToMain() {
-        val intent = Intent(this, MainActivity::class.java)
+        val draft = intent.getStringExtra("external_share_draft")
+        val intent = if (draft != null) Intent(this, com.elon.app.sharing.ExternalShareActivity::class.java).putExtra("draft_id", draft) else Intent(this, MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()

@@ -203,7 +203,7 @@ class ChatAdapter(
         val shareCardBound = !recalled && AiConversationShareCardViews.bind(
             holder.attachmentList, holder.text, message, onAiConversationShareOpen, onAiConversationShareCoverLoad,
             onLongPress = onAiConversationShareLongPress)
-        val postCardBound = shareCardBound || (!recalled && (com.elon.app.articles.ArticleCardViews.bind(holder.attachmentList, holder.text, message) || bindChatProjectPostCardView(holder.attachmentList, holder.text, message)))
+        val postCardBound = shareCardBound || (!recalled && (com.elon.app.sharing.SourceLinkViews.bindCard(holder.attachmentList, holder.text, message) || com.elon.app.articles.ArticleCardViews.bind(holder.attachmentList, holder.text, message) || bindChatProjectPostCardView(holder.attachmentList, holder.text, message)))
         val projectShareBound = if (postCardBound) {
             false
         } else {

@@ -13,6 +13,7 @@ fn temp_store() -> Store {
 
 fn image_attachment(name: &str) -> ProjectAttachmentRef {
     ProjectAttachmentRef {
+        source_link: None,
         attachment_id: Some(format!("att_{}", name)),
         kind: Some("image".to_string()),
         display_name: Some(name.to_string()),
@@ -32,6 +33,7 @@ fn image_attachment(name: &str) -> ProjectAttachmentRef {
 
 fn voice_attachment(seconds: u32) -> ProjectAttachmentRef {
     ProjectAttachmentRef {
+        source_link: None,
         attachment_id: Some("att_voice".to_string()),
         kind: Some("voice".to_string()),
         display_name: Some("voice.m4a".to_string()),
@@ -47,6 +49,26 @@ fn voice_attachment(seconds: u32) -> ProjectAttachmentRef {
         transcription: None,
         annotations: Vec::new(),
     }
+}
+
+#[test]
+fn attachment_source_survives_chat_storage_and_legacy_round_trip() {
+    let mut image = image_attachment("synthetic.png");
+    let legacy = serde_json::to_value(&image).unwrap();
+    assert!(legacy.get("source_link").is_none());
+    assert!(serde_json::from_value::<ProjectAttachmentRef>(legacy)
+        .unwrap()
+        .source_link
+        .is_none());
+    let url = "https://mp.weixin.qq.com/s/test?scene=90";
+    image.source_link = Some(
+        serde_json::from_value(serde_json::json!({"version":1,"url":url,"method":"qr"})).unwrap(),
+    );
+    let stored = crate::store::friend_messages::attachments_to_json(Some(&[image])).unwrap();
+    let received = crate::store::friend_messages::parse_attachments(stored.as_deref()).unwrap();
+    assert_eq!(received[0].source_link.as_ref().unwrap().url, url);
+    assert_eq!(received[0].file_name.as_deref(), Some("synthetic.png"));
+    assert!(stored.unwrap().len() < 1000);
 }
 
 #[test]
@@ -185,6 +207,7 @@ fn friend_image_annotations_are_visible_to_recipient() {
         .expect("alice can add bob");
 
     let attachments = vec![ProjectAttachmentRef {
+        source_link: None,
         attachment_id: Some("att_annotated".to_string()),
         kind: Some("image".to_string()),
         display_name: Some("marked.jpg".to_string()),

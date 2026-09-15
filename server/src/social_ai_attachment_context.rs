@@ -190,6 +190,7 @@ mod tests {
         let text = append_to_message_content(
             "",
             &[ProjectAttachmentRef {
+                source_link: None,
                 attachment_id: Some("att_1".to_string()),
                 kind: Some("image".to_string()),
                 display_name: Some("marked.jpg".to_string()),

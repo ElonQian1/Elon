@@ -46,7 +46,7 @@ internal fun bindChatAttachmentViews(
     container.visibility = View.VISIBLE
     visibleItems.forEachIndexed { index, attachment ->
         val view = when {
-            attachment.isImage() -> createImageAttachmentView(container.context, attachment)
+            attachment.isImage() -> com.elon.app.sharing.SourceLinkViews.wrapImage(container.context, attachment, createImageAttachmentView(container.context, attachment))
             attachment.isVoice() -> createVoiceAttachmentView(container.context, attachment, isSent, onVoiceLongPress)
             else -> createFileAttachmentView(container.context, attachment)
         }
@@ -447,6 +447,7 @@ private fun List<ChatAttachment>.attachmentRenderSignature(): String {
     return joinToString(separator = "\u001F") { attachment ->
         val source = if (attachment.isImage()) chatAttachmentImageSource(attachment).orEmpty() else attachment.url.orEmpty()
         listOf(
+            attachment.sourceLink?.url.orEmpty(),
             attachment.kind.orEmpty(),
             attachment.mimeType.orEmpty(),
             source,

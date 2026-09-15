@@ -205,6 +205,8 @@ data class PendingAttachment(
     val transcription: String? = null,
     val annotations: List<ChatImageAnnotation> = emptyList(),
     val chatGptUploadCopy: Boolean = false,
+    var sourceLink: com.elon.app.sharing.SourceLink? = null,
+    var sourceLinkChecked: Boolean = false,
 )
 
 data class SendTarget(

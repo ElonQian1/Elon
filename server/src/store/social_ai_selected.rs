@@ -188,6 +188,7 @@ mod tests {
             .expect("alice can add bob");
 
         let attachment = ProjectAttachmentRef {
+            source_link: None,
             attachment_id: Some("att_selected".to_string()),
             kind: Some("image".to_string()),
             display_name: Some("selected.jpg".to_string()),

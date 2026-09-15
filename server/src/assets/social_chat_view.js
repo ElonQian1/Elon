@@ -27,6 +27,7 @@
         player.src = url.href; box.append(player, retry);
       }
       box.append(link); bubble.append(box);
+      if (kind === 'image' || mime.startsWith('image/')) root.ElonSourceLinks?.image(box, item, url.href);
     });
   }
   function create(options) {
@@ -56,7 +57,7 @@
               avatarFallback: outgoing ? (options.user()?.nickname || options.user()?.account || '我') : (msg.sender_name || options.friendName(contact)),
             });
             const shared = !recalled && kind === 'group' && root.ElonAiConversationShare?.mount(bubble, msg, { api: options.api, groupId: contact.id, list, isCurrent: () => scope === key });
-            if (!recalled && !shared) { root.ElonArticles.mount(bubble, text, options.api, options.user()?.id); media(bubble, msg.attachments); }
+            if (!recalled && !shared) { root.ElonArticles.mount(bubble, text, options.api, options.user()?.id); media(bubble, msg.attachments); if (!msg.attachments?.length) root.ElonSourceLinks?.text(bubble, text); }
             if (kind === 'group' && msg.id && !shared) root.ElonGroupMessageRevisions.mount(bubble, contact.id, msg, options.api, () => options.changed(contact.id));
             if (msg.send_status) { const status = document.createElement('small'); status.textContent = msg.send_status; status.style.display = 'block'; bubble.append(status); }
             entry = { signature, block: bubble.closest('.chat-message-block') };

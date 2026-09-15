@@ -269,6 +269,7 @@ mod tests {
     fn only_returns_image_urls_from_current_server() {
         let task = UiDesignTaskInput::default();
         let attachments = vec![ProjectAttachmentRef {
+            source_link: None,
             attachment_id: Some("att_1".into()),
             kind: Some("image".into()),
             display_name: Some("target.png".into()),

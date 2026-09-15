@@ -4,6 +4,7 @@ import { formatTime } from '../../lib/utils'
 import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import { messageCopySourceId } from '../message-actions/MessageActions'
 import MarkdownContent from '../markdown/MarkdownContent'
+import { TextSourceCard } from './source-links/SourceLinkView'
 import ArticleMessage from '../articles/ArticleMessage'
 import { articleReference } from '../articles/articleApi'
 import type { ActiveConversation, Friend, FriendGroup, SocialMessage } from './socialMessageTypes'
@@ -100,6 +101,7 @@ export default function SocialConversation(props: Props) {
             {content && (articleReference(content) ? <ArticleMessage content={content} /> : <div id={copyId} className={styles.msgContent}>
               {(!own || content.startsWith('>')) && /[#*`\[\]>|]/.test(content) ? <MarkdownContent content={content} copy={false} /> : content}
             </div>)}
+            {!recalled && !m.attachments?.length && <TextSourceCard text={m.content} />}
             {!recalled && <SocialMessageAttachments attachments={m.attachments} />}
             <SocialMessageMenu conversation={conversation} message={m} own={own} special={specialMessage(m)} copySourceId={copyId} request={menu} onMenu={setMenu} favorite={favorites.has(savedKey)}
               onQuote={() => setQuote({ conversation: key, message: m, author: name, nonce: Date.now() })}

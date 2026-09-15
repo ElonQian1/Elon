@@ -1,0 +1,5 @@
+.link{display:block;color:var(--color-accent,#8ea7d5);padding:10px 2px;min-height:40px;font-size:13px;line-height:1.5;overflow-wrap:anywhere;text-decoration:none}
+.link:hover{text-decoration:underline}
+.manual{display:flex;flex-wrap:wrap;align-items:center;gap:12px;font-size:13px}
+.manual button{min-height:40px;padding:8px 12px;border:1px solid #252b33;border-radius:8px;background:#171c22;color:#c2cbd6;cursor:pointer}
+.manual .link{width:100%}

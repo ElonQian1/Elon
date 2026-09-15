@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { scanImageLinks } from './source-links/scanImageLinks'
+import type { SourceLink } from './source-links/sourceLink'
 import { socialLocalId } from './socialLocalId'
 import type { ActiveConversation, SocialAttachment } from './socialMessageTypes'
 import { conversationId } from './socialChatCache'
 import { socialRequest } from './socialChatOperations'
 
-export interface PendingSocialFile { id: string; file: File; status: 'uploading' | 'ready' | 'error'; attachment?: SocialAttachment; error?: string }
+export interface PendingSocialFile { id: string; file: File; status: 'uploading' | 'ready' | 'error'; attachment?: SocialAttachment; error?: string; sources?: SourceLink[] }
 export function useSocialAttachments(userId: string) {
   const [byConversation, setByConversation] = useState<Record<string, PendingSocialFile[]>>({})
   const current = useRef(byConversation)
@@ -22,13 +24,15 @@ export function useSocialAttachments(userId: string) {
     update(key, files => files.map(f => f.id === item.id ? { ...f, status: 'uploading', error: '' } : f))
     try {
       const mime = item.file.type || 'application/octet-stream'
+      const sources = await scanImageLinks(item.file).catch(() => [])
+      if (controller.signal.aborted) return
       const params = new URLSearchParams({ file_name: item.file.name, display_name: item.file.name, mime_type: mime,
         kind: mime.startsWith('image/') ? 'image' : mime.startsWith('audio/') ? 'audio' : 'attachment', conversation_id: `${conversation.kind}-${conversation.id}` })
       const result = await socialRequest<{ attachment: SocialAttachment }>(`/api/user/${encodeURIComponent(userId)}/chat-attachments?${params}`, {
         method: 'POST', body: item.file, headers: { 'Content-Type': mime }, signal: controller.signal,
       }, 60000)
       if (!result.attachment?.attachment_id || !result.attachment.url) throw new Error('上传响应缺少附件信息，请重试')
-      update(key, files => files.map(f => f.id === item.id ? { ...f, status: 'ready', attachment: result.attachment } : f))
+      update(key, files => files.map(f => f.id === item.id ? { ...f, status: 'ready', sources, attachment: { ...result.attachment, source_link: sources.length === 1 ? sources[0] : null } } : f))
     } catch (failure) {
       if (!controller.signal.aborted) update(key, files => files.map(f => f.id === item.id ? { ...f, status: 'error', error: (failure as Error).message } : f))
     } finally { controllers.current.delete(item.id) }
@@ -46,5 +50,8 @@ export function useSocialAttachments(userId: string) {
     ids.forEach(id => controllers.current.get(id)?.abort())
     update(conversationId(conversation), files => files.filter(f => !ids.includes(f.id)))
   }
-  return { byConversation, add, remove, retry: upload }
+  function chooseSource(conversation: ActiveConversation, id: string, url: string) {
+    update(conversationId(conversation), files => files.map(file => file.id === id && file.attachment ? { ...file, attachment: { ...file.attachment, source_link: file.sources?.find(source => source.url === url) ?? null } } : file))
+  }
+  return { byConversation, add, remove, retry: upload, chooseSource }
 }

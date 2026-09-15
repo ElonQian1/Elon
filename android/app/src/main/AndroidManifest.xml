@@ -66,6 +66,20 @@
         android:theme="@style/Theme.ElonApp"
         android:usesCleartextTraffic="true">
 
+        <activity android:name=".sharing.ArticleLinkActivity" android:exported="false" />
+        <activity android:name=".sharing.ExternalShareActivity" android:exported="true" android:label="发送到一龙" android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" /><data android:mimeType="text/html" />
+                <data android:mimeType="image/*" /><data android:mimeType="video/*" /><data android:mimeType="application/pdf" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" /><data android:mimeType="video/*" /><data android:mimeType="application/pdf" />
+            </intent-filter>
+        </activity>
         <activity android:name=".articles.ArticleActivity" android:exported="false" android:windowSoftInputMode="adjustResize" android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity android:name=".articles.square.SquareActivity" android:exported="false" android:windowSoftInputMode="adjustResize" android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity android:name=".grid.host.BinanceGridOfficialActivity"

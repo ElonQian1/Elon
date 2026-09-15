@@ -1,4 +1,5 @@
 use serde::Deserialize;
+pub mod attachment_source;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -102,6 +103,8 @@ pub struct ProjectAttachmentAnnotation {
 
 #[derive(Debug, Clone, Deserialize, serde::Serialize)]
 pub struct ProjectAttachmentRef {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_link: Option<attachment_source::AttachmentSource>,
     pub attachment_id: Option<String>,
     pub kind: Option<String>,
     pub display_name: Option<String>,

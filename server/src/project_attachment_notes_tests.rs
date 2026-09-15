@@ -4,6 +4,7 @@ use crate::project_ws_protocol::{ProjectAttachmentAnnotation, ProjectAttachmentR
 #[test]
 fn project_attachment_annotations_are_summarized_for_ai_context() {
     let attachment = ProjectAttachmentRef {
+        source_link: None,
         attachment_id: Some("att_marked".to_string()),
         kind: Some("image".to_string()),
         display_name: Some("marked.jpg".to_string()),
@@ -55,6 +56,7 @@ fn project_attachment_annotations_are_summarized_for_ai_context() {
 #[test]
 fn empty_project_message_uses_image_annotation_fallback() {
     let attachment = ProjectAttachmentRef {
+        source_link: None,
         attachment_id: Some("att_marked".to_string()),
         kind: Some("image".to_string()),
         display_name: Some("marked.jpg".to_string()),
@@ -73,7 +75,7 @@ fn empty_project_message_uses_image_annotation_fallback() {
             y: 0.2,
             width: 0.3,
             height: 0.4,
-            note: "add a yellow button named 魔王".to_string(),
+            note: "add a yellow button named 榄旂帇".to_string(),
             icon_x: None,
             icon_y: None,
             icon_width: None,
@@ -85,5 +87,5 @@ fn empty_project_message_uses_image_annotation_fallback() {
 
     assert!(message.contains("uploaded attachments"));
     assert!(message.contains("annotation #1"));
-    assert!(message.contains("add a yellow button named 魔王"));
+    assert!(message.contains("add a yellow button named 榄旂帇"));
 }

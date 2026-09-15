@@ -1,4 +1,5 @@
 export interface SocialAttachment {
+  source_link?: import('./source-links/sourceLink').SourceLink | null
   attachment_id?: string | null
   kind?: string | null
   display_name?: string | null

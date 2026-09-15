@@ -115,12 +115,12 @@
       const job = jobs.get(key); if (job) { job.controller.abort(); jobs.delete(key); }
       cache.remove(scopeKey(key));
     }
-    async function send(kind, contact, content) {
+    async function send(kind, contact, content, attachments = []) {
       ensureOwner(); const identity = owner, key = contactKey(kind, contact);
-      const pending = { client_id: 'local-' + Date.now() + '-' + Math.random(), content, outgoing: true, created_at: new Date().toISOString(), send_status: '发送中…' };
+      const pending = { client_id: 'local-' + Date.now() + '-' + Math.random(), content, attachments, outgoing: true, created_at: new Date().toISOString(), send_status: '发送中…' };
       outbox.set(key, (outbox.get(key) || []).concat(pending)); if (active?.key === key) paint(true);
       try {
-        const data = await json('/api/me/' + kind + 's/' + encodeURIComponent(contact.id) + '/messages', { method: 'POST', body: JSON.stringify({ content }) }, undefined, 30000);
+        const data = await json('/api/me/' + kind + 's/' + encodeURIComponent(contact.id) + '/messages', { method: 'POST', body: JSON.stringify({ content, attachments }) }, undefined, 30000);
         if (identity !== session()) return;
         if (!data.message?.id) throw new Error('发送结果未确认，请刷新核对后再重试');
         Object.assign(pending, data.message, { send_status: '' });

@@ -3,6 +3,7 @@ import { Download, FileText, X } from 'lucide-react'
 import { cloudResourceUrl } from '../../lib/cloudResourceUrl'
 import type { SocialAttachment } from './socialMessageTypes'
 import styles from './SocialMessageAttachments.module.css'
+import { SourceLinkView, ManualImageQr } from './source-links/SourceLinkView'
 import { attachmentKind } from './socialMessageContext'
 
 export default function SocialMessageAttachments({ attachments }: { attachments?: SocialAttachment[] | null }) {
@@ -22,7 +23,7 @@ function Attachment({ attachment }: { attachment: SocialAttachment }) {
   const name = attachment.display_name || attachment.file_name || '附件'
   const kind = attachmentKind(attachment)
   if (!url) return <div className={styles.unavailable}>{name}：附件地址不可用</div>
-  if (kind === 'image') return <ImageAttachment key={url} url={url} name={name} />
+  if (kind === 'image') return <><ImageAttachment key={url} url={url} name={name} /><SourceLinkView value={attachment.source_link} /></>
   if (kind === 'audio') return <AudioAttachment key={url} url={url} name={name} attachment={attachment} />
   return (
     <a className={styles.file} href={url} download>
@@ -63,7 +64,7 @@ function ImagePreview({ url, name, onClose }: { url: string; name: string; onClo
       <header><strong>{name}</strong><a href={url} download>下载原图</a>
         <button type="button" aria-label="关闭图片预览" autoFocus onClick={onClose}><X size={20} /></button>
       </header>
-      <img src={url} alt={name} />
+      <ManualImageQr url={url} /><img src={url} alt={name} />
     </dialog>
   )
 }

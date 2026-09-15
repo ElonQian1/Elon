@@ -18,6 +18,7 @@ data class ChatAttachment(
     val imageHeight: Int? = null,
     val durationSeconds: Int? = null,
     val transcription: String? = null,
+    val sourceLink: com.elon.app.sharing.SourceLink? = null,
     val annotations: List<ChatImageAnnotation> = emptyList()
 ) {
     fun isImage(): Boolean {
@@ -39,6 +40,7 @@ internal fun chatAttachmentsFromRefs(refs: JsonArray): List<ChatAttachment> {
         if (!element.isJsonObject) return@mapNotNull null
         val item = element.asJsonObject
         ChatAttachment(
+            sourceLink = com.elon.app.sharing.SourceLink.fromJson(runCatching { JSONObject(item.get("source_link").toString()) }.getOrNull()),
             kind = item.stringOrNull("kind"),
             displayName = item.stringOrNull("display_name"),
             fileName = item.stringOrNull("file_name"),
@@ -62,6 +64,7 @@ internal fun chatAttachmentsFromJsonArray(array: JSONArray?): List<ChatAttachmen
         .mapNotNull { item ->
             item ?: return@mapNotNull null
             ChatAttachment(
+                sourceLink = com.elon.app.sharing.SourceLink.fromJson(item.optJSONObject("source_link")),
                 kind = item.optString("kind").takeIf { it.isNotBlank() },
                 displayName = item.optString("display_name").takeIf { it.isNotBlank() },
                 fileName = item.optString("file_name").takeIf { it.isNotBlank() },
@@ -91,6 +94,7 @@ internal fun chatAttachmentsFromPending(attachments: List<PendingAttachment>): L
             imageHeight = attachment.imageHeight,
             durationSeconds = attachment.durationSeconds,
             transcription = attachment.transcription,
+            sourceLink = attachment.sourceLink,
             annotations = attachment.annotations
         )
     }
@@ -100,6 +104,7 @@ internal fun chatAttachmentRefsFromChatAttachments(attachments: List<ChatAttachm
     return JsonArray().apply {
         attachments.forEach { attachment ->
             add(JsonObject().apply {
+                attachment.sourceLink?.let { add("source_link", com.google.gson.JsonParser.parseString(it.json().toString())) }
                 attachment.kind?.let { addProperty("kind", it) }
                 attachment.displayName?.let { addProperty("display_name", it) }
                 attachment.fileName?.let { addProperty("file_name", it) }
@@ -137,6 +142,7 @@ internal fun pendingAttachmentsFromChatAttachments(attachments: List<ChatAttachm
             file = file,
             imageWidth = attachment.imageWidth,
             imageHeight = attachment.imageHeight,
+            sourceLink = attachment.sourceLink,
             annotations = attachment.annotations
         )
     }

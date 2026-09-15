@@ -71,7 +71,9 @@ internal fun uploadAttachmentRefsOrNull(
                 showLongToast("附件上传响应异常：${attachment.displayName}")
                 return null
             }
+            val source = attachment.sourceLink ?: if (!attachment.sourceLinkChecked && target.projectId == CHAT_ATTACHMENT_TARGET_ID && attachment.mimeType.startsWith("image/")) com.elon.app.sharing.ImageQrLinks.decode(attachment.file).singleOrNull() else null
             array.add(JsonObject().apply {
+                source?.let { add("source_link", com.google.gson.JsonParser.parseString(it.json().toString())) }
                 uploaded.optString("attachment_id", "").takeIf { it.isNotBlank() }?.let {
                     addProperty("attachment_id", it)
                 }

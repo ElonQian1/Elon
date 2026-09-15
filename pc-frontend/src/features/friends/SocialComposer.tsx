@@ -87,6 +87,7 @@ export default function SocialComposer({ conversation, title, me, input, setInpu
   }
   return <section className={styles.compose} aria-label="消息编辑器" onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault() }}
     onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); addFiles(Array.from(event.dataTransfer.files)) } }}>
+    {files.filter(file => file.sources?.length && file.attachment).map(file => <label key={file.id} style={{display: 'block', padding: 8}}>图片链接 · {file.file.name}<select aria-label={`选择图片原文链接：${file.file.name}`} value={file.attachment?.source_link?.url ?? ''} onChange={event => media.chooseSource(conversation, file.id, event.target.value)}><option value="">不附加链接</option>{file.sources?.map(source => <option key={source.url} value={source.url}>{source.url}</option>)}</select></label>)}
     <div className={styles.toolbar}>
       <input ref={chooser} type="file" multiple hidden aria-label="选择聊天附件" onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ''; addFiles(files) }} />
       <button type="button" disabled={sending} onClick={() => chooser.current?.click()}>图片 / 文件 / 语音</button>

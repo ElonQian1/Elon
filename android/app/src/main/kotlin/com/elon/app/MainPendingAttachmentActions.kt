@@ -43,6 +43,7 @@ internal class MainPendingAttachmentActions(
             return
         }
         pendingAttachments.add(attachment)
+        com.elon.app.sharing.PendingSourceLinks.inspect(activity, listOf(attachment))
         if (isVoiceMode()) {
             setVoiceMode(false)
             applyVoiceMode()
@@ -67,6 +68,7 @@ internal class MainPendingAttachmentActions(
         val accepted = attachments.take(available)
         attachments.drop(available).forEach { attachment -> runCatching { attachment.file.delete() } }
         pendingAttachments.addAll(accepted)
+        com.elon.app.sharing.PendingSourceLinks.inspect(activity, accepted)
         if (isVoiceMode()) {
             setVoiceMode(false)
             applyVoiceMode()

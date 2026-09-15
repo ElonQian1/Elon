@@ -8,6 +8,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         ("cache-control", "no-cache"),
     ];
     Router::new()
+        .route("/assets/social_source_links.js", get(move || async move { (headers, include_str!("../../assets/social_source_links.js")) }))
+        .route("/assets/social_source_compose.js", get(move || async move { (headers, include_str!("../../assets/social_source_compose.js")) }))
+        .route("/assets/social_source_worker.js", get(move || async move { (headers, include_str!("../../assets/social_source_worker.js")) }))
+        .route("/assets/vendor/jsqr.js", get(move || async move { (headers, include_str!("../../assets/vendor/jsqr.js")) }))
         .route(
             "/assets/ai_conversation_share.js",
             get(move || async move {

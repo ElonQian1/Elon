@@ -80,6 +80,7 @@ internal class ChatSocialFavorites(context: Context) {
     private fun ChatAttachment.toJson(): JSONObject {
         val attachment = this
         return JSONObject().apply {
+            attachment.sourceLink?.let { put("source_link", it.json()) }
             put("kind", attachment.kind)
             put("display_name", attachment.displayName)
             put("file_name", attachment.fileName)
@@ -99,6 +100,7 @@ internal class ChatSocialFavorites(context: Context) {
         return List(length()) { index -> optJSONObject(index) }.mapNotNull { item ->
             item ?: return@mapNotNull null
             ChatAttachment(
+                sourceLink = com.elon.app.sharing.SourceLink.fromJson(item.optJSONObject("source_link")),
                 kind = item.cleanString("kind"),
                 displayName = item.cleanString("display_name"),
                 fileName = item.cleanString("file_name"),
