@@ -301,6 +301,12 @@
   }
 
   function contentImage(node) {
+    // Source favicons are also unlinked images (for example inside a Sources button).
+    // Use displayed size first: a 256px favicon can be rendered as a 16px icon.
+    const rect = node.getBoundingClientRect();
+    const width = Number(rect.width) || Number(node.width) || Number(node.naturalWidth) || 0;
+    const height = Number(rect.height) || Number(node.height) || Number(node.naturalHeight) || 0;
+    if (width > 0 && height > 0 && width <= 64 && height <= 64) return null;
     const preview = imageAssets && typeof imageAssets.describe === 'function'
       ? imageAssets.describe(node)
       : {};

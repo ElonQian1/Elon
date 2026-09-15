@@ -19,27 +19,33 @@ internal class ChatGptWebImageAssetCoordinator(
     private val failed = linkedSetOf<String>()
     private var activeHandle: String? = null
     private var timeout: Runnable? = null
+    private var generation = 0L
 
     fun observe(snapshot: ChatGptWebSnapshot) {
         snapshot.messages.asSequence()
             .flatMap { message -> message.parts.asSequence() }
+            .filter { part -> part.type == "image" }
             .mapNotNull { part -> part.metadata?.assetHandle }
-            .filter { handle -> store.resolvePath(handle) == null && handle !in failed }
+            .filter { handle -> handle != activeHandle &&
+                store.resolvePath(handle) == null && handle !in failed }
             .forEach(queued::add)
         pump()
     }
 
     fun accept(asset: ChatGptWebImageAsset) {
-        if (asset.handle == activeHandle) clearActiveTimeout()
+        if (asset.handle != activeHandle) return
         if (!asset.ready) {
             onAttemptFailed(asset.handle)
             return
         }
         failed.remove(asset.handle)
         queued.remove(asset.handle)
+        val owner = generation
         store.save(asset) { saved ->
             dispatch {
-                if (asset.handle == activeHandle) activeHandle = null
+                if (owner != generation || asset.handle != activeHandle) return@dispatch
+                clearActiveTimeout()
+                activeHandle = null
                 if (!saved) failed += asset.handle
                 onChanged()
                 pump()
@@ -49,6 +55,7 @@ internal class ChatGptWebImageAssetCoordinator(
 
     fun retry(handle: String) {
         if (!ChatGptWebImageAssetProtocol.validHandle(handle)) return
+        if (handle == activeHandle) return
         failed.remove(handle)
         attempts.remove(handle)
         if (store.resolvePath(handle) == null) queued += handle
@@ -63,6 +70,13 @@ internal class ChatGptWebImageAssetCoordinator(
 
     fun resolvePath(handle: String): String? = store.resolvePath(handle)
 
+    fun state(handle: String): ChatGptWebImagePreviewState = when {
+        store.resolvePath(handle) != null -> ChatGptWebImagePreviewState.IDLE
+        handle in failed -> ChatGptWebImagePreviewState.FAILED
+        activeHandle == handle || handle in queued -> ChatGptWebImagePreviewState.PREPARING
+        else -> ChatGptWebImagePreviewState.IDLE
+    }
+
     fun state(): ChatGptWebImagePreviewState = when {
         activeHandle != null || queued.isNotEmpty() -> ChatGptWebImagePreviewState.PREPARING
         failed.isNotEmpty() -> ChatGptWebImagePreviewState.FAILED
@@ -70,6 +84,7 @@ internal class ChatGptWebImageAssetCoordinator(
     }
 
     fun reset() {
+        generation++
         clearActiveTimeout()
         queued.clear()
         attempts.clear()
@@ -81,7 +96,7 @@ internal class ChatGptWebImageAssetCoordinator(
         if (activeHandle != null) return
         while (queued.isNotEmpty()) {
             val handle = queued.first().also(queued::remove)
-            if (store.resolvePath(handle) != null) continue
+            if (handle in failed || store.resolvePath(handle) != null) continue
             if (!request(handle)) {
                 failed += handle
                 onChanged()

@@ -59,6 +59,9 @@ internal object ChatGptWebMessageJson {
                 value.mediaType?.let { put("media_type", it) }
                 value.targetKind?.let { put("target_kind", it) }
                 value.targetHost?.let { put("target_host", it) }
+                value.imageWidth?.let { put("image_width", it) }
+                value.imageHeight?.let { put("image_height", it) }
+                if (value.kind == "image") put("preview_registered", value.assetHandle != null)
                 value.lineCount?.let { put("line_count", it) }
                 value.rowCount?.let { put("row_count", it) }
                 value.columnCount?.let { put("column_count", it) }

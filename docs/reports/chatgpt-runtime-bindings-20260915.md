@@ -12,6 +12,10 @@ ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
 
+- [Native inline image preview regression](chatgpt-image-preview-regression-20260915.md):
+  small source icons and per-image loading failures are tracked separately from
+  previously accepted image-gallery generation and original downloads.
+
 - Grouped normal Release **1.1.1765 (1765)**, source
   `c032b0573bf09185a5e9f171137f13e97911a449`, adapter **428**, is published and
   replacement-installed on the trusted Xiaomi. Build/upload/remote verification

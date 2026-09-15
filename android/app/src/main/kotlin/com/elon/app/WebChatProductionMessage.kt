@@ -18,6 +18,7 @@ data class WebChatProductionContentPart(
     val imageWidth: Int? = null,
     val imageHeight: Int? = null,
     val previewPending: Boolean = false,
+    val previewFailed: Boolean = false,
     val lineCount: Int? = null,
     val rowCount: Int? = null,
     val columnCount: Int? = null,

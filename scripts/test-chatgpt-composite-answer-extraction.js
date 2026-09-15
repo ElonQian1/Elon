@@ -278,6 +278,27 @@ assert.equal(
 );
 assert.equal(generatedMessages[0].content[1].assetHandle, 'image_0123456789abcdef');
 
+// A Sources button can contain an unlinked, high-resolution favicon.
+for (const linked of [false, true]) {
+  for (const naturalSize of [0, 16, 256]) {
+    const icon = new ElementNode('', { tagName: 'IMG', currentSrc: 'https://example.test/favicon.png',
+      naturalWidth: naturalSize, naturalHeight: naturalSize,
+      closestMap: linked ? { 'a[href]': generatedImageLink } : {} });
+    icon.getBoundingClientRect = () => ({ width: 16, height: 16 });
+    generatedTurn.querySelectorAllMap.img = [icon];
+    assert.equal(messages.readMessages(false)[0]?.content.filter(part => part.type === 'image').length || 0,
+      0, 'source icons must not become full-size pending image cards');
+  }
+}
+for (const size of [[512, 512], [300, 40], [40, 300]]) {
+  const answerImage = new ElementNode('', { tagName: 'IMG', currentSrc: 'https://example.test/answer.png' });
+  answerImage.getBoundingClientRect = () => ({ width: size[0], height: size[1] });
+  generatedTurn.querySelectorAllMap.img = [answerImage];
+  assert.equal(messages.readMessages(false)[0].content.filter(part => part.type === 'image').length,
+    1, 'unloaded answer images and narrow diagrams remain available');
+}
+generatedTurn.querySelectorAllMap.img = [generatedImage];
+
 // Current website cV progress is nested under these markers, not an answer.
 for (const attribute of ['data-streaming-response-fallback', 'data-streaming-response-indicator', 'data-dotball-loading-indicator']) {
   const progress = new ElementNode('正在思考', { attributes: { [attribute]: '' } });

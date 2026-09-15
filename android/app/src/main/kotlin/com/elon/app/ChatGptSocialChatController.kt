@@ -491,6 +491,7 @@ internal class ChatGptSocialChatController(
                 socialConsumerPort.state().controls,
             ),
             imagePreviewPath = session::imagePreviewPath,
+            imagePreviewState = session::imagePreviewState,
             timestampFor = transcript::timestampFor,
         )
         if (pendingTextPrompt != null) {

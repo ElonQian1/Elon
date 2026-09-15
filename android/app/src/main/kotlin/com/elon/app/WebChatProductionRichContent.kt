@@ -59,7 +59,7 @@ internal object WebChatProductionRichContentBinder {
                 onClick = onOpen?.let { callback -> { callback(message, part) } },
             )
         }
-        if (part.type == "image" && (part.imageSource != null || part.previewPending)) {
+        if (part.type == "image" && (part.imageSource != null || part.assetHandle != null || part.previewPending)) {
             return createImagePart(container, message, metadata, part, index, onOpen)
         }
         return TextView(container.context).apply {
@@ -119,7 +119,12 @@ internal object WebChatProductionRichContentBinder {
         }
         addView(preview)
         addView(TextView(context).apply {
-            text = if (part.previewPending) "正在准备图片预览…" else part.label
+            text = when {
+                part.imageSource != null -> part.label
+                part.previewFailed -> "图片加载失败，点击重试"
+                part.previewPending -> "正在准备图片预览…"
+                else -> "点击加载图片"
+            }
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
             setPadding(dp(container, 10), dp(container, 8), dp(container, 10), dp(container, 9))

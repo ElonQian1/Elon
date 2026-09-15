@@ -18,6 +18,7 @@ internal object ChatGptFriendMessageMapper {
         attachmentsForMessage: (String) -> List<ChatAttachment> = { emptyList() },
         messageActionContextIds: Set<String> = emptySet(),
         imagePreviewPath: (String) -> String? = { null },
+        imagePreviewState: (String) -> ChatGptWebImagePreviewState = { ChatGptWebImagePreviewState.IDLE },
         timestampFor: (String) -> Long,
     ): List<ChatMessage> {
         val latestAssistantIndex = snapshot.messages.indexOfLast { it.role == "assistant" }
@@ -31,6 +32,7 @@ internal object ChatGptFriendMessageMapper {
                         part = part,
                         suppressAttachmentFallback = messageAttachments.isNotEmpty(),
                         imagePreviewPath = imagePreviewPath,
+                        imagePreviewState = imagePreviewState,
                     )
                 }
             } else {
@@ -115,6 +117,7 @@ internal object ChatGptFriendMessageMapper {
         part: ChatGptWebMessagePart,
         suppressAttachmentFallback: Boolean,
         imagePreviewPath: (String) -> String?,
+        imagePreviewState: (String) -> ChatGptWebImagePreviewState,
     ): WebChatProductionContentPart? {
         if (suppressAttachmentFallback && part.type in ATTACHMENT_PART_TYPES) return null
         val assetHandle = part.metadata?.assetHandle
@@ -130,7 +133,10 @@ internal object ChatGptFriendMessageMapper {
             imageSource = imageSource,
             imageWidth = part.metadata?.imageWidth,
             imageHeight = part.metadata?.imageHeight,
-            previewPending = part.type == "image" && assetHandle != null && imageSource == null,
+            previewPending = part.type == "image" && assetHandle != null && imageSource == null &&
+                imagePreviewState(assetHandle) == ChatGptWebImagePreviewState.PREPARING,
+            previewFailed = part.type == "image" && assetHandle != null && imageSource == null &&
+                imagePreviewState(assetHandle) == ChatGptWebImagePreviewState.FAILED,
             lineCount = part.metadata?.lineCount,
             rowCount = part.metadata?.rowCount,
             columnCount = part.metadata?.columnCount,
