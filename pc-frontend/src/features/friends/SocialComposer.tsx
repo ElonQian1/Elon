@@ -4,6 +4,7 @@ import type { ActiveConversation, SocialMessage } from './socialMessageTypes'
 import { conversationId } from './socialChatCache'
 import { quoteText, sendSocialMessage, socialRequest } from './socialChatOperations'
 import { useSocialAttachments } from './useSocialAttachments'
+import { socialLocalId } from './socialLocalId'
 import SocialDialog from './SocialDialog'
 import styles from './SocialTools.module.css'
 import pageStyles from './FriendsPage.module.css'
@@ -58,14 +59,15 @@ export default function SocialComposer({ conversation, title, me, input, setInpu
     const content = pendingQuote ? `${quoteText(pendingQuote.message, pendingQuote.author)}\n\n${text}` : text
     if (Array.from(content).length > 4000) { showError('正文与引用合计不能超过 4000 字，请精简后发送'); return }
     inFlight.current.add(key)
-    const capturedFiles = [...files]
-    const attachments = capturedFiles.map(file => file.attachment!)
-    const id = `tmp-${crypto.randomUUID()}`
-    setBusy(old => ({ ...old, [key]: true })); showError('')
-    setInput(''); setQuotes(old => ({ ...old, [key]: undefined }))
-    const optimistic: SocialMessage = { id, content, attachments, created_at: new Date().toISOString(), sender_user_id: me.id, sender_name: me.nickname || me.account, outgoing: true }
-    setMessages(old => [...old, optimistic])
+    let id = ''
     try {
+      const capturedFiles = [...files]
+      const attachments = capturedFiles.map(file => file.attachment!)
+      id = `tmp-${socialLocalId()}`
+      setBusy(old => ({ ...old, [key]: true })); showError('')
+      setInput(''); setQuotes(old => ({ ...old, [key]: undefined }))
+      const optimistic: SocialMessage = { id, content, attachments, created_at: new Date().toISOString(), sender_user_id: me.id, sender_name: me.nickname || me.account, outgoing: true }
+      setMessages(old => [...old, optimistic])
       const data = await sendSocialMessage(conversation, { content, attachments })
       if (!data.message?.id) throw new Error('发送结果未确认，请同步消息后检查')
       if (mounted.current) {

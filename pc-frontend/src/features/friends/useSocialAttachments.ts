@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { socialLocalId } from './socialLocalId'
 import type { ActiveConversation, SocialAttachment } from './socialMessageTypes'
 import { conversationId } from './socialChatCache'
 import { socialRequest } from './socialChatOperations'
@@ -36,7 +37,7 @@ export function useSocialAttachments(userId: string) {
     const key = conversationId(conversation)
     if ((current.current[key]?.length ?? 0) + files.length > 6) return '每条消息最多添加 6 个附件'
     if (files.some(file => file.size > 12 * 1024 * 1024)) return '每个附件不能超过 12 MB'
-    const items: PendingSocialFile[] = files.map(file => ({ id: crypto.randomUUID(), file, status: 'uploading' }))
+    const items: PendingSocialFile[] = files.map(file => ({ id: socialLocalId(), file, status: 'uploading' }))
     update(key, previous => [...previous, ...items])
     items.forEach(item => void upload(conversation, item))
     return ''
