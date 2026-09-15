@@ -17,6 +17,12 @@ runtime compatibility path remain. Project, attachment, feedback and tool retrie
 are not covered by this completion marker. The dated failed trials below remain
 historical evidence, not the current capability status.
 
+[Existing project retry](reports/chatgpt-fresh-project-retry-20260915.md) now has
+an offline-verified independent candidate in adapter 428. It reuses this ledger,
+stream, Stop and history with exact project ownership; one-command trial or a
+separate explicit flag only. Grouped build/native acceptance is pending, so the
+ordinary retry completion marker and defaults above are unchanged.
+
 September 14: [runtime-parent correction](reports/chatgpt-fresh-retry-parent-20260914.md)
 reproduces and fixes a runtime `parentId` / history `parent` field mismatch.
 The 1721 native retry attempt failed before independent dispatch, then the runtime

@@ -7,6 +7,7 @@ const UID = '44444444-4444-4444-8444-444444444444';
 const ROOT = '55555555-5555-4555-8555-555555555555';
 const AID = '66666666-6666-4666-8666-666666666666';
 const OTHER = '77777777-7777-4777-8777-777777777777';
+const PROJECT = 'g-p-' + 'a'.repeat(32);
 
 function fixture() {
   const f = freshContext(), r = runtimeRetry();
@@ -64,6 +65,8 @@ function fixture() {
     const mapping = Object.fromEntries(Object.entries(tree.nodes).map(([key, { parentId, ...node }]) =>
       [key, { ...node, parent: parentId }]));
     return { conversation_id: CID, current_node: id, async_status: null,
+      ...(tree.mode.gizmo_id ? { gizmo_id: tree.mode.gizmo_id, is_do_not_remember: false,
+        owner: { user_id: shared.mq().normalizedAccountUserId }, context_scopes: ['GLOBAL'] } : {}),
       mapping: { ...mapping, [id]: { id, parent: UID, message: reply(id) } } };
   }
   function apply(value, preserveLeaf = false) {
@@ -74,7 +77,25 @@ function fixture() {
   }
   const api = regeneration.create(page, f.api);
   return Object.assign(f, { retry: r, user, command, reply, history, apply, branchSelections,
-    capture: () => api.capture(command), inspect: () => api.inspect(command) });
+    capture: options => api.capture(command, options), inspect: options => api.inspect(command, options) });
 }
 
-module.exports = { fixture, CID, PID, UID, ROOT, AID, OTHER };
+function projectFixture(path = '/g/' + PROJECT + '/c/' + CID) {
+  const f = fixture();
+  f.tree.mode = { kind: 'gizmo_interaction', gizmo_id: PROJECT, gizmo: { name: 'Synthetic project' } };
+  Object.assign(f.tree, { isLoading: false, is_do_not_remember: false, contextScopes: ['GLOBAL'] });
+  f.shared.HM.getGizmoId = state => state.mode.gizmo_id ?? null;
+  f.shared.HM.getConversationTurns = () => [];
+  f.shared.textBusinessContext = () => null;
+  f.shared.textLockedChatPin = () => undefined;
+  f.shared.textLockedProjectId = () => null;
+  f.shared.textProjectHeaders = () => undefined;
+  const account = f.shared.mq;
+  f.shared.mq = () => ({ ...account(), normalizedAccountUserId: f.retry.identity.userId });
+  f.tree.sharedProjectConversationOwner = { id: f.retry.identity.userId };
+  f.selected.config = { urlGizmoId: PROJECT };
+  f.page.location.href = f.binding.href = 'https://chatgpt.com' + path;
+  return f;
+}
+
+module.exports = { fixture, projectFixture, PROJECT, CID, PID, UID, ROOT, AID, OTHER };

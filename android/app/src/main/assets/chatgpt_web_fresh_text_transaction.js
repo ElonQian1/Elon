@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 36, create: factory });
+  const api = Object.freeze({ version: 37, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -156,6 +156,7 @@
     const allowPersonalImage = page.__elonChatGptFreshTextToolsEnabled !== false;
     const allowProjects = page.__elonChatGptFreshTextProjectsEnabled === true || trialArmed();
     const allowExistingProjects = page.__elonChatGptFreshTextProjectsEnabled !== false;
+    const allowRegenerationProjects = page.__elonChatGptFreshRegenerationProjectsEnabled === true || trialArmed();
     // The committed conversation and draft own first-send admission, not the
     // editor DOM. Context capture still rejects missing or ambiguous owners.
     const allowNewConversations = trialArmed() || page.__elonChatGptFreshTextNewConversationsEnabled !== false;
@@ -233,7 +234,7 @@
             context.stamp() !== stamp) throw Error('context_changed');
       }
       if (regenerate && !regeneration) throw Error('runtime_unavailable');
-      const capture = () => regenerate ? regeneration.capture(command) :
+      const capture = () => regenerate ? regeneration.capture(command, { allowExistingProjects: allowRegenerationProjects }) :
         context.capture(command.composer, continuation,
           { allowTools, allowPersonalSearch, allowPersonalImage, allowProjects, allowExistingProjects, allowNewConversations, allowTemporary,
             allowAttachments, allowPersonalAttachments, requireNativeAttachment: command.requireNativeAttachment === true });
@@ -451,7 +452,7 @@
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
   const pendingRecoverySnapshot = onChange => { state(); return pendingRecovery?.snapshot(onChange) || 'disabled'; };
-  return Object.freeze({ version: 36, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 37, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     pendingRecoverySnapshot,
     addRecoverySnapshotFields: (event, onChange) => { event.privateSendRecoveryState = pendingRecoverySnapshot(onChange); },

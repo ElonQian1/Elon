@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 8, create: factory });
+  const api = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextRequest = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -49,7 +49,7 @@
   function create(context, command) {
     const regenerate = context?.operation === 'regenerate';
     if (context?.operation != null && !regenerate || regenerate && (context.newConversation || context.temporary ||
-        context.projectId != null || context.attachments || context.tool || context.parentRole !== 'user' ||
+        context.attachments || context.tool || context.parentRole !== 'user' ||
         !['comparison_implicit', 'none'].includes(context.variantPurpose))) fail('scope_unsupported');
     if (!/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || '') ||
         typeof command.prompt !== 'string' || (regenerate ? command.prompt !== '' : !command.prompt.trim() && !context?.attachments) ||

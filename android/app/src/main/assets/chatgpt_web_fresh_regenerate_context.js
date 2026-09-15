@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 7, create: factory });
+  const api = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshRegenerateContext = api;
 })(typeof window === 'object' ? window : null, function (page, baseContext) {
@@ -12,12 +12,15 @@
   const userSignature = (page.__elonChatGptFreshTextUserIdentity ||
     (typeof module === 'object' && module.exports ? require('./chatgpt_web_fresh_text_user_identity') : null))?.signature;
 
-  async function capture(command) {
+  async function capture(command, options = {}) {
     if (!contract || !userSignature) fail('runtime_unavailable', 'contract');
     const seed = contract.capture(command.turn, command.getModelTrigger);
     if (!seed) fail('context_unavailable', 'menu');
-    const base = await baseContext.capture(command.composer);
-    if (base.newConversation || base.temporary || base.projectId != null || base.attachments || base.tool) fail('scope_unsupported', 'base_scope');
+    const allowExistingProjects = options.allowExistingProjects === true ||
+      page.__elonChatGptFreshRegenerationProjectsEnabled === true;
+    const base = await baseContext.capture(command.composer, null, { allowExistingProjects });
+    if (base.newConversation || base.temporary || base.projectId != null && !allowExistingProjects ||
+        base.attachments || base.tool) fail('scope_unsupported', 'base_scope');
     const { shared, runtime } = base;
     const owner = contract.prepare(seed, { shared, conversation: runtime });
     if (!owner || owner.cid !== base.conversationId || owner.token !== base.token ||
@@ -149,18 +152,22 @@
     });
   }
   let inspection = null;
-  function inspect(command) {
+  function inspect(command, options = {}) {
     if (inspection) return inspection;
+    const allowExistingProjects = options.allowExistingProjects === true ||
+      page.__elonChatGptFreshTextTransaction?.trialControl?.('state')?.armed === true;
     const result = (code, stage) => ({ schema: 'elon.fresh_regenerate_admission.v1', code, stage });
     const codes = ['scope_unsupported', 'runtime_unavailable', 'identity_unavailable', 'context_unavailable',
       'context_changed', 'context_invalid', 'attachments_active', 'tools_active', 'conversation_busy', 'parent_unavailable'];
     const stages = ['contract', 'menu', 'base_scope', 'owner', 'resolver', 'model', 'user_identity', 'user_content',
       'user_parent', 'user_channel', 'user_recipient', 'user_metadata', 'reply_metadata', 'effort', 'current',
       'base_route', 'base_new', 'base_owner', 'base_composer', 'base_route_state', 'base_privacy', 'base_prepare',
-      'base_model', 'base_workspace', 'base_project', 'base_mode', 'base_branch', 'base_config'];
+      'base_model', 'base_workspace', 'base_project', 'base_mode', 'base_branch', 'base_config',
+      'project_route', 'project_mode', 'project_loading', 'project_privacy', 'project_shared',
+      'project_scopes', 'project_business', 'project_headers'];
     let timer;
     // Admission only: no prepare request, stream, draft mutation or writer ledger.
-    inspection = Promise.race([capture(command).then(() => result('ready', 'ready'), error =>
+    inspection = Promise.race([capture(command, { allowExistingProjects }).then(() => result('ready', 'ready'), error =>
       result(codes.includes(error?.message) ? error.message : 'read_failed',
         stages.includes(error?.admissionStage) ? error.admissionStage : 'base_context')),
     new Promise(resolve => { timer = page.setTimeout(() => resolve(result('timeout', 'timeout')), 5000); })])

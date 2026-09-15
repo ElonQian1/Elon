@@ -12,6 +12,12 @@ ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
 
+- [Existing project retry](chatgpt-fresh-project-retry-20260915.md): adapter 428
+  source candidate reuses independent prepare/variant/stream/Stop/history with
+  the original user parent and exact project owner. 627 Node tests and the
+  current pinned public-source contract pass; grouped build/native trial remain
+  pending. No change to accepted ordinary retry or project Send defaults.
+
 - [Cold input preparation](chatgpt-cold-composer-owner-20260915.md): adapter 427
   source candidate removes the cold shared-identity module's circular readiness
   wait and rejects missing models before advertising native Send readiness.

@@ -2,20 +2,21 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
-const { fixture: contextFixture, CID, PID, UID, AID, OTHER } = require('./fixtures/chatgpt-fresh-regeneration');
+const { fixture: contextFixture, projectFixture, PROJECT, CID, PID, UID, AID, OTHER } = require('./fixtures/chatgpt-fresh-regeneration');
 const { install } = require('./fixtures/chatgpt-owned-stream-transport');
 const load = name => require('../android/app/src/main/assets/chatgpt_web_fresh_text_' + name);
 const tick = () => new Promise(resolve => setImmediate(resolve));
 async function settle() { for (let i = 0; i < 12; i++) await tick(); }
 
 function fixture(options = {}) {
-  const f = contextFixture(), calls = [], { page, shared, conversation } = f;
+  const f = options.project ? projectFixture() : contextFixture(), calls = [], { page, shared, conversation } = f;
   let draft = 'Synthetic unsent draft', body, stopped = false,
     historyId = options.historyId || AID, streamId = options.streamId || AID;
   Object.assign(page, { crypto, AbortController, setTimeout, clearTimeout,
     __elonChatGptPrivateTextTransactionsEnabled: true,
     __elonChatGptFreshTextStream: load('stream') });
   if ('enabled' in options) page.__elonChatGptFreshRegenerationEnabled = options.enabled;
+  if ('projectsEnabled' in options) page.__elonChatGptFreshRegenerationProjectsEnabled = options.projectsEnabled;
   page.document.visibilityState = 'visible';
   install(page);
   shared.textTopic = () => { throw Error('unexpected topic'); };
@@ -49,6 +50,7 @@ function fixture(options = {}) {
     calls.push({ kind: 'history' });
     if (options.history === false) return;
     const payload = f.history(historyId);
+    options.historyPayload?.(payload);
     if (options.waitForStop) {
       payload.mapping[historyId].message = f.reply(historyId, stopped ? 'finished_partial_completion' : 'in_progress');
       payload.async_status = stopped ? null : 3;
@@ -177,8 +179,8 @@ test('leaving the conversation prevents late stream projection and history appli
   f.close();
 });
 
-test('native stop uses this variant preparation and preserves the owned partial answer', async () => {
-  const f = fixture({ waitForStop: true });
+for (const project of [false, true]) test('native stop preserves the owned partial answer, project=' + project, async () => {
+  const f = fixture({ waitForStop: true, project, projectsEnabled: project });
   assert.equal((await f.api.regenerate(f.command).completion).status, 'accepted');
   await settle();
   assert.equal(f.page.__elonChatGptPrivateStreamTransport.current('/c/' + CID).id, AID);
@@ -194,4 +196,58 @@ test('native stop uses this variant preparation and preserves the owned partial 
   assert.equal(f.calls.filter(c => c.kind === 'post').length, 1);
   assert.equal(f.calls.filter(c => c.kind === 'stop').length, 1);
   f.close();
+});
+
+test('accepted project-send scope does not silently enable unverified project retry', async () => {
+  const f = fixture({ project: true });
+  f.page.__elonChatGptFreshTextProjectsEnabled = true;
+  const sent = f.api.regenerate(f.command);
+  assert.equal((await sent.completion).status, 'unavailable');
+  assert.equal(f.calls.length, 0); assert.equal(sent.claimFallback(), true);
+  assert.equal(sent.claimFallback(), false); f.close();
+});
+
+for (const trial of [false, true]) test('project variant reuses the native stream and history, single-trial=' + trial, async () => {
+  const f = fixture({ project: true, projectsEnabled: !trial, preserveLeaf: true });
+  if (trial) assert.equal(f.api.trialControl('start').armed, true);
+  const sent = f.api.regenerate(f.command);
+  assert.equal((await sent.completion).status, 'accepted'); await settle();
+  assert.equal(f.body().action, 'variant'); assert.equal(f.body().parent_message_id, UID);
+  assert.deepEqual(f.body().conversation_mode, { kind: 'gizmo_interaction', gizmo_id: PROJECT });
+  assert.equal('messages' in f.body(), false);
+  assert.equal(f.api.state().pending, false); assert.equal(f.tree.leaf, AID);
+  assert.deepEqual(f.branchSelections, [AID]); assert.equal(f.retry.calls.length, 0);
+  assert.equal(f.draft(), 'Synthetic unsent draft');
+  assert.equal(f.api.regenerate(f.command), sent);
+  assert.equal(f.calls.filter(c => c.kind === 'post').length, 1);
+  assert.equal(f.api.trialControl('state').armed, false);
+  assert.equal(f.page.__elonChatGptFreshRegenerationProjectsEnabled, !trial);
+  assert.equal(Object.values(f.tree.nodes).filter(n => n.message?.author?.role === 'user').length, 1);
+  f.close();
+});
+
+test('project membership changed during prepare prevents the variant POST', async () => {
+  const f = fixture({ project: true, projectsEnabled: true, prepare: f => {
+    f.tree.mode.gizmo_id = 'g-p-' + 'b'.repeat(32);
+  } });
+  const sent = f.api.regenerate(f.command);
+  assert.equal((await sent.completion).status, 'rejected');
+  assert.equal(sent.claimFallback(), false);
+  assert.equal(f.calls.filter(c => c.kind === 'post').length, 0);
+  assert.equal(f.draft(), 'Synthetic unsent draft'); f.close();
+});
+
+test('project retry rejects another project history and recovers only its own variant without replay', async () => {
+  let wrongProject = true;
+  const f = fixture({ project: true, projectsEnabled: true, historyPayload: value => {
+    if (wrongProject) value.gizmo_id = 'g-p-' + 'b'.repeat(32);
+  } });
+  const sent = f.api.regenerate(f.command);
+  assert.equal((await sent.completion).status, 'accepted'); await settle();
+  assert.equal(f.api.state().pending, true); assert.equal(f.tree.leaf, PID);
+  assert.equal(sent.claimFallback(), false);
+  wrongProject = false;
+  assert.equal((await f.api.recover().completion).status, 'accepted'); await settle();
+  assert.equal(f.api.state().pending, false); assert.equal(f.tree.leaf, AID);
+  assert.equal(f.calls.filter(c => c.kind === 'post').length, 1); f.close();
 });
