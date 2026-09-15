@@ -19450,7 +19450,7 @@
       "id": "pc-social-chat-recovery-v1",
       "title": "Windows 会话缓存与同步恢复",
       "summary": "缓存优先显示、超时重试、前台与实时恢复，修复空白及停更",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/pc-social-chat-recovery.md",
@@ -19562,7 +19562,7 @@
         }
       ],
       "created_at_ms": 1789456185467,
-      "updated_at_ms": 1789457124581
+      "updated_at_ms": 1789457366093
     },
     {
       "id": "private-grid-read-bridge-v1",
@@ -28854,16 +28854,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_df0a226398484706ad76cd2bca46bbd9",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "claim_released",
-      "actor": "codex-native-manage-v2",
-      "reason": "按注册表约束临时释放以校正需求历史状态，随后重新认领当前管理切片",
-      "from_status": "in_progress",
-      "to_status": "blocked",
-      "at_ms": 1788983339526
-    },
-    {
       "id": "feature_event_a171e86bc83d461f80f7685730803eec",
       "feature_id": "android-exchange-session-host-v2",
       "action": "requirement_rebound",
@@ -30852,6 +30842,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1789457124581
+    },
+    {
+      "id": "feature_event_2dd4db5c67d542648b1936486da0ba06",
+      "feature_id": "pc-social-chat-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "前端 aec17a1ba 已通过正式脚本发布，兼容后端 0.3.1755；线上 release marker 和实际资源哈希匹配，/pc 与 /pc-next HTTP 200",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1789457366093
     }
   ]
 }
