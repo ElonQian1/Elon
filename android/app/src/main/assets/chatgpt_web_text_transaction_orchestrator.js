@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptTextTransactionOrchestrator;
-  if (existing && Number(existing.version) >= 13) return;
+  if (existing && Number(existing.version) >= 14) return;
 
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
@@ -179,7 +179,9 @@
         if (receipt?.status === 'rejected' || receipt?.status === 'unavailable') {
           // Reuse the native pre-dispatch failure UI. This command never wrote;
           // it must not leave the native ledger waiting for a server receipt.
-          return respond('send_prompt', false, 'official_runtime_v1:rejected:not_ready');
+          return respond('send_prompt', false, 'official_runtime_v1:rejected:' +
+            (['recovery_previous_unresolved', 'recovery_history_timeout', 'recovery_history_unavailable'].includes(receipt.code)
+              ? 'previous_send_unresolved' : receipt.code?.startsWith('recovery_') ? 'send_record_unavailable' : 'not_ready'));
         }
         respond('send_prompt', receipt?.status === 'accepted', 'private_text_v1:' +
           (receipt?.status === 'accepted' ? 'accepted' : 'unknown:' + safeCode(receipt?.code, 'unknown')));

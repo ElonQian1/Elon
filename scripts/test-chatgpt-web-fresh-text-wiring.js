@@ -90,6 +90,22 @@ test('unavailable before dispatch needs a single-use fallback claim', async () =
     if (!allowed) assert.equal(f.results[0][2], 'official_runtime_v1:rejected:not_ready');
   }
 });
+
+test('a previous uncertain write does not mark the new unsent draft as pending or fall back', async () => {
+  const f = fixture({ state: () => ({ pending: false }), send: () => ({ handled: true,
+    completion: Promise.resolve({ status: 'rejected', code: 'recovery_previous_unresolved' }) }) });
+  f.api.sendPrompt('fixture', '', f.respond, true); await tick();
+  assert.equal(f.calls.includes('official'), false);
+  assert.deepEqual(f.results[0], ['send_prompt', false, 'official_runtime_v1:rejected:previous_send_unresolved']);
+});
+
+test('local recording failure is not falsely described as a previous submitted message', async () => {
+  const f = fixture({ state: () => ({ pending: false }), send: () => ({ handled: true,
+    completion: Promise.resolve({ status: 'rejected', code: 'recovery_storage_unavailable' }) }) });
+  f.api.sendPrompt('fixture', '', f.respond, true); await tick();
+  assert.equal(f.calls.includes('official'), false);
+  assert.deepEqual(f.results[0], ['send_prompt', false, 'official_runtime_v1:rejected:send_record_unavailable']);
+});
 test('an unreconciled private write blocks attachment and regeneration callbacks', () => {
   const f = fixture({ state: () => ({ pending: true }) });
   f.api.sendPrompt('fixture', '', f.respond, false);
@@ -123,8 +139,10 @@ test('production asset assembly loads dependencies before the one existing send 
     'chatgpt_web_fresh_text_attachments.js',
     'chatgpt_web_fresh_text_request.js', 'chatgpt_web_fresh_text_context.js',
     'chatgpt_web_private_text_input.js',
+    'chatgpt_web_fresh_text_user_identity.js', 'chatgpt_web_fresh_regenerate_context.js',
     'chatgpt_web_fresh_text_reconcile.js', 'chatgpt_web_fresh_text_stop.js',
     'chatgpt_web_fresh_text_recovery.js', 'chatgpt_web_fresh_text_stream.js',
+    'chatgpt_web_fresh_text_journal_store.js', 'chatgpt_web_fresh_text_journal.js',
     'chatgpt_web_fresh_text_receipts.js', 'chatgpt_web_fresh_text_transaction.js', 'chatgpt_web_text_transaction_orchestrator.js'];
   for (let i = 0; i < chain.length; i++) {
     assert.equal(names.filter(n => n === chain[i]).length, 1);

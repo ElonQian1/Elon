@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 23, create: factory });
+  const api = Object.freeze({ version: 24, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -319,6 +319,7 @@
     }
     if (!current()) fail('context_changed');
     return Object.freeze({ ...snapshot, get conversationId() { return serverId; }, token, current, owns, shared, runtime: conversation,
+      recoveryIdentity: () => owns() ? ownerAccount : null,
       attachments, draft: binding.draft,
       diagnostics: () => ({ ownership: ownershipStage, reconciliation: reconciliationStage }),
       beforeDispatch() {

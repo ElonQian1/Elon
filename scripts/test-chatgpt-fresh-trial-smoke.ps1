@@ -18,7 +18,7 @@ function Fixture {
 }
 $good = Fixture
 if (!(Test-ChatGptFreshRetryEvidence -Before $good.before -After $good.after -Receipt $good.receipt)) { throw 'Valid fresh evidence rejected.' }
-foreach ($version in @(6, 7, 8)) {
+foreach ($version in @(6, 7, 8, 9)) {
     $f = Fixture; $f.after.version = $version
     if (!(Test-ChatGptFreshRetryEvidence -Before $f.before -After $f.after -Receipt $f.receipt)) { throw 'Reviewed receipt version rejected.' }
 }
@@ -28,7 +28,7 @@ $cases = @(
     {param($f) $f.after.dispatched=$false}, {param($f) $f.after.accepted=$false},
     {param($f) $f.after.reconciled=$false}, {param($f) $f.after.pending=$true},
     {param($f) $f.after.parent_role='assistant'}, {param($f) $f.after.stream_events=0},
-    {param($f) $f.after.version=5}, {param($f) $f.after.version=9}, {param($f) $f.after.version='7'},
+    {param($f) $f.after.version=5}, {param($f) $f.after.version=10}, {param($f) $f.after.version='7'},
     {param($f) $f.before.armed=$false},
     {param($f) $f.before.pending=$true}, {param($f) $f.receipt.status='failed'},
     {param($f) $f.receipt.result.detail='official_runtime_v1:regenerate_observed'}

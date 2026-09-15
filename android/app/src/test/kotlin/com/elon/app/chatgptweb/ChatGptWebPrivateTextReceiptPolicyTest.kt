@@ -71,6 +71,22 @@ class ChatGptWebPrivateTextReceiptPolicyTest {
         }
     }
 
+    @Test
+    fun previousUnconfirmedSendPreservesThisDraftAsUnsent() {
+        val source = event(ok = false, detail = "official_runtime_v1:rejected:previous_send_unresolved")
+        assertFalse(ChatGptWebPrivateTextReceiptPolicy.resolve(source).indeterminate)
+        assertEquals("上次发送结果尚未确认，本次草稿未发送。请先查看原会话记录后重试。",
+            ChatGptWebPrivateTextReceiptPolicy.userDetail(source))
+    }
+
+    @Test
+    fun unavailableJournalDoesNotInventAPreviousSubmission() {
+        val source = event(ok = false, detail = "official_runtime_v1:rejected:send_record_unavailable")
+        assertFalse(ChatGptWebPrivateTextReceiptPolicy.resolve(source).indeterminate)
+        assertEquals("暂时无法安全保存发送状态，本次草稿未发送，请稍后重试。",
+            ChatGptWebPrivateTextReceiptPolicy.userDetail(source))
+    }
+
     private fun event(ok: Boolean, detail: String) = ChatGptWebEvent.CommandResult(
         action = "send_prompt",
         ok = ok,

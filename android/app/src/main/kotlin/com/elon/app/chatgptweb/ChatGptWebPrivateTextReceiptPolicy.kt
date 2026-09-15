@@ -49,6 +49,10 @@ internal object ChatGptWebPrivateTextReceiptPolicy {
             "官网已确认提交。"
         } else if (event.action == "send_prompt" && event.detail == RUNTIME_PREFIX + "rejected:not_ready" && !event.ok) {
             "会话暂未准备好，草稿已保留，请稍后重试。"
+        } else if (event.action == "send_prompt" && event.detail == RUNTIME_PREFIX + "rejected:previous_send_unresolved" && !event.ok) {
+            "上次发送结果尚未确认，本次草稿未发送。请先查看原会话记录后重试。"
+        } else if (event.action == "send_prompt" && event.detail == RUNTIME_PREFIX + "rejected:send_record_unavailable" && !event.ok) {
+            "暂时无法安全保存发送状态，本次草稿未发送，请稍后重试。"
         } else {
             event.detail
         }

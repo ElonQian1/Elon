@@ -27,7 +27,7 @@ function Fixture {
 }
 $f = Fixture
 if (!(Test-ChatGptFreshSendEvidence -Before $f.before -After $f.after -Receipt $f.receipt)) { throw 'valid_send_rejected' }
-foreach ($version in @(7, 8)) {
+foreach ($version in @(7, 8, 9)) {
     $versioned = Fixture; $versioned.before.version = $version; $versioned.after.version = $version
     if (!(Test-ChatGptFreshSendEvidence $versioned.before $versioned.after $versioned.receipt)) { throw 'reviewed_send_version_rejected' }
     $versioned.before.armed = $false

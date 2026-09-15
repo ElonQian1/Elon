@@ -29,7 +29,7 @@ function Test-ChatGptFreshRetryEvidence {
     foreach ($value in @($Before.attempts, $After.attempts, $After.stream_events)) {
         if (($value -isnot [int] -and $value -isnot [long]) -or $value -lt 0) { return $false }
     }
-    if (($After.version -isnot [int] -and $After.version -isnot [long]) -or $After.version -notin @(6, 7, 8)) { return $false }
+    if (($After.version -isnot [int] -and $After.version -isnot [long]) -or $After.version -notin @(6, 7, 8, 9)) { return $false }
     if ($Before.schema -cne 'elon.fresh_text_trial.v1' -or $After.schema -cne 'elon.fresh_text_trial.v1' -or
         $Before.armed -ne $true -or $Before.pending -ne $false -or
         $After.operation -cne 'regenerate' -or

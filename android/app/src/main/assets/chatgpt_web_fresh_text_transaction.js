@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 32, create: factory });
+  const api = Object.freeze({ version: 33, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -20,6 +20,7 @@
     onAutomaticReady: () => recover(true)
   });
   const records = (options.receipts || page.__elonChatGptFreshTextReceipts).create();
+  let journal = options.journal || null;
   let document = page.document, token = page.__elonChatGptDocumentToken, active = null, disposed = false;
   let trial = null, last = null, stoppedParent = null;
   const now = options.now || Date.now;
@@ -32,7 +33,9 @@
     'login_required', 'draft_changed', 'stream_unavailable', 'preparation_timeout', 'stream_open_timeout',
     'stream_timeout', 'reconciliation_timeout', 'cancelled', 'stream_item_invalid', 'stream_server_error',
     'stream_handoff_unavailable', 'stream_topic_owned', 'stream_topic_timeout', 'stream_item_gap',
-    'stream_item_limit', 'stream_queue_limit', 'stream_subscribe_failed', 'stream_owner_changed', 'stream_decode_failed']);
+    'stream_item_limit', 'stream_queue_limit', 'stream_subscribe_failed', 'stream_owner_changed', 'stream_decode_failed',
+    'recovery_identity_unavailable', 'recovery_previous_unresolved', 'recovery_history_timeout', 'recovery_history_unavailable',
+    'recovery_storage_unavailable', 'recovery_record_invalid', 'recovery_record_changed', 'recovery_capacity']);
 
   function boundary() {
     if (document === page.document && token === page.__elonChatGptDocumentToken) return;
@@ -48,7 +51,7 @@
       try { if ((active.stopConfirmed || active.recoveryConfirmed ||
         active.binding.reconciled(active.request.userMessageId, active.stopAcknowledged === true) &&
           active.binding.navigationReady?.() !== false) && retireAttachments(active)) {
-        recovery?.cancelScheduled?.(active); active = null;
+        active.journal?.settled(); recovery?.cancelScheduled?.(active); active = null;
       } } catch (_) {}
     }
     return { version: 7, transport: 'fresh_page_http_v1', pending: active !== null,
@@ -88,7 +91,7 @@
     const ownership = ['not_observed', 'document', 'document_token', 'route', 'runtime', 'account', 'registry',
       'history_scope', 'server_id', 'project_scope', 'owned', 'context_error'];
     const readiness = ['not_observed', 'identity', 'history_busy', 'ready', 'leaf_mismatch'];
-    return { schema: 'elon.fresh_text_trial.v1', version: 8, control, armed,
+    return { schema: 'elon.fresh_text_trial.v1', version: 9, control, armed,
       operation: last?.operation || '',
       remaining_ms: armed ? Math.max(0, Math.min(120000, trial.expiresAt - now())) : 0,
       attempts: records.attempts(), pending: active !== null, phase: last?.phase || 'idle',
@@ -96,13 +99,16 @@
       accepted: last?.accepted === true, reconciled: last?.recoveryConfirmed === true || last?.stopConfirmed === true,
       parent_role: ['user', 'assistant'].includes(last?.binding?.parentRole) ? last.binding.parentRole : 'unknown',
       stream_events: last?.streamEvents || 0, event_types: Array.from(last?.eventTypes || []),
-      history: last?.historyCode || 'not_observed',
+      history: last?.historyCode || 'not_observed', journal: journal?.state?.() || { code: 'disabled', recovered: 0 },
       owner: { ownership: ownership.includes(observedOwner?.ownership) ? observedOwner.ownership : 'not_observed',
         reconciliation: readiness.includes(observedOwner?.reconciliation) ? observedOwner.reconciliation : 'not_observed' } };
   }
 
   function dispatch(command, operation) {
-    if (disposed) return { handled: false, code: 'disposed' };
+    const useJournal = page.__elonChatGptFreshTextJournalEnabled === true || !!journal || !!options.journal;
+    const decline = code => useJournal ? { handled: true,
+      completion: Promise.resolve({ status: 'rejected', code }) } : { handled: false, code };
+    if (disposed) return decline('disposed');
     state();
     const previous = records.get(command?.requestId);
     if (previous) return previous.operation === operation && previous.prompt === command.prompt && previous.expectedDraft === command.expectedDraft &&
@@ -115,20 +121,20 @@
     const regenerate = operation === 'regenerate';
     if ((regenerate ? page.__elonChatGptFreshRegenerationEnabled === false : page.__elonChatGptFreshTextDispatchEnabled === false) && !trialArmed() ||
         page.__elonChatGptPrivateTextTransactionsEnabled !== true) {
-      return { handled: false, code: 'disabled' };
+      return decline('disabled');
     }
     if (command.requireNativeAttachment === true && page.__elonChatGptFreshTextAttachmentsEnabled !== true &&
         page.__elonChatGptFreshTextPersonalAttachmentsEnabled === false && !trialArmed()) {
-      return { handled: false, code: 'disabled' };
+      return decline('disabled');
     }
     // Cold/unknown identity keeps the accepted sender; no UI-blocking import is
     // started merely to discover whether the independent candidate is eligible.
     const stamp = context.stamp();
-    if (!stamp) return { handled: false, code: 'identity_unavailable' };
+    if (!stamp) return decline(useJournal ? 'recovery_identity_unavailable' : 'identity_unavailable');
     if (!/^mcp_[a-z0-9]{1,32}$/.test(command?.requestId || '') || typeof command.prompt !== 'string' ||
         !regenerate && !command.prompt.trim() && page.__elonChatGptFreshTextAttachmentsEnabled !== true && !trialArmed() ||
         command.prompt.length > 20000 || typeof command.expectedDraft !== 'string' ||
-        !regenerate && command.expectedDraft && command.expectedDraft !== command.prompt) return { handled: false, code: 'invalid_command' };
+        !regenerate && command.expectedDraft && command.expectedDraft !== command.prompt) return decline('invalid_command');
     const admission = records.admit(command.requestId);
     if (admission) return { handled: true, completion: Promise.resolve({ status: 'rejected', code: admission }) };
     if (stoppedParent && !stoppedParent.current()) stoppedParent = null;
@@ -208,12 +214,24 @@
     async function run() {
       timeout(options.prepareTimeoutMs || 15000, 'preparation_timeout');
       if (regenerate && !regeneration) throw Error('runtime_unavailable');
-      owner.binding = await abortable(regenerate ? regeneration.capture(command) :
+      const capture = () => regenerate ? regeneration.capture(command) :
         context.capture(command.composer, continuation,
           { allowTools, allowPersonalSearch, allowPersonalImage, allowProjects, allowExistingProjects, allowNewConversations, allowTemporary,
-            allowAttachments, allowPersonalAttachments, requireNativeAttachment: command.requireNativeAttachment === true }));
+            allowAttachments, allowPersonalAttachments, requireNativeAttachment: command.requireNativeAttachment === true });
+      owner.binding = await abortable(capture());
       check();
       owner.request = requests.create(owner.binding, command);
+      if (useJournal) {
+        journal ||= page.__elonChatGptFreshTextJournal.create(page);
+        owner.journal = await abortable(journal.prepare(owner.binding, owner.request, operation, owner.controller.signal));
+        if (owner.journal?.recapture) {
+          owner.binding = await abortable(capture());
+          check(); owner.request = requests.create(owner.binding, command);
+          owner.journal = await abortable(journal.prepare(owner.binding, owner.request, operation, owner.controller.signal));
+          if (owner.journal?.recapture) throw Error('recovery_previous_unresolved');
+        }
+        check();
+      }
       const { shared, runtime } = owner.binding;
       if (typeof shared.textTopic !== 'function') throw Error('runtime_unavailable');
       // This is a new preparation request for this exact parent/model/command,
@@ -242,6 +260,7 @@
           check();
           if (owner.dispatched) throw Error('preparation_consumed');
           owner.binding.beforeDispatch?.();
+          owner.journal?.persist();
           // The provider invokes fetch immediately after this hook. Crossing
           // this boundary is uncertain even if fetch subsequently throws.
           owner.dispatched = true; owner.phase = 'dispatching';
@@ -252,13 +271,20 @@
           if (!ready) throw Error('stream_unavailable');
           owner.sink = stream.beginPrivateStream({ conversationId: owner.binding.conversationId,
             userMessageId: owner.request.userMessageId, current: owner.stopCurrent,
-            observePayload: owner.binding.observePayload,
+            observePayload: payload => {
+              const accepted = owner.binding.observePayload?.(payload) !== false;
+              if (accepted) owner.journal?.observePayload(payload);
+              return accepted;
+            },
             adoptConversation: owner.binding.newConversation ? (id, payload) => {
               const adopted = owner.binding.adoptConversation(id, payload, owner.request.userMessageId);
               // Match the official first-response handler: bind and begin its
               // owned route before publishing this event, not after stream end.
               // Failure is reconciled without retrying the already-sent POST.
-              if (adopted) void owner.binding.finalize?.(owner.controller.signal)?.catch(() => {});
+              if (adopted) {
+                owner.journal?.adoptConversation(id);
+                void owner.binding.finalize?.(owner.controller.signal)?.catch(() => {});
+              }
               return adopted;
             } : undefined });
           if (!owner.sink) throw Error('stream_unavailable');
@@ -308,7 +334,7 @@
       owner.controller.abort();
       // Only pre-preparation runtime/context absence may offer the accepted
       // sender. No auth refusal, timeout or post-dispatch failure is replayed.
-      owner.fallback = !owner.binding && !owner.dispatched &&
+      owner.fallback = !useJournal && !owner.binding && !owner.dispatched &&
         ['runtime_unavailable', 'context_unavailable', 'scope_unsupported',
           'attachments_active', 'tools_active', 'parent_unavailable', 'identity_unavailable'].includes(owner.code);
       receipt({ status: owner.dispatched ? 'unknown' : owner.fallback ? 'unavailable' : 'rejected', code: owner.code });
@@ -344,7 +370,9 @@
     recovery?.cancelScheduled?.(owner);
     owner.recoveryController?.abort();
     owner.phase = 'stopping';
+    owner.journal?.markStop();
     const completion = stopping.stop(owner).then(receipt => {
+      if (owner.stopAcknowledged === true) owner.journal?.markStop(true);
       if ((active === owner || active === null) && owner.document === page.document &&
           owner.token === page.__elonChatGptDocumentToken && owner.binding.owns()) {
         owner.phase = receipt.status === 'accepted' ? 'completed' : 'uncertain';
@@ -402,7 +430,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 32, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 33, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

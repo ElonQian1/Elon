@@ -1,7 +1,7 @@
 {
   "common": {
     "schema": "elon.fresh_text_trial.v1",
-    "version": 8,
+    "version": 9,
     "control": "state",
     "armed": false,
     "operation": "",
@@ -17,7 +17,8 @@
     "stream_events": 0,
     "event_types": [],
     "history": "not_observed",
-    "owner": { "ownership": "not_observed", "reconciliation": "not_observed" }
+    "owner": { "ownership": "not_observed", "reconciliation": "not_observed" },
+    "journal": { "code": "disabled", "recovered": 0 }
   },
   "cases": {
     "idle": {},

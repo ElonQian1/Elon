@@ -71,6 +71,24 @@ class ChatGptWebFreshTextTrialTest {
         }
     }
 
+    @Test fun versionNineAcceptsOnlyAggregateJournalDiagnostics() {
+        val owner = JSONObject().put("ownership", "owned").put("reconciliation", "ready")
+        val journal = JSONObject().put("code", "recovered").put("recovered", 1)
+        val current = sample().put("version", 9).put("owner", owner).put("journal", journal)
+        assertTrue(current.similar(JSONObject(ChatGptWebPrivateProtocolEvidence.detail(
+            "private_protocol_probe", current.toString()))))
+        for (bad in listOf(JSONObject(journal.toString()).put("recovered", 65536),
+            JSONObject(journal.toString()).put("recovered", 1.5),
+            JSONObject(journal.toString()).put("code", "private_fixture"),
+            JSONObject(journal.toString()).put("account", "private_fixture"),
+            JSONObject(journal.toString()).apply { remove("recovered") })) {
+            assertEquals("invalid_protocol_evidence", ChatGptWebPrivateProtocolEvidence.detail(
+                "private_protocol_probe", JSONObject(current.toString()).put("journal", bad).toString()))
+        }
+        assertEquals("invalid_protocol_evidence", ChatGptWebPrivateProtocolEvidence.detail(
+            "private_protocol_probe", sample().put("version", 9).put("owner", owner).toString()))
+    }
+
     @Test fun rejectsPrivateOrUnboundedStreamDiagnostics() {
         for (value in listOf(sample().put("stream_events", 65536), sample().put("history", "private_fixture"),
             sample().put("event_types", org.json.JSONArray(listOf("private_fixture"))),

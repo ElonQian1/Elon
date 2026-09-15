@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshRegenerateContext = api;
 })(typeof window === 'object' ? window : null, function (page, baseContext) {
@@ -9,9 +9,11 @@
   const SLUG = /^[a-z0-9][a-z0-9._-]{0,127}$/i;
   const fail = (code, admissionStage) => { throw Object.assign(Error(code), { admissionStage }); };
   const contract = page.__elonChatGptPrivateRegenerateContract?.create(page);
+  const userSignature = (page.__elonChatGptFreshTextUserIdentity ||
+    (typeof module === 'object' && module.exports ? require('./chatgpt_web_fresh_text_user_identity') : null))?.signature;
 
   async function capture(command) {
-    if (!contract) fail('runtime_unavailable', 'contract');
+    if (!contract || !userSignature) fail('runtime_unavailable', 'contract');
     const seed = contract.capture(command.turn, command.getModelTrigger);
     if (!seed) fail('context_unavailable', 'menu');
     const base = await baseContext.capture(command.composer);
@@ -48,12 +50,6 @@
       .some(key => metadata[key] != null && metadata[key] !== false &&
         (!Array.isArray(metadata[key]) || metadata[key].length))) fail('scope_unsupported', 'user_metadata');
     if (owner.message.metadata?.map_search_parameters != null || owner.message.metadata?.image_gen_async) fail('scope_unsupported', 'reply_metadata');
-    const userSignature = message => JSON.stringify([message?.id, message?.author?.role,
-      message?.channel ?? null, message?.recipient ?? 'all', message?.content?.content_type, message?.content?.parts,
-      ...['attachments', 'system_hints', 'contextual_retry_message', 'is_contextual_retry_user_message',
-        'is_visually_hidden_from_conversation', 'is_visually_hidden_reasoning_group', 'debug_internal_only']
-        .map(key => { const value = message?.metadata?.[key];
-          return value == null || value === false || Array.isArray(value) && !value.length ? null : value; })]);
     // Official in-memory nodes use parentId; only the history response uses parent.
     const originalUser = userSignature(original.message), historyParentId = original.parentId;
     const variants = new Set(owner.variants), observed = new Set();
@@ -95,6 +91,7 @@
       parentId: owner.parentId, parentRole: 'user', historyParentId,
       variantPurpose: variants.size === 1 ? 'comparison_implicit' : 'none', current, owns, isOwnedResponse,
       matchesOriginalUser: message => userSignature(message) === originalUser,
+      recoveryUserSignature: () => owns() ? originalUser : null,
       beforeDispatch() { if (!current()) fail('context_changed'); base.beforeDispatch(); },
       observePayload(payload) {
         if (!owns()) return false;

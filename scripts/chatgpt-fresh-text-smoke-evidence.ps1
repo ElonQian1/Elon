@@ -57,7 +57,7 @@ function Test-ChatGptFreshPendingReadback {
 function Test-ChatGptFreshTextIdle {
     param([AllowNull()]$State)
     return $State.schema -ceq 'elon.fresh_text_trial.v1' -and
-        ($State.version -is [int] -or $State.version -is [long]) -and $State.version -in @(7, 8) -and
+        ($State.version -is [int] -or $State.version -is [long]) -and $State.version -in @(7, 8, 9) -and
         $State.pending -is [bool] -and !$State.pending -and
         $State.armed -is [bool] -and !$State.armed
 }
@@ -72,7 +72,7 @@ function Test-ChatGptFreshSendEvidence {
         if (($value -isnot [int] -and $value -isnot [long]) -or $value -lt 0) { return $false }
     }
     return $Before.schema -ceq 'elon.fresh_text_trial.v1' -and $After.schema -ceq 'elon.fresh_text_trial.v1' -and
-        $Before.version -in @(7, 8) -and $After.version -in @(7, 8) -and !$Before.pending -and
+        $Before.version -in @(7, 8, 9) -and $After.version -in @(7, 8, 9) -and !$Before.pending -and
         ($UseDefault -or $Before.armed) -and $After.operation -ceq 'send' -and
         $After.attempts -eq ($Before.attempts + 1) -and $After.dispatched -and $After.accepted -and
         $After.reconciled -and !$After.pending -and $After.stream_events -gt 0 -and

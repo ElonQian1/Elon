@@ -60,6 +60,8 @@ internal class ChatGptWebPageAdapter(
                 ${BuildConfig.CHATGPT_PRIVATE_STREAM_OBSERVER_ENABLED};
             window.__elonChatGptPrivateTextTransactionsEnabled =
                 ${BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED};
+            window.__elonChatGptFreshTextJournalEnabled =
+                ${BuildConfig.CHATGPT_FRESH_TEXT_JOURNAL_ENABLED};
             window.__elonChatGptPrivateDictationEnabled =
                 ${BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED};
             window.__elonChatGptPrivateReadAloudEnabled =
@@ -746,7 +748,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-internal const val ADAPTER_VERSION = 421
+internal const val ADAPTER_VERSION = 422
 
         private val ADAPTER_ASSETS = ChatGptWebAdapterAssets.names
         private const val BRIDGE_OBJECT = "elonChatGptNative"

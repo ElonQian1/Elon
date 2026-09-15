@@ -11,19 +11,30 @@ internal object ChatGptWebFreshTextTrial {
             "remaining_ms", "attempts", "pending", "phase", "code", "dispatched", "accepted", "reconciled",
             "stream_events", "event_types", "history")
         val version = value.opt("version")
-        require(value.opt("schema") == SCHEMA && version in setOf(5, 6, 7, 8))
+        require(value.opt("schema") == SCHEMA && version in setOf(5, 6, 7, 8, 9))
         // Both v6 shapes shipped. Keep old active writers readable without weakening the v7 contract.
-        val hasOperation = version in setOf(7, 8) || version == 6 && value.has("operation")
+        val hasOperation = version in setOf(7, 8, 9) || version == 6 && value.has("operation")
         val expected = fields + (if (version != 5) setOf("parent_role") else emptySet()) +
             (if (hasOperation) setOf("operation") else emptySet()) +
-            (if (version == 8) setOf("owner") else emptySet())
+            (if (version in setOf(8, 9)) setOf("owner") else emptySet()) +
+            (if (version == 9) setOf("journal") else emptySet())
         require(value.keys().asSequence().toSet() == expected)
-        if (version == 8) {
+        if (version in setOf(8, 9)) {
             val owner = value.getJSONObject("owner")
             require(owner.keys().asSequence().toSet() == setOf("ownership", "reconciliation"))
             require(owner.opt("ownership") in setOf("not_observed", "document", "document_token", "route", "runtime",
                 "account", "registry", "history_scope", "server_id", "project_scope", "owned", "context_error"))
             require(owner.opt("reconciliation") in setOf("not_observed", "identity", "history_busy", "ready", "leaf_mismatch"))
+        }
+        if (version == 9) {
+            val journal = value.getJSONObject("journal")
+            require(journal.keys().asSequence().toSet() == setOf("code", "recovered"))
+            require(journal.opt("code") in setOf("disabled", "idle", "pending", "reading", "recovered", "settled",
+                "context_changed", "recovery_identity_unavailable", "recovery_previous_unresolved",
+                "recovery_history_timeout", "recovery_history_unavailable", "recovery_storage_unavailable",
+                "recovery_record_invalid", "recovery_record_changed", "recovery_capacity"))
+            val count = journal.opt("recovered")
+            require((count is Int || count is Long) && (count as Number).toLong() in 0..65535)
         }
         if (version != 5) require(value.opt("parent_role") in setOf("user", "assistant", "unknown"))
         if (hasOperation) require(value.opt("operation") in setOf("", "send", "regenerate"))
