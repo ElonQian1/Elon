@@ -1,6 +1,120 @@
 use super::*;
 
 #[test]
+fn short_and_identifier_shaped_nicknames_are_searchable_ignoring_ascii_case() {
+    let conn = fixture();
+    for (index, nickname) in ["Q@", "Alias@Home", "USR_ALIAS", "12", "7", "中", "A"]
+        .iter()
+        .enumerate()
+    {
+        let id = format!("usr_nickname_{index}");
+        conn.execute(
+            "INSERT INTO users(id,nickname) VALUES (?1,?2)",
+            params![id, nickname],
+        )
+        .unwrap();
+        for query in [
+            nickname.to_string(),
+            nickname.to_ascii_lowercase(),
+            format!(" {nickname} "),
+        ] {
+            let found = search_auto_candidates(&conn, "viewer", &query).unwrap();
+            assert_eq!(
+                found.results.len(),
+                1,
+                "nickname {query:?} must not be rejected as an account"
+            );
+            assert_eq!(found.results[0].id, id);
+            assert_eq!(found.results[0].nickname, *nickname);
+        }
+    }
+}
+
+#[test]
+fn real_identifiers_take_priority_and_formatted_phones_remain_exact() {
+    let conn = fixture();
+    conn.execute_batch(
+        "INSERT INTO users(id,phone,nickname) VALUES
+         ('usr_name_email',NULL,'PRIVATE@EXAMPLE.TEST'),
+         ('usr_name_id',NULL,'USR_TARGET'),
+         ('usr_name_phone',NULL,'13900009650'),
+         ('usr_prefixed_login','usr_customer','Login Display'),
+         ('usr_compacted_login','alphabeta','Compact Display'),
+         ('usr_dash_nickname',NULL,'Alpha-Beta');",
+    )
+    .unwrap();
+    for (query, id) in [
+        ("PRIVATE@EXAMPLE.TEST", "usr_email"),
+        ("USR_TARGET", "usr_target"),
+        ("13900009650", "usr_target"),
+        ("(139) 0000-9650", "usr_target"),
+        ("USR_CUSTOMER", "usr_prefixed_login"),
+        ("alpha-beta", "usr_dash_nickname"),
+    ] {
+        let found = search_auto_candidates(&conn, "viewer", query).unwrap();
+        assert_eq!(found.results.len(), 1, "query {query}");
+        assert_eq!(found.results[0].id, id, "query {query}");
+    }
+}
+
+#[test]
+fn case_variants_return_separate_candidates_and_empty_input_never_enumerates() {
+    let conn = fixture();
+    conn.execute_batch(
+        "INSERT INTO users(id,nickname) VALUES ('usr_upper','Q@'),('usr_lower','q@');",
+    )
+    .unwrap();
+    let found = search_auto_candidates(&conn, "usr_upper", "q@").unwrap();
+    assert_eq!(found.results.len(), 2);
+    assert!(found
+        .results
+        .iter()
+        .any(|item| item.id == "usr_upper" && item.is_self));
+    assert!(found
+        .results
+        .iter()
+        .any(|item| item.id == "usr_lower" && !item.is_self));
+    let explicit = search_candidates(&conn, "viewer", CandidateField::Nickname, "q@").unwrap();
+    assert_eq!(explicit.results.len(), 2);
+    assert!(search_auto_candidates(&conn, "viewer", "").is_err());
+    assert!(search_auto_candidates(&conn, "viewer", "  ").is_err());
+    assert!(
+        search_auto_candidates(&conn, "viewer", "q")
+            .unwrap()
+            .results
+            .is_empty(),
+        "nickname matches must remain exact"
+    );
+}
+
+#[test]
+fn auto_identifier_resolution_never_exposes_inactive_or_device_accounts() {
+    let conn = fixture();
+    conn.execute(
+        "UPDATE users SET email='inactive@example.test' WHERE id='usr_inactive'",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "UPDATE users SET email='device@example.test' WHERE id='usr_device'",
+        [],
+    )
+    .unwrap();
+    for query in [
+        "inactive@example.test",
+        "device@example.test",
+        "usr_inactive",
+        "usr_device",
+    ] {
+        assert!(auto_account_id(&conn, query).unwrap().is_none());
+        assert!(search_auto_candidates(&conn, "viewer", query)
+            .unwrap()
+            .results
+            .is_empty());
+    }
+}
+
+#[test]
 fn text_login_accounts_are_found_even_when_the_display_name_differs() {
     let conn = fixture();
     conn.execute_batch(
@@ -10,7 +124,7 @@ fn text_login_accounts_are_found_even_when_the_display_name_differs() {
     )
     .unwrap();
     for query in ["tester1999", "TESTER1999", "  tester1999  "] {
-        let found = search_text_candidates(&conn, "viewer", query).unwrap();
+        let found = search_auto_candidates(&conn, "viewer", query).unwrap();
         assert_eq!(found.results.len(), 1);
         assert_eq!(
             found.results[0].id, "usr_login",
@@ -18,7 +132,7 @@ fn text_login_accounts_are_found_even_when_the_display_name_differs() {
         );
         assert_eq!(found.results[0].nickname, "Display Name");
         assert_eq!(
-            text_login_account_id(&conn, query).unwrap().as_deref(),
+            auto_account_id(&conn, query).unwrap().as_deref(),
             Some("usr_login")
         );
         assert!(!serde_json::to_string(&found)
@@ -34,7 +148,7 @@ fn text_login_accounts_are_found_even_when_the_display_name_differs() {
 fn text_account_misses_fall_back_to_nicknames_without_partial_account_matches() {
     let conn = fixture();
     assert_eq!(
-        search_text_candidates(&conn, "usr_self", "同名用户")
+        search_auto_candidates(&conn, "usr_self", "同名用户")
             .unwrap()
             .results
             .len(),
@@ -46,17 +160,17 @@ fn text_account_misses_fall_back_to_nicknames_without_partial_account_matches() 
     )
     .unwrap();
     assert_eq!(
-        search_text_candidates(&conn, "viewer", "ab")
+        search_auto_candidates(&conn, "viewer", "ab")
             .unwrap()
             .results[0]
             .id,
         "usr_short"
     );
-    assert!(search_text_candidates(&conn, "viewer", "testacc")
+    assert!(search_auto_candidates(&conn, "viewer", "testacc")
         .unwrap()
         .results
         .is_empty());
-    assert!(search_text_candidates(&conn, "viewer", "missing1999")
+    assert!(search_auto_candidates(&conn, "viewer", "missing1999")
         .unwrap()
         .results
         .is_empty());
@@ -76,15 +190,15 @@ fn inactive_and_device_login_accounts_stay_hidden_and_search_does_not_add_friend
     )
     .unwrap();
     for query in ["inactive1999", "device1999"] {
-        assert!(text_login_account_id(&conn, query).unwrap().is_none());
-        assert!(search_text_candidates(&conn, "viewer", query)
+        assert!(auto_account_id(&conn, query).unwrap().is_none());
+        assert!(search_auto_candidates(&conn, "viewer", query)
             .unwrap()
             .results
             .is_empty());
     }
-    let found = search_text_candidates(&conn, "usr_self", "testaccount").unwrap();
+    let found = search_auto_candidates(&conn, "usr_self", "testaccount").unwrap();
     assert!(found.results[0].already_friend);
-    let own = search_text_candidates(&conn, "usr_old", "testaccount").unwrap();
+    let own = search_auto_candidates(&conn, "usr_old", "testaccount").unwrap();
     assert!(own.results[0].is_self);
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM user_friends", [], |row| row.get(0))
@@ -180,7 +294,7 @@ fn phone_email_and_selected_account_id_are_exact_and_private() {
             .results
             .is_empty());
     }
-    assert!(search_candidates(&conn, "usr_self", CandidateField::Nickname, "同").is_err());
+    assert!(search_candidates(&conn, "usr_self", CandidateField::Nickname, "").is_err());
 }
 
 #[test]

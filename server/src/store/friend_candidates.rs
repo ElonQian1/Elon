@@ -27,30 +27,43 @@ pub struct FriendCandidates {
     pub has_more: bool,
 }
 
-/// Account registration stores non-email login names in users.phone as well.
-/// Match their canonical login value before falling back to a display name.
-pub(super) fn text_login_account_id(conn: &Connection, query: &str) -> Result<Option<String>> {
+/// Resolve actual registered identifiers; punctuation alone does not select a search mode.
+/// Registration stores non-email login names in users.phone as well.
+pub(super) fn auto_account_id(conn: &Connection, query: &str) -> Result<Option<String>> {
     let account = query.trim().to_ascii_lowercase();
-    if account.len() < 3 {
+    if account.is_empty() {
         return Ok(None);
     }
+    let formatted_phone: Option<String> = account
+        .chars()
+        .all(|ch| ch.is_ascii_digit() || matches!(ch, '+' | ' ' | '-' | '(' | ')'))
+        .then(|| {
+            account
+                .chars()
+                .filter(|ch| !matches!(ch, ' ' | '-' | '(' | ')'))
+                .collect()
+        });
     conn.query_row(
-        "SELECT id FROM users WHERE phone = ?1
-         AND status = 'active' AND password_hash != 'device-user'",
-        params![account],
+        "SELECT id FROM users
+         WHERE status = 'active' AND password_hash != 'device-user'
+           AND (id = ?1 OR email = ?1 OR phone = ?1 OR phone = ?2)
+         ORDER BY CASE WHEN id = ?1 THEN 0 WHEN email = ?1 THEN 1
+                       WHEN phone = ?1 THEN 2 ELSE 3 END, id
+         LIMIT 1",
+        params![account, formatted_phone],
         |row| row.get(0),
     )
     .optional()
     .map_err(Into::into)
 }
 
-/// Auto search after phone, email and internal account-ID routing.
-pub(super) fn search_text_candidates(
+/// Prefer an exact registered identifier, then an exact case-insensitive nickname.
+pub(super) fn search_auto_candidates(
     conn: &Connection,
     viewer_id: &str,
     query: &str,
 ) -> Result<FriendCandidates> {
-    match text_login_account_id(conn, query)? {
+    match auto_account_id(conn, query)? {
         Some(id) => search_candidates(conn, viewer_id, CandidateField::AccountId, &id),
         None => search_candidates(conn, viewer_id, CandidateField::Nickname, query.trim()),
     }
@@ -68,10 +81,10 @@ pub(super) fn search_candidates(
         CandidateField::Email => "email",
         CandidateField::AccountId => "id",
         CandidateField::Nickname => {
-            if value.chars().count() < 2 {
-                return Err(anyhow!("昵称至少输入 2 个字"));
+            if value.trim().is_empty() {
+                return Err(anyhow!("请输入昵称"));
             }
-            "nickname"
+            "nickname COLLATE NOCASE"
         }
     };
     let sql = format!(

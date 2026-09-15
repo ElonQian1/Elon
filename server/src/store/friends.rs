@@ -4,8 +4,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 #[path = "friend_candidates.rs"]
 mod friend_candidates;
 use friend_candidates::{
-    search_candidates, search_text_candidates, text_login_account_id, CandidateField,
-    FriendCandidates,
+    auto_account_id, search_auto_candidates, search_candidates, CandidateField, FriendCandidates,
 };
 
 use super::friend_messages::message_preview_for_viewer;
@@ -32,25 +31,7 @@ impl Store {
             FriendSearchType::Phone => (CandidateField::Phone, normalize_phone(query)?),
             FriendSearchType::Email => (CandidateField::Email, normalize_email(query)?),
             FriendSearchType::AccountId => (CandidateField::AccountId, normalize_account(query)?),
-            FriendSearchType::Auto if query.contains('@') => {
-                (CandidateField::Email, normalize_email(query)?)
-            }
-            FriendSearchType::Auto if query.to_ascii_lowercase().starts_with("usr_") => {
-                (CandidateField::AccountId, normalize_account(query)?)
-            }
-            FriendSearchType::Auto if looks_like_phone(query) => {
-                let result = search_candidates(
-                    &conn,
-                    user_id,
-                    CandidateField::Phone,
-                    &normalize_phone(query)?,
-                )?;
-                if !result.results.is_empty() {
-                    return Ok(result);
-                }
-                (CandidateField::Nickname, query.to_string())
-            }
-            FriendSearchType::Auto => return search_text_candidates(&conn, user_id, query),
+            FriendSearchType::Auto => return search_auto_candidates(&conn, user_id, query),
             FriendSearchType::Nickname => (CandidateField::Nickname, query.to_string()),
         };
         search_candidates(&conn, user_id, field, &value)
@@ -505,20 +486,7 @@ fn search_profile(
 }
 
 fn search_profile_auto(conn: &rusqlite::Connection, query: &str) -> Result<Option<FriendProfile>> {
-    if query.contains('@') {
-        return search_profile_by_column(conn, "email", &normalize_email(query)?);
-    }
-
-    if query.trim().to_ascii_lowercase().starts_with("usr_") {
-        let account = normalize_account(query)?;
-        return search_profile_by_column(conn, "id", &account);
-    }
-
-    if looks_like_phone(query) {
-        if let Some(profile) = search_profile_by_column(conn, "phone", &normalize_phone(query)?)? {
-            return Ok(Some(profile));
-        }
-    } else if let Some(id) = text_login_account_id(conn, query)? {
+    if let Some(id) = auto_account_id(conn, query)? {
         return search_profile_by_column(conn, "id", &id);
     }
 
@@ -545,14 +513,14 @@ fn search_profile_by_nickname(
     query: &str,
 ) -> Result<Option<FriendProfile>> {
     let nickname = query.trim();
-    if nickname.chars().count() < 2 {
-        return Err(anyhow!("昵称至少输入 2 个字符"));
+    if nickname.is_empty() {
+        return Err(anyhow!("请输入昵称"));
     }
 
     let mut stmt = conn.prepare(
         "SELECT id, phone, email, nickname, avatar_data_url
          FROM users
-         WHERE nickname = ?1 AND status = 'active' AND password_hash != 'device-user'
+         WHERE nickname = ?1 COLLATE NOCASE AND status = 'active' AND password_hash != 'device-user'
          ORDER BY created_at DESC
          LIMIT 2",
     )?;
@@ -612,12 +580,6 @@ fn compact_phone(value: &str) -> String {
         .chars()
         .filter(|ch| !matches!(ch, ' ' | '-' | '(' | ')'))
         .collect()
-}
-
-fn looks_like_phone(value: &str) -> bool {
-    value
-        .chars()
-        .all(|ch| ch.is_ascii_digit() || matches!(ch, '+' | ' ' | '-' | '(' | ')'))
 }
 
 #[cfg(test)]
