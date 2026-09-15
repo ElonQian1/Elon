@@ -9596,7 +9596,7 @@
       "id": "desktop-social-context-menu-v1",
       "title": "桌面聊天消息右键交互整改",
       "summary": "按消息与媒体类型提供紧凑菜单，修正连续右键、选区和焦点，保留已有社交工作流",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/desktop-social-context-menu.md",
@@ -9732,7 +9732,7 @@
         }
       ],
       "created_at_ms": 1789468297828,
-      "updated_at_ms": 1789469328447
+      "updated_at_ms": 1789469571436
     },
     {
       "id": "erp-managed-hosting-node-v1",
@@ -29347,16 +29347,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8fcb624326e24ab2858094e3d70867bb",
-      "feature_id": "android-binance-protection-v3",
-      "action": "transitioned",
-      "actor": "codex-grid",
-      "reason": "已完成核心实现，正在验证两包与运行链路",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789088799388
-    },
-    {
       "id": "feature_event_e72682a8c601431db4e42fd6f2341a46",
       "feature_id": "android-binance-protection-v3",
       "action": "evidence_recorded",
@@ -31345,6 +31335,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1789469328447
+    },
+    {
+      "id": "feature_event_17554eb66e9643d38812d0b301a3ac18",
+      "feature_id": "desktop-social-context-menu-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "PC 前端业务提交 563e9066c 已发布，来源及兼容服务端 bfe6d8b 已核对；现有证据文件哈希未变化",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1789469571436
     }
   ]
 }
