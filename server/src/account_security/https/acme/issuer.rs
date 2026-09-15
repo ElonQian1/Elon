@@ -45,7 +45,7 @@ pub(super) async fn issue(config: &Config) -> Result<i64> {
             .new_order(&NewOrder::new(&ids).profile("shortlived"))
             .await?;
         let mut challenge_server = None;
-        phase = "CHALLENGE";
+        phase = "AUTHORIZATION";
         let mut auths = order.authorizations();
         while let Some(auth) = auths.next().await {
             let mut auth = auth?;
@@ -54,9 +54,11 @@ pub(super) async fn issue(config: &Config) -> Result<i64> {
                 AuthorizationStatus::Pending => {}
                 _ => bail!("ACME authorization rejected"),
             }
+            phase = "CHALLENGE_SELECT";
             let mut challenge = auth
                 .challenge(ChallengeType::TlsAlpn01)
                 .context("TLS-ALPN-01 unavailable")?;
+            phase = "CHALLENGE_BIND";
             challenge_server = Some(
                 ChallengeServer::bind(
                     config.listen,
@@ -65,12 +67,26 @@ pub(super) async fn issue(config: &Config) -> Result<i64> {
                 )
                 .await?,
             );
+            phase = "CHALLENGE_START";
             challenge.set_ready().await?;
         }
         let policy = RetryPolicy::new()
             .initial_delay(Duration::from_secs(2))
             .timeout(Duration::from_secs(180));
-        if order.poll_ready(&policy).await? != OrderStatus::Ready {
+        phase = "CHALLENGE_VALIDATE";
+        let ready = order.poll_ready(&policy).await;
+        if !matches!(ready, Ok(OrderStatus::Ready)) {
+            // Order status alone can omit the useful validation failure. Refresh
+            // our own authorizations and retain only the typed CA error code.
+            let mut auths = order.authorizations();
+            while let Some(auth) = auths.next().await {
+                let mut auth = auth?;
+                let state = auth.refresh().await?;
+                if let Some(error) = state.challenges.iter().find_map(|c| c.error.clone()) {
+                    return Err(instant_acme::Error::Api(error).into());
+                }
+            }
+            ready?;
             bail!("ACME order not ready");
         }
         drop(challenge_server);
@@ -86,5 +102,8 @@ pub(super) async fn issue(config: &Config) -> Result<i64> {
         storage::activate(config, &certificate, &key.serialize_pem())
     }
     .await;
-    result.with_context(|| format!("ACCOUNT_ACME_{phase}_FAILED"))
+    result.map_err(|error| {
+        let code = super::diagnostics::classify(&error);
+        error.context(format!("ACCOUNT_ACME_{phase}_{code}"))
+    })
 }

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::{fs, time::Duration};
 mod challenge;
 mod config;
+mod diagnostics;
 mod issuer;
 mod storage;
 pub(super) use storage::pair;
