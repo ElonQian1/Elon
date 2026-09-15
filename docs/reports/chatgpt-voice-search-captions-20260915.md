@@ -2,7 +2,7 @@
 capability_id: android_chatgpt_realtime_voice_data_channel_transcript_v1
 implementation_status: regression_fix_implemented
 verification_status: targeted_android_tests_passed_device_pending
-delivery_status: pending
+delivery_status: published_1761_device_install_deferred
 ---
 
 # Voice Captions After Search
@@ -70,4 +70,21 @@ MCP state 3. Source-size and whitespace checks also passed.
 Live acceptance must distinguish received frames, decode rejections and native
 message updates during the search response. Do not claim the user's exact live
 regression resolved from unit tests alone. The user subsequently confirmed that
-the call ended and installation is permitted. Release/install is the next step.
+the call ended and installation is permitted.
+
+## Release
+
+Normal signed Release **1.1.1761**, source `656d0fd3e2410229cb9175702fa86d14d25e606a`,
+is published at the normal APK endpoint. Receipt
+`voice-search-caption-release-20260915-121154-403` passed in 563.5 seconds;
+Android compilation, release checks, upload and remote package verification passed.
+APK size: 40,562,991 bytes. SHA-256:
+`93b16e1e83fb09986a129ac2860f83014932d6a22c4e25e563e6288d86c8ef12`.
+The page adapter remains 421 because this is a native subtitle-decoder change.
+
+Installation did not succeed: the known wireless target timed out during bounded
+autodeploy. A fresh local ADB server subsequently returned an empty device list;
+one bounded reconnect also timed out and mDNS discovered no device. The user was
+asked to reconnect USB or wireless debugging. Do not call this installed or
+device-accepted; do not rebuild the already published package merely to retry
+installation. Preserve the account and conversation on replacement install.
