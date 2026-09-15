@@ -125,18 +125,7 @@ pub struct FriendSearchResult {
     pub is_self: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct FriendRecommendation {
-    pub id: String,
-    pub account: String,
-    pub nickname: Option<String>,
-    pub phone: Option<String>,
-    pub avatar_data_url: Option<String>,
-    pub mutual_friend_count: i64,
-    pub already_friend: bool,
-    /// 当前是否在线（由 API 层在返回前注入，store 层默认 false）
-    pub is_online: bool,
-}
+pub use super::friends::recommendations::FriendRecommendation;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AddFriendResult {
