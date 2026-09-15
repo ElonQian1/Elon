@@ -21720,7 +21720,7 @@
       "id": "social-sync-status-lifecycle-v1",
       "title": "APK 社交同步提示生命周期修复",
       "summary": "修复 AI 聊天交接、暂停及消息已出现时仍显示好友或群聊同步提示",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/social-sync-status-lifecycle.md",
@@ -21805,7 +21805,7 @@
         }
       ],
       "created_at_ms": 1789472065970,
-      "updated_at_ms": 1789472724067
+      "updated_at_ms": 1789473285654
     },
     {
       "id": "sqlite-safe-snapshot-v1",
@@ -29438,16 +29438,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_3e31b6b4cb4149e5994bb669e369b794",
-      "feature_id": "android-binance-strategy-funds-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789104878228
-    },
-    {
       "id": "feature_event_a703e0516bac4e198001fdcb7e61303b",
       "feature_id": "android-binance-strategy-funds-v1",
       "action": "evidence_recorded",
@@ -31436,6 +31426,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1789472724067
+    },
+    {
+      "id": "feature_event_858d00461a6a46d4a1901dae0b02ee8c",
+      "feature_id": "social-sync-status-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "APK 1.1.1768（build 1768）正式发布，来源 87cb47386fc87ddb4f8bff7d314dadfe815df85c；14 项回归通过；线上版本及包 SHA-256 一致，下载 HTTP 200。物理设备复核 deferred，详见 docs/reports/social-sync-status-lifecycle-2026-09-15.md。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1789473285654
     }
   ]
 }

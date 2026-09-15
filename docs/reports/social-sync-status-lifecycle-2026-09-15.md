@@ -1,7 +1,7 @@
 ---
 version_status: report
 reviewed_at: 2026-09-15
-implementation_status: verified
+implementation_status: released
 ---
 
 # APK 同步提示残留修复
@@ -25,4 +25,9 @@ implementation_status: verified
 - 修复后 `SocialChatStatusTest` 7 项、`SocialChatReadChannelTest` 3 项、`SocialChatRecoveryTest` 4 项全部通过，合计 14 项、0 失败。覆盖真实绑定视图及好友控制器的交接、读取取消、迟到响应、同步成功、后台刷新、失败重试和待发消息。
 - 测试采用 Robolectric，使用隔离账号及本地 HTTP interceptor，不向生产发送消息。未进行用户账号或物理设备现场验收。
 - 测试日志：`social-sync-status-red-20260915-193557-690.result.json`（回归复现）及 `social-sync-status-green-20260915-194031-985.result.json`（修复后通过）。日志保存在共享 Git 目录的 `ai-command-logs` 下。
-- 正式 APK 构建及发布结果将在发布后补充。
+- 正式 APK **1.1.1768 / build 1768** 已通过 `scripts/publish-apk.ps1` 发布；Release 构建成功，安装包 manifest 与分配版本一致。
+- 发布来源：`87cb47386fc87ddb4f8bff7d314dadfe815df85c`。首次推送遇到并行服务端提交 `d994e3544`，按流程 rebase；Android 输入与测试时完全相同。
+- 线上 `/app/version.json` 的版本、源码 SHA 和 SHA-256 与本次安装包一致，下载 HEAD 为 200，文件大小 40,649,993 字节。
+- APK SHA-256：`aaf002fc5f999e9219e40426ebd271aa08a4eb2ba738035b401171eb979f7671`。
+- 发布日志：`social-sync-status-publish-apk-20260915-194751-386.result.json`，退出码 0。物理设备未配置自动安装目标，本次实机复核记为 deferred；不能据此宣称用户手机已更新或现场验收通过。
+- 同步版本仅影响 APK：本轮没有修改 Windows 或 PWA 源码，也没有重新发布它们。
