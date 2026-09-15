@@ -107,3 +107,16 @@ test('regeneration records preserve their user and original parent identities', 
   assert.throws(() => store.write(record({ operation: 'regenerate', attemptId: uid(9), parentId: uid(3),
     historyParentId: uid(4), projectId: 'g-p-' + 'a'.repeat(32) })), /recovery_record_invalid/);
 });
+
+test('version 2 requires an immutable exact attachment digest and retains version 1 records', () => {
+  const store = api.create(memory());
+  store.write(record());
+  const next = store.write(record({ version: 2, attemptId: uid(8), attachmentSignatureHash: other }));
+  assert.equal(store.list(account).length, 2);
+  assert.equal(next.attachmentSignatureHash, other);
+  assert.throws(() => store.update(next, { attachmentSignatureHash: account }), /recovery_record_invalid/);
+  for (const patch of [{ version: 2 }, { version: 3 }, { version: 2, attachmentSignatureHash: 'file-private' },
+    { version: 2, attachmentSignatureHash: [other] }, { version: 1, attachmentSignatureHash: null }]) {
+    assert.throws(() => store.write(record({ attemptId: uid(9), ...patch })), /recovery_record_invalid/);
+  }
+});

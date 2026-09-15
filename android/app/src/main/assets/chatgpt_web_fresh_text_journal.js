@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextJournal = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -8,6 +8,7 @@
   options ||= {};
   const history = options.history || page.__elonChatGptFreshTextReconcile.create();
   const userSignature = (options.userIdentity || page.__elonChatGptFreshTextUserIdentity)?.signature;
+  const attachmentSignature = (options.attachmentIdentity || page.__elonChatGptFreshTextAttachmentIdentity)?.signature;
   const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
   const fail = code => { throw Error(code); };
   let store = null, identityCache = null, code = 'idle', recovered = 0;
@@ -39,13 +40,20 @@
   }
 
   async function resolve(record, binding, owner, signal) {
+    // V1 did not record whether files were sent. Retain its uncertainty instead
+    // of assuming that an old attachment send was plain text.
+    if (record.version !== 2 && record.operation === 'send') fail('recovery_previous_unresolved');
     const candidate = record.conversationId || binding.conversationId;
     if (!uuid.test(candidate || '') || candidate !== binding.conversationId ||
         record.projectId !== (binding.projectId ?? null)) fail('recovery_previous_unresolved');
     if (record.operation === 'regenerate' && record.replyIds.length === 0) fail('recovery_previous_unresolved');
-    let originalSignature = null;
+    let originalSignature = null, originalAttachments = null;
     const proof = proofBinding(record, candidate, owner.userId, message =>
       originalSignature !== null && userSignature(message) === originalSignature);
+    if (record.operation === 'send') proof.attachments = { matchesHistory(message) {
+      try { return typeof attachmentSignature === 'function' && attachmentSignature(message) === originalAttachments; }
+      catch (_) { return false; }
+    } };
     let active = true, verified = false, timer, abort;
     const controller = new page.AbortController();
     const current = () => active && !signal.aborted && !controller.signal.aborted && binding.owns() === true;
@@ -60,27 +68,33 @@
       if (!current()) fail('context_changed');
       code = 'reading';
       await Promise.race([Promise.resolve().then(async () => {
-        if (record.operation === 'regenerate') {
-          if (!userSignature) fail('recovery_previous_unresolved');
-          // A regenerated response reuses an existing user ID. Prove its saved
-          // content digest in a read-only pass before the official loader may apply it.
+        if (record.operation === 'regenerate' || record.attachmentSignatureHash != null) {
+          const getSignature = record.operation === 'regenerate' ? userSignature : attachmentSignature;
+          const expectedHash = record.operation === 'regenerate' ? record.userSignatureHash : record.attachmentSignatureHash;
+          if (!getSignature) fail('recovery_previous_unresolved');
+          // Hash evidence before allowing the loader to apply history. The
+          // second read must retain the exact proved user/file references.
           let signature = null;
           await binding.runtime.textHydrateHistory(candidate, {
             forceNetworkFetch: true, includeMessageId: record.userMessageId, signal: controller.signal,
-            skipIfExisting: false, source: 'native_fresh_journal_v1', shouldApplyResponse: () => false,
+            skipIfExisting: false, source: 'native_fresh_journal_v2', shouldApplyResponse: () => false,
             onConversationLoadedFromNetwork(payload) {
-              if (current()) signature = userSignature(payload?.mapping?.[record.userMessageId]?.message);
+              if (current()) {
+                try { signature = getSignature(payload?.mapping?.[record.userMessageId]?.message); }
+                catch (_) { signature = null; }
+              }
             },
           });
           if (!current()) fail('context_changed');
           if (typeof signature !== 'string' || signature.length > 50000 ||
-              await digest(signature) !== record.userSignatureHash) fail('recovery_previous_unresolved');
-          originalSignature = signature;
+              await digest(signature) !== expectedHash) fail('recovery_previous_unresolved');
+          if (record.operation === 'regenerate') originalSignature = signature;
+          else originalAttachments = signature;
         }
         if (!current()) fail('context_changed');
         return binding.runtime.textHydrateHistory(candidate, {
           forceNetworkFetch: true, includeMessageId: record.userMessageId, signal: controller.signal,
-          skipIfExisting: false, source: 'native_fresh_journal_v1',
+          skipIfExisting: false, source: 'native_fresh_journal_v2',
           onConversationLoadedFromNetwork(payload) {
             verified = current() && payload?.is_do_not_remember === false && payload.is_temporary_chat !== true &&
               history.ownsResponse(payload, proof, record.userMessageId, record.stopAttempted, record.stopAcknowledged);
@@ -124,12 +138,17 @@
         fail('recovery_identity_unavailable');
       }
       const userSignatureHash = operation === 'regenerate' ? await digest(signature) : null;
+      if (typeof request.recoveryAttachmentSignature !== 'function') fail('recovery_identity_unavailable');
+      const attachmentProof = request.recoveryAttachmentSignature();
+      if (attachmentProof !== null && (operation === 'regenerate' || typeof attachmentProof !== 'string' ||
+          !attachmentProof || attachmentProof.length > 8192)) fail('recovery_identity_unavailable');
+      const attachmentSignatureHash = attachmentProof === null ? null : await digest(attachmentProof);
       if (!binding.current() || signal.aborted) fail('context_changed');
-      let record = store.normalize({ version: 1, accountHash: owner.accountHash, attemptId: request.turnId,
+      let record = store.normalize({ version: 2, accountHash: owner.accountHash, attemptId: request.turnId,
         conversationId: binding.conversationId, userMessageId: request.userMessageId, parentId: binding.parentId,
         projectId: binding.projectId ?? null, newConversation: binding.newConversation === true,
         operation, historyParentId: operation === 'regenerate' ? binding.historyParentId : null, userSignatureHash,
-        replyIds: [], stopAttempted: false, stopAcknowledged: false, createdAtMs: Date.now() });
+        replyIds: [], stopAttempted: false, stopAcknowledged: false, createdAtMs: Date.now(), attachmentSignatureHash });
       let persisted = false;
       const update = patch => {
         if (!persisted) return;

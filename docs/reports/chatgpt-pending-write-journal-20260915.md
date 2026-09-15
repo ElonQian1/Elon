@@ -44,7 +44,8 @@ that an outstanding write has failed, and must not be used to retry that write.
 - Regeneration also hashes the original question signature and requires a reply
   ID actually observed for that attempt. Its recovery does a read-only signature
   check before a second, separately guarded official history application. Normal
-  send recovery uses one history request.
+  plain-text recovery uses one history request. Attachment recovery now has the
+  additional digest check described below.
 - Bound history reads to 12 seconds, abort on timeout/context change, and prevent
   late callbacks from hydrating a different owner. Recapture the current parent
   and generate a fresh request after recovery, before the next prepare/POST.
@@ -82,6 +83,50 @@ production/test sources; it did not assemble or publish a new APK.
 
 ## Remaining Evidence And Limits
 
+### Attachment Proof Follow-Up
+
+Journal/store 2, request 8 and adapter 423 close a reproduced source defect:
+after recreation, the earlier journal constructed a history owner without the
+original attachment lease. Exact user identity and a terminal answer could
+therefore settle an attachment send whose file references were absent or changed.
+The accepted live sender already checks its immutable file lease; that path is
+unchanged. Two new negative tests failed against journal 1 before the correction
+(`fresh-journal-attachment-red-20260915-141233-771`).
+
+- Request preparation exposes a read-only signature of its actual selected
+  document IDs, image pointers and materialized mounted references. Only its
+  SHA-256 hash is persisted, never file names, prompt text or content bytes.
+- Record schema 2 requires an explicit digest or null for a plain-text send.
+  Reference ordering and unrelated provider-added fields do not change the
+  signature; duplicate, missing, extra or replaced references fail verification.
+- Attachment recovery hashes a read-only history response, then requires the
+  same exact references in the guarded application response. It shares the
+  existing 12-second total deadline, route/owner checks and no-replay barrier.
+  Plain-text recovery still needs one read and rejects unexpected file references.
+- The storage namespace is unchanged so schema 1 records cannot become invisible.
+  Old sends cannot be assumed to have no attachments and remain unresolved.
+  Old regeneration records retain their existing full-user-digest/reply-ID proof.
+- The request/transaction integration test compares the persisted digest with
+  the actual POST body, recreates the journal against shared storage and proves
+  terminal history with one original POST and no replay.
+
+This remains the same opt-in candidate, not a new accepted capability or a
+default promotion. The change adds no upload, DOM selector or provider endpoint.
+The final scoped **431-case JS regression passed**, zero failures, skips or
+cancellations (`fresh-journal-attachment-final-20260915-142018-412`, 4.4 seconds).
+It includes the preserved legacy regeneration proof. No Android compilation,
+APK publication or active-write process-kill acceptance was done in this follow-up.
+
+### Device Boundary
+
+The latest read-only MCP check confirms normal 1.1.1762 / adapter 421 installed,
+authenticated and ready in the production native chat, with empty draft and
+idle voice/dictation/streaming. It does not contain this opt-in source follow-up.
+The existing idle-body recovery smoke then stopped before navigation/force-stop:
+the handset was locked. A separate display-state read confirmed awake=true and
+keyguard_showing=true. Zero messages were sent; original/awake restoration passed.
+Receipt: `conversation-process-recovery-1762-20260915-140845-230`.
+
 - No genuine active-send process-kill recovery has been accepted on a device.
   Existing idle process-recovery smoke is insufficient for that claim.
 - Reconciliation is triggered by the next native send preparation; automatic
@@ -100,8 +145,9 @@ production/test sources; it did not assemble or publish a new APK.
   before Chromium flushes its storage is an additional acceptance boundary.
   Device testing must verify real process-kill retention before enabling the
   candidate, not extrapolate durability from the in-memory test storage.
-- Attachment completion uses exact user-message identity here; this is not new
-  acceptance of Library/mounted or expanded attachment combinations.
+- Attachment completion now requires the request's reference digest as well as
+  exact user identity; this is not device acceptance of Library/mounted or
+  expanded attachment combinations.
 - Normal APK release and device verification will be grouped with the remaining
   batch. No additional APK was published for this candidate. Subtitle fix 1761
   was separately installed; its live voice acceptance is still pending.

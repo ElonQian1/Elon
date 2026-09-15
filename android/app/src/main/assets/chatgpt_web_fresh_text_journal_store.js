@@ -1,17 +1,19 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextJournalStore = api;
 })(typeof window === 'object' ? window : null, function (storage) {
   'use strict';
+  // Keep the storage namespace so older unresolved records cannot disappear
+  // when the record schema changes.
   const prefix = 'elon.fresh.pending.v1.';
   const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
   const hash = /^[a-f0-9]{64}$/;
   const project = /^g-p-[a-f0-9]{32}$/i;
   const isUuid = value => typeof value === 'string' && uuid.test(value);
   const isHash = value => typeof value === 'string' && hash.test(value);
-  const fields = ['version', 'accountHash', 'attemptId', 'conversationId', 'userMessageId',
+  const baseFields = ['version', 'accountHash', 'attemptId', 'conversationId', 'userMessageId',
     'parentId', 'projectId', 'newConversation', 'operation', 'historyParentId', 'userSignatureHash',
     'replyIds', 'stopAttempted', 'stopAcknowledged', 'createdAtMs'];
   const fail = code => { throw Error(code); };
@@ -22,9 +24,11 @@
     }
   };
   function normalize(value) {
+    const fields = value?.version === 2 ? [...baseFields, 'attachmentSignatureHash'] : baseFields;
     if (!value || typeof value !== 'object' || Array.isArray(value) ||
         Object.keys(value).length !== fields.length || fields.some(key => !Object.prototype.hasOwnProperty.call(value, key)) ||
-        value.version !== 1 || !isHash(value.accountHash) ||
+        ![1, 2].includes(value.version) || !isHash(value.accountHash) ||
+        value.version === 2 && !(value.attachmentSignatureHash === null || isHash(value.attachmentSignatureHash)) ||
         !isUuid(value.attemptId) || !isUuid(value.userMessageId) ||
         !(value.conversationId === null || isUuid(value.conversationId)) ||
         !(value.projectId === null || typeof value.projectId === 'string' && project.test(value.projectId)) ||
@@ -37,7 +41,8 @@
         Array.from(value.replyIds).some(id => !isUuid(id)) ||
         new Set(value.replyIds).size !== value.replyIds.length) fail('recovery_record_invalid');
     if (value.operation === 'regenerate') {
-      if (!isHash(value.userSignatureHash) || value.newConversation || !value.conversationId || value.projectId !== null ||
+      if (!isHash(value.userSignatureHash) || value.attachmentSignatureHash != null ||
+          value.newConversation || !value.conversationId || value.projectId !== null ||
           value.parentId !== value.userMessageId || typeof value.historyParentId !== 'string' ||
           !(uuid.test(value.historyParentId) || ['', 'client-created-root'].includes(value.historyParentId))) {
         fail('recovery_record_invalid');

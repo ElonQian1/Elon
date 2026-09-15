@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 7, create: factory });
+  const api = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextRequest = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -78,6 +78,14 @@
     if (!UUID.test(userMessageId) || !UUID.test(turnId)) fail('identifier_invalid');
     let consumed = false, stopConduit = null, stopConsumed = false;
     return Object.freeze({ userMessageId, turnId,
+      recoveryAttachmentSignature() {
+        if (!attachmentMessage) return null;
+        const identity = page.__elonChatGptFreshTextAttachmentIdentity;
+        if (typeof identity?.signature !== 'function') fail('recovery_identity_unavailable');
+        const signature = identity.signature(attachmentMessage);
+        if (typeof signature !== 'string' || !signature) fail('recovery_identity_unavailable');
+        return signature;
+      },
       preparationBody: () => JSON.parse(JSON.stringify(preparedBody)),
       preparationHeaders: () => ({ ...projectHeaders }),
       securityMetadata: () => ({ systemHints: [...dispatchBody.system_hints],

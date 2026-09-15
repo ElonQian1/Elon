@@ -2,7 +2,7 @@
 capability_id: android_chatgpt_realtime_voice_data_channel_transcript_v1
 implementation_status: regression_fix_implemented
 verification_status: targeted_android_tests_passed_device_pending
-delivery_status: published_1761_installed_voice_acceptance_pending
+delivery_status: included_in_installed_1762_voice_acceptance_pending
 ---
 
 # Voice Captions After Search
@@ -95,3 +95,12 @@ failed subtitle decoder. No new call/microphone session was started. Actual
 search-to-spoken-answer caption continuity remains pending. A later mainline APK
 containing this commit can be used; do not downgrade or rebuild 1761 merely to
 repeat installation.
+
+Later the separately published group-chat release 1.1.1762, source
+`b643afa250a580a3faff717c25e1e7d6d7488928`, included this decoder fix and was
+installed by the canonical release script. This task independently read back
+MCP version 1762 and opened the production social AI surface: adapter 421 current,
+bridge ready, authenticated, no login requirement and native voice idle. Debug
+transport had recovered. No microphone was started and caption continuity is
+still not device-accepted; the subsequent safe restart smoke found the screen
+locked before any process stop.

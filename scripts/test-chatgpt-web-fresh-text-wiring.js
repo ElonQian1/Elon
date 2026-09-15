@@ -137,7 +137,7 @@ test('production asset assembly loads dependencies before the one existing send 
     .matchAll(/"([a-z0-9_]+\.js)"/g)].map(m => m[1]);
   const chain = ['chatgpt_web_private_runtime_bindings.js', 'chatgpt_web_committed_composer_owner.js', 'chatgpt_web_private_text_runtime_submit.js',
     'chatgpt_web_fresh_text_attachments.js',
-    'chatgpt_web_fresh_text_request.js', 'chatgpt_web_fresh_text_context.js',
+    'chatgpt_web_fresh_text_attachment_identity.js', 'chatgpt_web_fresh_text_request.js', 'chatgpt_web_fresh_text_context.js',
     'chatgpt_web_private_text_input.js',
     'chatgpt_web_fresh_text_user_identity.js', 'chatgpt_web_fresh_regenerate_context.js',
     'chatgpt_web_fresh_text_reconcile.js', 'chatgpt_web_fresh_text_stop.js',

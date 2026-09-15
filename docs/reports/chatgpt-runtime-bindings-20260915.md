@@ -14,8 +14,9 @@ ordinary text, Search and Image modules.
 
 - [Voice captions after search](chatgpt-voice-search-captions-20260915.md): current
   native preview gap confirmed; channel-identifier/cache-limit mismatch corrected,
-  with 34 passing Android tests; normal 1761 published. Installation and exact live
-  regression acceptance remain pending because ADB lost the device during release.
+  with 34 passing Android tests; installed in normal 1761 and later 1762.
+  Production readiness was verified by MCP; exact live caption acceptance remains
+  pending user participation, not installation or an ongoing ADB outage.
 
 - [Current Writing projection and SPA recovery](chatgpt-spa-recovery-writing-20260915.md)
   closes a current-profile read omission and the reproduced stale startup-route

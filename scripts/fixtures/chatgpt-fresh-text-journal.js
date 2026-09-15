@@ -14,7 +14,8 @@ function fixture(options = {}) {
   const storage = options.storage || memory(), calls = [];
   const page = { crypto, AbortController, setTimeout, clearTimeout, localStorage: storage,
     __elonChatGptFreshTextJournalStore: asset('journal_store'),
-    __elonChatGptFreshTextReconcile: asset('reconcile'), __elonChatGptFreshTextUserIdentity: asset('user_identity') };
+    __elonChatGptFreshTextReconcile: asset('reconcile'), __elonChatGptFreshTextUserIdentity: asset('user_identity'),
+    __elonChatGptFreshTextAttachmentIdentity: asset('attachment_identity') };
   const binding = { conversationId: uid(2), parentId: uid(4), projectId: null, newConversation: false,
     temporary: false, historyDisabled: false, doNotRemember: false,
     owns: () => current, current: () => current, recoveryIdentity: () => identity,
@@ -24,7 +25,7 @@ function fixture(options = {}) {
       value.onConversationLoadedFromNetwork(payload);
       if (value.shouldApplyResponse()) calls.push({ kind: 'apply' });
     } } };
-  const request = { turnId: uid(1), userMessageId: uid(3) };
+  const request = { turnId: uid(1), userMessageId: uid(3), recoveryAttachmentSignature: () => null };
   const payload = { conversation_id: uid(2), is_do_not_remember: false, is_temporary_chat: false,
     current_node: uid(5), async_status: 4, mapping: {
       [uid(3)]: { id: uid(3), parent: uid(4), message: { id: uid(3), author: { role: 'user' },
