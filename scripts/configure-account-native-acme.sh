@@ -49,7 +49,28 @@ done
 rollback() {
   local code=$?; trap - EXIT
   if [[ $code -ne 0 ]]; then
-    cp -p "$BACKUP" "$ENV_FILE"
+    # Restore only this operation's settings; preserve concurrent unrelated edits.
+    if ! python3 - "$ENV_FILE" "$BACKUP" "$MODE" "$IP" "$ROOT" <<'PY'
+import os,pathlib,sys,tempfile
+p,backup=map(pathlib.Path,sys.argv[1:3]);mode,ip,root=sys.argv[3:]
+expected={'ACCOUNT_ACME_ENABLED':'false' if mode=='disable' else 'true','ACCOUNT_ACME_STAGING':'true' if mode=='staging' else 'false'}
+if mode!='disable': expected.update(ACCOUNT_ACME_ACCEPT_TOS='true',ACCOUNT_ACME_IP=ip,ACCOUNT_ACME_LISTEN_ADDR='0.0.0.0:443',ACCOUNT_ACME_DATA_DIR=root)
+def entries(lines): return {k.strip():v for s in lines for k,sep,v in [s.partition('=')] if sep}
+lines=p.read_text().splitlines();current=entries(lines);before=entries(backup.read_text().splitlines())
+restore={k for k,v in expected.items() if current.get(k)==v}
+lines=[s for s in lines if s.partition('=')[0].strip() not in restore]
+lines += [f'{k}={before[k]}' for k in sorted(restore) if k in before]
+fd,tmp=tempfile.mkstemp(prefix='.native-acme-rollback-',dir=p.parent)
+try:
+    with os.fdopen(fd,'w') as out: out.write('\n'.join(lines)+'\n');out.flush();os.fsync(out.fileno())
+    os.chmod(tmp,0o600);os.replace(tmp,p)
+finally:
+    if os.path.exists(tmp): os.unlink(tmp)
+PY
+    then
+      printf 'NATIVE_ACME_STATUS=rollback_failed_private_backup_retained\n' >&2
+      exit "$code"
+    fi
     systemctl restart "$SERVICE" || true
     if [[ "$TIMERS_CHANGED" == true ]]; then
       for timer in elon-account-acme-renew.timer elon-account-cert-renew.timer; do
