@@ -12,6 +12,7 @@ mod group_web_ai;
 mod ai_snapshots;
 mod articles;
 mod group_members;
+mod link_previews;
 mod social_assets;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
@@ -19,6 +20,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
     .merge(articles::routes())
     .merge(social_assets::routes())
     .merge(ai_snapshots::routes())
+    .merge(link_previews::routes())
     .route("/api/me/groups/:group_id/ai/work-models", get(group_web_ai::work_models))
     .route("/api/me/groups/:group_id/web-ai/messages", post(group_web_ai::send))
     .route("/api/me/groups/:group_id/messages/:message_id/web-ai", post(group_web_ai::prepare))

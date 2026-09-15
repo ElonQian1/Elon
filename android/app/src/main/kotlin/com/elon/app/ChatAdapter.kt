@@ -242,6 +242,7 @@ class ChatAdapter(
                 holder.text.movementMethod = LinkMovementMethod.getInstance()
             }
         }
+        com.elon.app.sociallinks.SocialLinkCards.bind(holder.attachmentList, holder.text, message, !recalled && !projectCardBound)
         WebChatProductionRichContentBinder.bindParts(holder.webChatPartList, message, onWebChatContentOpen)
         bindSendStatus(holder, message)
         bindGroupMessageRevision(holder, message, onMessageHistory)

@@ -51,5 +51,5 @@
     };
     host.append(action, result);
   }
-  root.ElonSourceLinks = { webUrl, source, label, link, scan, image, text(host, text) { const url = webUrl(text.trim()); if (url) link(host, { version: 1, url, method: 'share' }); } };
+  root.ElonSourceLinks = { webUrl, source, label, link, scan, image, text(host, text) { if (root.ElonSocialLinks?.links(text).length) return; const url = webUrl(text.trim()); if (url) link(host, { version: 1, url, method: 'share' }); } };
 })(globalThis);

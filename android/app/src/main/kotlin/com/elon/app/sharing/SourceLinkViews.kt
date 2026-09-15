@@ -46,6 +46,7 @@ internal object SourceLinkViews {
             .setNegativeButton("取消", null).show()
     }
     fun bindCard(container: LinearLayout?, text: TextView, message: ChatMessage): Boolean {
+        if (com.elon.app.sociallinks.SocialLinkPolicy.extract(message.content).isNotEmpty()) return false
         if (container == null || !message.attachments.isNullOrEmpty()) return false
         val link = SourceLink.fromText(message.content) ?: return false
         val ui = ArticleUi(container.context)

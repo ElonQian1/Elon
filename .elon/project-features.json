@@ -21948,6 +21948,163 @@
       "updated_at_ms": 1789462658299
     },
     {
+      "id": "social-link-cards-v1",
+      "title": "三端社交外链卡片与阅读",
+      "summary": "公众号、抖音、小红书、B站、币安广场、X的轻量预览及原文阅读",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/social-link-cards.md",
+        "content_hash": "1426033f239d7a202f3e03b4c9aa255b6553e0e78ea0b8afec9a18dc40fa3be4",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "a6ae8bbb7ef7022754ebfc759ab0671bfb09e60d",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "1f554ee8479b7a2df30d037f37c7977dbdf523dd",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/sociallinks",
+        "pc-frontend/src/features/friends/SocialLinkCards.tsx",
+        "server/src/assets/social_links.js",
+        "server/src/router/social_routes/link_previews"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "六平台原链接与时间参数保留",
+        "预览不阻塞消息且缓存有界",
+        "Win APK PWA 可打开并返回聊天",
+        "定向回归和构建发布证据"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/sociallinks/SocialLinkBrowserActivity.kt",
+          "content_hash": "7b73408eaebccd54ab303d3834fc8a3f39269f0d986e204eda88274f2d6200ce",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7990d9b20df623d0110634fa04fcdb1959939fab",
+            "head_blob_oid": "2e9c05677d8e3c9956535a936318078dc6004866",
+            "worktree_blob_oid": "2e9c05677d8e3c9956535a936318078dc6004866",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/sociallinks/SocialLinkCards.kt",
+          "content_hash": "c535bde011738f845310facf5d714e5ee9e854b3d17eb9b14a96d770ed2811b7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7990d9b20df623d0110634fa04fcdb1959939fab",
+            "head_blob_oid": "78ef55097af95dfd9a72c91bc66886411f2b7de4",
+            "worktree_blob_oid": "78ef55097af95dfd9a72c91bc66886411f2b7de4",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/sociallinks/SocialLinkPolicyTest.kt",
+          "content_hash": "4240a8f968b166429754c3fde575b21d74faf45c311700c6e091c2b3f82d8492",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7990d9b20df623d0110634fa04fcdb1959939fab",
+            "head_blob_oid": "435f5b0043a2938aa8e55952771166a09c0db092",
+            "worktree_blob_oid": "435f5b0043a2938aa8e55952771166a09c0db092",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/SocialLinkBrowser.tsx",
+          "content_hash": "fff037005dc321f64077cdb5a7b9a622d7bc6a0f25b40281cb4bd4075e24a8e8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7990d9b20df623d0110634fa04fcdb1959939fab",
+            "head_blob_oid": "ae27867f56a3667cd3b5539632ad8b037f952dba",
+            "worktree_blob_oid": "ae27867f56a3667cd3b5539632ad8b037f952dba",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-social-link-cards.mjs",
+          "content_hash": "fabf9e07c39281dda3369a059ffde55293d2a6390619b6646304aa360d70d2de",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7990d9b20df623d0110634fa04fcdb1959939fab",
+            "head_blob_oid": "d78afec504a538a8aa28cf3280fa879c07807993",
+            "worktree_blob_oid": "006d4f8905145fd722773e043c30e80f80a85464",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/assets/social_link_viewer.js",
+          "content_hash": "2937ecb321f9649ab7ec83f5a227add374d44b9c6b6bff7080dbb2adc8bebe83",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7990d9b20df623d0110634fa04fcdb1959939fab",
+            "head_blob_oid": "34501e1aef8ee48a26a75653ab23675e67520a8e",
+            "worktree_blob_oid": "34501e1aef8ee48a26a75653ab23675e67520a8e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/assets/social_links.js",
+          "content_hash": "027ab47d04c4a74bff3fd9156172695da7b29968721c4ca4217a83dad7adf32f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7990d9b20df623d0110634fa04fcdb1959939fab",
+            "head_blob_oid": "7cc480b338191021accb6373d96cc863879d33a9",
+            "worktree_blob_oid": "7cc480b338191021accb6373d96cc863879d33a9",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/router/social_routes/link_previews/service.rs",
+          "content_hash": "05e7c1bd9c46bf3670a09fade31395685306f4d12bb46303c9fd40deb72c0bdb",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7990d9b20df623d0110634fa04fcdb1959939fab",
+            "head_blob_oid": "2eeb1629a0525513457c70f2d922d14c30875137",
+            "worktree_blob_oid": "2eeb1629a0525513457c70f2d922d14c30875137",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/router/social_routes/link_previews/tests.rs",
+          "content_hash": "36278eee32a8ba1062b284edae0420e5a5b74deb0ba1266505bbfecf18866d2a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7990d9b20df623d0110634fa04fcdb1959939fab",
+            "head_blob_oid": "30eaa591df0a13d2de3c6c4f609bba079ebdf580",
+            "worktree_blob_oid": "30eaa591df0a13d2de3c6c4f609bba079ebdf580",
+            "state": "tracked_clean"
+          }
+        }
+      ],
+      "created_at_ms": 1789492845079,
+      "updated_at_ms": 1789493177891
+    },
+    {
       "id": "social-sync-status-lifecycle-v1",
       "title": "APK 社交同步提示生命周期修复",
       "summary": "修复 AI 聊天交接、暂停及消息已出现时仍显示好友或群聊同步提示",
@@ -29669,66 +29826,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_3e2d724fae1543158f3d2cc766683392",
-      "feature_id": "android-binance-create-reference-v1",
-      "action": "claimed",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789154803208
-    },
-    {
-      "id": "feature_event_1a98e73d800a4f94aa31856137aea3df",
-      "feature_id": "android-binance-create-reference-v1",
-      "action": "transitioned",
-      "actor": "codex-grid",
-      "reason": "已核对量化 UI 归属，新增固定只读合同及已捕获计算向量。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789154823602
-    },
-    {
-      "id": "feature_event_70dac74b62ae4c41b69b39985456f004",
-      "feature_id": "android-binance-create-reference-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789156276569
-    },
-    {
-      "id": "feature_event_e78399b22060400bb306ce7a8750966b",
-      "feature_id": "android-binance-create-reference-v1",
-      "action": "transitioned",
-      "actor": "codex-grid",
-      "reason": "固定只读参考服务与规则模块已接通，最终67项创建/宿主和52项JS回归通过；账号实测与发布装机独立待验。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789156614063
-    },
-    {
-      "id": "feature_event_c033e0fd585c4dac96de6524f60a05ee",
-      "feature_id": "android-binance-create-validation-v1",
-      "action": "registered",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789158470158
-    },
-    {
-      "id": "feature_event_27bfac4b3a9d41cfacfb31d4977a5298",
-      "feature_id": "android-binance-create-validation-v1",
-      "action": "claimed",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789158470201
-    },
-    {
       "id": "feature_event_8c5ff8ff6bf1481e9f7f2f8fcb06ed84",
       "feature_id": "android-binance-create-validation-v1",
       "action": "transitioned",
@@ -31667,6 +31764,66 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1789491651611
+    },
+    {
+      "id": "feature_event_e8990473902842df9aed008502b46111",
+      "feature_id": "social-link-cards-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789492845079
+    },
+    {
+      "id": "feature_event_bd6e23f98b504a3198c83c1f93506cfa",
+      "feature_id": "social-link-cards-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789492845121
+    },
+    {
+      "id": "feature_event_e114e7061ed74295a0b730e6600af61e",
+      "feature_id": "social-link-cards-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789492845155
+    },
+    {
+      "id": "feature_event_4ce2399b41f64648b6c428fc957dc267",
+      "feature_id": "social-link-cards-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789493107578
+    },
+    {
+      "id": "feature_event_5b28190e67774461b86951e62998bc3a",
+      "feature_id": "social-link-cards-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "六平台三端入口已实现，主线系统分享能力已合并并去重",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789493107637
+    },
+    {
+      "id": "feature_event_75a5af7cd974432b8d973a308d6b75cb",
+      "feature_id": "social-link-cards-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "生产源码 Rust 14 项、Android 4 项、Web 回归及合并后 PC/Android 构建通过；平台和设备验收边界已记录",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1789493177891
     }
   ]
 }
