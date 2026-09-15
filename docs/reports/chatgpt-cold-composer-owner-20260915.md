@@ -1,7 +1,9 @@
 # Cold composer owner preparation
 
 Date: 2026-09-15. Source-batch regression fix, not new device acceptance.
-Context module 25; adapter 424. Reuses the existing private sender and loader.
+Original correction: context 25 / adapter 424. The identity-cache follow-up below
+uses context 26, private input 8, transaction 36 and adapter 427. Both reuse the
+existing private sender and loader; their device acceptance is separate.
 
 ## Failure and Scope
 
@@ -47,3 +49,52 @@ No new APK build/install or device latency claim belongs to this fix. Include it
 in the next grouped release and verify one cold-module native send there. The
 installed 1762 search-caption fix still has its separate live acceptance pending;
 this work does not replace that test or the pending process-recreation checks.
+
+## Cold Identity Cache Follow-Up
+
+The native input observer required `context.stamp()` before calling context
+preparation. That stamp requires the loaded shared module's account state, but
+the observer did not initiate that module's load. On an existing conversation
+with no composer DOM, it could wait for an unrelated feature to warm the cache.
+The new regression reproduced zero imports across 20 input snapshots. This is
+a local observer deadlock, not proof of an account/login or network failure.
+
+The observer now imports the already-observed shared module through the existing
+versioned loader when the account stamp is not available. This imports code only:
+it captures no user command, edits no draft and issues no preparation/send POST.
+It does not guess asset names or synthesize page/account/conversation state.
+An account becoming available schedules fresh normal input preparation, which
+still verifies the committed owner, draft, model, files, tools and parent.
+
+There is one local in-flight observer, a five-second deadline, ten-second failure
+cooldown and at most three attempts for the same document/route/profile/scope.
+The module loader retains its own shared import and deadline. Hidden/offline
+pages start no new work; network flapping cannot erase the cooldown. A changed
+document, token, route, profile or binding instance invalidates late notification.
+An account change while importing cannot inherit draft authority: no draft has
+been captured, and the next snapshot must validate the current owner anew.
+Loaded-but-signed-out state does not become ready and is not repeatedly imported.
+
+The same regression found that a missing model could be advertised as ready by
+the input observer even though request construction would later reject it. Context
+admission now uses the request's model-ID format before publishing readiness.
+Missing/malformed model data is `context_unavailable / base_model`, not a claim
+that the official model or capability does not exist. Arrival of a valid model
+allows the existing bounded input recheck to succeed without a reload.
+
+The new test composes the actual private input, fresh context and committed-owner
+runtime. Fixtures cover cold shared and editor modules, reentrant notification,
+failed imports, stale/disabled/background/offline state, account changes, absent
+owners, uploads and delayed models. Existing independent-send and retry tests
+remain in the batch. The initial combined run also caught an incorrect fixture
+assertion counting the pre-existing constructor's composer prewarm; the fixture
+now excludes that constructor baseline rather than changing production prewarm.
+
+`cold-identity-final-20260915-163059-642` passed 600 Node tests, zero failures,
+errors, cancellations or skips, in 5.2 seconds. Coverage includes the new cold
+identity cases, fresh sends/retries, private input, runtime bindings, full asset
+assembly and pending-recovery wiring. This does not add 600 live provider samples.
+No Android build, APK publication, installation, cold-start latency claim or new
+live acceptance belongs to this follow-up. Accepted private-send defaults are unchanged.
+This closes cold shared-module preparation, not a completely uninitialized page
+without authenticated identity, a committed conversation or a reviewed runtime.

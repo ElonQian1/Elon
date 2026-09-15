@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 35, create: factory });
+  const api = Object.freeze({ version: 36, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -451,7 +451,7 @@
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
   const pendingRecoverySnapshot = onChange => { state(); return pendingRecovery?.snapshot(onChange) || 'disabled'; };
-  return Object.freeze({ version: 35, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 36, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     pendingRecoverySnapshot,
     addRecoverySnapshotFields: (event, onChange) => { event.privateSendRecoveryState = pendingRecoverySnapshot(onChange); },

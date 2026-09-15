@@ -12,6 +12,12 @@ ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
 
+- [Cold input preparation](chatgpt-cold-composer-owner-20260915.md): adapter 427
+  source candidate removes the cold shared-identity module's circular readiness
+  wait and rejects missing models before advertising native Send readiness.
+  It reuses bounded observed-module imports and the current private sender;
+  grouped APK/device acceptance remains pending, with no new default scopes.
+
 - [Voice captions after search](chatgpt-voice-search-captions-20260915.md): current
   native preview gap confirmed; channel-identifier/cache-limit mismatch corrected,
   with 34 passing Android tests; installed in normal 1761 and later 1762.

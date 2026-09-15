@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 7, create: factory });
+  const api = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateTextInput = factory(root);
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -9,6 +9,7 @@
   const context = options.context || page.__elonChatGptFreshTextContext.create(page);
   const now = options.now || Date.now;
   let cached = null, pending = null, retryAfter = 0, lastStamp = null, lastDocument = page.document;
+  let bootstrapAttempts = 0;
 
   function scope() {
     return { allowNewConversations: page.__elonChatGptFreshTextNewConversationsEnabled !== false,
@@ -36,13 +37,32 @@
     const empty = { ready: false, draft: null };
     try {
       const currentStamp = enabled() ? stamp() : null;
-      if (currentStamp !== lastStamp || page.document !== lastDocument) {
-        cached = null; retryAfter = 0; lastStamp = currentStamp; lastDocument = page.document;
+      const bootstrap = !currentStamp && !composer && enabled() ? context.identityBootstrap?.() : null;
+      const observerStamp = currentStamp || (bootstrap ? JSON.stringify(['identity', bootstrap.key, scope()]) : null);
+      if (observerStamp !== lastStamp || page.document !== lastDocument) {
+        cached = null; retryAfter = 0; bootstrapAttempts = 0; lastStamp = observerStamp; lastDocument = page.document;
         // Retire this observer only; shared runtime loads may have other consumers.
         if (pending) page.clearTimeout(pending.timer);
         pending = null;
       }
-      if (!currentStamp || composer) return empty;
+      if (!currentStamp || composer) {
+        if (bootstrap?.current() && !pending && bootstrapAttempts < 3 && now() >= retryAfter) {
+          const attempt = { timer: null }; pending = attempt; bootstrapAttempts++;
+          attempt.timer = page.setTimeout(() => {
+            if (pending !== attempt) return;
+            pending = null; retryAfter = now() + 10000;
+          }, 5000);
+          void Promise.resolve().then(() => bootstrap.load()).then(ready => {
+            if (ready && pending === attempt && enabled() && bootstrap.current()) {
+              try { notify?.(); } catch (_) {}
+            }
+          }).catch(() => {}).finally(() => {
+            if (pending !== attempt) return;
+            page.clearTimeout(attempt.timer); pending = null; retryAfter = now() + 10000;
+          });
+        }
+        return empty;
+      }
       if (cached?.binding.current()) {
         const draft = cached.binding.draft?.read();
         if (typeof draft === 'string') return { ready: true, draft };
@@ -98,5 +118,5 @@
     respond('set_draft', true, ''); io.notify();
   }
 
-  return Object.freeze({ version: 7, snapshot, setDraft, setCommand });
+  return Object.freeze({ version: 8, snapshot, setDraft, setCommand });
 });

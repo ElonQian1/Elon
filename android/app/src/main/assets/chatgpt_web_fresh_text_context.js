@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 25, create: factory });
+  const api = Object.freeze({ version: 26, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -8,6 +8,7 @@
   const PROFILES = ['web_20260912', 'web_20260915', 'web_20260915_b'];
   const fail = (code, admissionStage) => { throw Object.assign(Error(code), { admissionStage }); };
   const idPattern = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+  const modelPattern = /^[a-z0-9][a-z0-9._-]{0,127}$/i;
   const projectPattern = /^g-p-[a-f0-9]{32}$/i;
   const routePattern = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9-]{36})$/i;
   const newProjectPattern = /^\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?\/project$/i;
@@ -22,6 +23,31 @@
       const shared = bindings.peek('shared');
       const account = page.__elonChatGptPrivateModelContract?.create(page).withRuntimeIdentity({}, shared)?.account;
       return account ? JSON.stringify([page.__elonChatGptDocumentToken, page.location.href, account]) : null;
+    } catch (_) { return null; }
+  }
+
+  function identityBootstrap() {
+    try {
+      const bindings = page.__elonChatGptPrivateRuntimeBindings;
+      const profile = bindings?.state?.().profile_id;
+      const token = page.__elonChatGptDocumentToken, href = page.location.href, document = page.document;
+      const url = new URL(href);
+      if (!PROFILES.includes(profile) || !/^doc_[a-z0-9_]{3,80}$/.test(token || '') ||
+          url.origin !== 'https://chatgpt.com' || url.username || url.password || url.hash ||
+          url.search && !(url.pathname === '/' && url.search === '?temporary-chat=true') ||
+          url.pathname !== '/' && !routePattern.test(url.pathname) && !newProjectPattern.test(url.pathname) ||
+          bindings.peek('shared') || bindings.observed?.('shared') !== true) return null;
+      const current = () => document === page.document && token === page.__elonChatGptDocumentToken &&
+        href === page.location.href && page.__elonChatGptPrivateRuntimeBindings === bindings &&
+        bindings.state().profile_id === profile && page.document.hidden !== true && page.navigator?.onLine !== false;
+      // This imports a reviewed module only. It captures no draft/command and
+      // grants no send permission; the next snapshot validates the live account.
+      return Object.freeze({ key: JSON.stringify([token, href, profile]), current,
+        async load() {
+          if (!current()) return false;
+          await bindings.load('shared');
+          return current() && stamp() !== null;
+        } });
     } catch (_) { return null; }
   }
 
@@ -221,6 +247,7 @@
           page.__elonChatGptPrivateStopRuntime?.state?.().pending ||
           page.__elonChatGptCanvasDocumentActions?.generationPending?.()) fail('conversation_busy');
       const parent = shared.HM.getCurrentMessage(state), model = conversation.Nrn(selected);
+      if (typeof model?.id !== 'string' || !modelPattern.test(model.id)) fail('context_unavailable', 'base_model');
       if (toolOwner && toolOwner.model !== model?.id) fail('context_changed');
       const completedAssistant = parent?.author?.role === 'assistant' &&
         (parent.status === 'finished_partial_completion' || parent.status === 'finished_successfully' && parent.end_turn === true);
@@ -236,7 +263,7 @@
           shared.textModelOverride()?.model_slug === model?.id) fail('parent_unavailable');
       const requestedDefaultModel = newConversation ? conversation.textRequestedDefaultModel(selected, model?.id) ?? null : null;
       if (requestedDefaultModel !== null && (typeof requestedDefaultModel !== 'string' ||
-          !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(requestedDefaultModel))) fail('context_invalid');
+          !modelPattern.test(requestedDefaultModel))) fail('context_invalid');
       let temporaryPersonalization = null;
       if (temporary && newConversation) {
         if (['textTemporaryPersonalizationEnabled', 'textTemporaryPersonalization', 'textReadUntracked']
@@ -414,7 +441,7 @@
     const codes = ['scope_unsupported', 'runtime_unavailable', 'identity_unavailable', 'context_unavailable',
       'context_changed', 'context_invalid', 'attachments_active', 'tools_active', 'conversation_busy', 'parent_unavailable'];
     const stages = ['base_route', 'base_new', 'base_owner', 'base_composer', 'base_route_state', 'base_privacy',
-      'base_prepare', 'base_workspace', 'base_project', 'base_mode', 'base_branch', 'base_config',
+      'base_prepare', 'base_model', 'base_workspace', 'base_project', 'base_mode', 'base_branch', 'base_config',
       'project_business', 'project_headers', 'project_route', 'project_mode', 'project_loading',
       'project_privacy', 'project_shared', 'project_scopes'];
     let timer;
@@ -428,5 +455,5 @@
       .finally(() => { page.clearTimeout(timer); inspection = null; });
     return inspection;
   }
-  return Object.freeze({ capture, stamp, inspect });
+  return Object.freeze({ capture, stamp, inspect, identityBootstrap });
 });

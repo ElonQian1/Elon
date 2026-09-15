@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshRegenerateContext = api;
 })(typeof window === 'object' ? window : null, function (page, baseContext) {
@@ -157,7 +157,7 @@
     const stages = ['contract', 'menu', 'base_scope', 'owner', 'resolver', 'model', 'user_identity', 'user_content',
       'user_parent', 'user_channel', 'user_recipient', 'user_metadata', 'reply_metadata', 'effort', 'current',
       'base_route', 'base_new', 'base_owner', 'base_composer', 'base_route_state', 'base_privacy', 'base_prepare',
-      'base_workspace', 'base_project', 'base_mode', 'base_branch', 'base_config'];
+      'base_model', 'base_workspace', 'base_project', 'base_mode', 'base_branch', 'base_config'];
     let timer;
     // Admission only: no prepare request, stream, draft mutation or writer ledger.
     inspection = Promise.race([capture(command).then(() => result('ready', 'ready'), error =>
