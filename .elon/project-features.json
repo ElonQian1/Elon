@@ -21227,7 +21227,7 @@
       "id": "social-chat-desktop-parity-v1",
       "title": "Windows 社交消息操作与聊天工作流补齐",
       "summary": "统一消息菜单、引用撤回转发、附件发送和会话工具，保留修订审计及缓存同步",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/social-chat-desktop-remediation.md",
@@ -21363,7 +21363,7 @@
         }
       ],
       "created_at_ms": 1789460596075,
-      "updated_at_ms": 1789462521369
+      "updated_at_ms": 1789462658299
     },
     {
       "id": "sqlite-safe-snapshot-v1",
@@ -28996,16 +28996,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b3beae04c90340af84bfb1de2c8718c1",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "claim_released",
-      "actor": "codex-native-manage-v2",
-      "reason": "四项原生管理切片源码/离线测试已完成；双包安装、冷启动、真实准备/交易及止盈止损独立编辑待续，完整V2不标为released",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1788983543981
-    },
-    {
       "id": "feature_event_fe8ce1344bc2498cb531904589b0db84",
       "feature_id": "android-binance-read-context-recovery-v1",
       "action": "registered",
@@ -30994,6 +30984,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1789462521369
+    },
+    {
+      "id": "feature_event_506b2c6079704621b857617fdc4bec56",
+      "feature_id": "social-chat-desktop-parity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "正式 PC 前端发布通过：dfc99bb09f4416743b19b1311240ea20407b6759；兼容服务端 66c411a116e37c1ec53d07c0ee0e2e437e1fe97b。此元数据提交后由正式入口重发同一已验证前端工件再收尾。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1789462658299
     }
   ]
 }
