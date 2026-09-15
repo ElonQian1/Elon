@@ -9593,6 +9593,148 @@
       "updated_at_ms": 1786647275788
     },
     {
+      "id": "desktop-social-context-menu-v1",
+      "title": "桌面聊天消息右键交互整改",
+      "summary": "按消息与媒体类型提供紧凑菜单，修正连续右键、选区和焦点，保留已有社交工作流",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/desktop-social-context-menu.md",
+        "content_hash": "98bd855252f3c99530168f9aaaa6744c2f2e92012ad299865cbcb00d6cd69dcd",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "91bfb56a5718f22a7c3010feac2cb6f56876ce5d",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex",
+      "tags": [],
+      "task_paths": [
+        "pc-frontend/src/features/friends",
+        "scripts/pc-social-context-menu-cases.cjs",
+        "scripts/test-pc-social-chat-parity.cjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "消息右键紧凑分组并按类型和权限提供操作",
+        "选区与媒体操作正确，菜单单实例和键盘焦点正确",
+        "既有编辑历史引用转发回归通过并发布 PC 前端"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "pc-frontend/src/features/friends/SocialContextMenu.tsx",
+          "content_hash": "64df7f4c888ad5b515e239652ac36a0d141530ee367fb7c1c8397e66eec97ff1",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c69c132344024d39af993c6d34777d198f3a805e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/SocialConversation.tsx",
+          "content_hash": "beaf5c7009f4bb5000e8d795d50e532498b854190af47202440ccbc8c4185d42",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "77bc3c81c09c4150e5184a8132380f8e573f5530",
+            "worktree_blob_oid": "aaa81f2022706c3533ee17788964f09b2427a0b7",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/SocialMessageAttachments.tsx",
+          "content_hash": "85f17b1f762d4bc874c1b63f998d6deba440f316d5b36ac990dc6c3632eda280",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "a1cc26b4cf08aad10e04ff3f495cf9a062afd5da",
+            "worktree_blob_oid": "2fb5abc15aef56576bdea134a85f2def263c193d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/SocialMessageMenu.module.css",
+          "content_hash": "7f8bc29c9bf967c599e55321fb577d5ac7fd838efba9bb2d0befd6dc66aea008",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bc41d4b1957e0ec01432fa9293bd41fd099b161a",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/SocialMessageMenu.tsx",
+          "content_hash": "a2f41157cdf86de069b17e9b910209c6b38bdb71a95c492e50e28be6a03d5b64",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "c1f339d5d69ac9f4a365ea46a462f1b8e6cece61",
+            "worktree_blob_oid": "e8248744e1d34bd91fd85d29e88667b8dd53b14d",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/socialMessageContext.ts",
+          "content_hash": "24f30e8e0e240d0256d2985d2580752de4d6e9badacaea80df424588aa936ff1",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a5b77824e87812013898fea0d5ba26313a1e70c8",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/pc-social-context-menu-cases.cjs",
+          "content_hash": "9374c731396af01c03cf0097bee5f01949dcc71eeec40fa8bd1c88f52741a298",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7cf1b3423d817478324e6692ae16090e90e7b538",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-pc-social-chat-parity.cjs",
+          "content_hash": "5e8a935379b5e2799074c00d9c4838ff62f4d68cb6fad33234ce471eca0668e8",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "517102a71b352b711e7807e0f17b1a37422aa1ef",
+            "worktree_blob_oid": "54fde174d144f2c50892222e0866d159d0621821",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1789468297828,
+      "updated_at_ms": 1789469328447
+    },
+    {
       "id": "erp-managed-hosting-node-v1",
       "title": "ERP 商户托管节点 V1",
       "summary": "将 cofficethinking 抽象为通用商户 ERP 参考实现，在同一电商子服务器共享发布版本，并以独立进程、数据库、系统用户、端口、配置、密钥和状态目录隔离不同商户。",
@@ -17902,7 +18044,7 @@
       "id": "mobile-social-chat-recovery-v1",
       "title": "APK 与 PWA 社交聊天缓存及前台恢复",
       "summary": "补齐持久缓存和有界读取，修复待发阻断接收、恢复失效及重复全量渲染",
-      "status": "implemented",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/mobile-social-chat-recovery.md",
@@ -17936,176 +18078,176 @@
       "implementation_evidence": [
         {
           "path": "android/app/src/main/kotlin/com/elon/app/MainFriendChatActions.kt",
-          "content_hash": "ab5f760a4278d404532427287f93b656a8750f92ac783fc95ac3e5bb911963dc",
+          "content_hash": "8de41eb93f24972b5fbec479779d48dd4a7b3accbf11845bbf9923e5a8e09292",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "9a67ca8db0094ed02f8dafffb14020e58dd8fde7",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "76361f84cad90eb2177c839236796183eb1b3951",
             "worktree_blob_oid": "76361f84cad90eb2177c839236796183eb1b3951",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/MainGroupChatActions.kt",
-          "content_hash": "1dde61807145018246e053dfdca44e5d8ad0914415daa68913309c1c6b4a5319",
+          "content_hash": "4d8cf1c5bbd762110419ad237ce4e967fea220462caca4837b47a5531265a909",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "d873590e359e370af04eac656903580ce1c01645",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "9b93df25ad6274bc6a104cc204d1953ce668b92a",
             "worktree_blob_oid": "9b93df25ad6274bc6a104cc204d1953ce668b92a",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/SocialChatMessageState.kt",
-          "content_hash": "fc8b1d777b1ab18f27be89eb7ae5584ca51e23a299c6e1e5aadd91d9dd27120d",
+          "content_hash": "a82a1fb946fb25f92afbf1a235a444c6478c181b7b139e4ac8945591206cb792",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "6f083cbb4991961e218864032e8811692cab202c",
             "worktree_blob_oid": "6f083cbb4991961e218864032e8811692cab202c",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/SocialChatReadChannel.kt",
-          "content_hash": "e7af3f3f8db998e048b5f8af89a202213f7808aa0f835f269dc371634a7bde79",
+          "content_hash": "c67b9897e1f7c7dfab8ade8320200c98a475ba3fc0c53698f9df355d19cb4541",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "39efb53a3252580b8868a1e8d5ad4976a77089d9",
             "worktree_blob_oid": "39efb53a3252580b8868a1e8d5ad4976a77089d9",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/SocialChatSnapshotStore.kt",
-          "content_hash": "efbf020558673a596f4131f280dc6a644f00b4baa83cd4373b8347f08adb0fce",
+          "content_hash": "969bb0c4497d90025f95ccaf07d03a88d4919c074fc554826bd73cb93438aa6c",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "911bc28073a8015532c23f976f57eb034c762ddc",
             "worktree_blob_oid": "911bc28073a8015532c23f976f57eb034c762ddc",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/SocialChatReadChannelTest.kt",
-          "content_hash": "a19961b62138f4bff3063f761b62d3248cf6c2c13f176807793a75c718b65149",
+          "content_hash": "fe5f26240110cbaef81e6cd96de08b2022e644cbc8d6295043e59cf4dd2e5cd4",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "c83a23b01af2d0170b7936aee8e2ddc4180f7be9",
             "worktree_blob_oid": "c83a23b01af2d0170b7936aee8e2ddc4180f7be9",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/SocialChatRecoveryTest.kt",
-          "content_hash": "963d05ab86e9a15eeb0fb773b0daf40b49cd212247a86404ee30228500c0246f",
+          "content_hash": "f0cfe0f2658870530ff4ac503fc9db3936379d7db6c356dc6f097325cf055de0",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "c9bb308961d70365b896e63fbc24d0d7d6e0cc8c",
             "worktree_blob_oid": "c9bb308961d70365b896e63fbc24d0d7d6e0cc8c",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/test-mobile-social-browser.cjs",
-          "content_hash": "c62f1e331cb101dd7eda90235ad441a385cbed8043fd823e285ca165fdba2083",
+          "content_hash": "0c728de44997e119478a5b13c3cb79b16127aacb58393232c370256176883b88",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "2f3f7b2b5d7e89a6913d575d7364dafdecdc101b",
             "worktree_blob_oid": "2f3f7b2b5d7e89a6913d575d7364dafdecdc101b",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "scripts/test-mobile-social-recovery.cjs",
-          "content_hash": "8ca275296a0f71fd1d33a1f7e6ee2a4f81c7ae3283817cf96c2e053179dd4ffc",
+          "content_hash": "526af2a1821b0305292b9c4715dd6a8dd08d7ee0c82a3e5ffc16fe45951d18c9",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "bffe31ef91b6fae85c236c98cb186bfa2ce58dd9",
             "worktree_blob_oid": "bffe31ef91b6fae85c236c98cb186bfa2ce58dd9",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/assets/mobile_shell_worker.js",
-          "content_hash": "c1b3c30e6a6fbcee5871d85038c5ae0c7937e828485eb1d7945ddc428b17d5d7",
+          "content_hash": "849c7a094ad40a8c1e4ddae32fef5cef15cd3906fdfe42fa1134b52584c3eeaa",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "9f80a045dd4132b1c3ba516dcbda66d955023ef1",
             "worktree_blob_oid": "9f80a045dd4132b1c3ba516dcbda66d955023ef1",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/assets/social_chat_cache.js",
-          "content_hash": "9790cd82fba1c4562c434df940ec5969fc6f597b54cdc029678ba46aecf476db",
+          "content_hash": "f2b71d8aa0de17d149f0098be1061aecbbe3c7a2b085319034dc8aeae9f06851",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "b6f9510a5e3a61595e0918819c472dd43ef150dc",
             "worktree_blob_oid": "b6f9510a5e3a61595e0918819c472dd43ef150dc",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/assets/social_chat_recovery.js",
-          "content_hash": "286d532e26a2505f54c153e90be4a0c79333ac5bc39cce8f5aa236a06526dcdf",
+          "content_hash": "2720c0d7a4c86a8a0634da83eee48812eaa38f465fd1b323aae0c3e88c86a47e",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "bd27b9f325a0e6c1f82caf57e6ff2545e77dc67b",
             "worktree_blob_oid": "bd27b9f325a0e6c1f82caf57e6ff2545e77dc67b",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "server/src/assets/social_chat_view.js",
-          "content_hash": "787598b0b211eb7cdc17b26b2b7917fd051a5049bed56213e84acf09a459000f",
+          "content_hash": "c826a795fb6c1a4ef9b2238a04a2ec699c7ea729415db04663315e250bb64cb3",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "7a82b5f90ae74bdb612111edd989e090ab43cc76",
-            "head_blob_oid": "",
+            "head_commit": "bfe6d8b0640f3cd5774a755b4ebff974df9134f5",
+            "head_blob_oid": "75fead0ae827603dc035d737ed9cb2f1f6b6e245",
             "worktree_blob_oid": "75fead0ae827603dc035d737ed9cb2f1f6b6e245",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1789463207303,
-      "updated_at_ms": 1789466337630
+      "updated_at_ms": 1789469324559
     },
     {
       "id": "node-status-runtime-identity-v1",
@@ -29205,96 +29347,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_d0d4424099e448cdb41be0ffb65682d8",
-      "feature_id": "android-binance-read-context-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex-binance-read-recovery",
-      "reason": "106 Kotlin tests and readonly JS regression passed; official main APK 1.1.1633 installed; quant 0.7.6 resumed one fresh grid. Auto-reload branch tested by unit tests; no live fault injection.",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1789023488569
-    },
-    {
-      "id": "feature_event_2d0f37023b0b4cc789917151df218cc6",
-      "feature_id": "win-browser-research-affinity-v1",
-      "action": "registered",
-      "actor": "codex-quant-product",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789080936617
-    },
-    {
-      "id": "feature_event_f0d7d3b424964d5ca11fc51ce4ea42c5",
-      "feature_id": "win-browser-research-affinity-v1",
-      "action": "claimed",
-      "actor": "codex-quant-product",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789080936677
-    },
-    {
-      "id": "feature_event_72ce415a6ba34b678b1469febd852d12",
-      "feature_id": "win-browser-research-affinity-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-product",
-      "reason": "已复现双实例竞争并完成独立工作区与文件计划",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789081008598
-    },
-    {
-      "id": "feature_event_f4ae1a22347c4ea98c81c1fea5dc9e5f",
-      "feature_id": "win-browser-research-affinity-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-quant-product",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789082094449
-    },
-    {
-      "id": "feature_event_962f99ecb15a40cb971a7fa2e8556d0a",
-      "feature_id": "win-browser-research-affinity-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-product",
-      "reason": "前端23、节点合同20、原生研究43测试及完整节点构建通过；安装与现场仍待验",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789082094569
-    },
-    {
-      "id": "feature_event_caa8e0bc03d140789fd1aa7882cdf820",
-      "feature_id": "win-browser-research-affinity-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-quant-product",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789083490381
-    },
-    {
-      "id": "feature_event_0bcbf83f39c44971871eb96c9b3e5968",
-      "feature_id": "android-binance-protection-v3",
-      "action": "registered",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789087391199
-    },
-    {
-      "id": "feature_event_30b7a4d0a9354f07bfec7e8a2f3606a6",
-      "feature_id": "android-binance-protection-v3",
-      "action": "claimed",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789087391266
-    },
-    {
       "id": "feature_event_8fcb624326e24ab2858094e3d70867bb",
       "feature_id": "android-binance-protection-v3",
       "action": "transitioned",
@@ -31203,6 +31255,96 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1789466337631
+    },
+    {
+      "id": "feature_event_c4fda6dcf5fb4019bacc85f43a7de690",
+      "feature_id": "desktop-social-context-menu-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789468297828
+    },
+    {
+      "id": "feature_event_f590db9e6c6e4e72980475adf3b3da7a",
+      "feature_id": "desktop-social-context-menu-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789468297900
+    },
+    {
+      "id": "feature_event_cc2c79e9d74840338a9b4807ad71b4f4",
+      "feature_id": "desktop-social-context-menu-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "已核对现有菜单与桌面外壳入口，实施限定于社交消息交互",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789468392630
+    },
+    {
+      "id": "feature_event_fd1d708bd58143219e3313766595b52e",
+      "feature_id": "mobile-social-chat-recovery-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789469256248
+    },
+    {
+      "id": "feature_event_cf0a4878bf9841488f74818d86aa1d12",
+      "feature_id": "mobile-social-chat-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "9 项 APK 单测、11 项 Node 测试和离线浏览器回归通过；APK 1766、服务端 1758 及 PWA runtime 发布核对通过",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1789469323773
+    },
+    {
+      "id": "feature_event_dadc806c87984d328b35ae8ac03e51c6",
+      "feature_id": "mobile-social-chat-recovery-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "9 项 APK 单测、11 项 Node 测试和离线浏览器回归通过；APK 1766、服务端 1758 及 PWA runtime 发布核对通过",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1789469324559
+    },
+    {
+      "id": "feature_event_0571c37dea87489396bdf74b861557f0",
+      "feature_id": "desktop-social-context-menu-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789469328075
+    },
+    {
+      "id": "feature_event_fccc202f93b0464098d1e683cb509c30",
+      "feature_id": "desktop-social-context-menu-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "消息菜单与媒体操作、选区及键盘、缩放和已有社交流程通过浏览器回归，构建及定向 lint 通过",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789469328370
+    },
+    {
+      "id": "feature_event_5c24a0e7cf5d404c93cce7e5ca259770",
+      "feature_id": "desktop-social-context-menu-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "消息菜单与媒体操作、选区及键盘、缩放和已有社交流程通过浏览器回归，构建及定向 lint 通过",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1789469328447
     }
   ]
 }

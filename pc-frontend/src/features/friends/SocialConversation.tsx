@@ -12,7 +12,8 @@ import { isPending, isRecalled, messageText } from './socialChatOperations'
 import { localMessageKey, useSocialLocalState, type SavedSocialMessage } from './socialLocalState'
 import SocialAvatar from './SocialAvatar'
 import SocialMessageAttachments from './SocialMessageAttachments'
-import SocialMessageMenu, { type SocialMenuRequest } from './SocialMessageMenu'
+import SocialMessageMenu from './SocialMessageMenu'
+import { messageMenuRequest, type SocialMenuRequest } from './socialMessageContext'
 import SocialComposer, { type QuoteRequest } from './SocialComposer'
 import SocialForwardDialog, { type SocialTarget } from './SocialForwardDialog'
 import SocialConversationTools from './SocialConversationTools'
@@ -82,17 +83,25 @@ export default function SocialConversation(props: Props) {
         const savedKey = localMessageKey(conversation, m.id)
         return <div key={`${key}:${m.id}`} data-message-id={m.id} tabIndex={0} aria-label={`${name}的消息`}
           className={[styles.msgRow, own ? styles.ownRow : '', selectedIds.includes(m.id) ? tools.selected : ''].join(' ')}
-          onContextMenu={event => { event.preventDefault(); setMenu({ id: m.id, x: event.clientX, y: event.clientY, nonce: Date.now() }) }}
-          onKeyDown={event => { if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { event.preventDefault(); const rect = event.currentTarget.getBoundingClientRect(); setMenu({ id: m.id, x: rect.left + 20, y: rect.top + 20, nonce: Date.now() }) } }}>
+          onContextMenu={event => {
+            const target = event.target as HTMLElement
+            if (!target.closest('[data-social-content]') || target.closest('dialog')) return
+            event.preventDefault(); event.stopPropagation()
+            setMenu(messageMenuRequest(m.id, event.currentTarget, event.clientX, event.clientY, target))
+          }}
+          onKeyDown={event => { if ((event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) && !(event.target as HTMLElement).closest('dialog')) {
+            event.preventDefault(); event.stopPropagation(); const rect = event.currentTarget.querySelector('[data-social-content]')!.getBoundingClientRect()
+            setMenu(messageMenuRequest(m.id, event.currentTarget, rect.left + 20, rect.top + 20, event.currentTarget))
+          } }}>
           {selectionMode && selectable(m) && <input type="checkbox" aria-label={`选择消息 ${m.id}`} checked={selectedIds.includes(m.id)} onChange={() => select(m)} />}
           <div className={styles.avatar}><SocialAvatar userId={m.sender_user_id} name={name} avatar={avatar} /></div>
-          <div className={styles.msgBody}>
+          <div className={styles.msgBody} data-social-content>
             <div className={styles.msgMeta}><strong>{name}</strong><span>{formatTime(m.created_at)}</span></div>
             {content && (articleReference(content) ? <ArticleMessage content={content} /> : <div id={copyId} className={styles.msgContent}>
               {(!own || content.startsWith('>')) && /[#*`\[\]>|]/.test(content) ? <MarkdownContent content={content} copy={false} /> : content}
             </div>)}
             {!recalled && <SocialMessageAttachments attachments={m.attachments} />}
-            <SocialMessageMenu conversation={conversation} message={m} own={own} special={specialMessage(m)} copySourceId={copyId} request={menu} favorite={favorites.has(savedKey)}
+            <SocialMessageMenu conversation={conversation} message={m} own={own} special={specialMessage(m)} copySourceId={copyId} request={menu} onMenu={setMenu} favorite={favorites.has(savedKey)}
               onQuote={() => setQuote({ conversation: key, message: m, author: name, nonce: Date.now() })}
               onForward={() => setForward([saveItem(m)])} onSelect={() => select(m)}
               onFavorite={() => favorites.has(savedKey) ? local.remove(savedKey) : local.save([saveItem(m)])}

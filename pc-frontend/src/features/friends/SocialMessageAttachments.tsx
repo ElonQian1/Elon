@@ -3,12 +3,15 @@ import { Download, FileText, X } from 'lucide-react'
 import { cloudResourceUrl } from '../../lib/cloudResourceUrl'
 import type { SocialAttachment } from './socialMessageTypes'
 import styles from './SocialMessageAttachments.module.css'
+import { attachmentKind } from './socialMessageContext'
 
 export default function SocialMessageAttachments({ attachments }: { attachments?: SocialAttachment[] | null }) {
   return (
     <div className={styles.attachments}>
       {(attachments ?? []).map((attachment, index) => (
-        <Attachment key={`${attachment.attachment_id || attachment.url || index}:${index}`} attachment={attachment} />
+        <div key={`${attachment.attachment_id || attachment.url || index}:${index}`} data-social-attachment={index}>
+          <Attachment attachment={attachment} />
+        </div>
       ))}
     </div>
   )
@@ -17,14 +20,10 @@ export default function SocialMessageAttachments({ attachments }: { attachments?
 function Attachment({ attachment }: { attachment: SocialAttachment }) {
   const url = cloudResourceUrl(attachment.url)
   const name = attachment.display_name || attachment.file_name || '附件'
-  const kind = attachment.kind?.toLowerCase()
-  const mime = attachment.mime_type?.toLowerCase() || ''
-  const extension = (attachment.file_name || url.split('?')[0]).toLowerCase()
-  const isImage = kind === 'image' || mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|avif)$/.test(extension)
-  const isAudio = kind === 'audio' || kind === 'voice' || mime.startsWith('audio/') || /\.(mp3|m4a|aac|ogg|opus|wav|amr)$/.test(extension)
+  const kind = attachmentKind(attachment)
   if (!url) return <div className={styles.unavailable}>{name}：附件地址不可用</div>
-  if (isImage) return <ImageAttachment key={url} url={url} name={name} />
-  if (isAudio) return <AudioAttachment key={url} url={url} name={name} attachment={attachment} />
+  if (kind === 'image') return <ImageAttachment key={url} url={url} name={name} />
+  if (kind === 'audio') return <AudioAttachment key={url} url={url} name={name} attachment={attachment} />
   return (
     <a className={styles.file} href={url} download>
       <FileText size={20} aria-hidden="true" /><span>{name}</span><Download size={16} aria-hidden="true" />
@@ -45,7 +44,7 @@ function ImageAttachment({ url, name }: { url: string; name: string }) {
           <a href={url} download>下载图片</a>
         </div>
       ) : (
-        <button type="button" className={styles.imageButton} aria-label={`查看图片：${name}`} onClick={() => setExpanded(true)}>
+        <button type="button" className={styles.imageButton} data-preview-image aria-label={`查看图片：${name}`} onClick={() => setExpanded(true)}>
           <img key={attempt} className={styles.image} src={url} alt={name} loading="lazy" onError={() => setFailed(true)} />
         </button>
       )}

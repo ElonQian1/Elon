@@ -1,16 +1,10 @@
 .toolbar, .buttons { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .toolbar { padding: 8px 12px; border-bottom: 1px solid var(--line-soft); }
-.toolbar button, .buttons button, .dialog button, .menu button { font: inherit; cursor: pointer; }
+.toolbar button, .buttons button, .dialog button { font: inherit; cursor: pointer; }
 .toolbar button, .buttons button, .dialog button { border: 1px solid var(--line); border-radius: 6px; background: #282c33; color: var(--text); padding: 6px 10px; }
 .toolbar button:disabled, .buttons button:disabled, .dialog button:disabled { opacity: .55; cursor: default; }
 .toolbar input, .dialog input, .dialog textarea, .dialog select { min-width: 0; background: #20242b; border: 1px solid var(--line); border-radius: 6px; padding: 8px; color: var(--text); font: inherit; }
 .toolbar input { flex: 1; min-width: 140px; }
-.more { background: transparent; border: 1px solid var(--line); border-radius: 5px; color: var(--text-muted); padding: 2px 7px; cursor: pointer; }
-.more:hover { color: var(--text); background: #30353d; }
-.menu { position: fixed; z-index: 10000; min-width: 185px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow: auto; padding: 5px; background: #20262e; color: #f2f5f7; border: 1px solid #505b67; border-radius: 8px; box-shadow: 0 10px 30px #0009; }
-.menu button { display: block; text-align: left; width: 100%; padding: 7px 12px; border: 0; color: inherit; background: transparent; border-radius: 4px; }
-.menu button:hover, .menu button:focus-visible { background: #35404d; }
-.menu button:disabled { color: #9ca8b5; cursor: default; }
 .dialog { width: min(680px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 1px solid #505b67; border-radius: 12px; background: #171c22; color: #f2f5f7; }
 .dialog::backdrop { background: #0009; }
 .dialog header, .dialog footer { padding: 14px 18px; display: flex; gap: 10px; align-items: center; justify-content: space-between; border-bottom: 1px solid #37404b; }
@@ -30,7 +24,7 @@
 .compose textarea { max-height: 150px; min-height: 46px; }
 .compose .toolbar { border: 0; padding-bottom: 0; }
 .status { padding: 0 12px 8px; }
-:is(.toolbar,.buttons,.dialog,.menu) button:focus-visible { outline: 2px solid #85bdf5; outline-offset: 2px; }
+:is(.toolbar,.buttons,.dialog) button:focus-visible { outline: 2px solid #85bdf5; outline-offset: 2px; }
 
 .conversation { display: flex; flex-direction: column; min-height: 0; flex: 1; position: relative; }
 .feed { flex: 1; min-height: 0; }
