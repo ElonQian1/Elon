@@ -399,6 +399,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (295, "群聊消息追加式修订历史", group_message_revisions::migrate),
     (296, "群聊网页 AI 设备执行与派发边界", crate::store::social_ai_messages::requests::web::migrate),
     (297, "群聊工作 AI 请求模型快照", crate::store::social_ai_messages::requests::work::migrate),
+    (298, "文章草稿、版本与群聊分发", crate::store::articles::migration::migrate),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

@@ -176,7 +176,7 @@ class ChatAdapter(
             }
         )
         if (!recalled) bindChatSuggestionStatus(holder.attachmentList, message, onSuggestionResolve)
-        val postCardBound = !recalled && bindChatProjectPostCardView(holder.attachmentList, holder.text, message)
+        val postCardBound = !recalled && (com.elon.app.articles.ArticleCardViews.bind(holder.attachmentList, holder.text, message) || bindChatProjectPostCardView(holder.attachmentList, holder.text, message))
         val projectShareBound = if (postCardBound) {
             false
         } else {

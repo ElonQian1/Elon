@@ -45,6 +45,7 @@ internal class MainGroupChatActions(
     private val revisions by lazy { GroupMessageRevisionController(activity, http, serverUrl, { activeGroup?.id == it }, ::applyRevision) }
 
     fun revisionActions(message: ChatMessage): List<TopAction> {
+        if (com.elon.app.articles.ArticleApi.reference(message.content) != null) return emptyList()
         val group = activeGroup ?: return emptyList()
         if (messagesByGroup[group.id]?.none { it.id == message.id } != false) return emptyList()
         return revisions.actions(group.id, message)
@@ -101,6 +102,7 @@ internal class MainGroupChatActions(
         showFriendChat(group.name, animate)
         aiComposer.open(group.id)
         summaryPosts.openGroup(group)
+        com.elon.app.articles.ArticleCardViews.openGroup(binding.groupSummaryStrip, group.id)
         loadMessages(group, silent = false, scrollToBottom = true)
         startPolling()
         webAi.recover()

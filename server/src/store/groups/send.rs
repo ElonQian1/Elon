@@ -1,7 +1,7 @@
 use super::super::social_ai_messages::requests::web::{self, WebGroupRequest};
 use super::*;
 
-pub(super) fn insert_message(
+pub(in crate::store) fn insert_message(
     conn: &Connection,
     user: &str,
     group: &str,

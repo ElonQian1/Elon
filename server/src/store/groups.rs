@@ -11,7 +11,7 @@ use super::{new_id, now, FriendGroupMemberPreview, FriendGroupMessage, FriendGro
 mod members;
 #[path = "group_message_revisions.rs"]
 pub(crate) mod revisions;
-mod send;
+pub(super) mod send;
 
 impl Store {
     pub fn list_friend_groups(&self, user_id: &str) -> Result<Vec<FriendGroupProfile>> {

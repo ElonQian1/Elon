@@ -13,6 +13,9 @@ import SocialMessageAttachments from './SocialMessageAttachments'
 import type { SocialMessage, Friend, FriendGroup } from './socialMessageTypes'
 import GroupMessageRevisionActions from './GroupMessageRevisionActions'
 import useSocialChat from './useSocialChat'
+import ArticleWorkspace from '../articles/ArticleWorkspace'
+import ArticleMessage from '../articles/ArticleMessage'
+import { articleReference } from '../articles/articleApi'
 
 interface SearchResult {
   user: Friend
@@ -469,6 +472,7 @@ function FriendsPageContent() {
           ) : (
             <span className={styles.topbarTitle}>选择好友或群聊开始聊天</span>
           )}
+          {activeItem?.kind === 'group' && <ArticleWorkspace key={activeItem.id} groupId={activeItem.id} groups={groups} />}
         </header>
 
         <div className={styles.feed} ref={feedRef}>
@@ -508,12 +512,12 @@ function FriendsPageContent() {
                     <strong>{senderName}</strong>
                     <span>{formatTime(m.created_at)}</span>
                   </div>
-                  {content && (hasMarkdown
+                  {content && (articleReference(content) ? <ArticleMessage content={content} /> : hasMarkdown
                     ? <div id={copySourceId} className={styles.msgContent}><MarkdownContent content={content} copy={false} /></div>
                     : <div id={copySourceId} className={styles.msgContent}>{content}</div>)}
                   {!recalled && <SocialMessageAttachments attachments={m.attachments} />}
-                  {activeConversation?.kind === 'group' && <GroupMessageRevisionActions key={`${activeConversation.id}:${m.id}`} groupId={activeConversation.id} message={m} own={isMe} onSaved={edited => { if (currentConversation.current === conversationKey) setMessages(previous => previous.map(row => row.id === edited.id ? { ...row, ...edited } : row)) }} />}
-                  {content && (
+                  {activeConversation?.kind === 'group' && !articleReference(content) && <GroupMessageRevisionActions key={`${activeConversation.id}:${m.id}`} groupId={activeConversation.id} message={m} own={isMe} onSaved={edited => { if (currentConversation.current === conversationKey) setMessages(previous => previous.map(row => row.id === edited.id ? { ...row, ...edited } : row)) }} />}
+                  {content && !articleReference(content) && (
                   <MessageActions
                     content={content}
                     messageKey={messageActionKey}

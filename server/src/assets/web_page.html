@@ -4537,7 +4537,7 @@
     .login-card .hint { font-size: 12px; color: var(--ink-faint); text-align: center; }
     #projectPlazaInlineRoot .project-plaza-results { gap: 38px; }
   </style>
-  <link rel="stylesheet" href="/assets/group_mentions.css" /><script src="/assets/group_mentions.js"></script>
+  <link rel="stylesheet" href="/assets/group_mentions.css" /><script src="/assets/group_mentions.js"></script><link rel="stylesheet" href="/assets/articles.css" /><script src="/assets/articles.js"></script>
 </head>
 <body data-ui-system="apk-orbital-metal-workbench-v1">
 
@@ -7578,7 +7578,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     const name = currentFriend ? friendDisplayName(currentFriend) : currentGroup ? groupDisplayName(currentGroup) : '聊天';
     showNativeOnly('「' + name + '」的聊天设置、成员管理和长按消息操作请在 Android APK 中使用。网页版已同步私聊/群聊收发。');
   });
-  if (groupSummaryStrip) {
+  window.ElonArticles.install(api, () => currentGroup, groupSummaryStrip); if (groupSummaryStrip) {
     groupSummaryStrip.addEventListener('click', () => {
       showGroupSummaryPanel().catch((e) => renderGroupSummaryError(e.message || '总结帖操作失败'));
     });
@@ -8437,7 +8437,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
         avatarFallback: kind === 'user'
           ? ((currentUser && (currentUser.nickname || currentUser.account)) || '我')
           : (msg.sender_name || (chatKind === 'friend' ? friendDisplayName(contact) : groupDisplayName(contact))),
-      }); if (chatKind === 'group') window.ElonGroupMessageRevisions.mount(bubble, contact.id, msg, api, () => currentGroup?.id === contact.id ? loadGroupMessages(false) : Promise.resolve());
+      }); if (!recalled) window.ElonArticles.mount(bubble, bubbleText, api, currentUser?.id); if (chatKind === 'group') window.ElonGroupMessageRevisions.mount(bubble, contact.id, msg, api, () => currentGroup?.id === contact.id ? loadGroupMessages(false) : Promise.resolve());
     });
     if (scrollToBottom !== false) chatList.scrollTop = chatList.scrollHeight; else chatList.scrollTop = previousScroll;
   }

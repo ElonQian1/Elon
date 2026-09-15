@@ -14,6 +14,7 @@ mod admin_stats_quotas;
 #[cfg(test)]
 mod admin_stats_tests;
 mod ai_resource_policies;
+pub(crate) mod articles;
 mod billing;
 mod billing_alerts;
 mod billing_pay;
@@ -722,7 +723,6 @@ pub(crate) use social_ai_messages::{
 };
 pub(crate) use social_ai_pending::SocialAiPendingMention;
 pub use store_types::*;
-pub use store_types_project::JoinRequestRecord;
 pub use store_types_project::*;
 pub(crate) use system_projects::{
     is_system_project_name, is_system_project_source_type, system_project_key_for_source_type,

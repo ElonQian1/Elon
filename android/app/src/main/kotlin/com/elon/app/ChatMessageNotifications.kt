@@ -147,6 +147,7 @@ internal object ChatMessageNotifications {
     }
 
     private fun messagePreview(content: String): String {
+        com.elon.app.articles.ArticleApi.reference(content)?.let { return "[文章] ${it.optString("title").take(120)}" }
         val text = content.trim()
         if (text.isBlank()) return "\u6536\u5230\u4e00\u6761\u65b0\u6d88\u606f"
         return text.take(80)
