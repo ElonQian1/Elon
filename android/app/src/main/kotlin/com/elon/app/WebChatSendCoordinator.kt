@@ -1,6 +1,7 @@
 package com.elon.app
 
 import com.elon.app.chatgptweb.ChatGptWebSnapshot
+import com.elon.app.chatgptweb.ChatGptWebConversationPath
 
 internal enum class WebChatTransportDispatchResult {
     QUEUED,
@@ -259,6 +260,7 @@ internal class WebChatSendCoordinator(
         val latestUserIndex = snapshot.messages.indexOfLast { it.role == "user" }
         val latestUser = snapshot.messages.getOrNull(latestUserIndex)
         return SnapshotEvidence(
+            conversationId = ChatGptWebConversationPath.identity(ChatGptWebConversationPath.fromUrl(snapshot.url)),
             latestUserPrompt = latestUser?.content,
             latestUserMessageId = latestUser?.id,
             observedMessageCount = snapshot.observedMessageCount,
@@ -269,6 +271,7 @@ internal class WebChatSendCoordinator(
     }
 
     private data class SnapshotEvidence(
+        val conversationId: String?,
         val latestUserPrompt: String?,
         val latestUserMessageId: String?,
         val observedMessageCount: Int,
@@ -276,6 +279,15 @@ internal class WebChatSendCoordinator(
     ) {
         fun isNewerThan(previous: SnapshotEvidence?): Boolean {
             if (previous == null) return true
+            if (previous.conversationId != null) {
+                if (conversationId != previous.conversationId) return false
+                // Private history may expand without adding a new user turn.
+                // A known message identity must not be replaced by count evidence.
+                if (!previous.latestUserMessageId.isNullOrBlank()) {
+                    return !latestUserMessageId.isNullOrBlank() &&
+                        latestUserMessageId != previous.latestUserMessageId
+                }
+            }
             if (observedMessageCount > previous.observedMessageCount) return true
             return !latestUserMessageId.isNullOrBlank() &&
                 latestUserMessageId != previous.latestUserMessageId

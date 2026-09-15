@@ -49,6 +49,9 @@ project/tool/file/temporary and cold-bootstrap scopes remain separate.
 [Composer-unavailable acceptance](chatgpt-composer-unavailable-acceptance.md)
 passed on adapter 411 using the existing default memory owner and native Send.
 
+[Send confirmation fix and process-recovery gap](reports/chatgpt-send-confirmation-identity-20260915.md):
+source batch; grouped release and device acceptance pending.
+
 The [new-chat tool composition audit](chatgpt-fresh-tool-text-dispatch.md#new-conversation-composition-audit)
 confirms that new personal/owned-project Search and Picture requests already use
 the existing sender. Their combined first-send/follow-up/Stop and no-replay
