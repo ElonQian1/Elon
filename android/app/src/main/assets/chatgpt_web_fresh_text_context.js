@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 24, create: factory });
+  const api = Object.freeze({ version: 25, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -11,6 +11,9 @@
   const projectPattern = /^g-p-[a-f0-9]{32}$/i;
   const routePattern = /^(?:\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?)?\/c\/([a-f0-9-]{36})$/i;
   const newProjectPattern = /^\/g\/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]{1,124})?\/project$/i;
+  const sameOwner = (before, after) => !!before && !!after &&
+    ['token', 'account', 'conversation', 'controller', 'shared', 'files', 'serverId', 'href', 'newThread', 'temporary']
+      .every(key => before[key] === after[key]);
 
   function stamp() {
     try {
@@ -37,7 +40,18 @@
         !existingRoute && !temporary && options.allowNewConversations !== true) fail('scope_unsupported', 'base_route');
     const submit = page.__elonChatGptPrivateTextRuntimeSubmit;
     const captureOwner = composer?.isConnected ? submit?.captureConversation : submit?.capturePrivateConversation;
-    const binding = captureOwner?.(composer);
+    let binding = captureOwner?.(composer);
+    if (!binding && !composer?.isConnected && bindings.observed?.('composer') === true && !bindings.peek('composer')) {
+      // Pin the committed owner before joining the known module import. A late
+      // import must never redirect this command to another conversation's draft.
+      const before = submit?.captureConversation?.(composer, false, true);
+      if (!before || before.current?.() !== true) fail('context_unavailable');
+      await bindings.load('composer');
+      if (document !== page.document || token !== page.__elonChatGptDocumentToken || href !== page.location.href ||
+          bindings.state().profile_id !== profile) fail('context_changed');
+      binding = captureOwner?.(composer);
+      if (!sameOwner(before, binding) || before.current?.() !== true) fail('context_changed');
+    }
     const newConversation = binding?.newThread === true;
     if (!binding || binding.temporary !== temporary || binding.href !== href ||
         (temporary ? typeof binding.newThread !== 'boolean' ||
@@ -51,8 +65,7 @@
     ]);
     if (document !== page.document || token !== page.__elonChatGptDocumentToken || href !== page.location.href) fail('context_changed');
     const afterLoad = captureOwner(composer);
-    if (!afterLoad || ['token', 'account', 'conversation', 'controller', 'shared', 'files', 'serverId', 'href', 'newThread', 'temporary']
-      .some(key => binding[key] !== afterLoad[key])) fail('context_changed');
+    if (!sameOwner(binding, afterLoad)) fail('context_changed');
     const identity = page.__elonChatGptPrivateModelContract?.create(page);
     const account = () => identity?.withRuntimeIdentity({}, shared)?.account;
     const ownerAccount = account();

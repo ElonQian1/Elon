@@ -48,6 +48,9 @@ latest Sep15 mapping passed native first/follow-up on 1743. Reuse it; new
 project/tool/file/temporary and cold-bootstrap scopes remain separate.
 [Composer-unavailable acceptance](chatgpt-composer-unavailable-acceptance.md)
 passed on adapter 411 using the existing default memory owner and native Send.
+[Cold observed composer import](reports/chatgpt-cold-composer-owner-20260915.md):
+source fix joins the existing module load with owner checks instead of failing
+the first operation early; 345 focused checks pass, grouped release/device check pending.
 
 [Send confirmation fix and process-recovery gap](reports/chatgpt-send-confirmation-identity-20260915.md):
 source batch; grouped release and device acceptance pending.
