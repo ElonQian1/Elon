@@ -48,3 +48,31 @@ function Test-ChatGptConversationRecoveryMatch {
         $Before.native_digest -cmatch '^[A-F0-9]{64}$' -and $Before.web_digest -cmatch '^[A-F0-9]{64}$' -and
         $Before.native_digest -ceq $After.native_digest -and $Before.web_digest -ceq $After.web_digest
 }
+
+function Get-ChatGptConversationRecoveryDiagnostic {
+    param($Main, [string]$Path)
+    # Use the nested projection from the same native snapshot, not a later MCP read.
+    $web = $Main.chatgpt_web_mcp
+    $surface = if ($Main.active_surface -cin @('social_ai','friend_chat','project_chat',
+        'conversation_home','project_space','project_plaza','profile','agent','unknown')) {
+        $Main.active_surface
+    } else { 'unknown' }
+    $nativeRoute = ![string]::IsNullOrWhiteSpace($Path) -and
+        $Main.social_chat.web_chat_conversation_path -ceq $Path
+    $webRoute = ![string]::IsNullOrWhiteSpace($Path) -and
+        $web.conversation.url -ceq ('https://chatgpt.com' + $Path)
+    $layer = if ($surface -ceq 'unknown') { 'native_state' }
+        elseif ($surface -cne 'social_ai') { 'native_surface' }
+        elseif ($null -eq $web) { 'web_projection' }
+        elseif (!$nativeRoute -or !$webRoute) { 'conversation_route' }
+        else { 'body_or_readiness' }
+    return [pscustomobject]@{
+        active_surface = $surface
+        web_projection_present = $null -ne $web
+        native_route_equal = $nativeRoute
+        web_route_equal = $webRoute
+        native_message_count = if ($Main.social_chat.messages -is [array]) { $Main.social_chat.messages.Count } else { $null }
+        web_message_count = if ($web.conversation.messages -is [array]) { $web.conversation.messages.Count } else { $null }
+        failure_layer = $layer
+    }
+}

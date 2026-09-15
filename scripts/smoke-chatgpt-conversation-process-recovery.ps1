@@ -24,15 +24,16 @@ $fixture = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
 if (!(Test-ChatGptFreshProjectPath $fixture.expected_path $fixture.project_id) -or
     $fixture.readback_completed -cne $true -or $fixture.replay_allowed -cne $false) { throw 'owned_fixture_ledger_invalid' }
 $origin = ''; $restored = $false; $changed = $false
-$report = [ordered]@{schema='elon.conversation_process_recovery.v1';passed=$false;
+$report = [ordered]@{schema='elon.conversation_process_recovery.v2';passed=$false;
     adapter=$ExpectedAdapterVersion;send_clicks=0;process_stopped=$false;process_recreated=$false;
     automatic_route_restored=$false;native_body_equal=$false;web_body_equal=$false}
 try {
     Start-ChatGptWebSmokeAwakeLease -Runtime $r | Out-Null
     Open-WebChatNativeChatSurface -Runtime $r -ProviderId chatgpt_web -TimeoutSec 30 | Out-Null
     $m = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state -MainState
-    $w = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state
+    $w = $m.chatgpt_web_mcp
     $origin = [string]$m.social_chat.web_chat_conversation_path
+    if ([string]::IsNullOrWhiteSpace($origin)) { throw 'origin_route_unavailable' }
     if ($m.input.has_text -cne $false -or $w.input.text -cne '' -or $w.streaming -cne $false -or
         $w.dictation_active -cne $false -or $w.private_voice_native_research.phase -cne 'idle') { throw 'origin_not_idle' }
     $t = Invoke-ChatGptFreshTrial -Runtime $r -Mode state
@@ -44,7 +45,7 @@ try {
     $before = $null; $stable = 0
     do {
         $m = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state -MainState
-        $w = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state
+        $w = $m.chatgpt_web_mcp
         $candidate = Get-ChatGptConversationRecoveryEvidence $m $w $fixture.expected_path $ExpectedAdapterVersion
         if ($candidate -and (Test-ChatGptFreshProjectFixtureUsers @($m.social_chat.messages)) -and
             (Test-ChatGptFreshProjectFixtureUsers @($w.conversation.messages))) {
@@ -55,8 +56,9 @@ try {
         Start-Sleep -Milliseconds 500
     } while ([DateTimeOffset]::UtcNow -lt $until)
     if (!$before -or $stable -lt 3) {
-        $report.baseline_native_count = @($m.social_chat.messages).Count
-        $report.baseline_web_count = @($w.conversation.messages).Count
+        $report.baseline_diagnostic = Get-ChatGptConversationRecoveryDiagnostic $m $fixture.expected_path
+        $report.baseline_native_count = $report.baseline_diagnostic.native_message_count
+        $report.baseline_web_count = $report.baseline_diagnostic.web_message_count
         $report.baseline_window_start = $w.conversation.message_window_start
         $report.baseline_observed_count = $w.conversation.message_count
         $report.baseline_available_count = $w.conversation.available_message_count
@@ -87,9 +89,11 @@ try {
     $until = $started.AddSeconds($RestoreTimeoutSeconds)
     do {
         $m = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state -MainState
-        $w = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state
+        $w = $m.chatgpt_web_mcp
         $after = Get-ChatGptConversationRecoveryEvidence $m $w $fixture.expected_path $ExpectedAdapterVersion
         if (Test-ChatGptConversationRecoveryMatch $before $after) { break }
+        # Once the opened chat surface is lost, waiting for its body mislabels navigation as data loss.
+        if ($m.active_surface -and $m.active_surface -cne 'social_ai') { break }
         Start-Sleep -Milliseconds 700
     } while ([DateTimeOffset]::UtcNow -lt $until)
     $report.native_route_equal = $m.social_chat.web_chat_conversation_path -ceq $fixture.expected_path
@@ -99,14 +103,23 @@ try {
     $report.web_body_equal = $after -and $before.web_digest -ceq $after.web_digest
     $report.native_before_count = $before.native_count
     $report.web_before_count = $before.web_count
-    $report.native_after_count = @($m.social_chat.messages).Count
-    $report.web_after_count = @($w.conversation.messages).Count
+    $report.recovery_diagnostic = Get-ChatGptConversationRecoveryDiagnostic $m $fixture.expected_path
+    $report.native_after_count = $report.recovery_diagnostic.native_message_count
+    $report.web_after_count = $report.recovery_diagnostic.web_message_count
     $report.web_window_start = $w.conversation.message_window_start
     $report.web_observed_count = $w.conversation.message_count
     $report.web_available_count = $w.conversation.available_message_count
     $report.web_context_complete = $w.conversation.context_complete
     $report.web_export_truncated = $w.conversation.messages_truncated
-    if (!(Test-ChatGptConversationRecoveryMatch $before $after)) { throw 'restored_conversation_body_mismatch' }
+    if (!(Test-ChatGptConversationRecoveryMatch $before $after)) {
+        switch ($report.recovery_diagnostic.failure_layer) {
+            'native_state' { throw 'restored_native_state_unavailable' }
+            'native_surface' { throw 'restored_native_surface_changed' }
+            'web_projection' { throw 'restored_web_projection_unavailable' }
+            'conversation_route' { throw 'restored_conversation_route_mismatch' }
+            default { throw 'restored_conversation_body_mismatch' }
+        }
+    }
     $t = Invoke-ChatGptFreshTrial -Runtime $r -Mode state
     if ($t.pending -cne $false -or $t.armed -cne $false -or $t.attempts -ne 0) { throw 'unexpected_send_after_restart' }
     $report.automatic_route_restored = $true; $report.native_body_equal = $true; $report.web_body_equal = $true

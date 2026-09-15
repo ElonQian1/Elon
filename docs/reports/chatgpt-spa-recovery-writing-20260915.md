@@ -158,15 +158,50 @@ text streaming, but native realtime voice phase `connected`. The call was not
 stopped. The currently visible conversation had complete zero-offset history;
 that observation is not substituted for the owned-fixture restart acceptance.
 
-The user was asked to end voice when convenient. Resume the existing recovery
-smoke on adapter 421 after it is idle; do not rebuild or repeat successful send,
-attachment, Writing Block or sparse-history tests without a new regression.
+The user was asked to end voice when convenient. Do not rebuild or repeat
+successful send, attachment, Writing Block or sparse-history tests without a
+new regression. The later restart result below supersedes the idle prerequisite.
+
+## 1762 Restart Observation
+
+After the user ended voice and the phone was unlocked, normal 1762 / adapter 421
+ran `conversation-process-recovery-1762-unlocked-20260915-142612-766` (134.1s).
+The baseline was complete: 18 native and 18 web messages. App force-stop and
+process recreation succeeded, but the expected route/body did not recover within
+the acceptance window. The observed native surface was `project_chat`, with no
+nested ChatGPT projection. Original-route restoration also failed; awake settings
+were restored. There were zero sends and no microphone, Cookie/data or VPN changes.
+
+The v1 receipt's two after-counts of 1 came from PowerShell `@($null).Count`, not
+one-message histories. Its generic `restored_conversation_body_mismatch` therefore
+does not prove loss of persisted history. The persisted trace showed this smoke's
+social/provider/navigation commands, but no MCP project-navigation command. That
+does not exclude manual navigation or an internal lifecycle change. The exact
+cause of the changed surface remains unproven; no production fix is claimed.
+
+A later read-only observation returned `social_ai`, adapter 421 ready,
+authenticated and voice idle. This is not retrospective proof that the original
+route was restored or that restart acceptance passed. MCP temporarily stopped
+responding while basic ADB remained usable; one background MCP bootstrap restored
+diagnostics without another app restart. Do not repeat force-stop while the user
+is performing the separate search-caption voice check on the same installed APK.
+
+The v2 smoke now reads native state and its nested web projection in one MCP
+snapshot, distinguishes missing (`null`) from empty (`0`) message arrays, and
+records an allowlisted failure layer without routes, text or hashes. If a confirmed
+chat surface changes, it stops waiting for its body and reports navigation, not
+history loss. Exact route/order/full-body checks remain unchanged. The diagnostic
+suite passed 33 checks (`recovery-diagnostic-green-20260915-144344-329`, 1.0s).
+This is an acceptance-script correction only: it changes no APK or provider
+transport, and the revised restart smoke is not yet device-accepted.
 
 ## Boundaries
 
 - Idle completed-conversation process recreation is not an in-flight unknown
-  write recovery test. The existing send ledger is in memory; this change does
-  not make it durable, replay a request or claim such recovery is complete.
+  write recovery test. The installed APK's send ledger is in memory; the separate
+  default-off journal candidate is documented in
+  [pending-write evidence](chatgpt-pending-write-journal-20260915.md), not accepted
+  by this test. Neither path replays a request or claims such recovery is complete.
 - Real network-loss acceptance remains pending. The handset currently has only
   wireless ADB; Wi-Fi/VPN were not disabled to manufacture a network incident.
 - Original Canvas edit/save/conflict/history/restore is implemented and covered
