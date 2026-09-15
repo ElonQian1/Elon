@@ -54,7 +54,19 @@ try {
         } else { $before = $null; $stable = 0 }
         Start-Sleep -Milliseconds 500
     } while ([DateTimeOffset]::UtcNow -lt $until)
-    if (!$before -or $stable -lt 3) { throw 'fixture_baseline_unconfirmed' }
+    if (!$before -or $stable -lt 3) {
+        $report.baseline_native_count = @($m.social_chat.messages).Count
+        $report.baseline_web_count = @($w.conversation.messages).Count
+        $report.baseline_window_start = $w.conversation.message_window_start
+        $report.baseline_observed_count = $w.conversation.message_count
+        $report.baseline_available_count = $w.conversation.available_message_count
+        $report.baseline_context_complete = $w.conversation.context_complete
+        $report.baseline_export_truncated = $w.conversation.messages_truncated
+        $report.baseline_evidence_valid = $null -ne $candidate
+        $report.baseline_owned_users = (Test-ChatGptFreshProjectFixtureUsers @($m.social_chat.messages)) -and
+            (Test-ChatGptFreshProjectFixtureUsers @($w.conversation.messages))
+        throw 'fixture_baseline_unconfirmed'
+    }
     $t = Invoke-ChatGptFreshTrial -Runtime $r -Mode state
     if ($t.pending -cne $false -or $t.armed -cne $false) { throw 'fixture_has_pending_write' }
     if (!(Test-WebChatNativeChatSurfaceForeground -Runtime $r)) { throw 'foreground_package_mismatch' }

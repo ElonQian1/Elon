@@ -1,7 +1,7 @@
 # SPA Recovery And Current Writing Projection
 
-Status: normal 1755 / adapter 418 published; route recovery verified, full-body
-recovery not yet accepted. Adapter 419 adds one startup history read below.
+Status: normal 1756 / adapter 419 published; route recovery verified, full-body
+recovery not yet accepted. Sparse snapshot regression fix is under verification.
 This extends the [September 15 compatibility batch](chatgpt-runtime-bindings-20260915.md),
 not another private sender or Canvas implementation.
 
@@ -90,7 +90,37 @@ and equal native/web counts before comparing exact per-surface fingerprints.
 The evidence helper passes 26 cases; partial windows cannot manufacture a pass.
 `startup-history-unit-20260915-101334-208` passed in 313s: 13 Android tests,
 zero failures/errors/skips, including the new one-shot recovery cases. Adapter
-419 signed release and device evidence remain pending.
+419 normal release 1756 passed in 453.2s and was installed without a data reset.
+Source: `3d2114ec4`. SHA-256:
+`6c927b9e0730d6fa97ebd76ec3dd20c1bed9bd1c5d2af5892584e7fd6d2e3088`.
+
+## Sparse Snapshot Regression
+
+Two 1756 checks stopped before process termination because the strengthened
+baseline never became complete. The diagnostic run
+`conversation-baseline-diagnosis-1756-20260915-103407-696` reported 14 native
+rows / 13 web messages, window start 5, observed count 18 and incomplete context.
+The extra native row is the existing missing-history notice. Both runs sent
+zero messages and restored the original route and awake setting.
+
+The merger replaced the entire span between first/last matching IDs with a
+sparse incoming DOM subset, silently discarding unmatched messages in between.
+The new 18-message/three-known-row regression failed against the old code
+(`sparse-history-red-20260915-103819-422`, 113.1s). This explains how a complete
+private read could shrink again after the next partial snapshot.
+
+Adapter 420 preserves missing rows when the incoming ordered subset contains
+only already-known exact message identities. It still updates the observed
+rows; it does not deduplicate by text. A complete private content-only history
+read is separately authoritative and can replace an old branch or inflated
+window. Active streaming and partial/empty reads cannot claim that authority.
+The existing 80-message bound and cross-conversation isolation remain enforced.
+`sparse-history-regression-20260915-104145-106` passed 31 Android tests in 308.7s.
+After moving the unchanged conversation ownership check out of the background
+entry into the merger, `sparse-history-ownership-regression-20260915-104758-178`
+passed 32 tests in 377.8s with zero failures/errors/skips. The source-size and
+document guards passed. Adapter 420 release and full-history device evidence
+remain pending.
 
 ## Boundaries
 

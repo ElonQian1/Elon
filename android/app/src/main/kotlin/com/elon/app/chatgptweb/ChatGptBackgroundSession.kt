@@ -561,14 +561,10 @@ internal class ChatGptBackgroundSession(
                     ChatGptWebContentSnapshotPolicy.reconcile(latestSnapshot, event.value),
                 )
                 val previous = latestSnapshot
-                val previousIdentity = ChatGptWebConversationPath.fromUrl(previous?.url)
-                    ?.let(ChatGptWebConversationPath::identity)
-                val incomingIdentity = ChatGptWebConversationPath.fromUrl(reconciliation.snapshot.url)
-                    ?.let(ChatGptWebConversationPath::identity)
-                val merged = WebChatSnapshotWindowMerger.merge(
+                val merged = WebChatSnapshotWindowMerger.mergeConversation(
                     previous = previous,
                     incoming = reconciliation.snapshot,
-                    sameConversation = previousIdentity != null && previousIdentity == incomingIdentity,
+                    authoritativeHistory = event.value.contentOnly,
                 )
                 val snapshot = ChatGptWebTransientComposerReadiness.reconcile(
                     previous = previous,

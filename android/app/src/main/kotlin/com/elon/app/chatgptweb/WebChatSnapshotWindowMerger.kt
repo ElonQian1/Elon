@@ -1,12 +1,33 @@
 package com.elon.app.chatgptweb
 
 internal object WebChatSnapshotWindowMerger {
+    fun mergeConversation(
+        previous: ChatGptWebSnapshot?,
+        incoming: ChatGptWebSnapshot,
+        authoritativeHistory: Boolean,
+    ): ChatGptWebSnapshot {
+        val previousIdentity = ChatGptWebConversationPath.fromUrl(previous?.url)
+            ?.let(ChatGptWebConversationPath::identity)
+        val incomingIdentity = ChatGptWebConversationPath.fromUrl(incoming.url)
+            ?.let(ChatGptWebConversationPath::identity)
+        return merge(previous, incoming,
+            previousIdentity != null && previousIdentity == incomingIdentity, authoritativeHistory)
+    }
+
     fun merge(
         previous: ChatGptWebSnapshot?,
         incoming: ChatGptWebSnapshot,
         sameConversation: Boolean,
+        authoritativeHistory: Boolean = false,
     ): ChatGptWebSnapshot {
         if (!sameConversation || previous == null) return incoming
+        // Only a complete private history read may discard an old branch or inflated window.
+        if (authoritativeHistory && !previous.streaming && incoming.messages.isNotEmpty() &&
+            incoming.messageWindowStart == 0 && incoming.observedMessageCount == incoming.messages.size
+        ) {
+            val bounded = incoming.messages.takeLast(MAX_MESSAGES)
+            return incoming.copy(messages = bounded, messageWindowStart = incoming.messages.size - bounded.size)
+        }
         if (incoming.messages.isEmpty()) {
             return incoming.copy(
                 messages = previous.messages,
@@ -57,6 +78,11 @@ internal object WebChatSnapshotWindowMerger {
                 message.copy(id = old.id)
             } else message
             WebChatTextBlockContinuity.merge(old?.copy(id = current.id), current)
+        }
+        if (common.size == incoming.size) {
+            // Missing rows in a known, ordered DOM subset are not deleted provider messages.
+            val updates = enriched.associateBy(::messageKey)
+            return deduplicated(previous.map { updates[messageKey(it)] ?: it })
         }
         return deduplicated(previous.take(first.previous) + enriched + previous.drop(last.previous + 1))
     }

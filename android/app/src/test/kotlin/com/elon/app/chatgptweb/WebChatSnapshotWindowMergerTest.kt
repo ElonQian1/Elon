@@ -6,6 +6,77 @@ import com.elon.app.WebChatTextBlock
 
 class WebChatSnapshotWindowMergerTest {
     @Test
+    fun conversationOwnershipIsDerivedFromValidatedOfficialPaths() {
+        val previous = snapshot(listOf(message("m0", "old"), message("m1", "tail")), observed = 2)
+        val incoming = snapshot(listOf(message("m1", "tail")), observed = 2)
+        assertEquals(previous.messages,
+            WebChatSnapshotWindowMerger.mergeConversation(previous, incoming, false).messages)
+        for (url in listOf("https://other.example/c/example", "https://chatgpt.com/",
+            "https://chatgpt.com/c/another")) {
+            val different = incoming.copy(url = url)
+            assertEquals(different,
+                WebChatSnapshotWindowMerger.mergeConversation(previous, different, true))
+        }
+        assertEquals(incoming, WebChatSnapshotWindowMerger.mergeConversation(null, incoming, true))
+    }
+
+    @Test
+    fun sparseKnownDomMessagesDoNotEraseMiddleHistory() {
+        val cached = snapshot((0 until 18).map { message("m$it", "body$it") }, observed = 18)
+        val live = snapshot(listOf(message("m0", "body0"), message("m8", "updated8"),
+            message("m17", "body17")), observed = 18)
+        val merged = WebChatSnapshotWindowMerger.merge(cached, live, true)
+        assertEquals((0 until 18).map { "m$it" }, merged.messages.map { it.id })
+        assertEquals("updated8", merged.messages[8].content)
+        assertEquals(0, merged.messageWindowStart)
+        assertEquals(18, merged.observedMessageCount)
+    }
+
+    @Test
+    fun completePrivateHistoryReplacesOldBranchAndInflatedWindow() {
+        val previous = snapshot(listOf(message("u1", "question"), message("old", "old branch")),
+            start = 5, observed = 9)
+        val incoming = snapshot(listOf(message("u1", "question"), message("new", "new branch")), observed = 2)
+        val merged = WebChatSnapshotWindowMerger.merge(previous, incoming, true, authoritativeHistory = true)
+        assertEquals(incoming, merged)
+    }
+
+    @Test
+    fun fullReadThenSparseDomRemainsComplete() {
+        val all = (0 until 18).map { message("m$it", "body$it") }
+        val initial = snapshot(listOf(all.first(), all.last()), start = 8, observed = 20)
+        val history = WebChatSnapshotWindowMerger.merge(initial, snapshot(all, observed = 18), true, true)
+        val sparse = snapshot(listOf(all[0], all[8], all[17]), observed = 18)
+        var current = history
+        repeat(3) { current = WebChatSnapshotWindowMerger.merge(current, sparse, true) }
+        assertEquals(history, current)
+    }
+
+    @Test
+    fun privateAuthorityCannotReplaceActiveStreamOrPartialWindow() {
+        val previous = snapshot(listOf(message("u1", "question"), message("a1", "answer")), observed = 2)
+        val partial = snapshot(listOf(message("a1", "answer")), start = 1, observed = 2)
+        assertEquals(previous.messages,
+            WebChatSnapshotWindowMerger.merge(previous, partial, true, true).messages)
+        val active = previous.copy(streaming = true)
+        val candidate = snapshot(listOf(message("u1", "question")), observed = 1)
+        assertEquals(previous.messages,
+            WebChatSnapshotWindowMerger.merge(active, candidate, true, true).messages)
+    }
+
+    @Test
+    fun privateHistoryRespectsBoundAndConversationIsolation() {
+        val previous = snapshot(listOf(message("old", "old")), observed = 1)
+        val history = snapshot((0 until 90).map { message("m$it", "body$it") }, observed = 90)
+        val bounded = WebChatSnapshotWindowMerger.merge(previous, history, true, true)
+        assertEquals(80, bounded.messages.size)
+        assertEquals(10, bounded.messageWindowStart)
+        assertEquals(90, bounded.observedMessageCount)
+        val another = snapshot(listOf(message("new", "new")), observed = 1)
+        assertEquals(another, WebChatSnapshotWindowMerger.merge(previous, another, false, true))
+    }
+
+    @Test
     fun partialOfficialWindowUpdatesCacheWithoutErasingOlderMessages() {
         val cached = snapshot(
             messages = listOf(message("u1", "旧问题"), message("a1", "旧回答"),
