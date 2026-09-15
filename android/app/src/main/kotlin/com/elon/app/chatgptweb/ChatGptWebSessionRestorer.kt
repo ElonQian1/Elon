@@ -4,6 +4,7 @@ import android.content.Context
 
 internal class ChatGptWebSessionRestorer(context: Context) {
     private val stateStore = ChatGptWebSessionStateStore(context)
+    private val startupHistory = ChatGptStartupHistoryRefresh(stateStore.restoreUrl())
 
     fun restoreUrl(): String = stateStore.restoreUrl()
 
@@ -11,11 +12,13 @@ internal class ChatGptWebSessionRestorer(context: Context) {
         stateStore.saveUrl(url)
     }
 
-    fun onSnapshot(snapshot: ChatGptWebSnapshot) {
+    fun onSnapshot(snapshot: ChatGptWebSnapshot, refreshHistory: () -> Unit) {
         confirmedConversationUrl(snapshot)?.let(stateStore::saveUrl)
+        if (startupHistory.take(snapshot)) refreshHistory()
     }
 
     fun clear() {
+        startupHistory.clear()
         stateStore.clear()
     }
 

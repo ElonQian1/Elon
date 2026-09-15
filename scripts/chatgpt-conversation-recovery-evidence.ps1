@@ -30,6 +30,12 @@ function Get-ChatGptConversationRecoveryEvidence {
     $native = Get-ChatGptRecoveryBodyDigest @($Main.social_chat.messages)
     $official = Get-ChatGptRecoveryBodyDigest @($Web.conversation.messages)
     if (!$native -or !$official) { return $null }
+    if ($Web.conversation.context_complete -isnot [bool] -or !$Web.conversation.context_complete -or
+        $Web.conversation.messages_truncated -isnot [bool] -or $Web.conversation.messages_truncated -or
+        $Web.conversation.message_window_start -ne 0 -or
+        $Web.conversation.available_message_count -ne @($Web.conversation.messages).Count -or
+        $Web.conversation.message_count -ne @($Web.conversation.messages).Count -or
+        @($Main.social_chat.messages).Count -ne @($Web.conversation.messages).Count) { return $null }
     return [pscustomobject]@{native_digest=$native;web_digest=$official;
         native_count=@($Main.social_chat.messages).Count;web_count=@($Web.conversation.messages).Count}
 }

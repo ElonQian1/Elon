@@ -4,7 +4,8 @@ param(
     [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe',
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
-    [Parameter(Mandatory)][ValidateRange(1,9999)][int]$ExpectedAdapterVersion
+    [Parameter(Mandatory)][ValidateRange(1,9999)][int]$ExpectedAdapterVersion,
+    [ValidateRange(15,120)][int]$RestoreTimeoutSeconds = 90
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'chatgpt-web-smoke-runtime.ps1')
@@ -71,7 +72,7 @@ try {
     $pidAfter = (Invoke-ChatGptWebSmokeAdb -Runtime $r -Arguments @('shell','pidof','com.elon.app')).Trim()
     if ($pidAfter -cnotmatch '^[0-9]+$' -or $pidBefore -ceq $pidAfter) { throw 'process_recreation_unconfirmed' }
     $report.process_recreated = $true
-    $until = $started.AddSeconds(90)
+    $until = $started.AddSeconds($RestoreTimeoutSeconds)
     do {
         $m = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state -MainState
         $w = Invoke-ChatGptWebSmokeMcp -Runtime $r -Tool ui_state
@@ -88,6 +89,11 @@ try {
     $report.web_before_count = $before.web_count
     $report.native_after_count = @($m.social_chat.messages).Count
     $report.web_after_count = @($w.conversation.messages).Count
+    $report.web_window_start = $w.conversation.message_window_start
+    $report.web_observed_count = $w.conversation.message_count
+    $report.web_available_count = $w.conversation.available_message_count
+    $report.web_context_complete = $w.conversation.context_complete
+    $report.web_export_truncated = $w.conversation.messages_truncated
     if (!(Test-ChatGptConversationRecoveryMatch $before $after)) { throw 'restored_conversation_body_mismatch' }
     $t = Invoke-ChatGptFreshTrial -Runtime $r -Mode state
     if ($t.pending -cne $false -or $t.armed -cne $false -or $t.attempts -ne 0) { throw 'unexpected_send_after_restart' }

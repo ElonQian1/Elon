@@ -1,6 +1,7 @@
 # SPA Recovery And Current Writing Projection
 
-Status: implementation complete; adapter 418 release and device acceptance pending.
+Status: normal 1755 / adapter 418 published; route recovery verified, full-body
+recovery not yet accepted. Adapter 419 adds one startup history read below.
 This extends the [September 15 compatibility batch](chatgpt-runtime-bindings-20260915.md),
 not another private sender or Canvas implementation.
 
@@ -53,14 +54,43 @@ conversation to manufacture a pass. It requires a new process and exact route,
 body ordering/counts, idle state and zero new send attempts, then restores the
 original route and awake settings. Receipts contain only booleans and counts.
 
-The evidence helper has 20 passing positive/negative checks, including changed
+The evidence helper initially had 20 passing positive/negative checks, including changed
 content/order/count, invalid scalar types, wrong route, draft and voice activity.
 Nine Android tests passed (`conversation-session-unit-release-20260915-094211-919`,
 319.1s) and cover confirmed personal/project/streaming route capture without
 composer readiness, preview/login/temporary rejection and origin/path safety.
 The first invocation used a nonexistent Gradle task; the corrected repository
 `:app:testReleaseUnitTest` invocation above passed without failures or skips.
-The signed APK release and corrected device recovery case remain pending here.
+Normal 1755 from `f076b17a0ed868ffd4880f58dfbb7c6962f1b274` passed release build,
+remote hash/size verification and unattended Xiaomi installation in 446s.
+SHA-256: `4c21caead57f449a4221c38302f10a275a102c1db5692d45029561e312e5f4a5`.
+
+`conversation-process-recovery-1755-20260915-095844-044` restored both correct
+routes but body counts changed 23/23 to 9/9, so it failed. A shorter diagnostic
+matched 15 native / 14 web messages after restart in 10.666s, but its web window
+started at 4 with 18 observed messages and `context_complete=false`. That is
+only window continuity, not complete history acceptance, and is not promoted.
+Both restored the original route/awake setting with zero sends. A subsequent
+explicit private read exposed 18 complete messages, with stable UUID identities.
+
+## Startup Read Follow-Up
+
+Complete private history reads were wired to explicit conversation navigation,
+not process startup. Adapter 419 reuses the existing current-conversation read
+once after the restored route has confirmed private runtime readiness. It does
+not require usable composer DOM, poll, reload the page or replay a send. Active
+streaming/dictation delays this read; a confirmed different conversation or clear
+cancels it. Failures retain the existing transport policy and manual refresh.
+
+`ChatGptStartupHistoryRefresh` owns this small one-shot decision separately from
+the background session. Unit cases cover delayed identity, content-only previews,
+project ownership, navigation, capture and repeated snapshots. The full-body
+acceptance now requires a complete zero-offset web history, no export truncation,
+and equal native/web counts before comparing exact per-surface fingerprints.
+The evidence helper passes 26 cases; partial windows cannot manufacture a pass.
+`startup-history-unit-20260915-101334-208` passed in 313s: 13 Android tests,
+zero failures/errors/skips, including the new one-shot recovery cases. Adapter
+419 signed release and device evidence remain pending.
 
 ## Boundaries
 

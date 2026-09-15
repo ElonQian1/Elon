@@ -579,7 +579,7 @@ internal class ChatGptBackgroundSession(
                 )
                 scheduleSessionContinuityRecheck(reconciliation.recheckAfterMs)
                 if (reconciliation.clearConversationHistory) clearConversationHistory()
-                latestSnapshot = snapshot.also(sessionRestorer::onSnapshot)
+                latestSnapshot = snapshot.also { sessionRestorer.onSnapshot(it) { pageAdapter?.requestConversationRefresh() } }
                 backgroundInteractionLease.observeDictationState(
                     controlActive = snapshot.dictationActive,
                     capturePending = snapshot.dictationCapturePending,
