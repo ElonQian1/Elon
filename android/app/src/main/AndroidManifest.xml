@@ -67,6 +67,7 @@
         android:usesCleartextTraffic="true">
 
         <activity android:name=".articles.ArticleActivity" android:exported="false" android:windowSoftInputMode="adjustResize" android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity android:name=".articles.square.SquareActivity" android:exported="false" android:windowSoftInputMode="adjustResize" android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity android:name=".grid.host.BinanceGridOfficialActivity"
             android:exported="true" android:excludeFromRecents="true"
             android:allowTaskReparenting="false" />

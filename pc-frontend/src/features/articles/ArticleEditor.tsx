@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { articles, errorMessage, uploadImage, type Article, type Block, type Group } from './articleApi'
 import { ArticleBody } from './ArticleReader'
 import styles from './Articles.module.css'
+import SquareCenter from './square/SquareCenter'
 
 export default function ArticleEditor({ initial, groups, groupId, onClose }: { initial: Article; groups: Group[]; groupId: string; onClose: () => void }) {
+  const [squareArticle, setSquareArticle] = useState<Article>()
   const [a, setA] = useState(initial); const [dirty, setDirty] = useState(false); const [busy, setBusy] = useState(false)
   const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [preview, setPreview] = useState(false)
   const [targets, setTargets] = useState([groupId]); const [choosing, setChoosing] = useState(false)
@@ -22,6 +24,7 @@ export default function ArticleEditor({ initial, groups, groupId, onClose }: { i
       <button disabled={busy} onClick={() => setPreview(!preview)}>{preview ? '继续编辑' : '预览'}</button>
       <button disabled={busy || !dirty} onClick={() => void run(async () => { await save(); setNotice('草稿已保存') })}>保存草稿</button>
       <button className={styles.primary} disabled={busy} onClick={() => { setPreview(true); setChoosing(true) }}>发布到群</button>
+      <button disabled={busy} onClick={() => void run(async () => setSquareArticle(await save()))}>币安广场</button>
     </header>
     {error && <p className={styles.error} role="alert">{error}。当前内容仍保留在编辑器中。</p>}{notice && <p role="status" className={styles.notice}>{notice}</p>}
     {choosing && <section className={styles.publish} aria-label="选择发布群聊"><strong>选择群聊（最多10个）</strong><p>仅作者和所选群的当前成员可读。相同版本不会重复发送。</p>
@@ -42,5 +45,6 @@ export default function ArticleEditor({ initial, groups, groupId, onClose }: { i
       <p className={styles.meta}>修改已发布文章后，须再次发布才会发送新版本。旧卡片保留旧版本。</p>
       <button onClick={() => { if (window.confirm('撤下后，所有群中的文章将无法打开，也不能再次发布。确定撤下？')) void run(async () => { const saved = await save(); await articles.withdraw(saved); onClose() }) }}>撤下文章</button>
     </fieldset>}
+    {squareArticle && <SquareCenter article={squareArticle} onClose={() => setSquareArticle(undefined)} />}
   </section>
 }

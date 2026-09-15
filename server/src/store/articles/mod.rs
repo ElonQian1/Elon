@@ -8,6 +8,7 @@ pub(crate) mod migration;
 mod model;
 mod publishing;
 mod reads;
+pub(crate) mod square;
 #[cfg(test)]
 mod tests;
 pub(crate) use model::*;

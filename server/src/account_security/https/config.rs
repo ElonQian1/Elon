@@ -26,8 +26,12 @@ impl Config {
         if listen.port() == 0 {
             bail!("ACCOUNT_HTTPS_LISTEN_ADDR requires a port");
         }
+        let managed = super::acme::configured_bundle(&get)?;
         let path = |name| -> Result<PathBuf> {
-            let path = PathBuf::from(get(name).context(format!("missing {name}"))?);
+            let path = get(name)
+                .map(PathBuf::from)
+                .or_else(|| managed.clone())
+                .context(format!("missing {name}"))?;
             if !path.is_absolute() {
                 bail!("{name} must be absolute");
             }
@@ -47,6 +51,9 @@ mod tests {
     #[test]
     fn accepts_absolute_paths_and_explicit_bind_address() {
         let config = Config::from_lookup(|key| {
+            if key.starts_with("ACCOUNT_ACME_") {
+                return None;
+            }
             Some(match key {
                 "ACCOUNT_HTTPS_ENABLED" => "true".into(),
                 "ACCOUNT_HTTPS_LISTEN_ADDR" => "127.0.0.1:8443".into(),

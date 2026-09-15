@@ -92,6 +92,7 @@ class ArticleActivity : AppCompatActivity() {
             addView(ui.button(if (session.mine) "群文章" else "✓ 群文章") { session.mine = false; library() })
             addView(ui.button(if (session.mine) "✓ 我的文章" else "我的文章") { session.mine = true; library() })
         })
+        content.addView(ui.button("币安广场 · 发布记录与账号") { startActivity(android.content.Intent(this, com.elon.app.articles.square.SquareActivity::class.java)) })
         val list = ui.column(); content.addView(list); loadPage(list, 0)
     }
     private fun loadPage(list: LinearLayout, offset: Int) {
@@ -116,6 +117,7 @@ class ArticleActivity : AppCompatActivity() {
     internal fun preview() {
         session.mode = "preview"; content.removeAllViews(); header("预览文章") { editor() }
         toolbar.addView(ui.button("发布到群") { editorViews.chooseGroups() }); content.addView(ui.body(session.article!!))
+        content.addView(ui.button("发布到币安广场") { work(::saveDraft) { saved -> startActivity(android.content.Intent(this, com.elon.app.articles.square.SquareActivity::class.java).putExtra("article_id", saved.getString("id"))) } })
     }
     private fun read() {
         session.mode = "read"; content.removeAllViews(); header("文章", ::back)

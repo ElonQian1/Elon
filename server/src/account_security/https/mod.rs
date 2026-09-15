@@ -9,9 +9,12 @@ use axum::{
 
 use crate::types::AppState;
 
+mod acme;
 mod config;
 mod policy;
 mod quant_public;
+mod square;
+mod square_page;
 mod transport;
 
 pub(crate) async fn serve(legacy_app: Router, state: Arc<AppState>) -> Result<()> {
@@ -24,7 +27,9 @@ pub(crate) async fn serve(legacy_app: Router, state: Arc<AppState>) -> Result<()
         return crate::node_endpoint_transport::serve(legacy_app, state).await;
     };
     // Fail before starting legacy ingress if explicitly enabled TLS cannot bind.
+    acme::bootstrap(&config).await?;
     let server = transport::Server::bind(config).await?;
+    acme::spawn()?;
     let app = routes(state.clone(), public_quant);
     tokio::try_join!(
         crate::node_endpoint_transport::serve(legacy_app, state),
@@ -51,4 +56,6 @@ pub(crate) fn routes(state: Arc<AppState>, public_quant: bool) -> Router {
         ))
         .with_state(state.clone());
     quant_public::attach(policy::protect(app), &state.data_dir, public_quant)
+        .merge(square::routes(state))
+        .merge(square_page::routes())
 }

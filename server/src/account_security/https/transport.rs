@@ -22,9 +22,19 @@ pub(super) struct Server {
 }
 
 fn load(config: &Config) -> Result<TlsAcceptor> {
-    let chain =
-        CertificateDer::pem_file_iter(&config.certificate)?.collect::<Result<Vec<_>, _>>()?;
-    let key = PrivateKeyDer::from_pem_file(&config.key)?;
+    let (chain, key) = match super::acme::managed_pair() {
+        Ok(Some(bytes)) => super::acme::pair(&bytes)?,
+        // Startup and renewal retain the independently managed legacy certificate.
+        Ok(None) | Err(_) => {
+            let mut bytes = std::fs::read(&config.certificate)?;
+            bytes.extend(std::fs::read(&config.key)?);
+            super::acme::validate_fallback(&bytes)?;
+            (
+                CertificateDer::pem_slice_iter(&bytes).collect::<Result<Vec<_>, _>>()?,
+                PrivateKeyDer::from_pem_slice(&bytes)?,
+            )
+        }
+    };
     let mut tls =
         ServerConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
             .with_protocol_versions(&[&rustls::version::TLS13])?

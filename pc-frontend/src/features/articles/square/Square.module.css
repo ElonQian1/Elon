@@ -1,0 +1,9 @@
+.center { font-size: 15px; line-height: 1.65; }
+.center h2 { font-size: 22px; }
+.center h3 { font-size: 19px; margin: 0; }
+.center p { margin: 0; }
+.center button, .center select, .center input:not([type=checkbox]) { min-height: 44px; font-size: 15px; }
+.center label:has(> input[type=checkbox]):not(:has(> img)) { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; padding: 8px 0; }
+.center input[type=checkbox] { width: 20px; height: 20px; flex: none; margin: 3px 0; align-self: flex-start; }
+.center fieldset { border: 0; padding: 0; margin: 0; }
+@media (max-width: 600px) { .center button, .center select, .center input:not([type=checkbox]) { min-height: 48px; } }

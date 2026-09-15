@@ -1,6 +1,9 @@
 //! Exercise the production ingress policy without linking the full server test binary.
 #![allow(dead_code)]
 
+#[path = "../../../src/account_security/https/acme/mod.rs"]
+mod acme;
+
 #[path = "../../../src/auth_request_guard.rs"]
 mod auth_request_guard;
 #[path = "../../../src/auth_safety_store.rs"]

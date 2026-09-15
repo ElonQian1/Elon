@@ -4538,7 +4538,7 @@
     .login-card .hint { font-size: 12px; color: var(--ink-faint); text-align: center; }
     #projectPlazaInlineRoot .project-plaza-results { gap: 38px; }
   </style>
-  <link rel="stylesheet" href="/assets/group_mentions.css" /><script src="/assets/group_mentions.js"></script><link rel="stylesheet" href="/assets/articles.css" /><script src="/assets/articles.js"></script>
+  <link rel="stylesheet" href="/assets/group_mentions.css" /><script src="/assets/group_mentions.js"></script><link rel="stylesheet" href="/assets/articles.css" /><script src="/assets/article_square_media.js"></script><script src="/assets/article_square.js"></script><script src="/assets/articles.js"></script>
 </head>
 <body data-ui-system="apk-orbital-metal-workbench-v1">
 
@@ -6492,7 +6492,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   function api(path, options = {}) {
     const headers = Object.assign({}, options.headers || {});
     if (token) headers.Authorization = 'Bearer ' + token;
-    if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+    if (options.body && !(options.body instanceof FormData) && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
     return fetch(path, Object.assign({}, options, { headers }));
   }
   function escapeHtml(v) {

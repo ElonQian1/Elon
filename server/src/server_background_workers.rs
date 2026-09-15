@@ -9,6 +9,7 @@ use crate::{
 };
 
 pub(crate) fn spawn(state: Arc<AppState>) {
+    crate::store::articles::square::spawn(state.clone());
     codex_health::spawn_codex_network_monitor(state.clone());
     billing_lifecycle::spawn_reservation_janitor(state.clone());
     compute_federation::external_pool_adapter_task_worker::spawn(state.clone());

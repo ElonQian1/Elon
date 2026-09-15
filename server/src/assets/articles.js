@@ -45,7 +45,7 @@
     const leaveEditor = () => { if (busy) return; if (dirty && !confirm('还有未保存的修改，确定放弃并返回列表？')) return; dirty = false; current = null; void library(); };
     async function library() {
       mode = 'library'; const bar = header('文章'); bar.append(button('写文章', () => void run(async () => { current = await request('/api/me/articles', 'POST', {}); dirty = false; editor(); })));
-      const nav = el('nav'); nav.append(button(mine ? '群文章' : '✓ 群文章', () => { if (!busy) { mine = false; void library(); } }), button(mine ? '✓ 我的文章' : '我的文章', () => { if (!busy) { mine = true; void library(); } })); panel.append(nav);
+      const nav = el('nav'); nav.append(button(mine ? '群文章' : '✓ 群文章', () => { if (!busy) { mine = false; void library(); } }), button(mine ? '✓ 我的文章' : '我的文章', () => { if (!busy) { mine = true; void library(); } }),button('币安广场',()=>window.ElonSquare.open(api))); panel.append(nav);
       const list = el('div', null, 'article-library'); panel.append(list);
       const load = async offset => { const p = await request(`/api/me/articles?offset=${offset}${mine ? '' : '&group_id=' + encodeURIComponent(groupId)}`);
         if (!p.items.length && offset === 0) list.append(el('p', mine ? '还没有文章，开始写第一篇吧。' : '群里还没有文章，点击“写文章”开始。'));
@@ -59,7 +59,7 @@
       const retry = button('重新读取', () => void run(() => read(id, revision))); panel.append(retry);
       const a = await request(`/api/me/articles/${id}/revisions/${revision}`); retry.remove(); panel.append(body(a));
     }
-    function preview() { mode = 'preview'; const bar = header('预览文章', editor); bar.append(button('发布到群', () => void run(chooseGroups))); panel.append(body(current)); }
+    function preview() { mode = 'preview'; const bar = header('预览文章', editor); bar.append(button('发布到群', () => void run(chooseGroups)),button('币安广场',()=>void run(async()=>window.ElonSquare.open(api,await save())))); panel.append(body(current)); }
     async function chooseGroups() {
       const data = await request('/api/me/groups'); const section = el('section', null, 'article-publish'), form = el('div'); section.append(el('h3', '选择发布群聊'), el('p', '仅作者和所选群的当前成员可读。相同版本不会重复发送。'), form);
       const checks = (data.groups || []).map(g => { const label = el('label'), check = el('input'); check.type = 'checkbox'; check.value = g.id; check.checked = g.id === groupId; label.append(check, document.createTextNode(g.name)); form.append(label); return check; });

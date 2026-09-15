@@ -9,6 +9,10 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 
 internal fun uploadArticleImage(context: Context, uri: Uri, api: ArticleApi): JSONObject {
+    return api.request("/api/me/articles/media", "POST", JSONObject().put("base64", articleImageBase64(context, uri)))
+}
+
+internal fun articleImageBase64(context: Context, uri: Uri): String {
     check(context.contentResolver.getType(uri) in setOf("image/png", "image/jpeg", "image/webp")) { "请选择PNG、JPEG或WebP图片" }
     val bytes = context.contentResolver.openInputStream(uri)?.use { stream ->
         val buffer = ByteArrayOutputStream(); val chunk = ByteArray(8192)
@@ -36,6 +40,6 @@ internal fun uploadArticleImage(context: Context, uri: Uri, api: ArticleApi): JS
             if (compressed.size <= 512 * 1024) break
         }
         check(compressed.size <= 512 * 1024) { "图片仍然过大，请裁剪后重试" }
-        return api.request("/api/me/articles/media", "POST", JSONObject().put("base64", Base64.encodeToString(compressed, Base64.NO_WRAP)))
+        return Base64.encodeToString(compressed, Base64.NO_WRAP)
     } finally { bitmap.recycle() }
 }
