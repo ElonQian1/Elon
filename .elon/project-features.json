@@ -21717,6 +21717,97 @@
       "updated_at_ms": 1789462658299
     },
     {
+      "id": "social-sync-status-lifecycle-v1",
+      "title": "APK 社交同步提示生命周期修复",
+      "summary": "修复 AI 聊天交接、暂停及消息已出现时仍显示好友或群聊同步提示",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/social-sync-status-lifecycle.md",
+        "content_hash": "2cacf0d38b8bde50f3c253d156dda7a148a028adf75542afbcde33250b42a1c4",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "6d21aac9eb1170e149b5d57a56f91d8b1e79a976",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "5c4b9f9cc8f6eb2f0cce918da3253c7fc543a532",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/MainFriendChatActions.kt",
+        "android/app/src/main/kotlin/com/elon/app/MainGroupChatActions.kt",
+        "android/app/src/main/kotlin/com/elon/app/SocialChatStatus.kt",
+        "android/app/src/test/kotlin/com/elon/app/SocialChatStatusTest.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "暂停及交接清除提示，取消迟到响应不复活",
+        "已有消息及待发消息不叠加同步提示",
+        "空态错误可重试，定向回归和 APK 发布验证"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/MainFriendChatActions.kt",
+          "content_hash": "fe211789bfb9052beab0c8f0573be508e904b99474eb9a28dff846e7fea6eefc",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6d21aac9eb1170e149b5d57a56f91d8b1e79a976",
+            "head_blob_oid": "76361f84cad90eb2177c839236796183eb1b3951",
+            "worktree_blob_oid": "b025fa317ce9162625b909b5e2a864e4fd99ddea",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/MainGroupChatActions.kt",
+          "content_hash": "1a007f93686f5f563b9f2be2fad88bef31c950c7086bb83cb19abd37736afa23",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6d21aac9eb1170e149b5d57a56f91d8b1e79a976",
+            "head_blob_oid": "9b93df25ad6274bc6a104cc204d1953ce668b92a",
+            "worktree_blob_oid": "0cda636643c99798baa64b861a8efded4236f150",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/SocialChatStatus.kt",
+          "content_hash": "3d5b5346ab4b07427815d59eea2f369597a633a61fdaba596b869599e236fc2f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6d21aac9eb1170e149b5d57a56f91d8b1e79a976",
+            "head_blob_oid": "3b188f53980e74479194d01fb36c633c15b8d79b",
+            "worktree_blob_oid": "70af88c3fd58bf66627503a0722c58945597f26b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/SocialChatStatusTest.kt",
+          "content_hash": "3a22da8f30c7184842c09317b1c63ce9579870a99ef3b2ffcbcb2bae6b5d17f4",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "6d21aac9eb1170e149b5d57a56f91d8b1e79a976",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a4f2bc69c546e562a8b5d4916bb70f85b5316e6d",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1789472065970,
+      "updated_at_ms": 1789472724067
+    },
+    {
       "id": "sqlite-safe-snapshot-v1",
       "title": "商户 SQLite 一致性备份与离线恢复 V1",
       "summary": "为通用 ERP 主库和开放商业商户运行时幂等库提供共享的在线一致性快照、摘要绑定验证和只恢复到全新文件的离线恢复 SDK。",
@@ -29347,66 +29438,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_e72682a8c601431db4e42fd6f2341a46",
-      "feature_id": "android-binance-protection-v3",
-      "action": "evidence_recorded",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789088935168
-    },
-    {
-      "id": "feature_event_9d518834259f4189bc521c04a295ea15",
-      "feature_id": "android-binance-protection-v3",
-      "action": "transitioned",
-      "actor": "codex-grid",
-      "reason": "78项主端JUnit和网页专项通过；双包发布及真实写入仍待验",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789089050211
-    },
-    {
-      "id": "feature_event_b4a39c5fc6d24cfab99c43c4b8f84aac",
-      "feature_id": "android-binance-protection-v3",
-      "action": "evidence_recorded",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789091135399
-    },
-    {
-      "id": "feature_event_ab0a95e32dd24eb88d21aeca3be833cd",
-      "feature_id": "android-binance-protection-v3",
-      "action": "evidence_recorded",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789091628448
-    },
-    {
-      "id": "feature_event_6a7bd6911a1247b988293b5adc449fb7",
-      "feature_id": "android-binance-strategy-funds-v1",
-      "action": "registered",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789104878144
-    },
-    {
-      "id": "feature_event_aba789b4db1746eb98778c9aaae42eca",
-      "feature_id": "android-binance-strategy-funds-v1",
-      "action": "claimed",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789104878183
-    },
-    {
       "id": "feature_event_3e31b6b4cb4149e5994bb669e369b794",
       "feature_id": "android-binance-strategy-funds-v1",
       "action": "transitioned",
@@ -31345,6 +31376,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1789469571436
+    },
+    {
+      "id": "feature_event_a7941cb9aa3046bf9b6c54a65b7db7e1",
+      "feature_id": "social-sync-status-lifecycle-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789472065970
+    },
+    {
+      "id": "feature_event_b13fc0af1cc7496fa0afca90c4ab72fe",
+      "feature_id": "social-sync-status-lifecycle-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789472066009
+    },
+    {
+      "id": "feature_event_785379d1c97b42f089b43aef3d35455f",
+      "feature_id": "social-sync-status-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "已定位共用容器中取消请求后的空态提示残留，修复限定于社交状态清理",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789472066042
+    },
+    {
+      "id": "feature_event_a66a9d76b27f49fda1fc2a1787b93919",
+      "feature_id": "social-sync-status-lifecycle-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789472723955
+    },
+    {
+      "id": "feature_event_549ef060e7484209b83a2859a4ed278e",
+      "feature_id": "social-sync-status-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "空态提示生命周期已修复；先复现 7 项中 6 项失败，再通过状态、读取通道和恢复回归共 14 项。正式 APK 发布待执行。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789472724013
+    },
+    {
+      "id": "feature_event_d0932864da3e415bb135597ba343569c",
+      "feature_id": "social-sync-status-lifecycle-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "空态提示生命周期已修复；先复现 7 项中 6 项失败，再通过状态、读取通道和恢复回归共 14 项。正式 APK 发布待执行。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1789472724067
     }
   ]
 }

@@ -161,6 +161,7 @@ internal class MainGroupChatActions(
     fun stopPolling() {
         foreground = false
         reader.cancel()
+        showSocialChatStatus(binding, null)
         polling = false
         pollHandler.removeCallbacks(pollRunnable)
     }
@@ -193,6 +194,7 @@ internal class MainGroupChatActions(
         )
         messages.add(pending)
         activeAdapter?.notifyItemInserted(messages.lastIndex)
+        showSocialChatStatus(binding, null)
         binding.chatList.scrollToPosition(messages.lastIndex)
         binding.inputEdit.text.clear()
         clearPendingAttachments()
@@ -252,6 +254,7 @@ internal class MainGroupChatActions(
         )
         messages.add(pending)
         activeAdapter?.notifyItemInserted(messages.lastIndex)
+        showSocialChatStatus(binding, null)
         binding.chatList.scrollToPosition(messages.lastIndex)
         inputFocusActions().collapseInputComposer()
 
@@ -384,7 +387,7 @@ internal class MainGroupChatActions(
             showSocialChatStatus(binding, if (currentMessages.isEmpty()) "还没有消息" else null)
             if (changed || !silent || allowPendingRefresh) onGroupSummariesChanged()
         }
-        if (currentMessages.isEmpty()) showSocialChatStatus(binding, "正在同步群聊消息…")
+        showSocialChatStatus(binding, if (currentMessages.isEmpty()) "正在同步群聊消息…" else null)
         reader.read("group:${group.id}", "/api/me/groups/${urlPart(group.id)}/messages?limit=120&preserve_unread=false", "messages",
             hydrate = currentMessages.isEmpty(), cached = { if (it.length() > 0) apply(it) }, value = ::apply,
             error = { failure ->

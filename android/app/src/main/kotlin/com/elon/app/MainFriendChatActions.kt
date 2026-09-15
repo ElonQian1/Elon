@@ -205,6 +205,7 @@ internal class MainFriendChatActions(
     fun stopPolling() {
         foreground = false
         reader.cancel()
+        showSocialChatStatus(binding, null)
         polling = false
         pollHandler.removeCallbacks(pollRunnable)
     }
@@ -232,6 +233,7 @@ internal class MainFriendChatActions(
         )
         messages.add(pending)
         activeAdapter?.notifyItemInserted(messages.lastIndex)
+        showSocialChatStatus(binding, null)
         binding.chatList.scrollToPosition(messages.lastIndex)
         binding.inputEdit.text.clear()
         clearPendingAttachments()
@@ -278,6 +280,7 @@ internal class MainFriendChatActions(
         )
         messages.add(pending)
         activeAdapter?.notifyItemInserted(messages.lastIndex)
+        showSocialChatStatus(binding, null)
         binding.chatList.scrollToPosition(messages.lastIndex)
         collapseInputComposer()
 
@@ -426,7 +429,7 @@ internal class MainFriendChatActions(
             showSocialChatStatus(binding, if (currentMessages.isEmpty()) "还没有消息" else null)
             if (changed || !silent || allowPendingRefresh) onFriendSummariesChanged()
         }
-        if (currentMessages.isEmpty()) showSocialChatStatus(binding, "正在同步好友消息…")
+        showSocialChatStatus(binding, if (currentMessages.isEmpty()) "正在同步好友消息…" else null)
         reader.read("friend:${friend.id}", "/api/me/friends/${urlPart(friend.id)}/messages?limit=120&preserve_unread=false", "messages",
             hydrate = currentMessages.isEmpty(), cached = { if (it.length() > 0) apply(it) }, value = ::apply,
             error = { failure ->
