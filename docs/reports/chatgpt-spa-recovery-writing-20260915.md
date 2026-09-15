@@ -1,7 +1,8 @@
 # SPA Recovery And Current Writing Projection
 
-Status: normal 1757 / adapter 420 published. Sparse snapshot retention was
-observed on device; automatic full-body recovery still needs the new-document fix.
+Status: normal 1759 / adapter 421 published and installed. Sparse snapshot
+retention was observed on device; automatic process-recovery acceptance is
+deferred while the user's realtime voice call is connected.
 This extends the [September 15 compatibility batch](chatgpt-runtime-bindings-20260915.md),
 not another private sender or Canvas implementation.
 
@@ -143,8 +144,23 @@ live route. Repeated adapter-ready events, stale generations, cached previews,
 login/temporary states and same-document route changes cannot cause repeated
 reads or target the old conversation. No new transport, reload loop or send is
 added. `document-history-regression-20260915-111753-591` passed 35 Android tests
-in 377.6s with zero failures/errors/skips. Source-size and document guards passed;
-the signed release and automatic full-history acceptance are next.
+in 377.6s with zero failures/errors/skips. Source-size and document guards passed.
+An actual non-fast-forward rejection required rebasing over two unrelated friend
+search commits; there were no conflicts or history/voice changes upstream.
+
+Normal 1759 from `a127d4230f36ff1444c69417449ae83e7f09ba56` passed signed Release,
+remote verification and unattended Xiaomi replacement in 534.6s. SHA-256:
+`3339f54442da05cf548e92c0d2f73cee39276edf9557627b3d53c1a10022fb12`.
+`conversation-process-recovery-421-20260915-113905-225` stopped at `origin_not_idle`
+before navigation or force-stop, with zero sends and restored awake settings.
+Read-only MCP confirmed adapter 421, authenticated, empty draft, no dictation or
+text streaming, but native realtime voice phase `connected`. The call was not
+stopped. The currently visible conversation had complete zero-offset history;
+that observation is not substituted for the owned-fixture restart acceptance.
+
+The user was asked to end voice when convenient. Resume the existing recovery
+smoke on adapter 421 after it is idle; do not rebuild or repeat successful send,
+attachment, Writing Block or sparse-history tests without a new regression.
 
 ## Boundaries
 

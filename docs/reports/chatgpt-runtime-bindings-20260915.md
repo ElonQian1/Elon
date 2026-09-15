@@ -1,6 +1,6 @@
 # September 15 Runtime Compatibility Investigation
 
-Status: bindings 30 / adapter 420 published and installed as 1.1.1757.
+Status: bindings 30 / adapter 421 published and installed as 1.1.1759.
 [Second-rollout compatibility](chatgpt-runtime-bindings-20260915-b.md) and one
 native independent existing-project Send passed on 1753; 1754 publishes the
 narrow default, with ready/idle read-only admission and successful restoration.
@@ -17,7 +17,9 @@ ordinary text, Search and Image modules.
   pointer after process recreation. 1755 route recovery passed; 1756 adds one
   asynchronous startup history read. Adapter 420 preserves a complete private
   history through sparse DOM snapshots; a device read retained all 18 messages.
-  Automatic restoration still needs adapter 421's once-per-document rearm.
+  Adapter 421's once-per-document rearm is published with 35 passing Android
+  tests. Restart acceptance stopped safely because realtime voice is connected;
+  resume the existing smoke after the call ends, without another build.
 
 - [Project admission follow-up](chatgpt-fresh-project-admission-20260915.md):
   GLOBAL, same-user owner and matching project config are corrected. After the
