@@ -51,6 +51,8 @@ passed on adapter 411 using the existing default memory owner and native Send.
 
 [Send confirmation fix and process-recovery gap](reports/chatgpt-send-confirmation-identity-20260915.md):
 source batch; grouped release and device acceptance pending.
+[Pending-write journal](reports/chatgpt-pending-write-journal-20260915.md): integrated
+opt-in candidate; no POST replay, real process-recreation acceptance pending.
 
 The [new-chat tool composition audit](chatgpt-fresh-tool-text-dispatch.md#new-conversation-composition-audit)
 confirms that new personal/owned-project Search and Picture requests already use

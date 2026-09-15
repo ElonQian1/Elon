@@ -2,7 +2,7 @@
 capability_id: android_chatgpt_realtime_voice_data_channel_transcript_v1
 implementation_status: regression_fix_implemented
 verification_status: targeted_android_tests_passed_device_pending
-delivery_status: published_1761_device_install_deferred
+delivery_status: published_1761_installed_voice_acceptance_pending
 ---
 
 # Voice Captions After Search
@@ -82,9 +82,16 @@ APK size: 40,562,991 bytes. SHA-256:
 `93b16e1e83fb09986a129ac2860f83014932d6a22c4e25e563e6288d86c8ef12`.
 The page adapter remains 421 because this is a native subtitle-decoder change.
 
-Installation did not succeed: the known wireless target timed out during bounded
-autodeploy. A fresh local ADB server subsequently returned an empty device list;
-one bounded reconnect also timed out and mDNS discovered no device. The user was
-asked to reconnect USB or wireless debugging. Do not call this installed or
-device-accepted; do not rebuild the already published package merely to retry
-installation. Preserve the account and conversation on replacement install.
+The initial autodeploy was deferred while the phone was absent. On Sep 15 the
+same trusted Xiaomi returned over wireless ADB. The saved package hash matched
+the published SHA above; `adb install -r` succeeded and package-manager readback
+confirmed version name 1.1.1761 and code 1761. No application data or login state
+was cleared. MCP opened the production social AI chat, reporting adapter 421
+with the bridge still restoring (`web_only`, adapter not yet current).
+
+Subsequent MCP health and a four-second basic ADB shell probe timed out. This is
+loss of the debug transport, not evidence of provider network failure or a
+failed subtitle decoder. No new call/microphone session was started. Actual
+search-to-spoken-answer caption continuity remains pending. A later mainline APK
+containing this commit can be used; do not downgrade or rebuild 1761 merely to
+repeat installation.
