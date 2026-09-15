@@ -21224,6 +21224,49 @@
       "updated_at_ms": 1786711941712
     },
     {
+      "id": "social-chat-desktop-parity-v1",
+      "title": "Windows 社交消息操作与聊天工作流补齐",
+      "summary": "统一消息菜单、引用撤回转发、附件发送和会话工具，保留修订审计及缓存同步",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/social-chat-desktop-remediation.md",
+        "content_hash": "746ad6ef744fd483163c6afcd0d745dee4d3df393e68e5b965b44d6c85e6c974",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "01353ce870b0fc2bda6b0194ddeb71e746afe6db",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "c269e3a8a86bf611f966eb45a5740926d0a966ef",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "",
+      "tags": [],
+      "task_paths": [
+        "pc-frontend/src/features/friends",
+        "pc-frontend/src/store/auth.ts"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "本人/他人/撤回/文章权限保持正确",
+        "引用与附件不会串会话且失败保留草稿",
+        "转发部分成功不重复提交，本机收藏与隐藏可恢复",
+        "菜单键盘、暗色布局、原有同步及文章回归通过"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_319d1f4dd9734d30a74c0dd638408224",
+        "agent_id": "codex",
+        "claimed_at_ms": 1789460596124,
+        "expires_at_ms": 1789546996124
+      },
+      "created_at_ms": 1789460596075,
+      "updated_at_ms": 1789460596170
+    },
+    {
       "id": "sqlite-safe-snapshot-v1",
       "title": "商户 SQLite 一致性备份与离线恢复 V1",
       "summary": "为通用 ERP 主库和开放商业商户运行时幂等库提供共享的在线一致性快照、摘要绑定验证和只恢复到全新文件的离线恢复 SDK。",
@@ -28854,36 +28897,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a171e86bc83d461f80f7685730803eec",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "requirement_rebound",
-      "actor": "codex-native-manage-v2",
-      "reason": "关联当前创建和管理合同，保留真实验收缺口",
-      "from_status": "blocked",
-      "to_status": "proposed",
-      "at_ms": 1788983340876
-    },
-    {
-      "id": "feature_event_001548fd9bfb469ab63506e78aee8658",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "transitioned",
-      "actor": "codex-native-manage-v2",
-      "reason": "用户已接受长期架构并授权继续；本次仅校正进展，不扩展权限",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1788983383272
-    },
-    {
-      "id": "feature_event_50a58a6e662c4d30acbe6cc1d66c4fdb",
-      "feature_id": "android-exchange-session-host-v2",
-      "action": "transitioned",
-      "actor": "codex-native-manage-v2",
-      "reason": "用户已接受长期架构并授权继续；本次仅校正进展，不扩展权限",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1788983383322
-    },
-    {
       "id": "feature_event_8ff933014e6f4778b3d101bc83ea5615",
       "feature_id": "android-exchange-session-host-v2",
       "action": "claimed",
@@ -30852,6 +30865,36 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1789457366093
+    },
+    {
+      "id": "feature_event_01540821053348d0b32047b9543f02d9",
+      "feature_id": "social-chat-desktop-parity-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789460596075
+    },
+    {
+      "id": "feature_event_167c80b13c3f440ab778646c9da15d96",
+      "feature_id": "social-chat-desktop-parity-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789460596125
+    },
+    {
+      "id": "feature_event_97cd6540e78a4428b8bdd762a049a765",
+      "feature_id": "social-chat-desktop-parity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789460596170
     }
   ]
 }

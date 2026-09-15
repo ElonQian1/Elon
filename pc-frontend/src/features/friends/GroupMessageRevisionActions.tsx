@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
-import { api } from '../../api/client'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { socialRequest } from './socialChatOperations'
 import type { SocialMessage } from './socialMessageTypes'
 import { changedText, revisionOf, revisionsPath, type MessageEdit, type MessageHistory, type MessageRevision } from './groupMessageRevisions'
 import styles from './GroupMessageRevisions.module.css'
 
-interface Props { groupId: string; message: SocialMessage; own: boolean; onSaved: (message: MessageEdit) => void }
+interface Props { groupId: string; message: SocialMessage; own: boolean; onSaved: (message: MessageEdit) => void; renderActions?: (actions: { edit: () => void; history: () => void; editable: boolean; edited: boolean }) => ReactNode }
 
-export default function GroupMessageRevisionActions({ groupId, message, own, onSaved }: Props) {
+export default function GroupMessageRevisionActions({ groupId, message, own, onSaved, renderActions }: Props) {
   const [mode, setMode] = useState<'edit' | 'history' | null>(null)
   const [draft, setDraft] = useState('')
   const [expected, setExpected] = useState(1)
@@ -33,7 +33,7 @@ export default function GroupMessageRevisionActions({ groupId, message, own, onS
     setMode('history'); setError(''); setBusy(true)
     if (!append) { setVersions([]); setBefore(null) }
     try {
-      const data = await api.get<MessageHistory>(`${path}/revisions?limit=20${append && before ? `&before_revision=${before}` : ''}`)
+      const data = await socialRequest<MessageHistory>(`${path}/revisions?limit=20${append && before ? `&before_revision=${before}` : ''}`)
       if (request !== epoch.current) return
       setVersions(previous => append ? [...previous, ...data.revisions] : data.revisions)
       setBefore(data.next_before_revision)
@@ -49,7 +49,7 @@ export default function GroupMessageRevisionActions({ groupId, message, own, onS
     const request = ++epoch.current
     setBusy(true); setError('')
     try {
-      const result = await api.patch<{ message: MessageEdit }>(path, { content: draft.trim(), expected_revision: expected })
+      const result = await socialRequest<{ message: MessageEdit }>(path, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: draft.trim(), expected_revision: expected }) })
       if (request !== epoch.current) return
       onSaved(result.message); setMode(null)
     } catch (failure) {
@@ -57,17 +57,17 @@ export default function GroupMessageRevisionActions({ groupId, message, own, onS
       setError((failure as Error).message || '保存失败，草稿已保留，请重试')
       if ((failure as { status?: number }).status === 409) {
         try {
-          const latest = await api.get<MessageHistory>(`${path}/revisions?limit=1`)
+          const latest = await socialRequest<MessageHistory>(`${path}/revisions?limit=1`)
           if (request === epoch.current) setConflict(latest.revisions[0] ?? null)
         } catch { /* Keep original expected version: retry must still detect the conflict. */ }
       }
     } finally { if (request === epoch.current) setBusy(false) }
   }
   return <>
-    <div className={styles.actions}>
+    {renderActions ? renderActions({ edit, history: () => void history(), editable, edited: revisionOf(message) > 1 }) : <div className={styles.actions}>
       {revisionOf(message) > 1 && <button type="button" onClick={() => void history()} title={message.edited_at ? `最后修改：${new Date(message.edited_at).toLocaleString()}` : undefined}>已编辑 · {revisionOf(message) - 1} 次</button>}
       {editable && <button type="button" onClick={edit}>编辑</button>}
-    </div>
+    </div>}
     {mode && <dialog ref={dialog} className={styles.dialog} onCancel={event => { event.preventDefault(); close() }} aria-labelledby={`revision-title-${message.id}`}>
       <header><h2 id={`revision-title-${message.id}`}>{mode === 'edit' ? '编辑消息' : '修改记录'}</h2><button type="button" onClick={close} disabled={busy} aria-label="关闭">关闭</button></header>
       <div className={styles.body}>
