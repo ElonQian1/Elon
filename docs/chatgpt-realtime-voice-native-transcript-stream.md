@@ -50,6 +50,10 @@ and circuit-breaker policy rather than introducing a second transport.
 
 ## Verification
 
+Current regression follow-up: [search-turn captions, Sep 15](reports/chatgpt-voice-search-captions-20260915.md).
+The previous supervised acceptance below remains valid for its original sample;
+it does not establish coverage of the newly reported search-turn gap.
+
 Passed offline:
 
 - compact private message delta add, append, replace, patch, remove, and truncate;

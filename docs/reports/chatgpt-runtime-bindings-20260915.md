@@ -12,6 +12,10 @@ ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
 
+- [Voice captions after search](chatgpt-voice-search-captions-20260915.md): current
+  native preview gap confirmed; channel-identifier/cache-limit mismatch corrected,
+  with 34 passing Android tests. Exact live regression acceptance remains pending.
+
 - [Current Writing projection and SPA recovery](chatgpt-spa-recovery-writing-20260915.md)
   closes a current-profile read omission and the reproduced stale startup-route
   pointer after process recreation. 1755 route recovery passed; 1756 adds one

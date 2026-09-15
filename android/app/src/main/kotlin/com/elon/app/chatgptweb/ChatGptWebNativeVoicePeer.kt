@@ -39,6 +39,7 @@ internal data class ChatGptWebNativeVoiceState(
     val dataChannelOpen: Boolean = false,
     val dataChannelMessageCount: Int = 0,
     val transcriptEventCount: Int = 0,
+    val transcriptDeltaDiagnostics: ChatGptWebNativeVoiceDeltaDiagnostics = ChatGptWebNativeVoiceDeltaDiagnostics(),
     val officialMediaSuspended: Boolean = false,
     val officialPeerReleased: Boolean = false,
     val code: String? = null,
@@ -248,9 +249,10 @@ internal class ChatGptWebNativeVoicePeer(
                 ByteArray(data.remaining()).also(data::get).toString(Charsets.UTF_8)
             }
             if (dataChannelMessageCount < Int.MAX_VALUE) dataChannelMessageCount += 1
-            val event = transcriptDecoder.decode(payload) ?: return
-            if (transcriptEventCount < Int.MAX_VALUE) transcriptEventCount += 1
+            val event = transcriptDecoder.decode(payload)
+            if (event != null && transcriptEventCount < Int.MAX_VALUE) transcriptEventCount += 1
             emit()
+            if (event == null) return
             mainHandler.post {
                 if (current(token)) onTranscript(event)
             }
@@ -362,6 +364,7 @@ internal class ChatGptWebNativeVoicePeer(
                 dataChannelOpen = dataChannelOpen,
                 dataChannelMessageCount = dataChannelMessageCount,
                 transcriptEventCount = transcriptEventCount,
+                transcriptDeltaDiagnostics = transcriptDecoder.diagnostics(),
             ),
         )
     }

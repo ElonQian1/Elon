@@ -87,6 +87,12 @@ class ChatGptWebNativeVoiceResearchMcpPortTest {
                     dataChannelOpen = true,
                     dataChannelMessageCount = 12,
                     transcriptEventCount = 7,
+                    transcriptDeltaDiagnostics = ChatGptWebNativeVoiceDeltaDiagnostics(
+                        rejectedCount = 2,
+                        highestChannel = 400,
+                        cachedChannels = 16,
+                        lastRejection = "missing_channel_base",
+                    ),
                 )
             },
         )
@@ -95,6 +101,10 @@ class ChatGptWebNativeVoiceResearchMcpPortTest {
 
         assertEquals(12, state.getInt("data_channel_message_count"))
         assertEquals(7, state.getInt("transcript_event_count"))
+        assertEquals(2, state.getInt("transcript_delta_rejected_count"))
+        assertEquals(400, state.getInt("transcript_delta_highest_channel"))
+        assertEquals(16, state.getInt("transcript_delta_cached_channels"))
+        assertEquals("missing_channel_base", state.getString("transcript_delta_last_rejection"))
         assertFalse(state.has("transcript"))
         assertFalse(state.has("text"))
         assertFalse(state.has("payload"))

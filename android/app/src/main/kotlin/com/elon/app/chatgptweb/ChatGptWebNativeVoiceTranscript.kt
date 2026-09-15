@@ -153,6 +153,7 @@ internal class ChatGptWebNativeVoiceTranscriptDecoder {
     private val deltaDecoder = ChatGptWebNativeVoiceJsonDeltaDecoder()
     private val previousTextByStream = LinkedHashMap<String, String>()
 
+    @Synchronized
     fun decode(payload: String): ChatGptWebNativeVoiceTranscriptEvent? {
         val event = ChatGptWebNativeVoiceTranscriptParser.eventObject(payload) ?: return null
         ChatGptWebNativeVoiceTranscriptParser.parseEvent(event)?.let { return it }
@@ -171,10 +172,14 @@ internal class ChatGptWebNativeVoiceTranscriptDecoder {
         }
     }
 
+    @Synchronized
     fun reset() {
         deltaDecoder.reset()
         previousTextByStream.clear()
     }
+
+    @Synchronized
+    fun diagnostics(): ChatGptWebNativeVoiceDeltaDiagnostics = deltaDecoder.diagnostics()
 
     private fun decodeMessageDelta(event: JSONObject): ChatGptWebNativeVoiceTranscriptEvent? {
         val delta = event.optJSONObject("payload")?.optJSONObject("delta") ?: return null
