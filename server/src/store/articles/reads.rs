@@ -143,7 +143,7 @@ impl Store {
             member(&conn, user, group)?;
             let mut statement = conn.prepare(
                 "SELECT d.content_id,MAX(d.revision) FROM social_content_distributions d
-                JOIN social_contents c ON c.id=d.content_id AND c.status='published'
+                JOIN social_contents c ON c.id=d.content_id AND c.status='published' AND c.kind='article'
                 JOIN friend_group_messages m ON m.id=d.message_id AND m.recalled_at IS NULL
                 WHERE d.target_kind='group' AND d.target_id=?1 GROUP BY d.content_id
                 ORDER BY MAX(d.created_at) DESC,d.content_id LIMIT 21 OFFSET ?2",

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@id/messageText"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:minHeight="48dp"
+    android:padding="12dp"
+    android:text="@string/ai_conversation_share_gap"
+    android:textColor="@color/elon_text_tertiary"
+    android:textSize="12sp" />

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_conversation_share_back">返回</string>
+    <string name="ai_conversation_share_discuss">回群讨论</string>
+    <string name="ai_conversation_share_source">%1$s · %2$s</string>
+    <string name="ai_conversation_share_message_count">%1$d 条消息</string>
+    <string name="ai_conversation_share_card_description">%1$s 分享的 %2$s 对话：%3$s，%4$d 条消息</string>
+    <string name="ai_conversation_share_cover">对话封面</string>
+    <string name="ai_conversation_share_search">搜索对话</string>
+    <string name="ai_conversation_share_clear_search">清除搜索</string>
+    <string name="ai_conversation_share_previous">上一个结果</string>
+    <string name="ai_conversation_share_next">下一个结果</string>
+    <string name="ai_conversation_share_matches">%1$d / %2$d</string>
+    <string name="ai_conversation_share_no_matches">无匹配</string>
+    <string name="ai_conversation_share_loading">正在读取对话…</string>
+    <string name="ai_conversation_share_empty">没有可显示的消息</string>
+    <string name="ai_conversation_share_unavailable">对话无法读取，请检查登录状态与群访问权限后重试。</string>
+    <string name="ai_conversation_share_revoked">分享已撤销</string>
+    <string name="ai_conversation_share_retry">重试</string>
+    <string name="ai_conversation_share_attachment">附件</string>
+    <string name="ai_conversation_share_image_unavailable">图片暂不可用</string>
+    <string name="ai_conversation_share_gap">部分消息未分享</string>
+</resources>

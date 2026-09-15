@@ -401,6 +401,8 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (297, "群聊工作 AI 请求模型快照", crate::store::social_ai_messages::requests::work::migrate),
     (298, "文章草稿、版本与群聊分发", crate::store::articles::migration::migrate),
     (299, "币安广场凭证、媒体与持久发布队列", crate::store::articles::square::migration::migrate),
+    (300, "Permissioned immutable AI conversation snapshots", crate::store::articles::snapshots::migration::migrate),
+    (301, "Scoped snapshot orphan media retention", crate::store::articles::snapshots::orphan_media::migrate),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

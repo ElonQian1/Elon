@@ -8,6 +8,38 @@ pub(in crate::store) fn insert_message(
     content: &str,
     attachments: Option<&[ProjectAttachmentRef]>,
 ) -> Result<FriendGroupMessage> {
+    if content
+        .trim_start()
+        .starts_with(crate::store::articles::snapshots::CARD_PREFIX.trim_end())
+    {
+        return Err(anyhow!(
+            "Reserved AI snapshot card; use the snapshot share endpoint"
+        ));
+    }
+    insert_content(conn, user, group, content, attachments)
+}
+
+pub(in crate::store) fn insert_snapshot_message(
+    conn: &Connection,
+    user: &str,
+    group: &str,
+    card: &crate::store::articles::snapshots::SnapshotCard,
+) -> Result<FriendGroupMessage> {
+    let content = format!(
+        "{}{}",
+        crate::store::articles::snapshots::CARD_PREFIX,
+        serde_json::to_string(card)?
+    );
+    insert_content(conn, user, group, &content, None)
+}
+
+fn insert_content(
+    conn: &Connection,
+    user: &str,
+    group: &str,
+    content: &str,
+    attachments: Option<&[ProjectAttachmentRef]>,
+) -> Result<FriendGroupMessage> {
     let member: bool = conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM friend_group_members WHERE group_id=?1 AND user_id=?2)",
         params![group, user],

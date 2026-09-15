@@ -64,26 +64,13 @@ class MainActivity : AppCompatActivity() {
         adapter.onVoiceAttachmentLongPress = { message, attachment ->
             inputActions.showVoiceAttachmentActions(message, attachment)
         }
+        adapter.onAiConversationShareOpen = { aiConversationShares.open(it) }
+        adapter.onAiConversationShareCoverLoad = { card, loaded -> aiConversationShares.loadCover(card, loaded) }
+        adapter.onAiConversationShareLongPress = { anchor, message, card -> aiConversationShares.showCardActions(anchor, message, card) }
         chatAdapter = adapter
     }
 
-    private fun handleApkChatAction(action: String, url: String) {
-        when (action) {
-            "install" -> ApkChatInstaller.downloadAndInstall(this, url, s.http)
-            "copy" -> {
-                val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE)
-                    as android.content.ClipboardManager
-                cm.setPrimaryClip(android.content.ClipData.newPlainText("apk_url", url))
-                android.widget.Toast.makeText(this, "链接已复制", android.widget.Toast.LENGTH_SHORT).show()
-            }
-            "share" -> startActivity(
-                android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(android.content.Intent.EXTRA_TEXT, url)
-                }
-            )
-        }
-    }
+    private fun handleApkChatAction(action: String, url: String) = handleApkChatAction(this, s.http, action, url)
     /** 运行时可变状态与工具实例（OkHttpClient 含超时配置）。 */
     private val s = MainActivityState()
     private val prefs by lazy { AuthManager.userDataPrefs(this) }
@@ -1349,7 +1336,8 @@ class MainActivity : AppCompatActivity() {
             },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
-            showStoreDialog = { storeController.showStoreDialog() }
+            showStoreDialog = { storeController.showStoreDialog() },
+            shareAiMessage = { aiConversationShares.forwardOne(it) }
         )
     }
 
@@ -1477,8 +1465,19 @@ class MainActivity : AppCompatActivity() {
             isProjectChannelActive = projectSpaceController::isChannelActive,
             summarizeInCurrentChannel = projectSpaceController::summarizeSelectedDiscussion,
             summarizeInPersonalChat = { prompt -> sendSelectedDiscussionToAi(prompt) },
-            summarizeInNewPersonalChat = { prompt -> sendSelectedDiscussionToNewAiChat(prompt) }
+            summarizeInNewPersonalChat = { prompt -> sendSelectedDiscussionToNewAiChat(prompt) },
+            isAiChat = { socialAiChatFeature.isChatModeActive() },
+            forwardAiMessages = { messages, complete -> aiConversationShares.forward(messages, complete) }
         )
+    }
+
+    private val aiConversationShares by lazy {
+        MainAiConversationShareFeature(this, s.http, serverUrl,
+            isAiChat = { socialAiChatFeature.isChatModeActive() },
+            currentMessages = { chatAdapter.currentMessagesForSharing() },
+            streaming = { socialAiChatFeature.webChatStreaming() },
+            groupId = { groupChatActions.currentGroup()?.id },
+            onPublished = { groupActions.loadGroups(); groupChatActions.currentGroup()?.id?.let(groupChatActions::handleRealtimeMessage) })
     }
 
     private fun sendSelectedDiscussionToNewAiChat(prompt: String) {

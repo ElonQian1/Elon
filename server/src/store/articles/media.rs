@@ -17,8 +17,32 @@ impl Store {
         let bytes = STANDARD
             .decode(encoded)
             .map_err(|_| fail(400, "图片编码无效"))?;
-        if bytes.is_empty() || bytes.len() > 512 * 1024 {
-            return Err(fail(413, "图片需小于512KB"));
+        let mut conn = self.conn()?;
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let (media, _) = Self::persist_social_image(&tx, user, bytes, 512 * 1024)?;
+        // Reusing a snapshot upload for an ordinary article makes it ineligible for orphan GC.
+        let tracks_snapshots: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='social_snapshot_orphan_media')",
+            [], |r| r.get(0),
+        )?;
+        if tracks_snapshots {
+            tx.execute(
+                "DELETE FROM social_snapshot_orphan_media WHERE media_id=?1",
+                [&media.id],
+            )?;
+        }
+        tx.commit()?;
+        Ok(media)
+    }
+
+    pub(in crate::store::articles) fn persist_social_image(
+        conn: &Connection,
+        user: &str,
+        bytes: Vec<u8>,
+        max_bytes: usize,
+    ) -> Result<(ArticleMedia, bool)> {
+        if bytes.is_empty() || bytes.len() > max_bytes {
+            return Err(fail(413, "Image exceeds this upload path's byte limit"));
         }
         let format = image::guess_format(&bytes).map_err(|_| fail(400, "图片格式无效"))?;
         let mime = match format {
@@ -34,9 +58,7 @@ impl Store {
             return Err(fail(400, "图片尺寸需小于4096×4096"));
         }
         let hash = format!("{:x}", Sha256::digest(&bytes));
-        let mut conn = self.conn()?;
-        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        if let Some(id) = tx
+        if let Some(id) = conn
             .query_row(
                 "SELECT id FROM social_content_media WHERE owner_id=?1 AND sha256=?2",
                 params![user, hash],
@@ -44,12 +66,15 @@ impl Store {
             )
             .optional()?
         {
-            return Ok(ArticleMedia {
-                id,
-                data_url: format!("data:{mime};base64,{}", STANDARD.encode(bytes)),
-            });
+            return Ok((
+                ArticleMedia {
+                    id,
+                    data_url: format!("data:{mime};base64,{}", STANDARD.encode(bytes)),
+                },
+                false,
+            ));
         }
-        let (count,total):(i64,i64)=tx.query_row("SELECT COUNT(*),COALESCE(SUM(length(bytes)),0) FROM social_content_media WHERE owner_id=?1",[user],|r|Ok((r.get(0)?,r.get(1)?)))?;
+        let (count,total):(i64,i64)=conn.query_row("SELECT COUNT(*),COALESCE(SUM(length(bytes)),0) FROM social_content_media WHERE owner_id=?1",[user],|r|Ok((r.get(0)?,r.get(1)?)))?;
         if count >= 300 || total + bytes.len() as i64 > 100 * 1024 * 1024 {
             return Err(fail(400, "文章图片空间已达到当前上限"));
         }
@@ -65,14 +90,16 @@ impl Store {
             STANDARD.encode(thumbnail.into_inner())
         );
         let id = new_id("article_media");
-        tx.execute(
+        conn.execute(
             "INSERT INTO social_content_media VALUES (?1,?2,?3,?4,?5,?6,?7)",
             params![id, user, hash, mime, bytes, preview, now()],
         )?;
-        tx.commit()?;
-        Ok(ArticleMedia {
-            id,
-            data_url: format!("data:{mime};base64,{}", STANDARD.encode(bytes)),
-        })
+        Ok((
+            ArticleMedia {
+                id,
+                data_url: format!("data:{mime};base64,{}", STANDARD.encode(bytes)),
+            },
+            true,
+        ))
     }
 }

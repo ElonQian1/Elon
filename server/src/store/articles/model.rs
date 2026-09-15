@@ -82,7 +82,7 @@ impl ArticleDocument {
         }
         for id in media {
             let valid: bool = conn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM social_content_media WHERE id=?1 AND owner_id=?2)",
+                "SELECT EXISTS(SELECT 1 FROM social_content_media WHERE id=?1 AND owner_id=?2 AND length(bytes)<=524288)",
                 params![id, owner],
                 |r| r.get(0),
             )?;

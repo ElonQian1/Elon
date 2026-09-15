@@ -145,7 +145,12 @@ fn edit(
     if original.sender != actor {
         return Err(RevisionError::Forbidden.into());
     }
-    if original.content.starts_with("【一龙项目卡片】") || content.starts_with("【一龙项目卡片】")
+    if original.content.starts_with("【一龙项目卡片】")
+        || content.starts_with("【一龙项目卡片】")
+        || original
+            .content
+            .starts_with(crate::store::articles::snapshots::CARD_PREFIX.trim_end())
+        || content.starts_with(crate::store::articles::snapshots::CARD_PREFIX.trim_end())
     {
         return Err(RevisionError::Invalid.into());
     }

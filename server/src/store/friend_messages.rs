@@ -401,7 +401,9 @@ pub(super) fn message_preview_from_parts(
 ) -> rusqlite::Result<Option<String>> {
     if let Some(content) = content.map(str::trim).filter(|value| !value.is_empty()) {
         return Ok(Some(
-            super::articles::message_preview(content).unwrap_or_else(|| content.to_string()),
+            super::articles::snapshots::message_preview(content)
+                .or_else(|| super::articles::message_preview(content))
+                .unwrap_or_else(|| content.to_string()),
         ));
     }
 

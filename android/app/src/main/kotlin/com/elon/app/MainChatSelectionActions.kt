@@ -17,8 +17,13 @@ internal class MainChatSelectionActions(
     private val isProjectChannelActive: () -> Boolean,
     private val summarizeInCurrentChannel: (SelectedDiscussionSummary) -> Boolean,
     private val summarizeInPersonalChat: (String) -> Unit,
-    private val summarizeInNewPersonalChat: (String) -> Unit
+    private val summarizeInNewPersonalChat: (String) -> Unit,
+    private val isAiChat: () -> Boolean = { false },
+    private val forwardAiMessages: (List<ChatMessage>, () -> Unit) -> Unit = { _, _ -> },
 ) {
+    private var inputVisibility = View.GONE
+    private var tabsVisibility = View.GONE
+    private val selectionHeader by lazy { MainChatSelectionHeader(binding, ::cancelSelection) }
     fun setup() {
         binding.selectionCancelButton.setOnClickListener { cancelSelection() }
         binding.selectionCopyButton.setOnClickListener { copySelectedMessages() }
@@ -30,22 +35,42 @@ internal class MainChatSelectionActions(
 
     fun startSelection(message: ChatMessage) {
         val adapter = currentAdapterOrNull() ?: return
+        if (!adapter.isSelectionModeActive()) {
+            inputVisibility = binding.inputLayout.visibility
+            tabsVisibility = binding.pageTabs.visibility
+        }
         adapter.setSelectionChangedListener(::renderSelectionCount)
         adapter.startSelection(message)
         if (!adapter.isSelectionModeActive()) return
         binding.inputLayout.visibility = View.GONE
         binding.pageTabs.visibility = View.GONE
         binding.chatSelectionBar.visibility = View.VISIBLE
+        if (isAiChat()) {
+            selectionHeader.show()
+            binding.selectionCancelButton.visibility = View.GONE
+            binding.selectionCountText.visibility = View.GONE
+            binding.selectionDeleteButton.visibility = View.GONE
+            binding.selectionForwardButton.text = "合并转发"
+            binding.selectionForwardButton.contentDescription = "ai-conversation-share-selected"
+        }
         renderSelectionCount(adapter.selectedMessagesInOrder().size)
     }
 
     fun cancelSelection() {
+        val wasSelecting = binding.chatSelectionBar.visibility == View.VISIBLE
         val adapter = currentAdapterOrNull()
         adapter?.exitSelection()
         adapter?.setSelectionChangedListener(null)
         binding.chatSelectionBar.visibility = View.GONE
-        if (binding.chatPage.visibility == View.VISIBLE) {
-            binding.inputLayout.visibility = View.VISIBLE
+        selectionHeader.hide()
+        binding.selectionCancelButton.visibility = View.VISIBLE
+        binding.selectionCountText.visibility = View.VISIBLE
+        binding.selectionDeleteButton.visibility = View.VISIBLE
+        binding.selectionForwardButton.text = "转发"
+        binding.selectionForwardButton.contentDescription = "转发"
+        if (wasSelecting && binding.chatPage.visibility == View.VISIBLE) {
+            binding.inputLayout.visibility = inputVisibility
+            binding.pageTabs.visibility = tabsVisibility
         }
         renderSelectionCount(0)
     }
@@ -62,6 +87,10 @@ internal class MainChatSelectionActions(
 
     private fun forwardSelectedMessages() {
         val selected = selectedMessagesOrToast() ?: return
+        if (isAiChat()) {
+            forwardAiMessages(selected, ::cancelSelection)
+            return
+        }
         shareActions().forwardMessageText(selectedDiscussionTranscript(selected))
         cancelSelection()
     }
@@ -116,12 +145,7 @@ internal class MainChatSelectionActions(
         }
 
         indices.forEach { index -> messages.removeAt(index) }
-        adapter.exitSelection()
-        adapter.setSelectionChangedListener(null)
-        binding.chatSelectionBar.visibility = View.GONE
-        if (binding.chatPage.visibility == View.VISIBLE) {
-            binding.inputLayout.visibility = View.VISIBLE
-        }
+        cancelSelection()
         saveConversations()
         renderConversationList()
         Toast.makeText(activity, "已删除 ${indices.size} 条", Toast.LENGTH_SHORT).show()
@@ -137,6 +161,7 @@ internal class MainChatSelectionActions(
     }
 
     private fun renderSelectionCount(count: Int) {
+        if (isAiChat()) selectionHeader.update(count)
         binding.selectionCountText.text = if (count > 0) {
             "已选择 $count 条"
         } else {

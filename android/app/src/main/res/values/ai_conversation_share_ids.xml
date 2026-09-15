@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item type="id" name="ai_conversation_share_reader" />
+    <item type="id" name="ai_conversation_share_back" />
+    <item type="id" name="ai_conversation_share_search" />
+    <item type="id" name="ai_conversation_share_list" />
+    <item type="id" name="ai_conversation_share_discuss" />
+    <item type="id" name="ai_conversation_share_retry" />
+    <item type="id" name="ai_conversation_share_status" />
+</resources>

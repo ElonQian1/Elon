@@ -68,7 +68,8 @@ class ChatAdapter(
     private val onMessageLongPress: ((View, ChatMessage) -> Unit)? = null,
     private val onRetryFailedSend: ((ChatMessage) -> Unit)? = null,
     private val onProjectShareAction: ((ChatProjectShare) -> Unit)? = null,
-    private val onProjectShareLongPress: ((View, ChatMessage, ChatProjectShare) -> Unit)? = null
+    private val onProjectShareLongPress: ((View, ChatMessage, ChatProjectShare) -> Unit)? = null,
+    private val readOnly: Boolean = false
 ) : RecyclerView.Adapter<ChatAdapter.VH>() {
     /** 处理消息气泡上的 APK 操作按钮（安装 / 复制链接 / 分享），由 Activity 注入。 */
     var onApkAction: ((action: String, url: String) -> Unit)? = null
@@ -79,13 +80,25 @@ class ChatAdapter(
     var onWebChatContentOpen: ((ChatMessage, WebChatProductionContentPart) -> Unit)? = null
     var onSenderAvatarLongPress: ((ChatMessage) -> Unit)? = null
     var onMessageHistory: ((ChatMessage) -> Unit)? = null
+    var onAiConversationShareOpen: ((AiConversationShareCard) -> Unit)? = null
+    var onAiConversationShareCoverLoad: ((AiConversationShareCard, (String?) -> Unit) -> Unit)? = null
+    var onAiConversationShareLongPress: ((View, ChatMessage, AiConversationShareCard) -> Unit)? = null
     private var cachedUserProfile: UserProfile? = null
     private var cachedUserBitmap: Bitmap? = null
     private var selectionMode = false
     private var selectionChangedListener: ((Int) -> Unit)? = null
-    private val selectedPositions = linkedSetOf<Int>()
-    private var lastTogglePosition = RecyclerView.NO_POSITION
+    private val selectionIdentity = ChatSelectionIdentity()
+    private var lastToggleIdentity: String? = null
     private var lastToggleAtMs = 0L
+
+    init {
+        observeChatSelectionChanges(this, ::reconcileSelection)
+    }
+
+    private fun reconcileSelection() {
+        selectionIdentity.reconcile(messages)
+        if (selectionMode) notifySelectionChanged()
+    }
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
         val selectionCheck: TextView? = view.findViewById(R.id.messageSelectionCheck)
@@ -129,7 +142,13 @@ class ChatAdapter(
     }
 
     override fun getItemViewType(position: Int): Int {
+        if (readOnly) return when (messages[position].role) {
+            "user" -> 0
+            "ai-conversation-share-gap" -> 7
+            else -> 4
+        }
         if (messages[position].isRecalled()) return if (messages[position].role == "user") 0 else 4
+        if (AiConversationShareCodec.parseCard(messages[position].content) != null) return 5
         if (messages[position].projectPostCard != null) return 6
         if (parseChatProjectShareMessage(messages[position].content) != null) return 5
         return when (messages[position].role) {
@@ -156,6 +175,7 @@ class ChatAdapter(
             4    -> R.layout.item_message_friend
             5    -> R.layout.item_message_project_share
             6    -> R.layout.item_message_project_post
+            7    -> R.layout.ai_conversation_share_gap
             else -> R.layout.item_message_ai
         }
         val view = LayoutInflater.from(parent.context).inflate(layout, parent, false)
@@ -167,6 +187,10 @@ class ChatAdapter(
         val recalled = message.isRecalled()
         holder.stopShimmer()
         bindTimelineLabel(holder.timelineLabel, position)
+        if (readOnly) {
+            AiConversationShareReaderPresentation.bind(holder, message, onWebChatContentOpen)
+            return
+        }
         bindChatAttachmentViews(
             holder.attachmentList,
             if (recalled) null else message.attachments,
@@ -176,7 +200,10 @@ class ChatAdapter(
             }
         )
         if (!recalled) bindChatSuggestionStatus(holder.attachmentList, message, onSuggestionResolve)
-        val postCardBound = !recalled && (com.elon.app.articles.ArticleCardViews.bind(holder.attachmentList, holder.text, message) || bindChatProjectPostCardView(holder.attachmentList, holder.text, message))
+        val shareCardBound = !recalled && AiConversationShareCardViews.bind(
+            holder.attachmentList, holder.text, message, onAiConversationShareOpen, onAiConversationShareCoverLoad,
+            onLongPress = onAiConversationShareLongPress)
+        val postCardBound = shareCardBound || (!recalled && (com.elon.app.articles.ArticleCardViews.bind(holder.attachmentList, holder.text, message) || bindChatProjectPostCardView(holder.attachmentList, holder.text, message)))
         val projectShareBound = if (postCardBound) {
             false
         } else {
@@ -221,9 +248,10 @@ class ChatAdapter(
         bindUserAvatar(holder.userAvatar)
         bindSenderAvatar(holder.friendAvatar, message)
         bindGroupMentionAvatar(holder.friendAvatar ?: holder.itemView.findViewById(R.id.groupAiAvatar), message, onSenderAvatarLongPress)
-        bindSelectionVisual(holder, message, projectCardBound, position)
+        bindChatSelectionVisual(holder, selectionMode, !projectCardBound && isSelectableMessage(message),
+            selectionMode && selectionIdentity.contains(message))
         bindMessageActions(holder, message, projectCardBound)
-        WebChatProductionMessageActionBinder.bind(holder.itemView, message, onWebChatMessageAction)
+        WebChatProductionMessageActionBinder.bind(holder.itemView, message, onWebChatMessageAction.takeUnless { selectionMode })
         bindFinalReplyLabel(holder, message)
         bindEvidence(holder, message, position)
         bindModelAttribution(holder, message)
@@ -336,26 +364,26 @@ class ChatAdapter(
 
     fun setSelectionChangedListener(listener: ((Int) -> Unit)?) {
         selectionChangedListener = listener
-        if (selectionMode) selectionChangedListener?.invoke(selectedPositions.size)
+        if (selectionMode) notifySelectionChanged()
     }
 
     fun startSelection(message: ChatMessage) {
-        if (!isSelectableMessage(message)) return
+        if (readOnly || !isSelectableMessage(message)) return
         val position = messages.indexOfFirst { it === message }.takeIf { it >= 0 }
-            ?: messages.indexOf(message)
+            ?: messages.indexOfFirst { selectionIdentity.key(it) == selectionIdentity.key(message) }
         if (position !in messages.indices) return
         selectionMode = true
-        selectedPositions.clear()
-        selectedPositions.add(position)
+        selectionIdentity.clear()
+        selectionIdentity.select(messages[position])
         notifyDataSetChanged()
         notifySelectionChanged()
     }
 
     fun exitSelection() {
-        if (!selectionMode && selectedPositions.isEmpty()) return
+        if (!selectionMode && selectionIdentity.count() == 0) return
         selectionMode = false
-        selectedPositions.clear()
-        lastTogglePosition = RecyclerView.NO_POSITION
+        selectionIdentity.clear()
+        lastToggleIdentity = null
         lastToggleAtMs = 0L
         notifyDataSetChanged()
         notifySelectionChanged()
@@ -364,13 +392,17 @@ class ChatAdapter(
     fun isSelectionModeActive(): Boolean = selectionMode
 
     fun selectedMessagesInOrder(): List<ChatMessage> {
-        return selectedPositions
-            .sorted()
-            .mapNotNull { position -> messages.getOrNull(position) }
+        return selectionIdentity.messagesInOrder(messages)
     }
 
+    fun selectedMessageIdentitiesInOrder(): List<SelectedChatMessageIdentity> =
+        selectionIdentity.metadataInOrder(messages)
+
+    fun currentMessagesForSharing(): List<ChatMessage> = messages.map { it.copyForSharing() }
+
     fun selectedPositionsDescending(): List<Int> {
-        return selectedPositions.sortedDescending()
+        selectionIdentity.reconcile(messages)
+        return messages.indices.filter { selectionIdentity.contains(messages[it]) }.reversed()
     }
 
     fun ownsMessages(candidate: List<ChatMessage>): Boolean {
@@ -434,16 +466,7 @@ class ChatAdapter(
             } else {
                 null
             }
-            holder.itemView.setOnClickListener(clickListener)
-            holder.bubble?.setOnClickListener(clickListener)
-            holder.text.setOnClickListener(null)
-            holder.text.isClickable = false
-            holder.itemView.setOnLongClickListener(null)
-            holder.bubble?.setOnLongClickListener(null)
-            holder.text.setOnLongClickListener(null)
-            holder.itemView.isLongClickable = false
-            holder.bubble?.isLongClickable = false
-            holder.text.isLongClickable = false
+            bindChatSelectionMode(holder, clickListener)
             return
         }
 
@@ -468,58 +491,35 @@ class ChatAdapter(
         holder.itemView.setOnLongClickListener(listener)
         holder.bubble?.setOnLongClickListener(listener)
         holder.text.setOnLongClickListener(listener)
-    }
-
-    private fun bindSelectionVisual(holder: VH, message: ChatMessage, projectCardBound: Boolean, position: Int) {
-        val canSelect = !projectCardBound && isSelectableMessage(message)
-        val selected = selectionMode && selectedPositions.contains(position)
-        holder.itemView.setBackgroundColor(Color.TRANSPARENT)
-        holder.itemView.alpha = if (selectionMode && !canSelect) 0.62f else 1f
-        holder.bubble?.alpha = 1f
-        holder.selectionCheck?.visibility = if (selectionMode && canSelect) View.VISIBLE else View.GONE
-        holder.selectionCheck?.text = if (selected) "✓" else ""
-        holder.selectionCheck?.setBackgroundResource(
-            if (selected) R.drawable.bg_message_selection_on else R.drawable.bg_message_selection_off
-        )
-        holder.itemView.contentDescription = if (selectionMode && canSelect) {
-            if (selected) "已选中消息，点击取消选择" else "未选中消息，点击选择"
-        } else {
-            null
-        }
+        bindChatSelectionLongPress(holder.attachmentList, listener)
+        bindChatSelectionLongPress(holder.webChatPartList, listener)
     }
 
     private fun toggleSelection(message: ChatMessage, position: Int) {
         if (!isSelectableMessage(message)) return
         if (position !in messages.indices) return
         val now = android.os.SystemClock.elapsedRealtime()
-        if (position == lastTogglePosition && now - lastToggleAtMs < 180L) return
-        lastTogglePosition = position
+        val identity = selectionIdentity.key(message)
+        if (identity == lastToggleIdentity && now - lastToggleAtMs < 180L) return
+        lastToggleIdentity = identity
         lastToggleAtMs = now
-        if (selectedPositions.contains(position)) {
-            selectedPositions.remove(position)
-        } else {
-            selectedPositions.add(position)
-        }
-        if (selectedPositions.isEmpty()) {
-            exitSelection()
-            return
-        }
+        selectionIdentity.toggle(message)
         if (position != RecyclerView.NO_POSITION) notifyItemChanged(position)
         notifySelectionChanged()
     }
 
     private fun isSelectableMessage(message: ChatMessage): Boolean {
-        if (message.role !in selectableMessageRoles) return false
-        return isActionableMessage(message)
+        return ChatSelectionIdentity.isSelectable(message)
     }
 
     private fun isActionableMessage(message: ChatMessage): Boolean {
         if (message.isRecalled()) return false
-        return message.content.isNotBlank() || !message.attachments.isNullOrEmpty()
+        return message.content.isNotBlank() || !message.attachments.isNullOrEmpty() ||
+            message.webChatMessage?.contentParts?.isNotEmpty() == true
     }
 
     private fun notifySelectionChanged() {
-        selectionChangedListener?.invoke(selectedPositions.size)
+        selectionChangedListener?.invoke(selectionIdentity.count())
     }
 
     private fun bindUserAvatar(avatar: TextView?) {
@@ -777,7 +777,6 @@ class ChatAdapter(
         val workflowStatusRoles = setOf("ai-working", "ai-progress", "ai-tool", "ai-cli-log", "ai-complete", "ai-stopped")
         val terminalRoles = setOf("ai", "ai-intent", "error")
         val evidenceBubbleRoles = setOf("ai", "ai-intent")
-        val selectableMessageRoles = setOf("user", "ai", "ai-intent", "ai-complete", "friend")
     }
 }
 

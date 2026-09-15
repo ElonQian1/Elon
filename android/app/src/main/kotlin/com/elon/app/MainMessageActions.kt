@@ -29,7 +29,8 @@ internal class MainMessageActions(
 ) {
     fun showMessageActions(anchor: View, message: ChatMessage) {
         val text = shareableMessageText(message)
-        if (text.isBlank() && message.attachments.isNullOrEmpty()) return
+        if (text.isBlank() && message.attachments.isNullOrEmpty() &&
+            message.webChatMessage?.contentParts.isNullOrEmpty()) return
         showMessageActionPopup(anchor, message, text)
     }
 
