@@ -1,8 +1,8 @@
 ---
 capability_id: android_chatgpt_realtime_voice_data_channel_transcript_v1
-implementation_status: regression_fix_implemented
-verification_status: targeted_android_tests_passed_device_pending
-delivery_status: included_in_installed_1765_voice_acceptance_pending
+implementation_status: regression_fix_completed
+verification_status: targeted_android_tests_and_supervised_native_sample_passed
+delivery_status: installed_1765_search_caption_sample_accepted
 ---
 
 # Voice Captions After Search
@@ -110,6 +110,28 @@ adapter 428 was replacement-installed. Before installation, MCP confirmed idle
 voice; afterward production native chat became ready/authenticated with 10 native
 and 10 backing messages, zero voice frames/transcripts/rejections and no active
 audio. See the [grouped release receipt](chatgpt-runtime-bindings-20260915.md).
-The user was asked to start the blue realtime control and ask a search-requiring
-question. No new spoken sample or post-search caption continuity has yet been
-observed, so the exact live regression remains pending rather than passed.
+The user started the blue realtime control and asked a search-requiring question.
+This was not composer dictation and did not navigate to the official-page UI.
+
+## Supervised Native Acceptance
+
+The user reported the question was finished. Read-only MCP on normal 1765 then
+confirmed production `social_ai`, adapter 428 current/ready, voice connected,
+remote audio present and the native data channel open. It received 195 frames
+and 171 decoded transcript events, with zero delta rejections. The highest
+observed channel was 13 and 14 channels were cached. A native assistant bubble
+contained 170 characters instead of only a short search preamble. A later
+snapshot received 197 frames with the same 171 transcript events and no rejection.
+
+When specifically asked whether the post-search text followed the spoken answer,
+the user confirmed the captions were complete and kept up with the audio.
+This accepts the reported search-to-answer native-caption regression for this
+real sample; do not repeat implementation or require expanded sampling without
+new regression evidence. Channels >=16 remain covered by the focused synthetic
+tests, not by this live sample. The exact original failing frame was not captured.
+
+Native/backing message counts were 31/22 and later 37/28 during the active call.
+These counts are not whole-history convergence or duplicate-free acceptance;
+the accepted result is live post-search caption continuity. No audio/private
+text was recorded, no page was refreshed, no message was sent by the agent and
+the active call was left under the user's control.

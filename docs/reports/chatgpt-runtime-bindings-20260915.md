@@ -26,9 +26,9 @@ ordinary text, Search and Image modules.
   Accepted conversation prefetch remains enabled; private research and the
   pending-write journal remain disabled. No Cookie or application data was cleared.
   This closes grouped compilation/publication/installation, not the pending
-  project retry, cold-module Send, process-kill journal or live search-caption
-  acceptances. The user was asked to exercise the blue realtime button; the white
-  dictation control is not under test.
+  project retry, cold-module Send or process-kill journal acceptances. The user
+  subsequently exercised the blue realtime button and confirmed complete
+  post-search captions. The white dictation control was not under test.
 
 - [Existing project retry](chatgpt-fresh-project-retry-20260915.md): adapter 428
   reuses independent prepare/variant/stream/Stop/history with
@@ -46,8 +46,10 @@ ordinary text, Search and Image modules.
 - [Voice captions after search](chatgpt-voice-search-captions-20260915.md): current
   native preview gap confirmed; channel-identifier/cache-limit mismatch corrected,
   with 34 passing Android tests; installed in normal 1761, 1762 and now 1765.
-  Production readiness was verified by MCP; exact live caption acceptance remains
-  pending user participation, not installation or an ongoing ADB outage.
+  One supervised native search-response sample passed on 1765: the user confirmed
+  complete captions keeping up with audio, with 171 decoded transcript events
+  and zero delta rejections. Do not repeat this accepted regression test without
+  new evidence. Broader recovery/history convergence remains separately scoped.
 
 - [Current Writing projection and SPA recovery](chatgpt-spa-recovery-writing-20260915.md)
   closes a current-profile read omission and the reproduced stale startup-route

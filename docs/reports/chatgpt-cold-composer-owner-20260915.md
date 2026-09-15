@@ -51,8 +51,8 @@ runtime submission. Logs remain under Git metadata:
 
 The original source batch did not build/install an APK or claim device latency.
 The subsequent grouped release above includes it; verify one cold-module native
-send there. The installed search-caption fix has separate live acceptance pending;
-this work does not replace that test or the pending process-recreation checks.
+send there. The separate search-caption fix subsequently passed one supervised
+native sample on 1765; that does not accept the pending process-recreation checks.
 
 ## Cold Identity Cache Follow-Up
 

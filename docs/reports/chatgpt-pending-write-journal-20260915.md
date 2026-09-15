@@ -229,4 +229,5 @@ Receipt: `conversation-process-recovery-1762-20260915-140845-230`.
   expanded attachment combinations.
 - Normal APK 1765 now includes this candidate with its flag disabled. Grouped
   build/install/readiness evidence is recorded above, not active-write durability.
-  The included subtitle fix still requires its live search-response acceptance.
+  The included subtitle fix separately passed one supervised search-response
+  sample on 1765; this is not evidence of journal durability.
