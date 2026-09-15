@@ -5693,15 +5693,15 @@
       "priority": "p0",
       "requirement": {
         "path": "docs/binance-grid-chinese-symbols.md",
-        "content_hash": "b6eef691c3db8fb15f8264b61491383eb1169376689d7e41cc1452487c124dab",
+        "content_hash": "7a16e355e1c61a9da70488c579083065b361d4a22836a173126243aa0eee1055",
         "locator": "",
         "evidence_kind": "document",
         "git_identity": {
           "schema": "elon.project_context_git_identity.v1",
-          "head_commit": "2d43562fdf1d04e4f8ca05dd78ca363c016d5cf4",
-          "head_blob_oid": "",
-          "worktree_blob_oid": "8b3c2994abcaa580e5bfe7561df93b195b9fda7e",
-          "state": "untracked"
+          "head_commit": "6b5de8ea560ade5158fb51b7bf1f1f4648017d11",
+          "head_blob_oid": "7812d51bce25172e3c385c915eee5e7eca080144",
+          "worktree_blob_oid": "7812d51bce25172e3c385c915eee5e7eca080144",
+          "state": "tracked_clean"
         }
       },
       "knowledge_node_id": "",
@@ -5729,73 +5729,73 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "2d43562fdf1d04e4f8ca05dd78ca363c016d5cf4",
-            "head_blob_oid": "827461aaf573467513711e36d6b24136982cc601",
+            "head_commit": "6b5de8ea560ade5158fb51b7bf1f1f4648017d11",
+            "head_blob_oid": "c7f208b982b3c122b5570cf1384dd0ed9fd3c0ee",
             "worktree_blob_oid": "c7f208b982b3c122b5570cf1384dd0ed9fd3c0ee",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/kotlin/com/elon/app/grid/BinanceSymbols.kt",
-          "content_hash": "850f6e44fe3dbcfd46bdf18ff7e7e196117bd2abef5fb66404100639dc2c71ed",
+          "content_hash": "a7ab800422e1916f1f944d4ffffef7cbed36c70dffc60e48f85871676d84d3be",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "2d43562fdf1d04e4f8ca05dd78ca363c016d5cf4",
-            "head_blob_oid": "",
+            "head_commit": "6b5de8ea560ade5158fb51b7bf1f1f4648017d11",
+            "head_blob_oid": "6e4843357353cb6931fc4a8b4fc041285ef96eb0",
             "worktree_blob_oid": "6e4843357353cb6931fc4a8b4fc041285ef96eb0",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/grid/BinanceChineseSymbolsTest.kt",
-          "content_hash": "bdee1578738cc45eed5b510fc716371a89d4f92f8ed8dc78bc9bbf043555f7d0",
+          "content_hash": "51a9b57c91ebd43e9b3eaca86b5f06dc772ed81d720b42bc39c79bca619e0a67",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "2d43562fdf1d04e4f8ca05dd78ca363c016d5cf4",
-            "head_blob_oid": "",
+            "head_commit": "6b5de8ea560ade5158fb51b7bf1f1f4648017d11",
+            "head_blob_oid": "9a866e036bc5910e022ad92faf02732def3b4d3c",
             "worktree_blob_oid": "9a866e036bc5910e022ad92faf02732def3b4d3c",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
-          "path": "docs/binance-grid-chinese-symbols.md",
-          "content_hash": "2bcf4b0205627d26d13adf9dc3e0b708fd06c7b3146138e9403985c87f525512",
+          "path": "docs/binance-grid-chinese-symbols-delivery.md",
+          "content_hash": "8fc8c9bd5b1bb50041dcadaa895487a0fc42b3ca2d2d65f2dbe54593d5df959d",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "2d43562fdf1d04e4f8ca05dd78ca363c016d5cf4",
+            "head_commit": "6b5de8ea560ade5158fb51b7bf1f1f4648017d11",
             "head_blob_oid": "",
-            "worktree_blob_oid": "7812d51bce25172e3c385c915eee5e7eca080144",
+            "worktree_blob_oid": "06be34a121aae1570b4f21c51cd83d445deec79b",
             "state": "untracked"
           }
         },
         {
           "path": "scripts/test-binance-grid-chinese-symbols.cjs",
-          "content_hash": "6ac8ded5db734044c68273a25827653a3817030339be1cef058c058d97b34483",
+          "content_hash": "d7020717edb618aa31b9217abcf95dbccc60ddeb8460ce07cde5fd4f66ba94bc",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "2d43562fdf1d04e4f8ca05dd78ca363c016d5cf4",
-            "head_blob_oid": "",
+            "head_commit": "6b5de8ea560ade5158fb51b7bf1f1f4648017d11",
+            "head_blob_oid": "3eaf5349b6e3fd4b8baa62887bc63f3087c5e890",
             "worktree_blob_oid": "3eaf5349b6e3fd4b8baa62887bc63f3087c5e890",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         }
       ],
       "claim": {
-        "claim_id": "claim_6191370e910043e39386002c82ede49c",
+        "claim_id": "claim_3e7dd37c43e14f3f8d7cb56020ee8e1c",
         "agent_id": "quant-grid",
-        "claimed_at_ms": 1789487951024,
-        "expires_at_ms": 1789502351024
+        "claimed_at_ms": 1789489092568,
+        "expires_at_ms": 1789503492568
       },
       "created_at_ms": 1789487950958,
-      "updated_at_ms": 1789488354812
+      "updated_at_ms": 1789489094279
     },
     {
       "id": "binance-grid-observer-v1",
@@ -29550,76 +29550,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_6c6b9136b18a42b38852378b6e3cdad6",
-      "feature_id": "android-binance-account-read-v3",
-      "action": "claimed",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789108956769
-    },
-    {
-      "id": "feature_event_d92334efadc847c59597314a831c1a2e",
-      "feature_id": "android-binance-account-read-v3",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789108956805
-    },
-    {
-      "id": "feature_event_eebac7c1a34e4f1393f7c14bf01b8358",
-      "feature_id": "android-binance-account-read-v3",
-      "action": "evidence_recorded",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789110339410
-    },
-    {
-      "id": "feature_event_a0abedb7bfc44378b96f58a350762cf2",
-      "feature_id": "android-binance-account-read-v3",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "Contract and offline tests passed; release, installation and actual account/UI acceptance are separate pending gates.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789110339474
-    },
-    {
-      "id": "feature_event_7847501276574867a6ddc1f28045919a",
-      "feature_id": "android-binance-account-read-v3",
-      "action": "evidence_recorded",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789111392093
-    },
-    {
-      "id": "feature_event_9b10910fd9c24e798622cf2cdda9ffdd",
-      "feature_id": "android-binance-trailing-v4",
-      "action": "registered",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789117808505
-    },
-    {
-      "id": "feature_event_51f70a6f28dc434e8101ea4bd26d9789",
-      "feature_id": "android-binance-trailing-v4",
-      "action": "claimed",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789117808593
-    },
-    {
       "id": "feature_event_767f149123c04e95b84a27c3b088786f",
       "feature_id": "android-binance-trailing-v4",
       "action": "transitioned",
@@ -31548,6 +31478,76 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1789488354812
+    },
+    {
+      "id": "feature_event_f3f7e0d0fb8a4204b0d395ba87a1fe21",
+      "feature_id": "binance-grid-chinese-symbols-v1",
+      "action": "claim_released",
+      "actor": "quant-grid",
+      "reason": "绑定最终需求与验证事实，真实页面由用户验收",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1789489090503
+    },
+    {
+      "id": "feature_event_b77d0ea70903442e923848c3b493ff83",
+      "feature_id": "binance-grid-chinese-symbols-v1",
+      "action": "requirement_rebound",
+      "actor": "quant-grid",
+      "reason": "需求范围不变，补齐离线验证事实后重新绑定",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1789489092358
+    },
+    {
+      "id": "feature_event_4d0f0171ba8d4adb975ff32c486e0d19",
+      "feature_id": "binance-grid-chinese-symbols-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1789489092427
+    },
+    {
+      "id": "feature_event_ffbcb4307fcb45168309c1754655ae03",
+      "feature_id": "binance-grid-chinese-symbols-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1789489092495
+    },
+    {
+      "id": "feature_event_f15aaae72f584d0ca58d38c22603a936",
+      "feature_id": "binance-grid-chinese-symbols-v1",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789489092568
+    },
+    {
+      "id": "feature_event_77ade88ee77a453f91ec0fdd6765a34b",
+      "feature_id": "binance-grid-chinese-symbols-v1",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789489092641
+    },
+    {
+      "id": "feature_event_9ffe1c41417a48e1bb4899aa78529885",
+      "feature_id": "binance-grid-chinese-symbols-v1",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789489094279
     }
   ]
 }
