@@ -56,7 +56,7 @@ test('confirmed process recovery recaptures the updated parent before preparing 
     after.binding.parentId = uid(5);
   } });
   assert.equal((await after.send().completion).status, 'accepted');
-  assert.equal(after.captures(), 2);
+  assert.equal(after.captures(), 1);
   const posts = after.calls.filter(x => x.kind === 'post');
   assert.equal(posts.length, 1); assert.equal(posts[0].body.parent_message_id, uid(5));
   assert.notEqual(posts[0].body.messages[0].id, row.userMessageId);

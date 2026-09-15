@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 33, create: factory });
+  const api = Object.freeze({ version: 34, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -11,6 +11,7 @@
   'use strict';
   options ||= {};
   const context = options.context || page.__elonChatGptFreshTextContext.create(page);
+  const recoveryContext = options.recoveryContext || page.__elonChatGptFreshTextRecoveryContext?.create(page);
   const regeneration = options.regeneration || page.__elonChatGptFreshRegenerateContext?.create(page, context);
   const requests = (options.requests || page.__elonChatGptFreshTextRequest).create(page);
   const reconciliation = options.reconciliation || page.__elonChatGptFreshTextReconcile.create();
@@ -213,6 +214,14 @@
 
     async function run() {
       timeout(options.prepareTimeoutMs || 15000, 'preparation_timeout');
+      if (useJournal) {
+        if (!recoveryContext) throw Error('recovery_identity_unavailable');
+        journal ||= page.__elonChatGptFreshTextJournal.create(page);
+        const selected = await abortable(recoveryContext.capture(owner.controller.signal));
+        await abortable(journal.recoverSelected(selected, owner.controller.signal));
+        if (owner.document !== page.document || owner.token !== page.__elonChatGptDocumentToken ||
+            context.stamp() !== stamp) throw Error('context_changed');
+      }
       if (regenerate && !regeneration) throw Error('runtime_unavailable');
       const capture = () => regenerate ? regeneration.capture(command) :
         context.capture(command.composer, continuation,
@@ -430,7 +439,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 33, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 34, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

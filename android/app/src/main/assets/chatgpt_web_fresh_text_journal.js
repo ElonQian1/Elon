@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextJournal = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -118,16 +118,27 @@
     }
   }
 
+  async function reconcilePending(binding, signal) {
+    const owner = await identity(binding, signal);
+    store ||= (options.store || page.__elonChatGptFreshTextJournalStore).create(options.storage || page.localStorage);
+    const pending = store.list(owner.accountHash).filter(record =>
+      record.conversationId === null || record.conversationId === binding.conversationId);
+    for (const record of pending) await resolve(record, binding, owner, signal);
+    return { owner, count: pending.length };
+  }
+
+  async function recoverSelected(binding, signal) {
+    if (!binding || binding.temporary === true || binding.historyDisabled === true || binding.doNotRemember === true) return 0;
+    try { return (await reconcilePending(binding, signal)).count; }
+    catch (error) { code = safeCode(error); throw Error(code); }
+  }
+
   async function prepare(binding, request, operation, signal) {
     // Never put temporary chats or history-disabled contexts in durable storage.
     if (binding.temporary === true || binding.historyDisabled === true || binding.doNotRemember === true) return null;
     try {
-      const owner = await identity(binding, signal);
-      store ||= (options.store || page.__elonChatGptFreshTextJournalStore).create(options.storage || page.localStorage);
-      const pending = store.list(owner.accountHash).filter(record =>
-        record.conversationId === null || record.conversationId === binding.conversationId);
-      if (pending.length) {
-        for (const record of pending) await resolve(record, binding, owner, signal);
+      const { owner, count } = await reconcilePending(binding, signal);
+      if (count) {
         // Hydration may replace the parent or runtime owner. Capture a fresh
         // binding before preparing a new POST, never reuse the old parent.
         return { recapture: true };
@@ -190,5 +201,5 @@
     return /^(?:context_changed|recovery_[a-z_]{1,40})$/.test(error?.message || '')
       ? error.message : 'recovery_storage_unavailable';
   }
-  return Object.freeze({ prepare, state: () => ({ code, recovered }) });
+  return Object.freeze({ prepare, recoverSelected, state: () => ({ code, recovered }) });
 });

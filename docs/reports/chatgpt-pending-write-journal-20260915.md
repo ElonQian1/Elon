@@ -117,6 +117,41 @@ cancellations (`fresh-journal-attachment-final-20260915-142018-412`, 4.4 seconds
 It includes the preserved legacy regeneration proof. No Android compilation,
 APK publication or active-write process-kill acceptance was done in this follow-up.
 
+### Read-First Follow-Up
+
+Journal 3, transaction 34 and adapter 425 correct an admission-order defect. The
+old transaction captured a fully sendable parent/model/draft before inspecting
+its journal. After recreation, a missing parent or unavailable editor could
+therefore stop the very history read needed to restore that parent. The new
+negative cases reproduced this against the old order
+(`journal-read-first-red-20260915-151709-892`).
+
+- A separate read-only context binds the committed conversation, identity,
+  document, profile, project and privacy scope. It loads only the reviewed
+  conversation runtime, never the editor or selected model, and does not require
+  a completed parent before reading history.
+- Native send intent first calls `recoverSelected` using that context. This
+  reuses the original journal's account filtering, exact terminal user/branch/
+  attachment proof, timeout, cancellation and compare-before-remove behavior.
+- An empty journal issues no history request. An unresolved record stops before
+  normal send capture, preparation or POST; a resolved record permits one fresh
+  capture using the now-restored parent. No prompt is replayed and no new journal
+  record is created by the read-only step.
+- The read owner expires on account, document, route, runtime profile, committed
+  owner, privacy/project changes or a competing official write. Temporary and
+  history-disabled chats still skip durable recovery. The public read operation
+  can consume a context with no draft, model or `current()` send-admission method.
+- Production asset registration precedes transaction creation. Both transaction
+  module and instance are version 34, preserving the reinjection ledger guard.
+
+The final focused run passed **333 JS cases**, including actual journal/context
+integration, recreated sender order, an unavailable DOM draft reader, legacy
+records, attachments, normal/new/project/temporary/tool sends, Stop and recovery.
+Log: `journal-read-first-final-20260915-152359-278`. The first wider run caught a
+module/instance version mismatch; it was corrected before the final passing run.
+The candidate flag remains unchanged. No Android build, installation, POST replay
+or active-write process-kill device acceptance was performed for this follow-up.
+
 ### Device Boundary
 
 The latest read-only MCP check confirms normal 1.1.1762 / adapter 421 installed,
@@ -129,8 +164,14 @@ Receipt: `conversation-process-recovery-1762-20260915-140845-230`.
 
 - No genuine active-send process-kill recovery has been accepted on a device.
   Existing idle process-recovery smoke is insufficient for that claim.
-- Reconciliation is triggered by the next native send preparation; automatic
-  startup projection of an unresolved-send badge is not implemented in this batch.
+- Reconciliation is triggered by the next native send intent, before new-send
+  admission; automatic startup projection of an unresolved-send badge is not
+  implemented in this batch.
+- Automatic startup recovery is not wired yet. If both `composerReady` and
+  `privateSendReady` are false, native transport admission can still prevent a
+  send intent from reaching this read-first path. This source fix does not prove
+  composer-less recovery through the native button; startup read scheduling and
+  its native status projection remain the next integration gap.
 - If a new conversation POST may have succeeded but its server ID was never
   observed, the record remains unresolved on the empty home route. Navigating to
   the correct recovered conversation permits exact user-ID proof; this module

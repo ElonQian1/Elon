@@ -27,8 +27,11 @@ function fixture(options = {}) {
   };
   let captures = 0;
   const api = asset('transaction').create(page, { requests: asset('request'), receipts: asset('receipts'),
+    recoveryContext: { capture: async () => options.recoveryBinding || binding },
     context: { stamp: () => options.noIdentity ? '' : 'fixture-account-stamp', capture: async () => {
-      captures++; if (options.captureError) throw Error('context_unavailable'); return binding;
+      captures++; if (options.captureError) throw Error('context_unavailable');
+      if (options.captureReady?.() === false) throw Error('parent_unavailable');
+      return binding;
     } },
     reconciliation: {}, recovery: { recover: async () => ({ status: 'unknown', code: 'history_unavailable' }) },
     prepareTimeoutMs: 1000, streamTimeoutMs: 1000 });
