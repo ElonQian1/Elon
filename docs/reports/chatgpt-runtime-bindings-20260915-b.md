@@ -1,8 +1,21 @@
 # September 15 Second Rollout
 
-Status: bindings 30 / adapter 416 published/installed as 1753; native existing
-ordinary project text acceptance passed. Adapter 417's narrow default is
-implemented and tested, pending normal Release.
+Status: bindings 30 / adapter 417 published/installed as normal 1754. Existing
+ordinary project text passed native independent acceptance on 1753; its narrow
+default and post-install read-only admission are verified on 1754.
+
+## Default Release
+
+- Normal 1754 from `530d1569a29b02b1962793bf95970ea21188e286` passed Release
+  build, remote size/hash checks and unattended Xiaomi replacement.
+  `fresh-project-default-release-20260915-090500-439` passed in 420.6s.
+  SHA-256: `3d91a3766dc1584cf31db31e670c6b26c81acb1304c9fee57726c67a5a2447db`.
+- Bounded post-install MCP admission in the existing PowerShell returned
+  `ready`, adapter 417, exact owned fixture, no armed trial/pending write/draft/
+  stream, zero Send clicks, restored route and awake settings. Two PC wrapper
+  launches failed before output; the direct check passed, without rebuilding
+  or repeating a Send. This is not a second independent-send acceptance.
+- No Cookie/application-data reset, microphone use or proxy changes.
 
 ## Accepted Native Send
 
@@ -72,6 +85,6 @@ retain their reviewed shapes. Existing modules are reused, including the
   attachments, history, stop/recovery, Canvas and Writing Blocks.
 - Original Canvas mutation still needs an eligible owned document.
 
-Next: publish adapter 417's default, read installed state without another Send.
-Keep existing resolved ledgers; never replay a prior message. Original Canvas
+Keep the completed default and existing resolved ledgers; never replay a prior
+message or repeat the accepted Send without regression evidence. Original Canvas
 still requires an eligible owned document, not a synthetic code block or Writing Block.

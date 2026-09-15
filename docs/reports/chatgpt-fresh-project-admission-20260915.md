@@ -1,9 +1,9 @@
 # Project Send Admission Follow-Up
 
-Status: adapter 416 / 1753 is published/installed and native independent project
-text acceptance passed. Adapter 417 promotes only existing ordinary project
-plain text; its normal Release is pending. Personal fresh text, composer-free
-first sends and local attachment defaults are unchanged.
+Status: native independent project text acceptance passed on 1753; normal 1754 /
+adapter 417 is published/installed with existing ordinary project plain text
+default-enabled. Post-install read-only admission passed. Personal fresh text,
+composer-free first sends and local attachment defaults are unchanged.
 
 ## Accepted Follow-Up
 
@@ -117,8 +117,9 @@ No owner ID, credential or shared-continuation field enters the fresh request.
 
 ## Remaining
 
-Publish adapter 417's narrow default and use read-only post-install checks;
-do not repeat the successful Send. New/locked/project-tool/project-attachment
+Adapter 417's narrow default is published; post-install admission was ready,
+with no armed trial/pending write/draft/stream, zero Send clicks and restored
+route/awake state. Do not repeat the successful Send. New/locked/project-tool/project-attachment
 extensions have not been accepted and are not part of this promotion.
 Original editable Canvas acceptance still needs an actual eligible original
 document; Writing Blocks and synthetic code blocks do not prove that loop.

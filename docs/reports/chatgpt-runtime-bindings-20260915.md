@@ -1,9 +1,9 @@
 # September 15 Runtime Compatibility Investigation
 
-Status: bindings 30 / adapter 416 published and installed as 1.1.1753.
+Status: bindings 30 / adapter 417 published and installed as 1.1.1754.
 [Second-rollout compatibility](chatgpt-runtime-bindings-20260915-b.md) and one
-native independent existing-project Send passed; adapter 417's narrow default
-is implemented/tested and awaiting normal Release.
+native independent existing-project Send passed on 1753; 1754 publishes the
+narrow default, with ready/idle read-only admission and successful restoration.
 First-send/follow-up and independent local attachment delivery passed on Xiaomi.
 The verified attachment scope is default-enabled, reusing the corrected model argument and pre-write
 handoff below. `web_20260915` uses its exact observed asset set.

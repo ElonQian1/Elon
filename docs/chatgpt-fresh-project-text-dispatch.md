@@ -14,8 +14,8 @@ one independent HTTP request, 25 stream events, exact reply/history and project
 membership, with original route/awake restoration. No seed or replay. The
 earlier 1749 fallback remains a failed independent test, not this proof.
 [Admission follow-up](reports/chatgpt-fresh-project-admission-20260915.md) retains
-the regression history. Adapter 417 makes only this verified existing ordinary
-project/plain-text scope default; its normal Release is pending.
+the regression history. Normal 1754 / adapter 417 publishes this verified
+existing ordinary project/plain-text scope as default.
 
 September 13 source extension of [the accepted plain-text sender](chatgpt-fresh-text-dispatch.md).
 It reuses its queue, native stream, owned stop and history recovery. It does not
@@ -95,6 +95,12 @@ reply observed at 16.896s, not a speed A/B). Default-scope regression:
 zero skips/failures, including input/dispatch scope parity, opt-out, new-project
 rejection, owner changes and locked-header exclusion. Do not repeat the accepted
 send without current regression evidence.
+
+Normal 1754 from `530d1569a29b02b1962793bf95970ea21188e286` passed build,
+remote hash/size verification and unattended Xiaomi replacement. Read-only
+post-install admission was `ready`, adapter 417, on the owned fixture: no
+armed trial, pending write, draft or stream; zero Send clicks; original route
+and awake state restored. [Release receipt](reports/chatgpt-runtime-bindings-20260915-b.md).
 
 ## Verification
 
