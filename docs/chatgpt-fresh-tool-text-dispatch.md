@@ -3,7 +3,7 @@ capability_id: android_chatgpt_fresh_tool_text_dispatch_v1
 implementation_status: completed
 verification_status: device_verified
 production_default: true
-delivery_status: image_default_source_only_next_grouped_release
+delivery_status: normal_grouped_release_published_installed
 scope: authenticated_existing_personal_text_search_or_picture_v2
 ---
 
@@ -13,8 +13,9 @@ September 13 source batch extending [the accepted plain-text sender](chatgpt-fre
 Current scope: existing-personal [Search](chatgpt-fresh-search-text-dispatch.md)
 and [Image](reports/chatgpt-fresh-image-device-20260915.md) each have a real
 native/independent-HTTP pass. This exact combined scope is complete; reuse it.
-Source defaults now admit both, while the installed 1739 still needs a one-shot
-trial for Image. The default change awaits the next grouped release. New chats,
+Source defaults admit both and were included in subsequent grouped releases;
+normal 1765 is now installed. The earlier 1739 Image trial-only boundary is
+historical, not a reason to rebuild or repeat its accepted sample. New chats,
 projects, temporary chats and attachments are not included. No UI, transcript
 store or second send queue is added; accepted plain-text defaults are unchanged.
 

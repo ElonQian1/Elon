@@ -20,8 +20,10 @@ historical evidence, not the current capability status.
 [Existing project retry](reports/chatgpt-fresh-project-retry-20260915.md) now has
 an offline-verified independent candidate in adapter 428. It reuses this ledger,
 stream, Stop and history with exact project ownership; one-command trial or a
-separate explicit flag only. Grouped build/native acceptance is pending, so the
-ordinary retry completion marker and defaults above are unchanged.
+separate explicit flag only. Grouped normal 1765 is published and installed;
+native project Retry acceptance remains pending. The former project fixture now
+contains ordinary user turns and is no longer eligible for unattended write
+acceptance. The ordinary retry completion marker and defaults above are unchanged.
 
 September 14: [runtime-parent correction](reports/chatgpt-fresh-retry-parent-20260914.md)
 reproduces and fixes a runtime `parentId` / history `parent` field mismatch.

@@ -74,3 +74,25 @@ WebView identity layer. No audio/subtitle/dictation or proxy code changed.
 
 Do not redo the implementation because native acceptance is pending. Reuse the
 existing trial, receipt, Stop and history tools in installed 1765 or a successor.
+
+## Installed Fixture Admission Check
+
+On Sep 15 after voice was confirmed closed, a read-only native probe reused the
+previously resolved project-send fixture on installed 1765 / adapter 428. Both
+native and backing paths matched the recorded project conversation; both showed
+33 messages and 12 user turns with an empty draft. Six current user turns did
+not match the controlled synthetic fixture. The fixture guard correctly refused
+write eligibility instead of widening its prompt allowlist to cover real use.
+
+`project-retry-native-admission-1765-20260915-173925-762` stopped at fixture
+ownership. The bounded diagnostic
+`project-retry-native-fixture-diagnosis-1765-20260915-174153-338` identified the
+mixed user turns on both projections. Neither run armed a trial, sent a message,
+regenerated an answer, changed project membership or cleared data. Both restored
+the original native conversation. No conversation content was exported.
+
+This is an acceptance-fixture failure, not a rejected private regeneration
+request: private admission was never reached. Do not repeat this fixture or
+count it as a provider incompatibility. Next use a newly isolated owned-project
+synthetic question, keeping the existing original-user/variant/history/native
+UI checks. No new Android build is needed merely to perform that acceptance.

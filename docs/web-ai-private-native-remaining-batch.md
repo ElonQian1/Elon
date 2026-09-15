@@ -42,20 +42,32 @@ attachments are separate extension scopes, not missing ordinary sender code.
 [Extended tool combinations](chatgpt-fresh-tool-text-dispatch.md) and
 [temporary sends/cache guard](chatgpt-fresh-temporary-text-dispatch.md): offline-verified.
 [Fresh retry](chatgpt-fresh-regeneration.md): 1726 native pass;
-1728 enables personal plain-text retry. Other scopes remain gated.
+1728 enables personal plain-text retry. The
+[existing project retry candidate](reports/chatgpt-fresh-project-retry-20260915.md)
+is included in installed 1765 / adapter 428, but actual project Retry remains
+unaccepted and gated. Its old project fixture now contains ordinary user turns;
+do not reuse it for writes or count the stopped admission probe as a provider failure.
 [New personal first send](chatgpt-fresh-new-text-dispatch.md) is completed/default-enabled:
 latest Sep15 mapping passed native first/follow-up on 1743. Reuse it; new
 project/tool/file/temporary and cold-bootstrap scopes remain separate.
 [Composer-unavailable acceptance](chatgpt-composer-unavailable-acceptance.md)
 passed on adapter 411 using the existing default memory owner and native Send.
 [Cold observed composer import](reports/chatgpt-cold-composer-owner-20260915.md):
-source fix joins the existing module load with owner checks instead of failing
-the first operation early; 345 focused checks pass, grouped release/device check pending.
+fix joins the existing module load with owner checks instead of failing the first
+operation early. The shared-identity follow-up passed 600 focused checks and is
+included in installed 1765. Native readiness passed; cold-module first Send and
+latency acceptance remain pending, not compilation or publication.
 
 [Send confirmation fix and process-recovery gap](reports/chatgpt-send-confirmation-identity-20260915.md):
-source batch; grouped release and device acceptance pending.
+included in the current grouped release; process-recovery acceptance remains pending.
 [Pending-write journal](reports/chatgpt-pending-write-journal-20260915.md): integrated
-opt-in candidate; no POST replay, real process-recreation acceptance pending.
+opt-in candidate in installed 1765, disabled in the normal build; no POST replay,
+real active-write process-recreation acceptance pending.
+
+[Search-response voice captions](reports/chatgpt-voice-search-captions-20260915.md)
+passed one supervised native sample on 1765: user-confirmed complete captions,
+171 decoded transcript events, zero delta rejections. Reuse this pass without
+repeating the test; whole-history convergence is a separate acceptance boundary.
 
 The [new-chat tool composition audit](chatgpt-fresh-tool-text-dispatch.md#new-conversation-composition-audit)
 confirms that new personal/owned-project Search and Picture requests already use
