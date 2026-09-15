@@ -11,6 +11,7 @@ internal class ChatGptWebSessionStateStore(context: Context) {
 
     fun saveUrl(rawUrl: String) {
         val normalized = normalizeRestorableUrl(rawUrl) ?: return
+        if (preferences.getString(KEY_URL, null) == normalized) return
         preferences.edit().putString(KEY_URL, normalized).apply()
     }
 

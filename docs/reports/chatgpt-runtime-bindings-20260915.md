@@ -12,6 +12,10 @@ ordinary text, Search and Image modules.
 
 ## Implemented Follow-Up
 
+- [Current Writing projection and SPA recovery](chatgpt-spa-recovery-writing-20260915.md)
+  closes a current-profile read omission and the reproduced stale startup-route
+  pointer after process recreation. Adapter 418 release/device acceptance pending.
+
 - [Project admission follow-up](chatgpt-fresh-project-admission-20260915.md):
   GLOBAL, same-user owner and matching project config are corrected. After the
   second official rollout was mapped, one native independent project send on
