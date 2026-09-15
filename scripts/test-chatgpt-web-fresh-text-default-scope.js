@@ -4,11 +4,12 @@ const assert = require('node:assert/strict');
 const assets = '../android/app/src/main/assets/';
 const transaction = require(assets + 'chatgpt_web_fresh_text_transaction');
 
-async function admission({ composer = {}, enabled, trial = false } = {}) {
+async function admission({ composer = {}, enabled, projectEnabled, trial = false } = {}) {
   const page = { document: {}, __elonChatGptDocumentToken: 'synthetic-default-scope',
     location: { href: 'https://chatgpt.com/' }, AbortController, setTimeout, clearTimeout,
     __elonChatGptPrivateTextTransactionsEnabled: true };
   if (enabled !== undefined) page.__elonChatGptFreshTextNewConversationsEnabled = enabled;
+  if (projectEnabled !== undefined) page.__elonChatGptFreshTextProjectsEnabled = projectEnabled;
   let captured;
   const api = transaction.create(page, {
     context: { stamp: () => 'synthetic-owner', async capture(_, __, scope) {
@@ -34,9 +35,18 @@ async function admission({ composer = {}, enabled, trial = false } = {}) {
 }
 
 test('defaults keep extended scopes off and expose separately gated personal Search and Image', async () => {
-  assert.deepEqual(await admission(), { allowNewConversations: true, allowProjects: false,
+  assert.deepEqual(await admission(), { allowNewConversations: true, allowProjects: false, allowExistingProjects: true,
     allowTools: false, allowPersonalSearch: true, allowPersonalImage: true, allowTemporary: false,
     allowAttachments: false, allowPersonalAttachments: true, requireNativeAttachment: false });
+});
+
+test('existing-project default honors opt-out without enabling broad project scopes', async () => {
+  const off = await admission({ projectEnabled: false });
+  assert.equal(off.allowExistingProjects, false); assert.equal(off.allowProjects, false);
+  const explicit = await admission({ projectEnabled: true });
+  assert.equal(explicit.allowProjects, true);
+  const trial = await admission({ trial: true, projectEnabled: false });
+  assert.equal(trial.allowProjects, true);
 });
 
 test('new-conversation default admits committed memory owners without a composer element', async () => {

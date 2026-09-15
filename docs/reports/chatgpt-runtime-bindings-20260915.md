@@ -1,8 +1,9 @@
 # September 15 Runtime Compatibility Investigation
 
-Status: bindings 29 / adapter 415 published and installed as 1.1.1752.
-The page changed again during acceptance: [second-rollout compatibility](chatgpt-runtime-bindings-20260915-b.md)
-is implemented/offline verified as bindings 30 / adapter 416; release pending.
+Status: bindings 30 / adapter 416 published and installed as 1.1.1753.
+[Second-rollout compatibility](chatgpt-runtime-bindings-20260915-b.md) and one
+native independent existing-project Send passed; adapter 417's narrow default
+is implemented/tested and awaiting normal Release.
 First-send/follow-up and independent local attachment delivery passed on Xiaomi.
 The verified attachment scope is default-enabled, reusing the corrected model argument and pre-write
 handoff below. `web_20260915` uses its exact observed asset set.
@@ -12,13 +13,12 @@ ordinary text, Search and Image modules.
 ## Implemented Follow-Up
 
 - [Project admission follow-up](chatgpt-fresh-project-admission-20260915.md):
-  native project send reached the independent sender but was rejected before
-  POST; the existing runtime fallback replied once. Project default remains
-  off. Installed 1751 corrects ordinary GLOBAL contexts and identifies the
-  remaining `project_shared` rejection without another Send. Adapter 415
-  recognizes same-user owners and matching project-route config, and checks
-  owner/scopes on history apply. Its 1752 package is installed, but the new
-  official rollout blocked admission before another Send; see the follow-up.
+  GLOBAL, same-user owner and matching project config are corrected. After the
+  second official rollout was mapped, one native independent project send on
+  1753 passed with 25 stream events and exact history/project membership.
+  Adapter 417 defaults only the verified existing ordinary project/plain-text
+  scope, not broad new/locked/tool/attachment extensions. Earlier fallback
+  successes remain separately recorded and are never counted as independent.
 
 - [1749 recovery follow-up](chatgpt-fresh-recovery-suspend-20260915.md) cancels
   automatic history reads on background/offline suspension without replaying

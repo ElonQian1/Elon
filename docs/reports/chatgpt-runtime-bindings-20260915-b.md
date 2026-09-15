@@ -1,7 +1,22 @@
 # September 15 Second Rollout
 
-Status: bindings 30 / adapter 416 implemented and offline verified; normal
-Release and native project acceptance pending. No new capability is promoted.
+Status: bindings 30 / adapter 416 published/installed as 1753; native existing
+ordinary project text acceptance passed. Adapter 417's narrow default is
+implemented and tested, pending normal Release.
+
+## Accepted Native Send
+
+- 1753 from `6366e86aa` built, passed remote size/hash checks and installed;
+  `runtime-sep15b-release-20260915-084544-150` passed in 432.3s. SHA-256:
+  `5a879e7c149024a34a3981bcdb679202b099a026d9d6ce5867a42925f0b9093c`.
+- Read-only admission: `ready`, adapter 416, exact owned fixture, no Send/draft/
+  stream, successful route and awake restoration.
+- `fresh-project-native-1753-20260915-085402-374`: one native Send, independent
+  HTTP, 25 stream events, exact completed native reply/history and unchanged
+  project membership. No seed/replay/uncertain write; original view restored.
+- Adapter 417 defaults only existing ordinary owned-project plain text, not
+  new/temporary/locked/tool/attachment combinations. 415 focused tests passed,
+  zero skips/failures; readiness and dispatch use the same opt-out and scope.
 
 ## Observed Boundary
 
@@ -44,7 +59,7 @@ token contract. Real stop acceptance on this revision remains separate.
 
 History pending-draft/identity logic and six-argument attachment serialization
 retain their reviewed shapes. Existing modules are reused, including the
-personal first-send and attachment defaults. Project sends remain trial-only.
+  personal first-send and attachment defaults. Broad project extensions remain trial-only.
 
 ## Verification
 
@@ -55,9 +70,8 @@ personal first-send and attachment defaults. Project sends remain trial-only.
 - `runtime-sep15b-regression-20260915-084212-263`: 1043 passed, four optional
   evidence skips, zero failures. Covers fresh sends, owner changes, tools,
   attachments, history, stop/recovery, Canvas and Writing Blocks.
-- No new project Send or original Canvas mutation has been accepted yet.
+- Original Canvas mutation still needs an eligible owned document.
 
-Next: install this exact normal Release, read project admission, and only on
-`ready` perform one new native project Send. Keep existing resolved ledgers;
-never replay a prior message. Original Canvas still requires an eligible owned
-document, not a synthetic code block or Writing Block.
+Next: publish adapter 417's default, read installed state without another Send.
+Keep existing resolved ledgers; never replay a prior message. Original Canvas
+still requires an eligible owned document, not a synthetic code block or Writing Block.

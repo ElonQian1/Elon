@@ -64,6 +64,12 @@ function newFixture(project = false) {
   return f;
 }
 
+test('existing-project default never enables a new project conversation', async () => {
+  const f = newFixture(true);
+  await assert.rejects(f.api.capture(f.node, null,
+    { allowNewConversations: true, allowExistingProjects: true }), /scope_unsupported/);
+});
+
 for (const project of [false, true]) for (const tool of ['search', 'picture_v2']) {
   test('existing personal tool defaults do not admit new ' + (project ? 'project ' : 'personal ') + tool, async () => {
     const f = newFixture(project); f.hints.activeSystemHintType = tool;

@@ -1,11 +1,18 @@
 # Project Send Admission Follow-Up
 
-Status: adapter 415 is published/installed as 1.1.1752. Before the next project
-acceptance, the official page changed again; its read-only admission returned
-`runtime_unavailable`. [Second-rollout compatibility](chatgpt-runtime-bindings-20260915-b.md)
-is implemented in adapter 416, pending release/device acceptance.
-Production project-independent sends remain disabled. Personal fresh text,
-composer-free first sends and local attachment defaults are unchanged.
+Status: adapter 416 / 1753 is published/installed and native independent project
+text acceptance passed. Adapter 417 promotes only existing ordinary project
+plain text; its normal Release is pending. Personal fresh text, composer-free
+first sends and local attachment defaults are unchanged.
+
+## Accepted Follow-Up
+
+After [second-rollout compatibility](chatgpt-runtime-bindings-20260915-b.md),
+the read-only probe returned `ready` on the same owned fixture. One new native
+Send then passed in `fresh-project-native-1753-20260915-085402-374`: independent
+HTTP, 25 stream events, one user/answer, exact history and project membership.
+No seed, replay or uncertain write; original route and awake state restored.
+Below are prior failures and their fixes, not remaining failed acceptance.
 
 ## Actual Device Result
 
@@ -110,9 +117,9 @@ No owner ID, credential or shared-continuation field enters the fresh request.
 
 ## Remaining
 
-Read admission on adapter 416 before any new project send. Only if all actual
-guards pass, perform one new scoped native acceptance, never replay the prior
-fallback-accepted message. Do not loosen project ownership for acceptance.
+Publish adapter 417's narrow default and use read-only post-install checks;
+do not repeat the successful Send. New/locked/project-tool/project-attachment
+extensions have not been accepted and are not part of this promotion.
 Original editable Canvas acceptance still needs an actual eligible original
 document; Writing Blocks and synthetic code blocks do not prove that loop.
 

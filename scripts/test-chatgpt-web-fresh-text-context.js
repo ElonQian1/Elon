@@ -116,6 +116,21 @@ test('project scope rejects foreign, incomplete, temporary and business-agent co
   }
 });
 
+test('verified existing plain-project option admits only its exact scope', async () => {
+  const f = projectFixture();
+  f.tree.contextScopes = ['GLOBAL'];
+  f.tree.sharedProjectConversationOwner = { id: f.shared.mq().normalizedAccountUserId };
+  const scope = { allowExistingProjects: true };
+  const binding = await f.api.capture(f.node, null, scope);
+  assert.equal(binding.current(), true);
+  f.shared.textProjectHeaders = () => ({ 'x-openai-locked-chats-pin': 'fixture-only' });
+  assert.equal(binding.current(), false);
+  await assert.rejects(f.api.capture(f.node, null, scope), /scope_unsupported/);
+  const other = projectFixture();
+  other.tree.continuingFromSharedProjectConversationId = CID;
+  await assert.rejects(other.api.capture(other.node, null, scope), /scope_unsupported/);
+});
+
 test('ordinary GLOBAL project context is admitted but special and malformed scopes remain blocked', async () => {
   for (const scopes of [undefined, null, [], ['GLOBAL'], ['GLOBAL', 'GLOBAL']]) {
     const f = projectFixture(); f.tree.contextScopes = scopes;

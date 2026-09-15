@@ -1,25 +1,26 @@
 ---
 capability_id: android_chatgpt_fresh_project_text_dispatch_v1
 implementation_status: implemented
-verification_status: device_failed
-production_default: false
+verification_status: device_verified
+production_default: true
+completed: true
 scope: authenticated_existing_personal_owned_project_text
 ---
 
 # Fresh Project Text Dispatch
 
-September 15 native acceptance on 1749 verified the owned project fixture but
-the independent sender rejected `scope_unsupported` before POST. The existing
-official-runtime fallback produced exactly one reply. Do not enable the project
-default or repeat that message. [Admission follow-up](reports/chatgpt-fresh-project-admission-20260915.md)
-records the installed 1751 `project_shared` rejection, ordinary GLOBAL fix and
-the next same-user ownership correction. This is not yet a successful HTTP proof.
+September 15 native acceptance passed on 1753 / adapter 416: one native Send,
+one independent HTTP request, 25 stream events, exact reply/history and project
+membership, with original route/awake restoration. No seed or replay. The
+earlier 1749 fallback remains a failed independent test, not this proof.
+[Admission follow-up](reports/chatgpt-fresh-project-admission-20260915.md) retains
+the regression history. Adapter 417 makes only this verified existing ordinary
+project/plain-text scope default; its normal Release is pending.
 
 September 13 source extension of [the accepted plain-text sender](chatgpt-fresh-text-dispatch.md).
 It reuses its queue, native stream, owned stop and history recovery. It does not
-create another editor or transport. Project admission remains explicit until one
-grouped production-native acceptance succeeds; ordinary sends keep their accepted
-default. [Project Writing Blocks save](chatgpt-writing-blocks-project-save.md) is
+create another editor or transport. Existing ordinary project text is now an
+accepted default scope. [Project Writing Blocks save](chatgpt-writing-blocks-project-save.md) is
 a separate implemented batch, not evidence that project generation is accepted.
 
 ## Observed Contract
@@ -64,17 +65,20 @@ message and parent/branch. No later response may turn a project into a personal
 chat or overwrite another project's tree. A result uncertain after POST is
 recovered through reads, never a second send.
 
-Initial ownership still uses the committed composer host. Later checks read
-owned memory, not DOM readiness or the website submit callback. This does not
-claim composer-free startup, Android HTTP, WebView removal or lower temperature.
+Ownership uses the committed conversation/controller/draft host, with or without
+usable composer DOM. No-composer device acceptance is separately proven for
+personal first sends, not this project fixture. This does not claim cold runtime
+startup, Android HTTP, WebView removal or lower temperature.
 
 ## Admission And Acceptance
 
-Transaction v11 reuses `fresh_text_trial_start`: one command, current document /
-account / route, at most 120 seconds. The private-transaction switch still
-applies. `__elonChatGptFreshTextProjectsEnabled === true` permits this source scope
-explicitly; it is not set by the production default. Search/Picture additionally
-require [their existing tool admission](chatgpt-fresh-tool-text-dispatch.md).
+Transaction v32 and native private-input readiness both default
+`allowExistingProjects` on, with the same `ProjectsEnabled !== false` opt-out.
+Context v23 limits this to existing, ordinary personal-owned, non-temporary
+project text, no active tools, attachments or locked-project headers. New
+project chats, tools/attachments and locked contexts still require explicit
+`ProjectsEnabled === true` or an owned one-command trial; they were not promoted.
+Trial admission remains account/route/document-bound for at most 120 seconds.
 Pre-dispatch failure may claim the accepted sender once; after POST it cannot.
 
 Grouped acceptance should use one controlled existing owned project with an
@@ -84,6 +88,13 @@ and unchanged project association. Restore the previous route, draft and tool.
 Promote only the accepted scope; a mock send or installation is not acceptance.
 Locked-project authorization and project/tool combinations require their own
 owned sample before claiming those variants production-verified.
+
+Accepted run: `fresh-project-native-1753-20260915-085402-374` (39.7s total;
+reply observed at 16.896s, not a speed A/B). Default-scope regression:
+`fresh-project-default-regression-20260915-085719-167`, 415 passing tests,
+zero skips/failures, including input/dispatch scope parity, opt-out, new-project
+rejection, owner changes and locked-header exclusion. Do not repeat the accepted
+send without current regression evidence.
 
 ## Verification
 

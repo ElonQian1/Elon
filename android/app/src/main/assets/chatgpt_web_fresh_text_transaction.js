@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 31, create: factory });
+  const api = Object.freeze({ version: 32, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(root.__elonChatGptFreshTextTransaction?.version >= api.version) && !root.__elonChatGptFreshTextTransaction?.state?.().pending) {
@@ -138,6 +138,7 @@
     const allowPersonalSearch = page.__elonChatGptFreshTextToolsEnabled !== false;
     const allowPersonalImage = page.__elonChatGptFreshTextToolsEnabled !== false;
     const allowProjects = page.__elonChatGptFreshTextProjectsEnabled === true || trialArmed();
+    const allowExistingProjects = page.__elonChatGptFreshTextProjectsEnabled !== false;
     // The committed conversation and draft own first-send admission, not the
     // editor DOM. Context capture still rejects missing or ambiguous owners.
     const allowNewConversations = trialArmed() || page.__elonChatGptFreshTextNewConversationsEnabled !== false;
@@ -209,7 +210,7 @@
       if (regenerate && !regeneration) throw Error('runtime_unavailable');
       owner.binding = await abortable(regenerate ? regeneration.capture(command) :
         context.capture(command.composer, continuation,
-          { allowTools, allowPersonalSearch, allowPersonalImage, allowProjects, allowNewConversations, allowTemporary,
+          { allowTools, allowPersonalSearch, allowPersonalImage, allowProjects, allowExistingProjects, allowNewConversations, allowTemporary,
             allowAttachments, allowPersonalAttachments, requireNativeAttachment: command.requireNativeAttachment === true }));
       check();
       owner.request = requests.create(owner.binding, command);
@@ -401,7 +402,7 @@
   }
   const hasCurrentWriter = () => !!active?.dispatched && !active.stopConfirmed &&
     !active.recoveryConfirmed && active.stopCurrent();
-  return Object.freeze({ version: 31, send: command => dispatch(command, 'send'),
+  return Object.freeze({ version: 32, send: command => dispatch(command, 'send'),
     regenerate: command => dispatch({ ...command, prompt: '' }, 'regenerate'),
     state, cancel, stop, recover, dispose, trialControl, hasCurrentWriter });
 });

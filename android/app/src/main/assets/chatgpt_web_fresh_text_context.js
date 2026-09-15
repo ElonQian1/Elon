@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 22, create: factory });
+  const api = Object.freeze({ version: 23, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.__elonChatGptFreshTextContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -131,7 +131,10 @@
         if (route[1] || state.mode?.kind !== 'primary_assistant' || state.mode.gizmo_id != null) fail('scope_unsupported', 'base_mode');
         return null;
       }
-      if (options.allowProjects !== true || typeof projectId !== 'string' || !projectPattern.test(projectId)) fail('scope_unsupported', 'base_project');
+      const existingPlainProject = options.allowExistingProjects === true && !newConversation &&
+        !temporary && !attachments && selectedTool === null;
+      if (options.allowProjects !== true && !existingPlainProject ||
+          typeof projectId !== 'string' || !projectPattern.test(projectId)) fail('scope_unsupported', 'base_project');
       if (route[1] && route[1] !== projectId) fail('scope_unsupported', 'project_route');
       if (state.mode?.kind !== 'gizmo_interaction' || state.mode.gizmo_id !== projectId ||
           Object.keys(state.mode).some(key => !['kind', 'gizmo_id', 'gizmo'].includes(key))) fail('scope_unsupported', 'project_mode');
@@ -160,6 +163,7 @@
       const headers = shared.textProjectHeaders(projectId,
         shared.textLockedProjectId(shared.canvasQueryClient()), shared.textLockedChatPin());
       if (headers === undefined) return Object.freeze({});
+      if (options.allowProjects !== true) fail('scope_unsupported', 'project_headers');
       if (!headers || typeof headers !== 'object' || Array.isArray(headers) ||
           Object.keys(headers).length !== 1 || typeof headers['x-openai-locked-chats-pin'] !== 'string' ||
           !headers['x-openai-locked-chats-pin'] || headers['x-openai-locked-chats-pin'].length > 65536 ||

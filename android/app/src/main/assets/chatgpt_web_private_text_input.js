@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateTextInput = factory(root);
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -13,6 +13,7 @@
   function scope() {
     return { allowNewConversations: page.__elonChatGptFreshTextNewConversationsEnabled !== false,
       allowProjects: page.__elonChatGptFreshTextProjectsEnabled === true,
+      allowExistingProjects: page.__elonChatGptFreshTextProjectsEnabled !== false,
       allowTemporary: page.__elonChatGptFreshTextTemporaryEnabled === true,
       allowTools: page.__elonChatGptFreshTextToolsEnabled === true,
       allowPersonalSearch: page.__elonChatGptFreshTextToolsEnabled !== false,
@@ -97,5 +98,5 @@
     respond('set_draft', true, ''); io.notify();
   }
 
-  return Object.freeze({ version: 6, snapshot, setDraft, setCommand });
+  return Object.freeze({ version: 7, snapshot, setDraft, setCommand });
 });
