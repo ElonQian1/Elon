@@ -495,7 +495,9 @@ Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'running
 $releaseArtifactCache = Join-Path $TargetDir 'release-input-cache'
 $pcFrontendEnvironmentValues = @(Get-NodeAgentReleaseEnvironmentValues -Prefix 'VITE_')
 $pcFrontendInputHash = Get-NodeAgentReleaseInputHash -RepoRoot $RepoRoot -GitSha $GitSha `
-    -GitPaths @('pc-frontend') `
+    -GitPaths @('pc-frontend', 'android/app/src/main/assets/social_link_read_adapter.js',
+        'server/src/assets/social_links.js', 'server/src/assets/social_links.css',
+        'server/src/assets/social_link_viewer.js') `
     -ToolVersions @((& node --version | Out-String), (& npm --version | Out-String)) `
     -EnvironmentValues $pcFrontendEnvironmentValues
 Invoke-NodeAgentCachedDirectoryBuild -Kind 'pc-frontend' -InputHash $pcFrontendInputHash `
