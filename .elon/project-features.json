@@ -26892,15 +26892,15 @@
         },
         {
           "path": "docs/requirements/win-social-card-polish-evidence.md",
-          "content_hash": "642db5d6375da3c12b99d7ffb8c0c3acb890d660720d8352f3d369d78a7007d4",
+          "content_hash": "8c88578c580b4b660758d3ba04d9632a97f32b6a89a54937a08289c19a4d6787",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "d11fc42e9e78acd22bf7bf3a641785a26759016b",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "9ac7336fdbf70776120a255ea72fb91b4810c6de",
-            "state": "untracked"
+            "head_commit": "7a9caffb91a2f1b8ff73c8173750e6b016448076",
+            "head_blob_oid": "9ac7336fdbf70776120a255ea72fb91b4810c6de",
+            "worktree_blob_oid": "1038f738007baff88b44928663d18564306eb2e0",
+            "state": "tracked_modified"
           }
         },
         {
@@ -26983,7 +26983,7 @@
         }
       ],
       "created_at_ms": 1789549285606,
-      "updated_at_ms": 1789550566650
+      "updated_at_ms": 1789552393913
     },
     {
       "id": "win-update-exact-target-recovery-v1",
@@ -30284,16 +30284,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_3deac957c2a34ee9be5acb8097bb66e1",
-      "feature_id": "android-binance-session-events-v1",
-      "action": "claimed",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789212142768
-    },
-    {
       "id": "feature_event_dea56c3009ec466b9d017f2f2490f649",
       "feature_id": "android-binance-session-events-v1",
       "action": "transitioned",
@@ -32282,6 +32272,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789550566650
+    },
+    {
+      "id": "feature_event_06c13d83d3ba400fbf56bc34202e6015",
+      "feature_id": "win-social-card-polish-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789552393913
     }
   ]
 }

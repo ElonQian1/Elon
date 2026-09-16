@@ -27,3 +27,13 @@ reviewed_at: 2026-09-16
 所有 fixture 消息为合成数据，浏览器用元数据响应及 IPC 替身，禁止真实群聊写入。IPC 只验证打开/关闭参数，不能声称真实 Windows 宿主已打开。当前 Win 语义桥显示没有在线宿主。APK 更新后反馈按 UI 工作流触发一次干净提交后的真机准备；无真实帧时视觉验收延期，不制造截图或将 PWA 当成 APK。
 
 发布使用项目 Server（包含 PC）与 APK 发布脚本，版本与源码身份以发布回执为准。功能登记停留在 implemented，直到真实设备与跨端视觉证据补齐；源码、组件测试、正式发布分别报告。
+
+## 本轮交付回执
+
+- 源码：`f18e9b309`（共享及 APK 卡片）和 `7a9caffb91a2f1b8ff73c8173750e6b016448076`（桌面动作、组件验收），均已推送主线。
+- Server/PWA/PC：`0.3.1766`；健康接口 `OK`，服务端与 `/pc/assets/release.json` 均为上述完整源码 SHA；线上 `social_links.js/css` 与源码归一化换行后逐字一致。
+- APK：`1.1.1777` / build `1777`，40,779,778 字节，SHA-256 `82bce2d0d8a597b8f21c49dbdd633a1308f1d8959d7a6188a396750d1e8b1c0f`，线上源码、文件大小、哈希均与本地发布工件一致。
+- JS、Rust 预览 harness、Android 15 项测试、PC 类型检查/正式构建、两种元数据场景的实际 React/PWA 浏览器验收通过。PWA MCP 获取 390×844 实际 PNG，SHA-256 `d3f1fc867820df3b0f45218c584874a47b459ece1c841c165298e437fc7bda30`，绑定源码 `7a9caffb91a2f1b8ff73c8173750e6b016448076` 与测试路由。
+- 首次服务端发布被日志静默 600 秒门限中止。确认原构建进程退出后，通过原发布入口以 1800 秒静默/3600 秒总时限恢复；成功回执耗时 699 秒，没有改功能代码、跳过构建或手工上传。
+- 真机仅准备一次，返回 `RENDERER_CAPACITY_UNAVAILABLE`，没有可用设备；`REAL_DEVICE_STATUS=REQUIRED_FOLLOWUP`，`ANDROID_RENDERER=UNAVAILABLE`。没有尝试修复 ADB、重建会话或以模拟器冒充真机。
+- `FIT_RUN_STATUS=NOT_RUN`，`FINAL_VISUAL_LOSS=NOT_MEASURED`，`VISUAL_ACCEPTANCE_THRESHOLD=NOT_PROVIDED`，`CROSS_PLATFORM_VISUAL_PARITY=VERIFICATION_DEFERRED`。UI 门禁 `BUSINESS_DELIVERY_READY=false`（未取得真实 Android 帧），`PLATFORM_EVOLUTION_PENDING=false`，`EVOLUTION_THREAD=none`；这与已完成的业务发布分别报告。
