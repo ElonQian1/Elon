@@ -174,7 +174,7 @@ internal class MainGroupChatActions(
             return true
         }
         if (configuration.usesWebAi && GroupWebAiFeature.mentionsAi(rawText) && !webAiConfirmed) {
-            webAi.confirm(group) {
+            webAi.confirm(group, configuration) {
                 if (activeGroup?.id == group.id && binding.inputEdit.text.toString().trim() == rawText.trim()) trySendMessage(rawText, pendingAttachments, true, configuration)
                 else webAi.release()
             }
@@ -235,7 +235,7 @@ internal class MainGroupChatActions(
             return true
         }
         if (configuration.usesWebAi && GroupWebAiFeature.mentionsAi(source.content) && !webAiConfirmed) {
-            webAi.confirm(group) {
+            webAi.confirm(group, configuration) {
                 if (activeGroup?.id == group.id) trySendForwardedMessage(source, true, configuration)
                 else webAi.release()
             }

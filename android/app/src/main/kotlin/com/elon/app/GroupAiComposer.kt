@@ -6,6 +6,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.elon.app.googleweb.GoogleWebOfficialActivity
+import com.elon.app.googleweb.GoogleWebNavigationPolicy
 import com.elon.app.databinding.ActivityMainBinding
 
 /** Group-only UI owner. Engine configuration stays separate from social message delivery. */
@@ -66,9 +68,13 @@ internal class GroupAiComposer(
         ui.planModeButton.visibility = View.GONE
         ui.webToolsButton.visibility = View.GONE
         ui.attachmentButton.visibility = View.VISIBLE
-        WebChatComposerProviderPresentation.apply(binding.modelButton,
-            WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB), config.label)
-        if (!config.usesWebAi) WebChatComposerProviderPresentation.clear(binding.modelButton)
+        val provider = config.engine.providerId
+        if (provider != null) WebChatComposerProviderPresentation.apply(binding.modelButton,
+            WebChatProviderRegistry.get(provider), config.label)
+        else {
+            WebChatComposerProviderPresentation.clear(binding.modelButton)
+            binding.modelButton.text = config.label
+        }
         val description = "group-ai-settings:${config.engine.name}；${config.label}"
         binding.modelButton.contentDescription = description
         ui.modelButtonShell.contentDescription = description
@@ -82,6 +88,10 @@ internal class GroupAiComposer(
         picker?.close()
         workSettings?.close()
         val ui = views() ?: return
+        if (config.engine == GroupAiEngine.GOOGLE) {
+            showProviders()
+            return
+        }
         if (!config.usesWebAi) {
             val expectedGroup = requireNotNull(group)
             val expectedAccount = account
@@ -101,11 +111,7 @@ internal class GroupAiComposer(
         if (!valid()) return
         val expectedGroup = group
         val expectedAccount = account
-        menu = ChatAiChoiceSheet.show(activity, "切换 AI", listOf(
-            ChatAiChoice(GroupAiEngine.CHATGPT.name, "ChatGPT", "模型与档位", R.drawable.ic_web_ai_chatgpt_avatar,
-                config.usesWebAi, "group-ai-provider:CHATGPT"),
-            ChatAiChoice(GroupAiEngine.WORK.name, "工作 AI", config.work.label, R.drawable.ic_msg_ai_reply,
-                !config.usesWebAi, "group-ai-provider:WORK")), onSelected = { id ->
+        menu = ChatAiChoiceSheet.show(activity, "切换 AI", GroupAiProviderChoices.options(config), onSelected = { id ->
                 if (group != expectedGroup || account != expectedAccount || !valid()) return@show
                 val engine = GroupAiEngine.valueOf(id)
                 if (engine == GroupAiEngine.WORK && config.engine != engine) {
@@ -119,9 +125,15 @@ internal class GroupAiComposer(
                         }.show()
                 } else {
                     save(config.copy(engine = engine))
-                    showSettings()
+                    if (engine != GroupAiEngine.GOOGLE) showSettings()
                 }
-            })?.dialog
+            }, actions = if (config.engine == GroupAiEngine.GOOGLE) listOf(
+                ChatAiSheetAction("Google 官方页", "group-ai-google-official") {
+                    if (group == expectedGroup && account == expectedAccount && valid()) {
+                        activity.startActivity(GoogleWebOfficialActivity.createIntent(activity, GoogleWebNavigationPolicy.START_URL))
+                    }
+                },
+            ) else emptyList())?.dialog
     }
 
     fun close() {

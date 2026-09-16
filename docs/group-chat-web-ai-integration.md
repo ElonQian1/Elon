@@ -118,6 +118,37 @@ Android Release Kotlin 与 3 项定向测试通过，覆盖群提及、完整回
 正式发布状态以发布端点为准。设备只读 MCP 连接超时，未重建会话、未中断语音；
 群聊视觉和真实问答验收延后，不能把编译和单元测试成功等同于真机验收通过。
 
+## Google 群聊接入（第五批）
+
+2026-09-16：群聊此前在配置、选择面板和执行器里都只支持 ChatGPT / 工作 AI，
+并非 Google 暂未加载导致菜单消失。本批复用 Google 适配器接入第三个可选项：
+
+- `GroupAiProviderChoices` 复用个人聊天的图标和 `ChatAiChoiceSheet`，提供
+  ChatGPT、Google AI 模式（预览版）、工作 AI。每群保存选择，切回 ChatGPT
+  保留档位，切回工作 AI 保留模型。Google 不显示不适用的 ChatGPT 档位。
+- `GroupWebAiSession` 按提供方创建独立后台文档，Google 从 `/aimode` 启动，
+  不恢复个人目录、会话、正文、草稿或 URL。空白 AI 页面且输入就绪才派发；
+  未就绪保持等待，最终失败不是“官网没有功能”。Google 设置提供官方页入口。
+- Google 复用 `GoogleWebPageAdapter` 发送与回复采集，以及已有有界刷新协调器，
+  没有新造 Google 私有接口；完成且对应本次群提示词的回答才发布。
+- 确认说明会将最多 30 条群文字交给所选提供方；Google 使用独立新会话而非
+  ChatGPT 临时聊天，不承诺 Google 不保存历史。原有群附件传送范围不变。
+- V302 仅新增 `web_provider` 列，保留旧 `engine=chatgpt_web` 的设备执行合同
+  与旧客户端兼容；实际提供方在单次派发事务中固定。Google 派发后不能再换
+  ChatGPT 或工作 AI 重发。新客户端拒绝没有 Google 来源回执的旧服务器许可。
+- PWA 群聊没有本机厂商身份 WebView 执行层，本批不展示无法运行的 Google
+  按钮，也不把账号 Cookie 上传到群服务器。仅 APK 群聊接入，个人聊天不变。
+
+实现入口：`GroupAiProviderChoices`、`GroupWebAiSessionPolicy`、
+`GroupWebAiRequestPolicy`、`group_web_ai_provider`。定向测试覆盖三选一、
+配置保存、上下文隔离、派发来源、防重复、旧库升级及既有模型配置。
+本批 Android 编译与 30 项定向测试通过，包含 320dp 窄屏提供方选择面板的
+实际点击测试；服务端 17 项请求/事务回归通过，包含 Google 来源绑定与 V302
+重复迁移。服务端验证指纹为
+`fdf6d57523c53c53ecdbff4f7a6c0573ff3a7debb85609a12893f8f87232ffe9`。
+发布证据以本批交付回执为准；Google 真实群聊与真机视觉验收仍未完成，
+不得把 Robolectric 点击、编译或单元测试成功写成真机问答成功。
+
 ## 暂不接入
 
 - 个人会话目录、ChatGPT 项目文件夹、图片库与完整 Canvas。

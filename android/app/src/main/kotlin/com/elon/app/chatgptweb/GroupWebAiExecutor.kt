@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.GroupAiConfiguration
+import com.elon.app.WebChatProviderId
 import java.util.UUID
 
 /** A separate document, sharing identity but never personal conversation/navigation state. */
@@ -16,6 +17,7 @@ internal class GroupWebAiExecutor(
     private val configuration: GroupAiConfiguration = GroupAiConfiguration(),
 ) {
     private val handler = Handler(Looper.getMainLooper())
+    private val provider = requireNotNull(configuration.engine.providerId)
     private var session: GroupWebAiSession? = null
     private val adapter get() = session?.adapter
     private var modelConfiguration: GroupWebAiModelConfiguration? = null
@@ -29,7 +31,7 @@ internal class GroupWebAiExecutor(
 
     fun start() {
         handler.postDelayed(timeout, 60_000L)
-        session = GroupWebAiSession(activity, ::event, ::fail).also { it.start() }
+        session = GroupWebAiSession(activity, ::event, ::fail, provider).also { it.start() }
     }
 
     private fun event(event: ChatGptWebEvent) {
@@ -48,8 +50,8 @@ internal class GroupWebAiExecutor(
         lastSnapshot = value
         if (!dispatched) {
             if (value.loginRequired) { fail(); return }
-            if (dispatching || !GroupWebAiSession.ready(value)) return
-            if (!configured) {
+            if (dispatching || !GroupWebAiSession.ready(value, provider)) return
+            if (!configured && provider == WebChatProviderId.CHATGPT_WEB) {
                 if (modelConfiguration == null) {
                     modelConfiguration = GroupWebAiModelConfiguration(GroupAiModelPort.from(requireNotNull(adapter)), configuration.modelPath,
                         onReady = { configured = true; lastSnapshot?.let(::snapshot) }, onFailure = ::fail)
@@ -62,10 +64,11 @@ internal class GroupWebAiExecutor(
             authorize { permitted ->
                 if (finished) return@authorize
                 if (!permitted) { fail(); return@authorize }
+                if (lastSnapshot?.let { GroupWebAiSession.ready(it, provider) } != true) { fail(); return@authorize }
                 dispatched = true
                 handler.removeCallbacks(timeout)
                 handler.postDelayed(timeout, 180_000L)
-                adapter?.sendPrompt(prompt, "", commandId, allowPrivateTextTransaction = true)
+                session?.sendPrompt(prompt, commandId)
             }
             return
         }

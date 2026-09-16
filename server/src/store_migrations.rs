@@ -403,6 +403,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (299, "币安广场凭证、媒体与持久发布队列", crate::store::articles::square::migration::migrate),
     (300, "Permissioned immutable AI conversation snapshots", crate::store::articles::snapshots::migration::migrate),
     (301, "Scoped snapshot orphan media retention", crate::store::articles::snapshots::orphan_media::migrate),
+    (302, "Bind group web AI provider at dispatch", crate::store::social_ai_messages::requests::provider::migrate),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

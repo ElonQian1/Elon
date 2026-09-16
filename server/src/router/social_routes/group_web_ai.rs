@@ -26,6 +26,7 @@ pub(super) struct ActionRequest {
     action: String,
     content: Option<String>,
     work_options: Option<GroupWorkAiOptions>,
+    web_provider: Option<String>,
 }
 
 pub(super) async fn work_models(
@@ -115,6 +116,16 @@ pub(super) async fn action(
         }
     }
     let result = (|| -> anyhow::Result<_> {
+        if req.action == "dispatch" {
+            return state.store.group_web_ai_provider_action(
+                &user.id,
+                &group,
+                &id,
+                &req.operation_id,
+                "dispatch",
+                req.web_provider.as_deref().unwrap_or("chatgpt_web"),
+            );
+        }
         if req.action == "work" {
             return state.store.activate_group_work_ai(
                 &user.id,

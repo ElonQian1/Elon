@@ -34,12 +34,12 @@ internal class GroupWebAiFeature(
 
     init { activity.lifecycle.addObserver(this) }
 
-    fun confirm(group: AppGroup, proceed: () -> Unit) {
+    fun confirm(group: AppGroup, configuration: GroupAiConfiguration = GroupAiConfiguration(), proceed: () -> Unit) {
         if (busy) { toast("群聊 AI 正在处理，请稍候"); return }
         if (preferences.contains(pendingKey(userId()))) { recover(); toast("先同步上一条 AI 回答"); return }
         busy = true
-        AlertDialog.Builder(activity).setTitle("使用 ChatGPT 回复群聊")
-            .setMessage("将把这个群最近最多 30 条文字发送到本机 ChatGPT 临时会话，并把回答发回群里。不会读取个人会话，也不会读取群附件。")
+        AlertDialog.Builder(activity).setTitle("使用 ${configuration.engine.label} 回复群聊")
+            .setMessage(GroupWebAiRequestPolicy.consent(configuration))
             .setNegativeButton("取消") { _, _ -> release() }
             .setOnCancelListener { release() }
             .setPositiveButton("继续") { _, _ -> busy = true; proceed() }.show()
@@ -53,7 +53,7 @@ internal class GroupWebAiFeature(
         return true
     }
 
-    fun prepare(group: AppGroup, messageId: String, configuration: GroupAiConfiguration = GroupAiConfiguration()) = confirm(group) {
+    fun prepare(group: AppGroup, messageId: String, configuration: GroupAiConfiguration = GroupAiConfiguration()) = confirm(group, configuration) {
         prepareRequest(group, messageId, configuration)
     }
 
@@ -90,7 +90,7 @@ internal class GroupWebAiFeature(
         if (activity.isDestroyed || userId() != owner) { release(); return }
         if (!configuration.usesWebAi) { executeWork(request, operation, owner, configuration.work); return }
         busy = true
-        progress = Snackbar.make(root, "ChatGPT 正在处理群聊回复", Snackbar.LENGTH_INDEFINITE)
+        progress = Snackbar.make(root, "${configuration.engine.label} 正在处理群聊回复", Snackbar.LENGTH_INDEFINITE)
             .setAction("取消") { executor?.cancel() }.also { it.show() }
         executor = GroupWebAiExecutor(activity, request.getString("prompt"),
             configuration = configuration,
@@ -98,7 +98,8 @@ internal class GroupWebAiFeature(
                 thread {
                     val result = runCatching {
                         check(userId() == owner)
-                        action(request, operation, "dispatch").optBoolean("dispatch_permit")
+                        val receipt = action(request, operation, "dispatch", provider = configuration.engine.providerId?.wireValue)
+                        GroupWebAiRequestPolicy.permitted(configuration, receipt)
                     }
                     activity.runOnUiThread { ready(userId() == owner && result.getOrDefault(false)) }
                 }
@@ -117,8 +118,8 @@ internal class GroupWebAiFeature(
                     thread { runCatching { if (userId() == owner) action(request, operation, "uncertain") } }
                     toast("请求可能已发送，未重复提交。请稍后查看群消息")
                 } else if (!activity.isDestroyed && userId() == owner) {
-                    AlertDialog.Builder(activity).setTitle("ChatGPT 尚未可用")
-                        .setMessage("没有向 ChatGPT 发送。可以取消，或使用备用 AI（可能计费）。")
+                    AlertDialog.Builder(activity).setTitle("${configuration.engine.label} 尚未就绪")
+                        .setMessage("没有向 ${configuration.engine.label} 发送。可以取消，或使用备用 AI（可能计费）。")
                         .setNegativeButton("取消") { _, _ ->
                             thread { runCatching { action(request, operation, "cancel") } }
                         }
@@ -181,9 +182,12 @@ internal class GroupWebAiFeature(
         }
     }
 
-    private fun action(request: JSONObject, operation: String, action: String, text: String? = null): JSONObject =
+    private fun action(request: JSONObject, operation: String, action: String, text: String? = null, provider: String? = null): JSONObject =
         post("${base(request.getString("group_id"))}/web-ai/requests/${part(request.getString("id"))}",
-            JSONObject().put("operation_id", operation).put("action", action).apply { if (text != null) put("content", text) })
+            JSONObject().put("operation_id", operation).put("action", action).apply {
+                if (text != null) put("content", text)
+                if (provider != null) put("web_provider", provider)
+            })
             .getJSONObject("request")
 
     private fun post(path: String, payload: JSONObject): JSONObject {

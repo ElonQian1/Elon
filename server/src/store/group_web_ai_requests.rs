@@ -45,6 +45,7 @@ pub(crate) struct WebGroupRequest {
     pub group_id: String,
     pub trigger_message_id: String,
     pub engine: String,
+    pub web_provider: String,
     pub state: String,
     pub prompt: String,
     pub result_message_id: Option<String>,
@@ -152,11 +153,11 @@ pub(crate) fn read_owned(
 ) -> Result<WebGroupRequest> {
     let hash = operation_hash(operation)?;
     let row = conn.query_row(
-        "SELECT id,group_id,trigger_message_id,engine,state,COALESCE(context_prompt,''),result_message_id
+        "SELECT id,group_id,trigger_message_id,engine,state,COALESCE(context_prompt,''),result_message_id,web_provider
          FROM group_ai_reply_requests WHERE id = ?1 AND requester_id = ?2 AND group_id = ?3 AND operation_hash = ?4",
         params![id,user,group,hash], |r| Ok(WebGroupRequest {
             id:r.get(0)?,group_id:r.get(1)?,trigger_message_id:r.get(2)?,engine:r.get(3)?,state:r.get(4)?,
-            prompt:r.get(5)?,result_message_id:r.get(6)?,dispatch_permit:false,
+            prompt:r.get(5)?,result_message_id:r.get(6)?,web_provider:r.get(7)?,dispatch_permit:false,
         }),
     ).optional()?.ok_or_else(|| anyhow!("请求不存在或不属于当前设备操作"))?;
     ensure_member_and_source(conn, user, group, &row.trigger_message_id)?;
@@ -186,6 +187,19 @@ impl Store {
         operation: &str,
         action: &str,
     ) -> Result<WebGroupRequest> {
+        self.group_web_ai_provider_action(user, group, id, operation, action, "chatgpt_web")
+    }
+
+    pub(crate) fn group_web_ai_provider_action(
+        &self,
+        user: &str,
+        group: &str,
+        id: &str,
+        operation: &str,
+        action: &str,
+        provider: &str,
+    ) -> Result<WebGroupRequest> {
+        super::provider::validate(provider)?;
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let before = read_owned(&tx, user, group, id, operation)?;
@@ -193,9 +207,13 @@ impl Store {
         match action {
             "status" => (),
             "dispatch" => {
+                anyhow::ensure!(
+                    before.state == "prepared" || before.web_provider == provider,
+                    "请求已派发给其他网页 AI"
+                );
                 permitted = tx.execute(
-                    "UPDATE group_ai_reply_requests SET state='dispatched',updated_at=?1 WHERE id=?2 AND state='prepared' AND engine='chatgpt_web'",
-                    params![now(),id],
+                    "UPDATE group_ai_reply_requests SET state='dispatched',updated_at=?1,web_provider=?3 WHERE id=?2 AND state='prepared' AND engine='chatgpt_web'",
+                    params![now(),id,provider],
                 )? == 1;
             }
             "fallback" if before.state == "prepared" && before.engine == "chatgpt_web" => {

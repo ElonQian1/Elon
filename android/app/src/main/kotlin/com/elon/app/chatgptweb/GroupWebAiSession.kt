@@ -1,52 +1,91 @@
 package com.elon.app.chatgptweb
 
-import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.webkit.CookieManager
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.beginWebChatBackgroundInteraction
+import com.elon.app.WebChatProviderId
+import com.elon.app.googleweb.GoogleWebPageAdapter
+import com.elon.app.googleweb.GoogleWebViewClient
+import com.elon.app.googleweb.GoogleWebResponseRefreshCoordinator
 
-/** One isolated temporary document used for group configuration or a group request. */
+/** One isolated document; shared identity, no personal history stores or navigation. */
 internal class GroupWebAiSession(
     private val activity: AppCompatActivity,
     private val onEvent: (ChatGptWebEvent) -> Unit,
     private val onFailure: () -> Unit,
+    private val provider: WebChatProviderId = WebChatProviderId.CHATGPT_WEB,
 ) {
     private var closed = false
+    private val handler = Handler(Looper.getMainLooper())
     private val view = createChatGptBackgroundWebView(activity, null, {}, { it.onReceiveValue(null) })
-    val adapter = ChatGptWebPageAdapter(activity, view, { if (!closed) onEvent(it) }, {})
+    private val chatGpt = if (provider == WebChatProviderId.CHATGPT_WEB)
+        ChatGptWebPageAdapter(activity, view, ::event, {}) else null
+    private val google = if (provider == WebChatProviderId.GOOGLE_WEB)
+        GoogleWebPageAdapter(activity, view, ::event, {}) else null
+    val adapter: ChatGptWebPageAdapter get() = requireNotNull(chatGpt)
+    private val refresh = GoogleWebResponseRefreshCoordinator(
+        requestSnapshot = { google?.requestSnapshot() },
+        schedule = { task, delay -> handler.postDelayed(task, delay) }, cancel = handler::removeCallbacks,
+    )
+
+    private fun event(event: ChatGptWebEvent) {
+        if (closed) return
+        if (event is ChatGptWebEvent.CommandResult && event.action == "send_prompt" && event.ok) refresh.onSendConfirmed()
+        if (event is ChatGptWebEvent.Snapshot) {
+            val snapshot = event.value
+            val user = snapshot.messages.indexOfLast { it.role == "user" }
+            refresh.onSnapshot(snapshot.messages.getOrNull(user)?.content,
+                user >= 0 && snapshot.messages.drop(user + 1).any { it.role == "assistant" }, snapshot.streaming)
+        }
+        onEvent(event)
+    }
+
+    fun sendPrompt(prompt: String, requestId: String) {
+        if (closed) return
+        if (google != null) {
+            refresh.onSendStarted(prompt)
+            google.sendPrompt(prompt, "", requestId)
+        } else adapter.sendPrompt(prompt, "", requestId, allowPrivateTextTransaction = true)
+    }
 
     fun start() {
         activity.findViewById<ViewGroup>(android.R.id.content).addView(view, 0,
             ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         view.beginWebChatBackgroundInteraction()
         view.settings.mediaPlaybackRequiresUserGesture = true
-        view.webViewClient = ChatGptWebViewClient(
+        view.settings.allowContentAccess = false
+        CookieManager.getInstance().apply { setAcceptCookie(true); setAcceptThirdPartyCookies(view, true) }
+        view.webViewClient = if (google != null) GoogleWebViewClient(
+            onPageStarted = { google.onPageStarted(it) }, onPageReady = { google.onPageReady(it) },
+            onBlockedNavigation = { if (!closed) onFailure() }, onPageError = { if (!closed) onFailure() },
+        ) else ChatGptWebViewClient(
             onPageStarted = { adapter.onPageStarted(it) }, onPageReady = { adapter.onPageReady(it) },
             onBlockedNavigation = { if (!closed) onFailure() }, onPageError = { if (!closed) onFailure() },
             rewriteAllowedMainFrameUrl = { null },
         )
-        adapter.install()
+        if (google != null) google.install() else adapter.install()
         ChatGptWebProxyController(activity).prepare {
-            if (!closed) view.loadUrl("https://chatgpt.com/?temporary-chat=true")
+            if (!closed) view.loadUrl(GroupWebAiSessionPolicy.startUrl(provider))
         }
     }
 
     fun close() {
         if (closed) return
         closed = true
-        adapter.dispose()
+        refresh.stop()
+        handler.removeCallbacksAndMessages(null)
+        google?.dispose()
+        chatGpt?.dispose()
         view.stopLoading()
         (view.parent as? ViewGroup)?.removeView(view)
         view.destroy()
     }
 
     companion object {
-        fun ready(snapshot: ChatGptWebSnapshot): Boolean {
-            val uri = Uri.parse(snapshot.url)
-            return !snapshot.loginRequired && (snapshot.composerReady || snapshot.privateSendReady) &&
-                !snapshot.streaming && uri.scheme == "https" && uri.host == "chatgpt.com" &&
-                uri.path in listOf("", "/") && uri.getQueryParameter("temporary-chat") == "true" &&
-                snapshot.messages.isEmpty() && snapshot.draft.isBlank()
-        }
+        fun ready(snapshot: ChatGptWebSnapshot, provider: WebChatProviderId = WebChatProviderId.CHATGPT_WEB) =
+            GroupWebAiSessionPolicy.ready(snapshot, provider)
     }
 }

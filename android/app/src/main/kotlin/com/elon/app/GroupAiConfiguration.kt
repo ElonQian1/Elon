@@ -5,8 +5,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
 
-internal enum class GroupAiEngine(val label: String) {
-    CHATGPT("ChatGPT"), WORK("工作 AI");
+internal enum class GroupAiEngine(val label: String, val providerId: WebChatProviderId? = null) {
+    CHATGPT("ChatGPT", WebChatProviderId.CHATGPT_WEB),
+    GOOGLE("Google AI 模式", WebChatProviderId.GOOGLE_WEB),
+    WORK("工作 AI");
 }
 
 /** Persist intent, never a page-local control id or provider credential. */
@@ -22,9 +24,12 @@ internal data class GroupAiConfiguration(
     val modelPath: List<GroupAiModelChoice> = emptyList(),
     val work: GroupWorkAiConfiguration = GroupWorkAiConfiguration(),
 ) {
-    val label: String get() = if (engine == GroupAiEngine.WORK) work.label
-        else modelPath.lastOrNull()?.label?.let(WebChatModelControlPolicy::compactLabel) ?: "默认"
-    val usesWebAi: Boolean get() = engine == GroupAiEngine.CHATGPT
+    val label: String get() = when (engine) {
+        GroupAiEngine.WORK -> work.label
+        GroupAiEngine.GOOGLE -> "Google AI"
+        GroupAiEngine.CHATGPT -> modelPath.lastOrNull()?.label?.let(WebChatModelControlPolicy::compactLabel) ?: "默认"
+    }
+    val usesWebAi: Boolean get() = engine.providerId != null
 }
 
 /** Group-only preference namespace; personal/work AI preferences remain untouched. */
