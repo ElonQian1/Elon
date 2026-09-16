@@ -21951,7 +21951,7 @@
       "id": "social-link-cards-v1",
       "title": "三端社交外链卡片与阅读",
       "summary": "公众号、抖音、小红书、B站、币安广场、X的轻量预览及原文阅读",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/social-link-cards.md",
@@ -22102,7 +22102,7 @@
         }
       ],
       "created_at_ms": 1789492845079,
-      "updated_at_ms": 1789493177891
+      "updated_at_ms": 1789542082009
     },
     {
       "id": "social-sync-status-lifecycle-v1",
@@ -29826,16 +29826,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8c5ff8ff6bf1481e9f7f2f8fcb06ed84",
-      "feature_id": "android-binance-create-validation-v1",
-      "action": "transitioned",
-      "actor": "codex-grid",
-      "reason": "已完成精确路径查重并实现动态准备检查，回归验证正在运行",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789158844036
-    },
-    {
       "id": "feature_event_19c0542cfc0449e0b457a03ed72b2361",
       "feature_id": "android-binance-create-validation-v1",
       "action": "evidence_recorded",
@@ -31824,6 +31814,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1789493177891
+    },
+    {
+      "id": "feature_event_ab8f4c2eba8b41e08c1e03bbf7533501",
+      "feature_id": "social-link-cards-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "APK 1.1.1773、Server/PWA 0.3.1763 与 PC bundle 已发布 c9748fe；线上来源、资源哈希与完成检查通过。卡片宽窄屏 PNG 已检查；设备播放、登录恢复及跨端视觉验收延期。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1789542082009
     }
   ]
 }
