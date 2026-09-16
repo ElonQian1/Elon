@@ -19,7 +19,7 @@ export default function SocialLinkCards({ text, owner, compact = false }: { text
   const [reading, setReading] = useState<LinkPreview | null>(null)
   useEffect(() => {
     if (!host.current) return
-    return ElonSocialLinks.mount(host.current, text, { owner, compact, api: previewApi, open: p => {
+    return ElonSocialLinks.mount(host.current, text, { owner, compact, desktop: true, api: previewApi, open: p => {
       if (getDesktopInvoke() && p.embed?.kind !== 'x') setReading(p)
       else ElonSocialLinkViewer.open(p)
     } })

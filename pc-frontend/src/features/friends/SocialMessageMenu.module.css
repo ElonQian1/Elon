@@ -14,5 +14,11 @@
 .more:hover, .edited:hover { color: var(--text); background: #ffffff12; }
 .more:focus-visible, .edited:focus-visible { outline: 2px solid #85bdf5; outline-offset: 2px; }
 .notice { color: var(--text-muted); font-size: 12px; }
+@media (hover: hover) {
+  :global([data-social-content]) { position: relative; }
+  .compact { min-height: 0; }
+  .compact .more { position: absolute; top: 34px; right: -30px; }
+  .compact.own .more { right: auto; left: -30px; }
+}
 @media (hover: none) { .more { opacity: 1; } }
 @media (forced-colors: active) { .menu { border: 1px solid CanvasText; } .menu button:focus-visible { outline: 2px solid Highlight; } }

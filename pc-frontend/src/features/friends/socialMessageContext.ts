@@ -3,7 +3,7 @@ import { cloudResourceUrl } from '../../lib/cloudResourceUrl'
 
 export interface SocialMenuRequest {
   id: string; x: number; y: number; nonce: number
-  origin: HTMLElement; selection: string; media: HTMLElement | null
+  origin: HTMLElement; selection: string; media: HTMLElement | null; link: HTMLAnchorElement | null
 }
 
 export function messageMenuRequest(id: string, origin: HTMLElement, x: number, y: number, target: HTMLElement): SocialMenuRequest {
@@ -12,7 +12,11 @@ export function messageMenuRequest(id: string, origin: HTMLElement, x: number, y
   // Copy only a selection wholly inside the message that was invoked.
   const selected = selection && !selection.isCollapsed && body?.contains(selection.anchorNode) && body.contains(selection.focusNode)
     ? selection.toString() : ''
-  return { id, x, y, nonce: performance.now(), origin, selection: selected,
+  const directLink = target.closest<HTMLAnchorElement>('a.social-link-card[href]')
+  const links = body?.querySelectorAll<HTMLAnchorElement>('a.social-link-card[href]')
+  // Keyboard/ellipsis on a message with one card targets that card, too.
+  const link = directLink || (links?.length === 1 ? links[0] : null)
+  return { id, x, y, nonce: performance.now(), origin, selection: selected, link,
     media: target.closest<HTMLElement>('[data-social-attachment]') }
 }
 

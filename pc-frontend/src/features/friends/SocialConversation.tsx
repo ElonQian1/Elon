@@ -106,7 +106,7 @@ export default function SocialConversation(props: Props) {
             {!recalled && !m.attachments?.length && <TextSourceCard text={m.content} />}
             {!recalled && <SocialMessageAttachments attachments={m.attachments} />}
             {!recalled && !specialMessage(m) && <SocialLinkCards text={content} owner={`${me.id}:${key}`} compact={compactLink} />}
-            <SocialMessageMenu conversation={conversation} message={m} own={own} special={specialMessage(m)} copySourceId={copyId} request={menu} onMenu={setMenu} favorite={favorites.has(savedKey)}
+            <SocialMessageMenu conversation={conversation} message={m} own={own} compactLink={compactLink} special={specialMessage(m)} copySourceId={copyId} request={menu} onMenu={setMenu} favorite={favorites.has(savedKey)}
               onQuote={() => setQuote({ conversation: key, message: m, author: name, nonce: Date.now() })}
               onForward={() => setForward([saveItem(m)])} onSelect={() => select(m)}
               onFavorite={() => favorites.has(savedKey) ? local.remove(savedKey) : local.save([saveItem(m)])}

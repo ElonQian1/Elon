@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Copy, FileText, Reply, Forward, Star, ListChecks, AtSign, Pencil, History, Undo2, Info, EyeOff, Image, Download, Play, Pause } from 'lucide-react'
+import { Copy, FileText, Reply, Forward, Star, ListChecks, AtSign, Pencil, History, Undo2, Info, EyeOff, Image, Download, Play, Pause, ExternalLink, Link } from 'lucide-react'
 import { copyRichTextToClipboard, copyTextToClipboard, sanitizedRichHtmlFromElement } from '../../lib/clipboard'
 import type { ActiveConversation, SocialMessage } from './socialMessageTypes'
 import type { MessageEdit } from './groupMessageRevisions'
@@ -12,7 +12,7 @@ import styles from './SocialMessageMenu.module.css'
 import tools from './SocialTools.module.css'
 
 interface Props {
-  conversation: ActiveConversation; message: SocialMessage; own: boolean; special?: boolean; copySourceId: string
+  conversation: ActiveConversation; message: SocialMessage; own: boolean; special?: boolean; compactLink?: boolean; copySourceId: string
   request: SocialMenuRequest | null; onMenu: (request: SocialMenuRequest | null) => void; favorite: boolean
   onQuote: () => void; onForward: () => void; onFavorite: () => void; onHide: () => void; onSelect: () => void; onMention?: () => void
   onSaved: (patch: MessageEdit) => void; onRecalled: () => void
@@ -51,6 +51,14 @@ export default function SocialMessageMenu(props: Props) {
   function render(edit?: () => void, history?: () => void) {
     const common: SocialMenuItem[] = [], revisions: SocialMenuItem[] = [], details: SocialMenuItem[] = []
     if (usable && request) {
+      const link = request.link
+      if (link) common.push(
+        { label: '打开链接', icon: <ExternalLink />, action: () => link.click() },
+        { label: '复制链接', icon: <Link />, action: () => void mediaAction(async () => {
+          const result = await copyTextToClipboard(link.href)
+          if (!result) throw new Error('复制失败，请重试')
+        }, '已复制链接') },
+      )
       const attachment = request.media ? message.attachments?.[Number(request.media.dataset.socialAttachment)] : undefined
       if (attachment) {
         const kind = attachmentKind(attachment)
@@ -83,7 +91,7 @@ export default function SocialMessageMenu(props: Props) {
     details.push({ label: '详细信息', icon: <Info />, action: () => setDialog('time') },
       { label: '隐藏消息', hint: '仅此设备', icon: <EyeOff />, action: props.onHide })
     return <>
-      <div className={styles.actions}>
+      <div className={[styles.actions, props.compactLink ? styles.compact : '', own ? styles.own : ''].join(' ')}>
         {history && <button type="button" className={styles.edited} onClick={history}>已编辑 · {(message.revision ?? 1) - 1} 次</button>}
         <button type="button" ref={trigger} className={styles.more} aria-label="更多消息操作" aria-haspopup="menu" aria-expanded={!!request}
           onClick={() => { const node = trigger.current!, rect = node.getBoundingClientRect(); props.onMenu(request ? null : messageMenuRequest(message.id, node, rect.left, rect.bottom + 4, node)) }}>···</button>
