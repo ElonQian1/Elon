@@ -7,7 +7,11 @@ internal object SocialLinkShareText {
         return clean.isBlank() || clean == site.lowercase() || clean in setOf(
             "小红书-你的生活兴趣社区", "小红书–你的生活兴趣社区", "微信公众平台", "微信公众号", "环境异常", "安全验证", "访问验证", "抖音-记录美好生活")
     }
-    fun title(raw: String, site: String): Pair<String, String> {
+    fun title(raw: String, site: String, nearby: String = ""): Pair<String, String> {
+        if (site == "抖音") {
+            val match = Regex("看看【([^】]+)的作品】\\s*(\\S[\\s\\S]*)$").find(nearby)
+            if (match != null) return match.groupValues[2].trim().take(160) to match.groupValues[1].take(80)
+        }
         if (site != "小红书") return raw.take(160) to ""
         val split = raw.substringBefore(" | 小红书").split(" - ")
         return if (split.size > 1) split.dropLast(1).joinToString(" - ").take(160) to split.last().take(80) else raw.take(160) to ""

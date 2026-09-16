@@ -1,5 +1,16 @@
 use super::*;
 #[test]
+fn binance_app_shares_preserve_url_and_only_allow_exact_host() {
+    let url = policy::public_url("https://app.binance.com/uni-qr/cpos/123456?r=synthetic&l=zh-CN")
+        .unwrap();
+    assert_eq!(policy::site(&url), "币安广场");
+    assert!(policy::fetchable(&url));
+    assert_eq!(Preview::fallback(&url).url, url.as_str());
+    let spoof =
+        policy::public_url("https://app.binance.com.evil.example/uni-qr/cpos/123456").unwrap();
+    assert!(!policy::fetchable(&spoof));
+}
+#[test]
 fn social_link_preview_official_players_preserve_time_and_page() {
     let url = policy::public_url(
         "https://www.bilibili.com/video/BV1enYL6SEtU/?share_source=copy_web&t=2&p=3",

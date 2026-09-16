@@ -79,6 +79,19 @@ class SocialLinkCardInteractionTest {
         bindChatSelectionLongPress(rebound, View.OnLongClickListener { true })
         touch(rebound, next.title); assertEquals(1, opened)
     }
+    @Test fun fallbackBadgeAndTimestampRemainClickableWithChatLongPress() {
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        var opened = 0; var held = 0
+        val card = SocialLinkCardView(activity) { opened++ }
+        card.bind(SocialLinkPolicy.link("https://www.bilibili.com/video/BV1enYL6SEtU/?t=80")!!)
+        val root = screen(card)
+        bindChatSelectionLongPress(root, View.OnLongClickListener { held++; true })
+        assertEquals("B站", card.badge.text); assertEquals("从 01:20 开始", card.time.text)
+        assertEquals(View.GONE, card.cover.visibility)
+        touch(root, card.badge); touch(root, card.time)
+        assertEquals(2, opened)
+        touch(root, card.badge, true); assertEquals(1, held); assertEquals(2, opened)
+    }
     @Test fun readerUsesExplicitActivityAndPreservesOriginalUrl() {
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         val item = SocialLink("https://mp.weixin.qq.com/s/test?from=groupmessage", "微信公众号")

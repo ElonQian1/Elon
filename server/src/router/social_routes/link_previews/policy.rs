@@ -29,7 +29,7 @@ pub(super) fn site(url: &Url) -> &'static str {
         "douyin.com" | "www.douyin.com" | "v.douyin.com" | "www.iesdouyin.com" => "抖音",
         "xiaohongshu.com" | "www.xiaohongshu.com" | "xhslink.com" | "www.xhslink.com" => "小红书",
         "bilibili.com" | "www.bilibili.com" | "m.bilibili.com" | "b23.tv" => "哔哩哔哩",
-        "binance.com" | "www.binance.com" => "币安广场",
+        "binance.com" | "www.binance.com" | "app.binance.com" => "币安广场",
         "x.com" | "www.x.com" | "twitter.com" | "www.twitter.com" | "mobile.twitter.com"
         | "t.co" => "X",
         _ => "网页",

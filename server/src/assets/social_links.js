@@ -4,14 +4,31 @@
     'mp.weixin.qq.com': '微信公众号', 'douyin.com': '抖音', 'www.douyin.com': '抖音', 'v.douyin.com': '抖音',
     'www.iesdouyin.com': '抖音', 'xiaohongshu.com': '小红书', 'www.xiaohongshu.com': '小红书', 'xhslink.com': '小红书', 'www.xhslink.com': '小红书',
     'bilibili.com': '哔哩哔哩', 'www.bilibili.com': '哔哩哔哩', 'm.bilibili.com': '哔哩哔哩', 'b23.tv': '哔哩哔哩',
-    'binance.com': '币安广场', 'www.binance.com': '币安广场', 'x.com': 'X', 'www.x.com': 'X', 'twitter.com': 'X', 'www.twitter.com': 'X', 'mobile.twitter.com': 'X', 't.co': 'X',
+    'binance.com': '币安广场', 'www.binance.com': '币安广场', 'app.binance.com': '币安广场', 'x.com': 'X', 'www.x.com': 'X', 'twitter.com': 'X', 'www.twitter.com': 'X', 'mobile.twitter.com': 'X', 't.co': 'X',
   };
+  const labels = { '微信公众号': ['文', '微信公众号文章'], '小红书': ['小红书', '小红书笔记'], '抖音': ['抖', '抖音视频'], '哔哩哔哩': ['B站', '哔哩哔哩视频'], '币安广场': ['币安', '币安广场帖子'], 'X': ['X', 'X 帖子'] };
+  function presentation(value) {
+    const [badge, fallback] = labels[value.site] || ['↗', '网页链接'];
+    let author = value.author?.trim() || '';
+    if (!author && value.site === 'X') {
+      const parts = safeUrl(value.url)?.pathname.split('/').filter(Boolean) || [];
+      if (parts[1] === 'status' && parts[0] !== 'i' && /^[A-Za-z0-9_]{1,15}$/.test(parts[0])) author = '@' + parts[0];
+    }
+    const seconds = value.embed?.kind === 'bilibili' ? new URL(value.embed.url).searchParams.get('t') : null;
+    const n = Number(seconds);
+    const stamp = n >= 3600 ? `${Math.floor(n / 3600)}:${String(Math.floor(n / 60) % 60).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}` : `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+    return { badge, title: value.title || fallback, source: value.site + (author && author !== value.site ? ' · ' + author : ''), time: seconds !== null && /^\d+$/.test(seconds) && n <= 604800 ? `从 ${stamp} 开始` : '' };
+  }
   const cache = new Map();
   function genericTitle(title, site) {
     const clean = String(title || '').replace(/\s+/g, '').toLowerCase();
     return !clean || clean === site.toLowerCase() || ['小红书-你的生活兴趣社区', '小红书–你的生活兴趣社区', '微信公众平台', '微信公众号', '环境异常', '安全验证', '访问验证', '抖音-记录美好生活'].includes(clean);
   }
-  function shareTitle(raw, site) {
+  function shareTitle(raw, site, nearby = '') {
+    if (site === '抖音') {
+      const match = nearby.match(/看看【([^】]+)的作品】\s*(\S[\s\S]*)$/u);
+      if (match) return { title: match[2].trim().slice(0, 160), author: match[1].slice(0, 80) };
+    }
     if (site !== '小红书') return { title: raw.slice(0, 160), author: '' };
     const parts = raw.split(' | 小红书')[0].split(' - ');
     return parts.length > 1 ? { title: parts.slice(0, -1).join(' - ').slice(0, 160), author: parts.at(-1).slice(0, 80) } : { title: raw.slice(0, 160), author: '' };
@@ -69,7 +86,7 @@
       seen.add(u.href);
       const nearby = text.slice(Math.max(0, match.index - 300), match.index);
       const title = [...nearby.matchAll(/【([^】]+)】/g)].map(m => m[1]).find(t => !t.startsWith('精准空降')) || '';
-      result.push({ schema: 1, url: u.href, site: sites[u.hostname], ...shareTitle(title, sites[u.hostname]), image: null, embed: embed(u.href), status: 'unavailable' });
+      result.push({ schema: 1, url: u.href, site: sites[u.hostname], ...shareTitle(title, sites[u.hostname], nearby), image: null, embed: embed(u.href), status: 'unavailable' });
       if (result.length === 2) break;
     }
     return result;
@@ -112,7 +129,7 @@
   function mount(container, text, options) {
     const items = links(text); if (!items.length) return () => {};
     let active = true; const cleanups = [];
-    const host = document.createElement('div'); host.className = 'social-link-cards' + (options.compact ? ' social-link-cards-compact' : ''); container.append(host);
+    const host = document.createElement('div'); host.className = 'social-link-cards' + (options.compact ? ' social-link-cards-compact' : '') + (options.desktop ? ' social-link-cards-desktop' : ''); container.append(host);
     const valid = () => active && host.parentNode === container && (!options.isCurrent || options.isCurrent());
     for (const item of items) {
       let current = item, busy = false;
@@ -122,16 +139,20 @@
       const copy = document.createElement('span'); copy.className = 'social-link-copy';
       const title = document.createElement('strong'); title.className = 'social-link-title';
       const source = document.createElement('span'); source.className = 'social-link-source';
+      const time = document.createElement('span'); time.className = 'social-link-time';
+      const media = document.createElement('span'); media.className = 'social-link-media'; media.setAttribute('aria-hidden', 'true');
+      const badge = document.createElement('span'); badge.className = 'social-link-badge';
       const cover = document.createElement('img'); cover.className = 'social-link-cover'; cover.alt = ''; cover.hidden = true; cover.referrerPolicy = 'no-referrer'; cover.loading = 'lazy';
       cover.onerror = () => { cover.hidden = true; cover.removeAttribute('src'); };
       const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'social-link-retry'; retry.textContent = '更新预览'; retry.hidden = true;
-      copy.append(title, source); button.append(copy, cover); wrap.append(button, retry); host.append(wrap);
+      copy.append(title, source, time); media.append(badge, cover); button.append(copy, media); wrap.append(button, retry); host.append(wrap);
       function draw(value) {
-        current = value; title.textContent = value.title || (value.site === '微信公众号' ? '微信公众号文章' : `${value.site}分享`);
-        const time = value.embed?.kind === 'bilibili' ? new URL(value.embed.url).searchParams.get('t') : null;
-        source.textContent = `${value.author || value.site}${time ? ' · 从 ' + time + ' 秒开始' : ''}`;
-        source.setAttribute('data-site', value.site);
-        button.setAttribute('aria-label', `打开${title.textContent}（${value.site}）`);
+        current = value; const view = presentation(value);
+        title.textContent = view.title; button.title = view.title;
+        source.textContent = view.source; source.title = view.source;
+        time.textContent = view.time; time.hidden = !view.time;
+        badge.textContent = view.badge; media.setAttribute('data-site', value.site);
+        button.setAttribute('aria-label', `打开${view.title}（${view.source}${view.time ? '，' + view.time : ''}）`);
         if (value.image) { cover.hidden = false; cover.src = value.image; } else { cover.hidden = true; cover.removeAttribute('src'); }
       }
       async function load(refresh = false) {
@@ -154,5 +175,5 @@
     }
     return () => { active = false; cleanups.forEach(fn => fn()); host.remove(); };
   }
-  root.ElonSocialLinks = { safeUrl, embed, trustedEmbed, links, sanitize, compact, prepareBubble, mount };
+  root.ElonSocialLinks = { safeUrl, embed, trustedEmbed, links, sanitize, compact, prepareBubble, presentation, mount };
 })(globalThis);

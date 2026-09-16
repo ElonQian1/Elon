@@ -11,7 +11,7 @@ internal object SocialLinkPolicy {
         "mp.weixin.qq.com" to "微信公众号", "douyin.com" to "抖音", "www.douyin.com" to "抖音", "v.douyin.com" to "抖音", "www.iesdouyin.com" to "抖音",
         "xiaohongshu.com" to "小红书", "www.xiaohongshu.com" to "小红书", "xhslink.com" to "小红书", "www.xhslink.com" to "小红书",
         "bilibili.com" to "哔哩哔哩", "www.bilibili.com" to "哔哩哔哩", "m.bilibili.com" to "哔哩哔哩", "b23.tv" to "哔哩哔哩",
-        "binance.com" to "币安广场", "www.binance.com" to "币安广场", "x.com" to "X", "www.x.com" to "X", "twitter.com" to "X", "www.twitter.com" to "X", "mobile.twitter.com" to "X", "t.co" to "X"
+        "binance.com" to "币安广场", "www.binance.com" to "币安广场", "app.binance.com" to "币安广场", "x.com" to "X", "www.x.com" to "X", "twitter.com" to "X", "www.twitter.com" to "X", "mobile.twitter.com" to "X", "t.co" to "X"
     )
     fun safeUrl(value: String?): URI? = runCatching {
         if (value == null || value.length > 4096 || value.any { it.code < 32 || it.code == 127 }) return null
@@ -50,7 +50,7 @@ internal object SocialLinkPolicy {
             val nearby = text.substring((match.range.first - 300).coerceAtLeast(0), match.range.first)
             val title = Regex("【([^】]+)】").findAll(nearby).map { it.groupValues[1] }.firstOrNull { !it.startsWith("精准空降") }.orEmpty()
             val linked = link(value, title) ?: continue
-            val (headline, author) = SocialLinkShareText.title(title, linked.site)
+            val (headline, author) = SocialLinkShareText.title(title, linked.site, nearby)
             val item = linked.copy(title = headline, author = author)
             if (result.none { it.url == item.url }) result.add(item)
             if (result.size == 2) break
