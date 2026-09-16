@@ -57,11 +57,12 @@
               senderName: msg.sender_name || options.friendName(contact), avatarDataUrl: avatar,
               avatarFallback: outgoing ? (options.user()?.nickname || options.user()?.account || '我') : (msg.sender_name || options.friendName(contact)),
             });
+            const compactLink = !recalled && !msg.attachments?.length && root.ElonSocialLinks?.prepareBubble(bubble, text);
             const shared = !recalled && kind === 'group' && root.ElonAiConversationShare?.mount(bubble, msg, { api: options.api, groupId: contact.id, list, isCurrent: () => scope === key });
             if (!recalled && !shared) { root.ElonArticles.mount(bubble, text, options.api, options.user()?.id); media(bubble, msg.attachments); if (!msg.attachments?.length) root.ElonSourceLinks?.text(bubble, text); }
             if (kind === 'group' && msg.id && !shared) root.ElonGroupMessageRevisions.mount(bubble, contact.id, msg, options.api, () => options.changed(contact.id));
             if (msg.send_status) { const status = document.createElement('small'); status.textContent = msg.send_status; status.style.display = 'block'; bubble.append(status); }
-            const owner = options.user()?.id, cleanup = !recalled && !shared && root.ElonSocialLinks?.mount(bubble, text, { api: options.api, owner, isCurrent: () => scope === key && options.user()?.id === owner });
+            const owner = options.user()?.id, cleanup = !recalled && !shared && root.ElonSocialLinks?.mount(bubble, text, { api: options.api, owner, compact: !!compactLink, isCurrent: () => scope === key && options.user()?.id === owner });
             entry = { signature, block: bubble.closest('.chat-message-block'), cleanup };
           }
           if (entry.block !== cursor) list.insertBefore(entry.block, cursor);

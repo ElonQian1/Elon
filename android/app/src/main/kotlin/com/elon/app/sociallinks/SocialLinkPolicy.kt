@@ -49,7 +49,9 @@ internal object SocialLinkPolicy {
             val value = match.value.trimEnd('，', '。', '！', '？', '；', '：', '、', '）', '】', '》', '”', '’', '.', ',', '!', ';')
             val nearby = text.substring((match.range.first - 300).coerceAtLeast(0), match.range.first)
             val title = Regex("【([^】]+)】").findAll(nearby).map { it.groupValues[1] }.firstOrNull { !it.startsWith("精准空降") }.orEmpty()
-            val item = link(value, title) ?: continue
+            val linked = link(value, title) ?: continue
+            val (headline, author) = SocialLinkShareText.title(title, linked.site)
+            val item = linked.copy(title = headline, author = author)
             if (result.none { it.url == item.url }) result.add(item)
             if (result.size == 2) break
         }
@@ -68,7 +70,8 @@ internal object SocialLinkPolicy {
             }
             else -> null
         }
-        return fallback.copy(title = value.optString("title").trim().take(160).ifBlank { fallback.title }, author = value.optString("author").take(80),
-            image = safeUrl(value.optString("image"))?.toString(), player = resolved?.player ?: fallback.player, xId = resolved?.xId ?: fallback.xId, ready = value.optString("status") == "ready")
+        val title = value.optString("title").trim().take(160).takeUnless { SocialLinkShareText.isGeneric(it, fallback.site) } ?: fallback.title
+        return fallback.copy(title = title, author = value.optString("author").take(80).ifBlank { fallback.author },
+            image = safeUrl(value.optString("image"))?.toString(), player = resolved?.player ?: fallback.player, xId = resolved?.xId ?: fallback.xId, ready = value.optString("status") == "ready" && title.isNotBlank())
     }
 }

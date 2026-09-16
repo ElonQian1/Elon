@@ -12,6 +12,15 @@ assert.equal(links.links(example)[0].title, '高糖VS戒糖14天！真的差别�
 const xhs = 'https://www.xiaohongshu.com/discovery/item/example?xsec_token=synthetic&xsec_source=pc_share';
 assert.equal(links.links(xhs)[0].url, xhs);
 assert.equal(links.links(xhs + ' ' + xhs).length, 1);
+const xhsShare = `45 【一次看完多位画师卡位实拍，哪张击中你？✨ - OC猫 | 小红书 - 你的生活兴趣社区】 😆 vEtl5AZaiF1Cpm2 😆 ${xhs}`;
+const sharedXhs = links.links(xhsShare)[0];
+assert.equal(sharedXhs.title, '一次看完多位画师卡位实拍，哪张击中你？✨');
+assert.equal(sharedXhs.author, 'OC猫');
+assert.equal(links.sanitize({ ...sharedXhs, title: '小红书 - 你的生活兴趣社区', author: '', status: 'ready' }, sharedXhs).title, sharedXhs.title);
+assert.equal(links.compact(xhsShare), true);
+assert.equal(links.compact(`我的评论 ${xhsShare}`), false);
+assert.equal(links.compact(`${xhsShare} 我的评论`), false);
+assert.equal(links.compact('3.53 复制打开抖音，看看【作者的作品】《世界》 https://v.douyin.com/_XMEsxVKKOY/ aNW:/ i@p.QX :9pm 02/07'), true);
 for (const bad of ['https://x.com.evil.example/a/status/123456', 'https://user:pass@x.com/a', 'javascript:alert(1)', '【一龙文章】\nhttps://x.com/a/status/123456']) assert.equal(links.links(bad).length, 0);
 assert.equal(links.embed('https://x.com/i/article/123456'), null);
 assert.equal(links.embed('https://www.binance.com/en/square/post/123456'), null);

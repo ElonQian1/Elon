@@ -14,16 +14,16 @@ async function previewApi(path: string, init: RequestInit) {
   if (!response.ok) throw new Error('预览暂不可用')
   return response.json()
 }
-export default function SocialLinkCards({ text, owner }: { text: string; owner: string }) {
+export default function SocialLinkCards({ text, owner, compact = false }: { text: string; owner: string; compact?: boolean }) {
   const host = useRef<HTMLDivElement>(null)
   const [reading, setReading] = useState<LinkPreview | null>(null)
   useEffect(() => {
     if (!host.current) return
-    return ElonSocialLinks.mount(host.current, text, { owner, api: previewApi, open: p => {
+    return ElonSocialLinks.mount(host.current, text, { owner, compact, api: previewApi, open: p => {
       if (getDesktopInvoke() && p.embed?.kind !== 'x') setReading(p)
       else ElonSocialLinkViewer.open(p)
     } })
-  }, [text, owner])
+  }, [text, owner, compact])
   useEffect(() => () => { ElonSocialLinkViewer.close() }, [owner, text])
   return <><div ref={host} />{reading && <SocialLinkBrowser preview={reading} onClose={() => setReading(null)} />}</>
 }

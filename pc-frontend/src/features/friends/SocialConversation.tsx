@@ -81,6 +81,7 @@ export default function SocialConversation(props: Props) {
         const name = own ? me.nickname || me.account : conversation.kind === 'group' ? m.sender_name || '群成员' : title
         const avatar = own ? me.avatar_data_url : conversation.kind === 'group' ? props.group?.members?.find(member => member.id === m.sender_user_id)?.avatar_data_url : props.friend?.avatar_data_url
         const content = recalled ? (own ? '你撤回了一条消息' : `${name} 撤回了一条消息`) : displayMessageContentOrAttachment(m.content)
+        const compactLink = !recalled && !m.attachments?.length && ElonSocialLinks.compact(content)
         const copyId = messageCopySourceId(`friends:${key}`, m.id)
         const savedKey = localMessageKey(conversation, m.id)
         return <div key={`${key}:${m.id}`} data-message-id={m.id} tabIndex={0} aria-label={`${name}的消息`}
@@ -99,12 +100,12 @@ export default function SocialConversation(props: Props) {
           <div className={styles.avatar}><SocialAvatar userId={m.sender_user_id} name={name} avatar={avatar} /></div>
           <div className={styles.msgBody} data-social-content>
             <div className={styles.msgMeta}><strong>{name}</strong><span>{formatTime(m.created_at)}</span></div>
-            {content && (articleReference(content) ? <ArticleMessage content={content} /> : <div id={copyId} className={styles.msgContent}>
+            {content && (articleReference(content) ? <ArticleMessage content={content} /> : <div id={copyId} className={styles.msgContent} hidden={compactLink}>
               {(!own || content.startsWith('>')) && /[#*`\[\]>|]/.test(content) ? <MarkdownContent content={content} copy={false} /> : content}
             </div>)}
             {!recalled && !m.attachments?.length && <TextSourceCard text={m.content} />}
             {!recalled && <SocialMessageAttachments attachments={m.attachments} />}
-            {!recalled && !specialMessage(m) && <SocialLinkCards text={content} owner={`${me.id}:${key}`} />}
+            {!recalled && !specialMessage(m) && <SocialLinkCards text={content} owner={`${me.id}:${key}`} compact={compactLink} />}
             <SocialMessageMenu conversation={conversation} message={m} own={own} special={specialMessage(m)} copySourceId={copyId} request={menu} onMenu={setMenu} favorite={favorites.has(savedKey)}
               onQuote={() => setQuote({ conversation: key, message: m, author: name, nonce: Date.now() })}
               onForward={() => setForward([saveItem(m)])} onSelect={() => select(m)}

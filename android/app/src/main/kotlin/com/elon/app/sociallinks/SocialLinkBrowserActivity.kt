@@ -38,6 +38,8 @@ class SocialLinkBrowserActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         original = SocialLinkPolicy.safeUrl(intent.getStringExtra("url"))?.toString().orEmpty()
         if (original.isEmpty()) { finish(); return }
+        val owner = com.elon.app.AuthManager.userId(applicationContext)
+        val server = com.elon.app.ServerUrlManager.getActive(applicationContext)
         root = FrameLayout(this).apply { setBackgroundColor(Color.parseColor("#15171B")) }
         main = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun dp(n: Int) = (resources.displayMetrics.density * n).toInt()
@@ -64,7 +66,11 @@ class SocialLinkBrowserActivity : AppCompatActivity() {
                 return true
             }
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) { handler.removeCallbacks(timeout); status.text = "正在打开…"; handler.postDelayed(timeout, 10000) }
-            override fun onPageFinished(view: WebView, url: String?) { handler.removeCallbacks(timeout); status.text = "内容由原平台提供；无法加载或需要登录时，可打开原文。" }
+            override fun onPageFinished(view: WebView, url: String?) {
+                handler.removeCallbacks(timeout); status.text = "内容由原平台提供；无法加载或需要登录时，可打开原文。"
+                SocialLinkReadPreview.capture(view, original, server, owner)
+                handler.postDelayed({ if (!isFinishing && !isDestroyed) SocialLinkReadPreview.capture(view, original, server, owner) }, 600)
+            }
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                 if (request.isForMainFrame) { handler.removeCallbacks(timeout); status.text = "页面加载失败，请刷新或打开原文。" }
             }

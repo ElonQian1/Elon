@@ -29,6 +29,7 @@ internal object SocialLinkPreviewApi {
     }
     fun load(context: Context, item: SocialLink, refresh: Boolean = false): SocialLink {
         val owner = AuthManager.userId(context).orEmpty()
+        SocialLinkReadPreview.cached(ServerUrlManager.getActive(context), AuthManager.userId(context), item.url)?.let { return it }
         val key = ServerUrlManager.getActive(context) + ":" + owner + ":" + item.url
         val old = previews.get(key)
         if (!refresh && old != null && old.first > System.currentTimeMillis()) return old.second

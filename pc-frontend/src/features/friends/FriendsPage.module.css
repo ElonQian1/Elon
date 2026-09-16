@@ -423,6 +423,7 @@ button.sectionHeader:focus-visible {
   background: rgba(46, 168, 97, .18);
   color: #effff4;
 }
+.msgContent[hidden] { display: none; }
 
 /* 输入框 */
 .composer {

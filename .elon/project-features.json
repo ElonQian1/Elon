@@ -22923,6 +22923,163 @@
       "updated_at_ms": 1788690756183
     },
     {
+      "id": "wechat-article-card-repair-v1",
+      "title": "社交外链卡片点击与布局修复",
+      "summary": "修复公众号小红书抖音卡片点击、分享标题优先级和三端消息卡片呈现",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/wechat-article-card-repair.md",
+        "content_hash": "99d12fe1eba755232779dfa841ac6d1eac722bfad3542255cf69c366340b2ade",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "1c6fad60ae88ef31068c184320481fb07c009e8e",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "1fa29b82a4e936fedd704106a50aa0ba59461c25",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/ChatAdapter.kt",
+        "android/app/src/main/kotlin/com/elon/app/sociallinks",
+        "pc-frontend/src/features/friends/SocialConversation.tsx",
+        "server/src/assets/social_links.css",
+        "server/src/assets/social_links.js"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "卡片子视图点击长按多选回归",
+        "分享标题和完整原文保留",
+        "三端布局与构建发布证据"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/sociallinks/SocialLinkCardView.kt",
+          "content_hash": "d71050750d0e2f2b88187e4f8d7b0a8829590cd3fba8a6039fb43bb08e9a08ed",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c6fad60ae88ef31068c184320481fb07c009e8e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "78b217cc2643521a852112713655d0ace578c030",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/sociallinks/SocialLinkReadPreview.kt",
+          "content_hash": "42f7aff03811f043601f2ce2559b81aaba76596e5558b8e771dbc4368950d915",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c6fad60ae88ef31068c184320481fb07c009e8e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5b82885671059c5f8974163b27ae21d6a5b22006",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/sociallinks/SocialLinkCardInteractionTest.kt",
+          "content_hash": "004cd411027bd2342ee0cb8b2784aeedbd806bd23e9a4069cde0c581dda51e87",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c6fad60ae88ef31068c184320481fb07c009e8e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "26e196ce808060a37c766d95c2436ed7eede7583",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/sociallinks/SocialLinkMessageBindingTest.kt",
+          "content_hash": "7f2c279e4191579867279c694cdfbe01e4634ed1efb6ce644555074cb43cf846",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c6fad60ae88ef31068c184320481fb07c009e8e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8935202dfc0802cb24ca3d4897a3bf13fddc4b79",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/sociallinks/SocialLinkShareTextTest.kt",
+          "content_hash": "e43166b7910477dc898eb5f84fa306d038b3e0809c48157efb9465ef4b1fc5a7",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c6fad60ae88ef31068c184320481fb07c009e8e",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f4721d7cef55d72225c9fad9c6292d81ca2a0ff0",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/FriendsPage.module.css",
+          "content_hash": "8424ea7d8fc072b877a55f8cd423289d8c70ddd0439e3fe8f38a4c20834b6eb8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c6fad60ae88ef31068c184320481fb07c009e8e",
+            "head_blob_oid": "a829fc9ac28ea6822411227d62bfcf6cbf9ee971",
+            "worktree_blob_oid": "32739a04bec553bcbda4071b2356caf7f4de3ef4",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-social-link-cards.mjs",
+          "content_hash": "7f5a11cb9e9d38578be13c426196eac2ed515a16367baf3d08f46026b107bcc1",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c6fad60ae88ef31068c184320481fb07c009e8e",
+            "head_blob_oid": "006d4f8905145fd722773e043c30e80f80a85464",
+            "worktree_blob_oid": "94c121b89a8dc52bdf817d0ce0d95e6ef6328194",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/assets/social_links.css",
+          "content_hash": "f2c6587d2096465080f34aeb07a5ab5f5952b34101d4a3d072ae860044759c62",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c6fad60ae88ef31068c184320481fb07c009e8e",
+            "head_blob_oid": "0ea9457b8994988a0bc934bb2ada22e946b458ee",
+            "worktree_blob_oid": "6ff327459ebadc13f9e48c76c1b537c0ca68d669",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/assets/social_links.js",
+          "content_hash": "68012b103225e4ef59f4740a5246517fb78b65841e8111b91772e68520ee1a4c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1c6fad60ae88ef31068c184320481fb07c009e8e",
+            "head_blob_oid": "7cc480b338191021accb6373d96cc863879d33a9",
+            "worktree_blob_oid": "03f1d422345fbd3e4cdec23921794f5bb6d09fbe",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1789544891468,
+      "updated_at_ms": 1789546802371
+    },
+    {
       "id": "win-ai-child-webview-capability-v1",
       "title": "Win 官方 AI 子 WebView 权限绑定 V1",
       "summary": "修复官方 AI 子 WebView 按宿主窗口匹配 capability 导致语义事件 IPC 被拒绝、原生输入与新会话永久禁用的问题。",
@@ -29926,56 +30083,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_bf1f7edf67aa4edd81561d91e0942fce",
-      "feature_id": "esk-game-funding-source-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-esk-game-goal",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789163961705
-    },
-    {
-      "id": "feature_event_dbdb51c1a330470ca22a08b33adbdae7",
-      "feature_id": "esk-game-funding-source-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-game-goal",
-      "reason": "Production source queries implemented; 19 SQL and 20 server reward tests passed. Publication pending.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789163961895
-    },
-    {
-      "id": "feature_event_f4f52848985c4560978b57f7fa03c041",
-      "feature_id": "esk-game-funding-source-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-game-goal",
-      "reason": "Production source queries implemented; 19 SQL and 20 server reward tests passed. Publication pending.",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1789163962065
-    },
-    {
-      "id": "feature_event_5ab8dfeeb163404eaf3b1e7e0f5ae551",
-      "feature_id": "android-binance-create-funds-v1",
-      "action": "registered",
-      "actor": "quant-grid",
-      "reason": "仅注册表并发冲突；保留上游所有功能，以官方工作流重放本功能登记及已验证证据。",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789164533657
-    },
-    {
-      "id": "feature_event_f02eb7405418499db618f5940a928df2",
-      "feature_id": "android-binance-create-funds-v1",
-      "action": "claimed",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789164533713
-    },
-    {
       "id": "feature_event_af758dd02cd5425c84eec7667d7386e8",
       "feature_id": "android-binance-create-funds-v1",
       "action": "transitioned",
@@ -31924,6 +32031,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789543660206
+    },
+    {
+      "id": "feature_event_59b64a44ea8b47aea71e850d2b126b40",
+      "feature_id": "wechat-article-card-repair-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789544891468
+    },
+    {
+      "id": "feature_event_fd78f715e55540ba84d06e5a0e90f860",
+      "feature_id": "wechat-article-card-repair-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789544891519
+    },
+    {
+      "id": "feature_event_06351211bcfd46c09fed0b47fc5c31f3",
+      "feature_id": "wechat-article-card-repair-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789544924140
+    },
+    {
+      "id": "feature_event_acd4adf00d3a431faeefc196aa9c3768",
+      "feature_id": "wechat-article-card-repair-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789546768939
+    },
+    {
+      "id": "feature_event_d22b8515117a4666b62a6e9fcdec4d2e",
+      "feature_id": "wechat-article-card-repair-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "Android 13 项定向测试、PWA 实际浏览器固定样例点击截图、PC 正式构建通过；正式发布继续，真实设备视觉验收延期，不宣称全平台验收。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789546802371
     }
   ]
 }

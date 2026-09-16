@@ -242,7 +242,7 @@ class ChatAdapter(
                 holder.text.movementMethod = LinkMovementMethod.getInstance()
             }
         }
-        com.elon.app.sociallinks.SocialLinkCards.bind(holder.attachmentList, holder.text, message, !recalled && !projectCardBound)
+        com.elon.app.sociallinks.SocialLinkCards.bind(holder.attachmentList, holder.text, message, !recalled && !projectCardBound, holder.bubble)
         WebChatProductionRichContentBinder.bindParts(holder.webChatPartList, message, onWebChatContentOpen)
         bindSendStatus(holder, message)
         bindGroupMessageRevision(holder, message, onMessageHistory)
@@ -480,10 +480,10 @@ class ChatAdapter(
         holder.text.isLongClickable = canAct
 
         val listener = if (canAct) {
-            View.OnLongClickListener {
+            View.OnLongClickListener { anchor ->
                 val position = holder.adapterPosition
                 val current = messages.getOrNull(position) ?: message
-                onMessageLongPress?.invoke(holder.text, current)
+                onMessageLongPress?.invoke(anchor, current)
                 true
             }
         } else {
