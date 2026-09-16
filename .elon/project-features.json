@@ -6035,7 +6035,7 @@
       "id": "binance-grid-rich-reports-v2",
       "title": "币安策略持仓丰富只读报告",
       "summary": "策略影子账户可选字段及v1兼容",
-      "status": "in_progress",
+      "status": "implemented",
       "priority": "p0",
       "requirement": {
         "path": "docs/binance-grid-rich-reports.md",
@@ -6069,10 +6069,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "89506eecef7febe112b5d5233d914dc37f793b01",
-            "head_blob_oid": "1d1781670f9fd8a8b9525d93e2de2c9901281320",
+            "head_commit": "e427016681391599e1d615f0b254700dedfb849c",
+            "head_blob_oid": "87603c8eb751e0b0459ff970971c53b646e5875c",
             "worktree_blob_oid": "87603c8eb751e0b0459ff970971c53b646e5875c",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6082,10 +6082,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "89506eecef7febe112b5d5233d914dc37f793b01",
-            "head_blob_oid": "191bb444c098ad92f1cbc1576ad6ecb7988db029",
+            "head_commit": "e427016681391599e1d615f0b254700dedfb849c",
+            "head_blob_oid": "1e00a0af44d7b9c92314a7effdd77378601073b1",
             "worktree_blob_oid": "1e00a0af44d7b9c92314a7effdd77378601073b1",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6095,23 +6095,23 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "89506eecef7febe112b5d5233d914dc37f793b01",
-            "head_blob_oid": "698771900276aafe7599d533fb4e36f5ca51f561",
+            "head_commit": "e427016681391599e1d615f0b254700dedfb849c",
+            "head_blob_oid": "cd10b39d2415fde070b8a3f4287cce7179f6a424",
             "worktree_blob_oid": "cd10b39d2415fde070b8a3f4287cce7179f6a424",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/binance-grid-rich-reports-delivery.md",
-          "content_hash": "1fa949831213dd25068366e2c310cdb87c97e1c1a0a628d272909b1d8cb896b9",
+          "content_hash": "4ae83db0668f4e11033505b2ce814cf05d30fe21826b2635b9cd407a76594d86",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "89506eecef7febe112b5d5233d914dc37f793b01",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "eb025d6eb46657655e5f6345646a1f5ffc07a0bc",
-            "state": "index_only"
+            "head_commit": "e427016681391599e1d615f0b254700dedfb849c",
+            "head_blob_oid": "eb025d6eb46657655e5f6345646a1f5ffc07a0bc",
+            "worktree_blob_oid": "e8c66e6048e0418a4b09dcdd2c5efc7f60caeb46",
+            "state": "tracked_modified"
           }
         },
         {
@@ -6121,21 +6121,15 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "89506eecef7febe112b5d5233d914dc37f793b01",
-            "head_blob_oid": "f24d720958059f122ed2a937b747a92c0a483526",
+            "head_commit": "e427016681391599e1d615f0b254700dedfb849c",
+            "head_blob_oid": "e02d199ed20bdaad5ea5ef4f8eaf33bdc4b7b77d",
             "worktree_blob_oid": "e02d199ed20bdaad5ea5ef4f8eaf33bdc4b7b77d",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         }
       ],
-      "claim": {
-        "claim_id": "claim_8def40f33fea45a9bd864fab73ba5769",
-        "agent_id": "quant-grid",
-        "claimed_at_ms": 1789543159566,
-        "expires_at_ms": 1789557559566
-      },
       "created_at_ms": 1789543159503,
-      "updated_at_ms": 1789543161034
+      "updated_at_ms": 1789543660206
     },
     {
       "id": "binance-grid-symbol-picker-v1",
@@ -29932,26 +29926,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_aebfa7fdd035414380f21dcdd5d1bc7d",
-      "feature_id": "esk-game-funding-source-v1",
-      "action": "claimed",
-      "actor": "codex-esk-game-goal",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789162928161
-    },
-    {
-      "id": "feature_event_65ff0ae998e54b7db82d102e73ee23e7",
-      "feature_id": "esk-game-funding-source-v1",
-      "action": "transitioned",
-      "actor": "codex-esk-game-goal",
-      "reason": "Implement the accepted funding source slice.",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789162939843
-    },
-    {
       "id": "feature_event_bf1f7edf67aa4edd81561d91e0942fce",
       "feature_id": "esk-game-funding-source-v1",
       "action": "evidence_recorded",
@@ -31930,6 +31904,26 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1789543161034
+    },
+    {
+      "id": "feature_event_6bf06f6a41b44c368a53976b85b68b9f",
+      "feature_id": "binance-grid-rich-reports-v2",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789543660149
+    },
+    {
+      "id": "feature_event_1dfb69418ae34bd9a39038fe946aff3e",
+      "feature_id": "binance-grid-rich-reports-v2",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "197项原生、23项报告回归通过，主1774与量化0.7.77已发布安装，用户真实数据验收待补",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789543660206
     }
   ]
 }
