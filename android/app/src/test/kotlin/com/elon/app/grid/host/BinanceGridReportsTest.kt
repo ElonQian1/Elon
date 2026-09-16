@@ -5,6 +5,19 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class BinanceGridReportsTest {
+    @Test fun richPositionsAreVersionedAndLegacyFieldsRemainExact() {
+        val row=mapOf("symbol" to "NEARUSDT","quantity" to "-2.1234567890123456789","entry" to "3",
+            "isolatedWallet" to "0","isolated" to false,"positionMargin" to "2","leverage" to "10","pnl" to "-0.1")
+        val state=BinanceGridReports({100},{1000000});val account=BinanceHostState.digest("42")
+        state.start(query(mapOf("kind" to "positions","id" to "123","symbol" to "NEARUSDT")),account,"sub")
+        state.accept(event(mapOf("kind" to "positions","total" to 1,"coverage" to "strategy_position","rows" to listOf(row))))
+        val old=StrictJson.parse(state.reply(request,account,"sub"));val rich=StrictJson.parse(state.reply(request,account,"sub",2))
+        assertEquals("yilong.binance_report.v1",old["schema"]);assertEquals("yilong.binance_report.v2",rich["schema"])
+        val legacy=(old["rows"] as List<*>).single() as Map<*,*>
+        assertEquals(setOf("symbol","quantity","entry","isolatedWallet","isolated"),legacy.keys)
+        assertEquals(row,(rich["rows"] as List<*>).single())
+        assertThrows(IllegalArgumentException::class.java){BinanceReportFields.decode("positions",row+("walletToken" to "private"))}
+    }
     private val request = "a".repeat(32)
     private fun query(changes: Map<String, Any?> = emptyMap()) = BinanceReportQuery.parse(StrictJson.encode(mapOf(
         "request" to request, "kind" to "history", "id" to "", "symbol" to "", "page" to 1, "days" to 30) + changes))

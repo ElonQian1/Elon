@@ -76,13 +76,17 @@ internal class BinanceGridReports(private val elapsed: () -> Long, private val e
         result = mapOf("status" to event["status"], "total" to total, "coverage" to coverage, "rows" to decoded)
         observed = epoch()
     }
-    fun reply(request: String, owner: String?, kind: String): String {
+    fun reply(request: String, owner: String?, kind: String, version:Int=1): String {
+        require(version in 1..2)
         val q = query ?: error("REPORT_MISSING")
         require(request == q.request && owner != null && account == owner && kind == accountKind)
         val age = elapsed() - started
         val value = if (age in 0..300000 && result != null) result!! else mapOf("status" to if (age in 0..35000) "pending" else "error",
             "total" to 0, "coverage" to "unavailable", "rows" to emptyList<Any>())
-        return StrictJson.encode(mapOf("schema" to "yilong.binance_report.v1", "request" to q.request, "kind" to q.kind,
-            "page" to q.page, "observed_at_ms" to observed) + value)
+        val compatible=if(version==1 && q.kind=="positions")value+("rows" to (value["rows"] as List<*>).map {row->
+            (row as Map<*,*>).filterKeys {it !in BinanceReportFields.positionExtras}
+        }) else value
+        return StrictJson.encode(mapOf("schema" to "yilong.binance_report.v$version", "request" to q.request, "kind" to q.kind,
+            "page" to q.page, "observed_at_ms" to observed) + compatible)
     }
 }

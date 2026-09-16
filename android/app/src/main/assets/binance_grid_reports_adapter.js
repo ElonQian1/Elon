@@ -176,9 +176,26 @@
               // Strategy shadow UID, never parent UID or the consumer supplied account.
               rows = array(data[uid] ?? []).filter(v => v.symbol === q.symbol && v.positionSide === 'BOTH').map(v => ({
                 symbol:q.symbol, quantity:dec(v.positionAmount), entry:dec(v.entryPrice), isolatedWallet:dec(v.isolatedWallet),
-                isolated: typeof v.isolated === 'boolean' ? v.isolated : null
+                isolated: typeof v.isolated === 'boolean' ? v.isolated : null,
+                leverage: num(v.leverage ?? detail.initialLeverage), notional: dec(v.notionalValue),
+                pnl: dec(v.unrealizedProfit), positionMargin: dec(v.positionInitialMargin),
+                initialMargin: dec(v.initialMargin), maintenanceMargin: dec(v.maintenanceMargin),
+                mark: dec(v.markPrice), liquidation: dec(v.liquidationPrice)
               }));
               total = rows.length;
+              if(rows.length) {
+                // Optional account risk context is scoped to the same strategy shadow UID.
+                // A missing/unsupported account response must not erase valid positions.
+                try {
+                  const funds=object((await request('funds',{strategyUserId:uid},context)).data);
+                  const values=array(funds[uid],1);
+                  if(values.length===1 && (values[0].asset==null || values[0].asset==='USDT') &&
+                      (values[0].marginAsset==null || values[0].marginAsset==='USDT')) {
+                    rows=rows.map(row=>({...row,accountMarginBalance:dec(values[0].marginBalance),
+                      accountMaintenanceMargin:dec(values[0].maintenanceMargin)}));
+                  }
+                } catch(_) { /* Position coverage remains valid without risk context. */ }
+              }
             }
           }
           if (!Number.isSafeInteger(total) || total < rows.length || total > 10000000) throw Error('unsupported_total');

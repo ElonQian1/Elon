@@ -226,9 +226,9 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
             if (document.accept(doc) != null && result != "true") { reports.fail(q.request); events.changed("reports") }
         } ?: run { reports.fail(q.request); events.changed("reports") }
     }
-    fun reportRead(token: String, request: String): String {
+    fun reportRead(token: String, request: String, version:Int=1): String {
         readContinuous(token)
-        return reports.reply(request, state.account, state.accountKind)
+        return reports.reply(request, state.account, state.accountKind,version)
     }
     fun fail(message: String) { state.unavailable(); wallet.clearSession(); status = message; notifyChanged() }
     fun invalidate(message: String) {

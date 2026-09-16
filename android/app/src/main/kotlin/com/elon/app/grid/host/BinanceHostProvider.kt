@@ -42,7 +42,7 @@ class BinanceHostProvider : ContentProvider() {
                     else { runtime.disconnect(); Bundle().apply { putString("status", "revoked") } }
                 }
             }
-            val keys = when(method) { "detail" -> setOf("grant", "id"); "report_request_v1" -> setOf("grant", "query"); "report_read_v1" -> setOf("grant", "request"); else -> setOf("grant") }
+            val keys = when(method) { "detail" -> setOf("grant", "id"); "report_request_v1" -> setOf("grant", "query"); "report_read_v1", "report_read_v2" -> setOf("grant", "request"); else -> setOf("grant") }
             require(extras.keySet() == keys)
             val token = extras.getString("grant") ?: error("GRANT_MISSING")
             require(Regex("[0-9a-f]{64}").matches(token))
@@ -54,6 +54,7 @@ class BinanceHostProvider : ContentProvider() {
                     }
                     "report_request_v1" -> { runtime.reportRequest(token, extras.getString("query") ?: error("QUERY_MISSING")); Bundle().apply { putString("status", "pending") } }
                     "report_read_v1" -> Bundle().apply { putString("result", runtime.reportRead(token, extras.getString("request") ?: error("REQUEST_MISSING"))) }
+                    "report_read_v2" -> Bundle().apply { putString("result", runtime.reportRead(token, extras.getString("request") ?: error("REQUEST_MISSING"),2)) }
                     "read" -> Bundle().apply { putString("result", runtime.read(token)) }
                     "read_v2" -> Bundle().apply { putString("result", runtime.readContinuous(token)) }
                     "read_v3" -> Bundle().apply { putString("result", runtime.readContinuous(token,3)) }

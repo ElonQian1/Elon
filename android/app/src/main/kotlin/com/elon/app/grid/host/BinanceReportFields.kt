@@ -17,12 +17,16 @@ internal object BinanceReportFields {
     private val deals = mapOf("time" to INTEGER, "side" to "BUY|SELL", "type" to ENUM, "price" to DECIMAL,
         "quantity" to DECIMAL, "total" to DECIMAL, "fee" to DECIMAL, "feeAsset" to ENUM)
     private val positions = mapOf("symbol" to SYMBOL, "quantity" to DECIMAL, "entry" to DECIMAL, "isolatedWallet" to DECIMAL)
+    val positionExtras = setOf("leverage", "notional", "pnl", "positionMargin", "initialMargin", "maintenanceMargin", "mark", "liquidation",
+        "accountMarginBalance", "accountMaintenanceMargin")
     private val funds = mapOf("asset" to "USDT", "marginBalance" to DECIMAL, "crossInitialMargin" to DECIMAL)
     fun decode(kind: String, value: Any?): Map<String, Any?> {
         @Suppress("UNCHECKED_CAST") val row = value as? Map<String, Any?> ?: error("REPORT_ROW_INVALID")
         val fields = when(kind) { "history" -> history; "orders" -> orders; "matches" -> matches; "deals" -> deals; "positions" -> positions; "funds" -> funds; else -> error("REPORT_KIND") }
         val extra = when(kind) { "matches" -> setOf("details", "cancelled"); "positions" -> setOf("isolated"); else -> emptySet() }
-        require(row.keys == fields.keys + extra)
+        val optional = if(kind=="positions")positionExtras else emptySet()
+        require(row.keys.containsAll(fields.keys + extra) && row.keys.all {it in fields.keys + extra + optional})
+        optional.forEach { key -> require(row[key]==null || row[key] is String && Regex(DECIMAL).matches(row[key] as String)) }
         fields.forEach { (key, pattern) -> require(row[key] == null || row[key] is String && Regex(pattern).matches(row[key] as String)) }
         when(kind) {
             "history" -> require(listOf("id", "symbol", "status").all { row[it] is String })

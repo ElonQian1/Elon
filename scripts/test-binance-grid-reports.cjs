@@ -22,6 +22,24 @@ function fixture() {
   return {events,calls,data,account,known,reports,q,diagnostics,setProof:f=>{prove=f;}};
 }
 const grid = {strategyId:'123',symbol:'NEARUSDT',rootUserId:'42',strategyUserId:'99',strategyStatus:'WORKING'};
+test('rich position fields remain decimal strings and are selected only from the strategy shadow account',async()=>{
+  const h=fixture();h.data.push({data:{...grid,initialLeverage:10}},{data:{'42':[{symbol:'NEARUSDT',positionSide:'BOTH',positionAmount:'999'}],
+    '99':[{symbol:'NEARUSDT',positionSide:'BOTH',positionAmount:'-2.1234567890123456789',entryPrice:'3',isolated:false,
+      positionInitialMargin:'1.23',maintenanceMargin:'0.005',unrealizedProfit:'-0.45',markPrice:'3.2',liquidationPrice:'4.5',notionalValue:'-6.79',email:'private@test'}]}});
+  h.reports.query(h.q('positions'));await tick();const v=h.events[0].rows[0];
+  assert.equal(h.events[0].status,'ready');assert.equal(v.quantity,'-2.1234567890123456789');assert.equal(v.leverage,'10');
+  assert.equal(v.positionMargin,'1.23');assert.equal(v.pnl,'-0.45');assert.equal(v.mark,'3.2');assert.equal(v.liquidation,'4.5');
+  assert.equal(v.notional,'-6.79');assert.equal(v.initialMargin,null);assert.ok(!JSON.stringify(v).includes('private@test'));
+});
+test('position margin context cannot use parent account or another asset',async()=>{
+  for(const wrong of [false,true]) {
+    const h=fixture();h.data.push({data:grid},{data:{'99':[{symbol:'NEARUSDT',positionSide:'BOTH',positionAmount:'2',isolated:false}]}},
+      {data:{'42':[{marginBalance:'99999'}],'99':[{asset:wrong?'USDC':'USDT',marginBalance:'100.123456789',maintenanceMargin:'4'}]}});
+    h.reports.query(h.q('positions'));await tick();const row=h.events[0].rows[0];
+    assert.equal(h.events[0].status,'ready');assert.equal(row.accountMarginBalance,wrong?undefined:'100.123456789');
+    assert.equal(h.calls[2].init.body,'{"marginAsset":"USDT","strategyUserIds":[99]}');
+  }
+});
 test('funds selects the verified strategy UID and preserves exact amounts with a fixed USDT read',async()=>{
   const h=fixture(); h.data.push({data:{...grid,strategyUserId:'9999999999999999999'}},
     '{"success":true,"code":"000000","data":{"42":[{"marginBalance":"9000"}],"9999999999999999999":[{"asset":"USDT","marginBalance":1.234567890123456789,"crossInitialMargin":"0","email":"private@example.test"}]}}');

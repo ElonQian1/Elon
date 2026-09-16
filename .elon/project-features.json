@@ -6032,6 +6032,112 @@
       "updated_at_ms": 1788726050592
     },
     {
+      "id": "binance-grid-rich-reports-v2",
+      "title": "币安策略持仓丰富只读报告",
+      "summary": "策略影子账户可选字段及v1兼容",
+      "status": "in_progress",
+      "priority": "p0",
+      "requirement": {
+        "path": "docs/binance-grid-rich-reports.md",
+        "content_hash": "b449b49dad476e303bddeac75ba83f8869225e6e18df1e67d2b794ee631b3963",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "89506eecef7febe112b5d5233d914dc37f793b01",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "8f3f873fb2c5d7846e058eac1a87016e94145c75",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "quant-grid",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/binance_grid_reports_adapter.js",
+        "android/app/src/main/kotlin/com/elon/app/grid/host"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "v2报告精度与影子账户隔离，v1字段不变"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/assets/binance_grid_reports_adapter.js",
+          "content_hash": "a48b2cb6b093404ba9dc09e0947b24fcaee8d9bc71b94b2bd071dd774f2e8166",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "89506eecef7febe112b5d5233d914dc37f793b01",
+            "head_blob_oid": "1d1781670f9fd8a8b9525d93e2de2c9901281320",
+            "worktree_blob_oid": "87603c8eb751e0b0459ff970971c53b646e5875c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/host/BinanceGridReports.kt",
+          "content_hash": "81090c8fff7fa7b4241c7c4423a2fbd4b21438415bf7a9f053239fe2e2545c76",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "89506eecef7febe112b5d5233d914dc37f793b01",
+            "head_blob_oid": "191bb444c098ad92f1cbc1576ad6ecb7988db029",
+            "worktree_blob_oid": "1e00a0af44d7b9c92314a7effdd77378601073b1",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/host/BinanceGridReportsTest.kt",
+          "content_hash": "0a435c331d9ab2dcc46405edfc789200aed9ba4c92094cc142be0696dd8a6df8",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "89506eecef7febe112b5d5233d914dc37f793b01",
+            "head_blob_oid": "698771900276aafe7599d533fb4e36f5ca51f561",
+            "worktree_blob_oid": "cd10b39d2415fde070b8a3f4287cce7179f6a424",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/binance-grid-rich-reports-delivery.md",
+          "content_hash": "1fa949831213dd25068366e2c310cdb87c97e1c1a0a628d272909b1d8cb896b9",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "89506eecef7febe112b5d5233d914dc37f793b01",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "eb025d6eb46657655e5f6345646a1f5ffc07a0bc",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-binance-grid-reports.cjs",
+          "content_hash": "09733e682c81c187389ef990f8ec3d740b91b6d6adc1e72126c684b09d75311d",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "89506eecef7febe112b5d5233d914dc37f793b01",
+            "head_blob_oid": "f24d720958059f122ed2a937b747a92c0a483526",
+            "worktree_blob_oid": "e02d199ed20bdaad5ea5ef4f8eaf33bdc4b7b77d",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "claim": {
+        "claim_id": "claim_8def40f33fea45a9bd864fab73ba5769",
+        "agent_id": "quant-grid",
+        "claimed_at_ms": 1789543159566,
+        "expires_at_ms": 1789557559566
+      },
+      "created_at_ms": 1789543159503,
+      "updated_at_ms": 1789543161034
+    },
+    {
       "id": "binance-grid-symbol-picker-v1",
       "title": "合约网格搜索分类选币",
       "summary": "主APK托管选币页，复用公开合约与24小时行情，提供搜索、分类、自选、最近、排序和换币清理",
@@ -29826,46 +29932,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_19c0542cfc0449e0b457a03ed72b2361",
-      "feature_id": "android-binance-create-validation-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789159308423
-    },
-    {
-      "id": "feature_event_03a29efd54c344caa7ca0ff021a0e317",
-      "feature_id": "android-binance-create-validation-v1",
-      "action": "transitioned",
-      "actor": "codex-grid",
-      "reason": "源码和离线回归通过；正式发布、装机和同账号动态比对分别继续取证，不标记已验收",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789159308519
-    },
-    {
-      "id": "feature_event_38ca052ed46a443c863abd391cb80f03",
-      "feature_id": "android-binance-create-validation-v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789162070807
-    },
-    {
-      "id": "feature_event_9567af7fb9ec49afa1c7cc57caa27297",
-      "feature_id": "esk-game-funding-source-v1",
-      "action": "registered",
-      "actor": "codex-esk-game-goal",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789162917371
-    },
-    {
       "id": "feature_event_aebfa7fdd035414380f21dcdd5d1bc7d",
       "feature_id": "esk-game-funding-source-v1",
       "action": "claimed",
@@ -31824,6 +31890,46 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1789542082009
+    },
+    {
+      "id": "feature_event_b779c095129c44919058f1165afbb9ce",
+      "feature_id": "binance-grid-rich-reports-v2",
+      "action": "registered",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789543159503
+    },
+    {
+      "id": "feature_event_a2fe40807b604d5e9b6723c272bb1a30",
+      "feature_id": "binance-grid-rich-reports-v2",
+      "action": "claimed",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789543159567
+    },
+    {
+      "id": "feature_event_a77d75a5a02544db8c5b5537fbddc907",
+      "feature_id": "binance-grid-rich-reports-v2",
+      "action": "transitioned",
+      "actor": "quant-grid",
+      "reason": "注册表冲突保留上游，再经官方工具恢复本批独立功能",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789543159629
+    },
+    {
+      "id": "feature_event_ba3c35e98e604b6a9ed37fef6b1d5aa9",
+      "feature_id": "binance-grid-rich-reports-v2",
+      "action": "evidence_recorded",
+      "actor": "quant-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789543161034
     }
   ]
 }
