@@ -19,11 +19,11 @@ reviewed_at: 2026-09-16
 
 | 能力 | 实现 | 验证 | 发布/验收 |
 |---|---|---|---|
-| 子控件点击、长按、多选、原链接打开 | implemented | Android 实际 View 手势与显式 Intent 测试 | 正式发布后记录版本；真机待复核 |
+| 子控件点击、长按、多选、原链接打开 | implemented | Android 实际 View 手势与显式 Intent 测试 | APK 1.1.1775 已发布；真机待复核 |
 | 消息复用、附加评论与附件 | implemented | 实际 ChatAdapter 绑定回归 | 同上 |
 | 分享标题、缓存隔离与验证页拒绝 | implemented | Kotlin/JS 定向回归 | 公开微信元数据获取仍受平台验证限制 |
 | PWA 卡片显示和阅读窗口 | implemented | 实际消息渲染函数、固定数据、Edge 截图与点击 | 非登录生产会话，不能代替真机内容验收 |
-| PC | implemented | TypeScript/Vite 正式构建、来源链接回归 | 发布后核对线上资源 |
+| PC | implemented | TypeScript/Vite 正式构建、来源链接回归 | 0.3.1764 已发布；线上来源校验通过 |
 
 浏览器固定数据分别覆盖可用封面与无元数据；封面样例不是远端获取证明。已点击标题、来源、封面，打开/关闭抖音阅读对话框，保留聊天草稿；没有发送任何测试消息。
 
@@ -41,4 +41,14 @@ reviewed_at: 2026-09-16
 
 ## 发布与证据
 
-定向测试、工件版本、线上来源校验和统一收尾结果在发布后补入。最终截图与回执复制到工作区外的 `social-card-repair` 证据目录，避免随任务工作树清理丢失。
+- 业务提交：`115dbd4fe7ee938145a7a76ae5d74ce43e8699fe`，已推送 `origin/main`。
+- Android：13 项定向测试，0 失败/错误；包括实际 ChatAdapter 对 user/friend 两类消息的复用验证。日志 `social-card-repair-binding-fixed-20260916-161751-586`。
+- PC：TypeScript/Vite 正式构建与来源链接脚本通过；六平台卡片 JS 回归通过。日志 `social-card-repair-pc-final-20260916-161423-742`。
+- 浏览器：Edge 153，390×844，绑定业务提交；成功样例执行 8 步、失败样例执行 3 步，均 0 JS 异常；临时浏览器/配置均已回收。
+- 成功 PNG SHA-256：`109e9ddd1bc39d1494b680571ad98bad2fa0aebfcd404d2da9debd7a92cfe67f`；失败 PNG：`3499a89db974b3ee8c269adeed82e79d6e53ebfa514cb085f5c5dcfc7b334d52`。
+- Server/PWA/PC：`0.3.1764`，正式发布成功，`/health` OK、`/pc` HTTP 200、前端/server gitSha 均等于业务提交；三个共享 JS/CSS 文件与源码逐字匹配（仅统一 LF）。日志 `social-card-repair-server-publish-20260916-162113-473`。
+- APK：`1.1.1775` / build `1775`，正式发布成功，40,775,682 字节；SHA-256 `b6a3bf68990a7912d942863041936f17eff050814d18f5e7342cca4cdc30e679`；线上 gitSha/sourceSha 均等于业务提交。日志 `social-card-repair-apk-publish-20260916-162841-329`。
+- `check-task-complete -Kind PcFrontend` 与 `AndroidFeature` 均通过。主工作区存在既有 tracked changes，仅阻止本地 main 快进；未改动或清理它们。
+- 功能注册表保持 `implemented`，正式工件 `published`，设备视觉 `acceptance_status=deferred`；未把设备验收缺口改记成 verified/released。
+
+截图、JUnit XML、发布回执与检查结果保存在工作区外 `C:/Users/Administrator/.codex/visualizations/2026/09/14/01a0a0f4-31f6-7172-80f5-e14a9ea76be1/social-card-repair/`。该目录的 `delivery.md` 与 `finish.log` 保存本轮最终统一收尾结果，避免任务工作树清理后证据丢失。

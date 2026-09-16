@@ -23024,6 +23024,19 @@
           }
         },
         {
+          "path": "docs/reports/social-card-repair-delivery.md",
+          "content_hash": "8eb44ca2e5d86c93f508e6b36aa6a76c426a50f13b7648d91b321c42fef6ae6a",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "115dbd4fe7ee938145a7a76ae5d74ce43e8699fe",
+            "head_blob_oid": "48ec4dfa6598d2cce61b8dc048224a37f08b1142",
+            "worktree_blob_oid": "92d3698bb44b76ea0886ea66d0c1a2920c2b7a6e",
+            "state": "tracked_modified"
+          }
+        },
+        {
           "path": "pc-frontend/src/features/friends/FriendsPage.module.css",
           "content_hash": "8424ea7d8fc072b877a55f8cd423289d8c70ddd0439e3fe8f38a4c20834b6eb8",
           "locator": "",
@@ -23077,7 +23090,7 @@
         }
       ],
       "created_at_ms": 1789544891468,
-      "updated_at_ms": 1789546802371
+      "updated_at_ms": 1789547772895
     },
     {
       "id": "win-ai-child-webview-capability-v1",
@@ -30083,16 +30096,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_af758dd02cd5425c84eec7667d7386e8",
-      "feature_id": "android-binance-create-funds-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "重放本功能已完成实现，保留上游其他功能。",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789164533755
-    },
-    {
       "id": "feature_event_cb325c050cd84fefaee4373d95c236eb",
       "feature_id": "android-binance-create-funds-v1",
       "action": "evidence_recorded",
@@ -32081,6 +32084,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789546802371
+    },
+    {
+      "id": "feature_event_42589e123e6d40d886f8994028855539",
+      "feature_id": "wechat-article-card-repair-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1789547772895
     }
   ]
 }
