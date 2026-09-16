@@ -32,6 +32,7 @@ class SocialLinkBrowserActivity : AppCompatActivity() {
     private var fullCallback: WebChromeClient.CustomViewCallback? = null
     private var original = ""
     private val handler = Handler(Looper.getMainLooper())
+    private var readCapture: Runnable? = null
     private val timeout = Runnable { status.text = "若内容未显示，请刷新或打开原文。" }
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,6 +41,12 @@ class SocialLinkBrowserActivity : AppCompatActivity() {
         if (original.isEmpty()) { finish(); return }
         val owner = com.elon.app.AuthManager.userId(applicationContext)
         val server = com.elon.app.ServerUrlManager.getActive(applicationContext)
+        fun returnToChat() {
+            var returned = false
+            fun done() { if (!returned) { returned = true; finish() } }
+            SocialLinkReadPreview.capture(web, original, server, owner) { done() }
+            handler.postDelayed({ done() }, 800)
+        }
         root = FrameLayout(this).apply { setBackgroundColor(Color.parseColor("#15171B")) }
         main = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun dp(n: Int) = (resources.displayMetrics.density * n).toInt()
@@ -48,8 +55,10 @@ class SocialLinkBrowserActivity : AppCompatActivity() {
         fun button(label: String, action: () -> Unit) {
             controls.addView(TextView(this).apply { text = label; textSize = 14f; setTextColor(Color.parseColor("#C5D6EC")); gravity = android.view.Gravity.CENTER; minHeight = dp(48); isFocusable = true; setOnClickListener { action() } }, LinearLayout.LayoutParams(0, -2, 1f))
         }
-        button("返回聊天") { finish() }; button("后退") { if (web.canGoBack()) web.goBack() }
+        button("返回聊天") { returnToChat() }; button("后退") { if (web.canGoBack()) web.goBack() }
         button("前进") { if (web.canGoForward()) web.goForward() }; button("刷新") { web.reload() }; button("打开原文") { external(original) }
+        val xId = intent.getStringExtra("x_id").orEmpty()
+        if (xId.matches(Regex("[0-9]{5,24}"))) button("嵌入查看") { embeddedX(xId) }
         status = TextView(this).apply { textSize = 12f; setTextColor(Color.parseColor("#B7BDC8")); setPadding(dp(16), dp(4), dp(16), dp(8)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
         web = WebView(this).apply {
             setBackgroundColor(Color.parseColor("#15171B"))
@@ -65,11 +74,18 @@ class SocialLinkBrowserActivity : AppCompatActivity() {
                 if (request.isForMainFrame) status.text = "该跳转需要原平台应用，可使用“打开原文”。"
                 return true
             }
-            override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) { handler.removeCallbacks(timeout); status.text = "正在打开…"; handler.postDelayed(timeout, 10000) }
+            override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) { readCapture?.let { handler.removeCallbacks(it) }; handler.removeCallbacks(timeout); status.text = "正在打开…"; handler.postDelayed(timeout, 10000) }
             override fun onPageFinished(view: WebView, url: String?) {
                 handler.removeCallbacks(timeout); status.text = "内容由原平台提供；无法加载或需要登录时，可打开原文。"
-                SocialLinkReadPreview.capture(view, original, server, owner)
-                handler.postDelayed({ if (!isFinishing && !isDestroyed) SocialLinkReadPreview.capture(view, original, server, owner) }, 600)
+                readCapture?.let { handler.removeCallbacks(it) }
+                var attempts = 0
+                readCapture = object : Runnable {
+                    override fun run() {
+                        if (isFinishing || isDestroyed) return
+                        SocialLinkReadPreview.capture(view, original, server, owner)
+                        if (++attempts < 12) handler.postDelayed(this, 1500)
+                    }
+                }.also { handler.post(it) }
             }
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                 if (request.isForMainFrame) { handler.removeCallbacks(timeout); status.text = "页面加载失败，请刷新或打开原文。" }
@@ -89,16 +105,20 @@ class SocialLinkBrowserActivity : AppCompatActivity() {
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom); insets
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() { if (full != null) hideFullscreen() else if (web.canGoBack()) web.goBack() else finish() }
+            override fun handleOnBackPressed() { if (full != null) hideFullscreen() else if (web.canGoBack()) web.goBack() else returnToChat() }
         })
         if (savedInstanceState != null && web.restoreState(savedInstanceState) != null) return
         val x = intent.getStringExtra("x_id").orEmpty()
-        if (x.matches(Regex("[0-9]{5,24}"))) {
-            web.loadDataWithBaseURL("https://social-link.invalid/", """<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{background:#15171b;color:#eee}a{color:#bdd4ef}</style><blockquote class="twitter-tweet" data-theme="dark" data-dnt="true"><a href="https://x.com/i/status/$x">在 X 查看原帖</a></blockquote><script async src="https://platform.x.com/widgets.js"></script>""", "text/html", "UTF-8", null)
+        if (x.matches(Regex("[0-9]{5,24}")) && SocialLinkReadIdentity.identity(original) == null) {
+            embeddedX(x)
         } else {
             val player = SocialLinkPolicy.safeUrl(intent.getStringExtra("player"))?.toString()
-            web.loadUrl(player ?: original)
+            web.loadUrl(player ?: SocialLinkReadIdentity.readingUrl(original))
         }
+    }
+    private fun embeddedX(id: String) {
+        if (!id.matches(Regex("[0-9]{5,24}"))) return
+        web.loadDataWithBaseURL("https://social-link.invalid/", """<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{background:#15171b;color:#eee}a{color:#bdd4ef}</style><blockquote class="twitter-tweet" data-theme="dark" data-dnt="true"><a href="https://x.com/i/status/$id">在 X 查看原帖</a></blockquote><script async src="https://platform.x.com/widgets.js"></script>""", "text/html", "UTF-8", null)
     }
     private fun external(url: String) { runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.onFailure { Toast.makeText(this, "未找到可打开网页的浏览器", Toast.LENGTH_SHORT).show() } }
     private fun hideFullscreen() { full?.let { root.removeView(it) }; full = null; fullCallback?.onCustomViewHidden(); fullCallback = null; main.visibility = View.VISIBLE }

@@ -4,6 +4,7 @@ import { resolveApiUrl } from '../../api/runtime'
 import { getDesktopInvoke } from '../shell/desktopShell'
 import type { LinkPreview } from './socialLinks'
 import SocialLinkBrowser from './SocialLinkBrowser'
+import { cachedRead, rememberRead } from './socialReadPreview'
 import '../../../../server/src/assets/social_links.js'
 import '../../../../server/src/assets/social_link_viewer.js'
 import '../../../../server/src/assets/social_links.css'
@@ -17,13 +18,21 @@ async function previewApi(path: string, init: RequestInit) {
 export default function SocialLinkCards({ text, owner, compact = false }: { text: string; owner: string; compact?: boolean }) {
   const host = useRef<HTMLDivElement>(null)
   const [reading, setReading] = useState<LinkPreview | null>(null)
+  const scope = resolveApiUrl('/') + '\n' + owner
+  const liveScope = useRef(scope); liveScope.current = scope
   useEffect(() => {
     if (!host.current) return
-    return ElonSocialLinks.mount(host.current, text, { owner, compact, desktop: true, api: previewApi, open: p => {
-      if (getDesktopInvoke() && p.embed?.kind !== 'x') setReading(p)
+    for (const item of ElonSocialLinks.links(text)) {
+      const cached = cachedRead(scope, item); if (cached) ElonSocialLinks.remember(scope, cached.preview, cached.expires)
+    }
+    return ElonSocialLinks.mount(host.current, text, { owner: scope, compact, desktop: true, api: previewApi, open: p => {
+      if (getDesktopInvoke()) setReading(p)
       else ElonSocialLinkViewer.open(p)
     } })
-  }, [text, owner, compact])
-  useEffect(() => () => { ElonSocialLinkViewer.close() }, [owner, text])
-  return <><div ref={host} />{reading && <SocialLinkBrowser preview={reading} onClose={() => setReading(null)} />}</>
+  }, [text, scope, compact])
+  useEffect(() => { setReading(null); return () => { ElonSocialLinkViewer.close() } }, [scope, text])
+  return <><div ref={host} />{reading && <SocialLinkBrowser preview={reading} onClose={() => setReading(null)} onRead={value => {
+    if (liveScope.current !== scope) return
+    const updated = rememberRead(scope, reading, value); if (updated) ElonSocialLinks.remember(scope, updated)
+  }} />}</>
 }

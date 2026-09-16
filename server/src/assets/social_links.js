@@ -20,6 +20,16 @@
     return { badge, title: value.title || fallback, source: value.site + (author && author !== value.site ? ' · ' + author : ''), time: seconds !== null && /^\d+$/.test(seconds) && n <= 604800 ? `从 ${stamp} 开始` : '' };
   }
   const cache = new Map();
+  const readers = new Set();
+  function remember(owner, value, expires = Date.now() + 24 * 3600000) {
+    if (!Number.isFinite(expires) || expires <= Date.now()) return;
+    const item = links(value?.url || '')[0]; if (!item) return;
+    const clean = sanitize(value, item); if (clean.status !== 'ready') return;
+    const key = String(owner || '') + '\n' + item.url;
+    while (cache.size >= 128) cache.delete(cache.keys().next().value);
+    cache.set(key, { expires: Math.min(expires, Date.now() + 24 * 3600000), promise: Promise.resolve(clean), read: clean });
+    readers.forEach(notify => notify(key, clean));
+  }
   function genericTitle(title, site) {
     const clean = String(title || '').replace(/\s+/g, '').toLowerCase();
     return !clean || clean === site.toLowerCase() || ['小红书-你的生活兴趣社区', '小红书–你的生活兴趣社区', '微信公众平台', '微信公众号', '环境异常', '安全验证', '访问验证', '抖音-记录美好生活'].includes(clean);
@@ -112,7 +122,7 @@
   async function preview(item, options, refresh) {
     const key = String(options.owner || '') + '\n' + item.url;
     const entry = cache.get(key);
-    if (!refresh && entry && entry.expires > Date.now()) return entry.promise;
+    if (entry && entry.expires > Date.now() && (!refresh || entry.read)) return entry.promise;
     while (cache.size >= 128) cache.delete(cache.keys().next().value);
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 12000);
     const record = { expires: Date.now() + 30000, promise: null };
@@ -159,13 +169,17 @@
         if (busy || !valid()) return; busy = true; retry.disabled = true;
         const value = await preview(item, options, refresh);
         busy = false;
-        if (valid()) { draw(value); retry.disabled = false; retry.hidden = value.status === 'ready' || options.compact === true; }
+        const observed = cache.get(String(options.owner || '') + '\n' + item.url);
+        const latest = observed?.read && observed.expires > Date.now() ? observed.read : value;
+        if (valid()) { draw(latest); retry.disabled = false; retry.hidden = latest.status === 'ready' || options.compact === true; }
       }
       button.onclick = event => {
         if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         event.preventDefault(); (options.open || root.ElonSocialLinkViewer?.open || (p => root.open(p.url, '_blank', 'noopener,noreferrer')))(current);
       };
       retry.onclick = () => load(true); draw(item);
+      const notify = (key, value) => { if (valid() && key === String(options.owner || '') + '\n' + item.url) draw(value); };
+      readers.add(notify); cleanups.push(() => readers.delete(notify));
       if (typeof IntersectionObserver === 'function') {
         const observer = new IntersectionObserver(entries => {
           if (entries.some(e => e.isIntersecting)) { observer.disconnect(); load(); }
@@ -175,5 +189,5 @@
     }
     return () => { active = false; cleanups.forEach(fn => fn()); host.remove(); };
   }
-  root.ElonSocialLinks = { safeUrl, embed, trustedEmbed, links, sanitize, compact, prepareBubble, presentation, mount };
+  root.ElonSocialLinks = { safeUrl, embed, trustedEmbed, links, sanitize, compact, prepareBubble, presentation, mount, remember };
 })(globalThis);

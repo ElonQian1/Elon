@@ -11,6 +11,8 @@ use crate::{
 };
 
 const INTERNAL_BROWSER_LABEL: &str = "internal-browser-source";
+#[path = "internal_browser_read_preview.rs"]
+mod read_preview;
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,6 +25,8 @@ pub(crate) struct InternalBrowserTabState {
     loaded: bool,
     visible: bool,
     last_error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    read_preview: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Default)]
@@ -179,12 +183,26 @@ pub async fn control_internal_browser_tab(
 }
 
 #[tauri::command]
-pub fn get_internal_browser_tab_state(
+pub async fn get_internal_browser_tab_state(
+    app: AppHandle,
     webview: Webview,
     runtime: State<'_, InternalBrowserRuntime>,
+    original_url: Option<String>,
 ) -> Result<InternalBrowserTabState, String> {
     ensure_main_webview(&webview)?;
-    runtime.snapshot()
+    let mut state = runtime.snapshot()?;
+    if let Some(original) = original_url {
+        if state.loaded && state.visible && state.last_error.is_none() {
+            if let Some(tab) = app.get_webview(INTERNAL_BROWSER_LABEL) {
+                state.read_preview = read_preview::read(&tab, &original).await;
+                let current = runtime.snapshot()?;
+                if current.current_url != state.current_url || current.loading || !current.visible {
+                    state.read_preview = None;
+                }
+            }
+        }
+    }
+    Ok(state)
 }
 
 fn parse_external_url(value: &str) -> Result<tauri::Url, String> {
@@ -210,6 +228,7 @@ fn state_for(
         loaded: false,
         visible,
         last_error: None,
+        read_preview: None,
     }
 }
 

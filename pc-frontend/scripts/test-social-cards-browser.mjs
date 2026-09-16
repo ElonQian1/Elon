@@ -67,7 +67,7 @@ try {
     await page.locator('dialog[open]').waitFor()
     await page.waitForFunction(() => window.__cardNativeCalls.some(call => call.command === 'open_internal_browser_tab'))
     const opened = await page.evaluate(() => window.__cardNativeCalls.find(call => call.command === 'open_internal_browser_tab').args.url)
-    assert.equal(opened, await card(4).getAttribute('href'))
+    assert.equal(opened, 'https://www.binance.com/zh-CN/square/post/123456?r=synthetic&l=zh-CN')
     assert.equal(await page.locator('dialog[open] a').filter({ hasText: '打开原文' }).getAttribute('href'), await card(4).getAttribute('href'))
     await page.locator('dialog[open]').getByRole('button', { name: '关闭', exact: true }).click()
     await page.waitForFunction(() => window.__cardNativeCalls.some(call => call.command === 'control_internal_browser_tab' && call.args?.action === 'close'))

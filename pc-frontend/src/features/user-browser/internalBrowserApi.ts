@@ -44,6 +44,7 @@ export interface InternalBrowserTabState {
   loaded: boolean
   visible: boolean
   lastError?: string | null
+  readPreview?: unknown
 }
 
 export type InternalBrowserControlAction = 'back' | 'forward' | 'reload' | 'show' | 'hide' | 'external' | 'close'
@@ -160,8 +161,8 @@ export async function controlInternalBrowserTab(
   return invoke<InternalBrowserTabState | null>('control_internal_browser_tab', { action })
 }
 
-export async function getInternalBrowserTabState(): Promise<InternalBrowserTabState> {
-  return invoke<InternalBrowserTabState>('get_internal_browser_tab_state')
+export async function getInternalBrowserTabState(originalUrl?: string): Promise<InternalBrowserTabState> {
+  return invoke<InternalBrowserTabState>('get_internal_browser_tab_state', originalUrl ? { originalUrl: safeHttpsUrl(originalUrl) } : undefined)
 }
 
 export async function refreshOfficialAiState(request: OfficialAiTabRequest) {

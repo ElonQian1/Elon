@@ -6,6 +6,7 @@ declare global {
     safeUrl(value: string): URL | null;
     links(text: string): LinkPreview[];
     compact(text: string): boolean;
+    remember(owner: string, preview: LinkPreview, expires?: number): void;
     mount(container: HTMLElement, text: string, options: LinkOptions): () => void;
   }
   var ElonSocialLinkViewer: { open(preview: LinkPreview): void; close(): void }

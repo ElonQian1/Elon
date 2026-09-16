@@ -29,7 +29,7 @@ internal object SocialLinkPreviewApi {
     }
     fun load(context: Context, item: SocialLink, refresh: Boolean = false): SocialLink {
         val owner = AuthManager.userId(context).orEmpty()
-        SocialLinkReadPreview.cached(ServerUrlManager.getActive(context), AuthManager.userId(context), item.url)?.let { return it }
+        SocialLinkReadPreview.cached(context, ServerUrlManager.getActive(context), AuthManager.userId(context), item.url)?.let { return it }
         val key = ServerUrlManager.getActive(context) + ":" + owner + ":" + item.url
         val old = previews.get(key)
         if (!refresh && old != null && old.first > System.currentTimeMillis()) return old.second
@@ -43,7 +43,7 @@ internal object SocialLinkPreviewApi {
             }
         }.getOrDefault(item)
         if (AuthManager.userId(context).orEmpty() == owner) previews.put(key, (System.currentTimeMillis() + if (preview.ready) 3600000 else 30000) to preview)
-        return preview
+        return SocialLinkReadPreview.cached(context, ServerUrlManager.getActive(context), owner, item.url) ?: preview
     }
     fun cover(context: Context, url: String): Bitmap? {
         bitmaps.get(url)?.let { return it }
