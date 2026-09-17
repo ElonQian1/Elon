@@ -18,7 +18,7 @@
 
 | 编号 | 必须满足 |
 |---|---|
-| `WF-START` | Windows：`powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`；Linux/macOS：`bash scripts/ai-task-preflight.sh --create-worktree`。 |
+| `WF-START` | Windows：`powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`；Linux/macOS：`bash scripts/ai-task-preflight.sh --create-worktree`。同步失败必须停止；`LOCAL_MAIN_RECOVERY_REQUIRED=true` 按 Git 手册恢复，不把残留自动当成未提交业务。 |
 | `WF-EDIT` | 只在脚本输出的 `EDIT_ROOT` 修改、格式化、验证、提交。`main` checkout 只做同步基线。`EDIT_ROOT=BLOCKED_CREATE_WORKTREE_FIRST` 时禁止编辑。 |
 | `WF-DEDUP` | 记 `TASK_BASE_SHA`；写模块前按手册查重。重叠转审查，仅补不相交缺口；同符号或边界不清则停止；不提前 rebase。 |
 | `WF-FILES` | 有意创建的源码、测试、fixture 必须提交；一次性产物写入 `.ai-tmp/`；稳定且可重复生成的输出才添加精确 `.gitignore`；来源不明文件不提交、不忽略、不删除。 |

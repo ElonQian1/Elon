@@ -115,6 +115,7 @@ description: Deliver non-trivial software features end to end across backend, fr
 ## 10. 失败时从正确层恢复
 
 - 根据最新证据停在失败层，不从头重复整个流程。
+- Git 同步失败或 `LOCAL_MAIN_RECOVERY_REQUIRED=true` 时，按项目 [Git 恢复手册](../../../.github/instructions/git-deploy-workflow.instructions.md#main-recovery) 核验原 HEAD、失败目标和文件内容；先区分部分 checkout 残留与独立业务改动，不因 `M`/`??` 就提交，也不因业务已交付就省略本机恢复状态。
 - 代码通过但环境失败时保留工件和日志，修环境后只补环境验收。
 - 外部服务变化时先确认合同差异，再更新 adapter 和兼容测试。
 - 发布失败时先核对提交、工件、租约和线上版本，避免重复发布。

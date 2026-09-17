@@ -24,8 +24,16 @@ applyTo: "scripts/**,.github/**,AGENTS.md,CODEX.md,AI_TASK_TEMPLATE.md"
 - 远端新增路径与本地未跟踪文件同名时 Git 会拒绝快进；脚本输出 `FINALIZABLE=false`。
 - 主工作区来源不明的未跟踪文件只告警，不自动提交或删除。
 - 任务 worktree 必须干净；未跟踪源码/测试显示 `candidate_track`，生成物显示 `candidate_temporary_or_precise_ignore`。
+- `candidate_track` 只是文件类型提示，不是提交授权；应先核对来源和远端历史。
 - 自动删除仅限 `.ai/workspace-policy.txt` 声明的临时根，目前是 `.ai-tmp/`。
 - 保护 60 分钟内及 locked worktree；预检锁定 `codex/*`，收尾解锁。平台会话/`ai/session/*` 仅在 clean、已合入且超龄时回收。
+
+<a id="main-recovery"></a>
+### main 同步失败与恢复
+
+同步失败可能只写入部分文件；`M`/`??` 不证明有业务漏提交。预检须非零退出并禁止创建任务树。Windows Git 写入使用命令级 `core.longpaths=true`。
+
+`LOCAL_MAIN_RECOVERY_REQUIRED=true` 时按 [main 恢复手册](../../docs/git-main-recovery.md) 备份、核验和定向恢复。独立业务可正常交付，但 `FINALIZABLE=true` 不代表本地 main 干净或最新，必须分报本机异常。
 
 ## push 冲突
 
