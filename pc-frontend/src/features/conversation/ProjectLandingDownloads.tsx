@@ -9,6 +9,9 @@ import {
   downloadMemberProtectedProjectApk,
   isMemberProtectedProjectApk,
 } from '../project-download/projectApkMemberDownload.js'
+import WindowsExchangeWebviewLaunch, {
+  type WindowsWebviewLaunchContract,
+} from '../exchange-webview/WindowsExchangeWebviewLaunch'
 import type { ProjectLandingDownload } from './types'
 import styles from './ProjectLandingDownloads.module.css'
 
@@ -28,10 +31,12 @@ export default function ProjectLandingDownloads({
   downloads,
   projectId,
   projectRole,
+  windowsWebview,
 }: {
   downloads: ProjectLandingDownload[]
   projectId?: string
   projectRole?: string
+  windowsWebview?: WindowsWebviewLaunchContract | null
 }) {
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState('')
@@ -66,6 +71,8 @@ export default function ProjectLandingDownloads({
         </div>
         {downloads.length > 0 && <em>可用入口优先显示</em>}
       </div>
+
+      {windowsWebview && <WindowsExchangeWebviewLaunch launch={windowsWebview} />}
 
       {downloads.length === 0 ? (
         <div className={styles.downloadEmpty}>

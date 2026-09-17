@@ -19,7 +19,6 @@ import ProjectLandingDownloads, {
   isLandingDownloadEnabled,
 } from './ProjectLandingDownloads'
 import QuantPaperLaunch from './QuantPaperLaunch'
-import WindowsExchangeWebviewLaunch from '../exchange-webview/WindowsExchangeWebviewLaunch'
 import styles from './ProjectLanding.module.css'
 
 interface Props {
@@ -116,7 +115,6 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
       </section>
 
       {quantPaperLaunch && <QuantPaperLaunch integration={quantPaperLaunch} />}
-      {windowsWebviewLaunch && <WindowsExchangeWebviewLaunch launch={windowsWebviewLaunch} />}
 
       <section className={styles.startSection} aria-label="项目工作流程">
         <div className={styles.startHeader}>
@@ -182,7 +180,12 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
         </section>
       </div>
 
-      <ProjectLandingDownloads downloads={downloads} projectId={project.id} projectRole={project.role} />
+      <ProjectLandingDownloads
+        downloads={downloads}
+        projectId={project.id}
+        projectRole={project.role}
+        windowsWebview={windowsWebviewLaunch}
+      />
     </div>
   )
 }

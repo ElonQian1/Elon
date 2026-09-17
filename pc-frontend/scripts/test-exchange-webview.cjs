@@ -13,6 +13,7 @@ const permission = read('desktop-shell/src-tauri/permissions/exchange-web-sessio
 const api = read('pc-frontend/src/features/exchange-webview/exchangeWebviewApi.ts')
 const launcher = read('pc-frontend/src/features/exchange-webview/WindowsExchangeWebviewLaunch.tsx')
 const landing = read('pc-frontend/src/features/conversation/ProjectLanding.tsx')
+const landingDownloads = read('pc-frontend/src/features/conversation/ProjectLandingDownloads.tsx')
 const landingTypes = read('pc-frontend/src/features/conversation/types.ts')
 
 assert.match(providerCatalogRust, /id: "binance"/)
@@ -36,7 +37,8 @@ assert.match(launcher, /openingRef\.current/)
 assert.match(launcher, /登录、验证和交易确认只在 Binance 官网完成/)
 assert.match(landingTypes, /windows_webview\?: WindowsWebviewLaunchContract/)
 assert.match(landing, /windowsWebviewLaunch/)
-assert.match(landing, /WindowsExchangeWebviewLaunch/)
+assert.match(landingDownloads, /WindowsExchangeWebviewLaunch/)
+assert.match(landingDownloads, /windowsWebview/)
 assert.doesNotMatch(`${api}\n${launcher}`, /setInterval|setTimeout\(/)
 assert.doesNotMatch(`${api}\n${launcher}`, /https:\/\/www\.binance\.com/)
 

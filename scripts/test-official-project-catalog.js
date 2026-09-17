@@ -25,6 +25,10 @@ const projectLandingSource = fs.readFileSync(
   path.join(root, 'pc-frontend/src/features/conversation/ProjectLanding.tsx'),
   'utf8',
 )
+const projectLandingDownloadsSource = fs.readFileSync(
+  path.join(root, 'pc-frontend/src/features/conversation/ProjectLandingDownloads.tsx'),
+  'utf8',
+)
 const conversationTypesSource = fs.readFileSync(
   path.join(root, 'pc-frontend/src/features/conversation/types.ts'),
   'utf8',
@@ -71,7 +75,7 @@ assert.equal(quantProject.landing.windows_webview.schema, 'yilong.windows_webvie
 assert.equal(quantProject.landing.windows_webview.provider_id, 'binance')
 assert.equal(Object.hasOwn(quantProject.landing.windows_webview, 'url'), false)
 assert.equal(quantProject.landing.downloads.android.status, 'available')
-assert.match(projectLandingSource, /WindowsExchangeWebviewLaunch/)
+assert.match(projectLandingDownloadsSource, /WindowsExchangeWebviewLaunch/)
 for (const retiredField of ['url', 'version', 'version_code', 'source_git_sha', 'sha256', 'size_label']) {
   assert.equal(
     Object.hasOwn(quantProject.landing.downloads.android, retiredField),
