@@ -1,43 +1,27 @@
-import { useEffect, useRef, useState } from 'react'
-import { getAuthToken } from '../../api/client'
+import { useEffect, useRef } from 'react'
 import { resolveApiUrl } from '../../api/runtime'
 import { getDesktopInvoke } from '../shell/desktopShell'
-import type { LinkPreview } from './socialLinks'
-import SocialLinkBrowser from './SocialLinkBrowser'
-import { cachedRead, rememberRead } from './socialReadPreview'
+import { useReaderTabs } from '../reader/readerTabsStore'
+import { previewApi } from './socialReadBack'
+import { cachedRead } from './socialReadPreview'
 import '../../../../server/src/assets/social_links.js'
 import '../../../../server/src/assets/social_link_viewer.js'
 import '../../../../server/src/assets/social_links.css'
 
-async function previewApi(path: string, init: RequestInit) {
-  const token = getAuthToken()
-  const response = await fetch(resolveApiUrl(path), { ...init, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) } })
-  if (!response.ok) throw new Error('预览暂不可用')
-  return response.json()
-}
-// Share what this member actually saw so readers whose server fetch was blocked get a real card.
-function reportRead(url: string, value: unknown) {
-  const read = ElonSocialReadAdapter.validate(url, value); if (!read) return
-  previewApi('/api/me/link-preview/report', { method: 'POST', body: JSON.stringify({ url, read }) }).catch(() => undefined)
-}
 export default function SocialLinkCards({ text, owner, compact = false }: { text: string; owner: string; compact?: boolean }) {
   const host = useRef<HTMLDivElement>(null)
-  const [reading, setReading] = useState<LinkPreview | null>(null)
   const scope = resolveApiUrl('/') + '\n' + owner
-  const liveScope = useRef(scope); liveScope.current = scope
   useEffect(() => {
     if (!host.current) return
     for (const item of ElonSocialLinks.links(text)) {
       const cached = cachedRead(scope, item); if (cached) ElonSocialLinks.remember(scope, cached.preview, cached.expires)
     }
+    // Desktop opens a reading tab so chat stays interactive; browsers keep the embedded viewer.
     return ElonSocialLinks.mount(host.current, text, { owner: scope, compact, desktop: true, api: previewApi, open: p => {
-      if (getDesktopInvoke()) setReading(p)
+      if (getDesktopInvoke()) useReaderTabs.getState().open(p, scope)
       else ElonSocialLinkViewer.open(p)
     } })
   }, [text, scope, compact])
-  useEffect(() => { setReading(null); return () => { ElonSocialLinkViewer.close() } }, [scope, text])
-  return <><div ref={host} />{reading && <SocialLinkBrowser preview={reading} onClose={() => setReading(null)} onRead={value => {
-    if (liveScope.current !== scope) return
-    const updated = rememberRead(scope, reading, value); if (updated) { ElonSocialLinks.remember(scope, updated); reportRead(reading.url, value) }
-  }} />}</>
+  useEffect(() => () => { ElonSocialLinkViewer.close() }, [scope, text])
+  return <div ref={host} />
 }

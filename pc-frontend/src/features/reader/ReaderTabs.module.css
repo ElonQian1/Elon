@@ -1,0 +1,217 @@
+.strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 36px;
+  padding: 4px 8px 0;
+  background: #0d0e10;
+  border-bottom: 1px solid #1f2023;
+  flex: 0 0 auto;
+  overflow: hidden;
+  -webkit-app-region: no-drag;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 31px;
+  min-width: 0;
+  max-width: 220px;
+  padding: 0 8px 0 10px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: #9298a4;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tab:hover { background: #1a1a1a; color: #e8e8e8; }
+.tab[data-active="true"] { background: #1f2023; border-color: #2a2b2f; color: #f1f3f6; }
+.tab[data-popout] .label { font-style: italic; }
+
+.badge {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: #272727;
+  color: #d0d0d0;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.badge[data-kind="home"] { background: #fff; color: #000; }
+.badge[data-loading] { animation: readerPulse 1.2s ease-in-out infinite; }
+
+@keyframes readerPulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+
+.label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.close, .action {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.close:hover, .action:hover { background: rgba(255, 255, 255, .12); color: #fff; }
+.action { width: 28px; height: 28px; margin-bottom: 2px; color: #9298a4; }
+.spacer { flex: 1 1 auto; }
+
+.menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid #2a2b2f;
+  border-radius: 8px;
+  background: #1a1a1a;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+}
+
+.menu button {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #e8e8e8;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu button:hover, .menu button:focus-visible { background: #272727; outline: 0; }
+.menu button:disabled { color: #666; cursor: default; }
+.menu button[data-danger]:hover { color: #ff8a8a; }
+
+.dock {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid #1f2023;
+  background: #0d0e10;
+}
+
+.splitter {
+  flex: 0 0 6px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.splitter:hover { background: rgba(255, 255, 255, .12); }
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 24;
+  display: flex;
+  background: #0d0e10;
+}
+
+.pane {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-rows: 36px 24px minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  background: #151618;
+  border-bottom: 1px solid #1f2023;
+}
+
+.toolbar strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: #e8e8e8;
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #9298a4;
+  cursor: pointer;
+}
+
+.toolbar button:hover { background: #272727; color: #fff; }
+
+.status {
+  margin: 0;
+  padding: 0 10px;
+  overflow: hidden;
+  color: #8d94a0;
+  font-size: 11px;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status[data-error="true"] { color: #ffb2b2; }
+
+.viewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #15171b;
+}
+
+.placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  align-content: center;
+  justify-content: center;
+  padding: 24px;
+  color: #b7bdc8;
+  font-size: 13px;
+  text-align: center;
+}
+
+.placeholder button, .dockHint {
+  padding: 6px 12px;
+  border: 1px solid #2a2b2f;
+  border-radius: 999px;
+  background: #1f2023;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dockHint { margin: 6px auto; }
+.placeholder button:hover, .dockHint:hover { background: #272727; }

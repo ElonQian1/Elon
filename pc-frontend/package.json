@@ -27,6 +27,7 @@
     "test:compute-capacity-commitment": "node ../scripts/test-pc-capacity-commitment-workbench.js",
     "test:plaza": "node scripts/test-project-plaza-carousel.mjs",
     "test:message-actions": "node scripts/test-message-actions-hover.cjs",
+    "test:reader-tabs": "node scripts/test-reader-tabs-model.cjs",
     "check:bundle-budget": "node ../scripts/test-pc-frontend-bundle-budget.js && node ../scripts/check-pc-frontend-bundle-budget.js",
     "test:admin-realtime": "node ../scripts/test-admin-realtime-health.js",
     "test:esk-asset": "node ../scripts/test-esk-asset-contract.js",

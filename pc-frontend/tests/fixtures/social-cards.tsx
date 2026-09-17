@@ -3,6 +3,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import SocialConversation from '../../src/features/friends/SocialConversation'
+import ReaderTabStrip from '../../src/features/reader/ReaderTabStrip'
+import ReaderWorkspace from '../../src/features/reader/ReaderWorkspace'
 import type { SocialMessage } from '../../src/features/friends/socialMessageTypes'
 import '../../src/styles/globals.css'
 
@@ -37,10 +39,16 @@ function Fixture() {
   const [messages, setMessages] = useState(initial)
   const [input, setInput] = useState('')
   return <main style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#232527' }}>
+    <ReaderTabStrip />
     <header style={{ padding: '8px 16px', fontSize: 12, color: '#b7bdc8' }}>组件验收 · 合成消息 · 无真实聊天写入</header>
     <button type="button" onClick={() => setMessages(old => old.map(m => m.id === 'fixture-0' ? { ...m, content: samples[3], revision: 2 } : m))}>模拟消息更新</button>
-    <SocialConversation conversation={{ kind: 'group', id: 'fixture-group' }} title="示例群聊" me={me} messages={messages} setMessages={setMessages}
-      input={input} setInput={setInput} targets={[]} loading={false} error="" retry={() => {}} onSent={() => {}} />
+    <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
+        <SocialConversation conversation={{ kind: 'group', id: 'fixture-group' }} title="示例群聊" me={me} messages={messages} setMessages={setMessages}
+          input={input} setInput={setInput} targets={[]} loading={false} error="" retry={() => {}} onSent={() => {}} />
+      </div>
+      <ReaderWorkspace />
+    </div>
   </main>
 }
 createRoot(document.getElementById('root')!).render(<BrowserRouter>{new URLSearchParams(location.search).has('pwa') ? <PwaCards /> : <Fixture />}</BrowserRouter>)

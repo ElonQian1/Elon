@@ -3,7 +3,9 @@ import { Outlet } from 'react-router-dom'
 import { CircleCheck, Link2, TriangleAlert, WifiOff } from 'lucide-react'
 import ServerRail from './ServerRail'
 import DesktopTitleBar from './DesktopTitleBar'
-import { isDesktopShellFrameless } from './desktopShell'
+import { getDesktopInvoke, isDesktopShellFrameless } from './desktopShell'
+import ReaderTabStrip from '../reader/ReaderTabStrip'
+import ReaderWorkspace from '../reader/ReaderWorkspace'
 import { useNotifications } from '../notifications/useNotifications'
 import { useNodeAutoConnect } from './useNodeAutoConnect'
 import { useWorkbenchTabCoordinator } from './useWorkbenchTabCoordinator'
@@ -119,19 +121,24 @@ export default function Shell() {
   useProjectOpenPrewarm(!duplicateTab && !localMode)
 
   if (duplicateTab) return <DuplicateWorkbenchNotice />
+  const desktop = Boolean(getDesktopInvoke())
 
   return (
     <div className={styles.shellRoot}>
       {isDesktopShellFrameless() && <DesktopTitleBar />}
+      {desktop && <ReaderTabStrip />}
       <div className={styles.shell}>
         <ServerRail />
         <div className={styles.content}>
           {!localMode && <AccountClaimBanner />}
           <LocalModeBanner />
           {!localMode && <NodeConnectBanner />}
-          <main className={styles.routeFrame}>
-            <Outlet />
-          </main>
+          <div className={styles.body}>
+            <main className={styles.routeFrame}>
+              <Outlet />
+            </main>
+            {desktop && <ReaderWorkspace />}
+          </div>
         </div>
         {!localMode && <AppUpdateWatcher />}
       </div>

@@ -36,18 +36,22 @@ export interface InternalBrowserLinkRequest {
 }
 
 export interface InternalBrowserTabState {
-  tabId: 'source'
+  tabId: string
   title: string
   currentUrl: string
   currentHost: string
   loading: boolean
   loaded: boolean
   visible: boolean
+  hosted: 'main' | 'popout'
   lastError?: string | null
   readPreview?: unknown
 }
 
-export type InternalBrowserControlAction = 'back' | 'forward' | 'reload' | 'show' | 'hide' | 'external' | 'close'
+export type InternalBrowserControlAction = 'back' | 'forward' | 'reload' | 'show' | 'hide' | 'external' | 'close' | 'popout' | 'dock'
+
+/** Tab used by the AI browser "source" surface; reading tabs pass their own ids. */
+export const DEFAULT_INTERNAL_TAB_ID = 'source'
 
 export function requestOfficialAiTab(request: OfficialAiTabRequest) {
   window.dispatchEvent(new CustomEvent<OfficialAiTabRequest>(OPEN_OFFICIAL_AI_TAB_EVENT, { detail: request }))
@@ -143,26 +147,34 @@ function queueOfficialSurface<T>(work: () => Promise<T>): Promise<T> {
 export async function openInternalBrowserTab(
   request: InternalBrowserLinkRequest,
   bounds: EmbeddedWebviewBounds,
+  tabId: string = DEFAULT_INTERNAL_TAB_ID,
 ): Promise<InternalBrowserTabState> {
   return invoke<InternalBrowserTabState>('open_internal_browser_tab', {
     url: safeHttpsUrl(request.url),
     title: cleanTitle(request.title, new URL(request.url).hostname),
     bounds: safeBounds(bounds),
+    tabId,
   })
 }
 
-export async function resizeInternalBrowserTab(bounds: EmbeddedWebviewBounds): Promise<void> {
-  await invoke<void>('resize_internal_browser_tab', { bounds: safeBounds(bounds) })
+export async function resizeInternalBrowserTab(bounds: EmbeddedWebviewBounds, tabId: string = DEFAULT_INTERNAL_TAB_ID): Promise<void> {
+  await invoke<void>('resize_internal_browser_tab', { bounds: safeBounds(bounds), tabId })
 }
 
 export async function controlInternalBrowserTab(
   action: InternalBrowserControlAction,
+  tabId: string = DEFAULT_INTERNAL_TAB_ID,
+  bounds?: EmbeddedWebviewBounds,
 ): Promise<InternalBrowserTabState | null> {
-  return invoke<InternalBrowserTabState | null>('control_internal_browser_tab', { action })
+  return invoke<InternalBrowserTabState | null>('control_internal_browser_tab', { action, tabId, ...(bounds ? { bounds: safeBounds(bounds) } : {}) })
 }
 
-export async function getInternalBrowserTabState(originalUrl?: string): Promise<InternalBrowserTabState> {
-  return invoke<InternalBrowserTabState>('get_internal_browser_tab_state', originalUrl ? { originalUrl: safeHttpsUrl(originalUrl) } : undefined)
+export async function getInternalBrowserTabState(originalUrl?: string, tabId: string = DEFAULT_INTERNAL_TAB_ID): Promise<InternalBrowserTabState> {
+  return invoke<InternalBrowserTabState>('get_internal_browser_tab_state', { tabId, ...(originalUrl ? { originalUrl: safeHttpsUrl(originalUrl) } : {}) })
+}
+
+export async function listInternalBrowserTabs(): Promise<InternalBrowserTabState[]> {
+  return invoke<InternalBrowserTabState[]>('list_internal_browser_tabs')
 }
 
 export async function refreshOfficialAiState(request: OfficialAiTabRequest) {
