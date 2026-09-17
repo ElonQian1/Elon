@@ -171,6 +171,7 @@ $externalScratchRoot = Join-Path $testRoot 'external-rust-scratch'
 $env:ELON_AI_TASK_RUST_SCRATCH_ROOT = $externalScratchRoot
 $previousRustCacheRoot = $env:ELON_RUST_CACHE_ROOT
 $env:ELON_RUST_CACHE_ROOT = Join-Path $testRoot 'managed-rust-cache'
+$platformReceiptPath = ''
 
 try {
     $originPath = Join-Path $testRoot "origin.git"
@@ -190,6 +191,9 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $mainRepo ".ai") | Out-Null
     Copy-Item -LiteralPath $finishScript -Destination (Join-Path $mainRepo "scripts\finish-ai-task.ps1")
     Copy-Item -LiteralPath $checkScript -Destination (Join-Path $mainRepo "scripts\check-task-complete.ps1")
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'scripts\app-branding.ps1') -Destination (Join-Path $mainRepo 'scripts\app-branding.ps1')
+    New-Item -ItemType Directory -Path (Join-Path $mainRepo 'server\src\assets') -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'server\src\assets\app_branding.json') -Destination (Join-Path $mainRepo 'server\src\assets\app_branding.json')
     Copy-Item -LiteralPath $androidProvenanceScript -Destination (Join-Path $mainRepo "scripts\android-task-provenance.ps1")
     Copy-Item -LiteralPath $cleanupScript -Destination (Join-Path $mainRepo "scripts\cleanup-task-worktrees.ps1")
     Copy-Item -LiteralPath $directNetworkScript -Destination (Join-Path $mainRepo "scripts\direct-network.ps1")
@@ -203,7 +207,7 @@ try {
     Copy-Item -LiteralPath $policyFile -Destination (Join-Path $mainRepo ".ai\workspace-policy.txt")
     Set-Content -LiteralPath (Join-Path $mainRepo "README.md") -Value "finish workflow fixture`n" -Encoding UTF8
 
-    Invoke-Git $mainRepo @("add", "README.md", "scripts", ".ai") | Out-Null
+    Invoke-Git $mainRepo @("add", "README.md", "scripts", ".ai", 'server/src/assets/app_branding.json') | Out-Null
     Invoke-Git $mainRepo @("commit", "-m", "seed finish workflow fixture") | Out-Null
     Invoke-Git $mainRepo @("remote", "add", "origin", $originPath) | Out-Null
     Invoke-Git $mainRepo @("push", "-u", "origin", "main") | Out-Null
@@ -290,6 +294,7 @@ try {
     $dirtyManagedOutput = Invoke-Finish -WorktreePath $taskWorktree -ContractId $taskContractId
     Assert-Contains $dirtyManagedOutput "BUSINESS_STATUS=complete" "Dirty shared main must not erase a pushed Codex task result."
     Assert-Contains $dirtyManagedOutput "LOCAL_MAIN_STATUS=blocked_tracked_changes" "Dirty shared main must remain visible."
+    Assert-Contains $dirtyManagedOutput 'LOCAL_MAIN_RECOVERY_REQUIRED=true' 'Independent task completion must preserve an explicit local recovery item.'
     Assert-Contains $dirtyManagedOutput "FINALIZABLE=true" "An isolated Codex worktree must finish without rewriting dirty main."
     $dirtyManagedContent = Get-Content -Raw -LiteralPath (Join-Path $mainRepo "README.md")
     if (-not $dirtyManagedContent.Contains("unknown ordinary main edit")) {
@@ -511,6 +516,7 @@ try {
     $collisionOutput = Invoke-Finish -WorktreePath $taskWorktree -ExpectFailure -ContractId $taskContractId
     Assert-Contains $collisionOutput "BUSINESS_STATUS=complete" "A local-main collision must not erase the completed remote business state."
     Assert-Contains $collisionOutput "LOCAL_MAIN_STATUS=sync_failed" "A same-path untracked collision must block only local-main synchronization."
+    Assert-Contains $collisionOutput 'LOCAL_MAIN_RECOVERY_REQUIRED=true' 'Failed finish synchronization must expose recovery.'
     Assert-Contains $collisionOutput "FINALIZABLE=false" "A same-path collision must remain visible to the task owner."
     $collisionContent = Get-Content -Raw -LiteralPath $mainCollisionPath
     if (-not $collisionContent.Contains("unknown local content")) {

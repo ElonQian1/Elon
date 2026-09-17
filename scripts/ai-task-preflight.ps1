@@ -93,6 +93,8 @@ function Sync-LocalMainBaseline {
             }
             if (-not [string]::IsNullOrWhiteSpace(($status -join "`n"))) {
                 Write-Host "MAIN_BASELINE_SYNC=blocked_tracked_changes:$mainPath"
+                Write-Host "LOCAL_MAIN_RECOVERY_REQUIRED=true"
+                Write-Host "DOC=docs/git-main-recovery.md"
                 return
             }
 
@@ -105,16 +107,24 @@ function Sync-LocalMainBaseline {
             }
 
             $oldPreference = $ErrorActionPreference
+            $syncBase = GitOutputInPath $mainPath @('rev-parse', 'HEAD')
+            $syncTarget = GitOutputInPath $mainPath @('rev-parse', 'origin/main')
             $ErrorActionPreference = "Continue"
             try {
-                $mergeOutput = & git -C $mainPath merge --ff-only origin/main 2>&1
+                $mergeOutput = & git -C $mainPath -c core.longpaths=true merge --ff-only origin/main 2>&1
                 $mergeExitCode = $LASTEXITCODE
             } finally {
                 $ErrorActionPreference = $oldPreference
             }
             if ($mergeExitCode -ne 0) {
                 Write-Host "MAIN_BASELINE_SYNC=failed:${mainPath}:$($mergeOutput -join ' ')"
-                return
+                Write-Host "MAIN_BASELINE_SYNC_FROM=$syncBase"
+                Write-Host "MAIN_BASELINE_SYNC_TARGET=$syncTarget"
+                Write-Host "LOCAL_MAIN_RECOVERY_REQUIRED=true"
+                Write-Host "ERROR_CODE=MAIN_BASELINE_SYNC_FAILED"
+                Write-Host "EDIT_ROOT=BLOCKED_MAIN_BASELINE_SYNC_FAILED"
+                Write-Host "DOC=docs/git-main-recovery.md"
+                throw 'Main sync failed; preserve the partial checkout and inspect recovery before starting a task.'
             }
             Write-Host "MAIN_BASELINE_SYNC=synced_worktree:$mainPath"
             return
@@ -290,7 +300,7 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
     $leaf = $uniqueSuffix
     $worktreePath = Join-Path $parent $leaf
 
-    & git worktree add -b $newBranch $worktreePath origin/main
+    & git -c core.longpaths=true worktree add -b $newBranch $worktreePath origin/main
     if ($LASTEXITCODE -ne 0) {
         throw "git worktree add failed"
     }

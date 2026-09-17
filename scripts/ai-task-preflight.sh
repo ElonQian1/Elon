@@ -166,6 +166,8 @@ sync_local_main_baseline() {
     status="$(git -C "$main_path" status --porcelain=v1 --untracked-files=no)"
     if [[ -n "$status" ]]; then
       echo "MAIN_BASELINE_SYNC=blocked_tracked_changes:$main_path"
+      echo "LOCAL_MAIN_RECOVERY_REQUIRED=true"
+      echo "DOC=docs/git-main-recovery.md"
       return 0
     fi
 
@@ -177,9 +179,18 @@ sync_local_main_baseline() {
       echo "MAIN_BASELINE_UNTRACKED=clean"
     fi
 
-    if ! merge_output="$(git -C "$main_path" merge --ff-only origin/main 2>&1)"; then
+    local sync_base sync_target
+    sync_base="$(git -C "$main_path" rev-parse HEAD)"
+    sync_target="$(git -C "$main_path" rev-parse origin/main)"
+    if ! merge_output="$(git -C "$main_path" -c core.longpaths=true merge --ff-only origin/main 2>&1)"; then
       echo "MAIN_BASELINE_SYNC=failed:$main_path:$merge_output"
-      return 0
+      echo "MAIN_BASELINE_SYNC_FROM=$sync_base"
+      echo "MAIN_BASELINE_SYNC_TARGET=$sync_target"
+      echo "LOCAL_MAIN_RECOVERY_REQUIRED=true"
+      echo "ERROR_CODE=MAIN_BASELINE_SYNC_FAILED"
+      echo "EDIT_ROOT=BLOCKED_MAIN_BASELINE_SYNC_FAILED"
+      echo "DOC=docs/git-main-recovery.md"
+      return 1
     fi
     echo "MAIN_BASELINE_SYNC=synced_worktree:$main_path"
     return 0
@@ -260,7 +271,7 @@ if [[ "$create_worktree" -eq 1 && "$needs_worktree" -eq 1 ]]; then
   leaf="$(basename "$repo_root")-task-$stamp-$unique_suffix"
   worktree_path="$worktree_parent/$leaf"
 
-  git worktree add -b "$new_branch" "$worktree_path" origin/main
+  git -c core.longpaths=true worktree add -b "$new_branch" "$worktree_path" origin/main
   lock_ai_task_worktree "$repo_root" "$worktree_path"
   echo "WORKTREE_CREATED=true"
   echo "WORKTREE_BRANCH=$new_branch"

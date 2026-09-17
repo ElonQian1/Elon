@@ -132,7 +132,7 @@ function Assert-DocumentTokenBudget {
 
     $docPath = Join-Path $repoRoot $RelativePath
     $docContent = [System.IO.File]::ReadAllText($docPath, [System.Text.Encoding]::UTF8)
-    $approxTokens = [int][Math]::Ceiling($docContent.Length / 4.0)
+    $approxTokens = [int][Math]::Ceiling($docContent.Replace("`r`n", "`n").Length / 4.0)
     if ($approxTokens -gt $MaxApproxTokens) {
         throw "Mandatory routing document exceeded its token budget: $RelativePath approxTokens=$approxTokens max=$MaxApproxTokens"
     }
@@ -521,3 +521,7 @@ $commandOutputTestOutput | ForEach-Object { Write-Host ([string]$_) }
 if ($commandOutputTestExitCode -ne 0) {
     throw "Bounded AI command output guard failed."
 }
+
+$baselineSyncTest = Join-Path $repoRoot 'scripts\test-ai-main-baseline-sync.ps1'
+& powershell -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File $baselineSyncTest
+if ($LASTEXITCODE -ne 0) { throw 'Main baseline synchronization regression failed.' }

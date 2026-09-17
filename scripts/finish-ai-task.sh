@@ -177,6 +177,8 @@ main_tracked="$(git -C "$main_path" status --porcelain=v1 --untracked-files=no)"
 skip_main_sync=0
 if [[ -n "$main_tracked" ]]; then
   local_main_status="blocked_tracked_changes"
+  echo "LOCAL_MAIN_RECOVERY_REQUIRED=true"
+  echo "DOC=docs/git-main-recovery.md"
   printf 'MAIN_TRACKED_CHANGE=%s\n' "$main_tracked"
   if [[ "$is_platform_managed_task" -eq 1 || "$task_branch" == codex/* || "$task_leaf" =~ -task-[0-9]{8}-[0-9]{6} ]]; then
     echo "MAIN_BASELINE_SYNC=blocked_tracked_changes:$main_path"
@@ -188,7 +190,10 @@ fi
 
 if [[ "$skip_main_sync" -eq 0 ]]; then
   git -C "$main_path" fetch origin main || finish_error "Unable to fetch origin/main while finalizing."
-  if ! merge_output="$(git -C "$main_path" merge --ff-only origin/main 2>&1)"; then
+  if ! merge_output="$(git -C "$main_path" -c core.longpaths=true merge --ff-only origin/main 2>&1)"; then
+    echo "LOCAL_MAIN_RECOVERY_REQUIRED=true"
+    echo "ERROR_CODE=MAIN_BASELINE_SYNC_FAILED"
+    echo "DOC=docs/git-main-recovery.md"
     local_main_status="sync_failed"
     finish_error "The main baseline could not fast-forward. Git may be protecting an untracked same-path collision: $merge_output"
   fi

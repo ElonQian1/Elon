@@ -372,6 +372,8 @@ try {
     $skipMainSync = $false
     if ($mainTrackedStatus.Count -gt 0) {
         $localMainStatus = "blocked_tracked_changes"
+        Write-Host "LOCAL_MAIN_RECOVERY_REQUIRED=true"
+        Write-Host "DOC=docs/git-main-recovery.md"
         $mainTrackedStatus | ForEach-Object { Write-Host "MAIN_TRACKED_CHANGE=$_" }
         if ($isPlatformManagedTask -or $isManagedTaskWorktree) {
             Write-Host "MAIN_BASELINE_SYNC=blocked_tracked_changes:$mainPath"
@@ -383,9 +385,12 @@ try {
 
     if (-not $skipMainSync) {
         Invoke-GitFetchWithRetry -RepoPath $mainPath
-        $merge = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("merge", "--ff-only", "origin/main")
+        $merge = Invoke-GitCapture -RepoPath $mainPath -GitArgs @('-c', 'core.longpaths=true', 'merge', '--ff-only', 'origin/main')
         if ($merge.ExitCode -ne 0) {
             $localMainStatus = "sync_failed"
+            Write-Host "LOCAL_MAIN_RECOVERY_REQUIRED=true"
+            Write-Host "ERROR_CODE=MAIN_BASELINE_SYNC_FAILED"
+            Write-Host "DOC=docs/git-main-recovery.md"
             throw "The main baseline could not fast-forward. Git may be protecting an untracked same-path collision: $($merge.Text)"
         }
 
