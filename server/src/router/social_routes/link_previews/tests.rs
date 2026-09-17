@@ -4,11 +4,13 @@ fn binance_app_shares_preserve_url_and_only_allow_exact_host() {
     let url = policy::public_url("https://app.binance.com/uni-qr/cpos/123456?r=synthetic&l=zh-CN")
         .unwrap();
     assert_eq!(policy::site(&url), "币安广场");
-    assert!(policy::fetchable(&url));
+    assert!(!policy::generic(&url));
     assert_eq!(Preview::fallback(&url).url, url.as_str());
     let spoof =
         policy::public_url("https://app.binance.com.evil.example/uni-qr/cpos/123456").unwrap();
-    assert!(!policy::fetchable(&spoof));
+    assert!(policy::generic(&spoof));
+    assert_eq!(policy::label(&spoof), "app.binance.com.evil.example");
+    assert!(policy::user_agent(&spoof).starts_with("Mozilla/5.0 (Windows"));
 }
 #[test]
 fn social_link_preview_official_players_preserve_time_and_page() {
@@ -41,21 +43,42 @@ fn social_link_preview_does_not_trust_suffix_lookalikes_or_credentials() {
         "https://user:pass@x.com/a",
         "https://x.com:8443/a",
         "file:///tmp/foo",
+        "https://127.0.0.1/a",
+        "https://[::1]/a",
+        "https://localhost/a",
     ] {
         assert!(policy::public_url(value).is_none());
     }
     for value in [
         "https://x.com.evil.example/a/status/123456",
-        "https://127.0.0.1/a",
         "https://evil.example/?url=https://x.com",
     ] {
-        assert!(!policy::fetchable(&policy::public_url(value).unwrap()));
+        let url = policy::public_url(value).unwrap();
+        assert!(policy::generic(&url));
+        assert!(policy::embed(&url).is_none());
+        assert!(report::identity(&url).is_none());
     }
     assert!(policy::image_url(
         "https://hdslb.com.evil.example/a.jpg",
         &policy::public_url("https://www.bilibili.com").unwrap()
     )
     .is_none());
+}
+
+#[test]
+fn social_link_generic_pages_copy_cover_but_never_hot_link() {
+    let url = policy::public_url("https://www.example.org/blog/post?id=1").unwrap();
+    assert_eq!(Preview::fallback(&url).site, "example.org");
+    let meta = metadata::parse(
+        r#"<title>Blog</title><meta property="og:title" content="Generic post"><meta property="og:image" content="//cdn.example.net/cover.png">"#,
+        &url,
+    );
+    assert_eq!(meta.title, "Generic post");
+    assert_eq!(
+        meta.image.as_deref(),
+        Some("https://cdn.example.net/cover.png")
+    );
+    assert!(policy::image_url("http://cdn.example.net/a.png", &url).is_none());
 }
 #[test]
 fn social_link_preview_metadata_is_text_and_skips_scripts() {

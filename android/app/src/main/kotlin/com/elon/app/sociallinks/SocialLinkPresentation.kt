@@ -17,7 +17,8 @@ internal object SocialLinkPresentation {
         "哔哩哔哩" -> "B站"
         "币安广场" -> "币安"
         "小红书" -> "小红书"
-        else -> "X"
+        "X" -> "X"
+        else -> "↗"
     }
     fun colors(site: String) = when (site) {
         "微信公众号" -> "#263E35" to "#BDE6CA"

@@ -1,5 +1,6 @@
 package com.elon.app.sociallinks
 
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -12,7 +13,7 @@ class SocialLinkPolicyTest {
         assertEquals(url, item.url); assertEquals("币安广场", item.site)
         assertTrue(SocialLinkShareText.compact(url, listOf(item)))
         assertEquals("币安广场帖子", SocialLinkPresentation.title(item))
-        assertNull(SocialLinkPolicy.link("https://app.binance.com.evil.example/a"))
+        assertEquals("app.binance.com.evil.example", SocialLinkPolicy.link("https://app.binance.com.evil.example/a")!!.site)
         assertEquals("小红书 · 作者", SocialLinkPresentation.source(item.copy(site = "小红书", author = "作者")))
         assertEquals("X · @example", SocialLinkPresentation.source(SocialLinkPolicy.link("https://x.com/example/status/123456")!!))
         for ((seconds, label) in listOf(80 to "01:20", 3680 to "1:01:20", 0 to "00:00")) {
@@ -29,7 +30,12 @@ class SocialLinkPolicyTest {
     @Test fun linksPreserveShareAccessAndRejectLookalikes() {
         val url = "https://www.xiaohongshu.com/discovery/item/123?xsec_token=synthetic&xsec_source=pc_share"
         assertEquals(url, SocialLinkPolicy.extract(url)[0].url)
-        assertTrue(SocialLinkPolicy.extract("https://x.com.evil.example/a/status/123456").isEmpty())
+        val lookalike = SocialLinkPolicy.extract("https://x.com.evil.example/a/status/123456").single()
+        assertEquals("x.com.evil.example", lookalike.site); assertNull(lookalike.xId); assertNull(lookalike.player)
+        val generic = SocialLinkPolicy.link("https://www.example.org/post/1")!!
+        assertEquals("example.org", generic.site); assertEquals("网页链接", SocialLinkPresentation.title(generic)); assertEquals("↗", SocialLinkPresentation.badge(generic.site))
+        assertTrue(SocialLinkPolicy.extract("https://10.0.0.1/a").isEmpty())
+        assertFalse(SocialLinkPolicy.merge(JSONObject().put("schema", 1).put("url", generic.url).put("title", "example.org").put("status", "ready"), generic).ready)
         assertNull(SocialLinkPolicy.safeUrl("https://user:pass@x.com/a"))
         assertNull(SocialLinkPolicy.safeUrl("javascript:alert(1)"))
     }

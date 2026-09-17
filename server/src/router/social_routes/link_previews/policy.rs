@@ -13,14 +13,19 @@ pub(super) fn public_url(value: &str) -> Option<Url> {
         return None;
     }
     let url = Url::parse(value).ok()?;
+    // Named hosts only: IP literals bypass DNS pinning and are never a shareable page.
+    let named = url.host_str().is_some_and(|h| {
+        h.contains('.')
+            && h != "localhost"
+            && !h.starts_with('[')
+            && h.parse::<std::net::Ipv4Addr>().is_err()
+    });
     (url.scheme() == "https"
         && url.port_or_known_default() == Some(443)
         && url.username().is_empty()
         && url.password().is_none()
-        && url
-            .host_str()
-            .is_some_and(|h| h.contains('.') && h != "localhost"))
-    .then_some(url)
+        && named)
+        .then_some(url)
 }
 
 pub(super) fn site(url: &Url) -> &'static str {
@@ -36,9 +41,21 @@ pub(super) fn site(url: &Url) -> &'static str {
     }
 }
 
-// Fetch only the six providers in this release; arbitrary links still open normally.
-pub(super) fn fetchable(url: &Url) -> bool {
-    site(url) != "网页"
+/// Any public page outside the six providers: Open Graph only, no member read-back, no hot-link.
+pub(super) fn generic(url: &Url) -> bool {
+    site(url) == "网页"
+}
+
+/// Card label: provider name, or the bare host for a generic page.
+pub(super) fn label(url: &Url) -> String {
+    if generic(url) {
+        url.host_str()
+            .unwrap_or("")
+            .trim_start_matches("www.")
+            .to_string()
+    } else {
+        site(url).into()
+    }
 }
 
 // WeChat answers unknown agents with a verification shell; Binance's WAF only serves Open Graph
@@ -116,10 +133,14 @@ fn digits(value: &str) -> bool {
     (5..=24).contains(&value.len()) && value.bytes().all(|b| b.is_ascii_digit())
 }
 
-// Covers are direct, credential-free HTTPS loads, limited to provider image CDNs.
+// Covers are direct, credential-free HTTPS loads, limited to provider image CDNs. A generic page
+// may name any public host because its cover is only ever copied server-side, never hot-linked.
 pub(super) fn image_url(value: &str, base: &Url) -> Option<String> {
     let url = base.join(value).ok()?;
     public_url(url.as_str())?;
+    if generic(base) {
+        return Some(url.to_string());
+    }
     let host = url.host_str()?;
     let allowed = [
         "qpic.cn",

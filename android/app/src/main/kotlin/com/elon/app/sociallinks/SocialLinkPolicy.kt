@@ -22,7 +22,10 @@ internal object SocialLinkPolicy {
         value?.takeIf { it.length <= 98304 && Regex("^data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$").matches(it) }
     fun link(value: String, title: String = ""): SocialLink? {
         val uri = safeUrl(value) ?: return null
-        val site = sites[uri.host.lowercase()] ?: return null
+        val host = uri.host.lowercase()
+        // Any other public page becomes a generic Open Graph card labelled by its host.
+        if (!host.contains('.') || host.startsWith('[') || Regex("\\d+\\.\\d+\\.\\d+\\.\\d+").matches(host)) return null
+        val site = sites[host] ?: host.removePrefix("www.")
         val parts = uri.path.split('/').filter { it.isNotBlank() }
         fun id(segment: String): String? = parts.indexOf(segment).takeIf { it >= 0 }?.let { parts.getOrNull(it + 1) }
         val params = uri.rawQuery.orEmpty().split('&').mapNotNull {

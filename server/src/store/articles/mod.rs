@@ -8,11 +8,13 @@ pub(crate) mod migration;
 mod model;
 mod publishing;
 mod reads;
+pub(crate) mod sharing;
 pub(crate) mod snapshots;
 pub(crate) mod square;
 #[cfg(test)]
 mod tests;
 pub(crate) use model::*;
+pub(crate) use sharing::ArticleShare;
 
 pub(super) fn message_preview(content: &str) -> Option<String> {
     let value: serde_json::Value =

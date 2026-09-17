@@ -17,6 +17,7 @@ mod assets;
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .merge(assets::routes())
+        .merge(share::routes())
         .route("/api/me/articles", get(list).post(create))
         .route("/api/me/articles/media", post(upload))
         .route("/api/me/articles/:id/draft", get(draft).put(save))
@@ -51,6 +52,8 @@ macro_rules! user {
         }
     };
 }
+// Declared after `user!` so the macro's textual scope covers the public share routes.
+mod share;
 #[derive(Deserialize)]
 struct ListQuery {
     group_id: Option<String>,

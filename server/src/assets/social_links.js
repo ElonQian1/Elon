@@ -88,16 +88,19 @@
     return site === 'X' ? { kind: 'x', id, url: `https://x.com/i/status/${id}` }
       : { kind: 'douyin', id, url: `https://open.douyin.com/player/video?vid=${id}&autoplay=0` };
   }
+  // Provider name, or the bare host for any other public page (generic Open Graph preview).
+  function siteOf(u) { return sites[u.hostname] || u.hostname.replace(/^www\./, ''); }
   function links(text) {
     if (!text || /^【一龙(?:文章|项目|AI)/.test(text)) return [];
     const result = [], seen = new Set();
     for (const match of text.slice(0, 50000).matchAll(/https:\/\/[^\s<>"'\]\)]+/g)) {
       const raw = match[0].replace(/[，。！？；：、）】》”’.,!;]+$/g, '');
-      const u = safeUrl(raw); if (!u || !sites[u.hostname] || seen.has(u.href)) continue;
+      const u = safeUrl(raw); if (!u || !u.hostname.includes('.') || /^\d+\.\d+\.\d+\.\d+$/.test(u.hostname) || seen.has(u.href)) continue;
       seen.add(u.href);
+      const site = siteOf(u);
       const nearby = text.slice(Math.max(0, match.index - 300), match.index);
       const title = [...nearby.matchAll(/【([^】]+)】/g)].map(m => m[1]).find(t => !t.startsWith('精准空降')) || '';
-      result.push({ schema: 1, url: u.href, site: sites[u.hostname], ...shareTitle(title, sites[u.hostname], nearby), description: '', image: null, embed: embed(u.href), status: 'unavailable', source: 'server' });
+      result.push({ schema: 1, url: u.href, site, ...shareTitle(title, site, nearby), description: '', image: null, embed: embed(u.href), status: 'unavailable', source: 'server' });
       if (result.length === 2) break;
     }
     return result;

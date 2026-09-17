@@ -45,7 +45,7 @@ impl Preview {
         Self {
             schema: 1,
             url: url.to_string(),
-            site: policy::site(url).into(),
+            site: policy::label(url),
             title: String::new(),
             description: String::new(),
             author: String::new(),
@@ -64,11 +64,7 @@ static FETCHES: Semaphore = Semaphore::const_new(8);
 const CAPACITY: usize = 512;
 
 pub(super) async fn preview(url: reqwest::Url) -> Preview {
-    if policy::fetchable(&url) {
-        cached(url).await
-    } else {
-        Preview::fallback(&url)
-    }
+    cached(url).await
 }
 async fn cached(url: reqwest::Url) -> Preview {
     let key: [u8; 32] = Sha256::digest(url.as_str()).into();
@@ -128,9 +124,6 @@ pub(super) async fn report(
     url: reqwest::Url,
     read: &Read,
 ) -> Result<Preview, &'static str> {
-    if !policy::fetchable(&url) {
-        return Err("该链接不支持预览");
-    }
     if !report::allow(user) {
         return Err("回填过于频繁，请稍后再试");
     }

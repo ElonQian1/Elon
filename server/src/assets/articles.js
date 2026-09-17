@@ -59,7 +59,16 @@
       const retry = button('重新读取', () => void run(() => read(id, revision))); panel.append(retry);
       const a = await request(`/api/me/articles/${id}/revisions/${revision}`); retry.remove(); panel.append(body(a));
     }
-    function preview() { mode = 'preview'; const bar = header('预览文章', editor); bar.append(button('发布到群', () => void run(chooseGroups)),button('币安广场',()=>void run(async()=>window.ElonSquare.open(api,await save())))); panel.append(body(current)); }
+    function preview() { mode = 'preview'; const bar = header('预览文章', editor); bar.append(button('发布到群', () => void run(chooseGroups)), button('公开链接', () => void run(shareLink)),button('币安广场',()=>void run(async()=>window.ElonSquare.open(api,await save())))); panel.append(body(current)); }
+    // Public page: opt-in per revision; anyone with the link can read, until the author revokes it.
+    async function shareLink() {
+      const a = await save(); const share = await request(`/api/me/articles/${a.id}/share`, 'POST', { version: a.revision }); current.status = 'published';
+      const section = el('section', null, 'article-publish'); section.append(el('h3', '公开链接'), el('p', '任何人打开都能阅读，分享到微信、X 等平台会显示标题和封面。修改后需重新生成。'));
+      const link = el('a', share.url); link.href = share.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.style.overflowWrap = 'anywhere'; section.append(link);
+      section.append(button('复制链接', () => { navigator.clipboard?.writeText(share.url).then(() => { status.textContent = '链接已复制'; }, () => { status.textContent = '复制失败，请长按链接复制'; }); }),
+        button('关闭公开链接', () => void run(async () => { await request(`/api/me/articles/${a.id}/share`, 'DELETE'); section.remove(); status.textContent = '公开链接已关闭'; })), button('收起', () => section.remove()));
+      panel.insertBefore(section, panel.children[2] || null);
+    }
     async function chooseGroups() {
       const data = await request('/api/me/groups'); const section = el('section', null, 'article-publish'), form = el('div'); section.append(el('h3', '选择发布群聊'), el('p', '仅作者和所选群的当前成员可读。相同版本不会重复发送。'), form);
       const checks = (data.groups || []).map(g => { const label = el('label'), check = el('input'); check.type = 'checkbox'; check.value = g.id; check.checked = g.id === groupId; label.append(check, document.createTextNode(g.name)); form.append(label); return check; });

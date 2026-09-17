@@ -222,3 +222,44 @@ fn empty_body_and_unsupported_blocks_are_rejected() {
     )
     .is_err());
 }
+#[test]
+fn public_share_is_author_opt_in_stable_per_revision_and_closed_by_revoke_or_withdraw() {
+    let s = fixture();
+    let a = s.create_article("author", doc("公开文章")).unwrap();
+    assert!(s.article_share("author", &a.card.id).unwrap().is_none());
+    assert!(s.create_article_share("reader", &a.card.id, 1).is_err());
+    assert!(s.create_article_share("author", &a.card.id, 2).is_err());
+    let share = s.create_article_share("author", &a.card.id, 1).unwrap();
+    assert!(sharing::valid_token(&share.token));
+    assert_eq!(share.path, format!("/a/{}", share.token));
+    assert_eq!(
+        s.create_article_share("author", &a.card.id, 1)
+            .unwrap()
+            .token,
+        share.token
+    );
+    let page = s.public_article(&share.token).unwrap();
+    assert_eq!(
+        (page.document.title.as_str(), page.card.status.as_str()),
+        ("公开文章", "published")
+    );
+    assert!(s.public_article("s_missing").is_err());
+    assert!(s.public_article("../etc").is_err());
+    assert!(s.public_article_media(&share.token, "m_none").is_err());
+    // Group readers still see the article; the public page never grants group access.
+    assert!(s.read_article("other", &a.card.id, 1, false).is_err());
+    assert_eq!(
+        s.article_share("author", &a.card.id)
+            .unwrap()
+            .unwrap()
+            .revision,
+        1
+    );
+    s.revoke_article_share("author", &a.card.id).unwrap();
+    assert!(s.public_article(&share.token).is_err());
+    let again = s.create_article_share("author", &a.card.id, 1).unwrap();
+    assert_ne!(again.token, share.token);
+    s.withdraw_article("author", &a.card.id, 1).unwrap();
+    assert!(s.public_article(&again.token).is_err());
+    assert!(s.create_article_share("author", &a.card.id, 1).is_err());
+}

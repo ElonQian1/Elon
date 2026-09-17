@@ -70,9 +70,6 @@ pub(super) async fn resolve(mut url: Url) -> Result<Preview> {
         return x_preview(original).await;
     }
     for hop in 0..=4 {
-        if !policy::fetchable(&url) {
-            bail!("unsupported redirect");
-        }
         if policy::embed(&url).is_some_and(|e| e.kind == "douyin") {
             return douyin_preview(&original, &url).await;
         }
@@ -94,7 +91,7 @@ pub(super) async fn resolve(mut url: Url) -> Result<Preview> {
         break;
     }
     let mut preview = Preview::fallback(&original);
-    preview.site = policy::site(&url).into();
+    preview.site = policy::label(&url);
     preview.embed = policy::embed(&url);
     if let Some(page) = page {
         let metadata = metadata::parse(&page, &url);
@@ -108,6 +105,10 @@ pub(super) async fn resolve(mut url: Url) -> Result<Preview> {
             if metadata.image_needs_check && preview.cover_data_url.is_none() {
                 preview.image = None;
             }
+        }
+        // Unknown hosts are never hot-linked by clients; only the bounded server copy is shared.
+        if policy::generic(&url) {
+            preview.image = None;
         }
     }
     preview.status = if preview.title.is_empty() {

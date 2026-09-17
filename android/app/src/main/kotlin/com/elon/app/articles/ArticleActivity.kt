@@ -117,7 +117,16 @@ class ArticleActivity : AppCompatActivity() {
     internal fun preview() {
         session.mode = "preview"; content.removeAllViews(); header("预览文章") { editor() }
         toolbar.addView(ui.button("发布到群") { editorViews.chooseGroups() }); content.addView(ui.body(session.article!!))
+        content.addView(ui.button("生成公开链接") { work({ val saved = saveDraft(); api.request("/api/me/articles/${saved.getString("id")}/share", "POST", JSONObject().put("version", saved.getLong("revision"))) }) { shareLink(it.getString("url")) } })
         content.addView(ui.button("发布到币安广场") { work(::saveDraft) { saved -> startActivity(android.content.Intent(this, com.elon.app.articles.square.SquareActivity::class.java).putExtra("article_id", saved.getString("id"))) } })
+    }
+    // Public page is opt-in per revision; the author can close it any time from this dialog.
+    private fun shareLink(url: String) {
+        session.article?.put("status", "published")
+        AlertDialog.Builder(this).setTitle("公开链接").setMessage("任何人打开都能阅读，分享到微信、X 等平台会显示标题和封面。\n\n$url")
+            .setPositiveButton("分享") { _, _ -> startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, url), "分享文章链接")) }
+            .setNeutralButton("复制") { _, _ -> (getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("文章链接", url)); notice("链接已复制") }
+            .setNegativeButton("关闭公开链接") { _, _ -> work({ api.request("/api/me/articles/${session.article!!.getString("id")}/share", "DELETE") }) { notice("公开链接已关闭") } }.show()
     }
     private fun read() {
         session.mode = "read"; content.removeAllViews(); header("文章", ::back)

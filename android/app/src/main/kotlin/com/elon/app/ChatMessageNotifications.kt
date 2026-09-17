@@ -30,6 +30,12 @@ internal object ChatMessageNotifications {
         visibleGroupId = groupId?.takeIf { it.isNotBlank() }
     }
 
+    /** The chat the user last had open, as (kind, id); the reader uses it as its reply target. */
+    fun visibleConversation(): Pair<String, String>? =
+        visibleGroupId?.let { "group" to it } ?: visibleFriendId?.let { "friend" to it }
+
+    fun displayName(context: Context, kind: String, id: String): String? = conversationName(context, kind, id)
+
     fun createChannel(context: Context) {
         ChatNotificationChannel.create(context)
     }
