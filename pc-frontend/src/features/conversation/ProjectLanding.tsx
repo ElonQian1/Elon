@@ -19,6 +19,7 @@ import ProjectLandingDownloads, {
   isLandingDownloadEnabled,
 } from './ProjectLandingDownloads'
 import QuantPaperLaunch from './QuantPaperLaunch'
+import WindowsExchangeWebviewLaunch from '../exchange-webview/WindowsExchangeWebviewLaunch'
 import styles from './ProjectLanding.module.css'
 
 interface Props {
@@ -61,12 +62,18 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
   const description = landing?.summary || landing?.description || project.description || '这个项目由一龙平台托管，已接入项目协作、AI 开发和交付流程。'
   const highlights = (landing?.highlights ?? []).filter(Boolean).slice(0, 4)
   const targetUsers = (landing?.target_users ?? []).filter(Boolean).slice(0, 4)
+  const recentUpdates = (landing?.recent_updates ?? []).filter(Boolean).slice(0, 6)
+  const privacyNotes = (landing?.privacy_notes ?? []).filter(Boolean)
+  const systemRequirements = (landing?.system_requirements ?? []).filter(Boolean)
   const updatedAt = project.updated_at ? formatTime(project.updated_at) : ''
   const primaryAction = buildPrimaryAction({ devChannel, buildChannel, firstDownload, resources, onSelectChannel })
   const workflow = buildWorkflow({ devChannel, buildChannel, availableDownloads, onSelectChannel })
   const quantPaperLaunch = project.id === 'yilong-quant'
     && landing?.paper_launch?.schema === 'yilong.quant.paper_launch.v1'
     ? landing.paper_launch
+    : null
+  const windowsWebviewLaunch = landing?.windows_webview?.schema === 'yilong.windows_webview_launch.v1'
+    ? landing.windows_webview
     : null
 
   return (
@@ -109,6 +116,7 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
       </section>
 
       {quantPaperLaunch && <QuantPaperLaunch integration={quantPaperLaunch} />}
+      {windowsWebviewLaunch && <WindowsExchangeWebviewLaunch launch={windowsWebviewLaunch} />}
 
       <section className={styles.startSection} aria-label="项目工作流程">
         <div className={styles.startHeader}>
@@ -136,6 +144,9 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
               {targetUsers.map((target) => <span key={target}>{target}</span>)}
             </div>
           )}
+          <LandingList title="最近更新" items={recentUpdates} />
+          <LandingList title="隐私与风险说明" items={privacyNotes} tone="warning" />
+          <LandingList title="系统要求" items={systemRequirements} />
         </section>
 
         <section className={styles.infoPanel}>
@@ -192,6 +203,16 @@ function PanelHeader({ icon: Icon, title, note }: { icon: LucideIcon; title: str
     <div className={styles.panelHeader}>
       <span className={styles.panelHeaderIcon}><Icon size={17} aria-hidden="true" /></span>
       <div><strong>{title}</strong><small>{note}</small></div>
+    </div>
+  )
+}
+
+function LandingList({ title, items, tone }: { title: string; items: string[]; tone?: 'warning' }) {
+  if (!items.length) return null
+  return (
+    <div className={styles.detailList} data-tone={tone}>
+      <strong>{title}</strong>
+      <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul>
     </div>
   )
 }

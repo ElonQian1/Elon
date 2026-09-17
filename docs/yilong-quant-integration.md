@@ -46,7 +46,7 @@
 
 - `server/src/official_project_catalog/catalog.json` 保存官方公开项目元数据和净化首页快照。
 - `server/src/official_project_catalog/mod.rs` 支持两类官方项目：带 ERP 蓝图的可安装项目，以及不带蓝图的普通公开产品项目。
-- `GET /api/store/projects/:id/preview` 只为当前公开且存在于内置官方目录的项目返回 `yilong.official_project_preview.v1`。PC 项目广场在用户加入前按需展示能力、目标用户、最近更新、隐私边界、客户端计划和净化 Paper 说明；下载/资源 URL、工作区内容、grant、participant、密钥和仓位不会进入该响应。
+- `GET /api/store/projects/:id/preview` 只为当前公开且存在于内置官方目录的项目返回 `yilong.official_project_preview.v1`；该接口和 `preview_action` 字段仍保留，但 PC 项目广场不再展示加入前“了解详情”弹窗。同等能力、目标用户、最近更新、隐私边界、客户端计划和净化 Paper/Windows WebView 入口说明改为在用户加入项目后的项目首页（`pc-frontend/src/features/conversation/ProjectLanding.tsx`）展示；下载/资源 URL、工作区内容、grant、participant、密钥和仓位不会进入首页展示的净化字段。
 - 量化项目属于第二类，因此不会显示 ERP 安装动作。
 - 子仓库自身的 `.elon/project-landing.json` 仍是后续同步更新的内容真源；官方目录快照变更必须与它保持一致。
 - Android 主服务器托管 V6/V17 要求公开下载路由只直接返回 `DATA_DIR/project-releases` 下且大小和 SHA-256 与发布记录一致的 APK；服务器启动同步官方目录后重新叠加最新 release。当前 `com.elon.quant 0.1.0 (1)` 已由 Server `v0.3.1721 / 725f91f0a` 托管，目录下载地址非空且真实下载摘要与发布回执一致；真机安装/打开仍待验收，详见 `docs/yilong-quant-android-main-hosting-v6-acceptance.md`。

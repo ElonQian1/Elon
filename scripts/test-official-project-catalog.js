@@ -21,8 +21,12 @@ const plazaSource = fs.readFileSync(
   path.join(root, 'pc-frontend/src/features/plaza/ProjectPlazaView.tsx'),
   'utf8',
 )
-const previewDialogSource = fs.readFileSync(
-  path.join(root, 'pc-frontend/src/features/plaza/OfficialProjectPreviewDialog.tsx'),
+const projectLandingSource = fs.readFileSync(
+  path.join(root, 'pc-frontend/src/features/conversation/ProjectLanding.tsx'),
+  'utf8',
+)
+const conversationTypesSource = fs.readFileSync(
+  path.join(root, 'pc-frontend/src/features/conversation/types.ts'),
   'utf8',
 )
 
@@ -36,9 +40,14 @@ assert.match(previewSource, /manifest_url/)
 assert.match(previewSource, /resource URLs are intentionally excluded/)
 assert.match(storeSource, /get_store_project_preview/)
 assert.match(routesSource, /\/api\/store\/projects\/:id\/preview/)
-assert.match(plazaSource, /<OfficialProjectPreviewDialog/)
-assert.match(previewDialogSource, /了解项目详情/)
-assert.doesNotMatch(previewDialogSource, /\/join|paper-launch|paper\/launch/)
+assert.doesNotMatch(plazaSource, /OfficialProjectPreviewDialog|preview_action/)
+assert.match(conversationTypesSource, /recent_updates\?: string\[\]/)
+assert.match(conversationTypesSource, /privacy_notes\?: string\[\]/)
+assert.match(conversationTypesSource, /system_requirements\?: string\[\]/)
+assert.match(conversationTypesSource, /windows_webview\?: WindowsWebviewLaunchContract/)
+assert.match(projectLandingSource, /recentUpdates/)
+assert.match(projectLandingSource, /privacyNotes/)
+assert.match(projectLandingSource, /systemRequirements/)
 
 const quantProject = catalog.projects.find((project) => project.id === 'yilong-quant')
 assert.ok(quantProject, 'yilong-quant must remain in the official catalog')
@@ -62,7 +71,7 @@ assert.equal(quantProject.landing.windows_webview.schema, 'yilong.windows_webvie
 assert.equal(quantProject.landing.windows_webview.provider_id, 'binance')
 assert.equal(Object.hasOwn(quantProject.landing.windows_webview, 'url'), false)
 assert.equal(quantProject.landing.downloads.android.status, 'available')
-assert.match(previewDialogSource, /WindowsExchangeWebviewLaunch/)
+assert.match(projectLandingSource, /WindowsExchangeWebviewLaunch/)
 for (const retiredField of ['url', 'version', 'version_code', 'source_git_sha', 'sha256', 'size_label']) {
   assert.equal(
     Object.hasOwn(quantProject.landing.downloads.android, retiredField),

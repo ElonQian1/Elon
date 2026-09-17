@@ -1,4 +1,5 @@
 import type { RuntimeRoute } from './runtimeRoutes'
+import type { WindowsWebviewLaunchContract } from '../exchange-webview/WindowsExchangeWebviewLaunch'
 
 export interface Project {
   id: string
@@ -227,11 +228,15 @@ export interface ProjectLanding {
   description?: string
   highlights?: string[]
   target_users?: string[]
+  recent_updates?: string[]
+  privacy_notes?: string[]
+  system_requirements?: string[]
   downloads?: ProjectLandingDownload[]
   resources?: ProjectLandingResource[]
   custom_landing_url?: string
   web_url?: string
   paper_launch?: ProjectLandingPaperLaunch
+  windows_webview?: WindowsWebviewLaunchContract
   source?: { mode?: string; status?: string }
 }
 

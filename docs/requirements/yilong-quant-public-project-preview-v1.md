@@ -1,10 +1,13 @@
 ---
-version_status: current
-reviewed_at: 2026-09-02
-implementation_status: planned
+version_status: superseded
+reviewed_at: 2026-09-17
+implementation_status: superseded
+superseded_note: PC 项目广场“了解详情”加入前预览按钮已下线；等价内容（当前能力、最近更新、隐私说明、系统要求、Windows WebView 入口）改为在加入后项目首页 pc-frontend/src/features/conversation/ProjectLanding.tsx 展示。后端 /api/store/projects/:id/preview 接口与 preview_action 字段序列化本次保留未删除。
 ---
 
-# 一龙量化交易加入前公开预览 V1
+# 一龙量化交易加入前公开预览 V1（已下线，仅存历史记录）
+
+> 本文档描述的“加入前了解详情”弹窗交互已下线，验收标准 4/5 不再适用。等价内容现由加入后的项目首页承载，见 `pc-frontend/src/features/conversation/ProjectLanding.tsx` 与 `docs/yilong-quant-integration.md`。以下正文保留作为历史设计记录，不再代表当前行为。
 
 ## 目标
 
