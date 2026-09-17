@@ -41,6 +41,15 @@ pub(super) fn fetchable(url: &Url) -> bool {
     site(url) != "网页"
 }
 
+// WeChat answers unknown agents with a verification shell; Binance's WAF only serves Open Graph
+// to allow-listed crawler agents (verified 2026-09: Twitterbot/facebookexternalhit are challenged).
+pub(super) fn user_agent(url: &Url) -> &'static str {
+    match site(url) {
+        "币安广场" => "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
+        _ => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36 YilongLinkPreview/1.0",
+    }
+}
+
 pub(super) fn embed(url: &Url) -> Option<Embed> {
     let parts: Vec<_> = url.path_segments()?.collect();
     match site(url) {

@@ -98,6 +98,132 @@ fn social_link_preview_skips_generic_logo_and_checks_upgraded_cover() {
     assert!(meta.image_needs_check);
 }
 
+#[test]
+fn social_link_preview_reads_description_and_site_agents() {
+    let url = policy::public_url("https://mp.weixin.qq.com/s/test").unwrap();
+    let meta = metadata::parse(
+        r#"<meta name="description" content="generic"><meta property="og:description" content="  正文&amp;摘要  "><meta name="twitter:description" content="ignored">"#,
+        &url,
+    );
+    assert_eq!(meta.description, "正文&摘要");
+    assert!(policy::user_agent(&url).starts_with("Mozilla/5.0 (Windows"));
+    let binance = policy::public_url("https://www.binance.com/en/square/post/1234567").unwrap();
+    assert!(policy::user_agent(&binance).contains("Discordbot"));
+}
+
+#[test]
+fn social_link_report_requires_same_identity_and_allowed_cover() {
+    let original = policy::public_url("https://app.binance.com/uni-qr/cpos/123456?r=abc").unwrap();
+    let read = |url: &str, title: &str, image: Option<&str>| report::Read {
+        schema: 1,
+        original: original.to_string(),
+        url: url.into(),
+        article: true,
+        title: title.into(),
+        author: " Author ".into(),
+        description: "d".into(),
+        image: image.map(Into::into),
+    };
+    let ok = report::validate(
+        &original,
+        &read(
+            "https://www.binance.com/zh-CN/square/post/123456",
+            "Real post",
+            Some("https://public.bnbstatic.com/image/cms/content.png"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        (ok.title.as_str(), ok.author.as_str()),
+        ("Real post", "Author")
+    );
+    assert!(ok.image.is_some());
+    assert!(report::validate(
+        &original,
+        &read(
+            "https://www.binance.com/en/square/post/999999",
+            "Other",
+            None
+        )
+    )
+    .is_err());
+    assert!(report::validate(
+        &original,
+        &read(
+            "https://www.binance.com/en/square/post/123456",
+            "Sign in to Binance",
+            None
+        )
+    )
+    .is_err());
+    let avatar = report::validate(
+        &original,
+        &read(
+            "https://www.binance.com/en/square/post/123456",
+            "Post",
+            Some("https://public.bnbstatic.com/static/avatar/1.png"),
+        ),
+    )
+    .unwrap();
+    assert!(avatar.image.is_none());
+    let x = policy::public_url("https://x.com/author/status/463440424141459456").unwrap();
+    assert_eq!(
+        report::identity(&x).as_deref(),
+        Some("x-post:463440424141459456")
+    );
+    assert_eq!(
+        report::identity(&policy::public_url("https://mp.weixin.qq.com/s?__biz=1&mid=2").unwrap())
+            .as_deref(),
+        Some("wechat:/s?__biz=1&mid=2")
+    );
+    assert!(report::identity(&policy::public_url("https://t.co/abc").unwrap()).is_none());
+}
+
+#[tokio::test]
+async fn social_link_report_does_not_override_server_result() {
+    let url = policy::public_url("https://mp.weixin.qq.com/s/report-test").unwrap();
+    let key: [u8; 32] = Sha256::digest(url.as_str()).into();
+    let mut ready = Preview::fallback(&url);
+    ready.title = "server title".into();
+    ready.status = "ready";
+    store(key, ready);
+    let read = report::Read {
+        schema: 1,
+        original: url.to_string(),
+        url: url.to_string(),
+        article: true,
+        title: "member title".into(),
+        author: String::new(),
+        description: String::new(),
+        image: None,
+    };
+    let kept = report("user-a", url.clone(), &read).await.unwrap();
+    assert_eq!(
+        (kept.title.as_str(), kept.source),
+        ("server title", "server")
+    );
+    CACHE.lock().unwrap().remove(&key);
+    let member = report("user-a", url.clone(), &read).await.unwrap();
+    assert_eq!(
+        (member.title.as_str(), member.source, member.status),
+        ("member title", "member", "ready")
+    );
+    assert_eq!(cached(url).await.title, "member title");
+    CACHE.lock().unwrap().remove(&key);
+}
+
+#[test]
+fn social_link_cover_thumbnail_is_small_inline_jpeg() {
+    let mut png = Vec::new();
+    image::RgbImage::from_pixel(900, 600, image::Rgb([200, 30, 30]))
+        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+        .unwrap();
+    let data = cover::thumbnail(&png).unwrap();
+    assert!(data.starts_with("data:image/jpeg;base64,"));
+    assert!(data.len() < cover::MAX_DATA_URL);
+    assert!(cover::thumbnail(b"not an image").is_err());
+}
+
 #[tokio::test]
 async fn social_link_preview_reuses_completed_cache_without_network() {
     let url =
@@ -128,16 +254,24 @@ async fn social_link_preview_live_public_sources() {
     ];
     for sample in samples {
         let url = public_url(sample).unwrap();
+        let direct = tokio::time::timeout(Duration::from_secs(12), fetch::resolve(url.clone()))
+            .await
+            .map_err(|_| "timeout".to_string())
+            .and_then(|r| r.map_err(|e| e.to_string()));
         let result = tokio::time::timeout(Duration::from_secs(12), preview(url))
             .await
             .unwrap();
         assert_eq!(result.url, sample);
         println!(
-            "provider={} metadata={} cover={} embed={}",
+            "provider={} metadata={} cover={} inline_cover={} embed={} title_len={} description_len={} direct_error={:?}",
             result.site,
             result.status,
             result.image.is_some(),
-            result.embed.is_some()
+            result.cover_data_url.is_some(),
+            result.embed.is_some(),
+            result.title.chars().count(),
+            result.description.chars().count(),
+            direct.err()
         );
     }
 }

@@ -41,6 +41,8 @@ pub(crate) async fn read(tab: &Webview, original: &str) -> Option<Value> {
     Some(serde_json::json!({
         "schema": 1, "original": original, "article": true,
         "url": result.get("url")?.as_str()?, "title": result.get("title")?.as_str()?,
-        "author": result.get("author")?.as_str()?, "image": result.get("image")?
+        "author": result.get("author")?.as_str()?,
+        "description": result.get("description").and_then(|v| v.as_str()).unwrap_or(""),
+        "image": result.get("image")?
     }))
 }

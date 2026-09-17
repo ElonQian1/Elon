@@ -31,8 +31,12 @@ internal object SocialLinkReadPreview {
         if (SocialLinkShareText.isGeneric(title, item.site)) return null
         if (Regex("^(?:Log in|Sign in|Access Denied|Just a moment|Page not found|Something went wrong|内容已删除)", RegexOption.IGNORE_CASE).containsMatchIn(title)) return null
         val image = SocialLinkReadIdentity.image(value.optString("image"), expected.substringBefore(':'))
-        return item.copy(title = title, author = value.optString("author").trim().take(80), image = image, ready = true)
+        return item.copy(title = title, author = value.optString("author").trim().take(80), image = image, ready = true, summary = value.optString("description").trim().take(300))
     }
+    /** Only the fields the adapter contract defines are forwarded to the server. */
+    fun reportable(value: JSONObject): JSONObject = JSONObject().put("schema", 1).put("original", value.optString("original"))
+        .put("url", value.optString("url")).put("article", true).put("title", value.optString("title")).put("author", value.optString("author"))
+        .put("description", value.optString("description")).put("image", value.optString("image").ifBlank { null })
     fun capture(web: WebView, original: String, server: String, owner: String?, complete: () -> Unit = {}) {
         if (SocialLinkReadIdentity.identity(original) == null) { complete(); return }
         val script = web.context.assets.open("social_link_read_adapter.js").bufferedReader().use { it.readText() }
@@ -46,6 +50,8 @@ internal object SocialLinkReadPreview {
                 parse(original, value)?.let {
                     remember(server, owner, it)
                     SocialLinkReadStore.put(app, server, owner, value)
+                    val read = reportable(value)
+                    SocialLinkPreviewApi.loader.execute { SocialLinkPreviewApi.report(app, server, original, read) }
                 }
             }
             complete()

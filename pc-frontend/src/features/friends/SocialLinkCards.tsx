@@ -15,6 +15,11 @@ async function previewApi(path: string, init: RequestInit) {
   if (!response.ok) throw new Error('预览暂不可用')
   return response.json()
 }
+// Share what this member actually saw so readers whose server fetch was blocked get a real card.
+function reportRead(url: string, value: unknown) {
+  const read = ElonSocialReadAdapter.validate(url, value); if (!read) return
+  previewApi('/api/me/link-preview/report', { method: 'POST', body: JSON.stringify({ url, read }) }).catch(() => undefined)
+}
 export default function SocialLinkCards({ text, owner, compact = false }: { text: string; owner: string; compact?: boolean }) {
   const host = useRef<HTMLDivElement>(null)
   const [reading, setReading] = useState<LinkPreview | null>(null)
@@ -33,6 +38,6 @@ export default function SocialLinkCards({ text, owner, compact = false }: { text
   useEffect(() => { setReading(null); return () => { ElonSocialLinkViewer.close() } }, [scope, text])
   return <><div ref={host} />{reading && <SocialLinkBrowser preview={reading} onClose={() => setReading(null)} onRead={value => {
     if (liveScope.current !== scope) return
-    const updated = rememberRead(scope, reading, value); if (updated) ElonSocialLinks.remember(scope, updated)
+    const updated = rememberRead(scope, reading, value); if (updated) { ElonSocialLinks.remember(scope, updated); reportRead(reading.url, value) }
   }} />}</>
 }

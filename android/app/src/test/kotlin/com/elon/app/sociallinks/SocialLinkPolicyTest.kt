@@ -38,6 +38,18 @@ class SocialLinkPolicyTest {
         assertEquals("463440424141459456", SocialLinkPolicy.link("https://twitter.com/Interior/status/463440424141459456?s=20")!!.xId)
         assertNull(SocialLinkPolicy.link("https://www.binance.com/en/square/post/123456")!!.player)
     }
+    @Test fun mergePrefersInlineCoverAndMarksMemberReadback() {
+        val item = SocialLinkPolicy.link("https://mp.weixin.qq.com/s/test")!!
+        val inline = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+        val value = org.json.JSONObject().put("schema", 1).put("url", item.url).put("title", "标题").put("status", "ready")
+            .put("description", " 摘要 ").put("image", "https://mmbiz.qpic.cn/a.jpg").put("cover_data_url", inline).put("source", "member")
+        val merged = SocialLinkPolicy.merge(value, item)
+        assertEquals(inline, merged.image); assertEquals("摘要", merged.summary); assertTrue(merged.member)
+        assertEquals("微信公众号 · 成员回填", SocialLinkPresentation.source(merged))
+        assertEquals("https://mmbiz.qpic.cn/a.jpg", SocialLinkPolicy.merge(value.put("cover_data_url", "data:text/html;base64,PGI+"), item).image)
+        assertFalse(SocialLinkPolicy.merge(value.put("source", "server"), item).member)
+        assertNull(SocialLinkPolicy.inlineCover("data:image/jpeg;base64," + "A".repeat(98304)))
+    }
     @Test fun repeatedAndInternalCardsDoNotExpandTwice() {
         val url = "https://mp.weixin.qq.com/s/example"
         assertEquals(1, SocialLinkPolicy.extract("$url $url").size)

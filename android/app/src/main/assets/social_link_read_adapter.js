@@ -46,7 +46,7 @@
     const id = identity(original);
     if (!id || !value || value.schema !== 1 || value.original !== original || identity(value.url) !== id || value.article !== true) return null;
     const title = clean(value.title); if (!meaningful(title)) return null;
-    return { schema: 1, original, url: value.url, article: true, title, author: clean(value.author, 80), image: image(value.image, id.split(':')[0]) };
+    return { schema: 1, original, url: value.url, article: true, title, author: clean(value.author, 80), description: clean(value.description, 300), image: image(value.image, id.split(':')[0]) };
   }
   function read(original) {
     try {
@@ -57,10 +57,10 @@
       const meta = name => document.querySelector('meta[property="' + name + '"],meta[name="' + name + '"]')?.content || '';
       const canonical = document.querySelector('link[rel="canonical"]')?.href || meta('og:url');
       if (canonical && identity(canonical) !== id) return null;
-      let title = '', author = '', cover = '', content;
+      let title = '', author = '', cover = '', description = '', content;
       if (id.startsWith('wechat:')) {
         content = document.querySelector('#js_content'); if (!visible(content)) return null;
-        title = txt(document.querySelector('#activity-name')); author = txt(document.querySelector('#js_name')); cover = meta('og:image');
+        title = txt(document.querySelector('#activity-name')); author = txt(document.querySelector('#js_name')); cover = meta('og:image'); description = meta('og:description') || meta('description');
       } else if (id.startsWith('x-post:')) {
         // Match the permalink's own article, never a quoted post or a recommendation.
         for (const time of document.querySelectorAll('article time')) {
@@ -85,12 +85,13 @@
         // Only accept page metadata backed by the actual rendered content, not a loading shell.
         const rendered = clean(content.innerText || content.textContent, 32000);
         if (!title && meaningful(ogTitle) && rendered.includes(ogTitle.slice(0, 32))) title = ogTitle;
-        const description = clean(meta('og:description') || meta('description'));
-        if (!title && meaningful(description) && rendered.includes(description.slice(0, 32))) title = description;
+        const summary = clean(meta('og:description') || meta('description'));
+        if (!title && meaningful(summary) && rendered.includes(summary.slice(0, 32))) title = summary;
+        else if (summary !== title) description = summary;
         author = meta('author') || meta('article:author'); cover = meta('og:image') || meta('twitter:image');
       }
       if (cover.startsWith('http:')) cover = 'https:' + cover.slice(5);
-      return validate(original, { schema: 1, original, url: location.href, article: true, title, author, image: cover });
+      return validate(original, { schema: 1, original, url: location.href, article: true, title, author, description, image: cover });
     } catch { return null; }
   }
   const api = { identity, image, readingUrl, validate, read };

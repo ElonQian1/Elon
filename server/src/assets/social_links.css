@@ -8,6 +8,7 @@
 .social-link-copy { display: contents; }
 .social-link-title { grid-column: 1; grid-row: 1; font-size: 16px; line-height: 1.4; font-weight: 400; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .social-link-source, .social-link-time { grid-column: 1 / -1; min-width: 0; font-size: 12px; color: #b7bdc8; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.social-link-summary { grid-column: 1 / -1; min-width: 0; font-size: 13px; color: #c9ced8; line-height: 1.45; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .social-link-time { color: #b5ccea; margin-top: -4px; }
 .social-link-media { grid-column: 2; grid-row: 1; position: relative; width: 56px; height: 56px; align-self: start; overflow: hidden; border-radius: 4px; background: #343e4a; color: #e4ebf4; }
 .social-link-badge { display: flex; height: 100%; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; }
@@ -16,7 +17,7 @@
 .social-link-media[data-site="币安广场"] { background: #403b2c; color: #f2dc94; }
 .social-link-media[data-site="哔哩哔哩"] { background: #2b3d49; color: #bde8fa; }
 .social-link-cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.social-link-cover[hidden], .social-link-retry[hidden], .social-link-time[hidden] { display: none; }
+.social-link-cover[hidden], .social-link-retry[hidden], .social-link-time[hidden], .social-link-summary[hidden] { display: none; }
 .social-link-cards-desktop { width: 300px; }
 .social-link-cards-desktop .social-link-title { font-size: 14px; }
 .social-link-retry { border: 0; background: transparent; color: #b5ccea; padding: 6px 0; font-size: 12px; cursor: pointer; }

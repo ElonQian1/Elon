@@ -17,7 +17,8 @@
     const seconds = value.embed?.kind === 'bilibili' ? new URL(value.embed.url).searchParams.get('t') : null;
     const n = Number(seconds);
     const stamp = n >= 3600 ? `${Math.floor(n / 3600)}:${String(Math.floor(n / 60) % 60).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}` : `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
-    return { badge, title: value.title || fallback, source: value.site + (author && author !== value.site ? ' · ' + author : ''), time: seconds !== null && /^\d+$/.test(seconds) && n <= 604800 ? `从 ${stamp} 开始` : '' };
+    const origin = value.source === 'member' ? ' · 成员回填' : '';
+    return { badge, title: value.title || fallback, summary: value.description || '', source: value.site + (author && author !== value.site ? ' · ' + author : '') + origin, time: seconds !== null && /^\d+$/.test(seconds) && n <= 604800 ? `从 ${stamp} 开始` : '' };
   }
   const cache = new Map();
   const readers = new Set();
@@ -96,7 +97,7 @@
       seen.add(u.href);
       const nearby = text.slice(Math.max(0, match.index - 300), match.index);
       const title = [...nearby.matchAll(/【([^】]+)】/g)].map(m => m[1]).find(t => !t.startsWith('精准空降')) || '';
-      result.push({ schema: 1, url: u.href, site: sites[u.hostname], ...shareTitle(title, sites[u.hostname], nearby), image: null, embed: embed(u.href), status: 'unavailable' });
+      result.push({ schema: 1, url: u.href, site: sites[u.hostname], ...shareTitle(title, sites[u.hostname], nearby), description: '', image: null, embed: embed(u.href), status: 'unavailable', source: 'server' });
       if (result.length === 2) break;
     }
     return result;
@@ -111,20 +112,23 @@
     for (const key of ['t', 'p']) { if (url.searchParams.has(key)) source.searchParams.set(key, url.searchParams.get(key)); }
     return embed(source.href);
   }
+  // Server-copied thumbnails avoid CDN referrer checks; bounded so a response cannot bloat memory.
+  function inlineCover(value) { return typeof value === 'string' && value.length <= 98304 && /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(value) ? value : null; }
   function sanitize(value, fallback) {
     if (!value || value.schema !== 1 || value.url !== fallback.url) return fallback;
     const title = typeof value.title === 'string' && !genericTitle(value.title, fallback.site) ? value.title.slice(0, 160) : fallback.title;
     return { ...fallback, title,
+      description: typeof value.description === 'string' ? value.description.slice(0, 300) : '',
       author: typeof value.author === 'string' && value.author.trim() ? value.author.slice(0, 80) : fallback.author,
-      image: safeUrl(value.image)?.href || null, embed: trustedEmbed(value.embed) || fallback.embed,
-      status: value.status === 'ready' && title ? 'ready' : 'unavailable' };
+      image: inlineCover(value.cover_data_url) || safeUrl(value.image)?.href || null, embed: trustedEmbed(value.embed) || fallback.embed,
+      status: value.status === 'ready' && title ? 'ready' : 'unavailable', source: value.source === 'member' ? 'member' : 'server' };
   }
   async function preview(item, options, refresh) {
     const key = String(options.owner || '') + '\n' + item.url;
     const entry = cache.get(key);
     if (entry && entry.expires > Date.now() && (!refresh || entry.read)) return entry.promise;
     while (cache.size >= 128) cache.delete(cache.keys().next().value);
-    const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 12000);
+    const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 15000);
     const record = { expires: Date.now() + 30000, promise: null };
     record.promise = Promise.resolve().then(() => options.api('/api/me/link-preview', {
       method: 'POST', body: JSON.stringify({ url: item.url }), signal: controller.signal,
@@ -148,6 +152,7 @@
       button.target = '_blank'; button.rel = 'noopener noreferrer';
       const copy = document.createElement('span'); copy.className = 'social-link-copy';
       const title = document.createElement('strong'); title.className = 'social-link-title';
+      const summary = document.createElement('span'); summary.className = 'social-link-summary'; summary.hidden = true;
       const source = document.createElement('span'); source.className = 'social-link-source';
       const time = document.createElement('span'); time.className = 'social-link-time';
       const media = document.createElement('span'); media.className = 'social-link-media'; media.setAttribute('aria-hidden', 'true');
@@ -155,10 +160,11 @@
       const cover = document.createElement('img'); cover.className = 'social-link-cover'; cover.alt = ''; cover.hidden = true; cover.referrerPolicy = 'no-referrer'; cover.loading = 'lazy';
       cover.onerror = () => { cover.hidden = true; cover.removeAttribute('src'); };
       const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'social-link-retry'; retry.textContent = '更新预览'; retry.hidden = true;
-      copy.append(title, source, time); media.append(badge, cover); button.append(copy, media); wrap.append(button, retry); host.append(wrap);
+      copy.append(title, summary, source, time); media.append(badge, cover); button.append(copy, media); wrap.append(button, retry); host.append(wrap);
       function draw(value) {
         current = value; const view = presentation(value);
         title.textContent = view.title; button.title = view.title;
+        summary.textContent = view.summary; summary.hidden = !view.summary || options.compact === true;
         source.textContent = view.source; source.title = view.source;
         time.textContent = view.time; time.hidden = !view.time;
         badge.textContent = view.badge; media.setAttribute('data-site', value.site);

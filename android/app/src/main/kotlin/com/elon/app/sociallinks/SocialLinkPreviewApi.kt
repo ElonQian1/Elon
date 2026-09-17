@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
 
 internal object SocialLinkPreviewApi {
     val loader = ThreadPoolExecutor(3, 3, 30, TimeUnit.SECONDS, ArrayBlockingQueue(32), ThreadPoolExecutor.DiscardPolicy())
-    private val http = OkHttpClient.Builder().callTimeout(12, TimeUnit.SECONDS).build()
+    private val http = OkHttpClient.Builder().callTimeout(15, TimeUnit.SECONDS).build()
     private var images: OkHttpClient? = null
     private val previews = object : LruCache<String, Pair<Long, SocialLink>>(128) {}
     private val bitmaps = object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
@@ -38,15 +38,28 @@ internal object SocialLinkPreviewApi {
         val preview = runCatching {
             http.newCall(AuthManager.applyAuth(context, request).build()).execute().use { response ->
                 if (!response.isSuccessful) return@use item
-                val bytes = response.body?.byteStream()?.use { readBounded(it, 16384) } ?: return@use item
+                val bytes = response.body?.byteStream()?.use { readBounded(it, 131072) } ?: return@use item
                 SocialLinkPolicy.merge(JSONObject(String(bytes, Charsets.UTF_8)), item)
             }
         }.getOrDefault(item)
         if (AuthManager.userId(context).orEmpty() == owner) previews.put(key, (System.currentTimeMillis() + if (preview.ready) 3600000 else 30000) to preview)
         return SocialLinkReadPreview.cached(context, ServerUrlManager.getActive(context), owner, item.url) ?: preview
     }
+    /** Best effort: the member's validated read-back lets the server serve other readers. */
+    fun report(context: Context, server: String, original: String, read: JSONObject) {
+        val body = JSONObject().put("url", original).put("read", read).toString()
+        if (body.length > 16384) return
+        val request = Request.Builder().url(server.trimEnd('/') + "/api/me/link-preview/report").post(body.toRequestBody("application/json".toMediaType()))
+        runCatching { http.newCall(AuthManager.applyAuth(context, request).build()).execute().close() }
+    }
     fun cover(context: Context, url: String): Bitmap? {
         bitmaps.get(url)?.let { return it }
+        SocialLinkPolicy.inlineCover(url)?.let { data ->
+            return runCatching {
+                val bytes = android.util.Base64.decode(data.substringAfter("base64,"), android.util.Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.also { bitmaps.put(url, it) }
+            }.getOrNull()
+        }
         if (SocialLinkPolicy.safeUrl(url) == null) return null
         return runCatching {
             val client = synchronized(this) { images ?: OkHttpClient.Builder().callTimeout(10, TimeUnit.SECONDS)

@@ -4,7 +4,7 @@ import java.net.URI
 import java.net.URLDecoder
 import org.json.JSONObject
 
-internal data class SocialLink(val url: String, val site: String, val title: String = "", val author: String = "", val image: String? = null, val player: String? = null, val xId: String? = null, val ready: Boolean = false)
+internal data class SocialLink(val url: String, val site: String, val title: String = "", val author: String = "", val image: String? = null, val player: String? = null, val xId: String? = null, val ready: Boolean = false, val summary: String = "", val member: Boolean = false)
 
 internal object SocialLinkPolicy {
     private val sites = mapOf(
@@ -17,6 +17,9 @@ internal object SocialLinkPolicy {
         if (value == null || value.length > 4096 || value.any { it.code < 32 || it.code == 127 }) return null
         URI(value).takeIf { it.scheme == "https" && !it.host.isNullOrBlank() && it.rawUserInfo == null && it.port in listOf(-1, 443) }
     }.getOrNull()
+    /** Server-copied thumbnail; bounded so one response cannot inflate the preview cache. */
+    fun inlineCover(value: String?): String? =
+        value?.takeIf { it.length <= 98304 && Regex("^data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$").matches(it) }
     fun link(value: String, title: String = ""): SocialLink? {
         val uri = safeUrl(value) ?: return null
         val site = sites[uri.host.lowercase()] ?: return null
@@ -72,6 +75,7 @@ internal object SocialLinkPolicy {
         }
         val title = value.optString("title").trim().take(160).takeUnless { SocialLinkShareText.isGeneric(it, fallback.site) } ?: fallback.title
         return fallback.copy(title = title, author = value.optString("author").take(80).ifBlank { fallback.author },
-            image = safeUrl(value.optString("image"))?.toString(), player = resolved?.player ?: fallback.player, xId = resolved?.xId ?: fallback.xId, ready = value.optString("status") == "ready" && title.isNotBlank())
+            image = inlineCover(value.optString("cover_data_url")) ?: safeUrl(value.optString("image"))?.toString(), player = resolved?.player ?: fallback.player, xId = resolved?.xId ?: fallback.xId, ready = value.optString("status") == "ready" && title.isNotBlank(),
+            summary = value.optString("description").trim().take(300), member = value.optString("source") == "member")
     }
 }

@@ -4,10 +4,13 @@ use reqwest::Url;
 #[derive(Default, Debug)]
 pub(super) struct Metadata {
     pub title: String,
+    pub description: String,
     pub author: String,
     pub image: Option<String>,
     pub image_needs_check: bool,
 }
+
+pub(super) const DESCRIPTION_MAX: usize = 300;
 
 pub(super) fn clean(value: &str, max: usize) -> String {
     let decoded = decode(value);
@@ -100,6 +103,10 @@ pub(super) fn parse(html: &str, base: &Url) -> Metadata {
             match key.as_str() {
                 "og:title" => out.title = clean(value, 160),
                 "twitter:title" if out.title.is_empty() => out.title = clean(value, 160),
+                "og:description" => out.description = clean(value, DESCRIPTION_MAX),
+                "twitter:description" | "description" if out.description.is_empty() => {
+                    out.description = clean(value, DESCRIPTION_MAX)
+                }
                 "author" | "og:article:author" => out.author = clean(value, 80),
                 "og:image" | "twitter:image" | "og:image:secure_url" => {
                     let decoded = decode(value);

@@ -100,4 +100,20 @@ links.remember('read-account', { ...observed, title: 'Expired read' }, Date.now(
 assert.equal(readHost.children[0].children[0].children[0].children[0].children[0].textContent, observed.title);
 disposeRead(); links.remember('read-account', { ...observed, title: 'After disposal' });
 assert.equal(readHost.children.length, 0);
-console.log('PASS: six-platform URL policy, Bilibili time/page, X isolated embed, both API contracts, stale callbacks and failure recovery');
+// Description, server-copied covers and member read-back marker.
+const wechat = links.links('https://mp.weixin.qq.com/s/test')[0];
+const inline = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+const rawRich = { ...wechat, title: '标题', description: '摘要', status: 'ready', source: 'member', image: 'https://mmbiz.qpic.cn/a.jpg', cover_data_url: inline };
+const rich = links.sanitize(rawRich, wechat);
+assert.equal(rich.image, inline); assert.equal(rich.description, '摘要'); assert.equal(rich.source, 'member');
+assert.equal(links.presentation(rich).source, '微信公众号 · 成员回填'); assert.equal(links.presentation(rich).summary, '摘要');
+assert.equal(links.sanitize({ ...rawRich, cover_data_url: 'data:text/html;base64,PGI+' }, wechat).image, 'https://mmbiz.qpic.cn/a.jpg');
+assert.equal(links.sanitize({ ...rawRich, source: 'anything' }, wechat).source, 'server');
+const richHost = new Node('host');
+links.mount(richHost, wechat.url, { owner: 'rich', api: async () => ({ ...rich }) }); await flush();
+const richCopy = richHost.children[0].children[0].children[0].children[0];
+assert.equal(richCopy.children[1].textContent, '摘要'); assert.equal(richCopy.children[1].hidden, false);
+const compactHost = new Node('host');
+links.mount(compactHost, wechat.url, { owner: 'rich-compact', compact: true, api: async () => ({ ...rich }) }); await flush();
+assert.equal(compactHost.children[0].children[0].children[0].children[0].children[1].hidden, true, 'compact cards keep summaries hidden');
+console.log('PASS: six-platform URL policy, Bilibili time/page, X isolated embed, both API contracts, stale callbacks, failure recovery, summaries and member read-back');

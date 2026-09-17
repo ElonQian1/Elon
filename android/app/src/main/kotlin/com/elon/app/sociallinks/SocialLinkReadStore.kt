@@ -25,7 +25,7 @@ internal object SocialLinkReadStore {
         val item = SocialLinkReadPreview.parse(original, value) ?: return
         // Rebuild the record to prevent unexpected adapter fields from becoming persisted data.
         val preview = JSONObject().put("schema", 1).put("original", original).put("url", value.optString("url"))
-            .put("article", true).put("title", item.title).put("author", item.author).put("image", item.image)
+            .put("article", true).put("title", item.title).put("author", item.author).put("description", item.summary).put("image", item.image)
         val record = JSONObject().put("saved", now).put("preview", preview).toString()
         if (record.length > 16384) return
         val store = prefs(context); val editor = store.edit(); val id = key(server, owner, original)

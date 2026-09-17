@@ -32,7 +32,7 @@ internal object SocialLinkPresentation {
         val author = item.author.trim().ifBlank {
             if (item.site == "X" && parts.getOrNull(1) == "status" && handle != "i" && handle.matches(Regex("[A-Za-z0-9_]{1,15}"))) "@$handle" else ""
         }
-        return item.site + if (author.isNotBlank() && author != item.site) " · $author" else ""
+        return item.site + (if (author.isNotBlank() && author != item.site) " · $author" else "") + (if (item.member) " · 成员回填" else "")
     }
     fun time(item: SocialLink): String {
         if (item.site != "哔哩哔哩") return ""

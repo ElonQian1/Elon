@@ -831,6 +831,7 @@ dependencies = [
  "ed25519-dalek",
  "elon-external-pool-adapter-session-core",
  "elon-pc-dev-runtime",
+ "flate2",
  "futures",
  "hex",
  "hmac",

@@ -1,4 +1,4 @@
-use super::{metadata, policy, Preview};
+use super::{cover, metadata, policy, Preview};
 use anyhow::{bail, Result};
 use reqwest::Url;
 use std::time::Duration;
@@ -16,8 +16,9 @@ async fn response(url: &Url) -> Result<reqwest::Response> {
     Ok(target
         .client
         .get(&target.url)
-        .header("User-Agent", "YilongLinkPreview/1.0")
+        .header("User-Agent", policy::user_agent(url))
         .header("Accept", "text/html,application/json;q=0.9")
+        .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
         .send()
         .await?)
 }
@@ -34,15 +35,29 @@ async fn body(mut response: reqwest::Response, head: bool) -> Result<String> {
     if !mime.contains(if head { "text/html" } else { "json" }) {
         bail!("unsupported preview");
     }
+    // Bilibili and others gzip regardless of Accept-Encoding; reqwest has no decoder enabled.
+    let gzip = response
+        .headers()
+        .get("content-encoding")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.eq_ignore_ascii_case("gzip"));
     let mut bytes = Vec::new();
     while let Some(chunk) = response.chunk().await? {
         let remaining = MAX_HEAD.saturating_sub(bytes.len());
         bytes.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
         if bytes.len() >= MAX_HEAD
-            || (head && bytes.windows(7).any(|s| s.eq_ignore_ascii_case(b"</head>")))
+            || (head && !gzip && bytes.windows(7).any(|s| s.eq_ignore_ascii_case(b"</head>")))
         {
             break;
         }
+    }
+    if gzip {
+        use std::io::Read;
+        let mut out = Vec::new();
+        let _ = flate2::read::GzDecoder::new(bytes.as_slice())
+            .take(4 * MAX_HEAD as u64)
+            .read_to_end(&mut out);
+        bytes = out;
     }
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
@@ -84,16 +99,14 @@ pub(super) async fn resolve(mut url: Url) -> Result<Preview> {
     if let Some(page) = page {
         let metadata = metadata::parse(&page, &url);
         preview.title = metadata.title;
+        preview.description = metadata.description;
         preview.author = metadata.author;
         preview.image = metadata.image;
-        if metadata.image_needs_check {
-            if let Some(image) = &preview.image {
-                let available = tokio::time::timeout(Duration::from_secs(2), check_image(image))
-                    .await
-                    .unwrap_or(false);
-                if !available {
-                    preview.image = None;
-                }
+        if let Some(image) = preview.image.as_deref().and_then(policy::public_url) {
+            preview.cover_data_url = cover::fetch(&image).await;
+            // An http-only cover that cannot be copied over https is not offered to clients.
+            if metadata.image_needs_check && preview.cover_data_url.is_none() {
+                preview.image = None;
             }
         }
     }
@@ -103,23 +116,6 @@ pub(super) async fn resolve(mut url: Url) -> Result<Preview> {
         "ready"
     };
     Ok(preview)
-}
-
-async fn check_image(value: &str) -> bool {
-    let Some(url) = policy::public_url(value) else {
-        return false;
-    };
-    match response(&url).await {
-        Ok(res) => {
-            res.status().is_success()
-                && res
-                    .headers()
-                    .get("content-type")
-                    .and_then(|v| v.to_str().ok())
-                    .is_some_and(|v| v.starts_with("image/"))
-        }
-        Err(_) => false,
-    }
 }
 
 async fn douyin_preview(original: &Url, resolved: &Url) -> Result<Preview> {
