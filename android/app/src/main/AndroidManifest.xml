@@ -114,6 +114,9 @@
             android:exported="true" android:grantUriPermissions="false" />
         <service android:name=".grid.host.BinanceHostLifecycleService"
             android:exported="true" />
+        <provider android:name=".update.ProjectReleaseCheckProvider"
+            android:authorities="${applicationId}.project-release-check"
+            android:exported="true" android:grantUriPermissions="false" />
 
         <activity
             android:name=".MainActivity"
