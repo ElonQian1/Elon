@@ -27,10 +27,17 @@ function Stop-Guard {
     exit 1
 }
 
-function Get-LineCountFromText {
-    param([AllowNull()][string[]]$Lines)
-    if ($null -eq $Lines) { return 0 }
-    return $Lines.Count
+function Get-LineCountFromNormalizedText {
+    param([string]$Text)
+    if ([string]::IsNullOrEmpty($Text)) { return 0 }
+    # Match System.IO.File]::ReadLines: \r\n, \n and lone \r all end a line,
+    # and a trailing terminator does not create a phantom extra empty line.
+    $normalized = $Text -replace "`r`n", "`n" -replace "`r", "`n"
+    $lines = $normalized -split "`n"
+    if ($lines.Length -gt 0 -and $lines[$lines.Length - 1] -eq "") {
+        return $lines.Length - 1
+    }
+    return $lines.Length
 }
 
 function Get-FileLineCount {
@@ -41,21 +48,27 @@ function Get-FileLineCount {
 function Get-GitFileLineCount {
     param([string]$Ref, [string]$Path)
     $spec = "${Ref}:$Path"
-    $oldPreference = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    try {
-        $output = & git show $spec 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            # A missing blob is the expected case for a newly added file.
-            # Clear the native probe's nonzero code so a dot-sourced guard
-            # cannot make its host fail after reporting success.
-            $global:LASTEXITCODE = 0
-            return $null
-        }
-        return Get-LineCountFromText $output
-    } finally {
-        $ErrorActionPreference = $oldPreference
+    # PowerShell's native-command output capture (`& git show ...`) decodes
+    # through the console codepage and can silently corrupt/merge lines for
+    # blobs with heavy multi-byte (CJK) content, undercounting a few lines.
+    # Read raw UTF-8 stdout directly via Process to avoid that corruption.
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = "git"
+    $psi.Arguments = "show `"$spec`""
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.UseShellExecute = $false
+    $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    $psi.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $stdout = $proc.StandardOutput.ReadToEnd()
+    $null = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+    if ($proc.ExitCode -ne 0) {
+        # A missing blob is the expected case for a newly added file.
+        return $null
     }
+    return Get-LineCountFromNormalizedText $stdout
 }
 
 function Test-SourcePath {
