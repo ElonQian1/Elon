@@ -31,6 +31,22 @@ test('rich position fields remain decimal strings and are selected only from the
   assert.equal(v.positionMargin,'1.23');assert.equal(v.pnl,'-0.45');assert.equal(v.mark,'3.2');assert.equal(v.liquidation,'4.5');
   assert.equal(v.notional,'-6.79');assert.equal(v.initialMargin,null);assert.ok(!JSON.stringify(v).includes('private@test'));
 });
+test('hedge mode reads the nonzero LONG/SHORT row and skips the unused zero-amount side',async()=>{
+  const h=fixture();h.data.push({data:{...grid,initialLeverage:4}},{data:{'99':[
+    {symbol:'NEARUSDT',positionSide:'LONG',positionAmount:'0'},
+    {symbol:'NEARUSDT',positionSide:'SHORT',positionAmount:'-85349',entryPrice:'0.2289261',isolated:false,
+      unrealizedProfit:'763.54',markPrice:'0.2199654',liquidationPrice:'0.3881099',notionalValue:'-18775.073'}]}});
+  h.reports.query(h.q('positions'));await tick();
+  assert.equal(h.events[0].status,'ready');assert.equal(h.events[0].rows.length,1);
+  const v=h.events[0].rows[0];
+  assert.equal(v.quantity,'-85349');assert.equal(v.pnl,'763.54');assert.equal(v.mark,'0.2199654');
+});
+test('hedge mode with no open position on either side reads as an empty, verified list',async()=>{
+  const h=fixture();h.data.push({data:grid},{data:{'99':[
+    {symbol:'NEARUSDT',positionSide:'LONG',positionAmount:'0'},{symbol:'NEARUSDT',positionSide:'SHORT',positionAmount:'0'}]}});
+  h.reports.query(h.q('positions'));await tick();
+  assert.equal(h.events[0].status,'ready');assert.equal(h.events[0].rows.length,0);
+});
 test('position margin context cannot use parent account or another asset',async()=>{
   for(const wrong of [false,true]) {
     const h=fixture();h.data.push({data:grid},{data:{'99':[{symbol:'NEARUSDT',positionSide:'BOTH',positionAmount:'2',isolated:false}]}},

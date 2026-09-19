@@ -174,7 +174,15 @@
               const uid = scalar(detail.strategyUserId, integer, true);
               const data = object((await request('positions', {}, context)).data);
               // Strategy shadow UID, never parent UID or the consumer supplied account.
-              rows = array(data[uid] ?? []).filter(v => v.symbol === q.symbol && v.positionSide === 'BOTH').map(v => ({
+              // One-way mode reports a single BOTH row; hedge mode splits LONG/SHORT and
+              // leaves the unused side at zero amount, which must not be shown as a position.
+              rows = array(data[uid] ?? []).filter(v => {
+                if (v.symbol !== q.symbol) return false;
+                if (v.positionSide === 'BOTH') return true;
+                if (v.positionSide !== 'LONG' && v.positionSide !== 'SHORT') return false;
+                const amount = dec(v.positionAmount);
+                return amount != null && /[1-9]/.test(amount);
+              }).map(v => ({
                 symbol:q.symbol, quantity:dec(v.positionAmount), entry:dec(v.entryPrice), isolatedWallet:dec(v.isolatedWallet),
                 isolated: typeof v.isolated === 'boolean' ? v.isolated : null,
                 leverage: num(v.leverage ?? detail.initialLeverage), notional: dec(v.notionalValue),
