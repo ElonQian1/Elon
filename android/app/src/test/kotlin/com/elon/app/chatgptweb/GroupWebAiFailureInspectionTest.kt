@@ -39,6 +39,22 @@ class GroupWebAiFailureInspectionTest {
         assertEquals("receipt_timeout", h.observations.single()["code"])
     }
 
+    @Test fun preservesAcceptedStreamFailureWithoutPayloadOrIdentity() {
+        val h = Harness(); h.inspection.start()
+        val receipt = JSONObject(h.receipt("stream_topic_timeout"))
+            .put("phase", "uncertain").put("dispatched", true).put("accepted", true)
+            .put("stream_events", 7).put("event_types", org.json.JSONArray(listOf("stream_handoff", "delta")))
+            .put("history", "not_terminal")
+        h.event(receipt.toString())
+        val value = h.observations.single()
+        assertEquals("stream_topic_timeout", value["code"])
+        assertEquals(7, value["stream_events"])
+        assertEquals("stream_handoff,delta", value["event_types"])
+        assertEquals("not_terminal", value["history"])
+        assertEquals(true, value["accepted"])
+        assertEquals(1, h.completed)
+    }
+
     @Test fun wrongCommandAndClosedInspectionCannotContinue() {
         val h = Harness(); h.inspection.start()
         h.event(h.receipt(), "mcp_other"); h.event(h.receipt(), action = "send_prompt")

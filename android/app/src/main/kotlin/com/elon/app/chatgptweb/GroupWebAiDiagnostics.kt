@@ -14,7 +14,7 @@ internal class GroupWebAiDiagnostics(
 
     fun stage(code: String) = emit(mapOf("stage" to code), code in TERMINAL)
 
-    fun sendPreparation(details: Map<String, Any?>) = emit(details)
+    fun sendPreparation(details: Map<String, Any?>) = emit(details, details["stage"] == "send_failure_context")
 
     fun sendReceipt(event: ChatGptWebEvent.CommandResult) {
         val receipt = ChatGptWebPrivateTextReceiptPolicy.resolve(event)
@@ -46,6 +46,12 @@ internal class GroupWebAiDiagnostics(
             "has_messages" to value.messages.isNotEmpty(),
             "has_draft" to value.draft.isNotBlank(),
             "streaming" to value.streaming,
+            "assistant_messages" to value.messages.count { it.role == "assistant" },
+            "assistant_characters" to value.messages.filter { it.role == "assistant" }
+                .sumOf { it.content.length.toLong() }.coerceAtMost(1_000_000L),
+            "private_stream_state" to value.privateStreamState.takeIf {
+                it in setOf("", "idle", "streaming", "completed", "interrupted", "failed", "error", "stopped")
+            }.orEmpty(),
             "ready" to GroupWebAiSessionPolicy.ready(value, provider, documentUrl),
         ))
     }

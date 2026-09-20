@@ -33,6 +33,12 @@ internal class GroupWebAiFailureInspection(
         val code = value.optString("code").takeIf { it in CODES } ?: "unknown"
         finish(mapOf("code" to code, "send_phase" to value.optString("phase"),
             "dispatched" to value.optBoolean("dispatched"), "accepted" to value.optBoolean("accepted"),
+            "stream_events" to value.optInt("stream_events"),
+            "event_types" to value.getJSONArray("event_types").let { types ->
+                List(types.length()) { types.getString(it) }.joinToString(",")
+            },
+            "reconciled" to value.optBoolean("reconciled"), "history" to value.optString("history"),
+            "reconciliation" to value.optJSONObject("owner")?.optString("reconciliation"),
             "ownership" to value.optJSONObject("owner")?.optString("ownership")))
     }
 
@@ -46,11 +52,14 @@ internal class GroupWebAiFailureInspection(
     fun close() { closed = true; pending = null }
 
     private companion object {
-        val CODES = setOf("", "context_changed", "context_invalid", "command_invalid", "scope_unsupported",
+        val CODES = setOf("", "context_changed", "context_invalid", "command_invalid", "invalid_command", "scope_unsupported",
             "runtime_unavailable", "identity_unavailable", "context_unavailable", "attachments_active", "tools_active",
             "conversation_busy", "parent_unavailable", "prepare_unconfirmed", "security_unavailable", "security_invalid",
             "login_required", "draft_changed", "stream_unavailable", "preparation_timeout", "stream_open_timeout",
-            "stream_timeout", "cancelled", "request_failed", "recovery_identity_unavailable",
+            "stream_timeout", "stream_item_invalid", "stream_server_error", "stream_handoff_unavailable",
+            "stream_topic_owned", "stream_topic_timeout", "stream_item_gap", "stream_item_limit",
+            "stream_queue_limit", "stream_subscribe_failed", "stream_owner_changed", "stream_decode_failed",
+            "reconciliation_timeout", "cancelled", "request_failed", "recovery_identity_unavailable",
             "recovery_previous_unresolved", "recovery_history_timeout", "recovery_history_unavailable",
             "recovery_storage_unavailable", "recovery_record_invalid", "recovery_record_changed", "recovery_capacity")
     }

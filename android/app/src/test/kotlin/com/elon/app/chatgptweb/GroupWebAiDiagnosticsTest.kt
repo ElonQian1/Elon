@@ -62,4 +62,13 @@ class GroupWebAiDiagnosticsTest {
         assertEquals(true, records.single()["temporary_route"])
         assertFalse(records.single().values.any { it.toString().contains("https:") })
     }
+
+    @Test fun finalStreamInspectionSurvivesSnapshotBudget() {
+        val records = mutableListOf<Map<String, Any?>>()
+        val diagnostics = GroupWebAiDiagnostics(WebChatProviderId.CHATGPT_WEB) { _, values -> records += values }
+        repeat(100) { diagnostics.snapshot(snapshot().copy(streaming = it % 2 == 0)) }
+        diagnostics.sendPreparation(mapOf("stage" to "send_failure_context", "code" to "stream_topic_timeout"))
+        assertEquals(25, records.size)
+        assertEquals("send_failure_context", records.last()["stage"])
+    }
 }

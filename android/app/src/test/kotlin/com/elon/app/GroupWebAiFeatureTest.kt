@@ -35,4 +35,17 @@ class GroupWebAiFeatureTest {
         )
         assertNull(GroupWebAiExecutor.completedReply(messages, "group prompt", false, "completed"))
     }
+
+    @Test fun confirmedPrivateReplyDoesNotWaitForThePageWriterToReconcile() {
+        for (state in listOf("complete", "completed", "finished_successfully")) {
+            val messages = listOf(
+                ChatGptWebMessage("u", "user", "group prompt", "completed", emptyList()),
+                ChatGptWebMessage("a", "assistant", "answer", state, emptyList()),
+            )
+            assertEquals("answer", GroupWebAiExecutor.completedReply(messages, "group prompt", true, "completed"))
+            assertNull(GroupWebAiExecutor.completedReply(messages, "other prompt", true, "completed"))
+            assertNull(GroupWebAiExecutor.completedReply(messages, "group prompt", true, "streaming"))
+            assertNull(GroupWebAiExecutor.completedReply(messages, "group prompt", true, "idle"))
+        }
+    }
 }

@@ -32,7 +32,8 @@ internal class GroupWebAiExecutor(
     private val commandId = GroupWebAiCommandIds.next()
     private val timeout = Runnable {
         diagnostics.stage(if (dispatched) "response_timeout" else "prepare_timeout")
-        fail(GroupWebAiFailureReason.TIMEOUT)
+        if (dispatched) inspectSendFailure(GroupWebAiFailureReason.TIMEOUT)
+        else fail(GroupWebAiFailureReason.TIMEOUT)
     }
 
     fun start() {
@@ -66,14 +67,14 @@ internal class GroupWebAiExecutor(
         }
     }
 
-    private fun inspectSendFailure() {
-        if (provider != WebChatProviderId.CHATGPT_WEB) { fail(GroupWebAiFailureReason.SEND); return }
+    private fun inspectSendFailure(reason: GroupWebAiFailureReason = GroupWebAiFailureReason.SEND) {
+        if (provider != WebChatProviderId.CHATGPT_WEB) { fail(reason); return }
         handler.removeCallbacks(timeout)
         failureInspection = GroupWebAiFailureInspection(
             probe = { adapter?.privateProtocolProbe("fresh_text_trial_state", it) },
             schedule = { delay, read -> handler.postDelayed({ if (!finished) read() }, delay) },
             observe = diagnostics::sendPreparation,
-            complete = { fail(GroupWebAiFailureReason.SEND) },
+            complete = { fail(reason) },
         ).also { it.start() }
     }
 
@@ -151,11 +152,15 @@ internal class GroupWebAiExecutor(
         fun completedReply(messages: List<ChatGptWebMessage>, prompt: String, streaming: Boolean, streamState: String): String? {
             val expected = normalizePrompt(prompt)
             val source = messages.indexOfLast { it.role == "user" && normalizePrompt(it.content) == expected }
-            if (source < 0 || streaming) return null
+            if (source < 0) return null
             val reply = messages.drop(source + 1).lastOrNull {
                 it.role == "assistant" && it.content.isNotBlank()
             } ?: return null
-            if (streamState != "completed" && reply.state !in listOf("complete", "completed", "finished_successfully")) return null
+            val replyComplete = reply.state in listOf("complete", "completed", "finished_successfully")
+            // The isolated task needs the completed answer, not the personal page's
+            // writer lock, which can stay active while React history reconciles.
+            if (streaming && !(streamState == "completed" && replyComplete)) return null
+            if (streamState != "completed" && !replyComplete) return null
             return reply.content
         }
         private fun normalizePrompt(value: String) = value.trim().replace(Regex("\\s+"), " ")
