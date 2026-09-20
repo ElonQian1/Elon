@@ -94,6 +94,12 @@ internal class AiConversationShareReaderView(
     private var messages = emptyList<ChatMessage>()
     private var finder = AiConversationShareReaderSearch(messages)
     private var beforeSearch: AiConversationShareReaderPosition? = null
+    private val continueButton = text("继续私聊", 15f).apply {
+        gravity = Gravity.CENTER
+        minHeight = dp(48)
+        visibility = View.GONE
+        contentDescription = "ai-conversation-share-continue-private"
+    }
 
     init {
         val header = LinearLayout(activity).apply {
@@ -133,6 +139,7 @@ internal class AiConversationShareReaderView(
             addView(list, FrameLayout.LayoutParams(-1, -1))
             addView(notice, FrameLayout.LayoutParams(-1, -1))
         }, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(continueButton, LinearLayout.LayoutParams(-1, dp(48)))
         if (onDiscuss != null) root.addView(text(activity.getString(R.string.ai_conversation_share_discuss), 15f).apply {
             id = R.id.ai_conversation_share_discuss
             gravity = Gravity.CENTER
@@ -201,6 +208,7 @@ internal class AiConversationShareReaderView(
     }
 
     fun clear() {
+        setContinueAction(null)
         list.adapter = null
         messages = emptyList()
         finder = AiConversationShareReaderSearch(messages)
@@ -209,6 +217,11 @@ internal class AiConversationShareReaderView(
         search.setText("")
         avatar.background = null
         avatar.text = ""
+    }
+
+    fun setContinueAction(action: (() -> Unit)?) {
+        continueButton.visibility = if (action == null) View.GONE else View.VISIBLE
+        continueButton.setOnClickListener { action?.invoke() }
     }
 
     fun messageChanged(index: Int) {

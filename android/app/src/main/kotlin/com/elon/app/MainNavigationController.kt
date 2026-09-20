@@ -10,7 +10,6 @@ import android.widget.FrameLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 
@@ -56,7 +55,8 @@ internal class MainNavigationController(
     private val onAgentTabSelected: () -> Unit,
     private val handleProjectSpaceInternalBack: () -> Boolean,
     private val openProjectSpacePostComposer: () -> Unit,
-    private val showCreateProjectDialog: () -> Unit, private val projectBrowserDependencies: ProjectBrowserSheetDependencies
+    private val showCreateProjectDialog: () -> Unit, private val projectBrowserDependencies: ProjectBrowserSheetDependencies,
+    private val returnToSharedSource: () -> Boolean = { false },
 ) {
     private enum class ChatReturnTarget {
         FRIENDS,
@@ -70,7 +70,7 @@ internal class MainNavigationController(
     private var projectPageReturnTarget = ChatReturnTarget.PROJECTS
     private var nextProjectChatReturnTarget: ChatReturnTarget? = null
     private var projectSpaceTitle = "项目空间"
-    private var exitConfirmDialog: AlertDialog? = null
+    private val exitPrompt = MainNavigationExitPrompt(activity)
     private val designMetrics = MainNavigationDesignMetrics(activity, binding, ::updateBottomTabVisual)
     private val bottomNavigationState = MainBottomNavigationSelectionState(binding, ::updateBottomTabVisual)
     private val projectBrowser = ProjectBrowserSheetController(activity, binding, ::dp, projectBrowserDependencies, bottomNavigationState::setProjectBrowserOpen)
@@ -376,6 +376,7 @@ internal class MainNavigationController(
         }
         if (binding.chatPage.visibility == View.VISIBLE) {
             if (collapseInputComposerForBack()) return
+            if (returnToSharedSource()) return
             collapseInputComposer(false)
             when (chatReturnTarget) {
                 ChatReturnTarget.PROJECTS -> showProjectHome(animate = true)
@@ -795,14 +796,7 @@ internal class MainNavigationController(
     }
 
     private fun showExitConfirmation() {
-        if (exitConfirmDialog?.isShowing == true) return
-        exitConfirmDialog = AlertDialog.Builder(activity)
-            .setTitle("退出应用")
-            .setMessage("确定要退出一龙吗？")
-            .setNegativeButton("取消", null)
-            .setPositiveButton("退出") { _, _ -> activity.finish() }
-            .create()
-        exitConfirmDialog?.show()
+        exitPrompt.show()
     }
     private fun applyChatChrome() {
         binding.restoreChatToolbar(activity.getColor(R.color.elon_bg_app))

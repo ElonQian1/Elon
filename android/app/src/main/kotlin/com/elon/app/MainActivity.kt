@@ -595,7 +595,7 @@ class MainActivity : AppCompatActivity() {
             loadMarketplace = { marketplaceActions.loadProjects() },
             onAgentTabSelected = { agentPageController.refresh() },
             handleProjectSpaceInternalBack = projectSpaceController::handleProjectSpaceInternalBack,
-            openProjectSpacePostComposer = projectSpaceController::openPostComposerFromSpace, showCreateProjectDialog = { projectActions.showCreateProjectDialog() }, projectBrowserDependencies = ProjectBrowserSheetDependencies({ s.projects }, { index -> openProjectSpaceForProject(index, true) }, uiTools::selectableForeground)
+            openProjectSpacePostComposer = projectSpaceController::openPostComposerFromSpace, showCreateProjectDialog = { projectActions.showCreateProjectDialog() }, projectBrowserDependencies = ProjectBrowserSheetDependencies({ s.projects }, { index -> openProjectSpaceForProject(index, true) }, uiTools::selectableForeground), returnToSharedSource = { aiConversationShares.returnToGroup() }
         )
     }
 
@@ -1337,7 +1337,7 @@ class MainActivity : AppCompatActivity() {
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             showStoreDialog = { storeController.showStoreDialog() },
-            shareAiMessage = { aiConversationShares.forwardOne(it) }
+            shareAiMessage = { message, plain -> aiConversationShares.forwardOne(message, plain) }
         )
     }
 
@@ -1455,9 +1455,7 @@ class MainActivity : AppCompatActivity() {
 
     private val messageSelectionActions: MainChatSelectionActions by lazy {
         MainChatSelectionActions(
-            activity = this,
-            binding = binding,
-            chatAdapter = { chatAdapter },
+            activity = this, binding = binding, chatAdapter = { chatAdapter },
             activeConversation = projectStateActions::activeConversation,
             saveConversations = projectStateActions::saveConversations,
             renderConversationList = homeListActions::renderConversationList,
@@ -1467,15 +1465,17 @@ class MainActivity : AppCompatActivity() {
             summarizeInPersonalChat = { prompt -> sendSelectedDiscussionToAi(prompt) },
             summarizeInNewPersonalChat = { prompt -> sendSelectedDiscussionToNewAiChat(prompt) },
             isAiChat = { socialAiChatFeature.isChatModeActive() },
-            forwardAiMessages = { messages, complete -> aiConversationShares.forward(messages, complete) }
+            forwardAiMessages = { messages, complete -> aiConversationShares.forward(messages, complete) },
+            isGroupChat = { groupChatActions.currentGroup() != null },
+            analyzeGroupMessages = { messages, complete -> groupChatActions.analyzeSelectedMessages(messages, complete) }
         )
     }
 
     private val aiConversationShares by lazy {
         MainAiConversationShareFeature(this, s.http, serverUrl,
-            isAiChat = { socialAiChatFeature.isChatModeActive() },
-            currentMessages = { chatAdapter.currentMessagesForSharing() },
-            streaming = { socialAiChatFeature.webChatStreaming() },
+            isAiChat = { socialAiChatFeature.isChatModeActive() }, currentMessages = { chatAdapter.currentMessagesForSharing() }, streaming = { socialAiChatFeature.webChatStreaming() },
+            nativeChat = { socialAiChatFeature }, input = binding.inputEdit,
+            sourceGroup = { groupChatActions.currentGroup() }, openGroup = { friendChatActions.closeFriendChat(); projectSpaceController.closeChannelChat(); groupChatActions.openGroup(it, true); syncVisibleChatNotificationState() },
             groupId = { groupChatActions.currentGroup()?.id },
             onPublished = { groupActions.loadGroups(); groupChatActions.currentGroup()?.id?.let(groupChatActions::handleRealtimeMessage) })
     }

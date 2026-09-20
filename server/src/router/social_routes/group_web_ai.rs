@@ -27,6 +27,29 @@ pub(super) struct ActionRequest {
     content: Option<String>,
     work_options: Option<GroupWorkAiOptions>,
     web_provider: Option<String>,
+    selected_context:
+        Option<crate::store::social_ai_messages::requests::selection::GroupAiSelection>,
+}
+
+pub(super) async fn share_context(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((group, message)): Path<(String, String)>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(v) => v,
+        Err(_) => return json_error(StatusCode::UNAUTHORIZED, "请先登录"),
+    };
+    match state
+        .store
+        .group_ai_context_share_draft(&user.id, &group, &message)
+    {
+        Ok(value) => ([("cache-control", "private, no-store")], Json(value)).into_response(),
+        Err(_) => json_error(
+            StatusCode::CONFLICT,
+            "仅发起人可分享仍有效的精选讨论；原消息可能已变化",
+        ),
+    }
 }
 
 pub(super) async fn work_models(
@@ -88,10 +111,19 @@ pub(super) async fn prepare(
         Ok(v) => v,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    match state
-        .store
-        .prepare_group_web_ai(&user.id, &group, &source, &req.operation_id)
-    {
+    let prepared = match req.selected_context.as_ref() {
+        Some(selection) => state.store.prepare_group_ai_selection(
+            &user.id,
+            &group,
+            &source,
+            &req.operation_id,
+            selection,
+        ),
+        None => state
+            .store
+            .prepare_group_web_ai(&user.id, &group, &source, &req.operation_id),
+    };
+    match prepared {
         Ok(request) => Json(serde_json::json!({"request":request})).into_response(),
         Err(e) => json_error(StatusCode::CONFLICT, e.to_string()),
     }

@@ -5,8 +5,17 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 use super::super::{new_id, now, FriendGroupMessage, Store, SOCIAL_AI_USER_ID};
 use super::{ensure_social_ai_user, SOCIAL_AI_DISPLAY_NAME};
+#[path = "group_ai_source_access.rs"]
+mod source;
+use source::ensure_member_and_source;
+#[path = "group_ai_context_share.rs"]
+mod context_share;
 #[path = "group_web_ai_provider.rs"]
 pub(crate) mod provider;
+#[path = "group_web_ai_selection.rs"]
+pub(crate) mod selection;
+#[path = "group_ai_selection_schema.rs"]
+pub(crate) mod selection_schema;
 #[path = "group_web_ai_requests.rs"]
 pub(crate) mod web;
 #[path = "group_work_ai_options.rs"]
@@ -46,11 +55,11 @@ impl Store {
             "INSERT INTO group_ai_reply_requests
                 (id, group_id, trigger_message_id, requester_id, state, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, 'dispatched', ?5, ?5)
-             ON CONFLICT(group_id, trigger_message_id) DO NOTHING",
+             ON CONFLICT DO NOTHING",
             params![id, group_id, trigger_message_id, user_id, now()],
         )?;
         let fallback = if inserted == 0 {
-            tx.query_row("SELECT id FROM group_ai_reply_requests WHERE group_id=?1 AND trigger_message_id=?2 AND requester_id=?3 AND state='server_ready' AND engine='server_api'",
+            tx.query_row("SELECT id FROM group_ai_reply_requests WHERE group_id=?1 AND trigger_message_id=?2 AND requester_id=?3 AND state='server_ready' AND engine='server_api' AND context_scope='recent'",
                 params![group_id,trigger_message_id,user_id], |r| r.get::<_,String>(0)).optional()?
         } else {
             None
@@ -86,6 +95,7 @@ impl Store {
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )?;
         ensure_member_and_source(&tx, user_id, &group_id, &trigger)?;
+        selection::validate_sources(&tx, user_id, &group_id, request_id)?;
         let (id, created_at) = if let Some(id) = result_id {
             let (stored, created): (String, String) = tx.query_row(
                 "SELECT content, created_at FROM friend_group_messages WHERE id = ?1 AND group_id = ?2",
@@ -147,29 +157,6 @@ impl Store {
         )?;
         Ok(())
     }
-}
-
-fn ensure_member_and_source(
-    conn: &Connection,
-    user_id: &str,
-    group_id: &str,
-    trigger: &str,
-) -> Result<()> {
-    let permitted = conn
-        .query_row(
-            "SELECT 1 FROM friend_group_messages m
-         JOIN friend_group_members member ON member.group_id = m.group_id
-         WHERE m.group_id = ?1 AND m.id = ?2 AND member.user_id = ?3
-           AND m.recalled_at IS NULL AND LENGTH(TRIM(m.content)) > 0",
-            params![group_id, trigger, user_id],
-            |_| Ok(()),
-        )
-        .optional()?
-        .is_some();
-    if !permitted {
-        return Err(anyhow!("group AI source unavailable or membership revoked"));
-    }
-    Ok(())
 }
 
 #[cfg(test)]

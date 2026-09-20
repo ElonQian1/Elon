@@ -36,7 +36,7 @@ internal class MainActionPopups(
     private val selectableForeground: () -> Drawable?,
     private val showStoreDialog: () -> Unit,
     private val groupRevisionActions: (ChatMessage) -> List<TopAction> = { emptyList() },
-    private val shareAiMessage: ((ChatMessage) -> Boolean)? = null,
+    private val shareAiMessage: ((ChatMessage, () -> Unit) -> Boolean)? = null,
 ) {
     fun showHomeActionPopup(anchor: View, tab: TextView) {
         val actions = if (tab == binding.tabProject) {
@@ -97,7 +97,8 @@ internal class MainActionPopups(
         }
         if (hasText || !message.webChatMessage?.contentParts.isNullOrEmpty()) {
             actions.add(TopAction("转发", R.drawable.ic_msg_forward) {
-                if (shareAiMessage?.invoke(message) != true) shareActions().forwardMessageText(text)
+                val plain = { shareActions().forwardMessageText(text); Unit }
+                if (shareAiMessage?.invoke(message, plain) != true) plain()
             })
         }
         if (hasText || !message.attachments.isNullOrEmpty()) {

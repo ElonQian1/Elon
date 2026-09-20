@@ -24,6 +24,17 @@ internal class AiConversationShareApi(private val context: Context, http: OkHttp
     private val authorized = mutableSetOf<String>()
     private var cacheSession: String? = null
 
+    fun groupReplyDraft(groupId: String, messageId: String): AiConversationShareDraft {
+        require(ID.matches(messageId) && messageId.startsWith("gai"))
+        val groupBase = groupPath(groupId).removeSuffix("/ai-snapshots")
+        val value = json(Request.Builder().url("$groupBase/messages/$messageId/ai-context").get(),
+            2 * 1024 * 1024, socialSession(context))
+        val card = AiConversationShareCard("preview", groupId, "群聊 AI 精选讨论", "", "chatgpt", "群聊成员", 1)
+        val snapshot = AiConversationShareCodec.snapshot(value, card)
+        return AiConversationShareDraft("chatgpt", snapshot.card.title,
+            AiConversationShareDraftBuilder.excerpt(snapshot.messages), snapshot.messages, snapshot.gaps)
+    }
+
     fun read(card: AiConversationShareCard): AiConversationShareSnapshot {
         val session = socialSession(context)
         val result = json(Request.Builder().url(path(card)).get(), 3 * 1024 * 1024, session)

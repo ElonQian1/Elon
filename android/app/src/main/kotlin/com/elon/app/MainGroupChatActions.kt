@@ -295,8 +295,22 @@ internal class MainGroupChatActions(
             return
         }
         val configuration = aiComposer.configuration()
-        if (configuration.usesWebAi) webAi.prepare(group, messageId, configuration)
+        if (configuration.usesWebAi) analyzeSelectedMessages(listOf(message)) {}
         else webAi.prepareWork(group, messageId, configuration)
+    }
+
+    fun analyzeSelectedMessages(messages: List<ChatMessage>, started: () -> Unit) {
+        val group = activeGroup ?: return
+        val owner = socialSession(activity)
+        val configuration = aiComposer.configuration()
+        if (!configuration.usesWebAi) {
+            Toast.makeText(activity, "请先在 AI 设置中选择网页 AI，再分析所选消息", Toast.LENGTH_LONG).show()
+            return
+        }
+        GroupAiSelectionPreview.show(activity, messages) { source, selection ->
+            if (owner == socialSession(activity) && activeGroup?.id == group.id &&
+                webAi.prepareSelected(group, source, selection, configuration)) started()
+        }
     }
 
     fun deleteCurrentMessage(message: ChatMessage, onDeleted: () -> Unit) {

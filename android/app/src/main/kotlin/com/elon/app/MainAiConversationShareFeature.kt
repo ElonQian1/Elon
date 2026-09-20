@@ -22,6 +22,10 @@ internal class MainAiConversationShareFeature(
     private val streaming: () -> Boolean,
     private val groupId: () -> String?,
     private val onPublished: () -> Unit,
+    nativeChat: () -> MainSocialAiChatFeature,
+    input: android.widget.EditText,
+    sourceGroup: () -> AppGroup?,
+    openGroup: (AppGroup) -> Unit,
 ) : DefaultLifecycleObserver {
     private val api = AiConversationShareApi(activity, http, server)
     private val reader = AiConversationShareReader(activity, http, server)
@@ -29,10 +33,34 @@ internal class MainAiConversationShareFeature(
     private val media = AiConversationShareMediaPreparer(activity)
     private var preview: AiConversationSharePreview? = null
     private var job: Job? = null
+    private val continuation = AiConversationPrivateContinuation(activity, nativeChat, input, sourceGroup, openGroup)
 
     init { activity.lifecycle.addObserver(this) }
 
-    fun forwardOne(message: ChatMessage): Boolean {
+    fun forwardOne(message: ChatMessage, forwardText: () -> Unit): Boolean {
+        val group = groupId()
+        if (!isAiChat() && group != null && message.id?.startsWith("gai") == true) {
+            if (job?.isActive == true || preview?.isShowing() == true) return true
+            job = activity.lifecycleScope.launch {
+                val session = socialSession(activity)
+                try {
+                    val draft = withContext(Dispatchers.IO) { api.groupReplyDraft(group, message.id!!) }
+                    check(groupId() == group && session == socialSession(activity))
+                    showPreview(draft) {}
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) {
+                    if (!activity.isDestroyed && groupId() == group && session == socialSession(activity)) {
+                        androidx.appcompat.app.AlertDialog.Builder(activity).setTitle("精选上下文暂不可用")
+                            .setMessage("可能是旧版回答、权限变化或网络未连接。仍可只转发这条回答的正文。")
+                            .setNegativeButton("取消", null)
+                            .setPositiveButton("仅转发正文") { _, _ ->
+                                if (groupId() == group && session == socialSession(activity)) forwardText()
+                            }.show()
+                    }
+                }
+            }
+            return true
+        }
         if (!isAiChat() || message.id?.startsWith("chatgpt_web:") != true) return false
         forward(listOf(message.copyForSharing())) {}
         return true
@@ -44,6 +72,10 @@ internal class MainAiConversationShareFeature(
         val draft = try { AiConversationShareDraftBuilder.build(currentMessages(), selected, streaming()) }
         catch (failure: RuntimeException) { toast(failure.message ?: "请重新选择消息"); return }
         if (draft.provider != "chatgpt") { toast("当前仅支持分享 ChatGPT 精选聊天记录"); return }
+        showPreview(draft, onComplete)
+    }
+
+    private fun showPreview(draft: AiConversationShareDraft, onComplete: () -> Unit) {
         val session = socialSession(activity)
         lateinit var screen: AiConversationSharePreview
         screen = AiConversationSharePreview(activity, draft,
@@ -88,8 +120,21 @@ internal class MainAiConversationShareFeature(
 
     fun open(card: AiConversationShareCard) {
         if (card.groupId != groupId()) { toast("请从原群聊打开这份记录"); return }
-        reader.show(card)
+        reader.show(card, onContinue = {
+            if (job?.isActive != true) job = activity.lifecycleScope.launch {
+                val session = socialSession(activity)
+                try {
+                    val current = withContext(Dispatchers.IO) { api.read(card) }
+                    check(!current.revoked && session == socialSession(activity) && groupId() == card.groupId)
+                    reader.close()
+                    continuation.show(current)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { toast("无法确认分享权限，请重新打开记录") }
+            }
+        })
     }
+
+    fun returnToGroup(): Boolean = continuation.returnToGroup()
 
     fun loadCover(card: AiConversationShareCard, loaded: (String?) -> Unit) {
         if (card.groupId != groupId()) loaded(null) else reader.loadCover(card, loaded)

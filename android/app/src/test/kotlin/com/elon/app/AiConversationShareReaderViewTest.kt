@@ -179,6 +179,33 @@ class AiConversationShareReaderViewTest {
         controller.pause().stop().destroy()
     }
 
+    @Test fun privateContinuationIsHiddenUntilAuthorizedAndRemovedOnClear() {
+        val controller = Robolectric.buildActivity(AiConversationShareReaderTestActivity::class.java).setup()
+        try {
+            val screen = AiConversationShareReaderView(controller.get(), card(), {}, {}, {})
+            screen.show()
+            fun findButton(view: View): View? {
+                if (view.contentDescription == "ai-conversation-share-continue-private") return view
+                if (view is android.view.ViewGroup) for (index in 0 until view.childCount) {
+                    findButton(view.getChildAt(index))?.let { return it }
+                }
+                return null
+            }
+            val button = requireNotNull(findButton(screen.dialog.window!!.decorView))
+            assertEquals(View.GONE, button.visibility)
+            var calls = 0
+            screen.setContinueAction { calls++ }
+            assertEquals(View.VISIBLE, button.visibility)
+            button.performClick()
+            assertEquals(1, calls)
+            screen.clear()
+            assertEquals(View.GONE, button.visibility)
+            button.performClick()
+            assertEquals(1, calls)
+            screen.dialog.dismiss()
+        } finally { controller.pause().stop().destroy() }
+    }
+
     private fun card() = AiConversationShareCard("ai_snapshot_test", "group", "Shared title", "Excerpt", "chatgpt", "Shared Author", 1)
 }
 

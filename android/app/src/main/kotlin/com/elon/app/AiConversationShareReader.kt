@@ -23,6 +23,7 @@ internal class AiConversationShareReader(
     private val positions = linkedMapOf<String, AiConversationShareReaderPosition>()
     private var view: AiConversationShareReaderView? = null
     private var card: AiConversationShareCard? = null
+    private var continueAction: ((AiConversationShareSnapshot) -> Unit)? = null
     private var job: Future<*>? = null
     private val imageJobs = mutableListOf<Future<*>>()
     @Volatile private var generation = 0L
@@ -44,11 +45,12 @@ internal class AiConversationShareReader(
     }
 
     /** Always authorize a new open. No cached transcript is rendered before API.read succeeds. */
-    fun show(card: AiConversationShareCard, onDiscuss: () -> Unit = {}) {
+    fun show(card: AiConversationShareCard, onDiscuss: () -> Unit = {}, onContinue: ((AiConversationShareSnapshot) -> Unit)? = null) {
         if (!canShow()) return
         close()
         scope = accountScope()
         this.card = card
+        continueAction = onContinue
         val key = key(card)
         val screen = AiConversationShareReaderView(activity, card, onDiscuss, { position ->
             if (scope == accountScope() && position != null) remember(key, position)
@@ -77,6 +79,7 @@ internal class AiConversationShareReader(
     fun refresh() {
         val requested = card ?: return
         val screen = view ?: return
+        screen.setContinueAction(null)
         val expectedScope = scope
         if (!validScope(expectedScope)) { close(); return }
         val position = screen.position() ?: positions[key(requested)]
@@ -177,6 +180,10 @@ internal class AiConversationShareReader(
             }
         }
         screen.render(snapshot, rows, adapter, position)
+        val action = continueAction
+        if (action != null) screen.setContinueAction {
+            if (view === screen && validScope(scope)) action(snapshot)
+        }
         if (card != null) loadImages(screen, snapshot.card, rows)
     }
 
@@ -235,6 +242,7 @@ internal class AiConversationShareReader(
         media.close()
         view = null
         card = null
+        continueAction = null
     }
 
     private fun remember(key: String, position: AiConversationShareReaderPosition) {

@@ -50,6 +50,7 @@ pub(crate) struct WebGroupRequest {
     pub prompt: String,
     pub result_message_id: Option<String>,
     pub dispatch_permit: bool,
+    pub context_scope: String,
 }
 
 pub(crate) fn operation_hash(operation: &str) -> Result<String> {
@@ -67,14 +68,14 @@ pub(crate) fn prepare_in_transaction(
     ensure_member_and_source(conn, user, group, source)?;
     let hash = operation_hash(operation)?;
     let prior: Option<String> = conn.query_row(
-        "SELECT id FROM group_ai_reply_requests WHERE operation_hash = ?1 AND requester_id = ?2 AND group_id = ?3 AND trigger_message_id = ?4",
+        "SELECT id FROM group_ai_reply_requests WHERE operation_hash = ?1 AND requester_id = ?2 AND group_id = ?3 AND trigger_message_id = ?4 AND context_scope='recent'",
         params![hash, user, group, source], |row| row.get(0),
     ).optional()?;
     if let Some(id) = prior {
         return read_owned(conn, user, group, &id, operation);
     }
     let resumable: Option<String> = conn.query_row(
-        "SELECT id FROM group_ai_reply_requests WHERE requester_id=?1 AND group_id=?2 AND trigger_message_id=?3 AND engine='chatgpt_web' AND state IN ('prepared','cancelled')",
+        "SELECT id FROM group_ai_reply_requests WHERE requester_id=?1 AND group_id=?2 AND trigger_message_id=?3 AND engine='chatgpt_web' AND state IN ('prepared','cancelled') AND context_scope='recent'",
         params![user, group, source], |row| row.get(0),
     ).optional()?;
     if let Some(id) = resumable {
@@ -153,14 +154,15 @@ pub(crate) fn read_owned(
 ) -> Result<WebGroupRequest> {
     let hash = operation_hash(operation)?;
     let row = conn.query_row(
-        "SELECT id,group_id,trigger_message_id,engine,state,COALESCE(context_prompt,''),result_message_id,web_provider
+        "SELECT id,group_id,trigger_message_id,engine,state,COALESCE(context_prompt,''),result_message_id,web_provider,context_scope
          FROM group_ai_reply_requests WHERE id = ?1 AND requester_id = ?2 AND group_id = ?3 AND operation_hash = ?4",
         params![id,user,group,hash], |r| Ok(WebGroupRequest {
             id:r.get(0)?,group_id:r.get(1)?,trigger_message_id:r.get(2)?,engine:r.get(3)?,state:r.get(4)?,
-            prompt:r.get(5)?,result_message_id:r.get(6)?,web_provider:r.get(7)?,dispatch_permit:false,
+            prompt:r.get(5)?,result_message_id:r.get(6)?,web_provider:r.get(7)?,context_scope:r.get(8)?,dispatch_permit:false,
         }),
     ).optional()?.ok_or_else(|| anyhow!("请求不存在或不属于当前设备操作"))?;
     ensure_member_and_source(conn, user, group, &row.trigger_message_id)?;
+    super::selection::validate_sources(conn, user, group, id)?;
     Ok(row)
 }
 
@@ -217,6 +219,10 @@ impl Store {
                 )? == 1;
             }
             "fallback" if before.state == "prepared" && before.engine == "chatgpt_web" => {
+                anyhow::ensure!(
+                    before.context_scope == "recent",
+                    "所选消息分析不能自动改用其他上下文链路"
+                );
                 tx.execute("UPDATE group_ai_reply_requests SET state='server_ready',engine='server_api',updated_at=?1 WHERE id=?2",params![now(),id])?;
             }
             "fallback" if before.engine == "server_api" => (),

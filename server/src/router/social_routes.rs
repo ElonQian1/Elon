@@ -24,6 +24,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
     .route("/api/me/groups/:group_id/ai/work-models", get(group_web_ai::work_models))
     .route("/api/me/groups/:group_id/web-ai/messages", post(group_web_ai::send))
     .route("/api/me/groups/:group_id/messages/:message_id/web-ai", post(group_web_ai::prepare))
+    .route("/api/me/groups/:group_id/messages/:message_id/ai-context", get(group_web_ai::share_context))
     .route("/api/me/groups/:group_id/web-ai/requests/:request_id", post(group_web_ai::action))
     .route("/assets/group_mentions.js", get(group_members::script))
     .route("/assets/group_mentions.css", get(group_members::styles))

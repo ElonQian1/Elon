@@ -20,6 +20,8 @@ internal class MainChatSelectionActions(
     private val summarizeInNewPersonalChat: (String) -> Unit,
     private val isAiChat: () -> Boolean = { false },
     private val forwardAiMessages: (List<ChatMessage>, () -> Unit) -> Unit = { _, _ -> },
+    private val isGroupChat: () -> Boolean = { false },
+    private val analyzeGroupMessages: (List<ChatMessage>, () -> Unit) -> Unit = { _, _ -> },
 ) {
     private var inputVisibility = View.GONE
     private var tabsVisibility = View.GONE
@@ -45,13 +47,16 @@ internal class MainChatSelectionActions(
         binding.inputLayout.visibility = View.GONE
         binding.pageTabs.visibility = View.GONE
         binding.chatSelectionBar.visibility = View.VISIBLE
-        if (isAiChat()) {
+        if (isAiChat() || isGroupChat()) {
             selectionHeader.show()
             binding.selectionCancelButton.visibility = View.GONE
             binding.selectionCountText.visibility = View.GONE
             binding.selectionDeleteButton.visibility = View.GONE
-            binding.selectionForwardButton.text = "合并转发"
-            binding.selectionForwardButton.contentDescription = "ai-conversation-share-selected"
+            if (isAiChat()) {
+                binding.selectionForwardButton.text = "合并转发"
+                binding.selectionForwardButton.contentDescription = "ai-conversation-share-selected"
+            }
+            if (isGroupChat()) binding.selectionSummarizeButton.text = "AI 分析"
         }
         renderSelectionCount(adapter.selectedMessagesInOrder().size)
     }
@@ -68,6 +73,7 @@ internal class MainChatSelectionActions(
         binding.selectionDeleteButton.visibility = View.VISIBLE
         binding.selectionForwardButton.text = "转发"
         binding.selectionForwardButton.contentDescription = "转发"
+        binding.selectionSummarizeButton.text = "AI 总结"
         if (wasSelecting && binding.chatPage.visibility == View.VISIBLE) {
             binding.inputLayout.visibility = inputVisibility
             binding.pageTabs.visibility = tabsVisibility
@@ -97,6 +103,7 @@ internal class MainChatSelectionActions(
 
     private fun summarizeSelectedMessages() {
         val selected = selectedMessagesOrToast() ?: return
+        if (isGroupChat()) { analyzeGroupMessages(selected, ::cancelSelection); return }
         val summary = buildSelectedDiscussionSummary(selected)
         if (isProjectChannelActive()) {
             showChannelSummaryTargetDialog(summary)
@@ -161,7 +168,7 @@ internal class MainChatSelectionActions(
     }
 
     private fun renderSelectionCount(count: Int) {
-        if (isAiChat()) selectionHeader.update(count)
+        if (isAiChat() || isGroupChat()) selectionHeader.update(count)
         binding.selectionCountText.text = if (count > 0) {
             "已选择 $count 条"
         } else {

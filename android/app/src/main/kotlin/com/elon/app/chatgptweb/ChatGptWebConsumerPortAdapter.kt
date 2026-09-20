@@ -339,6 +339,7 @@ internal class ChatGptWebConsumerPortAdapter(
 
     private companion object {
         val SESSION_COMMANDS = setOf(
+            "chatgpt_new_conversation",
             "chatgpt_stop_generation",
             "chatgpt_start_dictation",
             "chatgpt_cancel_dictation",

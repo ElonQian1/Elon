@@ -78,6 +78,10 @@ impl Store {
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let before = web::read_owned(&tx, user, group, id, operation)?;
+        ensure!(
+            before.context_scope == "recent",
+            "所选消息分析不能改用最近群消息上下文"
+        );
         if let Some(saved) = read(&tx, id)? {
             ensure!(
                 &saved == options && before.engine == "server_api",

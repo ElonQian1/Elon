@@ -57,13 +57,22 @@ internal class GroupWebAiFeature(
         prepareRequest(group, messageId, configuration)
     }
 
-    private fun prepareRequest(group: AppGroup, messageId: String, configuration: GroupAiConfiguration) {
+    fun prepareSelected(group: AppGroup, source: String, selection: JSONObject, configuration: GroupAiConfiguration): Boolean {
+        if (preferences.contains(pendingKey(userId()))) { recover(); toast("先同步上一条 AI 回答"); return false }
+        if (!configuration.usesWebAi || !beginWork()) return false
+        prepareRequest(group, source, configuration, selection)
+        return true
+    }
+
+    private fun prepareRequest(group: AppGroup, messageId: String, configuration: GroupAiConfiguration, selection: JSONObject? = null) {
         val operation = UUID.randomUUID().toString()
         val owner = userId()
         thread {
             val result = runCatching {
-                post("${base(group.id)}/messages/${part(messageId)}/web-ai", JSONObject().put("operation_id", operation))
+                post("${base(group.id)}/messages/${part(messageId)}/web-ai", JSONObject().put("operation_id", operation)
+                    .apply { if (selection != null) put("selected_context", selection) })
                     .getJSONObject("request")
+                    .also { check(selection == null || it.optString("context_scope") == "selected") { "服务器未确认选区范围，未发送给 AI" } }
             }
             activity.runOnUiThread {
                 result.onSuccess { execute(it, operation, owner, configuration) }
@@ -117,6 +126,9 @@ internal class GroupWebAiFeature(
                 if (uncertain) {
                     thread { runCatching { if (userId() == owner) action(request, operation, "uncertain") } }
                     toast("请求可能已发送，未重复提交。请稍后查看群消息")
+                } else if (request.optString("context_scope") == "selected") {
+                    thread { runCatching { if (userId() == owner) action(request, operation, "cancel") } }
+                    toast("网页 AI 未就绪，未发送所选消息。连接后可重新分析")
                 } else if (!activity.isDestroyed && userId() == owner) {
                     AlertDialog.Builder(activity).setTitle("${configuration.engine.label} 尚未就绪")
                         .setMessage("没有向 ${configuration.engine.label} 发送。可以取消，或使用备用 AI（可能计费）。")
