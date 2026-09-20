@@ -14,6 +14,25 @@ internal class GroupWebAiDiagnostics(
 
     fun stage(code: String) = emit(mapOf("stage" to code), code in TERMINAL)
 
+    fun sendPreparation(details: Map<String, Any?>) = emit(details)
+
+    fun sendReceipt(event: ChatGptWebEvent.CommandResult) {
+        val receipt = ChatGptWebPrivateTextReceiptPolicy.resolve(event)
+        val reason = when {
+            event.ok -> "accepted"
+            event.detail.startsWith("发送按钮尚未就绪") -> "send_button_not_ready"
+            event.detail.startsWith("官方输入框未接受文本") -> "draft_not_accepted"
+            event.detail.startsWith("网页草稿已变化") -> "draft_changed"
+            event.detail.startsWith("未找到输入框") -> "composer_missing"
+            event.detail.startsWith("官方网页未确认发送") -> "send_unconfirmed"
+            event.detail.startsWith("official_runtime_v1:rejected:") -> "runtime_rejected"
+            receipt.indeterminate -> "send_indeterminate"
+            else -> "unknown"
+        }
+        emit(mapOf("stage" to "send_receipt", "ok" to event.ok, "reason" to reason,
+            "authority" to receipt.authority.name.lowercase(), "indeterminate" to receipt.indeterminate), terminal = true)
+    }
+
     fun snapshot(value: ChatGptWebSnapshot, documentUrl: String = value.url) {
         val route = runCatching { URI(documentUrl) }.getOrNull()
         emit(mapOf(

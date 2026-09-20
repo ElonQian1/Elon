@@ -23,7 +23,8 @@ internal class GroupWebAiSession(
     private val handler = Handler(Looper.getMainLooper())
     private val view = createChatGptBackgroundWebView(activity, null, {}, { it.onReceiveValue(null) })
     private val chatGpt = if (provider == WebChatProviderId.CHATGPT_WEB)
-        ChatGptWebPageAdapter(activity, view, ::event, { observe("bridge_${it.name.lowercase()}") }) else null
+        ChatGptWebPageAdapter(activity, view, ::event, { observe("bridge_${it.name.lowercase()}") },
+            allowTemporaryTextDispatch = true) else null
     private val google = if (provider == WebChatProviderId.GOOGLE_WEB)
         GoogleWebPageAdapter(activity, view, ::event, {}) else null
     val adapter: ChatGptWebPageAdapter get() = requireNotNull(chatGpt)

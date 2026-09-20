@@ -9,6 +9,20 @@ import org.junit.Test
 
 class ChatGptWebPageAdapterExecutionContractTest {
     @Test
+    fun groupReusesTemporarySenderWithoutChangingPersonalDefaultsOrPersistingItsPrompt() {
+        val adapter = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt")
+        val group = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/GroupWebAiSession.kt")
+        val executor = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/GroupWebAiExecutor.kt")
+        assertTrue(adapter.contains("allowTemporaryTextDispatch: Boolean = false"))
+        assertTrue(adapter.contains("!allowTemporaryTextDispatch"))
+        assertTrue(adapter.contains("if (\$allowTemporaryTextDispatch) window.__elonChatGptFreshTextTemporaryEnabled = true"))
+        assertTrue(group.contains("allowTemporaryTextDispatch = true"))
+        assertTrue(executor.indexOf("if (!prepared") < executor.indexOf("authorize { permitted"))
+        assertTrue(executor.contains("session?.isReady(it)"))
+        assertTrue(executor.contains("sendPreparation?.close()"))
+    }
+
+    @Test
     fun commandsRunOnTheUiTurnAfterTheBackgroundWebViewIsResumed() {
         val source = read(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt",
@@ -19,11 +33,17 @@ class ChatGptWebPageAdapterExecutionContractTest {
         val command = source.substring(start, end)
 
         val resume = command.indexOf("onWebExecutionRequested()")
-        val posted = command.indexOf("webView.post {")
-        val execute = command.indexOf("webView.evaluateJavascript(")
+        val delivery = command.indexOf("commandDelivery.send(command)")
         assertTrue(resume >= 0)
-        assertTrue(posted > resume)
-        assertTrue(execute > posted)
+        assertTrue(delivery > resume)
+        val invokeStart = source.indexOf("invoke = { command, owner, allowed, result ->")
+        val invokeEnd = source.indexOf("repair =", invokeStart)
+        assertTrue(invokeStart >= 0 && invokeEnd > invokeStart)
+        val invoke = source.substring(invokeStart, invokeEnd)
+        val posted = invoke.indexOf("webView.post {")
+        val execute = invoke.indexOf("webView.evaluateJavascript(")
+        assertTrue(posted >= 0 && execute > posted)
+        assertTrue(invoke.contains("if (!allowed())"))
         assertTrue(command.contains("if (!listenerInstalled ||"))
         assertTrue(command.contains("ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)"))
     }

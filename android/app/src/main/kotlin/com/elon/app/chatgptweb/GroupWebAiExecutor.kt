@@ -22,6 +22,8 @@ internal class GroupWebAiExecutor(
     private val adapter get() = session?.adapter
     private var modelConfiguration: GroupWebAiModelConfiguration? = null
     private var configured = false
+    private var sendPreparation: GroupWebAiSendPreparation? = null
+    private var prepared = false
     private var lastSnapshot: ChatGptWebSnapshot? = null
     private var finished = false
     private var dispatching = false
@@ -46,13 +48,17 @@ internal class GroupWebAiExecutor(
     private fun event(event: ChatGptWebEvent) {
         if (finished) return
         modelConfiguration?.event(event)
+        sendPreparation?.event(event)
         if (finished) return
         when (event) {
             is ChatGptWebEvent.Snapshot -> snapshot(event.value)
             is ChatGptWebEvent.CommandResult ->
-                if (event.requestId == commandId && !event.ok) {
-                    diagnostics.stage("command_rejected")
-                    fail(GroupWebAiFailureReason.SEND)
+                if (event.requestId == commandId) {
+                    diagnostics.sendReceipt(event)
+                    if (!event.ok) {
+                        diagnostics.stage("command_rejected")
+                        fail(GroupWebAiFailureReason.SEND)
+                    }
                 }
             else -> Unit
         }
@@ -73,6 +79,18 @@ internal class GroupWebAiExecutor(
                         schedule = { delay, retry -> handler.postDelayed({ if (!finished) retry() }, delay) },
                         observe = diagnostics::stage)
                     modelConfiguration?.start()
+                }
+                return
+            }
+            if (!prepared && provider == WebChatProviderId.CHATGPT_WEB) {
+                if (sendPreparation == null) {
+                    sendPreparation = GroupWebAiSendPreparation(
+                        probe = { adapter?.privateProtocolProbe("fresh_text_admission", it) },
+                        schedule = { delay, read -> handler.postDelayed({ if (!finished) read() }, delay) },
+                        onReady = { prepared = true; lastSnapshot?.let(::snapshot) },
+                        observe = diagnostics::sendPreparation,
+                    )
+                    sendPreparation?.start()
                 }
                 return
             }
@@ -110,6 +128,7 @@ internal class GroupWebAiExecutor(
     private fun finish() {
         finished = true
         handler.removeCallbacksAndMessages(null)
+        sendPreparation?.close()
         session?.close()
         session = null
     }

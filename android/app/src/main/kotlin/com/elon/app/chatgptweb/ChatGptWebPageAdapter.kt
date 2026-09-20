@@ -22,6 +22,7 @@ internal class ChatGptWebPageAdapter(
     private val onStateChanged: (State) -> Unit,
     private val onDocumentChanged: (WebBridgeDocumentSession.Snapshot) -> Unit = {},
     private val onWebExecutionRequested: () -> Unit = {},
+    allowTemporaryTextDispatch: Boolean = false,
 ) : ChatGptOfficialPageSendCommandPort {
     enum class State {
         WEB_ONLY,
@@ -61,7 +62,8 @@ internal class ChatGptWebPageAdapter(
             window.__elonChatGptPrivateTextTransactionsEnabled =
                 ${BuildConfig.CHATGPT_PRIVATE_TEXT_TRANSACTIONS_ENABLED};
             window.__elonChatGptFreshTextJournalEnabled =
-                ${BuildConfig.CHATGPT_FRESH_TEXT_JOURNAL_ENABLED};
+                ${BuildConfig.CHATGPT_FRESH_TEXT_JOURNAL_ENABLED && !allowTemporaryTextDispatch};
+            if ($allowTemporaryTextDispatch) window.__elonChatGptFreshTextTemporaryEnabled = true;
             window.__elonChatGptPrivateDictationEnabled =
                 ${BuildConfig.CHATGPT_PRIVATE_DICTATION_ENABLED};
             window.__elonChatGptPrivateReadAloudEnabled =

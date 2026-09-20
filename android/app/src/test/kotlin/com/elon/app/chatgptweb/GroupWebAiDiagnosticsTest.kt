@@ -5,6 +5,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class GroupWebAiDiagnosticsTest {
+    @Test fun sendReceiptKeepsFailureClassNotUntrustedDetail() {
+        val records = mutableListOf<Map<String, Any?>>()
+        val diagnostics = GroupWebAiDiagnostics(WebChatProviderId.CHATGPT_WEB) { _, values -> records += values }
+        diagnostics.sendReceipt(ChatGptWebEvent.CommandResult("send_prompt", false,
+            "发送按钮尚未就绪，请返回官网重试。 [private-user-content]"))
+        assertEquals("send_button_not_ready", records.last()["reason"])
+        diagnostics.sendReceipt(ChatGptWebEvent.CommandResult("send_prompt", false, "private-user-content"))
+        assertEquals("unknown", records.last()["reason"])
+        diagnostics.sendReceipt(ChatGptWebEvent.CommandResult("send_prompt", true, "private_text_v1:accepted"))
+        assertEquals("same_origin_private", records.last()["authority"])
+        assertEquals(true, records.last()["ok"])
+        assertFalse(records.toString().contains("private-user-content"))
+    }
+
     private fun snapshot() = ChatGptWebSnapshot(
         title = "private-title", url = "https://chatgpt.com/?temporary-chat=true&secret=private-query",
         draft = "private-draft", messages = listOf(ChatGptWebMessage("private-id", "user", "private-text", "completed", emptyList())),
