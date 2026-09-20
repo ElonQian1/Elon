@@ -34,9 +34,39 @@ internal class GroupWebAiSession(
         requestSnapshot = { google?.requestSnapshot() },
         schedule = { task, delay -> handler.postDelayed(task, delay) }, cancel = handler::removeCallbacks,
     )
+    private val touchDispatcher = ChatGptWebTouchDispatcher(view)
+    private val modelTouch = ChatGptWebTouchRequestHandler(
+        webView = { view.takeUnless { closed } },
+        pageAdapter = { chatGpt.takeUnless { closed } },
+        touchDispatcher = { touchDispatcher.takeUnless { closed } },
+        isInteractiveSurface = { true },
+        runBackgroundInteraction = { _, _ -> false },
+        interactionRequested = { observe("model_touch_requested") },
+        dismissComposerOptions = {},
+        scheduleModelOptions = {
+            handler.postDelayed({
+                if (!closed) { chatGpt?.collectModelOptions(); chatGpt?.requestUiManifest() }
+            }, ChatGptWebInteractionTimings.COMPOSER_MENU_SETTLE_MS)
+        },
+        scheduleToolOptions = {},
+        onDispatchFailed = {
+            if (!closed) { observe("model_touch_failed"); onFailure(GroupWebAiFailureReason.MODEL) }
+        },
+    )
 
     private fun event(event: ChatGptWebEvent) {
         if (closed) return
+        if (event is ChatGptWebEvent.WebTouchRequest) {
+            if (provider == WebChatProviderId.CHATGPT_WEB && GroupWebAiSessionPolicy.allowsModelTouch(event.purpose)) {
+                modelTouch.handle(event)
+            }
+            return
+        }
+        if (event is ChatGptWebEvent.ComposerControls && event.section == "model") {
+            observe(if (event.options.isEmpty()) "model_catalog_empty" else "model_catalog")
+            // Read slider controls after the menu exists, not only before opening it.
+            chatGpt?.requestUiManifest()
+        }
         if (event is ChatGptWebEvent.CommandResult && event.action == "send_prompt" && event.ok) refresh.onSendConfirmed()
         if (event is ChatGptWebEvent.Snapshot) {
             val snapshot = event.value

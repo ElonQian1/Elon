@@ -6,6 +6,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class GroupAiConfigurationTest {
+    @Test fun failedModelCatalogTerminatesWithoutSendingOrChangingLevel() {
+        val port = FakePort()
+        var failed = 0
+        val config = GroupWebAiModelConfiguration(port, listOf(GroupAiModelChoice("高")), { fail() }, { failed++ })
+        config.start()
+        config.event(ChatGptWebEvent.CommandResult("list_model_options", false, "not ready"))
+        config.event(options(option("high", "高")))
+        config.event(ChatGptWebEvent.CommandResult("list_model_options", false, "not ready"))
+        assertEquals(1, failed)
+        assertEquals(0, port.writes)
+    }
+
     @Test fun workAndWebSettingsSurviveIndependentEngineSwitches() {
         val web = GroupAiConfiguration(modelPath = listOf(GroupAiModelChoice("高", rangeIndex = 2, rangeCount = 4)))
         val work = web.copy(engine = GroupAiEngine.WORK, work = GroupWorkAiConfiguration("work-b", "Model B", false))

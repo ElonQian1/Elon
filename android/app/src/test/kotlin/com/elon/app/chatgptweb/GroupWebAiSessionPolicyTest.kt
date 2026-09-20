@@ -5,6 +5,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class GroupWebAiSessionPolicyTest {
+    @Test fun isolatedGroupDocumentOnlyDispatchesModelMenuTouches() {
+        listOf("list_model_options", "open_model_submenu", "select_model_option", "dismiss_composer_menu")
+            .forEach { assertTrue(it, GroupWebAiSessionPolicy.allowsModelTouch(it)) }
+        listOf("select_navigation", "invoke_ui_control", "start_dictation", "select_composer_tool",
+            "send_prompt", "regenerate_retry", "", "unknown")
+            .forEach { assertFalse(it, GroupWebAiSessionPolicy.allowsModelTouch(it)) }
+    }
+
     private val provider = WebChatProviderId.CHATGPT_WEB
     private val document = GroupWebAiSessionPolicy.startUrl(provider)
     private fun snapshot() = ChatGptWebSnapshot(

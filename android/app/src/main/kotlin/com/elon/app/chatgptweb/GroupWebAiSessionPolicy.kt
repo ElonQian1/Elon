@@ -5,6 +5,10 @@ import com.elon.app.googleweb.GoogleWebNavigationPolicy
 import java.net.URI
 
 internal object GroupWebAiSessionPolicy {
+    fun allowsModelTouch(purpose: String): Boolean = purpose in setOf(
+        "list_model_options", "open_model_submenu", "select_model_option", "dismiss_composer_menu",
+    )
+
     fun startUrl(provider: WebChatProviderId): String = when (provider) {
         WebChatProviderId.CHATGPT_WEB -> "https://chatgpt.com/?temporary-chat=true"
         WebChatProviderId.GOOGLE_WEB -> GoogleWebNavigationPolicy.START_URL

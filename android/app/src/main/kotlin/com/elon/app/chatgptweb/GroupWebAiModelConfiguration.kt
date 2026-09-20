@@ -93,6 +93,12 @@ internal class GroupWebAiModelConfiguration(
 
     fun event(event: ChatGptWebEvent) {
         if (finished) return
+        if (event is ChatGptWebEvent.CommandResult && !event.ok && pending == null &&
+            event.action == "list_model_options") {
+            finished = true
+            onFailure()
+            return
+        }
         if (event is ChatGptWebEvent.CommandResult && pending != null && pending == event.requestId) {
             pending = null
             if (!event.ok) { finished = true; onFailure(); return }
