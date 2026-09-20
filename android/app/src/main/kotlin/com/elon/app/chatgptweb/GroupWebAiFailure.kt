@@ -5,7 +5,7 @@ internal enum class GroupWebAiFailureReason(val message: String) {
     PREPARATION("AI 页面尚未准备好，请稍后重试。"),
     TIMEOUT("等待 AI 超时，请检查网络后重试。"),
     LOGIN("请先在一龙 AI 中确认网页账号的登录状态，再重试。"),
-    MODEL("未能应用所选模型或档位，请检查群聊 AI 设置后重试。"),
+    MODEL("未能确认群聊保存的模型或档位。请打开群聊档位菜单重新选择，或选择“跟随官网设置”，再重试。"),
     SEND("AI 未确认发送结果。"),
     CANCELLED("已取消本次分析。"),
 }

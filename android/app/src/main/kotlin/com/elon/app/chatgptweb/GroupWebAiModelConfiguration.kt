@@ -94,8 +94,11 @@ internal class GroupWebAiModelConfiguration(
     private var closing = false
     private var finished = false
     private val pendingControls = mutableListOf<ChatGptWebEvent>()
-    private var catalogRetries = 0
-    private var catalogRetryPending = false
+    private var unresolvedIndex: Int? = null
+    private val catalogRetry = GroupWebAiModelCatalogRetry(schedule,
+        shouldRead = { !finished && pending == null && !closing && index == 0 && controls.options.isEmpty() },
+        read = { port.list(); port.manifest() },
+        exhausted = { finished = true; onFailure() })
 
     fun start() {
         if (path.isEmpty()) { finished = true; onReady(); return }
@@ -140,20 +143,7 @@ internal class GroupWebAiModelConfiguration(
         controls.accept(event)
         selectNext()
         if (event is ChatGptWebEvent.ComposerControls && event.section == "model" && event.options.isEmpty()) {
-            retryEmptyCatalog()
-        }
-    }
-
-    private fun retryEmptyCatalog() {
-        if (pending != null || closing || index != 0 || catalogRetryPending) return
-        if (catalogRetries == CATALOG_RETRY_DELAYS.size) { finished = true; onFailure(); return }
-        catalogRetryPending = true
-        schedule(CATALOG_RETRY_DELAYS[catalogRetries++]) {
-            catalogRetryPending = false
-            if (!finished && pending == null && !closing && index == 0 && controls.options.isEmpty()) {
-                port.list()
-                port.manifest()
-            }
+            catalogRetry.onEmpty()
         }
     }
 
@@ -161,7 +151,20 @@ internal class GroupWebAiModelConfiguration(
         if (pending != null || closing) return
         val option = path.getOrNull(index)?.let(controls::resolve)
         if (option == null) {
-            if (controls.options.isNotEmpty()) observe("model_intent_unresolved")
+            if (controls.options.isNotEmpty()) {
+                observe("model_intent_unresolved")
+                if (unresolvedIndex != index) {
+                    val expectedIndex = index
+                    unresolvedIndex = index
+                    // Allow the companion slider manifest to arrive before rejecting a saved intent.
+                    schedule(5_000L) {
+                        if (!finished && index == expectedIndex && pending == null && !closing) {
+                            finished = true
+                            onFailure()
+                        }
+                    }
+                }
+            }
             return
         }
         pending = GroupWebAiCommandIds.next()
@@ -169,7 +172,4 @@ internal class GroupWebAiModelConfiguration(
         controls.select(port, option, requireNotNull(pending))
     }
 
-    private companion object {
-        val CATALOG_RETRY_DELAYS = longArrayOf(500L, 1_000L, 2_000L, 4_000L)
-    }
 }

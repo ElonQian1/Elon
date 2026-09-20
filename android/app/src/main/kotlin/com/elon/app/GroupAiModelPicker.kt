@@ -10,6 +10,7 @@ import com.elon.app.chatgptweb.GroupWebAiModelControls
 import com.elon.app.chatgptweb.GroupWebAiSession
 import com.elon.app.chatgptweb.GroupAiModelPort
 import com.elon.app.chatgptweb.GroupWebAiCommandIds
+import com.elon.app.chatgptweb.GroupWebAiModelCatalogRetry
 
 /** Reuses the personal-chat presentation, not its document, draft or preference owner. */
 internal class GroupAiModelPicker(
@@ -34,12 +35,18 @@ internal class GroupAiModelPicker(
     private var failed = false
     private val pendingControls = mutableListOf<ChatGptWebEvent>()
     private val deadline = Runnable { unavailable() }
+    private val catalogRetry = GroupWebAiModelCatalogRetry(
+        schedule = { delay, task -> handler.postDelayed({ task() }, delay) },
+        shouldRead = { !closed && !failed && ready && command == null &&
+            path.isEmpty() && controls.options.isEmpty() },
+        read = { session?.adapter?.listModelOptions(); session?.adapter?.requestUiManifest() },
+        exhausted = ::unavailable)
 
     fun show() {
         displayed = cached()
         popup = WebChatModelControlPopup.show(activity, anchor, marked(displayed), configuration.label,
             onOptionSelected = ::choose, onProviderSwitch = switchProvider, onDismissed = ::close,
-            providerSwitchLabel = "切换 AI")
+            providerSwitchLabel = "切换 AI", onDefaultSelected = { select(emptyList()); close() })
         if (popup == null) return
         handler.postDelayed(deadline, 40_000)
         runCatching { session = GroupWebAiSession(activity, ::event, { unavailable() }).also { it.start() } }
@@ -119,6 +126,9 @@ internal class GroupAiModelPicker(
             return
         }
         controls.accept(event)
+        if (event is ChatGptWebEvent.ComposerControls && event.section == "model" && event.options.isEmpty()) {
+            catalogRetry.onEmpty()
+        }
         if (event is ChatGptWebEvent.ComposerControls || event is ChatGptWebEvent.UiManifest) {
             render()
             openPending()
@@ -128,7 +138,7 @@ internal class GroupAiModelPicker(
     private fun unavailable() {
         if (closed) return
         failed = true
-        handler.removeCallbacks(deadline)
+        handler.removeCallbacksAndMessages(null)
         session?.close()
         session = null
         Toast.makeText(activity, "模型配置暂未同步，可使用缓存档位；发送前会确认设置", Toast.LENGTH_LONG).show()
@@ -137,7 +147,7 @@ internal class GroupAiModelPicker(
     fun close() {
         if (closed) return
         closed = true
-        handler.removeCallbacks(deadline)
+        handler.removeCallbacksAndMessages(null)
         popup?.dismiss()
         popup = null
         session?.close()

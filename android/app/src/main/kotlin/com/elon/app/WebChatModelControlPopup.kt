@@ -37,6 +37,7 @@ internal object WebChatModelControlPopup {
         onProviderSwitch: () -> Unit,
         onDismissed: () -> Unit,
         providerSwitchLabel: String = "切换网页 AI",
+        onDefaultSelected: (() -> Unit)? = null,
     ): WebChatModelControlPopupHandle? {
         if (activity.isFinishing || activity.isDestroyed || !anchor.isAttachedToWindow) return null
         val renderer = WebChatModelControlPopupRenderer(
@@ -46,6 +47,7 @@ internal object WebChatModelControlPopup {
             onProviderSwitch = onProviderSwitch,
             onDismissed = onDismissed,
             providerSwitchLabel = providerSwitchLabel,
+            onDefaultSelected = onDefaultSelected,
         )
         renderer.show(options, currentModel)
         return WebChatModelControlPopupHandle(renderer)
@@ -59,6 +61,7 @@ internal class WebChatModelControlPopupRenderer(
     private val onProviderSwitch: () -> Unit,
     private val onDismissed: () -> Unit,
     private val providerSwitchLabel: String = "切换网页 AI",
+    private val onDefaultSelected: (() -> Unit)? = null,
 ) {
     private val popupWidth = dp(280)
     private val panel = LinearLayout(activity).apply {
@@ -133,6 +136,12 @@ internal class WebChatModelControlPopupRenderer(
             presentation.advanced == null -> panel.addView(presetRow())
         }
         panel.addView(divider())
+        onDefaultSelected?.let { selectDefault ->
+            panel.addView(actionRow(label = "跟随官网设置", selector = "web-chat-model-default", showChevron = false) {
+                popup.dismiss()
+                selectDefault()
+            })
+        }
         panel.addView(actionRow(
             label = providerSwitchLabel,
             selector = PROVIDER_SWITCH_SELECTOR,

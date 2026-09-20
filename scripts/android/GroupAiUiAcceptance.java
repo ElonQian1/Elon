@@ -131,6 +131,8 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
                 action(ai, false); action(text("完成"), false); break;
             case "open_fixture": openFixture(); break;
             case "open_model": fixtureOpen(); action(id("modelButton"), false); break;
+            case "model_default": action(desc("web-chat-model-default"), false); break;
+            case "model_latest": action(text("最新"), false); break;
             case "send_first":
             case "send_second":
                 fixtureOpen();

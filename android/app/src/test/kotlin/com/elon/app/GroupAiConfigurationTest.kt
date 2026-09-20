@@ -6,6 +6,51 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class GroupAiConfigurationTest {
+    @Test fun staleSavedChoiceFailsAsConfigurationNotAsNetworkTimeout() {
+        val port = FakePort()
+        val scheduled = mutableListOf<() -> Unit>()
+        var failed = 0
+        val config = GroupWebAiModelConfiguration(port, listOf(GroupAiModelChoice("自动")), { fail() }, { failed++ },
+            { delay, task -> assertEquals(5_000L, delay); scheduled.add(task) })
+        config.start()
+        config.event(options(option("latest", "最新")))
+        config.event(options(option("latest", "最新")))
+        assertEquals(1, scheduled.size)
+        assertEquals(0, failed)
+        scheduled.single()()
+        assertEquals(1, failed)
+        assertEquals(0, port.writes)
+    }
+
+    @Test fun lateSliderManifestCanResolveSavedChoiceBeforeConfigurationDeadline() {
+        val port = FakePort()
+        var scheduled: (() -> Unit)? = null
+        var ready = 0
+        val config = GroupWebAiModelConfiguration(port,
+            listOf(GroupAiModelChoice("高", rangeIndex = 2, rangeCount = 4)), { ready++ }, { fail() },
+            { _, task -> scheduled = task })
+        config.start()
+        config.event(options(option("latest", "最新")))
+        config.event(range(4))
+        requireNotNull(scheduled)()
+        assertEquals(1, port.writes)
+        config.event(ack(requireNotNull(port.request)))
+        config.event(ack(requireNotNull(port.request)))
+        assertEquals(1, ready)
+    }
+
+    @Test fun sharedCatalogRetryCannotReadAfterPickerCloses() {
+        var open = true
+        var scheduled: (() -> Unit)? = null
+        var reads = 0
+        val retry = GroupWebAiModelCatalogRetry({ _, task -> scheduled = task }, { open }, { reads++ }, { fail() })
+        retry.onEmpty()
+        open = false
+        requireNotNull(scheduled)()
+        retry.onEmpty()
+        assertEquals(0, reads)
+    }
+
     @Test fun commandIdsRemainUniqueAndSurviveBothProductionBridgeValidators() {
         val ids = List(100) { GroupWebAiCommandIds.next() }
         assertEquals(ids.size, ids.toSet().size)
