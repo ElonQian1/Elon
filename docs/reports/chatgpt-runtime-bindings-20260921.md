@@ -43,7 +43,10 @@ The fresh-send and recovery context accept the reviewed profile. Identity, activ
 - Fresh text context, temporary dispatch and private text input: combined 95 tests passed, zero failed or skipped. The source test used both downloaded old and new assets, not only synthetic namespaces.
 - Existing runtime compatibility and recovery admission/context: 60 additional tests passed, zero failed or skipped.
 - Android Kotlin compilation and 20 targeted tests passed; XML confirms zero failures, errors or skips (preparation 7, session policy 4, diagnostics 4, adapter delivery contract 2, group feature 3).
-- Release and actual group reply acceptance are recorded separately after execution. Offline compatibility checks alone do not prove an AI answer appeared in the group.
+- Release `v1.1.1795` (build 1795, source `6112eaca4`) succeeded. APK SHA-256: `13f4675593562d4e9fe642090e90dfb5b74752035ff6267136ce12424b4d626e`. Server artifact and manifest were verified; the registered Xiaomi was updated without clearing data and its installed build was read back as 1795. The Honor was offline.
+- After the user unlocked the phone, a fresh two-message selection was submitted through the real group UI on 1795. The first two read-only admissions returned `context_unavailable`; attempt three returned `ready` approximately 3.9 seconds after executor start. This confirms the new runtime binding is usable on the phone, not only in fixtures.
+- The subsequent one-shot send returned `official_runtime_v1:rejected` in approximately 25 ms. No AI answer reached the group. This request was not replayed. The generic receipt discards the lower-level rejection code, so the next change adds a single read-only `fresh_text_trial_state` inspection before destroying the failed isolated document, with a two-second deadline. It does not authorize, retry, or alter the write.
+- The bounded failure inspection passed 15 targeted Android tests (inspection 4, diagnostics 4, preparation 7), with XML-confirmed zero failures, errors or skips. Tests cover stale and wrong-action receipts, cancellation, timeout, single completion and untrusted-payload rejection.
 
 ## Reproduction
 

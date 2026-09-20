@@ -23,6 +23,7 @@ internal class GroupWebAiExecutor(
     private var modelConfiguration: GroupWebAiModelConfiguration? = null
     private var configured = false
     private var sendPreparation: GroupWebAiSendPreparation? = null
+    private var failureInspection: GroupWebAiFailureInspection? = null
     private var prepared = false
     private var lastSnapshot: ChatGptWebSnapshot? = null
     private var finished = false
@@ -47,6 +48,7 @@ internal class GroupWebAiExecutor(
 
     private fun event(event: ChatGptWebEvent) {
         if (finished) return
+        failureInspection?.let { it.event(event); return }
         modelConfiguration?.event(event)
         sendPreparation?.event(event)
         if (finished) return
@@ -57,11 +59,22 @@ internal class GroupWebAiExecutor(
                     diagnostics.sendReceipt(event)
                     if (!event.ok) {
                         diagnostics.stage("command_rejected")
-                        fail(GroupWebAiFailureReason.SEND)
+                        inspectSendFailure()
                     }
                 }
             else -> Unit
         }
+    }
+
+    private fun inspectSendFailure() {
+        if (provider != WebChatProviderId.CHATGPT_WEB) { fail(GroupWebAiFailureReason.SEND); return }
+        handler.removeCallbacks(timeout)
+        failureInspection = GroupWebAiFailureInspection(
+            probe = { adapter?.privateProtocolProbe("fresh_text_trial_state", it) },
+            schedule = { delay, read -> handler.postDelayed({ if (!finished) read() }, delay) },
+            observe = diagnostics::sendPreparation,
+            complete = { fail(GroupWebAiFailureReason.SEND) },
+        ).also { it.start() }
     }
 
     private fun snapshot(value: ChatGptWebSnapshot) {
@@ -129,6 +142,7 @@ internal class GroupWebAiExecutor(
         finished = true
         handler.removeCallbacksAndMessages(null)
         sendPreparation?.close()
+        failureInspection?.close()
         session?.close()
         session = null
     }
