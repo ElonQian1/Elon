@@ -95,6 +95,24 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
         }
         return text(value);
     }
+    private org.json.JSONArray modelMenuLabels() throws Exception {
+        org.json.JSONArray values = new org.json.JSONArray();
+        UiObject panel = desc("web-chat-model-control");
+        if (!panel.exists()) return values;
+        java.util.ArrayList<AccessibilityNodeInfo> pending = new java.util.ArrayList<>();
+        pending.add(node(panel));
+        for (int i = 0; i < pending.size() && i < 100; i++) {
+            AccessibilityNodeInfo info = pending.get(i);
+            CharSequence label = info.getText();
+            if (label != null && label.length() <= 120) values.put(label.toString());
+            for (int n = 0; n < info.getChildCount() && pending.size() < 100; n++) {
+                AccessibilityNodeInfo child = info.getChild(n);
+                if (child != null) pending.add(child);
+            }
+        }
+        for (AccessibilityNodeInfo info : pending) info.recycle();
+        return values;
+    }
     public void testStep() throws Exception {
         assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
         String step = getParams().getString("step", "inspect");
@@ -112,6 +130,7 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
                 fill(new UiObject(new UiSelector().packageName(APP).className("android.widget.EditText")), GROUP);
                 action(ai, false); action(text("完成"), false); break;
             case "open_fixture": openFixture(); break;
+            case "open_model": fixtureOpen(); action(id("modelButton"), false); break;
             case "send_first":
             case "send_second":
                 fixtureOpen();
@@ -157,6 +176,7 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
         getUiDevice().waitForIdle(1500);
         System.out.println("GROUP_AI_UI_RESULT=" + new JSONObject().put("step", step)
             .put("model_label", id("modelButton").exists() ? id("modelButton").getText() : "")
+            .put("model_menu_labels", modelMenuLabels())
             .put("fixture_visible", text(targetGroup()).exists()).put("first_visible", text(FIRST).exists())
             .put("second_visible", text(SECOND).exists())
             .put("create_group", text("发起群聊").exists()).put("home_add", id("addButton").exists())

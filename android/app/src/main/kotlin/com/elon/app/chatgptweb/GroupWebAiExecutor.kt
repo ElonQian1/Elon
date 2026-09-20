@@ -5,7 +5,6 @@ import android.os.Looper
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.GroupAiConfiguration
 import com.elon.app.WebChatProviderId
-import java.util.UUID
 
 /** A separate document, sharing identity but never personal conversation/navigation state. */
 internal class GroupWebAiExecutor(
@@ -27,7 +26,7 @@ internal class GroupWebAiExecutor(
     private var finished = false
     private var dispatching = false
     private var dispatched = false
-    private val commandId = UUID.randomUUID().toString()
+    private val commandId = GroupWebAiCommandIds.next()
     private val timeout = Runnable {
         diagnostics.stage(if (dispatched) "response_timeout" else "prepare_timeout")
         fail(GroupWebAiFailureReason.TIMEOUT)
@@ -71,7 +70,8 @@ internal class GroupWebAiExecutor(
                     modelConfiguration = GroupWebAiModelConfiguration(GroupAiModelPort.from(requireNotNull(adapter)), configuration.modelPath,
                         onReady = { configured = true; lastSnapshot?.let(::snapshot) },
                         onFailure = { fail(GroupWebAiFailureReason.MODEL) },
-                        schedule = { delay, retry -> handler.postDelayed({ if (!finished) retry() }, delay) })
+                        schedule = { delay, retry -> handler.postDelayed({ if (!finished) retry() }, delay) },
+                        observe = diagnostics::stage)
                     modelConfiguration?.start()
                 }
                 return

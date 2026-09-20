@@ -6,7 +6,7 @@ import com.elon.app.WebChatConsumerOption
 import com.elon.app.WebChatModelControlPolicy
 import com.elon.app.WebChatModelRangeBinding
 import com.elon.app.WebChatModelRangePolicy
-import java.util.UUID
+import com.elon.app.WebChatProductionBuiltInCatalog
 
 internal interface GroupAiModelPort {
     fun list()
@@ -52,6 +52,14 @@ internal class GroupWebAiModelControls {
             val levels = range?.options ?: return null
             return levels.takeIf { it.size == choice.rangeCount }?.getOrNull(choice.rangeIndex)
         }
+        // DOM menu rows may include a description after the actual mode name.
+        // Never infer Auto from a suffix or choose between two matching rows.
+        if (!choice.submenu && choice.label.trim().lowercase() in setOf("自动", "auto")) {
+            return options.filter { it.semantic == "model" && !it.opensSubmenu &&
+                !WebChatProductionBuiltInCatalog.isPresetId(it.id) &&
+                Regex("^(?:自动|auto)(?:\\s|$)", RegexOption.IGNORE_CASE).containsMatchIn(it.label.trim())
+            }.singleOrNull()
+        }
         val expected = WebChatConsumerOption("intent", choice.label, false, "model", choice.submenu, "")
         return WebChatModelControlPolicy.resolveSelection(expected, options, options.map { it.id }.toSet())
     }
@@ -78,6 +86,7 @@ internal class GroupWebAiModelConfiguration(
     private val onReady: () -> Unit,
     private val onFailure: () -> Unit,
     private val schedule: (Long, () -> Unit) -> Unit = { _, _ -> },
+    private val observe: (String) -> Unit = {},
 ) {
     private val controls = GroupWebAiModelControls()
     private var index = 0
@@ -103,6 +112,7 @@ internal class GroupWebAiModelConfiguration(
             return
         }
         if (event is ChatGptWebEvent.CommandResult && pending != null && pending == event.requestId) {
+            observe(if (event.ok) "model_choice_confirmed" else "model_choice_rejected")
             pending = null
             if (!event.ok) { finished = true; onFailure(); return }
             if (closing) { finished = true; onReady(); return }
@@ -113,7 +123,7 @@ internal class GroupWebAiModelConfiguration(
             pendingControls.clear()
             if (index == path.size) {
                 closing = true
-                pending = UUID.randomUUID().toString()
+                pending = GroupWebAiCommandIds.next()
                 port.dismiss(requireNotNull(pending))
             } else {
                 selectNext()
@@ -149,8 +159,13 @@ internal class GroupWebAiModelConfiguration(
 
     private fun selectNext() {
         if (pending != null || closing) return
-        val option = path.getOrNull(index)?.let(controls::resolve) ?: return
-        pending = UUID.randomUUID().toString()
+        val option = path.getOrNull(index)?.let(controls::resolve)
+        if (option == null) {
+            if (controls.options.isNotEmpty()) observe("model_intent_unresolved")
+            return
+        }
+        pending = GroupWebAiCommandIds.next()
+        observe("model_choice_requested")
         controls.select(port, option, requireNotNull(pending))
     }
 

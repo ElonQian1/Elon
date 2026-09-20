@@ -9,7 +9,7 @@ import com.elon.app.chatgptweb.ChatGptWebEvent
 import com.elon.app.chatgptweb.GroupWebAiModelControls
 import com.elon.app.chatgptweb.GroupWebAiSession
 import com.elon.app.chatgptweb.GroupAiModelPort
-import java.util.UUID
+import com.elon.app.chatgptweb.GroupWebAiCommandIds
 
 /** Reuses the personal-chat presentation, not its document, draft or preference owner. */
 internal class GroupAiModelPicker(
@@ -81,7 +81,7 @@ internal class GroupAiModelPicker(
         if (!ready || command != null) return
         val expected = pendingSubmenu ?: return
         val live = controls.resolve(expected) ?: return
-        command = UUID.randomUUID().toString()
+        command = GroupWebAiCommandIds.next()
         controls.select(GroupAiModelPort.from(requireNotNull(session).adapter), live, requireNotNull(command))
     }
 

@@ -6,6 +6,35 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class GroupAiConfigurationTest {
+    @Test fun commandIdsRemainUniqueAndSurviveBothProductionBridgeValidators() {
+        val ids = List(100) { GroupWebAiCommandIds.next() }
+        assertEquals(ids.size, ids.toSet().size)
+        assertTrue(ids.all { Regex("mcp_[a-z0-9]{1,32}").matches(it) })
+        val native = java.io.File("src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt").readText()
+        val page = java.io.File("src/main/assets/chatgpt_web_adapter.js").readText()
+        assertTrue(native.contains("Regex(\"mcp_[a-z0-9]{1,32}\")"))
+        assertTrue(page.contains("/^mcp_[a-z0-9]{1,32}$/"))
+    }
+
+    @Test fun autoModeMayHaveAnOfficialDescriptionButNotAnAmbiguousOrForeignMatch() {
+        val controls = GroupWebAiModelControls()
+        val intent = GroupAiModelChoice("自动")
+        controls.accept(options(option("auto-row", "Auto Decide when to think")))
+        assertEquals("auto-row", controls.resolve(intent)?.id)
+        controls.accept(options(option("auto-row", "自动 根据问题选择回答方式")))
+        assertEquals("auto-row", controls.resolve(intent)?.id)
+        controls.accept(options(option("auto-row", "Auto Decide when to think"), option("auto-other", "自动 另一项")))
+        assertNull(controls.resolve(intent))
+        controls.accept(options(option("other", "GPT Custom Auto")))
+        assertNull(controls.resolve(intent))
+        controls.accept(options(option("preset:fake", "Auto Decide when to think")))
+        assertNull(controls.resolve(intent))
+        controls.accept(options(option("tool", "Auto Decide when to think").copy(semantic = "tool")))
+        assertNull(controls.resolve(intent))
+        controls.accept(options(option("group", "Auto Decide when to think", true)))
+        assertNull(controls.resolve(intent))
+    }
+
     @Test fun emptyCatalogDuringHydrationIsReadAgainWithoutSendingTwice() {
         val port = FakePort()
         val scheduled = mutableListOf<() -> Unit>()
@@ -211,8 +240,12 @@ class GroupAiConfigurationTest {
         override fun list() { reads++ }
         override fun collect() {}
         override fun manifest() {}
-        override fun select(id: String, request: String) { action = "select:$id"; this.request = request; writes++ }
-        override fun slider(id: String, value: Double, request: String) { action = "slider:$id:$value"; this.request = request; writes++ }
-        override fun dismiss(request: String) { action = "dismiss"; this.request = request }
+        override fun select(id: String, request: String) { action = "select:$id"; accept(request); writes++ }
+        override fun slider(id: String, value: Double, request: String) { action = "slider:$id:$value"; accept(request); writes++ }
+        override fun dismiss(request: String) { action = "dismiss"; accept(request) }
+        private fun accept(request: String) {
+            assertTrue("Production bridge would discard this command id", Regex("mcp_[a-z0-9]{1,32}").matches(request))
+            this.request = request
+        }
     }
 }
