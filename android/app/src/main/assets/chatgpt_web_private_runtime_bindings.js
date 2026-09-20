@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 30, create: factory });
+  const api = Object.freeze({ version: 31, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -199,7 +199,36 @@
     composer: { Ih: 'mg', t_: 'j_', AS: 'sC', VS: 'vC', Ng: 'l_', Bg: 'g_', fh: 'Uh' },
     react: september15Exports.react
   };
+  // Hash-pinned source and dependency review: chatgpt-runtime-bindings-sep21.cjs.
+  const september21Exports = {
+    shared: { H3: 'l9', R5: 'Vtt', F5: 'Itt', mq: 'PK', wV: 'NI', SV: 'jI', XM: 'JY', HM: 'BY',
+      M$: 'n4', RW: 'EV', uo: 'Po', t4: 'B8', IX: 'OW', t6: 'R7', cX: 'Pq',
+      Fx: 'vS', Fl: 'Su', v7: 'xnt', $3: 'I7', Ur: 'Rr', zr: 'Pr', attachmentUploadType: 'gp',
+      conversationStore: 'cX', canvasQueryClient: 'd4', canvasConversations: 'dN', useCanvasSendBlocked: 'PM',
+      textApi: 'v3', textSecurityHeaders: 'is', textHistoryDisabled: 'Aq', textModelOverride: 'Ns', textTopic: 'Gk',
+      textBusinessContext: 'LR', textProjectHeaders: 'vK', textLockedProjectId: 'Tn', textLockedChatPin: 'yK',
+      textBindConversationId: 'hN', textClientConversation: 'dX', textResolvedConversationId: 'qY',
+      textNavigationKey: 'iq', textNavigate: 'cq', textTemporaryPersonalizationEnabled: 'Nq',
+      textTemporaryPersonalization: 'Lq', textReadUntracked: 'c4', writingUpdateState: 'nX',
+      writingTreeOwner: 'VY', writingLibraryAccount: 'MK', writingLibraryReadHeaders: 'xW' },
+    conversation: { AGt: 'KQt', J5t: 'kcn', Nrn: 'gmn', yRt: 'bGt', Grn: 'Omn', vRt: 'yGt',
+      p8t: 'Kon', l0: 'Q3', M1t: 'j7t', Rdn: 'twn', Rrn: 'xmn', win: 'shn', Ein: 'lhn', ay: 'Qb',
+      iy: 'Zb', ry: 'Xb', Jrn: 'jmn', Hrn: 'Tmn', f8t: 'Gon', c0: 'Z3', FVt: 'OJt',
+      u1t: 'l7t', l1t: 'c7t', iin: 'Vmn', attachmentBaseLimit: 'k3t', attachmentMaxUploads: 'I3t',
+      attachmentPendingCount: 'j3t', attachmentConfiguredLimit: 'O3t', canvasDirtyInit: 'cSt', useCanvasDirty: 'dSt',
+      textSecurity: 'NXt', textStream: 'MYt', textPrepareEnabled: 'wXt', textReviewAck: 'xXt',
+      textHydrateHistory: 'bPn', textRequestedDefaultModel: 'bmn', textRememberFirstModel: '_Fn',
+      textNavigateConversation: 'gqt', textSerializeAttachments: 'w_t', textResolveRequestedModel: 'bUt',
+      writingLibrarySessions: 'hjt' },
+    composer: { Ih: 'Og', t_: 'W_', AS: 'tS', VS: 'fS', Ng: 'S_', Bg: 'k_', fh: 'rg' },
+    react: { reactApi: 'Vn', reactDom: 'Kt', reactRoot: 'Gt', intlInit: 'Rn', intlProvider: 'Mn' }
+  };
   const profiles = [
+    { id: 'web_20260921', anchor: 'c2675c8c-mhr2av0d0a9vqezt.js',
+      files: { shared: '4813494d-dbc08vb642hnn0un.js', conversation: 'conversation-small-8auz4n865vyash62.js',
+        composer: '8b34dbc2-lcl4lqvg2jgttftg.js', react: '2340486e-b3t78qt0psmq9d8c.js' },
+      exports: september21Exports, tools: { owner: 'sTn' },
+      temporary: { owner: 'n1t', action: '()=>{lh.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(SB.reset(c),Ds()&&wo.delete(n),!o&&!wo(n)&&e1t(s),u(r1t,{replace:!0})):cD(l,{params:o?void 0:new URLSearchParams({[Fd]:`true`})})}' } },
     { id: 'web_20260915_b', anchor: 'c2675c8c-hyq5rrycw8ynuek2.js',
       files: { shared: '4813494d-npmn21nlnk5b1x5g.js', conversation: 'conversation-small-newrvr7nrx5tnmp4.js',
         composer: '8b34dbc2-duz5rkq42xhpbotn.js', react: '2340486e-lo737pyjfygyimqo.js' },
@@ -379,8 +408,8 @@
 
   function state() {
     const p = profile();
-    return { version: 30, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 31, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 30, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 31, observed, load, peek, temporary, tools, state });
 });

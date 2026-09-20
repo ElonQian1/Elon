@@ -49,6 +49,19 @@ function temporaryFixture(isNew = true) {
   return f;
 }
 
+test('Sep 21 temporary admission is read-only and loses ownership when the runtime changes', async () => {
+  const f = temporaryFixture();
+  f.page.__elonChatGptPrivateRuntimeBindings.state = () => ({ profile_id: 'web_20260921' });
+  assert.deepEqual(await f.api.inspect(f.node), { schema: 'elon.fresh_text_admission.v1', code: 'ready', stage: 'ready' });
+  assert.equal(f.binds, 0);
+  const binding = await f.api.capture(f.node, null, admission);
+  assert.equal(binding.current(), true);
+  f.page.__elonChatGptPrivateRuntimeBindings.state = () => ({ profile_id: 'web_unknown' });
+  assert.equal(binding.current(), false);
+  assert.equal((await f.api.inspect(f.node)).code, 'runtime_unavailable');
+  assert.equal(f.binds, 0);
+});
+
 function history(parent = ROOT) {
   return { conversation_id: CID, gizmo_id: null, is_do_not_remember: true, is_temporary_chat: true,
     async_status: null, current_node: AID, mapping: {

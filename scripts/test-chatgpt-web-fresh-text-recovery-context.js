@@ -32,6 +32,17 @@ test('read-only context captures a committed conversation without editor, model 
   assert.equal(f.page.localStorage.length, 0);
 });
 
+test('Sep 21 recovery remains read-only and rejects a runtime swap', async () => {
+  const f = fixture();
+  f.bindings.state = () => ({ profile_id: 'web_20260921' });
+  const binding = await f.capture();
+  assert.equal(binding.owns(), true);
+  assert.deepEqual(f.edits, []);
+  f.bindings.state = () => ({ profile_id: 'web_unknown' });
+  assert.equal(binding.owns(), false);
+  assert.equal(f.page.localStorage.length, 0);
+});
+
 test('recovery scope follows committed conversation and account without reading the editor', () => {
   const f = fixture(), context = moduleApi.create(f.page), before = context.stamp();
   assert.ok(before);
