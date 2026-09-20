@@ -43,6 +43,9 @@ function Get-ElonStaticMobilePwaInputPaths {
         'server/src/assets/project_plaza.css',
         'server/src/assets/project_plaza_cache.js',
         'server/src/assets/project_plaza.js',
+        'server/src/assets/social_chat_cache.js',
+        'server/src/assets/social_chat_recovery.js',
+        'server/src/assets/social_chat_view.js',
         'server/src/assets/orbital_mobile_theme.css'
     )
 }

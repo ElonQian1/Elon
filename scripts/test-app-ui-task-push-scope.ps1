@@ -80,6 +80,18 @@ try {
     Assert-Equal $ownedScope.OtherServerChanges.Count 0 'Task-owned server runtime paths must stay empty'
     Assert-Equal $ownedScope.AndroidChanged $true 'Task-owned Android changes must remain visible'
 
+    foreach ($asset in @('social_chat_cache.js', 'social_chat_recovery.js', 'social_chat_view.js')) {
+        $chatScope = Resolve-ElonAppUiChangeScope -RepoRoot $fixtureRoot `
+            -BaseSha $scopeBase.Sha -HeadSha $firstTaskHead `
+            -ChangedPaths @("server/src/assets/$asset")
+        Assert-Equal $chatScope.MobilePwaMode 'static_template' 'Inlined social chat assets must use static publication'
+        Assert-Equal $chatScope.OtherServerChanges.Count 0 'Inlined chat assets must not require a server binary'
+    }
+    $embeddedScope = Resolve-ElonAppUiChangeScope -RepoRoot $fixtureRoot `
+        -BaseSha $scopeBase.Sha -HeadSha $firstTaskHead `
+        -ChangedPaths @('server/src/assets/social_chat_view.js', 'server/src/assets/other.js')
+    Assert-Equal $embeddedScope.MobilePwaMode 'full_server' 'Unknown embedded assets still require a server binary'
+
     Set-Content -LiteralPath (Join-Path $fixtureRoot 'server\src\interleaved.rs') -Value 'other task' -Encoding UTF8
     Invoke-TestGit -Root $fixtureRoot -Arguments @('add', 'server/src/interleaved.rs')
     Invoke-TestGit -Root $fixtureRoot -Arguments @('commit', '-q', '-m', 'interleaved upstream task')
