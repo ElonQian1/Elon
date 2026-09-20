@@ -19,8 +19,8 @@ export default function ChatGptAccountCard() {
       <header className={styles.header}>
         <span className={styles.icon} aria-hidden="true"><MessageSquareText size={21} /></span>
         <div>
-          <strong>ChatGPT 账号与聊天</strong>
-          <small>登录本人账号，再从一龙打开 ChatGPT</small>
+          <strong>OpenAI / ChatGPT 账户</strong>
+          <small>在本机官网确认当前账户，或退出后登录另一账户</small>
         </div>
         <span className={styles.status} data-ready={desktopAvailable}>
           {status}
@@ -39,7 +39,7 @@ export default function ChatGptAccountCard() {
       </p>
 
       <Link className={styles.open} to="/user-browser">
-        登录或继续使用 ChatGPT
+        查看／切换 OpenAI 账户
         <ExternalLink size={16} aria-hidden="true" />
       </Link>
     </article>

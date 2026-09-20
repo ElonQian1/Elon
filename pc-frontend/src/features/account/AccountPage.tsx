@@ -7,6 +7,7 @@ import AccountSecurityCard from './AccountSecurityCard'
 import ChatGptAccountCard from './ChatGptAccountCard'
 import OpenAiChatKitCard from './OpenAiChatKitCard'
 import EskAssetCard from '../assets/EskAssetCard'
+import WindowsExchangeWebviewLaunch from '../exchange-webview/WindowsExchangeWebviewLaunch'
 import styles from './AccountPage.module.css'
 
 interface Balance {
@@ -119,14 +120,20 @@ export default function AccountPage() {
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>OpenAI 聊天方式</h2>
-          <ChatGptAccountCard />
+          <h2 className={styles.sectionTitle}>OpenAI API 聊天</h2>
           <OpenAiChatKitCard />
         </section>
 
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>账号与安全</h2>
           <LinkedIdentitiesCard />
+          <ChatGptAccountCard />
+          <WindowsExchangeWebviewLaunch launch={{
+            schema: 'yilong.windows_webview_launch.v1',
+            provider_id: 'binance',
+            label: '查看／切换币安账户',
+            description: '币安账户保存在本机。请在官网账户菜单确认身份或退出后登录另一账户。手机一龙量化 APK 使用手机主 APK 中的币安账户；请在手机“账号与安全”切换后重新授权连接。',
+          }} />
           <AccountSecurityCard />
         </section>
 

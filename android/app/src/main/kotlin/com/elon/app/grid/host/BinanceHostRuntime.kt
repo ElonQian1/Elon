@@ -37,6 +37,31 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     private var deadline = 0L
     private var resumeToken: String? = null
     private var lastResumeRefresh = 0L
+    private var maskedAccountUid: String? = null
+    val switchingAccount get() = preferences.contains("switch_from")
+
+    fun accountSummary(): String = if (switchingAccount) "正在切换币安账户，量化旧授权已撤销"
+        else BinanceAccountSwitch.label(state.account.takeIf { live() }, state.accountKind) +
+            if (live() && state.account != null) maskedAccountUid?.let { " · UID $it" }.orEmpty() else ""
+
+    fun startAccountSwitch(): Boolean {
+        if (!live() || state.account == null) return false
+        val previous = BinanceAccountSwitch.key(state.account!!, state.accountKind)
+        if (!preferences.edit().putString("switch_from", previous).commit()) return false
+        if (!revokeAccountAccess("请在币安官网退出当前账户，再登录另一账户")) return false
+        if (!begin()) return false
+        view?.loadUrl(ORIGIN)
+        return true
+    }
+    fun cancelAccountSwitch(): Boolean {
+        if (!revokeAccountAccess("已取消切换，请重新确认账户并授权量化")) return false
+        if (!preferences.edit().remove("switch_from").commit()) return false
+        return begin()
+    }
+    private fun revokeAccountAccess(message: String): Boolean = try {
+        consent.clear(); wallet.disconnect(); true
+    } catch (_: Exception) { false }
+    finally { resumeToken = null; invalidate(message) }
     private val expiry = Runnable { invalidate("连接已结束，请重新授权") }
     private val freshnessExpiry=Runnable {notifyChanged()}
 
@@ -100,6 +125,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     fun owner() = captured?.userId?.let(BinanceHostState::digest)
     fun readConsentCurrent() = live() && state.fresh() && consent.permits(owner(),state.account,state.accountKind)
     fun grant(continuous: Boolean = false): String {
+        require(!switchingAccount)
         require(live())
         require(state.fresh())
         if (continuous) consent.approve(owner() ?: error("OWNER_MISSING"), state.account ?: error("ACCOUNT_MISSING"), state.accountKind)
@@ -110,6 +136,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     }
     fun resume(): android.os.Bundle {
         fun status(value: String) = android.os.Bundle().apply { putString("status", value) }
+        if (switchingAccount) return status("consent_required")
         if (!consent.recorded()) return status("consent_required")
         if (!begin()) return status("login_required")
         if (state.account == null || !state.fresh()) {
@@ -136,6 +163,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         handler.postDelayed(expiry, (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0))
     }
     fun pageStarted(url: String) {
+        maskedAccountUid = null
         document.beginPage()
         wallet.clearSession()
         readRecovery.pageStarted()
@@ -165,7 +193,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     fun observed(raw: String) {
         if (!live()) return invalidate("登录或授权已失效")
         val event = runCatching { StrictJson.parse(raw) }.getOrNull() ?: return fail("响应格式暂不支持")
-        if(event["schema"]==com.elon.app.grid.wallet.BinanceWalletState.OBSERVATION){wallet.observed(event);return}
+        if(event["schema"]==com.elon.app.grid.wallet.BinanceWalletState.OBSERVATION){if (!switchingAccount) wallet.observed(event);return}
         if (event["schema"] == "yilong.binance_report_observation.v1") {
             if (document.accept(event["token"] as? String ?: "") != null) {
                 runCatching { reports.accept(event) }.onFailure { reports.fail(event["request"] as? String ?: "") }; events.changed("reports")
@@ -177,6 +205,20 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
             return
         }
         if (event["schema"] != "yilong.binance_observation.v1" || document.accept(event["token"] as? String ?: "") == null) return
+        val switchFrom = preferences.getString("switch_from", null)
+        if (switchFrom != null) {
+            val candidate = BinanceHostState(SystemClock::elapsedRealtime, System::currentTimeMillis)
+            val verified = runCatching { candidate.accept(raw) }.isSuccess
+            if (!verified || !BinanceAccountSwitch.accepts(switchFrom, candidate.account, candidate.accountKind)) {
+                state.unavailable(); wallet.clearSession()
+                status = "尚未确认另一币安账户。请在官网退出旧账户、登录新账户，然后点击核对账户。"
+                notifyChanged(); return
+            }
+            if (!preferences.edit().remove("switch_from").commit()) return fail("账户切换状态保存失败，请重试")
+            // Recreate the document so buffered observations from the switching page cannot reconnect an old identity.
+            invalidate("已确认新账户，正在刷新连接")
+            begin(); return
+        }
         if(event["kind"]=="identity")runCatching {
             wallet.observeAccount(event["account"] as String,event["account_kind"] as String)
             wallet.contextObserved()
@@ -184,6 +226,8 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
         val previousAccount = state.account
         runCatching { state.accept(raw) }.onFailure { fail("未取得可验证的本人网格响应，请在官网打开网格列表") }
             .onSuccess {
+                if (event["kind"] in setOf("identity", "list")) maskedAccountUid =
+                    (event["account"] as? String)?.takeIf { Regex("[0-9]{1,20}").matches(it) }?.let { "••••${it.takeLast(4)}" }
                 if (event["kind"] == "list" && state.fresh()) { readRecovery.verifiedList(); handler.removeCallbacks(freshnessExpiry); handler.postDelayed(freshnessExpiry,300_001) }
                 if(previousAccount != state.account) reports.clear()
                 if (state.account != null && consent.recorded() && !consent.permits(owner(), state.account, state.accountKind)) consent.clear()
@@ -232,6 +276,7 @@ internal class BinanceHostRuntime private constructor(private val context: Conte
     }
     fun fail(message: String) { state.unavailable(); wallet.clearSession(); status = message; notifyChanged() }
     fun invalidate(message: String) {
+        maskedAccountUid = null
         captured = null; state.unavailable(); reports.clear(); handler.removeCallbacks(expiry)
         wallet.clearSession()
         handler.removeCallbacks(freshnessExpiry); pendingReferenceReads.clear()

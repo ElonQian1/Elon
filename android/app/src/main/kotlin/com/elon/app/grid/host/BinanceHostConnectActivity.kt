@@ -54,6 +54,9 @@ class BinanceHostConnectActivity : Activity() {
             officialRequested = !officialRequested; render()
         }
         content.addView(toggle)
+        content.addView(ui.button("管理／切换币安账户", "binance-host-account") {
+            startActivity(Intent(this, BinanceAccountActivity::class.java))
+        })
         official = FrameLayout(this).apply { setBackgroundColor(ui.surface) }
         content.addView(official, LinearLayout.LayoutParams(-1, ui.dp(520)))
         root.addView(ScrollView(this).apply { isSaveEnabled = false; addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -82,11 +85,11 @@ class BinanceHostConnectActivity : Activity() {
     private fun render() {
         val runtime = host ?: return
         val ready = runtime.live() && runtime.state.fresh()
-        status.text = "${if (ready) "可以授权读取" else "正在确认读取连接"}\n${runtime.status}"
+        status.text = "${runtime.accountSummary()}\n${if (ready) "可以授权读取" else "正在确认读取连接"}\n${runtime.status}"
         authorize.isEnabled = ready
         official.visibility = if (officialRequested || !ready) View.VISIBLE else View.GONE
         toggle.visibility = if (ready) View.VISIBLE else View.GONE
-        toggle.text = if (officialRequested) "收起币安官网" else "查看币安官网／切换账户"
+        toggle.text = if (officialRequested) "收起币安官网" else "查看币安官网"
     }
     private fun approve() {
         if (finished || !hasWindowFocus() || !BinanceHostCaller.activity(this)) return
@@ -96,7 +99,7 @@ class BinanceHostConnectActivity : Activity() {
         setResult(RESULT_OK, Intent().putExtra("nonce", nonce).putExtra("grant", token).putExtra("schema", if (continuous) "yilong.binance_host_grant.v2" else "yilong.binance_host_grant.v1"))
         finished = true; finish()
     }
-    override fun onResume() { super.onResume(); if (::status.isInitialized) render() }
+    override fun onResume() { super.onResume(); if (::status.isInitialized) attachHost() }
     override fun onNewIntent(intent: Intent?) { super.onNewIntent(intent); finish() }
     override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); outState.clear() }
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {

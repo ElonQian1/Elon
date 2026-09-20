@@ -14,7 +14,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="登录方式"
+            android:text="我的账户与登录方式"
             android:textColor="@color/elon_text_primary"
             android:textSize="22sp"
             android:textStyle="bold" />
@@ -113,6 +113,12 @@
             android:text="安全提示：同邮箱不会自动合并，也不会保存 Google 密码或访问令牌。若 Google 已属于另一账号，请先在原账号解绑。"
             android:textColor="@color/elon_text_tertiary"
             android:textSize="12sp" />
+
+        <LinearLayout
+            android:id="@+id/accountProviderList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
 
         <TextView
             android:layout_width="match_parent"

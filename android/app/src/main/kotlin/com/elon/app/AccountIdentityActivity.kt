@@ -69,6 +69,11 @@ class AccountIdentityActivity : AppCompatActivity() {
         return true
     }
 
+    override fun onResume() {
+        super.onResume()
+        renderAccountProviders(this, findViewById(R.id.accountProviderList))
+    }
+
     private fun refresh() {
         status.text = "读取中…"
         googleBindingState.text = "正在读取绑定状态…"
