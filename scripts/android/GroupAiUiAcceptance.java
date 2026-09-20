@@ -13,6 +13,7 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
     private static final String GROUP = "ELON-GROUP-CONTEXT-ACCEPTANCE";
     private static final String FIRST = "ELON GROUP FIXTURE A: The release color is blue.";
     private static final String SECOND = "ELON GROUP FIXTURE B: The release day is Monday.";
+    private static final String CARD = "验收：群聊精选 AI 分析";
     private String targetGroup() {
         String encoded = getParams().getString("group_b64", "");
         if (encoded.isEmpty()) return GROUP;
@@ -59,7 +60,11 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
     }
     private void fixtureOpen() throws Exception {
         assertTrue("authorized_group_required", text(targetGroup()).exists());
-        assertTrue("group_composer_missing", id("inputEdit").exists());
+    }
+    private UiObject openComposer() throws Exception {
+        if (!id("inputEdit").exists()) action(text("输入内容"), false);
+        assertTrue("group_composer_missing", id("inputEdit").waitForExists(3000));
+        return id("inputEdit");
     }
     public void testStep() throws Exception {
         assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
@@ -81,8 +86,9 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
             case "send_first":
             case "send_second":
                 fixtureOpen();
-                assertTrue("existing_draft", id("inputEdit").getText().isEmpty() || id("inputEdit").getText().equals("输入内容"));
-                fill(id("inputEdit"), step.equals("send_first") ? FIRST : SECOND);
+                UiObject composer = openComposer();
+                assertTrue("existing_draft", composer.getText().isEmpty() || composer.getText().equals("输入内容"));
+                fill(composer, step.equals("send_first") ? FIRST : SECOND);
                 action(id("sendButton"), false); break;
             case "select_fixture":
                 fixtureOpen(); action(text(FIRST), true); action(text("多选"), false);
@@ -92,6 +98,25 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
                 action(desc("group-ai-selection-submit"), false); break;
             case "share_answer":
                 fixtureOpen(); action(text("ELON GROUP SELECTION PASSED"), true); action(text("转发"), false); break;
+            case "share_target":
+                assertTrue("share_preview_required", desc("ai-conversation-share-send").exists());
+                fill(desc("卡片标题"), CARD);
+                action(desc("ai-conversation-share-target"), false); break;
+            case "share_choose_group":
+                assertTrue("share_target_picker_required", text("发送到群聊").exists());
+                action(text(targetGroup()), false); break;
+            case "share_submit":
+                assertEquals("share_target_mismatch", targetGroup(), desc("ai-conversation-share-target").getText());
+                assertEquals("share_title_mismatch", CARD, desc("卡片标题").getText());
+                action(desc("ai-conversation-share-send"), false); break;
+            case "open_card": fixtureOpen(); action(text(CARD), false); break;
+            case "continue_private": action(desc("ai-conversation-share-continue-private"), false); break;
+            case "confirm_private":
+                assertTrue("private_confirmation_required", text("用自己的 ChatGPT 继续讨论").exists());
+                action(text("进入私人会话"), false); break;
+            case "return_group":
+                assertTrue("discard_confirmation_required", text("放弃未发送的私人草稿？").exists());
+                action(text("放弃并返回"), false); break;
             case "cancel": action(text("取消"), false); break;
             case "back": getUiDevice().pressBack(); break;
             case "inspect": break;
@@ -103,6 +128,10 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
             .put("second_visible", text(SECOND).exists())
             .put("create_group", text("发起群聊").exists()).put("home_add", id("addButton").exists())
             .put("reply_visible", text("ELON GROUP SELECTION PASSED").exists())
+            .put("card_visible", text(CARD).exists())
+            .put("reader_visible", id("ai_conversation_share_list").exists())
+            .put("private_confirmation", text("用自己的 ChatGPT 继续讨论").exists())
+            .put("return_confirmation", text("放弃未发送的私人草稿？").exists())
             .put("selection_question", desc("group-ai-selection-question").exists())
             .put("private_continue", desc("ai-conversation-share-continue-private").exists())
             .put("share_send", desc("ai-conversation-share-send").exists()).toString());

@@ -17,12 +17,13 @@ internal class GroupWebAiSession(
     private val onEvent: (ChatGptWebEvent) -> Unit,
     private val onFailure: () -> Unit,
     private val provider: WebChatProviderId = WebChatProviderId.CHATGPT_WEB,
+    private val observe: (String) -> Unit = {},
 ) {
     private var closed = false
     private val handler = Handler(Looper.getMainLooper())
     private val view = createChatGptBackgroundWebView(activity, null, {}, { it.onReceiveValue(null) })
     private val chatGpt = if (provider == WebChatProviderId.CHATGPT_WEB)
-        ChatGptWebPageAdapter(activity, view, ::event, {}) else null
+        ChatGptWebPageAdapter(activity, view, ::event, { observe("bridge_${it.name.lowercase()}") }) else null
     private val google = if (provider == WebChatProviderId.GOOGLE_WEB)
         GoogleWebPageAdapter(activity, view, ::event, {}) else null
     val adapter: ChatGptWebPageAdapter get() = requireNotNull(chatGpt)
@@ -62,8 +63,10 @@ internal class GroupWebAiSession(
             onPageStarted = { google.onPageStarted(it) }, onPageReady = { google.onPageReady(it) },
             onBlockedNavigation = { if (!closed) onFailure() }, onPageError = { if (!closed) onFailure() },
         ) else ChatGptWebViewClient(
-            onPageStarted = { adapter.onPageStarted(it) }, onPageReady = { adapter.onPageReady(it) },
-            onBlockedNavigation = { if (!closed) onFailure() }, onPageError = { if (!closed) onFailure() },
+            onPageStarted = { observe("page_started"); adapter.onPageStarted(it) },
+            onPageReady = { observe("page_loaded"); adapter.onPageReady(it) },
+            onBlockedNavigation = { if (!closed) { observe("navigation_blocked"); onFailure() } },
+            onPageError = { if (!closed) { observe("page_error"); onFailure() } },
             rewriteAllowedMainFrameUrl = { null },
         )
         if (google != null) google.install() else adapter.install()

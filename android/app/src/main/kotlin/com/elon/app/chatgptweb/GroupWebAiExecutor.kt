@@ -18,6 +18,7 @@ internal class GroupWebAiExecutor(
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private val provider = requireNotNull(configuration.engine.providerId)
+    private val diagnostics = GroupWebAiDiagnostics(provider)
     private var session: GroupWebAiSession? = null
     private val adapter get() = session?.adapter
     private var modelConfiguration: GroupWebAiModelConfiguration? = null
@@ -27,11 +28,12 @@ internal class GroupWebAiExecutor(
     private var dispatching = false
     private var dispatched = false
     private val commandId = UUID.randomUUID().toString()
-    private val timeout = Runnable { fail() }
+    private val timeout = Runnable { diagnostics.stage(if (dispatched) "response_timeout" else "prepare_timeout"); fail() }
 
     fun start() {
+        diagnostics.stage("start")
         handler.postDelayed(timeout, 60_000L)
-        session = GroupWebAiSession(activity, ::event, ::fail, provider).also { it.start() }
+        session = GroupWebAiSession(activity, ::event, ::fail, provider, diagnostics::stage).also { it.start() }
     }
 
     private fun event(event: ChatGptWebEvent) {
@@ -47,12 +49,14 @@ internal class GroupWebAiExecutor(
     }
 
     private fun snapshot(value: ChatGptWebSnapshot) {
+        diagnostics.snapshot(value)
         lastSnapshot = value
         if (!dispatched) {
             if (value.loginRequired) { fail(); return }
             if (dispatching || !GroupWebAiSession.ready(value, provider)) return
             if (!configured && provider == WebChatProviderId.CHATGPT_WEB) {
                 if (modelConfiguration == null) {
+                    diagnostics.stage("configure_model")
                     modelConfiguration = GroupWebAiModelConfiguration(GroupAiModelPort.from(requireNotNull(adapter)), configuration.modelPath,
                         onReady = { configured = true; lastSnapshot?.let(::snapshot) }, onFailure = ::fail)
                     modelConfiguration?.start()
@@ -60,12 +64,14 @@ internal class GroupWebAiExecutor(
                 return
             }
             dispatching = true
+            diagnostics.stage("authorize")
             // Once authorization is attempted, a lost response must never trigger paid fallback.
             authorize { permitted ->
                 if (finished) return@authorize
                 if (!permitted) { fail(); return@authorize }
                 if (lastSnapshot?.let { GroupWebAiSession.ready(it, provider) } != true) { fail(); return@authorize }
                 dispatched = true
+                diagnostics.stage("send")
                 handler.removeCallbacks(timeout)
                 handler.postDelayed(timeout, 180_000L)
                 session?.sendPrompt(prompt, commandId)
@@ -73,6 +79,7 @@ internal class GroupWebAiExecutor(
             return
         }
         val reply = completedReply(value.messages, prompt, value.streaming, value.privateStreamState) ?: return
+        diagnostics.stage("completed")
         finish()
         onResult(reply)
     }
@@ -82,6 +89,7 @@ internal class GroupWebAiExecutor(
     private fun fail() {
         if (finished) return
         val uncertain = dispatching || dispatched
+        diagnostics.stage(if (uncertain) "failed_after_authorize" else "failed_before_authorize")
         finish()
         onFailure(uncertain)
     }

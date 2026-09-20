@@ -62,3 +62,13 @@ reviewed_at: 2026-09-20
 - Android 定向：`AiConversationContinuationPromptTest`、`AiConversationShare*Test`。
 - 当前生产后端 `cargo check` 和定向 SQLite 测试通过；全后端 `--tests` 编译被既有 managed-fs 测试模块错误阻止，不代表本次全仓测试通过。
 - 真机端到端验收必须绑定新发布 APK 和后端；旧 APK 的 MCP 可连接不等于本批功能已验收。
+
+## 2026-09-20 发布与实测
+
+- 后端 `v0.3.1771`（`9b74cd7c1`）发布完成，健康与版本 smoke 通过。
+- APK `v1.1.1786`（build 1786，`29e522ea9`）已发布并以保留数据方式安装到登记的小米手机；荣耀离线。
+- 定向 SQLite 生产模块测试 6 项通过；Android 分享与续聊相关 70 项在批量测试及单项修正复跑中通过。Gradle 配置允许测试失败不改变退出码，因此核验了 XML，不能只凭 `BUILD SUCCESSFUL` 判断。
+- 指定测试群中，原生 UI 发送两条合成消息、长按多选和分析确认窗口已通过；生产后端确认 `context_scope=selected` 且来源为 2 条。
+- 真实 AI 分析未通过：群聊独立文档准备 60 秒后超时，在发送授权前取消。同期手机 HTTPS 探测和个人 ChatGPT 页面均正常，不能归因于未登录或网络不通。
+- 回答、分享卡片、私人续聊的整条真机链路仍待验证；没有用伪造回答替代真实验收。新增 `group_web_ai` MCP trace 仅记录有界状态转换和布尔标志，不含正文、URL 或身份凭证。
+- 可复用语义验收：`scripts/invoke-group-ai-ui-acceptance.ps1`，必须指定登记设备身份和用户授权的群名；前台不符、原有草稿或目标群不符时停止。
