@@ -6,14 +6,15 @@ const { test } = require('node:test');
 const read = file => readFileSync(resolve(__dirname, '..', file), 'utf8');
 const branding = JSON.parse(read('server/src/assets/app_branding.json'));
 
-test('PWA download actions and install titles match shared app branding', () => {
+test('PWA keeps shared downloads and its requested home-screen display name', () => {
   const page = read('server/src/assets/web_page.html');
   const apkUrl = page.match(/function apkUrl\(\)\s*\{[^}]+\}/)[0];
   assert.equal(runInNewContext(`${apkUrl}; apkUrl()`, { location: { origin: 'https://example.test' } }),
     `https://example.test/app/${branding.apkFileName}`);
   assert.ok(page.includes(`href="/app/${branding.apkFileName}"`));
-  assert.ok(page.includes(`<title>${branding.displayName}</title>`));
-  assert.ok(page.includes(`name="apple-mobile-web-app-title" content="${branding.displayName}"`));
+  assert.ok(page.includes('<title>一龙ai</title>'));
+  assert.ok(page.includes('name="apple-mobile-web-app-title" content="一龙ai"'));
+  assert.ok(page.includes('rel="apple-touch-icon" sizes="180x180" href="/app/icon-180.png"'));
   assert.ok(read('server/src/assets/download_page.html').includes(`<h1>${branding.displayName} APK 下载</h1>`));
   assert.ok(!page.includes(branding.legacyApkFileName));
 });

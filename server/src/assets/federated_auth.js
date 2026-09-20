@@ -1,5 +1,6 @@
 (function () {
   'use strict';
+  const localStorage = window.ElonMobileStartup?.storage || window.localStorage;
   const TOKEN_KEY = 'lodex_token';
   const CLIENT_KEY = 'elon_federated_auth_client_instance_id';
   const token = () => localStorage.getItem(TOKEN_KEY) || localStorage.getItem('elon_token') || '';

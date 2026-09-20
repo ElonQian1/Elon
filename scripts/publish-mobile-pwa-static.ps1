@@ -100,7 +100,7 @@ if ($fetch.ExitCode -ne 0) { throw "Unable to refresh origin/main before mobile 
 $mainSha = (& git -C $repoRoot rev-parse origin/main).Trim()
 & git -C $repoRoot merge-base --is-ancestor $sourceSha $mainSha 2>$null
 if ($LASTEXITCODE -ne 0) { throw "Mobile PWA candidate is not an ancestor of origin/main: $sourceSha" }
-$staticInputs = @(Get-ElonStaticMobilePwaInputPaths)
+$staticInputs = @('server/src/assets', 'scripts/mobile-pwa-runtime-template.ps1')
 $newerInputChanges = @(& git -C $repoRoot diff --name-only "$sourceSha..$mainSha" -- @staticInputs 2>$null)
 if ($newerInputChanges.Count -gt 0) {
     Write-Host "MOBILE_PWA_STATIC_SUPERSEDED_BY=$mainSha"

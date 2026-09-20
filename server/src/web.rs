@@ -384,55 +384,9 @@ fn encode_png(bytes: &[u8]) -> String {
 const WEB_HTML_TEMPLATE: &str = include_str!("assets/web_page.html");
 const DOWNLOAD_HTML_TEMPLATE: &str = include_str!("assets/download_page.html");
 
-/// PWA manifest.json —— 让 iOS/Android 浏览器把网页识别为可安装应用。
-pub async fn pwa_manifest() -> impl IntoResponse {
-    let body = r##"{
-  "name": "__APP_DISPLAY_NAME__",
-  "short_name": "__APP_DISPLAY_NAME__",
-  "description": "用自然语言开发你的 App",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#101010",
-  "theme_color": "#101010",
-  "icons": [
-    {
-      "src": "/app/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/app/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ]
-}"##;
-    (
-        [
-            (header::CONTENT_TYPE, "application/manifest+json"),
-            (header::CACHE_CONTROL, "public, max-age=86400"),
-        ],
-        body.replace(
-            "__APP_DISPLAY_NAME__",
-            &crate::app_update::distribution::BRANDING.display_name,
-        ),
-    )
-}
-
-/// Public mobile shell cache; account data stays in the isolated social snapshot store.
-pub async fn service_worker() -> impl IntoResponse {
-    let body = include_str!("assets/mobile_shell_worker.js");
-    (
-        [
-            (header::CONTENT_TYPE, "application/javascript"),
-            // SW 必须设短缓存，否则更新不及时
-            (header::CACHE_CONTROL, "no-cache, no-store, must-revalidate"),
-        ],
-        body,
-    )
-}
+#[path = "web_pwa.rs"]
+mod pwa;
+pub use pwa::routes as pwa_routes;
 
 pub async fn project_plaza_css() -> impl IntoResponse {
     (

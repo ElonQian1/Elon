@@ -20607,6 +20607,124 @@
       "updated_at_ms": 1786625470065
     },
     {
+      "id": "pwa-home-screen-startup-v1",
+      "title": "PWA 主屏幕启动与品牌修复",
+      "summary": "修复首屏同步资源阻塞、存储拒绝中断及缺失安装图标；桌面入口进入群聊。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/pwa-home-screen-startup.md",
+        "content_hash": "210abb5e10d028a0d29fa0ffac9ec42a79d1bd9a8713f81b2f4b4afc30d9e175",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "5ba79051cb29f271bb0842dec2a60b5b068377bc",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "a533363cc5a4a8af04cf06bafc368e6b61393a06",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "",
+      "tags": [],
+      "task_paths": [
+        "scripts/mobile-pwa-runtime-template.ps1",
+        "server/src/assets/mobile_shell_worker.js",
+        "server/src/assets/mobile_startup.js",
+        "server/src/assets/web_page.html",
+        "server/src/web_pwa.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "启动失败可恢复且存储异常不阻塞群聊",
+        "安装图标和名称、聊天入口正确",
+        "浏览器故障回归及线上发布验证，真机未测明确标注"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "scripts/mobile-pwa-runtime-template.ps1",
+          "content_hash": "f5ae4396cfde846fb0c91c64514d1207b47e8a9befd20c08bf8fdb9ed437aae7",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ba79051cb29f271bb0842dec2a60b5b068377bc",
+            "head_blob_oid": "066275dde7e0df463b3035b7043f40a49df79e02",
+            "worktree_blob_oid": "205fab8ea996708191c57cf7137655812cdf7674",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-app-branding.cjs",
+          "content_hash": "037f80ce5ac3f1aa5ef4df49df3d666167ede6d9a6230a71b6bcff3e97fc4372",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ba79051cb29f271bb0842dec2a60b5b068377bc",
+            "head_blob_oid": "5fff8df824ee66cf8bf339ad25ef909db37814a9",
+            "worktree_blob_oid": "94b156f72532aee82bb37dd54620bca4f712b0c6",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-pwa-home-startup.cjs",
+          "content_hash": "38aa46ce9bf2ff63a17bceb69db970a6a7d5705d0318daf4706c1c24aa52e875",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ba79051cb29f271bb0842dec2a60b5b068377bc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "74666ae341230a58a5337beda83651c1569b889c",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/assets/mobile_shell_worker.js",
+          "content_hash": "395309123d4e510a980d1e6584489025e34f535ebdc35c7732dd9c6978281bde",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ba79051cb29f271bb0842dec2a60b5b068377bc",
+            "head_blob_oid": "9f80a045dd4132b1c3ba516dcbda66d955023ef1",
+            "worktree_blob_oid": "df0d6c9f445634613644299dbf52ce4dc38f27f8",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "server/src/assets/mobile_startup.js",
+          "content_hash": "700360813d825bac950eb0f6f66c40aafdb76236c5e499e91a5b03a344df72d9",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ba79051cb29f271bb0842dec2a60b5b068377bc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2235d5c97dfc4044b08aa81a3cf02b4a242aa7ba",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/web_pwa.rs",
+          "content_hash": "3e03b0b886911aece7de0bbf749f27d2dc969b8df93ff814f5f3513e9eda8ff8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5ba79051cb29f271bb0842dec2a60b5b068377bc",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3141a3e7a8b372c49651f39b61ec4f9e5c4f25a4",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1789877925930,
+      "updated_at_ms": 1789879045849
+    },
+    {
       "id": "quant-native-grid-issuer-v1",
       "title": "原生模拟网格个人授权签发",
       "summary": "主账号真实会话签发独立yng1权限；与量化消费者互操作，不转换Paper或钱包权限。",
@@ -30467,56 +30585,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_09fda675af1144d985fc58ffcc4175f6",
-      "feature_id": "android_binance_range_empty_stops_v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "已用真实历史字段形状复现并修正，开始原生检查",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789267087606
-    },
-    {
-      "id": "feature_event_c866a8dec0444e9bb017a33b45abf2b1",
-      "feature_id": "android_binance_range_empty_stops_v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789267410544
-    },
-    {
-      "id": "feature_event_ceafca9fafe24d1ea1a7deeb9b2d1356",
-      "feature_id": "android_binance_range_empty_stops_v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "12组适配器和97项原生测试通过，正式发布/手机准备待验",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789267410591
-    },
-    {
-      "id": "feature_event_3fa167d2fe674dbfb4d01af5b463b77f",
-      "feature_id": "android_binance_range_empty_stops_v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789268778176
-    },
-    {
-      "id": "feature_event_79c6a269815342a2b18f984ac2f11768",
-      "feature_id": "android_binance_range_empty_stops_v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "主1700正式发布与无线安装摘要一致；当前量化0746区间带入、不变提示和变更只读准备通过，草稿已清理；真实交易不属于本解析修复验收",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1789268778225
-    },
-    {
       "id": "feature_event_9543d19314854a2fbbe137586a6ef471",
       "feature_id": "android_binance_range_empty_stops_v1",
       "action": "transitioned",
@@ -32465,6 +32533,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789558460536
+    },
+    {
+      "id": "feature_event_e665f872b71f46aeaa4985a435641205",
+      "feature_id": "pwa-home-screen-startup-v1",
+      "action": "registered",
+      "actor": "codex-pwa-startup",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1789877925930
+    },
+    {
+      "id": "feature_event_d81e0364767f42d4aebbd95fde7a84f8",
+      "feature_id": "pwa-home-screen-startup-v1",
+      "action": "claimed",
+      "actor": "codex-pwa-startup",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1789877973079
+    },
+    {
+      "id": "feature_event_f2bde2f8fd20458c9524b88706819b51",
+      "feature_id": "pwa-home-screen-startup-v1",
+      "action": "transitioned",
+      "actor": "codex-pwa-startup",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1789878119896
+    },
+    {
+      "id": "feature_event_e1538dc16119480abb65196c7eb5c7aa",
+      "feature_id": "pwa-home-screen-startup-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-pwa-startup",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1789878929800
+    },
+    {
+      "id": "feature_event_b9984df238274a859b0f48908146bbe8",
+      "feature_id": "pwa-home-screen-startup-v1",
+      "action": "transitioned",
+      "actor": "codex-pwa-startup",
+      "reason": "已完成启动容错、自包含资源、品牌路由及浏览器故障回归；Rust 验证和正式发布进行中，iPhone 主屏幕真机验收待用户实际网址。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1789879045849
     }
   ]
 }

@@ -4,12 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#070B10" />
-  <title>一龙 AI</title>
+  <title>一龙ai</title>
   <!-- ===== iOS PWA ===== -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="一龙 AI" />
-  <link rel="apple-touch-icon" href="data:image/png;base64,__BRAND_PNG_B64__" />
+  <meta name="apple-mobile-web-app-title" content="一龙ai" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/app/icon-180.png" />
+  <script src="/assets/mobile_startup.js"></script>
   <link rel="manifest" href="/manifest.json" />
   <link rel="stylesheet" href="/assets/project_plaza.css" />
   <link rel="stylesheet" href="/assets/project_home.css" />
@@ -5670,8 +5671,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
 <script>
 (function () {
   'use strict';
-
-  // ====== DOM 引用 ======
+  const localStorage = window.ElonMobileStartup.storage;
   const $ = (id) => document.getElementById(id);
   const pageParams = new URLSearchParams(window.location.search || '');
   const preferredStorageNodeId = String(pageParams.get('preferred_storage_node_id') || '').trim();
@@ -7240,10 +7240,12 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     stopContactPolling();
     appView.classList.add('hidden');
     loginView.classList.remove('hidden');
+    window.ElonMobileStartup.complete();
   }
   function showApp() {
     loginView.classList.add('hidden');
     appView.classList.remove('hidden');
+    window.ElonMobileStartup.complete();
   }
 
   function setProjectTopTabsVisible(visible, plazaSelected) {
@@ -12262,12 +12264,6 @@ if (window.visualViewport) {
     }, 900);
   });
 })();
-// ===== Service Worker 注册（离线缓存 / PWA 壳） =====
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch((e) => {
-    console.warn('SW registration failed:', e);
-  });
-}
 </script>
 <script src="/assets/esk_exchange.js"></script>
 <script src="/assets/project_plaza_cache.js"></script>

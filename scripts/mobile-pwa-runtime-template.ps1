@@ -1,74 +1,40 @@
 function New-ElonMobilePwaRuntimeTemplate {
     param(
-        [Parameter(Mandatory = $true)]
-        [string]$TemplatePath,
-        [Parameter(Mandatory = $true)]
-        [string]$StylesPath,
-        [Parameter(Mandatory = $true)]
-        [string]$ThemeStylesPath,
-        [Parameter(Mandatory = $true)]
-        [string]$CacheScriptPath,
-        [Parameter(Mandatory = $true)]
-        [string]$ScriptPath,
-        [Parameter(Mandatory = $true)]
-        [string]$OutputPath
+        [Parameter(Mandatory = $true)][string]$TemplatePath,
+        [Parameter(Mandatory = $true)][string]$StylesPath,
+        [Parameter(Mandatory = $true)][string]$ThemeStylesPath,
+        [Parameter(Mandatory = $true)][string]$CacheScriptPath,
+        [Parameter(Mandatory = $true)][string]$ScriptPath,
+        [Parameter(Mandatory = $true)][string]$OutputPath
     )
-
+    # Bundle the complete ordered startup generation, not a subset of its assets.
     $utf8 = [System.Text.UTF8Encoding]::new($false)
     $template = [System.IO.File]::ReadAllText($TemplatePath, $utf8)
-    $styles = [System.IO.File]::ReadAllText($StylesPath, $utf8)
-    $themeStyles = [System.IO.File]::ReadAllText($ThemeStylesPath, $utf8)
-    $cacheScript = [System.IO.File]::ReadAllText($CacheScriptPath, $utf8)
-    $script = [System.IO.File]::ReadAllText($ScriptPath, $utf8)
-    $styleReference = '<link rel="stylesheet" href="/assets/project_plaza.css" />'
-    $themeStyleReference = '<link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />'
-    $cacheScriptReference = '<script src="/assets/project_plaza_cache.js"></script>'
-    $scriptReference = '<script src="/assets/project_plaza.js"></script>'
-
-    if (-not $template.Contains($styleReference)) {
-        throw "Mobile PWA template is missing the project plaza stylesheet reference: $TemplatePath"
+    $assetRoot = Split-Path -Parent $TemplatePath
+    $overrides = @{
+        'project_plaza.css' = $StylesPath
+        'orbital_mobile_theme.css' = $ThemeStylesPath
+        'project_plaza_cache.js' = $CacheScriptPath
+        'project_plaza.js' = $ScriptPath
     }
-    if (-not $template.Contains($themeStyleReference)) {
-        throw "Mobile PWA template is missing the orbital theme stylesheet reference: $TemplatePath"
+    $pattern = '<script\b[^>]*\bsrc="(?<js>/assets/[\w.-]+\.js)(?:\?[^"<>]*)?"[^>]*>\s*</script>|<link\b(?=[^>]*\brel="stylesheet")(?=[^>]*\bhref="(?<css>/assets/[\w.-]+\.css)(?:\?[^"<>]*)?")[^>]*>'
+    $runtimeTemplate = [regex]::Replace($template, $pattern, [System.Text.RegularExpressions.MatchEvaluator]{
+        param($match)
+        $isScript = $match.Groups['js'].Success
+        $url = if ($isScript) { $match.Groups['js'].Value } else { $match.Groups['css'].Value }
+        $name = $url.Substring('/assets/'.Length)
+        $path = if ($overrides.ContainsKey($name)) { $overrides[$name] } else { Join-Path $assetRoot $name }
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing PWA startup asset: $name" }
+        $content = [System.IO.File]::ReadAllText($path, $utf8)
+        $tag = if ($isScript) { 'script' } else { 'style' }
+        if ($isScript) { $content = [regex]::Replace($content, '(?i)</script', '<\/script') }
+        elseif ($content -match '(?i)</style\s*>') { throw "PWA asset cannot be safely embedded: $name" }
+        "<$tag data-elon-runtime-asset=`"$url`">`n$content`n</$tag>"
+    })
+    if ($runtimeTemplate -match '(?:src|href)="/assets/[\w.-]+\.(?:js|css)(?:\?[^"<>]*)?"') {
+        throw 'Unbundled mobile startup asset; refuse a partial runtime generation.'
     }
-    if (-not $template.Contains($scriptReference)) {
-        throw "Mobile PWA template is missing the project plaza script reference: $TemplatePath"
-    }
-    if (-not $template.Contains($cacheScriptReference)) {
-        throw "Mobile PWA template is missing the project plaza cache script reference: $TemplatePath"
-    }
-    if ($styles -match '(?i)</style\s*>') {
-        throw "Project plaza styles cannot be embedded safely: $StylesPath"
-    }
-    if ($themeStyles -match '(?i)</style\s*>') {
-        throw "Orbital theme styles cannot be embedded safely: $ThemeStylesPath"
-    }
-    if ($script -match '(?i)</script\s*>') {
-        throw "Project plaza script cannot be embedded safely: $ScriptPath"
-    }
-    if ($cacheScript -match '(?i)</script\s*>') {
-        throw "Project plaza cache script cannot be embedded safely: $CacheScriptPath"
-    }
-
-    $styleBlock = "<style data-elon-runtime-asset=`"/assets/project_plaza.css`">`n$styles`n</style>"
-    $themeStyleBlock = "<style data-elon-runtime-asset=`"/assets/orbital_mobile_theme.css`">`n$themeStyles`n</style>"
-    $cacheScriptBlock = "<script data-elon-runtime-asset=`"/assets/project_plaza_cache.js`">`n$cacheScript`n</script>"
-    $scriptBlock = "<script data-elon-runtime-asset=`"/assets/project_plaza.js`">`n$script`n</script>"
-    $runtimeTemplate = $template.Replace($styleReference, $styleBlock)
-    $runtimeTemplate = $runtimeTemplate.Replace($themeStyleReference, $themeStyleBlock)
-    $runtimeTemplate = $runtimeTemplate.Replace($cacheScriptReference, $cacheScriptBlock)
-    $runtimeTemplate = $runtimeTemplate.Replace($scriptReference, $scriptBlock)
-    foreach ($name in @('social_chat_cache.js', 'social_chat_recovery.js', 'social_chat_view.js')) {
-        $reference = '<script src="/assets/' + $name + '"></script>'
-        if (-not $runtimeTemplate.Contains($reference)) { throw "Mobile PWA template is missing $name" }
-        $asset = [System.IO.File]::ReadAllText((Join-Path (Split-Path -Parent $TemplatePath) $name), $utf8)
-        if ($asset -match '(?i)</script\s*>') { throw "Mobile social script cannot be embedded safely: $name" }
-        $runtimeTemplate = $runtimeTemplate.Replace($reference, "<script data-elon-runtime-asset=`"/assets/$name`">`n$asset`n</script>")
-    }
-    $outputDirectory = Split-Path -Parent $OutputPath
-    if (-not [string]::IsNullOrWhiteSpace($outputDirectory)) {
-        [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
-    }
+    [System.IO.Directory]::CreateDirectory((Split-Path -Parent $OutputPath)) | Out-Null
     [System.IO.File]::WriteAllText($OutputPath, $runtimeTemplate, $utf8)
     Get-Item -LiteralPath $OutputPath
 }
