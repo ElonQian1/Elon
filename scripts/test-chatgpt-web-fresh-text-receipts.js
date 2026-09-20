@@ -4,6 +4,24 @@ const receipts = require('../android/app/src/main/assets/chatgpt_web_fresh_text_
 const id = value => 'mcp_' + BigInt(value).toString(36);
 const complete = () => ({ retirable: () => true });
 
+test('group commands reuse the canonical generator instead of bridge-only UUIDs', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const group = fs.readFileSync(path.join(__dirname,
+    '../android/app/src/main/kotlin/com/elon/app/chatgptweb/GroupWebAiCommandIds.kt'), 'utf8');
+  const canonical = fs.readFileSync(path.join(__dirname,
+    '../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebObservedState.kt'), 'utf8');
+  assert.match(group, /private val sequence = ChatGptWebObservedState\(\)/);
+  assert.match(group, /@Synchronized\s+fun next\(\): String = sequence\.nextRequestId\(\)/);
+  assert.match(canonical, /return "mcp_\$\{\(\+\+nextCommandId\)\.toString\(36\)\}"/);
+  const ledger = receipts.create();
+  const old = 'mcp_11111111111141118111111111111111';
+  assert.match(old, /^mcp_[a-z0-9]{1,32}$/, 'the bridge alone accepted the old IDs');
+  assert.equal(ledger.admit(old), 'invalid_command', 'the real private ledger rejects the old IDs');
+  for (const sequence of [1n, 35n, 36n, 9007199254740993n, 9223372036854775807n]) {
+    assert.equal(ledger.admit(id(sequence)), ''); ledger.set(id(sequence), complete());
+  }
+});
+
 test('long resident pages retain 32 receipts, not a 32-command lifetime limit', () => {
   const ledger = receipts.create();
   for (let i = 1; i <= 10000; i++) {

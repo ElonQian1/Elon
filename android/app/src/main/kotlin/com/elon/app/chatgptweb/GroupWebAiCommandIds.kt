@@ -1,8 +1,9 @@
 package com.elon.app.chatgptweb
 
-import java.util.UUID
-
-/** Both native and page bridge validators require this command correlation format. */
+/** Reuse the canonical sequence accepted by both the bridge and private-send ledger. */
 internal object GroupWebAiCommandIds {
-    fun next(): String = "mcp_" + UUID.randomUUID().toString().replace("-", "")
+    private val sequence = ChatGptWebObservedState()
+
+    @Synchronized
+    fun next(): String = sequence.nextRequestId()
 }

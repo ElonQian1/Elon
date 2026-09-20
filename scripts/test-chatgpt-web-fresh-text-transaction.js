@@ -70,6 +70,21 @@ function fixture(options = {}) {
     reconcile: () => { reconciled = true; }, draft: value => { if (value !== undefined) draft = value; return draft; } };
 }
 
+test('bridge-only UUID rejects before preparation while a canonical group sequence sends once', async () => {
+  const f = fixture({ reconciliation: async () => true });
+  const invalid = f.send({ requestId: 'mcp_11111111111141118111111111111111' });
+  assert.deepEqual(await invalid.completion, { status: 'rejected', code: 'invalid_command' });
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.api.trialControl('state').attempts, 0);
+  assert.equal((await f.send({ requestId: 'mcp_1' }).completion).status, 'accepted');
+  await turn(); await turn();
+  assert.equal(f.calls.filter(call => call.kind === 'post').length, 1);
+  assert.equal(f.api.trialControl('state').reconciled, true);
+  f.reconcile();
+  assert.equal(f.api.state().pending, false);
+  assert.equal(f.api.dispose(), true);
+});
+
 test('independent HTTP uses owned memory draft when the DOM reader is absent', async () => {
   const f = fixture({ reconciliation: async () => true });
   assert.equal(f.api.version, transactionModule.version, 're-injection must not replace the current settled writer ledger');
