@@ -43,17 +43,17 @@ internal class GroupWebAiExecutor(
         when (event) {
             is ChatGptWebEvent.Snapshot -> snapshot(event.value)
             is ChatGptWebEvent.CommandResult ->
-                if (event.requestId == commandId && !event.ok) fail()
+                if (event.requestId == commandId && !event.ok) { diagnostics.stage("command_rejected"); fail() }
             else -> Unit
         }
     }
 
     private fun snapshot(value: ChatGptWebSnapshot) {
-        diagnostics.snapshot(value)
+        diagnostics.snapshot(value, session?.documentUrl.orEmpty())
         lastSnapshot = value
         if (!dispatched) {
             if (value.loginRequired) { fail(); return }
-            if (dispatching || !GroupWebAiSession.ready(value, provider)) return
+            if (dispatching || session?.isReady(value) != true) return
             if (!configured && provider == WebChatProviderId.CHATGPT_WEB) {
                 if (modelConfiguration == null) {
                     diagnostics.stage("configure_model")
@@ -69,7 +69,7 @@ internal class GroupWebAiExecutor(
             authorize { permitted ->
                 if (finished) return@authorize
                 if (!permitted) { fail(); return@authorize }
-                if (lastSnapshot?.let { GroupWebAiSession.ready(it, provider) } != true) { fail(); return@authorize }
+                if (lastSnapshot?.let { session?.isReady(it) } != true) { fail(); return@authorize }
                 dispatched = true
                 diagnostics.stage("send")
                 handler.removeCallbacks(timeout)
@@ -84,7 +84,7 @@ internal class GroupWebAiExecutor(
         onResult(reply)
     }
 
-    fun cancel() = fail()
+    fun cancel() { diagnostics.stage("cancelled"); fail() }
 
     private fun fail() {
         if (finished) return

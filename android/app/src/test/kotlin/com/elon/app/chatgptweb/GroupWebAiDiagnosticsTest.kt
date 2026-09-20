@@ -38,4 +38,14 @@ class GroupWebAiDiagnosticsTest {
         assertEquals("failed_before_authorize", records.last()["stage"])
         assertEquals(26, records.size)
     }
+
+    @Test fun readinessUsesLiveDocumentWhileDiagnosticsRemainRedacted() {
+        val records = mutableListOf<Map<String, Any?>>()
+        val diagnostics = GroupWebAiDiagnostics(WebChatProviderId.CHATGPT_WEB) { _, values -> records += values }
+        diagnostics.snapshot(snapshot().copy(url = "https://chatgpt.com/", draft = "", messages = emptyList()),
+            "https://chatgpt.com/?temporary-chat=true")
+        assertEquals(true, records.single()["ready"])
+        assertEquals(true, records.single()["temporary_route"])
+        assertFalse(records.single().values.any { it.toString().contains("https:") })
+    }
 }

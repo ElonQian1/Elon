@@ -89,7 +89,7 @@ internal class GroupAiModelPicker(
         if (closed || failed) return
         if (event is ChatGptWebEvent.Snapshot) {
             if (event.value.loginRequired) { unavailable(); return }
-            if (!ready && GroupWebAiSession.ready(event.value)) {
+            if (!ready && session?.isReady(event.value) == true) {
                 ready = true
                 session?.adapter?.listModelOptions()
                 session?.adapter?.requestUiManifest()

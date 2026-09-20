@@ -14,8 +14,8 @@ internal class GroupWebAiDiagnostics(
 
     fun stage(code: String) = emit(mapOf("stage" to code), code in TERMINAL)
 
-    fun snapshot(value: ChatGptWebSnapshot) {
-        val route = runCatching { URI(value.url) }.getOrNull()
+    fun snapshot(value: ChatGptWebSnapshot, documentUrl: String = value.url) {
+        val route = runCatching { URI(documentUrl) }.getOrNull()
         emit(mapOf(
             "stage" to "snapshot",
             "root_route" to (route?.path in listOf("", "/")),
@@ -27,7 +27,7 @@ internal class GroupWebAiDiagnostics(
             "has_messages" to value.messages.isNotEmpty(),
             "has_draft" to value.draft.isNotBlank(),
             "streaming" to value.streaming,
-            "ready" to GroupWebAiSessionPolicy.ready(value, provider),
+            "ready" to GroupWebAiSessionPolicy.ready(value, provider, documentUrl),
         ))
     }
 

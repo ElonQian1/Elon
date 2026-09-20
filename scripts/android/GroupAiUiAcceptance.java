@@ -59,12 +59,41 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
         } finally { info.recycle(); }
     }
     private void fixtureOpen() throws Exception {
-        assertTrue("authorized_group_required", text(targetGroup()).exists());
+        assertTrue("authorized_group_required", new UiObject(new UiSelector().packageName(APP)
+            .resourceId(APP + ":id/topTitleText").text(targetGroup())).waitForExists(3000));
+    }
+    private void openFixture() throws Exception {
+        if (!text(targetGroup()).exists() && text("群聊").exists()) action(text("群聊"), false);
+        for (int attempt = 0; attempt < 5 && !text(targetGroup()).exists(); attempt++) {
+            UiObject list = new UiObject(new UiSelector().packageName(APP).scrollable(true)
+                .classNameMatches("(android.widget.(ScrollView|ListView)|androidx.recyclerview.widget.RecyclerView|androidx.core.widget.NestedScrollView)"));
+            assertTrue("group_list_missing", list.exists());
+            AccessibilityNodeInfo info = node(list);
+            boolean moved;
+            try { moved = info.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD); }
+            finally { info.recycle(); }
+            getUiDevice().waitForIdle(1000);
+            if (!moved) break;
+        }
+        action(text(targetGroup()), false);
+        fixtureOpen();
     }
     private UiObject openComposer() throws Exception {
         if (!id("inputEdit").exists()) action(text("输入内容"), false);
         assertTrue("group_composer_missing", id("inputEdit").waitForExists(3000));
         return id("inputEdit");
+    }
+    private UiObject findMessage(String value, boolean forward) throws Exception {
+        for (int attempt = 0; attempt < 4 && !text(value).exists(); attempt++) {
+            AccessibilityNodeInfo list = node(id("chatList"));
+            boolean moved;
+            try { moved = list.performAction(forward ? AccessibilityNodeInfo.ACTION_SCROLL_FORWARD :
+                AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD); }
+            finally { list.recycle(); }
+            getUiDevice().waitForIdle(1000);
+            if (!moved) break;
+        }
+        return text(value);
     }
     public void testStep() throws Exception {
         assertEquals("foreground_package_mismatch", APP, getUiDevice().getCurrentPackageName());
@@ -82,7 +111,7 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
                     .className("android.widget.CheckBox").textMatches("^一龙\\s*AI(?:\\s.*)?$").instance(1)).exists());
                 fill(new UiObject(new UiSelector().packageName(APP).className("android.widget.EditText")), GROUP);
                 action(ai, false); action(text("完成"), false); break;
-            case "open_fixture": action(text(targetGroup()), false); break;
+            case "open_fixture": openFixture(); break;
             case "send_first":
             case "send_second":
                 fixtureOpen();
@@ -91,8 +120,8 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
                 fill(composer, step.equals("send_first") ? FIRST : SECOND);
                 action(id("sendButton"), false); break;
             case "select_fixture":
-                fixtureOpen(); action(text(FIRST), true); action(text("多选"), false);
-                action(text(SECOND), false); action(text("AI 分析"), false); break;
+                fixtureOpen(); action(findMessage(FIRST, false), true); action(text("多选"), false);
+                action(findMessage(SECOND, true), false); action(text("AI 分析"), false); break;
             case "submit_selection":
                 fill(desc("group-ai-selection-question"), "Reply exactly: ELON GROUP SELECTION PASSED");
                 action(desc("group-ai-selection-submit"), false); break;

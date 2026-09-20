@@ -27,6 +27,9 @@ internal class GroupWebAiSession(
     private val google = if (provider == WebChatProviderId.GOOGLE_WEB)
         GoogleWebPageAdapter(activity, view, ::event, {}) else null
     val adapter: ChatGptWebPageAdapter get() = requireNotNull(chatGpt)
+    val documentUrl: String get() = view.url.orEmpty()
+    fun isReady(snapshot: ChatGptWebSnapshot): Boolean =
+        !closed && GroupWebAiSessionPolicy.ready(snapshot, provider, documentUrl)
     private val refresh = GoogleWebResponseRefreshCoordinator(
         requestSnapshot = { google?.requestSnapshot() },
         schedule = { task, delay -> handler.postDelayed(task, delay) }, cancel = handler::removeCallbacks,
@@ -87,8 +90,4 @@ internal class GroupWebAiSession(
         view.destroy()
     }
 
-    companion object {
-        fun ready(snapshot: ChatGptWebSnapshot, provider: WebChatProviderId = WebChatProviderId.CHATGPT_WEB) =
-            GroupWebAiSessionPolicy.ready(snapshot, provider)
-    }
 }
