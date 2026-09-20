@@ -13,6 +13,15 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
     private static final String GROUP = "ELON-GROUP-CONTEXT-ACCEPTANCE";
     private static final String FIRST = "ELON GROUP FIXTURE A: The release color is blue.";
     private static final String SECOND = "ELON GROUP FIXTURE B: The release day is Monday.";
+    private String targetGroup() {
+        String encoded = getParams().getString("group_b64", "");
+        if (encoded.isEmpty()) return GROUP;
+        String value = new String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT),
+            java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue("invalid_group_label", !value.trim().isEmpty() && value.length() <= 120 &&
+            !value.contains("\n") && !value.contains("\r"));
+        return value;
+    }
     private UiObject text(String value) { return new UiObject(new UiSelector().packageName(APP).text(value)); }
     private UiObject desc(String value) { return new UiObject(new UiSelector().packageName(APP).description(value)); }
     private UiObject id(String value) { return new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/" + value)); }
@@ -49,7 +58,7 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
         } finally { info.recycle(); }
     }
     private void fixtureOpen() throws Exception {
-        assertTrue("synthetic_group_required", text(GROUP).exists());
+        assertTrue("authorized_group_required", text(targetGroup()).exists());
         assertTrue("group_composer_missing", id("inputEdit").exists());
     }
     public void testStep() throws Exception {
@@ -68,7 +77,7 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
                     .className("android.widget.CheckBox").textMatches("^一龙\\s*AI(?:\\s.*)?$").instance(1)).exists());
                 fill(new UiObject(new UiSelector().packageName(APP).className("android.widget.EditText")), GROUP);
                 action(ai, false); action(text("完成"), false); break;
-            case "open_fixture": action(text(GROUP), false); break;
+            case "open_fixture": action(text(targetGroup()), false); break;
             case "send_first":
             case "send_second":
                 fixtureOpen();
@@ -90,7 +99,7 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
         }
         getUiDevice().waitForIdle(1500);
         System.out.println("GROUP_AI_UI_RESULT=" + new JSONObject().put("step", step)
-            .put("fixture_visible", text(GROUP).exists()).put("first_visible", text(FIRST).exists())
+            .put("fixture_visible", text(targetGroup()).exists()).put("first_visible", text(FIRST).exists())
             .put("second_visible", text(SECOND).exists())
             .put("create_group", text("发起群聊").exists()).put("home_add", id("addButton").exists())
             .put("reply_visible", text("ELON GROUP SELECTION PASSED").exists())
