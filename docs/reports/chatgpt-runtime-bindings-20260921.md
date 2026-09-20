@@ -56,6 +56,15 @@ The fresh-send and recovery context accept the reviewed profile. Identity, activ
 - Code review found a second completion boundary: the adapter reports `streaming=true` while the private writer retains its reconciliation lock, even when its answer stream is completed. Group completion previously rejected every such snapshot. An isolated group task now accepts a matching answer only when both the private stream and the assistant message are completed, without waiting for the personal-page writer lock. Partial answers, wrong prompts, an active private stream and the Google/DOM busy path remain rejected. Real group delivery must still verify this correction.
 - Completion-boundary validation passed 22 Android tests (group feature 4, Google group behavior 7, inspection 5, diagnostics 5, command IDs 1), with XML-confirmed zero failures, errors or skips. Timeout inspection separately passed the existing preparation checks. The native build compiled successfully; no personal-chat writer or shared streaming policy was changed.
 
+## Group Delivery Acceptance
+
+- **Completed for selected-message group replies**, on Release `v1.1.1798`, source `645f6a698`. APK SHA-256: `7ce6afc14cc7168c67318207364a85f5d67b306c279be09f9782a0a0eea97575`. Publication and installed Xiaomi version were verified; data and login were preserved. The Honor was offline.
+- Real production group UI: long-press an existing synthetic message, multi-select the second message, choose AI analysis and submit. No direct server insert or manual Share was used.
+- At `1789941355357`, the phone observed `streaming=true`, one assistant message, 27 answer characters and `private_stream_state=completed`. This confirms the page writer/reconciliation flag was still busy after the private answer finished. The new boundary accepted the completed answer, then emitted `completed`, `deliver_started`, and `deliver_completed` by `1789941355413`.
+- The semantic UI check reported `reply_visible=true` and `analysis_failed=false`. A read-only server query correlated the two synthetic source markers and the exact synthetic selection question: `completed | selected | chatgpt_web | source_count=2 | result_message_present=1`. Request creation to group delivery took approximately 10.8 seconds in this sample; it is not a latency benchmark.
+- Automatic rotation was temporarily locked for the portrait selection check and restored afterward. The temporary local CDP forward and generated hierarchy file were removed. No credentials, original messages or app data were modified.
+- This acceptance closes the reported two-message AI-reply-to-group failure. It does not claim completion of the broader per-group project lifecycle or public-share continuation design.
+
 ## Reproduction
 
 Download the fixture's exact public assets from `https://chatgpt.com/cdn/assets/` to an untracked directory. Download the prior Sep 15-b fixture assets separately. Set `CHATGPT_PUBLIC_RUNTIME_DIR`, `CHATGPT_PRIOR_RUNTIME_DIR`, and `CHATGPT_AST_PARSER` to the reviewed sources and Acorn 8.15.0, then run the evidence test with `node --test`.
