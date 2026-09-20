@@ -187,6 +187,7 @@ class ChatAdapter(
         val recalled = message.isRecalled()
         holder.stopShimmer()
         bindTimelineLabel(holder.timelineLabel, position)
+        bindChatSenderName(holder.itemView, message)
         if (readOnly) {
             AiConversationShareReaderPresentation.bind(holder, message, onWebChatContentOpen)
             return

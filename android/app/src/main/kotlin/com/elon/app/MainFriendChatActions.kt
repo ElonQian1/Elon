@@ -531,7 +531,7 @@ internal class MainFriendChatActions(
             role = if (outgoing) "user" else if (isElAssistant) "ai" else "friend",
             content = json.optString("content", ""),
             attachments = chatAttachmentsFromJsonArray(json.optJSONArray("attachments")).takeIf { it.isNotEmpty() },
-            senderLabel = if (outgoing || isElAssistant) null else senderName ?: friend.name,
+            senderLabel = if (isElAssistant) ELON_CHAT_SENDER_NAME else senderName ?: friend.name.takeUnless { outgoing },
             id = json.optString("id").trim().takeIf { it.isNotEmpty() },
             senderAvatarDataUrl = if (outgoing || isElAssistant) null else friend.avatarDataUrl,
             createdAtMs = parseChatMessageCreatedAt(json.optString("created_at", "")) ?: 0L,

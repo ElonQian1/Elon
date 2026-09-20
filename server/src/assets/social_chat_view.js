@@ -54,7 +54,7 @@
             const bubble = options.append(outgoing ? 'user' : senderId === 'usr_elon_ai' ? 'ai' : 'friend', text, null, null, null, {
               createdAtMs: options.time(msg.created_at) || Date.now(),
               mentionTarget: kind === 'group' && !outgoing && !recalled ? { id: senderId, display_name: senderId === 'usr_elon_ai' ? 'EL' : msg.sender_name } : null,
-              senderName: msg.sender_name || options.friendName(contact), avatarDataUrl: avatar,
+              senderName: msg.sender_name || (outgoing ? (options.user()?.nickname || options.user()?.account || '我') : source ? options.friendName(source) : '群成员'), avatarDataUrl: avatar,
               avatarFallback: outgoing ? (options.user()?.nickname || options.user()?.account || '我') : (msg.sender_name || options.friendName(contact)),
             });
             const compactLink = !recalled && !msg.attachments?.length && root.ElonSocialLinks?.prepareBubble(bubble, text);
@@ -63,7 +63,7 @@
             if (kind === 'group' && msg.id && !shared) root.ElonGroupMessageRevisions.mount(bubble, contact.id, msg, options.api, () => options.changed(contact.id));
             if (msg.send_status) { const status = document.createElement('small'); status.textContent = msg.send_status; status.style.display = 'block'; bubble.append(status); }
             const owner = options.user()?.id, cleanup = !recalled && !shared && root.ElonSocialLinks?.mount(bubble, text, { api: options.api, owner, compact: !!compactLink, isCurrent: () => scope === key && options.user()?.id === owner });
-            entry = { signature, block: bubble.closest('.chat-message-block'), cleanup };
+            entry = { signature, block: bubble.closest('.chat-message-block'), cleanup: typeof cleanup === 'function' ? cleanup : undefined };
           }
           if (entry.block !== cursor) list.insertBefore(entry.block, cursor);
           cursor = entry.block.nextSibling; next.set(id, entry);

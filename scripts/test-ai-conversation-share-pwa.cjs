@@ -97,7 +97,25 @@ async function main() {
     const close = async () => { await page.getByRole('button', { name: '返回群聊', exact: true }).click(); await page.locator('.ai-share-reader').waitFor({ state: 'detached' }); await wait(() => !history.state?.elonAiSnapshot); };
     for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 }, { width: 320, height: 640 }]) {
       state.code = 200; state.media = 200;
-      await page.setViewportSize(viewport); await page.goto(origin); await page.evaluate(seed => draw(seed), message);
+      await page.setViewportSize(viewport); await page.goto(origin);
+      const names = await page.evaluate(() => {
+        const ai = appendBubble('ai', 'AI reply', null, null, null, { senderName: 'EL' });
+        const user = appendBubble('user', 'My message', null, null, null, { senderName: '长昵称<img src=x>'.repeat(20) });
+        const label = user.parentElement.querySelector('.chat-sender-name');
+        const labelRect = label.getBoundingClientRect(), bubbleRect = user.getBoundingClientRect();
+        return { ai: ai.parentElement.querySelector('.chat-sender-name').textContent,
+          above: labelRect.bottom <= bubbleRect.top, rightAligned: Math.abs(labelRect.right - bubbleRect.right) < 1,
+          clipped: label.scrollWidth > label.clientWidth, safe: !label.querySelector('img'), fits: labelRect.right <= innerWidth };
+      });
+      assert.deepEqual(names, { ai: '一龙ai EL', above: true, rightAligned: true, clipped: true, safe: true, fits: true });
+      await page.evaluate(seed => draw(seed), message);
+      assert.equal(await page.locator('.chat-sender-name').last().textContent(), '分享者甲');
+      const senderLayout = await page.locator('.chat-message-content').last().evaluate(content => {
+        const name = content.querySelector('.chat-sender-name').getBoundingClientRect();
+        const bubble = content.querySelector('.bubble').getBoundingClientRect();
+        return { above: name.bottom <= bubble.top, aligned: Math.abs(name.left - bubble.left) < 1, fits: content.getBoundingClientRect().right <= innerWidth };
+      });
+      assert.deepEqual(senderLayout, { above: true, aligned: true, fits: true });
       await page.locator('.ai-share-card').scrollIntoViewIfNeeded();
       await wait(() => !!document.querySelector('.ai-share-cover img:not([hidden])'));
       const scroll = await page.locator('#chatList').evaluate(node => node.scrollTop);
