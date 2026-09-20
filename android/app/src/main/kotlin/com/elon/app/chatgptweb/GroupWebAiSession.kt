@@ -15,7 +15,7 @@ import com.elon.app.googleweb.GoogleWebResponseRefreshCoordinator
 internal class GroupWebAiSession(
     private val activity: AppCompatActivity,
     private val onEvent: (ChatGptWebEvent) -> Unit,
-    private val onFailure: () -> Unit,
+    private val onFailure: (GroupWebAiFailureReason) -> Unit,
     private val provider: WebChatProviderId = WebChatProviderId.CHATGPT_WEB,
     private val observe: (String) -> Unit = {},
 ) {
@@ -64,18 +64,24 @@ internal class GroupWebAiSession(
         CookieManager.getInstance().apply { setAcceptCookie(true); setAcceptThirdPartyCookies(view, true) }
         view.webViewClient = if (google != null) GoogleWebViewClient(
             onPageStarted = { google.onPageStarted(it) }, onPageReady = { google.onPageReady(it) },
-            onBlockedNavigation = { if (!closed) onFailure() }, onPageError = { if (!closed) onFailure() },
+            onBlockedNavigation = { pageFailure("navigation_blocked") }, onPageError = { pageFailure("page_error") },
         ) else ChatGptWebViewClient(
             onPageStarted = { observe("page_started"); adapter.onPageStarted(it) },
             onPageReady = { observe("page_loaded"); adapter.onPageReady(it) },
-            onBlockedNavigation = { if (!closed) { observe("navigation_blocked"); onFailure() } },
-            onPageError = { if (!closed) { observe("page_error"); onFailure() } },
+            onBlockedNavigation = { pageFailure("navigation_blocked") },
+            onPageError = { pageFailure("page_error") },
             rewriteAllowedMainFrameUrl = { null },
         )
         if (google != null) google.install() else adapter.install()
         ChatGptWebProxyController(activity).prepare {
             if (!closed) view.loadUrl(GroupWebAiSessionPolicy.startUrl(provider))
         }
+    }
+
+    private fun pageFailure(stage: String) {
+        if (closed) return
+        observe(stage)
+        onFailure(GroupWebAiFailureReason.PAGE)
     }
 
     fun close() {

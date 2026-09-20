@@ -42,7 +42,7 @@ internal class GroupAiModelPicker(
             providerSwitchLabel = "切换 AI")
         if (popup == null) return
         handler.postDelayed(deadline, 40_000)
-        runCatching { session = GroupWebAiSession(activity, ::event, ::unavailable).also { it.start() } }
+        runCatching { session = GroupWebAiSession(activity, ::event, { unavailable() }).also { it.start() } }
             .onFailure { unavailable() }
     }
 

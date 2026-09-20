@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory)][string]$DeviceSerial,
     [Parameter(Mandatory)][string]$ExpectedHardwareSerial,
     [ValidateSet('inspect','open_create','create_fixture','open_fixture','send_first','send_second',
-        'select_fixture','submit_selection','share_answer','share_target','share_choose_group','share_submit',
+        'select_fixture','submit_selection','retry_selection','share_answer','share_target','share_choose_group','share_submit',
         'open_card','continue_private','confirm_private','return_group','cancel','back')][string]$Step = 'inspect',
     [string]$GroupName = '',
     [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe'

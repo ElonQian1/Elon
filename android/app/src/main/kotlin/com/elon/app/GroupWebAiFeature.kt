@@ -7,6 +7,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.elon.app.chatgptweb.GroupWebAiExecutor
+import com.elon.app.chatgptweb.GroupWebAiFailure
+import com.elon.app.chatgptweb.GroupWebAiFailureReason
 import com.google.android.material.snackbar.Snackbar
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -119,16 +121,17 @@ internal class GroupWebAiFeature(
                 preferences.edit().putString(pendingKey(owner), pending.toString()).commit()
                 deliver(pending, owner)
             },
-            onFailure = { uncertain ->
+            onFailure = { failure ->
                 executor = null
                 progress?.dismiss()
                 release()
-                if (uncertain) {
+                if (failure.uncertain) {
                     thread { runCatching { if (userId() == owner) action(request, operation, "uncertain") } }
-                    toast("请求可能已发送，未重复提交。请稍后查看群消息")
-                } else if (request.optString("context_scope") == "selected") {
+                    showSelectedFailure(request, operation, owner, configuration, failure)
+                } else if (failure.reason == GroupWebAiFailureReason.CANCELLED) {
                     thread { runCatching { if (userId() == owner) action(request, operation, "cancel") } }
-                    toast("网页 AI 未就绪，未发送所选消息。连接后可重新分析")
+                } else if (request.optString("context_scope") == "selected") {
+                    showSelectedFailure(request, operation, owner, configuration, failure)
                 } else if (!activity.isDestroyed && userId() == owner) {
                     AlertDialog.Builder(activity).setTitle("${configuration.engine.label} 尚未就绪")
                         .setMessage("没有向 ${configuration.engine.label} 发送。可以取消，或使用备用 AI（可能计费）。")
@@ -146,7 +149,29 @@ internal class GroupWebAiFeature(
                         }.show()
                 }
             },
-        ).also { runCatching { it.start() }.onFailure { _ -> it.cancel() } }
+        ).also { it.start() }
+    }
+
+    private fun showSelectedFailure(request: JSONObject, operation: String, owner: String,
+        configuration: GroupAiConfiguration, failure: GroupWebAiFailure) {
+        if (activity.isDestroyed || userId() != owner) return
+        busy = true
+        val dismiss = {
+            release()
+            if (!failure.uncertain) thread {
+                runCatching { if (userId() == owner) action(request, operation, "cancel") }
+            }
+            Unit
+        }
+        val dialog = AlertDialog.Builder(activity).setTitle("AI 回答未发到群聊")
+            .setMessage(failure.message)
+            .setNegativeButton(if (failure.canRetry) "取消" else "知道了") { _, _ -> dismiss() }
+            .setOnCancelListener { dismiss() }
+        if (failure.canRetry) dialog.setPositiveButton("重试本次分析") { _, _ ->
+            if (userId() == owner && !activity.isDestroyed) execute(request, operation, owner, configuration)
+            else release()
+        }
+        dialog.show().getButton(AlertDialog.BUTTON_POSITIVE)?.contentDescription = "group-ai-analysis-retry"
     }
 
     fun recover() {
@@ -174,12 +199,14 @@ internal class GroupWebAiFeature(
     }
 
     private fun deliver(pending: JSONObject, owner: String) {
+        DebugTraceStore.record("group_web_ai", mapOf("stage" to "deliver_started"))
         thread {
             val result = runCatching {
                 check(userId() == owner)
                 action(pending.getJSONObject("request"), pending.getString("operation"), "complete", pending.getString("content"))
             }
             if (result.isSuccess) preferences.edit().remove(pendingKey(owner)).commit()
+            DebugTraceStore.record("group_web_ai", mapOf("stage" to if (result.isSuccess) "deliver_completed" else "deliver_failed"))
             activity.runOnUiThread {
                 progress?.dismiss()
                 release()

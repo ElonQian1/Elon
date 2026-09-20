@@ -13,7 +13,7 @@ internal class GroupWebAiExecutor(
     private val prompt: String,
     private val authorize: ((Boolean) -> Unit) -> Unit,
     private val onResult: (String) -> Unit,
-    private val onFailure: (Boolean) -> Unit,
+    private val onFailure: (GroupWebAiFailure) -> Unit,
     private val configuration: GroupAiConfiguration = GroupAiConfiguration(),
 ) {
     private val handler = Handler(Looper.getMainLooper())
@@ -28,12 +28,20 @@ internal class GroupWebAiExecutor(
     private var dispatching = false
     private var dispatched = false
     private val commandId = UUID.randomUUID().toString()
-    private val timeout = Runnable { diagnostics.stage(if (dispatched) "response_timeout" else "prepare_timeout"); fail() }
+    private val timeout = Runnable {
+        diagnostics.stage(if (dispatched) "response_timeout" else "prepare_timeout")
+        fail(GroupWebAiFailureReason.TIMEOUT)
+    }
 
     fun start() {
         diagnostics.stage("start")
         handler.postDelayed(timeout, 60_000L)
-        session = GroupWebAiSession(activity, ::event, ::fail, provider, diagnostics::stage).also { it.start() }
+        try {
+            session = GroupWebAiSession(activity, ::event, ::fail, provider, diagnostics::stage)
+            session?.start()
+        } catch (_: RuntimeException) {
+            fail(GroupWebAiFailureReason.PREPARATION)
+        }
     }
 
     private fun event(event: ChatGptWebEvent) {
@@ -43,7 +51,10 @@ internal class GroupWebAiExecutor(
         when (event) {
             is ChatGptWebEvent.Snapshot -> snapshot(event.value)
             is ChatGptWebEvent.CommandResult ->
-                if (event.requestId == commandId && !event.ok) { diagnostics.stage("command_rejected"); fail() }
+                if (event.requestId == commandId && !event.ok) {
+                    diagnostics.stage("command_rejected")
+                    fail(GroupWebAiFailureReason.SEND)
+                }
             else -> Unit
         }
     }
@@ -52,13 +63,14 @@ internal class GroupWebAiExecutor(
         diagnostics.snapshot(value, session?.documentUrl.orEmpty())
         lastSnapshot = value
         if (!dispatched) {
-            if (value.loginRequired) { fail(); return }
+            if (value.loginRequired) { fail(GroupWebAiFailureReason.LOGIN); return }
             if (dispatching || session?.isReady(value) != true) return
             if (!configured && provider == WebChatProviderId.CHATGPT_WEB) {
                 if (modelConfiguration == null) {
                     diagnostics.stage("configure_model")
                     modelConfiguration = GroupWebAiModelConfiguration(GroupAiModelPort.from(requireNotNull(adapter)), configuration.modelPath,
-                        onReady = { configured = true; lastSnapshot?.let(::snapshot) }, onFailure = ::fail)
+                        onReady = { configured = true; lastSnapshot?.let(::snapshot) },
+                        onFailure = { fail(GroupWebAiFailureReason.MODEL) })
                     modelConfiguration?.start()
                 }
                 return
@@ -84,14 +96,14 @@ internal class GroupWebAiExecutor(
         onResult(reply)
     }
 
-    fun cancel() { diagnostics.stage("cancelled"); fail() }
+    fun cancel() { diagnostics.stage("cancelled"); fail(GroupWebAiFailureReason.CANCELLED) }
 
-    private fun fail() {
+    private fun fail(reason: GroupWebAiFailureReason = GroupWebAiFailureReason.PREPARATION) {
         if (finished) return
         val uncertain = dispatching || dispatched
         diagnostics.stage(if (uncertain) "failed_after_authorize" else "failed_before_authorize")
         finish()
-        onFailure(uncertain)
+        onFailure(GroupWebAiFailure(uncertain, reason))
     }
 
     private fun finish() {

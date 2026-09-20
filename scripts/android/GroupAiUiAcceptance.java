@@ -125,6 +125,9 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
             case "submit_selection":
                 fill(desc("group-ai-selection-question"), "Reply exactly: ELON GROUP SELECTION PASSED");
                 action(desc("group-ai-selection-submit"), false); break;
+            case "retry_selection":
+                assertTrue("analysis_failure_required", text("AI 回答未发到群聊").exists());
+                action(desc("group-ai-analysis-retry"), false); break;
             case "share_answer":
                 fixtureOpen(); action(text("ELON GROUP SELECTION PASSED"), true); action(text("转发"), false); break;
             case "share_target":
@@ -162,6 +165,8 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
             .put("private_confirmation", text("用自己的 ChatGPT 继续讨论").exists())
             .put("return_confirmation", text("放弃未发送的私人草稿？").exists())
             .put("selection_question", desc("group-ai-selection-question").exists())
+            .put("analysis_failed", text("AI 回答未发到群聊").exists())
+            .put("analysis_retry", desc("group-ai-analysis-retry").exists())
             .put("private_continue", desc("ai-conversation-share-continue-private").exists())
             .put("share_send", desc("ai-conversation-share-send").exists()).toString());
     }
