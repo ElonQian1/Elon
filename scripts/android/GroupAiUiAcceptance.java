@@ -156,6 +156,7 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
         }
         getUiDevice().waitForIdle(1500);
         System.out.println("GROUP_AI_UI_RESULT=" + new JSONObject().put("step", step)
+            .put("model_label", id("modelButton").exists() ? id("modelButton").getText() : "")
             .put("fixture_visible", text(targetGroup()).exists()).put("first_visible", text(FIRST).exists())
             .put("second_visible", text(SECOND).exists())
             .put("create_group", text("发起群聊").exists()).put("home_add", id("addButton").exists())

@@ -70,7 +70,8 @@ internal class GroupWebAiExecutor(
                     diagnostics.stage("configure_model")
                     modelConfiguration = GroupWebAiModelConfiguration(GroupAiModelPort.from(requireNotNull(adapter)), configuration.modelPath,
                         onReady = { configured = true; lastSnapshot?.let(::snapshot) },
-                        onFailure = { fail(GroupWebAiFailureReason.MODEL) })
+                        onFailure = { fail(GroupWebAiFailureReason.MODEL) },
+                        schedule = { delay, retry -> handler.postDelayed({ if (!finished) retry() }, delay) })
                     modelConfiguration?.start()
                 }
                 return
@@ -108,7 +109,7 @@ internal class GroupWebAiExecutor(
 
     private fun finish() {
         finished = true
-        handler.removeCallbacks(timeout)
+        handler.removeCallbacksAndMessages(null)
         session?.close()
         session = null
     }

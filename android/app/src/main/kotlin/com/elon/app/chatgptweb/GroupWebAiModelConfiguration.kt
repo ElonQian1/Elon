@@ -77,6 +77,7 @@ internal class GroupWebAiModelConfiguration(
     private val path: List<GroupAiModelChoice>,
     private val onReady: () -> Unit,
     private val onFailure: () -> Unit,
+    private val schedule: (Long, () -> Unit) -> Unit = { _, _ -> },
 ) {
     private val controls = GroupWebAiModelControls()
     private var index = 0
@@ -84,6 +85,8 @@ internal class GroupWebAiModelConfiguration(
     private var closing = false
     private var finished = false
     private val pendingControls = mutableListOf<ChatGptWebEvent>()
+    private var catalogRetries = 0
+    private var catalogRetryPending = false
 
     fun start() {
         if (path.isEmpty()) { finished = true; onReady(); return }
@@ -126,6 +129,22 @@ internal class GroupWebAiModelConfiguration(
         }
         controls.accept(event)
         selectNext()
+        if (event is ChatGptWebEvent.ComposerControls && event.section == "model" && event.options.isEmpty()) {
+            retryEmptyCatalog()
+        }
+    }
+
+    private fun retryEmptyCatalog() {
+        if (pending != null || closing || index != 0 || catalogRetryPending) return
+        if (catalogRetries == CATALOG_RETRY_DELAYS.size) { finished = true; onFailure(); return }
+        catalogRetryPending = true
+        schedule(CATALOG_RETRY_DELAYS[catalogRetries++]) {
+            catalogRetryPending = false
+            if (!finished && pending == null && !closing && index == 0 && controls.options.isEmpty()) {
+                port.list()
+                port.manifest()
+            }
+        }
     }
 
     private fun selectNext() {
@@ -133,5 +152,9 @@ internal class GroupWebAiModelConfiguration(
         val option = path.getOrNull(index)?.let(controls::resolve) ?: return
         pending = UUID.randomUUID().toString()
         controls.select(port, option, requireNotNull(pending))
+    }
+
+    private companion object {
+        val CATALOG_RETRY_DELAYS = longArrayOf(500L, 1_000L, 2_000L, 4_000L)
     }
 }

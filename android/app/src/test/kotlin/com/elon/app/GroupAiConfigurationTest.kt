@@ -6,6 +6,58 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class GroupAiConfigurationTest {
+    @Test fun emptyCatalogDuringHydrationIsReadAgainWithoutSendingTwice() {
+        val port = FakePort()
+        val scheduled = mutableListOf<() -> Unit>()
+        var ready = 0
+        val config = GroupWebAiModelConfiguration(port, listOf(GroupAiModelChoice("高")), { ready++ }, { fail() },
+            { _, task -> scheduled.add(task) })
+        config.start()
+        config.event(options())
+        config.event(options())
+        assertEquals(1, scheduled.size)
+        assertEquals(0, port.writes)
+        scheduled.removeAt(0)()
+        assertEquals(2, port.reads)
+        config.event(options(option("high", "高")))
+        config.event(ack(requireNotNull(port.request)))
+        config.event(ack(requireNotNull(port.request)))
+        assertEquals(1, ready)
+        assertEquals(1, port.writes)
+    }
+
+    @Test fun emptyCatalogRetriesAreBoundedAndNeverChangeRequestedLevel() {
+        val port = FakePort()
+        val scheduled = mutableListOf<() -> Unit>()
+        val delays = mutableListOf<Long>()
+        var failed = 0
+        val config = GroupWebAiModelConfiguration(port, listOf(GroupAiModelChoice("高")), { fail() }, { failed++ },
+            { delay, task -> delays.add(delay); scheduled.add(task) })
+        config.start()
+        repeat(4) { config.event(options()); scheduled.removeAt(0)() }
+        config.event(options())
+        config.event(options())
+        assertEquals(listOf(500L, 1_000L, 2_000L, 4_000L), delays)
+        assertEquals(1, failed)
+        assertEquals(5, port.reads)
+        assertEquals(0, port.writes)
+        assertTrue(scheduled.isEmpty())
+    }
+
+    @Test fun pendingCatalogRetryCannotInterruptAnAppliedModel() {
+        val port = FakePort()
+        var scheduled: (() -> Unit)? = null
+        val config = GroupWebAiModelConfiguration(port, listOf(GroupAiModelChoice("高")), {}, { fail() },
+            { _, task -> scheduled = task })
+        config.start()
+        config.event(options())
+        config.event(options(option("high", "高")))
+        requireNotNull(scheduled)()
+        assertEquals(1, port.reads)
+        assertEquals(1, port.writes)
+        assertEquals("select:high", port.action)
+    }
+
     @Test fun failedModelCatalogTerminatesWithoutSendingOrChangingLevel() {
         val port = FakePort()
         var failed = 0
@@ -155,7 +207,8 @@ class GroupAiConfigurationTest {
         var action = ""
         var request: String? = null
         var writes = 0
-        override fun list() {}
+        var reads = 0
+        override fun list() { reads++ }
         override fun collect() {}
         override fun manifest() {}
         override fun select(id: String, request: String) { action = "select:$id"; this.request = request; writes++ }
