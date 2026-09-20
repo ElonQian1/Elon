@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+ELON_ADB_DISCOVERY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/apk_adb_discovery.py"
+elon_adb_exec() { local seconds="$1"; shift; python3 "$ELON_ADB_DISCOVERY" exec "$seconds" "$@"; }
 
 elon_apk_adb_config_path() {
   if [[ -n "${ELON_APK_ADB_TARGETS_FILE:-}" ]]; then
@@ -24,9 +26,14 @@ if expression == "settings":
     print(data.get("retryDelaySeconds", 5))
     print("1" if data.get("launchAfterInstall", True) else "0")
 elif expression == "targets":
+    seen=set()
     for target in data.get("targets", []):
+        if not target.get("enabled", True): continue
+        hardware=str(target.get("hardwareSerial", "" )).lower()
+        if hardware in seen: continue
+        seen.add(hardware)
         if target.get("enabled", True):
-            values = [target.get("serial", ""), target.get("hardwareSerial", ""), target.get("label", "")]
+            values = [target.get("serial") or target.get("hardwareSerial", ""), target.get("hardwareSerial", ""), target.get("label") or hardware]
             print("\t".join(str(value).replace("\t", " ").replace("\n", " ") for value in values))
 PY
 }
@@ -53,25 +60,28 @@ elon_adb_target_update() {
 
   for ((attempt=1; attempt<=max_attempts; attempt++)); do
     if [[ "$serial" =~ ^[^:]+:[0-9]+$ ]]; then
-      "$adb" connect "$serial" >/dev/null 2>&1 || true
+      elon_adb_exec 10 "$adb" connect "$serial" >/dev/null 2>&1 || true
     fi
-    state=$("$adb" -s "$serial" get-state 2>&1 || true)
+    state=$(elon_adb_exec 10 "$adb" -s "$serial" get-state 2>&1 || true)
     if [[ "$state" != "device" ]]; then
       last_error="设备未进入 device 状态: $state"
     else
-      actual_hardware=$("$adb" -s "$serial" shell getprop ro.serialno 2>&1 | tr -d '\r' || true)
+      actual_hardware=$(elon_adb_exec 10 "$adb" -s "$serial" shell getprop ro.serialno 2>&1 | tr -d '\r' || true)
       if [[ "$(printf '%s' "$actual_hardware" | tr '[:upper:]' '[:lower:]')" != \
         "$(printf '%s' "$hardware_serial" | tr '[:upper:]' '[:lower:]')" ]]; then
         last_error="硬件序列号不匹配：期望 $hardware_serial，实际 $actual_hardware"
       else
+        package_output=$(elon_adb_exec 20 "$adb" -s "$serial" shell dumpsys package "$package_name") || return 1
+        installed_version=$(sed -nE 's/.*versionCode=([0-9]+).*/\1/p' <<<"$package_output" | head -n 1)
+        if [[ "$installed_version" =~ ^[0-9]+$ ]] && ((installed_version > expected)); then return 3; fi
         echo "   ⬆️  [$label] 安装 Release APK（第 $attempt/$max_attempts 次）..."
-        if install_output=$("$adb" -s "$serial" install -r "$apk" 2>&1) && grep -qE '^Success[[:space:]]*$' <<<"$install_output"; then
-          package_output=$("$adb" -s "$serial" shell dumpsys package "$package_name" 2>&1 || true)
+        if install_output=$(elon_adb_exec 360 "$adb" -s "$serial" install -r "$apk" 2>&1) && grep -qE '^Success[[:space:]]*$' <<<"$install_output"; then
+          package_output=$(elon_adb_exec 20 "$adb" -s "$serial" shell dumpsys package "$package_name" 2>&1 || true)
           installed_version=$(sed -nE 's/.*versionCode=([0-9]+).*/\1/p' <<<"$package_output" | head -n 1)
           if [[ "$installed_version" == "$expected" ]]; then
             if [[ "$launch_after" == "1" ]]; then
-              "$adb" -s "$serial" shell am force-stop "$package_name" >/dev/null 2>&1 || true
-              if ! "$adb" -s "$serial" shell monkey -p "$package_name" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; then
+              elon_adb_exec 15 "$adb" -s "$serial" shell am force-stop "$package_name" >/dev/null 2>&1 || true
+              if ! elon_adb_exec 30 "$adb" -s "$serial" shell monkey -p "$package_name" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; then
                 last_error="安装成功但自动拉起 APP 失败"
               else
                 echo "   ✅ [$label] 已无人值守更新到 build $expected"
@@ -99,35 +109,58 @@ elon_adb_target_update() {
 }
 
 invoke_elon_apk_adb_autodeploy() {
-  local apk="$1" expected="$2" config settings enabled schema configured_adb package_name
-  local max_attempts retry_delay launch_after adb targets_file failures=0 target_count=0
+  local apk="$1" expected="$2" config settings enabled schema configured_adb package_name generated_config=""
+  local max_attempts retry_delay launch_after adb targets_file failures=0 target_count=0 offline=0 discovery status transport results_file
   config=$(elon_apk_adb_config_path)
-  if [[ ! -f "$config" ]]; then
-    echo "   ℹ️  未配置 ADB 自动部署，跳过：$config"
-    return 0
+  if [[ -z "${ELON_APK_ADB_TARGETS_FILE:-}" ]]; then
+    config=$(mktemp)
+    if ! python3 "$ELON_ADB_DISCOVERY" registry >"$config"; then rm -f "$config"; return 1; fi
+    echo APK_ADB_TARGET_SOURCE=main_project_registry
+    generated_config="$config"
+  elif [[ ! -f "$config" ]]; then
+    echo EXPLICIT_ADB_CONFIG_MISSING >&2; return 1
   fi
   [[ -f "$apk" ]] || { echo "APK 不存在: $apk" >&2; return 1; }
   mapfile -t settings < <(elon_apk_adb_json "$config" settings)
   enabled="${settings[0]}"; schema="${settings[1]}"; configured_adb="${settings[2]}"
   package_name="${settings[3]}"; max_attempts="${settings[4]}"; retry_delay="${settings[5]}"; launch_after="${settings[6]}"
-  [[ "$enabled" == "1" ]] || { echo "   ℹ️  ADB 自动部署已在本机配置中禁用"; return 0; }
+  [[ "$enabled" == "1" ]] || { echo ADB_CHECK_DISABLED >&2; return 1; }
   [[ "$schema" == "1" ]] || { echo "不支持的 ADB 配置版本: $schema" >&2; return 1; }
   ((max_attempts >= 1 && max_attempts <= 5)) || { echo "maxAttempts 必须在 1..5 之间。" >&2; return 1; }
   ((retry_delay >= 0 && retry_delay <= 60)) || { echo "retryDelaySeconds 必须在 0..60 之间。" >&2; return 1; }
   adb=$(elon_resolve_adb "$configured_adb") || { echo "ADB 未安装或不在 PATH 中。" >&2; return 1; }
   targets_file=$(mktemp)
+  results_file=$(mktemp)
   elon_apk_adb_json "$config" targets >"$targets_file"
   while IFS=$'\t' read -r serial hardware_serial label; do
     [[ -n "$serial$hardware_serial$label" ]] || continue
     ((target_count+=1))
-    elon_adb_target_update "$adb" "$apk" "$expected" "$package_name" "$max_attempts" \
-      "$retry_delay" "$launch_after" "$serial" "$hardware_serial" "$label" || failures=$((failures + 1))
+    if ! discovery=$(python3 "$ELON_ADB_DISCOVERY" resolve "$adb" "$hardware_serial" "$serial"); then
+      echo "APK_ADB_TARGET=$label STATUS=probe_failed"; printf '%s\t%s\n' "$label" probe_failed >>"$results_file"
+      failures=$((failures + 1)); continue
+    fi
+    IFS=$'\t' read -r status transport <<<"$discovery"
+    if [[ "$status" == online ]]; then
+      if elon_adb_target_update "$adb" "$apk" "$expected" "$package_name" "$max_attempts" "$retry_delay" "$launch_after" "$transport" "$hardware_serial" "$label"; then
+        status=updated
+      else
+        if [[ "$?" == 3 ]]; then status=newer_installed
+        else status=failed; failures=$((failures + 1)); fi
+      fi
+    elif [[ "$status" == offline ]]; then offline=$((offline + 1))
+    else failures=$((failures + 1)); fi
+    printf '%s\t%s\n' "$label" "$status" >>"$results_file"
+    echo "APK_ADB_TARGET=$label STATUS=$status"
   done <"$targets_file"
-  rm -f "$targets_file"
+  python3 "$ELON_ADB_DISCOVERY" receipt "$apk" "$expected" "$package_name" "$results_file" || return 1
+  rm -f "$targets_file" "$results_file"
+  [[ -z "$generated_config" ]] || rm -f "$generated_config"
   ((target_count > 0)) || { echo "ADB 自动部署已启用，但 targets 为空: $config" >&2; return 1; }
   if ((failures > 0)); then
     echo "APK_ADB_DEPLOY_STATUS=failed" >&2
     return 1
   fi
-  echo "APK_ADB_DEPLOY_STATUS=updated"
+  if ((offline == target_count)); then echo APK_ADB_DEPLOY_STATUS=offline
+  elif ((offline > 0)); then echo APK_ADB_DEPLOY_STATUS=partial_offline
+  else echo APK_ADB_DEPLOY_STATUS=updated; fi
 }

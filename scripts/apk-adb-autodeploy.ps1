@@ -1,4 +1,5 @@
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'apk-adb-discovery.ps1')
 
 function ConvertTo-ElonProcessArgument {
     param([AllowEmptyString()][string]$Value)
@@ -145,6 +146,13 @@ function Invoke-ElonTargetAdbDeployment {
             }
 
             Write-Host "   [$label] Installing release APK (attempt $attempt/$MaxAttempts)..." -ForegroundColor Cyan
+            $before = Invoke-ElonAdbCommand -AdbPath $AdbPath `
+                -Arguments @('-s', $serial, 'shell', 'dumpsys', 'package', $PackageName) -TimeoutSeconds 20
+            $prior = [regex]::Match($before.Stdout, '\bversionCode=(\d+)')
+            if ($before.ExitCode -ne 0) { throw 'Could not check installed version before update.' }
+            if ($prior.Success -and [long]$prior.Groups[1].Value -gt $ExpectedVersionCode) {
+                return [pscustomobject]@{ Label=$label; Serial=$serial; Status='newer_installed' }
+            }
             $install = Invoke-ElonAdbCommand -AdbPath $AdbPath `
                 -Arguments @('-s', $serial, 'install', '-r', $ApkPath) -TimeoutSeconds 360
             if ($install.ExitCode -ne 0 -or $install.Text -notmatch '(?im)^Success\s*$') {
@@ -190,20 +198,22 @@ function Invoke-ElonApkAdbAutodeploy {
         [Parameter(Mandatory)][int]$ExpectedVersionCode,
         [string]$PackageName = 'com.elon.app',
         [string]$ConfigPath,
-        [string]$AdbPath
+        [string]$AdbPath,
+        [string]$ReceiptPath
     )
 
     $resolvedConfigPath = Get-ElonApkAdbConfigPath -ConfigPath $ConfigPath
-    if (-not (Test-Path -LiteralPath $resolvedConfigPath -PathType Leaf)) {
-        Write-Host "   ADB autodeploy is not configured; skipped: $resolvedConfigPath" -ForegroundColor DarkGray
-        return @()
-    }
     if (-not (Test-Path -LiteralPath $ApkPath -PathType Leaf)) { throw "APK does not exist: $ApkPath" }
-
-    $config = Get-Content -LiteralPath $resolvedConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($ConfigPath -or $env:ELON_APK_ADB_TARGETS_FILE) {
+        if (-not (Test-Path -LiteralPath $resolvedConfigPath -PathType Leaf)) {
+            throw 'EXPLICIT_ADB_CONFIG_MISSING: requested device configuration does not exist.'
+        }
+        $config = Get-Content -LiteralPath $resolvedConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    } else {
+        $config = Get-ElonProjectApkAdbConfig
+    }
     if ((Test-ElonJsonProperty $config 'enabled') -and -not [bool]$config.enabled) {
-        Write-Host '   ADB autodeploy is disabled in the local config' -ForegroundColor DarkGray
-        return @()
+        throw 'ADB_CHECK_DISABLED: release phone checks are mandatory; enable the configured device checks.'
     }
     if ((Test-ElonJsonProperty $config 'schemaVersion') -and [int]$config.schemaVersion -ne 1) {
         throw "Unsupported ADB autodeploy schemaVersion: $($config.schemaVersion)"
@@ -211,6 +221,9 @@ function Invoke-ElonApkAdbAutodeploy {
     $targets = @($config.targets | Where-Object {
         -not (Test-ElonJsonProperty $_ 'enabled') -or [bool]$_.enabled
     })
+    foreach ($target in $targets) {
+        if (-not (Test-ElonJsonProperty $target 'label')) { $target | Add-Member NoteProperty label ([string]$target.hardwareSerial) }
+    }
     if ($targets.Count -eq 0) { throw "ADB autodeploy is enabled but targets is empty: $resolvedConfigPath" }
 
     $configuredAdbPath = if (Test-ElonJsonProperty $config 'adbPath') { [string]$config.adbPath } else { '' }
@@ -227,19 +240,42 @@ function Invoke-ElonApkAdbAutodeploy {
     Write-Host "Deploying the release APK to $($targets.Count) whitelisted ADB target(s)..." -ForegroundColor Cyan
     $results = @()
     $failures = @()
-    foreach ($target in $targets) {
+    foreach ($target in @($targets | Sort-Object hardwareSerial -Unique)) {
         try {
-            $results += Invoke-ElonTargetAdbDeployment -AdbPath $resolvedAdbPath -Target $target `
+            $transport = Find-ElonApkAdbTransport -AdbPath $resolvedAdbPath -Target $target
+            if ($transport.Status -ne 'online') {
+                $results += [pscustomobject]@{ Label=$target.label; HardwareSerial=$target.hardwareSerial; Serial=''; Status=$transport.Status }
+                Write-Host "APK_ADB_TARGET=$($target.label) STATUS=$($transport.Status)"
+                if ($transport.Status -in @('identity_mismatch','probe_failed','unauthorized')) { $failures += "$($target.label): $($transport.Status)" }
+                continue
+            }
+            $target = [pscustomobject]@{ label=$target.label; hardwareSerial=$target.hardwareSerial; serial=$transport.Serial }
+            $installed = Invoke-ElonTargetAdbDeployment -AdbPath $resolvedAdbPath -Target $target `
                 -ApkPath $ApkPath -PackageName $effectivePackageName -ExpectedVersionCode $ExpectedVersionCode `
                 -MaxAttempts $maxAttempts -RetryDelaySeconds $retryDelaySeconds -LaunchAfterInstall $launchAfterInstall
+            $installed | Add-Member NoteProperty HardwareSerial $target.hardwareSerial
+            $results += $installed
         } catch {
             $failures += $_.Exception.Message
+            $results += [pscustomobject]@{ Label=$target.label; HardwareSerial=$target.hardwareSerial; Serial=''; Status='failed' }
         }
     }
+    if (-not $ReceiptPath) {
+        $ReceiptPath = Join-Path $env:USERPROFILE ('.elon/apk-adb-receipts/' + $PackageName + '-' + $ExpectedVersionCode + '-' + [guid]::NewGuid().ToString('N') + '.json')
+    }
+    New-Item -ItemType Directory -Path (Split-Path -Parent $ReceiptPath) -Force | Out-Null
+    @{ schema='elon.apk_adb_receipt.v1'; checkedAt=[DateTime]::UtcNow.ToString('o');
+        packageName=$effectivePackageName; expectedVersionCode=$ExpectedVersionCode;
+        apkSha256=(Get-FileHash -LiteralPath $ApkPath -Algorithm SHA256).Hash.ToLowerInvariant();
+        targets=@($results); failures=@($failures) } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $ReceiptPath -Encoding UTF8
+    Write-Host "APK_ADB_RECEIPT=$ReceiptPath"
     if ($failures.Count -gt 0) {
         Write-Host 'APK_ADB_DEPLOY_STATUS=failed' -ForegroundColor Red
         throw ("The server APK was published, but one or more whitelisted ADB deployments failed: " + ($failures -join ' | '))
     }
-    Write-Host 'APK_ADB_DEPLOY_STATUS=updated' -ForegroundColor Green
+    $offline = @($results | Where-Object { $_.Status -eq 'offline' }).Count
+    $overall = if ($offline -eq $results.Count) { 'offline' } elseif ($offline -gt 0) { 'partial_offline' } else { 'updated' }
+    Write-Host "APK_ADB_DEPLOY_STATUS=$overall"
+    foreach ($result in $results) { Write-Host "APK_ADB_TARGET=$($result.Label) STATUS=$($result.Status)" }
     $results
 }

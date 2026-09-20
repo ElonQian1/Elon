@@ -40,13 +40,15 @@ function Write-FakeAdb {
     $content = @(
         '@echo off'
         ('echo %*>>"{0}"' -f $escapedLog)
-        'if "%1"=="connect" echo connected to %2& exit /b 0'
-        'if "%3"=="get-state" echo device& exit /b 0'
-        'if "%3"=="install" echo Success& exit /b 0'
-        'if "%3"=="shell" if "%4"=="getprop" echo hardware-123& exit /b 0'
-        'if "%3"=="shell" if "%4"=="dumpsys" echo versionCode=901 minSdk=26 targetSdk=34& exit /b 0'
+        'if "%1"=="devices" (echo List of devices attached& exit /b 0)'
+        'if "%1"=="mdns" (exit /b 0)'
+        'if "%1"=="connect" (echo connected to %2& exit /b 0)'
+        'if "%3"=="get-state" (echo device& exit /b 0)'
+        'if "%3"=="install" (echo Success& exit /b 0)'
+        'if "%3"=="shell" if "%4"=="getprop" (echo hardware-123& exit /b 0)'
+        'if "%3"=="shell" if "%4"=="dumpsys" (echo versionCode=901 minSdk=26 targetSdk=34& exit /b 0)'
         'if "%3"=="shell" if "%4"=="am" exit /b 0'
-        'if "%3"=="shell" if "%4"=="monkey" echo Events injected: 1& exit /b 0'
+        'if "%3"=="shell" if "%4"=="monkey" (echo Events injected: 1& exit /b 0)'
         'echo unexpected fake adb arguments: %*& exit /b 9'
     ) -join [Environment]::NewLine
     Set-Content -LiteralPath $Path -Value $content -Encoding Ascii
@@ -77,7 +79,7 @@ try {
         })
     } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $config -Encoding UTF8
 
-    $result = @(Invoke-ElonApkAdbAutodeploy -ApkPath $apk -ExpectedVersionCode 901 -ConfigPath $config)
+    $result = @(Invoke-ElonApkAdbAutodeploy -ApkPath $apk -ExpectedVersionCode 901 -ConfigPath $config -ReceiptPath (Join-Path $fixtureRoot 'receipt.json'))
     Assert-True ($result.Count -eq 1 -and $result[0].Status -eq 'updated') `
         'A whitelisted device must report an updated result'
     $calls = Get-Content -LiteralPath $log -Raw
@@ -92,17 +94,22 @@ try {
     $badConfig | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $config -Encoding UTF8
     $mismatchRejected = $false
     try {
-        Invoke-ElonApkAdbAutodeploy -ApkPath $apk -ExpectedVersionCode 901 -ConfigPath $config | Out-Null
+        Invoke-ElonApkAdbAutodeploy -ApkPath $apk -ExpectedVersionCode 901 -ConfigPath $config -ReceiptPath (Join-Path $fixtureRoot 'receipt.json') | Out-Null
     } catch {
-        $mismatchRejected = $_.Exception.Message.Contains('Hardware serial mismatch')
+        $mismatchRejected = $_.Exception.Message.Contains('identity_mismatch')
     }
     Assert-True $mismatchRejected 'A reused IP must not bypass the hardware serial whitelist'
 
     Remove-Item -LiteralPath $config -Force
-    $skipped = @(Invoke-ElonApkAdbAutodeploy -ApkPath $apk -ExpectedVersionCode 901 -ConfigPath $config)
-    Assert-True ($skipped.Count -eq 0) 'A machine without an opt-in config must skip ADB deployment'
+    $missingRejected = $false
+    try { Invoke-ElonApkAdbAutodeploy -ApkPath $apk -ExpectedVersionCode 901 -ConfigPath $config | Out-Null } catch { $missingRejected = $_.Exception.Message.Contains('EXPLICIT_ADB_CONFIG_MISSING') }
+    Assert-True $missingRejected 'Missing explicit configs must not silently skip device checks'
 } finally {
-    Remove-Item -LiteralPath $fixtureRoot -Recurse -Force -ErrorAction SilentlyContinue
+    $resolvedFixture = [IO.Path]::GetFullPath($fixtureRoot)
+    if ($resolvedFixture.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath())) -and
+        (Split-Path $resolvedFixture -Leaf) -like 'elon-apk-adb-autodeploy-*') {
+        Remove-Item -LiteralPath $resolvedFixture -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host 'APK_ADB_AUTODEPLOY_TESTS=passed' -ForegroundColor Green

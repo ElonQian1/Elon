@@ -100,27 +100,7 @@ Step 7: 通过 WebSocket 推送给用户
 
 ### 2.3.1 指定手机的无人值守 ADB 更新
 
-`publish-apk.*` 在服务器 APK 原子发布、版本验证和 release finish 全部成功后，会检查发布机本地的 `~/.elon/apk-adb-targets.json`。只有该文件显式列出的手机才会执行 `adb install -r`；不会把 `adb devices` 中偶然出现的其他手机当成部署目标。
-
-```json
-{
-  "schemaVersion": 1,
-  "enabled": true,
-  "packageName": "com.elon.app",
-  "maxAttempts": 3,
-  "retryDelaySeconds": 5,
-  "launchAfterInstall": true,
-  "targets": [
-    {
-      "label": "一龙测试手机",
-      "serial": "192.168.31.171:5555",
-      "hardwareSerial": "手机 ro.serialno"
-    }
-  ]
-}
-```
-
-`serial` 是当前 ADB 连接端点，`hardwareSerial` 是 `adb -s <serial> shell getprop ro.serialno` 返回的稳定硬件身份。两者必须同时匹配，防止无线 ADB IP 被其他手机复用时装错设备。安装后脚本会校验 `versionCode`、自动拉起 APP，并输出 `APK_ADB_DEPLOY_STATUS=updated`。指定手机连续重试后仍失败时发布命令返回非零，同时明确保留“服务器 APK 已发布”的事实。可用 `ELON_APK_ADB_TARGETS_FILE` 指定其他本机配置路径，用 `ELON_ADB_PATH` 覆盖 ADB 程序路径。
+发布后必须按主项目登记的调试手机检查有线／无线 ADB，在线则安装正式包并回读版本，离线逐台记录。本机未配置时从主项目设备档案读取，不再静默跳过；完整来源、配置与回执合同见 [APK 调试手机交付](apk-debug-device-delivery.md)。
 
 ### 2.4 PC 节点 AI 运行路线
 

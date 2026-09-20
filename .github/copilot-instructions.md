@@ -59,7 +59,9 @@ Windows 隔离 worktree 默认放在当前仓库盘符的 `\wt\<短ID>`；机器
 | Android 可安装端用户可见改动 | 默认 `publish-apk.*` | `AndroidFeature`；只同步时 `CodePushed` |
 | Android + 移动 PWA 视觉同步 | `publish-app-ui-fast-lane.ps1` | `AndroidFeature` |
 
-APP UI：`APP_UI_RELEASE_POLICY=publish_before_optional_renderer`。默认不用物理设备，push 后先验证并发布 Server/PWA 和 APK。仅当用户反馈修改不对或明确要求时设置 `realDeviceRequired=true`；同一 MCP 会话只准备一次、最多 30 秒，失败记 `VERIFICATION_DEFERRED`，不重建会话或阻塞已发布结果。用户要求发布前验收时除外；无真帧不得称视觉已验收。
+APK 发布后必须检查主项目登记的调试手机：探测 USB、已有无线 ADB、登记的无线端点及匹配硬件身份的 mDNS；在线且已授权则自动 `adb install -r` 并回读版本，同一硬件只更新一次，不降级。逐台记录已更新、离线、未授权或失败及安装包摘要；不能因本机没有配置文件就跳过。离线可报告延期，在线安装失败、设备档案读取失败或 ADB 缺失必须明确失败，不能用视觉验收延期参数掩盖。默认读取主项目设备档案，显式本机配置仅作覆盖；细节见 `docs/apk-debug-device-delivery.md`。
+
+APP UI：`APP_UI_RELEASE_POLICY=publish_before_optional_renderer`。默认不做物理设备视觉或交互验收；上述发布后 ADB 安装与版本回读始终执行。push 后先验证并发布 Server/PWA 和 APK。仅当用户反馈修改不对或明确要求时设置 `realDeviceRequired=true`；同一 MCP 会话只准备一次、最多 30 秒，失败记 `VERIFICATION_DEFERRED`，不重建会话或阻塞已发布结果。用户要求发布前验收时除外；无真帧不得称视觉已验收。
 
 发布期间主线前进：未构建的旧 Android 候选让位；已验证 APK 若仍是主线祖先且线上无更新后代，可先发布。发布类型互不阻塞，失联由短租约回收。业务已入主线的结论不变，不循环 rebase 或重跑旧构建。
 

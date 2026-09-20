@@ -95,6 +95,8 @@ Linux/macOS 使用 `bash scripts/format-rust.sh --apply --files ...`。脚本按
 
 发布脚本负责版本、构建、上传、并发保护和验证。不要手改版本、上传或部署未提交内容。
 
+APK 上传验证成功后，`apk-publish-postflight.*` 必须执行主项目调试手机的有线／无线 ADB 探测、在线安装和版本回读；不能只报告服务器发布。设备清单来源、逐台状态和离线处理见 [调试手机交付](../../docs/apk-debug-device-delivery.md)。`AllowAdbVerificationDeferred` 不跳过设备检查，也不吞掉在线安装失败。
+
 ## PowerShell 与网络
 
 - bootstrap 和未声明 PS7 的兼容脚本可用 `powershell.exe`。
