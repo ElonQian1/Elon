@@ -20,11 +20,13 @@ export default function GroupAiReplyContext(props: Props) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const mounted = useRef(true)
+  const intent = useRef(false)
   const navigate = useNavigate()
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const current = () => mounted.current && useAuthStore.getState().user?.id === owner
   async function load(continueChat = false) {
     if (busy) return
+    intent.current = continueChat
     setOpen(true); setError(''); setBusy(true); setSources(null); setDiscussion(null)
     try {
       if (continueChat) {
@@ -64,7 +66,7 @@ export default function GroupAiReplyContext(props: Props) {
     {open && <SocialDialog title={discussion ? '使用 ChatGPT 继续讨论' : '群聊的聊天记录'} onClose={() => { setOpen(false); setDiscussion(null); setSources(null) }} footer={<>
       <button type="button" onClick={() => setOpen(false)}>返回群聊</button>
       {discussion && <button type="button" onClick={start}>打开我的 ChatGPT</button>}
-      {error && <button type="button" onClick={() => void load(part === 'footer')}>重试</button>}
+      {error && <button type="button" onClick={() => void load(intent.current)}>重试</button>}
     </>}>
       {busy && <p role="status">正在读取记录…</p>}
       {error && <p role="alert">{error}</p>}

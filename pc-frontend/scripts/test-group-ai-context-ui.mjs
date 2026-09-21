@@ -17,12 +17,13 @@ try {
   for (const width of [1280, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } })
     const errors = []; page.on('pageerror', error => errors.push(error.message))
-    let allowed = false, version = 1, patches = 0
+    let allowed = false, version = 1, patches = 0, sourceFailures = 0
     const sources = [{ id: 'one', sender_user_id: 'fixture-owner', sender_name: '甲', content: '**验收记录**\n\n|步骤|状态|\n|---|---|\n|校验|完成|', created_at: '2026-09-21T01:00:00Z' },
       { id: 'two', sender_user_id: 'fixture-peer', sender_name: '乙', content: '```ts\nconst approved = true\n```', created_at: '2026-09-21T01:01:00Z' }]
     await page.route('**/*', async route => {
       const url = new URL(route.request().url())
       if (url.pathname.endsWith('/ai-sources')) {
+        if (sourceFailures > 0) { sourceFailures--; return route.fulfill({ status: 503, json: { error: 'Fixture retry' } }) }
         if (route.request().method() === 'PATCH') {
           const body = route.request().postDataJSON(); assert.equal(body.version, version)
           allowed = body.allow_continue; version++; patches++
@@ -46,6 +47,11 @@ try {
     assert.equal(patches, 1)
     await page.screenshot({ path: path.join(out, `reader-${width}.png`) })
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false)
+    await page.getByRole('button', { name: '返回群聊', exact: true }).click()
+    sourceFailures = 1
+    await page.getByRole('button', { name: '讨论分享设置', exact: true }).click()
+    await page.getByRole('button', { name: '重试', exact: true }).click()
+    await page.getByRole('checkbox').waitFor()
     await page.getByRole('button', { name: '返回群聊', exact: true }).click()
     await page.getByRole('button', { name: '使用 ChatGPT 继续讨论', exact: true }).click()
     await page.getByRole('button', { name: '打开我的 ChatGPT' }).waitFor()

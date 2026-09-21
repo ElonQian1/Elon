@@ -42,7 +42,11 @@ try {
     } } }
   })
   const message = (id, content, revision = 1) => ({ id, content, revision, sender_user_id: 'peer', sender_name: '测试成员', created_at: '2026-09-21T00:00:00Z' })
-  const messages = [message('one', 'First selected fixture'), message('two', 'Second selected fixture', 3)]
+  const messages = [message('one', 'First selected fixture'), message('two', 'Second selected fixture', 3),
+    { ...message('link-answer', 'https://www.bilibili.com/video/BV1xx411c7mD'), ai_reply: {
+      schema: 1, provider: 'chatgpt_web', requester_id: 'peer', source_count: 1, allow_continue: true, version: 1,
+      previews: [{ sender_name: '测试成员', text: 'Selected source' }],
+    } }]
   let prepared
   await page.route('**/*', async route => {
     const req = route.request(), url = new URL(req.url()), p = url.pathname
@@ -72,6 +76,7 @@ try {
   const menu = async id => { await row(id).getByRole('button', { name: '更多消息操作' }).click(); await page.getByRole('menu').waitFor() }
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/pc/tests/fixtures/group-ai.html`)
   await choose('群聊验收')
+  assert.equal(await row('link-answer').getByRole('button', { name: '使用 ChatGPT 继续讨论', exact: true }).isVisible(), true)
   await menu('one')
   await page.getByRole('menuitem', { name: 'AI 回复…', exact: true }).click()
   await page.getByRole('dialog', { name: 'AI 回复到群聊' }).waitFor()
@@ -101,7 +106,7 @@ try {
   assert.equal(await row('answer').count(), 0)
   await choose('群聊验收')
   await row('answer').getByText('AI answer fixture', { exact: true }).waitFor()
-  assert.deepEqual(requests[0].body.selected_context, { message_ids: ['one', 'two'], message_revisions: { one: 1, two: 3 }, question: 'Summarize the selection' })
+  assert.deepEqual(requests[0].body.selected_context, { message_ids: ['one', 'two'], message_revisions: { one: 1, two: 3 }, question: 'Summarize the selection', allow_continue: false })
   const sends = await page.evaluate(() => window.__groupFixture.commands.filter(c => c.action === 'send_prompt'))
   assert.equal(sends.length, 1)
   assert.equal(requests.filter(r => r.body.action === 'complete').length, 1)
