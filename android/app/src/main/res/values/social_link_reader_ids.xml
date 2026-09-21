@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="external_reader_chat" type="id" />
+    <item name="external_reader_back" type="id" />
+    <item name="external_reader_refresh" type="id" />
+    <item name="external_reader_original" type="id" />
+    <item name="external_reader_embed" type="id" />
+    <item name="external_reader_close" type="id" />
+</resources>

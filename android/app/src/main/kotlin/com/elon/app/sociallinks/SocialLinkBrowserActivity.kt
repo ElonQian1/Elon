@@ -8,8 +8,6 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Rational
 import android.view.Gravity
 import android.view.View
@@ -18,9 +16,11 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.ProgressBar
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
+import com.elon.app.R
 
 /**
  * Thin host for a [SocialLinkReaderSessions.Session]. External content never receives the main
@@ -30,6 +30,7 @@ import androidx.lifecycle.Lifecycle
  */
 class SocialLinkBrowserActivity : AppCompatActivity(), SocialLinkReaderSessions.Ui {
     private lateinit var status: TextView
+    private lateinit var progress: ProgressBar
     private lateinit var main: LinearLayout
     private lateinit var root: FrameLayout
     private lateinit var webHost: FrameLayout
@@ -38,8 +39,6 @@ class SocialLinkBrowserActivity : AppCompatActivity(), SocialLinkReaderSessions.
     private var session: SocialLinkReaderSessions.Session? = null
     private var full: View? = null
     private var closing = false
-    private val handler = Handler(Looper.getMainLooper())
-    private val timeout = Runnable { status.text = "若内容未显示，请刷新或打开原文。" }
     private val pipSupported by lazy { packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,19 +50,20 @@ class SocialLinkBrowserActivity : AppCompatActivity(), SocialLinkReaderSessions.
         fun dp(n: Int) = (resources.displayMetrics.density * n).toInt()
         val heading = TextView(this).apply { text = link.title.ifBlank { Uri.parse(link.url).host }; textSize = 16f; setTextColor(Color.parseColor("#F1F2F5")); maxLines = 2; setPadding(dp(16), dp(10), dp(16), dp(6)) }
         val controls = LinearLayout(this)
-        fun button(label: String, action: () -> Unit) {
-            controls.addView(TextView(this).apply { text = label; textSize = 14f; setTextColor(Color.parseColor("#C5D6EC")); gravity = android.view.Gravity.CENTER; minHeight = dp(48); isFocusable = true; setOnClickListener { action() } }, LinearLayout.LayoutParams(0, -2, 1f))
+        fun button(label: String, semanticId: Int, action: () -> Unit) {
+            controls.addView(TextView(this).apply { text = label; id = semanticId; textSize = 14f; setTextColor(Color.parseColor("#C5D6EC")); gravity = android.view.Gravity.CENTER; minHeight = dp(48); isFocusable = true; setOnClickListener { action() } }, LinearLayout.LayoutParams(0, -2, 1f))
         }
-        button("返回聊天") { minimize() }
-        button("后退") { session?.web?.let { if (it.canGoBack()) it.goBack() } }
-        button("刷新") { session?.web?.reload() }
-        button("打开原文") { external(link.url) }
-        link.xId?.let { id -> button("嵌入查看") { embeddedX(id) } }
-        button("关闭") { close() }
+        button("返回聊天", R.id.external_reader_chat) { minimize() }
+        button("后退", R.id.external_reader_back) { session?.web?.let { if (it.canGoBack()) it.goBack() } }
+        button("刷新", R.id.external_reader_refresh) { session?.web?.reload() }
+        button("打开原文", R.id.external_reader_original) { external(link.url) }
+        link.xId?.let { id -> button("嵌入查看", R.id.external_reader_embed) { embeddedX(id) } }
+        button("关闭", R.id.external_reader_close) { close() }
         status = TextView(this).apply { textSize = 12f; setTextColor(Color.parseColor("#B7BDC8")); setPadding(dp(16), dp(4), dp(16), dp(8)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
+        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { isIndeterminate = true; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
         inbox = SocialLinkReaderInboxBar(this) { minimize() }
         webHost = FrameLayout(this)
-        main.addView(heading); main.addView(controls); main.addView(status); main.addView(inbox); main.addView(webHost, LinearLayout.LayoutParams(-1, 0, 1f))
+        main.addView(heading); main.addView(controls); main.addView(status); main.addView(progress, LinearLayout.LayoutParams(-1, dp(2))); main.addView(inbox); main.addView(webHost, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(main, FrameLayout.LayoutParams(-1, -1))
         pipButton = TextView(this).apply {
             text = "画中画"; textSize = 13f; setTextColor(Color.WHITE); setBackgroundColor(Color.parseColor("#99000000")); gravity = Gravity.CENTER
@@ -88,8 +88,6 @@ class SocialLinkBrowserActivity : AppCompatActivity(), SocialLinkReaderSessions.
         SocialLinkReaderSessions.attach(current, this, webHost, this)
         if (fresh) {
             if (link.xId != null && SocialLinkReadIdentity.identity(link.url) == null) embeddedX(link.xId) else current.web.loadUrl(current.key)
-        } else if (!current.loading) {
-            status.text = "已恢复阅读位置；内容由原平台提供。"
         }
     }
 
@@ -111,8 +109,8 @@ class SocialLinkBrowserActivity : AppCompatActivity(), SocialLinkReaderSessions.
         finish()
     }
 
-    override fun onStatus(text: String) { handler.removeCallbacks(timeout); status.text = text }
-    override fun onLoading(loading: Boolean) { handler.removeCallbacks(timeout); if (loading) handler.postDelayed(timeout, 10000) }
+    override fun onStatus(text: String) { if (status.text.toString() != text) status.text = text }
+    override fun onLoading(loading: Boolean) { progress.visibility = if (loading) View.VISIBLE else View.INVISIBLE }
     override fun onShowFullscreen(view: View, callback: WebChromeClient.CustomViewCallback) {
         full = view; main.visibility = View.GONE; root.addView(view, 0, FrameLayout.LayoutParams(-1, -1))
         pipButton.visibility = if (pipSupported && !isInPictureInPictureMode) View.VISIBLE else View.GONE
@@ -145,9 +143,8 @@ class SocialLinkBrowserActivity : AppCompatActivity(), SocialLinkReaderSessions.
     override fun onStop() { inbox.detach(); super.onStop() }
     // In picture-in-picture the Activity is paused but visible; the video must keep playing.
     override fun onPause() { if (!isInPictureInPictureMode) session?.web?.onPause(); super.onPause() }
-    override fun onResume() { super.onResume(); session?.web?.onResume() }
+    override fun onResume() { super.onResume(); session?.let { it.web.onResume(); it.diagnostics.resume() } }
     override fun onDestroy() {
-        handler.removeCallbacksAndMessages(null)
         // System-initiated destruction (not 返回聊天/关闭) also keeps the page alive in the bubble.
         session?.let { if (!closing) SocialLinkReaderSessions.detach(it, applicationContext) }
         session = null
