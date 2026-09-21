@@ -8,7 +8,7 @@ reviewed_at: 2026-09-05
 
 ## 当前产品主链
 
-- [欧易余额](docs/okx-account-balance-delivery.md)：37 项通过，待发布/验收。
+- [欧易余额](docs/okx-account-balance-delivery.md)：37 项通过，1801 已装机，待验收。
 
 - [Web AI 当前批次](docs/reports/chatgpt-runtime-bindings-20260915.md)
 
