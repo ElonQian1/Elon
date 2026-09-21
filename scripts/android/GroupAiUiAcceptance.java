@@ -163,6 +163,9 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
                 assertEquals("share_title_mismatch", CARD, desc("卡片标题").getText());
                 action(desc("ai-conversation-share-send"), false); break;
             case "open_card": fixtureOpen(); action(text(CARD), false); break;
+            case "open_sources":
+                fixtureOpen(); action(desc("group-ai-source-records-2"), false);
+                assertTrue("source_reader_missing", id("ai_conversation_share_list").waitForExists(5000)); break;
             case "continue_private": action(desc("ai-conversation-share-continue-private"), false); break;
             case "confirm_private":
                 assertTrue("private_confirmation_required", text("用自己的 ChatGPT 继续讨论").exists());
@@ -184,6 +187,8 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
             .put("create_group", text("发起群聊").exists()).put("home_add", id("addButton").exists())
             .put("reply_visible", text("ELON GROUP SELECTION PASSED").exists())
             .put("card_visible", text(CARD).exists())
+            .put("source_records_visible", desc("group-ai-source-records-2").exists())
+            .put("continue_discussion_visible", desc("group-ai-continue-discussion").exists())
             .put("reader_visible", id("ai_conversation_share_list").exists())
             .put("private_confirmation", text("用自己的 ChatGPT 继续讨论").exists())
             .put("return_confirmation", text("放弃未发送的私人草稿？").exists())

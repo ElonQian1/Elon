@@ -4,13 +4,14 @@ use anyhow::Result;
 use rusqlite::Connection;
 
 pub(crate) struct Store {
-    path: std::path::PathBuf,
+    connection: std::sync::Mutex<Connection>,
 }
 impl Store {
-    fn conn(&self) -> Result<Connection> {
-        let conn = Connection::open(&self.path)?;
-        conn.execute_batch("PRAGMA foreign_keys=ON;")?;
-        Ok(conn)
+    fn conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>> {
+        // Match the production single-connection lock, but fail instead of hanging a test.
+        self.connection
+            .try_lock()
+            .map_err(|_| anyhow::anyhow!("database lock already held"))
     }
 }
 fn now() -> String {

@@ -189,6 +189,8 @@ impl Store {
         tx.execute("UPDATE group_ai_reply_contexts SET allow_continue=?1,version=version+1 WHERE request_id=
             (SELECT id FROM group_ai_reply_requests WHERE group_id=?2 AND result_message_id=?3)",params![allowed,group,message])?;
         tx.commit()?;
+        // The response reader acquires the same non-reentrant Store connection lock.
+        drop(conn);
         self.group_ai_reply_sources(user, group, message)
     }
 }
