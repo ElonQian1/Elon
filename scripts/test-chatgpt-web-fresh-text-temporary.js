@@ -49,9 +49,9 @@ function temporaryFixture(isNew = true) {
   return f;
 }
 
-test('Sep 21 temporary admission is read-only and loses ownership when the runtime changes', async () => {
+for (const profile of ['web_20260921', 'web_20260922']) test(`${profile} temporary admission is read-only and loses ownership when the runtime changes`, async () => {
   const f = temporaryFixture();
-  f.page.__elonChatGptPrivateRuntimeBindings.state = () => ({ profile_id: 'web_20260921' });
+  f.page.__elonChatGptPrivateRuntimeBindings.state = () => ({ profile_id: profile });
   assert.deepEqual(await f.api.inspect(f.node), { schema: 'elon.fresh_text_admission.v1', code: 'ready', stage: 'ready' });
   assert.equal(f.binds, 0);
   const binding = await f.api.capture(f.node, null, admission);

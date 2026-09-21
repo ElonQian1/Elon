@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname,
   '../android/app/src/main/assets/chatgpt_web_text_transaction_orchestrator.js'), 'utf8');
 
-function fixture(code, includeRuntime = true) {
+function fixture(code, includeRuntime = true, acceptDraft = true) {
   let time = 1, draft = '', clicks = 0;
   const timers = [], events = [];
   const composer = { closest: () => null };
@@ -21,7 +21,7 @@ function fixture(code, includeRuntime = true) {
   vm.runInNewContext(source, { window, Date: { now: () => time } });
   const api = window.__elonChatGptTextTransactionOrchestrator.create({
     findComposer: () => composer, composerValue: () => draft,
-    setComposerValue: (_, value) => { draft = value; return true; },
+    setComposerValue: (_, value) => { if (acceptDraft) draft = value; return acceptDraft; },
     comparableText: value => value, scheduleSnapshot() {}, isVisible: node => !!node,
     findButton: () => button, readStreamingState: () => ({ active: false }),
   });
@@ -48,6 +48,13 @@ test('legacy runtime absence does not invent an admission result', () => {
   assert.equal(f.events[0].ok, true);
   assert.doesNotMatch(f.events[0].detail, /runtime_fallback/);
   assert.match(f.events[0].detail, /\[private_fallback:template_unavailable\]/);
+});
+
+test('draft rejection proves no submit click and carries only the bounded runtime code', () => {
+  const f = fixture('runtime_unavailable', true, false); f.run();
+  assert.equal(f.clicks(), 0);
+  assert.deepEqual(f.events, [{ action: 'send_prompt', ok: false,
+    detail: '官方输入框未接受文本，请返回官网重试。 [runtime_fallback:runtime_unavailable]' }]);
 });
 
 test('diagnostic codes are bounded, not arbitrary exception or request content', () => {

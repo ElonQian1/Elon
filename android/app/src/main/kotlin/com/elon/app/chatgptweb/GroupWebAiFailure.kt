@@ -7,13 +7,27 @@ internal enum class GroupWebAiFailureReason(val message: String) {
     LOGIN("请先在一龙 AI 中确认网页账号的登录状态，再重试。"),
     MODEL("未能确认群聊保存的模型或档位。请打开群聊档位菜单重新选择，或选择“跟随官网设置”，再重试。"),
     SEND("AI 未确认发送结果。"),
+    COMPOSER("AI 输入框未接受内容，本次没有发送。可以重新分析。"),
     CANCELLED("已取消本次分析。"),
 }
 
 /** Only a failure before authorization can safely reuse the same reserved selection. */
-internal data class GroupWebAiFailure(val uncertain: Boolean, val reason: GroupWebAiFailureReason) {
+internal data class GroupWebAiFailure(
+    val uncertain: Boolean,
+    val reason: GroupWebAiFailureReason,
+    val rejectedBeforeSend: Boolean = false,
+) {
     val canRetry: Boolean get() = !uncertain && reason != GroupWebAiFailureReason.CANCELLED
     val message: String get() = if (uncertain) {
         "请求可能已发送，但没有收到完整回答，因此尚未生成群回复。为避免重复发送，本次不会自动重试。"
     } else "${reason.message}\n所选消息尚未发送，群里还没有 AI 回答。"
 }
+
+private val PRE_SEND_DRAFT_REJECTION = Regex(
+    "^官方输入框未接受文本，请返回官网重试。(?: \\[runtime_fallback:[a-z_]{1,32}\\])?$"
+)
+
+/** This production receipt is emitted before any submit click. Other rejections are not proof. */
+internal fun ChatGptWebEvent.CommandResult.isConfirmedPreSendRejection(): Boolean =
+    action == "send_prompt" && !ok && PRE_SEND_DRAFT_REJECTION.matches(detail) &&
+        !ChatGptWebPrivateTextReceiptPolicy.resolve(this).indeterminate

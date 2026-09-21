@@ -64,6 +64,6 @@ internal class GroupWebAiDiagnostics(
     }
 
     private companion object {
-        val TERMINAL = setOf("prepare_timeout", "response_timeout", "completed", "failed_after_authorize", "failed_before_authorize")
+        val TERMINAL = setOf("prepare_timeout", "response_timeout", "completed", "failed_after_authorize", "failed_before_authorize", "rejected_before_send")
     }
 }

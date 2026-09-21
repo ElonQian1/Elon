@@ -229,6 +229,15 @@ impl Store {
             "uncertain" if before.engine == "chatgpt_web" => {
                 tx.execute("UPDATE group_ai_reply_requests SET state='indeterminate',updated_at=?1 WHERE id=?2 AND state='dispatched'",params![now(),id])?;
             }
+            // A client may retire only its own definitely-unsubmitted attempt. Never
+            // reopen this token; preparing again rotates it, rejecting stale receipts.
+            "not_sent"
+                if before.engine == "chatgpt_web"
+                    && before.web_provider == "chatgpt_web"
+                    && matches!(before.state.as_str(), "dispatched" | "cancelled") =>
+            {
+                tx.execute("UPDATE group_ai_reply_requests SET state='cancelled',updated_at=?1 WHERE id=?2 AND state='dispatched'",params![now(),id])?;
+            }
             "cancel" if before.state == "prepared" => {
                 tx.execute("UPDATE group_ai_reply_requests SET state='cancelled',updated_at=?1 WHERE id=?2",params![now(),id])?;
             }

@@ -77,7 +77,9 @@ internal class GroupWebAiFeature(
                     .also { check(selection == null || it.optString("context_scope") == "selected") { "服务器未确认选区范围，未发送给 AI" } }
             }
             activity.runOnUiThread {
-                result.onSuccess { execute(it, operation, owner, configuration) }
+                result.onSuccess { execute(it, operation, owner, configuration) {
+                    prepareRequest(group, messageId, configuration, selection)
+                } }
                     .onFailure { release(); toast("创建 AI 请求失败，请稍后重试") }
             }
         }
@@ -89,7 +91,9 @@ internal class GroupWebAiFeature(
         val owner = userId()
         val response = post("${base(group.id)}/web-ai/messages", payload.put("operation_id", operation))
         val request = response.getJSONObject("request")
-        activity.runOnUiThread { execute(request, operation, owner, configuration) }
+        activity.runOnUiThread { execute(request, operation, owner, configuration) {
+            prepareRequest(group, request.getString("trigger_message_id"), configuration)
+        } }
         return response.getJSONObject("message")
     }
 
@@ -97,7 +101,8 @@ internal class GroupWebAiFeature(
         if (beginWork()) prepareRequest(group, messageId, configuration)
     }
 
-    private fun execute(request: JSONObject, operation: String, owner: String, configuration: GroupAiConfiguration) {
+    private fun execute(request: JSONObject, operation: String, owner: String, configuration: GroupAiConfiguration,
+        restart: () -> Unit) {
         if (activity.isDestroyed || userId() != owner) { release(); return }
         if (!configuration.usesWebAi) { executeWork(request, operation, owner, configuration.work); return }
         busy = true
@@ -125,13 +130,31 @@ internal class GroupWebAiFeature(
                 executor = null
                 progress?.dismiss()
                 release()
-                if (failure.uncertain) {
+                if (failure.rejectedBeforeSend) {
+                    // A lost retirement receipt cannot authorize another send. Keep the
+                    // old reservation closed until the server confirms cancellation.
+                    busy = true
+                    thread {
+                        val retired = runCatching {
+                            check(userId() == owner)
+                            action(request, operation, "not_sent").getString("state") == "cancelled"
+                        }.getOrDefault(false)
+                        activity.runOnUiThread {
+                            release()
+                            if (retired) showSelectedFailure(request, operation, owner, configuration, failure, restart)
+                            else if (userId() == owner && !activity.isDestroyed) AlertDialog.Builder(activity)
+                                .setTitle("本次没有发送")
+                                .setMessage("输入框未接受内容，但未能确认取消发送授权。本次不会重新发送，请检查网络后重新选择消息。")
+                                .setPositiveButton("知道了", null).show()
+                        }
+                    }
+                } else if (failure.uncertain) {
                     thread { runCatching { if (userId() == owner) action(request, operation, "uncertain") } }
-                    showSelectedFailure(request, operation, owner, configuration, failure)
+                    showSelectedFailure(request, operation, owner, configuration, failure, restart)
                 } else if (failure.reason == GroupWebAiFailureReason.CANCELLED) {
                     thread { runCatching { if (userId() == owner) action(request, operation, "cancel") } }
                 } else if (request.optString("context_scope") == "selected") {
-                    showSelectedFailure(request, operation, owner, configuration, failure)
+                    showSelectedFailure(request, operation, owner, configuration, failure, restart)
                 } else if (!activity.isDestroyed && userId() == owner) {
                     AlertDialog.Builder(activity).setTitle("${configuration.engine.label} 尚未就绪")
                         .setMessage("没有向 ${configuration.engine.label} 发送。可以取消，或使用备用 AI（可能计费）。")
@@ -153,12 +176,12 @@ internal class GroupWebAiFeature(
     }
 
     private fun showSelectedFailure(request: JSONObject, operation: String, owner: String,
-        configuration: GroupAiConfiguration, failure: GroupWebAiFailure) {
+        configuration: GroupAiConfiguration, failure: GroupWebAiFailure, restart: () -> Unit) {
         if (activity.isDestroyed || userId() != owner) return
         busy = true
         val dismiss = {
             release()
-            if (!failure.uncertain) thread {
+            if (!failure.uncertain && !failure.rejectedBeforeSend) thread {
                 runCatching { if (userId() == owner) action(request, operation, "cancel") }
             }
             Unit
@@ -168,7 +191,10 @@ internal class GroupWebAiFeature(
             .setNegativeButton(if (failure.canRetry) "取消" else "知道了") { _, _ -> dismiss() }
             .setOnCancelListener { dismiss() }
         if (failure.canRetry) dialog.setPositiveButton("重试本次分析") { _, _ ->
-            if (userId() == owner && !activity.isDestroyed) execute(request, operation, owner, configuration)
+            if (userId() == owner && !activity.isDestroyed) {
+                if (failure.rejectedBeforeSend) restart()
+                else execute(request, operation, owner, configuration, restart)
+            }
             else release()
         }
         dialog.show().getButton(AlertDialog.BUTTON_POSITIVE)?.contentDescription = "group-ai-analysis-retry"

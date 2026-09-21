@@ -1,6 +1,80 @@
 use super::*;
 
 #[test]
+fn confirmed_not_sent_retires_token_and_stale_receipt_cannot_cancel_retry() {
+    let f = Fixture::new();
+    let old = Uuid::new_v4().to_string();
+    let next = Uuid::new_v4().to_string();
+    let r = f
+        .store
+        .prepare_group_web_ai(&f.user, &f.group, &f.trigger, &old)
+        .unwrap();
+    assert!(f
+        .store
+        .group_web_ai_action(&f.user, &f.group, &r.id, &old, "not_sent")
+        .is_err());
+    assert!(
+        f.store
+            .group_web_ai_action(&f.user, &f.group, &r.id, &old, "dispatch")
+            .unwrap()
+            .dispatch_permit
+    );
+    assert!(f
+        .store
+        .group_web_ai_action(&f.other, &f.group, &r.id, &old, "not_sent")
+        .is_err());
+    for _ in 0..2 {
+        assert_eq!(
+            f.store
+                .group_web_ai_action(&f.user, &f.group, &r.id, &old, "not_sent")
+                .unwrap()
+                .state,
+            "cancelled"
+        );
+    }
+    assert!(
+        !f.store
+            .group_web_ai_action(&f.user, &f.group, &r.id, &old, "dispatch")
+            .unwrap()
+            .dispatch_permit
+    );
+    assert!(f
+        .store
+        .complete_group_ai_reply(&f.user, &r.id, "must not publish")
+        .is_err());
+    let retry = f
+        .store
+        .prepare_group_web_ai(&f.user, &f.group, &f.trigger, &next)
+        .unwrap();
+    assert_eq!(retry.id, r.id);
+    assert!(
+        f.store
+            .group_web_ai_action(&f.user, &f.group, &r.id, &next, "dispatch")
+            .unwrap()
+            .dispatch_permit
+    );
+    assert!(f
+        .store
+        .group_web_ai_action(&f.user, &f.group, &r.id, &old, "not_sent")
+        .is_err());
+    f.store
+        .group_web_ai_action(&f.user, &f.group, &r.id, &next, "uncertain")
+        .unwrap();
+    assert!(f
+        .store
+        .group_web_ai_action(&f.user, &f.group, &r.id, &next, "not_sent")
+        .is_err());
+    f.store
+        .complete_group_ai_reply(&f.user, &r.id, "one answer")
+        .unwrap();
+    assert!(f
+        .store
+        .group_web_ai_action(&f.user, &f.group, &r.id, &next, "not_sent")
+        .is_err());
+    assert_eq!(f.count(), 1);
+}
+
+#[test]
 fn google_dispatch_binds_provider_once_and_cannot_replay_through_chatgpt_or_work() {
     let f = Fixture::new();
     let op = Uuid::new_v4().to_string();

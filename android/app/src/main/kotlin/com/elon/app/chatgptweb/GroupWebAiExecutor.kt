@@ -60,7 +60,9 @@ internal class GroupWebAiExecutor(
                     diagnostics.sendReceipt(event)
                     if (!event.ok) {
                         diagnostics.stage("command_rejected")
-                        inspectSendFailure()
+                        if (provider == WebChatProviderId.CHATGPT_WEB && event.isConfirmedPreSendRejection()) {
+                            fail(GroupWebAiFailureReason.COMPOSER, rejectedBeforeSend = true)
+                        } else inspectSendFailure()
                     }
                 }
             else -> Unit
@@ -131,12 +133,15 @@ internal class GroupWebAiExecutor(
 
     fun cancel() { diagnostics.stage("cancelled"); fail(GroupWebAiFailureReason.CANCELLED) }
 
-    private fun fail(reason: GroupWebAiFailureReason = GroupWebAiFailureReason.PREPARATION) {
+    private fun fail(reason: GroupWebAiFailureReason = GroupWebAiFailureReason.PREPARATION) = fail(reason, false)
+
+    private fun fail(reason: GroupWebAiFailureReason, rejectedBeforeSend: Boolean) {
         if (finished) return
-        val uncertain = dispatching || dispatched
-        diagnostics.stage(if (uncertain) "failed_after_authorize" else "failed_before_authorize")
+        val uncertain = !rejectedBeforeSend && (dispatching || dispatched)
+        diagnostics.stage(if (rejectedBeforeSend) "rejected_before_send"
+            else if (uncertain) "failed_after_authorize" else "failed_before_authorize")
         finish()
-        onFailure(GroupWebAiFailure(uncertain, reason))
+        onFailure(GroupWebAiFailure(uncertain, reason, rejectedBeforeSend))
     }
 
     private fun finish() {
