@@ -47,6 +47,8 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot "node-agent-release-packaging.ps1")
 . (Join-Path $PSScriptRoot "node-agent-windows-installer.ps1")
 . (Join-Path $PSScriptRoot "node-storage-paths.ps1")
+. (Join-Path $PSScriptRoot "native-command-timeout.ps1")
+. (Join-Path $PSScriptRoot "node-agent-publish-ssh.ps1")
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
@@ -151,8 +153,9 @@ function Invoke-RemoteBashRaw {
     $oldPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        $output = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server $remoteCommand 2>&1
-        $exitCode = $LASTEXITCODE
+        $result = Invoke-NodeAgentPublishSshRaw -Server $Server -Command $remoteCommand
+        $output = @($result.Stdout, $result.Stderr) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+        $exitCode = $result.ExitCode
     } finally {
         $ErrorActionPreference = $oldPreference
     }
@@ -607,20 +610,16 @@ $currentReleaseSha = (git -C $RepoRoot rev-parse HEAD).Trim()
 if ($currentReleaseSha -ne $GitSha) {
     throw "上传前当前 worktree HEAD 已改变：claim=$GitSha, current=$currentReleaseSha。不可替换固定发布 SHA。"
 }
-ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "mkdir -p $RemoteDir"
+Invoke-NodeAgentPublishSsh -Server $Server -Command "mkdir -p $RemoteDir" | Out-Null
 if ($IncludeLinux) {
-    scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $LinuxBin "${Server}:${RemoteDir}/${Bin}"
-    if ($LASTEXITCODE -ne 0) { throw "上传 Linux 节点失败" }
-    ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "chmod +x ${RemoteDir}/${Bin}"
-    if ($LASTEXITCODE -ne 0) { throw "设置 Linux 节点执行权限失败" }
+    Invoke-NodeAgentPublishScp -Source $LinuxBin -Destination "${Server}:${RemoteDir}/${Bin}"
+    Invoke-NodeAgentPublishSsh -Server $Server -Command "chmod +x ${RemoteDir}/${Bin}" | Out-Null
 }
-scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $WinBin "${Server}:${RemoteDir}/${Bin}.exe"
-scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $WindowsClientPackage "${Server}:${RemoteDir}/${WindowsClientPackageName}"
-scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $WindowsInstallerPackage "${Server}:${RemoteDir}/${WindowsInstallerPackageName}"
-if ($LASTEXITCODE -ne 0) { throw "上传失败" }
+Invoke-NodeAgentPublishScp -Source $WinBin -Destination "${Server}:${RemoteDir}/${Bin}.exe"
+Invoke-NodeAgentPublishScp -Source $WindowsClientPackage -Destination "${Server}:${RemoteDir}/${WindowsClientPackageName}"
+Invoke-NodeAgentPublishScp -Source $WindowsInstallerPackage -Destination "${Server}:${RemoteDir}/${WindowsInstallerPackageName}"
 if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) {
-    scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $RipgrepPackage "${Server}:${RemoteDir}/${RipgrepPackageName}"
-    if ($LASTEXITCODE -ne 0) { throw "上传 ripgrep 绿色包失败" }
+    Invoke-NodeAgentPublishScp -Source $RipgrepPackage -Destination "${Server}:${RemoteDir}/${RipgrepPackageName}"
 }
 Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
@@ -629,13 +628,13 @@ Write-Host "[4/5] 验证下载地址..." -ForegroundColor Yellow
 
 $size = 0
 if ($IncludeLinux) {
-    $size = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${Bin}"
+    $size = Invoke-NodeAgentPublishSsh -Server $Server -Command "stat -c '%s' ${RemoteDir}/${Bin}"
 }
-$sizeWin = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${Bin}.exe"
-$sizeWinClient = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${WindowsClientPackageName}"
-$sizeWinInstaller = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${WindowsInstallerPackageName}"
+$sizeWin = Invoke-NodeAgentPublishSsh -Server $Server -Command "stat -c '%s' ${RemoteDir}/${Bin}.exe"
+$sizeWinClient = Invoke-NodeAgentPublishSsh -Server $Server -Command "stat -c '%s' ${RemoteDir}/${WindowsClientPackageName}"
+$sizeWinInstaller = Invoke-NodeAgentPublishSsh -Server $Server -Command "stat -c '%s' ${RemoteDir}/${WindowsInstallerPackageName}"
 if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) {
-    $RipgrepZipFileSize = [int64](ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${RipgrepPackageName}")
+    $RipgrepZipFileSize = [int64](Invoke-NodeAgentPublishSsh -Server $Server -Command "stat -c '%s' ${RemoteDir}/${RipgrepPackageName}")
 }
 $VersionInfo = [ordered]@{
     version = $PackageVersion

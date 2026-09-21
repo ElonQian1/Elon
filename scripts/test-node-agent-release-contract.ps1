@@ -7,6 +7,8 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot "release-publish-lease.ps1")
 . (Join-Path $PSScriptRoot "node-agent-publish-replay.ps1")
 . (Join-Path $PSScriptRoot "publish-health-checks.ps1")
+. (Join-Path $PSScriptRoot "native-command-timeout.ps1")
+. (Join-Path $PSScriptRoot "node-agent-publish-ssh.ps1")
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -105,6 +107,7 @@ Assert-True ($brandIconSha256 -match '^[0-9a-f]{64}$') `
     "The checked-in Windows brand ICO must produce a stable 32px bitmap hash"
 
 $publishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-node-agent.ps1") -Raw
+$publishSshScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "node-agent-publish-ssh.ps1") -Raw
 $healthScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-health-checks.ps1") -Raw
 $resolvedPublishCurl = Resolve-ElonPublishCurl
 Assert-True ($resolvedPublishCurl -is [string]) `
@@ -144,6 +147,16 @@ Assert-True ($publishScript.Contains('[switch]$RequireAllOnlineTargetBuild')) `
     "The publisher must expose an explicit strict rollout switch"
 Assert-True ($publishScript.Contains('[switch]$IncludeLinux')) `
     "Linux node publishing must be an explicit opt-in"
+$sshOptions = @(Get-NodeAgentPublishSshOptions)
+foreach ($requiredSshOption in @('BatchMode=yes', 'ConnectionAttempts=1', 'IPQoS=none', 'ProxyCommand=none', 'ProxyJump=none')) {
+    Assert-True ($sshOptions -contains $requiredSshOption) `
+        "Node-agent release SSH must include $requiredSshOption"
+}
+Assert-True ($publishSshScript.Contains("[int]`$TimeoutSeconds = 45") -and `
+    $publishSshScript.Contains("[int]`$TimeoutSeconds = 240")) `
+    "Every node-agent SSH and SCP operation must have a finite timeout"
+Assert-True (-not $publishScript.Contains('ssh -o ProxyCommand=none')) `
+    "Node-agent publishing must not bypass the bounded SSH transport helper"
 Assert-True ($publishScript.Contains('NODE_AGENT_LINUX_PUBLISH_STATUS=skipped_default')) `
     "A default Windows release must report that Linux was not published"
 Assert-True ($publishScript.Contains("Invoke-RustCacheCargo -ProjectRoot `$RepoRoot -Domain 'node-agent-release'")) `
