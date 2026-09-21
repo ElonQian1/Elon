@@ -42,6 +42,7 @@ internal object McpNativeControlBridge {
             .put("schema", "elon.apk.native_mcp_ui_state.v1")
             .put("activity_bound", current != null)
             .put("package_name", context.packageName)
+            .put("external_reader", com.elon.app.sociallinks.SocialLinkPageDiagnostics.snapshots())
             .put("mcp_endpoint", "http://127.0.0.1:8787/mcp")
             .put("adb_forward", "adb forward tcp:8787 tcp:8787")
             .put("generated_at_ms", System.currentTimeMillis())
