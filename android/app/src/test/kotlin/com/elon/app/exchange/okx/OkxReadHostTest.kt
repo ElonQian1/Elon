@@ -6,6 +6,33 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class OkxReadHostTest {
+    @Test fun legacyGridConsentDoesNotAuthorizeBalancesAndSavedConsentCanBeUpgraded() {
+        val vault = Vault(); val user = owner("alice")
+        vault.save("alice", OkxSavedAccess(credentials, OkxReadProtocol.account(account())))
+        val paths = mutableListOf<String>()
+        val host = OkxReadHost(vault, { user }, OkxReadGateway { _, request ->
+            paths.add(request.path)
+            if (request is OkxReadRequest.Balance) """{"code":"0","data":[{"details":[{"ccy":"USDT","availBal":"0","eq":"20"}]}]}""" else account()
+        }) { 0 }
+        val grant = host.resume()
+        assertEquals(OkxReadFailure.BALANCE_CONSENT_REQUIRED, assertThrows(OkxReadException::class.java) { host.balance(grant) }.reason)
+        assertTrue(paths.isEmpty())
+        val approved = host.approve(host.verifySaved())
+        val result = StrictJson.parse(host.balance(approved))
+        assertEquals("0", result["available"]); assertEquals("20", result["equity"])
+        assertEquals(3, paths.count { it == "/api/v5/account/config" })
+        assertEquals(1, paths.count { it == "/api/v5/account/balance?ccy=USDT" })
+    }
+    @Test fun balanceCannotReturnAfterExchangeAccountChangesOrGrantIsRevoked() {
+        var uid = "100"; var revoked: (() -> Unit)? = null
+        val host = OkxReadHost(Vault(), { owner("alice") }, OkxReadGateway { _, request ->
+            if (request is OkxReadRequest.Balance) { uid = "101"; revoked?.invoke(); """{"code":"0","data":[{"details":[]}]}""" } else account(uid)
+        }) { 0 }
+        var grant = host.approve(host.verify(credentials))
+        assertEquals(OkxReadFailure.ACCOUNT_CHANGED, assertThrows(OkxReadException::class.java) { host.balance(grant) }.reason)
+        uid = "100"; grant = host.approve(host.verify(credentials)); revoked = { uid = "100"; host.revoke(grant) }
+        assertEquals(OkxReadFailure.CONNECTION_CHANGED, assertThrows(OkxReadException::class.java) { host.balance(grant) }.reason)
+    }
     private class Vault : OkxAccessVault {
         val values = mutableMapOf<String, OkxSavedAccess>()
         override fun read(owner: String) = values[owner]

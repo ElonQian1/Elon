@@ -24,13 +24,14 @@ internal class OkxAccount(val reference: String, val kind: String) {
 internal enum class OkxReadFailure {
     AUTHORIZATION_REQUIRED, ACCOUNT_CHANGED, READ_ONLY_KEY_REQUIRED, INVALID_CREDENTIALS,
     CLOCK_SKEW, RATE_LIMITED, NETWORK_UNAVAILABLE, INVALID_RESPONSE, RESPONSE_LIMIT,
-    BUSY, HOST_SESSION_REQUIRED, CONNECTION_CHANGED
+    BUSY, HOST_SESSION_REQUIRED, CONNECTION_CHANGED, BALANCE_CONSENT_REQUIRED
 }
 internal class OkxReadException(val reason: OkxReadFailure) : IllegalStateException(reason.name)
 internal fun okxFail(reason: OkxReadFailure): Nothing = throw OkxReadException(reason)
 
 internal sealed class OkxReadRequest(val path: String) {
     object Account : OkxReadRequest("/api/v5/account/config")
+    object Balance : OkxReadRequest("/api/v5/account/balance?ccy=USDT")
     class Pending private constructor(val cursor: String?) : OkxReadRequest(
         "/api/v5/tradingBot/grid/orders-algo-pending?algoOrdType=contract_grid&instType=SWAP&limit=100" +
             (cursor?.let { "&after=$it" } ?: "")) {

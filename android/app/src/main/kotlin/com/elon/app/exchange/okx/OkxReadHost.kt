@@ -39,8 +39,18 @@ internal class OkxReadHost(private val vault: OkxAccessVault, private val captur
     }
     fun approve(verified: Verified): String = synchronized(lock) {
         if (!verified.owner.sameAs(capture())) okxFail(OkxReadFailure.CONNECTION_CHANGED)
-        vault.save(verified.owner.userId, verified.saved)
-        issue(verified.owner, verified.saved)
+        val saved = OkxSavedAccess(verified.saved.credentials, verified.saved.account, balanceAllowed = true)
+        vault.save(verified.owner.userId, saved)
+        issue(verified.owner, saved)
+    }
+    fun verifySaved(): Verified {
+        val captured = owner()
+        val saved = vault.read(captured.userId) ?: okxFail(OkxReadFailure.AUTHORIZATION_REQUIRED)
+        val proof = verify(saved.credentials)
+        if (!captured.sameAs(capture()) || !captured.sameAs(proof.owner)) okxFail(OkxReadFailure.CONNECTION_CHANGED)
+        if (proof.saved.account.reference != saved.account.reference || proof.saved.account.kind != saved.account.kind)
+            okxFail(OkxReadFailure.ACCOUNT_CHANGED)
+        return proof
     }
     fun resume(): String = synchronized(lock) {
         val current = owner()
@@ -62,8 +72,10 @@ internal class OkxReadHost(private val vault: OkxAccessVault, private val captur
     fun read(grant: String, id: String?): String = readBound(grant, id, null)
     fun history(grant: String, after: String): String = readBound(grant, null, after)
     fun records(grant:String,kind:String,id:String,symbol:String,after:String)=readBound(grant,null,null,OkxRecordQuery(kind,id,symbol,after))
-    private fun readBound(grant: String, id: String?, historyAfter: String?, recordQuery:OkxRecordQuery?=null): String = exclusive {
+    fun balance(grant: String) = readBound(grant, null, null, balance = true)
+    private fun readBound(grant: String, id: String?, historyAfter: String?, recordQuery:OkxRecordQuery?=null, balance:Boolean=false): String = exclusive {
         val captured = synchronized(lock) { access(grant) }
+        if (balance && !captured.saved.balanceAllowed) okxFail(OkxReadFailure.BALANCE_CONSENT_REQUIRED)
         val credentials = captured.saved.credentials
         fun verifyAccount() {
             val account = OkxReadProtocol.account(gateway.get(credentials, OkxReadRequest.Account))
@@ -74,6 +86,14 @@ internal class OkxReadHost(private val vault: OkxAccessVault, private val captur
             synchronized(lock) { valid(captured) }
         }
         verifyAccount()
+        if (balance) {
+            val amounts = OkxBalance.decode(gateway.get(credentials, OkxReadRequest.Balance))
+            verifyAccount()
+            return@exclusive synchronized(lock) {
+                valid(captured)
+                OkxBalance.encode(captured.saved.account, captured.generation, System.currentTimeMillis(), amounts)
+            }
+        }
         val records=recordQuery?.let{OkxRecordsReader(gateway).read(credentials,it,System.currentTimeMillis())}
         val history = historyAfter?.let { OkxHistoryReader(gateway).read(credentials, it) }
         val rows = if(records!=null)emptyList() else history?.rows ?: if (id == null) OkxPendingReader(gateway, elapsed).read(credentials) else {

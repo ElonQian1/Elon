@@ -16,8 +16,8 @@ class OkxReadProvider : ContentProvider() {
             require(arg == null)
             val data = extras ?: Bundle()
             val keys = when (method) {
-                "capabilities_v1", "capabilities_v2", "capabilities_v3", "resume_v1" -> emptySet()
-                "read_v1", "revoke_v1" -> setOf("grant")
+                "capabilities_v1", "capabilities_v2", "capabilities_v3", "balance_capabilities_v1", "resume_v1" -> emptySet()
+                "read_v1", "revoke_v1", "balance_v1" -> setOf("grant")
                 "detail_v1" -> setOf("grant", "id")
                 "history_v1" -> setOf("grant", "after")
                 "records_v1" -> setOf("grant","kind","id","symbol","after")
@@ -29,6 +29,8 @@ class OkxReadProvider : ContentProvider() {
             Bundle().apply {
                 putString("schema", OkxReadProtocol.SCHEMA)
                 when (method) {
+                    "balance_capabilities_v1" -> { putString("status", "supported"); putString("balance_schema", OkxBalance.SCHEMA) }
+                    "balance_v1" -> putString("result", host.balance(grant))
                     "capabilities_v1" -> { putString("status", "supported"); putString("environment", "live") }
                     "capabilities_v2" -> { putString("status", "supported"); putString("environment", "live"); putString("history_schema", OkxHistoryPage.SCHEMA) }
                     "capabilities_v3" -> {putString("status","supported");putString("environment","live");putString("history_schema",OkxHistoryPage.SCHEMA);putString("records_schema",OkxRecordsPage.SCHEMA)}

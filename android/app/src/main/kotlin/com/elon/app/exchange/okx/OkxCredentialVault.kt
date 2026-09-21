@@ -10,7 +10,7 @@ import java.security.KeyStore
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 
-internal class OkxSavedAccess(val credentials: OkxCredentials, val account: OkxAccount) {
+internal class OkxSavedAccess(val credentials: OkxCredentials, val account: OkxAccount, val balanceAllowed: Boolean = false) {
     override fun toString() = "OkxSavedAccess(private)"
 }
 
@@ -40,7 +40,7 @@ internal class OkxCredentialVault(context: Context) : OkxAccessVault {
         check(directory.isDirectory || directory.mkdirs())
         val plain = StrictJson.encode(mapOf("schema" to alias, "owner" to OkxReadProtocol.digest(owner),
             "key" to access.credentials.key, "secret" to access.credentials.secret, "passphrase" to access.credentials.passphrase,
-            "account" to access.account.reference, "kind" to access.account.kind)).toByteArray(Charsets.UTF_8)
+            "account" to access.account.reference, "kind" to access.account.kind, "balance_allowed" to access.balanceAllowed)).toByteArray(Charsets.UTF_8)
         try {
             val encrypted = OkxVaultCipher.seal(key(true), aad(owner), plain)
             val target = file(owner)
@@ -56,12 +56,14 @@ internal class OkxCredentialVault(context: Context) : OkxAccessVault {
         val plain = OkxVaultCipher.open(key(false), aad(owner), data)
         try {
             val row = StrictJson.parse(plain.toString(Charsets.UTF_8), 4096)
-            require(row.keys == setOf("schema", "owner", "key", "secret", "passphrase", "account", "kind"))
+            val legacy = setOf("schema", "owner", "key", "secret", "passphrase", "account", "kind")
+            require(row.keys == legacy || row.keys == legacy + "balance_allowed")
+            require(!row.containsKey("balance_allowed") || row["balance_allowed"] is Boolean)
             require(row["schema"] == alias && row["owner"] == OkxReadProtocol.digest(owner))
             val account = row["account"] as? String ?: error("INVALID_VAULT")
             val kind = row["kind"] as? String ?: error("INVALID_VAULT")
             require(Regex("[a-f0-9]{64}").matches(account) && kind in setOf("primary", "sub"))
-            return OkxSavedAccess(OkxCredentials(row["key"] as String, row["secret"] as String, row["passphrase"] as String), OkxAccount(account, kind))
+            return OkxSavedAccess(OkxCredentials(row["key"] as String, row["secret"] as String, row["passphrase"] as String), OkxAccount(account, kind), row["balance_allowed"] == true)
         } finally { plain.fill(0) }
     }
     @Synchronized override fun revoke(owner: String) { file(owner).delete() }

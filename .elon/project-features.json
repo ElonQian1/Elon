@@ -18953,6 +18953,94 @@
       "updated_at_ms": 1788576247834
     },
     {
+      "id": "okx-account-balance-v1",
+      "title": "欧易账户余额只读接口",
+      "summary": "经账户余额授权向量化提供 USDT 余额、权益和冻结金额",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/okx-account-balance-read.md",
+        "content_hash": "5cf72002a8a547623ca005310edc5114e26fafa765518efbe675fde776377676",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "69300e8bb7bdefb0b321a80d9061f768a4b66dbf",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "d7d6a83b5e29934496931906471c66cf8e31430b",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/exchange/okx"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "只读身份核验与旧授权隔离",
+        "精确金额和缺失值通过测试",
+        "发布主 APK"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/exchange/okx/OkxBalance.kt",
+          "content_hash": "9b81143a17de367ef32876a932e88f25e03e843fad6097ffad34dcdc1a69fbc8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69300e8bb7bdefb0b321a80d9061f768a4b66dbf",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7aeecb78b95a3dfd0a8d5ed2a4ee515fb15c221c",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/exchange/okx/OkxBalanceTest.kt",
+          "content_hash": "6098827ac38a57140965ca82db02a90130824e369f00dde35b309796849a8b07",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69300e8bb7bdefb0b321a80d9061f768a4b66dbf",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "721d4ecb5bb79905e27169f31ff652d6557708b6",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/exchange/okx/OkxReadHostTest.kt",
+          "content_hash": "b9424e4566047b49a652c50592da883fbd30da01e66d9092acf3b9d2e7adc6d4",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69300e8bb7bdefb0b321a80d9061f768a4b66dbf",
+            "head_blob_oid": "40dda823745ff77576c21ade76764c946fc4ac11",
+            "worktree_blob_oid": "0b9db5213f88952d215a9458248cf0028c38ff40",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/okx-account-balance-delivery.md",
+          "content_hash": "3b01f1072f6fe3593930daccd1394df157a1a0aaaa4adf17148f4e12b18186fa",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "69300e8bb7bdefb0b321a80d9061f768a4b66dbf",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "43333a000838ed22c41e5e8b5569791c13a35e75",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1790013041856,
+      "updated_at_ms": 1790013641930
+    },
+    {
       "id": "open-commerce-consumer-order-closure-v1",
       "title": "消费者订单闭环视图 V1",
       "summary": "为消费者本人及其 AI 只读聚合同一终态 Invocation 的商户订单声明、最新 ERP 衔接结果与零资金计量边界。",
@@ -30585,56 +30673,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_9543d19314854a2fbbe137586a6ef471",
-      "feature_id": "android_binance_range_empty_stops_v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "主1700正式发布与无线安装摘要一致；当前量化0746区间带入、不变提示和变更只读准备通过，草稿已清理；真实交易不属于本解析修复验收",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1789268778268
-    },
-    {
-      "id": "feature_event_136e3e9327b04d8c8aa086496466ba1e",
-      "feature_id": "android-binance-host-lifecycle-v1",
-      "action": "registered",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789272647705
-    },
-    {
-      "id": "feature_event_b070ebb90ff14638a7ed7d7567386e2a",
-      "feature_id": "android-binance-host-lifecycle-v1",
-      "action": "claimed",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789272662625
-    },
-    {
-      "id": "feature_event_b28048f85e8c49589a6a31aa1afbe958",
-      "feature_id": "android-binance-host-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "复现后按固定前台绑定合同实现",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789272662697
-    },
-    {
-      "id": "feature_event_8215ed46b1bf4e9bb6f5d1d61bedae0a",
-      "feature_id": "android-binance-host-lifecycle-v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789283366252
-    },
-    {
       "id": "feature_event_c59969fe886349caa3ea37905f8f1737",
       "feature_id": "android-binance-host-lifecycle-v1",
       "action": "transitioned",
@@ -32583,6 +32621,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1789879045849
+    },
+    {
+      "id": "feature_event_b7774ea0834f4c539b57fbcd9fda6a58",
+      "feature_id": "okx-account-balance-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790013041857
+    },
+    {
+      "id": "feature_event_e2b8c4ad486d4a38b22f918e87644eb8",
+      "feature_id": "okx-account-balance-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790013041979
+    },
+    {
+      "id": "feature_event_96dcacd6df62401ba93d1bfb896b2e7e",
+      "feature_id": "okx-account-balance-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "实现已开始，补充余额读取与授权隔离",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790013297570
+    },
+    {
+      "id": "feature_event_de75654cea6047498288d9ee81a5a3e5",
+      "feature_id": "okx-account-balance-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790013641822
+    },
+    {
+      "id": "feature_event_b0fbd860bf794566bba9b0e89a43d043",
+      "feature_id": "okx-account-balance-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "余额合同实现，37项自动测试通过；用户验收待补",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790013641930
     }
   ]
 }

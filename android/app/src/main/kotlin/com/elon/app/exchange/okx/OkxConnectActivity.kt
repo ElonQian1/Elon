@@ -48,7 +48,7 @@ class OkxConnectActivity : Activity() {
             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
         }
         root.addView(ui.label("连接欧易", 24f))
-        root.addView(ui.label("全球站 · 正式账户 · 仅查看合约网格", 13f).apply { setTextColor(ui.muted) })
+        root.addView(ui.label("全球站 · 正式账户 · 网格与账户余额只读", 13f).apply { setTextColor(ui.muted) })
         val fields = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; isSaveEnabled = false }
         fields.addView(ui.label("请在欧易 API 管理创建仅有 Read 权限的授权，再填写以下三项。", 15f))
         fun input(label: String, id: String): EditText {
@@ -69,15 +69,31 @@ class OkxConnectActivity : Activity() {
             }
         }
         key = input("API Key", "okx-api-key"); secret = input("Secret Key", "okx-secret"); passphrase = input("Passphrase", "okx-passphrase")
-        status = ui.label("授权资料加密保存在本机主应用，量化只接收网格数据。", 13f).apply { contentDescription = "okx-connect-status" }
+        status = ui.label("授权资料加密保存在本机主应用，量化可读取网格及 USDT 账户余额、权益和冻结金额。", 13f).apply { contentDescription = "okx-connect-status" }
         fields.addView(status)
         verify = ui.button("验证只读授权", "okx-verify", true) { verify() }; fields.addView(verify)
-        approve = ui.button("同意并保持只读连接", "okx-approve", true) { confirmReadAccess() }.apply { visibility = View.GONE }
+        approve = ui.button("同意读取网格与账户余额", "okx-approve", true) { confirmReadAccess() }.apply { visibility = View.GONE }
         fields.addView(approve)
         fields.addView(ui.label("连接后返回量化查看网格；可在量化随时断开并删除本机授权资料。本入口不支持模拟或地区账户切换。", 13f).apply { setTextColor(ui.muted) })
         root.addView(ScrollView(this).apply { isSaveEnabled = false; addView(fields) }, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(ui.button("取消并返回量化", "okx-connect-cancel") { finish() })
         setContentView(root)
+        restoreSaved()
+    }
+    private fun restoreSaved() {
+        val ticket = ++epoch; busy(true)
+        worker.execute {
+            val result = runCatching { OkxReadHost.get(this).verifySaved() }
+            runOnUiThread {
+                if (isFinishing || isDestroyed || ticket != epoch) return@runOnUiThread
+                busy(false)
+                result.onSuccess {
+                    verified = it
+                    status.text = "已核验本机保存的欧易${if (it.kind == "sub") "子账户" else "主账户"}。无需重新填写密钥，确认后允许量化读取网格与 USDT 账户余额。"
+                    approve.visibility = View.VISIBLE
+                }.onFailure { if ((it as? OkxReadException)?.reason != OkxReadFailure.AUTHORIZATION_REQUIRED) status.text = message(it) }
+            }
+        }
     }
     private fun busy(value: Boolean) {
         listOf(key, secret, passphrase, verify, approve).forEach { it.isEnabled = !value }

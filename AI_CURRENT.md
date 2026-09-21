@@ -8,6 +8,8 @@ reviewed_at: 2026-09-05
 
 ## 当前产品主链
 
+- [欧易余额](docs/okx-account-balance-delivery.md)：37 项通过，待发布/验收。
+
 - [Web AI 当前批次](docs/reports/chatgpt-runtime-bindings-20260915.md)
 
 - 主1774/量化0.7.77已装机：持仓报告v2补同策略保证金，保留v1；197项原生通过，[用户验收](docs/binance-grid-rich-reports-delivery.md)待补。
