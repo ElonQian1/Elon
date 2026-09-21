@@ -51,7 +51,8 @@ public final class SocialLinkUiAcceptance extends UiAutomatorTestCase {
                 assertTrue("chat_list_missing", new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/chatList")).waitForExists(5000));
                 break;
             case "open_article":
-                UiObject article = description(argument("article"));
+                // The preview may gain an author after read-back; match a supplied public-title prefix.
+                UiObject article = new UiObject(new UiSelector().packageName(APP).descriptionStartsWith(argument("article")));
                 UiObject list = new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/chatList"));
                 for (int i = 0; !article.exists() && i < 12; i++) {
                     AccessibilityNodeInfo info = node(list);
