@@ -27,14 +27,22 @@ internal object WebChatComposerProviderPresentation {
         modelButton.setOnClickListener { showWorkModelSelector() }
     }
 
+    fun applyGroup(button: TextView, provider: WebChatProviderIdentity, rawModelLabel: String) {
+        apply(button, provider, rawModelLabel, iconSizeDp = 32,
+            iconResId = if (provider.id == WebChatProviderId.CHATGPT_WEB)
+                R.drawable.ic_web_ai_chatgpt_compact else provider.avatarResId)
+    }
+
     fun apply(
         button: TextView,
         provider: WebChatProviderIdentity,
         rawModelLabel: String,
+        iconSizeDp: Int = 18,
+        iconResId: Int = provider.avatarResId,
     ) {
         val modelLabel = rawModelLabel.trim().ifBlank { provider.displayName }
-        val iconSize = (18 * button.resources.displayMetrics.density).toInt()
-        val icon = ContextCompat.getDrawable(button.context, provider.avatarResId)
+        val iconSize = (iconSizeDp * button.resources.displayMetrics.density).toInt()
+        val icon = ContextCompat.getDrawable(button.context, iconResId)
             ?.mutate()
             ?.apply { setBounds(0, 0, iconSize, iconSize) }
         button.text = modelLabel

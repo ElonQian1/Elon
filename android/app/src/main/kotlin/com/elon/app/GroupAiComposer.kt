@@ -69,7 +69,7 @@ internal class GroupAiComposer(
         ui.webToolsButton.visibility = View.GONE
         ui.attachmentButton.visibility = View.VISIBLE
         val provider = config.engine.providerId
-        if (provider != null) WebChatComposerProviderPresentation.apply(binding.modelButton,
+        if (provider != null) WebChatComposerProviderPresentation.applyGroup(binding.modelButton,
             WebChatProviderRegistry.get(provider), config.label)
         else {
             WebChatComposerProviderPresentation.clear(binding.modelButton)
