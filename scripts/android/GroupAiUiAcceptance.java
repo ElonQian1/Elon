@@ -166,6 +166,17 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
             case "open_sources":
                 fixtureOpen(); action(desc("group-ai-source-records-2"), false);
                 assertTrue("source_reader_missing", id("ai_conversation_share_list").waitForExists(5000)); break;
+            case "open_sharing":
+                fixtureOpen();
+                assertTrue("synthetic_answer_required", text("ELON GROUP SELECTION PASSED").exists());
+                assertFalse("ambiguous_sharing_control", new UiObject(new UiSelector().packageName(APP)
+                    .description("group-ai-discussion-sharing").instance(1)).exists());
+                action(desc("group-ai-discussion-sharing"), false);
+                assertTrue("sharing_dialog_missing", text("讨论分享设置").waitForExists(5000)); break;
+            case "allow_discussion":
+            case "disable_discussion":
+                assertTrue("sharing_dialog_required", text("讨论分享设置").exists());
+                action(text(step.equals("allow_discussion") ? "允许继续讨论" : "关闭分享"), false); break;
             case "continue_private": action(desc("ai-conversation-share-continue-private"), false); break;
             case "confirm_private":
                 assertTrue("private_confirmation_required", text("用自己的 ChatGPT 继续讨论").exists());
@@ -189,6 +200,9 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
             .put("card_visible", text(CARD).exists())
             .put("source_records_visible", desc("group-ai-source-records-2").exists())
             .put("continue_discussion_visible", desc("group-ai-continue-discussion").exists())
+            .put("sharing_dialog", text("讨论分享设置").exists())
+            .put("allow_discussion", text("允许继续讨论").exists())
+            .put("disable_discussion", text("关闭分享").exists())
             .put("reader_visible", id("ai_conversation_share_list").exists())
             .put("private_confirmation", text("用自己的 ChatGPT 继续讨论").exists())
             .put("return_confirmation", text("放弃未发送的私人草稿？").exists())
