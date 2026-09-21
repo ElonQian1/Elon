@@ -3,10 +3,12 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
 const { parseSource, roleFiles, compareSymbol } = require('./analyze-chatgpt-runtime-contracts.cjs');
 const prior = require('./fixtures/chatgpt-runtime-bindings-sep21.cjs');
-const profile = require('./fixtures/chatgpt-runtime-bindings-sep22.cjs');
+const profile = process.env.CHATGPT_RUNTIME_ROLLOUT === 'sep22b'
+  ? require('./fixtures/chatgpt-runtime-bindings-sep22b.cjs')
+  : require('./fixtures/chatgpt-runtime-bindings-sep22.cjs');
 const directory = process.env.CHATGPT_PUBLIC_RUNTIME_DIR, previous = process.env.CHATGPT_PRIOR_RUNTIME_DIR;
 
-test('Sep 22 exact profile exposes all reviewed live exports and rejects unknown documents', async () => {
+test(profile.id + ' exposes all reviewed live exports and rejects unknown documents', async () => {
   const bindings = require('../android/app/src/main/assets/chatgpt_web_private_runtime_bindings');
   const cdn = 'https://chatgpt.com/cdn/assets/';
   let observed = profile.anchor;
@@ -32,7 +34,7 @@ test('Sep 22 exact profile exposes all reviewed live exports and rejects unknown
   await assert.rejects(runtime.load('shared'), /runtime_not_observed/);
 });
 
-test('Sep 22 public-source contracts and ambiguous dependencies are pinned, not guessed', {
+test(profile.id + ' public-source contracts and ambiguous dependencies are pinned, not guessed', {
   skip: !(directory && previous) && 'Set both reviewed public runtime directories.'
 }, () => {
   const current = {}, old = {};

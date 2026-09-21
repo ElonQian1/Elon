@@ -25,7 +25,10 @@ This probe is evidence of the current live rollout, not a reconstruction of the 
 
 ## Verification
 
+- APK 1802 was published and installed, but the selected-message acceptance still failed before dispatch. A new read-only device probe observed a second rollout (`c2675c8c-irpzu8vf7ngp9dkh.js`), not the earlier asset set. This is not a successful user-path acceptance.
+- Added `web_20260922_b` for that exact asset set. All 100 consumed aliases match the earlier Sep 22 contracts; the tools/temporary owners and asset hashes are separately pinned. Unknown rollouts are not allowed by wildcard.
 - Public asset hashes and reviewed dependency tests: 66 passed, including all 100 mappings; send/runtime guards: 59 passed.
+- Second rollout evidence and temporary/recovery/send guards: 47 passed, no skips (`CHATGPT_RUNTIME_ROLLOUT=sep22b`).
 - Android Release unit tests: 30 passed across the group feature, command identity, diagnostics, failure classification, send preparation and session policy.
 - Server targeted regressions, Release delivery and real group acceptance: pending in this work batch.
 

@@ -32,7 +32,7 @@ test('read-only context captures a committed conversation without editor, model 
   assert.equal(f.page.localStorage.length, 0);
 });
 
-for (const profile of ['web_20260921', 'web_20260922']) test(`${profile} recovery remains read-only and rejects a runtime swap`, async () => {
+for (const profile of ['web_20260921', 'web_20260922', 'web_20260922_b']) test(`${profile} recovery remains read-only and rejects a runtime swap`, async () => {
   const f = fixture();
   f.bindings.state = () => ({ profile_id: profile });
   const binding = await f.capture();

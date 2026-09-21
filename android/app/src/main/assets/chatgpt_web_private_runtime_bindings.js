@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 32, create: factory });
+  const api = Object.freeze({ version: 33, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateRuntimeBindings?.version) >= api.version)) {
@@ -248,6 +248,11 @@
     react: september21Exports.react
   };
   const profiles = [
+    { id: 'web_20260922_b', anchor: 'c2675c8c-irpzu8vf7ngp9dkh.js',
+      files: { shared: '4813494d-l0x0s7iuq5eywkh0.js', conversation: 'conversation-small-fisxpb00fx88jy9f.js',
+        composer: '8b34dbc2-bhyhfsqvfupfymrt.js', react: '2340486e-b3t78qt0psmq9d8c.js' },
+      exports: september22Exports, tools: { owner: 'Wwn' },
+      temporary: { owner: 'Z$t', action: '()=>{mc.logEvent(`Temporary Chat Move: Temporary Chat Button Clicked`),a?(TB.reset(c),Am()&&Lh.delete(n),!o&&!Lh(n)&&Y$t(s),u(Q$t,{replace:!0})):sj(l,{params:o?void 0:new URLSearchParams({[im]:`true`})})}' } },
     { id: 'web_20260922', anchor: 'c2675c8c-m8j393ail312cu4n.js',
       files: { shared: '4813494d-cfz7xrlmg5sd5itt.js', conversation: 'conversation-small-g5bv8gqbm1uyfavj.js',
         composer: '8b34dbc2-hyspd96sta7ld0cc.js', react: '2340486e-b3t78qt0psmq9d8c.js' },
@@ -437,8 +442,8 @@
 
   function state() {
     const p = profile();
-    return { version: 32, profile_id: p?.id || '', cached_modules: cache.size, error };
+    return { version: 33, profile_id: p?.id || '', cached_modules: cache.size, error };
   }
 
-  return Object.freeze({ version: 32, observed, load, peek, temporary, tools, state });
+  return Object.freeze({ version: 33, observed, load, peek, temporary, tools, state });
 });
