@@ -231,7 +231,7 @@ impl Store {
              ORDER BY created_at ASC"
         };
         let mut stmt = conn.prepare(sql)?;
-        let messages = if let Some(after) = after {
+        let mut messages = if let Some(after) = after {
             stmt.query_map(params![group_id, after, limit], |row| {
                 row_to_group_message(row, user_id)
             })?
@@ -243,6 +243,7 @@ impl Store {
             .collect::<rusqlite::Result<Vec<_>>>()?
         };
         drop(stmt);
+        super::social_ai_messages::requests::context::decorate(&conn, &mut messages)?;
         if mark_read {
             mark_group_messages_read(&conn, user_id, group_id)?;
         }
@@ -532,6 +533,7 @@ fn row_to_group_message(
     let recalled_at: Option<String> = row.get(7)?;
     let recalled_by: Option<String> = row.get(8)?;
     Ok(FriendGroupMessage {
+        ai_reply: None,
         id: row.get(0)?,
         group_id: row.get(1)?,
         sender_name: row.get(3)?,

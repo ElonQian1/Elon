@@ -1,6 +1,6 @@
 ---
 version_status: current
-reviewed_at: 2026-09-20
+reviewed_at: 2026-09-21
 ---
 
 # 群聊 AI 选区、分享与私人续聊
@@ -15,15 +15,16 @@ reviewed_at: 2026-09-20
 4. 选区请求使用 `context_scope=selected`，不混入最近 30 条窗口，不自动进入旧工作 AI 回退。
 5. 已有独立网页 AI 执行器保留临时空白会话隔离，私有发送传输和现有模型档位继续复用。
 6. 服务端 dispatch 只发一次许可；结果不确定时不重新发送。完成时再次核验选区版本和权限。
-7. 发起人可长按 ChatGPT 精选分析回答“转发”，预览“所选消息 + 补充问题 + 回答”，再选择群发送已有原生分享卡片。
+7. 新产生的精选 AI 回答下方显示来源记录卡片，保留分析时的文字、Markdown、附件与时间；ChatGPT 回答气泡末尾提供“使用 ChatGPT 继续讨论”。发起人也可继续使用长按“转发”和原有分享卡片。
 8. 群成员点卡片，以已有原生只读聊天 UI 阅读，Markdown 和代码正文保留；重新打开和继续讨论均重新鉴权。
-9. “继续私聊”打开自己的 ChatGPT 空白会话，确认新会话命令成功、路由与草稿为空后才填入选段草稿。必须由用户按发送，不自动写回群。
+9. 发起人可在分析确认页或回答的分享设置中允许群成员继续讨论，默认未授权。续聊打开查看者自己的 ChatGPT 空白会话，确认新会话、路由与草稿为空后才填入选段草稿。必须由用户按发送，不自动写回群。
 10. 返回键回原群；未发送的私人草稿需要确认放弃，不能带到群输入框。旧回答无法获取精选上下文时仍可选择仅转发正文。
 
 ## 数据与隐私边界
 
 - 身份 Cookie、运行时令牌继续留在设备 WebView，不进入群聊服务端或分享卡片。
-- `group_ai_selected_sources` 固定消息版本。编辑、撤回、退群后拒绝派发、完成或重新生成精选分享草稿。
+- `group_ai_selected_sources` 固定消息版本。编辑、撤回、退群后拒绝派发或完成。V304 起同时保存分析时的来源快照：完成后的编辑不会改写来源记录；已撤回的来源隐藏正文及附件，退群拒绝访问。
+- 继续讨论权限独立保存，只有原发起人可修改，并用版本号拒绝过期覆盖。关闭不删除别人已经保存的内容。旧版未保存快照的回答只保留原发起人原有导出能力，不能追溯开放他人权限。
 - 完整选区超出 20,000 UTF-16 单位会拒绝，不静默截断。
 - 同一 operation 不可改群、改用户、改选区或问题；不同成员可以各自分析同一条消息。
 - 已显式发布的卡片是独立快照，原消息后续编辑不会重写快照；撤回分享仍走已有快照权限流程。
@@ -56,8 +57,10 @@ reviewed_at: 2026-09-20
 ## 实现与验证入口
 
 - Android：`GroupAiSelectionPreview`、`GroupWebAiFeature`、`MainAiConversationShareFeature`、`AiConversationPrivateContinuation`。
-- 后端：`group_web_ai_selection.rs`、`group_ai_context_share.rs`、迁移 V303。
-- HTTP：已有 web-ai prepare 接收 `selected_context`；新增 `GET /api/me/groups/:group_id/messages/:message_id/ai-context`。
+- 后端：`group_web_ai_selection.rs`、`group_ai_reply_context.rs`、`group_ai_context_share.rs`、迁移 V303/V304。
+- HTTP：web-ai prepare 接收 `selected_context.allow_continue`；`GET /api/me/groups/:group_id/messages/:message_id/ai-context` 重新检查续聊权限；同前缀 `GET/PATCH ai-sources` 提供来源记录与版本化分享设置。
+- Windows 与 APK 复用现有富文本、附件阅读和私人续聊模块；移动 PWA 支持来源阅读和分享设置，私人 ChatGPT 续聊明确引导到客户端，不冒充具有本地 WebView 身份层。
+- 本批交付与验证见 [来源卡片与续聊入口](reports/group-ai-reply-context-20260921.md)。
 - 定向 SQLite harness：`server/tests/group-ai-selection-harness`，直接引入生产模块，覆盖迁移、成员隔离、revision、幂等和分享范围。
 - Android 定向：`AiConversationContinuationPromptTest`、`AiConversationShare*Test`。
 - 当前生产后端 `cargo check` 和定向 SQLite 测试通过；全后端 `--tests` 编译被既有 managed-fs 测试模块错误阻止，不代表本次全仓测试通过。

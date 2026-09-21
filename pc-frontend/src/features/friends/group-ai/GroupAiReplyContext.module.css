@@ -1,0 +1,14 @@
+.footer { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--line, #5555); margin-top: 12px; padding-top: 8px; }
+.footer button { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; color: var(--brand, #2684e8); cursor: pointer; min-height: 36px; text-align: left; }
+.source { display: grid; gap: 5px; max-width: 100%; width: 360px; margin-top: 8px; border: 1px solid var(--line, #5555); border-radius: 6px; padding: 12px; background: var(--panel, #252525); color: inherit; text-align: left; cursor: pointer; }
+.source strong { display: flex; align-items: center; gap: 8px; }
+.source span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .8; }
+.source small { opacity: .6; margin-top: 5px; }
+.record { padding: 20px 0; border-bottom: 1px solid var(--line, #5555); overflow-wrap: anywhere; }
+.record header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.record header > :first-child { width: 32px; height: 32px; flex-shrink: 0; }
+.record time { margin-left: auto; font-size: 12px; opacity: .6; }
+.sharing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 0; }
+.sharing small { width: 100%; opacity: .7; }
+.handoff { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px 16px; background: var(--panel, #252525); border-bottom: 1px solid var(--line, #5555); font-size: 13px; }
+.handoff button { cursor: pointer; min-height: 36px; }

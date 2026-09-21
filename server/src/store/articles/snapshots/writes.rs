@@ -120,6 +120,7 @@ fn read_message(
          m.content,m.created_at,m.revision,m.edited_at FROM friend_group_messages m
          JOIN users u ON u.id=m.sender_user_id WHERE m.id=?1 AND m.group_id=?2 AND m.recalled_at IS NULL",
         params![id,group], |r| Ok(FriendGroupMessage {
+            ai_reply: None,
             id: r.get(0)?, group_id: r.get(1)?, sender_user_id: r.get(2)?, sender_name: r.get(3)?,
             content: r.get(4)?, created_at: r.get(5)?, revision: r.get(6)?, edited_at: r.get(7)?,
             attachments: vec![], outgoing: r.get::<_,String>(2)? == user,

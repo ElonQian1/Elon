@@ -13,6 +13,8 @@ pub(crate) struct GroupAiSelection {
     pub message_revisions: HashMap<String, i64>,
     #[serde(default)]
     pub question: String,
+    #[serde(default)]
+    pub allow_continue: bool,
 }
 
 fn prompt(
@@ -123,6 +125,18 @@ impl Store {
         ).optional()?;
         let id = if let Some((id, stored)) = existing {
             ensure!(stored == prompt, "同一操作不能更换选区或问题");
+            let allowed: bool = tx
+                .query_row(
+                    "SELECT allow_continue FROM group_ai_reply_contexts WHERE request_id=?1",
+                    [&id],
+                    |r| r.get(0),
+                )
+                .optional()?
+                .unwrap_or(false);
+            ensure!(
+                allowed == selection.allow_continue,
+                "同一操作不能更换分享权限"
+            );
             id
         } else {
             let id = new_id("gaireq");
@@ -141,6 +155,7 @@ impl Store {
                     params![id, message, revision],
                 )?;
             }
+            super::context::capture(&tx, &id, group, selection.allow_continue)?;
             id
         };
         let request = web::read_owned(&tx, user, group, &id, operation)?;

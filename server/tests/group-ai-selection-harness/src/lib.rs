@@ -23,8 +23,17 @@ fn new_id(prefix: &str) -> String {
 #[path = "../../../src/store/group_ai_source_access.rs"]
 mod source;
 use source::ensure_member_and_source;
+#[path = "../../../src/store/group_ai_reply_context.rs"]
+mod context;
 #[path = "../../../src/store/group_ai_context_share.rs"]
 mod context_share;
+mod store {
+    pub struct FriendGroupMessage {
+        pub id: String,
+        pub recalled_at: Option<String>,
+        pub ai_reply: Option<serde_json::Value>,
+    }
+}
 #[path = "../../../src/store/group_ai_selection_schema.rs"]
 mod migration;
 #[path = "../../../src/store/group_web_ai_selection.rs"]

@@ -73,6 +73,7 @@ fn insert_content(
     )?;
     mark_group_messages_read(conn, user, group)?;
     Ok(FriendGroupMessage {
+        ai_reply: None,
         id,
         group_id: group.to_owned(),
         sender_user_id: user.to_owned(),

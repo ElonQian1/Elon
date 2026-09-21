@@ -173,6 +173,8 @@ pub struct FriendGroupProfile {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FriendGroupMessage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ai_reply: Option<serde_json::Value>,
     pub id: String,
     pub group_id: String,
     pub sender_user_id: String,

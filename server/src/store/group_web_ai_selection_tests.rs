@@ -6,6 +6,7 @@ fn selection(ids: &[String]) -> GroupAiSelection {
         message_ids: ids.to_vec(),
         message_revisions: ids.iter().map(|id| (id.clone(), 1)).collect(),
         question: "compare".into(),
+        allow_continue: false,
     }
 }
 

@@ -38,6 +38,8 @@ internal class MainGroupChatActions(
     }
     private var owner = AuthManager.userId(activity)
     private val messagesByGroup = linkedMapOf<String, MutableList<ChatMessage>>()
+    private val readPositions = linkedMapOf<String, android.os.Parcelable>()
+    private var pendingReadPosition: android.os.Parcelable? = null
     private val pollHandler = Handler(Looper.getMainLooper())
     private var activeGroup: AppGroup? = null
     private var activeAdapter: ChatAdapter? = null
@@ -86,8 +88,9 @@ internal class MainGroupChatActions(
         }
     }
 
-    fun openGroup(group: AppGroup, animate: Boolean) {
+    fun openGroup(group: AppGroup, animate: Boolean, restorePosition: Boolean = false) {
         ensureOwner(); foreground = true; reader.cancel()
+        pendingReadPosition = if (restorePosition) readPositions[group.id] else null
         revisions.close()
         activeGroup = group
         mentions.setGroup(group)
@@ -103,19 +106,22 @@ internal class MainGroupChatActions(
         adapter.onMessageHistory = { revisions.history(group.id, it) }
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter
-        if (messages.isNotEmpty()) {
+        if (messages.isNotEmpty() && pendingReadPosition == null) {
             binding.chatList.jumpToLatestMessageBeforeNextDraw()
         }
         showFriendChat(group.name, animate)
         aiComposer.open(group.id)
         summaryPosts.openGroup(group)
         com.elon.app.articles.ArticleCardViews.openGroup(binding.groupSummaryStrip, group.id)
-        loadMessages(group, silent = false, scrollToBottom = true)
+        pendingReadPosition?.let { binding.chatList.layoutManager?.onRestoreInstanceState(it) }
+        loadMessages(group, silent = false, scrollToBottom = !restorePosition)
         startPolling()
         webAi.recover()
     }
 
     fun closeGroupChat() {
+        activeGroup?.id?.let { id -> binding.chatList.layoutManager?.onSaveInstanceState()?.let { readPositions[id] = it } }
+        while (readPositions.size > 30) readPositions.remove(readPositions.keys.first())
         showSocialChatStatus(binding, null)
         aiComposer.close()
         revisions.close()
@@ -393,10 +399,11 @@ internal class MainGroupChatActions(
             val remote = List(rows.length()) { groupMessageFromJson(group, rows.getJSONObject(it)) }
             val merged = mergeSocialChatMessages(currentMessages, remote.withMissingImageAnnotationsFromCurrent(currentMessages))
             val changed = currentMessages != merged
-            val follow = scrollToBottom || !binding.chatList.canScrollVertically(1)
+            val follow = pendingReadPosition == null && (scrollToBottom || !binding.chatList.canScrollVertically(1))
             currentMessages.clear(); currentMessages.addAll(merged)
             revisions.onMessagesChanged(merged)
             if (changed) activeAdapter?.notifyDataSetChanged()
+            pendingReadPosition?.let { binding.chatList.layoutManager?.onRestoreInstanceState(it); pendingReadPosition = null }
             if (follow && changed && currentMessages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
             showSocialChatStatus(binding, if (currentMessages.isEmpty()) "还没有消息" else null)
             if (changed || !silent || allowPendingRefresh) onGroupSummariesChanged()
@@ -416,6 +423,7 @@ internal class MainGroupChatActions(
         if (owner == next) return true
         messagesByGroup.values.forEach { it.clear() }; messagesByGroup.clear()
         activeAdapter?.notifyDataSetChanged(); closeGroupChat(); owner = next
+        readPositions.clear(); pendingReadPosition = null
         return false
     }
 
@@ -515,6 +523,7 @@ internal class MainGroupChatActions(
             id = json.optString("id").trim().takeIf { it.isNotEmpty() },
             senderAvatarDataUrl = senderAvatar,
             senderUserId = senderUserId,
+            groupAiReply = json.optJSONObject("ai_reply")?.toString(),
             createdAtMs = parseChatMessageCreatedAt(json.optString("created_at", "")) ?: 0L,
             recalledAt = json.cleanRecallString("recalled_at"),
             revision = json.optLong("revision", 1).coerceAtLeast(1),

@@ -45,10 +45,7 @@ pub(super) async fn share_context(
         .group_ai_context_share_draft(&user.id, &group, &message)
     {
         Ok(value) => ([("cache-control", "private, no-store")], Json(value)).into_response(),
-        Err(_) => json_error(
-            StatusCode::CONFLICT,
-            "仅发起人可分享仍有效的精选讨论；原消息可能已变化",
-        ),
+        Err(_) => json_error(StatusCode::CONFLICT, "讨论未开放、已撤回，或你已不在群中"),
     }
 }
 

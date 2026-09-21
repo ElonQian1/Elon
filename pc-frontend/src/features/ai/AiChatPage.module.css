@@ -13,6 +13,7 @@
 .layout[data-user-panel-collapsed="true"] {
   grid-template-columns: 260px minmax(0, 1fr);
 }
+.layout:has([data-group-discussion]) { grid-template-rows: auto minmax(0, 1fr); }
 
 @media (max-width: 960px) {
   .layout { grid-template-columns: 260px minmax(0, 1fr); }

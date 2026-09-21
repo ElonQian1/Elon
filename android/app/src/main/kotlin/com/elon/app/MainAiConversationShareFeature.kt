@@ -34,6 +34,13 @@ internal class MainAiConversationShareFeature(
     private var preview: AiConversationSharePreview? = null
     private var job: Job? = null
     private val continuation = AiConversationPrivateContinuation(activity, nativeChat, input, sourceGroup, openGroup)
+    private val groupReplies = GroupAiReplyFeature(activity, api, sourceGroup, continuation, onPublished)
+    fun bind(adapter: ChatAdapter) {
+        adapter.onAiConversationShareOpen = ::open
+        adapter.onGroupAiReplyAction = groupReplies::open
+        adapter.onAiConversationShareCoverLoad = ::loadCover
+        adapter.onAiConversationShareLongPress = ::showCardActions
+    }
 
     init { activity.lifecycle.addObserver(this) }
 

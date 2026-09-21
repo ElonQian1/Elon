@@ -1,4 +1,5 @@
 /* APK-led selected AI content; all surfaces use the existing mobile tokens. */
+.group-ai-source-card { border: 1px solid var(--line); border-radius: 6px; margin-top: 8px; max-width: 360px; }
 .bubble.ai-share-card-bubble {
   position: relative;
   width: 300px;

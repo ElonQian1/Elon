@@ -14,7 +14,7 @@ impl Fixture {
             CREATE TABLE friend_groups(id TEXT PRIMARY KEY);
             CREATE TABLE friend_group_members(group_id TEXT,user_id TEXT);
             CREATE TABLE friend_group_messages(id TEXT PRIMARY KEY,group_id TEXT,sender_user_id TEXT,
-                content TEXT,created_at TEXT,recalled_at TEXT,revision INTEGER NOT NULL DEFAULT 1);
+                content TEXT,created_at TEXT,recalled_at TEXT,attachments_json TEXT,revision INTEGER NOT NULL DEFAULT 1);
             INSERT INTO users VALUES('u','user','test@example.com'),('v','member','member@example.com');
             INSERT INTO friend_groups VALUES('g'),('foreign');
             INSERT INTO friend_group_members VALUES('g','u'),('g','v');
@@ -34,6 +34,7 @@ impl Fixture {
                 VALUES('legacy','g','b','u','dispatched','now','now');
             INSERT INTO group_ai_work_options VALUES('legacy','model',1);").unwrap();
         migration::migrate(&conn).unwrap();
+        context::migrate(&conn).unwrap();
         Self { store }
     }
     fn input(ids: &[&str]) -> selection::GroupAiSelection {
@@ -41,6 +42,7 @@ impl Fixture {
             message_ids: ids.iter().map(|s| s.to_string()).collect(),
             message_revisions: ids.iter().map(|s| (s.to_string(), 1)).collect(),
             question: "compare".into(),
+            allow_continue: false,
         }
     }
     fn prepare(
@@ -202,7 +204,7 @@ fn recent_request_cannot_adopt_selected_operation() {
 }
 
 #[test]
-fn reply_share_contains_only_selection_and_requires_owner_and_unchanged_sources() {
+fn reply_share_contains_only_selection_and_requires_consent_and_preserves_original_edits() {
     let f = Fixture::new();
     let operation = op();
     let req = f.prepare(&operation, &Fixture::input(&["a", "c"])).unwrap();
@@ -228,12 +230,155 @@ fn reply_share_contains_only_selection_and_requires_owner_and_unchanged_sources(
         .group_ai_context_share_draft("u", "foreign", "gai_reply")
         .is_err());
     conn.execute(
-        "UPDATE friend_group_messages SET revision=2 WHERE id='c'",
+        "UPDATE friend_group_messages SET revision=2,content='EDITED_AFTER_ANSWER' WHERE id='c'",
+        [],
+    )
+    .unwrap();
+    let frozen = f
+        .store
+        .group_ai_context_share_draft("u", "g", "gai_reply")
+        .unwrap()
+        .to_string();
+    assert!(frozen.contains("SELECTED_C") && !frozen.contains("EDITED_AFTER_ANSWER"));
+    assert!(f
+        .store
+        .set_group_ai_continuation("v", "g", "gai_reply", true, 1)
+        .is_err());
+    f.store
+        .set_group_ai_continuation("u", "g", "gai_reply", true, 1)
+        .unwrap();
+    assert!(f
+        .store
+        .group_ai_context_share_draft("v", "g", "gai_reply")
+        .is_ok());
+    assert!(f
+        .store
+        .set_group_ai_continuation("u", "g", "gai_reply", false, 1)
+        .is_err());
+    f.store
+        .set_group_ai_continuation("u", "g", "gai_reply", false, 2)
+        .unwrap();
+    assert!(f
+        .store
+        .group_ai_context_share_draft("v", "g", "gai_reply")
+        .is_err());
+    assert!(f
+        .store
+        .group_ai_reply_sources("v", "g", "gai_reply")
+        .is_ok());
+    conn.execute(
+        "UPDATE friend_group_messages SET recalled_at='now' WHERE id='c'",
+        [],
+    )
+    .unwrap();
+    assert!(!f
+        .store
+        .group_ai_reply_sources("v", "g", "gai_reply")
+        .unwrap()
+        .to_string()
+        .contains("SELECTED_C"));
+    conn.execute("DELETE FROM friend_group_members WHERE user_id='v'", [])
+        .unwrap();
+    assert!(f
+        .store
+        .group_ai_reply_sources("v", "g", "gai_reply")
+        .is_err());
+}
+
+#[test]
+fn rich_sources_are_frozen_but_never_sent_as_attachment_bytes() {
+    let f = Fixture::new();
+    let conn = f.store.conn().unwrap();
+    conn.execute(
+        "UPDATE friend_group_messages SET attachments_json=?1 WHERE id='a'",
+        [r#"[{"kind":"image","url":"/api/test-image","display_name":"Reference"}]"#],
+    )
+    .unwrap();
+    let mut input = Fixture::input(&["c", "a"]);
+    input.allow_continue = true;
+    let operation = op();
+    let req = f.prepare(&operation, &input).unwrap();
+    assert!(!req.prompt.contains("/api/test-image"));
+    input.allow_continue = false;
+    assert!(f.prepare(&operation, &input).is_err());
+    conn.execute("INSERT INTO friend_group_messages(id,group_id,sender_user_id,content,created_at) VALUES('gai_rich','g','u','**ANSWER**','2026-09-20T00:00:00Z')",[]).unwrap();
+    conn.execute("UPDATE group_ai_reply_requests SET state='completed',result_message_id='gai_rich' WHERE id=?1",[&req.id]).unwrap();
+    conn.execute("UPDATE friend_group_messages SET attachments_json=NULL,content='Changed',revision=2 WHERE id='a'",[]).unwrap();
+    let sources = f
+        .store
+        .group_ai_reply_sources("v", "g", "gai_rich")
+        .unwrap();
+    assert_eq!(sources["sources"][0]["id"], "a");
+    assert_eq!(sources["sources"][0]["content"], "SELECTED_A");
+    assert_eq!(
+        sources["sources"][0]["attachments"][0]["display_name"],
+        "Reference"
+    );
+    assert!(f
+        .store
+        .group_ai_context_share_draft("v", "g", "gai_rich")
+        .is_ok());
+    let mut messages = vec![store::FriendGroupMessage {
+        id: "gai_rich".into(),
+        recalled_at: None,
+        ai_reply: None,
+    }];
+    context::decorate(&conn, &mut messages).unwrap();
+    assert_eq!(messages[0].ai_reply.as_ref().unwrap()["source_count"], 2);
+    conn.execute(
+        "UPDATE friend_group_messages SET recalled_at='now' WHERE id='a'",
+        [],
+    )
+    .unwrap();
+    context::decorate(&conn, &mut messages).unwrap();
+    assert!(!messages[0]
+        .ai_reply
+        .as_ref()
+        .unwrap()
+        .to_string()
+        .contains("SELECTED_A"));
+    conn.execute(
+        "UPDATE friend_group_messages SET recalled_at='now' WHERE id='gai_rich'",
         [],
     )
     .unwrap();
     assert!(f
         .store
-        .group_ai_context_share_draft("u", "g", "gai_reply")
+        .group_ai_reply_sources("u", "g", "gai_rich")
+        .is_err());
+}
+
+#[test]
+fn pre_snapshot_owner_export_is_still_supported_without_expanding_access() {
+    let f = Fixture::new();
+    let req = f.prepare(&op(), &Fixture::input(&["a"])).unwrap();
+    let conn = f.store.conn().unwrap();
+    conn.execute(
+        "DELETE FROM group_ai_reply_contexts WHERE request_id=?1",
+        [&req.id],
+    )
+    .unwrap();
+    conn.execute("INSERT INTO friend_group_messages(id,group_id,sender_user_id,content,created_at) VALUES('gai_old','g','u','Legacy answer','2026-09-20T00:00:00Z')",[]).unwrap();
+    conn.execute("UPDATE group_ai_reply_requests SET state='completed',result_message_id='gai_old' WHERE id=?1",[&req.id]).unwrap();
+    assert!(f
+        .store
+        .group_ai_context_share_draft("u", "g", "gai_old")
+        .is_ok());
+    assert!(f
+        .store
+        .group_ai_context_share_draft("v", "g", "gai_old")
+        .is_err());
+    assert!(f
+        .store
+        .set_group_ai_continuation("u", "g", "gai_old", true, 0)
+        .is_err());
+    conn.execute(
+        "UPDATE friend_group_messages SET revision=2 WHERE id='a'",
+        [],
+    )
+    .unwrap();
+    assert!(f
+        .store
+        .group_ai_context_share_draft("u", "g", "gai_old")
         .is_err());
 }

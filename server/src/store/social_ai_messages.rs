@@ -221,6 +221,7 @@ impl Store {
         )?;
 
         Ok(FriendGroupMessage {
+            ai_reply: None,
             id,
             group_id: group_id.to_string(),
             sender_user_id: SOCIAL_AI_USER_ID.to_string(),

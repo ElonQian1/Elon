@@ -21,6 +21,8 @@ import SocialForwardDialog, { type SocialTarget } from './SocialForwardDialog'
 import SocialConversationTools from './SocialConversationTools'
 import GroupAiSelectionDialog from './group-ai/GroupAiSelectionDialog'
 import GroupAiStatus from './group-ai/GroupAiStatus'
+import GroupAiReplyContext from './group-ai/GroupAiReplyContext'
+import { readSocialPosition, saveSocialPosition } from './socialReadPosition'
 import styles from './FriendsPage.module.css'
 import tools from './SocialTools.module.css'
 
@@ -51,7 +53,9 @@ export default function SocialConversation(props: Props) {
   useEffect(() => {
     setAiSelection(null)
     setQuery(''); setSelectedIds([]); setSelectionMode(false); setMenu(null); setNotice(''); follow.current = true; setNewMessages(false)
-    if (feed.current) feed.current.scrollTop = feed.current.scrollHeight
+    const node = feed.current, saved = readSocialPosition(me.id, key)
+    if (node) { node.scrollTop = saved ?? node.scrollHeight; follow.current = saved == null || node.scrollHeight - node.clientHeight - saved < 80 }
+    return () => { if (node) saveSocialPosition(me.id, key, node.scrollTop) }
   }, [key])
   useEffect(() => {
     if (follow.current && feed.current) feed.current.scrollTop = feed.current.scrollHeight
@@ -108,7 +112,9 @@ export default function SocialConversation(props: Props) {
             <div className={styles.msgMeta}><strong>{name}</strong><span>{formatTime(m.created_at)}</span></div>
             {content && (articleReference(content) ? <ArticleMessage content={content} /> : <div id={copyId} className={styles.msgContent} hidden={compactLink}>
               {(!own || content.startsWith('>')) && /[#*`\[\]>|]/.test(content) ? <MarkdownContent content={content} copy={false} /> : content}
+              {!recalled && m.ai_reply && conversation.kind === 'group' && <GroupAiReplyContext owner={me.id} group={conversation.id} message={m.id} metadata={m.ai_reply} part="footer" />}
             </div>)}
+            {!recalled && m.ai_reply && conversation.kind === 'group' && <GroupAiReplyContext owner={me.id} group={conversation.id} message={m.id} metadata={m.ai_reply} part="sources" />}
             {!recalled && !m.attachments?.length && <TextSourceCard text={m.content} />}
             {!recalled && <SocialMessageAttachments attachments={m.attachments} />}
             {!recalled && !specialMessage(m) && <SocialLinkCards text={content} owner={`${me.id}:${key}`} compact={compactLink} />}

@@ -15,6 +15,7 @@ export default function GroupAiSelectionDialog(props: Props) {
   const [question, setQuestion] = useState('请结合所选消息，分析并回答。')
   const [provider, setProvider] = useState<GroupAiInput['provider']>('chatgpt')
   const [error, setError] = useState('')
+  const [allowContinue, setAllowContinue] = useState(false)
   const identity = useLocalAiOwnerIdentity()
   const unavailable = !getDesktopInvoke() ? '请在一龙 Windows 客户端使用网页 AI'
     : identity.source === 'conflict' ? identity.detail : ''
@@ -27,6 +28,7 @@ export default function GroupAiSelectionDialog(props: Props) {
           message_ids: props.messages.map(m => m.id),
           message_revisions: Object.fromEntries(props.messages.map(m => [m.id, m.revision ?? 1])),
           question: question.trim(),
+          allow_continue: provider === 'chatgpt' && allowContinue,
         },
       })
       props.onClose()
@@ -47,6 +49,7 @@ export default function GroupAiSelectionDialog(props: Props) {
     </details>
     {props.messages.some(m => m.attachments?.length) && <p className={styles.warning}>本次发送消息文字和附件说明，不包含附件原文件。</p>}
     <label className={styles.question}>想问什么<textarea rows={4} maxLength={2000} value={question} onChange={event => setQuestion(event.target.value)} /></label>
+    {provider === 'chatgpt' && <label><input type="checkbox" checked={allowContinue} onChange={e => setAllowContinue(e.target.checked)} />允许群成员用自己的 ChatGPT 继续讨论所选记录、问题和回答</label>}
     {(error || unavailable) && <p className={styles.warning} role="alert">{error || unavailable}</p>}
   </SocialDialog>
 }

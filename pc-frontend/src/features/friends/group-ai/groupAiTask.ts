@@ -5,7 +5,7 @@ export interface GroupAiRequest {
   engine: string; web_provider: string; dispatch_permit: boolean; result_message_id: string | null
 }
 export interface GroupAiSelection {
-  message_ids: string[]; message_revisions: Record<string, number>; question: string
+  message_ids: string[]; message_revisions: Record<string, number>; question: string; allow_continue?: boolean
 }
 export interface GroupAiInput {
   owner: string; group: string; title: string; source: string; selection: GroupAiSelection

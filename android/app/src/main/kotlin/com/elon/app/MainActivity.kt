@@ -64,9 +64,7 @@ class MainActivity : AppCompatActivity() {
         adapter.onVoiceAttachmentLongPress = { message, attachment ->
             inputActions.showVoiceAttachmentActions(message, attachment)
         }
-        adapter.onAiConversationShareOpen = { aiConversationShares.open(it) }
-        adapter.onAiConversationShareCoverLoad = { card, loaded -> aiConversationShares.loadCover(card, loaded) }
-        adapter.onAiConversationShareLongPress = { anchor, message, card -> aiConversationShares.showCardActions(anchor, message, card) }
+        aiConversationShares.bind(adapter)
         chatAdapter = adapter
     }
 
@@ -1475,7 +1473,7 @@ class MainActivity : AppCompatActivity() {
         MainAiConversationShareFeature(this, s.http, serverUrl,
             isAiChat = { socialAiChatFeature.isChatModeActive() }, currentMessages = { chatAdapter.currentMessagesForSharing() }, streaming = { socialAiChatFeature.webChatStreaming() },
             nativeChat = { socialAiChatFeature }, input = binding.inputEdit,
-            sourceGroup = { groupChatActions.currentGroup() }, openGroup = { friendChatActions.closeFriendChat(); projectSpaceController.closeChannelChat(); groupChatActions.openGroup(it, true); syncVisibleChatNotificationState() },
+            sourceGroup = { groupChatActions.currentGroup() }, openGroup = { friendChatActions.closeFriendChat(); projectSpaceController.closeChannelChat(); groupChatActions.openGroup(it, true, restorePosition = true); syncVisibleChatNotificationState() },
             groupId = { groupChatActions.currentGroup()?.id },
             onPublished = { groupActions.loadGroups(); groupChatActions.currentGroup()?.id?.let(groupChatActions::handleRealtimeMessage) })
     }

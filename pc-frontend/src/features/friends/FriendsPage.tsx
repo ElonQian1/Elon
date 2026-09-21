@@ -11,6 +11,7 @@ import type { Friend, FriendGroup } from './socialMessageTypes'
 import useSocialChat from './useSocialChat'
 import SocialConversation from './SocialConversation'
 import ArticleWorkspace from '../articles/ArticleWorkspace'
+import useGroupDiscussionReturn from './group-ai/useGroupDiscussionReturn'
 
 interface SearchResult {
   user: Friend
@@ -67,6 +68,7 @@ function FriendsPageContent() {
   const { friends, groups, setFriends, activeConversation, messages, setMessages, messagesLoading,
     input, setInput, selectConversation, loadSocialConversations, revisionNotice,
     listStatus, messageError, cacheWarning, retry } = useSocialChat(me!.id)
+  useGroupDiscussionReturn(groups, selectConversation)
   const [displayMode, setDisplayMode] = useState<ConversationDisplayMode>(() => readConversationDisplayMode())
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSection, boolean>>(
     () => readCollapsedSections(),

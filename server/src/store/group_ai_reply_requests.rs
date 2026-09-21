@@ -8,6 +8,8 @@ use super::{ensure_social_ai_user, SOCIAL_AI_DISPLAY_NAME};
 #[path = "group_ai_source_access.rs"]
 mod source;
 use source::ensure_member_and_source;
+#[path = "group_ai_reply_context.rs"]
+pub(crate) mod context;
 #[path = "group_ai_context_share.rs"]
 mod context_share;
 #[path = "group_web_ai_provider.rs"]
@@ -132,8 +134,7 @@ impl Store {
             )?;
             (id, created_at)
         };
-        tx.commit()?;
-        Ok(FriendGroupMessage {
+        let mut message = FriendGroupMessage {
             id,
             group_id,
             sender_user_id: SOCIAL_AI_USER_ID.to_owned(),
@@ -146,7 +147,11 @@ impl Store {
             recalled_by: None,
             revision: 1,
             edited_at: None,
-        })
+            ai_reply: None,
+        };
+        context::decorate(&tx, std::slice::from_mut(&mut message))?;
+        tx.commit()?;
+        Ok(message)
     }
 
     pub(crate) fn mark_group_ai_reply_indeterminate(&self, request_id: &str) -> Result<()> {

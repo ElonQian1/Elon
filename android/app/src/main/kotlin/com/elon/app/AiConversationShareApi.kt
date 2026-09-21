@@ -25,14 +25,31 @@ internal class AiConversationShareApi(private val context: Context, http: OkHttp
     private var cacheSession: String? = null
 
     fun groupReplyDraft(groupId: String, messageId: String): AiConversationShareDraft {
+        val snapshot = groupReplySnapshot(groupId, messageId)
+        return AiConversationShareDraft("chatgpt", snapshot.card.title,
+            AiConversationShareDraftBuilder.excerpt(snapshot.messages), snapshot.messages, snapshot.gaps)
+    }
+
+    fun groupReplySnapshot(groupId: String, messageId: String): AiConversationShareSnapshot {
         require(ID.matches(messageId) && messageId.startsWith("gai"))
         val groupBase = groupPath(groupId).removeSuffix("/ai-snapshots")
         val value = json(Request.Builder().url("$groupBase/messages/$messageId/ai-context").get(),
             2 * 1024 * 1024, socialSession(context))
         val card = AiConversationShareCard("preview", groupId, "群聊 AI 精选讨论", "", "chatgpt", "群聊成员", 1)
-        val snapshot = AiConversationShareCodec.snapshot(value, card)
-        return AiConversationShareDraft("chatgpt", snapshot.card.title,
-            AiConversationShareDraftBuilder.excerpt(snapshot.messages), snapshot.messages, snapshot.gaps)
+        return AiConversationShareCodec.snapshot(value, card)
+    }
+
+    fun groupReplySources(groupId: String, messageId: String): JSONObject =
+        json(Request.Builder().url(groupReplyPath(groupId, messageId)).get(), 3 * 1024 * 1024, socialSession(context))
+
+    fun setGroupReplySharing(groupId: String, messageId: String, allowed: Boolean, version: Long): JSONObject =
+        json(Request.Builder().url(groupReplyPath(groupId, messageId)).patch(JSONObject()
+            .put("allow_continue", allowed).put("version", version).toString().toRequestBody(JSON)),
+            3 * 1024 * 1024, socialSession(context))
+
+    private fun groupReplyPath(groupId: String, messageId: String): String {
+        require(ID.matches(messageId) && messageId.startsWith("gai"))
+        return groupPath(groupId).removeSuffix("/ai-snapshots") + "/messages/$messageId/ai-sources"
     }
 
     fun read(card: AiConversationShareCard): AiConversationShareSnapshot {

@@ -34,11 +34,16 @@ internal object GroupAiSelectionPreview {
             })
             addView(question)
         }
+        val share = android.widget.CheckBox(activity).apply {
+            text = "允许群成员用自己的 ChatGPT 继续讨论所选记录、问题和回答"
+            contentDescription = "group-ai-selection-allow-continue"
+        }
+        content.addView(share)
         AlertDialog.Builder(activity).setTitle("AI 分析所选消息").setView(content)
             .setNegativeButton("取消", null)
             .setPositiveButton("分析并回复群聊") { _, _ ->
                 submit(ids.last(), JSONObject().put("message_ids", JSONArray(ids)).put("message_revisions", revisions)
-                    .put("question", question.text.toString()))
+                    .put("question", question.text.toString()).put("allow_continue", share.isChecked))
             }.show().getButton(AlertDialog.BUTTON_POSITIVE).contentDescription = "group-ai-selection-submit"
     }
 }
