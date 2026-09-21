@@ -1,10 +1,9 @@
 package com.elon.app
 
-import android.content.Context
 import android.graphics.drawable.LayerDrawable
 import android.view.View
 import android.widget.TextView
-import androidx.test.core.app.ApplicationProvider
+import org.robolectric.RuntimeEnvironment
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,7 +14,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34], qualifiers = "w360dp-h800dp-mdpi", application = android.app.Application::class)
 class GroupAiProviderIconTest {
     @Test fun groupMarkIsLegibleAndFitsExistingSelector() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+        val context = RuntimeEnvironment.getApplication()
         val button = TextView(context).apply { setPadding(14, 0, 24, 0); textSize = 14f }
         val provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
         WebChatComposerProviderPresentation.applyGroup(button, provider, "默认")
@@ -32,7 +31,7 @@ class GroupAiProviderIconTest {
     }
 
     @Test fun groupSizeDoesNotLeakIntoPersonalOrWorkPresentation() {
-        val button = TextView(ApplicationProvider.getApplicationContext<Context>())
+        val button = TextView(RuntimeEnvironment.getApplication())
         val provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
         WebChatComposerProviderPresentation.applyGroup(button, provider, "极高")
         WebChatComposerProviderPresentation.apply(button, provider, "极高")
