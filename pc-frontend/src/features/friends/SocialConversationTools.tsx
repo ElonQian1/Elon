@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Bot } from 'lucide-react'
 import { copyTextToClipboard } from '../../lib/clipboard'
 import MarkdownContent from '../markdown/MarkdownContent'
 import type { ActiveConversation, SocialMessage } from './socialMessageTypes'
@@ -13,6 +14,7 @@ interface Props {
   conversation: ActiveConversation; query: string; onQuery: (value: string) => void; messages: SocialMessage[]
   selected: SavedSocialMessage[]; selectionMode?: boolean; onClearSelection: () => void; onForward: (items: SavedSocialMessage[]) => void; onSave: (items: SavedSocialMessage[]) => void
   favorites: SavedSocialMessage[]; onRemoveFavorite: (key: string) => void; hiddenCount: number; onRestore: () => void
+  onAiReply?: () => void
 }
 
 export default function SocialConversationTools(props: Props) {
@@ -68,6 +70,7 @@ export default function SocialConversationTools(props: Props) {
       {query && <span className={styles.hint}>当前 {props.messages.length} 条已加载消息；不是全部历史</span>}
     </div>
     {props.selectionMode && <div className={styles.toolbar} aria-label="多选消息操作"><strong>已选 {selected.length} 条</strong>
+      {props.onAiReply && <button type="button" disabled={!selected.length} onClick={props.onAiReply}><Bot size={16} aria-hidden="true" /> AI 分析</button>}
       <button type="button" disabled={!selected.length} onClick={() => void copyTextToClipboard(selected.map(item => messageText(item.message)).join('\n\n')).then(ok => setNotice(ok ? '已复制所选消息' : '复制失败'))}>复制所选</button>
       <button type="button" disabled={!selected.length} onClick={() => props.onForward(selected)}>转发所选</button><button type="button" disabled={!selected.length} onClick={() => props.onSave(selected)}>收藏所选</button><button type="button" onClick={props.onClearSelection}>退出多选</button>
     </div>}

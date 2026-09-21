@@ -150,6 +150,7 @@ fn main() {
             local_ai_browser::exchange_webview::list_exchange_web_providers,
             local_ai_browser::resolve_local_ai_guest_owner_identity,
             local_ai_browser::open_local_ai_web_session,
+            local_ai_browser::group_session::group_ai_web_session,
             local_ai_browser::exchange_webview::open_exchange_web_session,
             local_ai_browser::embedded_view::present_local_ai_web_session_embedded,
             local_ai_browser::embedded_view::hide_local_ai_web_session_embedded,

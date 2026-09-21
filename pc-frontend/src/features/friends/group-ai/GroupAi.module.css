@@ -1,0 +1,18 @@
+.status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); background: var(--panel); }
+.status > svg { color: #75b89b; flex-shrink: 0; }
+.statusText { display: flex; flex-direction: column; gap: 4px; min-width: 140px; flex: 1; overflow-wrap: anywhere; }
+.statusText strong { font-size: 13px; }
+.statusText span { font-size: 13px; color: var(--text-muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.actions button, .submit { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.actions button { font: inherit; color: var(--text); background: transparent; border: 1px solid var(--line); border-radius: 6px; min-height: 32px; padding: 6px 8px; cursor: pointer; }
+.actions button:focus-visible { outline: 2px solid #85bdf5; outline-offset: 2px; }
+.destination { margin: 0 0 12px; overflow-wrap: anywhere; }
+.context { margin: 16px 0; border-block: 1px solid var(--line); padding: 12px 0; }
+.context summary { cursor: pointer; }
+.context article { border-bottom: 1px solid var(--line-soft); padding: 12px 0; }
+.context article:last-child { border-bottom: 0; }
+.context pre { max-height: 150px; overflow: auto; }
+.question { flex-direction: column; align-items: stretch !important; }
+.question textarea { resize: vertical; width: 100%; box-sizing: border-box; }
+.warning, .statusText .warning { color: #ffbcaf; font-size: 13px; overflow-wrap: anywhere; }

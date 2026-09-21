@@ -4,15 +4,15 @@ use super::{
     adapter_content, chatgpt_adapter_bootstrap::ADAPTER_VERSION, semantic_context, snapshot_cache,
 };
 
-#[path = "adapter/private_rich_recovery.rs"]
-pub(super) mod private_rich_recovery;
 #[path = "adapter/attachment_transport.rs"]
 pub(super) mod attachment_transport;
-#[path = "adapter/scalar.rs"]
-mod scalar;
+#[path = "adapter/private_rich_recovery.rs"]
+pub(super) mod private_rich_recovery;
 #[cfg(test)]
 #[path = "adapter/realtime_voice_tests.rs"]
 mod realtime_voice_tests;
+#[path = "adapter/scalar.rs"]
+mod scalar;
 
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
@@ -20,7 +20,10 @@ const MAX_DRAFT_CHARS: usize = 20_000;
 const MAX_OPTIONS: usize = 100;
 const MAX_PROJECTS: usize = 40;
 
-use scalar::{bounded_u64, sanitize_access_reason, sanitize_access_source, sanitize_page_kind, sanitize_private_stream_state};
+use scalar::{
+    bounded_u64, sanitize_access_reason, sanitize_access_source, sanitize_page_kind,
+    sanitize_private_stream_state,
+};
 
 pub struct SanitizedAdapterEvent {
     pub kind: String,
@@ -126,6 +129,7 @@ fn sanitize_protocol_event(event: &Map<String, Value>) -> Result<SanitizedAdapte
             "accessReason": sanitize_access_reason(event.get("accessReason")),
             "accessSource": sanitize_access_source(event.get("accessSource")),
             "composerReady": event.get("composerReady").and_then(Value::as_bool).unwrap_or(false),
+            "privateSendReady": event.get("privateSendReady").and_then(Value::as_bool).unwrap_or(false),
             "streaming": event.get("streaming").and_then(Value::as_bool).unwrap_or(false),
             "streamingStatus": clean_string(event.get("streamingStatus"), 220),
             "privateStreamObserved": event.get("privateStreamObserved").and_then(Value::as_bool).unwrap_or(false),

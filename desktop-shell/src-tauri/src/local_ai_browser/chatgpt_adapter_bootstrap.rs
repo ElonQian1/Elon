@@ -449,37 +449,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn win_bootstrap_tracks_the_complete_android_adapter_bundle() {
+    fn win_bootstrap_uses_reviewed_shared_adapter_modules() {
         let script = initialization_script();
-        let android_page_adapter = include_str!(
-            "../../../../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt"
+        let android_assets = include_str!(
+            "../../../../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAdapterAssets.kt"
         );
-        let android_assets = android_page_adapter
-            .split("private val ADAPTER_ASSETS = listOf(")
-            .nth(1)
-            .and_then(|tail| tail.split("\n        )").next())
-            .expect("Android ChatGPT adapter asset list should remain readable")
-            .lines()
-            .filter_map(|line| {
-                let value = line.trim().trim_end_matches(',');
-                value
-                    .strip_prefix('"')
-                    .and_then(|value| value.strip_suffix('"'))
-            })
-            .collect::<Vec<_>>();
-        let android_version = android_page_adapter
-            .split("internal const val ADAPTER_VERSION = ")
-            .nth(1)
-            .and_then(|tail| tail.lines().next())
-            .and_then(|value| value.trim().parse::<u32>().ok())
-            .expect("Android ChatGPT adapter version should remain readable");
-        let win_assets = ADAPTER_ASSETS
-            .iter()
-            .map(|(name, _)| *name)
-            .collect::<Vec<_>>();
-
-        assert_eq!(win_assets, android_assets);
-        assert_eq!(ADAPTER_VERSION, android_version);
+        // Android's manifest moved out of PageAdapter and now includes mobile-only
+        // capabilities. The desktop baseline intentionally retains its reviewed subset.
+        assert!(ADAPTER_ASSETS.len() > 40);
+        for (name, _) in ADAPTER_ASSETS {
+            assert!(
+                android_assets.contains(&format!("\"{name}\"")),
+                "unreviewed asset {name}"
+            );
+            assert!(script.contains(&format!("window.__elonChatGptBootstrapStage = '{name}';")));
+        }
         assert!(script.contains(&format!(
             "__elonChatGptAdapterTargetVersion = {ADAPTER_VERSION}"
         )));

@@ -19,6 +19,8 @@ import { messageMenuRequest, type SocialMenuRequest } from './socialMessageConte
 import SocialComposer, { type QuoteRequest } from './SocialComposer'
 import SocialForwardDialog, { type SocialTarget } from './SocialForwardDialog'
 import SocialConversationTools from './SocialConversationTools'
+import GroupAiSelectionDialog from './group-ai/GroupAiSelectionDialog'
+import GroupAiStatus from './group-ai/GroupAiStatus'
 import styles from './FriendsPage.module.css'
 import tools from './SocialTools.module.css'
 
@@ -41,11 +43,13 @@ export default function SocialConversation(props: Props) {
   const [quote, setQuote] = useState<QuoteRequest | null>(null)
   const [forward, setForward] = useState<SavedSocialMessage[] | null>(null)
   const [menu, setMenu] = useState<SocialMenuRequest | null>(null)
+  const [aiSelection, setAiSelection] = useState<SocialMessage[] | null>(null)
   const local = useSocialLocalState(me.id)
   const feed = useRef<HTMLDivElement>(null)
   const follow = useRef(true)
   const [newMessages, setNewMessages] = useState(false)
   useEffect(() => {
+    setAiSelection(null)
     setQuery(''); setSelectedIds([]); setSelectionMode(false); setMenu(null); setNotice(''); follow.current = true; setNewMessages(false)
     if (feed.current) feed.current.scrollTop = feed.current.scrollHeight
   }, [key])
@@ -69,8 +73,10 @@ export default function SocialConversation(props: Props) {
     <SocialConversationTools conversation={conversation} query={query} onQuery={setQuery} messages={messages}
       selected={selected} selectionMode={selectionMode} onClearSelection={() => { setSelectedIds([]); setSelectionMode(false); setNotice('') }}
       onForward={setForward} onSave={local.save} favorites={local.favorites} onRemoveFavorite={local.remove}
+      onAiReply={conversation.kind === 'group' ? () => setAiSelection(selected.map(item => item.message)) : undefined}
       hiddenCount={local.hidden.filter(id => id.startsWith(`${key}:`)).length} onRestore={() => local.restore(`${key}:`)} />
     {(notice || local.error) && <p className={tools.status} role="status">{local.error || notice}</p>}
+    <GroupAiStatus owner={me.id} group={conversation.kind === 'group' ? conversation.id : ''} onDelivered={props.onSent} />
     <div className={`${styles.feed} ${tools.feed}`} ref={feed} onScroll={() => { const node = feed.current!; follow.current = node.scrollHeight - node.clientHeight - node.scrollTop < 80; if (follow.current) setNewMessages(false) }}>
       {props.error && <p className={styles.syncStatus} role="status">{props.error} <button type="button" className={styles.syncRetry} onClick={props.retry}>重试</button></p>}
       {props.loading && <p className={styles.hint}>读取消息…</p>}
@@ -109,6 +115,7 @@ export default function SocialConversation(props: Props) {
             <SocialMessageMenu conversation={conversation} message={m} own={own} compactLink={compactLink} special={specialMessage(m)} copySourceId={copyId} request={menu} onMenu={setMenu} favorite={favorites.has(savedKey)}
               onQuote={() => setQuote({ conversation: key, message: m, author: name, nonce: Date.now() })}
               onForward={() => setForward([saveItem(m)])} onSelect={() => select(m)}
+              onAiReply={conversation.kind === 'group' ? () => setAiSelection([m]) : undefined}
               onFavorite={() => favorites.has(savedKey) ? local.remove(savedKey) : local.save([saveItem(m)])}
               onHide={() => { local.hide([savedKey]); setSelectedIds(old => old.filter(id => id !== m.id)) }}
               onMention={conversation.kind === 'group' && !own ? () => setInput(old => `${old}${old && !/\s$/.test(old) ? ' ' : ''}@${name} `) : undefined}
@@ -121,5 +128,6 @@ export default function SocialConversation(props: Props) {
     {newMessages && <button type="button" className={tools.latest} onClick={latest}>有新消息 · 回到最新</button>}
     <SocialComposer conversation={conversation} title={title} me={me} input={input} setInput={setInput} setMessages={setMessages} onSent={() => { latest(); props.onSent() }} quote={quote} />
     {forward && <SocialForwardDialog messages={forward} targets={props.targets} onClose={() => setForward(null)} onSent={props.retry} />}
+    {aiSelection && conversation.kind === 'group' && <GroupAiSelectionDialog key={key} owner={me.id} group={conversation.id} title={title} messages={aiSelection} onClose={() => setAiSelection(null)} />}
   </div>
 }

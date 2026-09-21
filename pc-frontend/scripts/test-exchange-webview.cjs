@@ -5,7 +5,7 @@ const path = require('node:path')
 const root = path.resolve(__dirname, '..', '..')
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
 
-const rust = read('desktop-shell/src-tauri/src/local_ai_browser.rs')
+const rust = read('desktop-shell/src-tauri/src/local_ai_browser.rs') + '\n' + read('desktop-shell/src-tauri/src/local_ai_browser/session_host.rs')
 const providerCatalogRust = read('desktop-shell/src-tauri/src/local_ai_browser/provider_catalog.rs')
 const exchangeRust = read('desktop-shell/src-tauri/src/local_ai_browser/exchange_webview.rs')
 const main = read('desktop-shell/src-tauri/src/main.rs')

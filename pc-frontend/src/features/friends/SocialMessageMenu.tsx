@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Copy, FileText, Reply, Forward, Star, ListChecks, AtSign, Pencil, History, Undo2, Info, EyeOff, Image, Download, Play, Pause, ExternalLink, Link } from 'lucide-react'
+import { Bot, Copy, FileText, Reply, Forward, Star, ListChecks, AtSign, Pencil, History, Undo2, Info, EyeOff, Image, Download, Play, Pause, ExternalLink, Link } from 'lucide-react'
 import { copyRichTextToClipboard, copyTextToClipboard, sanitizedRichHtmlFromElement } from '../../lib/clipboard'
 import type { ActiveConversation, SocialMessage } from './socialMessageTypes'
 import type { MessageEdit } from './groupMessageRevisions'
@@ -16,6 +16,7 @@ interface Props {
   request: SocialMenuRequest | null; onMenu: (request: SocialMenuRequest | null) => void; favorite: boolean
   onQuote: () => void; onForward: () => void; onFavorite: () => void; onHide: () => void; onSelect: () => void; onMention?: () => void
   onSaved: (patch: MessageEdit) => void; onRecalled: () => void
+  onAiReply?: () => void
 }
 
 export default function SocialMessageMenu(props: Props) {
@@ -82,6 +83,7 @@ export default function SocialMessageMenu(props: Props) {
       if (!attachment && !request.selection && document.getElementById(props.copySourceId)?.querySelector('p,pre,blockquote,ul,ol,table')) common.push({ label: '复制富文本', icon: <FileText />, action: () => void copy(true) })
       common.push({ label: '引用', icon: <Reply />, action: props.onQuote }, { label: '转发…', icon: <Forward />, action: props.onForward },
         { label: props.favorite ? '取消收藏' : '收藏', hint: '仅此设备', icon: <Star />, action: props.onFavorite })
+      if (props.onAiReply) common.push({ label: 'AI 回复…', icon: <Bot />, action: props.onAiReply })
       if (edit) revisions.push({ label: '编辑', icon: <Pencil />, action: edit })
       if (history) revisions.push({ label: '修改记录', icon: <History />, action: history })
       if (canRecall(message, own)) revisions.push({ label: '撤回…', icon: <Undo2 />, action: () => { setError(''); setDialog('recall') } })

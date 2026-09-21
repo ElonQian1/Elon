@@ -87,6 +87,19 @@ struct SessionRecord {
 }
 
 impl LocalAiBrowserRuntime {
+    pub(super) fn group_session_count(&self, prefix: &str) -> usize {
+        self.sessions()
+            .keys()
+            .filter(|label| label.starts_with(prefix))
+            .count()
+    }
+
+    pub(super) fn remove_group_session(&self, label: &str) {
+        if label.contains("-group-") {
+            self.sessions().remove(label);
+        }
+    }
+
     pub fn cached_restorable_url(&self, label: &str) -> Option<String> {
         self.sessions().get(label).and_then(|record| {
             record.active_restorable_url.clone().or_else(|| {

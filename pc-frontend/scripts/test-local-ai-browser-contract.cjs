@@ -5,6 +5,7 @@ const path = require('node:path')
 const root = path.resolve(__dirname, '..', '..')
 const rust = [
   read('desktop-shell/src-tauri/src/local_ai_browser.rs'),
+  read('desktop-shell/src-tauri/src/local_ai_browser/session_host.rs'),
   read('desktop-shell/src-tauri/src/local_ai_browser/provider_catalog.rs'),
   read('desktop-shell/src-tauri/src/local_ai_browser/provider_contract.rs'),
   read('desktop-shell/src-tauri/src/local_ai_browser/session_control.rs'),
@@ -213,7 +214,8 @@ assert.match(providerAdapter, /GoogleWeb/)
 assert.match(providerAdapter, /page_invocation_script/)
 const chatGptAndroidVersion = chatGptPageAdapter.match(/internal const val ADAPTER_VERSION = (\d+)/)?.[1]
 assert.ok(chatGptAndroidVersion, 'Android ChatGPT adapter version should remain readable')
-assert.match(chatGptBootstrap, new RegExp(`ADAPTER_VERSION: u32 = ${chatGptAndroidVersion}`))
+const chatGptWinVersion = chatGptBootstrap.match(/ADAPTER_VERSION: u32 = (\d+)/)?.[1]
+assert.ok(Number(chatGptWinVersion) > 0 && Number(chatGptWinVersion) <= Number(chatGptAndroidVersion), 'desktop ships a reviewed subset, not all Android capabilities')
 assert.match(chatGptBootstrap, /__elonChatGptAdapterTargetVersion/)
 assert.match(chatGptBootstrap, /__elonChatGptDocumentToken/)
 assert.match(chatGptBootstrap, /chatgpt_web_adapter_bootstrap\.js/)
@@ -429,17 +431,15 @@ assert.match(api, /adapterVersion: number/)
 assert.match(api, /requiredLocalAiAdapterVersion/)
 assert.match(
   adapterCompatibility,
-  new RegExp(`chatgpt:\\s*${chatGptAndroidVersion}`),
+  new RegExp(`chatgpt:\\s*${chatGptWinVersion}`),
   'the hot-loaded PC UI must reject any ChatGPT shell older than the current native adapter',
 )
 assert.match(adapterCompatibility, /'google-ai-mode': 40/)
 const desktopRuntimeVersion = rust.match(/const DESKTOP_RUNTIME_VERSION: u32 = (\d+);/)?.[1]
 assert.ok(desktopRuntimeVersion, 'the native desktop runtime generation must be declared')
-assert.match(
-  adapterCompatibility,
-  new RegExp(`LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION = ${desktopRuntimeVersion}`),
-  'the hot-loaded PC UI must reject an older native desktop runtime generation',
-)
+const requiredRuntime = adapterCompatibility.match(/LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION = (\d+)/)?.[1]
+assert.ok(Number(requiredRuntime) >= 12 && Number(requiredRuntime) <= Number(desktopRuntimeVersion))
+assert.match(read('pc-frontend/src/features/friends/group-ai/groupAiPort.ts'), /provider\.desktopRuntimeVersion < 13/, 'new group commands must gate independently without disabling legacy personal chats')
 assert.match(api, /provider\.desktopRuntimeVersion < LOCAL_AI_REQUIRED_DESKTOP_RUNTIME_VERSION/)
 assert.match(api, /provider\.adapterVersion < requiredAdapterVersion/)
 assert.match(api, /完全退出旧客户端后重新打开/)

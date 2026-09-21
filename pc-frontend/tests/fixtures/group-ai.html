@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin:0"><div id="root" style="height:100vh"></div>
+<script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {MemoryRouter} from 'react-router-dom';
+import FriendsPage from '/src/features/friends/FriendsPage.tsx';
+import {useAuthStore} from '/src/store/auth.ts';
+import '/src/styles/globals.css';
+useAuthStore.getState().acceptSession('group-fixture-token','2099-01-01', {id:'group-fixture-user',account:'Test user',nickname:'测试账号'});
+createRoot(document.getElementById('root')).render(React.createElement(MemoryRouter,null,React.createElement(FriendsPage)));
+</script></body></html>

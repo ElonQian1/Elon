@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..', '..')
 
 const host = read('desktop-shell/src-tauri/src/internal_browser.rs')
 const embedded = read('desktop-shell/src-tauri/src/local_ai_browser/embedded_view.rs')
-const localBrowser = read('desktop-shell/src-tauri/src/local_ai_browser.rs')
+const localBrowser = read('desktop-shell/src-tauri/src/local_ai_browser.rs') + '\n' + read('desktop-shell/src-tauri/src/local_ai_browser/session_host.rs')
 const semanticBridge = read('desktop-shell/src-tauri/src/codex_semantic_bridge.rs')
 const main = read('desktop-shell/src-tauri/src/main.rs')
 const permission = read('desktop-shell/src-tauri/permissions/local-ai-web-session.toml')
