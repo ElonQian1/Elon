@@ -3,6 +3,7 @@ use super::{new_id, now, Store};
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
 mod drafts;
+pub(crate) mod group_assistant;
 mod media;
 pub(crate) mod migration;
 mod model;

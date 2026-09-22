@@ -9,6 +9,7 @@ use axum::Router;
 use std::sync::Arc;
 mod group_ai_context;
 mod group_chatgpt_project;
+mod group_assistant;
 mod group_web_ai;
 
 mod ai_snapshots;
@@ -19,6 +20,7 @@ mod social_assets;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
+    .merge(group_assistant::routes())
     .merge(articles::routes())
     .merge(social_assets::routes())
     .merge(ai_snapshots::routes())

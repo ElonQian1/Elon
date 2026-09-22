@@ -6,6 +6,7 @@ import type { ActiveConversation, SocialMessage } from './socialMessageTypes'
 import { localMessageKey, type SavedSocialMessage } from './socialLocalState'
 import { messageText, socialRequest } from './socialChatOperations'
 import SocialDialog from './SocialDialog'
+import GroupAssistantDialog from './group-assistant/GroupAssistantDialog'
 import styles from './SocialTools.module.css'
 
 interface Summary { id: string; title: string; summary?: string; pinned_at?: string | null; status?: string }
@@ -20,6 +21,7 @@ interface Props {
 export default function SocialConversationTools(props: Props) {
   const { conversation, query, onQuery, selected } = props
   const [panel, setPanel] = useState<'favorites' | 'search' | 'summaries' | null>(null)
+  const [assistantGroup, setAssistantGroup] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [hits, setHits] = useState<Hit[]>([])
   const [posts, setPosts] = useState<Summary[]>([])
@@ -61,7 +63,9 @@ export default function SocialConversationTools(props: Props) {
     finally { if (request === epoch.current) setBusy(false) }
   }
   return <>
+    {conversation.kind === 'group' && assistantGroup === conversation.id && <GroupAssistantDialog groupId={conversation.id} onClose={() => setAssistantGroup(null)} />}
     <div className={styles.toolbar} aria-label="聊天工具">
+      {conversation.kind === 'group' && <button type="button" onClick={() => setAssistantGroup(conversation.id)}><Bot size={16} aria-hidden="true" /> 群 AI 助手</button>}
       <input aria-label="查找已加载消息" placeholder="查找已加载的消息" value={query} onChange={event => onQuery(event.target.value)} />
       {query && <button type="button" onClick={() => onQuery('')}>清除查找</button>}
       <button type="button" onClick={() => { setError(''); setPanel('favorites') }}>本机收藏</button>

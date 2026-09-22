@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="/assets/account_security.css" />
   <link rel="stylesheet" href="/assets/group_message_revisions.css" /><script src="/assets/group_message_revisions.js"></script>
   <script src="/assets/ai_share_marked.js"></script><script src="/assets/ai_conversation_rich.js"></script>
+  <link rel="stylesheet" href="/assets/group_assistant.css" /><script src="/assets/group_assistant.js"></script>
     <script src="/assets/ai_conversation_share.js"></script><script src="/assets/ai_conversation_reader.js"></script>
     <script src="/assets/group_ai_reply_context.js"></script>
   <style>
@@ -4665,6 +4666,7 @@
             </svg>
           </button>
         </div>
+        <button id="groupAssistantEntry" class="group-assistant-entry" type="button" hidden>群 AI 助手</button>
         <button id="groupSummaryStrip" class="group-summary-strip hidden" type="button">
           <span class="summary-text">
             <span id="groupSummaryTitle" class="summary-title">AI 总结帖</span>
@@ -7620,6 +7622,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     const name = currentFriend ? friendDisplayName(currentFriend) : currentGroup ? groupDisplayName(currentGroup) : '聊天';
     showNativeOnly('「' + name + '」的聊天设置、成员管理和长按消息操作请在 Android APK 中使用。网页版已同步私聊/群聊收发。');
   });
+  window.ElonGroupAssistant.install(api, () => currentGroup, () => token, $('groupAssistantEntry'), groupSummaryStrip);
   window.ElonArticles.install(api, () => currentGroup, groupSummaryStrip); if (groupSummaryStrip) {
     groupSummaryStrip.addEventListener('click', () => {
       showGroupSummaryPanel().catch((e) => renderGroupSummaryError(e.message || '总结帖操作失败'));

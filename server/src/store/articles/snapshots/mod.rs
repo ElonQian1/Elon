@@ -12,6 +12,7 @@ pub(crate) mod orphan_media;
 #[cfg(test)]
 mod orphan_media_tests;
 mod privacy;
+pub(crate) use privacy::validate_text as validate_shared_text;
 mod rich_card;
 #[cfg(test)]
 mod tests;

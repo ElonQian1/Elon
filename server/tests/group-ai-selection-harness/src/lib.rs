@@ -31,6 +31,11 @@ mod context_share;
 #[path = "../../../src/store/group_chatgpt_project.rs"]
 mod group_chatgpt_project;
 mod store {
+    pub mod articles {
+        pub mod snapshots {
+            pub(crate) use crate::snapshot_privacy::validate_text as validate_shared_text;
+        }
+    }
     pub struct FriendGroupMessage {
         pub id: String,
         pub recalled_at: Option<String>,
@@ -71,3 +76,13 @@ mod store_migrations {
 
 #[cfg(test)]
 mod tests;
+
+fn fail(code: u16, message: &str) -> anyhow::Error {
+    anyhow::anyhow!("{code}: {message}")
+}
+#[path = "../../../src/store/articles/group_assistant/mod.rs"]
+mod group_assistant;
+#[path = "../../../src/store/articles/snapshots/privacy.rs"]
+mod snapshot_privacy;
+#[cfg(test)]
+mod tests_group_assistant;

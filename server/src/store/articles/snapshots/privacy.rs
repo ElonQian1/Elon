@@ -1,6 +1,6 @@
 use super::{fail, Result};
 
-pub(super) fn validate_text(value: &str) -> Result<()> {
+pub(crate) fn validate_text(value: &str) -> Result<()> {
     if value
         .chars()
         .any(|c| c.is_control() && !matches!(c, '\n' | '\r' | '\t'))

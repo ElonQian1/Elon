@@ -1,0 +1,20 @@
+.group-assistant-entry { margin: 4px 12px; padding: 10px 14px; text-align: left; color: inherit; background: transparent; border: 1px solid #53575d; border-radius: 6px; font: inherit; }
+.group-assistant-entry[hidden] { display: none; }
+.group-assistant-dialog { box-sizing: border-box; width: min(760px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; color: #ebedef; background: #191b1e; border: 1px solid #55595f; border-radius: 8px; font: 15px/1.6 system-ui, sans-serif; }
+.group-assistant-dialog::backdrop { background: #0009; }
+.group-assistant-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #42464c; }
+.group-assistant-dialog h2 { font-size: 18px; margin: 0; overflow-wrap: anywhere; }
+.group-assistant-dialog > p { margin: 10px 16px; font-size: 13px; color: #bdc2c8; }
+.group-assistant-body { padding: 0 16px 16px; overflow: auto; max-height: calc(100dvh - 170px); overflow-wrap: anywhere; }
+.group-assistant-row { border-bottom: 1px solid #42464c; padding: 16px 0; }
+.group-assistant-row p { color: #c3c8ce; }
+.group-assistant-row small { display: block; margin-bottom: 8px; }
+.group-assistant-tools { display: flex; gap: 8px; }
+.group-assistant-dialog button { min-height: 40px; max-width: 100%; padding: 8px 12px; white-space: normal; overflow-wrap: anywhere; font: inherit; color: inherit; background: #2a2d32; border: 1px solid #55595f; border-radius: 6px; cursor: pointer; }
+.group-assistant-dialog button:has(svg) { width: 40px; height: 40px; padding: 8px; flex-shrink: 0; display: inline-grid; place-items: center; }
+.group-assistant-dialog button:hover { background: #3b4047; }
+.group-assistant-dialog pre { overflow: auto; padding: 12px; background: #101215; border-radius: 4px; }
+.group-assistant-dialog a { color: #8fc8ff; }
+.group-assistant-dialog table { border-collapse: collapse; }
+.group-assistant-dialog th, .group-assistant-dialog td { border: 1px solid #55595f; padding: 6px 12px; }
+.group-assistant-dialog :focus-visible { outline: 2px solid #7cbaf9; outline-offset: 2px; }
