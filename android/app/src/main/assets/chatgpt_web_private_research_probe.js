@@ -606,6 +606,7 @@
     version: 26,
     enabled: legacyEnabled,
     handle: (action, command, respond) => {
+      if (window.__elonChatGptPrivateTasksProbe?.handle(action, command, respond)) return true;
       if (window.__elonChatGptHistoryParentDiagnostic?.handle(window, action, command, respond)) return true;
       if (freshTextTrial(action, command, respond)) return true;
       if (window.__elonChatGptTextBlockInventory?.handle(action, command, respond)) return true;

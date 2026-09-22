@@ -9,7 +9,7 @@ internal object ChatGptWebPrivateProtocolEvidence {
         "stop_runtime_context", "stop_runtime_owner", "directory_refresh", "model_runtime_context", "document_state",
         "library_attachment_policy", "file_download_source", "library_sources", "composer_tool_admission", "text_block_inventory",
         "fresh_text_trial_start", "fresh_text_trial_end", "fresh_text_trial_state", "history_parent", "regeneration_admission",
-        "fresh_text_admission")
+        "fresh_text_admission", "scheduled_tasks")
     private val libraryPolicyCodes = setOf("not_observed", "runtime_unavailable", "validator_unavailable", "document_changed",
         "runtime_changed", "limits_bypassed", "composer_detached", "owner_unavailable", "store_mismatch",
         "scope_mismatch", "model_mismatch", "limits_missing", "limits_invalid", "ready", "attachment_limit", "validator_error")
@@ -42,6 +42,8 @@ internal object ChatGptWebPrivateProtocolEvidence {
         if (action == "share_conversation") return ChatGptWebConversationShareReceipt.detail(raw)
         if (action != ACTION) return raw.take(160)
         if (raw == "protocol_probe_unavailable") return raw
+        if (raw in setOf("tasks_busy", "tasks_auth_unavailable", "tasks_auth_required", "tasks_context_changed",
+                "tasks_not_found", "tasks_rate_limited", "tasks_response_invalid", "tasks_request_invalid", "tasks_unavailable")) return raw
         if (raw.startsWith("model_runtime_context:") && raw.substringAfter(':') in modelContextCodes) return raw
         if (raw.startsWith("composer_tool_context:") && raw.substringAfter(':') in toolContextCodes) return raw
         if (raw.startsWith("library_attachment_policy:") && raw.substringAfter(':') in libraryPolicyCodes) return raw
@@ -52,6 +54,17 @@ internal object ChatGptWebPrivateProtocolEvidence {
     private fun sanitize(raw: String): String {
         require(raw.length <= 12000)
         val value = JSONObject(raw)
+        if (value.opt("schema") == "elon.scheduled_tasks_probe.v1") {
+            require(value.keys().asSequence().toSet() == setOf("schema", "catalogCount", "catalogComplete",
+                "cacheHit", "latestState", "updateCharacters", "lastRunFailed"))
+            require(integer(value, "catalogCount", 0..200) && integer(value, "updateCharacters", 0..131072))
+            require(value.opt("catalogComplete") is Boolean && value.opt("cacheHit") is Boolean)
+            require(value.isNull("lastRunFailed") || value.opt("lastRunFailed") is Boolean)
+            require(value.opt("latestState") in setOf("not_sampled", "no_update", "update", "requires_action",
+                "tasks_busy", "tasks_auth_unavailable", "tasks_auth_required", "tasks_context_changed",
+                "tasks_not_found", "tasks_rate_limited", "tasks_response_invalid", "tasks_request_invalid", "tasks_unavailable"))
+            return value.toString()
+        }
         if (value.opt("schema") in setOf("elon.fresh_regenerate_admission.v1", "elon.fresh_text_admission.v1")) {
             require(value.keys().asSequence().toSet() == setOf("schema", "code", "stage"))
             require(value.opt("code") in setOf("ready", "timeout", "read_failed", "scope_unsupported", "runtime_unavailable",

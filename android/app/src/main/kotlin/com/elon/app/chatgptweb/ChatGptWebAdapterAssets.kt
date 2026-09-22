@@ -101,6 +101,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_private_conversation_mutation.js",
         "chatgpt_web_private_conversation_delete.js",
         "chatgpt_web_private_conversation_share_contract.js", "chatgpt_web_private_canvas_content.js",
+        "chatgpt_web_private_tasks_policy.js", "chatgpt_web_private_tasks.js", "chatgpt_web_private_tasks_probe.js",
         "chatgpt_web_private_canvas_document_policy.js", "chatgpt_web_private_canvas_edit_observer.js",
         "chatgpt_web_private_canvas_edit_context.js",
         "chatgpt_web_private_canvas_document_sharing.js",
