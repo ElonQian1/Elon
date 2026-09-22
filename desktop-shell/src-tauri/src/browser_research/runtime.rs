@@ -1,4 +1,4 @@
-use super::{files, host, ingest, ingest_queue, model::*, query};
+use super::{dev_eval, export, files, host, ingest, ingest_queue, model::*, query};
 use serde_json::{json, Value};
 use std::{
     collections::{HashMap, HashSet},
@@ -243,6 +243,19 @@ impl ResearchRuntime {
         // Expired grants cannot disclose persisted private bodies; opening again requires a new session.
         if now_ms() >= session.expires_at_ms && command.kind != "status" {
             return Err("research_session_expired".into());
+        }
+        if command.kind == "export" {
+            return export::write(&scope.root, session);
+        }
+        if command.kind == "evaluate" {
+            let handle = core
+                .hosts
+                .get(id)
+                .cloned()
+                .ok_or("research_host_unavailable")?;
+            let session = session.clone();
+            drop(core);
+            return dev_eval::evaluate(app, &handle, &session, command.query.as_deref());
         }
         query::execute(&scope.root, session, &command)
     }

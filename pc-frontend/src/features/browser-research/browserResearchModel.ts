@@ -80,6 +80,14 @@ export function parseResearchResult(value: unknown, expected: ResearchCommand): 
   } else if (expected.kind === 'read_request') {
     valid = request(value.request) && record(value.request) && value.request.id === expected.request_id
       && (value.request_body === null || slice(value.request_body)) && (value.response_body === null || slice(value.response_body))
+  } else if (expected.kind === 'export') {
+    valid = identifier(value.session_id) && value.session_id === expected.session_id && string(value.path, 1024)
+      && (value.path as string).length > 0 && integer(value.bytes) && integer(value.resource_count) && integer(value.request_count)
+  } else if (expected.kind === 'evaluate') {
+    valid = identifier(value.session_id) && value.session_id === expected.session_id && integer(value.generation)
+      && string(value.type, 32) && string(value.value_json, 20000) && typeof value.truncated === 'boolean'
+      && typeof value.redacted === 'boolean' && (value.exception === null || string(value.exception, 1024))
+      && value.page_state_is_untrusted === true
   }
   if (!valid) throw new ResearchError('invalid_response')
   return value as unknown as ResearchResult
@@ -99,7 +107,7 @@ export function parseResearchAction(value: unknown): ResearchAction {
   for (const key of ['offset', 'limit']) {
     if (value.command[key] !== undefined && !integer(value.command[key])) throw new ResearchError('invalid_response')
   }
-  if (value.command.query !== undefined && !string(value.command.query, 512)) throw new ResearchError('invalid_response')
+  if (value.command.query !== undefined && !string(value.command.query, value.command.kind === 'evaluate' ? 4096 : 512)) throw new ResearchError('invalid_response')
   if (value.command.manifest !== undefined && !site(value.command.manifest)) throw new ResearchError('invalid_response')
   return value as unknown as ResearchAction
 }

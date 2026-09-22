@@ -127,6 +127,13 @@ pub fn save_session(root: &Path, session: &Session) -> Result<(), String> {
     }
     write(&root.join(&session.id).join("session.json"), &bytes)
 }
+/// Export snapshots share the same reparse-point and atomic-rename discipline as session files.
+pub fn write_export(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    if bytes.len() > 8 * 1024 * 1024 {
+        return Err("metadata_limit".into());
+    }
+    write(path, bytes)
+}
 pub fn load_sessions(root: &Path, project: &str, owner: &str) -> Vec<Session> {
     if !digest_id(project) || !digest_id(owner) || directory_chain(root, false).is_err() {
         return vec![];

@@ -4,6 +4,8 @@ use serde_json::Value;
 
 pub(crate) const MAX_RESULT_BYTES: usize = 64 * 1024;
 pub(crate) const MAX_COMMAND_BYTES: usize = 16 * 1024;
+/// Development-only page expression; the Win host refuses it unless its dev switch is on.
+pub(crate) const MAX_EVALUATE_EXPRESSION_BYTES: usize = 4096;
 pub(crate) type ResearchResult<T> = Result<T, &'static str>;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -70,6 +72,8 @@ impl ResearchCommand {
             "search" => &["session_id", "query", "offset", "limit"],
             "read_resource" => &["session_id", "resource_id", "offset", "limit"],
             "read_request" => &["session_id", "request_id", "offset", "limit"],
+            "export" => &["session_id"],
+            "evaluate" => &["session_id", "query"],
             _ => return Err("invalid_command"),
         };
         let value = serde_json::to_value(self).map_err(|_| "invalid_command")?;
@@ -106,6 +110,8 @@ impl ResearchCommand {
                     | "pause"
                     | "resume"
                     | "status"
+                    | "export"
+                    | "evaluate"
             ) && self.session_id.is_none()
             || self.kind == "read_resource" && self.resource_id.is_none()
             || self.kind == "read_request" && self.request_id.is_none()
@@ -115,6 +121,17 @@ impl ResearchCommand {
         if self.kind == "search" {
             let query = self.query.as_deref().ok_or("missing_argument")?;
             if query.trim().is_empty() || query.len() > 200 || query.chars().any(char::is_control) {
+                return Err("invalid_query");
+            }
+        }
+        if self.kind == "evaluate" {
+            let expression = self.query.as_deref().ok_or("missing_argument")?;
+            if expression.trim().is_empty()
+                || expression.len() > MAX_EVALUATE_EXPRESSION_BYTES
+                || expression
+                    .chars()
+                    .any(|c| c.is_control() && c != '\n' && c != '\t')
+            {
                 return Err("invalid_query");
             }
         }

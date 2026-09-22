@@ -1,4 +1,6 @@
 //! The research domain is separate from chat adapters and never executes financial actions.
+mod dev_eval;
+mod export;
 mod files;
 pub(crate) mod host;
 mod ingest;

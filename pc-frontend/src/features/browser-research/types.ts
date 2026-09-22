@@ -1,7 +1,7 @@
 export const RESULT_SCHEMA = 'yilong.browser-research.result.v1'
 export const RESEARCH_KINDS = [
   'sites', 'sessions', 'register_site', 'open', 'status', 'resources', 'search',
-  'read_resource', 'requests', 'read_request', 'pause', 'resume',
+  'read_resource', 'requests', 'read_request', 'pause', 'resume', 'export', 'evaluate',
 ] as const
 export type ResearchKind = typeof RESEARCH_KINDS[number]
 export interface SiteManifest {
@@ -92,6 +92,8 @@ export type ResearchResult =
   | (ResultBase & { kind: 'open' | 'status' | 'pause' | 'resume'; session: ResearchSession })
   | (ResultBase & { kind: 'read_resource'; item: ResearchResource } & ContentSlice)
   | (ResultBase & { kind: 'read_request'; request: ResearchRequest; request_body: ContentSlice | null; response_body: ContentSlice | null })
+  | (ResultBase & { kind: 'export'; session_id: string; path: string; bytes: number; resource_count: number; request_count: number })
+  | (ResultBase & { kind: 'evaluate'; session_id: string; generation: number; type: string; value_json: string; truncated: boolean; redacted: boolean; exception: string | null; page_state_is_untrusted: true })
 export interface ResearchAction {
   action_id: string
   instance_id: string

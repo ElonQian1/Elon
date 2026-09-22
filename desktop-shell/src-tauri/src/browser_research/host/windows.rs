@@ -18,9 +18,12 @@ use super::{
 };
 mod attach;
 mod cdp;
+mod dev_evaluate;
 mod enable;
 mod events;
 mod reads;
+
+pub(super) use dev_evaluate::evaluate;
 
 type Context = Rc<RefCell<Capture>>;
 thread_local! { static CAPTURES: RefCell<BTreeMap<String, Context>> = const { RefCell::new(BTreeMap::new()) }; }

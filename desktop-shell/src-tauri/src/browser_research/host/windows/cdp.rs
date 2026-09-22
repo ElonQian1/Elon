@@ -33,6 +33,8 @@ pub(super) enum Method {
     ScriptSource,
     ResponseBody,
     RequestBody,
+    /// Only reachable through `dev_eval`, which checks the host development switch first.
+    Evaluate,
 }
 impl Method {
     fn name(self) -> &'static str {
@@ -48,6 +50,7 @@ impl Method {
             Self::ScriptSource => "Debugger.getScriptSource",
             Self::ResponseBody => "Network.getResponseBody",
             Self::RequestBody => "Network.getRequestPostData",
+            Self::Evaluate => "Runtime.evaluate",
         }
     }
 }

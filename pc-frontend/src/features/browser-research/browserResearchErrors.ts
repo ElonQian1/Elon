@@ -40,6 +40,11 @@ const nativeCodes: Readonly<Record<string, ResearchFailureCode>> = {
   site_limit: 'limit_exceeded',
   research_window_limit: 'limit_exceeded',
   research_result_too_large: 'result_too_large',
+  dev_eval_disabled: 'unsupported',
+  invalid_expression: 'invalid_command',
+  host_document_not_observed: 'host_unavailable',
+  evaluate_timed_out: 'host_unavailable',
+  evaluate_failed: 'operation_failed',
 }
 
 export function receiptErrorCode(value: unknown): ResearchFailureCode {

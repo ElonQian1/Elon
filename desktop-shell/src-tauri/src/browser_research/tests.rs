@@ -322,3 +322,32 @@ fn sampled_search_reports_partial_and_same_transport_id_cannot_cross_urls() {
         fixture.session.requests[1].id
     );
 }
+
+#[test]
+fn export_snapshot_points_at_stored_bodies_without_copying_them() {
+    let mut fixture = Fixture::new();
+    let event = fixture.event(
+        "request",
+        "https://api.fixture.example/v2/grid/list-own",
+        Some(r#"{"data":{"rows":[{"strategyId":1}]},"token":"synthetic-secret-value-1234567890"}"#),
+    );
+    ingest::accept(&mut fixture.session, &fixture.root, event).unwrap();
+    let result = super::export::write(&fixture.root, &fixture.session).unwrap();
+    assert_eq!(result["kind"], "export");
+    assert_eq!(result["request_count"], 1);
+    let path = PathBuf::from(result["path"].as_str().unwrap());
+    assert!(path.starts_with(fixture.root.join(&fixture.session.id).join("exports")));
+    let snapshot: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(snapshot["schema"], super::export::SCHEMA);
+    assert_eq!(snapshot["session"]["host_mode"], "research_window");
+    assert_eq!(snapshot["trading_enabled"], false);
+    let body_path = PathBuf::from(snapshot["resources"][0]["body_path"].as_str().unwrap());
+    assert!(body_path.is_file());
+    let body = fs::read_to_string(body_path).unwrap();
+    assert!(body.contains("strategyId"));
+    // The snapshot itself only carries metadata; page material stays in the filtered body file.
+    let text = snapshot.to_string();
+    assert!(!text.contains("strategyId\":1"));
+    assert!(!text.contains("synthetic-secret-value"));
+    assert!(!body.contains("synthetic-secret-value"));
+}

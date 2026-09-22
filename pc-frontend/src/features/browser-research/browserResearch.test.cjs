@@ -41,6 +41,23 @@ test('opening or resuming is not displayed as collecting until host acknowledgem
   assert.throws(() => parseResearchResult({ schema, kind: 'status', session: { ...session, host_mode: 'chrome_tab' } }, { kind: 'status' }))
 })
 
+test('export and dev evaluate results are bound to the requested session and stay bounded', () => {
+  const exported = { schema, kind: 'export', session_id: 'session_1', path: 'C:\\research\\snapshot-1.json', bytes: 512, resource_count: 3, request_count: 2 }
+  assert.equal(parseResearchResult(exported, { kind: 'export', session_id: 'session_1' }).path, exported.path)
+  assert.throws(() => parseResearchResult(exported, { kind: 'export', session_id: 'session_2' }))
+  assert.throws(() => parseResearchResult({ ...exported, path: '' }, { kind: 'export', session_id: 'session_1' }))
+  const evaluated = { schema, kind: 'evaluate', session_id: 'session_1', generation: 4, type: 'string', value_json: '"title"', truncated: false, redacted: false, exception: null, page_state_is_untrusted: true }
+  assert.equal(parseResearchResult(evaluated, { kind: 'evaluate', session_id: 'session_1', query: 'document.title' }).value_json, '"title"')
+  assert.throws(() => parseResearchResult({ ...evaluated, page_state_is_untrusted: false }, { kind: 'evaluate', session_id: 'session_1' }))
+  assert.throws(() => parseResearchResult({ ...evaluated, value_json: 'x'.repeat(20001) }, { kind: 'evaluate', session_id: 'session_1' }))
+  const command = { kind: 'evaluate', session_id: 'session_1', query: 'y'.repeat(4096) }
+  assert.equal(parseResearchAction({ ...action(), command }).command.query.length, 4096)
+  assert.throws(() => parseResearchAction({ ...action(), command: { ...command, query: 'y'.repeat(4097) } }))
+  assert.throws(() => parseResearchAction({ ...action(), command: { kind: 'search', session_id: 'session_1', query: 'y'.repeat(513) } }))
+  assert.equal(nativeResearchErrorCode(new Error('dev_eval_disabled')), 'unsupported')
+  assert.equal(nativeResearchErrorCode(new Error('invalid_expression')), 'invalid_command')
+})
+
 test('version, command kind, item ID, and page movement are validated before display', () => {
   assert.equal(parseResearchResult(result, { kind: 'sites' }).total, 0)
   assert.throws(() => parseResearchResult({ ...result, schema: 'future' }, { kind: 'sites' }))

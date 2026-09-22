@@ -1,12 +1,23 @@
 ---
 version_status: current
-reviewed_at: 2026-09-07
+reviewed_at: 2026-09-23
 implementation_status: in_progress
 ---
 
 # Win 浏览器研究 MCP 运行说明
 
-## 当前进度（2026-09-07）
+## 当前进度（2026-09-23）
+
+源码已合入三项“AI 接管 Win WebView”能力，需部署匹配的节点、Win 宿主和 PC 前端后才能调用：
+
+- **交易所登录窗口即研究宿主**：`open` 的 `site_id` 与 Win 交易所 provider 同名（目前 `binance`）时，不再新开独立研究窗口，而是确保用户的交易所官网窗口已打开（未开则打开，已开不抢焦点），并把 CDP 只读采集挂到同一个 WebView2 上。会话摘要 `host_mode=exchange_window`；其他站点仍是 `research_window`。同一窗口重新 `open` 会复用采集上下文而不叠加 CDP 接收器。
+- **`export`**：把会话摘要、站点、资源/请求元数据和已过凭据过滤的正文文件路径写成 JSON（`<会话目录>/exports/snapshot-<ms>.json`，最多保留 16 份），返回绝对路径，供没有 MCP 的工具直接读文件。不复制正文。
+- **`evaluate`**（开发辅助）：在已观察的顶层业务文档上执行一条 ≤ 4096 字节的 JavaScript 表达式（`Runtime.evaluate`，按值返回，结果 ≤ 16 KiB 并经凭据过滤）。仅当 Win 宿主以 `ELON_BROWSER_RESEARCH_DEV_EVAL=1` 启动（或 debug 构建）时可用，否则返回 `dev_eval_disabled`。面向测试账户开发，页面状态是不可信资料，不是交易或请求重放通道。
+- **Binance 只读观察器**：Win 交易所窗口注入与 Android 共享的 `binance_grid_read_diagnostics/reports/wallet/read` 四个适配器（不含 create/manage 写传输），观察结果进入独立的 `ExchangeObservationRuntime`，PC 端通过 `get_exchange_web_observation` / `run_exchange_web_adapter_command(refresh|detail|report|wallet|inspect)` 读取与驱动，需要 `desktopRuntimeVersion >= 14`。
+
+VS Code 等 AI 客户端可直接把下面的 stdio 代理登记为 MCP server（用户级 `mcp.json`）：`node <主项目>/plugins/yilong-project-memory/scripts/project-memory-mcp-proxy.mjs browser_research`，环境变量 `ELON_PROJECT_ROOT` 指向目标项目。
+
+### 2026-09-07 基线
 
 MCP 的站点登记、会话控制、源码搜索和资料读取已在真实 Windows WebView2 上走通。无交易样例完成资源、请求、正文读取及暂停恢复；9 月 7 日晚在原项目 Profile 新会话中进一步读到币安私人网格列表、详情，以及页面已采集的创建、修改设置、结束业务响应。
 
@@ -46,7 +57,7 @@ Profile 采用 `appLocal/research-profiles-v1/SHA256([project, owner, site])` �
 3. `{"action":"action_status","payload":{"action_id":"上一步返回值"}}` 等待终态，读取 receipt。终态过期后不重试可能已发生的宿主操作。
 4. 用 receipt 中 session ID 提交 `resources`、`search`、`requests`，再按命中资源或请求 ID 分片读取。
 
-动作包括 `sites`、`register_site`、`sessions`、`open`、`status`、`resources`、`search`、`read_resource`、`requests`、`read_request`、`pause`、`resume`。`cancel` 取消排队或丢弃正在执行的结果，不回滚已经打开的窗口。暂停不关闭窗口、不清登录。
+动作包括 `sites`、`register_site`、`sessions`、`open`、`status`、`resources`、`search`、`read_resource`、`requests`、`read_request`、`pause`、`resume`、`export`、`evaluate`（开发门控）。`cancel` 取消排队或丢弃正在执行的结果，不回滚已经打开的窗口。暂停不关闭窗口、不清登录。
 
 列表最多 50 项；单段内容最多 8,192 UTF-8 字节，offset 为字节位置；请求体和响应体分别分页，较短的一侧可先 complete。查询最长 200 字节。最终结果最多 60 KiB；必须继续使用 next_offset，不假设第一页完整。
 
@@ -62,7 +73,7 @@ CDP `initiator` 的脚本行列位置来自浏览器中的原始脚本，属于�
 
 会话默认一小时；每份内容最多 2 MiB，单会话正文最多 256 MiB、资源最多 512 份。仅恢复元数据不会重新激活采集或过期访问。脚本超限、并发队列超限、读取失败及未覆盖的 Worker、WebSocket、二进制内容会在 gaps 中体现。静态搜索是有界文本搜索，单资源最多 20 个命中、总计最多 200 个命中；partial 表示还有未返回命中。
 
-代码候选只证明脚本含该字符串。实际样本证明请求被观察到；HTTP 200 不代表业务成功。创建、修改与结束须分别绑定证据，不能由列表接口推导。当前无请求重放、任意脚本执行或交易执行工具。
+代码候选只证明脚本含该字符串。实际样本证明请求被观察到；HTTP 200 不代表业务成功。创建、修改与结束须分别绑定证据，不能由列表接口推导。当前无请求重放或交易执行工具；唯一的脚本执行入口是开发门控的 `evaluate`，默认关闭。
 
 ## 减少重复读取的研究方式
 

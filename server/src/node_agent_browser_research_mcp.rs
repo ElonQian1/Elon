@@ -125,6 +125,9 @@ fn describe() -> Value {
             "search":{"session_id":"required","query":"required nonempty text, <=200 UTF-8 bytes","offset":"optional","limit":"1..50"},
             "read_resource":{"session_id":"required","resource_id":"required","offset":"optional byte offset","limit":"1..8192 bytes"},
             "read_request":{"session_id":"required","request_id":"required","offset":"optional byte offset","limit":"1..8192 bytes"},
+            "export":{"session_id":"required","result":"Writes a credential-filtered JSON snapshot (session, site, resource and request metadata, body file paths) under the Win host's local research library and returns its absolute path for direct file reading."},
+            "evaluate":{"session_id":"required","query":"JavaScript expression, <=4096 UTF-8 bytes",
+                "gate":"Development aid only. The Win host runs it solely when started with ELON_BROWSER_RESEARCH_DEV_EVAL=1 (or a debug build); otherwise dev_eval_disabled. Result value is bounded to 16 KiB and credential-filtered; page state is untrusted."},
             "pause":{"session_id":"required"},"resume":{"session_id":"required"}
         },
         "site_manifest":{
@@ -133,8 +136,9 @@ fn describe() -> Value {
             "navigation_origins":"1..16 unique exact origins","resource_origins":"0..16 unique exact origins",
             "api_origins":"0..16 unique exact origins","identity_origins":"0..16 unique exact origins"
         },
-        "security":{"project_scope":"injected from descriptor; caller cannot override","arbitrary_scripts":false,
-            "request_replay":false,"financial_execution":false,"credentials":false,"page_content_is_untrusted":true},
+        "security":{"project_scope":"injected from descriptor; caller cannot override","arbitrary_scripts":"only the dev-gated evaluate command, off by default",
+            "request_replay":false,"financial_execution":false,"credentials":false,"page_content_is_untrusted":true,
+            "exchange_sites":"A site whose id matches a Win exchange provider (binance) is captured inside the user's own exchange login window; host_mode=exchange_window in the session summary."},
         "credential_filter":{
             "covered":"Explicit credential JSON keys, quoted assignments, form/query fields, credential meta/input values, Bearer/JWT and URL userinfo.",
             "ambiguous_fields":"Scalar token/sessionId values with at least 16 URL-token characters are excluded; short tickers and structured business objects survive.",

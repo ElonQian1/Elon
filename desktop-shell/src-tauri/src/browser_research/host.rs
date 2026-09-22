@@ -62,3 +62,21 @@ pub(crate) fn resume(app: &tauri::AppHandle, handle: &HostHandle) -> Result<(), 
         Err("browser_research_host_unsupported".into())
     }
 }
+
+/// One bounded `Runtime.evaluate` on the observed top document. Callers must apply the
+/// development gate before reaching this; the host itself never decides policy.
+pub(crate) fn evaluate(
+    app: &tauri::AppHandle,
+    handle: &HostHandle,
+    expression: String,
+) -> Result<serde_json::Value, String> {
+    #[cfg(windows)]
+    {
+        windows::evaluate(app, handle, expression)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, handle, expression);
+        Err("browser_research_host_unsupported".into())
+    }
+}
