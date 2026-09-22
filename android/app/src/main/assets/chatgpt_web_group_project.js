@@ -1,39 +1,17 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptGroupProject = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
   'use strict';
   options = options || {};
   const policy = options.policy || page.__elonChatGptGroupProjectPolicy;
-  const model = () => page.__elonChatGptPrivateModelContract.create(page);
+  const identity = page.__elonChatGptGroupProjectIdentity.create(page);
   let busy = false;
-  async function bind() {
-    const token = page.__elonChatGptDocumentToken, document = page.document;
-    if (page.location.origin !== 'https://chatgpt.com' || !/^doc_[a-z0-9_]{3,80}$/.test(token || '')) throw Error('project_identity_unavailable');
-    const contract = model(), bindings = page.__elonChatGptPrivateRuntimeBindings;
-    if (!bindings?.observed(contract.urls.shared)) throw Error('project_identity_unavailable');
-    const shared = await bindings.load(contract.urls.shared);
-    const identity = contract.withRuntimeIdentity({}, shared);
-    if (!identity || shared.wV?.(shared.SV?.isPersonalWorkspace) !== true) throw Error('project_identity_unavailable');
-    const current = () => document === page.document && token === page.__elonChatGptDocumentToken &&
-      page.location.origin === 'https://chatgpt.com' && identity.readIdentity() === identity.account;
-    const bytes = await page.crypto.subtle.digest('SHA-256', new TextEncoder().encode(identity.account));
-    const accountScope = Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
-    if (!current()) throw Error('project_identity_changed');
-    return { accountScope, accountId: JSON.parse(identity.account)[1], current };
-  }
   async function request(owner, path, body) {
     if (!owner.current()) throw Error('project_identity_changed');
-    const headers = { Accept: 'application/json' };
-    const copied = page.__elonChatGptPrivateTransport.copySameOriginRequestHeaders();
-    for (const [name, value] of Object.entries(copied)) {
-      if (['authorization', 'oai-device-id', 'oai-language',
-        'oai-client-version', 'oai-client-build-number'].includes(name.toLowerCase())) headers[name] = String(value);
-    }
-    headers['ChatGPT-Account-ID'] = owner.accountId;
-    if (!Object.entries(headers).some(([k, v]) => k.toLowerCase() === 'authorization' && /^Bearer\s+\S{8,65536}$/.test(v))) throw Error('project_identity_unavailable');
+    const headers = { ...owner.headers };
     if (body) headers['Content-Type'] = 'application/json';
     const response = await page.__elonChatGptPrivateJsonRequest.request(page, path, {
       method: body ? 'POST' : 'GET', headers, credentials: 'include', cache: 'no-store', redirect: 'error',
@@ -86,7 +64,7 @@
     let writeStarted = false;
     try {
       if (!input || !['identity', 'read', 'create', 'reconcile'].includes(input.operation)) throw Error('project_input_invalid');
-      const owner = await bind();
+      const owner = await identity.bind();
       if (input.operation === 'identity') return { ok: true, code: 'project_identity_ready', accountScope: owner.accountScope };
       if (!policy.scope.test(input.accountScope || '') || input.accountScope !== owner.accountScope) throw Error('project_identity_changed');
       let result;
@@ -106,8 +84,9 @@
       const code = writeStarted ? 'project_create_unknown' : raw === 'http_404' ? 'project_not_found' :
         /^http_(401|403)$/.test(raw) ? 'project_auth_required' : raw === 'http_429' ? 'project_rate_limited' :
         /^project_[a-z_]+$/.test(raw) ? raw : 'project_unavailable';
-      return { ok: false, code };
+      return { ok: false, code, ...(['document', 'runtime', 'account', 'workspace'].includes(error?.identityReason)
+        ? { identityReason: error.identityReason } : {}) };
     } finally { busy = false; }
   }
-  return Object.freeze({ version: 1, run });
+  return Object.freeze({ version: 2, run });
 });

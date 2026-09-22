@@ -203,6 +203,8 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
             .put("second_visible", text(SECOND).exists())
             .put("create_group", text("发起群聊").exists()).put("home_add", id("addButton").exists())
             .put("reply_visible", text("ELON GROUP SELECTION PASSED").exists())
+            .put("project_reply_visible", text("ELON GROUP PROJECT PASSED").exists())
+            .put("project_memory_selected", desc("group-ai-selection-project-memory").exists() && desc("group-ai-selection-project-memory").isChecked())
             .put("card_visible", text(CARD).exists())
             .put("source_records_visible", desc("group-ai-source-records-2").exists())
             .put("continue_discussion_visible", desc("group-ai-continue-discussion").exists())

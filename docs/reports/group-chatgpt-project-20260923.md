@@ -11,14 +11,14 @@ reviewed_at: 2026-09-23
 
 - `capability_id`: `android_chatgpt_group_project_v1`
 - 代码：项目传输、服务器绑定租约、Android 长期执行、显式选区加入记忆已接线。
-- 验证：官网公开脚本契约、Node 定向测试、生产 SQL 测试和后端编译通过；APK 最终测试、发布及手机真实链路另记。
+- 验证：官网公开脚本契约、Node 定向测试、生产 SQL 测试、后端及 APK 编译通过；1806 已正式发布和安装。手机项目创建/复用的业务验收仍单独记录。
 - 未完成：Windows 执行器使用同一项目绑定、项目内多个主题的选择界面、官方分享链接导入/分叉、群图片附件分析仍不在本批完成范围。
 - 不能据此宣称整个历史 Goal 已完成，或“训练记忆”等于训练模型。
 
 ## 实现
 
 1. 一龙用户、不可变 `group_id`、ChatGPT 用户与 workspace 的 SHA-256 指纹组成绑定主键。群名只用于首次项目标题，改名不重建。
-2. Cookie、Bearer 和设备凭证留在 WebView。指纹由已审核官网运行时的 user/account 双重一致性校验产生，不包含临时令牌或设备 ID。
+2. Cookie、Bearer 和设备凭证留在 WebView。版本化身份模块通过官网同源 session GET 核对用户、当前账号及明确的 personal 范围，指纹不包含临时令牌或设备 ID；逐操作核验 Cookie 身份，防止退出后沿用旧 Bearer，不依赖每天变化的前端混淆模块。
 3. V306 表 `group_chatgpt_projects` 保存 generation、project ID、conversation ID 和有界操作租约。事务中检查群成员，跨设备不能并发抢同一绑定。
 4. 创建先登记 `creating`，再发一次官网 POST。创建超时保留未知结果，后续先按 instructions 内的稳定绑定标记查找，绝不自动重发创建。
 5. 只允许 `project_v2` 项目范围记忆，不默认使用 global 记忆。读取真实资源，核对 ID、写权限和 memory scope 后才导航。首次创建和未知恢复额外核验绑定标记；已有绑定按稳定 ID 读取，用户修改项目说明不会打断使用。
@@ -48,6 +48,7 @@ reviewed_at: 2026-09-23
 - `group-ai-selection-harness` 引用生产 SQL 模块：3 项通过，覆盖成员/账号/群隔离、租约过期、创建未知、会话去重、generation 和明确重建。
 - `cargo check --manifest-path server/Cargo.toml`：通过。
 - 最终 Android 定向测试：36 项，XML 核验失败/错误/跳过均为 0，包含线程回执恢复及绑定失败仍交付回答。日志：`group-project-final-unit-20260923-034525-110`。
+- 项目名称 slug 和 `/c/id` 规范地址兼容追加后，项目模块 7 项再次通过；仍核对稳定项目/会话 ID，拒绝跨项目、跨会话、临时参数和编码路径。日志：`group-project-route-unit-20260923-040928-649`。
 - 首次 Gradle 调用误用了多模块 `testDebugUnitTest`，辅助模块因没有匹配用例报错；改为 `:app:testDebugUnitTest`。不是将失败日志当作通过。
 
 ## 发布协调
@@ -55,3 +56,20 @@ reviewed_at: 2026-09-23
 V305 群 AI 助手由另一任务维护。本批 V306 与 V305 必须都进入发布源码后再部署，避免迁移版本乱序。APK 由合并后的已提交源码完整构建，不使用 `SkipBuild`。
 
 手机验收至少核对：首次创建并回群、第二次复用同一个项目/会话、严格选区不进入项目、取消及网络失败不重复创建。没有真实回执前，保留验收未完成状态。
+
+## 正式发布
+
+- 后端 `v0.3.1775`，源 `e264ea103`，包含 V305/V306 和 PC 前端，由协作任务完整构建部署，版本及端点回读通过。
+- APK `1.1.1806 / 1806`，源 `79ce4cac1`，完整 Release 构建成功，未使用 SkipBuild。SHA-256：`e3accabcb7626642ccd801187620febac9d678a6a4d782f2b5e1471ffc9c9e5c`。
+- 发布后自动无线 `install -r` 并回读小米版本成功；荣耀离线，未清数据或降级。
+- 发布前登录状态只读核验：authenticated=true、loginRequired=false、bridge=ready、无在途生成。生产库只读基线：授权测试群尚无项目绑定及本批合成回答。安装成功不代表群项目业务链路通过。
+
+## 首轮回归与修复候选
+
+- 1806 真机首轮：选区默认勾选项目，点击后页面 authenticated=true，但 `project_identity_unavailable` 连续出现，最终 `failed_before_authorize`。未取得服务器绑定，未创建项目，未发送问题，未发布群回答。
+- 当前公开 shared 资源不在 runtime bindings v33 白名单；项目身份原来强依赖 `observed(shared)`，使无须 DOM 的项目操作也被前端模块版本阻塞。
+- 候选改为独立同源身份读取；真机 `/api/auth/session` 返回 200，具有 `user.id/account.id`，`account.structure === personal` 确认通过。因此省去最初候选额外的 accounts/check 查询，只用一遍 session GET 核验身份，personal 不推测。
+- 新增固定诊断阶段；身份未读到不再提示重新登录。身份接口 404 不得被当作项目删除而触发重建。
+- Node 14 项通过，覆盖未知 runtime、账号切换、身份 GET 故障及退出后旧请求头不可继续授权；正式装机和真实创建/复用需在候选验证后补记，当前不标记通过。
+- 独立候选身份模块真机只读通过：`scopeValid/current/accountHeaderMatches=true`，同时 `runtimeKnown=false`；证明不再依赖旧模块映射。Android Coordinator/Route 定向通过，日志 `group-project-identity-unit-20260923-052309-078`。
+- 研究包热加载完整项目流程到达 `identity_ready/acquire/create_begin`，随后 `project_unavailable`，尚无群回答；热加载存在文档注入时序差异，不能作为正式安装包业务通过证据，后续需继续核实。

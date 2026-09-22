@@ -153,6 +153,8 @@ internal class GroupChatGptProjectCoordinator(
         if (!event.ok) result.put("ok", false)
         val code = result.optString("code")
         if (Regex("project_[a-z_]{1,48}").matches(code)) observe(code)
+        val identityReason = result.optString("identityReason")
+        if (identityReason in setOf("document", "runtime", "account", "workspace")) observe("project_identity_$identityReason")
         next(result)
     }
 
@@ -181,7 +183,7 @@ internal class GroupChatGptProjectCoordinator(
 
     private fun fail(result: JSONObject) = failure(when (result.optString("code")) {
         "project_create_unknown", "project_create_unresolved", "project_reconciliation_incomplete" -> GroupWebAiFailureReason.PROJECT_UNKNOWN
-        "project_auth_required", "project_identity_changed", "project_identity_unavailable" -> GroupWebAiFailureReason.LOGIN
+        "project_auth_required", "project_identity_changed" -> GroupWebAiFailureReason.LOGIN
         else -> GroupWebAiFailureReason.PROJECT
     })
 

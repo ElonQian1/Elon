@@ -75,6 +75,13 @@ class GroupChatGptProjectCoordinatorTest {
         }
     }
 
+    @Test fun unavailableRuntimeDoesNotTellAnAuthenticatedUserToLoginAgain() {
+        val h = Harness("ready"); h.binding.put("project_id", h.project); h.start()
+        h.reply(JSONObject().put("ok", false).put("code", "project_identity_unavailable").put("identityReason", "account"))
+        assertEquals(listOf(GroupWebAiFailureReason.PROJECT), h.failures)
+        assertNull(h.confirm)
+    }
+
     @Test fun completeAnswerIsNotDiscardedWhenThreadVerificationTemporarilyFails() {
         val h = Harness(); h.start(); h.success()
         h.coordinator.snapshot(h.snapshot(), h.url); h.success()
