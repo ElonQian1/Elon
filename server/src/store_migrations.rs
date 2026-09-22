@@ -406,6 +406,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (302, "Bind group web AI provider at dispatch", crate::store::social_ai_messages::requests::provider::migrate),
     (303, "Explicit group AI selections", crate::store::social_ai_messages::requests::selection_schema::migrate),
     (304, "Frozen group AI sources and continuation consent", crate::store::social_ai_messages::requests::context::migrate),
+    (306, "Account-scoped persistent group ChatGPT projects", crate::store::social_ai_messages::group_project::migrate),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

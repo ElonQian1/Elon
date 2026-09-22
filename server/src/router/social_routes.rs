@@ -8,6 +8,7 @@ use axum::routing::{delete, get, post};
 use axum::Router;
 use std::sync::Arc;
 mod group_ai_context;
+mod group_chatgpt_project;
 mod group_web_ai;
 
 mod ai_snapshots;
@@ -24,6 +25,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
     .merge(link_previews::routes())
     .route("/api/me/groups/:group_id/ai/work-models", get(group_web_ai::work_models))
     .route("/api/me/groups/:group_id/web-ai/messages", post(group_web_ai::send))
+    .route("/api/me/groups/:group_id/web-ai/project", post(group_chatgpt_project::action))
     .route("/api/me/groups/:group_id/messages/:message_id/web-ai", post(group_web_ai::prepare))
     .route("/api/me/groups/:group_id/messages/:message_id/ai-context", get(group_web_ai::share_context))
     .route("/api/me/groups/:group_id/messages/:message_id/ai-sources", get(group_ai_context::read).patch(group_ai_context::share))

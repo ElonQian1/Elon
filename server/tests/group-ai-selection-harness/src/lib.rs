@@ -28,6 +28,8 @@ use source::ensure_member_and_source;
 mod context;
 #[path = "../../../src/store/group_ai_context_share.rs"]
 mod context_share;
+#[path = "../../../src/store/group_chatgpt_project.rs"]
+mod group_chatgpt_project;
 mod store {
     pub struct FriendGroupMessage {
         pub id: String,

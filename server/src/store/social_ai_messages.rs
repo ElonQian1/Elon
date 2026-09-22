@@ -1,4 +1,6 @@
 use anyhow::{anyhow, Result};
+#[path = "group_chatgpt_project.rs"]
+pub(crate) mod group_project;
 #[path = "group_ai_reply_requests.rs"]
 pub(crate) mod requests;
 use rusqlite::{params, Connection, OptionalExtension};
