@@ -338,6 +338,7 @@ class MainActivity : AppCompatActivity() {
         }
         socialAiChatFeature.onHostResumed { friendChatActions.resumeIfActive() }
         groupChatActions.resumeIfActive()
+        groupAssistant.refresh()
         projectSpaceController.resumeIfActive()
         socialSummaryPolling.start()
         syncVisibleChatNotificationState()
@@ -605,18 +606,13 @@ class MainActivity : AppCompatActivity() {
             clearFriendMessages = { friendChatActions.clearCurrentMessages() },
             clearGroupMessages = { groupChatActions.clearCurrentMessages() },
             onAddGroupMember = { group, onDone -> groupActions.showAddMemberDialog(group, onDone) },
-            showGroupSummaryPosts = { group -> groupChatActions.showSummaryPosts(group) }
+            showGroupSummaryPosts = { group -> groupChatActions.showSummaryPosts(group) },
+            showGroupAssistant = { group -> groupAssistant.show(group) }
         )
     }
 
     private fun showActiveContactChatSettings() {
-        groupChatActions.currentGroup()?.let {
-            chatSettingsActions.showGroupSettings(it)
-            return
-        }
-        friendChatActions.currentFriend()?.let {
-            chatSettingsActions.showFriendSettings(it)
-        }
+        chatSettingsActions.showActiveSettings(groupChatActions.currentGroup(), friendChatActions.currentFriend())
     }
 
     private fun openSocialAiVoiceCall() {
@@ -1027,6 +1023,8 @@ class MainActivity : AppCompatActivity() {
             updateWorkModel = modelActions::updateModelButton, refreshInputComposerVisual = inputActions.sendButtonVisualActions::updateSendButtonVisual, chatGptWebLifecycle = chatGptWebLifecycle, serverUrl = { serverUrl }, userId = { AuthManager.effectiveUserId(this) },
         )
     }
+
+    private val groupAssistant by lazy { GroupAssistantFeature(this, s.http, serverUrl, socialAiChatFeature::scheduledTaskRequest) }
 
     private val groupChatActions: MainGroupChatActions by lazy {
         MainGroupChatActions(

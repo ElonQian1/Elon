@@ -72,6 +72,7 @@ internal class MainSocialAiChatFeature(
         )
     }
     private val chatGptController by chatGptControllerDelegate
+    suspend fun scheduledTaskRequest(input: org.json.JSONObject) = chatGptController.scheduledTaskRequest(input)
     private val googleControllerDelegate = lazy {
         GoogleWebSocialChatController(
             activity = activity,

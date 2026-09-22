@@ -161,6 +161,8 @@ internal class ChatGptWebPageAdapter(
     private var skinEnabled = false
     private val accountConnection = ChatGptWebAccountConnection(context)
 
+    val scheduledTasks = ChatGptScheduledTasks { value, id -> runCommand("scheduled_tasks", value = value, requestId = id) }
+
     fun install() {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             onStateChanged(State.UNSUPPORTED)
@@ -175,6 +177,7 @@ internal class ChatGptWebPageAdapter(
         ) { _, message, sourceOrigin, isMainFrame, _ ->
             if (!isMainFrame || !isAllowedOrigin(sourceOrigin)) return@addWebMessageListener
             val payload = message.data ?: return@addWebMessageListener
+            if (scheduledTasks.receive(payload, ADAPTER_VERSION) { documentSession.accept(it) != null }) return@addWebMessageListener
             val parsed = ChatGptWebProtocol.parseMessage(payload, ADAPTER_VERSION)
                 ?: return@addWebMessageListener
             val token = parsed.documentToken ?: return@addWebMessageListener
@@ -185,6 +188,7 @@ internal class ChatGptWebPageAdapter(
                 handshake.acknowledge()
             }
             accountConnection.observe(parsed.event)
+            scheduledTasks.failure(parsed.event)
             onEvent(parsed.event)
         }
         if (
@@ -666,6 +670,7 @@ internal class ChatGptWebPageAdapter(
     fun markLoginRequired() = onStateChanged(State.WEB_ONLY)
 
     fun dispose() {
+        scheduledTasks.close()
         nativeAttachments.dispose()
         nativeDownloads.dispose()
         onHostPaused()

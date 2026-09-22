@@ -31,10 +31,16 @@ internal class MainChatSettingsActions(
     private val clearFriendMessages: () -> Unit,
     private val clearGroupMessages: () -> Unit,
     private val onAddGroupMember: ((AppGroup, () -> Unit) -> Unit)? = null,
-    private val showGroupSummaryPosts: ((AppGroup) -> Unit)? = null
+    private val showGroupSummaryPosts: ((AppGroup) -> Unit)? = null,
+    private val showGroupAssistant: ((AppGroup) -> Unit)? = null
 ) {
     private val prefs by lazy { AuthManager.userDataPrefs(activity) }
     private var pageAnimator: AnimatorSet? = null
+
+    fun showActiveSettings(group: AppGroup?, friend: AppFriend?) {
+        if (group != null) showGroupSettings(group)
+        else if (friend != null) showFriendSettings(friend)
+    }
 
     fun showFriendSettings(friend: AppFriend) {
         showSettingsPage("聊天信息") { dialog ->
@@ -85,6 +91,10 @@ internal class MainChatSettingsActions(
                 dismissWithAnimation(dialog) {
                     showGroupSummaryPosts?.invoke(group) ?: toast("AI 总结帖准备中")
                 }
+            })
+            addView(divider())
+            addView(actionRow("群 AI 助手", "关注事项与更新动态") {
+                dismissWithAnimation(dialog) { showGroupAssistant?.invoke(group) }
             })
             addView(divider())
             addView(actionRow("查找聊天内容", "搜索这个群里的聊天记录") {

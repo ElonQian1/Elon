@@ -1,4 +1,6 @@
 package com.elon.app
+import com.elon.app.chatgptweb.scheduledTaskRequest
+import kotlinx.coroutines.sync.withLock
 
 import android.view.View
 import android.widget.Toast
@@ -41,6 +43,11 @@ internal class ChatGptSocialChatController(
     audioPermissionController: ChatGptWebAudioPermissionController,
 ) : WebChatSocialController {
     override val providerId = WebChatProviderId.CHATGPT_WEB
+    private val scheduledTaskLock = kotlinx.coroutines.sync.Mutex()
+    suspend fun scheduledTaskRequest(input: org.json.JSONObject) = scheduledTaskLock.withLock {
+        try { session.scheduledTaskRequest(input) }
+        finally { if (!active) session.deactivate() }
+    }
     private val transcript = WebChatProductionTranscript(
         list = binding.chatList,
         setChatAdapter = setChatAdapter,

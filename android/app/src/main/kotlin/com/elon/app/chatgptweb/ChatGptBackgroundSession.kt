@@ -454,6 +454,8 @@ internal class ChatGptBackgroundSession(
         updateState(State.IDLE)
     }
 
+    internal fun prepareScheduledTasks() { recovery.activate(); ensureInitialized(); onHostResumed() }
+    internal fun scheduledTaskClient() = pageAdapter?.scheduledTasks?.takeIf { observedMcpState.snapshot().adapterCurrent }
     private fun ensureInitialized() {
         if (webView != null) return
         WebView.setWebContentsDebuggingEnabled(BuildConfig.CHATGPT_PRIVATE_RESEARCH_ENABLED)
