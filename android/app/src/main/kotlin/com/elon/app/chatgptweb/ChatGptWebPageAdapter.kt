@@ -316,6 +316,9 @@ internal class ChatGptWebPageAdapter(
         action = "private_protocol_probe", value = mode, requestId = requestId,
     )
 
+    fun groupProjectRequest(payload: String, requestId: String) =
+        runCommand("group_project_request", value = payload, requestId = requestId)
+
     fun regenerateResponse() = runCommand("regenerate_response")
 
     fun regenerateResponse(requestId: String) = runCommand(
@@ -752,7 +755,7 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     companion object {
-internal const val ADAPTER_VERSION = 433
+internal const val ADAPTER_VERSION = 435
 
         private val ADAPTER_ASSETS = ChatGptWebAdapterAssets.names
         private const val BRIDGE_OBJECT = "elonChatGptNative"

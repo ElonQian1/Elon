@@ -59,14 +59,16 @@ internal class GroupWebAiFeature(
         prepareRequest(group, messageId, configuration)
     }
 
-    fun prepareSelected(group: AppGroup, source: String, selection: JSONObject, configuration: GroupAiConfiguration): Boolean {
+    fun prepareSelected(group: AppGroup, source: String, selection: JSONObject, configuration: GroupAiConfiguration,
+        projectMemory: Boolean = false): Boolean {
         if (preferences.contains(pendingKey(userId()))) { recover(); toast("先同步上一条 AI 回答"); return false }
         if (!configuration.usesWebAi || !beginWork()) return false
-        prepareRequest(group, source, configuration, selection)
+        prepareRequest(group, source, configuration, selection, projectMemory)
         return true
     }
 
-    private fun prepareRequest(group: AppGroup, messageId: String, configuration: GroupAiConfiguration, selection: JSONObject? = null) {
+    private fun prepareRequest(group: AppGroup, messageId: String, configuration: GroupAiConfiguration, selection: JSONObject? = null,
+        projectMemory: Boolean = selection == null) {
         val operation = UUID.randomUUID().toString()
         val owner = userId()
         thread {
@@ -77,8 +79,8 @@ internal class GroupWebAiFeature(
                     .also { check(selection == null || it.optString("context_scope") == "selected") { "服务器未确认选区范围，未发送给 AI" } }
             }
             activity.runOnUiThread {
-                result.onSuccess { execute(it, operation, owner, configuration) {
-                    prepareRequest(group, messageId, configuration, selection)
+                result.onSuccess { execute(it, operation, owner, configuration, projectMemory) {
+                    prepareRequest(group, messageId, configuration, selection, projectMemory)
                 } }
                     .onFailure { release(); toast("创建 AI 请求失败，请稍后重试") }
             }
@@ -102,14 +104,20 @@ internal class GroupWebAiFeature(
     }
 
     private fun execute(request: JSONObject, operation: String, owner: String, configuration: GroupAiConfiguration,
+        projectMemory: Boolean = request.optString("context_scope") != "selected",
         restart: () -> Unit) {
         if (activity.isDestroyed || userId() != owner) { release(); return }
         if (!configuration.usesWebAi) { executeWork(request, operation, owner, configuration.work); return }
         busy = true
         progress = Snackbar.make(root, "${configuration.engine.label} 正在处理群聊回复", Snackbar.LENGTH_INDEFINITE)
             .setAction("取消") { executor?.cancel() }.also { it.show() }
-        executor = GroupWebAiExecutor(activity, request.getString("prompt"),
+        val prompt = request.getString("prompt") + if (projectMemory && configuration.engine == GroupAiEngine.CHATGPT)
+            "\n\n本次群分析请求标记：${request.getString("id")}。请勿在回答中复述标记。" else ""
+        executor = GroupWebAiExecutor(activity, prompt,
             configuration = configuration,
+            projectServer = if (projectMemory && configuration.engine == GroupAiEngine.CHATGPT)
+                GroupChatGptProjectClient(activity, http, server, request.getString("group_id"), operation, owner,
+                    { userId() == owner })::action else null,
             authorize = { ready ->
                 thread {
                     val result = runCatching {
@@ -141,7 +149,7 @@ internal class GroupWebAiFeature(
                         }.getOrDefault(false)
                         activity.runOnUiThread {
                             release()
-                            if (retired) showSelectedFailure(request, operation, owner, configuration, failure, restart)
+                            if (retired) showSelectedFailure(request, operation, owner, configuration, failure, projectMemory, restart)
                             else if (userId() == owner && !activity.isDestroyed) AlertDialog.Builder(activity)
                                 .setTitle("本次没有发送")
                                 .setMessage("输入框未接受内容，但未能确认取消发送授权。本次不会重新发送，请检查网络后重新选择消息。")
@@ -150,11 +158,11 @@ internal class GroupWebAiFeature(
                     }
                 } else if (failure.uncertain) {
                     thread { runCatching { if (userId() == owner) action(request, operation, "uncertain") } }
-                    showSelectedFailure(request, operation, owner, configuration, failure, restart)
+                    showSelectedFailure(request, operation, owner, configuration, failure, projectMemory, restart)
                 } else if (failure.reason == GroupWebAiFailureReason.CANCELLED) {
                     thread { runCatching { if (userId() == owner) action(request, operation, "cancel") } }
                 } else if (request.optString("context_scope") == "selected") {
-                    showSelectedFailure(request, operation, owner, configuration, failure, restart)
+                    showSelectedFailure(request, operation, owner, configuration, failure, projectMemory, restart)
                 } else if (!activity.isDestroyed && userId() == owner) {
                     AlertDialog.Builder(activity).setTitle("${configuration.engine.label} 尚未就绪")
                         .setMessage("没有向 ${configuration.engine.label} 发送。可以取消，或使用备用 AI（可能计费）。")
@@ -176,7 +184,7 @@ internal class GroupWebAiFeature(
     }
 
     private fun showSelectedFailure(request: JSONObject, operation: String, owner: String,
-        configuration: GroupAiConfiguration, failure: GroupWebAiFailure, restart: () -> Unit) {
+        configuration: GroupAiConfiguration, failure: GroupWebAiFailure, projectMemory: Boolean, restart: () -> Unit) {
         if (activity.isDestroyed || userId() != owner) return
         busy = true
         val dismiss = {
@@ -193,7 +201,7 @@ internal class GroupWebAiFeature(
         if (failure.canRetry) dialog.setPositiveButton("重试本次分析") { _, _ ->
             if (userId() == owner && !activity.isDestroyed) {
                 if (failure.rejectedBeforeSend) restart()
-                else execute(request, operation, owner, configuration, restart)
+                else execute(request, operation, owner, configuration, projectMemory, restart)
             }
             else release()
         }

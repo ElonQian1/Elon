@@ -441,6 +441,7 @@
     const respond = (resultAction, ok, detail) => result(resultAction, ok, detail, requestId);
     respond.requestId = requestId;
     if (action === 'snapshot') return snapshot();
+    if (window.__elonChatGptGroupProjectBridge?.handle(action, command, respond)) return;
     if (action === 'private_protocol_probe' && ['regeneration_admission', 'fresh_text_admission'].includes(command.value)) {
       if (!textTransactionOrchestrator) return respond(action, false, 'protocol_probe_unavailable');
       return textTransactionOrchestrator.inspectAdmission(command.value, respond);

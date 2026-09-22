@@ -313,9 +313,9 @@ internal class MainGroupChatActions(
             Toast.makeText(activity, "请先在 AI 设置中选择网页 AI，再分析所选消息", Toast.LENGTH_LONG).show()
             return
         }
-        GroupAiSelectionPreview.show(activity, messages) { source, selection ->
+        GroupAiSelectionPreview.show(activity, messages, configuration.engine == GroupAiEngine.CHATGPT) { source, selection, memory ->
             if (owner == socialSession(activity) && activeGroup?.id == group.id &&
-                webAi.prepareSelected(group, source, selection, configuration)) started()
+                webAi.prepareSelected(group, source, selection, configuration, memory)) started()
         }
     }
 

@@ -10,7 +10,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal object GroupAiSelectionPreview {
-    fun show(activity: AppCompatActivity, messages: List<ChatMessage>, submit: (String, JSONObject) -> Unit) {
+    fun show(activity: AppCompatActivity, messages: List<ChatMessage>, allowProjectMemory: Boolean = false,
+        submit: (String, JSONObject, Boolean) -> Unit) {
         val ids = messages.mapNotNull { it.id?.takeIf(String::isNotBlank) }.distinct()
         val revisions = JSONObject().apply { messages.forEach { message -> message.id?.let { put(it, message.revision) } } }
         if (ids.size != messages.size || ids.size !in 1..100 || messages.any { it.content.isBlank() || it.isRecalled() }) {
@@ -39,11 +40,18 @@ internal object GroupAiSelectionPreview {
             contentDescription = "group-ai-selection-allow-continue"
         }
         content.addView(share)
+        val memory = android.widget.CheckBox(activity).apply {
+            text = "加入本群 ChatGPT 项目，结合本群已有记忆分析"
+            contentDescription = "group-ai-selection-project-memory"
+            visibility = if (allowProjectMemory) android.view.View.VISIBLE else android.view.View.GONE
+        }
+        content.addView(memory)
         AlertDialog.Builder(activity).setTitle("AI 分析所选消息").setView(content)
             .setNegativeButton("取消", null)
             .setPositiveButton("分析并回复群聊") { _, _ ->
                 submit(ids.last(), JSONObject().put("message_ids", JSONArray(ids)).put("message_revisions", revisions)
-                    .put("question", question.text.toString()).put("allow_continue", share.isChecked))
+                    .put("question", question.text.toString()).put("allow_continue", share.isChecked),
+                    allowProjectMemory && memory.isChecked)
             }.show().getButton(AlertDialog.BUTTON_POSITIVE).contentDescription = "group-ai-selection-submit"
     }
 }

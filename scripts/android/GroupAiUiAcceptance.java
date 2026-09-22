@@ -146,6 +146,11 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
             case "submit_selection":
                 fill(desc("group-ai-selection-question"), "Reply exactly: ELON GROUP SELECTION PASSED");
                 action(desc("group-ai-selection-submit"), false); break;
+            case "submit_project_selection":
+                assertTrue("project_memory_choice_required", desc("group-ai-selection-project-memory").exists());
+                if (!desc("group-ai-selection-project-memory").isChecked()) action(desc("group-ai-selection-project-memory"), false);
+                fill(desc("group-ai-selection-question"), "Reply exactly: ELON GROUP PROJECT PASSED");
+                action(desc("group-ai-selection-submit"), false); break;
             case "retry_selection":
                 assertTrue("analysis_failure_required", text("AI 回答未发到群聊").exists());
                 action(desc("group-ai-analysis-retry"), false); break;

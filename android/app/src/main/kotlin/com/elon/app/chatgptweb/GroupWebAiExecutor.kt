@@ -5,6 +5,7 @@ import android.os.Looper
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.GroupAiConfiguration
 import com.elon.app.WebChatProviderId
+import org.json.JSONObject
 
 /** A separate document, sharing identity but never personal conversation/navigation state. */
 internal class GroupWebAiExecutor(
@@ -14,6 +15,7 @@ internal class GroupWebAiExecutor(
     private val onResult: (String) -> Unit,
     private val onFailure: (GroupWebAiFailure) -> Unit,
     private val configuration: GroupAiConfiguration = GroupAiConfiguration(),
+    private val projectServer: ((JSONObject, (Result<JSONObject>) -> Unit) -> Unit)? = null,
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private val provider = requireNotNull(configuration.engine.providerId)
@@ -29,6 +31,8 @@ internal class GroupWebAiExecutor(
     private var finished = false
     private var dispatching = false
     private var dispatched = false
+    private var baselineIds: Set<String> = emptySet()
+    private var completing = false
     private val commandId = GroupWebAiCommandIds.next()
     private val timeout = Runnable {
         diagnostics.stage(if (dispatched) "response_timeout" else "prepare_timeout")
@@ -38,9 +42,9 @@ internal class GroupWebAiExecutor(
 
     fun start() {
         diagnostics.stage("start")
-        handler.postDelayed(timeout, 60_000L)
+        handler.postDelayed(timeout, if (projectServer != null) 120_000L else 60_000L)
         try {
-            session = GroupWebAiSession(activity, ::event, ::fail, provider, diagnostics::stage)
+            session = GroupWebAiSession(activity, ::event, ::fail, provider, diagnostics::stage, projectServer)
             session?.start()
         } catch (_: RuntimeException) {
             fail(GroupWebAiFailureReason.PREPARATION)
@@ -81,7 +85,7 @@ internal class GroupWebAiExecutor(
     }
 
     private fun snapshot(value: ChatGptWebSnapshot) {
-        diagnostics.snapshot(value, session?.documentUrl.orEmpty())
+        diagnostics.snapshot(value, session?.documentUrl.orEmpty(), session?.isReady(value) == true)
         lastSnapshot = value
         if (!dispatched) {
             if (value.loginRequired) { fail(GroupWebAiFailureReason.LOGIN); return }
@@ -117,18 +121,29 @@ internal class GroupWebAiExecutor(
                 if (finished) return@authorize
                 if (!permitted) { fail(); return@authorize }
                 if (lastSnapshot?.let { session?.isReady(it) } != true) { fail(); return@authorize }
-                dispatched = true
-                diagnostics.stage("send")
-                handler.removeCallbacks(timeout)
-                handler.postDelayed(timeout, 180_000L)
-                session?.sendPrompt(prompt, commandId)
+                session?.verifyForSend { verified ->
+                    if (finished) return@verifyForSend
+                    if (!verified || lastSnapshot?.let { session?.isReady(it) } != true) { fail(); return@verifyForSend }
+                    baselineIds = lastSnapshot?.messages.orEmpty().map { it.id }.toSet()
+                    dispatched = true
+                    diagnostics.stage("send")
+                    handler.removeCallbacks(timeout)
+                    handler.postDelayed(timeout, 180_000L)
+                    session?.sendPrompt(prompt, commandId)
+                }
             }
             return
         }
-        val reply = completedReply(value.messages, prompt, value.streaming, value.privateStreamState) ?: return
+        val reply = completedReply(value.messages.filterNot { it.id in baselineIds }, prompt, value.streaming, value.privateStreamState) ?: return
+        if (completing) return
+        completing = true
         diagnostics.stage("completed")
-        finish()
-        onResult(reply)
+        handler.removeCallbacks(timeout)
+        val publish = {
+            if (!finished) { finish(); onResult(reply) }
+        }
+        handler.postDelayed(publish, 20_000L)
+        session?.complete(publish)
     }
 
     fun cancel() { diagnostics.stage("cancelled"); fail(GroupWebAiFailureReason.CANCELLED) }

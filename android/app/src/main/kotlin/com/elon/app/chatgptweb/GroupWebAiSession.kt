@@ -5,6 +5,8 @@ import android.os.Looper
 import android.webkit.CookieManager
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AlertDialog
+import org.json.JSONObject
 import com.elon.app.beginWebChatBackgroundInteraction
 import com.elon.app.WebChatProviderId
 import com.elon.app.googleweb.GoogleWebPageAdapter
@@ -18,6 +20,7 @@ internal class GroupWebAiSession(
     private val onFailure: (GroupWebAiFailureReason) -> Unit,
     private val provider: WebChatProviderId = WebChatProviderId.CHATGPT_WEB,
     private val observe: (String) -> Unit = {},
+    projectServer: ((JSONObject, (Result<JSONObject>) -> Unit) -> Unit)? = null,
 ) {
     private var closed = false
     private val handler = Handler(Looper.getMainLooper())
@@ -29,8 +32,23 @@ internal class GroupWebAiSession(
         GoogleWebPageAdapter(activity, view, ::event, {}) else null
     val adapter: ChatGptWebPageAdapter get() = requireNotNull(chatGpt)
     val documentUrl: String get() = view.url.orEmpty()
+    private var latestSnapshot: ChatGptWebSnapshot? = null
+    private val project = projectServer?.let { server -> GroupChatGptProjectCoordinator(
+        command = { payload, id -> adapter.groupProjectRequest(payload, id) }, server = server,
+        navigate = { view.loadUrl(it) },
+        changed = { latestSnapshot?.let { onEvent(ChatGptWebEvent.Snapshot(it)) } }, failure = onFailure, observe = observe,
+        schedule = { delay, task -> handler.postDelayed(task, delay) },
+        confirmRebuild = { rebuild -> AlertDialog.Builder(activity).setTitle("本群 ChatGPT 项目已不可见")
+            .setMessage("官网返回原项目不存在或无权访问。是否创建新的独立项目？原项目里的历史无法自动恢复。")
+            .setNegativeButton("取消") { _, _ -> onFailure(GroupWebAiFailureReason.CANCELLED) }
+            .setOnCancelListener { onFailure(GroupWebAiFailureReason.CANCELLED) }
+            .setPositiveButton("重建项目") { _, _ -> rebuild() }.show() },
+    ) }
     fun isReady(snapshot: ChatGptWebSnapshot): Boolean =
-        !closed && GroupWebAiSessionPolicy.ready(snapshot, provider, documentUrl)
+        !closed && if (project != null) project.matches(documentUrl) && GroupChatGptProjectRoute.ready(snapshot, documentUrl)
+            else GroupWebAiSessionPolicy.ready(snapshot, provider, documentUrl)
+    fun verifyForSend(done: (Boolean) -> Unit) { project?.verifyForSend(done) ?: done(!closed) }
+    fun complete(done: () -> Unit) { project?.complete(documentUrl, done) ?: done() }
     private val refresh = GoogleWebResponseRefreshCoordinator(
         requestSnapshot = { google?.requestSnapshot() },
         schedule = { task, delay -> handler.postDelayed(task, delay) }, cancel = handler::removeCallbacks,
@@ -57,6 +75,8 @@ internal class GroupWebAiSession(
 
     private fun event(event: ChatGptWebEvent) {
         if (closed) return
+        project?.event(event)
+        if (closed) return
         if (event is ChatGptWebEvent.WebTouchRequest) {
             if (provider == WebChatProviderId.CHATGPT_WEB && GroupWebAiSessionPolicy.allowsModelTouch(event.purpose)) {
                 modelTouch.handle(event)
@@ -71,6 +91,8 @@ internal class GroupWebAiSession(
         if (event is ChatGptWebEvent.CommandResult && event.action == "send_prompt" && event.ok) refresh.onSendConfirmed()
         if (event is ChatGptWebEvent.Snapshot) {
             val snapshot = event.value
+            latestSnapshot = snapshot
+            project?.snapshot(snapshot, documentUrl)
             val user = snapshot.messages.indexOfLast { it.role == "user" }
             refresh.onSnapshot(snapshot.messages.getOrNull(user)?.content,
                 user >= 0 && snapshot.messages.drop(user + 1).any { it.role == "assistant" }, snapshot.streaming)
@@ -105,7 +127,7 @@ internal class GroupWebAiSession(
         )
         if (google != null) google.install() else adapter.install()
         ChatGptWebProxyController(activity).prepare {
-            if (!closed) view.loadUrl(GroupWebAiSessionPolicy.startUrl(provider))
+            if (!closed) view.loadUrl(if (project != null) "https://chatgpt.com/" else GroupWebAiSessionPolicy.startUrl(provider))
         }
     }
 
@@ -118,6 +140,7 @@ internal class GroupWebAiSession(
     fun close() {
         if (closed) return
         closed = true
+        project?.close()
         refresh.stop()
         handler.removeCallbacksAndMessages(null)
         google?.dispose()

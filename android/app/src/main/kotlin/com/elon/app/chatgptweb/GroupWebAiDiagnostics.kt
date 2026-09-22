@@ -33,7 +33,8 @@ internal class GroupWebAiDiagnostics(
             "authority" to receipt.authority.name.lowercase(), "indeterminate" to receipt.indeterminate), terminal = true)
     }
 
-    fun snapshot(value: ChatGptWebSnapshot, documentUrl: String = value.url) {
+    fun snapshot(value: ChatGptWebSnapshot, documentUrl: String = value.url,
+        ready: Boolean = GroupWebAiSessionPolicy.ready(value, provider, documentUrl)) {
         val route = runCatching { URI(documentUrl) }.getOrNull()
         emit(mapOf(
             "stage" to "snapshot",
@@ -52,7 +53,7 @@ internal class GroupWebAiDiagnostics(
             "private_stream_state" to value.privateStreamState.takeIf {
                 it in setOf("", "idle", "streaming", "completed", "interrupted", "failed", "error", "stopped")
             }.orEmpty(),
-            "ready" to GroupWebAiSessionPolicy.ready(value, provider, documentUrl),
+            "ready" to ready,
         ))
     }
 
