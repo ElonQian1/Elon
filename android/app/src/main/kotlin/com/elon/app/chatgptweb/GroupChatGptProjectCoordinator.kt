@@ -25,7 +25,7 @@ internal class GroupChatGptProjectCoordinator(
     private var validated = false
     private var committed = false
     val ready: Boolean get() = !closed && validated
-    fun matches(url: String): Boolean = ready && url == target
+    fun matches(url: String): Boolean = ready && GroupChatGptProjectRoute.matches(url, target)
     fun verifyForSend(done: (Boolean) -> Unit) {
         if (!ready) { done(false); return }
         privateRequest("read") { done(it.optBoolean("ok")) }
@@ -34,7 +34,7 @@ internal class GroupChatGptProjectCoordinator(
     fun snapshot(value: ChatGptWebSnapshot, documentUrl: String) {
         if (closed || !value.authenticated || value.loginRequired) return
         if (!started) { started = true; identify(); return }
-        if (target.isNotEmpty() && documentUrl == target && !validating && !validated) {
+        if (target.isNotEmpty() && GroupChatGptProjectRoute.matches(documentUrl, target) && !validating && !validated) {
             validating = true
             privateRequest("read") { result ->
                 if (!result.optBoolean("ok")) fail(result) else { validated = true; changed() }

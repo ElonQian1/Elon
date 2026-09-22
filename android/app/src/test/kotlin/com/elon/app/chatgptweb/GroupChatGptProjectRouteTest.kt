@@ -28,4 +28,15 @@ class GroupChatGptProjectRouteTest {
         assertEquals(id, GroupChatGptProjectRoute.conversationId(url))
         assertEquals(id, GroupChatGptProjectRoute.conversationId("https://chatgpt.com/c/$id"))
     }
+    @Test fun canonicalSlugAndShortConversationStillRequireTheBoundIds() {
+        val named = url.replace(project, "$project-group-name")
+        assertTrue(GroupChatGptProjectRoute.matches(named, url))
+        assertTrue(GroupChatGptProjectRoute.matches("https://chatgpt.com/c/$id", url))
+        assertTrue(GroupChatGptProjectRoute.ready(snapshot().copy(url = named), named))
+        assertEquals(id, GroupChatGptProjectRoute.conversationId(named))
+        assertFalse(GroupChatGptProjectRoute.matches(url.replace(project, "g-p-" + "b".repeat(32)), url))
+        assertFalse(GroupChatGptProjectRoute.matches(url.replace(id, "33333333-3333-4333-8333-333333333333"), url))
+        assertFalse(GroupChatGptProjectRoute.matches("https://chatgpt.com/c/$id", "https://chatgpt.com/g/$project/project"))
+        assertFalse(GroupChatGptProjectRoute.matches(url.replace("/c/", "%2Fc%2F"), url))
+    }
 }
