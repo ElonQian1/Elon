@@ -29,8 +29,11 @@
       } catch (error) {
         // A missing identity endpoint is never evidence that the user's project was deleted.
         const raw = error?.message || '';
-        throw Error(/^http_(401|403)$/.test(raw) ? 'project_auth_required' :
-          raw === 'http_429' ? 'project_rate_limited' : 'project_unavailable');
+        const code = /^http_(401|403)$/.test(raw) ? 'project_auth_required' :
+          raw === 'http_429' ? 'project_rate_limited' : 'project_unavailable';
+        const reason = ['timeout', 'invalid_json', 'response_too_large'].includes(raw) ? raw :
+          /^http_\d+$/.test(raw) ? 'http' : 'network';
+        throw Object.assign(Error(code), code === 'project_unavailable' ? { identityReason: reason } : {});
       }
       if (!current()) throw Error('project_identity_changed');
       return response.payload;

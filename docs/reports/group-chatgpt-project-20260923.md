@@ -73,3 +73,10 @@ V305 群 AI 助手由另一任务维护。本批 V306 与 V305 必须都进入�
 - Node 14 项通过，覆盖未知 runtime、账号切换、身份 GET 故障及退出后旧请求头不可继续授权；正式装机和真实创建/复用需在候选验证后补记，当前不标记通过。
 - 独立候选身份模块真机只读通过：`scopeValid/current/accountHeaderMatches=true`，同时 `runtimeKnown=false`；证明不再依赖旧模块映射。Android Coordinator/Route 定向通过，日志 `group-project-identity-unit-20260923-052309-078`。
 - 研究包热加载完整项目流程到达 `identity_ready/acquire/create_begin`，随后 `project_unavailable`，尚无群回答；热加载存在文档注入时序差异，不能作为正式安装包业务通过证据，后续需继续核实。
+
+## 创建恢复补缺
+
+- 确认存在创建日志先登记、身份读取随后失败的恢复缺口：请求还没发出，绑定却滞留 `creating`。传输仅在创建 POST 尚未开始时返回明确 `notSent`；当前操作租约可通过 `create_not_sent` 恢复为空，不抹掉已经发出但结果未知的创建。
+- 未知创建仍先查找唯一绑定标记；成功读完目录但没有结果时，提供明确“重新创建”确认，说明可能留下未确认的旧项目。用户确认后 `restart_unconfirmed` 增加 generation，旧回执不可重新绑定；不删除项目或历史，不自动重发。
+- 补充固定身份失败原因：超时、响应格式、大小、HTTP、网络等；不记录原始错误、凭证或私人内容。
+- Node 项目测试 15 项、生产 SQL 模块 5 项、Android 项目与群助手定向 13 项通过。新增明确未发送/未知结果边界、确认后重建、当前及过期租约、旧 generation 拒绝用例。日志 `group-project-recovery-rust-20260923-054642-749`、`group-project-recovery-unit-20260923-055147-348`；更新正式包和端到端验收仍待完成。

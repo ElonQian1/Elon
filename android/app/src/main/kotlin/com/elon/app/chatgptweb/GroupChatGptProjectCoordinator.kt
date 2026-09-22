@@ -12,6 +12,7 @@ internal class GroupChatGptProjectCoordinator(
     private val confirmRebuild: (() -> Unit) -> Unit,
     private val schedule: (Long, () -> Unit) -> Unit,
     private val observe: (String) -> Unit = {},
+    private val confirmRestart: ((() -> Unit) -> Unit)? = null,
 ) {
     private var closed = false
     private var started = false
@@ -59,11 +60,18 @@ internal class GroupChatGptProjectCoordinator(
         when (binding?.optString("state")) {
             "empty" -> serverAction("create_begin") {
                 privateRequest("create") { result ->
-                    if (result.optBoolean("ok")) bindProject(result) else fail(result)
+                    if (result.optBoolean("ok")) bindProject(result)
+                    else if (result.optBoolean("notSent")) serverAction("create_not_sent") { fail(result) }
+                    else fail(result)
                 }
             }
             "creating" -> privateRequest("reconcile") { result ->
-                if (result.optBoolean("ok")) bindProject(result) else fail(result)
+                if (result.optBoolean("ok")) bindProject(result)
+                else if (result.optString("code") == "project_create_unresolved" && confirmRestart != null) {
+                    confirmRestart.invoke {
+                        if (!closed) serverAction("restart_unconfirmed", JSONObject().put("confirmed_missing", true)) { prepare() }
+                    }
+                } else fail(result)
             }
             "ready" -> privateRequest("read") { result ->
                 if (result.optBoolean("ok")) open()
@@ -154,7 +162,9 @@ internal class GroupChatGptProjectCoordinator(
         val code = result.optString("code")
         if (Regex("project_[a-z_]{1,48}").matches(code)) observe(code)
         val identityReason = result.optString("identityReason")
-        if (identityReason in setOf("document", "runtime", "account", "workspace")) observe("project_identity_$identityReason")
+        if (identityReason in setOf("document", "runtime", "account", "workspace", "timeout", "invalid_json", "response_too_large", "http", "network")) {
+            observe("project_identity_$identityReason")
+        }
         next(result)
     }
 

@@ -155,6 +155,9 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
             case "retry_selection":
                 assertTrue("analysis_failure_required", text("AI 回答未发到群聊").exists());
                 action(desc("group-ai-analysis-retry"), false); break;
+            case "confirm_project_restart":
+                assertTrue("project_restart_confirmation_required", text("上次项目创建尚未确认").exists());
+                action(text("重新创建"), false); break;
             case "share_answer":
                 fixtureOpen(); action(text("ELON GROUP SELECTION PASSED"), true); action(text("转发"), false); break;
             case "share_target":

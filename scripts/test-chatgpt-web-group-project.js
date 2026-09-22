@@ -105,7 +105,8 @@ test('identity endpoint failures cannot masquerade as a deleted project', async 
     ['http_429', 'project_rate_limited'], ['timeout', 'project_unavailable']]) {
     const f = fixture();
     f.page.__elonChatGptPrivateJsonRequest.request = async () => { throw Error(raw); };
-    assert.deepEqual(await f.core.run({ operation: 'identity' }), { ok: false, code });
+    assert.deepEqual(await f.core.run({ operation: 'identity' }), { ok: false, code,
+      ...(code === 'project_unavailable' ? { identityReason: raw === 'timeout' ? 'timeout' : 'http' } : {}) });
     assert.equal(f.calls.length, 0);
   }
 });
@@ -141,8 +142,19 @@ test('read differentiates confirmed missing from network, authentication and rat
 });
 test('unknown create is never retried by transport', async () => {
   const f = fixture(), command = await input(f, 'create'); f.replies.push(Error('timeout'));
-  assert.equal((await f.core.run(command)).code, 'project_create_unknown');
+  const result = await f.core.run(command);
+  assert.equal(result.code, 'project_create_unknown');
+  assert.equal(result.notSent, undefined);
   assert.equal(f.calls.length, 1);
+});
+
+test('only a proven pre-dispatch create failure reports notSent', async () => {
+  const f = fixture(), command = await input(f, 'create');
+  f.page.__elonChatGptPrivateJsonRequest.request = async () => { throw Error('timeout'); };
+  const result = await f.core.run(command);
+  assert.equal(result.notSent, true);
+  assert.equal(result.identityReason, 'timeout');
+  assert.equal(f.calls.length, 0);
 });
 test('an already bound project remains usable after its owner edits instructions', async () => {
   const f = fixture(), command = await input(f, 'read', { projectId });

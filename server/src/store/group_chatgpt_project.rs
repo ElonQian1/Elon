@@ -144,6 +144,21 @@ fn apply(
                     [&current.binding_id],
                 )?;
             }
+            "create_not_sent" => {
+                // Only the current lease may cancel its own pre-dispatch journal.
+                ensure!(current.state == "creating", "当前不是待确认的项目创建");
+                tx.execute(
+                    "UPDATE group_chatgpt_projects SET state='empty' WHERE binding_id=?1",
+                    [&current.binding_id],
+                )?;
+            }
+            "restart_unconfirmed" => {
+                ensure!(
+                    req.confirmed_missing && current.state == "creating",
+                    "需要明确确认重新创建项目"
+                );
+                tx.execute("UPDATE group_chatgpt_projects SET state='empty',generation=generation+1 WHERE binding_id=?1", [&current.binding_id])?;
+            }
             "bind" => {
                 let project = req.project_id.as_deref().unwrap_or("");
                 ensure!(

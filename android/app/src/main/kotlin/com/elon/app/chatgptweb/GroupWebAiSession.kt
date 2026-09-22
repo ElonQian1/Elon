@@ -43,6 +43,11 @@ internal class GroupWebAiSession(
             .setNegativeButton("取消") { _, _ -> onFailure(GroupWebAiFailureReason.CANCELLED) }
             .setOnCancelListener { onFailure(GroupWebAiFailureReason.CANCELLED) }
             .setPositiveButton("重建项目") { _, _ -> rebuild() }.show() },
+        confirmRestart = { restart -> AlertDialog.Builder(activity).setTitle("上次项目创建尚未确认")
+            .setMessage("已查询官网项目列表，但未找到上次项目。可以稍后再试；现在重新创建可能留下一个未确认的旧项目，不会删除任何已有项目或历史。是否重新创建？")
+            .setNegativeButton("稍后再试") { _, _ -> onFailure(GroupWebAiFailureReason.PROJECT_UNKNOWN) }
+            .setOnCancelListener { onFailure(GroupWebAiFailureReason.CANCELLED) }
+            .setPositiveButton("重新创建") { _, _ -> restart() }.show() },
     ) }
     fun isReady(snapshot: ChatGptWebSnapshot): Boolean =
         !closed && if (project != null) project.matches(documentUrl) && GroupChatGptProjectRoute.ready(snapshot, documentUrl)

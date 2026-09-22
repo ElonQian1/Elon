@@ -109,3 +109,43 @@ fn conversation_commit_and_rebuild_require_current_lease_and_generation() {
     req.action = "release".into();
     assert!(apply(&mut conn, "u", "g", &req, 9).is_err());
 }
+
+#[test]
+fn pre_dispatch_failure_can_reset_only_its_current_lease() {
+    let (mut conn, mut req) = fixture();
+    let lease = apply(&mut conn, "u", "g", &req, 1).unwrap();
+    leased(&mut req, &lease);
+    req.action = "create_begin".into();
+    apply(&mut conn, "u", "g", &req, 2).unwrap();
+    req.action = "create_not_sent".into();
+    let reset = apply(&mut conn, "u", "g", &req, 3).unwrap();
+    assert_eq!(reset.state, "empty");
+    assert_eq!(reset.generation, 1);
+    assert!(apply(&mut conn, "u", "g", &req, 4).is_err());
+    req.action = "create_begin".into();
+    apply(&mut conn, "u", "g", &req, 4).unwrap();
+    req.action = "create_not_sent".into();
+    req.lease_id = Some("stale".into());
+    assert!(apply(&mut conn, "u", "g", &req, 5).is_err());
+    leased(&mut req, &lease);
+    assert!(apply(&mut conn, "u", "g", &req, 302).is_err());
+}
+
+#[test]
+fn abandoning_an_unconfirmed_create_requires_confirmation_and_new_generation() {
+    let (mut conn, mut req) = fixture();
+    let lease = apply(&mut conn, "u", "g", &req, 1).unwrap();
+    leased(&mut req, &lease);
+    req.action = "create_begin".into();
+    apply(&mut conn, "u", "g", &req, 2).unwrap();
+    req.action = "restart_unconfirmed".into();
+    assert!(apply(&mut conn, "u", "g", &req, 3).is_err());
+    req.confirmed_missing = true;
+    let reset = apply(&mut conn, "u", "g", &req, 4).unwrap();
+    assert_eq!(reset.state, "empty");
+    assert_eq!(reset.generation, 2);
+    req.action = "create_begin".into();
+    assert!(apply(&mut conn, "u", "g", &req, 5).is_err());
+    leased(&mut req, &reset);
+    assert!(apply(&mut conn, "u", "g", &req, 5).is_ok());
+}

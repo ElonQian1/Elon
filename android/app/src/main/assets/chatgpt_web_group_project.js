@@ -84,7 +84,8 @@
       const code = writeStarted ? 'project_create_unknown' : raw === 'http_404' ? 'project_not_found' :
         /^http_(401|403)$/.test(raw) ? 'project_auth_required' : raw === 'http_429' ? 'project_rate_limited' :
         /^project_[a-z_]+$/.test(raw) ? raw : 'project_unavailable';
-      return { ok: false, code, ...(['document', 'runtime', 'account', 'workspace'].includes(error?.identityReason)
+      return { ok: false, code, ...(input?.operation === 'create' && !writeStarted ? { notSent: true } : {}),
+        ...(['document', 'runtime', 'account', 'workspace', 'timeout', 'invalid_json', 'response_too_large', 'http', 'network'].includes(error?.identityReason)
         ? { identityReason: error.identityReason } : {}) };
     } finally { busy = false; }
   }

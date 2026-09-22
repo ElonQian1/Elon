@@ -15,6 +15,7 @@ class GroupChatGptProjectCoordinatorTest {
         var url = "https://chatgpt.com/"
         var readyCount = 0
         var confirm: (() -> Unit)? = null
+        var restart: (() -> Unit)? = null
         val coordinator = GroupChatGptProjectCoordinator(
             command = { raw, id -> commands += JSONObject(raw) to id },
             server = { req, done ->
@@ -22,10 +23,13 @@ class GroupChatGptProjectCoordinatorTest {
                 when (req.getString("action")) {
                     "create_begin" -> binding.put("state", "creating")
                     "bind" -> binding.put("state", "ready").put("project_id", req.getString("project_id"))
+                    "create_not_sent" -> binding.put("state", "empty")
+                    "restart_unconfirmed" -> binding.put("state", "empty").put("generation", binding.getLong("generation") + 1)
                 }
                 done(Result.success(JSONObject(binding.toString())))
             }, navigate = { url = it }, changed = { readyCount++ }, failure = failures::add,
             confirmRebuild = { confirm = it }, schedule = { _, _ -> },
+            confirmRestart = { restart = it },
         )
         fun snapshot() = ChatGptWebSnapshot("", url, "", emptyList(), true, true, false,
             currentModel = "", attachments = emptyList(), dictationActive = false, capabilities = ChatGptWebCapabilities.EMPTY)
@@ -94,5 +98,24 @@ class GroupChatGptProjectCoordinatorTest {
         assertTrue(h.failures.isEmpty())
         h.coordinator.complete(conversation) { published++ }
         assertEquals(1, published)
+    }
+
+    @Test fun onlyAnExplicitPreDispatchReceiptResetsTheCreateJournal() {
+        for (notSent in listOf(true, false)) {
+            val h = Harness(); h.start()
+            h.reply(JSONObject().put("ok", false).put("code", "project_unavailable").put("notSent", notSent))
+            assertEquals(notSent, h.actions.contains("create_not_sent"))
+            assertEquals(1, h.failures.size)
+        }
+    }
+
+    @Test fun unconfirmedCreateDoesNotRestartWithoutExplicitUserConfirmation() {
+        val h = Harness("creating"); h.start()
+        h.reply(JSONObject().put("ok", false).put("code", "project_create_unresolved"))
+        assertNotNull(h.restart)
+        assertFalse(h.actions.contains("restart_unconfirmed"))
+        h.restart!!.invoke()
+        assertEquals(listOf("acquire", "restart_unconfirmed", "create_begin"), h.actions)
+        assertEquals(2L, h.commands.last().first.getLong("generation"))
     }
 }
