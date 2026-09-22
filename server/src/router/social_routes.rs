@@ -8,8 +8,8 @@ use axum::routing::{delete, get, post};
 use axum::Router;
 use std::sync::Arc;
 mod group_ai_context;
-mod group_chatgpt_project;
 mod group_assistant;
+mod group_chatgpt_project;
 mod group_web_ai;
 
 mod ai_snapshots;

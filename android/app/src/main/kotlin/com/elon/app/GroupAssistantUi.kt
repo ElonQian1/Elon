@@ -51,7 +51,7 @@ internal class GroupAssistantUi(
             setBackgroundColor(ContextCompat.getColor(activity, R.color.elon_bg_app))
         }
         val header = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
-        header.addView(button("返回", "group-assistant-back", ::close))
+        header.addView(button("返回", "group-assistant-back", ::close).apply { setOnClickListener { close() } })
         header.addView(text("群 AI 助手", 20f), LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(header)
         root.addView(text(value.name, 13f))
