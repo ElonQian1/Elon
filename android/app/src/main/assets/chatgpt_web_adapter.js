@@ -197,20 +197,6 @@
     return { blocked: loginRequired, loginRequired, reason: loginRequired ? 'login_required' : '', source: loginRequired ? 'visible_page' : '' };
   }
 
-  function isAuthenticated(loginRequired, composerReady) {
-    const signals = {
-      loginRequired,
-      hasLoginEntry: hasLoginEntry(),
-      hasProfileEntry: hasProfileEntry(),
-      composerReady
-    };
-    if (authenticationPolicy && typeof authenticationPolicy.isAuthenticated === 'function') {
-      return authenticationPolicy.isAuthenticated(signals);
-    }
-    return !signals.loginRequired && !signals.hasLoginEntry &&
-      (signals.hasProfileEntry || signals.composerReady);
-  }
-
   function findButton(testId, labels) {
     const direct = testId ? document.querySelector('[data-testid="' + testId + '"]') : null;
     if (isVisible(direct)) return direct;
@@ -314,7 +300,8 @@
       messages,
       observedMessageCount: Math.max(messages.length, Number(messageWindow.observedCount) || 0),
       messageWindowStart: Math.max(0, Number(messageWindow.startIndex) || 0),
-      authenticated: privateInput?.ready === true || isAuthenticated(loginRequired, !!composer),
+      ...authenticationPolicy?.accountState?.({ loginRequired, composerReady: !!composer,
+        hasLoginEntry: hasLoginEntry(), hasProfileEntry: hasProfileEntry(), privateInputReady: privateInput?.ready === true }),
       pageKind,
       loginRequired,
       accessReason: access.reason || '',

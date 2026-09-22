@@ -48,6 +48,7 @@ internal data class ChatGptWebSnapshot(
     val contentOnly: Boolean = false,
     val privateSendReady: Boolean = false,
     val privateSendRecoveryState: String = "disabled",
+    val accountConfirmed: Boolean = false,
 )
 
 internal data class ChatGptWebComposerOption(
@@ -240,6 +241,7 @@ internal object ChatGptWebProtocol {
             draft = event.optString("draft").take(MAX_DRAFT_LENGTH),
             messages = messages,
             authenticated = event.optBoolean("authenticated"),
+            accountConfirmed = event.optBoolean("accountConfirmed"),
             composerReady = event.optBoolean("composerReady"),
             privateSendReady = event.optBoolean("privateSendReady") && event.optString("snapshotScope") != "content",
             streaming = event.optBoolean("streaming"),

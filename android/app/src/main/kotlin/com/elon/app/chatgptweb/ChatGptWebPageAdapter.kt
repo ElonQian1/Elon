@@ -159,6 +159,7 @@ internal class ChatGptWebPageAdapter(
     )
     private var listenerInstalled = false
     private var skinEnabled = false
+    private val accountConnection = ChatGptWebAccountConnection(context)
 
     fun install() {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
@@ -183,6 +184,7 @@ internal class ChatGptWebPageAdapter(
             if (ChatGptWebHandshakeCompletionPolicy.completes(parsed.event)) {
                 handshake.acknowledge()
             }
+            accountConnection.observe(parsed.event)
             onEvent(parsed.event)
         }
         if (

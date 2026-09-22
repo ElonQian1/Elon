@@ -59,11 +59,23 @@
     return signals.composerReady === true;
   }
 
+  function isAccountConfirmed(signals) {
+    if (!signals || signals.loginRequired === true || signals.hasLoginEntry === true) return false;
+    return signals.hasProfileEntry === true || signals.privateInputReady === true;
+  }
+
+  function accountState(signals) {
+    return { authenticated: signals?.privateInputReady === true || isAuthenticated(signals),
+      accountConfirmed: isAccountConfirmed(signals) };
+  }
+
   return Object.freeze({
-    version: 2,
+    version: 3,
     isLoginEntry,
     hasExplicitLoginRequirement,
     accessDecision,
-    isAuthenticated
+    isAuthenticated,
+    isAccountConfirmed,
+    accountState
   });
 });

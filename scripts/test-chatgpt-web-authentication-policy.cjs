@@ -70,3 +70,13 @@ assert.equal(policy.isAuthenticated({
 }), true)
 
 console.log('chatgpt web authentication policy passed')
+
+assert.equal(policy.isAccountConfirmed({ composerReady: true }), false, 'guest composer is not an account receipt')
+assert.equal(policy.isAccountConfirmed({ hasProfileEntry: true }), true)
+assert.equal(policy.isAccountConfirmed({ privateInputReady: true }), true)
+assert.equal(policy.isAccountConfirmed({ hasProfileEntry: true, loginRequired: true }), false)
+assert.equal(policy.isAccountConfirmed({ privateInputReady: true, hasLoginEntry: true }), false)
+assert.equal(policy.isAccountConfirmed(null), false)
+assert.deepEqual(policy.accountState({ composerReady: true }), { authenticated: true, accountConfirmed: false })
+assert.deepEqual(policy.accountState({ privateInputReady: true }), { authenticated: true, accountConfirmed: true })
+console.log('chatgpt account confirmation policy passed')

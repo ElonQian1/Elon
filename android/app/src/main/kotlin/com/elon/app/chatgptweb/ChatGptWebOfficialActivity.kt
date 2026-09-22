@@ -30,6 +30,7 @@ class ChatGptWebOfficialActivity : AppCompatActivity() {
     private lateinit var officialActionRuntime: ChatGptWebOfficialActionRuntime
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
     private val sessionRestorer by lazy { ChatGptWebSessionRestorer(this) }
+    private val loginReturn by lazy { ChatGptWebLoginReturn(this) }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,7 +68,7 @@ class ChatGptWebOfficialActivity : AppCompatActivity() {
                 },
                 onPageReady = { url ->
                     cookieManager.flush()
-                    sessionRestorer.onPageReady(url)
+                    if (!loginReturn.enabled) sessionRestorer.onPageReady(url)
                     officialActionRuntime.onPageReady(url)
                 },
                 onBlockedNavigation = { host ->
@@ -120,6 +121,7 @@ class ChatGptWebOfficialActivity : AppCompatActivity() {
             },
             audioPermissionController = audioPermissionController,
             onFeedback = ::showStartupFeedback,
+            onSnapshot = loginReturn::onSnapshot,
         )
 
         progress = ProgressBar(
@@ -130,7 +132,7 @@ class ChatGptWebOfficialActivity : AppCompatActivity() {
             max = 100
             isIndeterminate = false
         }
-        setContentView(FrameLayout(this).apply {
+        setContentView(loginReturn.wrap(FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
             addView(
                 webView,
@@ -147,13 +149,13 @@ class ChatGptWebOfficialActivity : AppCompatActivity() {
                     Gravity.TOP,
                 ),
             )
-        })
+        }))
 
         onBackPressedDispatcher.addCallback(
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    if (webView.canGoBack()) webView.goBack() else finish()
+                    if (!loginReturn.enabled && webView.canGoBack()) webView.goBack() else finish()
                 }
             },
         )

@@ -10,6 +10,7 @@ internal class ChatGptWebOfficialActionRuntime(
     startupAction: ChatGptWebOfficialStartupAction?,
     audioPermissionController: ChatGptWebAudioPermissionController,
     onFeedback: (ChatGptWebOfficialStartupFeedback) -> Unit,
+    private val onSnapshot: (ChatGptWebSnapshot) -> Unit = {},
 ) {
     private val touchDispatcher = ChatGptWebTouchDispatcher(webView)
     private lateinit var adapter: ChatGptWebPageAdapter
@@ -65,6 +66,7 @@ internal class ChatGptWebOfficialActionRuntime(
 
     private fun onEvent(event: ChatGptWebEvent) {
         coordinator.onEvent(event)
+        if (event is ChatGptWebEvent.Snapshot) onSnapshot(event.value)
         if (event is ChatGptWebEvent.WebTouchRequest) {
             touchDispatcher.dispatch(event) { dispatched ->
                 if (!dispatched) coordinator.onTouchDispatchFailed(event.controlId)
