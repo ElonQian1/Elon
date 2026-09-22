@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, RefreshCw, Trash2 } from 'lucide-react'
+import { getAuthToken } from '../../../api/client'
 import MarkdownContent from '../../markdown/MarkdownContent'
 import SocialDialog from '../SocialDialog'
 import { socialRequest } from '../socialChatOperations'
@@ -26,15 +27,20 @@ export default function GroupAssistantDialog({ groupId, onClose }: { groupId: st
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const epoch = useRef(0)
+  const owner = useRef(getAuthToken())
   const abort = useRef<AbortController | null>(null)
   const base = `/api/me/groups/${encodeURIComponent(groupId)}/ai-assistant`
   function cancel() { epoch.current++; abort.current?.abort(); setBusy(false) }
   async function run(work: (signal: AbortSignal, current: () => boolean) => Promise<void>) {
+    if (!owner.current || owner.current !== getAuthToken()) { cancel(); onClose(); return }
     cancel(); const id = epoch.current; const controller = new AbortController(); abort.current = controller
+    const current = () => id === epoch.current && owner.current === getAuthToken()
     setBusy(true); setError('')
-    try { await work(controller.signal, () => id === epoch.current) }
-    catch (failure) { if (id === epoch.current) setError((failure as Error).message || '读取失败，请重试') }
-    finally { if (id === epoch.current) setBusy(false) }
+    try { await work(controller.signal, current) }
+    catch (failure) { if (current()) setError((failure as Error).message || '读取失败，请重试') }
+    finally {
+      if (id === epoch.current) { setBusy(false); if (owner.current !== getAuthToken()) onClose() }
+    }
   }
   function list() { void run(async (signal, current) => {
     const page = await socialRequest<{ items: Binding[] }>(base, { signal })
