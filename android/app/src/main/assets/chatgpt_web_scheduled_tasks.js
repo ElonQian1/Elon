@@ -1,29 +1,29 @@
 (function (root, factory) {
   'use strict';
-  const api = { version: 1, create: factory };
+  const api = { version: 2, create: factory };
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptScheduledTasks ||= factory(root);
 })(typeof window === 'object' ? window : null, function (page) {
   'use strict';
-  let core, identityCache, busy = false;
+  let core, busy = false;
   const identity = () => page.__elonChatGptPrivateConversationShareContract.create(page).identity();
   async function accountScope() {
     await page.__elonChatGptPrivateAuthContext.acquireRequestHeaders();
     const before = identity(), token = page.__elonChatGptDocumentToken;
     if (!before) throw Error('tasks_auth_required');
-    if (identityCache?.identity === before && identityCache.token === token && Date.now() - identityCache.at < 60000) return identityCache.scope;
+    // Cookie identity is authoritative even while the page's captured headers are hydrating.
     const response = await page.__elonChatGptPrivateJsonRequest.request(page, '/api/auth/session', {
       method: 'GET', credentials: 'include', cache: 'no-store', redirect: 'error', headers: { Accept: 'application/json' },
     }, { timeoutMs: 5000, maxBytes: 256 * 1024, mode: 'json' });
-    const user = response.payload?.user?.id;
+    const user = response.payload?.user?.id, workspace = response.payload?.account?.id;
     const headers = page.__elonChatGptPrivateTransport.copySameOriginRequestHeaders();
-    const workspace = Object.entries(headers).find(([key]) => key.toLowerCase() === 'chatgpt-account-id')?.[1] || 'personal';
+    const capturedAccount = Object.entries(headers).find(([key]) => key.toLowerCase() === 'chatgpt-account-id')?.[1];
     if (typeof user !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/.test(user) ||
         typeof workspace !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/.test(workspace)) throw Error('tasks_auth_required');
+    if (capturedAccount && capturedAccount !== workspace) throw Error('tasks_account_changed');
     const bytes = await page.crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(['group_tasks_v1', user, workspace])));
     const scope = Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
     if (identity() !== before || page.__elonChatGptDocumentToken !== token) throw Error('tasks_context_changed');
-    identityCache = { identity: before, token, scope, at: Date.now() };
     return scope;
   }
   function handle(action, command, respond, emit) {
@@ -44,5 +44,5 @@
       .finally(() => { busy = false; });
     return true;
   }
-  return Object.freeze({ version: 1, handle });
+  return Object.freeze({ version: 2, handle });
 });

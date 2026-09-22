@@ -5,14 +5,14 @@ const { webcrypto } = require('node:crypto');
 const bridge = require('../android/app/src/main/assets/chatgpt_web_scheduled_tasks.js');
 
 function setup() {
-  const fixture = { user: 'user_one', account: 'personal', auth: 'opaque-runtime-one', calls: [], results: [], events: [] };
+  const fixture = { user: 'user_one', account: 'account_one', auth: 'opaque-runtime-one', calls: [], results: [], events: [] };
   const page = { location: { origin: 'https://chatgpt.com' }, crypto: webcrypto, __elonChatGptDocumentToken: 'doc_test_123',
     __elonChatGptPrivateAuthContext: { acquireRequestHeaders: async () => ({}) },
     __elonChatGptPrivateConversationShareContract: { create: () => ({ identity: () => fixture.auth }) },
-    __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({ 'chatgpt-account-id': fixture.account }) },
+    __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({ 'chatgpt-account-id': fixture.header ?? fixture.account }) },
     __elonChatGptPrivateJsonRequest: { request: async (_, path, options) => {
       assert.equal(path, '/api/auth/session'); assert.equal(options.method, 'GET');
-      return { payload: { user: { id: fixture.user } } };
+      return { payload: { user: { id: fixture.user }, account: { id: fixture.account } } };
     } },
     __elonChatGptPrivateTasks: { create: () => ({ run: async input => {
       fixture.calls.push(input); await fixture.wait;
@@ -52,6 +52,20 @@ test('auth changes during private read discard payload instead of sharing anothe
   while (!f.calls.length) await new Promise(resolve => setImmediate(resolve));
   f.auth = 'different'; release();
   assert.equal((await done).code, 'tasks_context_changed'); assert.equal(f.events.length, 0);
+});
+test('cold catalog and warm preview retain the same cookie account despite header hydration', async () => {
+  const f = setup(); f.header = ''; await f.run(list); const scope = f.events[0].scope;
+  f.header = f.account; f.auth = 'hydrated-runtime';
+  assert.equal((await f.run({ operation: 'latest', id: 'task_a', expectedScope: scope, force: true })).ok, true);
+  assert.equal(f.events[1].scope, scope); assert.equal(f.calls.length, 2);
+});
+test('cookie logout and workspace switch are checked even with unchanged captured credentials', async () => {
+  const f = setup(); await f.run(list); const scope = f.events[0].scope;
+  f.header = f.account; f.account = 'account_two';
+  assert.equal((await f.run({ ...list, expectedScope: scope })).code, 'tasks_account_changed');
+  f.account = undefined;
+  assert.equal((await f.run({ ...list, expectedScope: scope })).code, 'tasks_auth_required');
+  assert.equal(f.calls.length, 1); assert.equal(f.events.length, 1);
 });
 test('parallel commands fail quickly and a finished command releases admission', async () => {
   const f = setup(); let release; f.wait = new Promise(resolve => { release = resolve; });

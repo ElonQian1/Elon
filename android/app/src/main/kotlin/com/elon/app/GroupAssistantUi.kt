@@ -74,7 +74,11 @@ internal class GroupAssistantUi(
         job = activity.lifecycleScope.launch {
             try { work(epoch) }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { if (valid(epoch)) status?.text = "读取或同步失败，已显示内容保留。请刷新重试；登录失效时先打开 ChatGPT 完成登录。" }
+            catch (error: Exception) { if (valid(epoch)) status?.text = when (error.message) {
+                "tasks_account_changed", "tasks_context_changed" -> "ChatGPT 账号状态已变化，请重新打开关注事项列表后选择。已分享内容不会改变。"
+                "tasks_auth_required" -> "请先登录原 ChatGPT 账号，再重新读取关注事项。已显示内容保留。"
+                else -> "读取或同步失败，已显示内容保留。请刷新重试；登录失效时先打开 ChatGPT 完成登录。"
+            } }
         }
     }
     private fun load(refresh: Boolean): Unit = launch { epoch ->

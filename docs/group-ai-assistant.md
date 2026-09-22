@@ -22,7 +22,7 @@
 | 分页任务列表只读传输 | implemented | device_verified | 完整首屏 2 项；实际多页仅离线覆盖 |
 | 最新结果只读传输 | implemented | offline_verified | 真机确认 `no_update`；非空富文本结果仍待样本 |
 | 账号隔离、有界缓存、失败保留旧结果 | implemented | offline_verified | 真机已确认缓存命中，账号切换/失败分支由离线测试覆盖 |
-| APK 用户挑选、预览及明确授权 | implemented | offline_verified | 真机选择与确认待新版安装后验收 |
+| APK 用户挑选、预览及明确授权 | implemented | device_verified | 目录、预览和授权确认界面通过；实际分享仍等用户指定事项 |
 | 群绑定、成员权限及取消分享 | implemented | offline_verified | 8 项生产 SQL 回归，含退群/重新入群不恢复旧授权 |
 | 结果去重同步和群动态阅读 | implemented | offline_verified | APK/Win/PWA 入口已接；真实非空更新待分享者选择样本 |
 | Win/PWA 自己导入 ChatGPT 任务 | not_in_this_delivery | deferred | 当前由 APK 登录身份层采集；Win/PWA 可阅读和撤销自己的分享 |
@@ -66,7 +66,7 @@
 - `pc-frontend/.../group-assistant` 与 `server/src/assets/group_assistant.*`：同一授权 API 的目录、分页动态、Markdown 详情与返回。未复制 ChatGPT 凭证，也不把分享链接当实时订阅。
 - 分享范围仅为标题及官方最新结果的正文，保留 Markdown 表格、代码和公开引用链接。交互图表及附件原件尚不导入；不能描述为原始多模态内容完整迁移。确认页明确此范围。
 
-新增定向验证：生产命令 5 项、既有任务传输 14 项，Android `ChatGptScheduledTasksTest` 3 项，生产 SQL 8 项；PC 完整 build 通过。PWA Playwright 在 320/390/1280 像素宽度验证分页、Markdown、撤销、账号变化丢弃响应和返回保留草稿，未访问外部站点。真机非空结果分享不以这些夹具代替。
+新增定向验证：生产命令 7 项、既有任务传输 14 项，Android `ChatGptScheduledTasksTest` 3 项，生产 SQL 8 项；PC 完整 build 通过。PWA Playwright 在 320/390/1280 像素宽度验证分页、Markdown、撤销、账号变化丢弃响应和返回保留草稿，未访问外部站点。真机非空结果分享不以这些夹具代替。
 
 ### 本轮验证与安装包一致性
 
@@ -82,8 +82,26 @@
 
 ## 剩余验收
 
+### 2026-09-23 生产接入发布
+
+- Server `0.3.1775` 已完整构建发布，源码 `e264ea10372d79f9f299ab5f2c313300c57fac74`；线上 `/api/server/version` 回读一致。migration 305 与群项目绑定 migration 306 按顺序一并部署。
+- PC 前端完整 build、bundle budget 门禁和静态资源发布通过；`/pc/` 返回 200。PWA 群助手 JS/CSS 线上 SHA-256 与本地源码一致，未登录访问个人群助手目录返回 401。
+- APK `1.1.1806`（code 1806）已发布，源码 `79ce4cac17ef45fffb6d8c141993396737835668`，线上清单 SHA-256 `e3accabcb7626642ccd801187620febac9d678a6a4d782f2b5e1471ffc9c9e5c`。此提交与服务端发布提交之间没有 Android 源码差异；小米无线 ADB 已独立回读安装版本 1806。
+- 合并时保留 adapter 435 的两个独立入口：群项目绑定与关注事项读取。合并后任务 JS 19 项、PWA 三视口回归再次通过；PC 账号切换后丢弃旧响应的补丁通过完整 build。
+- 上述是代码、制品与安装证据，不代替真实私人结果共享验收。尚未由开发者代选私人任务分享到群。
+
+### 目录到预览的账号作用域回归
+
+- 1806 正式包可读到 2 项目录，但预览失败；同源只读诊断确认固定错误码 `tasks_account_changed`，不是官网任务缺失或 VPN 失效。
+- 冷目录在账号请求头尚未水合时，把 `personal` 占位串写入作用域；预览时请求头已出现真实账号 ID，两次 SHA-256 不一致，导致误判换号。真机仅输出布尔比较与错误码，未导出身份值或私人结果。
+- 生产桥 v2 改从每次 `/api/auth/session` 返回的 `user.id + account.id` 生成稳定作用域，并校验已捕获账号头与 Cookie 账号一致。无身份时拒绝请求，不再使用 `personal` 占位或仅凭旧 Bearer 缓存身份。
+- 新增冷目录到热预览、Cookie 换号/退出且捕获凭据未变的回归，总计 21 项任务 JS 测试通过。UI 将账号变化与登录失效分别提示，不输出异常原文。
+- 同签名本机研究候选（版本仍为 1806，不等于线上正式制品）热加载生产桥 v2 后，目录和预览均 `tasks_ready`，确认页 `consent_visible=true`；取消后回到 2 项目录且群绑定仍为 0。没有点击分享。正式版必须重新完整构建并恢复关闭研究开关，不能发布此诊断 APK。
+
+### 待验证边界
+
 1. 复用已验证的任务列表、缓存和无更新分支，不重复研究；首次出现非空更新时补结果结构验收，不自动运行私人任务造样本。
-2. 新版安装后验证生产目录和选择预览。由用户明确选择一个事项，再验证授权绑定、真实结果同步、群内阅读及撤销，不擅自公开私人任务。
+2. 修复正式版安装后回读版本并检查预览；由用户明确选择一个事项，再验证授权绑定、真实结果同步、群内阅读及撤销，不擅自公开私人任务。
 3. 未来 Win 本地 WebView2 采集与交互图表/私有附件需要各自独立契约和验收，不能因为本轮文本结果分享通路上线而标记完成。
 
 对应领域规则仍见 [私有集成手册](web-ai-private-integration-playbook.md)。在端到端授权、权限和重复同步验收前，不发布“群 AI 助手已可用”的说明。
