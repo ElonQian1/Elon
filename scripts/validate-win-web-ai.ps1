@@ -19,8 +19,9 @@ function Invoke-Checked {
 Invoke-Checked 'adapter_js_syntax' {
     $AdapterAssets = @(
         Get-ChildItem (Join-Path $TaskRepoRoot 'android\app\src\main\assets\*') `
-            -Include 'chatgpt_web_adapter*.js','google_web_*.js' -File
+            -Include 'chatgpt_web_adapter*.js','google_web_*.js','binance_grid_read_*.js','binance_grid_reports_adapter.js','binance_wallet_adapter.js' -File
         Get-ChildItem (Join-Path $TaskRepoRoot 'desktop-shell\src-tauri\src\local_ai_browser\*adapter.js') -File
+        Get-ChildItem (Join-Path $TaskRepoRoot 'desktop-shell\src-tauri\src\local_ai_browser\binance_win_bridge.js') -File
     )
     if (-not $AdapterAssets.Count) { throw 'No shared Web AI adapter assets were found.' }
     foreach ($Asset in $AdapterAssets) {

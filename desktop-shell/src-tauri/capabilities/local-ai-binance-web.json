@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "local-ai-binance-web",
+  "description": "Binance 官网子窗口只能上报共享读取适配器已验证的只读观察，不能调用主窗口会话控制、读取凭证或执行交易。",
+  "webviews": ["local-ai-binance-*"],
+  "remote": {
+    "urls": [
+      "https://www.binance.com/*"
+    ]
+  },
+  "permissions": ["local-ai-web-adapter-event"]
+}

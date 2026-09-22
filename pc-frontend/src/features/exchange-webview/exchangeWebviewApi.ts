@@ -3,8 +3,31 @@ import { normalizeExchangeWebviewError } from './exchangeWebviewErrors.js'
 
 const PROVIDER_SCHEMA = 'yilong.exchange_webview.provider.v1'
 const SESSION_SCHEMA = 'yilong.exchange_webview.session.v1'
+const OBSERVATION_SCHEMA = 'yilong.exchange_webview.observation.v1'
 
 export const REQUIRED_EXCHANGE_WEBVIEW_RUNTIME_VERSION = 12
+/** Desktop generation that ships the read-only observer bridge and its two commands. */
+export const EXCHANGE_OBSERVATION_RUNTIME_VERSION = 14
+export const EXCHANGE_ADAPTER_ACTIONS = ['refresh', 'detail', 'report', 'wallet', 'inspect'] as const
+export type ExchangeAdapterAction = typeof EXCHANGE_ADAPTER_ACTIONS[number]
+
+export interface ExchangeWebObservation {
+  schema: typeof OBSERVATION_SCHEMA
+  windowOpen: boolean
+  adapterReady: boolean
+  documentToken: string | null
+  identity: Record<string, unknown> | null
+  list: Record<string, unknown> | null
+  details: Record<string, Record<string, unknown>>
+  reports: Record<string, Record<string, unknown>>
+  wallet: Record<string, unknown> | null
+  diagnostic: Record<string, unknown> | null
+  unavailableAtMs: number
+  commandResults: Record<string, unknown>[]
+  lastError: string | null
+  updatedAtMs: number
+  tradingEnabled: false
+}
 
 export interface ExchangeWebProvider {
   schema: typeof PROVIDER_SCHEMA
@@ -83,6 +106,45 @@ export async function openExchangeWebSession(
     })
     .finally(() => { openFlight = null })
   return openFlight
+}
+
+export async function getExchangeWebObservation(
+  providerId: string,
+  ownerKey: string,
+): Promise<ExchangeWebObservation> {
+  if (!validId(providerId) || !ownerKey.trim()) throw new Error('交易所官网会话身份无效。')
+  const invoke = requireDesktopInvoke()
+  let value: ExchangeWebObservation
+  try {
+    value = await invoke<ExchangeWebObservation>('get_exchange_web_observation', { providerId, ownerKey })
+  } catch (error) {
+    throw normalizeExchangeWebviewError(error)
+  }
+  if (value?.schema !== OBSERVATION_SCHEMA
+    || typeof value.windowOpen !== 'boolean'
+    || typeof value.adapterReady !== 'boolean'
+    || value.tradingEnabled !== false
+    || !Number.isSafeInteger(value.updatedAtMs)
+    || !Array.isArray(value.commandResults)) {
+    throw new Error('Win 客户端返回了不受支持的交易所观察合同。')
+  }
+  return value
+}
+
+export async function runExchangeWebAdapterCommand(
+  providerId: string,
+  ownerKey: string,
+  action: ExchangeAdapterAction,
+  value?: string,
+): Promise<void> {
+  if (!validId(providerId) || !ownerKey.trim()) throw new Error('交易所官网会话身份无效。')
+  if (!EXCHANGE_ADAPTER_ACTIONS.includes(action)) throw new Error('不支持的交易所只读动作。')
+  const invoke = requireDesktopInvoke()
+  try {
+    await invoke('run_exchange_web_adapter_command', { providerId, ownerKey, action, value: value ?? null, requestId: null })
+  } catch (error) {
+    throw normalizeExchangeWebviewError(error)
+  }
 }
 
 function requireDesktopInvoke() {

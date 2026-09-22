@@ -2,11 +2,13 @@ import { useRef, useState } from 'react'
 import { ExternalLink, Loader2, ShieldCheck } from 'lucide-react'
 import useLocalAiOwnerIdentity from '../user-browser/useLocalAiOwnerIdentity'
 import {
+  EXCHANGE_OBSERVATION_RUNTIME_VERSION,
   isExchangeWebviewAvailable,
   listExchangeWebProviders,
   openExchangeWebSession,
 } from './exchangeWebviewApi'
 import { exchangeWebviewErrorMessage } from './exchangeWebviewErrors.js'
+import ExchangeObservationSummary from './ExchangeObservationSummary'
 import styles from './WindowsExchangeWebviewLaunch.module.css'
 
 export interface WindowsWebviewLaunchContract {
@@ -27,6 +29,8 @@ export default function WindowsExchangeWebviewLaunch({
   const [opening, setOpening] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  // Only a desktop that ships the observer bridge can answer observation queries.
+  const [observing, setObserving] = useState(false)
 
   async function open() {
     if (openingRef.current) return
@@ -44,6 +48,7 @@ export default function WindowsExchangeWebviewLaunch({
         throw new Error('当前 Win 客户端尚未安装这个交易所官网入口，请先更新客户端。')
       }
       await openExchangeWebSession(provider.providerId, identity.ownerKey)
+      setObserving(provider.desktopRuntimeVersion >= EXCHANGE_OBSERVATION_RUNTIME_VERSION)
       setMessage(`${provider.displayName} 已在独立窗口打开。`)
     } catch (caught) {
       setError(exchangeWebviewErrorMessage(caught))
@@ -63,6 +68,7 @@ export default function WindowsExchangeWebviewLaunch({
         <small>登录、验证和交易确认只在 Binance 官网完成；一龙不会读取或保存你的密码。</small>
         {message && <p className={styles.success} role="status">{message}</p>}
         {error && <p className={styles.error} role="alert">{error}</p>}
+        {observing && identity.ownerKey && <ExchangeObservationSummary providerId={launch.provider_id} ownerKey={identity.ownerKey} />}
       </div>
       <button type="button" disabled={disabled} onClick={() => void open()}>
         {opening ? <Loader2 className={styles.spinner} size={15} aria-hidden="true" /> : <ExternalLink size={15} aria-hidden="true" />}

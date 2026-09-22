@@ -11,6 +11,8 @@ mod adapter;
 mod adapter_command;
 #[path = "local_ai_browser/adapter_content.rs"]
 mod adapter_content;
+#[path = "local_ai_browser/binance_exchange_adapter.rs"]
+mod binance_exchange_adapter;
 #[path = "local_ai_browser/chatgpt_adapter_bootstrap.rs"]
 mod chatgpt_adapter_bootstrap;
 #[path = "local_ai_browser/chatgpt_cached_conversation_navigation.rs"]
@@ -19,6 +21,8 @@ mod chatgpt_cached_conversation_navigation;
 mod conversation_directory;
 #[path = "local_ai_browser/embedded_view.rs"]
 pub(crate) mod embedded_view;
+#[path = "local_ai_browser/exchange_observation.rs"]
+pub(crate) mod exchange_observation;
 #[path = "local_ai_browser/exchange_webview.rs"]
 pub(crate) mod exchange_webview;
 #[path = "local_ai_browser/google_ai_mode.rs"]
@@ -233,6 +237,9 @@ pub async fn run_local_ai_web_adapter_command(
     request_id: Option<String>,
 ) -> Result<(), String> {
     let provider = provider(&provider_id)?;
+    if provider.kind == ProviderKind::Exchange {
+        return Err("交易所窗口只接受 run_exchange_web_adapter_command 的只读动作。".to_string());
+    }
     let adapter = provider.adapter.ok_or_else(|| {
         format!(
             "{} 当前使用官方网页模式，尚未启用一龙原生语义界面。",
@@ -324,6 +331,7 @@ pub fn publish_local_ai_web_event(
     app: AppHandle,
     webview: Webview,
     runtime: State<'_, LocalAiBrowserRuntime>,
+    exchange_runtime: State<'_, exchange_observation::ExchangeObservationRuntime>,
     payload: String,
 ) -> Result<(), String> {
     let label = webview.label();
@@ -331,6 +339,12 @@ pub fn publish_local_ai_web_event(
         .filter(|provider| provider.adapter.is_some())
         .ok_or_else(|| "可见语义事件只允许已登记的本地 AI 会话窗口发送。".to_string())?;
     let event = provider.adapter.unwrap().sanitize_event(&payload)?;
+    // Exchange observations are business facts, not chat semantics; they keep their own store.
+    if provider.kind == ProviderKind::Exchange {
+        exchange_runtime.record(label, &event);
+        session_update_event::emit(&app, MAIN_WEBVIEW_LABEL, provider.id, label, &event.kind);
+        return Ok(());
+    }
     if !runtime.accept_adapter_document_event(label, &event.kind, event.document_token.as_deref()) {
         return Ok(());
     }

@@ -1,7 +1,9 @@
 [[permission]]
 identifier = "exchange-web-session"
-description = "允许一龙 PC 主窗口列出并打开白名单交易所的本地 WebView2 会话。"
+description = "允许一龙 PC 主窗口列出并打开白名单交易所的本地 WebView2 会话，读取适配器已验证的只读观察，并触发刷新/详情等只读动作。没有创建、管理或交易动作。"
 commands.allow = [
   "list_exchange_web_providers",
   "open_exchange_web_session",
+  "get_exchange_web_observation",
+  "run_exchange_web_adapter_command",
 ]

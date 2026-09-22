@@ -54,7 +54,13 @@ fn ai_and_exchange_provider_catalogs_stay_separate() {
         .collect::<Vec<_>>();
     assert_eq!(ai_ids, vec!["google-ai-mode", "chatgpt"]);
     assert_eq!(exchange_ids, vec!["binance"]);
-    assert!(BINANCE.adapter.is_none());
+    // The exchange adapter is a read-only observer: no chat semantics, no send/trade actions.
+    assert_eq!(BINANCE.adapter, Some(ProviderAdapter::Binance));
+    let actions = ProviderAdapter::Binance.supported_actions();
+    assert!(actions.contains(&"refresh") && actions.contains(&"detail"));
+    for forbidden in ["send_prompt", "snapshot", "create", "manage", "close", "submit"] {
+        assert!(!actions.contains(&forbidden), "{forbidden}");
+    }
 }
 
 #[test]

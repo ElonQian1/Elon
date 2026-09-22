@@ -1,13 +1,15 @@
 use super::{
     adapter::{self, SanitizedAdapterEvent},
     adapter_command::{self, PageCommandBinding},
-    chatgpt_adapter_bootstrap, google_ai_mode,
+    binance_exchange_adapter, chatgpt_adapter_bootstrap, google_ai_mode,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ProviderAdapter {
     ChatGpt,
     GoogleWeb,
+    /// Read-only observer sharing the Android Binance grid adapters; no trading surface.
+    Binance,
 }
 
 impl ProviderAdapter {
@@ -15,6 +17,7 @@ impl ProviderAdapter {
         match self {
             Self::ChatGpt => chatgpt_adapter_bootstrap::ADAPTER_VERSION,
             Self::GoogleWeb => google_ai_mode::ADAPTER_VERSION,
+            Self::Binance => binance_exchange_adapter::ADAPTER_VERSION,
         }
     }
 
@@ -22,6 +25,7 @@ impl ProviderAdapter {
         match self {
             Self::ChatGpt => chatgpt_adapter_bootstrap::initialization_script(),
             Self::GoogleWeb => google_ai_mode::initialization_script(),
+            Self::Binance => binance_exchange_adapter::initialization_script(),
         }
     }
 
@@ -29,6 +33,7 @@ impl ProviderAdapter {
         match self {
             Self::ChatGpt => adapter_command::CHATGPT_ACTIONS,
             Self::GoogleWeb => adapter_command::GOOGLE_AI_MODE_ACTIONS,
+            Self::Binance => adapter_command::BINANCE_ACTIONS,
         }
     }
 
@@ -36,6 +41,7 @@ impl ProviderAdapter {
         match self {
             Self::ChatGpt => adapter::sanitize_event(payload),
             Self::GoogleWeb => google_ai_mode::sanitize_event(payload),
+            Self::Binance => binance_exchange_adapter::sanitize_event(payload),
         }
     }
 
@@ -48,6 +54,11 @@ impl ProviderAdapter {
             ),
             Self::GoogleWeb => adapter_command::page_invocation_script(
                 "__elonGoogleWebBridge",
+                PageCommandBinding::None,
+                raw_command,
+            ),
+            Self::Binance => adapter_command::page_invocation_script(
+                "__elonBinanceWinBridge",
                 PageCommandBinding::None,
                 raw_command,
             ),
@@ -76,5 +87,12 @@ mod tests {
             .page_invocation_script(r#"{"action":"snapshot"}"#)
             .unwrap()
             .contains("__elonGoogleWebBridge"));
+        let binance = ProviderAdapter::Binance;
+        assert_eq!(binance.supported_actions(), adapter_command::BINANCE_ACTIONS);
+        assert!(!binance.supported_actions().contains(&"send_prompt"));
+        assert!(binance
+            .page_invocation_script(r#"{"action":"refresh"}"#)
+            .unwrap()
+            .contains("__elonBinanceWinBridge"));
     }
 }

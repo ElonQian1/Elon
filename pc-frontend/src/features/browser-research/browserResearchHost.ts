@@ -15,6 +15,7 @@ export function parseResearchHost(value: unknown): ResearchHost {
 
 // Broker-only routing metadata must never leak into the native research command.
 export function nativeResearchCommand(command: ResearchCommand): ResearchCommand {
-  const { instance_id: _instance, ...native } = command
+  const native = { ...command }
+  delete native.instance_id
   return native
 }

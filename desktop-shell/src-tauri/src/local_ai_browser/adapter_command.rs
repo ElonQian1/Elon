@@ -45,6 +45,9 @@ pub(super) const GOOGLE_AI_MODE_ACTIONS: &[&str] = &[
     "open_conversation",
 ];
 
+/// Read-only surface of the shared Binance grid adapters; no create, manage or trade action.
+pub(super) const BINANCE_ACTIONS: &[&str] = &["refresh", "detail", "report", "wallet", "inspect"];
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum PageCommandBinding {
     None,

@@ -143,11 +143,14 @@ fn main() {
         .manage(internal_browser::InternalBrowserRuntime::default())
         .manage(browser_research::ResearchRuntime::default())
         .manage(local_ai_browser::LocalAiBrowserRuntime::default())
+        .manage(local_ai_browser::exchange_observation::ExchangeObservationRuntime::default())
         .invoke_handler(tauri::generate_handler![
             browser_research::run_browser_research,
             browser_research::browser_research_host,
             local_ai_browser::list_local_ai_web_providers,
             local_ai_browser::exchange_webview::list_exchange_web_providers,
+            local_ai_browser::exchange_observation::get_exchange_web_observation,
+            local_ai_browser::exchange_observation::run_exchange_web_adapter_command,
             local_ai_browser::resolve_local_ai_guest_owner_identity,
             local_ai_browser::open_local_ai_web_session,
             local_ai_browser::group_session::group_ai_web_session,
