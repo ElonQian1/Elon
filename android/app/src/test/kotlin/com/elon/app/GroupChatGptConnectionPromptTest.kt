@@ -40,6 +40,7 @@ class GroupChatGptConnectionPromptTest {
                 }
             }
             assertTrue(prompt.root.contentDescription.contains("聊天不耗算力，又可训练群聊记忆"))
+            assertTrue(prompt.root.contentDescription.contains("群聊记忆待接通"))
             prompt.close()
             assertNull(prompt.root.parent)
         } finally { lifecycle.pause().stop().destroy() }

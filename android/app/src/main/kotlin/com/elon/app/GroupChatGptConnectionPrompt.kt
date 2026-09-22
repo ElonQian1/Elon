@@ -23,6 +23,7 @@ internal class GroupChatGptConnectionPrompt(
     private var selected = false
     private val title = label(14f, R.color.elon_text_primary)
     private val subtitle = label(11f, R.color.elon_text_secondary)
+    private val memoryStatus = label(11f, R.color.elon_text_secondary).apply { text = "群聊记忆待接通" }
     val root = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER_VERTICAL
@@ -35,6 +36,7 @@ internal class GroupChatGptConnectionPrompt(
         if (value.resourceId != 0) setBackgroundResource(value.resourceId)
         addView(title, LinearLayout.LayoutParams(-1, -2))
         addView(subtitle, LinearLayout.LayoutParams(-1, -2))
+        addView(memoryStatus, LinearLayout.LayoutParams(-1, -2))
         setOnClickListener { if (selected && valid()) showDetails() }
     }
 
@@ -60,7 +62,8 @@ internal class GroupChatGptConnectionPrompt(
         val connected = connection.state() == ChatGptWebAccountConnection.State.CONNECTED
         title.text = if (connected) "我的 ChatGPT ›" else "接入我的 ChatGPT ›"
         subtitle.text = if (connected) "本机已接入 · 群聊记忆待接通" else "聊天不耗算力，又可训练群聊记忆"
-        root.contentDescription = "${title.text}；${subtitle.text}"
+        memoryStatus.visibility = if (connected) View.GONE else View.VISIBLE
+        root.contentDescription = "${title.text}；${subtitle.text}" + if (connected) "" else "；${memoryStatus.text}"
         root.tag = "group-chatgpt-account"
     }
 
