@@ -43,9 +43,13 @@ internal object GroupAiSelectionPreview {
         val memory = android.widget.CheckBox(activity).apply {
             text = "加入本群 ChatGPT 项目，结合本群已有记忆分析"
             contentDescription = "group-ai-selection-project-memory"
+            isChecked = allowProjectMemory
             visibility = if (allowProjectMemory) android.view.View.VISIBLE else android.view.View.GONE
         }
         content.addView(memory)
+        if (allowProjectMemory) content.addView(TextView(activity).apply {
+            text = "取消勾选后，仅分析所选消息，不使用本群既有记忆。"
+        })
         AlertDialog.Builder(activity).setTitle("AI 分析所选消息").setView(content)
             .setNegativeButton("取消", null)
             .setPositiveButton("分析并回复群聊") { _, _ ->

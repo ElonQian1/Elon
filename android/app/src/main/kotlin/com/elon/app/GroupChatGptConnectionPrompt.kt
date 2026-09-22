@@ -23,7 +23,7 @@ internal class GroupChatGptConnectionPrompt(
     private var selected = false
     private val title = label(14f, R.color.elon_text_primary)
     private val subtitle = label(11f, R.color.elon_text_secondary)
-    private val memoryStatus = label(11f, R.color.elon_text_secondary).apply { text = "群聊记忆待接通" }
+    private val memoryStatus = label(11f, R.color.elon_text_secondary).apply { text = "每群独立项目 · 分析时建立" }
     val root = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER_VERTICAL
@@ -61,9 +61,9 @@ internal class GroupChatGptConnectionPrompt(
         root.visibility = if (selected && valid()) View.VISIBLE else View.GONE
         val connected = connection.state() == ChatGptWebAccountConnection.State.CONNECTED
         title.text = if (connected) "我的 ChatGPT ›" else "接入我的 ChatGPT ›"
-        subtitle.text = if (connected) "本机已接入 · 群聊记忆待接通" else "聊天不耗算力，又可训练群聊记忆"
-        memoryStatus.visibility = if (connected) View.GONE else View.VISIBLE
-        root.contentDescription = "${title.text}；${subtitle.text}" + if (connected) "" else "；${memoryStatus.text}"
+        subtitle.text = "聊天不耗算力，又可训练群聊记忆"
+        memoryStatus.visibility = View.VISIBLE
+        root.contentDescription = "${title.text}；${subtitle.text}；${memoryStatus.text}"
         root.tag = "group-chatgpt-account"
     }
 
@@ -78,8 +78,8 @@ internal class GroupChatGptConnectionPrompt(
             addView(label(20f, R.color.elon_text_primary).apply { text = "接入我的 ChatGPT" })
             addView(paragraph("聊天不耗算力，又可训练群聊记忆", true))
             addView(paragraph("网页 ChatGPT 聊天不扣一龙工作 AI 算力；实际用量、模型和工具仍受你的 ChatGPT 账号规则约束。切换工作 AI 时会另行确认。"))
-            addView(paragraph("长期群聊记忆 · 待接通", true))
-            addView(paragraph("目标是你的账号内，每个群对应独立 ChatGPT 项目及长期会话，群改名仍保持关联。当前群分析仍使用临时会话，登录不会立即开启长期记忆，也不会自动上传群消息。"))
+            addView(paragraph("每群独立项目与长期会话", true))
+            addView(paragraph("首次分析时，在你自己的 ChatGPT 账号内为本群建立独立项目和长期会话，以后继续沿用，群改名仍保持关联。登录本身不会上传群消息。多选分析时可取消加入项目，仅分析所选消息，不使用本群既有记忆。"))
             addView(paragraph("这里的“训练群聊记忆”指积累项目和会话上下文，不是训练模型，也不代表自动记住全部群消息。"))
             addView(paragraph("在官方页面登录你自己的账号，登录状态仅保存在此设备，与一龙账号独立。换人使用时请先核对或切换 ChatGPT 账号。确认登录后返回当前群，草稿和所选消息保持不变。"))
             addView(label(16f, R.color.elon_text_primary).apply {
