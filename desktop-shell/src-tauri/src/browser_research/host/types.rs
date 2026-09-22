@@ -22,6 +22,8 @@ pub(crate) struct HostConfig {
     pub identity_origins: Vec<String>,
     pub max_body_bytes: usize,
     pub expires_at_ms: u64,
+    /// Capture rides an existing exchange session webview; navigation is observed through CDP only.
+    pub attached: bool,
 }
 
 /// Internal untrusted website material. Core MUST apply its credential policy before storage/output.
@@ -100,7 +102,9 @@ impl HostHandle {
 
 impl HostConfig {
     pub(super) fn validate(&self) -> Result<(), String> {
-        let valid_label = self.label.starts_with("browser-research-")
+        let valid_prefix = self.label.starts_with("browser-research-")
+            || (self.attached && self.label.starts_with(super::ATTACHED_LABEL_PREFIX));
+        let valid_label = valid_prefix
             && self.label.len() <= 96
             && self
                 .label
@@ -244,7 +248,19 @@ mod tests {
             identity_origins: vec!["https://login.example".into()],
             max_body_bytes: 1024,
             expires_at_ms: now_ms() + 60000,
+            attached: false,
         }
+    }
+
+    #[test]
+    fn attached_capture_accepts_only_exchange_session_labels() {
+        let mut scope = config();
+        scope.label = "local-ai-binance-0123abcd".into();
+        assert!(scope.validate().is_err());
+        scope.attached = true;
+        assert!(scope.validate().is_ok());
+        scope.label = "main".into();
+        assert!(scope.validate().is_err());
     }
 
     #[test]

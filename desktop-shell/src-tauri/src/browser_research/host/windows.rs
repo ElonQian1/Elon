@@ -16,6 +16,7 @@ use super::{
     handshake::Stage,
     types::{now_ms, Control, HostConfig, HostEvent, HostHandle, HostSink},
 };
+mod attach;
 mod cdp;
 mod enable;
 mod events;
@@ -80,6 +81,29 @@ pub(super) fn open(
     }
     super::super::files::ensure_directory(&config.profile_dir)
         .map_err(|_| "browser_research_profile_unavailable")?;
+    launch(app, config, sink, open_on_main)
+}
+
+pub(super) fn attach(
+    app: &tauri::AppHandle,
+    config: HostConfig,
+    sink: HostSink,
+) -> Result<HostHandle, String> {
+    if app.get_webview(&config.label).is_none() {
+        return Err("browser_research_window_unavailable".into());
+    }
+    launch(app, config, sink, attach::attach_on_main)
+}
+
+type MainThreadInstall =
+    fn(&tauri::AppHandle, HostConfig, &HostHandle, u64) -> Result<(), &'static str>;
+
+fn launch(
+    app: &tauri::AppHandle,
+    config: HostConfig,
+    sink: HostSink,
+    on_main: MainThreadInstall,
+) -> Result<HostHandle, String> {
     let handle = HostHandle {
         label: config.label.clone(),
         control: Arc::new(Control {
@@ -108,7 +132,7 @@ pub(super) fn open(
                 let _ = attached_tx.try_send(Err("host_attach_cancelled"));
                 return;
             }
-            let result = open_on_main(&app, config, &install_handle, generation);
+            let result = on_main(&app, config, &install_handle, generation);
             if let Err(code) = result {
                 install_handle.fail_handshake(generation, code);
             }
@@ -191,6 +215,13 @@ fn open_on_main(
     if !handle.handshake_current(generation) {
         return Ok(());
     }
+    watch_destroyed(&AsRef::<tauri::Webview>::as_ref(&window).window(), handle);
+    let install_handle = handle.clone();
+    install(app, config, install_handle, generation, true)
+}
+
+/// A destroyed host window ends capture; runtime pruning also notices the missing webview.
+fn watch_destroyed(window: &tauri::Window, handle: &HostHandle) {
     let closed_handle = handle.clone();
     window.on_window_event(move |event| {
         if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -207,10 +238,23 @@ fn open_on_main(
             (closed_handle.control.sink)(HostEvent::new(generation, "closed", ""));
         }
     });
-    let install_handle = handle.clone();
+}
+
+/// Bind CDP capture to the webview registered under `config.label`. `navigate` loads the
+/// site entry once the domains are enabled; attached exchange webviews keep their page.
+fn install(
+    app: &tauri::AppHandle,
+    config: HostConfig,
+    install_handle: HostHandle,
+    generation: u64,
+    navigate: bool,
+) -> Result<(), &'static str> {
+    let webview = app
+        .get_webview(&config.label)
+        .ok_or("browser_research_window_unavailable")?;
     let installed = Arc::new(AtomicBool::new(false));
     let entered = installed.clone();
-    window
+    webview
         .with_webview(move |platform| {
             entered.store(true, Ordering::SeqCst);
             if !install_handle.handshake_stage(generation, Stage::NativeAttached) {
@@ -247,7 +291,7 @@ fn open_on_main(
                 install_handle.fail_handshake(generation, "host_subscription_unavailable");
                 return;
             }
-            enable::run(&context, generation, true);
+            enable::run(&context, generation, navigate);
         })
         .map_err(|_| "browser_research_host_dispatch_failed")?;
     // On the main thread Tauri dispatches synchronously; a missing native ID

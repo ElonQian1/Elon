@@ -1,10 +1,13 @@
-//! Native, read-only observation of a new, independently profiled research window.
+//! Native, read-only observation of a research window, or of an existing exchange session webview.
 mod handshake;
 mod types;
 #[cfg(windows)]
 mod windows;
 
 pub(crate) use types::{HostConfig, HostEvent, HostHandle, HostSink};
+
+/// Exchange session webviews created by `local_ai_browser` carry this label prefix.
+pub(crate) const ATTACHED_LABEL_PREFIX: &str = "local-ai-";
 
 pub(crate) fn open(
     app: &tauri::AppHandle,
@@ -15,6 +18,27 @@ pub(crate) fn open(
     #[cfg(windows)]
     {
         windows::open(app, config, sink)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, config, sink);
+        Err("browser_research_host_unsupported".into())
+    }
+}
+
+/// Attach capture to a webview that already exists under `config.label`; no window is created.
+pub(crate) fn attach(
+    app: &tauri::AppHandle,
+    config: HostConfig,
+    sink: HostSink,
+) -> Result<HostHandle, String> {
+    if !config.attached {
+        return Err("browser_research_host_config_invalid".into());
+    }
+    config.validate()?;
+    #[cfg(windows)]
+    {
+        windows::attach(app, config, sink)
     }
     #[cfg(not(windows))]
     {

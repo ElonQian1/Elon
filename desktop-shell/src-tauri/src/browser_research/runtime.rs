@@ -134,12 +134,15 @@ impl ResearchRuntime {
             owner,
         })
     }
+    /// `attach_label` names an already open exchange session webview for `open`; the command
+    /// layer resolves it so this domain never depends on the chat/exchange provider catalog.
     pub fn execute(
         &self,
         app: &AppHandle,
         project: &str,
         owner: &str,
         command: ResearchCommand,
+        attach_label: Option<&str>,
     ) -> Result<Value, String> {
         let scope = self.scope(app, project, owner)?;
         self.inner
@@ -177,7 +180,7 @@ impl ResearchRuntime {
                     &command,
                 ));
             }
-            "open" => return self.open(app, scope, &command),
+            "open" => return self.open(app, scope, &command, attach_label),
             _ => {}
         }
         let id = command.session_id.as_deref().ok_or("session_required")?;
@@ -248,6 +251,7 @@ impl ResearchRuntime {
         app: &AppHandle,
         scope: Scope,
         command: &ResearchCommand,
+        attach_label: Option<&str>,
     ) -> Result<Value, String> {
         let site = files::manifests(&scope.root)
             .into_iter()
@@ -281,6 +285,7 @@ impl ResearchRuntime {
             )
             .as_bytes(),
         );
+        let attached = attach_label.filter(|label| app.get_webview(label).is_some());
         let session = Session {
             schema: "yilong.browser-research.session.v1".into(),
             id: id.clone(),
@@ -293,6 +298,12 @@ impl ResearchRuntime {
             expires_at_ms: now_ms() + SESSION_DURATION,
             phase: "opening".into(),
             host_stage: None,
+            host_mode: if attached.is_some() {
+                HOST_MODE_EXCHANGE_WINDOW
+            } else {
+                HOST_MODE_RESEARCH_WINDOW
+            }
+            .into(),
             bytes: 0,
             resources: vec![],
             requests: vec![],
@@ -300,7 +311,9 @@ impl ResearchRuntime {
         };
         files::save_session(&scope.root, &session)?;
         let config = host::HostConfig {
-            label: format!("browser-research-{}", &id[..32]),
+            label: attached
+                .map(str::to_owned)
+                .unwrap_or_else(|| format!("browser-research-{}", &id[..32])),
             start_url: site.entry_url.clone(),
             // WebView2 creates deep internal paths; keep the profile itself short.
             // One full digest binds all three scopes without nesting their hashes.
@@ -316,6 +329,7 @@ impl ResearchRuntime {
             identity_origins: site.identity_origins,
             max_body_bytes: BODY_LIMIT,
             expires_at_ms: session.expires_at_ms,
+            attached: attached.is_some(),
         };
         core.sessions.insert(id.clone(), session);
         drop(core);
@@ -345,7 +359,11 @@ impl ResearchRuntime {
                 sink_overflow.fetch_add(1, Ordering::Relaxed);
             }
         });
-        let opened = host::open(app, config, sink);
+        let opened = if config.attached {
+            host::attach(app, config, sink)
+        } else {
+            host::open(app, config, sink)
+        };
         let mut core = self.inner.lock().map_err(|_| "research_unavailable")?;
         core.overflows.insert(id.clone(), overflow.clone());
         match opened {

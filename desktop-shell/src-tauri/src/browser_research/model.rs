@@ -132,6 +132,9 @@ pub struct Session {
     pub phase: String,
     #[serde(default)]
     pub host_stage: Option<String>,
+    /// `research_window` (own profiled window) or `exchange_window` (attached to the user's login window).
+    #[serde(default = "default_host_mode")]
+    pub host_mode: String,
     pub bytes: u64,
     pub resources: Vec<Resource>,
     pub requests: Vec<Request>,
@@ -144,6 +147,7 @@ impl Session {
             "owner_hash":self.owner_hash,
             "active":self.active && now_ms()<self.expires_at_ms,"generation":self.generation,
             "expires_at_ms":self.expires_at_ms,"phase":self.phase,"host_stage":self.host_stage,
+            "host_mode":self.host_mode,
             "resource_count":self.resources.len(),"request_count":self.requests.len(),
             "gaps":self.gaps,"trading_enabled":false})
     }
@@ -157,6 +161,12 @@ impl Session {
             self.gaps.push(safe);
         }
     }
+}
+
+pub const HOST_MODE_RESEARCH_WINDOW: &str = "research_window";
+pub const HOST_MODE_EXCHANGE_WINDOW: &str = "exchange_window";
+fn default_host_mode() -> String {
+    HOST_MODE_RESEARCH_WINDOW.into()
 }
 
 pub fn identifier(value: &str) -> bool {

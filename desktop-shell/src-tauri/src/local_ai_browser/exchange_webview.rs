@@ -1,9 +1,10 @@
 use serde::Serialize;
-use tauri::{AppHandle, State, Webview};
+use tauri::{AppHandle, Manager, State, Webview};
 
 use super::{
     ensure_main_webview, open_web_session, provider_for_kind, providers_for_kind,
-    LocalAiBrowserRuntime, ProviderKind, DESKTOP_RUNTIME_VERSION,
+    resolve_owner_fingerprint, window_label, LocalAiBrowserRuntime, ProviderKind,
+    DESKTOP_RUNTIME_VERSION,
 };
 
 const PROVIDER_SCHEMA: &str = "yilong.exchange_webview.provider.v1";
@@ -68,4 +69,33 @@ pub(crate) async fn open_exchange_web_session(
         profile_scope: session.profile_scope,
         cookie_access: session.cookie_access,
     })
+}
+
+/// Research on a site that is also an exchange provider rides the user's own login window.
+/// Returns the webview label once it exists; an already open window is not refocused.
+/// `None` means the site has no exchange provider and research should use its own window.
+pub(crate) async fn ensure_exchange_session_for_site(
+    app: &AppHandle,
+    webview: &Webview,
+    runtime: State<'_, LocalAiBrowserRuntime>,
+    site_id: &str,
+    owner_key: &str,
+) -> Option<String> {
+    let provider = provider_for_kind(site_id, ProviderKind::Exchange).ok()?;
+    let fingerprint = resolve_owner_fingerprint(app, provider, owner_key).ok()?;
+    let label = window_label(provider, &fingerprint);
+    if app.get_webview(&label).is_some() {
+        return Some(label);
+    }
+    open_web_session(
+        app.clone(),
+        webview.clone(),
+        runtime,
+        provider,
+        owner_key.to_string(),
+        true,
+    )
+    .await
+    .ok()
+    .map(|session| session.window_label)
 }

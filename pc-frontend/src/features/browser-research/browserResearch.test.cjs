@@ -37,6 +37,8 @@ test('opening or resuming is not displayed as collecting until host acknowledgem
   assert.equal(phaseLabel('host_unavailable'), '采集连接失败')
   assert.equal(parseResearchResult({ schema, kind: 'status', session: { ...session, host_stage: 'native_attached' } }, { kind: 'status' }).session.host_stage, 'native_attached')
   assert.throws(() => parseResearchResult({ schema, kind: 'status', session: { ...session, host_stage: {} } }, { kind: 'status' }))
+  assert.equal(parseResearchResult({ schema, kind: 'status', session: { ...session, host_mode: 'exchange_window' } }, { kind: 'status' }).session.host_mode, 'exchange_window')
+  assert.throws(() => parseResearchResult({ schema, kind: 'status', session: { ...session, host_mode: 'chrome_tab' } }, { kind: 'status' }))
 })
 
 test('version, command kind, item ID, and page movement are validated before display', () => {

@@ -43,6 +43,7 @@ impl Fixture {
             expires_at_ms: now_ms() + 60000,
             phase: "observing".into(),
             host_stage: None,
+            host_mode: HOST_MODE_RESEARCH_WINDOW.into(),
             bytes: 0,
             resources: vec![],
             requests: vec![],

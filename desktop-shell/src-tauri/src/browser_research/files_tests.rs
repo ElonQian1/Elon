@@ -128,6 +128,7 @@ fn restoring_metadata_never_changes_owner_project_or_revives_expiry() {
         expires_at_ms: 1,
         phase: "observing".into(),
         host_stage: None,
+        host_mode: "exchange_window".into(),
         bytes: 0,
         resources: vec![],
         requests: vec![],
@@ -138,6 +139,42 @@ fn restoring_metadata_never_changes_owner_project_or_revives_expiry() {
     assert!(load_sessions(&fixture.0, &project, &hash(b"different-owner")).is_empty());
     let restored = load_sessions(&fixture.0, &project, &owner);
     assert_eq!(restored.len(), 1);
+    assert_eq!(restored[0].host_mode, "exchange_window");
     assert!(!restored[0].active);
     assert_eq!(restored[0].phase, "expired");
+}
+
+#[test]
+fn sessions_saved_before_host_mode_restore_as_research_window() {
+    let fixture = Fixture::new();
+    let site = super::super::model::defaults().remove(0);
+    let project = hash(b"project");
+    let owner = hash(b"owner");
+    let id = hash(b"legacy-session");
+    let mut legacy = serde_json::to_value(Session {
+        schema: "yilong.browser-research.session.v1".into(),
+        id: id.clone(),
+        project_key: project.clone(),
+        owner_hash: owner.clone(),
+        site_fingerprint: site.fingerprint(),
+        site,
+        active: false,
+        generation: 1,
+        expires_at_ms: 1,
+        phase: "observing".into(),
+        host_stage: None,
+        host_mode: "exchange_window".into(),
+        bytes: 0,
+        resources: vec![],
+        requests: vec![],
+        gaps: vec![],
+    })
+    .unwrap();
+    legacy.as_object_mut().unwrap().remove("host_mode");
+    let directory = fixture.0.join(&id);
+    fs::create_dir_all(&directory).unwrap();
+    fs::write(directory.join("session.json"), legacy.to_string()).unwrap();
+    let restored = load_sessions(&fixture.0, &project, &owner);
+    assert_eq!(restored.len(), 1);
+    assert_eq!(restored[0].host_mode, "research_window");
 }

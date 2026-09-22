@@ -100,11 +100,19 @@ fn frame(context: &Context, value: &Value) {
         return;
     };
     let url = text(frame, "url", 8192).unwrap_or_default();
+    let loader = text(frame, "loaderId", 256);
+    let attached_document_change = {
+        let state = context.borrow();
+        state.config.attached && state.loader.is_some() && state.loader != loader
+    };
+    if attached_document_change {
+        attached_navigation(context, &url);
+    }
     let ready = {
         let mut state = context.borrow_mut();
         state.frame = Some(id);
         state.document_url = url;
-        state.loader = text(frame, "loaderId", 256);
+        state.loader = loader;
         (state.ready
             && !state.handle.handshake_pending()
             && state.config.allows_document(&state.document_url))
@@ -113,6 +121,33 @@ fn frame(context: &Context, value: &Value) {
     if let Some(event) = ready {
         emit(context, event);
     }
+}
+
+/// An attached exchange webview has no host-owned `on_navigation` hook, so a new top-frame
+/// loader observed through CDP plays the same generation-bump and navigation-event role.
+fn attached_navigation(context: &Context, url: &str) {
+    let (handle, generation, business) = {
+        let mut state = context.borrow_mut();
+        let generation = state
+            .handle
+            .control
+            .generation
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+            + 1;
+        state.synchronize();
+        state.document_url = url.into();
+        (
+            state.handle.clone(),
+            generation,
+            state.config.allows_document(url),
+        )
+    };
+    let mut event = HostEvent::new(generation, "navigation", if business { url } else { "" });
+    if !business {
+        event.error_code = Some("identity_navigation_not_captured".into());
+    }
+    (handle.control.sink)(event);
+    handle.navigation_during_handshake();
 }
 
 fn execution_context(context: &Context, value: &Value) {
