@@ -30,18 +30,22 @@ internal class GroupAiComposer(
     private var account = ""
     private var previousWidth = 0
     private var previousPlanVisibility = View.VISIBLE
+    private var previousModeRowHeight = 0
+    private val connectionPrompt = GroupChatGptConnectionPrompt(activity, ::valid)
 
     init { activity.lifecycle.addObserver(this) }
 
     fun configuration(): GroupAiConfiguration = config.copy(modelPath = config.modelPath.toList())
 
     fun open(id: String) {
+        connectionPrompt.close()
         picker?.close()
         workSettings?.close()
         menu?.dismiss()
         if (group == null) {
             previousWidth = views()?.modelButtonShell?.layoutParams?.width ?: dp(142)
             previousPlanVisibility = views()?.planModeButton?.visibility ?: View.VISIBLE
+            previousModeRowHeight = views()?.modeButtonRow?.layoutParams?.height ?: dp(48)
         }
         group = id
         account = owner()
@@ -65,6 +69,7 @@ internal class GroupAiComposer(
         binding.modelButton.tag = WEB_CHAT_MODEL_BUTTON_OWNER
         ui.modelButtonShell.tag = WEB_CHAT_MODEL_BUTTON_OWNER
         ui.modelButtonShell.layoutParams = ui.modelButtonShell.layoutParams.apply { width = dp(142) }
+        ui.modeButtonRow.layoutParams = ui.modeButtonRow.layoutParams.apply { height = -2 }
         ui.planModeButton.visibility = View.GONE
         ui.webToolsButton.visibility = View.GONE
         ui.attachmentButton.visibility = View.VISIBLE
@@ -80,6 +85,7 @@ internal class GroupAiComposer(
         ui.modelButtonShell.contentDescription = description
         ui.modelButtonShell.setOnClickListener { showSettings() }
         binding.modelButton.setOnClickListener { showSettings() }
+        connectionPrompt.attach(ui.modeButtonRow, config.engine == GroupAiEngine.CHATGPT)
         refreshComposer()
     }
 
@@ -139,6 +145,7 @@ internal class GroupAiComposer(
     fun close() {
         if (group == null) return
         group = null
+        connectionPrompt.close()
         picker?.close()
         picker = null
         workSettings?.close()
@@ -149,6 +156,7 @@ internal class GroupAiComposer(
             ui.modelButtonShell.tag = null
             ui.modelButtonShell.layoutParams = ui.modelButtonShell.layoutParams.apply { width = previousWidth }
             ui.planModeButton.visibility = previousPlanVisibility
+            ui.modeButtonRow.layoutParams = ui.modeButtonRow.layoutParams.apply { height = previousModeRowHeight }
             ui.modelButtonShell.setOnClickListener { showWorkModel() }
         }
         binding.modelButton.tag = null
@@ -158,7 +166,10 @@ internal class GroupAiComposer(
         refreshComposer()
     }
 
-    override fun onStop(owner: LifecycleOwner) { picker?.close(); workSettings?.close(); menu?.dismiss() }
+    override fun onResume(owner: LifecycleOwner) { connectionPrompt.resume() }
+    override fun onStop(owner: LifecycleOwner) {
+        picker?.close(); workSettings?.close(); menu?.dismiss(); connectionPrompt.stop()
+    }
     override fun onDestroy(owner: LifecycleOwner) { close() }
     private fun dp(value: Int) = (value * activity.resources.displayMetrics.density).toInt()
 
