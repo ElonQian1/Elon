@@ -51,6 +51,7 @@ $nativeCommandHelper = Join-Path $PSScriptRoot 'native-command-timeout.ps1'
 $apkTransportHelper = Join-Path $PSScriptRoot 'apk-publish-transport.ps1'
 . $nativeCommandHelper
 . $apkTransportHelper
+. (Join-Path $PSScriptRoot 'apk-publish-artifact-validation.ps1')
 
 Set-ElonProjectDirectNetwork
 
@@ -310,22 +311,6 @@ function Get-ApkManifestVersion {
         VersionCode = [int64]$codeMatch.Groups[1].Value
         VersionName = [string]$nameMatch.Groups[1].Value
     }
-}
-
-function Assert-ApkManifestVersion {
-    param(
-        [Parameter(Mandatory)] [string]$ApkPath,
-        [Parameter(Mandatory)] [int]$ExpectedVersionCode,
-        [Parameter(Mandatory)] [string]$ExpectedVersionName,
-        [string]$Label = "APK"
-    )
-
-    $actual = Get-ApkManifestVersion -ApkPath $ApkPath
-    if ($actual.VersionCode -ne $ExpectedVersionCode -or $actual.VersionName -ne $ExpectedVersionName) {
-        throw "$Label manifest 版本不匹配：期望 v$ExpectedVersionName (build $ExpectedVersionCode)，实际 v$($actual.VersionName) (build $($actual.VersionCode))。已停止发布，避免手机端重复更新。"
-    }
-
-    Write-Host "   ✅ $Label manifest: v$($actual.VersionName) (build $($actual.VersionCode))" -ForegroundColor Green
 }
 
 function Get-LocalSigningProperty {
@@ -842,7 +827,7 @@ $fileSize = $apk.Length
 $apkSha256 = Get-ElonFileSha256 -Path $apk.FullName
 Write-Host "📦 APK: $($apk.Name) ($([math]::Round($fileSize / 1MB, 2)) MB)" -ForegroundColor Green
 Write-Host "   SHA-256: $apkSha256" -ForegroundColor DarkGray
-Assert-ApkManifestVersion -ApkPath $apk.FullName -ExpectedVersionCode $newCode -ExpectedVersionName $versionName -Label "本地 release APK"
+Assert-ApkManifestVersion -ApkPath $apk.FullName -ExpectedVersionCode $newCode -ExpectedVersionName $versionName -SourceRoot $RepoRoot -Label "本地 release APK"
 
 # ── Step 4: 还原 build.gradle（版本号不进 git） ──────────────────────────────
 

@@ -19,8 +19,9 @@
 | 能力 | 代码状态 | 验证状态 | 缺口 |
 |---|---|---|---|
 | 手机官网任务入口及请求观察 | implemented | device_verified | 已确认页面可访问且读取返回 200；不是新传输验收 |
-| 分页任务列表、最新结果只读传输 | implemented | offline_verified | 新传输独立真机验收待完成 |
-| 账号隔离、有界缓存、失败保留旧结果 | implemented | offline_verified | 随新传输真机验收 |
+| 分页任务列表只读传输 | implemented | device_verified | 完整首屏 2 项；实际多页仅离线覆盖 |
+| 最新结果只读传输 | implemented | partial | 真机确认 `no_update`；非空富文本结果仍待样本 |
+| 账号隔离、有界缓存、失败保留旧结果 | implemented | offline_verified | 真机已确认缓存命中，账号切换/失败分支由离线测试覆盖 |
 | 用户挑选、预览及明确授权 | missing | deferred | 原生选择器和生产命令尚未接入 |
 | 群绑定、成员权限及取消分享 | missing | deferred | 后端存储和 API 尚未接入 |
 | 结果去重同步和群动态阅读 | missing | deferred | 同步器、富文本快照、APK/Win 展示尚未接入 |
@@ -53,6 +54,15 @@
 - `ChatGptWebScheduledTasksEvidenceTest.kt`：Android 接收端拒绝夹带私人字段的探测回执。
 
 本次模块不等待输入框或 DOM 控件就绪，不修改已有聊天发送、语音和群 AI 回复路径。未接入自动轮询，也未自动向任何群发送内容。
+
+### 本轮验证与安装包一致性
+
+- 相关 JavaScript 回归 127 项通过，其中本模块 14 项；Android 定向单元测试及编译通过。
+- 线上 `1.1.1804` 曾声明源提交 `d59abdde6`，但下载包没有新任务脚本，手机仍为 adapter 432 并拒绝新探测模式。因此不能把该版本记作本功能已上线或已验收。
+- Windows 发布入口增加独立 `apk-publish-artifact-validation.ps1`：上传前核对 APK 内所有 `chatgpt_web*.js` 与当前源码的 SHA-256；同时保留原版本校验。缺少脚本、旧内容和重复条目均失败关闭，定向 7 项通过。
+- 本机构建产物的 163 个脚本核对通过；该线上旧包被新门禁正确拒绝，不能只看版本清单的提交号。
+- 已用官方发布流程生成的本机 Release 候选覆盖安装验收：adapter 433、身份与 bridge 就绪，`catalogCount=2`、`catalogComplete=true`、`cacheHit=true`、`latestState=no_update`。只读取，没有修改任务或发群消息。
+- 该本机候选与线上旧包同为 1804，不能冒充同一制品。后续必须发布更高版本并校验摘要；非空最新结果及完整群分享仍未验收。
 
 ## 后续实施顺序
 
