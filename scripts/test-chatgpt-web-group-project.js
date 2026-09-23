@@ -6,6 +6,7 @@ const policy = require('../android/app/src/main/assets/chatgpt_web_group_project
 const transport = require('../android/app/src/main/assets/chatgpt_web_group_project');
 const identityContract = require('../android/app/src/main/assets/chatgpt_web_group_project_identity');
 const shareContract = require('../android/app/src/main/assets/chatgpt_web_private_conversation_share_contract');
+const directoryPages = require('../android/app/src/main/assets/chatgpt_web_private_directory_pages');
 const bindingId = '11111111-1111-4111-8111-111111111111';
 const projectId = 'g-p-' + 'a'.repeat(32);
 const conversationId = '22222222-2222-4222-8222-222222222222';
@@ -21,6 +22,7 @@ function fixture() {
   const page = { location: { origin: 'https://chatgpt.com' }, document: {}, __elonChatGptDocumentToken: 'doc_fixture_123',
     crypto: webcrypto,
     __elonChatGptGroupProjectIdentity: identityContract,
+    __elonChatGptPrivateDirectoryPages: directoryPages,
     __elonChatGptPrivateConversationShareContract: shareContract,
     __elonChatGptPrivateRuntimeBindings: { observed: () => false, load: () => { throw Error('must not import runtime'); } },
     __elonChatGptPrivateTransport: { copySameOriginRequestHeaders: () => ({ Authorization: 'Bearer synthetic-test-token', 'chatgpt-account-id': JSON.parse(account)[1] }) },
@@ -133,7 +135,9 @@ test('rename does not affect marker binding; wrong marker or global memory fails
 });
 test('read differentiates confirmed missing from network, authentication and rate limit', async () => {
   for (const [error, expected] of [['http_404','project_not_found'], ['http_401','project_auth_required'],
-    ['http_403','project_auth_required'], ['http_429','project_rate_limited'], ['timeout','project_unavailable']]) {
+    ['http_403','project_auth_required'], ['http_429','project_rate_limited'], ['timeout','project_request_timeout'],
+    ['http_422','project_request_rejected'], ['invalid_json','project_response_invalid_json'],
+    ['response_too_large','project_response_too_large'], ['http_503','project_service_unavailable']]) {
     const f = fixture(), command = await input(f, 'read', { projectId });
     f.replies.push(Error(error));
     assert.equal((await f.core.run(command)).code, expected);
@@ -174,9 +178,21 @@ test('reconcile requires unique existing marker and performs no writes', async (
   f.replies.push({ items: [{ gizmo: resource() }], cursor: null }, resource());
   assert.equal((await f.core.run(command)).projectId, projectId);
   assert.ok(f.calls.every(c => c.init.method === 'GET'));
+  assert.equal(f.calls[0].path, directoryPages.path(directoryPages.initial('projects')));
   const empty = fixture(), retry = await input(empty, 'reconcile');
   empty.replies.push({ items: [], cursor: null });
   assert.equal((await empty.core.run(retry)).code, 'project_create_unresolved');
+});
+
+test('missing page dependencies fail explicitly before any provider write', async () => {
+  const f = fixture(), command = await input(f, 'create');
+  const missingPolicy = transport.create(f.page);
+  assert.deepEqual(await missingPolicy.run(command), { ok: false, code: 'project_adapter_unavailable', notSent: true });
+  assert.equal(f.calls.length, 0);
+  delete f.page.__elonChatGptPrivateDirectoryPages;
+  const result = await f.core.run({ ...command, operation: 'reconcile' });
+  assert.equal(result.code, 'project_adapter_unavailable');
+  assert.equal(f.calls.length, 0);
 });
 test('existing conversation must explicitly belong to project and retain history', async () => {
   const f = fixture(), command = await input(f, 'read', { projectId, conversationId });
