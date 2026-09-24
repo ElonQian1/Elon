@@ -64,6 +64,15 @@ export function parseResearchResult(value: unknown, expected: ResearchCommand): 
     throw new ResearchError('invalid_response')
   }
   let valid = false
+  if (expected.kind === 'read_conversation') {
+    if (!record(value.reader) || !['pending', 'ready', 'failed'].includes(String(value.reader.status))) throw new ResearchError('invalid_response')
+    let input: Record<string, unknown>
+    try { input = JSON.parse(expected.query || '{}') } catch { throw new ResearchError('invalid_response') }
+    if (value.reader.status !== 'failed' && value.reader.request_id !== input.request_id) throw new ResearchError('invalid_response')
+    if (value.reader.status === 'ready' && (!record(value.reader.page) || value.reader.page.conversation_id !== input.conversation_id
+      || value.reader.page.schema !== 'yilong.web-conversation.snapshot.v1' || !Array.isArray(value.reader.page.blocks))) throw new ResearchError('invalid_response')
+    return value as unknown as ResearchResult
+  }
   const lists: Partial<Record<ResearchKind, (item: unknown) => boolean>> = { sites: site, register_site: site, sessions: session, resources: resource, requests: request, search }
   const itemCheck = lists[expected.kind]
   if (itemCheck) {
