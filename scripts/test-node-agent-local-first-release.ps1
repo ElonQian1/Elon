@@ -585,8 +585,8 @@ try {
     $desktopShellBuildOffset = $publishText.IndexOf("`$script:NodeReleaseActiveStage = 'desktop_shell_build'")
     Assert-True ($pcFrontendBundleOffset -ge 0 -and $desktopShellBuildOffset -gt $pcFrontendBundleOffset) `
         'PC frontend dist must be built before Tauri embeds it into elon-desktop.exe'
-    Assert-True ($publishText.Contains("-GitPaths @('desktop-shell/src-tauri', 'pc-frontend')")) `
-        'desktop shell artifact cache must invalidate when embedded PC frontend sources change'
+    Assert-True ($publishText.Contains("-GitPaths @('desktop-shell/src-tauri', 'pc-frontend', 'android/app/src/main/assets')")) `
+        'desktop shell artifact cache must invalidate when embedded frontend or shared web adapters change'
     Assert-True ($publishText.Contains('-EnvironmentValues $desktopShellEnvironmentValues')) `
         'desktop shell artifact cache must include the VITE environment used by the embedded frontend'
     Assert-True ($publishText.Contains("'node-agent-remote-publish-v1.lock'") -and `
