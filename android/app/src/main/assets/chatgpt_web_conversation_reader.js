@@ -1,21 +1,31 @@
 (function (page) {
   'use strict';
-  if (page?.location?.origin !== 'https://chatgpt.com' || page.__elonConversationReader?.version === 1) return;
+  if (page?.location?.origin !== 'https://chatgpt.com' || page.__elonConversationReader?.version === 2) return;
   const projection = page.__elonConversationProjection;
   const jobs = new Map(), snapshots = new Map();
   const ttl = 180000;
   const fail = code => { throw new Error(code); };
   const ownerKey = headers => JSON.stringify(Object.entries(headers || {}).filter(([key]) =>
     /authorization|account-id|workspace-id/i.test(key)).sort());
-  const errorCode = error => ['invalid_conversation_id', 'conversation_mismatch', 'unsupported_conversation',
+  const errorCode = error => ['auth_missing', 'auth_http_401'].includes(error?.message) ? 'login_required' :
+    error?.message === 'auth_http_403' ? 'http_403' : ['invalid_conversation_id', 'conversation_mismatch', 'unsupported_conversation',
     'source_incomplete', 'source_limit', 'invalid_branch', 'branch_ambiguous', 'unsupported_message_content',
     'invalid_cursor', 'cursor_expired', 'identity_changed', 'login_required', 'reader_unavailable', 'request_conflict',
-    'reader_busy', 'http_401', 'http_403', 'http_404', 'timeout', 'response_too_large'].includes(error?.message)
+    'reader_busy', 'auth_cooldown', 'auth_unavailable', 'http_401', 'http_403', 'http_404', 'timeout', 'response_too_large'].includes(error?.message)
     ? error.message : 'conversation_read_failed';
+  const transport = () => page.__elonChatGptPrivateTransport;
+  const authContext = () => page.__elonChatGptPrivateAuthContext;
+  function copiedHeaders() {
+    return transport()?.copySameOriginRequestHeaders?.() || authContext()?.copyRequestHeaders?.();
+  }
   async function identity() {
-    const transport = page.__elonChatGptPrivateTransport;
-    if (!projection || !transport?.conversationPrefetchEnabled || !transport.acquireSameOriginRequestHeaders) fail('reader_unavailable');
-    const headers = await transport.acquireSameOriginRequestHeaders();
+    if (!projection) fail('reader_unavailable');
+    // A read does not require composer, voice, layout or the full semantic UI bridge.
+    // Prefer observed account/workspace headers; otherwise use the existing page-local auth module.
+    let headers = copiedHeaders();
+    if (!headers && authContext()?.acquireRequestHeaders) headers = await authContext().acquireRequestHeaders();
+    if (!headers && transport()?.acquireSameOriginRequestHeaders) headers = await transport().acquireSameOriginRequestHeaders();
+    if (!headers && !authContext() && !transport()) fail('reader_unavailable');
     if (!headers || !Object.keys(headers).length) fail('login_required');
     // Retained only in the page closure, never included in native results or revisions.
     const owner = ownerKey(headers);
@@ -58,7 +68,7 @@
     const existing = jobs.get(input.request_id);
     if (existing) {
       if (existing.signature !== signature) return { status: 'failed', error: 'request_conflict' };
-      if (existing.result.status === 'ready' && ownerKey(page.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.()) !== existing.owner) {
+      if (existing.result.status === 'ready' && ownerKey(copiedHeaders()) !== existing.owner) {
         jobs.clear(); snapshots.clear();
         return { status: 'failed', error: 'identity_changed' };
       }
@@ -72,5 +82,5 @@
       .catch(error => { job.result = { status: 'failed', request_id: input.request_id, error: errorCode(error) }; });
     return job.result;
   }
-  page.__elonConversationReader = Object.freeze({ version: 1, run });
+  page.__elonConversationReader = Object.freeze({ version: 2, run });
 })(typeof window === 'object' ? window : null);

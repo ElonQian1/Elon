@@ -9,11 +9,19 @@ reviewed_at: 2026-09-24
 
 ## 使用入口
 
-在一龙项目任务中选择 Claude CLI，并在任务中附上完整 ChatGPT 会话链接或 `chatgpt-conversation://<UUID>`。节点为该次进程注入 `yilong_web_conversations` MCP，仅授权链接中的会话。普通任务不注入，既有项目治理 MCP 保留。Claude 使用 `web_conversation_read`，直至 `has_more=false`；`web_conversation_scope` 可检查授权数量。
+在一龙项目任务中选择 Claude CLI 或 Codex，并在任务中附上完整 ChatGPT 会话链接或 `chatgpt-conversation://<UUID>`。节点为该次进程注入 `yilong_web_conversations` MCP，仅授权链接中的会话。普通任务不注入，既有项目治理 MCP 保留。使用 `web_conversation_read`，直至 `has_more=false`；`web_conversation_scope` 可检查授权数量。
 
-需要 Node.js 18+、更新后的 Win 节点/桌面壳、正在运行的 PC 工作台，以及该工作台登录的 ChatGPT 网页会话。Win 根据本机研究宿主租约选取设备；多个宿主时须显式设置 `ELON_WEB_CONVERSATION_WIN_INSTANCE`，不会随机选择。
+需要 Node.js 18+、安装并激活更新后的 Win 节点/桌面壳，以及该工作台登录的 ChatGPT 网页会话。授权读取时，工具可以启动标准安装目录内的一龙启动器，等待本机节点和工作台上线，再创建或复用 ChatGPT WebView。`web_conversation_connect` 可验证指定会话的访问状态，只返回数量和覆盖信息。未登录时显示官方窗口供用户登录后重试，不导入其他设备凭据。
+
+Win 根据本机研究宿主租约选取设备；多个宿主时须显式设置 `ELON_WEB_CONVERSATION_WIN_INSTANCE`，多个节点则设置 `ELON_NODE_ADMIN_URL`。启动有界且只尝试一次；`ELON_WEB_CONVERSATION_AUTOSTART=0` 可禁用。旧版本明确返回 `win_reader_update_required`，工具不擅自升级。宿主重启后新读取可重新连接；原游标仍绑定原实例。
 
 CLI 配置使用 Claude 官方支持的 [--mcp-config JSON](https://code.claude.com/docs/en/cli-reference)。这是本机工具接入，不是用 OpenAI API key 读取 ChatGPT 网页历史；当前未自动接入一龙 API 模型运行时。
+
+## Codex 桌面端直接连接
+
+在 PowerShell 7 中运行 `scripts/web-conversations/register-codex.ps1 -ProjectRoot <真实项目目录> -ConversationReference <明确授权的会话链接>`。注册器把代码保存到用户本机的内容寻址目录，避免任务 worktree 清理后失效；通过 `codex mcp add` 注册当前授权范围，保留其他 MCP 和账号配置。新任务或重新加载 MCP 工具后即可发现连接、范围和分页读取三个工具。现有任务的工具列表是否支持热更新由 Codex 客户端决定，不能仅凭配置写入宣称已加载。
+
+注册使用 [Codex 官方 MCP 配置](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)，读取工具超时设为 150 秒以容纳冷启动。再次注册会替换本工具的会话范围；不会授权整个聊天账号。CLI 任务注入使用该次进程的配置，不写全局设置。
 
 ## APK 和其他 MCP 客户端
 
@@ -47,6 +55,7 @@ APK 已有 MCP 通道新增 `ui_control` 动作 `chatgpt_read_conversation`，�
 - 每页最多两个内容块；当前源响应上限 4 MiB，超限明确失败。游标闲置约三分钟失效，活跃分页续期；失效后从第一页重新读取。
 - 附件返回元数据与 `attachment_bytes_not_read`；生成图片、未知类型分别报告缺口。此版本没有把图片/PDF 字节交给模型，不能据此声称读懂截图。
 - 凭据仅在对应网页或本机 MCP 传输闭包中使用；统一工具不返回 Cookie、认证请求头、带签名下载地址。
+- Win 读取独立加载既有只读认证/JSON 请求模块，不依赖语音、输入框和布局等完整 UI 适配器初始化成功。官网验证或账号无权限仍明确失败。
 - 正文是用户明确请求的模型上下文，可能进入模型自身的会话历史；一龙不把正文写入通用诊断或 Git。
 - 会话内容是不可信资料，不授权追加读取其他会话、发送消息、删除或交易。
 

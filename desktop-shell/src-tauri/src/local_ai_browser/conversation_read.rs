@@ -50,6 +50,8 @@ pub(crate) async fn read(
     query: String,
 ) -> Result<Value, String> {
     validate(&query)?;
+    let input: Request =
+        serde_json::from_str(&query).map_err(|_| "invalid_conversation_request")?;
     let provider = provider("chatgpt")?;
     let fingerprint = resolve_owner_fingerprint(&app, provider, &owner)?;
     super::ensure_session_webview(&webview, provider, &fingerprint)?;
@@ -64,8 +66,6 @@ pub(crate) async fn read(
             Some(false),
         )
         .await?;
-        let input: Request =
-            serde_json::from_str(&query).map_err(|_| "invalid_conversation_request")?;
         return Ok(
             json!({"schema":"yilong.browser-research.result.v1", "kind":"read_conversation",
             "reader":{"status":"pending","request_id":input.request_id}}),
@@ -74,11 +74,32 @@ pub(crate) async fn read(
     let page = app.get_webview(&label).ok_or("reader_unavailable")?;
     let expected_url = page.url().map_err(|_| "reader_unavailable")?;
     if expected_url.origin().ascii_serialization() != "https://chatgpt.com" {
-        return Err("reader_unavailable".into());
+        let pending = expected_url.as_str() == "about:blank";
+        if !pending {
+            super::embedded_view::restore_popout(&app, &label)?;
+            runtime.mark_window_visible(&label, true);
+        }
+        return Ok(
+            json!({"schema":"yilong.browser-research.result.v1", "kind":"read_conversation",
+            "reader":if pending { json!({"status":"pending","request_id":input.request_id}) }
+                else { json!({"status":"failed","request_id":input.request_id,"error":"login_required"}) }}),
+        );
     }
-    let result = execute(page.clone(), query).await?;
+    let result = execute(page.clone(), query).await.unwrap_or_else(|error| {
+        json!({"status":"failed","request_id":input.request_id,"error": match error.as_str() {
+            "reader_timeout" => "reader_timeout", _ => "reader_unavailable"
+        }})
+    });
     if page.url().ok().as_ref() != Some(&expected_url) {
         return Err("reader_context_changed".into());
+    }
+    if matches!(
+        result.get("error").and_then(Value::as_str),
+        Some("login_required" | "http_401")
+    ) {
+        // Expose the official login surface; never automate credentials or switch profiles.
+        super::embedded_view::restore_popout(&app, &label)?;
+        runtime.mark_window_visible(&label, true);
     }
     Ok(
         json!({"schema":"yilong.browser-research.result.v1", "kind":"read_conversation", "reader":result}),
@@ -95,7 +116,11 @@ async fn execute(page: Webview, query: String) -> Result<Value, String> {
     );
     let reader =
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_conversation_reader.js");
-    let expression = format!("(function(){{if(location.origin!=='https://chatgpt.com')return null;\n{projection}\n{reader}\nreturn window.__elonConversationReader.run({query});}})()");
+    let request =
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_json_request.js");
+    let auth =
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_auth_context.js");
+    let expression = format!("(function(){{if(location.origin!=='https://chatgpt.com')return null;\nwindow.__elonChatGptPrivateAuthContextEnabled=true;\n{request}\n{auth}\n{projection}\n{reader}\nreturn window.__elonConversationReader.run({query});}})()");
     let params =
         json!({"expression":expression,"returnByValue":true,"timeout":3000,"userGesture":false})
             .to_string();

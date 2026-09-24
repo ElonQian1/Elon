@@ -1,4 +1,4 @@
-//! Add a narrowly scoped reader when a Claude task carries explicit conversation links.
+//! Add a narrowly scoped reader when a Claude or Codex task carries conversation links.
 use super::ProjectDocsMcpLaunchConfig;
 use serde_json::{json, Value};
 use std::{
@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const ASSETS: [(&str, &str); 4] = [
+const ASSETS: [(&str, &str); 5] = [
     (
         "stdio.mjs",
         include_str!("../../../scripts/web-conversations/stdio.mjs"),
@@ -22,6 +22,10 @@ const ASSETS: [(&str, &str); 4] = [
     (
         "local-rpc.mjs",
         include_str!("../../../scripts/web-conversations/local-rpc.mjs"),
+    ),
+    (
+        "win-runtime.mjs",
+        include_str!("../../../scripts/web-conversations/win-runtime.mjs"),
     ),
 ];
 
@@ -101,7 +105,8 @@ pub(super) fn extend(
     cli: &str,
     port: u16,
 ) -> Option<ProjectDocsMcpLaunchConfig> {
-    if !cli.trim().eq_ignore_ascii_case("claude") {
+    let cli = cli.trim().to_ascii_lowercase();
+    if !matches!(cli.as_str(), "claude" | "codex") {
         return previous;
     }
     let ids = references(prompt);
@@ -123,6 +128,20 @@ pub(super) fn extend(
         args: vec![],
         env: vec![],
     });
+    if cli == "codex" {
+        // One inline TOML table replaces only our server, preserving every other MCP.
+        // JSON quoted strings are valid TOML basic strings (including Windows paths).
+        let q = |value: &str| serde_json::to_string(value).expect("string serialization");
+        config.args.extend([
+            "-c".into(),
+            format!(
+                "mcp_servers.yilong_web_conversations={{command=\"node\",args=[{}],env={{ELON_PROJECT_ROOT={},ELON_NODE_ADMIN_URL={},ELON_WEB_CONVERSATION_IDS={}}},startup_timeout_sec=15,tool_timeout_sec=150}}",
+                q(&script.to_string_lossy()), q(cwd),
+                q(&format!("http://127.0.0.1:{port}")), q(&ids.join(","))
+            ),
+        ]);
+        return Some(config);
+    }
     let existing = config.args.iter().position(|arg| arg == "--mcp-config");
     let mut document = if let Some(index) = existing {
         let parsed = config
@@ -181,6 +200,7 @@ mod tests {
     #[test]
     fn ordinary_claude_tasks_are_unchanged() {
         assert!(extend(None, "Please edit a file", Some("."), "claude", 7799).is_none());
+        assert!(extend(None, "Please edit a file", Some("."), "codex", 7799).is_none());
         assert!(extend(
             None,
             &format!("chatgpt-conversation://{ID}"),
@@ -189,6 +209,32 @@ mod tests {
             7799
         )
         .is_none());
+    }
+    #[test]
+    fn codex_launch_adds_scoped_stdio_without_replacing_other_tools() {
+        let previous = ProjectDocsMcpLaunchConfig {
+            args: vec![
+                "-c".into(),
+                "mcp_servers.existing.url=\"http://127.0.0.1:7799/synthetic\"".into(),
+            ],
+            env: vec![("KEEP".into(), "yes".into())],
+        };
+        let config = extend(
+            Some(previous),
+            &format!("Read chatgpt-conversation://{ID}"),
+            Some("D:\\test project\\quoted\""),
+            "codex",
+            7799,
+        )
+        .unwrap();
+        assert_eq!(config.args.len(), 4);
+        assert!(config.args[1].contains("mcp_servers.existing.url"));
+        assert!(config.args[3].starts_with("mcp_servers.yilong_web_conversations={"));
+        assert!(config.args[3].contains(&format!("ELON_WEB_CONVERSATION_IDS=\"{ID}\"")));
+        assert!(config.args[3].contains("tool_timeout_sec=150"));
+        assert!(config.args[3].contains("D:\\\\test project\\\\quoted\\\""));
+        assert_eq!(config.env, vec![("KEEP".into(), "yes".into())]);
+        assert!(!config.args.iter().any(|arg| arg == "--mcp-config"));
     }
     #[test]
     fn claude_launch_merges_governance_and_grants_only_linked_ids() {

@@ -95,6 +95,59 @@ test('idle cursor expiration is explicit; active paging renews the snapshot', as
   f.run(expired); await tick(); assert.equal(f.run(expired).error, 'cursor_expired')
 })
 
+test('read-only auth works when the semantic UI bridge failed; logout invalidates cached text', async () => {
+  let headers = { Authorization: 'Bearer synthetic-read-only' }
+  const window = { location: { origin: 'https://chatgpt.com' }, crypto: webcrypto,
+    __elonConversationProjection: projection,
+    __elonChatGptPrivateAuthContext: {
+      acquireRequestHeaders: async () => { if (!headers) throw Error('auth_missing'); return headers },
+      copyRequestHeaders: () => headers,
+    },
+    __elonChatGptPrivateJsonRequest: { request: async () => ({ payload: raw([message('1', 'authorized text')]) }) },
+  }
+  vm.runInNewContext(readerScript, { window, Date, Uint8Array })
+  const input = { conversation_id: id, request_id: 'isolated-001' }
+  window.__elonConversationReader.run(input); await tick()
+  assert.equal(window.__elonConversationReader.run(input).status, 'ready')
+  headers = null
+  assert.equal(window.__elonConversationReader.run(input).error, 'identity_changed')
+  const retry = { ...input, request_id: 'isolated-002' }
+  window.__elonConversationReader.run(retry); await tick()
+  assert.equal(window.__elonConversationReader.run(retry).error, 'login_required')
+})
+
+test('production auth module obtains page-local credentials without the full transport', async () => {
+  const authScript = readFileSync(new URL('../../android/app/src/main/assets/chatgpt_web_private_auth_context.js', import.meta.url), 'utf8')
+  const urls = []
+  const window = { location: { origin: 'https://chatgpt.com' }, crypto: webcrypto,
+    fetch() {}, __elonChatGptPrivateAuthContextEnabled: true, __elonConversationProjection: projection,
+    __elonChatGptPrivateJsonRequest: { request: async (_, url, options) => {
+      urls.push(url); assert.equal(options.method, 'GET')
+      return { payload: url === '/api/auth/session'
+        ? { accessToken: 'synthetic-token-for-auth-module-test' }
+        : raw([message('1', 'synthetic message')]) }
+    } },
+  }
+  const context = vm.createContext({ window, Date, Uint8Array })
+  vm.runInContext(authScript, context); vm.runInContext(readerScript, context)
+  const input = { conversation_id: id, request_id: 'module-0001' }
+  window.__elonConversationReader.run(input); await tick()
+  const result = window.__elonConversationReader.run(input)
+  assert.equal(result.status, 'ready')
+  assert.deepEqual(urls, ['/api/auth/session', `/backend-api/conversations/${id}`])
+  assert.doesNotMatch(JSON.stringify(result), /synthetic-token/)
+})
+
+test('fresh request rediscovers after host failure while a continuation never migrates', async () => {
+  let attempts = 0
+  const service = createService({ env: { ELON_WEB_CONVERSATION_IDS: id }, factories: {
+    win: async () => { attempts++; return { source: 'win', read: async () => { throw Error('win_host_unavailable') } } },
+  } })
+  await assert.rejects(service.read({ reference: id }), /win_host_unavailable/)
+  await assert.rejects(service.read({ reference: id }), /win_host_unavailable/)
+  assert.equal(attempts, 2)
+})
+
 test('service authorization happens before device discovery; rejects unsafe URLs', async () => {
   let touched = false
   const service = createService({ env: {}, factories: { win: () => { touched = true } } })

@@ -22,12 +22,13 @@ async function localServer(t, handler) {
 test('stdio to Win queue completes a real JSON-RPC exchange and exports no host token', { timeout: 10000 }, async t => {
   let command, polls = 0, base
   base = await localServer(t, (url, body) => {
-    if (url === '/api/health') return { ok: true }
+    if (url === '/api/health') return { service: 'elon-node-agent', status: 'ok' }
     if (url === '/api/project-docs/mcp/bootstrap') {
       assert.equal(body.profile, 'browser_research'); return { ok: true, mcp: { url: base + '/mcp?token=synthetic-local-token' } }
     }
     assert.equal(url, '/mcp?token=synthetic-local-token')
     const args = body.params.arguments
+    if (args.action === 'describe') return mcp({ commands: { read_conversation: {} } })
     if (args.action === 'hosts') return mcp({ hosts: [{ instance_id: 'synthetic-host' }] })
     if (args.action === 'submit') { command = args.payload; return mcp({ terminal: false, action: { action_id: 'action1' } }) }
     if (args.action === 'action_status') {
@@ -55,7 +56,7 @@ test('stdio to Win queue completes a real JSON-RPC exchange and exports no host 
   const [code] = await once(child, 'exit')
   assert.equal(code, 0); assert.equal(error, '')
   const replies = output.trim().split('\n').map(JSON.parse)
-  assert.equal(replies.length, 3); assert.equal(replies[1].result.tools.length, 2)
+  assert.equal(replies.length, 3); assert.equal(replies[1].result.tools.length, 3)
   const page = JSON.parse(replies[2].result.content[0].text)
   assert.equal(page.conversation_id, id); assert.equal(page.source, 'win'); assert.equal(page.has_more, false)
   assert.equal(polls, 1); assert.doesNotMatch(output, /synthetic-local-token/)
