@@ -1,6 +1,6 @@
 (function (page) {
   'use strict';
-  if (page?.location?.origin !== 'https://chatgpt.com' || page.__elonConversationReader?.version === 2) return;
+  if (page?.location?.origin !== 'https://chatgpt.com' || page.__elonConversationReader?.version === 3) return;
   const projection = page.__elonConversationProjection;
   const jobs = new Map(), snapshots = new Map();
   const ttl = 180000;
@@ -47,12 +47,47 @@
     }
     const request = page.__elonChatGptPrivateJsonRequest;
     if (!request?.request) fail('reader_unavailable');
-    const response = await request.request(page, '/backend-api/conversations/' + encodeURIComponent(id), {
-      method: 'GET', credentials: 'include', cache: 'no-store', headers: { ...auth.headers, Accept: 'application/json' },
-      __elonPrivateTransport: 'authorized_conversation_read',
-    }, { timeoutMs: 18000, maxBytes: 4 * 1024 * 1024 });
-    if ((await identity()).owner !== auth.owner) fail('identity_changed');
-    const snapshot = projection.project(response.payload, id);
+    const deadline = Date.now() + 30000, path = '/backend-api/conversations/' + encodeURIComponent(id);
+    let bytes = 0;
+    const get = async url => {
+      if ((await identity()).owner !== auth.owner) fail('identity_changed');
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) fail('timeout');
+      const response = await request.request(page, url, {
+        method: 'GET', credentials: 'include', cache: 'no-store', headers: { ...auth.headers, Accept: 'application/json' },
+        __elonPrivateTransport: 'authorized_conversation_read',
+      }, { timeoutMs: Math.min(18000, remaining), maxBytes: 4 * 1024 * 1024 });
+      if ((await identity()).owner !== auth.owner) fail('identity_changed');
+      bytes += JSON.stringify(response.payload).length;
+      if (bytes > 16 * 1024 * 1024) fail('source_limit');
+      return response.payload;
+    };
+    const value = projection.normalize(await get(path), id, true);
+    let source = value;
+    if (value.page_info != null) {
+      let batch = projection.messagePage(value, id), rows = [...batch.rows];
+      const cursors = new Set(), ids = new Set(rows.map(row => row.id));
+      while (batch.cursor) {
+        if (cursors.has(batch.cursor)) fail('source_incomplete');
+        if (cursors.size >= 100) fail('source_limit');
+        cursors.add(batch.cursor);
+        batch = projection.messagePage(await get(path + '/messages?before=' + encodeURIComponent(batch.cursor) + '&include_has_versions=true'), id);
+        for (const row of batch.rows) {
+          if (ids.has(row.id)) fail('invalid_branch');
+          ids.add(row.id);
+        }
+        if (ids.size > 20000) fail('source_limit');
+        rows = [...batch.rows, ...rows];
+      }
+      if (cursors.size) {
+        // Detect a changed default branch or edits while collecting older pages.
+        const latest = projection.normalize(await get(path), id, true);
+        const stamp = value => JSON.stringify([value.current_node, value.update_time, value.messages, value.page_info]);
+        if (stamp(value) !== stamp(latest)) fail('source_incomplete');
+      }
+      source = { ...value, messages: rows, page_info: { has_previous_page: false } };
+    }
+    const snapshot = projection.project(source, id);
     const revision = [...page.crypto.getRandomValues(new Uint8Array(16))].map(v => v.toString(16).padStart(2, '0')).join('');
     if (snapshots.size >= 2) snapshots.delete(snapshots.keys().next().value);
     snapshots.set(revision, { snapshot, owner: auth.owner, expires: Date.now() + ttl });
@@ -82,5 +117,5 @@
       .catch(error => { job.result = { status: 'failed', request_id: input.request_id, error: errorCode(error) }; });
     return job.result;
   }
-  page.__elonConversationReader = Object.freeze({ version: 2, run });
+  page.__elonConversationReader = Object.freeze({ version: 3, run });
 })(typeof window === 'object' ? window : null);

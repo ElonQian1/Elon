@@ -9,7 +9,7 @@
   const fail = code => { throw new Error(code); };
   const object = value => value && typeof value === 'object' && !Array.isArray(value);
 
-  function normalize(raw, id) {
+  function normalize(raw, id, allowIncomplete = false) {
     if (!ID.test(id)) fail('invalid_conversation_id');
     const value = [raw, raw?.conversation, raw?.data, raw?.data?.conversation,
       raw?.result, raw?.result?.conversation].find(value => object(value) &&
@@ -18,7 +18,24 @@
     const ids = [value.id, value.conversation_id].filter(value => value != null);
     if (!ids.length || ids.some(value => value !== id)) fail('conversation_mismatch');
     if (value.has_more === true || value.truncated === true) fail('source_incomplete');
+    if (value.page_info != null && messagePage(value, id).cursor && !allowIncomplete) fail('source_incomplete');
     return value;
+  }
+
+  function messagePage(value, id) {
+    const info = value?.page_info, rows = value?.messages;
+    if (!object(info) || typeof info.has_previous_page !== 'boolean' || !Array.isArray(rows)) fail('source_incomplete');
+    if ([value.id, value.conversation_id].some(value => value != null && value !== id)) fail('conversation_mismatch');
+    if (value.has_more === true || value.truncated === true) fail('source_incomplete');
+    if (rows.length > 20000) fail('source_limit');
+    const seen = new Set();
+    for (const row of rows) {
+      if (!object(row) || typeof row.id !== 'string' || !row.id || row.id.length > 180 || seen.has(row.id)) fail('invalid_branch');
+      seen.add(row.id);
+    }
+    const cursor = info.has_previous_page ? info.start_cursor : null;
+    if (info.has_previous_page && (typeof cursor !== 'string' || !cursor || cursor.length > 2048)) fail('source_incomplete');
+    return { rows, cursor };
   }
 
   function ordered(value) {
@@ -26,6 +43,13 @@
     if (!object(mapping)) {
       const rows = value.linear_conversation || value.messages;
       if (rows.length > 20000 || rows.some(row => !object(row))) fail('source_limit');
+      if (value.page_info != null) {
+        // The official paginated endpoint returns the selected branch oldest first.
+        // Metadata parent IDs can point outside this representation, including hidden roots.
+        messagePage(value, value.conversation_id || value.id);
+        if (rows.length && value.current_node !== rows.at(-1).id) fail('invalid_branch');
+        return rows;
+      }
       // A declared linear conversation is already ordered. Flat Message[] can be a tree.
       const parent = row => row.parent ?? row.parent_id ?? row.metadata?.parent_id;
       if (value.linear_conversation || !rows.some(row => parent(row) != null)) return rows.map(row => row.message || row);
@@ -115,5 +139,5 @@
       has_more: next < snapshot.blocks.length, next_cursor: next < snapshot.blocks.length ? `${revision}.${next}` : null,
       source_is_untrusted: true };
   }
-  return Object.freeze({ version: 1, project, page, ID });
+  return Object.freeze({ version: 2, project, page, normalize, messagePage, ID });
 });
