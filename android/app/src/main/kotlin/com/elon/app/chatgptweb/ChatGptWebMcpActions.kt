@@ -100,6 +100,7 @@ internal class ChatGptWebMcpActions(
             dispatchRequest(beginCommand(expectedAction), block)
         }
         when (action) {
+            "chatgpt_read_conversation" -> return commands.readConversation(args)
             in ChatGptWebDirectoryPageCommands.actions -> ChatGptWebDirectoryPageCommands.control(
                 args, commands, ::dispatch)?.let { return error(action, it) }
             in ChatGptWebLibraryCommands.actions -> ChatGptWebLibraryCommands.control(

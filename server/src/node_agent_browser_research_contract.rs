@@ -74,6 +74,7 @@ impl ResearchCommand {
             "read_request" => &["session_id", "request_id", "offset", "limit"],
             "export" => &["session_id"],
             "evaluate" => &["session_id", "query"],
+            "read_conversation" => &["query"],
             _ => return Err("invalid_command"),
         };
         let value = serde_json::to_value(self).map_err(|_| "invalid_command")?;
@@ -131,6 +132,42 @@ impl ResearchCommand {
                 || expression
                     .chars()
                     .any(|c| c.is_control() && c != '\n' && c != '\t')
+            {
+                return Err("invalid_query");
+            }
+        }
+        if self.kind == "read_conversation" {
+            let query = self.query.as_deref().ok_or("missing_argument")?;
+            if query.len() > 512 {
+                return Err("invalid_query");
+            }
+            let request: Value = serde_json::from_str(query).map_err(|_| "invalid_query")?;
+            let fields = request.as_object().ok_or("invalid_query")?;
+            if fields
+                .keys()
+                .any(|key| !["conversation_id", "request_id", "cursor"].contains(&key.as_str()))
+                || !fields
+                    .get("conversation_id")
+                    .and_then(Value::as_str)
+                    .is_some_and(|id| {
+                        id.len() == 36
+                            && id.bytes().enumerate().all(|(i, c)| {
+                                if [8, 13, 18, 23].contains(&i) {
+                                    c == b'-'
+                                } else {
+                                    c.is_ascii_hexdigit()
+                                }
+                            })
+                    })
+                || !fields
+                    .get("request_id")
+                    .and_then(Value::as_str)
+                    .is_some_and(|id| (8..=80).contains(&id.len()) && identifier(id))
+                || fields.get("cursor").is_some_and(|v| {
+                    !v.as_str().is_some_and(|s| {
+                        s.len() <= 100 && s.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'.')
+                    })
+                })
             {
                 return Err("invalid_query");
             }

@@ -1,6 +1,7 @@
 package com.elon.app.chatgptweb
 
 internal interface ChatGptWebMcpCommandPort {
+    fun readConversation(request: org.json.JSONObject): org.json.JSONObject = org.json.JSONObject().put("status", "failed").put("error", "reader_unavailable")
     fun setDraft(value: String, expectedDraft: String, requestId: String)
     fun sendInput(requestId: String)
     fun invokeControl(controlId: String, requestId: String)

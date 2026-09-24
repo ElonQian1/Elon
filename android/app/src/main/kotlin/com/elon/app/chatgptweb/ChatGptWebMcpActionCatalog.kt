@@ -51,6 +51,7 @@ internal object ChatGptWebMcpActionCatalog {
         "chatgpt_dismiss_features",
         "chatgpt_select_feature",
         "chatgpt_get_context",
+        "chatgpt_read_conversation",
         "chatgpt_reveal_message",
         "chatgpt_find_controls",
         "chatgpt_get_conversations",

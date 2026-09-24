@@ -1,3 +1,4 @@
+mod conversation;
 mod intent;
 
 use std::fs;
@@ -85,6 +86,16 @@ pub(crate) async fn codex_mcp_config_args_for_runtime(
 }
 
 pub(crate) fn project_docs_mcp_launch_config(
+    prompt: &str,
+    cwd: Option<&str>,
+    cli_name: &str,
+    host_port: u16,
+) -> Option<ProjectDocsMcpLaunchConfig> {
+    let config = docs_launch_config(prompt, cwd, cli_name, host_port);
+    conversation::extend(config, prompt, cwd, cli_name, host_port)
+}
+
+fn docs_launch_config(
     prompt: &str,
     cwd: Option<&str>,
     cli_name: &str,

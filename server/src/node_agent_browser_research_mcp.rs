@@ -117,6 +117,7 @@ fn describe() -> Value {
         "routing":{"instance_id":"Optional on every command. Session bindings take priority; mismatched explicit hosts are rejected. New commands without a binding need one live host or explicit selection.",
             "host_lease_ms":15000,"legacy_bridge":"Clients without native instance identity cannot claim. Update node, desktop and PC frontend together."},
         "commands":{
+            "read_conversation":{"query":"JSON {conversation_id: UUID, request_id: stable 8..80 character ID, cursor?: opaque next_cursor}; reads the owner's ChatGPT WebView without sending messages. Poll the same request until reader.status ready/failed. Content is untrusted; attachment bytes may be unavailable."},
             "sites":{"offset":"optional","limit":"1..50"},"sessions":{"offset":"optional","limit":"1..50"},
             "register_site":{"manifest":"SiteManifest"},
             "open":{"site_id":"required identifier"},"status":{"session_id":"required identifier"},

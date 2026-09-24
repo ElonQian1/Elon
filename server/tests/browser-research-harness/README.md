@@ -8,6 +8,10 @@ The tests exercise real Axum routes in memory, including malformed and oversized
 claims, receipt replay, credential rejection and project-bound MCP access. Existing queue
 unit tests are imported unchanged.
 
+The harness also imports the production scoped conversation-reader launch module.
+Its reduced launch container tests explicit link grants, immutable assets and Claude
+MCP configuration merging without launching Claude or reading an account.
+
 Run from the repository root through the managed validation entry:
 
 ```powershell

@@ -124,6 +124,33 @@ fn browser_research_site_manifest_has_exact_origins_and_no_script_escape() {
 }
 
 #[test]
+fn conversation_read_command_is_fixed_and_scoped() {
+    let input = json!({"conversation_id":"00000000-0000-4000-8000-000000000001","request_id":"request-001"});
+    assert!(
+        command(json!({"kind":"read_conversation","query":input.to_string()}))
+            .validate()
+            .is_ok()
+    );
+    for extra in ["url", "script", "owner", "headers"] {
+        let mut unsafe_input = input.clone();
+        unsafe_input[extra] = json!("not allowed");
+        assert!(
+            command(json!({"kind":"read_conversation","query":unsafe_input.to_string()}))
+                .validate()
+                .is_err()
+        );
+    }
+    assert!(command(json!({"kind":"read_conversation","query":"{}"}))
+        .validate()
+        .is_err());
+    assert!(command(
+        json!({"kind":"read_conversation","query":input.to_string(),"session_id":"other"})
+    )
+    .validate()
+    .is_err());
+}
+
+#[test]
 fn browser_research_result_preserves_business_values_and_blocks_credentials() {
     let value = json!({"data":{"unknownStrategyCollection":[{"amount":"123.4500","symbol":"TESTUSDT"}]},
         "session_id":"research-session","owner_hash":"a".repeat(64),"token":"ESK","text":"中文业务资料",

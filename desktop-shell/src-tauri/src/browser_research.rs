@@ -45,6 +45,16 @@ pub(crate) async fn run_browser_research(
     }
     // A site that is also an exchange provider is researched inside the user's own login
     // window, so one login serves both the person and the AI. Other sites keep their own window.
+    if command.kind == "read_conversation" {
+        return crate::local_ai_browser::conversation_read::read(
+            app,
+            webview,
+            exchange_runtime,
+            owner_key,
+            command.query.ok_or("invalid_conversation_request")?,
+        )
+        .await;
+    }
     let attach_label = match (command.kind.as_str(), command.site_id.as_deref()) {
         ("open", Some(site_id)) => {
             crate::local_ai_browser::exchange_webview::ensure_exchange_session_for_site(

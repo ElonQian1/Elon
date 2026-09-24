@@ -20335,6 +20335,95 @@
       "updated_at_ms": 1789457366093
     },
     {
+      "id": "personal-web-conversation-reader-v1",
+      "title": "个人网页会话读取 V1",
+      "summary": "复用 Win/APK 登录会话，向 Claude 等代理提供按授权会话读取正文、分页和附件缺口的统一工具。",
+      "status": "implemented",
+      "priority": "p2",
+      "requirement": {
+        "path": "docs/requirements/personal-web-conversation-reader-v1.md",
+        "content_hash": "13bbd239b52671208f22c46ebb8a9df67bb1ff039b6c100a3048c82eff84a6ea",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "f427fe758e74b9a597d58abb33abcb6930b3bf69",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "88e038e18ac712915f86a2adacc3d06912957d13",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/assets/chatgpt_web_conversation_reader.js",
+        "desktop-shell/src-tauri/src/local_ai_browser/conversation_read.rs",
+        "scripts/web-conversations"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "长会话与长消息按稳定游标完整读取；明确附件缺失。",
+        "Win/APK 适配与 Claude MCP 接入完成；现场证据独立报告。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "docs/reports/personal-web-conversation-reader-20260924.md",
+          "content_hash": "e66841e580e554a5f7758fb4074c67827ec005c03c6e7053962587193aa25936",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f427fe758e74b9a597d58abb33abcb6930b3bf69",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7e5ff54995643e2931590914ff98be0457a697db",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/web-conversations/reader.test.mjs",
+          "content_hash": "dad40a0218d9c13315d0d8fd707203cab7fd2a59f3e1dc5ac36b2b0a6ba40c31",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f427fe758e74b9a597d58abb33abcb6930b3bf69",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ba7063fa184715532857d11e0d5435525cfd495c",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/web-conversations/service.mjs",
+          "content_hash": "108480681e8317dd1b12dd54719ce2d1e193dfaaf9d2c1e969e597345014b871",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f427fe758e74b9a597d58abb33abcb6930b3bf69",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a99167d4e2e115ab3b6aca622af22ecb50b676c1",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/web-conversations/transport.test.mjs",
+          "content_hash": "2eb7c2bf67ad150f1a442b0760abac83d56ad5c1248c9bdc7003ec8faefd28df",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "f427fe758e74b9a597d58abb33abcb6930b3bf69",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "04838551e73f252ca3d46840ce4ee39e663b8328",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1790234154170,
+      "updated_at_ms": 1790236013213
+    },
+    {
       "id": "private-grid-read-bridge-v1",
       "title": "本人网格只读投影传输",
       "summary": "Win 当前节点绑定本人账号的私密只读投影经可信 HTTPS 上送，量化 APK 经独立可撤销授权读取；不执行交易。",
@@ -30673,56 +30762,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_e8f94f73d8284853913b7ac25b3833ce",
-      "feature_id": "android-binance-host-lifecycle-v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789284784124
-    },
-    {
-      "id": "feature_event_395f15afa5b643a0a4f65566523e3abb",
-      "feature_id": "android-binance-initialization-diagnostics-v1",
-      "action": "registered",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789290614766
-    },
-    {
-      "id": "feature_event_c41566bb267e4332a6da52a7a9cfa1d5",
-      "feature_id": "android-binance-initialization-diagnostics-v1",
-      "action": "claimed",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789290614814
-    },
-    {
-      "id": "feature_event_4f50eb514c624d20bb6fdcaa815067b7",
-      "feature_id": "android-binance-initialization-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789290614859
-    },
-    {
-      "id": "feature_event_0006ab34833d4497bdcd95de87343a4d",
-      "feature_id": "android-binance-initialization-diagnostics-v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789291076651
-    },
-    {
       "id": "feature_event_3534789850b645cf8b44b8e04c4af9ee",
       "feature_id": "android-binance-initialization-diagnostics-v1",
       "action": "transitioned",
@@ -32671,6 +32710,56 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1790014180746
+    },
+    {
+      "id": "feature_event_30c218a7e8d8401792d244488b57f8a8",
+      "feature_id": "personal-web-conversation-reader-v1",
+      "action": "registered",
+      "actor": "codex-conversation-reader",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790234154170
+    },
+    {
+      "id": "feature_event_adbff7f40ea34a43955adebf23872180",
+      "feature_id": "personal-web-conversation-reader-v1",
+      "action": "claimed",
+      "actor": "codex-conversation-reader",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790234154262
+    },
+    {
+      "id": "feature_event_01eaeef2c7fd4fbf952dcb31ac33306c",
+      "feature_id": "personal-web-conversation-reader-v1",
+      "action": "transitioned",
+      "actor": "codex-conversation-reader",
+      "reason": "Implementing scoped reader and validating Win/APK adapters",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790235487897
+    },
+    {
+      "id": "feature_event_dce7a852dbb24b7182801d42f01101bf",
+      "feature_id": "personal-web-conversation-reader-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-conversation-reader",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790236013106
+    },
+    {
+      "id": "feature_event_2a9656abd0b74974a26a4b7cc4f26910",
+      "feature_id": "personal-web-conversation-reader-v1",
+      "action": "transitioned",
+      "actor": "codex-conversation-reader",
+      "reason": "Scoped reader and both native adapters implemented; offline tests pass; release and live acceptance tracked separately",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790236013213
     }
   ]
 }

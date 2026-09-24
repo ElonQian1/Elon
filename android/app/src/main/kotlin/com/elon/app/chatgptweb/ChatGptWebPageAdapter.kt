@@ -153,6 +153,7 @@ internal class ChatGptWebPageAdapter(
     )
     private val nativeAttachments = ChatGptWebNativeAttachmentGateway(context, webView, documentSession::snapshot)
     internal val nativeDownloads = ChatGptWebFileDownloadGateway(context, webView, documentSession::snapshot)
+    internal val conversationReader = ChatGptWebConversationRead(context, webView, documentSession::snapshot)
     private val handshake = ChatGptWebBridgeHandshake(
         schedule = { delayMs, action -> mainHandler.postDelayed({ action() }, delayMs) },
         injectAndRequestSnapshot = ::injectAndRequestSnapshot,

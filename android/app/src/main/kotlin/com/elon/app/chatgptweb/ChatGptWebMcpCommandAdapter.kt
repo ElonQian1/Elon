@@ -42,6 +42,7 @@ internal class ChatGptWebMcpCommandAdapter(
 
     override fun privateProtocolProbe(mode: String, requestId: String) =
         pageAdapter.privateProtocolProbe(mode, requestId)
+    override fun readConversation(request: org.json.JSONObject) = pageAdapter.conversationReader.read(request)
     override fun regenerateResponse(requestId: String) = pageAdapter.regenerateResponse(requestId)
     override fun togglePrivateReadAloud(contextId: String, requestId: String) =
         pageAdapter.togglePrivateReadAloud(contextId, requestId)
