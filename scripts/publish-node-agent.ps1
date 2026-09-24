@@ -518,7 +518,7 @@ $desktopShellEnvironmentValues = @(
     "PC_FRONTEND_INPUT_HASH=$pcFrontendInputHash"
 )
 $desktopInputHash = Get-NodeAgentReleaseInputHash -RepoRoot $RepoRoot -GitSha $GitSha `
-    -GitPaths @('desktop-shell/src-tauri', 'pc-frontend') `
+    -GitPaths @('desktop-shell/src-tauri', 'pc-frontend', 'android/app/src/main/assets') `
     -ToolVersions @((rustc -vV | Out-String), (cargo -V | Out-String), 'target-cpu=x86-64') `
     -EnvironmentValues $desktopShellEnvironmentValues
 Invoke-NodeAgentCachedFileBuild -Kind 'desktop-shell' -InputHash $desktopInputHash `
