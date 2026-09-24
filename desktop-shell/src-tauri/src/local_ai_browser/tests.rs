@@ -24,6 +24,51 @@ fn bootstrap_and_vendor_navigation_are_allowed() {
 }
 
 #[test]
+fn chatgpt_google_login_continuation_matches_the_android_host_policy() {
+    for target in [
+        "https://accounts.google.com/v3/signin/challenge/pwd",
+        "https://accounts.youtube.com/accounts/SetSID?source=example&continue=https%3A%2F%2Fauth.openai.com%2F",
+        "https://auth.openai.com/login/callback",
+        "https://chatgpt.com/",
+    ] {
+        assert!(allows_navigation(&CHATGPT, &url(target)), "{target}");
+    }
+    for target in [
+        "https://accounts.youtube.com.evil.example/accounts/SetSID",
+        "https://www.youtube.com/",
+        "http://accounts.youtube.com/accounts/SetSID",
+        "https://accounts.youtube.com:444/accounts/SetSID",
+        "https://user:password@accounts.youtube.com/accounts/SetSID",
+    ] {
+        assert!(!allows_navigation(&CHATGPT, &url(target)), "{target}");
+    }
+    // This exception belongs to ChatGPT's existing official identity flow.
+    assert!(!allows_navigation(
+        &GOOGLE_AI_MODE,
+        &url("https://accounts.youtube.com/accounts/SetSID")
+    ));
+}
+
+#[test]
+fn blocked_navigation_message_identifies_only_the_destination_host() {
+    let message = navigation_block_message(
+        &CHATGPT,
+        &url("https://user:password@untrusted.example/private-path?code=private-code#private-fragment"),
+    )
+    .expect("blocked destination");
+    assert!(message.contains("untrusted.example"));
+    for secret in [
+        "user:",
+        "password",
+        "private-path",
+        "private-code",
+        "private-fragment",
+    ] {
+        assert!(!message.contains(secret));
+    }
+}
+
+#[test]
 fn binance_exchange_navigation_is_fixed_to_official_login_and_trading_hosts() {
     assert!(allows_navigation(
         &BINANCE,
@@ -58,7 +103,14 @@ fn ai_and_exchange_provider_catalogs_stay_separate() {
     assert_eq!(BINANCE.adapter, Some(ProviderAdapter::Binance));
     let actions = ProviderAdapter::Binance.supported_actions();
     assert!(actions.contains(&"refresh") && actions.contains(&"detail"));
-    for forbidden in ["send_prompt", "snapshot", "create", "manage", "close", "submit"] {
+    for forbidden in [
+        "send_prompt",
+        "snapshot",
+        "create",
+        "manage",
+        "close",
+        "submit",
+    ] {
         assert!(!actions.contains(&forbidden), "{forbidden}");
     }
 }

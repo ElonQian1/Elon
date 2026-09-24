@@ -35,6 +35,7 @@ pub(super) const CHATGPT: ProviderDefinition = ProviderDefinition {
     allowed_domain_suffixes: &["chatgpt.com", "openai.com"],
     allowed_identity_hosts: &[
         "accounts.google.com",
+        "accounts.youtube.com",
         "appleid.apple.com",
         "login.live.com",
         "account.live.com",

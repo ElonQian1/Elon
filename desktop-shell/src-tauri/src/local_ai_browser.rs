@@ -542,8 +542,9 @@ fn navigation_block_message(provider: &ProviderDefinition, url: &Url) -> Option<
         );
     }
     Some(format!(
-        "页面尝试离开 {} 允许的官方网页域名，已由一龙拦截。",
-        provider.display_name
+        "页面尝试访问 {} 允许范围外的站点 {}，已由一龙拦截。",
+        provider.display_name,
+        url.host_str().unwrap_or("非网页地址")
     ))
 }
 
