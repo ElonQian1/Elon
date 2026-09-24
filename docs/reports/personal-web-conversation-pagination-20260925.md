@@ -49,7 +49,48 @@ ordering, unstable source rejection, account drift and bounded collection.
 Existing authorization, Unicode, attachments, stdio/HTTP, persistent registration
 and Win startup tests passed unchanged.
 
-At source preparation, live acceptance of the repaired Win/APK builds is pending.
-Real cold startup, Claude model invocation and attachment-content reading remain
-separate acceptance items; passing substituted transport tests does not establish
-those outcomes.
+## Released Artifacts And Live Acceptance
+
+Source `19fe4eb900008f5e3e617ffb1e99f1e31f8a7a1c` passed the formal NodeAgent
+and AndroidFeature completion checks. Win `0.3.69+19fe4eb` was activated and
+its exact identity read back from the running node. APK `1.1.1811` was published
+and remotely hash-verified: SHA-256
+`f7c641177229012e96de79f908b2b8e736ace66df07b7be57a5c3fdc308b2036`.
+Both registered debug phones were offline; this release was not installed on them.
+
+The actual persisted Codex MCP configuration discovered its three tools and
+read the authorized conversation to the last output cursor in 69,135 ms:
+
+- 17 pages, 34 blocks, 25,347 Unicode code points, and 21 message IDs with blocks.
+- The projection's candidate message counter was 90; this is not proof of 90
+  complete visible messages. Some candidate messages had no supported content.
+- Eight attachment metadata records; attachment bytes were not read.
+- `text_complete=false`, `multimodal_complete=false`;
+  gaps were `unsupported_message_content` and `attachment_bytes_not_read`.
+- Ordered block SHA-256:
+  `ca969a9e980f2f66ff2736110d4d7245ce7653d4cb5a53f930418ab6866275b7`.
+
+With zero active client tasks, the installed desktop process was stopped for
+startup acceptance while the background node remained online. An immediate
+attempt encountered the old host lease and returned `win_action_timeout`.
+After the host list became empty, the same configured MCP automatically launched
+the installed desktop and ChatGPT WebView, reused login, and read the same 17
+pages in 74,637 ms with the identical block hash. This proves desktop/WebView
+startup from an absent host; it does not prove full node-off cold startup.
+
+The first parallel Win build was terminated by the 600-second silent-output
+guard under memory pressure. A premature retry correctly rejected the APK
+publisher's temporary version edit. After APK completion restored the tree,
+the sequential Win build passed with a bounded 1,800-second silent-output limit.
+
+## Remaining Gaps
+
+The authenticated transport and original `invalid_branch` failure are resolved.
+Full-text completeness remains unverified because unsupported candidate content
+is still reported. Its exact response shapes were not exported or diagnosed;
+the public schema's helper/reasoning types alone do not prove which live records
+caused the gap. Do not discard this flag or label those records harmless without
+bounded structural evidence. Attachment bytes, APK device reading, full node-off
+cold startup and actual Claude model invocation remain unverified. No Claude CLI
+was available on this PC's PATH. The separate full UI adapter bootstrap was not
+repaired by this reader change. The feature remains `implemented`, not `verified`.
