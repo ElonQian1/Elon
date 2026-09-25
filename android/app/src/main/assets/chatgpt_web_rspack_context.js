@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptRspackContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -43,7 +43,7 @@
     if (nodes.size !== 1 || ids.size !== 1) return fail(nodes.size > 1 || ids.size > 1 ? 'owner_ambiguous' : 'owner_pending');
     return { scope: scopes.values().next().value, id: ids.values().next().value };
   }
-  function capture(node) {
+  function capture(node, reading = false) {
     const runtime = page.__elonChatGptRspackRuntime?.peek();
     if (!runtime) return fail('runtime_pending');
     if (!node?.isConnected) return fail('composer_detached');
@@ -62,6 +62,12 @@
         scope.get(runtime.identity.j)?.status !== 'allowed') return fail('identity_unavailable');
     const serverId = scope.get(runtime.conversation.i, id) || null;
     if (pathId ? serverId !== pathId : serverId !== null || !id.startsWith('local-chatgpt:')) return fail('conversation_mismatch');
+    const binding = { scope, id, node, runtime, token, href: url.href, serverId,
+      accountId: identity.accountId, userId: identity.userId, generation: auth.getBrowserChatGptAuthGeneration(),
+      temporary: url.search === '?temporary-chat=true', parent: scope.get(runtime.conversation.z, id) || null };
+    // Reading the active branch must not wait for an idle or empty composer.
+    // The send entry continues to apply every write-admission guard below.
+    if (reading) { code = 'ready'; return binding; }
     // Work, custom GPTs and project sends have additional context contracts.
     if (scope.get(runtime.conversation.K, id) != null || scope.get(runtime.conversation.w, id) != null) return fail('mode_unsupported');
     if (scope.get(runtime.conversation.T, id) !== 'idle' || scope.get(runtime.composer.h, id)) return fail('busy');
@@ -71,9 +77,7 @@
     if (typeof draft !== 'string' || typeof model?.slug !== 'string' || !model.slug ||
         model.thinkingEffort != null && typeof model.thinkingEffort !== 'string') return fail('composer_state_pending');
     code = 'ready';
-    return { scope, id, node, runtime, token, href: url.href, serverId, draft, model: { ...model },
-      accountId: identity.accountId, userId: identity.userId, generation: auth.getBrowserChatGptAuthGeneration(),
-      temporary: url.search === '?temporary-chat=true', parent: scope.get(runtime.conversation.z, id) || null };
+    return { ...binding, draft, model: { ...model } };
   }
   function current(binding) {
     try {
@@ -96,5 +100,6 @@
         binding.scope.get(binding.runtime.identity.i) === binding.userId;
     } catch (_) { return false; }
   }
-  return Object.freeze({ capture, current, owns, state: () => ({ code }) });
+  return Object.freeze({ capture: node => capture(node), read: node => capture(node, true),
+    current, owns, state: () => ({ code }) });
 });

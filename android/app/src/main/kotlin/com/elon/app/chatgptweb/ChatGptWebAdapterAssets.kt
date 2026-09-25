@@ -10,6 +10,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_committed_composer_owner.js",
         "chatgpt_web_rspack_runtime.js",
         "chatgpt_web_rspack_context.js",
+        "chatgpt_web_rspack_messages.js",
         "chatgpt_web_rspack_submit.js",
         "chatgpt_web_new_chat_confirmation.js",
         "chatgpt_web_private_new_conversation.js",

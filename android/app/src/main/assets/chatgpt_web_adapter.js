@@ -270,21 +270,24 @@
     const privateStreamState = ['streaming', 'completed'].includes(
       String(privateStream && privateStream.state || '')
     ) ? String(privateStream.state) : 'idle';
+    const runtimeWindow = optional(null, () => window.__elonChatGptRspackMessages?.read(
+      composer, () => scheduleSnapshot(true)));
     const streamingState = optional(
       { active: false, assistantKey: '' },
       () => readStreamingState(privateStream)
     );
     const streaming = access.blocked !== true &&
-      (streamingState.active || !!(privateStream && privateStream.state === 'streaming'));
+      (streamingState.active || runtimeWindow?.streaming === true || !!(privateStream && privateStream.state === 'streaming'));
     if (access.blocked === true && streamingPolicy) streamingPolicy.reset();
     streamingSnapshotMode = streaming;
     privateStreamingSnapshotMode = access.blocked !== true &&
       !!(privateStream && privateStream.state === 'streaming');
-    const messageWindow = optional({ messages: [], observedCount: 0, startIndex: 0 }, () =>
+    const domWindow = optional({ messages: [], observedCount: 0, startIndex: 0 }, () =>
       messageAdapter && typeof messageAdapter.readMessageWindow === 'function'
         ? messageAdapter.readMessageWindow(streaming, streamingState.assistantKey)
         : { messages: messageAdapter ? messageAdapter.readMessages(streaming) : [], observedCount: 0, startIndex: 0 }
     );
+    const messageWindow = domWindow.messages?.length ? domWindow : runtimeWindow || domWindow;
     const domMessages = Array.isArray(messageWindow.messages) ? messageWindow.messages : [];
     const messages = optional(domMessages, () => privateStreamTransport &&
       typeof privateStreamTransport.mergeMessages === 'function'

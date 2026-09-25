@@ -45,6 +45,10 @@ const ASSETS: &[(&str, &str)] = &[
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_rspack_context.js"),
     ),
     (
+        "chatgpt_web_rspack_messages.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_rspack_messages.js"),
+    ),
+    (
         "chatgpt_web_rspack_submit.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_rspack_submit.js"),
     ),

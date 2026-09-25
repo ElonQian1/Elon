@@ -72,10 +72,27 @@ official page is a project conversation, outside this candidate's admitted
 ordinary-chat scope. This is evidence of remaining projection compatibility
 work, not a missing website capability or a successful end-to-end repair.
 
-The existing draft was preserved. No test message or group reply was sent;
-the requested confirmation for a separate ordinary-chat acceptance message
-has not been received. Actual Win scope admission and text streaming still
-need independent verification. Upload association, image understanding, complete answer
+After explicit confirmation, one fixed acceptance message was sent in a new
+ordinary ChatGPT conversation. Installed `23d021cf4` reports `send_prompt`
+successful; the official page shows the complete requested answer. No retry
+or group post was issued. The original draft was retained in task memory for
+restoration, not included in the acceptance message.
+
+The same readback exposes the next failure: native `message_count` and
+`assistant_message_count` remain zero while the official answer exists. The
+old DOM reader searches `main` and old message/turn markers; the reviewed
+Rspack source has no `data-message-author-role` marker. Thus website delivery
+works for this sample, but native answer projection still fails.
+
+Adapter 214 adds an ordinary-chat read path using the committed AppScope's
+reviewed `LGwv.G` mapping and `LGwv.z` selected branch. It reuses the existing
+rich history projector and preserves DOM projection when present. Read
+admission retains account, document and conversation ownership checks but
+does not wait for an idle/empty composer; send guards are unchanged. Sixteen
+new focused tests plus the 27 previous Rspack tests pass. Actual installed
+native projection acceptance is still pending.
+
+Upload association, image understanding, complete answer
 delivery to the group and APK device acceptance remain **unverified**. A
 passing offline test or HTTP 200 does not mark those workflows complete.
 
