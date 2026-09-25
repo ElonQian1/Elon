@@ -8,6 +8,8 @@
 
 项目现状以 `AI_CURRENT.md` 为准。
 
+Codex、Copilot、Claude 的 Win 无人值守更新/接管统一按 [执行入口](../docs/win-conversation-unattended-acceptance.md)；已有任务授权后直接执行，不逐步重复询问。
+
 - 一龙 Android 发布只走 `scripts/publish-apk.*`，不能用 Debug 包代替可安装端发布。
 - 后端发布只走 `scripts/publish-server.*`；Win 节点发布只走 `scripts/publish-node-agent.ps1`。
 - 发布版本由服务器 claim/finish 分配，不手改并提交 `server/Cargo.toml` 或 `build.gradle` 版本号。

@@ -5,10 +5,20 @@ reviewed_at: 2026-09-25
 
 # Win 会话读取无人值守验收
 
-用户授权 Codex 更新一龙 Win 并测试指定 ChatGPT 会话后，使用正式入口
+用户授权 Codex、Copilot 或 Claude 更新一龙 Win 并测试指定 ChatGPT 会话后，使用正式入口
 `scripts/win-conversation-acceptance/run.mjs` 完成整条链路，不再临时拼接更新脚本。
 它复用 [Win 语义控制](win-codex-control.md) 与
 [个人会话 MCP](personal-web-conversation-reader.md)，由当前代理直接执行。
+
+## 多代理发现入口
+
+Codex 从 `AGENTS.md`/`CODEX.md` 进入共享 `.github/copilot-instructions.md`；Copilot 读取该共享规则；
+Claude 从仓库根 `CLAUDE.md` 进入同一共享规则。三者均按本说明执行，不依赖某一个模型的个人记忆。
+已有任务授权涵盖的启动、精确更新、重连、导航和只读验收直接执行，不因每一步需要开窗口或重启而重复询问。
+当前组合入口测试指定 ChatGPT 会话；其他 Win 功能按各自合同验收，不能用此会话测试冒充。
+执行需要本机命令能力、Node.js 和现有 Win 控制通道；只读聊天模式或没有这些工具时明确报告缺口。
+底层 `win_control` 的 `codex_mcp` 是现有固定控制来源标记，入口复用该通道，不伪造模型身份或新增绕过路径。
+入口更新适用于读取最新项目规则的任务；旧会话需要重新读取，其他项目不会自动继承。
 
 ## 一次调用
 
