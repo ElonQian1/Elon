@@ -20369,54 +20369,93 @@
       "implementation_evidence": [
         {
           "path": "android/app/src/main/assets/chatgpt_web_conversation_projection.js",
-          "content_hash": "9dfa5448657c17644c6d6fbf0b146f262c510251bf6ac6b0337f3a393a4d25c2",
+          "content_hash": "30e4b6edbece90f63e630c235a53719be5bc15cd1f241f6eb1bef85448391b55",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6f06ab0d6462a234cde436215ad898ce6679d875",
-            "head_blob_oid": "2f716635a70e5503b39c23f9c8714877650e563a",
-            "worktree_blob_oid": "964c8eb52b073e947d74342a3d4cc84195f56d81",
-            "state": "tracked_modified"
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
+            "head_blob_oid": "7d6bd0a331214a9b9ad5ac226d59ac0d2bf81fd0",
+            "worktree_blob_oid": "7d6bd0a331214a9b9ad5ac226d59ac0d2bf81fd0",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/main/assets/chatgpt_web_conversation_reader.js",
-          "content_hash": "920847a73d052cadf7c198bb5cd9cf0fb194d0bd39a4eee4dc627b6757c7380f",
+          "content_hash": "b89d62498909b4221cfbef0f5f92bbd61782324b384c0ae8b3cf26969347afe0",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6f06ab0d6462a234cde436215ad898ce6679d875",
-            "head_blob_oid": "d984e569e86ac52f6ae1bce286a8074cf55a8d24",
-            "worktree_blob_oid": "813d2f105f08065b08217bc95ab124903891279c",
-            "state": "tracked_modified"
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
+            "head_blob_oid": "86aafffcb62b552f01798e7c882796cc35f4e3fd",
+            "worktree_blob_oid": "86aafffcb62b552f01798e7c882796cc35f4e3fd",
+            "state": "tracked_clean"
           }
         },
         {
-          "path": "docs/reports/personal-web-conversation-pagination-20260925.md",
-          "content_hash": "69e10a59441b0a65fbf76e03b4e643c56db23b7423a30687e617e5163fb2ab46",
+          "path": "docs/reports/conversation-desktop-dual-read-20260925.md",
+          "content_hash": "38082b79b1688e1fc6361ec8b0d21917e3a9aba3f623027699d0382867ce529d",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "19fe4eb900008f5e3e617ffb1e99f1e31f8a7a1c",
-            "head_blob_oid": "b4c40d98cc7ac220c61e643417155e917c50f867",
-            "worktree_blob_oid": "87fba0d55ac1e51868a750e9028ce2de6eb23c8b",
-            "state": "tracked_modified"
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ea1767a4892b52a1b85da0e5ab28db64bc2ed64d",
+            "state": "untracked"
           }
         },
         {
-          "path": "scripts/web-conversations/pagination.test.mjs",
-          "content_hash": "f3b8639abb1468a2a0dbbd85749c3c8166ed8090bb0d56a8190e1bc3ede014c6",
+          "path": "docs/reports/personal-web-conversation-pagination-20260925.md",
+          "content_hash": "9fcb3dba093ed69c1527c19f56e498f5360658580c9840d2513870eda80b18a5",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
+            "head_blob_oid": "87fba0d55ac1e51868a750e9028ce2de6eb23c8b",
+            "worktree_blob_oid": "87fba0d55ac1e51868a750e9028ce2de6eb23c8b",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/web-conversations/acceptance.mjs",
+          "content_hash": "f03351093e7f7d6a3d977dd26310beefcd584bae4b156e91918b3dc3cad2db23",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
+            "head_blob_oid": "886e2cf282d25162d084f9b9e38ad8ea645a3ce2",
+            "worktree_blob_oid": "886e2cf282d25162d084f9b9e38ad8ea645a3ce2",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/web-conversations/acceptance.test.mjs",
+          "content_hash": "28f1aa0a0edf437f4811b4f59e58cb6601d9f235f2eb443158ac1973abdc2840",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6f06ab0d6462a234cde436215ad898ce6679d875",
-            "head_blob_oid": "",
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
+            "head_blob_oid": "b1ad105e429b2791f6e7ec730af77d5c092f99d6",
+            "worktree_blob_oid": "b1ad105e429b2791f6e7ec730af77d5c092f99d6",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/web-conversations/pagination.test.mjs",
+          "content_hash": "6e98b26a926a75bb4c4935b7eae1692896d731f9773d573d1ebd26a9251f7ea8",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
+            "head_blob_oid": "cadea110a1a6ed072118bb34e024e335ef33605d",
             "worktree_blob_oid": "cadea110a1a6ed072118bb34e024e335ef33605d",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -20426,9 +20465,35 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6f06ab0d6462a234cde436215ad898ce6679d875",
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
             "head_blob_oid": "61dcca933273eb1d68c31667885d2fa6a1bc370e",
             "worktree_blob_oid": "61dcca933273eb1d68c31667885d2fa6a1bc370e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/web-conversations/register-claude.mjs",
+          "content_hash": "63b05756cc79b6317373778e70a62581a0d7f1daeaa3f79a325136c41cfbdae5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
+            "head_blob_oid": "08c4341c09ab45af8e24d1055540a5522fd150df",
+            "worktree_blob_oid": "08c4341c09ab45af8e24d1055540a5522fd150df",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/web-conversations/register-claude.test.mjs",
+          "content_hash": "82b5a8f3198b6f73c86f02fbcd40093e98d03abc29a7b1cbaf7bf6c6ff514a3d",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
+            "head_blob_oid": "af4452f2b94d1d86037e3ba1313362d4f193a054",
+            "worktree_blob_oid": "af4452f2b94d1d86037e3ba1313362d4f193a054",
             "state": "tracked_clean"
           }
         },
@@ -20439,7 +20504,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6f06ab0d6462a234cde436215ad898ce6679d875",
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
             "head_blob_oid": "bd220e8affdf1177d5f6ce08d1ab235b100cfea3",
             "worktree_blob_oid": "bd220e8affdf1177d5f6ce08d1ab235b100cfea3",
             "state": "tracked_clean"
@@ -20452,15 +20517,41 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "6f06ab0d6462a234cde436215ad898ce6679d875",
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
             "head_blob_oid": "db09beaddb82c47c62457d11a1ba527c2d6951e7",
             "worktree_blob_oid": "db09beaddb82c47c62457d11a1ba527c2d6951e7",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/win-conversation-acceptance/reader.mjs",
+          "content_hash": "c0a8aa326b2298476d23d27b7813cadcf359e209cfb20004d678b9ef6156eae6",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
+            "head_blob_oid": "c7f4db7e09cecee37cc2be5fb7567b5b7e389f0c",
+            "worktree_blob_oid": "c7f4db7e09cecee37cc2be5fb7567b5b7e389f0c",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/win-conversation-acceptance/reader.test.mjs",
+          "content_hash": "0b9574ed26622152ea076426bf11fce96c25af4662cdc46fb52c643dbaa5286f",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "21d0276ecc46c0ccd2216e162ba45afe74213602",
+            "head_blob_oid": "4f8eaf3145e1ecdd9ce5dd1a398ba9f02ea0e187",
+            "worktree_blob_oid": "4f8eaf3145e1ecdd9ce5dd1a398ba9f02ea0e187",
             "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1790234154170,
-      "updated_at_ms": 1790278113015
+      "updated_at_ms": 1790342253533
     },
     {
       "id": "private-grid-read-bridge-v1",
@@ -30801,36 +30892,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_cb5a2f74e168404fa0226fb74d176961",
-      "feature_id": "android-binance-command-handoff-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "177项相关回归含10项真实命令交接通过；正式发布及手机实读另列待验，未做交易。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789312678076
-    },
-    {
-      "id": "feature_event_d3880ee63ddd474ca5a9395a79c16bd5",
-      "feature_id": "android-binance-command-handoff-v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789313621049
-    },
-    {
-      "id": "feature_event_a080be4704684415ad8cb20be76e36db",
-      "feature_id": "android-okx-history-read-v1",
-      "action": "registered",
-      "actor": "codex-quant-grid",
-      "reason": "Accepted commercial grid goal G21/G22",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789317411734
-    },
-    {
       "id": "feature_event_9aad38d204ed4be0bb397f4afbc85320",
       "feature_id": "android-okx-history-read-v1",
       "action": "claimed",
@@ -32799,6 +32860,36 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1790278113015
+    },
+    {
+      "id": "feature_event_9179c9a3297f455ba64e9213706121fd",
+      "feature_id": "personal-web-conversation-reader-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-desktop-reader-audit",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1790340682298
+    },
+    {
+      "id": "feature_event_4219241222254283ad626828691a432c",
+      "feature_id": "personal-web-conversation-reader-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-desktop-reader-audit",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1790341623175
+    },
+    {
+      "id": "feature_event_89a5a7a7e0f84735a6feb8f9dcf0cfd6",
+      "feature_id": "personal-web-conversation-reader-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-desktop-reader-audit",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1790342253533
     }
   ]
 }

@@ -9,6 +9,8 @@ reviewed_at: 2026-09-25
 
 最新代码与真机证据：[富文本及附件读取验收](reports/personal-web-conversation-rich-reader-20260925.md)。
 
+后续桌面版接入及双端复测：[Claude Desktop 与双端读取检查](reports/conversation-desktop-dual-read-20260925.md)。
+
 Win 已授权的更新、重启、打开功能与完整读取测试，使用
 [无人值守验收入口](win-conversation-unattended-acceptance.md)，支持检查点恢复与脱敏收据。
 
@@ -53,6 +55,35 @@ APK 已有 MCP 通道新增 `ui_control` 动作 `chatgpt_read_conversation`，�
 ```
 
 调用 `web_conversation_read({reference, source:"apk"})` 可固定使用 APK；`source:"auto"` 优先 Win，初始 Win 不可用且已配置 APK 时再选择 APK。第一页成功后，游标固定设备与快照，不跨设备回退。
+
+## Claude 桌面版
+
+Claude Code 的进程注入不会自动配置 Claude Desktop。桌面版按
+[官方本地 MCP 入口](https://modelcontextprotocol.io/docs/develop/connect-local-servers)
+使用 `%APPDATA%/Claude/claude_desktop_config.json`。在本仓库运行：
+
+```powershell
+@{ projectRoot = '<持久项目绝对路径>'; references = @('<明确授权的会话链接>');
+   apkMcpUrl = 'http://127.0.0.1:8787' } | ConvertTo-Json -Compress |
+   node scripts/web-conversations/register-claude.mjs
+```
+
+注册器只合并 `yilong_web_conversations`，保留其他服务器与偏好，备份原文件；
+无效 JSON、非本机端点、并发写入或无效授权失败关闭。代码存入本机内容寻址目录，
+任务 worktree 删除不影响运行。重新注册替换本读取器的会话授权，保留设备选择；
+只用 Win 时可省略 `apkMcpUrl`，显式空字符串清除旧 APK 地址。
+
+完成退出并重启 Claude 后，仍需核对其实际工具列表及调用结果；配置写入与公共 MCP
+协议测试均不等于 Claude 模型已经调用成功。客户端自己的工具授权仍由客户端处理。
+
+## 双端重复验收
+
+`node scripts/web-conversations/acceptance.mjs --project-root <持久项目绝对路径> --reference <会话链接> --source both --apk-url http://127.0.0.1:8787`
+分别固定 Win/APK，逐页核验修订/偏移并逐个读取附件字节，再比较文本摘要与附件摘要。
+也可指定 `--source win` 或 `--source apk`。失败端不冒充另一端，未知格式继续判为 partial；
+退出码 0/2/1 分别表示 passed/partial/failed。脱敏回执保存到本机
+`%LOCALAPPDATA%/Elon/conversation-acceptance-v1`，没有正文、文件名、游标或凭据。
+手机必须在线且系统允许网页执行；安全锁屏导致的执行阻塞需用户解锁，不解除锁屏保护。
 
 ## 完整性与隔离
 
