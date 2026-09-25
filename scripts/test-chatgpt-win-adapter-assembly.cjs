@@ -18,6 +18,7 @@ const constants = Object.fromEntries([...rust.matchAll(/const (\w+): &str\s*=\s*
 function script(omit) {
   const source = file => path.basename(file) === omit ? '' : read(file)
   const attachment = includes(read('attachment_bootstrap.rs')).map(source).join('\n')
+  const textSender = includes(read('text_bootstrap.rs')).map(source).join('\n')
   const branches = new Map([...rust.matchAll(/(?:if|else if) \*name == "([^"]+)" \{([\s\S]*?)(?=\n            \} else)/g)]
     .map(([, name, body]) => [name, body]))
   const adapters = [...manifest.matchAll(/\(\s*"([^"]+\.js)",([\s\S]*?)\n    \),/g)].map(([, name, expression]) => {
@@ -29,6 +30,7 @@ function script(omit) {
     const values = match[2].trim().replace(/,$/, '').split(/,\s*/).map(arg => {
       if (arg === 'shared') return shared
       if (arg === 'super::attachment_bootstrap::initialization_script()') return attachment
+      if (arg === 'super::text_bootstrap::initialization_script()') return textSender
       assert.ok(Object.hasOwn(constants, arg), 'Unrecognized assembly argument: ' + arg)
       return constants[arg]
     })
@@ -94,11 +96,19 @@ assert.equal(ready.window.__elonChatGptBootstrapStage, 'ready', JSON.stringify(r
 assert.equal(typeof ready.window.__elonChatGptLayout?.emitSnapshot, 'function')
 assert.equal(typeof ready.window.__elonChatGptBridge?.command, 'function')
 assert.equal(typeof ready.window.__elonChatGptPrivateTextRuntimeSubmit?.submit, 'function')
+assert.equal(typeof ready.window.__elonChatGptPrivateTextInput?.setCommand, 'function')
+assert.equal(typeof ready.window.__elonChatGptFreshTextTransaction?.send, 'function')
+assert.equal(typeof ready.window.__elonChatGptPrivateAuthContext?.acquireRequestHeaders, 'function')
+// Transport captures auth at construction: a later globally available auth module
+// is insufficient. Confirm the real transport is subscribed to the real context.
+ready.window.__elonChatGptPrivateAuthContext.acceptObservedHeaders({ Authorization: 'Bearer fixture-assembly-identity' })
+assert.ok(ready.window.__elonChatGptPrivateTransport.copySameOriginRequestHeaders()?.Authorization)
 assert.ok(ready.events.some(envelope => envelope.event?.type === 'adapter_ready'))
 const snapshots = []
 ready.window.__elonChatGptLayout.emitSnapshot(event => snapshots.push(event), true)
 assert.ok(snapshots.length > 0)
-for (const omitted of ['chatgpt_web_adapter_control_labels.js', 'chatgpt_web_adapter_dictation_actions.js']) {
+for (const omitted of ['chatgpt_web_adapter_control_labels.js', 'chatgpt_web_adapter_dictation_actions.js',
+  'chatgpt_web_fresh_text_context.js']) {
   const failed = assemble(omitted)
   assert.notEqual(failed.window.__elonChatGptBootstrapStage, 'ready')
   assert.ok(failed.events.some(event => event.kind === 'adapter_bootstrap_failed'))

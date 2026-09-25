@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 211;
+pub(super) const ADAPTER_VERSION: u32 = 212;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
@@ -32,6 +32,8 @@ const PRIVATE_SOCKET_TAP: &str =
     include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_socket_tap.js");
 const PRIVATE_JSON_REQUEST: &str =
     include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_json_request.js");
+const PRIVATE_OWNED_STREAM: &str =
+    include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_owned_stream.js");
 const PRIVATE_CONVERSATION_DIRECTORY: &str = include_str!(
     "../../../../android/app/src/main/assets/chatgpt_web_private_conversation_directory.js"
 );
@@ -223,7 +225,11 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
     ),
     (
         "chatgpt_web_private_history_projection.js",
-        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_history_projection.js"),
+        concat!(include_str!("../../../../android/app/src/main/assets/chatgpt_web_text_blocks.js"), "\n", include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_file_citation.js"), "\n", include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_history_projection.js")),
+    ),
+    (
+        "chatgpt_web_private_auth_context.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_auth_context.js"),
     ),
     (
         "chatgpt_web_private_transport.js",
@@ -302,9 +308,11 @@ pub(super) fn initialization_script() -> String {
                 )
             } else if *name == "chatgpt_web_private_stream_transport.js" {
                 format!(
-                    "window.__elonChatGptBootstrapStage = 'chatgpt_win_private_stream_binding.js';\n{}\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_stream_recovery.js';\n{}\nif (window.__elonWinChatGptPrivateStreamBindingLifecycle) window.__elonWinChatGptPrivateStreamBindingLifecycle.commit(window);",
-                    WIN_PRIVATE_STREAM_BINDING, shared, WIN_PRIVATE_STREAM_RECOVERY
+                    "window.__elonChatGptBootstrapStage = 'chatgpt_win_private_stream_binding.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_web_private_owned_stream.js';\n{}\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_private_stream_recovery.js';\n{}\nif (window.__elonWinChatGptPrivateStreamBindingLifecycle) window.__elonWinChatGptPrivateStreamBindingLifecycle.commit(window);",
+                    WIN_PRIVATE_STREAM_BINDING, PRIVATE_OWNED_STREAM, shared, WIN_PRIVATE_STREAM_RECOVERY
                 )
+            } else if *name == "chatgpt_web_text_transaction_orchestrator.js" {
+                format!("window.__elonChatGptBootstrapStage = 'chatgpt_text_bootstrap';\n{}\n{}", super::text_bootstrap::initialization_script(), shared)
             } else if *name == "chatgpt_web_private_voice_relay.js" {
                 format!(
                     "if (!window.__elonWinChatGptManagedVoicePeerConstructor && typeof window.RTCPeerConnection === 'function') Object.defineProperty(window, '__elonWinChatGptManagedVoicePeerConstructor', {{ value: window.RTCPeerConnection, configurable: false }});\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_managed_voice_peer.js';\n{}",

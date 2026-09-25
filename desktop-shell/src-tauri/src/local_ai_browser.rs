@@ -70,6 +70,8 @@ mod state;
 #[cfg(test)]
 #[path = "local_ai_browser/tests.rs"]
 mod tests;
+#[path = "local_ai_browser/text_bootstrap.rs"]
+mod text_bootstrap;
 
 use std::{fs, process::Command};
 
