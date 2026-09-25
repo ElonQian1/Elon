@@ -10,6 +10,9 @@ pub(super) fn initialization_script() -> String {
             "../../../../android/app/src/main/assets/chatgpt_web_committed_composer_owner.js"
         ),
         include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_private_text_runtime_submit.js"
+        ),
+        include_str!(
             "../../../../android/app/src/main/assets/chatgpt_web_private_attachment_protocol.js"
         ),
         include_str!(

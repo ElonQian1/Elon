@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 210;
+pub(super) const ADAPTER_VERSION: u32 = 211;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
@@ -60,6 +60,14 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
         "chatgpt_web_adapter_context_menu_policy.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_context_menu_policy.js"),
+    ),
+    (
+        "chatgpt_web_adapter_control_labels.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_control_labels.js"),
+    ),
+    (
+        "chatgpt_web_adapter_project_choice_reveal.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_project_choice_reveal.js"),
     ),
     (
         "chatgpt_web_adapter_conversation_history.js",
