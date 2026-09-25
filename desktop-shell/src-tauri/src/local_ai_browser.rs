@@ -20,6 +20,7 @@ mod chatgpt_cached_conversation_navigation;
 #[path = "local_ai_browser/conversation_directory.rs"]
 mod conversation_directory;
 pub(crate) mod conversation_read;
+mod conversation_scripts;
 #[path = "local_ai_browser/embedded_view.rs"]
 pub(crate) mod embedded_view;
 #[path = "local_ai_browser/exchange_observation.rs"]

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { conversationId } from './service.mjs'
 
-const assets = ['stdio.mjs', 'service.mjs', 'transport.mjs', 'local-rpc.mjs', 'win-runtime.mjs']
+const assets = ['stdio.mjs', 'service.mjs', 'assets.mjs', 'transport.mjs', 'local-rpc.mjs', 'win-runtime.mjs']
 export async function prepareRegistration({ projectRoot, references, storageRoot }) {
   if (!Array.isArray(references) || !references.length || references.length > 16) throw Error('invalid_conversation_grant')
   const ids = [...new Set(references.map(conversationId))].sort()

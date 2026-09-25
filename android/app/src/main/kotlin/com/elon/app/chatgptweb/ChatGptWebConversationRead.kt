@@ -12,7 +12,14 @@ internal class ChatGptWebConversationRead(
     private val document: () -> WebBridgeDocumentSession.Snapshot,
 ) {
     private val script by lazy {
-        listOf("chatgpt_web_conversation_projection.js", "chatgpt_web_conversation_reader.js")
+        listOf("chatgpt_web_private_json_request.js", "chatgpt_web_private_auth_context.js",
+            "chatgpt_web_text_blocks.js", "chatgpt_web_private_file_citation.js",
+            "chatgpt_web_private_history_projection.js", "chatgpt_web_private_image_pointer.js",
+            "chatgpt_web_private_content_source.js", "chatgpt_web_private_library_download.js",
+            "chatgpt_web_private_library_raster_policy.js", "chatgpt_web_private_canvas_text_export.js",
+            "chatgpt_web_private_generated_image_download.js", "chatgpt_web_private_file_download.js",
+            "chatgpt_web_conversation_content.js", "chatgpt_web_conversation_projection.js",
+            "chatgpt_web_conversation_assets.js", "chatgpt_web_conversation_reader.js")
             .joinToString("\n") { context.assets.open(it).bufferedReader().use { reader -> reader.readText() } }
     }
     private var signature = ""
@@ -23,9 +30,11 @@ internal class ChatGptWebConversationRead(
 
     fun read(args: JSONObject): JSONObject {
         val binding = document()
-        if (!binding.adapterCurrent || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) {
+        val expectedUrl = webView.url
+        val rejection = ChatGptWebConversationReadAdmission.rejection(expectedUrl, binding)
+        if (rejection != null) {
             clear()
-            return failed("reader_unavailable")
+            return failed(rejection).put("request_id", args.optString("request_id"))
         }
         val request = JSONObject().put("conversation_id", args.optString("conversation_id"))
             .put("request_id", args.optString("request_id"))
@@ -43,10 +52,15 @@ internal class ChatGptWebConversationRead(
             reading = true
             val token = binding.documentToken
             val code = "(function(){if(location.origin!=='https://chatgpt.com'||" +
-                "window.__elonChatGptDocumentToken!==${JSONObject.quote(token)})return null;\n" +
+                "(window.__elonChatGptDocumentToken&&window.__elonChatGptDocumentToken!==${JSONObject.quote(token)}))return null;\n" +
+                "window.__elonChatGptPrivateAuthContextEnabled=true;\n" +
                 "$script\nreturn window.__elonConversationReader.run($request);})()"
             webView.evaluateJavascript(code) { raw ->
                 if (signature == key && owner == token && document().documentToken == token) {
+                    if (webView.url != expectedUrl) {
+                        clear()
+                        return@evaluateJavascript
+                    }
                     reading = false
                     result = if (raw.length <= 60 * 1024) runCatching { JSONObject(raw) }.getOrNull()
                         ?: failed("reader_context_changed") else failed("source_limit")

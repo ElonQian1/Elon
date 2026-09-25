@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const ASSETS: [(&str, &str); 5] = [
+const ASSETS: [(&str, &str); 6] = [
     (
         "stdio.mjs",
         include_str!("../../../scripts/web-conversations/stdio.mjs"),
@@ -14,6 +14,10 @@ const ASSETS: [(&str, &str); 5] = [
     (
         "service.mjs",
         include_str!("../../../scripts/web-conversations/service.mjs"),
+    ),
+    (
+        "assets.mjs",
+        include_str!("../../../scripts/web-conversations/assets.mjs"),
     ),
     (
         "transport.mjs",

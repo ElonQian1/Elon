@@ -111,16 +111,8 @@ async fn execute(page: Webview, query: String) -> Result<Value, String> {
     use std::{sync::mpsc, time::Duration};
     use webview2_com::CallDevToolsProtocolMethodCompletedHandler;
     use windows::core::{HSTRING, PCWSTR};
-    let projection = include_str!(
-        "../../../../android/app/src/main/assets/chatgpt_web_conversation_projection.js"
-    );
-    let reader =
-        include_str!("../../../../android/app/src/main/assets/chatgpt_web_conversation_reader.js");
-    let request =
-        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_json_request.js");
-    let auth =
-        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_auth_context.js");
-    let expression = format!("(function(){{if(location.origin!=='https://chatgpt.com')return null;\nwindow.__elonChatGptPrivateAuthContextEnabled=true;\n{request}\n{auth}\n{projection}\n{reader}\nreturn window.__elonConversationReader.run({query});}})()");
+    let scripts = super::conversation_scripts::scripts();
+    let expression = format!("(function(){{if(location.origin!=='https://chatgpt.com')return null;\nwindow.__elonChatGptPrivateAuthContextEnabled=true;\n{scripts}\nreturn window.__elonConversationReader.run({query});}})()");
     let params =
         json!({"expression":expression,"returnByValue":true,"timeout":3000,"userGesture":false})
             .to_string();

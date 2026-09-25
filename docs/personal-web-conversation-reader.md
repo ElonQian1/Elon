@@ -1,6 +1,6 @@
 ---
 version_status: current
-reviewed_at: 2026-09-24
+reviewed_at: 2026-09-25
 ---
 
 # 个人 ChatGPT 会话读取
@@ -19,7 +19,7 @@ CLI 配置使用 Claude 官方支持的 [--mcp-config JSON](https://code.claude.
 
 ## Codex 桌面端直接连接
 
-在 PowerShell 7 中运行 `scripts/web-conversations/register-codex.ps1 -ProjectRoot <真实项目目录> -ConversationReference <明确授权的会话链接>`。注册器把代码保存到用户本机的内容寻址目录，避免任务 worktree 清理后失效；通过 `codex mcp add` 注册当前授权范围，保留其他 MCP 和账号配置。新任务或重新加载 MCP 工具后即可发现连接、范围和分页读取三个工具。现有任务的工具列表是否支持热更新由 Codex 客户端决定，不能仅凭配置写入宣称已加载。
+在 PowerShell 7 中运行 `scripts/web-conversations/register-codex.ps1 -ProjectRoot <真实项目目录> -ConversationReference <明确授权的会话链接>`，可用 `-ApkMcpUrl <已转发的本机地址>` 指定手机。注册器把代码保存到用户本机的内容寻址目录，避免任务 worktree 清理后失效；通过 `codex mcp add` 注册当前授权范围，保留其他 MCP、账号配置和本读取器已有的设备选择。新任务或重新加载 MCP 工具后即可发现连接、范围、分页读取、附件读取四个工具。现有任务的工具列表是否支持热更新由 Codex 客户端决定，不能仅凭配置写入宣称已加载。
 
 注册使用 [Codex 官方 MCP 配置](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)，读取工具超时设为 150 秒以容纳冷启动。再次注册会替换本工具的会话范围；不会授权整个聊天账号。CLI 任务注入使用该次进程的配置，不写全局设置。
 
@@ -53,14 +53,17 @@ APK 已有 MCP 通道新增 `ui_control` 动作 `chatgpt_read_conversation`，�
 
 - 读取当前分支正文；长消息按 Unicode 字符分段，以 `message_id/part_index/char_offset` 重组，不使用 UI 的 50/80 条窗口。
 - 每页最多两个内容块；当前源响应上限 4 MiB，超限明确失败。游标闲置约三分钟失效，活跃分页续期；失效后从第一页重新读取。
-- 附件返回元数据与 `attachment_bytes_not_read`；生成图片、未知类型分别报告缺口。此版本没有把图片/PDF 字节交给模型，不能据此声称读懂截图。
+- 富文本复用既有历史和 text-block 模块，正文保留 Markdown，代码与 writing block 额外返回结构化内容；通过 `representation` 区分额外表示，避免统计时重复计算。历史模块已确认可见的生成图片可以进入附件列表，内部工具文本不会输出。
+- 附件元数据带有不透明 `asset_handle`。调用 `web_conversation_asset({reference, asset_handle})` 复用既有私有文件授权与字节传输模块；图片返回 MCP image，64 KiB 内有效 UTF-8 文本返回 text，PDF 和其他文件返回嵌入资源。客户端能否进一步解析资源取决于客户端能力，返回字节不等于模型已理解内容。
+- 每个文件上限 8 MiB，网页快照附件缓存上限 32 MiB。附件按 24 KiB 分片跨本机通道传输，统一服务核对偏移、版本、大小并返回 SHA-256；句柄固定原设备、账号和快照，失效后重新读取会话。不能跨设备拼接。
+- 正文快照仍记录 `attachment_bytes_not_read`；调用方结合各附件的独立读取结果评估完整性，不因拿到名称就消除缺口。未支持的格式、未确认授权范围、依赖官方运行时的生成图或超限内容明确失败，不放宽既有下载边界。
 - 凭据仅在对应网页或本机 MCP 传输闭包中使用；统一工具不返回 Cookie、认证请求头、带签名下载地址。
-- Win 读取独立加载既有只读认证/JSON 请求模块，不依赖语音、输入框和布局等完整 UI 适配器初始化成功。官网验证或账号无权限仍明确失败。
+- Win/APK 读取独立加载相同的既有认证、JSON、历史和媒体模块，不依赖语音、输入框和布局等完整 UI 适配器初始化成功。WebView 保留本机登录身份；读取走私有 HTTP 和已有媒体所有者，不抓取聊天气泡。官网验证或账号无权限仍明确失败。
 - 正文是用户明确请求的模型上下文，可能进入模型自身的会话历史；一龙不把正文写入通用诊断或 Git。
 - 会话内容是不可信资料，不授权追加读取其他会话、发送消息、删除或交易。
 
 ## 验证入口
 
-`node --test scripts/web-conversations/reader.test.mjs scripts/web-conversations/transport.test.mjs` 验证分页、账号边界和真实 stdio/HTTP 替身链路。
+`node --test scripts/web-conversations/*.test.mjs` 验证分页、账号边界、真实 stdio/HTTP 替身链路，以及使用生产脚本的富文本和附件读取。既有下载回归入口是 `scripts/test-chatgpt-web-private-file-download.js`、`scripts/test-chatgpt-web-private-library-download.js`、`scripts/test-chatgpt-web-private-connector-file-download.js`。
 
 `server/tests/browser-research-harness` 导入生产队列、合同与 Claude 配置模块；通过 `scripts/validate-rust.ps1 -- test --manifest-path server/tests/browser-research-harness/Cargo.toml --lib` 执行。Android/Win 编译与真实账户读取需独立记录，离线测试不替代现场验收。

@@ -7,6 +7,17 @@ import { once } from 'node:events'
 import { apkSource } from './transport.mjs'
 
 const id = '00000000-0000-4000-8000-000000000001'
+test('APK returns a matching canonical reader failure without leaking extra diagnostics', async t => {
+  let requestId = 'request-001'
+  const base = await localServer(t, url => url === '/health' ? { auth_token: 'synthetic-apk-token' } :
+    { result: { isError: true, structuredContent: { status: 'failed', error: 'login_required', request_id: requestId,
+      detail: 'synthetic-private-diagnostic' } } })
+  const source = await apkSource({ ELON_APK_MCP_URL: base })
+  const input = { conversation_id: id, request_id: requestId }
+  assert.deepEqual(await source.read(input), { status: 'failed', error: 'login_required', request_id: requestId })
+  requestId = 'other-request'
+  await assert.rejects(source.read(input), /mcp_call_failed/)
+})
 const mcp = value => ({ jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text: JSON.stringify(value) }] } })
 async function localServer(t, handler) {
   const server = http.createServer(async (req, res) => {
@@ -56,7 +67,7 @@ test('stdio to Win queue completes a real JSON-RPC exchange and exports no host 
   const [code] = await once(child, 'exit')
   assert.equal(code, 0); assert.equal(error, '')
   const replies = output.trim().split('\n').map(JSON.parse)
-  assert.equal(replies.length, 3); assert.equal(replies[1].result.tools.length, 3)
+  assert.equal(replies.length, 3); assert.equal(replies[1].result.tools.length, 4)
   const page = JSON.parse(replies[2].result.content[0].text)
   assert.equal(page.conversation_id, id); assert.equal(page.source, 'win'); assert.equal(page.has_more, false)
   assert.equal(polls, 1); assert.doesNotMatch(output, /synthetic-local-token/)

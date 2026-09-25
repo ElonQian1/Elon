@@ -1,6 +1,8 @@
 (function (page) {
   'use strict';
-  if (page?.location?.origin !== 'https://chatgpt.com' || page.__elonConversationReader?.version === 3) return;
+  if (page?.location?.origin !== 'https://chatgpt.com' || page.__elonConversationReader?.version === 4) return;
+  if (!page.__elonConversationDocumentToken) page.__elonConversationDocumentToken = 'doc_reader_' +
+    [...page.crypto.getRandomValues(new Uint8Array(16))].map(v => v.toString(16).padStart(2, '0')).join('');
   const projection = page.__elonConversationProjection;
   const jobs = new Map(), snapshots = new Map();
   const ttl = 180000;
@@ -11,7 +13,11 @@
     error?.message === 'auth_http_403' ? 'http_403' : ['invalid_conversation_id', 'conversation_mismatch', 'unsupported_conversation',
     'source_incomplete', 'source_limit', 'invalid_branch', 'branch_ambiguous', 'unsupported_message_content',
     'invalid_cursor', 'cursor_expired', 'identity_changed', 'login_required', 'reader_unavailable', 'request_conflict',
-    'reader_busy', 'auth_cooldown', 'auth_unavailable', 'http_401', 'http_403', 'http_404', 'timeout', 'response_too_large'].includes(error?.message)
+    'reader_busy', 'auth_cooldown', 'auth_unavailable', 'http_401', 'http_403', 'http_404', 'timeout', 'response_too_large',
+    'invalid_asset_cursor', 'asset_cache_limit', 'reader_update_required', 'download_busy', 'download_scope_unconfirmed',
+    'download_file_too_large', 'download_file_unavailable', 'download_source_unsupported', 'download_content_invalid',
+    'download_cancelled', 'download_prepare_failed', 'download_transfer_timeout', 'download_bridge_unavailable',
+    'download_authorization_failed', 'download_file_not_ready', 'download_storage_failed'].includes(error?.message)
     ? error.message : 'conversation_read_failed';
   const transport = () => page.__elonChatGptPrivateTransport;
   const authContext = () => page.__elonChatGptPrivateAuthContext;
@@ -36,6 +42,16 @@
     const id = input.conversation_id;
     if (!projection?.ID.test(id)) fail('invalid_conversation_id');
     const auth = await identity();
+    if (input.cursor?.startsWith('asset.')) {
+      const match = /^asset\.([a-f0-9]{32})\.(\d{1,6})\.(\d{1,8})$/.exec(input.cursor);
+      if (!match) fail('invalid_asset_cursor');
+      const saved = snapshots.get(match[1]);
+      if (!saved || saved.expires < Date.now()) fail('cursor_expired');
+      if (saved.owner !== auth.owner || saved.snapshot.conversation_id !== id) fail('identity_changed');
+      if (!page.__elonConversationAssets) fail('reader_update_required');
+      return { page: await page.__elonConversationAssets.read(saved, match[1], Number(match[2]), Number(match[3]), identity),
+        owner: auth.owner };
+    }
     if (input.cursor) {
       const match = /^([a-f0-9]{32})\.(\d{1,6})$/.exec(input.cursor);
       if (!match) fail('invalid_cursor');
@@ -87,10 +103,16 @@
       }
       source = { ...value, messages: rows, page_info: { has_previous_page: false } };
     }
-    const snapshot = projection.project(source, id);
+    const assets = new Map();
+    const snapshot = projection.project(source, id, (index, descriptor) => assets.set(index, descriptor));
     const revision = [...page.crypto.getRandomValues(new Uint8Array(16))].map(v => v.toString(16).padStart(2, '0')).join('');
     if (snapshots.size >= 2) snapshots.delete(snapshots.keys().next().value);
-    snapshots.set(revision, { snapshot, owner: auth.owner, expires: Date.now() + ttl });
+    for (const block of snapshot.blocks) {
+      if (Number.isSafeInteger(block.asset_index) && assets.has(block.asset_index)) {
+        block.asset_cursor = `asset.${revision}.${block.asset_index}.0`;
+      }
+    }
+    snapshots.set(revision, { snapshot, assets, owner: auth.owner, expires: Date.now() + ttl });
     return { page: projection.page(snapshot, revision), owner: auth.owner };
   }
   function run(input) {
@@ -117,5 +139,5 @@
       .catch(error => { job.result = { status: 'failed', request_id: input.request_id, error: errorCode(error) }; });
     return job.result;
   }
-  page.__elonConversationReader = Object.freeze({ version: 3, run });
+  page.__elonConversationReader = Object.freeze({ version: 4, run });
 })(typeof window === 'object' ? window : null);

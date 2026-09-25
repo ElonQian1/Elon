@@ -1,9 +1,11 @@
 (function (root, factory) {
   'use strict';
-  const api = factory();
+  const content = typeof module === 'object' && module.exports
+    ? require('./chatgpt_web_conversation_content.js') : root?.__elonConversationContent;
+  const api = factory(content);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonConversationProjection = api;
-})(typeof window === 'object' ? window : null, function () {
+})(typeof window === 'object' ? window : null, function (contentProjection) {
   'use strict';
   const ID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
   const fail = code => { throw new Error(code); };
@@ -80,49 +82,45 @@
     return rows.reverse();
   }
 
-  function project(raw, id) {
+  function project(raw, id, onAsset) {
     const value = normalize(raw, id), blocks = [], gaps = new Set();
     let messageCount = 0, attachmentCount = 0;
     for (const message of ordered(value)) {
-      const role = message.author?.role || message.role;
-      if (role === 'tool' && message.content?.parts?.some(part => part?.content_type === 'image_asset_pointer')) {
-        gaps.add('generated_image_not_read');
-      }
+      let role = message.author?.role || message.role;
+      const generated = role === 'tool' ? contentProjection?.describe(message, value) : null;
+      if (generated?.media.length) role = 'assistant';
       if (!['user', 'assistant'].includes(role) || message.metadata?.is_visually_hidden_from_conversation === true ||
           role === 'assistant' && (message.channel && message.channel !== 'final' || message.recipient && message.recipient !== 'all')) continue;
       const messageId = typeof message.id === 'string' ? message.id : `message-${messageCount}`;
       const base = { message_id: messageId, role, message_index: messageCount++ };
       let partIndex = 0;
-      const addText = text => {
+      const addText = (text, attributes = {}) => {
         const chars = Array.from(text);
         if (chars.length > 4 * 1024 * 1024) fail('source_limit');
         for (let offset = 0; offset < chars.length; offset += 3000) {
-          blocks.push({ ...base, type: 'text', part_index: partIndex, char_offset: offset,
+          blocks.push({ ...base, type: 'text', ...attributes, part_index: partIndex, char_offset: offset,
             char_count: chars.length, text: chars.slice(offset, offset + 3000).join('') });
         }
         partIndex++;
       };
-      const addAttachment = (part, kind) => {
+      const addAttachment = part => {
+        const assetIndex = attachmentCount;
         attachmentCount++;
         blocks.push({ ...base, type: 'attachment', attachment_id: `${base.message_index}:${partIndex++}`,
-          kind, name: typeof part.name === 'string' ? part.name.slice(0, 180) : kind,
-          media_type: typeof part.mime_type === 'string' ? part.mime_type.slice(0, 96) : null,
-          state: 'native_download_required', bytes_available: false });
+          kind: part.kind, name: part.name.slice(0, 180), media_type: part.mediaType || null,
+          state: part.source ? 'asset_read_available' : 'native_download_required', bytes_available: false,
+          ...(part.source ? { asset_index: assetIndex } : {}) });
+        if (part.source && typeof onAsset === 'function') onAsset(assetIndex, part);
         gaps.add('attachment_bytes_not_read');
       };
-      const content = message.content;
-      const parts = typeof content === 'string' ? [content] : Array.isArray(content?.parts) ? content.parts :
-        typeof content?.text === 'string' ? [content.text] : [];
-      for (const part of parts) {
-        if (typeof part === 'string') addText(part);
-        else if (typeof part?.text === 'string') addText(part.text);
-        else if (part?.content_type === 'image_asset_pointer') addAttachment(part, 'image');
-        else { gaps.add('unsupported_content_part'); blocks.push({ ...base, type: 'unavailable', part_index: partIndex++ }); }
-      }
-      if (!parts.length) gaps.add('unsupported_message_content');
-      for (const key of ['attachments', 'shared_library_file_references', 'mounted_library_file_references']) {
-        for (const file of message.metadata?.[key] || []) addAttachment(file, 'file');
-      }
+      if (!contentProjection) fail('reader_unavailable');
+      const projected = generated || contentProjection.describe(message, value);
+      for (const text of projected.text) addText(text, { format: role === 'assistant' ? 'markdown' : 'plain' });
+      for (const rich of projected.rich) addText(rich.text, { type: rich.type,
+        block_id: rich.id, title: rich.title, language: rich.language, complete: rich.complete,
+        representation: 'structured_content' });
+      for (const gap of projected.gaps) gaps.add(gap);
+      for (const media of projected.media) addAttachment(media);
     }
     if (blocks.length > 100000) fail('source_limit');
     return { schema: 'yilong.web-conversation.snapshot.v1', conversation_id: id,
@@ -139,5 +137,5 @@
       has_more: next < snapshot.blocks.length, next_cursor: next < snapshot.blocks.length ? `${revision}.${next}` : null,
       source_is_untrusted: true };
   }
-  return Object.freeze({ version: 2, project, page, normalize, messagePage, ID });
+  return Object.freeze({ version: 3, project, page, normalize, messagePage, ID });
 });

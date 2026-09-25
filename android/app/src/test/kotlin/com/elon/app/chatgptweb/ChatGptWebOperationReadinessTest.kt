@@ -29,6 +29,26 @@ class ChatGptWebOperationReadinessTest {
         }
     }
 
+    @Test fun scopedReaderChecksLiveDocumentInsteadOfUiHandshake() {
+        val action = "chatgpt_read_conversation"
+        assertEquals(ChatGptWebOperationReadiness.Requirement.SESSION_READ,
+            ChatGptWebOperationReadiness.requirement(action))
+        assertNull(rejection(action, null, current = false, ready = false))
+        val document = com.elon.app.WebBridgeDocumentSession.Snapshot(2, 0, "doc_2_fixture")
+        assertNull(ChatGptWebConversationReadAdmission.rejection("https://chatgpt.com/", document))
+        assertNull(ChatGptWebConversationReadAdmission.rejection("https://chatgpt.com/c/fixture", document))
+        assertEquals("login_required",
+            ChatGptWebConversationReadAdmission.rejection("https://chatgpt.com/auth/login", document))
+        for (url in listOf(null, "about:blank", "https://example.com/", "http://chatgpt.com/",
+            "https://chatgpt.com:444/", "https://user@chatgpt.com/")) {
+            assertEquals("reader_unavailable", ChatGptWebConversationReadAdmission.rejection(url, document))
+        }
+        assertEquals("reader_unavailable", ChatGptWebConversationReadAdmission.rejection(
+            "https://chatgpt.com/", document.copy(pageGeneration = 0)))
+        assertEquals("reader_unavailable", ChatGptWebConversationReadAdmission.rejection(
+            "https://chatgpt.com/", document.copy(documentToken = "invalid")))
+    }
+
     @Test fun authenticatedReadsIgnoreComposerAndChatRateLimit() {
         listOf("chatgpt_list_conversations", "chatgpt_list_library_files", "chatgpt_list_conversation_files",
             "chatgpt_browse_directory_page",

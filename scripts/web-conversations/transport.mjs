@@ -37,6 +37,11 @@ export async function apkSource(env) {
     // Native UI reports recoverable page readiness through an MCP error envelope.
     // Only read readiness may recover; navigation and unrelated errors still fail.
     const error = reply.result?.structuredContent?.error
+    const structured = reply.result?.structuredContent
+    if (!reply.error && reply.result?.isError === true && args.action === 'chatgpt_read_conversation' &&
+      structured?.status === 'failed' && structured.request_id === args.request_id && /^[a-z_0-9]{1,80}$/.test(error || '')) {
+      return { status: 'failed', request_id: args.request_id, error }
+    }
     if (!reply.error && reply.result?.isError === true && args.action === 'chatgpt_read_conversation' &&
       ['chatgpt_web_chat_inactive', 'adapter_generation_not_ready', 'bridge_not_ready'].includes(error)) {
       return { error }

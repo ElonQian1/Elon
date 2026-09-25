@@ -118,7 +118,8 @@
     const result = await root.__elonChatGptPrivateJsonRequest.request(root,
       new URL('/backend-api/files/library/mounted/materialize', root.location.origin).href, {
         method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
-        headers: { ...root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders(), 'Content-Type': 'application/json' },
+        headers: { ...(root.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.() ||
+          root.__elonChatGptPrivateAuthContext?.copyRequestHeaders?.()), 'Content-Type': 'application/json' },
         signal: job.controller.signal, body: JSON.stringify({ file_id: job.entry.mountedFileId,
           name: job.entry.name, mime_type: sourceMime || null, index_for_retrieval: false }),
       }, { timeoutMs: 6000, maxBytes: 65536 });
@@ -166,6 +167,59 @@
 
   function runPrepared(root, job, current, prepare) {
     return transfer(root, job, current, null, null, true, prepare);
+  }
+
+  // Another consumer of the same validated byte-transfer protocol. No signed
+  // URL or credentials enter its result, and no native file is created.
+  async function readMemory(root, job, current, execute, maxBytes = 8 * 1024 * 1024) {
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 8 * 1024 * 1024) {
+      throw new Error('download_file_too_large');
+    }
+    const chunks = [];
+    let total = 0, nextSequence = 0, begun = false, committed = false, failure = '', mime = '';
+    const bridge = { onmessage: null, postMessage(raw) {
+      const packet = JSON.parse(raw);
+      let state = 'failed';
+      if (current(job) && packet.leaseId === job.descriptor.leaseId &&
+          packet.documentToken === job.entry.token && packet.sequence === nextSequence) {
+        if (packet.byteOperation === 'begin' && !begun && packet.expectedBytes <= maxBytes) {
+          begun = true; state = 'ready';
+        } else if (packet.byteOperation === 'chunk' && begun && !committed &&
+            typeof packet.data === 'string' && packet.data.length <= 65536) {
+          const bytes = Uint8Array.from(root.atob(packet.data), character => character.charCodeAt(0));
+          if (total + bytes.length <= maxBytes) {
+            chunks.push(bytes); total += bytes.length; nextSequence++; state = 'written';
+          } else failure = 'download_file_too_large';
+        } else if (packet.byteOperation === 'commit' && begun && !committed && packet.totalBytes === total) {
+          committed = true; state = 'saved';
+        } else if (packet.byteOperation === 'begin' && packet.expectedBytes > maxBytes) {
+          failure = 'download_file_too_large';
+        }
+      }
+      bridge.onmessage?.({ data: JSON.stringify({ leaseId: packet.leaseId,
+        byteOperation: packet.byteOperation, sequence: packet.sequence, state }) });
+    } };
+    const page = { location: root.location, setTimeout: root.setTimeout.bind(root),
+      clearTimeout: root.clearTimeout.bind(root), btoa: root.btoa.bind(root), elonChatGptFileDownload: bridge,
+      fetch: async (...args) => {
+        const response = await root.fetch(...args);
+        mime = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+        return response;
+      } };
+    try { await execute(page); }
+    catch (error) { throw new Error(failure || error.message); }
+    if (!committed || !current(job)) throw new Error('download_cancelled');
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+    return { bytes, mediaType: mime || job.entry.mediaType || 'application/octet-stream',
+      name: job.entry.resolvedFile?.name || job.entry.name };
+  }
+
+  function runAuthorized(root, job, current, value, validateSignedUrl) {
+    const url = validateSignedUrl(value);
+    // Explicitly authorized CDN bytes must not follow a fresh redirect elsewhere.
+    return transfer(root, job, current, validateSignedUrl, url, true);
   }
 
   async function transfer(root, job, current, validateSignedUrl, url, content, prepare) {
@@ -298,5 +352,5 @@
       try { reader?.releaseLock(); } catch (_) {}
     }
   }
-  return Object.freeze({ version: 12, target, sharedReference, mountedTarget, catalogTarget, materialize, contentUrl, run, runContent, runPrepared });
+  return Object.freeze({ version: 13, target, sharedReference, mountedTarget, catalogTarget, materialize, contentUrl, run, runContent, runPrepared, readMemory, runAuthorized });
 });

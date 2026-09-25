@@ -10,7 +10,7 @@
     ? require('./chatgpt_web_private_canvas_text_export.js') : root?.__elonChatGptPrivateCanvasTextExport;
   const generated = typeof module === 'object' && module.exports
     ? require('./chatgpt_web_private_generated_image_download.js') : root?.__elonChatGptPrivateGeneratedImageDownload;
-  const exported = Object.freeze({ version: 38, create: root => factory(root, pointer, citation, raster, canvas, generated) });
+  const exported = Object.freeze({ version: 39, create: root => factory(root, pointer, citation, raster, canvas, generated) });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       Number(root.__elonChatGptPrivateFileDownload?.version || 0) < exported.version) {
@@ -36,12 +36,18 @@
   }
 
   function identity() {
-    const headers = root.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.();
+    const headers = readHeaders();
     const values = {};
     for (const [key, value] of Object.entries(headers || {})) values[key.toLowerCase()] = value;
     if (!/^Bearer\s+\S{8,65536}$/.test(values.authorization || '')) return null;
     return JSON.stringify(['authorization', 'chatgpt-account-id', 'oai-device-id'].map(key => values[key] || ''));
   }
+
+  function readHeaders() {
+    return root.__elonChatGptPrivateTransport?.copySameOriginRequestHeaders?.() ||
+      root.__elonChatGptPrivateAuthContext?.copyRequestHeaders?.();
+  }
+  const readDocumentToken = () => root.__elonChatGptDocumentToken || root.__elonConversationDocumentToken;
 
   function authorizationUrl(entry, projectId) {
     const url = new URL('/backend-api/files/download/' + encodeURIComponent(entry.downloadFileId || entry.fileId), root.location.origin);
@@ -169,7 +175,7 @@
     if (entry.conversationId) url.searchParams.set('conversation_id', entry.conversationId);
     const result = await request.request(root, url.href, {
       method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
-      headers: root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders(), signal: job.controller.signal,
+      headers: readHeaders(), signal: job.controller.signal,
     }, { timeoutMs: 6000, maxBytes: 65536 });
     if (!current(job)) throw new Error('download_cancelled');
     const info = result.payload;
@@ -228,7 +234,8 @@
       (!job.entry.imageCurrent || job.entry.imageCurrent()) &&
       (!job.entry.canvasCurrent || job.entry.canvasCurrent()) &&
       (!job.entry.generatedPolicyCurrent || job.entry.generatedPolicyCurrent()) &&
-      root.location.href === job.descriptor.href && root.__elonChatGptDocumentToken === job.entry.token &&
+      root.location.href === job.descriptor.href &&
+      (job.reader ? readDocumentToken() : root.__elonChatGptDocumentToken) === job.entry.token &&
       identity() === job.entry.account && (Boolean(job.entry.sharedLibraryFileId) || job.byteTransfer || job.entry.expiresAt > Date.now());
   }
 
@@ -389,6 +396,53 @@
     } catch (_) {}
   }
 
+  async function authorizedSource(job, destination, request) {
+    if (destination.originalUrl) return destination.originalUrl;
+    const result = await request.request(root, destination.url, {
+      method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+      headers: readHeaders(), signal: job.controller.signal,
+    }, { timeoutMs: 8000, maxBytes: 65536 });
+    if (!current(job)) throw new Error('download_cancelled');
+    const payload = result.payload;
+    if (payload?.status === 'retry') throw new Error('download_file_not_ready');
+    if (payload?.status !== 'success' || (payload.file_id && payload.file_id !== (destination.fileId || job.entry.fileId) &&
+      payload.file_id !== job.entry.downloadFileId)) throw new Error('download_authorization_failed');
+    return payload.download_url;
+  }
+
+  async function readSource(path, source, scope) {
+    if (active && !current(active)) { active.controller.abort(); active = null; }
+    if (disposed || active) throw new Error('download_busy');
+    const account = identity(), token = readDocumentToken(), entry = target(path, source, scope);
+    if (!account || !/^doc_[a-z0-9_]{3,80}$/.test(token || '') || !entry ||
+        root.location.origin !== 'https://chatgpt.com') throw new Error('download_scope_unconfirmed');
+    const binary = root.__elonChatGptPrivateLibraryDownload;
+    if (!binary?.readMemory || !binary?.runAuthorized) throw new Error('download_bridge_unavailable');
+    const job = { reader: true, entry: { ...entry, name: entry.name || source.name || 'file',
+      account, token, expiresAt: Date.now() + 45000 }, controller: new root.AbortController(),
+      descriptor: { leaseId: root.crypto.randomUUID(), href: root.location.href,
+        byteTransferVersion: 1, resolvedFileVersion: 1 } };
+    active = job;
+    const timer = root.setTimeout(() => job.controller.abort(), 30000);
+    try {
+      const request = root.__elonChatGptPrivateJsonRequest;
+      const destination = entry.sharedLibraryFileId ? { libraryDownloadId: entry.sharedLibraryFileId }
+        : await resolveDestination(job, request);
+      if (!current(job)) throw new Error('download_cancelled');
+      job.byteTransfer = true;
+      if (destination.libraryDownloadId) return await binary.readMemory(root, job, current,
+        page => binary.run(page, job, current, downloadUrl, destination.libraryDownloadId));
+      const sourceUrl = await authorizedSource(job, destination, request);
+      return await binary.readMemory(root, job, current, page => binary.contentUrl(sourceUrl, destination.projectContentScope)
+        ? binary.runContent(page, job, current, sourceUrl, destination.projectContentScope)
+        : binary.runAuthorized(page, job, current, sourceUrl, downloadUrl));
+    } finally {
+      root.clearTimeout(timer);
+      job.controller.abort();
+      if (active === job) active = null;
+    }
+  }
+
   async function start(raw, respond) {
     let descriptor;
     try { descriptor = JSON.parse(raw); } catch (_) { return respond(ACTION, false, 'invalid_file_request'); }
@@ -437,21 +491,7 @@
         respond(ACTION, true, detail);
         return;
       }
-      let sourceUrl = destination.originalUrl;
-      if (!sourceUrl) {
-        const result = await request.request(root, destination.url, {
-          method: 'GET', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
-          headers: root.__elonChatGptPrivateTransport.copySameOriginRequestHeaders(), signal: job.controller.signal,
-        }, { timeoutMs: 8000, maxBytes: 65536 });
-        if (!current(job)) throw new Error('download_cancelled');
-        const payload = result.payload;
-        if (payload?.status === 'retry') throw new Error('download_file_not_ready');
-        if (payload?.status !== 'success' || (payload.file_id && payload.file_id !== (destination.fileId || job.entry.fileId) &&
-          payload.file_id !== job.entry.downloadFileId)) {
-          throw new Error('download_authorization_failed');
-        }
-        sourceUrl = payload.download_url;
-      }
+      const sourceUrl = await authorizedSource(job, destination, request);
       const binary = root.__elonChatGptPrivateLibraryDownload;
       lastSource = { account: entry.account, token: entry.token, expiresAt: Date.now() + 120000,
         value: root.__elonChatGptPrivateContentSource?.describe?.(sourceUrl, destination.projectContentScope) };
@@ -491,5 +531,5 @@
     return true;
   }
   function dispose() { disposed = true; cancel(); entries.clear(); lastSource = null; }
-  return Object.freeze({ version: 38, register, registerLibraryFile, registerGalleryImage, registerMessageImage, registerCanvasExport, start, cancel, dispose, sourceDiagnostics });
+  return Object.freeze({ version: 39, register, registerLibraryFile, registerGalleryImage, registerMessageImage, registerCanvasExport, start, cancel, dispose, sourceDiagnostics, readSource });
 });

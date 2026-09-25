@@ -2,7 +2,7 @@ package com.elon.app.chatgptweb
 
 /** Admission only: individual commands still validate context, handles and confirmations. */
 internal object ChatGptWebOperationReadiness {
-    enum class Requirement { LOCAL, CACHED_DIRECTORY, DOCUMENT, DIRECTORY_READ, ACCOUNT_READ, ACCOUNT_MUTATION, TEXT_INPUT, COMPOSER }
+    enum class Requirement { LOCAL, CACHED_DIRECTORY, SESSION_READ, DOCUMENT, DIRECTORY_READ, ACCOUNT_READ, ACCOUNT_MUTATION, TEXT_INPUT, COMPOSER }
 
     private val groups = mapOf(
         Requirement.LOCAL to setOf(
@@ -10,6 +10,7 @@ internal object ChatGptWebOperationReadiness {
             "chatgpt_cancel_file_download", "chatgpt_get_capability_matrix",
         ),
         Requirement.CACHED_DIRECTORY to setOf("chatgpt_get_conversations", "chatgpt_get_navigation"),
+        Requirement.SESSION_READ to setOf("chatgpt_read_conversation"),
         Requirement.DOCUMENT to setOf(
             "chatgpt_get_context", "chatgpt_find_controls", "chatgpt_copy_last_response",
             "chatgpt_reveal_message", "chatgpt_refresh_controls", "chatgpt_open_conversation",
@@ -20,7 +21,6 @@ internal object ChatGptWebOperationReadiness {
         ),
         Requirement.DIRECTORY_READ to setOf("chatgpt_list_conversations"),
         Requirement.ACCOUNT_READ to setOf(
-            "chatgpt_read_conversation",
             "chatgpt_canvas_document", "chatgpt_writing_block",
             "chatgpt_list_conversation_files", "chatgpt_list_library_files",
             "chatgpt_browse_directory_page",
@@ -57,6 +57,9 @@ internal object ChatGptWebOperationReadiness {
     ): String? {
         val required = requirement(action) ?: return "unsupported_action"
         if (required == Requirement.LOCAL || required == Requirement.CACHED_DIRECTORY) return null
+        // The scoped reader checks the live WebView origin, document and private
+        // account context itself; an unrelated UI handshake is not read authority.
+        if (required == Requirement.SESSION_READ) return null
         // Preserve the existing admission for composer transactions, including its error contract.
         if (required == Requirement.COMPOSER && !bridgeReady) return "bridge_not_ready"
         if (required == Requirement.TEXT_INPUT && !bridgeReady &&

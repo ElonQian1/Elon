@@ -5,6 +5,11 @@ reviewed_at: 2026-09-25
 
 # APK Wireless Connection and Private Reader Audit
 
+This report records the initial transport repair and the audit that motivated
+the following rich-content integration. Its remaining gaps describe that
+checkpoint, not the updated implementation in the
+[current reader contract](../personal-web-conversation-reader.md).
+
 Baseline: `598699d4ce532e5c6b33aa5453c090ce808d4050`. This follows the
 [dual-client check](personal-web-conversation-dual-client-check-20260925.md).
 No credentials, account identities, conversation bodies, phone serials or LAN
