@@ -32,7 +32,17 @@ export async function apkSource(env) {
   if (typeof health.auth_token !== 'string' || !health.auth_token) throw new Error('apk_unavailable')
   const token = health.auth_token
   let opened = false
-  const control = args => json(base + '/mcp', rpc('ui_control', { ...args, auth_token: token })).then(result)
+  const control = async args => {
+    const reply = await json(base + '/mcp', rpc('ui_control', { ...args, auth_token: token }))
+    // Native UI reports recoverable page readiness through an MCP error envelope.
+    // Only read readiness may recover; navigation and unrelated errors still fail.
+    const error = reply.result?.structuredContent?.error
+    if (!reply.error && reply.result?.isError === true && args.action === 'chatgpt_read_conversation' &&
+      ['chatgpt_web_chat_inactive', 'adapter_generation_not_ready', 'bridge_not_ready'].includes(error)) {
+      return { error }
+    }
+    return result(reply)
+  }
   return { source: 'apk', identity: createHash('sha256').update(token).digest('hex'), async read(input) {
     if ((await json(base + '/health')).auth_token !== token) throw new Error('apk_session_changed')
     const value = await control({

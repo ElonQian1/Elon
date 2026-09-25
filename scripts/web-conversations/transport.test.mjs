@@ -62,7 +62,7 @@ test('stdio to Win queue completes a real JSON-RPC exchange and exports no host 
   assert.equal(polls, 1); assert.doesNotMatch(output, /synthetic-local-token/)
 })
 
-test('APK transport navigates only when inactive and refuses a changed device session', { timeout: 6000 }, async t => {
+test('APK transport recovers the native inactive error envelope and refuses a changed device session', { timeout: 6000 }, async t => {
   let token = 'synthetic-apk-token', active = false, opens = 0
   const base = await localServer(t, (url, body) => {
     if (url === '/health') return { auth_token: token }
@@ -70,11 +70,34 @@ test('APK transport navigates only when inactive and refuses a changed device se
     const args = body.params.arguments; assert.equal(args.auth_token, token)
     if (args.action === 'open_chatgpt_web') { opens++; active = true; return mcp({ control_ok: true }) }
     assert.equal(args.action, 'chatgpt_read_conversation')
-    return mcp(active ? { status: 'ready', request_id: args.request_id, page: {} } : { error: 'chatgpt_web_chat_inactive' })
+    return active ? mcp({ status: 'ready', request_id: args.request_id, page: {} }) : {
+      jsonrpc: '2.0', id: 1, result: { isError: true,
+        structuredContent: { control_ok: false, error: 'chatgpt_web_chat_inactive' } },
+    }
   })
   const source = await apkSource({ ELON_APK_MCP_URL: base }), input = { conversation_id: id, request_id: 'request-001' }
   assert.equal((await source.read(input)).status, 'pending')
   assert.equal((await source.read(input)).status, 'ready'); assert.equal(opens, 1)
   token = 'synthetic-replacement'
   await assert.rejects(source.read(input), /apk_session_changed/)
+})
+
+test('APK retries only known read readiness errors, never other errors or failed navigation', async t => {
+  let error = 'adapter_generation_not_ready', opens = 0
+  const base = await localServer(t, (url, body) => {
+    if (url === '/health') return { auth_token: 'synthetic-apk-token' }
+    if (body.params.arguments.action === 'open_chatgpt_web') opens++
+    return { jsonrpc: '2.0', id: 1, result: { isError: true, structuredContent: { error } } }
+  })
+  const source = await apkSource({ ELON_APK_MCP_URL: base })
+  const input = { conversation_id: id, request_id: 'request-001' }
+  assert.equal((await source.read(input)).status, 'pending')
+  error = 'bridge_not_ready'
+  assert.equal((await source.read(input)).status, 'pending')
+  error = 'permission_denied'
+  await assert.rejects(source.read(input), /mcp_call_failed/)
+  assert.equal(opens, 0)
+  error = 'chatgpt_web_chat_inactive'
+  await assert.rejects(source.read(input), /mcp_call_failed/)
+  assert.equal(opens, 1)
 })
