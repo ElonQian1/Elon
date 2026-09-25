@@ -16,6 +16,9 @@ const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL 
 try {
   for (const width of [1280, 390]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } })
+    await page.addInitScript(() => {
+      Object.defineProperty(globalThis.crypto, 'randomUUID', { value: undefined, configurable: true })
+    })
     const errors = []; page.on('pageerror', error => errors.push(error.message))
     let allowed = false, version = 1, patches = 0, sourceFailures = 0
     const sources = [{ id: 'one', sender_user_id: 'fixture-owner', sender_name: '甲', content: '**验收记录**\n\n|步骤|状态|\n|---|---|\n|校验|完成|', created_at: '2026-09-21T01:00:00Z' },

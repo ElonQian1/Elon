@@ -6,6 +6,8 @@ const ts = require('typescript')
 const { test } = require('node:test')
 const filename = path.resolve(__dirname, '../src/features/friends/group-ai/groupAiContext.ts')
 const compiled = new Module(filename, module)
+compiled.filename = filename
+compiled.paths = module.paths
 compiled._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }, fileName: filename,
 }).outputText, filename)
@@ -22,6 +24,7 @@ test('continuation preserves markdown and roles without auto sending', () => {
 })
 test('handoff is owner scoped and consumable', () => {
   const id = prepareGroupContinuation('owner', 'group', 'Selected', 'private text')
+  assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
   assert.equal(groupContinuation(id, 'other'), null)
   assert.equal(groupContinuation(id, 'owner').group, 'group')
   assert.equal(groupContinuation('wrong', 'owner'), null)
@@ -31,6 +34,7 @@ test('handoff is owner scoped and consumable', () => {
 test('new handoff invalidates the prior one', () => {
   const old = prepareGroupContinuation('owner', 'a', 'A', 'a')
   const next = prepareGroupContinuation('owner', 'b', 'B', 'b')
+  assert.notEqual(old, next)
   assert.equal(groupContinuation(old, 'owner'), null)
   assert.equal(groupContinuation(next, 'owner').group, 'b')
   clearGroupContinuation(next)

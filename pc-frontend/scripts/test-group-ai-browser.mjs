@@ -8,11 +8,13 @@ const require = createRequire(import.meta.url)
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const artifacts = path.resolve(root, '../.ai-tmp/group-ai')
-const server = await createServer({ root, configFile: path.join(root, 'vite.config.ts'), server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' })
+const httpHost = 'workbench.test'
+const server = await createServer({ root, configFile: path.join(root, 'vite.config.ts'), server: { host: '127.0.0.1', port: 0, allowedHosts: [httpHost] }, logLevel: 'error' })
 let browser
 try {
   await server.listen()
-  browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' })
+  browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge',
+    args: [`--host-resolver-rules=MAP ${httpHost} 127.0.0.1`, '--no-proxy-server'] })
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
   page.setDefaultTimeout(12000)
   const errors = [], requests = []
@@ -42,7 +44,10 @@ try {
     } } }
   })
   const message = (id, content, revision = 1) => ({ id, content, revision, sender_user_id: 'peer', sender_name: '测试成员', created_at: '2026-09-21T00:00:00Z' })
-  const messages = [message('one', 'First selected fixture'), message('two', 'Second selected fixture', 3),
+  const messages = [{ ...message('one', 'First selected fixture'), attachments: [{
+    attachment_id: 'fixture-image', kind: 'image', mime_type: 'image/png', display_name: 'fixture.png',
+    url: '/api/fixture-image.png',
+  }] }, message('two', 'Second selected fixture', 3),
     { ...message('link-answer', 'https://www.bilibili.com/video/BV1xx411c7mD'), ai_reply: {
       schema: 1, provider: 'chatgpt_web', requester_id: 'peer', source_count: 1, allow_continue: true, version: 1,
       previews: [{ sender_name: '测试成员', text: 'Selected source' }],
@@ -50,7 +55,9 @@ try {
   let prepared
   await page.route('**/*', async route => {
     const req = route.request(), url = new URL(req.url()), p = url.pathname
-    if (!p.startsWith('/api/')) return url.hostname === '127.0.0.1' ? route.continue() : route.abort()
+    if (!p.startsWith('/api/')) return url.hostname === httpHost ? route.continue() : route.abort()
+    if (p === '/api/fixture-image.png') return route.fulfill({ contentType: 'image/png',
+      body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0WQAAAAASUVORK5CYII=', 'base64') })
     if (p === '/api/me/groups/g/messages/one/web-ai') {
       const body = req.postDataJSON(); requests.push({ p, body })
       prepared = { id: 'request', group_id: 'g', trigger_message_id: 'one', prompt: 'fixture selected prompt', state: 'prepared', engine: 'chatgpt_web', web_provider: 'chatgpt_web' }
@@ -74,13 +81,18 @@ try {
   const choose = title => page.getByRole('button').filter({ has: page.locator('strong', { hasText: title }) }).first().click()
   const row = id => page.locator(`[data-message-id="${id}"]`)
   const menu = async id => { await row(id).getByRole('button', { name: '更多消息操作' }).click(); await page.getByRole('menu').waitFor() }
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/pc/tests/fixtures/group-ai.html`)
+  await page.goto(`http://${httpHost}:${server.httpServer.address().port}/pc/tests/fixtures/group-ai.html`)
+  assert.equal(await page.evaluate(() => isSecureContext), false)
+  assert.equal(await page.evaluate(() => typeof crypto.randomUUID), 'undefined')
+  assert.equal(await page.evaluate(() => typeof crypto.getRandomValues), 'function')
   await choose('群聊验收')
   assert.equal(await row('link-answer').getByRole('button', { name: '使用 ChatGPT 继续讨论', exact: true }).isVisible(), true)
-  await menu('one')
+  await row('one').getByRole('img', { name: 'fixture.png', exact: true }).click({ button: 'right' })
+  await page.getByRole('menu').waitFor()
   await page.getByRole('menuitem', { name: 'AI 回复…', exact: true }).click()
   await page.getByRole('dialog', { name: 'AI 回复到群聊' }).waitFor()
   await page.getByText('已选择 1 条消息', { exact: true }).waitFor()
+  await page.getByText('本次发送消息文字和附件说明，不包含附件原文件。', { exact: true }).waitFor()
   await page.getByRole('button', { name: '取消', exact: true }).click()
   await menu('one'); await page.getByRole('menuitem', { name: '多选', exact: true }).click()
   await row('two').getByRole('checkbox').check()
@@ -109,6 +121,10 @@ try {
   assert.deepEqual(requests[0].body.selected_context, { message_ids: ['one', 'two'], message_revisions: { one: 1, two: 3 }, question: 'Summarize the selection', allow_continue: false })
   const sends = await page.evaluate(() => window.__groupFixture.commands.filter(c => c.action === 'send_prompt'))
   assert.equal(sends.length, 1)
+  const operation = requests[0].body.operation_id
+  assert.match(operation, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+  assert.ok(requests.every(r => r.body.operation_id === operation))
+  assert.equal(sends[0].taskId, operation)
   assert.equal(requests.filter(r => r.body.action === 'complete').length, 1)
   assert.equal(requests.at(-1).body.content, '**AI answer fixture**\n\nComplete reply.')
   await page.screenshot({ path: path.join(artifacts, 'group-ai-delivered.png') })
@@ -116,5 +132,6 @@ try {
   assert.equal(await page.getByRole('menuitem', { name: 'AI 回复…', exact: true }).count(), 0)
   assert.deepEqual(errors, [])
   console.log(JSON.stringify({ passed: true, singleMessage: true, multiSelect: true, revisionBound: true, returnToOriginalGroup: true,
+    randomUuidUnavailable: true, imageContextMenu: true, stableOperationId: true,
     markdownPreserved: true, duplicateSends: 0, transport: 'mocked', realProviderVerified: false }))
 } finally { await browser?.close(); await server.close() }

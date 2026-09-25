@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { v4 as uuidv4 } from 'uuid'
 import { GroupAiTask, type GroupAiInput } from './groupAiTask'
 import { createGroupAiPort } from './groupAiPort'
 import { useAuthStore } from '../../../store/auth'
@@ -15,7 +16,7 @@ useAuthStore.subscribe(state => {
 })
 export function startGroupAi(input: GroupAiInput) {
   if (task && !['completed', 'cancelled'].includes(task.progress.phase)) throw new Error('已有群聊 AI 请求，请先处理或停止已有任务')
-  task = new GroupAiTask(crypto.randomUUID(), input, createGroupAiPort(input.owner), changed)
+  task = new GroupAiTask(uuidv4(), input, createGroupAiPort(input.owner), changed)
   changed(); void task.start()
   return task
 }

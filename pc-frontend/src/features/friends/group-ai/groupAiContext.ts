@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid'
 import type { SocialMessage } from '../socialMessageTypes'
 export interface GroupAiReplyMetadata {
   schema: number; requester_id: string; provider: string; allow_continue: boolean; version: number
@@ -22,7 +23,7 @@ export function continuationDraft(discussion: GroupAiDiscussion): string {
 interface Handoff { id: string; owner: string; group: string; title: string; draft: string; created: number }
 let pending: Handoff | null = null
 export function prepareGroupContinuation(owner: string, group: string, title: string, draft: string) {
-  pending = { id: crypto.randomUUID(), owner, group, title, draft, created: Date.now() }
+  pending = { id: uuidv4(), owner, group, title, draft, created: Date.now() }
   return pending.id
 }
 export function groupContinuation(id: string, owner: string) {
