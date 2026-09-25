@@ -4,11 +4,13 @@ import { prepareRegistration } from '../web-conversations/registration.mjs'
 import { conversationId } from '../web-conversations/service.mjs'
 
 const hash = value => createHash('sha256').update(value).digest('hex')
-export async function openReader({ env, projectRoot, reference, storageRoot, base }) {
+export async function openReader({ env, projectRoot, reference, storageRoot, base, source = 'win' }) {
+  if (!['win', 'apk'].includes(source)) throw Error('invalid_acceptance_source')
+  if (source === 'apk' && !env.ELON_APK_MCP_URL) throw Error('apk_endpoint_not_configured')
   const registration = await prepareRegistration({ projectRoot, references: [reference], storageRoot })
   const child = spawn(registration.command, [registration.entrypoint], { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'],
     env: { ...env, ELON_PROJECT_ROOT: projectRoot, ELON_WEB_CONVERSATION_IDS: registration.ids,
-      ELON_NODE_ADMIN_URL: base, ELON_APK_MCP_URL: '' } })
+      ...(base ? { ELON_NODE_ADMIN_URL: base } : {}), ELON_APK_MCP_URL: source === 'apk' ? env.ELON_APK_MCP_URL : '' } })
   let sequence = 0, buffer = '', pending, closed = false
   const fail = code => {
     if (pending) { clearTimeout(pending.timer); pending.reject(Error(code)); pending = null }
@@ -65,15 +67,16 @@ function structured(reply) {
 
 // Accumulate hashes and structural counts only. Private bodies, titles, filenames,
 // attachment handles and page cursors never enter receipts or progress events.
-export async function verifyReader({ client, reference, progress = async () => {}, now = Date.now }) {
+export async function verifyReader({ client, reference, source = 'win', progress = async () => {}, now = Date.now }) {
+  if (!['win', 'apk'].includes(source)) throw Error('invalid_acceptance_source')
   const id = conversationId(reference), textHash = createHash('sha256'), seen = new Set(), gaps = new Set()
   const counts = { pages: 0, blocks: 0, text_characters: 0, attachment_references: 0, attachments_read: 0, images: 0, files: 0 }
   const assets = [], deadline = now() + 900000
   let cursor, revision, total, messageCount, attachmentCount, complete = true
   do {
     if (counts.pages >= 50000 || now() >= deadline) throw Error('acceptance_read_limit')
-    const page = structured(await client.call('web_conversation_read', { reference, source: 'win', ...(cursor ? { cursor } : {}) }))
-    if (page.schema !== 'yilong.web-conversation.snapshot.v1' || page.source !== 'win' || page.conversation_id !== id ||
+    const page = structured(await client.call('web_conversation_read', { reference, source, ...(cursor ? { cursor } : {}) }))
+    if (page.schema !== 'yilong.web-conversation.snapshot.v1' || page.source !== source || page.conversation_id !== id ||
         !/^[a-f0-9]{32}$/.test(page.revision || '') || !Array.isArray(page.blocks) || page.blocks.length > 2 ||
         page.block_offset !== counts.blocks || !Number.isSafeInteger(page.total_blocks) || page.total_blocks > 100000 ||
         typeof page.text_complete !== 'boolean' || !Array.isArray(page.gaps) ||
@@ -95,7 +98,7 @@ export async function verifyReader({ client, reference, progress = async () => {
         else if (body?.type === 'text') { bytes = Buffer.from(body.text, 'utf8'); counts.files++ }
         else throw Error('attachment_content_missing')
         const digest = hash(bytes)
-        if (meta.source !== 'win' || meta.conversation_id !== id || meta.byte_count !== bytes.length ||
+        if (meta.source !== source || meta.conversation_id !== id || meta.byte_count !== bytes.length ||
             bytes.length > 8 * 1024 * 1024 || meta.sha256 !== digest) throw Error('attachment_digest_mismatch')
         counts.attachments_read++
         if (!assets.some(item => item.sha256 === digest)) assets.push({ bytes: bytes.length, sha256: digest, kind: body.type })
@@ -115,7 +118,7 @@ export async function verifyReader({ client, reference, progress = async () => {
       counts.attachment_references !== attachmentCount) throw Error('reader_counts_mismatch')
   // Snapshot metadata predates asset reads; only that specific gap can be resolved.
   gaps.delete('attachment_bytes_not_read')
-  return { ...counts, message_count: messageCount, unique_attachments: assets.length, assets,
+  return { source, ...counts, message_count: messageCount, unique_attachments: assets.length, assets,
     text_sha256: textHash.digest('hex'), text_complete: complete, remaining_gaps: [...gaps].sort(),
     read_to_end: true, attachments_complete: counts.attachments_read === counts.attachment_references,
     content_complete: complete && gaps.size === 0 }

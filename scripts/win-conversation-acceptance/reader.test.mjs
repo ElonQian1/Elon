@@ -35,6 +35,18 @@ test('unsupported content stays partial even when all images were read', async (
   assert.equal(result.content_complete, false); assert.deepEqual(result.remaining_gaps, ['unsupported_message_content'])
   assert.equal(result.attachments_complete, true)
 })
+test('explicit APK acceptance follows APK pages and bytes and rejects cross-device substitutions', async () => {
+  const f = fixture(); f.input.source = 'apk'
+  for (const page of f.pages) page.source = 'apk'
+  const meta = JSON.parse(f.asset.content[0].text); meta.source = 'apk'
+  f.asset.content[0].text = JSON.stringify(meta)
+  const result = await verifyReader(f.input)
+  assert.equal(result.source, 'apk'); assert.equal(result.content_complete, true)
+  assert.ok(f.calls.filter(([name]) => name === 'web_conversation_read').every(([, args]) => args.source === 'apk'))
+  meta.source = 'win'; f.asset.content[0].text = JSON.stringify(meta)
+  await assert.rejects(verifyReader(f.input), /attachment_digest_mismatch/)
+  await assert.rejects(verifyReader({ ...f.input, source: 'auto' }), /invalid_acceptance_source/)
+})
 test('missing bytes, altered digests, wrong conversation and broken continuation are rejected', async () => {
   const cases = [
     f => { f.asset.content.pop() },
