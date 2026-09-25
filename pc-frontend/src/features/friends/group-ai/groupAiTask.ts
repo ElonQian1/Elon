@@ -1,8 +1,10 @@
 import type { LocalAiMessageSnapshot, LocalAiWebSessionState } from '../../user-browser/localAiBrowserApi'
+import type { GroupAiAttachment } from './groupAiAttachments'
 
 export interface GroupAiRequest {
   id: string; group_id: string; trigger_message_id: string; state: string; prompt: string
   engine: string; web_provider: string; dispatch_permit: boolean; result_message_id: string | null
+  attachments?: GroupAiAttachment[]
 }
 export interface GroupAiSelection {
   message_ids: string[]; message_revisions: Record<string, number>; question: string; allow_continue?: boolean
@@ -15,6 +17,7 @@ export interface GroupAiPort {
   prepare(operation: string, input: GroupAiInput): Promise<GroupAiRequest>
   action(operation: string, input: GroupAiInput, request: GroupAiRequest, action: string, content?: string): Promise<GroupAiRequest>
   host(operation: string, input: GroupAiInput, action: string, value?: string, requestId?: string): Promise<LocalAiWebSessionState>
+  upload?(operation: string, input: GroupAiInput, files: GroupAiAttachment[], check: () => void): Promise<void>
   checkOwner(): void
   now(): number
   wait(ms: number): Promise<void>
@@ -64,6 +67,7 @@ export class GroupAiTask {
   dispatched = false
   sendRequestId = ''
   stopped = false
+  private attachmentAttempted = false
   progress: GroupAiProgress = { phase: 'preparing', message: '正在准备群聊 AI', busy: false, hasAnswer: false }
   constructor(readonly operation: string, readonly input: GroupAiInput, private port: GroupAiPort, private changed: () => void) {}
   private update(phase: GroupAiPhase, message: string, busy: boolean) {
@@ -108,6 +112,14 @@ export class GroupAiTask {
         await this.port.wait(800)
       }
       if (!ready) throw new Error('AI 网页连接超时，请检查网络后重试')
+      if (this.request.attachments?.length) {
+        if (this.input.provider !== 'chatgpt' || !this.port.upload) throw new Error('当前客户端或 AI 来源不能上传所选附件，未发送文字')
+        this.update('preparing', '正在上传所选图片和文件', true)
+        this.attachmentAttempted = true
+        await this.port.upload(this.operation, this.input, this.request.attachments, () => this.check())
+        this.check()
+        await this.action('status')
+      }
       if (this.input.provider === 'chatgpt') await this.preparePrivateSender()
       this.check()
       // Set before requesting permission: a lost server response is never safe to replay.
@@ -192,6 +204,8 @@ export class GroupAiTask {
     if (this.stopped) return
     try { this.port.checkOwner() } catch { await this.cancel(); return }
     const message = error instanceof Error ? error.message : '群聊 AI 处理失败'
+    // A retry must not append to files already associated with the previous draft.
+    if (!this.dispatched && this.attachmentAttempted) { await this.close(); this.attachmentAttempted = false }
     this.update(this.dispatched ? 'uncertain' : 'failed', message, false)
     if (this.dispatched && this.request) {
       try { await this.action('uncertain') } catch { /* Preserve uncertain status locally. */ }

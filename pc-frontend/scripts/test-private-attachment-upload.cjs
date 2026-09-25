@@ -1,0 +1,86 @@
+const { test } = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const Module = require('node:module')
+const ts = require('typescript')
+function load(relative, stubs = {}) {
+  const filename = path.resolve(__dirname, '../src', relative)
+  const compiled = new Module(filename, module)
+  compiled.filename = filename
+  compiled.paths = Module._nodeModulePaths(path.dirname(filename))
+  const original = compiled.require.bind(compiled)
+  compiled.require = name => stubs[name] || original(name)
+  compiled._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }, fileName: filename,
+  }).outputText, filename)
+  return compiled.exports
+}
+const { uploadPrivateAttachments } = load('features/user-browser/privateAttachmentUpload.ts')
+const { groupAttachmentFiles } = load('features/friends/group-ai/groupAiAttachments.ts', {
+  '../../../api/runtime': { resolveApiUrl: path => 'https://platform.invalid' + path },
+})
+const manifest = { name: 'group_01_file.txt', mime_type: 'text/plain', size_bytes: 3,
+  download_path: '/api/user/u/chat-attachments/g/file.txt', message_id: 'm', attachment_id: 'f' }
+
+test('frontend chunks flow through the production Win byte bridge and shared native reader', async () => {
+  const factory = require('../../desktop-shell/src-tauri/src/local_ai_browser/win_attachment_source.js')
+  const nativeSource = require('../../android/app/src/main/assets/chatgpt_web_native_attachment_source.js')
+  const receipts = [], uploaded = []
+  const root = { location: { href: 'https://chatgpt.com/?temporary-chat=true' },
+    __elonChatGptDocumentToken: 'doc-fixture', __elonChatGptAdapterVersion: 209,
+    __elonChatGptPrivateAttachmentProtocol: require('../../android/app/src/main/assets/chatgpt_web_private_attachment_protocol.js'),
+    File, Blob, atob, btoa, setTimeout, clearTimeout,
+    elonChatGptNative: { postMessage: raw => receipts.push(JSON.parse(raw)) } }
+  const bridge = factory(root), reader = nativeSource.create(root)
+  root.__elonChatGptPrivateAttachmentSend = { cancel() {}, async start(raw, respond) {
+    for (const descriptor of JSON.parse(raw).files) {
+      const file = await reader.read(descriptor)
+      uploaded.push(Buffer.from(await file.arrayBuffer()))
+    }
+    respond('request_attachment_upload', true, 'private_attachment_associated')
+  } }
+  const bytes = Buffer.alloc(70003, 37)
+  await uploadPrivateAttachments([{ name: 'fixture.txt', type: 'text/plain', size: bytes.length,
+    load: async () => new Blob([bytes]) }], {
+    check() {},
+    command: (value, requestId) => bridge.command(JSON.stringify({ value, requestId })),
+    state: async () => ({ commandResults: receipts }),
+  })
+  assert.deepEqual(uploaded, [bytes])
+  assert.equal(bridge.guardSend('{"action":"send_prompt"}'), false)
+})
+
+test('a changed file cancels the batch without requesting a private upload', async () => {
+  const calls = [], receipts = []
+  await assert.rejects(uploadPrivateAttachments([{ name: 'file.txt', type: 'text/plain', size: 3,
+    load: async () => new Blob(['changed']) }], {
+    check() {},
+    command: async (raw, requestId) => {
+      calls.push(JSON.parse(raw).step)
+      receipts.push({ requestId, action: 'stage_attachments', ok: true })
+    },
+    state: async () => ({ commandResults: receipts }),
+  }), /附件已变化/)
+  assert.deepEqual(calls, ['begin', 'cancel'])
+})
+
+test('group files use only platform URLs, omit credentials and reject incomplete bodies', async () => {
+  const previous = global.fetch
+  const requests = []
+  try {
+    global.fetch = async (url, options) => {
+      requests.push([url, options]); return new Response('abc')
+    }
+    assert.equal(await (await groupAttachmentFiles([manifest])[0].load()).text(), 'abc')
+    assert.equal(requests[0][0], 'https://platform.invalid' + manifest.download_path)
+    assert.equal(requests[0][1].credentials, 'omit')
+    assert.equal(requests[0][1].redirect, 'error')
+    assert.equal(requests[0][1].headers, undefined)
+    await assert.rejects(groupAttachmentFiles([{ ...manifest, size_bytes: 4 }])[0].load(), /未完整下载/)
+    await assert.rejects(groupAttachmentFiles([{ ...manifest, size_bytes: 2 }])[0].load(), /大小已变化/)
+    for (const download_path of ['https://other.invalid/file', '/api/user/u/chat-attachments/g/../secret',
+      '/api/user/u/chat-attachments/g/%252fsecret', '/api/user/u/chat-attachments/g/file?token=secret'])
+      assert.throws(() => groupAttachmentFiles([{ ...manifest, download_path }]), /地址无效/)
+  } finally { global.fetch = previous }
+})

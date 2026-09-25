@@ -46,12 +46,29 @@ impl ProviderAdapter {
     }
 
     pub(super) fn page_invocation_script(self, raw_command: &str) -> Result<String, String> {
-        match self {
-            Self::ChatGpt => adapter_command::page_invocation_script(
-                "__elonChatGptBridge",
+        if self == Self::ChatGpt
+            && serde_json::from_str::<serde_json::Value>(raw_command)
+                .ok()
+                .is_some_and(|v| v["action"] == "stage_attachments")
+        {
+            return adapter_command::page_invocation_script(
+                "__elonWinAttachmentSource",
                 PageCommandBinding::ChatGptDocument,
                 raw_command,
-            ),
+            );
+        }
+        match self {
+            Self::ChatGpt => {
+                let script = adapter_command::page_invocation_script(
+                    "__elonChatGptBridge",
+                    PageCommandBinding::ChatGptDocument,
+                    raw_command,
+                )?;
+                let encoded = serde_json::to_string(raw_command).map_err(|e| e.to_string())?;
+                Ok(format!(
+                    "if(!window.__elonWinAttachmentSource?.guardSend({encoded})){{{script}}}"
+                ))
+            }
             Self::GoogleWeb => adapter_command::page_invocation_script(
                 "__elonGoogleWebBridge",
                 PageCommandBinding::None,
@@ -77,7 +94,10 @@ mod tests {
         assert!(chatgpt.supported_actions().contains(&"list_conversations"));
         assert!(google.supported_actions().contains(&"list_conversations"));
         assert!(google.supported_actions().contains(&"open_conversation"));
-        assert_eq!(chatgpt.version(), chatgpt_adapter_bootstrap::ADAPTER_VERSION);
+        assert_eq!(
+            chatgpt.version(),
+            chatgpt_adapter_bootstrap::ADAPTER_VERSION
+        );
         assert_eq!(google.version(), google_ai_mode::ADAPTER_VERSION);
         assert!(chatgpt
             .page_invocation_script(r#"{"action":"snapshot"}"#)
@@ -88,7 +108,10 @@ mod tests {
             .unwrap()
             .contains("__elonGoogleWebBridge"));
         let binance = ProviderAdapter::Binance;
-        assert_eq!(binance.supported_actions(), adapter_command::BINANCE_ACTIONS);
+        assert_eq!(
+            binance.supported_actions(),
+            adapter_command::BINANCE_ACTIONS
+        );
         assert!(!binance.supported_actions().contains(&"send_prompt"));
         assert!(binance
             .page_invocation_script(r#"{"action":"refresh"}"#)

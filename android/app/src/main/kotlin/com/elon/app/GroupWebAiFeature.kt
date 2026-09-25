@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.elon.app.chatgptweb.GroupWebAiExecutor
+import com.elon.app.chatgptweb.GroupWebAiAttachments
 import com.elon.app.chatgptweb.GroupWebAiFailure
 import com.elon.app.chatgptweb.GroupWebAiFailureReason
 import com.google.android.material.snackbar.Snackbar
@@ -82,7 +83,7 @@ internal class GroupWebAiFeature(
                 result.onSuccess { execute(it, operation, owner, configuration, projectMemory) {
                     prepareRequest(group, messageId, configuration, selection, projectMemory)
                 } }
-                    .onFailure { release(); toast("创建 AI 请求失败，请稍后重试") }
+                    .onFailure { release(); toast(it.message?.take(200) ?: "创建 AI 请求失败，请稍后重试") }
             }
         }
     }
@@ -114,6 +115,8 @@ internal class GroupWebAiFeature(
         val prompt = request.getString("prompt") + if (projectMemory && configuration.engine == GroupAiEngine.CHATGPT)
             "\n\n本次群分析请求标记：${request.getString("id")}。请勿在回答中复述标记。" else ""
         executor = GroupWebAiExecutor(activity, prompt,
+            attachments = GroupWebAiAttachments(activity, http, server, request.optJSONArray("attachments") ?: org.json.JSONArray(),
+                { !activity.isDestroyed && userId() == owner }),
             configuration = configuration,
             projectServer = if (projectMemory && configuration.engine == GroupAiEngine.CHATGPT)
                 GroupChatGptProjectClient(activity, http, server, request.getString("group_id"), operation, owner,
@@ -267,8 +270,11 @@ internal class GroupWebAiFeature(
         val request = AuthManager.applyAuth(activity, Request.Builder().url("$server$path")
             .post(payload.toString().toRequestBody("application/json".toMediaType()))).build()
         return calls.newCall(request).execute().use {
-            check(it.isSuccessful) { "群聊请求未完成" }
-            JSONObject(it.body?.string().orEmpty())
+            val body = it.body?.string().orEmpty()
+            check(it.isSuccessful) {
+                runCatching { JSONObject(body).optString("error").takeIf(String::isNotBlank)?.take(200) }.getOrNull() ?: "群聊请求未完成"
+            }
+            JSONObject(body)
         }
     }
 

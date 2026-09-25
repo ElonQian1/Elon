@@ -45,6 +45,7 @@ impl Fixture {
             message_revisions: ids.iter().map(|s| (s.to_string(), 1)).collect(),
             question: "compare".into(),
             allow_continue: false,
+            attachment_transport_version: 1,
         }
     }
     fn prepare(
@@ -58,6 +59,48 @@ impl Fixture {
 }
 fn op() -> String {
     uuid::Uuid::new_v4().to_string()
+}
+
+#[test]
+fn attachment_manifest_preserves_scope_and_requires_updated_client() {
+    let f = Fixture::new();
+    let raw = serde_json::json!([{"attachment_id":"fixture", "display_name":"chart.png", "mime_type":"image/png",
+        "size_bytes":123, "url":"https://platform.example/api/user/u/chat-attachments/g/chart.png"}]).to_string();
+    f.store
+        .conn()
+        .unwrap()
+        .execute(
+            "UPDATE friend_group_messages SET attachments_json=?1,content=?2 WHERE id='a'",
+            params![
+                raw,
+                "> quote\n```rust\nlet n = 1;\n```\n| A | B |\n|---|---|\n| 1 | 2 |"
+            ],
+        )
+        .unwrap();
+    let mut input = Fixture::input(&["a"]);
+    input.attachment_transport_version = 0;
+    assert!(f.prepare(&op(), &input).is_err());
+    input.attachment_transport_version = 1;
+    let token = op();
+    let request = f.prepare(&token, &input).unwrap();
+    assert_eq!(request.attachments.len(), 1);
+    assert_eq!(request.attachments[0].message_id, "a");
+    assert!(request.prompt.contains("group_01_chart.png"));
+    assert!(request.prompt.contains("```rust"));
+    assert!(request.prompt.contains("| 1 | 2 |"));
+    assert!(!request.prompt.contains("platform.example"));
+    f.store
+        .conn()
+        .unwrap()
+        .execute(
+            "UPDATE friend_group_messages SET revision=2 WHERE id='a'",
+            [],
+        )
+        .unwrap();
+    assert!(f
+        .store
+        .group_web_ai_action("u", "g", &request.id, &token, "dispatch")
+        .is_err());
 }
 
 #[test]
@@ -290,12 +333,12 @@ fn reply_share_contains_only_selection_and_requires_consent_and_preserves_origin
 }
 
 #[test]
-fn rich_sources_are_frozen_but_never_sent_as_attachment_bytes() {
+fn rich_sources_are_frozen_with_a_separate_private_attachment_manifest() {
     let f = Fixture::new();
     let conn = f.store.conn().unwrap();
     conn.execute(
         "UPDATE friend_group_messages SET attachments_json=?1 WHERE id='a'",
-        [r#"[{"kind":"image","url":"/api/test-image","display_name":"Reference"}]"#],
+        [r#"[{"kind":"image","attachment_id":"ref","url":"/api/user/u/chat-attachments/g/reference.png","display_name":"Reference","mime_type":"image/png","size_bytes":123}]"#],
     )
     .unwrap();
     drop(conn);
@@ -303,7 +346,9 @@ fn rich_sources_are_frozen_but_never_sent_as_attachment_bytes() {
     input.allow_continue = true;
     let operation = op();
     let req = f.prepare(&operation, &input).unwrap();
-    assert!(!req.prompt.contains("/api/test-image"));
+    assert!(!req.prompt.contains("/api/user/u/chat-attachments/g/reference.png"));
+    assert_eq!(req.attachments.len(), 1);
+    assert_eq!(req.attachments[0].message_id, "a");
     input.allow_continue = false;
     assert!(f.prepare(&operation, &input).is_err());
     let conn = f.store.conn().unwrap();

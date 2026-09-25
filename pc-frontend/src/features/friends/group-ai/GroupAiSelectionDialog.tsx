@@ -22,6 +22,7 @@ export default function GroupAiSelectionDialog(props: Props) {
   function submit() {
     try {
       if (unavailable) throw new Error(unavailable)
+      if (provider !== 'chatgpt' && props.messages.some(m => m.attachments?.length)) throw new Error('群聊图片和文件请使用 ChatGPT 分析；未发送任何消息')
       startGroupAi({
         owner: props.owner, group: props.group, title: props.title, source: props.messages[0].id, provider,
         selection: {
@@ -47,7 +48,7 @@ export default function GroupAiSelectionDialog(props: Props) {
     <details className={styles.context}><summary>已选择 {props.messages.length} 条消息</summary>
       {props.messages.map(message => <article key={message.id}><strong>{message.sender_name || '群成员'}</strong><pre>{messageText(message)}</pre></article>)}
     </details>
-    {props.messages.some(m => m.attachments?.length) && <p className={styles.warning}>本次发送消息文字和附件说明，不包含附件原文件。</p>}
+    {props.messages.some(m => m.attachments?.length) && <p className={styles.warning}>本次会将所选消息的图片和文件发送给 ChatGPT，上传失败不会改为纯文字分析。</p>}
     <label className={styles.question}>想问什么<textarea rows={4} maxLength={2000} value={question} onChange={event => setQuestion(event.target.value)} /></label>
     {provider === 'chatgpt' && <label><input type="checkbox" checked={allowContinue} onChange={e => setAllowContinue(e.target.checked)} />允许群成员用自己的 ChatGPT 继续讨论所选记录、问题和回答</label>}
     {(error || unavailable) && <p className={styles.warning} role="alert">{error || unavailable}</p>}

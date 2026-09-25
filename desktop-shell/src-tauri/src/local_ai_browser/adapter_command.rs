@@ -19,6 +19,7 @@ pub(super) const CHATGPT_ACTIONS: &[&str] = &[
     "select_model_option",
     "select_composer_tool",
     "request_attachment_upload",
+    "stage_attachments",
     "open_model_selector",
     "open_composer_tools",
     "start_dictation",
@@ -91,7 +92,13 @@ pub fn build(
         command.insert("requestId".to_string(), Value::String(request_id));
     }
     if let Some(value) = value {
-        if value.chars().count() > 20_000 {
+        if value.chars().count()
+            > if action == "stage_attachments" {
+                96 * 1024
+            } else {
+                20_000
+            }
+        {
             return Err(format!("{provider_name} 输入内容过长。"));
         }
         command.insert("value".to_string(), Value::String(value));

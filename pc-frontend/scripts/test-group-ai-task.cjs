@@ -24,12 +24,19 @@ const documentState = s => ({ loading: false, contextReady: true, semanticCacheS
 function fixture(options = {}) {
   let time = 0, sent = false, owner = true
   let request = { id: 'request', group_id: 'group', trigger_message_id: 'one', state: 'prepared',
-    prompt: 'Selected fixture question', engine: 'chatgpt_web', dispatch_permit: false, result_message_id: null }
+    prompt: 'Selected fixture question', engine: 'chatgpt_web', dispatch_permit: false, result_message_id: null,
+    attachments: options.attachments || [] }
   let receipt
   const calls = []
   const port = {
     now: () => time, wait: async ms => { time += ms },
     checkOwner: () => { if (!owner) throw new Error('Account changed') },
+    async upload(operation, received, files, check) {
+      check(); calls.push(['upload', files]);
+      if (options.failUpload) throw new Error('Attachment incomplete')
+      if (options.cancelUpload) await options.cancelUpload()
+      check()
+    },
     async prepare(operation, received) { calls.push(['prepare', operation, received]); return { ...request } },
     async action(operation, received, previous, action, content) {
       calls.push([action, content])
@@ -60,6 +67,23 @@ function fixture(options = {}) {
   const task = new GroupAiTask('operation', input, port, () => {})
   return { task, port, calls, options }
 }
+
+test('all selected files are confirmed before authorization and send', async () => {
+  const f = fixture({ attachments: [{ attachment_id: 'synthetic-image' }] })
+  await f.task.start()
+  assert.equal(f.task.progress.phase, 'completed')
+  assert.ok(f.calls.findIndex(c => c[0] === 'upload') < f.calls.findIndex(c => c[0] === 'dispatch'))
+  assert.equal(f.calls.filter(c => c[0] === 'send_prompt').length, 1)
+})
+
+test('attachment failure or cancel never falls back to a text-only analysis', async () => {
+  for (const cancel of [false, true]) {
+    const f = fixture({ attachments: [{ attachment_id: 'synthetic-image' }], failUpload: !cancel })
+    if (cancel) f.options.cancelUpload = () => f.task.cancel()
+    await f.task.start()
+    assert.equal(f.calls.filter(c => ['dispatch', 'send_prompt', 'complete', 'fallback'].includes(c[0])).length, 0)
+  }
+})
 
 test('private command id is canonical and signed-long safe', () => {
   const ids = new Set(Array.from({ length: 100 }, () => groupAiCommandId(1789900000000)))
@@ -154,4 +178,17 @@ test('concurrent starts are single-flight', async () => {
   const { task, calls } = fixture()
   await Promise.all([task.start(), task.start()])
   assert.equal(calls.filter(c => c[0] === 'dispatch').length, 1)
+})
+
+test('a failed attachment attempt closes its draft before retrying in a fresh host', async () => {
+  const f = fixture({ attachments: [{ name: 'fixture.png' }], failUpload: true })
+  await f.task.start()
+  assert.equal(f.task.progress.phase, 'failed')
+  assert.equal(f.calls.filter(c => c[0] === 'close').length, 1)
+  assert.equal(f.calls.filter(c => c[0] === 'send_prompt').length, 0)
+  f.options.failUpload = false
+  await f.task.resume()
+  assert.equal(f.task.progress.phase, 'completed')
+  assert.equal(f.calls.filter(c => c[0] === 'open').length, 2)
+  assert.equal(f.calls.filter(c => c[0] === 'send_prompt').length, 1)
 })

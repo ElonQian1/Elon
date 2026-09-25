@@ -11,6 +11,8 @@ mod adapter;
 mod adapter_command;
 #[path = "local_ai_browser/adapter_content.rs"]
 mod adapter_content;
+#[path = "local_ai_browser/attachment_bootstrap.rs"]
+mod attachment_bootstrap;
 #[path = "local_ai_browser/binance_exchange_adapter.rs"]
 mod binance_exchange_adapter;
 #[path = "local_ai_browser/chatgpt_adapter_bootstrap.rs"]

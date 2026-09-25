@@ -3,6 +3,8 @@ import { useAuthStore } from '../../../store/auth'
 import { listLocalAiWebProviders, type LocalAiWebSessionState } from '../../user-browser/localAiBrowserApi'
 import { socialRequest } from '../socialChatOperations'
 import type { GroupAiPort, GroupAiRequest, GroupAiInput } from './groupAiTask'
+import { groupAttachmentFiles } from './groupAiAttachments'
+import { uploadPrivateAttachments } from '../../user-browser/privateAttachmentUpload'
 
 function endpoint(input: GroupAiInput) { return '/api/me/groups/' + encodeURIComponent(input.group) }
 export function createGroupAiPort(owner: string): GroupAiPort {
@@ -16,10 +18,10 @@ export function createGroupAiPort(owner: string): GroupAiPort {
     })
     checkOwner(); return response.request
   }
-  return {
+  const port: GroupAiPort = {
     checkOwner, now: Date.now, wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
     prepare: (operation, input) => post(endpoint(input) + '/messages/' + encodeURIComponent(input.source) + '/web-ai', {
-      operation_id: operation, selected_context: input.selection,
+      operation_id: operation, selected_context: { ...input.selection, attachment_transport_version: 1 },
     }),
     action: (operation, input, request, action, content) => post(endpoint(input) + '/web-ai/requests/' + encodeURIComponent(request.id), {
       operation_id: operation, action, content,
@@ -43,5 +45,15 @@ export function createGroupAiPort(owner: string): GroupAiPort {
         ])
       } finally { clearTimeout(timer) }
     },
+    async upload(operation, input, files, check) {
+      check()
+      const provider = (await listLocalAiWebProviders()).find(p => p.id === input.provider)
+      if (!provider || provider.desktopRuntimeVersion < 15) throw new Error('请升级 Windows 客户端后使用群聊图片和文件分析；文字未发送')
+      await uploadPrivateAttachments(groupAttachmentFiles(files), {
+        command: (value, requestId) => port.host(operation, input, 'stage_attachments', value, requestId),
+        state: () => port.host(operation, input, 'state'), check,
+      })
+    },
   }
+  return port
 }

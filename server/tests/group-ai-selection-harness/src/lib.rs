@@ -42,6 +42,8 @@ mod store {
         pub ai_reply: Option<serde_json::Value>,
     }
 }
+#[path = "../../../src/store/group_web_ai_attachments.rs"]
+mod attachments;
 #[path = "../../../src/store/group_ai_selection_schema.rs"]
 mod migration;
 #[path = "../../../src/store/group_web_ai_selection.rs"]

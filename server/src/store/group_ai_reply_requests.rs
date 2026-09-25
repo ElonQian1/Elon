@@ -8,6 +8,8 @@ use super::{ensure_social_ai_user, SOCIAL_AI_DISPLAY_NAME};
 #[path = "group_ai_source_access.rs"]
 mod source;
 use source::ensure_member_and_source;
+#[path = "group_web_ai_attachments.rs"]
+pub(crate) mod attachments;
 #[path = "group_ai_reply_context.rs"]
 pub(crate) mod context;
 #[path = "group_ai_context_share.rs"]

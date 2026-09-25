@@ -51,6 +51,7 @@ pub(crate) struct WebGroupRequest {
     pub result_message_id: Option<String>,
     pub dispatch_permit: bool,
     pub context_scope: String,
+    pub attachments: Vec<super::attachments::GroupAiAttachment>,
 }
 
 pub(crate) fn operation_hash(operation: &str) -> Result<String> {
@@ -153,16 +154,17 @@ pub(crate) fn read_owned(
     operation: &str,
 ) -> Result<WebGroupRequest> {
     let hash = operation_hash(operation)?;
-    let row = conn.query_row(
+    let mut row = conn.query_row(
         "SELECT id,group_id,trigger_message_id,engine,state,COALESCE(context_prompt,''),result_message_id,web_provider,context_scope
          FROM group_ai_reply_requests WHERE id = ?1 AND requester_id = ?2 AND group_id = ?3 AND operation_hash = ?4",
         params![id,user,group,hash], |r| Ok(WebGroupRequest {
             id:r.get(0)?,group_id:r.get(1)?,trigger_message_id:r.get(2)?,engine:r.get(3)?,state:r.get(4)?,
-            prompt:r.get(5)?,result_message_id:r.get(6)?,web_provider:r.get(7)?,context_scope:r.get(8)?,dispatch_permit:false,
+            prompt:r.get(5)?,result_message_id:r.get(6)?,web_provider:r.get(7)?,context_scope:r.get(8)?,dispatch_permit:false,attachments:Vec::new(),
         }),
     ).optional()?.ok_or_else(|| anyhow!("请求不存在或不属于当前设备操作"))?;
     ensure_member_and_source(conn, user, group, &row.trigger_message_id)?;
     super::selection::validate_sources(conn, user, group, id)?;
+    row.attachments = super::attachments::for_request(conn, id)?;
     Ok(row)
 }
 
@@ -209,6 +211,10 @@ impl Store {
         match action {
             "status" => (),
             "dispatch" => {
+                anyhow::ensure!(
+                    before.attachments.is_empty() || provider == "chatgpt_web",
+                    "群聊图片和文件请使用 ChatGPT 分析；未派发请求"
+                );
                 anyhow::ensure!(
                     before.state == "prepared" || before.web_provider == provider,
                     "请求已派发给其他网页 AI"

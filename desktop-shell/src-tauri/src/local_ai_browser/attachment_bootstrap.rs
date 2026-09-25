@@ -1,0 +1,44 @@
+// Reuse the Android private upload protocol; Win only supplies bounded file bytes.
+pub(super) fn initialization_script() -> String {
+    [
+        include_str!("win_attachment_source.js"),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_private_runtime_bindings.js"
+        ),
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_committed_owner_path.js"),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_committed_composer_owner.js"
+        ),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_private_attachment_protocol.js"
+        ),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_private_attachment_bytes.js"
+        ),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_private_attachment_reservation.js"
+        ),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_private_attachment_library.js"
+        ),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_private_attachment_transport.js"
+        ),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_native_attachment_source.js"
+        ),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_private_attachment_project.js"
+        ),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_private_attachment_composer.js"
+        ),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_private_attachment_image.js"
+        ),
+        include_str!(
+            "../../../../android/app/src/main/assets/chatgpt_web_private_attachment_send.js"
+        ),
+    ]
+    .join("\n")
+}

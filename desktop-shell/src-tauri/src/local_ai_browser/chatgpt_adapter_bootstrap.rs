@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 208;
+pub(super) const ADAPTER_VERSION: u32 = 209;
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
@@ -290,6 +290,8 @@ pub(super) fn initialization_script() -> String {
                     "if (!window.__elonWinChatGptManagedVoicePeerConstructor && typeof window.RTCPeerConnection === 'function') Object.defineProperty(window, '__elonWinChatGptManagedVoicePeerConstructor', {{ value: window.RTCPeerConnection, configurable: false }});\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_managed_voice_peer.js';\n{}",
                     shared, WIN_MANAGED_VOICE_PEER
                 )
+            } else if *name == "chatgpt_web_adapter.js" {
+                format!("{}\n{}", super::attachment_bootstrap::initialization_script(), shared)
             } else {
                 shared
             }

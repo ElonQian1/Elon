@@ -78,10 +78,11 @@ pub async fn group_ai_web_session(
                 "private_protocol_probe",
                 Some("fresh_text_admission".into()),
             ),
+            "stage_attachments" if provider.id == "chatgpt" => (action.as_str(), value),
             "snapshot" | "send_prompt" | "stop_generation" => (action.as_str(), value),
             _ => return Err("不支持的群聊 AI 动作。".into()),
         };
-        if command_action == "send_prompt" {
+        if matches!(command_action, "send_prompt" | "stage_attachments") {
             runtime.require_bound_context(&label)?;
             let snapshot = runtime.snapshot(&label).ok_or("群聊 AI 尚未就绪。")?;
             if !ready(
@@ -100,6 +101,7 @@ pub async fn group_ai_web_session(
                 "send_prompt",
                 "stop_generation",
                 "private_protocol_probe",
+                "stage_attachments",
             ],
             command_action,
             command_value.clone(),

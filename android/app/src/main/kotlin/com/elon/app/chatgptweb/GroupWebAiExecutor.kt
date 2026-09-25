@@ -16,6 +16,7 @@ internal class GroupWebAiExecutor(
     private val onFailure: (GroupWebAiFailure) -> Unit,
     private val configuration: GroupAiConfiguration = GroupAiConfiguration(),
     private val projectServer: ((JSONObject, (Result<JSONObject>) -> Unit) -> Unit)? = null,
+    private val attachments: GroupWebAiAttachments? = null,
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private val provider = requireNotNull(configuration.engine.providerId)
@@ -27,6 +28,10 @@ internal class GroupWebAiExecutor(
     private var sendPreparation: GroupWebAiSendPreparation? = null
     private var failureInspection: GroupWebAiFailureInspection? = null
     private var prepared = false
+    private var filesLoaded = attachments?.hasFiles != true
+    private var filesAssociated = attachments?.hasFiles != true
+    private var uploadStarted = false
+    private val uploadId = GroupWebAiCommandIds.next()
     private var lastSnapshot: ChatGptWebSnapshot? = null
     private var finished = false
     private var dispatching = false
@@ -42,7 +47,16 @@ internal class GroupWebAiExecutor(
 
     fun start() {
         diagnostics.stage("start")
-        handler.postDelayed(timeout, if (projectServer != null) 120_000L else 60_000L)
+        handler.postDelayed(timeout, if (attachments?.hasFiles == true) 180_000L else if (projectServer != null) 120_000L else 60_000L)
+        if (attachments?.hasFiles == true) {
+            if (provider != WebChatProviderId.CHATGPT_WEB) { fail(GroupWebAiFailureReason.ATTACHMENT); return }
+            attachments.load { ok ->
+                if (!finished) {
+                    if (!ok) fail(GroupWebAiFailureReason.ATTACHMENT)
+                    else { filesLoaded = true; lastSnapshot?.let(::snapshot) }
+                }
+            }
+        }
         try {
             session = GroupWebAiSession(activity, ::event, ::fail, provider, diagnostics::stage, projectServer)
             session?.start()
@@ -53,6 +67,11 @@ internal class GroupWebAiExecutor(
 
     private fun event(event: ChatGptWebEvent) {
         if (finished) return
+        if (event is ChatGptWebEvent.CommandResult && event.requestId == uploadId && event.action == "request_attachment_upload") {
+            if (!event.ok || event.detail != "private_attachment_associated") fail(GroupWebAiFailureReason.ATTACHMENT)
+            else { filesAssociated = true; lastSnapshot?.let(::snapshot) }
+            return
+        }
         failureInspection?.let { it.event(event); return }
         modelConfiguration?.event(event)
         sendPreparation?.event(event)
@@ -99,6 +118,16 @@ internal class GroupWebAiExecutor(
                         schedule = { delay, retry -> handler.postDelayed({ if (!finished) retry() }, delay) },
                         observe = diagnostics::stage)
                     modelConfiguration?.start()
+                }
+                return
+            }
+            if (!filesAssociated) {
+                if (filesLoaded && !uploadStarted) {
+                    uploadStarted = true
+                    diagnostics.stage("private_attachment_upload")
+                    val source = requireNotNull(attachments)
+                    if (adapter?.requestNativeAttachmentUpload(source.files, source.uris, uploadId) != true)
+                        fail(GroupWebAiFailureReason.ATTACHMENT)
                 }
                 return
             }
@@ -165,6 +194,7 @@ internal class GroupWebAiExecutor(
         sendPreparation?.close()
         failureInspection?.close()
         session?.close()
+        attachments?.close()
         session = null
     }
 

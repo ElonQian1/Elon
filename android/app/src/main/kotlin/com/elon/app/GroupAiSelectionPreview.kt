@@ -14,8 +14,8 @@ internal object GroupAiSelectionPreview {
         submit: (String, JSONObject, Boolean) -> Unit) {
         val ids = messages.mapNotNull { it.id?.takeIf(String::isNotBlank) }.distinct()
         val revisions = JSONObject().apply { messages.forEach { message -> message.id?.let { put(it, message.revision) } } }
-        if (ids.size != messages.size || ids.size !in 1..100 || messages.any { it.content.isBlank() || it.isRecalled() }) {
-            Toast.makeText(activity, "请选择 1 至 100 条已同步的文字消息；纯附件暂不能分析", Toast.LENGTH_LONG).show()
+        if (ids.size != messages.size || ids.size !in 1..100 || messages.any { (it.content.isBlank() && it.attachments.isNullOrEmpty()) || it.isRecalled() }) {
+            Toast.makeText(activity, "请选择 1 至 100 条已同步且未撤回的消息", Toast.LENGTH_LONG).show()
             return
         }
         val space = (20 * activity.resources.displayMetrics.density).toInt()
@@ -30,7 +30,7 @@ internal object GroupAiSelectionPreview {
             orientation = LinearLayout.VERTICAL
             setPadding(space, 0, space, 0)
             addView(TextView(activity).apply {
-                text = "仅发送选中的 ${ids.size} 条文字，回答将发布到当前群。不会附带其他群消息或附件。"
+                text = "发送选中的 ${ids.size} 条消息及其图片、文件，回答将发布到当前群。不会附带未选择的消息。"
                 setPadding(0, space / 2, 0, space)
             })
             addView(question)
@@ -54,7 +54,7 @@ internal object GroupAiSelectionPreview {
             .setNegativeButton("取消", null)
             .setPositiveButton("分析并回复群聊") { _, _ ->
                 submit(ids.last(), JSONObject().put("message_ids", JSONArray(ids)).put("message_revisions", revisions)
-                    .put("question", question.text.toString()).put("allow_continue", share.isChecked),
+                    .put("question", question.text.toString()).put("allow_continue", share.isChecked).put("attachment_transport_version", 1),
                     allowProjectMemory && memory.isChecked)
             }.show().getButton(AlertDialog.BUTTON_POSITIVE).contentDescription = "group-ai-selection-submit"
     }

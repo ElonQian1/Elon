@@ -8,6 +8,7 @@ internal enum class GroupWebAiFailureReason(val message: String) {
     MODEL("未能确认群聊保存的模型或档位。请打开群聊档位菜单重新选择，或选择“跟随官网设置”，再重试。"),
     SEND("AI 未确认发送结果。"),
     COMPOSER("AI 输入框未接受内容，本次没有发送。可以重新分析。"),
+    ATTACHMENT("图片或文件尚未完整上传到 ChatGPT，未改为纯文字分析。请检查文件格式、大小和网络后重试。"),
     PROJECT("本群 ChatGPT 项目未能确认。请检查登录和网络，或稍后再试；没有切换到其他会话。"),
     PROJECT_UNKNOWN("项目创建结果尚未确认。下次将先查找原项目，不会重复创建。"),
     CANCELLED("已取消本次分析。"),

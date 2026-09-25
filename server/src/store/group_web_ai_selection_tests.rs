@@ -7,7 +7,40 @@ fn selection(ids: &[String]) -> GroupAiSelection {
         message_revisions: ids.iter().map(|id| (id.clone(), 1)).collect(),
         question: "compare".into(),
         allow_continue: false,
+        attachment_transport_version: 1,
     }
+}
+
+#[test]
+fn selected_original_files_require_transport_support_and_keep_rich_text() {
+    let f = Fixture::new();
+    let files: Vec<crate::project_ws_protocol::ProjectAttachmentRef> = serde_json::from_value(serde_json::json!([{
+        "attachment_id":"synthetic", "display_name":"chart.png", "mime_type":"image/png", "size_bytes":123,
+        "url":"https://platform.example/api/user/fixture/chat-attachments/group/chart.png"
+    }])).unwrap();
+    let content = "> quoted text\n\n```rust\nlet n = 1;\n```\n\n| A | B |\n|---|---|\n| 1 | 2 |";
+    let message = f
+        .store
+        .send_friend_group_message(&f.user, &f.group, content, Some(&files))
+        .unwrap();
+    let mut input = selection(&[message.id.clone()]);
+    input.attachment_transport_version = 0;
+    let operation = Uuid::new_v4().to_string();
+    assert!(f
+        .store
+        .prepare_group_ai_selection(&f.user, &f.group, &message.id, &operation, &input)
+        .is_err());
+    input.attachment_transport_version = 1;
+    let request = f
+        .store
+        .prepare_group_ai_selection(&f.user, &f.group, &message.id, &operation, &input)
+        .unwrap();
+    assert_eq!(request.attachments.len(), 1);
+    assert_eq!(request.attachments[0].message_id, message.id);
+    assert!(request.prompt.contains("group_01_chart.png"));
+    assert!(request.prompt.contains("```rust"));
+    assert!(request.prompt.contains("| 1 | 2 |"));
+    assert!(!request.prompt.contains("platform.example"));
 }
 
 #[test]

@@ -19,6 +19,7 @@ import useLocalAiRealtimeVoiceControl from './useLocalAiRealtimeVoiceControl'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
 import { isLocalAiAttachmentTransportEvent } from './localAiBrowserApi'
 import AiWebAccessRecoveryCard from './AiWebAccessRecoveryCard'
+import AiWebPrivateAttachmentButton from './AiWebPrivateAttachmentButton'
 import AiWebRealtimeVoiceDock from './AiWebRealtimeVoiceDock'
 import styles from './AiWebComposerControls.module.css'
 
@@ -244,7 +245,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
           </button>
         )}
         {actions.has('request_attachment_upload') && (
-          <button type="button" onClick={() => void requestAttachment()} disabled={busy || !web.canCompose} title="由 ChatGPT 官方文件选择器读取附件">
+          providerId === 'chatgpt' ? <AiWebPrivateAttachmentButton web={web} /> : <button type="button" onClick={() => void requestAttachment()} disabled={busy || !web.canCompose} title="由官方文件选择器读取附件">
             <Paperclip size={13} /><span>附件</span>
           </button>
         )}
