@@ -33,5 +33,33 @@ adapter 212 实机 bootstrap 正常、输入框和会话绑定就绪，但 ChatG
 并把失败直接展示在输入框旁。兼容修复仍须检查当前实际脚本，再验证消息被接受、回复
 回到一龙和同一会话历史；不能仅更换资源 URL 或猜测 minified 导出名称。
 
+## 当前登录文档的运行时证据
+
+`220e10975ebd7c2117fb876bcccc162eef7df365` 已正式发布、本机自动激活，精确版本、
+Tauri 和前端在线回读通过，`NodeAgent` 发布检查通过。进入原生聊天后，原官网会话
+和未发送测试草稿仍在。`site_id=chatgpt` 的只读研究回执为 `host_mode=ai_window`，
+证据来自本人当前文档，不是独立访客 Profile。收集后已暂停，回读 `active=false`。
+
+这份文档加载 `manifest-492fbfe6.js`，入口是 `908190.44b0fc59dd.js`，公开入口导出
+`__rspack_esm_id`、`__webpack_modules__`，并从 `633146.03cad12214.js` 导入
+`__webpack_require__`。现有 bindings 33 只识别旧 `c2675c8c-*` 等明确构建，无法把
+新的模块注册表当作旧 ESM 命名导出读取。这解释 `runtime_not_observed`，不是登录失败
+或当前 VPN 未连接。此次未尝试第三次发送，未执行未知模块或放宽版本/身份门控。
+
+公开 CDN 原始文件单独无凭据下载核验；下列 SHA-256 不混用本机凭据过滤后的正文哈希。
+所有文件位于 `https://chatgpt.com/cdn/assets/`：
+
+| 文件 | 原始文件 SHA-256 |
+|---|---|
+| `manifest-492fbfe6.js` | `7a287c1ec724ca0d81094ec8556c90de937f206a06ab2e13807bd7fce9b95648` |
+| `908190.44b0fc59dd.js` | `3970d87cb066da0a0e1af97955fd34b193ad05986b8658fea9c0bdabdfe2bcc1` |
+| `633146.03cad12214.js` | `e1c8be6ea49317892798a70d98882449c009708fcd6698a49aaa38ef760c52e2` |
+
+采集得到 115 份资源，其中 107 份 CDN 脚本；存在 `body_read_queue_limit`、
+`script_index_limit`、`event_queue_full` 和仅顶层文本覆盖缺口，不代表全部源码、全部
+请求或回复传输已采集。API origins 留空，请求正文计数为零。私人 HTML、策略和草稿
+正文没有加入 Git。尚未完成新版运行时的身份、目录/历史、发送接受、流式回复和重复
+发送对账适配，功能登记改为 `blocked`，整体仍未通过验收。
+
 既有全量检查缺口：全量 PC lint 的 `GroupAssistantDialog.tsx` 未用 disable、
 `test-local-ai-browser-contract.cjs` 旧认证文本断言；均非本批修改，不能称全量通过。
