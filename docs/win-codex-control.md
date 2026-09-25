@@ -8,6 +8,9 @@ implementation_status: tested
 
 本文定义 Codex 操控一龙 Win 工作台和读取调试证据的公开合同。它扩展现有 `codex exec --json + pipe_sidecar + task journal`，不替代 Codex CLI，也不把任意桌面点击、任意 JavaScript、任意 Tauri command 或用户浏览器凭据暴露给代理。
 
+已授权的个人 ChatGPT 会话测试可直接运行[无人值守验收入口](win-conversation-unattended-acceptance.md)，
+串联精确更新、重连、打开功能、正文和附件验证；更新回执丢失时按持久检查点恢复。
+
 ## 用户结果
 
 - Codex 通过短期、项目绑定的 MCP profile 查询 Win/Tauri 能力、读取当前页面和节点状态、提交白名单语义动作并读取执行回执。

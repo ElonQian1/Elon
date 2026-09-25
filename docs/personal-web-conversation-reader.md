@@ -9,6 +9,9 @@ reviewed_at: 2026-09-25
 
 最新代码与真机证据：[富文本及附件读取验收](reports/personal-web-conversation-rich-reader-20260925.md)。
 
+Win 已授权的更新、重启、打开功能与完整读取测试，使用
+[无人值守验收入口](win-conversation-unattended-acceptance.md)，支持检查点恢复与脱敏收据。
+
 ## 使用入口
 
 在一龙项目任务中选择 Claude CLI 或 Codex，并在任务中附上完整 ChatGPT 会话链接或 `chatgpt-conversation://<UUID>`。节点为该次进程注入 `yilong_web_conversations` MCP，仅授权链接中的会话。普通任务不注入，既有项目治理 MCP 保留。使用 `web_conversation_read`，直至 `has_more=false`；`web_conversation_scope` 可检查授权数量。
