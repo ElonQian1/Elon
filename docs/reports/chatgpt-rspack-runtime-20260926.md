@@ -59,8 +59,23 @@ official completion service rather than duplicating the request protocol.
 
 ## Remaining Acceptance
 
-Actual Win scope admission and text streaming must be read back from the new
-installed release. Upload association, image understanding, complete answer
+Win release `0.3.69+23d021cf4fb463794fbd8218dce86790cb473f1f` built successfully.
+The official publisher reports local activation `activated`, terminal
+`complete`, and remote outbox `synced`. MCP `update_and_restart` succeeded;
+subsequent `win_control_status` confirms that exact release with both native
+and frontend hosts available.
+
+Read-only MCP capture on the installed release confirms adapter connection,
+composer readiness and context readiness. It still reports zero projected
+messages/directories and a failed `list_conversations` command. The current
+official page is a project conversation, outside this candidate's admitted
+ordinary-chat scope. This is evidence of remaining projection compatibility
+work, not a missing website capability or a successful end-to-end repair.
+
+The existing draft was preserved. No test message or group reply was sent;
+the requested confirmation for a separate ordinary-chat acceptance message
+has not been received. Actual Win scope admission and text streaming still
+need independent verification. Upload association, image understanding, complete answer
 delivery to the group and APK device acceptance remain **unverified**. A
 passing offline test or HTTP 200 does not mark those workflows complete.
 
