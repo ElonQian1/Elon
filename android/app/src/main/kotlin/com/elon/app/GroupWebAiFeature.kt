@@ -77,7 +77,10 @@ internal class GroupWebAiFeature(
                 post("${base(group.id)}/messages/${part(messageId)}/web-ai", JSONObject().put("operation_id", operation)
                     .apply { if (selection != null) put("selected_context", selection) })
                     .getJSONObject("request")
-                    .also { check(selection == null || it.optString("context_scope") == "selected") { "服务器未确认选区范围，未发送给 AI" } }
+                    .also {
+                        check(selection == null || it.optString("context_scope") == "selected") { "服务器未确认选区范围，未发送给 AI" }
+                        check(selection == null || it.optJSONArray("attachments") != null) { "服务器尚未支持附件清单，请等待服务更新；未发送给 AI" }
+                    }
             }
             activity.runOnUiThread {
                 result.onSuccess { execute(it, operation, owner, configuration, projectMemory) {

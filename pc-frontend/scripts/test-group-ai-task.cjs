@@ -37,7 +37,10 @@ function fixture(options = {}) {
       if (options.cancelUpload) await options.cancelUpload()
       check()
     },
-    async prepare(operation, received) { calls.push(['prepare', operation, received]); return { ...request } },
+    async prepare(operation, received) {
+      calls.push(['prepare', operation, received])
+      return { ...request, attachments: options.legacyServer ? undefined : request.attachments }
+    },
     async action(operation, received, previous, action, content) {
       calls.push([action, content])
       if (action === 'dispatch') {
@@ -191,4 +194,12 @@ test('a failed attachment attempt closes its draft before retrying in a fresh ho
   assert.equal(f.task.progress.phase, 'completed')
   assert.equal(f.calls.filter(c => c[0] === 'open').length, 2)
   assert.equal(f.calls.filter(c => c[0] === 'send_prompt').length, 1)
+})
+
+test('an old server cannot silently turn a selected attachment request into text only', async () => {
+  const f = fixture({ legacyServer: true })
+  await f.task.start()
+  assert.equal(f.task.progress.phase, 'failed')
+  assert.match(f.task.progress.message, /服务器尚未支持附件清单/)
+  assert.equal(f.calls.filter(c => ['open', 'dispatch', 'send_prompt'].includes(c[0])).length, 0)
 })

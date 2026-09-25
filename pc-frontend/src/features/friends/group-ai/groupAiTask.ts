@@ -100,6 +100,7 @@ export class GroupAiTask {
       if (this.request.group_id !== this.input.group || this.request.trigger_message_id !== this.input.source) throw new Error('群聊请求身份不匹配')
       if (this.request.state === 'completed') { this.update('completed', 'AI 回答已发送到群聊', false); return }
       if (this.request.state !== 'prepared') { this.dispatched = true; throw new Error('请求已经派发，请核对结果，未重复发送') }
+      if (!Array.isArray(this.request.attachments)) throw new Error('服务器尚未支持附件清单，请等待服务更新；未发送给 AI')
       await this.host('open')
       const deadline = this.port.now() + 60_000
       let ready = false
