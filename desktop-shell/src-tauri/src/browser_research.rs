@@ -43,8 +43,8 @@ pub(crate) async fn run_browser_research(
     if webview.label() != crate::MAIN_WINDOW_LABEL {
         return Err("research_main_window_required".into());
     }
-    // A site that is also an exchange provider is researched inside the user's own login
-    // window, so one login serves both the person and the AI. Other sites keep their own window.
+    // Explicit ChatGPT research uses the owner's existing personal document. It must
+    // fail rather than silently inspect an unrelated, logged-out research profile.
     if command.kind == "read_conversation" {
         return crate::local_ai_browser::conversation_read::read(
             app,
@@ -56,6 +56,9 @@ pub(crate) async fn run_browser_research(
         .await;
     }
     let attach_label = match (command.kind.as_str(), command.site_id.as_deref()) {
+        ("open", Some("chatgpt")) => {
+            Some(crate::local_ai_browser::chatgpt_research_label(&app, &owner_key)?)
+        }
         ("open", Some(site_id)) => {
             crate::local_ai_browser::exchange_webview::ensure_exchange_session_for_site(
                 &app,

@@ -1,0 +1,5 @@
+.error { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border: 1px solid #ad864e66; border-radius: 10px;
+  color: #e7c58e; font-size: 13px; }
+.error button { flex-shrink: 0; padding: 5px 9px; border: 1px solid currentColor;
+  border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }

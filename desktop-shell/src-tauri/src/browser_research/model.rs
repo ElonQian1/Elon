@@ -132,7 +132,7 @@ pub struct Session {
     pub phase: String,
     #[serde(default)]
     pub host_stage: Option<String>,
-    /// `research_window` (own profiled window) or `exchange_window` (attached to the user's login window).
+    /// `research_window`, `exchange_window`, or `ai_window` (the owner's personal ChatGPT document).
     #[serde(default = "default_host_mode")]
     pub host_mode: String,
     pub bytes: u64,

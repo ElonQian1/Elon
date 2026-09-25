@@ -311,7 +311,9 @@ impl ResearchRuntime {
             expires_at_ms: now_ms() + SESSION_DURATION,
             phase: "opening".into(),
             host_stage: None,
-            host_mode: if attached.is_some() {
+            host_mode: if attached.is_some() && site.id == "chatgpt" {
+                "ai_window"
+            } else if attached.is_some() {
                 HOST_MODE_EXCHANGE_WINDOW
             } else {
                 HOST_MODE_RESEARCH_WINDOW

@@ -25,6 +25,12 @@ MCP 的站点登记、会话控制、源码搜索和资料读取已在真实 Win
 
 ## 使用入口
 
+`open` 指定已登记的 `site_id=chatgpt` 时，复用当前 owner 已打开的个人 ChatGPT 文档，
+回执 `host_mode=ai_window`；不开新 Profile、不切换会话、不发送消息。未打开或不在官方
+origin 时明确失败。用途是读取当前实际运行脚本和响应以诊断兼容性；`evaluate` 仍受原有
+开发门控。普通自定义站点继续使用独立研究窗口。登记时导航/资源 origin 使用
+`https://chatgpt.com`；只分析公开脚本时将 `api_origins` 和 `identity_origins` 留空。
+
 一龙 Windows 客户端的“浏览器研究”页先指定真实本机项目目录，再选择站点、打开官网窗口。WebView2 使用项目、当前 owner、站点隔离的 Profile；Chrome 的窗口和登录状态不会转移或修改。首次官网登录及验证在新窗口完成。
 
 Profile 采用 `appLocal/research-profiles-v1/SHA256([project, owner, site])` 的短目录，完整摘要绑定三个范围，避免深层目录导致 WebView2 初始化失败。原有资料目录及旧 Profile 不会自动搬移或删除。采集入队同时限制 256 个事件和 32 MiB 估算内存；超限明确报告缺口，不阻塞官网窗口。

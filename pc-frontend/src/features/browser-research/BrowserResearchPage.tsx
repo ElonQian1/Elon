@@ -101,7 +101,7 @@ function ResearchWorkspace({ project }: { project: string }) {
         </section>
         {selected && <section className={styles.card}>
           <div className={styles.sectionTitle}><h2>{expired ? '已过期' : phaseLabel(selected.phase)}</h2><span className={styles.badge}>{collecting(selected, now) ? '采集中' : '未采集'}</span></div>
-          <dl className={styles.facts}><dt>文档代次</dt><dd>{selected.generation}</dd><dt>资源 / 请求</dt><dd>{selected.resource_count} / {selected.request_count}</dd><dt>到期时间</dt><dd>{formatTime(selected.expires_at_ms)}</dd><dt>宿主</dt><dd>{selected.host_mode === 'exchange_window' ? '交易所登录窗口' : '独立研究窗口'}</dd></dl>
+          <dl className={styles.facts}><dt>文档代次</dt><dd>{selected.generation}</dd><dt>资源 / 请求</dt><dd>{selected.resource_count} / {selected.request_count}</dd><dt>到期时间</dt><dd>{formatTime(selected.expires_at_ms)}</dd><dt>宿主</dt><dd>{selected.host_mode === 'exchange_window' ? '交易所登录窗口' : selected.host_mode === 'ai_window' ? '当前 ChatGPT 会话' : '独立研究窗口'}</dd></dl>
           {selected.host_stage && !collecting(selected, now) && <p className={styles.help}>{hostStageLabel(selected.host_stage)}</p>}
           <div className={styles.actions}><button disabled={request.busy} onClick={() => void update('status')}>刷新状态</button><button disabled={request.busy || expired} onClick={() => void update(selected.active ? 'pause' : 'resume')}>{selected.active ? '暂停采集' : '恢复采集'}</button><button disabled={request.busy || expired} onClick={() => void exportSnapshot()}>导出快照</button></div>
           {exported && <p className={styles.help}>快照已写入：<code>{exported}</code></p>}

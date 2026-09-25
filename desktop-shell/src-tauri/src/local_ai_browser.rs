@@ -53,6 +53,8 @@ mod provider_catalog;
 mod provider_contract;
 #[path = "local_ai_browser/research_capture.rs"]
 pub(crate) mod research_capture;
+mod research_session;
+pub(crate) use research_session::chatgpt_label as chatgpt_research_label;
 #[path = "local_ai_browser/semantic_context.rs"]
 mod semantic_context;
 #[path = "local_ai_browser/session_control.rs"]

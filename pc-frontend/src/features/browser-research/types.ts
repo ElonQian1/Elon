@@ -38,7 +38,7 @@ export interface ResearchSession {
   phase: string
   host_stage?: string | null
   /** `exchange_window` when capture rides the user's own exchange login window. */
-  host_mode?: 'research_window' | 'exchange_window'
+  host_mode?: 'research_window' | 'exchange_window' | 'ai_window'
   gaps: string[]
   trading_enabled: false
 }

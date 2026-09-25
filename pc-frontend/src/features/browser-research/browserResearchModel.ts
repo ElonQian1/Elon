@@ -37,7 +37,8 @@ function session(value: unknown): boolean {
   return record(value) && identifier(value.id) && identifier(value.site_id) && typeof value.active === 'boolean'
     && ['generation', 'expires_at_ms', 'resource_count', 'request_count'].every((key) => integer(value[key]))
     && string(value.phase, 64) && (value.host_stage == null || string(value.host_stage, 64))
-    && (value.host_mode === undefined || value.host_mode === 'research_window' || value.host_mode === 'exchange_window')
+    && (value.host_mode === undefined || value.host_mode === 'research_window'
+      || value.host_mode === 'exchange_window' || value.host_mode === 'ai_window')
     && strings(value.gaps) && value.trading_enabled === false
 }
 function resource(value: unknown): boolean {
