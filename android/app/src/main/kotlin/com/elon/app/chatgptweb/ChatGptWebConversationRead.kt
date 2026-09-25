@@ -10,6 +10,7 @@ internal class ChatGptWebConversationRead(
     context: Context,
     private val webView: WebView,
     private val document: () -> WebBridgeDocumentSession.Snapshot,
+    private val requestExecution: () -> Unit,
 ) {
     private val script by lazy {
         listOf("chatgpt_web_private_json_request.js", "chatgpt_web_private_auth_context.js",
@@ -36,6 +37,9 @@ internal class ChatGptWebConversationRead(
             clear()
             return failed(rejection).put("request_id", args.optString("request_id"))
         }
+        // Every authorized poll renews the existing bounded execution lease.
+        // Direct evaluation alone can run while WebView network/timers are paused.
+        requestExecution()
         val request = JSONObject().put("conversation_id", args.optString("conversation_id"))
             .put("request_id", args.optString("request_id"))
             .put("cursor", args.optString("message_cursor"))

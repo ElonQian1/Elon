@@ -1,6 +1,7 @@
 import { RESEARCH_KINDS, RESULT_SCHEMA } from './types'
 import type { ResearchAction, ResearchCommand, ResearchKind, ResearchResult } from './types'
 import { researchFailureLabels, type ResearchFailureCode } from './browserResearchErrors'
+import { validConversationPage } from './conversationResult'
 
 export class ResearchError extends Error {
   constructor(public readonly code: 'invalid_response' | 'timeout' | 'cancelled' | ResearchFailureCode) {
@@ -69,8 +70,7 @@ export function parseResearchResult(value: unknown, expected: ResearchCommand): 
     let input: Record<string, unknown>
     try { input = JSON.parse(expected.query || '{}') } catch { throw new ResearchError('invalid_response') }
     if (value.reader.status !== 'failed' && value.reader.request_id !== input.request_id) throw new ResearchError('invalid_response')
-    if (value.reader.status === 'ready' && (!record(value.reader.page) || value.reader.page.conversation_id !== input.conversation_id
-      || value.reader.page.schema !== 'yilong.web-conversation.snapshot.v1' || !Array.isArray(value.reader.page.blocks))) throw new ResearchError('invalid_response')
+    if (value.reader.status === 'ready' && !validConversationPage(value.reader.page, input)) throw new ResearchError('invalid_response')
     return value as unknown as ResearchResult
   }
   const lists: Partial<Record<ResearchKind, (item: unknown) => boolean>> = { sites: site, register_site: site, sessions: session, resources: resource, requests: request, search }

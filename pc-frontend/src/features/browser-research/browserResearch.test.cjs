@@ -28,6 +28,27 @@ const result = { schema, kind: 'sites', items: [], total: 0, offset: 0, next_off
 const action = (id = 'research_1') => ({ action_id: id, instance_id: 'instance_a', project_key: 'a'.repeat(64), command: { kind: 'sites' }, requested_at_ms: 100, expires_at_ms: 1000, status: 'queued' })
 const resource = { id: 'resource_1', url: 'https://example.org/app.js', resource_type: 'Script', mime: 'text/javascript', size_bytes: 11, sha256: 'b'.repeat(64), generation: 2, truncated: false, redacted: true }
 
+test('conversation attachment bytes cross the desktop host with exact request and chunk ownership', () => {
+  const revision = 'a'.repeat(32), id = '00000000-0000-4000-8000-000000000001'
+  const input = { conversation_id: id, request_id: 'read-asset-001', cursor: `asset.${revision}.2.0` }
+  const command = { kind: 'read_conversation', query: JSON.stringify(input) }
+  const page = { schema: 'yilong.web-conversation.asset.v1', conversation_id: id, revision, asset_index: 2,
+    byte_offset: 0, total_bytes: 24579, data: Buffer.alloc(24576, 1).toString('base64'),
+    media_type: 'image/png', name: 'synthetic.png', has_more: true, next_cursor: `asset.${revision}.2.24576` }
+  const wrap = page => ({ schema, kind: command.kind, reader: { status: 'ready', request_id: input.request_id, page } })
+  assert.equal(parseResearchResult(wrap(page), command).reader.page, page)
+  for (const patch of [{ revision: 'b'.repeat(32) }, { conversation_id: 'other' }, { byte_offset: 1 },
+    { asset_index: 3 }, { total_bytes: 9 * 1024 * 1024 }, { data: '?' }, { data: page.data + 'AAAA' },
+    { media_type: 'text/html; charset=utf-8' }, { has_more: false }, { next_cursor: `asset.${revision}.3.24576` }]) {
+    assert.throws(() => parseResearchResult(wrap({ ...page, ...patch }), command))
+  }
+  const terminal = { ...page, byte_offset: 24576, data: 'AQID', has_more: false, next_cursor: null }
+  const next = { ...command, query: JSON.stringify({ ...input, cursor: page.next_cursor }) }
+  assert.equal(parseResearchResult(wrap(terminal), next).reader.page, terminal)
+  assert.throws(() => parseResearchResult(wrap(page), { ...command, query: JSON.stringify({ ...input, cursor: '' }) }))
+  assert.throws(() => parseResearchResult(wrap({ ...page, schema: 'yilong.web-conversation.snapshot.v1', blocks: [] }), command))
+})
+
 test('opening or resuming is not displayed as collecting until host acknowledgement', () => {
   const session = { id: 'session_1', site_id: 'example', active: true, generation: 1, expires_at_ms: 500, resource_count: 0, request_count: 0, phase: 'opening', gaps: [], trading_enabled: false }
   for (const phase of ['opening', 'resuming', 'host_unavailable', 'login']) assert.equal(collecting({ ...session, phase }, 100), false)

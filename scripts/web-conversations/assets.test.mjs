@@ -56,6 +56,9 @@ test('Win and APK load the same private history and media dependencies in the sa
   assert.deepEqual([...rust.matchAll(/asset!\("([a-z_]+)"\)/g)].map(match => match[1] + '.js'), scripts)
   const packed = readFileSync(new URL('../../server/src/node_agent_cli_mcp/conversation.rs', import.meta.url), 'utf8')
   assert.match(packed, /include_str!\("\.\.\/\.\.\/\.\.\/scripts\/web-conversations\/assets.mjs"\)/)
+  const adapter = readFileSync(new URL('../../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt', import.meta.url), 'utf8')
+  assert.match(adapter, /ChatGptWebConversationRead\(context, webView, documentSession::snapshot, onWebExecutionRequested\)/)
+  assert.ok(kotlin.indexOf('requestExecution()') < kotlin.indexOf('webView.evaluateJavascript'))
 })
 
 test('actual shared download owner returns chunked bytes through an opaque MCP handle without a UI adapter', async () => {

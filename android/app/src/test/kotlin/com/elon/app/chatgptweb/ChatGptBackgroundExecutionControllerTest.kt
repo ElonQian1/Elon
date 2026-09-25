@@ -7,6 +7,20 @@ import org.junit.Test
 
 class ChatGptBackgroundExecutionControllerTest {
     @Test
+    fun repeatedReadPollsReplaceTheIdlePauseAndReleaseAfterTheLastPoll() {
+        val fixture = Fixture()
+        fixture.controller.hostResumed()
+        repeat(50) { fixture.controller.interactionRequested() }
+        assertEquals(1, fixture.resumeCount)
+        assertEquals(0, fixture.pauseCount)
+        fixture.scheduler.runNext()
+        assertEquals(1, fixture.pauseCount)
+        assertFalse(fixture.scheduler.hasTasks())
+        fixture.controller.interactionRequested()
+        assertEquals(2, fixture.resumeCount)
+    }
+
+    @Test
     fun pausesAfterIdleAndResumesForTheNextInteraction() {
         val fixture = Fixture()
 
