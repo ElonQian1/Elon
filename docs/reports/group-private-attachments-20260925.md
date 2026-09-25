@@ -46,3 +46,12 @@
 - 手机 MCP 的已有个人聊天附件入口使用 `fixed_media_batch_v1`（无隐私 PNG/PDF/TXT）实际尝试一次：仅收到旧网页附件请求回执，未取得 `private_attachment_associated`，最终为 `failed`，会话消息数仍为 0。测试附件及对应草稿已移除，未向群聊发送消息。
 - 同一现场登录与输入框就绪，但 `private_send_ready=false`；`fresh_text_admission` 返回 `runtime_unavailable / base_context`。手机 VPN 存在，ChatGPT HTTPS 探测 HTTP 200、659ms。网络探测成功不证明页面全部运行时模块就绪，也不能据此断言官网没有上传能力。
 - **现场状态为 failed / needs investigation，不是 completed。** 该尝试验证的是共用上传器的个人入口，不冒充本次群附件下载、上传及原群回复全链路验收。当前仍需定位运行时适配未就绪的具体原因，并补一次真实群图片分析与 Windows 上传验证；不得把离线字节桥测试或发布成功当成此项通过。
+
+## Win 现场复核：输入框依赖缺失
+
+- 9 月 25 日晚经 Win MCP 核对，实际运行的是 `b3945a7486e0e269b46ede1b51d5f1a477e952aa`；通过精确 `update_and_restart` 后回读为 `bc9a3f937bf78f3fd2642f6a41003da6f5c02711`，节点、Tauri 和前端均在线。发布包存在不代表旧进程已激活它。
+- 实际新版本的个人 AI 页显示 `TypeError / chatgpt_web_adapter_composer.js`，附件及发送按钮禁用。MCP 进一步确认 `last_error_code=adapter_bootstrap_failed`、`adapter_connected=false`、`composer_ready=false`、`context_ready=false`，页面加载已结束。此处不能报成官网没有功能或单纯网络连接超时。
+- 使用真实 Win `ADAPTER_ASSETS` 按顺序执行到 composer，稳定复现第 24 行 `__elonChatGptDictationActions.create` 访问未定义对象。Win 子集漏装了共享输入框已经依赖的听写 actions，以及听写 runtime 和菜单关闭策略。Android manifest 包含它们；本结论不解释前述 APK `base_context` 失败。
+- 在离线对照中仅补入三个现有模块，composer 即完成初始化。修复只补 Win 清单并将 adapter 从 209 升至 210，不改共享听写实现，也不绕过上传、身份或恰好一次发送门禁。
+- 新增 `scripts/test-chatgpt-win-composer-bootstrap.cjs`：真实清单顺序、无测试注入的初始化、重复注入及旧缺失回归四项通过。此前“Win 清单中的文件属于 Android 清单”的单向检查不能发现漏项；人工注入依赖的 composer 单测也不能证明 Win 装配可运行。
+- 真实群聊已经完成图片右键、AI 回复、单图片选区及新版文件披露检查，未勾选继续讨论授权；未提交人物识别问题。完整图片上传、回答和群落地仍待后续实测，不能由上述修复推导成功。
