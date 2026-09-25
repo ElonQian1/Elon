@@ -22,7 +22,9 @@ const walk = (node, visit) => {
 };
 
 async function download() {
-  const manifest = fs.readFileSync(path.join(directory, 'manifest-492fbfe6.js'), 'utf8');
+  const manifestName = query || 'manifest-492fbfe6.js';
+  if (!/^manifest-[a-f0-9]+\.js$/.test(manifestName)) throw Error('observed manifest basename required');
+  const manifest = fs.readFileSync(path.join(directory, manifestName), 'utf8');
   const root = parse(manifest).body[0].expression.right;
   const routes = property(root, 'routes');
   const entries = [property(root, 'entry'), ...['root', 'home.route', 'conversation-layout.route',
@@ -46,11 +48,17 @@ async function download() {
 function inspect() {
   const [selection, needle = ''] = query.split('@');
   const found = [];
+  const parseGaps = [];
   let modules = 0;
   for (const file of fs.readdirSync(directory).filter(name => /^\d+\.[a-f0-9]+\.js$/.test(name))) {
     const bytes = fs.readFileSync(path.join(directory, file));
     const source = bytes.toString('utf8');
-    const ast = parse(source);
+    let ast;
+    try { ast = parse(source); } catch (error) {
+      // Credential-filtered research exports may no longer be valid JavaScript.
+      parseGaps.push({ file, error: error.message });
+      continue;
+    }
     for (const statement of ast.body) {
       const declarations = statement.declaration?.declarations || [];
       const table = declarations.find(item => item.id.name === '__webpack_modules__')?.init;
@@ -80,7 +88,7 @@ function inspect() {
       }
     }
   }
-  console.log(JSON.stringify({ modules, matched: found.length, items: found.slice(0, mode === 'source' ? 3 : 30) }, null, 2));
+  console.log(JSON.stringify({ modules, parseGaps, matched: found.length, items: found.slice(0, mode === 'source' ? 3 : 30) }, null, 2));
 }
 
 function prior() {

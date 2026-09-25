@@ -89,8 +89,39 @@ reviewed `LGwv.G` mapping and `LGwv.z` selected branch. It reuses the existing
 rich history projector and preserves DOM projection when present. Read
 admission retains account, document and conversation ownership checks but
 does not wait for an idle/empty composer; send guards are unchanged. Sixteen
-new focused tests plus the 27 previous Rspack tests pass. Actual installed
-native projection acceptance is still pending.
+new focused tests plus the 27 previous Rspack tests pass.
+
+## Installed Acceptance Result
+
+Win `0.3.69+ca99127e16090e793be38e552d7366702993a21f` built and installed;
+MCP confirms that exact identity, local activation `activated`, terminal
+`complete`, and remote outbox `synced`. The existing acceptance answer was
+read without sending another message. Native projection **failed**:
+`win_act_d10daf33bb084263abfa0ba5b1daa028` still reports message counts zero.
+
+The actual document after restart uses a newer deployment:
+`manifest-06f8ceb1.js`, runtime `633146.6ed5d111e4.js`, and entry
+`908190.d446cd6dfd.js`. Browser-research attached to the same production
+WebView (`host_mode=ai_window`); it did not navigate, invoke requests or
+capture API/identity origins. This deployment is not admitted by the prior
+exact runtime profile, so the new projection cannot run. The earlier
+single-send success does not validate sending on this newer deployment.
+
+The public-source export contains 73 CDN assets. AST inspection reports
+2,454 modules and four explicit parse gaps; the prior `LGwv` identifier was
+not found in the successfully parsed subset. Do not assume identical export
+aliases or silently treat malformed filtered sources as fully reviewed.
+Source inspection now accepts an explicitly observed manifest basename and
+reports per-file parse gaps; three fixture tests cover these changes.
+
+Next work is to review the current deployment's identity, committed scope,
+conversation and composer contracts, add a separately versioned profile,
+and verify readback before requesting another write test. Do not mark this
+candidate completed or enable an unreviewed alias substitution.
+
+The original official conversation and its 809-character native draft were
+restored and checked; no original draft, group message, image or second
+acceptance message was sent. The transient sidebar search was cleared.
 
 Upload association, image understanding, complete answer
 delivery to the group and APK device acceptance remain **unverified**. A
