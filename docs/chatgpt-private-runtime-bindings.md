@@ -2,6 +2,10 @@
 
 ## Status
 
+September 26: the observed Win website uses Rspack and AppScope rather than the
+old ESM composer owners. The [new compatibility work](reports/chatgpt-rspack-runtime-20260926.md)
+is isolated from legacy profiles; actual image/group delivery is not yet certified.
+
 September 15: normal 1739 now observes a newer website build not admitted by
 resolver 28. Independent attachment acceptance stopped before upload/send.
 The [current compatibility investigation](reports/chatgpt-runtime-bindings-20260915.md)

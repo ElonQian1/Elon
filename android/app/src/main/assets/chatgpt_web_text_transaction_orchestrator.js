@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptTextTransactionOrchestrator;
-  if (existing && Number(existing.version) >= 14) return;
+  if (existing && Number(existing.version) >= 15) return;
 
   const SEND_BUTTON_POLL_MS = 60;
   const SEND_BUTTON_SETTLE_MS = 180;
@@ -305,6 +305,12 @@
     let freshTextInspector = null;
     function inspectAdmission(mode, respond) {
       if (mode === 'regeneration_admission') return inspectRegeneration(respond);
+      if (mode === 'fresh_text_admission' && window.__elonChatGptRspackRuntime?.observed() &&
+          window.__elonChatGptRspackSubmit?.inspect) {
+        return window.__elonChatGptRspackSubmit.inspect(options.findComposer()).then(value =>
+          respond('private_protocol_probe', value.code === 'ready', JSON.stringify(value)),
+        () => respond('private_protocol_probe', false, 'protocol_probe_unavailable'));
+      }
       const module = window.__elonChatGptFreshTextContext;
       if (mode !== 'fresh_text_admission' || !module?.create) return respond('private_protocol_probe', false, 'protocol_probe_unavailable');
       freshTextInspector ||= module.create(window);
@@ -444,5 +450,5 @@
     return Object.freeze({ sendPrompt, tryPrivateRegeneration, regenerateResponse, inspectRegeneration, inspectAdmission, stopPrivate, stopGeneration, refreshConversation });
   }
 
-  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 14, create });
+  window.__elonChatGptTextTransactionOrchestrator = Object.freeze({ version: 15, create });
 })();

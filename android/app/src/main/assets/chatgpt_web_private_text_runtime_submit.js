@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 23, create: factory });
+  const exported = Object.freeze({ version: 24, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') {
     const existing = root.__elonChatGptPrivateTextRuntimeSubmit;
@@ -276,6 +276,8 @@
     const value = command?.prompt, expected = command?.expectedDraft;
     if (typeof value !== 'string' || !value.trim() || value.length > 20000 ||
         typeof expected !== 'string' || !/^mcp_[a-z0-9]{1,32}$/.test(command.requestId || '')) return { handled: false, code: 'invalid_command' };
+    const rspack = page.__elonChatGptRspackSubmit?.submit(command);
+    if (rspack?.handled) return rspack;
     let binding, draftMutationAttempted = false;
     try {
       captureCode = 'context_unavailable';
@@ -360,5 +362,6 @@
       if (bindings?.observed('composer')) bindings.load('composer').catch(() => {});
     }
   } catch (_) {}
-  return Object.freeze({ version: 23, submit, captureConversation, capturePrivateConversation, state: () => ({ pending: active !== null }) });
+  return Object.freeze({ version: 24, submit, captureConversation, capturePrivateConversation,
+    state: () => ({ pending: active !== null || page.__elonChatGptRspackSubmit?.state?.().pending === true }) });
 });

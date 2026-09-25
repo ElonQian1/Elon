@@ -99,6 +99,8 @@ assert.equal(typeof ready.window.__elonChatGptPrivateTextRuntimeSubmit?.submit, 
 assert.equal(typeof ready.window.__elonChatGptPrivateTextInput?.setCommand, 'function')
 assert.equal(typeof ready.window.__elonChatGptFreshTextTransaction?.send, 'function')
 assert.equal(typeof ready.window.__elonChatGptPrivateAuthContext?.acquireRequestHeaders, 'function')
+assert.equal(typeof ready.window.__elonChatGptRspackRuntime?.load, 'function')
+assert.equal(typeof ready.window.__elonChatGptRspackSubmit?.inspect, 'function')
 // Transport captures auth at construction: a later globally available auth module
 // is insufficient. Confirm the real transport is subscribed to the real context.
 ready.window.__elonChatGptPrivateAuthContext.acceptObservedHeaders({ Authorization: 'Bearer fixture-assembly-identity' })
