@@ -37,3 +37,12 @@
 ## 验收方法
 
 使用不含隐私的图表图片和带 Markdown/代码的文字消息，多选后提问图中数值并要求引用文字，检查仅一个 AI 气泡回到原群；对不支持类型、超过限制、撤回消息及上传时取消，确认没有纯文字误发或重复回复。无需用私人照片作为测试数据。
+
+## 发布与现场证据
+
+- 业务源提交 `bc9a3f937bf78f3fd2642f6a41003da6f5c02711` 已推送；APK `1.1.1815 (1815)` 已发布并覆盖安装到登记的小米，版本回读通过；荣耀离线。
+- 后端 `0.3.1776` 健康与源 SHA 回读通过。PC 页面由独立前端发布入口补发，`PcFrontend` 完成检查通过。Windows 同源版本安装包已构建，远端 outbox 为 `synced`，`NodeAgent` 完成检查通过；这不等于正在运行的每台 Windows 已更新。
+- APK SHA-256：`e09b2acec7421203d1a5fac79ef3eb7b2be95dc0d6168aba9d941b6200315e5b`。
+- 手机 MCP 的已有个人聊天附件入口使用 `fixed_media_batch_v1`（无隐私 PNG/PDF/TXT）实际尝试一次：仅收到旧网页附件请求回执，未取得 `private_attachment_associated`，最终为 `failed`，会话消息数仍为 0。测试附件及对应草稿已移除，未向群聊发送消息。
+- 同一现场登录与输入框就绪，但 `private_send_ready=false`；`fresh_text_admission` 返回 `runtime_unavailable / base_context`。手机 VPN 存在，ChatGPT HTTPS 探测 HTTP 200、659ms。网络探测成功不证明页面全部运行时模块就绪，也不能据此断言官网没有上传能力。
+- **现场状态为 failed / needs investigation，不是 completed。** 该尝试验证的是共用上传器的个人入口，不冒充本次群附件下载、上传及原群回复全链路验收。当前仍需定位运行时适配未就绪的具体原因，并补一次真实群图片分析与 Windows 上传验证；不得把离线字节桥测试或发布成功当成此项通过。
