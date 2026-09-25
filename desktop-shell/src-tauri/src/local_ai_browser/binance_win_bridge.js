@@ -12,8 +12,19 @@
     if (typeof call !== 'function') return;
     Promise.resolve(call(command, args)).catch(function () {});
   }
+  var observationSequence = 0;
   function post(payload) {
     if (typeof payload !== 'string' || payload.length > 1048576) return;
+    // Stamp each new observation, not cache reads or command acknowledgements.
+    // Optional additive fields keep older consumers compatible.
+    try {
+      var event = JSON.parse(payload);
+      if (event.schema === 'yilong.binance_observation.v1') {
+        event.observedAtMs = Date.now();
+        event.observationSequence = ++observationSequence;
+        payload = JSON.stringify(event);
+      }
+    } catch (_) { return; }
     invoke('publish_local_ai_web_event', { payload: payload });
   }
 

@@ -1,0 +1,28 @@
+.host { margin-top: 8px; color: #d8dbe2; font-size: 12px; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.host button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; min-height: 30px;
+  border: 1px solid #454b56; border-radius: 8px; background: #292c33; color: #e2e8ef; cursor: pointer; }
+.host button:hover:not(:disabled) { border-color: #79bbab; background: #303c3a; }
+.host button:focus-visible, .card summary:focus-visible { outline: 2px solid #91d6c7; outline-offset: 3px; }
+.host button:disabled { opacity: .55; cursor: default; }
+.hint, .card summary span, .picker button span { color: #aeb6c2; font-size: 11px; }
+.remove { margin-left: auto; }
+.picker, .card, .error { margin-top: 8px; padding: 10px; border: 1px solid #424955;
+  border-radius: 10px; background: #25292f; }
+.picker { display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+.picker p, .card p { margin: 0 0 8px; }
+.picker button { flex-direction: column; align-items: flex-start; text-align: left; }
+.picker strong, .card strong { overflow-wrap: anywhere; font-weight: 500; }
+.card summary { cursor: pointer; }
+.card summary span { display: block; margin: 5px 0 0 16px; }
+.card p { margin-top: 12px; color: #b7c0cd; }
+.card dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 7px 18px; max-height: 240px; overflow: auto; margin: 0; }
+.card dl > div { display: flex; justify-content: space-between; gap: 8px; }
+.card dt { color: #aeb6c2; }
+.card dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.error { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 8px; border-color: #786349; color: #edcf9e; }
+.spinner { animation: spin 1.2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

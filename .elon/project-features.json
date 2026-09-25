@@ -26764,6 +26764,125 @@
       "updated_at_ms": 1787445972007
     },
     {
+      "id": "win-grid-chat-attachment-v1",
+      "title": "Win 手动附带币安网格到 ChatGPT",
+      "summary": "只在点击附带网格后读取并选择策略，预览快照，复用现有 ChatGPT 发送通道。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/win-grid-chat-attachment.md",
+        "content_hash": "9fd97b83f56e3e4be5b8382931f13e86ad846b7a7b16ebe4a060c02496670307",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "7d504eb4f2522405c98a26395d794ee1d8b608c2",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "bc230f737f664030b7912f5723a298de28416271",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex-grid-chat",
+      "tags": [],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/local_ai_browser/binance_win_bridge.js",
+        "pc-frontend/scripts/test-grid-chat.cjs",
+        "pc-frontend/src/features/grid-chat",
+        "pc-frontend/src/features/user-browser/AiWebComposerControls.tsx",
+        "pc-frontend/src/features/user-browser/useAiWebChatBackend.ts"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "只有点击附带网格才读取本人币安数据，按策略 ID 选择并预览。",
+        "校验账号、文档、时效；未知字段不猜测，发送投影不含账号或认证信息。",
+        "附件一次性发送、移除和换会话正确，复用发送对账不重复。",
+        "完成针对性测试、生产构建与发布，区分现场验证。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/binance_win_bridge.js",
+          "content_hash": "3c78e722eb052dfe923e41b5f71f498cade1da3740e632cb59fc33b2c021fbc3",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7d504eb4f2522405c98a26395d794ee1d8b608c2",
+            "head_blob_oid": "9b714d5f842b51ebaf8f3064636aa6571f557a7e",
+            "worktree_blob_oid": "f545acbdc689730edc2cf2acf319095969e124fe",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-grid-chat.cjs",
+          "content_hash": "a86ea516ae1a3d55a38880f4e6bd119b39c3355f6c53b6ed76e1f0cd89575826",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7d504eb4f2522405c98a26395d794ee1d8b608c2",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d8eff32a1fa6d18ae3c444d1ac249088b5cbd2df",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/grid-chat/GridChatAttachmentControl.tsx",
+          "content_hash": "e6cbdf9c86bf935625a64d36ce90371fd40552714d79376859c48de27b2c95a8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7d504eb4f2522405c98a26395d794ee1d8b608c2",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "24e020a5da4abd93bbe967d94516850b7427472a",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/grid-chat/gridChatSnapshot.ts",
+          "content_hash": "34112d61b9199a175027a12775cf545a96a9977393e7a535a2d1f9d77d0b793e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7d504eb4f2522405c98a26395d794ee1d8b608c2",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "99cf53f467aa33056b55e342cd93ebfab42aed7c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/grid-chat/readGridChatSnapshot.ts",
+          "content_hash": "ecd3db9c3e225a4f40245aaa01c53e0c44db459019d650f404e2d36bdef39ff5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7d504eb4f2522405c98a26395d794ee1d8b608c2",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "d31d322e522f2cff5da5d9695e4e42b280ce398c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/grid-chat/useGridChatAttachment.ts",
+          "content_hash": "259a155078b585ba3eae0d26b6956b98d27c2b153c28edd845fb1b2fe1b563c5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "7d504eb4f2522405c98a26395d794ee1d8b608c2",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bf8c07b2cc9a92154d829b2dd6c98eb8c0bd05c3",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1790343430447,
+      "updated_at_ms": 1790344026579
+    },
+    {
       "id": "win-hidden-ai-webview-input-hit-test-v1",
       "title": "Win 后台官方 AI WebView 输入命中隔离 V1",
       "summary": "修复官方 AI WebView 收起后仍拦截原生聊天输入框和新对话点击的问题，保留同一 WebView2 会话与手动官网显示能力。",
@@ -30892,56 +31011,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_9aad38d204ed4be0bb397f4afbc85320",
-      "feature_id": "android-okx-history-read-v1",
-      "action": "claimed",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789317411774
-    },
-    {
-      "id": "feature_event_1f05627dc6c74afbbb641e7640e60770",
-      "feature_id": "android-okx-history-read-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "Fixed read contract and native history implementation",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789317411812
-    },
-    {
-      "id": "feature_event_a6c4d6cfe7744f7280998eb3c255e174",
-      "feature_id": "android-okx-history-read-v1",
-      "action": "claim_released",
-      "actor": "codex-quant-grid",
-      "reason": "Record exact shared-view and inspection file ownership before evidence",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1789318518077
-    },
-    {
-      "id": "feature_event_5e9a6514b35e48d68936f2d68e7f736b",
-      "feature_id": "android-okx-history-read-v1",
-      "action": "metadata_updated",
-      "actor": "codex-quant-grid",
-      "reason": "Actual bounded history implementation file plan",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1789318518437
-    },
-    {
-      "id": "feature_event_ef7ba68bc416445c9663744bccd48fef",
-      "feature_id": "android-okx-history-read-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "Scope remains accepted grid history slice",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1789318518481
-    },
-    {
       "id": "feature_event_bb6833a85998425e8efcc069e890c56d",
       "feature_id": "android-okx-history-read-v1",
       "action": "transitioned",
@@ -32890,6 +32959,56 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1790342253533
+    },
+    {
+      "id": "feature_event_4c99ffe4a7fc4fba8f7ac71da301d7a4",
+      "feature_id": "win-grid-chat-attachment-v1",
+      "action": "registered",
+      "actor": "codex-grid-chat",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790343430447
+    },
+    {
+      "id": "feature_event_8a624c291223484da1405e22949b4ae0",
+      "feature_id": "win-grid-chat-attachment-v1",
+      "action": "claimed",
+      "actor": "codex-grid-chat",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790343455790
+    },
+    {
+      "id": "feature_event_df8f897687384a1e8cd32ed357bb9989",
+      "feature_id": "win-grid-chat-attachment-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-chat",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790343475567
+    },
+    {
+      "id": "feature_event_78ba9d08b4be44baa1f6dac46eb42009",
+      "feature_id": "win-grid-chat-attachment-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-grid-chat",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790344026491
+    },
+    {
+      "id": "feature_event_997be15460114717852068968ac673d8",
+      "feature_id": "win-grid-chat-attachment-v1",
+      "action": "transitioned",
+      "actor": "codex-grid-chat",
+      "reason": "11 个针对性回归、类型检查与生产构建通过；发布及 Win 现场验收待执行。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790344026579
     }
   ]
 }

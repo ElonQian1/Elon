@@ -22,6 +22,7 @@ import AiWebAccessRecoveryCard from './AiWebAccessRecoveryCard'
 import AiWebPrivateAttachmentButton from './AiWebPrivateAttachmentButton'
 import AiWebRealtimeVoiceDock from './AiWebRealtimeVoiceDock'
 import styles from './AiWebComposerControls.module.css'
+import GridChatAttachmentControl from '../grid-chat/GridChatAttachmentControl'
 
 export { default as AiBrowserExperience } from './AiBrowserExperience'
 
@@ -217,6 +218,7 @@ export default function AiWebComposerControls({ web }: { web: AiWebChatBackend }
   return (
     <section className={styles.host} aria-label={`${web.provider.displayName} 原生聊天能力`}>
       <AiWebAccessRecoveryCard web={web} />
+      <GridChatAttachmentControl control={web.gridAttachment} />
       <AiWebRealtimeVoiceDock
         visible={voiceDockVisible}
         statusText={voiceStatusText}

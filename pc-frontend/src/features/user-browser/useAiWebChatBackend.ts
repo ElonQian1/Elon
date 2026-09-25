@@ -23,6 +23,7 @@ import {
 import { localAiPrivateStreamState } from './localAiPrivateStreamSignal'
 import useLocalAiProviderSessionPrewarm from './useLocalAiProviderSessionPrewarm'
 import useLocalAiResearchCompatibility from './useLocalAiResearchCompatibility'
+import useGridChatAttachment from '../grid-chat/useGridChatAttachment'
 
 const PROVIDER_STORAGE_KEY = 'elon.pc.aiChatProvider'
 
@@ -40,6 +41,11 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     mode === 'chat' ? ownerKey : '',
     capability.state,
   )
+  const gridAttachment = useGridChatAttachment({
+    enabled: mode === 'chat' && capability.state === 'ready' && provider?.id === 'chatgpt',
+    ownerKey,
+    controller,
+  })
   const streamingTarget = useMemo(() => localAiStreamingTarget(
     controller.visibleMessages,
     controller.snapshot?.streaming === true,
@@ -204,7 +210,8 @@ export default function useAiWebChatBackend(mode: AiHomeMode, ownerKey: string) 
     researchStatus,
     provider,
     selectProvider,
-    controller,
+    controller: { ...controller, run: gridAttachment.run },
+    gridAttachment,
     officialRequest,
     userState: controller.userState,
     messages,
