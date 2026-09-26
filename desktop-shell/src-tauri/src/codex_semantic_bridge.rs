@@ -227,7 +227,7 @@ pub(crate) fn codex_win_capabilities(
         "desktop_process_id":std::process::id(),
         "available":true,
         "window_label":webview.label(),
-        "actions":["show_window","focus_window","navigate","reload_page","open_devtools","close_devtools","capture_state","list_ai_windows","capture_ai_window_state","focus_ai_window","update_and_restart"],
+        "actions":["show_window","focus_window","navigate","open_group_workbench","reload_page","open_devtools","close_devtools","capture_state","list_ai_windows","capture_ai_window_state","focus_ai_window","update_and_restart"],
         "ai_window_providers":["chatgpt","google-ai-mode"],
         "devtools_supported":cfg!(debug_assertions),
         "arbitrary_javascript":false,
@@ -340,6 +340,14 @@ fn execute(
                 ))
                 .map_err(display_error)?;
             outcome(format!("已导航到 {route}"), None)
+        }
+        "open_group_workbench" => {
+            webview
+                .eval(include_str!(
+                    "codex_semantic_bridge/open_group_workbench.js"
+                ))
+                .map_err(display_error)?;
+            outcome("群聊工作台导航已安排，需继续核对登录与群列表", None)
         }
         "reload_page" => {
             webview
@@ -457,6 +465,7 @@ fn validate_action(action: &SemanticAction) -> Result<(), String> {
         "show_window"
             | "focus_window"
             | "navigate"
+            | "open_group_workbench"
             | "reload_page"
             | "open_devtools"
             | "close_devtools"

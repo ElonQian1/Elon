@@ -84,7 +84,7 @@ fn definitions() -> Vec<Value> {
             "inputSchema":{
                 "type":"object","required":["kind"],"additionalProperties":false,
                 "properties":{
-                    "kind":{"type":"string","enum":["show_window","focus_window","navigate","reload_page","open_devtools","close_devtools","capture_state","list_ai_windows","capture_ai_window_state","focus_ai_window","update_and_restart"]},
+                    "kind":{"type":"string","enum":["show_window","focus_window","navigate","open_group_workbench","reload_page","open_devtools","close_devtools","capture_state","list_ai_windows","capture_ai_window_state","focus_ai_window","update_and_restart"]},
                     "route":{"type":"string","maxLength":180,"description":"仅 navigate 使用的已登记相对路径，不含 URL/query/hash。"},
                     "provider_id":{"type":"string","enum":["chatgpt","google-ai-mode"],"description":"仅 AI 子窗口定向动作使用。"},
                     "target_release_identity":{"type":"string","maxLength":113,"description":"仅 update_and_restart 使用，格式为 version+40至64位git_sha。"},

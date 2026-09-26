@@ -624,6 +624,7 @@ fn allowed_actions() -> &'static [&'static str] {
         "show_window",
         "focus_window",
         "navigate",
+        "open_group_workbench",
         "reload_page",
         "open_devtools",
         "close_devtools",
