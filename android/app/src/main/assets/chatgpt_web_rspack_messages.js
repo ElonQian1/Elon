@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptRspackMessages = factory(root);
 })(typeof window === 'object' ? window : null, function (page) {
@@ -52,10 +52,11 @@
       if (!rows.length) return fail('branch_empty');
       if (!messages.length) return fail('projection_empty');
       if (!context.owns(binding)) return fail('owner_changed');
-      diagnostic('ready');
+      const submitted = page.__elonChatGptRspackSubmit?.state();
+      diagnostic(submitted?.requestCurrent === false ? 'request_expired' : state === 'error' ? 'generation_error' : 'ready');
       return { messages, observedCount: rows.length, startIndex: Math.max(0, rows.length - 80),
         streaming: !['idle', 'error'].includes(state) };
     } catch (_) { return fail('exception'); }
   }
-  return Object.freeze({ version: 2, read });
+  return Object.freeze({ version: 3, read });
 });

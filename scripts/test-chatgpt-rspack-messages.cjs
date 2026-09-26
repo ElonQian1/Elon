@@ -73,6 +73,20 @@ test('group read diagnostics contain only changed fixed codes after acceptance',
   assert.equal(events.length, 2);
 });
 
+test('group diagnostics distinguish generation failure from an expired request', async () => {
+  const f = await setup(), events = [];
+  let current = true;
+  f.page.__elonChatGptGroupReadDiagnosticsEnabled = true;
+  f.page.__elonChatGptRspackSubmit = { state: () => ({ code: 'accepted', requestCurrent: current }) };
+  f.page.elonChatGptNative = { postMessage: raw => events.push(JSON.parse(raw)) };
+  f.values.set(f.conversation.T, 'error');
+  assert.equal(f.reader.read(f.editor).messages.length, 2);
+  assert.equal(events.at(-1).kind, 'rspack_read_generation_error');
+  current = false;
+  assert.equal(f.reader.read(f.editor).messages.length, 2);
+  assert.equal(events.at(-1).kind, 'rspack_read_request_expired');
+});
+
 test('streaming reads are allowed without relaxing the send guard', async () => {
   const f = await setup();
   f.values.set(f.conversation.T, 'streaming');

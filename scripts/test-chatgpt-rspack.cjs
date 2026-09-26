@@ -177,3 +177,33 @@ for (const drift of ['alias', 'owner', 'route', 'document', 'account', 'ambiguou
     assert.equal(f.context.requestCurrent(binding, serverId), false);
   });
 }
+
+test('exclusive group request stays bound to its account when the editor disappears', async () => {
+  const f = fixture();
+  f.page.__elonChatGptGroupRequestOwnershipEnabled = true;
+  let request;
+  f.officialSubmit.a = async (_scope, options) => { request = options; return true; };
+  assert.equal((await f.submit.submit(f.command).completion).status, 'accepted');
+  f.editor.isConnected = false;
+  assert.equal(request.isSubmissionCurrent(), false);
+  assert.equal(request.isRequestCurrent(), true);
+  assert.equal(f.submit.state().requestCurrent, true);
+  f.refreshAuth();
+  assert.equal(request.isRequestCurrent(), true, 'same-account credential refresh is not a different owner');
+  f.changeAccount();
+  assert.equal(request.isRequestCurrent(), false);
+});
+
+test('exclusive request cannot survive document or route changes or be enabled on a personal host', async () => {
+  const f = fixture();
+  await f.page.__elonChatGptRspackRuntime.load();
+  const binding = f.context.capture(f.editor);
+  assert.equal(f.context.ownedRequestCurrent(binding), false);
+  f.page.__elonChatGptGroupRequestOwnershipEnabled = true;
+  assert.equal(f.context.ownedRequestCurrent(binding), true);
+  f.page.location = new URL('https://chatgpt.com/?temporary-chat=true');
+  assert.equal(f.context.ownedRequestCurrent(binding), false);
+  f.page.location = new URL(binding.href);
+  f.page.__elonChatGptDocumentToken = 'doc_reloaded';
+  assert.equal(f.context.ownedRequestCurrent(binding), false);
+});

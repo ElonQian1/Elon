@@ -44,6 +44,8 @@ const ERROR_CODES: &[&str] = &[
 ];
 const RUNTIME_READ_CODES: &[&str] = &[
     "rspack_read_ready",
+    "rspack_read_request_expired",
+    "rspack_read_generation_error",
     "rspack_read_runtime_pending",
     "rspack_read_projection_contract",
     "rspack_read_mapping_missing",

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 7, create: factory });
+  const api = Object.freeze({ version: 8, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptRspackContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -140,6 +140,23 @@
       return { ...binding, node: next[0].node };
     } catch (_) { return null; }
   }
+  function ownedRequestCurrent(binding, serverId) {
+    try {
+      const auth = binding.runtime.auth, identity = auth.getBrowserChatGptAuthSnapshot();
+      const alias = binding.scope.get(binding.runtime.conversation.i, binding.id) || null;
+      if (serverId && (alias !== serverId || !new RegExp('^' + UUID + '$', 'i').test(serverId))) return false;
+      // Exclusive group hosts own a submitted request, not an editor node.
+      // This is never used for write admission or a shared personal host.
+      // A token refresh may advance auth generation without changing its owner.
+      return page.__elonChatGptGroupRequestOwnershipEnabled === true &&
+        page.__elonChatGptDocumentToken === binding.token && page.location.href === binding.href &&
+        !auth.isBrowserWorkspaceSwitchPending() && !auth.isBrowserAccountSwitchLoading() &&
+        identity?.accountId === binding.accountId && identity?.userId === binding.userId &&
+        binding.scope.get(binding.runtime.identity.d) === binding.accountId &&
+        binding.scope.get(binding.runtime.identity.i) === binding.userId &&
+        binding.scope.get(binding.runtime.identity.j)?.status === 'allowed';
+    } catch (_) { return false; }
+  }
   function find(uploads) {
     const bindings = [];
     code = 'composer_detached';
@@ -154,5 +171,5 @@
     code = 'ready'; return bindings[0];
   }
   return Object.freeze({ find, capture: (node, uploads) => capture(node, false, uploads), read: node => capture(node, true),
-    current, owns, requestCurrent, refreshOwner, state: () => ({ code }) });
+    current, owns, requestCurrent, ownedRequestCurrent, refreshOwner, state: () => ({ code }) });
 });

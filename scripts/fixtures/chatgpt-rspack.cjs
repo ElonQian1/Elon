@@ -60,6 +60,7 @@ function fixture(options = {}) {
   return { page, context, submit, command, values, scope, node, parent, root, editor, cache, loader, imports, calls,
     auth, identityAtoms, composer, conversation, officialSubmit,
     changeAccount: () => { identity = { ...identity, accountId: 'changed' }; generation++; },
+    refreshAuth: () => { identity = { ...identity, accessToken: 'refreshed-fixture' }; generation++; },
     switchAccount: () => { switching = true; } };
 }
 module.exports = { fixture, files, newFiles, CDN };

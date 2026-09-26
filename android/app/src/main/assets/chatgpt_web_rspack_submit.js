@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptRspackSubmit) {
     root.__elonChatGptRspackSubmit = factory(root);
@@ -10,7 +10,7 @@
   options = options || {};
   const runtime = page.__elonChatGptRspackRuntime;
   const context = (options.context || page.__elonChatGptRspackContext)?.create(page);
-  let active = null, code = 'not_observed';
+  let active = null, code = 'not_observed', requestGuard = null;
   function submit(command) {
     if (!runtime?.observed()) return { handled: false, code: 'not_observed' };
     if (page.__elonChatGptPrivateTextTransactionsEnabled !== true) return { handled: false, code: 'disabled' };
@@ -54,6 +54,8 @@
       const current = () => !controller.signal.aborted &&
         (job.serverId ? context.requestCurrent(binding, job.serverId) : context.owns(binding)) &&
         (job.accepted || !!job.serverId || attachmentLease?.current() !== false);
+      requestGuard = page.__elonChatGptGroupRequestOwnershipEnabled === true
+        ? () => !controller.signal.aborted && context.ownedRequestCurrent(binding, job.serverId) : current;
       code = 'dispatching';
       job.invoked = true;
       // CUv.a is the reviewed official composer transaction. It prepares integrity,
@@ -62,7 +64,7 @@
         conversationId: binding.id, prompt: command.prompt, selectedModel: binding.model,
         isTemporaryChat: binding.temporary, preserveDraft: true, requireDispatchAcceptance: true,
         ...(attachmentLease ? { additionalAttachments: attachmentLease.attachments } : {}),
-        isSubmissionCurrent: current, isRequestCurrent: current, signal: controller.signal,
+        isSubmissionCurrent: current, isRequestCurrent: requestGuard, signal: controller.signal,
         onServerThreadIdChange: id => { job.serverId = id; },
       });
       const accepted = await Promise.race([Promise.resolve(request), new Promise((_, reject) => {
@@ -98,5 +100,6 @@
       return { profile: runtime.profile, stage: binding ? 'ready' : 'runtime', code: reason };
     } catch (_) { return { profile: runtime.profile, stage: 'runtime', code: 'context_unavailable' }; }
   }
-  return Object.freeze({ version: 4, submit, inspect, state: () => ({ pending: !!active, code }) });
+  return Object.freeze({ version: 5, submit, inspect, state: () => ({ pending: !!active, code,
+    requestCurrent: requestGuard ? requestGuard() : null }) });
 });
