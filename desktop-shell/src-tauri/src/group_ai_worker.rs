@@ -29,15 +29,51 @@ fn target(main: &Url, cloud: &str, node: &str) -> Result<Url, String> {
     if cloud.origin().ascii_serialization() != CLOUD && cloud.origin() != main.origin() {
         return Err("worker_cloud_not_trusted".into());
     }
-    let node = origin(node)?;
-    if !matches!(node.host_str(), Some("127.0.0.1" | "localhost" | "[::1]")) {
-        return Err("worker_node_not_loopback".into());
-    }
+    let node = node_origin(node)?;
     cloud.set_path(PATH);
     cloud
         .query_pairs_mut()
         .append_pair("node_admin", node.as_str());
     Ok(cloud)
+}
+
+fn node_origin(raw: &str) -> Result<Url, String> {
+    let mut node = origin(raw)?;
+    if !matches!(node.host_str(), Some("127.0.0.1" | "localhost" | "[::1]")) {
+        return Err("worker_node_not_loopback".into());
+    }
+    if node.host_str() == Some("localhost") {
+        node.set_host(Some("127.0.0.1"))
+            .map_err(|_| "invalid_worker_origin")?;
+    }
+    Ok(node)
+}
+
+fn same_target(actual: &Url, expected: &Url) -> bool {
+    if actual.origin() != expected.origin()
+        || actual.path() != PATH
+        || actual.fragment().is_some()
+        || !actual.username().is_empty()
+        || actual.password().is_some()
+    {
+        return false;
+    }
+    let actual_pairs: Vec<_> = actual.query_pairs().collect();
+    let expected_pairs: Vec<_> = expected.query_pairs().collect();
+    if actual_pairs.len() != 1
+        || expected_pairs.len() != 1
+        || actual_pairs[0].0 != "node_admin"
+        || expected_pairs[0].0 != "node_admin"
+    {
+        return false;
+    }
+    match (
+        node_origin(&actual_pairs[0].1),
+        node_origin(&expected_pairs[0].1),
+    ) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    }
 }
 
 pub(crate) fn ensure_caller(webview: &Webview) -> Result<(), String> {
@@ -46,9 +82,12 @@ pub(crate) fn ensure_caller(webview: &Webview) -> Result<(), String> {
     }
     let expected = TARGET.lock().map_err(|_| "worker_state_unavailable")?;
     if webview.label() == LABEL
-        && expected
-            .as_ref()
-            .is_some_and(|url| webview.url().ok().as_ref() == Some(url))
+        && expected.as_ref().is_some_and(|url| {
+            webview
+                .url()
+                .ok()
+                .is_some_and(|actual| same_target(&actual, url))
+        })
     {
         Ok(())
     } else {
@@ -74,7 +113,10 @@ pub async fn ensure_group_ai_worker(
     let mut expected = TARGET.lock().map_err(|_| "worker_state_unavailable")?;
     if app.get_webview(LABEL).is_some() {
         // Never reload a runner that may have an in-flight dispatch.
-        return if expected.as_ref() == Some(&url) {
+        return if expected
+            .as_ref()
+            .is_some_and(|current| same_target(&url, current))
+        {
             Ok(true)
         } else {
             Err("worker_origin_changed_restart_required".into())
@@ -88,7 +130,7 @@ pub async fn ensure_group_ai_worker(
         .skip_taskbar(true)
         .additional_browser_args(crate::WEBVIEW2_BROWSER_ARGS)
         // No data_directory override: same WebView2 profile and same-origin elon_auth as main.
-        .on_navigation(move |next| next == &allowed)
+        .on_navigation(move |next| same_target(next, &allowed))
         .on_new_window(|_, _| NewWindowResponse::Deny)
         .build()
         .map_err(|_| "worker_creation_failed")?;
@@ -125,6 +167,31 @@ mod tests {
             "http://127.0.0.1:7799/#secret",
         ] {
             assert!(target(&main, CLOUD, node).is_err());
+        }
+    }
+
+    #[test]
+    fn worker_target_compares_decoded_loopback_identity_without_widening_scope() {
+        let main = Url::parse("http://127.0.0.1:7799/pc/local-tasks").unwrap();
+        let expected = target(&main, CLOUD, "http://127.0.0.1:7799").unwrap();
+        let equivalent =
+            Url::parse(&format!("{CLOUD}{PATH}?node_admin=http://localhost:7799/")).unwrap();
+        assert!(same_target(&equivalent, &expected));
+        assert_eq!(
+            target(&main, CLOUD, "http://localhost:7799").unwrap(),
+            expected
+        );
+        for suffix in [
+            "?node_admin=http://localhost:7800/",
+            "?node_admin=http://example.org/",
+            "?node_admin=http://localhost:7799/&extra=1",
+            "?node_admin=http://localhost:7799/#fragment",
+            "/other?node_admin=http://localhost:7799/",
+        ] {
+            assert!(!same_target(
+                &Url::parse(&format!("{CLOUD}{PATH}{suffix}")).unwrap(),
+                &expected
+            ));
         }
     }
 }
