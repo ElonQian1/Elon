@@ -286,6 +286,12 @@ impl BrowserResearchHub {
         if entry.action.status != "executing" {
             return Err("action_not_executing");
         }
+        if receipt.status == "succeeded" {
+            contract::grid::validate_response(
+                &entry.action.command,
+                receipt.result.as_ref().ok_or("invalid_result")?,
+            )?;
+        }
         if receipt.status == "succeeded" && entry.action.command.kind == "open" {
             let result = receipt.result.as_ref().ok_or("invalid_result")?;
             let session = result

@@ -19,7 +19,7 @@ export const GRID_FIELDS = {
 } as const
 export type GridFacts = Record<keyof typeof GRID_FIELDS, string | null>
 export interface GridSource { document: string; account: string; accountKind: string }
-export interface GridSelection { source: GridSource; rows: GridFacts[] }
+export interface GridSelection { source: GridSource; rows: GridFacts[]; observedAtMs: number }
 export interface GridAttachment {
   source: GridSource
   chatScope: string
@@ -78,7 +78,7 @@ export function gridRows(state: ExchangeWebObservation): GridSelection {
     return projectGrid(raw)
   })
   if (new Set(rows.map(row => row.id)).size !== rows.length) throw new Error('网格列表包含重复策略，无法可靠选择。')
-  return { source, rows }
+  return { source, rows, observedAtMs: Number(list.observedAtMs) }
 }
 export function gridCaption(facts: GridFacts) {
   const direction = { LONG: '做多', SHORT: '做空', NEUTRAL: '中性' }[facts.direction ?? ''] ?? '方向未知'

@@ -39,6 +39,28 @@ Profile 采用 `appLocal/research-profiles-v1/SHA256([project, owner, site])` �
 
 ## MCP 合同
 
+### 币安网格业务读取（2026-09-26）
+
+`binance_grid_list` / `binance_grid_detail` 直接使用已登录的币安 WebView 内固定只读 API。
+不需要先做源码研究或调用 `evaluate`，也不需要桌面点击。匹配的节点、Win 和 PC 前端必须一起更新。
+完整范围见[需求](requirements/win-binance-grid-mcp-v1.md)。当前功能登记与验收报告决定现场可用状态。
+
+1. 通过现有 `browser_research` profile bootstrap，先 `hosts` 选择实例。
+2. `submit` 的 payload 为 `{"kind":"binance_grid_list","request_id":"grid-list-example-001","query":"start","limit":25}`，多实例加 `instance_id`。
+3. 按 action ID 查询 `action_status`。`receipt.result.reader.status=pending` 表示后台读取中。
+4. 重新 `submit` 相同 request_id、**省略 query**，再查新 action ID，直到 reader 为 `ready` 或 `failed`。每次间隔约 2 秒，总等待有界。
+5. ready 列表使用 `next_offset` 分页，同 request_id、省略 query；页面来自同一快照，最多 500 项。
+6. 从列表选择精确策略 ID，用新的 request_id 提交 `{"kind":"binance_grid_detail","request_id":"grid-detail-example-001","resource_id":"123456","query":"start"}`，随后同样省略 query 查询。
+
+后台读取会恢复本人 Binance 窗口但不显示/抢焦点；首次登录或网站验证由用户在官网完成。
+详情先刷新当前账号列表确认 ID，再读详情；同币种多个网格不会自动合并。`observed_at_ms` 是本次采集时间，
+结果保留最多 5 分钟/16 个请求；过期、宿主刷新或重启返回 `request_expired`，需要新的 request_id 和 start。
+`busy` 时稍后显式重试启动。普通轮询不会自动重新读 API。
+
+输出只含固定网格字段，十进制保持字符串，未取得的值为 null；不含账号 ID、Cookie、请求头或页面任意文本。
+它不提供实时持仓、强平价、账户总资产或交易操作，也不会自动发送到 ChatGPT。
+“附带网格”仍只在用户点击时读取；Claude 桌面、Codex、Copilot 使用同一个 MCP 合同。
+
 ### 多 Win 实例定向（2026-09-11，已发布，待本机加载验收）
 
 新版节点、原生壳和前端增加实例归属合同，修复两个实例竞争同一请求后出现假性

@@ -2,7 +2,7 @@ export const RESULT_SCHEMA = 'yilong.browser-research.result.v1'
 export const RESEARCH_KINDS = [
   'sites', 'sessions', 'register_site', 'open', 'status', 'resources', 'search',
   'read_resource', 'requests', 'read_request', 'pause', 'resume', 'export', 'evaluate',
-  'read_conversation',
+  'read_conversation', 'binance_grid_list', 'binance_grid_detail',
 ] as const
 export type ResearchKind = typeof RESEARCH_KINDS[number]
 export interface SiteManifest {
@@ -84,6 +84,7 @@ export interface ResearchList<K extends ResearchKind, T> extends ResultBase {
   partial?: boolean
 }
 export type ResearchResult =
+  | import('./binanceGridContract').GridReadResult
   | (ResultBase & { kind: 'read_conversation'; reader: Record<string, unknown> })
   | ResearchList<'sites', SiteManifest>
   | ResearchList<'sessions', ResearchSession>

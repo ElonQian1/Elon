@@ -23941,6 +23941,164 @@
       "updated_at_ms": 1787228653680
     },
     {
+      "id": "win-binance-grid-mcp-v1",
+      "title": "Win MCP 直接读取币安网格",
+      "summary": "复用本人 WebView 私有 API，固定列表与详情 MCP，无桌面点击；新鲜度、分页、账号及策略校验。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/win-binance-grid-mcp-v1.md",
+        "content_hash": "d2b852bcbf909ba86b54e84f04cfea7e42eba350a7d09dff0a7d56ac9f232456",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "ad1177a212c5cd457a0b3f533ec6dad730eecc80",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "8ea4f9650649e0d255a203996512805ebd55a7c3",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex-binance-mcp",
+      "tags": [],
+      "task_paths": [
+        "desktop-shell/src-tauri/src/local_ai_browser/exchange_webview.rs",
+        "pc-frontend/src/features/browser-research",
+        "pc-frontend/src/features/grid-chat",
+        "server/src/node_agent_browser_research_contract.rs",
+        "server/src/node_agent_browser_research_mcp.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "MCP 无点击取得最新列表和精确策略详情，保留采集时间。",
+        "重复查询/分页不重复读取，账号或文档变化和超时不返回旧值。",
+        "仅固定字段出站，拒绝未知请求及泄漏凭据；保留手动附带行为。",
+        "定向验证、正式发布和真实 MCP 验收分别记录。"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "desktop-shell/src-tauri/src/local_ai_browser/exchange_webview.rs",
+          "content_hash": "8714e70f75cbdd27ba0c304dcfe2f5044a7bb0cc438156e0cc2438be8daea5f8",
+          "locator": "open_exchange_web_session",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad1177a212c5cd457a0b3f533ec6dad730eecc80",
+            "head_blob_oid": "687b145ac08b17f4f5e10cc62924fb5ff9e083a9",
+            "worktree_blob_oid": "8588a6908d38fcc4186c44f74c5106e237fff577",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/reports/win-binance-grid-mcp-20260926.md",
+          "content_hash": "c883f75c2026384dab50d0fb1c5b0aac9b8091f9cc34f102b3bcb7b0a0a2eeab",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad1177a212c5cd457a0b3f533ec6dad730eecc80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "0e2c073a4a4d542f275dfeff86a89c9a781a2a9d",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/browser-research/binanceGridContract.ts",
+          "content_hash": "63892cc5eb25391d77193625492eaee1c9a3b12ff2daf7ea80e8fd9a6e287f83",
+          "locator": "validGridReadResult",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad1177a212c5cd457a0b3f533ec6dad730eecc80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bdb1494dcb8d39f3ed73216ee5e7ecf23ceffa3f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/browser-research/binanceGridReader.test.cjs",
+          "content_hash": "108f4a71dd80cba016d6f3803caad919341458edf69c237e3f6ff70a537ddbbc",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad1177a212c5cd457a0b3f533ec6dad730eecc80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "dd909e0f86fad5ac5ff50eeb9cca0d0fd1cdcedd",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/browser-research/binanceGridReader.ts",
+          "content_hash": "7d36acaa312c806ad5e17e4104745f6c550f4d5aa5d91396e4903b4f995e28d9",
+          "locator": "createBinanceGridReader",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad1177a212c5cd457a0b3f533ec6dad730eecc80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "6901e29412ca8979e028a7a09ddee63aaac1d981",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/exchange-webview/exchangeWebviewApi.test.cjs",
+          "content_hash": "7dfb2e0b2941a3cc478f3d84fd5bf0b9496f90208948f5dac550c352e4f93cfe",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad1177a212c5cd457a0b3f533ec6dad730eecc80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "58f5f69d11631eb08cdb2d94f942d870cce93344",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/node_agent_browser_research_grid.rs",
+          "content_hash": "dc1fa030365ea8338a4aa9be8379fad30554f131f0007ca705e92043f4205b29",
+          "locator": "validate_response",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad1177a212c5cd457a0b3f533ec6dad730eecc80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bf420bd5b89517dda6033d3528d74e8d8a06be34",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/node_agent_browser_research_grid_tests.rs",
+          "content_hash": "0972ced6b661dd0e2b29ea4b795cbee0a271a945e2b53b909d6a0e894b322af1",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad1177a212c5cd457a0b3f533ec6dad730eecc80",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8bd331a46cc028495f7585ac869302d6d90c53c9",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/node_agent_browser_research_tests.rs",
+          "content_hash": "310282b7e24a987367d278befcab99aa8471568d35e82dd16f034528d59533f6",
+          "locator": "binance_grid_receipt_is_checked_against_the_claimed_command",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "ad1177a212c5cd457a0b3f533ec6dad730eecc80",
+            "head_blob_oid": "46fe3bb3ba2237fcb22a12e7c03e8595f91a9f23",
+            "worktree_blob_oid": "337953968d0b4e6a2ffbfd19b754bbe8fbabb096",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1790397270395,
+      "updated_at_ms": 1790398887530
+    },
+    {
       "id": "win-browser-research-affinity-v1",
       "title": "Win 研究会话实例定向与恢复",
       "summary": "修复多 Win 实例竞争研究请求导致错误 session_not_found，按原生实例及会话绑定领取，提供有界发现、过期和兼容诊断，保留已登录窗口及至多一次执行。",
@@ -31050,116 +31208,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_421f716686ce47389d4a808a66ca90bc",
-      "feature_id": "android-okx-records-read-v1",
-      "action": "registered",
-      "actor": "codex-quant-grid",
-      "reason": "Accepted commercial grid goal G21/G22",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789322069680
-    },
-    {
-      "id": "feature_event_eda3c4c9f1174571a6a25798952329c9",
-      "feature_id": "android-okx-records-read-v1",
-      "action": "claimed",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789322069719
-    },
-    {
-      "id": "feature_event_73ea7d37842349739cf140d5169836ef",
-      "feature_id": "android-okx-records-read-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "Fixed read contract and native history implementation",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789322069763
-    },
-    {
-      "id": "feature_event_11305358ffaf4a2481131f1ede54b8da",
-      "feature_id": "android-okx-records-read-v1",
-      "action": "claim_released",
-      "actor": "codex-quant-grid",
-      "reason": "Record exact shared-view and inspection file ownership before evidence",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1789323425043
-    },
-    {
-      "id": "feature_event_8f4db6aa8b55467e8e0bafb4a9d4d42b",
-      "feature_id": "android-okx-records-read-v1",
-      "action": "metadata_updated",
-      "actor": "codex-quant-grid",
-      "reason": "Actual bounded records implementation file plan",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1789323425087
-    },
-    {
-      "id": "feature_event_c46a4415b1454ca58b0779ee71c9cfad",
-      "feature_id": "android-okx-records-read-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "Scope remains accepted grid records slice",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1789323425125
-    },
-    {
-      "id": "feature_event_b1930ad9b4fb4879a1bd5b70b8fb8f62",
-      "feature_id": "android-okx-records-read-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "Scope remains accepted grid records slice",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1789323425167
-    },
-    {
-      "id": "feature_event_d36f59aa88c54bc9bbadb7799bf2b70b",
-      "feature_id": "android-okx-records-read-v1",
-      "action": "claimed",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789323425206
-    },
-    {
-      "id": "feature_event_a9c53b9afe3146dcaf199651ac57d417",
-      "feature_id": "android-okx-records-read-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "Bind final source and tests",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789323425242
-    },
-    {
-      "id": "feature_event_dd3f4f8463b8426c82a2edc887e5d943",
-      "feature_id": "android-okx-records-read-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789323428487
-    },
-    {
-      "id": "feature_event_6a5e077ccb3849abb0ca1b1f06588ab5",
-      "feature_id": "android-okx-records-read-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "Read implementation and offline tests passed; release, pixels and real account acceptance remain separate",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789323428554
-    },
-    {
       "id": "feature_event_a7c00a3930a44ca1957c1a6488116ff4",
       "feature_id": "android-okx-records-read-v1",
       "action": "evidence_recorded",
@@ -33048,6 +33096,116 @@
       "from_status": "blocked",
       "to_status": "blocked",
       "at_ms": 1790351612283
+    },
+    {
+      "id": "feature_event_e17f0229a581440daa007948eeaf31d7",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "registered",
+      "actor": "codex-binance-mcp",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790397270396
+    },
+    {
+      "id": "feature_event_133a3b7e000f46b39148fb3215667301",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "claimed",
+      "actor": "codex-binance-mcp",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790397270477
+    },
+    {
+      "id": "feature_event_0ce6ab92cb0545db9912c3cb5cb48546",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-mcp",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790397270551
+    },
+    {
+      "id": "feature_event_b51535065b83495286f1fb962eee60bf",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "claim_released",
+      "actor": "codex-binance-mcp",
+      "reason": "明确 start 与轮询语义，需求重新绑定",
+      "from_status": "in_progress",
+      "to_status": "blocked",
+      "at_ms": 1790398275148
+    },
+    {
+      "id": "feature_event_5613e0052290420bb898c85bc9085563",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "requirement_rebound",
+      "actor": "codex-binance-mcp",
+      "reason": "增加显式 query=start；轮询和分页丢失时不会启动读取",
+      "from_status": "blocked",
+      "to_status": "proposed",
+      "at_ms": 1790398295624
+    },
+    {
+      "id": "feature_event_f732a9b98ec9411aaeb77f4d6dd13054",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-mcp",
+      "reason": "明确只读任务范围和重复调用语义",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1790398295722
+    },
+    {
+      "id": "feature_event_d55fba37a66a45fbafc94b1d953daef2",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-mcp",
+      "reason": "明确只读任务范围和重复调用语义",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1790398295818
+    },
+    {
+      "id": "feature_event_61e1f5ccab424e5cacef7254de4b6872",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "claimed",
+      "actor": "codex-binance-mcp",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790398295890
+    },
+    {
+      "id": "feature_event_f3cbcb840a3b4b939e1a6d50a35cc892",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-mcp",
+      "reason": "执行固定读取合同和后台恢复验证",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790398334975
+    },
+    {
+      "id": "feature_event_8ffd9e65759b4a8fb9764a71c88528a6",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-mcp",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790398887452
+    },
+    {
+      "id": "feature_event_917c1a86a9ec435196f5c1d9944f2168",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-mcp",
+      "reason": "固定读取链路与离线测试完成；尚待正式发布及真实Win MCP验收，不标verified/released",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790398887530
     }
   ]
 }

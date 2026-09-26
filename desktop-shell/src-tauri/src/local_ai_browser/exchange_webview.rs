@@ -20,6 +20,7 @@ pub(crate) struct ExchangeWebProvider {
     login_mode: &'static str,
     profile_scope: &'static str,
     desktop_runtime_version: u32,
+    background_open_supported: bool,
 }
 
 #[derive(Serialize)]
@@ -47,6 +48,7 @@ pub(crate) fn list_exchange_web_providers(
             login_mode: provider.login_mode,
             profile_scope: "local_owner_provider",
             desktop_runtime_version: DESKTOP_RUNTIME_VERSION,
+            background_open_supported: true,
         })
         .collect())
 }
@@ -58,9 +60,18 @@ pub(crate) async fn open_exchange_web_session(
     runtime: State<'_, LocalAiBrowserRuntime>,
     provider_id: String,
     owner_key: String,
+    show_window: Option<bool>,
 ) -> Result<ExchangeWebSession, String> {
     let provider = provider_for_kind(&provider_id, ProviderKind::Exchange)?;
-    let session = open_web_session(app, webview, runtime, provider, owner_key, true).await?;
+    let session = open_web_session(
+        app,
+        webview,
+        runtime,
+        provider,
+        owner_key,
+        show_window.unwrap_or(true),
+    )
+    .await?;
     Ok(ExchangeWebSession {
         schema: SESSION_SCHEMA,
         provider_id: session.provider_id,

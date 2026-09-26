@@ -239,6 +239,49 @@ fn browser_research_receipts_require_token_and_exact_duplicate_is_idempotent() {
 }
 
 #[test]
+fn binance_grid_receipt_is_checked_against_the_claimed_command() {
+    let hub = test_hub();
+    let action = hub
+        .enqueue(
+            &workspace(),
+            command(json!({
+                "kind":"binance_grid_detail","request_id":"grid_read_001","resource_id":"123"
+            })),
+        )
+        .unwrap();
+    let claim = hub.claim(&action.action_id, "instance_a").unwrap();
+    let result = json!({"schema":"yilong.browser-research.result.v1","kind":"binance_grid_detail",
+        "reader":{"schema":"yilong.binance-grid-read.v1","request_id":"grid_read_001","status":"pending"}});
+    for bad in [json!({"sites":[]}), {
+        let mut other = result.clone();
+        other["reader"]["request_id"] = json!("grid_read_002");
+        other
+    }] {
+        assert_eq!(
+            hub.record_receipt(&action.action_id, success(&claim.claim_token, bad))
+                .unwrap_err(),
+            "invalid_result"
+        );
+        assert_eq!(
+            hub.action(&workspace(), &action.action_id).unwrap().status,
+            "executing"
+        );
+    }
+    assert_eq!(
+        hub.record_receipt(
+            &action.action_id,
+            success(&claim.claim_token, result.clone())
+        )
+        .unwrap()
+        .status,
+        "succeeded"
+    );
+    assert!(hub
+        .record_receipt(&action.action_id, success(&claim.claim_token, result))
+        .is_ok());
+}
+
+#[test]
 fn browser_research_expiry_and_cancel_discard_late_results() {
     let hub = test_hub();
     let root = workspace();

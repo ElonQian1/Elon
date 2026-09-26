@@ -37,18 +37,19 @@ export interface ExchangeWebProvider {
   loginMode: 'manual_web'
   profileScope: 'local_owner_provider'
   desktopRuntimeVersion: number
+  backgroundOpenSupported?: boolean
 }
 
 export interface ExchangeWebSession {
   schema: typeof SESSION_SCHEMA
   providerId: string
   windowLabel: string
-  status: 'created' | 'focused'
+  status: 'created' | 'focused' | 'background'
   profileScope: 'local_owner_provider'
   cookieAccess: 'webview_only'
 }
 
-let openFlight: Promise<ExchangeWebSession> | null = null
+const openFlights = new Map<string, Promise<ExchangeWebSession>>()
 
 export function isExchangeWebviewAvailable(): boolean {
   return getDesktopInvoke() !== null
@@ -86,17 +87,28 @@ export async function listExchangeWebProviders(): Promise<ExchangeWebProvider[]>
 export async function openExchangeWebSession(
   providerId: string,
   ownerKey: string,
+  showWindow = true,
 ): Promise<ExchangeWebSession> {
   if (!validId(providerId) || !ownerKey.trim()) throw new Error('交易所官网会话身份无效。')
-  if (openFlight) return openFlight
+  const flightKey = JSON.stringify([providerId, ownerKey, showWindow])
+  const existing = openFlights.get(flightKey)
+  if (existing) return existing
   const invoke = requireDesktopInvoke()
-  openFlight = invoke<ExchangeWebSession>('open_exchange_web_session', { providerId, ownerKey })
+  const flight = (async () => {
+    if (!showWindow) {
+      const providers = await listExchangeWebProviders()
+      if (!providers.some(p => p.providerId === providerId && p.backgroundOpenSupported === true)) {
+        throw new Error('当前 Win 宿主尚不支持后台打开币安，请更新并重启后读取。')
+      }
+    }
+    return invoke<ExchangeWebSession>('open_exchange_web_session', { providerId, ownerKey, showWindow })
+  })()
     .then((session) => {
       if (session?.schema !== SESSION_SCHEMA
         || session.providerId !== providerId
         || session.profileScope !== 'local_owner_provider'
         || session.cookieAccess !== 'webview_only'
-        || !['created', 'focused'].includes(session.status)) {
+        || !(showWindow ? ['created', 'focused'] : ['background']).includes(session.status)) {
         throw new Error('Win 客户端返回了不受支持的交易所官网会话。')
       }
       return session
@@ -104,8 +116,9 @@ export async function openExchangeWebSession(
     .catch((error) => {
       throw normalizeExchangeWebviewError(error)
     })
-    .finally(() => { openFlight = null })
-  return openFlight
+    .finally(() => { openFlights.delete(flightKey) })
+  openFlights.set(flightKey, flight)
+  return flight
 }
 
 export async function getExchangeWebObservation(

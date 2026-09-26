@@ -1,6 +1,8 @@
 //! Bounded, site-neutral commands. Credentials are never a research result.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+#[path = "node_agent_browser_research_grid.rs"]
+pub(crate) mod grid;
 
 pub(crate) const MAX_RESULT_BYTES: usize = 64 * 1024;
 pub(crate) const MAX_COMMAND_BYTES: usize = 16 * 1024;
@@ -75,9 +77,12 @@ impl ResearchCommand {
             "export" => &["session_id"],
             "evaluate" => &["session_id", "query"],
             "read_conversation" => &["query"],
+            "binance_grid_list" => &["request_id", "query", "offset", "limit"],
+            "binance_grid_detail" => &["request_id", "query", "resource_id"],
             _ => return Err("invalid_command"),
         };
         let value = serde_json::to_value(self).map_err(|_| "invalid_command")?;
+        grid::validate_command(self)?;
         if value
             .as_object()
             .ok_or("invalid_command")?

@@ -2,6 +2,7 @@ import { RESEARCH_KINDS, RESULT_SCHEMA } from './types'
 import type { ResearchAction, ResearchCommand, ResearchKind, ResearchResult } from './types'
 import { researchFailureLabels, type ResearchFailureCode } from './browserResearchErrors'
 import { validConversationPage } from './conversationResult'
+import { isBinanceGridKind, validGridReadResult } from './binanceGridContract'
 
 export class ResearchError extends Error {
   constructor(public readonly code: 'invalid_response' | 'timeout' | 'cancelled' | ResearchFailureCode) {
@@ -66,6 +67,10 @@ export function parseResearchResult(value: unknown, expected: ResearchCommand): 
     throw new ResearchError('invalid_response')
   }
   let valid = false
+  if (isBinanceGridKind(expected.kind)) {
+    if (!validGridReadResult(value, expected)) throw new ResearchError('invalid_response')
+    return value
+  }
   if (expected.kind === 'read_conversation') {
     if (!record(value.reader) || !['pending', 'ready', 'failed'].includes(String(value.reader.status))) throw new ResearchError('invalid_response')
     let input: Record<string, unknown>

@@ -4,6 +4,8 @@ import useLocalAiOwnerIdentity from '../user-browser/useLocalAiOwnerIdentity'
 import { claimResearchAction, pendingResearchActions, postResearchReceipt, heartbeatResearchHost } from './browserResearchApi'
 import { createResearchExecutor } from './browserResearchExecutor'
 import { parseResearchHost } from './browserResearchHost'
+import { browserBinanceGridReader } from './binanceGridReader'
+import { isBinanceGridKind } from './binanceGridContract'
 
 export function useBrowserResearchBridge() {
   const identity = useLocalAiOwnerIdentity()
@@ -13,6 +15,7 @@ export function useBrowserResearchBridge() {
   useEffect(() => {
     const invoke = getDesktopInvoke()
     if (!invoke) return
+    const gridReader = browserBinanceGridReader(() => owner.current)
     const executor = createResearchExecutor({
       heartbeat: async (ownerKey) => {
         const host = parseResearchHost(await invoke('browser_research_host', { ownerKey }))
@@ -24,12 +27,14 @@ export function useBrowserResearchBridge() {
       pending: pendingResearchActions,
       claim: claimResearchAction,
       receipt: postResearchReceipt,
-      invoke: (projectKey, ownerKey, command) => invoke('run_browser_research', { projectKey, ownerKey, command }),
+      invoke: (projectKey, ownerKey, command) => isBinanceGridKind(command.kind)
+        ? gridReader.run(projectKey, ownerKey, command)
+        : invoke('run_browser_research', { projectKey, ownerKey, command }),
       owner: () => owner.current,
       now: Date.now,
     })
     void executor.poll()
     const timer = window.setInterval(() => { void executor.poll() }, 1800)
-    return () => { window.clearInterval(timer); executor.dispose() }
+    return () => { window.clearInterval(timer); executor.dispose(); gridReader.dispose() }
   }, [])
 }

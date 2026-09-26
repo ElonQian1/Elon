@@ -12,7 +12,7 @@ function load(name) {
   const compiled = new Module(filename, module)
   compiled.filename = filename
   compiled.paths = module.paths
-  compiled.require = (id) => id.startsWith('./') ? load(id.slice(2)) : require(id)
+  compiled.require = (id) => id.startsWith('.') ? load(path.relative(__dirname, path.resolve(path.dirname(filename), id))) : require(id)
   compiled._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS }, fileName: filename,
   }).outputText, filename)
