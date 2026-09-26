@@ -15,6 +15,7 @@ test('registration persists complete immutable assets outside disposable worktre
   assert.equal(first.ids, id)
   assert.equal(path.dirname(path.dirname(first.entrypoint)), root)
   assert.match(await readFile(path.join(path.dirname(first.entrypoint), 'assets.mjs'), 'utf8'), /export function assetContent/)
+  assert.match(await readFile(path.join(path.dirname(first.entrypoint), 'grid.mjs'), 'utf8'), /export function createGridService/)
   await writeFile(path.join(path.dirname(first.entrypoint), 'win-runtime.mjs'), 'changed')
   await assert.rejects(prepareRegistration(input), /reader_asset_mismatch/)
   await assert.rejects(prepareRegistration({ ...input, references: ['https://example.com/private'] }), /invalid_conversation_reference/)

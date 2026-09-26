@@ -67,7 +67,11 @@ test('stdio to Win queue completes a real JSON-RPC exchange and exports no host 
   const [code] = await once(child, 'exit')
   assert.equal(code, 0); assert.equal(error, '')
   const replies = output.trim().split('\n').map(JSON.parse)
-  assert.equal(replies.length, 3); assert.equal(replies[1].result.tools.length, 4)
+  assert.equal(replies.length, 3)
+  assert.deepEqual(replies[1].result.tools.map(tool => tool.name), [
+    'web_conversation_read', 'web_conversation_scope', 'web_conversation_connect', 'web_conversation_asset',
+    'binance_grid_list', 'binance_grid_detail',
+  ])
   const page = JSON.parse(replies[2].result.content[0].text)
   assert.equal(page.conversation_id, id); assert.equal(page.source, 'win'); assert.equal(page.has_more, false)
   assert.equal(polls, 1); assert.doesNotMatch(output, /synthetic-local-token/)
