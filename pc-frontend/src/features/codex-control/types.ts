@@ -1,5 +1,5 @@
 export type WinLogSource = 'frontend' | 'rust' | 'cli' | 'network' | 'tauri' | 'control'
-export type WinActionKind = 'show_window' | 'focus_window' | 'navigate' | 'reload_page' | 'open_devtools' | 'close_devtools' | 'capture_state' | 'list_ai_windows' | 'capture_ai_window_state' | 'focus_ai_window' | 'update_and_restart'
+export type WinActionKind = 'show_window' | 'focus_window' | 'navigate' | 'open_group_workbench' | 'reload_page' | 'open_devtools' | 'close_devtools' | 'capture_state' | 'list_ai_windows' | 'capture_ai_window_state' | 'focus_ai_window' | 'update_and_restart'
 export type WinAiProviderId = 'chatgpt' | 'google-ai-mode'
 
 export interface WinControlCapabilities {

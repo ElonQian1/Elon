@@ -16,6 +16,10 @@ implementation_status: implemented
 
 ## 操作
 
+重启后若停在本地工作台，先调用 `win_control_action(kind="open_group_workbench")`。
+它仅打开已配置云端的固定 `/pc/friends` 路由，不接受 URL，不搬运登录凭证。
+等待动作回执后重新执行 `groups` 确认登录；导航已安排不等于群聊已经可用。
+
 1. `groups` 返回当前登录用户的群 ID、群名和短期 `owner_binding`；每页 20 项。
 2. `messages` 传绑定和群 ID，返回最近 120 条内的消息分页，每页 30 项，含消息 ID、
    修订号、最多 240 字预览和图片标记。保留未读状态，不导出附件地址或字节。
