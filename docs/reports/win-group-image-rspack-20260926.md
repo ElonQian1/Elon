@@ -68,11 +68,25 @@ The inspection tool now emits module-level hashes as well as asset hashes.
   activated locally and verified through the unattended MCP update workflow.
   Receipt `ddfb2543-5f78-47ae-94de-c2d96421b838` confirmed the node and desktop
   identities and desktop PID 26900. This is update evidence, not image evidence.
-- The real group image and a neutral image-description test question are
-  selected in the production UI. Final group submission awaits action-time
+- Final Win release `0.3.69+85a697133f130d6e0304ed928de84e91e022f1e4`
+  includes attachment-aware admission. Unattended receipt
+  `b25f0a57-f09f-4f42-a062-575aa265fe6f` verified both runtime identities and
+  desktop PID 11892. The additional research-tool tests also passed (62 total
+  Rspack/research checks, plus the 180 existing regressions).
+- APK `1.1.1816` was published from `85a697133`, asset manifest verified (177
+  files), SHA-256 `65769804ebbe2fefe0a87d9113dc214a6a6e3ca1e2ff0df74d0638a2c13e103e`.
+  Registry discovery reconnected the Xiaomi and verified installation at 1816;
+  Honor remained offline. MCP independently confirmed 1816 and native UI binding.
+- Xiaomi read-only checks showed authenticated/bridge-ready/composer-ready,
+  but `fresh_text_admission` returned `runtime_unavailable/base_context`.
+  `runtime_assets` returned `manifest-4da31bb4.js`; its legacy filename filter
+  omits dot-hash Rspack assets, so this does not establish the phone's complete
+  runtime profile. Do not mark Android private image sending accepted.
+- The real group image and neutral image-description question were prepared
+  in production UI before the final update. Group submission awaits action-time
   confirmation; no prompt or group reply was submitted in this check.
-- Real upload, image understanding, native answer readback, group publication
-  and APK device verification remain unverified. ADB currently lists no device.
+- Real upload, image understanding, native answer readback and group publication
+  remain unverified. Installation and ready-state checks cannot substitute for them.
 
 This report does not mark the capability completed before live acceptance.
 Tools/projects on the new Rspack sender remain separately scoped contracts;
