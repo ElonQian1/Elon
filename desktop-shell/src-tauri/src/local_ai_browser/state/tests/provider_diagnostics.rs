@@ -1,6 +1,32 @@
 use super::*;
 
 #[test]
+fn runtime_read_diagnostic_survives_empty_snapshots_until_document_restarts() {
+    let runtime = LocalAiBrowserRuntime::default();
+    runtime.ensure_session("local-ai-chatgpt-group-test", "chatgpt", "connecting");
+    runtime.record_adapter_event(
+        "local-ai-chatgpt-group-test",
+        "browser_diagnostic",
+        json!({"kind":"rspack_read_branch_empty","detail":"fixed code"}),
+    );
+    runtime.record_adapter_event(
+        "local-ai-chatgpt-group-test",
+        "message_snapshot",
+        json!({"type":"message_snapshot","messages":[],"composerReady":true}),
+    );
+    let diagnostic = runtime.diagnostic_for_provider("chatgpt").unwrap();
+    assert_eq!(
+        diagnostic["runtime_message_read_code"],
+        "rspack_read_branch_empty"
+    );
+    assert!(diagnostic["last_error_code"].is_null());
+    runtime.record_adapter_event("local-ai-chatgpt-group-test", "adapter_ready", json!({}));
+    assert!(
+        runtime.diagnostic_for_provider("chatgpt").unwrap()["runtime_message_read_code"].is_null()
+    );
+}
+
+#[test]
 fn exposes_readiness_without_identity_or_page_content() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("local-ai-chatgpt-owner-secret", "chatgpt", "connecting");
@@ -114,10 +140,21 @@ fn exposes_readiness_without_identity_or_page_content() {
 
     let encoded = diagnostic.to_string();
     for secret in [
-        "owner-secret", "private-conversation-id", "private prompt", "private answer",
-        "private source", "private marker", "example.com", "private asset",
-        "private value", "private title", "private project", "private exception detail",
-        "private recovery material", "private-secret-kind", "private voice credential",
+        "owner-secret",
+        "private-conversation-id",
+        "private prompt",
+        "private answer",
+        "private source",
+        "private marker",
+        "example.com",
+        "private asset",
+        "private value",
+        "private title",
+        "private project",
+        "private exception detail",
+        "private recovery material",
+        "private-secret-kind",
+        "private voice credential",
         "private-upload",
     ] {
         assert!(!encoded.contains(secret), "diagnostic leaked {secret}");

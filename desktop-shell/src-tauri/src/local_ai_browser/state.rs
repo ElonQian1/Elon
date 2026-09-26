@@ -44,6 +44,7 @@ struct SessionRecord {
     renderer_status: String,
     last_error: Option<String>,
     last_error_code: Option<String>,
+    runtime_message_read_code: Option<String>,
     semantic_event: Option<Value>,
     navigation_event: Option<Value>,
     composer_event: Option<Value>,
@@ -214,6 +215,7 @@ impl LocalAiBrowserRuntime {
                 renderer_status: renderer_status.to_string(),
                 last_error: None,
                 last_error_code: None,
+                runtime_message_read_code: None,
                 semantic_event,
                 navigation_event,
                 composer_event,
@@ -431,6 +433,7 @@ impl LocalAiBrowserRuntime {
             record.last_event_kind = truncate(kind.to_string(), 48);
             match kind {
                 "adapter_ready" => {
+                    record.runtime_message_read_code = None;
                     record.renderer_status = "active".to_string();
                     record.realtime_voice_event = None;
                     record.attachment_transport_event = None;
@@ -531,18 +534,7 @@ impl LocalAiBrowserRuntime {
                     }
                     record.command_result = Some(payload);
                 }
-                "browser_diagnostic" => {
-                    let detail = payload
-                        .get("detail")
-                        .and_then(Value::as_str)
-                        .unwrap_or("ChatGPT 页面暂未完成加载。")
-                        .to_string();
-                    record.last_error = Some(truncate(detail, 240));
-                    record.last_error_code = payload
-                        .get("kind")
-                        .and_then(Value::as_str)
-                        .map(|kind| truncate(kind.to_string(), 48));
-                }
+                "browser_diagnostic" => diagnostics::record_browser_diagnostic(record, &payload),
                 _ => {}
             }
         });
@@ -691,6 +683,10 @@ impl LocalAiBrowserRuntime {
             "updated_at_ms": record.updated_at_ms,
         });
         let object = diagnostic.as_object_mut()?;
+        object.insert(
+            "runtime_message_read_code".to_string(),
+            serde_json::json!(record.runtime_message_read_code),
+        );
         object.insert(
             "private_rich_recovery".to_string(),
             diagnostics::private_rich_recovery(snapshot),

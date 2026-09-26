@@ -42,6 +42,27 @@ const ERROR_CODES: &[&str] = &[
     "promise_rejection",
     "adapter_bootstrap_failed",
 ];
+const RUNTIME_READ_CODES: &[&str] = &[
+    "rspack_read_ready",
+    "rspack_read_runtime_pending",
+    "rspack_read_projection_contract",
+    "rspack_read_mapping_missing",
+    "rspack_read_state_unknown",
+    "rspack_read_branch_missing",
+    "rspack_read_branch_empty",
+    "rspack_read_projection_empty",
+    "rspack_read_owner_changed",
+    "rspack_read_exception",
+    "rspack_read_context_runtime_pending",
+    "rspack_read_context_composer_detached",
+    "rspack_read_context_route_unsupported",
+    "rspack_read_context_document_unavailable",
+    "rspack_read_context_owner_ambiguous",
+    "rspack_read_context_owner_pending",
+    "rspack_read_context_identity_pending",
+    "rspack_read_context_identity_unavailable",
+    "rspack_read_context_conversation_mismatch",
+];
 const COMMAND_ACTIONS: &[&str] = &[
     "snapshot",
     "send_prompt",
@@ -109,6 +130,7 @@ pub(super) fn sanitize(value: Option<&Value>) -> Result<Option<Value>, String> {
         "local_conversation_count": count(value, "local_conversation_count"),
         "active_conversation": bool_value(value, "active_conversation"),
         "last_error_code": fixed(value, "last_error_code", ERROR_CODES),
+        "runtime_message_read_code": fixed(value, "runtime_message_read_code", RUNTIME_READ_CODES),
         "last_event_kind": fixed(value, "last_event_kind", EVENT_KINDS),
         "last_command_action": fixed(value, "last_command_action", COMMAND_ACTIONS),
         "last_command_ok": value.get("last_command_ok").and_then(Value::as_bool),
@@ -172,6 +194,26 @@ fn fixed_or(value: &Value, key: &str, allowed: &[&str], fallback: &str) -> Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn group_runtime_read_diagnostic_only_accepts_fixed_codes() {
+        for code in RUNTIME_READ_CODES {
+            let value = sanitize(Some(&json!({"runtime_message_read_code":code})))
+                .unwrap()
+                .unwrap();
+            assert_eq!(value["runtime_message_read_code"], *code);
+        }
+        for code in [
+            "rspack_read_private prompt",
+            "rspack_read_context_private-account",
+            "rspack_read_ready:https://private.test",
+        ] {
+            let value = sanitize(Some(&json!({"runtime_message_read_code":code})))
+                .unwrap()
+                .unwrap();
+            assert!(value["runtime_message_read_code"].is_null());
+        }
+    }
 
     #[test]
     fn send_receipt_diagnostic_only_accepts_a_sha256_fingerprint() {

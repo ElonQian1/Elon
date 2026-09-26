@@ -2,7 +2,7 @@
 pub(super) fn initialization_script() -> String {
     let marker = "window.__elonChatGptBootstrapStage = 'chatgpt_text_bootstrap';";
     super::chatgpt_adapter_bootstrap::initialization_script().replace(marker, &format!(
-        "window.__elonChatGptFreshTextTemporaryEnabled = true;\nwindow.__elonChatGptFreshTextJournalEnabled = false;\n{marker}"
+        "window.__elonChatGptFreshTextTemporaryEnabled = true;\nwindow.__elonChatGptFreshTextJournalEnabled = false;\nwindow.__elonChatGptGroupReadDiagnosticsEnabled = true;\n{marker}"
     ))
 }
 #[cfg(test)]
@@ -13,6 +13,7 @@ mod tests {
         let source = initialization_script();
         assert!(source.contains("window.__elonChatGptFreshTextTemporaryEnabled = true"));
         assert!(source.contains("window.__elonChatGptFreshTextJournalEnabled = false"));
+        assert!(source.contains("window.__elonChatGptGroupReadDiagnosticsEnabled = true"));
         assert!(
             source
                 .find("chatgpt_web_private_runtime_bindings.js")

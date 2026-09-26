@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptRspackContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -63,7 +63,8 @@
     const serverId = scope.get(runtime.conversation.i, id) || null;
     // A temporary/new local thread acquires a server ID before its URL changes.
     // Its committed owner remains authoritative; never accept a malformed server ID.
-    if (pathId ? serverId !== pathId : !id.startsWith('local-chatgpt:') ||
+    const committedServerOwner = reading && serverId !== null && id === serverId;
+    if (pathId ? serverId !== pathId : !id.startsWith('local-chatgpt:') && !committedServerOwner ||
         serverId !== null && !new RegExp('^' + UUID + '$', 'i').test(serverId)) return fail('conversation_mismatch');
     const binding = { scope, id, node, runtime, token, href: url.href, serverId,
       accountId: identity.accountId, userId: identity.userId, generation: auth.getBrowserChatGptAuthGeneration(),

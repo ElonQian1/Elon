@@ -5,6 +5,20 @@ use sha2::{Digest, Sha256};
 
 use super::super::adapter::{attachment_transport, private_rich_recovery as rich_recovery};
 
+pub(super) fn record_browser_diagnostic(record: &mut super::SessionRecord, payload: &Value) {
+    let code = payload.get("kind").and_then(Value::as_str);
+    if let Some(code) = code.filter(|code| code.starts_with("rspack_read_")) {
+        record.runtime_message_read_code = Some(super::truncate(code.to_string(), 48));
+        return;
+    }
+    let detail = payload
+        .get("detail")
+        .and_then(Value::as_str)
+        .unwrap_or("ChatGPT 页面暂未完成加载。");
+    record.last_error = Some(super::truncate(detail.to_string(), 240));
+    record.last_error_code = code.map(|code| super::truncate(code.to_string(), 48));
+}
+
 #[derive(Default)]
 pub(super) struct ContentCoverage {
     pub(super) part_counts: BTreeMap<String, u64>,

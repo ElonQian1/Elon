@@ -45,6 +45,34 @@ test('temporary local owner keeps its answer after receiving a server conversati
   assert.equal(f.values.get(f.conversation.i), ID);
 });
 
+test('temporary root can read the exact committed server owner without allowing another fresh send', async () => {
+  const f = await setup();
+  f.page.location = new URL('https://chatgpt.com/?temporary-chat=true');
+  f.parent.memoizedProps.conversationId = ID;
+  assert.equal(f.reader.read(f.editor).messages[1].content[0].text, '**fixture answer**');
+  assert.equal(f.context.capture(f.editor), null);
+  assert.equal(f.context.state().code, 'conversation_mismatch');
+  f.parent.memoizedProps.conversationId = '33333333-3333-4333-8333-333333333333';
+  assert.equal(f.reader.read(f.editor), null);
+});
+
+test('group read diagnostics contain only changed fixed codes after acceptance', async () => {
+  const f = await setup(), events = [];
+  f.page.__elonChatGptGroupReadDiagnosticsEnabled = true;
+  f.page.__elonChatGptRspackSubmit = { state: () => ({ code: 'accepted' }) };
+  f.page.elonChatGptNative = { postMessage: raw => events.push(JSON.parse(raw)) };
+  f.values.set(f.conversation.z, 'missing');
+  f.reader.read(f.editor); f.reader.read(f.editor);
+  assert.deepEqual(events, [{ type: 'browser_diagnostic', kind: 'rspack_read_branch_missing', detail: 'rspack_read_branch_missing' }]);
+  f.values.set(f.conversation.z, 'assistant');
+  f.reader.read(f.editor);
+  assert.equal(events.at(-1).kind, 'rspack_read_ready');
+  assert.ok(!JSON.stringify(events).includes('fixture prompt'));
+  f.page.__elonChatGptGroupReadDiagnosticsEnabled = false;
+  f.values.set(f.conversation.z, 'missing'); f.reader.read(f.editor);
+  assert.equal(events.length, 2);
+});
+
 test('streaming reads are allowed without relaxing the send guard', async () => {
   const f = await setup();
   f.values.set(f.conversation.T, 'streaming');
