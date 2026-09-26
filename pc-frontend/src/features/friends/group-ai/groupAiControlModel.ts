@@ -37,6 +37,7 @@ export class GroupAiControlModel {
     const read = async <T>(url: string) => { check(); const data = await this.port.read<T>(url); check(); return data }
     const output = (data: Record<string, unknown>) => { check(); return { schema: 'elon.win_group_ai_result.v1', ok: true, owner_binding: binding, ...data } }
     if (c.action !== 'groups' && c.owner_binding !== binding) return fail('owner_binding_stale')
+    if (c.action === 'groups') { await this.port.checkIdentity(owner); check() }
     if (['groups', 'messages', 'start'].includes(c.action)) {
       const { groups } = await read<{ groups: FriendGroup[] }>('/api/me/groups')
       if (!Array.isArray(groups)) return fail('invalid_group_directory')

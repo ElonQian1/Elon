@@ -5,7 +5,8 @@ import { registerPcServiceWorker } from './registerPcServiceWorker'
 import WorkbenchErrorBoundary from './WorkbenchErrorBoundary'
 import './styles/globals.css'
 
-const App = React.lazy(() => import('./App'))
+const App = React.lazy<React.ComponentType>(() => location.pathname === '/pc/group-ai-worker'
+  ? import('./features/friends/group-ai/GroupAiWorker') : import('./App'))
 
 registerPcServiceWorker()
 

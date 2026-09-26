@@ -16,9 +16,11 @@ implementation_status: implemented
 
 ## 操作
 
-重启后若停在本地工作台，先调用 `win_control_action(kind="open_group_workbench")`。
-它仅打开已配置云端的固定 `/pc/friends` 路由，不接受 URL，不搬运登录凭证。
-等待动作回执后重新执行 `groups` 确认登录；导航已安排不等于群聊已经可用。
+无需先打开群聊页面。首次有群命令时，主窗口只唤起隐藏的
+`/pc/group-ai-worker` 执行页，不领取命令、不导航、不抢焦点。
+执行页与主窗口使用相同 WebView2 Profile、云端 Origin 和已有 `elon_auth`，
+不把 Cookie、用户令牌或本机管理员凭据交给 MCP。
+原 `open_group_workbench` 仍可用于用户明确要求显示群聊时的前台导航，但不是业务前置条件。
 
 1. `groups` 返回当前登录用户的群 ID、群名和短期 `owner_binding`；每页 20 项。
 2. `messages` 传绑定和群 ID，返回最近 120 条内的消息分页，每页 30 项，含消息 ID、
@@ -46,6 +48,11 @@ implementation_status: implemented
 - 业务结果与普通诊断时间线分离；日志及诊断导出不记录问题、聊天、Cookie 或令牌。
 - 结果白名单清洗；没有任意 URL、文件路径、HTTP 请求或脚本执行能力。
 - `stage` 区分连接、上传、发送准备、派发、接收与回群，不把未就绪误报为功能不存在。
+- 隐藏执行页只获厂商能力列表和独立群分析会话权限；禁止个人会话控制、导航、清数据、
+  文件读取和剪贴板权限。原生层核对固定 label 与完整受信入口 URL，并禁止弹窗/异站导航。
+- 登录变化通过同源存储同步；发现群和派发前核对服务端身份与本机绑定。
+  本机任务页没有云端令牌不等于用户退出云端群账号。
+- 一个后台执行页单飞领取命令，不重建仍可能在发送中的宿主；退出重登使旧绑定失效。
 
 ## 验证
 
@@ -53,5 +60,7 @@ implementation_status: implemented
 权限、分享关闭、禁止重新发送及群消息/来源回读。沿用 `test-group-ai-task.cjs` 的
 附件先确认后派发、发送不明不重试和幂等回群回归。
 Rust `group_ai::tests` 覆盖命令验证、项目隔离、单次领取、幂等冲突、过期不重放及字段净化。
+`test-group-ai-worker.cjs` 覆盖本机页面不消费命令、隐藏执行页单次执行、回执重试、
+登录同步和最小权限；原生 `group_ai_worker::tests` 验证固定路由、Origin 和 loopback 限制。
 
 现场图片分析与回群验收待发布后执行；编译、离线回归和安装成功不能代替真实回复。
