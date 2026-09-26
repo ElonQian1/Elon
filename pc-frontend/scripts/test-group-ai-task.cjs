@@ -18,7 +18,7 @@ compiled.require = name => name === '../../user-browser/privateAttachmentUpload'
 compiled._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }, fileName: filename,
 }).outputText, filename)
-const { GroupAiTask, groupAiCommandId, groupAiDocumentReady, completedGroupAiReply, groupAiFailureCode } = compiled.exports
+const { GroupAiTask, groupAiCommandId, groupAiDocumentReady, completedGroupAiReply, groupAiFailureCode, groupAiReceiptCode } = compiled.exports
 const privateReceipts = require('../../android/app/src/main/assets/chatgpt_web_fresh_text_receipts.js')
 const input = { owner: 'owner', group: 'group', title: 'Test group', source: 'one', provider: 'chatgpt',
   selection: { message_ids: ['one', 'two'], message_revisions: { one: 1, two: 3 }, question: 'Summarize' } }
@@ -35,6 +35,14 @@ test('host failures retain fixed diagnostics without exporting raw errors', () =
   assert.equal(groupAiFailureCode(new Error('private content https://example.test/?token=secret'), 'opening'), 'group_opening_failed')
   assert.equal(groupAiFailureCode({ code: 'private_upload_rspack_owner_pending' }, 'uploading'), 'private_upload_rspack_owner_pending')
   assert.equal(groupAiFailureCode({ code: 'private_upload_rspack_secret' }, 'uploading'), 'group_uploading_failed')
+})
+
+test('MCP preserves protocol failure codes but not arbitrary receipt content', () => {
+  assert.equal(groupAiReceiptCode('official_runtime_v1:rejected:draft_mismatch'), 'official_runtime_v1_rejected_draft_mismatch')
+  assert.equal(groupAiReceiptCode('official_runtime_v1:unknown:dispatch_unconfirmed'), 'official_runtime_v1_unknown_dispatch_unconfirmed')
+  for (const value of ['private secret', 'official_runtime_v1:rejected:private_secret', 'private_text_v1:unknown:https://private.test']) {
+    assert.equal(groupAiReceiptCode(value), '')
+  }
 })
 
 function fixture(options = {}) {

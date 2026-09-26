@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptRspackSubmit) {
     root.__elonChatGptRspackSubmit = factory(root);
@@ -35,11 +35,18 @@
       if (command.requireNativeAttachment && !attachmentLease) return reject('attachment_contract_pending');
       const binding = attachmentLease?.binding || context.capture(command.composer);
       if (!binding) return reject(context.state().code);
-      if (binding.draft !== command.expectedDraft || command.readDraft() !== command.expectedDraft ||
+      // An empty contenteditable paragraph reports a layout newline via innerText.
+      // Only normalize that empty state; never trim or overwrite a real draft.
+      const draftMatches = () => {
+        const value = command.readDraft();
+        return value === command.expectedDraft || command.expectedDraft === '' &&
+          typeof value === 'string' && value.trim() === '';
+      };
+      if (binding.draft !== command.expectedDraft || !draftMatches() ||
           command.expectedDraft && command.expectedDraft !== command.prompt) return reject('draft_mismatch');
       command.beforeSubmit?.();
       if (!context.current(binding) || attachmentLease?.current() === false ||
-          command.readDraft() !== command.expectedDraft) return reject('context_changed');
+          !draftMatches()) return reject('context_changed');
       controller = new page.AbortController();
       const current = () => !controller.signal.aborted && context.owns(binding) &&
         (job.accepted || attachmentLease?.current() !== false);
@@ -84,5 +91,5 @@
       return { profile: runtime.profile, stage: binding ? 'ready' : 'runtime', code: reason };
     } catch (_) { return { profile: runtime.profile, stage: 'runtime', code: 'context_unavailable' }; }
   }
-  return Object.freeze({ version: 2, submit, inspect, state: () => ({ pending: !!active, code }) });
+  return Object.freeze({ version: 3, submit, inspect, state: () => ({ pending: !!active, code }) });
 });

@@ -33,6 +33,17 @@ export function groupAiCommandId(now = Date.now()): string {
   return 'mcp_' + (now * 1024 + sequence).toString(36)
 }
 const normalized = (v: string) => v.trim().replace(/\s+/g, ' ')
+const receiptCodes = new Set(['accepted', 'not_ready', 'busy', 'disabled', 'invalid_command', 'document_changed',
+  'build_unreviewed', 'role_pending', 'contract_mismatch', 'loader_mismatch', 'runtime_pending', 'composer_detached',
+  'route_unsupported', 'document_unavailable', 'owner_ambiguous', 'owner_pending', 'identity_pending', 'identity_unavailable',
+  'conversation_mismatch', 'mode_unsupported', 'attachments_or_tools_present', 'composer_state_pending',
+  'attachment_contract_pending', 'draft_mismatch', 'context_changed', 'context_unavailable', 'dispatch_unconfirmed',
+  'draft_handoff', 'state_handoff', 'completion_failed', 'timeout', 'network', 'unknown', 'reconciliation_pending',
+  'previous_send_unresolved', 'send_record_unavailable', 'stop_pending'])
+export function groupAiReceiptCode(detail: string): string {
+  const match = /^(official_runtime_v1|private_text_v1):(accepted|rejected|unknown)(?::([a-z_]+))?$/.exec(detail)
+  return match && receiptCodes.has(match[3] || match[2]) ? detail.replaceAll(':', '_') : ''
+}
 export function groupAiFailureCode(error: unknown, stage: string): string {
   const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
   const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
@@ -184,7 +195,7 @@ export class GroupAiTask {
         if (answer) { this.answer = answer; await this.deliver(); return }
       }
       const receipt = [state.commandResult, ...(state.commandResults || [])].find(r => r?.requestId === this.sendRequestId && r.action === 'send_prompt')
-      if (receipt && /^[a-zA-Z0-9_-]{1,100}$/.test(receipt.detail)) this.lastReceiptCode = receipt.detail
+      if (receipt) this.lastReceiptCode = groupAiReceiptCode(receipt.detail)
       if (receipt && !receipt.ok) throw new Error('网页尚未确认发送成功。请检查已有会话；不会自动重发问题')
       await this.host('snapshot')
       await this.port.wait(1000)

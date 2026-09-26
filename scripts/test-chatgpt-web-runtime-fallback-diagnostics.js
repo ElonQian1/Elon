@@ -62,3 +62,13 @@ test('diagnostic codes are bounded, not arbitrary exception or request content',
   const code = /\[runtime_fallback:([^\]]+)\]/.exec(f.events[0].detail)?.[1];
   assert.equal(code, 'x'.repeat(32));
 });
+
+test('runtime pre-dispatch rejection retains its reason without DOM fallback', async () => {
+  const f = fixture('');
+  f.window.__elonChatGptPrivateTextRuntimeSubmit.submit = () => ({ handled: true,
+    completion: Promise.resolve({ status: 'rejected', code: 'draft_mismatch' }) });
+  f.run();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.clicks(), 0);
+  assert.deepEqual(f.events, [{ action: 'send_prompt', ok: false, detail: 'official_runtime_v1:rejected:draft_mismatch' }]);
+});

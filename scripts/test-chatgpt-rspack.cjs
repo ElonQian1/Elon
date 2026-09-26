@@ -94,6 +94,23 @@ for (const kind of ['draft', 'native_attachment', 'preparation_change']) {
   });
 }
 
+test('an empty rich-text editor line break is not a changed draft', async () => {
+  const f = fixture();
+  f.command.readDraft = () => '\n';
+  assert.equal((await f.submit.submit(f.command).completion).status, 'accepted');
+  assert.equal(f.calls.length, 1);
+});
+
+test('empty-editor normalization never permits a nonempty official or visible draft', async () => {
+  for (const stored of [false, true]) {
+    const f = fixture();
+    f.command.readDraft = () => stored ? '\n' : '\nnot empty\n';
+    if (stored) f.values.set(f.composer.r, 'not empty');
+    assert.equal((await f.submit.submit(f.command).completion).code, 'draft_mismatch');
+    assert.equal(f.calls.length, 0);
+  }
+});
+
 for (const kind of ['false', 'throw', 'timeout']) {
   test('ambiguous ' + kind + ' retains single-flight and never replays', async () => {
     const f = fixture({ timeoutMs: 5 });
