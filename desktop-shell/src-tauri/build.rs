@@ -20,6 +20,7 @@ fn main() {
             "list_exchange_web_providers",
             "open_local_ai_web_session",
             "group_ai_web_session",
+            "ensure_group_ai_worker",
             "open_exchange_web_session",
             "present_local_ai_web_session_embedded",
             "hide_local_ai_web_session_embedded",

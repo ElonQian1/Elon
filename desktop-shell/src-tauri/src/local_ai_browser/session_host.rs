@@ -10,7 +10,11 @@ pub(super) async fn open(
     task_id: Option<&str>,
 ) -> Result<LocalAiWebSession, String> {
     let owner_fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
-    ensure_session_webview(&webview, provider, &owner_fingerprint)?;
+    if task_id.is_some() {
+        crate::group_ai_worker::ensure_caller(&webview)?;
+    } else {
+        ensure_session_webview(&webview, provider, &owner_fingerprint)?;
+    }
     let _creation_guard = lock_webview_creation();
     let window_label = match task_id {
         Some(id) => group_session::label(provider, &owner_fingerprint, id)?,

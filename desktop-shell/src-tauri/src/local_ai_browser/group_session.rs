@@ -37,7 +37,10 @@ pub async fn group_ai_web_session(
     value: Option<String>,
     request_id: Option<String>,
 ) -> Result<Value, String> {
-    ensure_main_webview(&webview)?;
+    crate::group_ai_worker::ensure_caller(&webview)?;
+    if webview.label() != MAIN_WEBVIEW_LABEL && (provider_id != "chatgpt" || action == "show") {
+        return Err("group_worker_action_not_allowed".into());
+    }
     let provider = provider_for_kind(&provider_id, ProviderKind::AiAssistant)?;
     let fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
     let label = label(provider, &fingerprint, &task_id)?;

@@ -28,6 +28,7 @@ mod autostart;
 mod browser_research;
 mod codex_semantic_bridge;
 mod external_navigation;
+mod group_ai_worker;
 mod internal_browser;
 mod local_ai_browser;
 
@@ -154,6 +155,7 @@ fn main() {
             local_ai_browser::resolve_local_ai_guest_owner_identity,
             local_ai_browser::open_local_ai_web_session,
             local_ai_browser::group_session::group_ai_web_session,
+            group_ai_worker::ensure_group_ai_worker,
             local_ai_browser::exchange_webview::open_exchange_web_session,
             local_ai_browser::embedded_view::present_local_ai_web_session_embedded,
             local_ai_browser::embedded_view::hide_local_ai_web_session_embedded,

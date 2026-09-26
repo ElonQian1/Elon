@@ -437,11 +437,7 @@ fn ensure_main_webview(webview: &Webview) -> Result<(), String> {
 }
 
 fn ensure_provider_list_webview(webview: &Webview) -> Result<(), String> {
-    if webview.label() == MAIN_WEBVIEW_LABEL {
-        Ok(())
-    } else {
-        Err("AI 网页厂商列表只允许一龙 PC 窗口读取。".to_string())
-    }
+    crate::group_ai_worker::ensure_caller(webview)
 }
 
 fn ensure_session_webview(

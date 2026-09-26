@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "group-ai-worker-session"
+description = "Read provider capabilities and operate isolated group AI documents only."
+commands.allow = ["list_local_ai_web_providers", "group_ai_web_session"]

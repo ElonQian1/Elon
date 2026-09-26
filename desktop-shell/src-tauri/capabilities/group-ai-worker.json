@@ -1,0 +1,7 @@
+{
+  "identifier": "group-ai-worker",
+  "description": "Hidden group business runner with only isolated AI session access.",
+  "windows": ["group-ai-worker"],
+  "remote": { "urls": ["http://43.139.149.158:8080/pc/group-ai-worker*", "http://localhost:*/pc/group-ai-worker*", "http://127.0.0.1:*/pc/group-ai-worker*"] },
+  "permissions": ["group-ai-worker-session"]
+}
