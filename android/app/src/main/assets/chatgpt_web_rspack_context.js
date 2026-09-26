@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptRspackContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -106,16 +106,35 @@
         binding.scope.get(binding.runtime.identity.i) === binding.userId;
     } catch (_) { return false; }
   }
-  function find(uploads) {
+  function visibleComposers() {
     const selectors = ['#prompt-textarea', '[data-testid="prompt-textarea"]', 'form [contenteditable="true"]',
       'form textarea', 'main [contenteditable="true"]', 'textarea[placeholder]'];
     const candidates = new Set(selectors.flatMap(selector => Array.from(page.document.querySelectorAll(selector))));
+    return [...candidates].filter(node => {
+      if (!node.isConnected) return false;
+      const rect = node.getBoundingClientRect(), style = page.getComputedStyle(node);
+      return !!rect.width && !!rect.height && style.display !== 'none' && style.visibility !== 'hidden';
+    });
+  }
+  function requestCurrent(binding, serverId) {
+    try {
+      if (!new RegExp('^' + UUID + '$', 'i').test(serverId || '') ||
+          binding.scope.get(binding.runtime.conversation.i, binding.id) !== serverId) return false;
+      const allowedUrl = new URL(binding.href);
+      allowedUrl.pathname = '/c/' + serverId;
+      // The official server-ID callback may remount the editor and change its
+      // committed owner. Only that exact alias, scope and account may continue.
+      const next = visibleComposers().map(node => capture(node, true)).filter(Boolean);
+      return next.length === 1 && ['token', 'accountId', 'userId', 'generation'].every(key => next[0][key] === binding[key]) &&
+        next[0].scope.node === binding.scope.node && next[0].serverId === serverId &&
+        [binding.id, serverId].includes(next[0].id) &&
+        [binding.href, allowedUrl.href].includes(next[0].href);
+    } catch (_) { return false; }
+  }
+  function find(uploads) {
     const bindings = [];
     code = 'composer_detached';
-    for (const node of candidates) {
-      if (!node.isConnected) continue;
-      const rect = node.getBoundingClientRect(), style = page.getComputedStyle(node);
-      if (!rect.width || !rect.height || style.display === 'none' || style.visibility === 'hidden') continue;
+    for (const node of visibleComposers()) {
       // Selector matches alone are not ownership: every candidate must belong
       // to the current committed account and conversation before any upload.
       const binding = capture(node, false, uploads);
@@ -126,5 +145,5 @@
     code = 'ready'; return bindings[0];
   }
   return Object.freeze({ find, capture: (node, uploads) => capture(node, false, uploads), read: node => capture(node, true),
-    current, owns, state: () => ({ code }) });
+    current, owns, requestCurrent, state: () => ({ code }) });
 });

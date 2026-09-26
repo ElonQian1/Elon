@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptRspackSubmit) {
     root.__elonChatGptRspackSubmit = factory(root);
@@ -51,8 +51,9 @@
       if (!context.current(binding) || attachmentLease?.current() === false ||
           !draftMatches()) return reject('context_changed');
       controller = new page.AbortController();
-      const current = () => !controller.signal.aborted && context.owns(binding) &&
-        (job.accepted || attachmentLease?.current() !== false);
+      const current = () => !controller.signal.aborted &&
+        (job.serverId ? context.requestCurrent(binding, job.serverId) : context.owns(binding)) &&
+        (job.accepted || !!job.serverId || attachmentLease?.current() !== false);
       code = 'dispatching';
       job.invoked = true;
       // CUv.a is the reviewed official composer transaction. It prepares integrity,
@@ -62,6 +63,7 @@
         isTemporaryChat: binding.temporary, preserveDraft: true, requireDispatchAcceptance: true,
         ...(attachmentLease ? { additionalAttachments: attachmentLease.attachments } : {}),
         isSubmissionCurrent: current, isRequestCurrent: current, signal: controller.signal,
+        onServerThreadIdChange: id => { job.serverId = id; },
       });
       const accepted = await Promise.race([Promise.resolve(request), new Promise((_, reject) => {
         timer = page.setTimeout(() => { controller.abort(); reject(Error('timeout')); }, options.timeoutMs || 20000);
@@ -96,5 +98,5 @@
       return { profile: runtime.profile, stage: binding ? 'ready' : 'runtime', code: reason };
     } catch (_) { return { profile: runtime.profile, stage: 'runtime', code: 'context_unavailable' }; }
   }
-  return Object.freeze({ version: 3, submit, inspect, state: () => ({ pending: !!active, code }) });
+  return Object.freeze({ version: 4, submit, inspect, state: () => ({ pending: !!active, code }) });
 });

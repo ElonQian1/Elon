@@ -137,3 +137,43 @@ test('account switch after invocation invalidates request guard', async () => {
   };
   assert.equal((await f.submit.submit(f.command).completion).current, false);
 });
+
+test('official server alias keeps the stream current after the editor remounts', async () => {
+  const f = fixture(), serverId = '22222222-2222-4222-8222-222222222222';
+  let request;
+  f.officialSubmit.a = async (_scope, options) => {
+    request = options;
+    f.values.set(f.conversation.i, serverId);
+    f.parent.memoizedProps.conversationId = serverId;
+    const editor = { ...f.editor };
+    f.editor.isConnected = false;
+    f.page.document.querySelectorAll = selector => selector === '#prompt-textarea' ? [editor] : [];
+    options.onServerThreadIdChange(serverId);
+    assert.equal(options.isRequestCurrent(), true);
+    return true;
+  };
+  assert.equal((await f.submit.submit(f.command).completion).status, 'accepted');
+  assert.equal(request.isRequestCurrent(), true);
+  f.page.location = new URL('https://chatgpt.com/c/' + serverId);
+  assert.equal(request.isRequestCurrent(), true);
+  f.changeAccount();
+  assert.equal(request.isRequestCurrent(), false);
+});
+
+for (const drift of ['alias', 'owner', 'route', 'document', 'account', 'ambiguous']) {
+  test('server alias does not authorize ' + drift + ' drift', async () => {
+    const f = fixture(), serverId = '22222222-2222-4222-8222-222222222222';
+    await f.page.__elonChatGptRspackRuntime.load();
+    const binding = f.context.capture(f.editor);
+    f.values.set(f.conversation.i, serverId);
+    f.parent.memoizedProps.conversationId = serverId;
+    assert.equal(f.context.requestCurrent(binding, serverId), true);
+    if (drift === 'alias') f.values.set(f.conversation.i, '33333333-3333-4333-8333-333333333333');
+    if (drift === 'owner') f.parent.memoizedProps.conversationId = '33333333-3333-4333-8333-333333333333';
+    if (drift === 'route') f.page.location = new URL('https://chatgpt.com/c/33333333-3333-4333-8333-333333333333');
+    if (drift === 'document') f.page.__elonChatGptDocumentToken = 'doc_changed';
+    if (drift === 'account') f.changeAccount();
+    if (drift === 'ambiguous') f.page.document.querySelectorAll = () => [f.editor, { ...f.editor }];
+    assert.equal(f.context.requestCurrent(binding, serverId), false);
+  });
+}
