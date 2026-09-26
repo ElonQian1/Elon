@@ -101,6 +101,34 @@ test('an empty rich-text editor line break is not a changed draft', async () => 
   assert.equal(f.calls.length, 1);
 });
 
+test('cleared resource timings do not erase a verified runtime or reroute a send', async () => {
+  const f = fixture({ latest: 'current' }), runtime = f.page.__elonChatGptRspackRuntime;
+  assert.ok(await runtime.load());
+  f.page.performance.getEntriesByType = () => [];
+  assert.equal(runtime.observed(), true);
+  assert.equal(runtime.profile, 'web_20260926b_rspack');
+  assert.equal(runtime.peek().submit, f.officialSubmit);
+  assert.equal((await f.submit.submit(f.command).completion).status, 'accepted');
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.imports.length, 1);
+  delete f.cache.CUv;
+  assert.equal(runtime.peek(), null, 'cached evidence never replaces executed-module validation');
+});
+
+test('runtime evidence expires with its document and rejects mixed runtime versions', async () => {
+  const f = fixture(), runtime = f.page.__elonChatGptRspackRuntime;
+  assert.ok(await runtime.load());
+  f.page.performance.getEntriesByType = () => [{ name: CDN + '633146.aaaaaaaaaa.js' }];
+  assert.equal(runtime.observed(), true);
+  assert.equal(runtime.peek(), null);
+  assert.equal(await runtime.load(), null);
+  assert.equal(runtime.state().code, 'build_unreviewed');
+  f.page.performance.getEntriesByType = () => [];
+  f.page.__elonChatGptDocumentToken = 'doc_replaced';
+  assert.equal(runtime.observed(), false);
+  assert.equal(runtime.peek(), null);
+});
+
 test('empty-editor normalization never permits a nonempty official or visible draft', async () => {
   for (const stored of [false, true]) {
     const f = fixture();

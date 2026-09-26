@@ -63,6 +63,7 @@ test('group read follows the accepted request after the home editor changes owne
   f.page.__elonChatGptGroupRequestOwnershipEnabled = true;
   f.page.__elonChatGptRspackSubmit = f.submit;
   assert.equal((await f.submit.submit(f.command).completion).status, 'accepted');
+  f.page.performance.getEntriesByType = () => [];
   f.parent.memoizedProps.conversationId = 'local-chatgpt:33333333-3333-4333-8333-333333333333';
   f.editor.isConnected = false;
   assert.equal(f.reader.read(null).messages[1].content[0].text, '**fixture answer**');

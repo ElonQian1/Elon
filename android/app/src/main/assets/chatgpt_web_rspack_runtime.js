@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptRspackRuntime) {
     root.__elonChatGptRspackRuntime = factory(root);
@@ -30,22 +30,43 @@
     } }];
   const importer = options.importModule || (url => import(url));
   let loader = null, pending = null, owner = null, code = 'not_observed', retryAt = 0;
+  const knownUrls = new Set(profiles.flatMap(p => [p.runtime, ...p.anchors,
+    ...Object.values(p.modules).map(([file]) => file)]).map(file => CDN + file));
+  const evidence = new Set();
+  let evidenceOwner = null, runtimeUrl = null, runtimeConflict = false;
 
   function documentKey() {
     const token = page.__elonChatGptDocumentToken;
     return page.location?.origin === 'https://chatgpt.com' && /^doc_[a-z0-9_]{3,80}$/.test(token || '') ? token : null;
   }
   function urls() {
-    return new Set((page.performance?.getEntriesByType?.('resource') || []).map(item => item.name));
+    const token = documentKey();
+    if (evidenceOwner !== token) {
+      evidence.clear(); runtimeUrl = null; runtimeConflict = false; evidenceOwner = token;
+    }
+    if (!token) return evidence;
+    // Resource Timing is a disposable telemetry buffer, not a module registry.
+    // Retain only reviewed asset evidence within this exact document; peek()
+    // still validates the executed module cache and every AppScope contract.
+    for (const item of page.performance?.getEntriesByType?.('resource') || []) {
+      if (knownUrls.has(item.name)) evidence.add(item.name);
+      if (/^https:\/\/chatgpt\.com\/cdn\/assets\/633146\.[a-f0-9]+\.js$/.test(item.name)) {
+        if (runtimeUrl && runtimeUrl !== item.name) runtimeConflict = true;
+        runtimeUrl ||= item.name;
+      }
+    }
+    return evidence;
   }
   function observed() {
-    return !!documentKey() && [...urls()].some(url => /^https:\/\/chatgpt\.com\/cdn\/assets\/633146\.[a-f0-9]+\.js$/.test(url));
+    urls();
+    return !!documentKey() && !!runtimeUrl;
   }
   function profile() {
     const names = urls();
     // These exact anchors identify the reviewed deployment, not an arbitrary Rspack build.
     const matches = profiles.filter(p => names.has(CDN + p.runtime) && p.anchors.every(file => names.has(CDN + file)));
-    return documentKey() && matches.length === 1 ? matches[0] : null;
+    return documentKey() && !runtimeConflict && matches.length === 1 &&
+      CDN + matches[0].runtime === runtimeUrl ? matches[0] : null;
   }
   function peek() {
     const selected = profile();
@@ -95,6 +116,6 @@
       .finally(() => { page.clearTimeout(timer); pending = null; });
     return pending;
   }
-  return Object.freeze({ version: 2, get profile() { return profile()?.id || 'rspack_unreviewed'; }, observed, load, peek,
+  return Object.freeze({ version: 3, get profile() { return profile()?.id || 'rspack_unreviewed'; }, observed, load, peek,
     state: () => ({ profile: profile()?.id || 'rspack_unreviewed', code, pending: !!pending }) });
 });
