@@ -8,6 +8,8 @@ use std::{collections::HashSet, path::Path};
 use crate::{node_agent_project_docs_mcp::McpRequest, NodeRuntime};
 
 pub(crate) const PROFILE: &str = "win_control";
+#[path = "node_agent_win_codex_control/group_ai_mcp.rs"]
+mod group_ai_mcp;
 
 #[derive(Debug, Deserialize)]
 struct TimelineArguments {
@@ -49,7 +51,7 @@ pub(crate) fn handle_request(
             "protocolVersion":"2025-03-26",
             "capabilities":{"tools":{"listChanged":false}},
             "serverInfo":{"name":"yilong-win-control","version":"1.0.0"},
-            "instructions":"Use semantic allowlisted actions only. Read status/timeline before changing the Win client. Never request arbitrary JavaScript, Tauri commands, URLs, cookies, request bodies, prompts, or secrets. A queued action is not successful until a Tauri receipt says succeeded."
+            "instructions":"Use semantic allowlisted actions only. Read status/timeline before changing the Win client. Never request arbitrary JavaScript, Tauri commands, URLs, cookies or secrets. Group business tools accept only explicitly authorized questions and selected message IDs, not runtime credentials. Queued is not success; verify task completion and group delivery."
         })),
         "tools/list" => Ok(json!({"tools": definitions()})),
         "tools/call" => call_tool(runtime, workspace, request.params.clone()),
@@ -59,7 +61,7 @@ pub(crate) fn handle_request(
 }
 
 fn definitions() -> Vec<Value> {
-    vec![
+    let mut tools = vec![
         json!({
             "name":"win_control_status",
             "description":"读取 Win/Tauri 在线状态、动作白名单、日志来源和安全边界。",
@@ -98,7 +100,9 @@ fn definitions() -> Vec<Value> {
                 "properties":{"action_id":{"type":"string","minLength":1,"maxLength":100}}
             }
         }),
-    ]
+    ];
+    tools.extend(group_ai_mcp::definitions());
+    tools
 }
 
 fn call_tool(runtime: &NodeRuntime, workspace: &Path, params: Value) -> Result<Value> {
@@ -111,6 +115,27 @@ fn call_tool(runtime: &NodeRuntime, workspace: &Path, params: Value) -> Result<V
         .cloned()
         .unwrap_or_else(|| json!({}));
     let value = match name {
+        "win_group_ai_action" => {
+            let command = serde_json::from_value(arguments)?;
+            runtime
+                .win_codex_control
+                .group_ai
+                .enqueue(workspace, command)
+                .map_err(anyhow::Error::msg)?
+        }
+        "win_group_ai_action_status" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct Input {
+                command_id: String,
+            }
+            let input: Input = serde_json::from_value(arguments)?;
+            runtime
+                .win_codex_control
+                .group_ai
+                .status(workspace, &input.command_id)
+                .map_err(anyhow::Error::msg)?
+        }
         "win_control_status" => json!({
             "schema":"elon.win_codex_control_status.v1",
             "project_root":workspace.to_string_lossy(),

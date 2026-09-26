@@ -57,6 +57,7 @@ struct PendingQuery {
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
     Router::new()
+        .merge(super::group_ai_api::routes())
         .route("/api/codex-control/capabilities", get(capabilities_handler))
         .route(
             "/api/codex-control/events",

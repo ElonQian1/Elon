@@ -16,6 +16,8 @@ mod action_queue;
 #[path = "node_agent_win_codex_control/ai_session_diagnostic.rs"]
 mod ai_session_diagnostic;
 mod desktop_release;
+pub(crate) mod group_ai;
+mod group_ai_api;
 use desktop_release::{heartbeat_live, validate_release_identity};
 
 const MAX_EVENTS: usize = 2_000;
@@ -78,6 +80,7 @@ struct WinControlState {
 #[derive(Default)]
 pub(crate) struct WinCodexControlHub {
     inner: Mutex<WinControlState>,
+    pub(crate) group_ai: group_ai::GroupAiControl,
 }
 
 impl WinCodexControlHub {
@@ -635,6 +638,7 @@ fn allowed_actions() -> &'static [&'static str] {
 fn allowed_route_roots() -> &'static [&'static str] {
     &[
         "/ai",
+        "/friends",
         "/workspace",
         "/projects",
         "/git-worktrees",

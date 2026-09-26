@@ -514,6 +514,7 @@ fn validate_route(route: &str) -> Result<(), String> {
     let route = route.trim();
     let roots = [
         "/ai",
+        "/friends",
         "/workspace",
         "/projects",
         "/git-worktrees",
