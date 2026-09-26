@@ -14,9 +14,14 @@ useAuthStore.subscribe(state => {
     task = null; changed(); void previous.cancel()
   }
 })
-export function startGroupAi(input: GroupAiInput) {
+export function getGroupAiTask() { return task }
+export function startGroupAi(input: GroupAiInput, operation = uuidv4()) {
+  if (task?.operation === operation) {
+    if (JSON.stringify(task.input) !== JSON.stringify(input)) throw new Error('群聊任务标识已用于不同请求')
+    return task
+  }
   if (task && !['completed', 'cancelled'].includes(task.progress.phase)) throw new Error('已有群聊 AI 请求，请先处理或停止已有任务')
-  task = new GroupAiTask(uuidv4(), input, createGroupAiPort(input.owner), changed)
+  task = new GroupAiTask(operation, input, createGroupAiPort(input.owner), changed)
   changed(); void task.start()
   return task
 }

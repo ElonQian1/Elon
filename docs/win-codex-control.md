@@ -13,6 +13,8 @@ implementation_status: tested
 
 ## 用户结果
 
+群聊图片分析与回复回群使用[群聊业务 MCP](win-group-ai-mcp.md)，复用生产任务，不依赖截图点击。
+
 - Codex 通过短期、项目绑定的 MCP profile 查询 Win/Tauri 能力、读取当前页面和节点状态、提交白名单语义动作并读取执行回执。
 - Win 工作台提供 `/codex-control` 控制台，以同一时间线查看 `frontend`、`rust`、`cli`、`network`、`tauri` 与 `control` 事件。
 - 每个事件包含稳定 `event_id`、`trace_id`、来源、级别、类型、摘要和时间；不记录请求/响应正文、Cookie、Authorization、API key、prompt、CLI 原始秘密或 Tauri 参数正文。

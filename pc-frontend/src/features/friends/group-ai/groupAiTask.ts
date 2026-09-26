@@ -67,6 +67,9 @@ export class GroupAiTask {
   dispatched = false
   sendRequestId = ''
   stopped = false
+  stage = 'preparing'
+  observedMessageCount = 0
+  lastReceiptCode = ''
   private attachmentAttempted = false
   progress: GroupAiProgress = { phase: 'preparing', message: '正在准备群聊 AI', busy: false, hasAnswer: false }
   constructor(readonly operation: string, readonly input: GroupAiInput, private port: GroupAiPort, private changed: () => void) {}
@@ -102,6 +105,7 @@ export class GroupAiTask {
       if (this.request.state !== 'prepared') { this.dispatched = true; throw new Error('请求已经派发，请核对结果，未重复发送') }
       if (!Array.isArray(this.request.attachments)) throw new Error('服务器尚未支持附件清单，请等待服务更新；未发送给 AI')
       await this.host('open')
+      this.stage = 'connecting'
       const deadline = this.port.now() + 60_000
       let ready = false
       while (this.port.now() < deadline) {
@@ -116,15 +120,18 @@ export class GroupAiTask {
       if (this.request.attachments?.length) {
         if (this.input.provider !== 'chatgpt' || !this.port.upload) throw new Error('当前客户端或 AI 来源不能上传所选附件，未发送文字')
         this.update('preparing', '正在上传所选图片和文件', true)
+        this.stage = 'uploading'
         this.attachmentAttempted = true
         await this.port.upload(this.operation, this.input, this.request.attachments, () => this.check())
         this.check()
         await this.action('status')
       }
+      this.stage = 'admission'
       if (this.input.provider === 'chatgpt') await this.preparePrivateSender()
       this.check()
       // Set before requesting permission: a lost server response is never safe to replay.
       this.dispatched = true
+      this.stage = 'dispatching'
       const permission = await this.action('dispatch')
       if (!permission.dispatch_permit) throw new Error('请求已在处理，未重复发送')
       this.sendRequestId = groupAiCommandId()
@@ -154,16 +161,19 @@ export class GroupAiTask {
     }
   }
   private async receiveAndDeliver() {
+    this.stage = 'answering'
     this.update('answering', 'AI 正在分析所选消息', true)
     const deadline = this.port.now() + 180_000
     while (this.port.now() < deadline) {
       const state = await this.host('state')
       const snapshot = state.semanticEvent as LocalAiMessageSnapshot | null
+      this.observedMessageCount = snapshot?.messages?.length ?? 0
       if (state.semanticCacheStatus === 'live' && snapshot?.type === 'message_snapshot') {
         const answer = completedGroupAiReply(snapshot, this.request!.prompt)
         if (answer) { this.answer = answer; await this.deliver(); return }
       }
       const receipt = [state.commandResult, ...(state.commandResults || [])].find(r => r?.requestId === this.sendRequestId && r.action === 'send_prompt')
+      if (receipt && /^[a-zA-Z0-9_-]{1,100}$/.test(receipt.detail)) this.lastReceiptCode = receipt.detail
       if (receipt && !receipt.ok) throw new Error('网页尚未确认发送成功。请检查已有会话；不会自动重发问题')
       await this.host('snapshot')
       await this.port.wait(1000)
@@ -171,10 +181,12 @@ export class GroupAiTask {
     throw new Error('尚未收到完整回答。可继续检查，系统不会重复发送问题')
   }
   private async deliver() {
+    this.stage = 'delivering'
     this.update('delivering', '正在发送 AI 回答到群聊', true)
     const result = await this.action('complete', this.answer)
     if (result.state !== 'completed' || !result.result_message_id) throw new Error('群消息尚未确认送达')
     this.update('completed', 'AI 回答已发送到群聊', false)
+    this.stage = 'completed'
     await this.close()
   }
   async resume() {
@@ -205,6 +217,7 @@ export class GroupAiTask {
     if (this.stopped) return
     try { this.port.checkOwner() } catch { await this.cancel(); return }
     const message = error instanceof Error ? error.message : '群聊 AI 处理失败'
+    if (!this.lastReceiptCode) this.lastReceiptCode = 'group_' + this.stage + '_failed'
     // A retry must not append to files already associated with the previous draft.
     if (!this.dispatched && this.attachmentAttempted) { await this.close(); this.attachmentAttempted = false }
     this.update(this.dispatched ? 'uncertain' : 'failed', message, false)

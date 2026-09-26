@@ -3,6 +3,7 @@ import { getDesktopInvoke } from '../shell/desktopShell'
 import { claimWinAction, fetchPendingWinActions, postWinActionReceipt, postWinEvent } from './codexControlApi'
 import type { WinControlAction } from './types'
 import { localAiProviderDraftCache } from '../user-browser/localAiProviderDraftCache'
+import { pollGroupAiCommands } from '../friends/group-ai/groupAiControlBridge'
 
 const HEARTBEAT_MS = 8_000
 const ACTION_POLL_MS = 2_500
@@ -80,6 +81,7 @@ export function useCodexControlBridge(): void {
       const invoke = getDesktopInvoke()
       if (!invoke || disposed) return
       const actions = await fetchPendingWinActions().catch(() => [])
+      void pollGroupAiCommands()
       for (const action of actions) {
         if (processed.has(action.action_id)) continue
         const claimed = await claimWinAction(action.action_id).catch(() => null)
