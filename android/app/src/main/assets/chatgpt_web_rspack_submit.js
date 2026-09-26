@@ -32,6 +32,9 @@
       if (!context || !await runtime.load()) return reject(runtime.state().code);
       if (job.token !== page.__elonChatGptDocumentToken) return reject('document_changed');
       const attachmentLease = page.__elonChatGptRspackAttachments?.prepare(command.composer);
+      if (!attachmentLease && page.__elonChatGptRspackAttachments?.state().count > 0) {
+        return reject(page.__elonChatGptRspackAttachments.state().code);
+      }
       if (command.requireNativeAttachment && !attachmentLease) return reject('attachment_contract_pending');
       const binding = attachmentLease?.binding || context.capture(command.composer);
       if (!binding) return reject(context.state().code);
@@ -87,7 +90,9 @@
       const loaded = await runtime.load();
       const lease = loaded && page.__elonChatGptRspackAttachments?.prepare(node);
       const binding = loaded && (lease?.binding || context?.capture(node));
-      const reason = binding ? 'ready' : loaded ? context?.state().code || 'context_unavailable' : runtime.state().code;
+      const attachmentState = page.__elonChatGptRspackAttachments?.state();
+      const reason = binding ? 'ready' : loaded ? attachmentState?.count > 0 && !lease ? attachmentState.code
+        : context?.state().code || 'context_unavailable' : runtime.state().code;
       return { profile: runtime.profile, stage: binding ? 'ready' : 'runtime', code: reason };
     } catch (_) { return { profile: runtime.profile, stage: 'runtime', code: 'context_unavailable' }; }
   }

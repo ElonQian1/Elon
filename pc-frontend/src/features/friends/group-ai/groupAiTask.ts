@@ -37,7 +37,8 @@ const receiptCodes = new Set(['accepted', 'not_ready', 'busy', 'disabled', 'inva
   'build_unreviewed', 'role_pending', 'contract_mismatch', 'loader_mismatch', 'runtime_pending', 'composer_detached',
   'route_unsupported', 'document_unavailable', 'owner_ambiguous', 'owner_pending', 'identity_pending', 'identity_unavailable',
   'conversation_mismatch', 'mode_unsupported', 'attachments_or_tools_present', 'composer_state_pending',
-  'attachment_contract_pending', 'draft_mismatch', 'context_changed', 'context_unavailable', 'dispatch_unconfirmed',
+  'attachment_contract_pending', 'attachment_not_owned', 'attachment_entries_changed', 'attachment_owner_changed',
+  'attachment_model_changed', 'attachment_projection_changed', 'attachment_tools_changed', 'draft_mismatch', 'context_changed', 'context_unavailable', 'dispatch_unconfirmed',
   'draft_handoff', 'state_handoff', 'completion_failed', 'timeout', 'network', 'unknown', 'reconciliation_pending',
   'previous_send_unresolved', 'send_record_unavailable', 'stop_pending'])
 export function groupAiReceiptCode(detail: string): string {

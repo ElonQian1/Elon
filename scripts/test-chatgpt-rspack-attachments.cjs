@@ -121,6 +121,28 @@ test('readiness accepts only this bridge confirmed uploads without dispatching',
   assert.equal(f.calls.length, 0);
 });
 
+test('a remounted composer can claim the exact upload in the same account and conversation', async () => {
+  const f = setup({ latest: 'current' });
+  await f.upload();
+  const next = { ...f.editor };
+  f.editor.isConnected = false;
+  f.command.composer = next;
+  f.command.requireNativeAttachment = true;
+  assert.equal((await f.submit.submit(f.command).completion).status, 'accepted');
+  assert.equal(f.calls[0][1].additionalAttachments[0].id, 'file-0');
+});
+
+test('an editor replacement cannot transfer an upload to a different account', async () => {
+  const f = setup({ latest: 'current' });
+  await f.upload();
+  f.command.composer = { ...f.editor };
+  f.editor.isConnected = false;
+  f.changeAccount();
+  f.command.requireNativeAttachment = true;
+  assert.equal((await f.submit.submit(f.command).completion).status, 'rejected');
+  assert.equal(f.calls.length, 0);
+});
+
 for (const kind of ['partial', 'error', 'wrong_ids', 'switched_account', 'changed_route', 'changed_model']) {
   test('does not confirm or send a ' + kind + ' upload', async () => {
     const f = setup();

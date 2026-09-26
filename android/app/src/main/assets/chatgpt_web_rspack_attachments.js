@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptRspackAttachments) {
     root.__elonChatGptRspackAttachments = factory(root);
@@ -80,15 +80,26 @@
   }
   function prepare(node) {
     const value = owned;
-    if (!value || node !== value.binding.node || !context.owns(value.binding) || !same(entries(value.binding), value.ready)) return null;
+    const fail = reason => { code = reason; return null; };
+    if (!value) return fail('attachment_not_owned');
+    if (!same(entries(value.binding), value.ready)) return fail('attachment_entries_changed');
+    const owner = context.read(node);
+    if (!owner) return fail(context.state().code);
+    // React may replace the editor after an upload. The committed account,
+    // conversation and exact file entries own the lease, not the old DOM node.
+    if (!['id', 'token', 'href', 'accountId', 'userId', 'generation'].every(key => owner[key] === value.binding[key]) ||
+        owner.scope.node !== value.binding.scope.node) return fail('attachment_owner_changed');
     const binding = context.capture(node, value.ready);
-    if (!binding || binding.model.slug !== value.binding.model.slug) return null;
+    if (!binding) return fail(context.state().code === 'attachments_or_tools_present'
+      ? 'attachment_tools_changed' : context.state().code);
+    if (binding.model.slug !== value.binding.model.slug) return fail('attachment_model_changed');
     const attachments = binding.runtime.attachments.m(value.ready);
-    if (attachments.length !== value.ready.length) return null;
+    if (attachments.length !== value.ready.length) return fail('attachment_projection_changed');
     const fingerprint = JSON.stringify(attachments);
     let consumed = false;
     const current = () => !consumed && owned === value && context.owns(binding) &&
       same(entries(binding), value.ready) && JSON.stringify(binding.runtime.attachments.m(value.ready)) === fingerprint;
+    code = 'associated';
     return { binding, attachments: JSON.parse(fingerprint), current,
       consumeAccepted() {
         if (consumed) return;
@@ -112,6 +123,6 @@
     if (!owned.ready.length) owned = null;
     return true;
   }
-  return Object.freeze({ version: 2, upload, prepare, cancel, merge, remove,
+  return Object.freeze({ version: 3, upload, prepare, cancel, merge, remove,
     state: () => ({ code, pending: !!active, count: owned?.ready.length || 0 }) });
 });
