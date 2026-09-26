@@ -4,14 +4,14 @@ import { runWorkflow } from './workflow.mjs'
 import { parseArgs } from './run.mjs'
 
 const target = '0.3.70+' + 'a'.repeat(40), old = '0.3.69+' + 'b'.repeat(40)
-function fixture({ current = target, state = {}, read = { content_complete: true } } = {}) {
+function fixture({ current = target, desktop = current, state = {}, read = { content_complete: true } } = {}) {
   const calls = [], snapshots = []
   const control = {
-    connect: async (...args) => { calls.push(['connect', ...args]); return { base: 'http://127.0.0.1:7799', status: { release_identity: current } } },
+    connect: async (...args) => { calls.push(['connect', ...args]); return { base: 'http://127.0.0.1:7799', status: await control.status() } },
     submit: async kind => { calls.push(['submit', kind]); return { kind, action_id: 'win_act_' + 'c'.repeat(32), status: 'queued' } },
     waitAction: async action => { calls.push(['receipt', action.kind]); return { ...action, status: 'succeeded', route: action.kind === 'navigate' ? '/ai' : undefined } },
-    waitRelease: async value => { calls.push(['activate', value]); current = value },
-    status: async () => ({ release_identity: current, tauri_available: true, frontend_available: true }),
+    waitRelease: async value => { calls.push(['activate', value]); current = value; desktop = value },
+    status: async () => ({ release_identity: current, desktop_release_identity: desktop, tauri_available: true, frontend_available: true }),
   }
   const input = { state: { run_id: 'run', target_release: target, ...state }, control, delay: async () => {},
     save: async value => snapshots.push(structuredClone(value)), read: async progress => { calls.push(['read']); await progress({ pages: 1 }); return read } }
@@ -23,6 +23,19 @@ test('current release is reused; page actions, actual read and final identity ar
   assert.deepEqual(f.calls.filter(call => call[0] === 'submit').map(call => call[1]), ['reload_page', 'navigate', 'capture_state'])
   assert.equal(value.final_release, target); assert.equal(value.stage, 'finished')
   assert.equal(value.workflow_complete, true)
+})
+
+test('update-only repairs a stale desktop without reading, navigating or reloading chats', async () => {
+  const f = fixture({ desktop: old, state: { update_only: true } })
+  const outcome = await runWorkflow(f.input)
+  assert.equal(outcome.status, 'passed')
+  assert.equal(outcome.desktop_release, target)
+  assert.deepEqual(f.calls.filter(c => c[0] === 'submit').map(c => c[1]), ['update_and_restart'])
+  assert.ok(!f.calls.some(c => c[0] === 'read'))
+  const args = ['--project-root', '.', '--target-release', target, '--update-only']
+  assert.equal(parseArgs(args).reference, null)
+  assert.equal(parseArgs(args).updateOnly, true)
+  assert.throws(() => parseArgs([...args, '--reference', '00000000-0000-4000-8000-000000000001']))
 })
 test('update intent is durable before submitting and scheduling is followed by exact activation', async () => {
   const f = fixture({ current: old })

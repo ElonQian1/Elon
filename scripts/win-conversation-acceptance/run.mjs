@@ -12,15 +12,18 @@ export function parseArgs(argv) {
   const values = {}
   for (let i = 0; i < argv.length; i += 2) {
     const key = argv[i]
+    if (key === '--update-only' && !values[key]) { values[key] = true; i--; continue }
     if (!['--project-root', '--reference', '--target-release', '--resume'].includes(key) ||
         values[key] || !argv[i + 1] || argv[i + 1].startsWith('--')) throw Error('invalid_arguments')
     values[key] = argv[i + 1]
   }
   if (!values['--project-root'] || !exactRelease(values['--target-release'])) throw Error('exact_target_and_project_required')
-  const reference = conversationId(values['--reference'])
+  const updateOnly = values['--update-only'] === true
+  if (updateOnly && values['--reference']) throw Error('update_only_has_no_conversation')
+  const reference = updateOnly ? null : conversationId(values['--reference'])
   const runId = values['--resume'] || randomUUID()
   if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(runId)) throw Error('invalid_run_id')
-  return { projectRoot: values['--project-root'], reference, targetRelease: values['--target-release'], runId, resume: Boolean(values['--resume']) }
+  return { projectRoot: values['--project-root'], reference, updateOnly, targetRelease: values['--target-release'], runId, resume: Boolean(values['--resume']) }
 }
 const digest = value => createHash('sha256').update(value).digest('hex')
 
@@ -61,6 +64,7 @@ export async function run(argv, env = process.env, emit = value => process.stdou
           state.target_release !== options.targetRelease) throw Error('acceptance_resume_mismatch')
     } else {
       state = { schema: 'yilong.win_conversation_acceptance.v1', run_id: options.runId, binding,
+        update_only: options.updateOnly,
         target_release: options.targetRelease, started_at: new Date().toISOString() }
     }
     const save = async value => {
@@ -88,6 +92,7 @@ export async function run(argv, env = process.env, emit = value => process.stdou
     emit({ status: outcome.status, run_id: options.runId, receipt: receiptPath,
       workflow_complete: outcome.workflow_complete,
       target_release: outcome.target_release, final_release: outcome.final_release,
+      desktop_release: outcome.desktop_release, desktop_process_ids: outcome.desktop_process_ids,
       update_mode: outcome.update?.mode, read: outcome.read, error: outcome.error })
     return outcome.status === 'passed' ? 0 : outcome.status === 'partial' ? 2 : outcome.status === 'user_action_required' ? 3 : 1
   } finally { await lock.close(); await rm(lockPath, { force: true }) }

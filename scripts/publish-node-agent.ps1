@@ -27,11 +27,15 @@ param(
     [string]$ReplayPublishedSha = "",
     [switch]$SynchronousRemote,
     [string]$RemoteOutboxEventPath = "",
-    [switch]$SkipLocalActivation
+    [switch]$SkipLocalActivation,
+    [switch]$UpdateRunningDesktop
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ($UpdateRunningDesktop -and ($SkipLocalActivation -or $SynchronousRemote)) {
+    throw '-UpdateRunningDesktop requires the local activation phase.'
+}
 . (Join-Path $PSScriptRoot "direct-network.ps1")
 . (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
 . (Join-Path $PSScriptRoot "publish-health-checks.ps1")
@@ -516,14 +520,17 @@ $DesktopShellBin = Join-Path $TargetDir "release\elon-desktop.exe"
 $desktopShellEnvironmentValues = @(
     $pcFrontendEnvironmentValues
     "PC_FRONTEND_INPUT_HASH=$pcFrontendInputHash"
+    "ELON_DESKTOP_RELEASE_IDENTITY=$ReleaseIdentity"
 )
 $desktopInputHash = Get-NodeAgentReleaseInputHash -RepoRoot $RepoRoot -GitSha $GitSha `
-    -GitPaths @('desktop-shell/src-tauri', 'pc-frontend', 'android/app/src/main/assets') `
+    -GitPaths @('desktop-shell/src-tauri', 'pc-frontend', 'android/app/src/main/assets', 'scripts/node-storage-paths.ps1') `
     -ToolVersions @((rustc -vV | Out-String), (cargo -V | Out-String), 'target-cpu=x86-64') `
     -EnvironmentValues $desktopShellEnvironmentValues
 Invoke-NodeAgentCachedFileBuild -Kind 'desktop-shell' -InputHash $desktopInputHash `
     -CacheRoot $releaseArtifactCache -OutputPath $DesktopShellBin -Build {
+        $previousDesktopIdentity = $env:ELON_DESKTOP_RELEASE_IDENTITY
         try {
+            $env:ELON_DESKTOP_RELEASE_IDENTITY = $ReleaseIdentity
             $unitSeparator = [char]0x1f
             $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
             Invoke-RustCacheCargo -ProjectRoot $RepoRoot -Domain 'node-agent-release' `
@@ -535,6 +542,11 @@ Invoke-NodeAgentCachedFileBuild -Kind 'desktop-shell' -InputHash $desktopInputHa
             if ($LASTEXITCODE -ne 0) { throw "elon-desktop 编译失败" }
         } finally {
             Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
+            if ($null -eq $previousDesktopIdentity) {
+                Remove-Item Env:\ELON_DESKTOP_RELEASE_IDENTITY -ErrorAction SilentlyContinue
+            } else {
+                $env:ELON_DESKTOP_RELEASE_IDENTITY = $previousDesktopIdentity
+            }
         }
     } | Out-Host
 Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
@@ -598,6 +610,17 @@ if (-not $SynchronousRemote) {
     Write-Output "NODE_AGENT_REMOTE_OUTBOX_EVENT=$($outboxEvent.EventPath)"
     Write-Output "NODE_AGENT_REMOTE_WORKER_PID=$workerPid"
     Write-Output 'NODE_AGENT_LOCAL_SERVER_DEPENDENCY=none'
+    if ($UpdateRunningDesktop) {
+        & node (Join-Path $PSScriptRoot 'win-conversation-acceptance/run.mjs') `
+            --project-root $RepoRoot --target-release $ReleaseIdentity --update-only
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Package prepared, but Win runtime update is not verified. Resume the emitted receipt; do not report the client as updated.'
+        }
+        Write-Output 'NODE_AGENT_DESKTOP_RUNTIME_STATUS=verified'
+    } else {
+        Write-Output 'NODE_AGENT_DESKTOP_RUNTIME_STATUS=not_verified'
+        Write-Output "NODE_AGENT_DESKTOP_UPDATE_COMMAND=node scripts/win-conversation-acceptance/run.mjs --project-root `"$RepoRoot`" --target-release $ReleaseIdentity --update-only"
+    }
     $script:NodeReleaseFinished = $true
     return
 }

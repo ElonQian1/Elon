@@ -1,6 +1,6 @@
 ---
 version_status: current
-reviewed_at: 2026-09-25
+reviewed_at: 2026-09-26
 ---
 
 # Win 会话读取无人值守验收
@@ -15,7 +15,8 @@ reviewed_at: 2026-09-25
 Codex 从 `AGENTS.md`/`CODEX.md` 进入共享 `.github/copilot-instructions.md`；Copilot 读取该共享规则；
 Claude 从仓库根 `CLAUDE.md` 进入同一共享规则。三者均按本说明执行，不依赖某一个模型的个人记忆。
 已有任务授权涵盖的启动、精确更新、重连、导航和只读验收直接执行，不因每一步需要开窗口或重启而重复询问。
-当前组合入口测试指定 ChatGPT 会话；其他 Win 功能按各自合同验收，不能用此会话测试冒充。
+默认入口测试指定 ChatGPT 会话；`--update-only` 只更新 Win，不要求官网登录、不读取或发送聊天。
+其他 Win 功能按各自合同验收，不能用版本检查冒充功能验收。
 执行需要本机命令能力、Node.js 和现有 Win 控制通道；只读聊天模式或没有这些工具时明确报告缺口。
 底层 `win_control` 的 `codex_mcp` 是现有固定控制来源标记，入口复用该通道，不伪造模型身份或新增绕过路径。
 入口更新适用于读取最新项目规则的任务；旧会话需要重新读取，其他项目不会自动继承。
@@ -24,7 +25,30 @@ Claude 从仓库根 `CLAUDE.md` 进入同一共享规则。三者均按本说明
 
 需要 Windows、Node.js 18+、已安装一龙、有效的 ChatGPT 登录以及可达的官网网络。
 发布目标取自正式发布收据，必须是 `version+完整 Git SHA`，不能传 `latest`、下载地址或程序路径。
-当前版本已经匹配时自动跳过更新，继续打开功能和测试。
+只有节点和新鲜桌面进程心跳都匹配目标时才跳过更新，不能用磁盘清单或节点版本代表桌面版本。
+
+### 只更新 Win，不操作聊天
+
+已本机编译的包直接复用正式激活队列及 SHA-256 校验、owner 门禁、安装锁和回滚，
+不需要等远端上传，也不手工复制正在运行的 EXE。首次升级旧守护器时仍可能走旧下载路径；
+本版以后从安装身份绑定的数据根定位本地包，不再只查旧的 LOCALAPPDATA 缓存目录。
+
+```powershell
+# 本机编译、安排远端异步发布，并通过 MCP 自动更新/重启/验收本机 Win。
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publish-node-agent.ps1 -UpdateRunningDesktop
+
+# 已有发布包时只做更新，不重复编译。不导航、不刷新页面、不发聊天。
+node scripts/win-conversation-acceptance/run.mjs `
+  --project-root 'D:\path\to\project' `
+  --target-release '正式发布收据中的version+完整GitSHA' --update-only
+```
+
+未指定 `-UpdateRunningDesktop` 的普通发布仍不打断用户桌面，会明确输出
+`NODE_AGENT_DESKTOP_RUNTIME_STATUS=not_verified` 和可执行的更新命令；不能据此说客户端已更新。
+显式更新必须收到 `NODE_AGENT_DESKTOP_RUNTIME_STATUS=verified` 或 update-only 的 `passed` 收据。
+收据保留节点/桌面完整 SHA 和实际桌面 PID；缺失、混合版本、过期心跳都不能过关。
+重复执行已匹配版本时不重启。若回复丢失，用相同参数和 `--resume <run_id>` 只核实原动作，
+不再提交第二次更新。超时保留检查点并返回非零，不能自动强杀任务或假报成功。
 
 ```powershell
 node scripts/win-conversation-acceptance/run.mjs `
@@ -41,8 +65,10 @@ node scripts/win-conversation-acceptance/run.mjs `
 1. 发现真正的本机节点；缺少节点或工作台时调用固定安装启动器一次，等待两者上线。
 2. 建立项目绑定的 `win_control` MCP 会话，读取当前真实发布身份。
 3. 版本不同时先保存更新意图，再提交一次 `update_and_restart`；读取精确动作回执。
-4. 等待节点重连，重新申请短期 MCP 会话，核对目标发布身份与 Tauri/前端在线状态。
+4. 等待节点重连，重新申请短期 MCP 会话，核对 `capabilities.release_identity`、
+   `capabilities.desktop_runtime.release_identity` 均等于目标，且 Tauri/前端在线。
    “更新已安排”不能代替“新版本已激活”。
+   `--update-only` 在此再次确认后结束，不执行后面的聊天操作。
 5. 执行固定 `reload_page`、`navigate /ai`、`capture_state`，逐项等待成功回执并核对导航路由。
 6. 准备内容寻址的正式 MCP 代码副本并启动新 stdio 进程，只授权本次明确指定的会话。
    验证四个读取工具真实可发现；不修改全局 Codex 配置。
@@ -76,7 +102,7 @@ PID 仍存在、锁损坏或恢复竞争均明确失败，不能只凭锁的年�
 
 | 退出码 | status | 含义 |
 |---:|---|---|
-| 0 | `passed` | 指定版本、功能打开、全部页、附件字节和已知内容完整性均验证成功 |
+| 0 | `passed` | update-only：节点和桌面精确版本均验证；默认：另含功能打开、全部页和附件完整性 |
 | 2 | `partial` | 已自动跑完，但源内容仍报告未支持格式等缺口 |
 | 3 | `user_action_required` | 官网登录或验证必须由用户完成 |
 | 1 | `failed` | 更新、连接、导航、读取、身份或摘要校验失败；按收据错误码定位 |

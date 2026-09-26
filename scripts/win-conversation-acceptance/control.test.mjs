@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createControl, exactRelease } from './control.mjs'
 
 const target = '0.3.70+' + 'a'.repeat(40), base = 'http://127.0.0.1:7799'
-function fixture({ online = true, host = true } = {}) {
+function fixture({ online = true, host = true, desktop = target } = {}) {
   let time = 0, launches = 0, bootstraps = 0, calls = 0
   const options = { env: {}, projectRoot: '.', now: () => time, delay: async ms => { time += ms },
     discover: async () => online ? base : null, launch: async () => { launches++; online = true; host = true },
@@ -11,7 +11,9 @@ function fixture({ online = true, host = true } = {}) {
       calls++
       if (url.endsWith('/bootstrap')) { bootstraps++; return { mcp: { url: base + '/mcp?token=synthetic' } } }
       if (body.params.name === 'win_control_status') return { result: { structuredContent: { capabilities: {
-        schema: 'elon.win_codex_control.v1', release_identity: target, tauri_available: host, frontend_available: host } } } }
+        schema: 'elon.win_codex_control.v1', release_identity: target,
+        desktop_runtime: { release_identity: desktop, process_ids: [123] },
+        tauri_available: host, frontend_available: host } } } }
       const args = body.params.arguments
       return { result: { structuredContent: { action: { action_id: 'win_act_' + 'b'.repeat(32), kind: args.kind, status: 'succeeded' } } } }
     } }
@@ -22,6 +24,14 @@ test('cold node and missing desktop reuse installed launcher once', async () => 
     const f = fixture(input), control = createControl(f.options)
     assert.equal((await control.connect()).base, base)
     assert.equal(f.launches(), Object.keys(input).length ? 1 : 0)
+  }
+})
+
+test('a new node with old or unverified desktop is never accepted as updated', async () => {
+  for (const desktop of [null, '0.3.69+' + 'b'.repeat(40)]) {
+    const f = fixture({ desktop }), control = createControl(f.options)
+    await control.connect()
+    await assert.rejects(control.waitRelease(target, 3000), /win_release_timeout/)
   }
 })
 test('update resume waits on its pinned endpoint without launching a second desktop', async () => {

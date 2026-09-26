@@ -585,10 +585,16 @@ try {
     $desktopShellBuildOffset = $publishText.IndexOf("`$script:NodeReleaseActiveStage = 'desktop_shell_build'")
     Assert-True ($pcFrontendBundleOffset -ge 0 -and $desktopShellBuildOffset -gt $pcFrontendBundleOffset) `
         'PC frontend dist must be built before Tauri embeds it into elon-desktop.exe'
-    Assert-True ($publishText.Contains("-GitPaths @('desktop-shell/src-tauri', 'pc-frontend', 'android/app/src/main/assets')")) `
+    Assert-True ($publishText.Contains("-GitPaths @('desktop-shell/src-tauri', 'pc-frontend', 'android/app/src/main/assets', 'scripts/node-storage-paths.ps1')")) `
         'desktop shell artifact cache must invalidate when embedded frontend or shared web adapters change'
     Assert-True ($publishText.Contains('-EnvironmentValues $desktopShellEnvironmentValues')) `
         'desktop shell artifact cache must include the VITE environment used by the embedded frontend'
+    Assert-True ($publishText.Contains('"ELON_DESKTOP_RELEASE_IDENTITY=$ReleaseIdentity"') -and `
+        $publishText.Contains('$env:ELON_DESKTOP_RELEASE_IDENTITY = $ReleaseIdentity')) `
+        'desktop shell cache and binary must both be pinned to the exact release identity'
+    Assert-True ($publishText.Contains('--target-release $ReleaseIdentity --update-only') -and `
+        $publishText.Contains('NODE_AGENT_DESKTOP_RUNTIME_STATUS=not_verified')) `
+        'publication alone must not claim that the running desktop was updated'
     Assert-True ($publishText.Contains("'node-agent-remote-publish-v1.lock'") -and `
         $publishText.Contains("'node-agent-local-publish-v1.lock'")) `
         'remote retry lane must never hold the local publish lock'

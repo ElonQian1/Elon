@@ -1,4 +1,4 @@
-import { safeCode } from './control.mjs'
+import { releaseReady, safeCode } from './control.mjs'
 
 // update.intent is checkpointed before the mutation; interrupted or ambiguous
 // updates reconcile the exact running release instead of submitting again.
@@ -6,14 +6,15 @@ export async function runWorkflow({ state, control, save, read, delay = ms => ne
   const checkpoint = async stage => { state.stage = stage; state.updated_at = new Date().toISOString(); await save(state) }
   try {
     state.status = 'running'; delete state.error; delete state.read; delete state.progress; delete state.final_release
+    delete state.desktop_release; delete state.desktop_process_ids
     state.workflow_complete = false
     await checkpoint('connecting')
     const connected = await control.connect(state.base, { waitOnly: Boolean(state.update && state.update.phase !== 'verified') })
     state.base = connected.base
     state.initial_release ??= connected.status.release_identity
     await checkpoint('connected')
-    if (state.update?.phase === 'verified' && connected.status.release_identity !== state.target_release) throw Error('win_release_drift')
-    if (connected.status.release_identity === state.target_release) {
+    if (state.update?.phase === 'verified' && !releaseReady(connected.status, state.target_release)) throw Error('win_release_drift')
+    if (releaseReady(connected.status, state.target_release)) {
       state.update = { ...state.update, phase: 'verified', mode: state.update?.mode || 'already_current' }
     } else {
       if (!state.update) {
@@ -43,6 +44,17 @@ export async function runWorkflow({ state, control, save, read, delay = ms => ne
       state.update.phase = 'verified'
     }
     await checkpoint('release_verified')
+    if (state.update_only) {
+      const final = await control.status()
+      if (!releaseReady(final, state.target_release)) throw Error('win_release_drift')
+      state.final_release = final.release_identity
+      state.desktop_release = final.desktop_release_identity
+      state.desktop_process_ids = final.desktop_process_ids
+      state.workflow_complete = true
+      state.status = 'passed'
+      await checkpoint('finished')
+      return state
+    }
     // These actions are reversible; a resumed run may repeat them. Page cursors
     // are deliberately discarded after an interruption or host restart.
     state.controls = []
@@ -59,7 +71,7 @@ export async function runWorkflow({ state, control, save, read, delay = ms => ne
     // Prevent a rolling update during a long read from being accepted as the
     // original artifact. The reader also pins its own host/snapshot identity.
     const final = await control.status()
-    if (final.release_identity !== state.target_release || !final.tauri_available || !final.frontend_available) throw Error('win_release_drift')
+    if (!releaseReady(final, state.target_release)) throw Error('win_release_drift')
     state.final_release = final.release_identity
     state.workflow_complete = true
     state.status = state.read.content_complete ? 'passed' : 'partial'

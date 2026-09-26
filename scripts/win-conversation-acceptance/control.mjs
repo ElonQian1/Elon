@@ -2,6 +2,8 @@ import { discoverWin, launchInstalledWin } from '../web-conversations/win-runtim
 import { json, localUrl, result, rpc, sleep } from '../web-conversations/local-rpc.mjs'
 
 export const exactRelease = value => typeof value === 'string' && /^[A-Za-z0-9._-]{1,48}\+[a-fA-F0-9]{40,64}$/.test(value)
+export const releaseReady = (value, target) => exactRelease(target) && value?.release_identity === target &&
+  value?.desktop_release_identity === target && value.tauri_available === true && value.frontend_available === true
 export function safeCode(error) {
   return /^[a-z][a-z_0-9]{0,79}$/.test(error?.message || '') ? error.message : 'acceptance_failed'
 }
@@ -31,6 +33,9 @@ export function createControl({ env, projectRoot, request = json, discover = () 
     if (value?.schema !== 'elon.win_codex_control.v1' || !exactRelease(value.release_identity) ||
         typeof value.tauri_available !== 'boolean' || typeof value.frontend_available !== 'boolean') throw Error('invalid_win_capabilities')
     return { release_identity: value.release_identity, tauri_available: value.tauri_available,
+      desktop_release_identity: exactRelease(value.desktop_runtime?.release_identity) ? value.desktop_runtime.release_identity : null,
+      desktop_process_ids: Array.isArray(value.desktop_runtime?.process_ids)
+        ? value.desktop_runtime.process_ids.filter(pid => Number.isSafeInteger(pid) && pid > 0).slice(0, 8) : [],
       frontend_available: value.frontend_available }
   }
   async function connect(pinnedBase, { waitOnly = false } = {}) {
@@ -85,7 +90,7 @@ export function createControl({ env, projectRoot, request = json, discover = () 
     while (now() < deadline) {
       try {
         const value = await status()
-        if (value.release_identity === target && value.tauri_available && value.frontend_available) return value
+        if (releaseReady(value, target)) return value
       } catch { /* Node restart invalidates short-lived MCP tokens; rebind next poll. */ }
       await delay(1000)
     }
