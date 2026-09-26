@@ -143,6 +143,30 @@ pub async fn ensure_group_ai_worker(
 mod tests {
     use super::*;
     #[test]
+    fn worker_capability_accepts_ipc_origin_with_only_scoped_commands() {
+        // Tauri custom-protocol IPC uses the Origin header, not the document path.
+        let capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/group-ai-worker.json")).unwrap();
+        assert_eq!(capability["windows"], serde_json::json!([LABEL]));
+        assert_eq!(
+            capability["permissions"],
+            serde_json::json!(["group-ai-worker-session"])
+        );
+        let patterns: Vec<tauri::utils::acl::RemoteUrlPattern> = capability["remote"]["urls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| value.as_str().unwrap().parse().unwrap())
+            .collect();
+        for raw in [CLOUD, "http://127.0.0.1:7799", "http://localhost:7799"] {
+            assert!(patterns.iter().any(|p| p.test(&Url::parse(raw).unwrap())));
+        }
+        for raw in ["https://example.org", "http://43.139.149.158:8081"] {
+            assert!(!patterns.iter().any(|p| p.test(&Url::parse(raw).unwrap())));
+        }
+    }
+
+    #[test]
     fn fixed_background_route_reuses_cloud_origin_without_credentials() {
         let main = Url::parse("http://127.0.0.1:7799/pc/local-tasks").unwrap();
         let url = target(&main, CLOUD, "http://127.0.0.1:7799").unwrap();
