@@ -1,6 +1,7 @@
 # Win Group Image Runtime Repair
 
-Status: implementation and offline checks passed; installed acceptance pending.
+Status: implementation and offline checks passed; Win update verified;
+image answer and group delivery acceptance pending.
 Scope: the existing group selection, native attachment byte bridge, ChatGPT
 temporary conversation and group reply flow. No proxy or credential changes.
 
@@ -53,16 +54,25 @@ The inspection tool now emits module-level hashes as well as asset hashes.
   remains single-flight until it settles, including late admission callbacks.
 - The current committed local owner can acquire a valid server UUID without
   losing native rich-message projection on the unchanged temporary URL.
+- Sender admission recognizes the same confirmed attachment lease as dispatch;
+  unrelated user-owned attachments remain rejected.
 
 ## Verification
 
-- 58 targeted Rspack tests passed, including the server-ID transition,
+- 59 targeted Rspack tests passed, including the server-ID transition,
   multimodal send, partial batch, timeout, account changes and ACK cleanup.
 - 180 existing upload, Win assembly and group-reply tests passed.
 - A stale test pinned adapter version 207; it now checks the actual minimum
   attachment-observer contract instead of rejecting every later adapter.
+- Win release `0.3.69+374db03d553dfd008c976d56bc256e2471bede7b` was built,
+  activated locally and verified through the unattended MCP update workflow.
+  Receipt `ddfb2543-5f78-47ae-94de-c2d96421b838` confirmed the node and desktop
+  identities and desktop PID 26900. This is update evidence, not image evidence.
+- The real group image and a neutral image-description test question are
+  selected in the production UI. Final group submission awaits action-time
+  confirmation; no prompt or group reply was submitted in this check.
 - Real upload, image understanding, native answer readback, group publication
-  and APK device verification must be recorded after installing the candidate.
+  and APK device verification remain unverified. ADB currently lists no device.
 
 This report does not mark the capability completed before live acceptance.
 Tools/projects on the new Rspack sender remain separately scoped contracts;

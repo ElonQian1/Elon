@@ -64,6 +64,16 @@ test('current live manifest resolves its reviewed conversation alias and image s
   assert.equal(f.calls[0][1].additionalAttachments.length, 1);
 });
 
+test('readiness accepts only this bridge confirmed uploads without dispatching', async () => {
+  const f = setup({ latest: 'current' });
+  await f.upload();
+  assert.equal((await f.submit.inspect(f.editor)).code, 'ready');
+  assert.equal(f.calls.length, 0);
+  f.values.set(f.composer.f, [{ id: 'user-owned', status: 'ready' }]);
+  assert.notEqual((await f.submit.inspect(f.editor)).code, 'ready');
+  assert.equal(f.calls.length, 0);
+});
+
 for (const kind of ['partial', 'error', 'wrong_ids', 'switched_account', 'changed_route', 'changed_model']) {
   test('does not confirm or send a ' + kind + ' upload', async () => {
     const f = setup();

@@ -78,7 +78,8 @@
   async function inspect(node) {
     try {
       const loaded = await runtime.load();
-      const binding = loaded && context?.capture(node);
+      const lease = loaded && page.__elonChatGptRspackAttachments?.prepare(node);
+      const binding = loaded && (lease?.binding || context?.capture(node));
       const reason = binding ? 'ready' : loaded ? context?.state().code || 'context_unavailable' : runtime.state().code;
       return { profile: runtime.profile, stage: binding ? 'ready' : 'runtime', code: reason };
     } catch (_) { return { profile: runtime.profile, stage: 'runtime', code: 'context_unavailable' }; }
