@@ -42,7 +42,7 @@ const receiptCodes = new Set(['accepted', 'not_ready', 'busy', 'disabled', 'inva
   'previous_send_unresolved', 'send_record_unavailable', 'stop_pending'])
 export function groupAiReceiptCode(detail: string): string {
   const match = /^(official_runtime_v1|private_text_v1):(accepted|rejected|unknown)(?::([a-z_]+))?$/.exec(detail)
-  return match && receiptCodes.has(match[3] || match[2]) ? detail.replaceAll(':', '_') : ''
+  return match && receiptCodes.has(match[3] || match[2]) ? detail.replace(/:/g, '_') : ''
 }
 export function groupAiFailureCode(error: unknown, stage: string): string {
   const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
