@@ -223,6 +223,8 @@ pub(crate) fn codex_win_capabilities(
     );
     Ok(json!({
         "schema":"elon.tauri_codex_bridge.v1",
+        "desktop_release_identity":option_env!("ELON_DESKTOP_RELEASE_IDENTITY"),
+        "desktop_process_id":std::process::id(),
         "available":true,
         "window_label":webview.label(),
         "actions":["show_window","focus_window","navigate","reload_page","open_devtools","close_devtools","capture_state","list_ai_windows","capture_ai_window_state","focus_ai_window","update_and_restart"],

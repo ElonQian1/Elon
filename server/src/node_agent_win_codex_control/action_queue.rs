@@ -16,11 +16,16 @@ pub(super) fn enqueue(
     let target_release_identity =
         validate_action_target(kind, target_release_identity, requested_by)?;
     let now = now_ms();
+    let mut state = lock(&hub.inner);
     let already_current = kind == "update_and_restart"
-        && target_release_identity.as_deref()
-            == validate_release_identity(current_release_identity)
-                .ok()
-                .as_deref();
+        && target_release_identity.as_deref().is_some_and(|target| {
+            state.desktop_release.ready(
+                current_release_identity,
+                target,
+                state.last_frontend_heartbeat_ms,
+                now,
+            )
+        });
     let action = WinControlAction {
         action_id: format!("win_act_{}", uuid::Uuid::new_v4().simple()),
         trace_id: clean_identifier(trace_id, "win_action"),
@@ -40,7 +45,7 @@ pub(super) fn enqueue(
         receipt: already_current.then(|| WinControlReceipt {
             status: "succeeded".to_string(),
             message: Some(
-                "already_current_noop: 当前 Win 节点已运行精确目标版本，未排队且未重启 Tauri。"
+                "already_current_noop: Win 节点和桌面进程均已运行精确目标版本，未排队且未重启 Tauri。"
                     .to_string(),
             ),
             route: None,
@@ -48,7 +53,6 @@ pub(super) fn enqueue(
             at_ms: Some(now),
         }),
     };
-    let mut state = lock(&hub.inner);
     expire_actions(&mut state, now);
     state.actions.push_back(action.clone());
     while state.actions.len() > MAX_ACTIONS {

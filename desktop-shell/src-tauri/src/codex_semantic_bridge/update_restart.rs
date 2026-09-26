@@ -3,6 +3,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{Manager, Webview};
 
 const GUARD_SCRIPT: &str = include_str!("update_restart_guard.ps1");
+const STORAGE_SCRIPT: &str = include_str!("../../../../scripts/node-storage-paths.ps1");
 const EXIT_DELAY: Duration = Duration::from_millis(2_500);
 static RESTART_SCHEDULED: AtomicBool = AtomicBool::new(false);
 
@@ -82,6 +83,11 @@ fn schedule_platform_guard(
     std::fs::create_dir_all(&guard_root)
         .map_err(|error| format!("无法创建更新守卫目录: {error}"))?;
     let script_path = guard_root.join(format!("guard-{}-{}.ps1", std::process::id(), now_ms()));
+    std::fs::write(
+        guard_root.join("node-storage-paths.ps1"),
+        STORAGE_SCRIPT.as_bytes(),
+    )
+    .map_err(|error| format!("无法写入安装路径解析脚本: {error}"))?;
     std::fs::write(&script_path, GUARD_SCRIPT.as_bytes())
         .map_err(|error| format!("无法写入更新守卫脚本: {error}"))?;
 

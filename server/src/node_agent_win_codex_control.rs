@@ -15,11 +15,12 @@ pub(crate) use api::{routes, tauri_diagnostic_snapshot, timeline_payload};
 mod action_queue;
 #[path = "node_agent_win_codex_control/ai_session_diagnostic.rs"]
 mod ai_session_diagnostic;
+mod desktop_release;
+use desktop_release::{heartbeat_live, validate_release_identity};
 
 const MAX_EVENTS: usize = 2_000;
 const MAX_ACTIONS: usize = 256;
 const ACTION_TTL_MS: u128 = 120_000;
-const HOST_HEARTBEAT_TTL_MS: u128 = 20_000;
 const MAX_SUMMARY_CHARS: usize = 600;
 const MAX_FIELD_STRING_CHARS: usize = 800;
 
@@ -71,6 +72,7 @@ struct WinControlState {
     actions: VecDeque<WinControlAction>,
     last_frontend_heartbeat_ms: Option<u128>,
     last_tauri_heartbeat_ms: Option<u128>,
+    desktop_release: desktop_release::DesktopRelease,
 }
 
 #[derive(Default)]
@@ -96,6 +98,7 @@ impl WinCodexControlHub {
             state.last_frontend_heartbeat_ms = Some(now);
         } else if source == "tauri" {
             state.last_tauri_heartbeat_ms = Some(now);
+            state.desktop_release.observe(kind, &fields, now);
         }
         let event = WinControlEvent {
             seq: state.next_seq,
@@ -285,6 +288,7 @@ impl WinCodexControlHub {
         json!({
             "schema": "elon.win_codex_control.v1",
             "release_identity": crate::node_agent_release_identity::current(),
+            "desktop_runtime": state.desktop_release.snapshot(now),
             "actions": allowed_actions(),
             "ai_window_providers": ["chatgpt", "google-ai-mode"],
             "routes": allowed_route_roots(),
@@ -437,23 +441,6 @@ fn validate_action_target(
         return Err("只有 update_and_restart 允许 target_release_identity。".to_string());
     }
     Ok(None)
-}
-
-fn validate_release_identity(value: &str) -> Result<String, String> {
-    let (version, git_sha) = value
-        .rsplit_once('+')
-        .ok_or_else(|| "target_release_identity 必须是 version+git_sha。".to_string())?;
-    let version_ok = !version.is_empty()
-        && version.len() <= 48
-        && version
-            .chars()
-            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_'));
-    let git_sha_ok =
-        (40..=64).contains(&git_sha.len()) && git_sha.bytes().all(|byte| byte.is_ascii_hexdigit());
-    if !version_ok || !git_sha_ok {
-        return Err("target_release_identity 不是合法的精确 Win 发布身份。".to_string());
-    }
-    Ok(format!("{}+{}", version, git_sha.to_ascii_lowercase()))
 }
 
 fn validate_route(route: &str) -> Result<String, String> {
@@ -718,10 +705,6 @@ fn truncate_chars(value: &str, limit: usize) -> String {
         return value.to_string();
     }
     value.chars().take(limit).collect::<String>() + "…"
-}
-
-fn heartbeat_live(value: Option<u128>, now: u128) -> bool {
-    value.is_some_and(|value| now.saturating_sub(value) <= HOST_HEARTBEAT_TTL_MS)
 }
 
 fn u128_to_u64(value: u128) -> u64 {

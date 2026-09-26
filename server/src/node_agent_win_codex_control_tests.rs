@@ -113,6 +113,22 @@ fn update_restart_requires_codex_and_an_exact_release_identity() {
 fn update_restart_for_current_exact_release_is_a_terminal_noop() {
     let hub = WinCodexControlHub::default();
     let current = format!("0.3.69+{}", "a".repeat(40));
+    hub.record(
+        "live",
+        "frontend",
+        "debug",
+        "bridge.heartbeat",
+        "",
+        json!({}),
+    );
+    hub.record(
+        "live",
+        "tauri",
+        "debug",
+        "bridge.heartbeat",
+        "",
+        json!({"desktop_process_id": 123, "desktop_release_identity": current}),
+    );
     let action = action_queue::enqueue(
         &hub,
         "trace",
@@ -134,6 +150,42 @@ fn update_restart_for_current_exact_release_is_a_terminal_noop() {
     assert!(hub.pending_actions(10).is_empty());
     assert!(hub.claim_action(&action.action_id).is_err());
     assert_eq!(hub.action(&action.action_id).unwrap().status, "succeeded");
+}
+
+#[test]
+fn current_node_with_old_or_unknown_desktop_must_not_skip_restart() {
+    let current = format!("0.3.69+{}", "a".repeat(40));
+    for desktop in [Value::Null, json!(format!("0.3.69+{}", "b".repeat(40)))] {
+        let hub = WinCodexControlHub::default();
+        hub.record(
+            "live",
+            "frontend",
+            "debug",
+            "bridge.heartbeat",
+            "",
+            json!({}),
+        );
+        hub.record(
+            "live",
+            "tauri",
+            "debug",
+            "bridge.heartbeat",
+            "",
+            json!({"desktop_process_id": 123, "desktop_release_identity": desktop}),
+        );
+        let action = action_queue::enqueue(
+            &hub,
+            "trace",
+            "update_and_restart",
+            None,
+            None,
+            Some(&current),
+            "codex_mcp",
+            &current,
+        )
+        .unwrap();
+        assert_eq!(action.status, "queued");
+    }
 }
 
 #[test]

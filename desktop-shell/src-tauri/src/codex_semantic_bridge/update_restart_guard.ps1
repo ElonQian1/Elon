@@ -12,7 +12,14 @@ $localAppData = [Environment]::GetFolderPath('LocalApplicationData')
 $stateRoot = Join-Path $localAppData 'Elon\desktop-update-restart-v1'
 $logPath = Join-Path $stateRoot 'orchestrator.jsonl'
 $applyLockPath = Join-Path $internalDir 'update.apply.lock'
-$deadline = [DateTime]::UtcNow.AddHours(6)
+$deadline = [DateTime]::UtcNow.AddMinutes(5)
+. (Join-Path $PSScriptRoot 'node-storage-paths.ps1')
+$localReleaseRoot = Get-ElonManagedNodeReleaseStateRoot
+if ($localReleaseRoot) {
+    $localReleaseRoot = Join-Path $localReleaseRoot 'local-node-releases-v1'
+} else {
+    $localReleaseRoot = Join-Path $localAppData 'Elon\local-node-releases-v1'
+}
 
 function Write-GuardEvent {
     param([string]$Kind, [string]$Outcome, [string]$Detail = '')
@@ -70,19 +77,32 @@ function Get-NodeStatus {
 }
 
 function Get-TargetLocalReleaseState {
-    $releaseRoot = Join-Path $localAppData 'Elon\local-node-releases-v1\releases'
-    if (-not (Test-Path -LiteralPath $releaseRoot)) { return '' }
-    $states = Get-ChildItem -LiteralPath $releaseRoot -Filter 'state.json' -File -Recurse -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTimeUtc -Descending
-    foreach ($stateFile in $states) {
-        try {
-            $state = Get-Content -LiteralPath $stateFile.FullName -Raw | ConvertFrom-Json
-            if ([string]$state.release_identity -eq $ExpectedReleaseIdentity) {
-                return [string]$state.activation_state
-            }
-        } catch {}
-    }
+    $sha = ($ExpectedReleaseIdentity -split '\+')[-1]
+    $statePath = Join-Path $localReleaseRoot "releases\$sha\state.json"
+    try {
+        $state = Get-Content -LiteralPath $statePath -Raw -ErrorAction Stop | ConvertFrom-Json
+        if ([string]$state.release_identity -eq $ExpectedReleaseIdentity) {
+            return [string]$state.activation_state
+        }
+    } catch {}
     return ''
+}
+
+function Test-InstalledTarget {
+    try {
+        $metadata = Get-Content -LiteralPath (Join-Path $internalDir 'node-agent-version.json') -Raw -ErrorAction Stop | ConvertFrom-Json
+        return ("{0}+{1}" -f $metadata.version, $metadata.gitSha) -eq $ExpectedReleaseIdentity
+    } catch { return $false }
+}
+
+function Start-LocalActivator {
+    # Reuse the staged, hash-verified transaction and its single-writer lock.
+    $worker = Join-Path $localReleaseRoot 'runtime\node-agent-post-terminal-activator.ps1'
+    if (-not (Test-Path -LiteralPath $worker -PathType Leaf)) { throw 'local activator missing' }
+    Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $worker + '"'),
+        '-StateRoot', ('"' + $localReleaseRoot + '"')
+    ) | Out-Null
 }
 
 function Test-ApplyIdle {
@@ -139,7 +159,11 @@ try {
     Write-GuardEvent 'desktop.exited' 'ok'
 
     $targetState = Get-TargetLocalReleaseState
-    if ($targetState -in @('verified', 'restart_scheduled', 'waiting_for_terminal')) {
+    $status = Get-NodeStatus -Port $port
+    if ($null -ne $status -and [string]$status.release_identity -eq $ExpectedReleaseIdentity -and (Test-InstalledTarget)) {
+        Write-GuardEvent 'update.trigger' 'restart_installed_target'
+    } elseif ($targetState -in @('verified', 'restart_scheduled', 'waiting_for_terminal')) {
+        Start-LocalActivator
         Write-GuardEvent 'update.trigger' 'reused_local_release' $targetState
     } else {
         $env:ELON_EXPECTED_UPDATE_RELEASE_IDENTITY = $ExpectedReleaseIdentity
@@ -159,7 +183,7 @@ try {
         $identity = if ($null -ne $status) { [string]$status.release_identity } else { '' }
         $targetState = Get-TargetLocalReleaseState
         $applyIdle = Test-ApplyIdle
-        if ($identity -eq $ExpectedReleaseIdentity -and $applyIdle) {
+        if ($identity -eq $ExpectedReleaseIdentity -and $applyIdle -and (Test-InstalledTarget)) {
             $outcome = 'activated'
             break
         }
@@ -191,6 +215,7 @@ try {
         Start-Sleep -Milliseconds 500
     }
     try {
+        if (-not (Test-ApplyIdle)) { throw 'installation still locked; desktop reopen deferred' }
         Start-Process -FilePath $ClientPath -WorkingDirectory $installDir -WindowStyle Hidden | Out-Null
         Write-GuardEvent 'desktop.reopen' $outcome
     } catch {

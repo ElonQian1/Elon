@@ -78,7 +78,7 @@ fn definitions() -> Vec<Value> {
         }),
         json!({
             "name":"win_control_action",
-            "description":"提交白名单 Win 语义动作。queued 不等于成功；同版本 update_and_restart 会立即 no-op 成功，其他更新必须提供精确发布身份并在 Win 重连后核对版本。",
+            "description":"提交白名单 Win 语义动作。queued 不等于成功；只有节点与桌面进程均确认在精确目标版本才 no-op。更新后必须核对 release_identity 和 desktop_runtime.release_identity，旧桌面未上报版本不能视为成功。",
             "inputSchema":{
                 "type":"object","required":["kind"],"additionalProperties":false,
                 "properties":{
@@ -180,12 +180,12 @@ fn completion_contract(kind: &str, status: &str) -> (&'static str, &'static str)
     if kind == "update_and_restart" && status == "succeeded" {
         return (
             "already_current_noop",
-            "already terminal: exact target already runs locally; no Tauri restart was queued",
+            "already terminal: fresh node and desktop runtime identities both match the exact target; no Tauri restart was queued",
         );
     }
     (
         "await_tauri_receipt",
-        "queued is not success; wait for a succeeded Tauri scheduling receipt, then after reconnect verify capabilities.release_identity equals the requested target",
+        "queued is not success; wait for a succeeded Tauri scheduling receipt, then verify fresh capabilities.release_identity AND desktop_runtime.release_identity equal the target with frontend_available and tauri_available",
     )
 }
 

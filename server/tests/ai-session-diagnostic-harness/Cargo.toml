@@ -11,3 +11,7 @@ path = "../node_agent_win_codex_ai_session_diagnostic.rs"
 
 [dependencies]
 serde_json = "1"
+
+[[test]]
+name = "node_agent_win_runtime_release"
+path = "../node_agent_win_runtime_release.rs"

@@ -5,6 +5,7 @@ export type WinAiProviderId = 'chatgpt' | 'google-ai-mode'
 export interface WinControlCapabilities {
   schema: string
   release_identity?: string
+  desktop_runtime?: { release_identity: string | null; process_ids: number[] }
   actions: WinActionKind[]
   routes: string[]
   sources: WinLogSource[]

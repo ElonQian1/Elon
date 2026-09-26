@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { getDesktopInvoke } from '../shell/desktopShell'
 import { claimWinAction, fetchPendingWinActions, postWinActionReceipt, postWinEvent } from './codexControlApi'
 import type { WinControlAction } from './types'
+import { localAiProviderDraftCache } from '../user-browser/localAiProviderDraftCache'
 
 const HEARTBEAT_MS = 8_000
 const ACTION_POLL_MS = 2_500
@@ -52,7 +53,9 @@ export function useCodexControlBridge(): void {
         await postWinEvent({
           trace_id: 'tauri_heartbeat', source: 'tauri', level: 'debug',
           kind: 'bridge.heartbeat', summary: 'Tauri 语义桥在线',
-          fields: { schema: capabilities.schema, devtools_supported: capabilities.devtools_supported },
+          fields: { schema: capabilities.schema, devtools_supported: capabilities.devtools_supported,
+            desktop_release_identity: capabilities.desktop_release_identity,
+            desktop_process_id: capabilities.desktop_process_id },
         })
         const payload = await invoke<NativeEventPayload>('codex_read_native_events', {
           after: nativeCursor, limit: 100,
@@ -104,7 +107,9 @@ async function executeAction(
   action: WinControlAction,
 ): Promise<void> {
   try {
+    if (action.kind === 'update_and_restart') localAiProviderDraftCache.checkpointForRestart()
     const receipt = await invoke<NativeReceipt>('codex_execute_semantic_action', { action })
+    if (action.kind === 'update_and_restart' && receipt.status !== 'succeeded') localAiProviderDraftCache.cancelRestartCheckpoint()
     await postWinActionReceipt(action.action_id, {
       status: receipt.status || 'succeeded',
       message: receipt.message,
@@ -113,6 +118,8 @@ async function executeAction(
       at_ms: receipt.at_ms || Date.now(),
     })
   } catch (error) {
+    // An invoke/receipt transport failure can happen after native exit was scheduled.
+    // Keep the local recovery point until restart rather than deleting unsent text.
     await postWinActionReceipt(action.action_id, {
       status: 'failed', message: safeMessage(error), route: location.pathname, at_ms: Date.now(),
     }).catch(() => {})
