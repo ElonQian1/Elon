@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptRspackAttachments) {
     root.__elonChatGptRspackAttachments = factory(root);
@@ -92,7 +92,17 @@
     const binding = context.capture(node, value.ready);
     if (!binding) return fail(context.state().code === 'attachments_or_tools_present'
       ? 'attachment_tools_changed' : context.state().code);
-    if (binding.model.slug !== value.binding.model.slug) return fail('attachment_model_changed');
+    if (binding.model.slug !== value.binding.model.slug) {
+      // Model hydration may finish after upload. Use the reviewed website's
+      // routing check, not slug equality, to validate these exact ready files.
+      try {
+        if (runtime.profile !== 'web_20260926b_rspack' || typeof binding.runtime.composer.x !== 'function' ||
+            binding.runtime.composer.x(binding.scope, binding.id, binding.model,
+              binding.scope.get(binding.runtime.conversation.w, binding.id), value.ready) !== true) {
+          return fail('attachment_model_changed');
+        }
+      } catch (_) { return fail('attachment_model_changed'); }
+    }
     const attachments = binding.runtime.attachments.m(value.ready);
     if (attachments.length !== value.ready.length) return fail('attachment_projection_changed');
     const fingerprint = JSON.stringify(attachments);
@@ -123,6 +133,6 @@
     if (!owned.ready.length) owned = null;
     return true;
   }
-  return Object.freeze({ version: 3, upload, prepare, cancel, merge, remove,
+  return Object.freeze({ version: 4, upload, prepare, cancel, merge, remove,
     state: () => ({ code, pending: !!active, count: owned?.ready.length || 0 }) });
 });

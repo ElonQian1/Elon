@@ -143,6 +143,48 @@ test('an editor replacement cannot transfer an upload to a different account', a
   assert.equal(f.calls.length, 0);
 });
 
+test('a hydrated model may send only when the official routing check accepts the exact files', async () => {
+  const f = setup({ latest: 'current' });
+  await f.upload();
+  const ready = f.values.get(f.composer.f);
+  f.values.set(f.composer.s, { slug: 'hydrated-model', thinkingEffort: 'standard' });
+  let checks = 0;
+  f.composer.x = (scope, id, model, origin, uploads) => {
+    checks++;
+    assert.equal(scope, f.scope);
+    assert.equal(id, f.parent.memoizedProps.conversationId);
+    assert.equal(model.slug, 'hydrated-model');
+    assert.equal(origin, null);
+    assert.deepEqual(uploads, ready);
+    assert.equal(uploads[0], ready[0]);
+    return true;
+  };
+  assert.equal((await f.submit.inspect(f.editor)).code, 'ready');
+  f.command.requireNativeAttachment = true;
+  assert.equal((await f.submit.submit(f.command).completion).status, 'accepted');
+  assert.ok(checks >= 2, 'recheck at dispatch, not just readiness');
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0][1].selectedModel.slug, 'hydrated-model');
+  assert.equal(f.calls[0][1].additionalAttachments[0].id, 'file-0');
+});
+
+for (const outcome of ['missing', 'false', 'throws', 'unreviewed']) {
+  test('changed model fails closed when compatibility is ' + outcome, async () => {
+    const f = setup({ latest: outcome === 'unreviewed' ? true : 'current' });
+    await f.upload();
+    f.values.set(f.composer.s, { slug: 'other-model' });
+    if (outcome !== 'missing') f.composer.x = () => {
+      if (outcome === 'throws') throw Error('fixture unavailable');
+      return outcome === 'unreviewed';
+    };
+    const result = await f.submit.submit(f.command).completion;
+    assert.equal(result.status, 'rejected');
+    assert.equal(result.code, 'attachment_model_changed');
+    assert.equal(f.calls.length, 0);
+    assert.equal(f.values.get(f.composer.f).length, 1);
+  });
+}
+
 for (const kind of ['partial', 'error', 'wrong_ids', 'switched_account', 'changed_route', 'changed_model']) {
   test('does not confirm or send a ' + kind + ' upload', async () => {
     const f = setup();
