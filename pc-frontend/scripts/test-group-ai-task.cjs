@@ -8,6 +8,13 @@ const filename = path.resolve(__dirname, '../src/features/friends/group-ai/group
 const compiled = new Module(filename, module)
 compiled.filename = filename
 compiled.paths = module.paths
+const uploadFilename = path.resolve(__dirname, '../src/features/user-browser/privateAttachmentUpload.ts')
+const uploadModule = new Module(uploadFilename, module)
+uploadModule.paths = module.paths
+uploadModule._compile(ts.transpileModule(fs.readFileSync(uploadFilename, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }, fileName: uploadFilename,
+}).outputText, uploadFilename)
+compiled.require = name => name === '../../user-browser/privateAttachmentUpload' ? uploadModule.exports : require(name)
 compiled._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }, fileName: filename,
 }).outputText, filename)
@@ -26,6 +33,8 @@ test('host failures retain fixed diagnostics without exporting raw errors', () =
   assert.equal(groupAiFailureCode({ code: 'upgrade_required' }, 'opening'), 'desktop_upgrade_required')
   assert.equal(groupAiFailureCode('command permission denied for private-owner', 'opening'), 'desktop_permission_denied')
   assert.equal(groupAiFailureCode(new Error('private content https://example.test/?token=secret'), 'opening'), 'group_opening_failed')
+  assert.equal(groupAiFailureCode({ code: 'private_upload_rspack_owner_pending' }, 'uploading'), 'private_upload_rspack_owner_pending')
+  assert.equal(groupAiFailureCode({ code: 'private_upload_rspack_secret' }, 'uploading'), 'group_uploading_failed')
 })
 
 function fixture(options = {}) {

@@ -61,3 +61,18 @@ test('oversized and unsupported batches fail before allocating a file lease', as
     assert.equal(f.source.guardSend('{"action":"send_prompt"}'), false);
   }
 });
+
+test('Rspack preflight exports only fixed readiness codes and never uploads an unbound file', async () => {
+  for (const code of ['owner_pending', 'identity_unavailable', 'mode_unsupported', 'private credential value']) {
+    const f = fixture();
+    f.root.__elonChatGptRspackRuntime = { observed: () => true, load: async () => ({}) };
+    f.root.document = { querySelector: () => ({}) };
+    f.root.__elonChatGptRspackContext = { create: () => ({ capture: () => null, state: () => ({ code }) }) };
+    await f.command({ step: 'begin', files: [descriptor(3)] });
+    await f.command({ step: 'chunk', leaseId, offset: 0, data: 'YWJj' });
+    await f.command({ step: 'upload' });
+    assert.equal(f.receipts.at(-1).detail, 'private_upload_rspack_' + (code.includes(' ') ? 'runtime_pending' : code));
+    assert.equal(f.uploaded.length, 0);
+    assert.equal(f.source.guardSend('{"action":"send_prompt"}'), false);
+  }
+});

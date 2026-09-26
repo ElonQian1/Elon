@@ -6,6 +6,25 @@
   'use strict';
   let batch = null;
   const validId = value => /^[a-f0-9-]{36}$/.test(value || '');
+  const diagnosticCodes = new Set(['build_unreviewed', 'role_pending', 'contract_mismatch', 'loader_mismatch',
+    'runtime_pending', 'composer_detached', 'route_unsupported', 'document_unavailable', 'owner_ambiguous',
+    'owner_pending', 'identity_pending', 'identity_unavailable', 'conversation_mismatch', 'mode_unsupported',
+    'busy', 'attachments_or_tools_present', 'composer_state_pending', 'upload_timeout', 'upload_unconfirmed']);
+  async function rspackDiagnostic() {
+    const runtime = root.__elonChatGptRspackRuntime;
+    if (!runtime?.observed()) return null;
+    const loaded = await runtime.load();
+    if (!loaded) {
+      const code = runtime.state?.().code;
+      return diagnosticCodes.has(code) ? code : 'runtime_pending';
+    }
+    const context = root.__elonChatGptRspackContext?.create(root);
+    if (!context?.capture(root.document.querySelector('#prompt-textarea'))) {
+      const code = context?.state().code;
+      return diagnosticCodes.has(code) ? code : 'runtime_pending';
+    }
+    return null;
+  }
   const current = job => batch === job && root.location.href === job.href && root.__elonChatGptDocumentToken === job.token;
   function clear() {
     if (!batch) return;
@@ -82,9 +101,14 @@
         width, height, href: job.href, documentToken: job.token, uploadCopy });
     }
     if (!root.__elonChatGptPrivateAttachmentSend) throw new Error('private_upload_unavailable');
+    const diagnostic = await rspackDiagnostic();
+    if (diagnostic) throw new Error('private_upload_rspack_' + diagnostic);
     await root.__elonChatGptPrivateAttachmentSend.start(JSON.stringify({ version: 2, files: descriptors,
       href: job.href, documentToken: job.token }),
-    (action, ok, detail) => receipt(action, requestId, ok, detail),
+    (action, ok, detail) => {
+      const code = root.__elonChatGptRspackAttachments?.state?.().code;
+      receipt(action, requestId, ok, !ok && diagnosticCodes.has(code) ? 'private_upload_rspack_' + code : detail);
+    },
     () => root.__elonChatGptBridge?.command(JSON.stringify({ action: 'snapshot', documentToken: job.token })),
     () => receipt('request_attachment_upload', requestId, false, 'private_upload_unavailable'));
     clear();
@@ -96,10 +120,11 @@
       const value = JSON.parse(command.value);
       await execute(value, command.requestId);
       if (value.step !== 'upload') receipt('stage_attachments', command.requestId, true, 'staged');
-    } catch (_) {
+    } catch (error) {
       const action = (() => { try { return JSON.parse(command?.value).step === 'upload' ? 'request_attachment_upload' : 'stage_attachments'; } catch (_) { return 'stage_attachments'; } })();
       cancel();
-      receipt(action, command?.requestId, false, '附件读取或上传失败；未发送文字，请重新选择。');
+      const code = String(error?.message || '').replace(/^private_upload_rspack_/, '');
+      receipt(action, command?.requestId, false, diagnosticCodes.has(code) ? 'private_upload_rspack_' + code : '附件读取或上传失败；未发送文字，请重新选择。');
     }
   }
   root.addEventListener?.('pagehide', cancel);

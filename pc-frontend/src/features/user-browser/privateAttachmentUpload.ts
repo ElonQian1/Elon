@@ -11,6 +11,7 @@ export interface PrivateUploadPort {
   check(): void
 }
 let sequence = 0
+export const privateUploadDiagnostic = /^private_upload_rspack_(build_unreviewed|role_pending|contract_mismatch|loader_mismatch|runtime_pending|composer_detached|route_unsupported|document_unavailable|owner_ambiguous|owner_pending|identity_pending|identity_unavailable|conversation_mismatch|mode_unsupported|busy|attachments_or_tools_present|composer_state_pending|upload_timeout|upload_unconfirmed)$/
 const requestId = () => `mcp_att${Date.now().toString(36)}${(++sequence).toString(36)}`
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -34,8 +35,11 @@ export async function uploadPrivateAttachments(files: PrivateUploadFile[], port:
       port.check()
       const receipt = [state.commandResult, ...(state.commandResults || [])].find(r => r?.requestId === id && r.action === action)
       if (receipt) {
-        if (!receipt.ok || action === 'request_attachment_upload' && receipt.detail !== 'private_attachment_associated')
-          throw failure('rejected', '附件尚未完整上传到 ChatGPT，未发送文字。请检查文件和网络后重试')
+        if (!receipt.ok || action === 'request_attachment_upload' && receipt.detail !== 'private_attachment_associated') {
+          const error = failure('rejected', '附件尚未完整上传到 ChatGPT，未发送文字。请检查文件和网络后重试')
+          if (privateUploadDiagnostic.test(receipt.detail || '')) error.code = receipt.detail!
+          throw error
+        }
         return
       }
       await wait(150)
@@ -63,7 +67,7 @@ export async function uploadPrivateAttachments(files: PrivateUploadFile[], port:
     await confirmed(await send({ step: 'upload' }), 'request_attachment_upload', 120000)
   } catch (error) {
     try { port.check(); await send({ step: 'cancel' }) } catch { /* Closed/navigated hosts expire their own file leases. */ }
-    if (error && typeof error === 'object' && 'code' in error && /^private_upload_(begin|read|chunk|associate)_(failed|rejected|timeout)$/.test(String(error.code))) throw error
+    if (error && typeof error === 'object' && 'code' in error && (/^private_upload_(begin|read|chunk|associate)_(failed|rejected|timeout)$/.test(String(error.code)) || privateUploadDiagnostic.test(String(error.code)))) throw error
     throw failure('failed', error instanceof Error ? error.message : '附件操作失败，未发送文字')
   }
 }

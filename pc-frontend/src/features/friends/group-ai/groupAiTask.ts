@@ -1,5 +1,6 @@
 import type { LocalAiMessageSnapshot, LocalAiWebSessionState } from '../../user-browser/localAiBrowserApi'
 import type { GroupAiAttachment } from './groupAiAttachments'
+import { privateUploadDiagnostic } from '../../user-browser/privateAttachmentUpload'
 
 export interface GroupAiRequest {
   id: string; group_id: string; trigger_message_id: string; state: string; prompt: string
@@ -35,7 +36,7 @@ const normalized = (v: string) => v.trim().replace(/\s+/g, ' ')
 export function groupAiFailureCode(error: unknown, stage: string): string {
   const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
   const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
-  if (/^private_upload_(begin|read|chunk|associate)_(failed|rejected|timeout)$/.test(code)) return code
+  if (/^private_upload_(begin|read|chunk|associate)_(failed|rejected|timeout)$/.test(code) || privateUploadDiagnostic.test(code)) return code
   if (['upgrade_required', 'desktop_required', 'invoke_timeout'].includes(code)) return 'desktop_' + code
   if (['group_worker_not_trusted', 'group_worker_action_not_allowed'].includes(raw)) return raw
   if (/not allowed|permission denied|allowlist/i.test(raw)) return 'desktop_permission_denied'

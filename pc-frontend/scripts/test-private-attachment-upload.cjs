@@ -16,7 +16,7 @@ function load(relative, stubs = {}) {
   }).outputText, filename)
   return compiled.exports
 }
-const { uploadPrivateAttachments } = load('features/user-browser/privateAttachmentUpload.ts')
+const { uploadPrivateAttachments, privateUploadDiagnostic } = load('features/user-browser/privateAttachmentUpload.ts')
 const { groupAttachmentFiles } = load('features/friends/group-ai/groupAiAttachments.ts', {
   '../../../api/runtime': { resolveApiUrl: path => 'https://platform.invalid' + path },
 })
@@ -84,6 +84,25 @@ test('upload diagnostics identify the failed step without exporting provider det
       return true
     })
     assert.equal(calls.at(-1), 'cancel')
+  }
+})
+
+test('only reviewed Rspack diagnostic details survive the MCP boundary', async () => {
+  for (const detail of ['private_upload_rspack_owner_pending', 'private_upload_rspack_private_content']) {
+    const receipts = []
+    await assert.rejects(uploadPrivateAttachments([{ name: 'fixture.txt', type: 'text/plain', size: 3,
+      load: async () => new Blob(['abc']) }], {
+      check() {},
+      async command(raw, requestId) {
+        const step = JSON.parse(raw).step
+        receipts.push({ requestId, action: step === 'upload' ? 'request_attachment_upload' : 'stage_attachments',
+          ok: step !== 'upload', detail })
+      },
+      state: async () => ({ commandResults: receipts }),
+    }), error => {
+      assert.equal(error.code, privateUploadDiagnostic.test(detail) ? detail : 'private_upload_associate_rejected')
+      return true
+    })
   }
 })
 
