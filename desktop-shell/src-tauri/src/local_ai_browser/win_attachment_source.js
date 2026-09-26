@@ -75,8 +75,11 @@
         width = bitmap.width; height = bitmap.height; bitmap.close();
       }
       if (!current(job)) throw new Error('expired_batch');
+      // Win supplies fresh file selections, not a user-requested library copy.
+      // The current official upload transaction does not support the legacy copy override.
+      const uploadCopy = !root.__elonChatGptRspackRuntime?.observed();
       descriptors.push({ version: 1, leaseId: file.leaseId, name: file.name, type: file.type, size: file.size,
-        width, height, href: job.href, documentToken: job.token, uploadCopy: true });
+        width, height, href: job.href, documentToken: job.token, uploadCopy });
     }
     if (!root.__elonChatGptPrivateAttachmentSend) throw new Error('private_upload_unavailable');
     await root.__elonChatGptPrivateAttachmentSend.start(JSON.stringify({ version: 2, files: descriptors,

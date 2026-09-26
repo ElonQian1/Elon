@@ -54,6 +54,30 @@ test('official upload -> ready file specs -> one send, then consume only after A
   assert.equal(args.isRequestCurrent(), true, 'consuming after ACK must not cancel the stream');
 });
 
+test('Win staged bytes pass through the shared sender into the current official upload', async () => {
+  const f = setup({ latest: 'current' }), receipts = [];
+  Object.assign(f.page, { File, Blob, atob, btoa,
+    __elonChatGptAdapterVersion: 215,
+    createImageBitmap: async () => ({ width: 8, height: 8, close() {} }),
+    elonChatGptNative: { postMessage: raw => receipts.push(JSON.parse(raw)) },
+  });
+  const bridge = require('../desktop-shell/src-tauri/src/local_ai_browser/win_attachment_source.js')(f.page);
+  f.page.__elonChatGptNativeAttachmentSource = require('../android/app/src/main/assets/chatgpt_web_native_attachment_source.js');
+  f.page.__elonChatGptPrivateAttachmentSend = require('../android/app/src/main/assets/chatgpt_web_private_attachment_send.js').create(f.page);
+  const batchId = '00000000-0000-4000-8000-000000000001';
+  const leaseId = '00000000-0000-4000-8000-000000000002';
+  const command = value => bridge.command(JSON.stringify({ requestId: 'mcp_image1', value: JSON.stringify({ batchId, ...value }) }));
+  await command({ step: 'begin', files: [{ leaseId, name: 'fixture.png', type: 'image/png', size: 3 }] });
+  await command({ step: 'chunk', leaseId, offset: 0, data: 'YWJj' });
+  await command({ step: 'upload' });
+  assert.equal(receipts.at(-1).detail, 'private_attachment_associated');
+  assert.equal(f.uploads.length, 1);
+  assert.equal(await f.uploads[0].files[0].text(), 'abc');
+  assert.equal(f.uploads[0].options.isTemporaryChat, true);
+  assert.equal(f.calls.length, 0, 'upload does not send the question');
+  assert.equal(bridge.guardSend('{"action":"send_prompt"}'), false);
+});
+
 test('current live manifest resolves its reviewed conversation alias and image sender', async () => {
   const f = setup({ latest: 'current' });
   await f.upload();

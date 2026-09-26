@@ -18,6 +18,8 @@ const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 export async function uploadPrivateAttachments(files: PrivateUploadFile[], port: PrivateUploadPort) {
   if (!files.length || files.length > 9 || files.some(f => f.size < 1 || f.size > 8388608)) throw new Error('请选择 1 至 9 个附件，每个不超过 8 MB')
   const batchId = uuidv4(), leases = files.map(() => uuidv4())
+  let stage = 'begin'
+  const failure = (kind: string, message: string) => Object.assign(new Error(message), { code: `private_upload_${stage}_${kind}` })
   async function send(payload: object) {
     port.check()
     const id = requestId()
@@ -33,20 +35,22 @@ export async function uploadPrivateAttachments(files: PrivateUploadFile[], port:
       const receipt = [state.commandResult, ...(state.commandResults || [])].find(r => r?.requestId === id && r.action === action)
       if (receipt) {
         if (!receipt.ok || action === 'request_attachment_upload' && receipt.detail !== 'private_attachment_associated')
-          throw new Error('附件尚未完整上传到 ChatGPT，未发送文字。请检查文件和网络后重试')
+          throw failure('rejected', '附件尚未完整上传到 ChatGPT，未发送文字。请检查文件和网络后重试')
         return
       }
       await wait(150)
     }
-    throw new Error('附件上传未确认，未发送文字；请检查网络后重新选择')
+    throw failure('timeout', '附件上传未确认，未发送文字；请检查网络后重新选择')
   }
   try {
     const id = await send({ step: 'begin', files: files.map((f, i) => ({ leaseId: leases[i], name: f.name, type: f.type, size: f.size, sha256: f.sha256 })) })
     await confirmed(id, 'stage_attachments', 5000)
     for (let index = 0; index < files.length; index++) {
       port.check()
+      stage = 'read'
       const blob = await files[index].load()
       if (blob.size !== files[index].size) throw new Error('附件已变化，未发送文字')
+      stage = 'chunk'
       for (let offset = 0; offset < blob.size; offset += 65536) {
         port.check()
         const bytes = new Uint8Array(await blob.slice(offset, offset + 65536).arrayBuffer())
@@ -55,9 +59,11 @@ export async function uploadPrivateAttachments(files: PrivateUploadFile[], port:
         await send({ step: 'chunk', leaseId: leases[index], offset, data: btoa(binary) })
       }
     }
+    stage = 'associate'
     await confirmed(await send({ step: 'upload' }), 'request_attachment_upload', 120000)
   } catch (error) {
     try { port.check(); await send({ step: 'cancel' }) } catch { /* Closed/navigated hosts expire their own file leases. */ }
-    throw error
+    if (error && typeof error === 'object' && 'code' in error && /^private_upload_(begin|read|chunk|associate)_(failed|rejected|timeout)$/.test(String(error.code))) throw error
+    throw failure('failed', error instanceof Error ? error.message : '附件操作失败，未发送文字')
   }
 }

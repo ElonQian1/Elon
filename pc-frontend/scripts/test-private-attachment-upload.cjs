@@ -65,6 +65,28 @@ test('a changed file cancels the batch without requesting a private upload', asy
   assert.deepEqual(calls, ['begin', 'cancel'])
 })
 
+test('upload diagnostics identify the failed step without exporting provider details', async () => {
+  for (const step of ['begin', 'read', 'chunk', 'upload']) {
+    const receipts = [], calls = []
+    await assert.rejects(uploadPrivateAttachments([{ name: 'fixture.txt', type: 'text/plain', size: 3,
+      load: async () => { if (step === 'read') throw Error('network unavailable'); return new Blob(['abc']) } }], {
+      check() {},
+      async command(raw, requestId) {
+        const value = JSON.parse(raw); calls.push(value.step)
+        if (value.step === 'chunk' && step === 'chunk') throw Error('bridge unavailable')
+        receipts.push({ requestId, action: value.step === 'upload' ? 'request_attachment_upload' : 'stage_attachments',
+          ok: value.step !== step, detail: value.step === step ? 'provider private detail' : 'private_attachment_associated' })
+      },
+      state: async () => ({ commandResults: receipts }),
+    }), error => {
+      assert.equal(error.code, `private_upload_${step === 'upload' ? 'associate' : step}_${['read', 'chunk'].includes(step) ? 'failed' : 'rejected'}`)
+      assert.doesNotMatch(error.message, /provider private detail/)
+      return true
+    })
+    assert.equal(calls.at(-1), 'cancel')
+  }
+})
+
 test('group files use only platform URLs, omit credentials and reject incomplete bodies', async () => {
   const previous = global.fetch
   const requests = []
