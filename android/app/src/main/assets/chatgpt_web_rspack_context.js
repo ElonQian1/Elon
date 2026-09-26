@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptRspackContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -131,6 +131,15 @@
         [binding.href, allowedUrl.href].includes(next[0].href);
     } catch (_) { return false; }
   }
+  function refreshOwner(binding) {
+    try {
+      const next = visibleComposers().map(node => capture(node, true)).filter(Boolean);
+      if (next.length !== 1 || next[0].scope.node !== binding.scope.node ||
+          !['id', 'token', 'href', 'serverId', 'accountId', 'userId', 'generation']
+            .every(key => next[0][key] === binding[key])) return null;
+      return { ...binding, node: next[0].node };
+    } catch (_) { return null; }
+  }
   function find(uploads) {
     const bindings = [];
     code = 'composer_detached';
@@ -145,5 +154,5 @@
     code = 'ready'; return bindings[0];
   }
   return Object.freeze({ find, capture: (node, uploads) => capture(node, false, uploads), read: node => capture(node, true),
-    current, owns, requestCurrent, state: () => ({ code }) });
+    current, owns, requestCurrent, refreshOwner, state: () => ({ code }) });
 });

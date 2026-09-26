@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 4, create: factory });
+  const api = Object.freeze({ version: 5, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptRspackAttachments) {
     root.__elonChatGptRspackAttachments = factory(root);
@@ -28,13 +28,20 @@
     const loaded = await runtime?.load();
     if (!['web_20260926_rspack', 'web_20260926b_rspack'].includes(runtime?.profile) || typeof loaded?.composer.N !== 'function' ||
         typeof loaded?.composer.E !== 'function' || typeof loaded?.attachments.m !== 'function') throw Error('attachment_runtime_pending');
-    const binding = context.find();
+    let binding = context.find();
     if (!binding || binding.href !== descriptor.href || binding.token !== descriptor.documentToken ||
         !Array.isArray(files) || !files.length || files.length > 9 || signal?.aborted) throw Error('attachment_context_changed');
     const job = { binding, ids: [], cancelled: false, abort: null };
     active = job;
     let timer, guard;
-    const current = () => !job.cancelled && !signal?.aborted && context.owns(binding);
+    const current = () => {
+      if (job.cancelled || signal?.aborted) return false;
+      const refreshed = context.refreshOwner(binding);
+      if (!refreshed) return false;
+      binding = refreshed;
+      job.binding = refreshed;
+      return true;
+    };
     signal?.addEventListener('abort', cancel, { once: true });
     try {
       code = 'uploading';
@@ -70,7 +77,10 @@
       code = 'associated';
     } catch (error) {
       job.cancelled = true; removeIds(job);
-      if (code !== 'upload_timeout') code = 'upload_unconfirmed';
+      if (code !== 'upload_timeout') {
+        code = ({ attachment_cancelled: 'upload_cancelled', attachment_context_changed: 'upload_context_changed',
+          attachment_association_unconfirmed: 'upload_association_unconfirmed' })[error?.message] || 'upload_transaction_failed';
+      }
       throw error;
     } finally {
       page.clearTimeout(timer); page.clearInterval(guard);
@@ -133,6 +143,6 @@
     if (!owned.ready.length) owned = null;
     return true;
   }
-  return Object.freeze({ version: 4, upload, prepare, cancel, merge, remove,
+  return Object.freeze({ version: 5, upload, prepare, cancel, merge, remove,
     state: () => ({ code, pending: !!active, count: owned?.ready.length || 0 }) });
 });

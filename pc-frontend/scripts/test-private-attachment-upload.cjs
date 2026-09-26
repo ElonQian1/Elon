@@ -88,7 +88,9 @@ test('upload diagnostics identify the failed step without exporting provider det
 })
 
 test('only reviewed Rspack diagnostic details survive the MCP boundary', async () => {
-  for (const detail of ['private_upload_rspack_owner_pending', 'private_upload_rspack_private_content']) {
+  for (const detail of ['private_upload_rspack_owner_pending', 'private_upload_rspack_private_content',
+    'private_upload_rspack_upload_cancelled', 'private_upload_rspack_upload_context_changed',
+    'private_upload_rspack_upload_association_unconfirmed', 'private_upload_rspack_upload_transaction_failed']) {
     const receipts = []
     await assert.rejects(uploadPrivateAttachments([{ name: 'fixture.txt', type: 'text/plain', size: 3,
       load: async () => new Blob(['abc']) }], {

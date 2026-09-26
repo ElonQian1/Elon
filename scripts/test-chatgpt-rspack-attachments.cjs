@@ -132,6 +132,45 @@ test('a remounted composer can claim the exact upload in the same account and co
   assert.equal(f.calls[0][1].additionalAttachments[0].id, 'file-0');
 });
 
+test('a composer remount during upload preserves the exact account and ready entries', async () => {
+  const f = setup({ latest: 'current' }), upload = f.composer.N;
+  f.composer.N = async (...args) => {
+    const next = { ...f.editor };
+    f.editor.isConnected = false;
+    f.page.document.querySelectorAll = selector => selector === '#prompt-textarea' ? [next] : [];
+    f.command.composer = next;
+    await upload(...args);
+  };
+  await f.upload();
+  assert.equal(f.attachments.state().code, 'associated');
+  f.command.requireNativeAttachment = true;
+  assert.equal((await f.submit.submit(f.command).completion).status, 'accepted');
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0][1].additionalAttachments[0].id, 'file-0');
+});
+
+test('remount plus account drift cannot transfer an in-flight upload', async () => {
+  const f = setup({ latest: 'current' }), upload = f.composer.N;
+  f.composer.N = async (...args) => {
+    const next = { ...f.editor };
+    f.editor.isConnected = false;
+    f.page.document.querySelectorAll = () => [next];
+    f.changeAccount();
+    await upload(...args);
+  };
+  await assert.rejects(f.upload());
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.attachments.state().code, 'upload_association_unconfirmed');
+});
+
+test('official upload exception produces only a fixed transaction diagnostic', async () => {
+  const f = setup();
+  f.composer.N = async () => { throw Error('private upstream detail'); };
+  await assert.rejects(f.upload());
+  assert.equal(f.attachments.state().code, 'upload_transaction_failed');
+  assert.ok(!JSON.stringify(f.attachments.state()).includes('private upstream detail'));
+});
+
 test('an editor replacement cannot transfer an upload to a different account', async () => {
   const f = setup({ latest: 'current' });
   await f.upload();

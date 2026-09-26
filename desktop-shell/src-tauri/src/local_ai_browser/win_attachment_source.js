@@ -9,7 +9,8 @@
   const diagnosticCodes = new Set(['build_unreviewed', 'role_pending', 'contract_mismatch', 'loader_mismatch',
     'runtime_pending', 'composer_detached', 'composer_ambiguous', 'route_unsupported', 'document_unavailable', 'owner_ambiguous',
     'owner_pending', 'identity_pending', 'identity_unavailable', 'conversation_mismatch', 'mode_unsupported',
-    'busy', 'attachments_or_tools_present', 'composer_state_pending', 'upload_timeout', 'upload_unconfirmed']);
+    'busy', 'attachments_or_tools_present', 'composer_state_pending', 'upload_timeout', 'upload_unconfirmed',
+    'upload_cancelled', 'upload_context_changed', 'upload_association_unconfirmed', 'upload_transaction_failed']);
   async function rspackDiagnostic(job) {
     const runtime = root.__elonChatGptRspackRuntime;
     if (!runtime?.observed()) return null;

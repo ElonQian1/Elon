@@ -11,7 +11,7 @@ export interface PrivateUploadPort {
   check(): void
 }
 let sequence = 0
-export const privateUploadDiagnostic = /^private_upload_rspack_(build_unreviewed|role_pending|contract_mismatch|loader_mismatch|runtime_pending|composer_detached|composer_ambiguous|route_unsupported|document_unavailable|owner_ambiguous|owner_pending|identity_pending|identity_unavailable|conversation_mismatch|mode_unsupported|busy|attachments_or_tools_present|composer_state_pending|upload_timeout|upload_unconfirmed)$/
+export const privateUploadDiagnostic = /^private_upload_rspack_(build_unreviewed|role_pending|contract_mismatch|loader_mismatch|runtime_pending|composer_detached|composer_ambiguous|route_unsupported|document_unavailable|owner_ambiguous|owner_pending|identity_pending|identity_unavailable|conversation_mismatch|mode_unsupported|busy|attachments_or_tools_present|composer_state_pending|upload_timeout|upload_unconfirmed|upload_cancelled|upload_context_changed|upload_association_unconfirmed|upload_transaction_failed)$/
 const requestId = () => `mcp_att${Date.now().toString(36)}${(++sequence).toString(36)}`
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
