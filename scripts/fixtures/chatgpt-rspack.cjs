@@ -45,8 +45,10 @@ function fixture(options = {}) {
   const parent = { return: root, memoizedProps: { conversationId: id }, memoizedState: { memoizedState: { current: scope } } };
   const fiber = { return: parent, memoizedProps: {} };
   root.child = parent; parent.child = fiber;
-  const editor = { isConnected: true, '__reactFiber$fixture': fiber };
+  const editor = { isConnected: true, '__reactFiber$fixture': fiber, getBoundingClientRect: () => ({ width: 500, height: 80 }) };
   page.document.querySelector = selector => selector === '#prompt-textarea' ? editor : null;
+  page.document.querySelectorAll = selector => selector === '#prompt-textarea' ? [editor] : [];
+  page.getComputedStyle = () => ({ display: 'block', visibility: 'visible' });
   page.__elonChatGptRspackRuntime = runtimeApi.create(page, { importModule: async url => {
     imports.push(url); return options.importModule ? options.importModule() : { __webpack_require__: loader };
   } });

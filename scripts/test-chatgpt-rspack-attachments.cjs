@@ -88,6 +88,29 @@ test('current live manifest resolves its reviewed conversation alias and image s
   assert.equal(f.calls[0][1].additionalAttachments.length, 1);
 });
 
+test('uploads from the committed composer when the legacy element ID is absent', async () => {
+  const f = setup({ latest: 'current' });
+  f.page.document.querySelector = () => null;
+  f.page.document.querySelectorAll = selector => selector === '[data-testid="prompt-textarea"]' ? [f.editor] : [];
+  await f.upload();
+  assert.equal(f.attachments.prepare(f.editor).attachments[0].id, 'file-0');
+});
+
+test('composer lookup ignores hidden and unowned fields but rejects two live owners', async () => {
+  const f = setup({ latest: 'current' });
+  await f.page.__elonChatGptRspackRuntime.load();
+  const hidden = { ...f.editor, getBoundingClientRect: () => ({ width: 0, height: 0 }) };
+  const unrelated = { isConnected: true, getBoundingClientRect: f.editor.getBoundingClientRect };
+  const candidates = [hidden, unrelated, f.editor];
+  f.page.document.querySelectorAll = () => candidates;
+  assert.equal(f.context.find().node, f.editor);
+  candidates.push({ ...f.editor });
+  assert.equal(f.context.find(), null);
+  assert.equal(f.context.state().code, 'composer_ambiguous');
+  await assert.rejects(f.upload());
+  assert.equal(f.uploads.length, 0);
+});
+
 test('readiness accepts only this bridge confirmed uploads without dispatching', async () => {
   const f = setup({ latest: 'current' });
   await f.upload();

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptRspackAttachments) {
     root.__elonChatGptRspackAttachments = factory(root);
@@ -11,7 +11,6 @@
   const runtime = page.__elonChatGptRspackRuntime;
   const context = page.__elonChatGptRspackContext?.create(page);
   let active = null, owned = null, code = 'idle';
-  const editor = () => page.document.querySelector('#prompt-textarea');
   const entries = binding => binding.scope.get(binding.runtime.composer.f, binding.id);
   const same = (a, b) => Array.isArray(a) && a.length === b.length && a.every((entry, i) => entry === b[i]);
   function removeIds(job) {
@@ -29,7 +28,7 @@
     const loaded = await runtime?.load();
     if (!['web_20260926_rspack', 'web_20260926b_rspack'].includes(runtime?.profile) || typeof loaded?.composer.N !== 'function' ||
         typeof loaded?.composer.E !== 'function' || typeof loaded?.attachments.m !== 'function') throw Error('attachment_runtime_pending');
-    const binding = context.capture(editor());
+    const binding = context.find();
     if (!binding || binding.href !== descriptor.href || binding.token !== descriptor.documentToken ||
         !Array.isArray(files) || !files.length || files.length > 9 || signal?.aborted) throw Error('attachment_context_changed');
     const job = { binding, ids: [], cancelled: false, abort: null };
@@ -113,6 +112,6 @@
     if (!owned.ready.length) owned = null;
     return true;
   }
-  return Object.freeze({ version: 1, upload, prepare, cancel, merge, remove,
+  return Object.freeze({ version: 2, upload, prepare, cancel, merge, remove,
     state: () => ({ code, pending: !!active, count: owned?.ready.length || 0 }) });
 });

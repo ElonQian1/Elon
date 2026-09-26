@@ -7,23 +7,25 @@
   let batch = null;
   const validId = value => /^[a-f0-9-]{36}$/.test(value || '');
   const diagnosticCodes = new Set(['build_unreviewed', 'role_pending', 'contract_mismatch', 'loader_mismatch',
-    'runtime_pending', 'composer_detached', 'route_unsupported', 'document_unavailable', 'owner_ambiguous',
+    'runtime_pending', 'composer_detached', 'composer_ambiguous', 'route_unsupported', 'document_unavailable', 'owner_ambiguous',
     'owner_pending', 'identity_pending', 'identity_unavailable', 'conversation_mismatch', 'mode_unsupported',
     'busy', 'attachments_or_tools_present', 'composer_state_pending', 'upload_timeout', 'upload_unconfirmed']);
-  async function rspackDiagnostic() {
+  async function rspackDiagnostic(job) {
     const runtime = root.__elonChatGptRspackRuntime;
     if (!runtime?.observed()) return null;
-    const loaded = await runtime.load();
-    if (!loaded) {
-      const code = runtime.state?.().code;
-      return diagnosticCodes.has(code) ? code : 'runtime_pending';
-    }
     const context = root.__elonChatGptRspackContext?.create(root);
-    if (!context?.capture(root.document.querySelector('#prompt-textarea'))) {
-      const code = context?.state().code;
-      return diagnosticCodes.has(code) ? code : 'runtime_pending';
+    const deadline = Date.now() + 8000;
+    const pending = new Set(['runtime_pending', 'composer_detached', 'owner_pending', 'identity_pending',
+      'identity_unavailable', 'composer_state_pending']);
+    for (;;) {
+      if (!current(job)) throw Error('expired_batch');
+      const loaded = await runtime.load();
+      if (loaded && context?.find()) return null;
+      const observed = loaded ? context?.state().code : runtime.state?.().code;
+      const code = diagnosticCodes.has(observed) ? observed : 'runtime_pending';
+      if (!pending.has(code) || Date.now() >= deadline) return code;
+      await new Promise(resolve => root.setTimeout(resolve, 250));
     }
-    return null;
   }
   const current = job => batch === job && root.location.href === job.href && root.__elonChatGptDocumentToken === job.token;
   function clear() {
@@ -101,7 +103,7 @@
         width, height, href: job.href, documentToken: job.token, uploadCopy });
     }
     if (!root.__elonChatGptPrivateAttachmentSend) throw new Error('private_upload_unavailable');
-    const diagnostic = await rspackDiagnostic();
+    const diagnostic = await rspackDiagnostic(job);
     if (diagnostic) throw new Error('private_upload_rspack_' + diagnostic);
     await root.__elonChatGptPrivateAttachmentSend.start(JSON.stringify({ version: 2, files: descriptors,
       href: job.href, documentToken: job.token }),

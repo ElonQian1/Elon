@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptRspackContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -105,6 +105,25 @@
         binding.scope.get(binding.runtime.identity.i) === binding.userId;
     } catch (_) { return false; }
   }
-  return Object.freeze({ capture: (node, uploads) => capture(node, false, uploads), read: node => capture(node, true),
+  function find(uploads) {
+    const selectors = ['#prompt-textarea', '[data-testid="prompt-textarea"]', 'form [contenteditable="true"]',
+      'form textarea', 'main [contenteditable="true"]', 'textarea[placeholder]'];
+    const candidates = new Set(selectors.flatMap(selector => Array.from(page.document.querySelectorAll(selector))));
+    const bindings = [];
+    code = 'composer_detached';
+    for (const node of candidates) {
+      if (!node.isConnected) continue;
+      const rect = node.getBoundingClientRect(), style = page.getComputedStyle(node);
+      if (!rect.width || !rect.height || style.display === 'none' || style.visibility === 'hidden') continue;
+      // Selector matches alone are not ownership: every candidate must belong
+      // to the current committed account and conversation before any upload.
+      const binding = capture(node, false, uploads);
+      if (binding) bindings.push(binding);
+    }
+    if (bindings.length > 1) return fail('composer_ambiguous');
+    if (!bindings.length) return null;
+    code = 'ready'; return bindings[0];
+  }
+  return Object.freeze({ find, capture: (node, uploads) => capture(node, false, uploads), read: node => capture(node, true),
     current, owns, state: () => ({ code }) });
 });
