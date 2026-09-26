@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 1, create: factory });
+  const api = Object.freeze({ version: 2, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptRspackSubmit) {
     root.__elonChatGptRspackSubmit = factory(root);
@@ -31,15 +31,18 @@
       code = 'loading';
       if (!context || !await runtime.load()) return reject(runtime.state().code);
       if (job.token !== page.__elonChatGptDocumentToken) return reject('document_changed');
-      if (command.requireNativeAttachment) return reject('attachment_contract_pending');
-      const binding = context.capture(command.composer);
+      const attachmentLease = page.__elonChatGptRspackAttachments?.prepare(command.composer);
+      if (command.requireNativeAttachment && !attachmentLease) return reject('attachment_contract_pending');
+      const binding = attachmentLease?.binding || context.capture(command.composer);
       if (!binding) return reject(context.state().code);
       if (binding.draft !== command.expectedDraft || command.readDraft() !== command.expectedDraft ||
           command.expectedDraft && command.expectedDraft !== command.prompt) return reject('draft_mismatch');
       command.beforeSubmit?.();
-      if (!context.current(binding) || command.readDraft() !== command.expectedDraft) return reject('context_changed');
+      if (!context.current(binding) || attachmentLease?.current() === false ||
+          command.readDraft() !== command.expectedDraft) return reject('context_changed');
       controller = new page.AbortController();
-      const current = () => !controller.signal.aborted && context.owns(binding);
+      const current = () => !controller.signal.aborted && context.owns(binding) &&
+        (job.accepted || attachmentLease?.current() !== false);
       code = 'dispatching';
       job.invoked = true;
       // CUv.a is the reviewed official composer transaction. It prepares integrity,
@@ -47,6 +50,7 @@
       const request = binding.runtime.submit.a(binding.scope, {
         conversationId: binding.id, prompt: command.prompt, selectedModel: binding.model,
         isTemporaryChat: binding.temporary, preserveDraft: true, requireDispatchAcceptance: true,
+        ...(attachmentLease ? { additionalAttachments: attachmentLease.attachments } : {}),
         isSubmissionCurrent: current, isRequestCurrent: current, signal: controller.signal,
       });
       const accepted = await Promise.race([Promise.resolve(request), new Promise((_, reject) => {
@@ -57,8 +61,10 @@
         job.uncertain = true; code = 'dispatch_unconfirmed';
         return { status: 'unknown', code };
       }
+      job.accepted = true;
       const sameOwner = context.owns(binding);
       try {
+        attachmentLease?.consumeAccepted();
         if (sameOwner && command.expectedDraft && command.readDraft() === command.expectedDraft) command.clearDraft?.();
       } catch (_) { /* Local cleanup cannot revoke a confirmed dispatch. */ }
       code = 'accepted';
@@ -77,5 +83,5 @@
       return { profile: runtime.profile, stage: binding ? 'ready' : 'runtime', code: reason };
     } catch (_) { return { profile: runtime.profile, stage: 'runtime', code: 'context_unavailable' }; }
   }
-  return Object.freeze({ version: 1, submit, inspect, state: () => ({ pending: !!active, code }) });
+  return Object.freeze({ version: 2, submit, inspect, state: () => ({ pending: !!active, code }) });
 });

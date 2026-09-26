@@ -80,6 +80,7 @@ function inspect() {
           }
         });
         found.push({ file, module: key(item.key), bytes: body.length, exports: exports.slice(0, 50),
+          moduleSha256: crypto.createHash('sha256').update(body).digest('hex'),
           ...(mode === 'source' ? { source: body.slice(offset, offset + 16000) } : {}),
           ...(mode === 'snippets' ? { snippets: [...body.matchAll(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))]
             .slice(0, 4).map(match => body.slice(Math.max(0, match.index - 450), match.index + query.length + 900)) } : {}),

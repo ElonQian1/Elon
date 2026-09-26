@@ -38,6 +38,13 @@ test('reads the current official branch without a DOM turn, fetch or write', asy
   assert.ok(!JSON.stringify(result).includes('not-a-credential'));
 });
 
+test('temporary local owner keeps its answer after receiving a server conversation ID', async () => {
+  const f = await setup();
+  f.page.location = new URL('https://chatgpt.com/?temporary-chat=true');
+  assert.equal(f.reader.read(f.editor).messages[1].content[0].text, '**fixture answer**');
+  assert.equal(f.values.get(f.conversation.i), ID);
+});
+
 test('streaming reads are allowed without relaxing the send guard', async () => {
   const f = await setup();
   f.values.set(f.conversation.T, 'streaming');

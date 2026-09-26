@@ -28,6 +28,7 @@ const adapterIndex = bootstrap.indexOf('"chatgpt_web_adapter.js"', observerIndex
 assert.ok(observerIndex >= 0, 'Win bootstrap must include the shared attachment observer');
 assert.ok(adapterIndex > observerIndex, 'Win must install the attachment observer before the command adapter');
 assert.match(adapter, /attachmentTransportObserver\.arm\(\)/);
-assert.match(bootstrap, /ADAPTER_VERSION: u32 = 207/);
+assert.ok(Number(/ADAPTER_VERSION: u32 = (\d+)/.exec(bootstrap)?.[1]) >= 207,
+  'Attachment observer requires adapter version 207 or newer');
 
 process.stdout.write('PASS Win ChatGPT attachment transport bootstrap\n');

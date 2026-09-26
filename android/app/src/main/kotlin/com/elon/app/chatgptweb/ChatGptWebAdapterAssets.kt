@@ -12,6 +12,7 @@ internal object ChatGptWebAdapterAssets {
         "chatgpt_web_rspack_context.js",
         "chatgpt_web_rspack_messages.js",
         "chatgpt_web_rspack_submit.js",
+        "chatgpt_web_rspack_attachments.js",
         "chatgpt_web_new_chat_confirmation.js",
         "chatgpt_web_private_new_conversation.js",
         "chatgpt_web_adapter_authentication_policy.js",

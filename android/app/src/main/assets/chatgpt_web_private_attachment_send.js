@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 27, create: factory });
+  const exported = Object.freeze({ version: 28, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com' &&
       !(Number(root.__elonChatGptPrivateAttachmentSend?.version) >= exported.version)) {
@@ -22,6 +22,7 @@
 
   function suspend() {
     library?.cancel();
+    root.__elonChatGptRspackAttachments?.cancel();
     if (!active) return;
     active.controller.abort();
     active.transport?.cancel();
@@ -54,6 +55,27 @@
         '尚未能重新上传这份附件，文字未发送，请重试。') : fallback();
     };
     if (uploadCopy) selections?.cancel();
+    // The new official runtime owns a different upload store. Never replay a
+    // rejected Rspack upload through legacy DOM/file-picker automation.
+    if (root.__elonChatGptRspackRuntime?.observed()) {
+      selections?.cancel();
+      const job = { controller: new root.AbortController() };
+      active = job;
+      try {
+        if (!source || !descriptor || !root.__elonChatGptRspackAttachments || uploadCopy) throw Error('attachment_runtime_pending');
+        const files = [];
+        for (const item of descriptors) files.push(await source.read(item, job.controller.signal));
+        await root.__elonChatGptRspackAttachments.upload(files, descriptor, job.controller.signal);
+        respond('request_attachment_upload', true, 'private_attachment_associated');
+        changed(true);
+      } catch (_) {
+        respond('request_attachment_upload', false, '附件未能确认关联到当前会话，文字尚未发送，请检查连接后重试。');
+      } finally {
+        job.controller.abort();
+        if (active === job) active = null;
+      }
+      return;
+    }
     // Compatibility selection is before any private write, never an automatic replay.
     if (!descriptor || !composer || !source || !root.__elonChatGptPrivateTransport ||
         !root.__elonChatGptPrivateAttachmentTransport || batch && typeof composer.associateMany !== 'function') return unavailable();
@@ -166,18 +188,19 @@
   function remove(id, respond, changed) {
     if (!String(id).startsWith('private_attachment_')) return false;
     let ok = false;
-    try { ok = composer.remove(id); } catch (_) {}
+    try { ok = root.__elonChatGptRspackAttachments?.remove(id) || composer?.remove(id); } catch (_) {}
     respond('remove_attachment', ok, ok ? '' : '附件状态已变化，请刷新后重试。');
     changed(true);
     return true;
   }
 
-  return Object.freeze({ version: 27, start, cancel, suspend, remove,
+  return Object.freeze({ version: 28, start, cancel, suspend, remove,
     attachLibrary: (command, respond, changed) => {
       selections?.cancel();
       return library ? library.attach(command, respond, changed) : respond('attach_library_file', false, 'library_not_ready');
     },
     prepareSubmit: store => composer?.prepareSubmit?.(store) || null,
     beginSelection: raw => selections?.begin(raw) === true, cancelSelection: id => selections?.cancel(id),
-    merge: dom => composer?.merge(dom) || dom });
+    merge: dom => root.__elonChatGptRspackRuntime?.observed()
+      ? root.__elonChatGptRspackAttachments?.merge(dom) || dom : composer?.merge(dom) || dom });
 });
