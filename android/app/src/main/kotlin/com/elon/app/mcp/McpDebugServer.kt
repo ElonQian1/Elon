@@ -187,6 +187,8 @@ object McpDebugServer {
         val result = when (name) {
             "phone_status" -> toolResult("Phone MCP debug server is running.", statusJson(includeToken = false))
             "binance_host_status" -> mcpBinanceHostStatus(appContext)
+            "binance_grid_read" -> mcpBinanceGridRead(appContext, args)
+            "binance_grid_attachment" -> mcpBinanceGridAttachment(appContext, args)
             "binance_manage_read" -> mcpBinanceManageRead(appContext, args)
             "trace_recent" -> mcpTraceRecent(args)
             "trace_clear" -> {

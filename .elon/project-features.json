@@ -1310,6 +1310,50 @@
       "updated_at_ms": 1788890532656
     },
     {
+      "id": "android-binance-grid-chat-v1",
+      "title": "APK 手动附带币安网格与只读 MCP",
+      "summary": "复用手机会话宿主返回实际网格；点击附带才读取，预览后通过当前 ChatGPT 发送器发送。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/android-binance-grid-chat-v1.md",
+        "content_hash": "3fabc318585657758531828fc921a622a5ca9e0fcabbcb48216b0b8be327ce73",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "4cee21ea0d1bd72704904c222e21f72eb872f69d",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "b888537ac22e5da6806a562de2cf6890c183363b",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "android-grid-chat",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/grid/chat",
+        "android/app/src/main/kotlin/com/elon/app/mcp/McpBinanceGridRead.kt",
+        "scripts/web-conversations/grid.mjs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "MCP 新鲜列表、精确详情与稳定分页",
+        "失效与账号隔离、字段边界测试",
+        "手动附带与现有 ChatGPT 发送路径",
+        "正式 APK 发布安装及真机证据"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_53d8a195af1f4f718f1b3f85fbb672f5",
+        "agent_id": "codex-apk-grid",
+        "claimed_at_ms": 1790405578889,
+        "expires_at_ms": 1790491978889
+      },
+      "created_at_ms": 1790405486771,
+      "updated_at_ms": 1790405660468
+    },
+    {
       "id": "android-binance-grid-core-v2",
       "title": "本人U本位网格核心功能V2",
       "summary": "持续只读连接、丰富网格读取与原生管理体验；主APK托管会话，量化APK授权调用。",
@@ -31208,36 +31252,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_bc9f78de9e3d41cc97bc34dcbd945e55",
-      "feature_id": "quant-public-https-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789328234149
-    },
-    {
-      "id": "feature_event_c6dd450c4af74c348c283156d8132bd0",
-      "feature_id": "quant-public-https-v1",
-      "action": "claim_released",
-      "actor": "codex-quant-grid",
-      "reason": "补充现有HTTPS独立测试工程的依赖和生产路由接入路径，业务范围不变",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1789328575281
-    },
-    {
-      "id": "feature_event_b3edcf9413c64d69b681a9a2e127aaed",
-      "feature_id": "quant-public-https-v1",
-      "action": "metadata_updated",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "proposed",
-      "at_ms": 1789328575324
-    },
-    {
       "id": "feature_event_afb7df1ab9d94d1480a4d2b0962fad19",
       "feature_id": "quant-public-https-v1",
       "action": "transitioned",
@@ -33206,6 +33220,36 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1790402868135
+    },
+    {
+      "id": "feature_event_9bfd797450da40039850d394335b906e",
+      "feature_id": "android-binance-grid-chat-v1",
+      "action": "registered",
+      "actor": "codex-apk-grid",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790405486771
+    },
+    {
+      "id": "feature_event_aaa94d9095c04469acbf7bdf2e57b4be",
+      "feature_id": "android-binance-grid-chat-v1",
+      "action": "claimed",
+      "actor": "codex-apk-grid",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790405578890
+    },
+    {
+      "id": "feature_event_761c0c36696045b39112c140171212d9",
+      "feature_id": "android-binance-grid-chat-v1",
+      "action": "transitioned",
+      "actor": "codex-apk-grid",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790405660468
     }
   ]
 }

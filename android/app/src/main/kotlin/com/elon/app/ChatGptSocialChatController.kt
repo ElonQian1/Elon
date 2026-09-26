@@ -87,6 +87,9 @@ internal class ChatGptSocialChatController(
     }
     private var provider = WebChatProviderRegistry.get(WebChatProviderId.CHATGPT_WEB)
     private var active = false
+    private val gridAttachment by lazy { com.elon.app.grid.chat.GridChatAttachmentController(activity, binding.inputEdit) {
+        if (active) com.elon.app.grid.chat.GridChatAttachmentController.chatScope(socialMcpPort.uiState(), session.currentOfficialUrl()) else null
+    } }
     private var pendingAttachmentPrompt: String? = null
     private var pendingAttachments = emptyList<PendingAttachment>()
     private var lastMessageSnapshot: ChatGptWebSnapshot? = null
@@ -158,6 +161,7 @@ internal class ChatGptSocialChatController(
             return
         }
         active = true
+        gridAttachment.activate()
         transcript.activate()
         session.activate()
         session.currentSnapshot()?.let(::renderSnapshot)
@@ -166,6 +170,7 @@ internal class ChatGptSocialChatController(
 
     override fun deactivate() {
         active = false
+        gridAttachment.deactivate()
         newConversationConfirmation.dismiss()
         session.pauseSendWatchdog()
         if (!session.realtimeVoiceActive()) realtimeVoiceTranscript.reset()
@@ -225,6 +230,7 @@ internal class ChatGptSocialChatController(
 
     override fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
         if (!active) return false
+        if (!gridAttachment.validateSend(rawText)) return true
         if (session.pendingSendPrompt() != null) {
             val detail = if (session.pendingSendRequiresOfficialConfirmation()) {
                 "上一条已发送，但回答尚未同步，请打开官网功能确认"
@@ -354,6 +360,7 @@ internal class ChatGptSocialChatController(
     }
 
     fun openConversationTracked(path: String): WebChatConsumerCommandResult {
+        gridAttachment.deactivate(); if (active) gridAttachment.activate()
         realtimeVoiceTranscript.reset()
         clearPendingSend()
         latestSendCommandStatus = null
@@ -366,6 +373,7 @@ internal class ChatGptSocialChatController(
     }
 
     override fun openProject(path: String): Boolean {
+        gridAttachment.deactivate(); if (active) gridAttachment.activate()
         realtimeVoiceTranscript.reset()
         clearPendingSend()
         latestSendCommandStatus = null
@@ -374,7 +382,7 @@ internal class ChatGptSocialChatController(
         return session.openProject(path)
     }
 
-    override fun mcpPort(): WebChatSocialMcpPort = socialMcpPort
+    override fun mcpPort(): WebChatSocialMcpPort = gridAttachment.guardMcp(socialMcpPort)
 
     override fun consumerPort(): WebChatConsumerPort = socialConsumerPort
     override fun beginAttachmentSelection(kind: WebChatAttachmentSelectionKind): WebChatAttachmentSelection? =
@@ -439,6 +447,7 @@ internal class ChatGptSocialChatController(
 
     override fun onHostPaused() = session.onHostPaused()
     override fun destroy() {
+        gridAttachment.deactivate()
         clearPendingSend()
         privateDictation.destroy()
         productionMessageActions.release()
@@ -452,6 +461,7 @@ internal class ChatGptSocialChatController(
     }
 
     private fun renderSnapshot(snapshot: ChatGptWebSnapshot) {
+        gridAttachment.reconcile()
         privateDictation.observeOfficialDraft(snapshot.draft)
         if (pendingOfficialDictationDraft) {
             setInputTextFromMcp(snapshot.draft)

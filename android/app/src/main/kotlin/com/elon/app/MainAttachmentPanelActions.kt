@@ -32,6 +32,7 @@ internal class MainAttachmentPanelActions(
 
     private var iconAnimationToken = 0
     private var uiDesignAction: View? = null
+    private var gridAction: View? = null
 
     fun buildAttachmentPanel(): LinearLayout {
         return LinearLayout(activity).apply {
@@ -54,6 +55,9 @@ internal class MainAttachmentPanelActions(
             addView(createAttachmentAction("文件", R.drawable.ic_attach_files, "attachment-action-files") {
                 openDocumentAttachment()
             })
+            gridAction = createAttachmentAction("附带网格", R.drawable.ic_attach_function, "attachment-action-binance-grid") {
+                com.elon.app.grid.chat.GridChatAttachmentController.current?.open()
+            }.also { addView(it) }
             val designAction = createAttachmentAction(
                 "UI设计",
                 R.drawable.ic_attach_function,
@@ -77,6 +81,7 @@ internal class MainAttachmentPanelActions(
         if (isOpen) return
         val panel = attachmentPanel() ?: return
         uiDesignAction?.visibility = if (showUiDesignAction()) View.VISIBLE else View.GONE
+        gridAction?.visibility = if (com.elon.app.grid.chat.GridChatAttachmentController.current != null) View.VISIBLE else View.GONE
         isOpen = true
         applyAttachmentPanelBackground(expanded = true)
         panel.visibility = View.VISIBLE

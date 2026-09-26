@@ -15,6 +15,8 @@ internal class BinanceHostState(private val elapsed: () -> Long, private val epo
     var observed = 0L; private set
     var observedElapsed = 0L; private set
     var ready = false; private set
+    var listRevision = 0L; private set
+    private val detailRevisions = mutableMapOf<String, Pair<Long, Long>>()
     private var rows = linkedMapOf<String, Map<String, Any?>>()
     private val grants = mutableMapOf<String, Long>()
     private val renewable = mutableSetOf<String>()
@@ -22,7 +24,7 @@ internal class BinanceHostState(private val elapsed: () -> Long, private val epo
     val detailCount get() = rows.values.count { it["detail"] == true }
     val activeGrantCount get() = grants.values.count { it > elapsed() }
 
-    fun unavailable() { ready = false; account = null; accountKind = "unknown"; rows.clear(); grants.clear(); renewable.clear(); generation++ }
+    fun unavailable() { ready = false; account = null; accountKind = "unknown"; rows.clear(); detailRevisions.clear(); grants.clear(); renewable.clear(); generation++ }
     fun accept(raw: String) {
         try { acceptVerified(raw) } catch (failure: RuntimeException) { unavailable(); throw failure }
     }
@@ -54,7 +56,7 @@ internal class BinanceHostState(private val elapsed: () -> Long, private val epo
                 rows = linkedMapOf<String, Map<String, Any?>>().apply {
                     decoded.forEach { put(it["id"] as String, it.filterKeys { key -> key != "account" } + ("detail" to false)) }
                 }
-                observed = epoch(); observedElapsed = elapsed(); generation++; ready = true
+                observed = epoch(); observedElapsed = elapsed(); generation++; listRevision++; detailRevisions.clear(); ready = true
             }
             "detail" -> {
                 require(fresh())
@@ -68,11 +70,16 @@ internal class BinanceHostState(private val elapsed: () -> Long, private val epo
                 rows[row["id"] as String] = old + row.filterKeys { it != "account" && it != "metrics" }.filterValues { it != null } +
                     mapOf("detail" to true, "metrics" to metrics)
                 generation++
+                detailRevisions[row["id"] as String] = generation to epoch()
             }
             else -> unavailable()
         }
     }
     fun fresh() = ready && elapsed() - observedElapsed in 0 until 300_000
+    fun snapshotRows(): List<Map<String, Any?>> = if (fresh()) rows.values.map { row ->
+        row.toMap() + ("metrics" to BinanceGridMetrics.decode(row["metrics"]).toMap())
+    } else emptyList()
+    fun detailObservation(id: String): Pair<Long, Long>? = if (fresh()) detailRevisions[id] else null
     fun grant(continuous: Boolean = false): String {
         require(fresh() && account != null)
         grants.entries.removeAll { it.value <= elapsed() }
