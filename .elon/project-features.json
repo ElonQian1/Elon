@@ -23944,7 +23944,7 @@
       "id": "win-binance-grid-mcp-v1",
       "title": "Win MCP 直接读取币安网格",
       "summary": "复用本人 WebView 私有 API，固定列表与详情 MCP，无桌面点击；新鲜度、分页、账号及策略校验。",
-      "status": "implemented",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/win-binance-grid-mcp-v1.md",
@@ -23992,15 +23992,15 @@
         },
         {
           "path": "docs/reports/win-binance-grid-mcp-20260926.md",
-          "content_hash": "c883f75c2026384dab50d0fb1c5b0aac9b8091f9cc34f102b3bcb7b0a0a2eeab",
+          "content_hash": "5ee4f8b63683629e0d2132cbc40218c4a0db5fcbff3ce5a287ac9ab8075e834c",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "ad1177a212c5cd457a0b3f533ec6dad730eecc80",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "0e2c073a4a4d542f275dfeff86a89c9a781a2a9d",
-            "state": "index_only"
+            "head_commit": "8e2187d116bd9dfee8025fcb6eed9e117ccd419b",
+            "head_blob_oid": "0e2c073a4a4d542f275dfeff86a89c9a781a2a9d",
+            "worktree_blob_oid": "cda11bf76ca52833fcd19156e6903f0fcf6985ba",
+            "state": "tracked_modified"
           }
         },
         {
@@ -24096,7 +24096,7 @@
         }
       ],
       "created_at_ms": 1790397270395,
-      "updated_at_ms": 1790398887530
+      "updated_at_ms": 1790402868135
     },
     {
       "id": "win-browser-research-affinity-v1",
@@ -31208,36 +31208,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a7c00a3930a44ca1957c1a6488116ff4",
-      "feature_id": "android-okx-records-read-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789324188988
-    },
-    {
-      "id": "feature_event_4891b048334c4331ab3b95bb3aa0f763",
-      "feature_id": "quant-public-https-v1",
-      "action": "registered",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789328234067
-    },
-    {
-      "id": "feature_event_fceaf4fa33b84de19452f3607fe23b80",
-      "feature_id": "quant-public-https-v1",
-      "action": "claimed",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789328234106
-    },
-    {
       "id": "feature_event_bc9f78de9e3d41cc97bc34dcbd945e55",
       "feature_id": "quant-public-https-v1",
       "action": "transitioned",
@@ -33206,6 +33176,36 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1790398887530
+    },
+    {
+      "id": "feature_event_b30e7054c69a45939ff86c673bffe2ee",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-binance-mcp",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1790402864946
+    },
+    {
+      "id": "feature_event_3d5275fd1b8d4bc084c891c65991dc84",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-mcp",
+      "reason": "8e2187d11 已完成云端/Win发布、活进程版本回读和真实MCP读取验收；Claude本机配置单独待授权",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1790402866555
+    },
+    {
+      "id": "feature_event_6f2ad5b0ae124f0badbedec5f33a8ab2",
+      "feature_id": "win-binance-grid-mcp-v1",
+      "action": "transitioned",
+      "actor": "codex-binance-mcp",
+      "reason": "8e2187d11 已完成云端/Win发布、活进程版本回读和真实MCP读取验收；Claude本机配置单独待授权",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1790402868135
     }
   ]
 }
