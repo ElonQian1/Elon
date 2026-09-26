@@ -90,6 +90,7 @@ export class GroupAiControlModel {
       result_message_id: task.request?.result_message_id ?? null, phase: task.progress.phase, stage: task.stage,
       busy: task.progress.busy, dispatched: task.dispatched, has_answer: !!task.answer, answer_chars: task.answer.length,
       attachment_count: task.request?.attachments?.length ?? 0, source_count: task.input.selection.message_ids.length,
-      message_count: task.observedMessageCount, error_code: task.lastReceiptCode || null }
+      message_count: task.observedMessageCount, error_code: task.lastReceiptCode || null,
+      runtime_diagnostic: task.runtimeDiagnostic }
   }
 }

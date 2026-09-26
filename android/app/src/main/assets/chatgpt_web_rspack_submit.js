@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 5, create: factory });
+  const api = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptRspackSubmit) {
     root.__elonChatGptRspackSubmit = factory(root);
@@ -10,7 +10,7 @@
   options = options || {};
   const runtime = page.__elonChatGptRspackRuntime;
   const context = (options.context || page.__elonChatGptRspackContext)?.create(page);
-  let active = null, code = 'not_observed', requestGuard = null;
+  let active = null, code = 'not_observed', requestGuard = null, acceptedBinding = null;
   function submit(command) {
     if (!runtime?.observed()) return { handled: false, code: 'not_observed' };
     if (page.__elonChatGptPrivateTextTransactionsEnabled !== true) return { handled: false, code: 'disabled' };
@@ -20,6 +20,7 @@
       return { handled: false, code: 'invalid_command' };
     }
     const job = { invoked: false, uncertain: false, token: page.__elonChatGptDocumentToken };
+    acceptedBinding = null;
     active = job;
     const completion = run(command, job).finally(() => { if (active === job && !job.uncertain) active = null; });
     return { handled: true, completion };
@@ -76,6 +77,7 @@
         return { status: 'unknown', code };
       }
       job.accepted = true;
+      acceptedBinding = binding;
       const sameOwner = context.owns(binding);
       try {
         attachmentLease?.consumeAccepted();
@@ -100,6 +102,9 @@
       return { profile: runtime.profile, stage: binding ? 'ready' : 'runtime', code: reason };
     } catch (_) { return { profile: runtime.profile, stage: 'runtime', code: 'context_unavailable' }; }
   }
-  return Object.freeze({ version: 5, submit, inspect, state: () => ({ pending: !!active, code,
+  // A hidden group job reads its submitted thread, never a replacement home editor.
+  const readAccepted = () => page.__elonChatGptGroupRequestOwnershipEnabled === true &&
+    code === 'accepted' && requestGuard?.() === true ? acceptedBinding : null;
+  return Object.freeze({ version: 6, submit, inspect, readAccepted, state: () => ({ pending: !!active, code,
     requestCurrent: requestGuard ? requestGuard() : null }) });
 });

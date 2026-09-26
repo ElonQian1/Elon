@@ -95,6 +95,7 @@ export class GroupAiTask {
   stopped = false
   stage = 'preparing'
   observedMessageCount = 0
+  runtimeDiagnostic: unknown = null
   lastReceiptCode = ''
   private attachmentAttempted = false
   progress: GroupAiProgress = { phase: 'preparing', message: '正在准备群聊 AI', busy: false, hasAnswer: false }
@@ -204,6 +205,7 @@ export class GroupAiTask {
       const state = await this.host('state')
       const snapshot = state.semanticEvent as LocalAiMessageSnapshot | null
       this.observedMessageCount = snapshot?.messages?.length ?? 0
+      this.runtimeDiagnostic = (snapshot as (LocalAiMessageSnapshot & { groupRuntimeDiagnostic?: unknown }) | null)?.groupRuntimeDiagnostic ?? null
       if (state.semanticCacheStatus === 'live' && snapshot?.type === 'message_snapshot') {
         const answer = completedGroupAiReply(snapshot, this.request!.prompt)
         if (answer) { this.answer = answer; await this.deliver(); return }

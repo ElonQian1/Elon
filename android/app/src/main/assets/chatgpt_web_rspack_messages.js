@@ -1,13 +1,15 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 3, create: factory });
+  const api = Object.freeze({ version: 4, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptRspackMessages = factory(root);
 })(typeof window === 'object' ? window : null, function (page) {
   'use strict';
   let context, projection, warming = false, retryAt = 0, lastDiagnostic = '';
+  let observation = { code: 'not_observed', message_count: 0, assistant_message_count: 0, streaming: false };
   const states = new Set(['idle', 'error', 'streaming', 'active-async-turn', 'active-tpp-turn']);
   function diagnostic(code) {
+    observation.code = code;
     if (page.__elonChatGptGroupReadDiagnosticsEnabled !== true ||
         page.__elonChatGptRspackSubmit?.state().code !== 'accepted' || code === lastDiagnostic) return;
     lastDiagnostic = code;
@@ -28,16 +30,20 @@
   }
 
   function read(composer, notify) {
+    observation = { code: 'not_observed', message_count: 0, assistant_message_count: 0, streaming: false };
     try {
       const loader = page.__elonChatGptRspackRuntime;
-      if (!loader?.observed()) return null;
+      if (!loader?.observed()) return fail('runtime_not_observed');
       const runtime = loader.peek();
       if (!runtime) { warm(notify); return fail('runtime_pending'); }
       if (runtime.conversation.G?.scope !== runtime.scope.a ||
           !page.__elonChatGptRspackContext?.create || !page.__elonChatGptPrivateHistoryProjection?.create) return fail('projection_contract');
       context ||= page.__elonChatGptRspackContext.create(page);
       projection ||= page.__elonChatGptPrivateHistoryProjection.create({ streamPolicy: page.__elonChatGptPrivateStreamPolicy });
-      const binding = context.read(composer);
+      const submit = page.__elonChatGptRspackSubmit;
+      const owned = page.__elonChatGptGroupRequestOwnershipEnabled === true && submit?.state().code === 'accepted';
+      const binding = owned ? submit.readAccepted?.() : context.read(composer);
+      if (owned && !binding) return fail('request_expired');
       if (!binding) return fail('context_' + context.state().code);
       const mapping = binding.scope.get(runtime.conversation.G, binding.id);
       const currentNode = binding.scope.get(runtime.conversation.z, binding.id);
@@ -51,12 +57,19 @@
       const rows = projection.sourceMessages(payload), messages = projection.project(payload);
       if (!rows.length) return fail('branch_empty');
       if (!messages.length) return fail('projection_empty');
-      if (!context.owns(binding)) return fail('owner_changed');
+      if (owned ? submit.readAccepted?.() !== binding : !context.owns(binding)) return fail('owner_changed');
+      observation.message_count = messages.length;
+      observation.assistant_message_count = messages.filter(message => message.role === 'assistant').length;
+      observation.streaming = !['idle', 'error'].includes(state);
       const submitted = page.__elonChatGptRspackSubmit?.state();
       diagnostic(submitted?.requestCurrent === false ? 'request_expired' : state === 'error' ? 'generation_error' : 'ready');
       return { messages, observedCount: rows.length, startIndex: Math.max(0, rows.length - 80),
         streaming: !['idle', 'error'].includes(state) };
     } catch (_) { return fail('exception'); }
   }
-  return Object.freeze({ version: 3, read });
+  function state() {
+    const submit = page.__elonChatGptRspackSubmit?.state();
+    return { ...observation, submit_code: submit?.code || 'not_observed', request_current: submit?.requestCurrent ?? null };
+  }
+  return Object.freeze({ version: 4, read, state });
 });

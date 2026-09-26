@@ -287,7 +287,10 @@
         ? messageAdapter.readMessageWindow(streaming, streamingState.assistantKey)
         : { messages: messageAdapter ? messageAdapter.readMessages(streaming) : [], observedCount: 0, startIndex: 0 }
     );
-    const messageWindow = domWindow.messages?.length ? domWindow : runtimeWindow || domWindow;
+    const ownedGroupReply = window.__elonChatGptGroupRequestOwnershipEnabled === true &&
+      window.__elonChatGptRspackSubmit?.state().code === 'accepted';
+    const messageWindow = ownedGroupReply ? runtimeWindow || { messages: [], observedCount: 0, startIndex: 0 }
+      : domWindow.messages?.length ? domWindow : runtimeWindow || domWindow;
     const domMessages = Array.isArray(messageWindow.messages) ? messageWindow.messages : [];
     const messages = optional(domMessages, () => privateStreamTransport &&
       typeof privateStreamTransport.mergeMessages === 'function'
@@ -301,6 +304,9 @@
       url: location.origin + location.pathname,
       draft: (privateInput?.ready ? privateInput.draft : composerValue(composer)).slice(0, 20000),
       messages,
+      ...(window.__elonChatGptGroupReadDiagnosticsEnabled === true ? {
+        groupRuntimeDiagnostic: optional(null, () => window.__elonChatGptRspackMessages?.state())
+      } : {}),
       observedMessageCount: Math.max(messages.length, Number(messageWindow.observedCount) || 0),
       messageWindowStart: Math.max(0, Number(messageWindow.startIndex) || 0),
       ...authenticationPolicy?.accountState?.({ loginRequired, composerReady: !!composer,

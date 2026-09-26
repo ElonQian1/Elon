@@ -281,12 +281,55 @@ fn sanitize_result(v: Value) -> Result<Value, String> {
             }).collect::<Vec<_>>());
         }
     }
+    out["runtime_diagnostic"] = runtime_diagnostic(&v["runtime_diagnostic"]);
     Ok(out)
+}
+
+fn runtime_diagnostic(value: &Value) -> Value {
+    if !value.is_object() {
+        return Value::Null;
+    }
+    let fixed = |key: &str, allowed: &[&str]| {
+        value[key]
+            .as_str()
+            .filter(|code| allowed.contains(code))
+            .map(|code| json!(code))
+            .unwrap_or(Value::Null)
+    };
+    json!({
+        "code": fixed("code", &["not_observed", "runtime_not_observed", "runtime_pending", "projection_contract",
+            "context_runtime_pending", "context_composer_detached", "context_route_unsupported", "context_document_unavailable",
+            "context_owner_ambiguous", "context_owner_pending", "context_identity_pending", "context_identity_unavailable",
+            "context_conversation_mismatch", "mapping_missing", "state_unknown", "branch_missing", "branch_empty",
+            "projection_empty", "owner_changed", "request_expired", "generation_error", "ready", "exception"]),
+        "submit_code": fixed("submit_code", &["not_observed", "loading", "dispatching", "accepted", "dispatch_unconfirmed",
+            "context_changed", "context_unavailable", "document_changed", "draft_mismatch", "busy", "disabled"]),
+        "request_current": value["request_current"].as_bool(),
+        "streaming": value["streaming"].as_bool(),
+        "message_count": value["message_count"].as_u64().filter(|count| *count <= 1000),
+        "assistant_message_count": value["assistant_message_count"].as_u64().filter(|count| *count <= 1000)
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn runtime_observation_is_task_local_fixed_codes_and_counts_only() {
+        let value = runtime_diagnostic(&json!({"code":"ready", "submit_code":"accepted",
+            "request_current":true, "streaming":false, "message_count":2, "assistant_message_count":1,
+            "prompt":"private", "token":"secret"}));
+        assert_eq!(value["code"], "ready");
+        assert_eq!(value["assistant_message_count"], 1);
+        assert!(value.get("prompt").is_none());
+        assert!(value.get("token").is_none());
+        let invalid = runtime_diagnostic(
+            &json!({"code":"private", "submit_code":"secret", "message_count":1001}),
+        );
+        assert!(invalid["code"].is_null());
+        assert!(invalid["submit_code"].is_null());
+        assert!(invalid["message_count"].is_null());
+    }
     fn command(action: &str) -> Command {
         serde_json::from_value(
             json!({"command_id":uuid::Uuid::new_v4().to_string(),"action":action}),

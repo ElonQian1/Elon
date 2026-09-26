@@ -45,6 +45,32 @@ test('temporary local owner keeps its answer after receiving a server conversati
   assert.equal(f.values.get(f.conversation.i), ID);
 });
 
+test('task-local read state separates runtime messages from DOM and survives missing runtime', async () => {
+  const f = await setup();
+  f.page.__elonChatGptRspackSubmit = { state: () => ({ code: 'accepted', requestCurrent: true }) };
+  f.reader.read(f.editor);
+  assert.deepEqual(f.reader.state(), { code: 'ready', message_count: 2, assistant_message_count: 1,
+    streaming: false, submit_code: 'accepted', request_current: true });
+  f.page.__elonChatGptRspackRuntime = { observed: () => false };
+  assert.equal(f.reader.read(f.editor), null);
+  assert.equal(f.reader.state().code, 'runtime_not_observed');
+  assert.equal(f.reader.state().message_count, 0);
+  assert.ok(!JSON.stringify(f.reader.state()).includes('fixture'));
+});
+
+test('group read follows the accepted request after the home editor changes owners', async () => {
+  const f = await setup();
+  f.page.__elonChatGptGroupRequestOwnershipEnabled = true;
+  f.page.__elonChatGptRspackSubmit = f.submit;
+  assert.equal((await f.submit.submit(f.command).completion).status, 'accepted');
+  f.parent.memoizedProps.conversationId = 'local-chatgpt:33333333-3333-4333-8333-333333333333';
+  f.editor.isConnected = false;
+  assert.equal(f.reader.read(null).messages[1].content[0].text, '**fixture answer**');
+  f.changeAccount();
+  assert.equal(f.reader.read(null), null);
+  assert.equal(f.reader.state().code, 'request_expired');
+});
+
 test('temporary root can read the exact committed server owner without allowing another fresh send', async () => {
   const f = await setup();
   f.page.location = new URL('https://chatgpt.com/?temporary-chat=true');

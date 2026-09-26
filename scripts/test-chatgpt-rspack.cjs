@@ -188,10 +188,12 @@ test('exclusive group request stays bound to its account when the editor disappe
   assert.equal(request.isSubmissionCurrent(), false);
   assert.equal(request.isRequestCurrent(), true);
   assert.equal(f.submit.state().requestCurrent, true);
+  assert.ok(f.submit.readAccepted());
   f.refreshAuth();
   assert.equal(request.isRequestCurrent(), true, 'same-account credential refresh is not a different owner');
   f.changeAccount();
   assert.equal(request.isRequestCurrent(), false);
+  assert.equal(f.submit.readAccepted(), null);
 });
 
 test('exclusive request cannot survive document or route changes or be enabled on a personal host', async () => {
