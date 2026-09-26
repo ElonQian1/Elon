@@ -104,6 +104,58 @@ fn attachment_manifest_preserves_scope_and_requires_updated_client() {
 }
 
 #[test]
+fn image_only_selection_retains_attachment_and_dispatches_without_text() {
+    let f = Fixture::new();
+    let raw = serde_json::json!([{"attachment_id":"fixture", "display_name":"chart.jpg", "mime_type":"image/jpeg",
+        "size_bytes":128238, "url":"https://platform.example/api/user/u/chat-attachments/g/chart.jpg"}]).to_string();
+    f.store
+        .conn()
+        .unwrap()
+        .execute(
+            "UPDATE friend_group_messages SET content='',attachments_json=?1 WHERE id='a'",
+            [raw],
+        )
+        .unwrap();
+    let token = op();
+    let mut input = Fixture::input(&["a"]);
+    input.attachment_transport_version = 0;
+    assert!(f.prepare(&token, &input).is_err());
+    assert!(f.store.prepare_group_web_ai("u", "g", "a", &token).is_err());
+    input.attachment_transport_version = 1;
+    let request = f.prepare(&token, &input).unwrap();
+    assert_eq!(request.attachments.len(), 1);
+    assert_eq!(request.attachments[0].size_bytes, 128238);
+    assert!(
+        f.store
+            .group_web_ai_action("u", "g", &request.id, &token, "dispatch")
+            .unwrap()
+            .dispatch_permit
+    );
+    assert!(
+        !f.store
+            .group_web_ai_action("u", "g", &request.id, &token, "dispatch")
+            .unwrap()
+            .dispatch_permit
+    );
+    assert!(f
+        .store
+        .group_web_ai_action("v", "g", &request.id, &token, "status")
+        .is_err());
+    f.store
+        .conn()
+        .unwrap()
+        .execute(
+            "UPDATE friend_group_messages SET recalled_at='recalled' WHERE id='a'",
+            [],
+        )
+        .unwrap();
+    assert!(f
+        .store
+        .group_web_ai_action("u", "g", &request.id, &token, "status")
+        .is_err());
+}
+
+#[test]
 fn migration_preserves_legacy_ownership_and_work_options() {
     let f = Fixture::new();
     let conn = f.store.conn().unwrap();
@@ -346,7 +398,9 @@ fn rich_sources_are_frozen_with_a_separate_private_attachment_manifest() {
     input.allow_continue = true;
     let operation = op();
     let req = f.prepare(&operation, &input).unwrap();
-    assert!(!req.prompt.contains("/api/user/u/chat-attachments/g/reference.png"));
+    assert!(!req
+        .prompt
+        .contains("/api/user/u/chat-attachments/g/reference.png"));
     assert_eq!(req.attachments.len(), 1);
     assert_eq!(req.attachments[0].message_id, "a");
     input.allow_continue = false;

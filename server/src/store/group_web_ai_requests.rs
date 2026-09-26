@@ -162,7 +162,16 @@ pub(crate) fn read_owned(
             prompt:r.get(5)?,result_message_id:r.get(6)?,web_provider:r.get(7)?,context_scope:r.get(8)?,dispatch_permit:false,attachments:Vec::new(),
         }),
     ).optional()?.ok_or_else(|| anyhow!("请求不存在或不属于当前设备操作"))?;
-    ensure_member_and_source(conn, user, group, &row.trigger_message_id)?;
+    if row.context_scope == "selected" {
+        super::source::ensure_member_and_selected_source(
+            conn,
+            user,
+            group,
+            &row.trigger_message_id,
+        )?;
+    } else {
+        ensure_member_and_source(conn, user, group, &row.trigger_message_id)?;
+    }
     super::selection::validate_sources(conn, user, group, id)?;
     row.attachments = super::attachments::for_request(conn, id)?;
     Ok(row)

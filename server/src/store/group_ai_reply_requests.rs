@@ -91,14 +91,31 @@ impl Store {
         }
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let (group_id, trigger, state, result_id): (String, String, String, Option<String>) = tx
-            .query_row(
-                "SELECT group_id, trigger_message_id, state, result_message_id
+        let (group_id, trigger, state, result_id, scope): (
+            String,
+            String,
+            String,
+            Option<String>,
+            String,
+        ) = tx.query_row(
+            "SELECT group_id, trigger_message_id, state, result_message_id, context_scope
                  FROM group_ai_reply_requests WHERE id = ?1 AND requester_id = ?2",
-                params![request_id, user_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-            )?;
-        ensure_member_and_source(&tx, user_id, &group_id, &trigger)?;
+            params![request_id, user_id],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
+        )?;
+        if scope == "selected" {
+            source::ensure_member_and_selected_source(&tx, user_id, &group_id, &trigger)?;
+        } else {
+            ensure_member_and_source(&tx, user_id, &group_id, &trigger)?;
+        }
         selection::validate_sources(&tx, user_id, &group_id, request_id)?;
         let (id, created_at) = if let Some(id) = result_id {
             let (stored, created): (String, String) = tx.query_row(

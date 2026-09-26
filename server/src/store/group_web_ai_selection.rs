@@ -4,7 +4,8 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 
-use super::{ensure_member_and_source, new_id, now, web, Store};
+use super::source::ensure_member_and_selected_source;
+use super::{new_id, now, web, Store};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -49,7 +50,7 @@ fn prompt(
     );
     let mut rows = Vec::new();
     for id in &selection.message_ids {
-        ensure_member_and_source(conn, user, group, id)?;
+        ensure_member_and_selected_source(conn, user, group, id)?;
         let (order, revision, speaker, content, created, attachments): (i64, i64, String, String, String, Option<String>) = conn
             .query_row(
                 "SELECT m.rowid,m.revision,COALESCE(u.nickname,u.email,u.id),m.content,m.created_at,m.attachments_json
@@ -110,7 +111,7 @@ pub(crate) fn validate_sources(
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     for (id, revision) in sources {
-        ensure_member_and_source(conn, user, group, &id)?;
+        ensure_member_and_selected_source(conn, user, group, &id)?;
         let current: i64 = conn.query_row(
             "SELECT revision FROM friend_group_messages WHERE id=?1 AND group_id=?2",
             params![id, group],

@@ -44,6 +44,144 @@ fn selected_original_files_require_transport_support_and_keep_rich_text() {
 }
 
 #[test]
+fn image_only_selection_prepares_dispatches_and_delivers_once_with_source_evidence() {
+    let f = Fixture::new();
+    let files = serde_json::from_value::<Vec<crate::project_ws_protocol::ProjectAttachmentRef>>(serde_json::json!([{
+        "attachment_id":"image-only", "display_name":"chart.jpg", "mime_type":"image/jpeg", "size_bytes":128238,
+        "url":"https://platform.example/api/user/fixture/chat-attachments/group/chart.jpg"
+    }])).unwrap();
+    let message = f
+        .store
+        .send_friend_group_message(&f.other, &f.group, "", Some(&files))
+        .unwrap();
+    let operation = Uuid::new_v4().to_string();
+    let mut input = selection(&[message.id.clone()]);
+    input.attachment_transport_version = 0;
+    assert!(f
+        .store
+        .prepare_group_ai_selection(&f.user, &f.group, &message.id, &operation, &input)
+        .is_err());
+    // Old text-only routes must not accept a picture and silently omit its bytes.
+    assert!(f
+        .store
+        .claim_group_ai_reply(&f.user, &f.group, &message.id)
+        .is_err());
+    assert!(f
+        .store
+        .prepare_group_web_ai(&f.user, &f.group, &message.id, &operation)
+        .is_err());
+    input.attachment_transport_version = 1;
+    let request = f
+        .store
+        .prepare_group_ai_selection(&f.user, &f.group, &message.id, &operation, &input)
+        .unwrap();
+    assert_eq!(request.attachments.len(), 1);
+    assert_eq!(request.attachments[0].message_id, message.id);
+    assert!(
+        f.store
+            .group_web_ai_action(&f.user, &f.group, &request.id, &operation, "dispatch")
+            .unwrap()
+            .dispatch_permit
+    );
+    let result = f
+        .store
+        .complete_group_ai_reply(&f.user, &request.id, "image analysis")
+        .unwrap();
+    assert_eq!(
+        result.id,
+        f.store
+            .complete_group_ai_reply(&f.user, &request.id, "image analysis")
+            .unwrap()
+            .id
+    );
+    let finished = f
+        .store
+        .group_web_ai_action(&f.user, &f.group, &request.id, &operation, "status")
+        .unwrap();
+    assert_eq!(
+        finished.result_message_id.as_deref(),
+        Some(result.id.as_str())
+    );
+    assert_eq!(f.count(), 1);
+    let raw: String = f
+        .store
+        .conn()
+        .unwrap()
+        .query_row(
+            "SELECT sources_json FROM group_ai_reply_contexts WHERE request_id=?1",
+            [&request.id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let evidence: serde_json::Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(evidence[0]["id"], message.id);
+    assert_eq!(evidence[0]["attachments"].as_array().unwrap().len(), 1);
+    f.store
+        .conn()
+        .unwrap()
+        .execute(
+            "UPDATE friend_group_messages SET recalled_at='recalled' WHERE id=?1",
+            [&message.id],
+        )
+        .unwrap();
+    assert!(f
+        .store
+        .group_web_ai_action(&f.user, &f.group, &request.id, &operation, "status")
+        .is_err());
+    assert!(f
+        .store
+        .complete_group_ai_reply(&f.user, &request.id, "image analysis")
+        .is_err());
+}
+
+#[test]
+fn attachment_only_access_still_rejects_empty_malformed_or_foreign_sources() {
+    let f = Fixture::new();
+    let conn = f.store.conn().unwrap();
+    for attachments in [None, Some("[]"), Some("{}"), Some("not-json")] {
+        conn.execute(
+            "UPDATE friend_group_messages SET content='',attachments_json=?1 WHERE id=?2",
+            params![attachments, f.trigger],
+        )
+        .unwrap();
+        assert!(super::super::source::ensure_member_and_selected_source(
+            &conn, &f.user, &f.group, &f.trigger
+        )
+        .is_err());
+    }
+    conn.execute(
+        "UPDATE friend_group_messages SET attachments_json='[{}]' WHERE id=?1",
+        [&f.trigger],
+    )
+    .unwrap();
+    assert!(super::super::source::ensure_member_and_selected_source(
+        &conn,
+        "not-a-member",
+        &f.group,
+        &f.trigger
+    )
+    .is_err());
+    assert!(super::super::source::ensure_member_and_selected_source(
+        &conn,
+        &f.user,
+        "another-group",
+        &f.trigger
+    )
+    .is_err());
+    drop(conn);
+    assert!(f
+        .store
+        .prepare_group_ai_selection(
+            &f.user,
+            &f.group,
+            &f.trigger,
+            &Uuid::new_v4().to_string(),
+            &selection(&[f.trigger.clone()])
+        )
+        .is_err());
+}
+
+#[test]
 fn selection_is_ordered_exclusive_and_idempotent() {
     let f = Fixture::new();
     f.store
@@ -127,7 +265,9 @@ fn selection_rejects_invalid_sources_and_never_silently_truncates() {
         params!["x".repeat(21_000), f.trigger],
     )
     .unwrap();
+    drop(conn);
     assert!(prepare(&selection(&[f.trigger.clone()])).is_err());
+    let conn = f.store.conn().unwrap();
     assert_eq!(
         conn.query_row("SELECT count(*) FROM group_ai_reply_requests", [], |r| r
             .get::<_, i64>(0))
@@ -168,6 +308,7 @@ fn selection_rechecks_every_revision_before_dispatch_and_publish() {
         [&second],
     )
     .unwrap();
+    drop(conn);
     assert!(f
         .store
         .complete_group_ai_reply(&f.user, &req.id, "must not publish")
