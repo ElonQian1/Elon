@@ -1,6 +1,6 @@
 ---
 version_status: current
-reviewed_at: 2026-09-26
+reviewed_at: 2026-09-27
 implementation_status: implemented
 ---
 
@@ -63,4 +63,18 @@ Rust `group_ai::tests` 覆盖命令验证、项目隔离、单次领取、幂等
 `test-group-ai-worker.cjs` 覆盖本机页面不消费命令、隐藏执行页单次执行、回执重试、
 登录同步和最小权限；原生 `group_ai_worker::tests` 验证固定路由、Origin 和 loopback 限制。
 
-现场图片分析与回群验收待发布后执行；编译、离线回归和安装成功不能代替真实回复。
+2026-09-27 已通过原图现场验收：已有 Win 登录账号、指定群与原消息、私有图片上传、
+ChatGPT 完整回答、单次回群及消息/来源回读，均通过后台 MCP 完成，没有界面点击。
+结果为 `phase=completed`、`delivery_verified=true`、`source_verified=true`。
+版本与具体证据见 [现场报告](reports/win-group-image-mcp-20260927.md)。
+编译、离线回归、安装成功或发送受理，均不能单独代替上述业务结果。
+
+## 运行时维护
+
+- Rspack 构建证据按文档令牌缓存。Resource Timing 可被页面清空，不能据此断言
+  已加载的运行时消失，更不能因此切换到旧的发送实现。
+- 缓存只保留已审核资源名称；实际导出、模块缓存、AppScope、账号和会话仍须校验。
+  更换文档会清空证据，混合运行时版本会被拒绝，不复用旧账号的运行状态。
+- 隔离群任务发送后读取已接受请求的绑定，不依赖首页输入框是否重建。
+- MCP 可返回任务级 `runtime_diagnostic` 固定状态码和计数；字段允许为空，不承载
+  正文、令牌或请求头，也不是送达证明。回群仍以实际群消息和来源回读为准。
