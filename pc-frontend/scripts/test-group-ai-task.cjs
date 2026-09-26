@@ -161,6 +161,53 @@ test('preserves code formatting in the delivered reply', () => {
   const s = snapshot([message('user', 'Q'), { role: 'assistant', state: 'completed', content: [{ type: 'code', language: 'js', text: 'return 1' }] }])
   assert.equal(completedGroupAiReply(s, 'Q'), '```js\nreturn 1\n```')
 })
+
+test('image and document labels do not become part of the submitted prompt', () => {
+  const user = message('user', 'Describe the photo')
+  user.content.unshift({ type: 'image', text: '\u56fe\u7247', kind: 'image' }, { type: 'file', text: 'notes.pdf' })
+  const s = snapshot([user, message('assistant', 'A table with flowers.')])
+  assert.equal(completedGroupAiReply(s, 'Describe the photo'), 'A table with flowers.')
+  assert.equal(completedGroupAiReply(s, 'Different question'), null)
+  assert.equal(completedGroupAiReply(s, 'notes.pdf'), null)
+})
+
+test('uncertain receipts keep observing a late answer without repeating the send', async () => {
+  for (const detail of ['official_runtime_v1:unknown:dispatch_unconfirmed', 'unrecognized local receipt']) {
+    const f = fixture()
+    const host = f.port.host
+    let sent = false, reads = 0, id
+    f.port.host = async (...args) => {
+      const value = await host(...args)
+      if (args[2] === 'send_prompt') { sent = true; id = args[4] }
+      if (sent && args[2] === 'state' && reads++ === 0) return {
+        ...documentState(snapshot()), commandResult: { requestId: id, action: 'send_prompt', ok: false, detail },
+      }
+      return value
+    }
+    await f.task.start()
+    assert.equal(f.task.progress.phase, 'completed')
+    assert.equal(f.task.lastReceiptCode, '')
+    assert.equal(f.calls.filter(c => c[0] === 'send_prompt').length, 1)
+    assert.equal(f.calls.filter(c => c[0] === 'complete').length, 1)
+  }
+})
+
+test('an explicit pre-write rejection is not mistaken for a delayed answer', async () => {
+  const f = fixture({ noAnswer: true })
+  const host = f.port.host
+  let id
+  f.port.host = async (...args) => {
+    const value = await host(...args)
+    if (args[2] === 'send_prompt') id = args[4]
+    return id ? { ...value, commandResult: { requestId: id, action: 'send_prompt', ok: false,
+      detail: 'official_runtime_v1:rejected:attachment_owner_changed' } } : value
+  }
+  await f.task.start()
+  assert.equal(f.task.lastReceiptCode, 'official_runtime_v1_rejected_attachment_owner_changed')
+  assert.equal(f.calls.filter(c => c[0] === 'send_prompt').length, 1)
+  assert.equal(f.calls.filter(c => c[0] === 'complete').length, 0)
+  assert.ok(f.port.now() < 180000)
+})
 test('selected revisions dispatch once and completed answer is delivered to the same group', async () => {
   const { task, calls } = fixture()
   await task.start()

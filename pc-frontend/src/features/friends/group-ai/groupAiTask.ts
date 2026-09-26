@@ -60,7 +60,11 @@ const body = (message: LocalAiMessageSnapshot['messages'][number]) => message.co
 }).join('\n').trim()
 
 export function completedGroupAiReply(snapshot: LocalAiMessageSnapshot, prompt: string): string | null {
-  const source = snapshot.messages.map(m => m.role === 'user' && normalized(body(m)) === normalized(prompt)).lastIndexOf(true)
+  // Rich projections label images/files for display; those labels were never
+  // part of the submitted prompt and must not break turn matching.
+  const source = snapshot.messages.map(m => m.role === 'user' && normalized(body({ ...m,
+    content: m.content.filter(part => ['text', 'markdown', 'code'].includes(part.type)),
+  })) === normalized(prompt)).lastIndexOf(true)
   if (source < 0) return null
   const replies = snapshot.messages.slice(source + 1)
   if (replies.some(m => m.role === 'user')) return null
@@ -117,6 +121,7 @@ export class GroupAiTask {
   }
   async start() {
     if (this.progress.busy || this.dispatched || this.stopped) return
+    this.lastReceiptCode = ''
     this.update('preparing', '正在准备群聊 AI', true)
     try {
       this.check()
@@ -204,8 +209,12 @@ export class GroupAiTask {
         if (answer) { this.answer = answer; await this.deliver(); return }
       }
       const receipt = [state.commandResult, ...(state.commandResults || [])].find(r => r?.requestId === this.sendRequestId && r.action === 'send_prompt')
-      if (receipt) this.lastReceiptCode = groupAiReceiptCode(receipt.detail)
-      if (receipt && !receipt.ok) throw new Error('网页尚未确认发送成功。请检查已有会话；不会自动重发问题')
+      if (receipt) this.lastReceiptCode = receipt.ok ? '' : groupAiReceiptCode(receipt.detail) || 'send_receipt_unrecognized'
+      if (receipt && !receipt.ok && /^(official_runtime_v1|private_text_v1)_rejected_/.test(this.lastReceiptCode)) {
+        throw new Error('网页拒绝了本次发送。请检查已有会话；不会自动重发问题')
+      }
+      // An unknown acknowledgement can still be followed by a complete answer.
+      // Keep observing the same document; never replay the send to recover it.
       await this.host('snapshot')
       await this.port.wait(1000)
     }
@@ -216,6 +225,7 @@ export class GroupAiTask {
     this.update('delivering', '正在发送 AI 回答到群聊', true)
     const result = await this.action('complete', this.answer)
     if (result.state !== 'completed' || !result.result_message_id) throw new Error('群消息尚未确认送达')
+    this.lastReceiptCode = ''
     this.update('completed', 'AI 回答已发送到群聊', false)
     this.stage = 'completed'
     await this.close()
@@ -226,7 +236,7 @@ export class GroupAiTask {
     this.update('answering', '正在核对已有请求', true)
     try {
       const state = await this.action('status')
-      if (state.state === 'completed') { this.update('completed', 'AI 回答已发送到群聊', false); await this.close(); return }
+      if (state.state === 'completed') { this.lastReceiptCode = ''; this.update('completed', 'AI 回答已发送到群聊', false); await this.close(); return }
       if (this.answer) await this.deliver()
       else await this.receiveAndDeliver()
     } catch (error) { await this.fail(error) }
