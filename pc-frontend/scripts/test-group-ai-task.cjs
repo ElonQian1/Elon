@@ -11,7 +11,7 @@ compiled.paths = module.paths
 compiled._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }, fileName: filename,
 }).outputText, filename)
-const { GroupAiTask, groupAiCommandId, groupAiDocumentReady, completedGroupAiReply } = compiled.exports
+const { GroupAiTask, groupAiCommandId, groupAiDocumentReady, completedGroupAiReply, groupAiFailureCode } = compiled.exports
 const privateReceipts = require('../../android/app/src/main/assets/chatgpt_web_fresh_text_receipts.js')
 const input = { owner: 'owner', group: 'group', title: 'Test group', source: 'one', provider: 'chatgpt',
   selection: { message_ids: ['one', 'two'], message_revisions: { one: 1, two: 3 }, question: 'Summarize' } }
@@ -20,6 +20,13 @@ const snapshot = (messages = []) => ({ type: 'message_snapshot', url: 'https://c
   draft: '', composerReady: true, loginRequired: false, streaming: false, messages })
 const documentState = s => ({ loading: false, contextReady: true, semanticCacheStatus: 'live',
   currentUrl: 'https://chatgpt.com/?temporary-chat=true', semanticEvent: s, commandResults: [] })
+
+test('host failures retain fixed diagnostics without exporting raw errors', () => {
+  assert.equal(groupAiFailureCode('group_worker_not_trusted', 'opening'), 'group_worker_not_trusted')
+  assert.equal(groupAiFailureCode({ code: 'upgrade_required' }, 'opening'), 'desktop_upgrade_required')
+  assert.equal(groupAiFailureCode('command permission denied for private-owner', 'opening'), 'desktop_permission_denied')
+  assert.equal(groupAiFailureCode(new Error('private content https://example.test/?token=secret'), 'opening'), 'group_opening_failed')
+})
 
 function fixture(options = {}) {
   let time = 0, sent = false, owner = true

@@ -32,6 +32,14 @@ export function groupAiCommandId(now = Date.now()): string {
   return 'mcp_' + (now * 1024 + sequence).toString(36)
 }
 const normalized = (v: string) => v.trim().replace(/\s+/g, ' ')
+export function groupAiFailureCode(error: unknown, stage: string): string {
+  const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
+  const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
+  if (['upgrade_required', 'desktop_required', 'invoke_timeout'].includes(code)) return 'desktop_' + code
+  if (['group_worker_not_trusted', 'group_worker_action_not_allowed'].includes(raw)) return raw
+  if (/not allowed|permission denied|allowlist/i.test(raw)) return 'desktop_permission_denied'
+  return 'group_' + stage + '_failed'
+}
 const body = (message: LocalAiMessageSnapshot['messages'][number]) => message.content.map(part => {
   if (part.type === 'code') return '\n```' + (part.language || '') + '\n' + part.text + '\n```\n'
   return part.text || ''
@@ -104,6 +112,7 @@ export class GroupAiTask {
       if (this.request.state === 'completed') { this.update('completed', 'AI 回答已发送到群聊', false); return }
       if (this.request.state !== 'prepared') { this.dispatched = true; throw new Error('请求已经派发，请核对结果，未重复发送') }
       if (!Array.isArray(this.request.attachments)) throw new Error('服务器尚未支持附件清单，请等待服务更新；未发送给 AI')
+      this.stage = 'opening'
       await this.host('open')
       this.stage = 'connecting'
       const deadline = this.port.now() + 60_000
@@ -217,7 +226,7 @@ export class GroupAiTask {
     if (this.stopped) return
     try { this.port.checkOwner() } catch { await this.cancel(); return }
     const message = error instanceof Error ? error.message : '群聊 AI 处理失败'
-    if (!this.lastReceiptCode) this.lastReceiptCode = 'group_' + this.stage + '_failed'
+    if (!this.lastReceiptCode) this.lastReceiptCode = groupAiFailureCode(error, this.stage)
     // A retry must not append to files already associated with the previous draft.
     if (!this.dispatched && this.attachmentAttempted) { await this.close(); this.attachmentAttempted = false }
     this.update(this.dispatched ? 'uncertain' : 'failed', message, false)
