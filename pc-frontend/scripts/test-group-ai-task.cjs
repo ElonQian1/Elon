@@ -82,7 +82,8 @@ function fixture(options = {}) {
     },
     async host(operation, received, action, value, requestId) {
       calls.push([action, value])
-      if (action === 'prepare') receipt = { requestId, action: 'private_protocol_probe', ok: true, detail: '{"code":"ready","stage":"ready"}' }
+      if (action === 'prepare') receipt = { requestId, action: 'private_protocol_probe', ok: !options.admissionCode,
+        detail: JSON.stringify({ code: options.admissionCode || 'ready', stage: options.admissionCode ? 'runtime' : 'ready' }) }
       if (action === 'send_prompt') { assert.equal(value, request.prompt); sent = true; if (options.ownerChange) owner = false }
       if (action === 'open' && options.cancelOnOpen) await options.cancelOnOpen()
       const s = options.loginRequired ? { ...snapshot(), loginRequired: true }
@@ -101,6 +102,23 @@ test('all selected files are confirmed before authorization and send', async () 
   assert.equal(f.task.progress.phase, 'completed')
   assert.ok(f.calls.findIndex(c => c[0] === 'upload') < f.calls.findIndex(c => c[0] === 'dispatch'))
   assert.equal(f.calls.filter(c => c[0] === 'send_prompt').length, 1)
+})
+
+test('rejected attachment admission never consumes dispatch or becomes an uncertain send', async () => {
+  const f = fixture({ attachments: [{ attachment_id: 'synthetic-image' }], admissionCode: 'attachment_entries_changed' })
+  await f.task.start()
+  assert.equal(f.task.progress.phase, 'failed')
+  assert.equal(f.task.dispatched, false)
+  assert.equal(f.task.lastReceiptCode, 'private_attachment_admission_attachment_entries_changed')
+  assert.equal(f.calls.filter(c => ['dispatch', 'send_prompt', 'complete'].includes(c[0])).length, 0)
+  assert.equal(f.calls.filter(c => c[0] === 'close').length, 1)
+})
+
+test('admission diagnostics never export arbitrary provider content', async () => {
+  const f = fixture({ attachments: [{ attachment_id: 'synthetic-image' }], admissionCode: 'private prompt' })
+  await f.task.start()
+  assert.equal(f.task.lastReceiptCode, 'private_attachment_admission_not_ready')
+  assert.equal(f.task.dispatched, false)
 })
 
 test('attachment failure or cancel never falls back to a text-only analysis', async () => {

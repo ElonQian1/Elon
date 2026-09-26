@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 use super::super::adapter::{attachment_transport, private_rich_recovery as rich_recovery};
 
@@ -100,9 +101,7 @@ pub(super) fn realtime_voice_state(event: Option<&Value>) -> Value {
             .unwrap_or_default()
             .chars()
             .filter(|character| {
-                character.is_ascii_lowercase()
-                    || character.is_ascii_digit()
-                    || *character == '_'
+                character.is_ascii_lowercase() || character.is_ascii_digit() || *character == '_'
             })
             .take(max)
             .collect::<String>()
@@ -143,4 +142,37 @@ fn has_text(value: &Value, key: &str) -> bool {
         .get(key)
         .and_then(Value::as_str)
         .is_some_and(|value| !value.is_empty())
+}
+
+pub(super) fn send_receipt_fingerprint(receipts: &[Value]) -> Value {
+    let detail = receipts
+        .iter()
+        .rev()
+        .find(|value| value.get("action").and_then(Value::as_str) == Some("send_prompt"))
+        .and_then(|value| value.get("detail"))
+        .and_then(Value::as_str);
+    detail
+        .map(|detail| json!(format!("{:x}", Sha256::digest(detail.as_bytes()))))
+        .unwrap_or(Value::Null)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn receipt_fingerprint_preserves_no_raw_error_or_identity() {
+        let receipt = json!({"action":"send_prompt", "detail":"private draft and credential", "requestId":"private-id"});
+        let value = send_receipt_fingerprint(&[receipt.clone()]);
+        assert_eq!(value.as_str().unwrap().len(), 64);
+        assert!(!value.to_string().contains("private"));
+        assert_eq!(
+            value,
+            send_receipt_fingerprint(&[
+                receipt,
+                json!({"action":"snapshot", "detail":"different"})
+            ])
+        );
+        assert_eq!(send_receipt_fingerprint(&[]), Value::Null);
+    }
 }

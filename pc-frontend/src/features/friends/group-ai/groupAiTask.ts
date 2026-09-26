@@ -164,6 +164,7 @@ export class GroupAiTask {
     finally { if (this.stopped) await this.close() }
   }
   private async preparePrivateSender() {
+    let admissionCode = 'timeout'
     for (let attempt = 0; attempt < 3; attempt++) {
       const id = groupAiCommandId()
       await this.host('prepare', undefined, id)
@@ -175,12 +176,19 @@ export class GroupAiTask {
           try {
             const detail = JSON.parse(receipt.detail)
             if (receipt.ok && detail.code === 'ready' && detail.stage === 'ready') return
+            admissionCode = receiptCodes.has(detail.code) ? detail.code : 'not_ready'
           } catch { /* Keep the existing official sender if private admission is unavailable. */ }
           break
         }
         await this.port.wait(350)
       }
       await this.port.wait(500)
+    }
+    // A completed upload is not permission to send: the current private sender
+    // must still own those exact files. Do not consume the dispatch permit first.
+    if (this.request?.attachments?.length) {
+      this.lastReceiptCode = 'private_attachment_admission_' + admissionCode
+      throw new Error('图片已上传，但发送条件尚未确认；问题没有发送，请重试')
     }
   }
   private async receiveAndDeliver() {

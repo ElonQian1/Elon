@@ -112,6 +112,8 @@ pub(super) fn sanitize(value: Option<&Value>) -> Result<Option<Value>, String> {
         "last_event_kind": fixed(value, "last_event_kind", EVENT_KINDS),
         "last_command_action": fixed(value, "last_command_action", COMMAND_ACTIONS),
         "last_command_ok": value.get("last_command_ok").and_then(Value::as_bool),
+        "last_send_receipt_sha256": value.get("last_send_receipt_sha256").and_then(Value::as_str)
+            .filter(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())),
         "message_count": count(value, "message_count"),
         "assistant_message_count": count(value, "assistant_message_count"),
         "content_part_counts": fixed_count_map(value, "content_part_counts", CONTENT_PART_TYPES),
@@ -170,6 +172,26 @@ fn fixed_or(value: &Value, key: &str, allowed: &[&str], fallback: &str) -> Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn send_receipt_diagnostic_only_accepts_a_sha256_fingerprint() {
+        let digest = "a".repeat(64);
+        let value = sanitize(Some(&json!({"last_send_receipt_sha256":digest})))
+            .unwrap()
+            .unwrap();
+        assert_eq!(value["last_send_receipt_sha256"], digest);
+        for invalid in [
+            "private error",
+            "https://private.test/token",
+            &"a".repeat(65),
+            &"A".repeat(64),
+        ] {
+            let value = sanitize(Some(&json!({"last_send_receipt_sha256":invalid})))
+                .unwrap()
+                .unwrap();
+            assert!(value["last_send_receipt_sha256"].is_null());
+        }
+    }
 
     #[test]
     fn production_session_diagnostic_is_rebuilt_from_allowlisted_structure() {

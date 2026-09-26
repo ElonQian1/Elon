@@ -676,6 +676,7 @@ impl LocalAiBrowserRuntime {
             "last_event_kind": record.last_event_kind,
             "last_command_action": record.last_command_action,
             "last_command_ok": record.last_command_ok,
+            "last_send_receipt_sha256": diagnostics::send_receipt_fingerprint(&record.command_results),
             "message_count": record.message_count,
             "assistant_message_count": record.assistant_message_count,
             "content_part_counts": coverage.part_counts,
