@@ -1313,7 +1313,7 @@
       "id": "android-binance-grid-chat-v1",
       "title": "APK 手动附带币安网格与只读 MCP",
       "summary": "复用手机会话宿主返回实际网格；点击附带才读取，预览后通过当前 ChatGPT 发送器发送。",
-      "status": "in_progress",
+      "status": "implemented",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/android-binance-grid-chat-v1.md",
@@ -1343,15 +1343,114 @@
         "手动附带与现有 ChatGPT 发送路径",
         "正式 APK 发布安装及真机证据"
       ],
-      "implementation_evidence": [],
-      "claim": {
-        "claim_id": "claim_53d8a195af1f4f718f1b3f85fbb672f5",
-        "agent_id": "codex-apk-grid",
-        "claimed_at_ms": 1790405578889,
-        "expires_at_ms": 1790491978889
-      },
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/chat/BinanceGridReader.kt",
+          "content_hash": "a6f2cd5a20234a00e0a30de3a028912c0e513ccc6d0926d9ab3c0e1552224d82",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1a46207d090b0cf068b766fe7c904ebcc46f5175",
+            "head_blob_oid": "20bf1769351a792cc85608fb8e3fb467f2022b39",
+            "worktree_blob_oid": "20bf1769351a792cc85608fb8e3fb467f2022b39",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/grid/chat/GridChatAttachmentController.kt",
+          "content_hash": "1e3f40ad6ffb4ec779c802602646f9a3c5bad6ea22c46f11525b5d823de2ff81",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1a46207d090b0cf068b766fe7c904ebcc46f5175",
+            "head_blob_oid": "93796890a0b1a58d9d9400675c25d1e78b78eabd",
+            "worktree_blob_oid": "93796890a0b1a58d9d9400675c25d1e78b78eabd",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/mcp/McpBinanceGridRead.kt",
+          "content_hash": "ddf8e11f8fab1496136f3c3d1fda7d4eb826afd8268acf9540159b072f37b2ea",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1a46207d090b0cf068b766fe7c904ebcc46f5175",
+            "head_blob_oid": "90a5e6c50595c745a5da079d300787bd13fc87cc",
+            "worktree_blob_oid": "90a5e6c50595c745a5da079d300787bd13fc87cc",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/chat/BinanceGridReadTest.kt",
+          "content_hash": "d54fcebc090b0d5bd2be70e75742d19e3a38c14a89069de74a5986697daf595a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1a46207d090b0cf068b766fe7c904ebcc46f5175",
+            "head_blob_oid": "af6210ee58e271f9342e16b3151fec00a06cab97",
+            "worktree_blob_oid": "af6210ee58e271f9342e16b3151fec00a06cab97",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/grid/chat/GridChatDraftTest.kt",
+          "content_hash": "cafccc433d9c56fc45cbc1c7b0834c3a81ac4c9ddce2a7dfc6ae4c5afc5dbdd5",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1a46207d090b0cf068b766fe7c904ebcc46f5175",
+            "head_blob_oid": "5d981607f0e47aeff224c53405b45af9a0cbebdb",
+            "worktree_blob_oid": "5d981607f0e47aeff224c53405b45af9a0cbebdb",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/reports/android-binance-grid-chat-20260926.md",
+          "content_hash": "37b7288d0c1ff23cfac1096e142b66d30f6184118e92aa5e53e1413033dae84a",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1a46207d090b0cf068b766fe7c904ebcc46f5175",
+            "head_blob_oid": "584506a287e1d3a683f7dcdfd0c45374c88a7ef3",
+            "worktree_blob_oid": "ac737e93e90ddd65f5566a45a49b14c2bede5840",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/web-conversations/grid.mjs",
+          "content_hash": "42801b59f28c1c7f70a84e12292bbaa35c4842d7d6c8825a2b86f1336269c745",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1a46207d090b0cf068b766fe7c904ebcc46f5175",
+            "head_blob_oid": "811caaa1a59e8329bd2900718138b64ce88b79ae",
+            "worktree_blob_oid": "8163a7b9d804af09fa091cdd3f568955091afa98",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/web-conversations/grid.test.mjs",
+          "content_hash": "046f444be601f3c544c50f1f9e304147aa4b3885c3749ae01dba9dca20d28660",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "1a46207d090b0cf068b766fe7c904ebcc46f5175",
+            "head_blob_oid": "092753e75241dfdb6d6056fb6564bd8950eff6f2",
+            "worktree_blob_oid": "676b13256bd9719f017b8132efb77cfaf70551ab",
+            "state": "tracked_modified"
+          }
+        }
+      ],
       "created_at_ms": 1790405486771,
-      "updated_at_ms": 1790405660468
+      "updated_at_ms": 1790408742409
     },
     {
       "id": "android-binance-grid-core-v2",
@@ -31252,26 +31351,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_afb7df1ab9d94d1480a4d2b0962fad19",
-      "feature_id": "quant-public-https-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "复用现有测试工程验证已接受的同一HTTPS范围",
-      "from_status": "proposed",
-      "to_status": "accepted",
-      "at_ms": 1789328575365
-    },
-    {
-      "id": "feature_event_ee1db681f4344206a844e88bedd5e115",
-      "feature_id": "quant-public-https-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "复用现有测试工程验证已接受的同一HTTPS范围",
-      "from_status": "accepted",
-      "to_status": "ready",
-      "at_ms": 1789328575409
-    },
-    {
       "id": "feature_event_393cb10a61a14bc8a2690d17ec748a9f",
       "feature_id": "quant-public-https-v1",
       "action": "claimed",
@@ -33250,6 +33329,26 @@
       "from_status": "claimed",
       "to_status": "in_progress",
       "at_ms": 1790405660468
+    },
+    {
+      "id": "feature_event_f387e076c0bb4b17a3c95ca28377be7c",
+      "feature_id": "android-binance-grid-chat-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-apk-grid",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790408726081
+    },
+    {
+      "id": "feature_event_05687e1ff0bf440ebde9f31a6c8760b3",
+      "feature_id": "android-binance-grid-chat-v1",
+      "action": "transitioned",
+      "actor": "codex-apk-grid",
+      "reason": "APK 1.1.1817已正式发布并在登记小米安装，MCP真实空列表、未知策略拒绝与原生附带入口恢复通过；保留用户当前子账户，真实非空详情及附带发送/回复待验收，不宣称整体verified或released。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790408742409
     }
   ]
 }

@@ -48,6 +48,9 @@ Codex/Claude 的持久注册流程仍使用[现有注册器](personal-web-conver
 - `context_changed`：账号或文档变化，重新检查当前会话后再读取。
 - `host_busy`：已有管理/读取操作占用宿主，等其完成后使用新请求。
 - `list_context_unavailable` / `login_required`：需要用户在手机官网完成登录或打开网格列表。
+- `apk_transport_unavailable`：手机休眠或无线转发不可达；通过项目登记信息重连，
+  核对硬件身份，恢复本机转发，必要时唤醒手机。先轮询原请求，不自动重复发起读取。
+  新的 Android 信任/配对提示仍需用户在手机上确认。
 
 代码、发布、安装、真实空列表、非空详情及聊天发送分别验收；完整证据在
 [APK 验收记录](reports/android-binance-grid-chat-20260926.md)。

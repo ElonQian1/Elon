@@ -50,6 +50,17 @@ test('failed requests contain only bounded errors and no stale rows', () => {
   const reply = gridReceipt({ ...ready(), status: 'failed', error: 'strategy_not_found', rows: [{ cookie: 'private' }] }, input)
   assert.equal(reply.error, 'strategy_not_found'); assert.equal(reply.rows, undefined)
 })
+
+for (const failedStage of ['health', 'mcp']) test(`phone ${failedStage} outage returns a recovery code without replay or private diagnostics`, async () => {
+  let calls = 0
+  const service = createGridService({ ELON_APK_MCP_URL: 'http://127.0.0.1:18787' }, async url => {
+    calls++
+    if (url.endsWith('/health') && failedStage === 'mcp') return { auth_token: 'private-token' }
+    throw Error('private-device-transport-diagnostic')
+  })
+  await assert.rejects(service('binance_grid_list', { request_id: input.request_id, start: true }), { message: 'apk_transport_unavailable' })
+  assert.equal(calls, failedStage === 'health' ? 1 : 2)
+})
 test('exact strategy detail preserves decimals and rejects foreign ID or extra fields', () => {
   const names = ['id', 'symbol', 'status', 'direction', 'spacing', 'lower', 'upper', 'count', 'leverage', 'profit', 'created',
     'investment', 'initialNotional', 'perGridQty', 'perGridQuoteQty', 'matchedPnl', 'fundingFee', 'fee', 'matchedCount', 'marginType', 'orderCurrency', 'stopUpper', 'stopLower']

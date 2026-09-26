@@ -53,6 +53,9 @@ async function handle(request) {
     // Never echo network bodies, credentials, URLs, or page exceptions into diagnostics.
     const code = /^[a-z_0-9]{1,80}$/.test(error.message) ? error.message : 'reader_failed'
     const recovery = ({
+      apk_transport_unavailable: 'Reconnect the registered phone through ADB, verify its hardware identity, restore the loopback forward, and wake it if sleeping. Poll the same request_id before starting another read.',
+      apk_endpoint_not_configured: 'Configure ELON_APK_MCP_URL to the loopback forward of the verified registered phone.',
+      apk_session_changed: 'The phone MCP session changed. Verify the intended device before explicitly starting a new request.',
       login_required: 'Log in in the official ChatGPT window opened on this Windows PC, then retry.',
       http_401: 'Log in again in this device official ChatGPT window, then retry.',
       http_403: 'Complete any verification in the official ChatGPT window; do not bypass it.',

@@ -56,15 +56,18 @@ export function gridReceipt(value, input) {
 }
 export function createGridService(env = process.env, transport = json) {
   let token
+  const phone = async (...args) => {
+    try { return await transport(...args) } catch { throw new Error('apk_transport_unavailable') }
+  }
   return async (name, args) => {
     const input = request(name, args)
     if (!env.ELON_APK_MCP_URL) throw new Error('apk_endpoint_not_configured')
     const base = localUrl(env.ELON_APK_MCP_URL)
-    const health = await transport(base + '/health')
+    const health = await phone(base + '/health')
     if (typeof health.auth_token !== 'string' || !health.auth_token) throw new Error('apk_unavailable')
     if (token && token !== health.auth_token) { token = health.auth_token; throw new Error('apk_session_changed') }
     token = health.auth_token
-    const value = result(await transport(base + '/mcp', rpc('binance_grid_read', { ...input, auth_token: token })))
+    const value = result(await phone(base + '/mcp', rpc('binance_grid_read', { ...input, auth_token: token })))
     return gridReceipt(value, input)
   }
 }
