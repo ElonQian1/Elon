@@ -157,7 +157,7 @@ internal class GroupChatGptProjectCoordinator(
         if (closed || event !is ChatGptWebEvent.CommandResult || event.action != "group_project_request" || event.requestId != requestId) return
         val next = callback ?: return
         callback = null
-        val result = runCatching { JSONObject(event.detail) }.getOrElse { JSONObject().put("code", "project_unavailable") }
+        val result = JSONObject(GroupChatGptProjectReceipt.detail(event.detail))
         if (!event.ok) result.put("ok", false)
         val code = result.optString("code")
         if (Regex("project_[a-z_]{1,48}").matches(code)) observe(code)

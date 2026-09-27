@@ -38,8 +38,15 @@ class GroupChatGptProjectCoordinatorTest {
             reply(JSONObject().put("ok", true).put("accountScope", "a".repeat(64)))
         }
         fun reply(payload: JSONObject) {
-            coordinator.event(ChatGptWebEvent.CommandResult("group_project_request", payload.optBoolean("ok"),
-                payload.toString(), commands.last().second))
+            if (payload.optBoolean("ok")) {
+                payload.put("accountScope", "a".repeat(64))
+                payload.put("code", if (payload.has("projectId")) "project_ready" else "project_identity_ready")
+                if (payload.has("projectId")) payload.put("memoryScope", "project_v2")
+            }
+            coordinator.event(ChatGptWebProtocol.parse(JSONObject().put("type", "command_result")
+                .put("action", "group_project_request").put("ok", payload.optBoolean("ok"))
+                .put("requestId", commands.last().second).put("detail", payload.toString())
+                .toString()) as ChatGptWebEvent.CommandResult)
         }
         fun success() = reply(JSONObject().put("ok", true).put("projectId", project))
     }

@@ -38,6 +38,7 @@ internal object ChatGptWebPrivateProtocolEvidence {
         "requestState", "responseState", "requestFields", "responseFields")
 
     fun detail(action: String, raw: String): String {
+        if (action == GroupChatGptProjectReceipt.ACTION) return GroupChatGptProjectReceipt.detail(raw)
         if (action == ChatGptWebCanvasDocumentProtocol.ACTION) return ChatGptWebCanvasDocumentProtocol.detail(raw)
         if (action == "share_conversation") return ChatGptWebConversationShareReceipt.detail(raw)
         if (action != ACTION) return raw.take(160)
