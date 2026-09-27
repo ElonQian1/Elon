@@ -1,5 +1,7 @@
 # Android 真渲染与双端样式工作流
 
+当前视觉权威见 [移动设计 V2](design/mobile-design-system-v2.md)。主题/公共组件/导航重建先取得原生运行证据再正式发布。本文旧 token 文件示例仅说明工作台输入格式；本项目正式运行色源为 `docs/design/mobile-tokens-v2.json`，不得恢复为第二套颜色权威。
+
 本项目的 UI Tuner 采用四层渲染策略，优先级不可颠倒：
 
 1. **真实 Android Renderer**：优先使用 Compose Preview / Layoutlib、Preview Host 或已运行 APK 的真帧，作为视觉权威结果。

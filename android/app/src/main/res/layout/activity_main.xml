@@ -112,8 +112,8 @@
                 </LinearLayout>
 
                 <ImageButton
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:background="@drawable/bg_plaza_header_action"
                     android:contentDescription="项目通知与更新"
                     android:padding="11dp"
@@ -130,7 +130,7 @@
             <LinearLayout
                 android:id="@+id/projectTopTabs"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
+                android:layout_height="48dp"
                 android:layout_gravity="start|center_vertical"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -213,8 +213,8 @@
 
             <FrameLayout
                 android:id="@+id/addButton"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_gravity="end|center_vertical"
                 android:layout_marginEnd="12dp"
                 android:clickable="true"
@@ -261,8 +261,8 @@
 
             <ImageButton
                 android:id="@+id/moreButton"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_gravity="end|center_vertical"
                 android:layout_marginEnd="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"

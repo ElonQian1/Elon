@@ -14,7 +14,6 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="stylesheet" href="/assets/project_plaza.css" />
   <link rel="stylesheet" href="/assets/project_home.css" />
-  <link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />
   <link rel="stylesheet" href="/assets/esk_exchange.css" />
   <link rel="stylesheet" href="/assets/ai_provider_accounts.css" />
   <link rel="stylesheet" href="/assets/social_links.css?v=card-polish-3"><script src="/assets/social_links.js?v=card-polish-3"></script><script src="/assets/social_link_viewer.js"></script><script src="/assets/social_chat_cache.js"></script><script src="/assets/social_chat_recovery.js"></script><script src="/assets/social_source_links.js"></script><script src="/assets/social_source_compose.js"></script><script src="/assets/social_chat_view.js"></script>
@@ -29,79 +28,8 @@
     <script src="/assets/group_ai_reply_context.js"></script>
   <style>
     :root {
-      color-scheme: dark;
-      --bg: #0B1017;
-      --bg-hint: #070B10;
-      --side-menu-bg: #0A0F16;
-      --panel: #111923;
-      --panel-2: #172231;
-      --panel-3: #1D2A39;
-      --line: rgba(151, 174, 204, 0.20);
-      --ink: rgba(243, 248, 251, 0.94);
-      --ink-strong: #F3F8FB;
-      --ink-soft: rgba(205, 220, 228, 0.68);
-      --ink-muted: rgba(181, 201, 211, 0.48);
-      --ink-list-preview: rgba(181, 201, 211, 0.48);
-      --ink-faint: rgba(181, 201, 211, 0.48);
-      --ink-dim: rgba(181, 201, 211, 0.48);
-      --brand: #7AA7FF;
-      --brand-hover: #91B7FF;
-      --brand-ink: #070B10;
-      --accent: #73C7E8;
-      --link: #A8C5FF;
-      --success: #5AC8A0;
-      --warning: #E7B86A;
-      --danger: #F07884;
-      --pull-filter-project: #E7B86A;
-      --pull-filter-friend: #5AC8A0;
-      --pull-filter-light: #A8C5FF;
-      --secondary-btn: #172231;
-      --secondary-btn-ink: rgba(243, 248, 251, 0.94);
-      --input-pill-bg: #1D2A39;
-      --project-space-page-bg: #0B1017;
-      --project-space-panel-bg: #0B1017;
-      --project-space-info-bg: #172231;
-      --project-space-info-ink: rgba(243, 248, 251, 0.94);
-      --project-space-info-ink-soft: rgba(205, 220, 228, 0.68);
-      --project-space-info-ink-faint: rgba(181, 201, 211, 0.48);
-      --store-detail-bg: #0B1017;
-      --store-detail-ink: rgba(243, 248, 251, 0.94);
-      --store-detail-muted: rgba(205, 220, 228, 0.68);
-      --store-detail-link: #A8C5FF;
-      --store-detail-divider: rgba(151, 174, 204, 0.20);
-      --store-detail-button: #7AA7FF;
-      --store-detail-button-ink: #070B10;
-      --badge-info-bg: rgba(122, 167, 255, 0.12);
-      --badge-info-ink: #73C7E8;
-      --badge-neutral-bg: #172231;
-      --badge-neutral-ink: rgba(243, 248, 251, 0.94);
-      --nav-bg: #0A0F16;
-      --nav-active-bg: rgba(122, 167, 255, 0.13);
-      --nav-glass-overlay: rgb(53 58 66 / 45%);
-      --nav-glass-border: rgb(255 255 255 / 12%);
-      --system-nav-bg: #070B10;
-      --popup-panel-bg: #172231;
-      --bubble-user: #7AA7FF;
-      --bubble-user-ink: #070B10;
-      --bubble-ai-bg: #111923;
-      --bubble-ai-border: rgba(151, 174, 204, 0.20);
-      --bubble-ai-ink: rgba(243, 248, 251, 0.94);
-      --bubble-progress-bg: #172231;
-      --bubble-progress-border: rgba(151, 174, 204, 0.20);
-      --bubble-progress-ink: rgba(205, 220, 228, 0.68);
-      --bubble-error-bg: #2B151B;
-      --bubble-error-border: #6B2E3A;
-      --bubble-error-ink: #F07884;
-      --tab-icon: rgba(205, 220, 228, 0.68);
-      --tab-active: #A8C5FF;
       --bottom-menu-height: 72px;
       --profile-action-group-radius: 18px;
-      --profile-quota-selected: #7AA7FF;
-      --profile-quota-control: #172231;
-      --profile-quota-border: rgba(122, 167, 255, 0.30);
-      --profile-quota-control-ink: rgba(243, 248, 251, 0.94);
-      --profile-account-action: #A8C5FF;
-      --focus-ring: 0 0 0 2px #0B1017, 0 0 0 4px rgba(122, 167, 255, 0.78);
       --top-safe-area: env(safe-area-inset-top);
     }
     * {
@@ -4551,8 +4479,9 @@
   </style>
   <link rel="stylesheet" href="/assets/ai_conversation_share.css" />
   <link rel="stylesheet" href="/assets/group_mentions.css" /><script src="/assets/group_mentions.js"></script><link rel="stylesheet" href="/assets/articles.css" /><script src="/assets/article_square_media.js"></script><script src="/assets/article_square.js"></script><script src="/assets/articles.js"></script>
+  <link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />
 </head>
-<body data-ui-system="apk-orbital-metal-workbench-v1">
+<body data-ui-system="mobile-design-v2">
 
 <!-- ============ 登录视图 ============ -->
 <section id="loginView" class="login">
@@ -4947,6 +4876,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <div class="download-link-box" id="downloadLinkBox">生成中…</div>
       </div>
 
+      <label class="profile-row" for="mobileAppearance">
+        <span>外观</span>
+        <select id="mobileAppearance" aria-label="外观" style="min-height:48px;background:var(--panel);color:var(--ink)">
+          <option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option>
+        </select>
+      </label>
       <div class="profile-action-group profile-primary-group">
       <div class="profile-node-resource-panel" id="profileNodeResourcePanel">
         <button class="profile-node-resource-header" id="profileNodeResourceToggle" type="button" aria-expanded="false">

@@ -1,0 +1,9 @@
+{
+  "spec_version": "2.0",
+  "canonical_blob_sha1": "9e882b1979d00d2da10ad78ff0d04b64121c5622",
+  "product_document": "docs/Design.md",
+  "retired_documents": ["docs/APP 颜色规范.md"],
+  "system_ui_release_policy": "runtime-evidence-before-release",
+  "implementation_route": "compose-material3-incremental",
+  "cross_platform_policy": "semantic-parity-platform-adaptation"
+}

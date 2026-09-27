@@ -13,6 +13,7 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'app-ui-change-scope.ps1')
 . (Join-Path $PSScriptRoot 'release-stage-receipt.ps1')
+. (Join-Path $PSScriptRoot 'mobile-ui-design-scope.ps1')
 
 $repoRoot = (& git rev-parse --show-toplevel 2>&1)
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repoRoot)) {
@@ -46,6 +47,9 @@ $scope = if ($null -ne $taskScopeBase.ChangedPaths) {
 }
 $deploymentDebt = Resolve-ElonAppUiChangeScope `
     -RepoRoot $repoRoot -BaseSha $DeployedServerSha -HeadSha $headSha
+if (Test-ElonSystemicMobileDesignChange -Paths @($scope.ChangedPaths)) {
+    throw 'SYSTEM_UI_REFACTOR_REQUIRES_RUNTIME_EVIDENCE: use the full release workflow after native verification.'
+}
 if ($StaticRuntimePwa -and $scope.MobilePwaMode -ne 'static_template') {
     throw "-StaticRuntimePwa cannot override task scope '$($scope.MobilePwaMode)'. Static publishing is allowed only for self-contained mobile PWA assets."
 }

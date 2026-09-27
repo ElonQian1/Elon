@@ -1,12 +1,17 @@
 # 一龙项目 AI 共享契约
 
-> 本文件只保留共享不变量；专项细节由 `AGENTS.md` 按需路由。
+先读 `AGENTS.md` 与 `AI_CURRENT.md`。
+
+## 移动设计 V2
+
+`MOBILE_DESIGN_SYSTEM=2.0`
+`APP_UI_SYSTEM_REFACTOR_POLICY=runtime-evidence-before-release`
+
+Android/PWA 按 `docs/design/mobile-design-system-v2.md` 与 `docs/Design.md`。旧皮肤/截图标准退役，采用 Material 3，允许渐进 View 迁移。系统级主题/组件/导航/框架及整页导入，必须先内部构建与原生运行证据再发布；缺证据可提交待审，不能发布或称视觉通过。覆盖旧快速通道/模板冲突；业务与工程合同不变。双端语义对齐，平台适配无需空改 HTML。
 
 ## 项目边界
 
-一龙是云端 APK 开发平台。本仓库中的 `android/`、`server/`、`pc-frontend/`、`scripts/` 都属于一龙自项目；用户子项目位于独立项目目录，不能套用一龙自身的发布脚本。
-
-项目现状以 `AI_CURRENT.md` 为准。
+本仓库属于一龙自项目；独立用户子项目不得使用本仓库的发布脚本。
 
 Codex、Copilot、Claude 的 Win 无人值守更新/接管统一按 [执行入口](../docs/win-conversation-unattended-acceptance.md)；已有任务授权后直接执行，不逐步重复询问。
 
@@ -16,7 +21,7 @@ Codex、Copilot、Claude 的 Win 无人值守更新/接管统一按 [执行入�
 
 ## 强制任务生命周期
 
-以下规则使用稳定编号。其他 Prompt、Agent、Skill 和长文档只能引用这些编号，不重复整段步骤。
+其他 Prompt、Agent、Skill 只引用以下编号，不重复步骤。
 
 | 编号 | 必须满足 |
 |---|---|
@@ -48,7 +53,7 @@ Windows 隔离 worktree 默认放在当前仓库盘符的 `\wt\<短ID>`；机器
 | 工具每次都会在固定路径生成的非源码输出 | 添加路径精确、可验证的 `.gitignore` 规则并提交 |
 | 任务开始前已存在或归属不明 | 保留并报告，绝不自动 stage、stash、删除或忽略 |
 
-文件名包含 `test` 不能作为删除或忽略依据。机器分类策略位于 `.ai/workspace-policy.txt`，代理无需把它全文读入上下文。
+不得仅因文件名含 `test` 而删除或忽略；分类见 `.ai/workspace-policy.txt`。
 
 ## 完成类型
 
@@ -58,12 +63,12 @@ Windows 隔离 worktree 默认放在当前仓库盘符的 `\wt\<短ID>`；机器
 | 后端运行代码 | 默认运行 `publish-server.*`，除非用户明确只同步代码 | `Server`；只同步时 `CodePushed` |
 | PC 前端 | 纯前端用 `publish-pc-frontend.ps1`；含 API 用 `publish-server.*` | `PcFrontend`；只同步用 `CodePushed` |
 | Win 节点客户端用户可见改动 | 默认 `publish-node-agent.ps1` | `NodeAgent`；只同步时 `CodePushed` |
-| Android 可安装端用户可见改动 | 默认 `publish-apk.*` | `AndroidFeature`；只同步时 `CodePushed` |
-| Android + 移动 PWA 视觉同步 | `publish-app-ui-fast-lane.ps1` | `AndroidFeature` |
+| Android 可安装端用户可见改动 | 默认 `publish-apk.*`；系统级 UI 先满足 V2 运行证据 | `AndroidFeature`；只同步时 `CodePushed` |
+| Android + 移动 PWA 低风险视觉同步 | `publish-app-ui-fast-lane.ps1`；系统级重构除外 | `AndroidFeature` |
 
-APK 发布后必须检查主项目登记的调试手机：探测 USB、已有无线 ADB、登记的无线端点及匹配硬件身份的 mDNS；在线且已授权则自动 `adb install -r` 并回读版本，同一硬件只更新一次，不降级。逐台记录已更新、离线、未授权或失败及安装包摘要；不能因本机没有配置文件就跳过。离线可报告延期，在线安装失败、设备档案读取失败或 ADB 缺失必须明确失败，不能用视觉验收延期参数掩盖。默认读取主项目设备档案，显式本机配置仅作覆盖；细节见 `docs/apk-debug-device-delivery.md`。
+APK 发布后按 `docs/apk-debug-device-delivery.md` 读取主项目手机档案，探测 USB/无线 ADB/mDNS、核对硬件、保留数据 `adb install -r`、不降级并回读版本/摘要，同一硬件只更新一次。离线记延期；在线安装、档案或 ADB 失败必须报失败，不用视觉延期掩盖；本机配置只能覆盖，不能省略检测。
 
-APP UI：`APP_UI_RELEASE_POLICY=publish_before_optional_renderer`。默认不做物理设备视觉或交互验收；上述发布后 ADB 安装与版本回读始终执行。push 后先验证并发布 Server/PWA 和 APK。仅当用户反馈修改不对或明确要求时设置 `realDeviceRequired=true`；同一 MCP 会话只准备一次、最多 30 秒，失败记 `VERIFICATION_DEFERRED`，不重建会话或阻塞已发布结果。用户要求发布前验收时除外；无真帧不得称视觉已验收。
+普通微调仅按 `docs/app-ui-fast-lane.md` 使用 `APP_UI_RELEASE_POLICY=publish_before_optional_renderer`；系统级重构不适用。默认无需物理设备视觉检查；用户要求或反馈不正确时才用 `realDeviceRequired=true`，单会话准备最多 30 秒，失败记 `VERIFICATION_DEFERRED`。无真帧不称视觉通过，发布后装机义务不变。
 
 发布期间主线前进：未构建的旧 Android 候选让位；已验证 APK 若仍是主线祖先且线上无更新后代，可先发布。发布类型互不阻塞，失联由短租约回收。业务已入主线的结论不变，不循环 rebase 或重跑旧构建。
 
@@ -74,7 +79,5 @@ APP UI：`APP_UI_RELEASE_POLICY=publish_before_optional_renderer`。默认不做
 - Rust/Cargo 验证必须走 `scripts/validate-rust.ps1`（Git Bash/非 Windows 由 `cargo-dev.sh` 适配）；入口先执行廉价门禁，再按精确指纹复用或运行 `cargo-dev`。发布构建走发布脚本，不能共享裸 Cargo 写入。
 - 经仓库脚本确认的全量纯 rustfmt 先独立提交；业务改动另提，不为缩小 diff 反复撤销。
 - 新建源文件目标不超过 500 行，超过 800 行必须拆分；入口文件只做组装。
-- APP 纯视觉微调读 `docs/app-ui-fast-lane.md`；复杂 UI 再读完整设计规则。
+- APP 纯视觉微调读 `docs/app-ui-fast-lane.md`；复杂 UI 先读 V2 及产品规则。
 - 带 `#requires -Version 7.0` 的脚本必须用 `pwsh`，不能删要求或降级脚本来绕过。
-
-专项文档和命令从 `AGENTS.md` 路由。

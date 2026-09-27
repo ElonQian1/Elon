@@ -8,7 +8,7 @@ use std::{
 
 const TEMPLATE_RELATIVE_PATH: &str = "mobile-pwa/web_page.html";
 const ORBITAL_THEME_ASSET: &str = "/assets/orbital_mobile_theme.css";
-const ORBITAL_THEME_MARKER: &str = "apk-orbital-metal-workbench-v1";
+const ORBITAL_THEME_MARKER: &str = "mobile-design-v2";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct TemplateSignature {
@@ -68,6 +68,12 @@ where
 }
 
 pub(crate) fn enforce_orbital_mobile_theme(mut html: String, theme_css: &str) -> String {
+    // Runtime HTML can outlive the embedded template. Replace its retired marker
+    // before inserting the current one, so the body never has duplicate attributes.
+    html = html.replace(
+        "data-ui-system=\"apk-orbital-metal-workbench-v1\"",
+        "data-ui-system=\"mobile-design-v2\"",
+    );
     if !html.contains(ORBITAL_THEME_ASSET) {
         let style = format!(
             "\n<style data-elon-runtime-asset=\"{ORBITAL_THEME_ASSET}\">\n{theme_css}\n</style>\n"
@@ -179,12 +185,22 @@ mod tests {
         );
         assert!(rendered.contains("data-elon-runtime-asset=\"/assets/orbital_mobile_theme.css\""));
         assert!(rendered.contains(":root { --bg: #07090d; }"));
-        assert!(rendered.contains("data-ui-system=\"apk-orbital-metal-workbench-v1\""));
+        assert!(rendered.contains("data-ui-system=\"mobile-design-v2\""));
+    }
+
+    #[test]
+    fn replaces_the_retired_marker_without_a_duplicate_body_attribute() {
+        let template = "<html><head></head><body data-ui-system=\"apk-orbital-metal-workbench-v1\" class=\"app\"></body></html>";
+        let rendered =
+            enforce_orbital_mobile_theme(template.to_owned(), "body { color: inherit; }");
+        assert_eq!(rendered.matches("data-ui-system=").count(), 1);
+        assert!(rendered.contains("data-ui-system=\"mobile-design-v2\""));
+        assert!(!rendered.contains("apk-orbital-metal-workbench-v1"));
     }
 
     #[test]
     fn does_not_duplicate_an_existing_orbital_theme() {
-        let template = "<html><head><link href=\"/assets/orbital_mobile_theme.css\"></head><body data-ui-system=\"apk-orbital-metal-workbench-v1\"></body></html>";
+        let template = "<html><head><link href=\"/assets/orbital_mobile_theme.css\"></head><body data-ui-system=\"mobile-design-v2\"></body></html>";
         let rendered = enforce_orbital_mobile_theme(template.to_owned(), "unused");
         assert_eq!(
             rendered.matches("/assets/orbital_mobile_theme.css").count(),

@@ -62,6 +62,9 @@ function Invoke-StitchInspector {
         $exitCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
+        # Expected rejection fixtures must not leak their native exit status to
+        # GitHub Actions' PowerShell wrapper after all assertions pass.
+        $global:LASTEXITCODE = 0
     }
     return [pscustomobject]@{
         ExitCode = $exitCode

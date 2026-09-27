@@ -11,11 +11,12 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
-import kotlin.math.roundToInt
+import android.content.Context
+import android.content.res.ColorStateList
+import com.google.android.material.button.MaterialButton
 
 internal class ProjectManagementHomeView(
-    private val activity: AppCompatActivity,
+    private val activity: Context,
     private val container: LinearLayout,
     private val segmentContainer: LinearLayout?,
     private val projects: () -> List<AppProject>,
@@ -79,7 +80,7 @@ internal class ProjectManagementHomeView(
         target.removeAllViews()
         target.setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
         target.layoutParams = target.layoutParams.apply {
-            height = designPx(FIXED_SEGMENT_BAR_HEIGHT_PX)
+            height = LinearLayout.LayoutParams.WRAP_CONTENT
         }
         target.addView(createSegmentRow(showJoint), fixedSegmentLayoutParams())
         return true
@@ -98,7 +99,7 @@ internal class ProjectManagementHomeView(
                 setPersonalProjectsExpanded(false)
                 setJointProjectsExpanded(true)
                 render()
-            }, segmentButtonLayoutParams(marginStartPx = SEGMENT_GAP_PX))
+            }, segmentButtonLayoutParams(marginStartPx = SEGMENT_GAP_DP))
         }
     }
 
@@ -107,34 +108,30 @@ internal class ProjectManagementHomeView(
         selected: Boolean,
         onClick: () -> Unit
     ): TextView {
-        return TextView(activity).apply {
+        return MaterialButton(activity).apply {
             text = label
-            includeFontPadding = false
-            gravity = Gravity.CENTER
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { onClick() }
-            setTextColor(
-                activity.elonColor(if (selected) R.color.elon_text_accent else R.color.elon_text_primary)
-            )
+            isAllCaps = false
+            isSelected = selected
+            minimumHeight = dp(48)
+            minHeight = dp(48)
+            insetTop = 0; insetBottom = 0
             setFontSizeSp(FONT_SEGMENT_SP)
-            setTypeface(typeface, Typeface.NORMAL)
-            setPadding(0, 0, 0, 0)
-            background = if (selected) {
-                roundedPx(activity.elonColor(R.color.elon_segment_selected), SEGMENT_HEIGHT_PX / 2)
-            } else {
-                null
-            }
-            minWidth = 0
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setTextColor(activity.elonColor(if (selected) R.color.mobile_on_primary_container else R.color.mobile_on_surface_variant))
+            backgroundTintList = ColorStateList.valueOf(activity.elonColor(
+                if (selected) R.color.elon_segment_selected else R.color.elon_bg_app))
+            cornerRadius = dp(12)
+            setOnClickListener { onClick() }
         }
     }
 
     private fun segmentButtonLayoutParams(marginStartPx: Int = 0): LinearLayout.LayoutParams {
         return LinearLayout.LayoutParams(
-            designPx(SEGMENT_WIDTH_PX),
-            designPx(SEGMENT_HEIGHT_PX)
+            0,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            1f
         ).apply {
-            marginStart = designPx(marginStartPx)
+            marginStart = dp(marginStartPx)
         }
     }
 
@@ -144,6 +141,9 @@ internal class ProjectManagementHomeView(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             isClickable = true
+            isFocusable = true
+            minimumHeight = dp(72)
+            setPadding(0, dp(12), 0, dp(12))
             foreground = selectableForeground()
             setOnClickListener { openProject(item.index) }
             setOnLongClickListener { anchor ->
@@ -152,8 +152,8 @@ internal class ProjectManagementHomeView(
             }
 
             addView(projectThumbnail(project), LinearLayout.LayoutParams(
-                designPx(THUMB_SIZE_PX),
-                designPx(THUMB_SIZE_PX)
+                dp(THUMB_SIZE_DP),
+                dp(THUMB_SIZE_DP)
             ))
 
             addView(projectTextColumn(project), LinearLayout.LayoutParams(
@@ -161,8 +161,8 @@ internal class ProjectManagementHomeView(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             ).apply {
-                marginStart = designPx(TEXT_START_GAP_PX)
-                marginEnd = designPx(TEXT_END_GAP_PX)
+                marginStart = dp(TEXT_START_GAP_DP)
+                marginEnd = dp(TEXT_END_GAP_DP)
             })
 
             addView(TextView(activity).apply {
@@ -172,8 +172,8 @@ internal class ProjectManagementHomeView(
                 setTextColor(activity.elonColor(R.color.elon_text_placeholder))
                 setFontSizeSp(FONT_CHEVRON_SP)
             }, LinearLayout.LayoutParams(
-                designPx(CHEVRON_WIDTH_PX),
-                designPx(THUMB_SIZE_PX)
+                dp(CHEVRON_WIDTH_DP),
+                dp(THUMB_SIZE_DP)
             ))
         }
     }
@@ -182,11 +182,11 @@ internal class ProjectManagementHomeView(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = designPx(THUMB_SIZE_PX)
+            minimumHeight = dp(THUMB_SIZE_DP)
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = project.title.ifBlank { "项目名称" }
-                maxLines = 1
+                maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(activity.elonColor(R.color.elon_text_list_title))
                 setFontSizeSp(FONT_LIST_TITLE_SP)
@@ -199,7 +199,7 @@ internal class ProjectManagementHomeView(
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = projectIntroduction(project)
-                maxLines = 1
+                maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(activity.elonColor(R.color.elon_text_placeholder))
                 setFontSizeSp(FONT_LIST_DESC_SP)
@@ -207,24 +207,24 @@ internal class ProjectManagementHomeView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = designPx(DESC_TOP_MARGIN_PX)
+                topMargin = dp(DESC_TOP_MARGIN_DP)
             })
 
             addView(LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
+                orientation = if (resources.configuration.fontScale >= 1.3f) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                addMetaText("创建者：${projectOwner(project)}")
-                addMetaText("成员：${projectMemberCount(project)}", marginStartPx = META_GAP_PX)
+                addMetaText("创建者：${projectOwner(project)}", weighted = orientation == LinearLayout.HORIZONTAL)
+                addMetaText("成员：${projectMemberCount(project)}", marginStartPx = if (orientation == LinearLayout.HORIZONTAL) META_GAP_DP else 0)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = designPx(META_TOP_MARGIN_PX)
+                topMargin = dp(META_TOP_MARGIN_DP)
             })
         }
     }
 
-    private fun LinearLayout.addMetaText(value: String, marginStartPx: Int = 0) {
+    private fun LinearLayout.addMetaText(value: String, marginStartPx: Int = 0, weighted: Boolean = false) {
         addView(TextView(activity).apply {
             includeFontPadding = false
             text = value
@@ -233,17 +233,18 @@ internal class ProjectManagementHomeView(
             setTextColor(activity.elonColor(R.color.elon_text_placeholder))
             setFontSizeSp(FONT_META_SP)
         }, LinearLayout.LayoutParams(
+            if (weighted) 0 else LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
+            if (weighted) 1f else 0f
         ).apply {
-            marginStart = designPx(marginStartPx)
+            marginStart = dp(marginStartPx)
         })
     }
 
     private fun projectThumbnail(project: AppProject): View {
         return FrameLayout(activity).apply {
             contentDescription = "${project.title.ifBlank { "项目" }}封面"
-            background = roundedPx(activity.elonColor(R.color.elon_button_primary_bg), THUMB_RADIUS_PX)
+            background = roundedPx(activity.elonColor(R.color.elon_button_primary_bg), THUMB_RADIUS_DP)
             clipToOutline = true
             val iconBitmap = UserProfileStore.decodeAvatar(project.iconDataUrl)
             if (iconBitmap != null) {
@@ -274,6 +275,9 @@ internal class ProjectManagementHomeView(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
+            minimumHeight = dp(160)
+            setPadding(dp(16), dp(24), dp(16), dp(24))
+            isFocusable = !showJoint
             isClickable = !showJoint
             foreground = if (showJoint) null else selectableForeground()
             if (!showJoint) setOnClickListener { showCreateProjectDialog() }
@@ -293,33 +297,33 @@ internal class ProjectManagementHomeView(
     private fun segmentLayoutParams(): LinearLayout.LayoutParams {
         return LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            designPx(SEGMENT_HEIGHT_PX)
+            LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            marginStart = designPx(SEGMENT_SIDE_PX)
-            marginEnd = designPx(SEGMENT_SIDE_PX)
-            topMargin = designPx(SEGMENT_TOP_MARGIN_PX)
+            marginStart = dp(SEGMENT_SIDE_DP)
+            marginEnd = dp(SEGMENT_SIDE_DP)
+            topMargin = dp(SEGMENT_TOP_MARGIN_DP)
         }
     }
 
     private fun firstRowLayoutParams(): LinearLayout.LayoutParams {
         return LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            designPx(EMPTY_HEIGHT_PX)
+            LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            marginStart = designPx(ROW_SIDE_PX)
-            marginEnd = designPx(ROW_END_PX)
-            topMargin = designPx(FIRST_ROW_TOP_MARGIN_PX)
+            marginStart = dp(ROW_SIDE_DP)
+            marginEnd = dp(ROW_END_DP)
+            topMargin = dp(FIRST_ROW_TOP_MARGIN_DP)
         }
     }
 
     private fun rowLayoutParams(index: Int): LinearLayout.LayoutParams {
         return LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            designPx(ROW_HEIGHT_PX)
+            LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            marginStart = designPx(ROW_SIDE_PX)
-            marginEnd = designPx(ROW_END_PX)
-            topMargin = designPx(if (index == 0) FIRST_ROW_TOP_MARGIN_PX else ROW_GAP_PX)
+            marginStart = dp(ROW_SIDE_DP)
+            marginEnd = dp(ROW_END_DP)
+            topMargin = dp(if (index == 0) FIRST_ROW_TOP_MARGIN_DP else ROW_GAP_DP)
         }
     }
 
@@ -357,7 +361,11 @@ internal class ProjectManagementHomeView(
         return View(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                designPx(FIXED_SEGMENT_BAR_HEIGHT_PX)
+                segmentContainer?.let { target ->
+                    target.measure(View.MeasureSpec.makeMeasureSpec(activity.resources.displayMetrics.widthPixels, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+                    target.measuredHeight
+                } ?: dp(FIXED_SEGMENT_BAR_HEIGHT_DP)
             )
         }
     }
@@ -365,11 +373,11 @@ internal class ProjectManagementHomeView(
     private fun fixedSegmentLayoutParams(): LinearLayout.LayoutParams {
         return LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            designPx(SEGMENT_HEIGHT_PX)
+            LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            marginStart = designPx(SEGMENT_SIDE_PX)
-            marginEnd = designPx(SEGMENT_SIDE_PX)
-            topMargin = designPx(FIXED_SEGMENT_TOP_MARGIN_PX)
+            marginStart = dp(SEGMENT_SIDE_DP)
+            marginEnd = dp(SEGMENT_SIDE_DP)
+            topMargin = dp(FIXED_SEGMENT_TOP_MARGIN_DP)
         }
     }
 
@@ -377,14 +385,9 @@ internal class ProjectManagementHomeView(
         return View(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                designPx(BOTTOM_SPACER_PX)
+                dp(BOTTOM_SPACER_DP)
             )
         }
-    }
-
-    private fun designPx(value: Int): Int {
-        val width = activity.resources.displayMetrics.widthPixels.takeIf { it > 0 } ?: DESIGN_WIDTH_PX
-        return (value * (width / DESIGN_WIDTH_PX.toFloat())).roundToInt()
     }
 
     private fun TextView.setFontSizeSp(value: Int) {
@@ -395,38 +398,37 @@ internal class ProjectManagementHomeView(
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             setColor(color)
-            cornerRadius = designPx(radiusPx).toFloat()
+            cornerRadius = dp(radiusPx).toFloat()
         }
     }
 
     private companion object {
-        const val DESIGN_WIDTH_PX = 1272
-        const val SEGMENT_SIDE_PX = 30
-        const val ROW_SIDE_PX = 112
-        const val ROW_END_PX = 92
-        const val SEGMENT_TOP_MARGIN_PX = 154
-        const val SEGMENT_HEIGHT_PX = 138
-        const val SEGMENT_WIDTH_PX = 210
-        const val SEGMENT_GAP_PX = 60
-        const val FIXED_SEGMENT_TOP_MARGIN_PX = 106
-        const val FIXED_SEGMENT_BAR_HEIGHT_PX = FIXED_SEGMENT_TOP_MARGIN_PX + SEGMENT_HEIGHT_PX
-        const val FIRST_ROW_TOP_MARGIN_PX = 102
-        const val ROW_HEIGHT_PX = 220
-        const val ROW_GAP_PX = 98
-        const val THUMB_SIZE_PX = 172
-        const val THUMB_RADIUS_PX = 10
-        const val TEXT_START_GAP_PX = 58
-        const val TEXT_END_GAP_PX = 44
-        const val DESC_TOP_MARGIN_PX = 10
-        const val META_TOP_MARGIN_PX = 8
-        const val META_GAP_PX = 112
-        const val CHEVRON_WIDTH_PX = 52
-        const val EMPTY_HEIGHT_PX = 520
-        const val BOTTOM_SPACER_PX = 120
+        const val SEGMENT_SIDE_DP = 16
+        const val ROW_SIDE_DP = 16
+        const val ROW_END_DP = 16
+        const val SEGMENT_TOP_MARGIN_DP = 16
+        const val SEGMENT_HEIGHT_DP = 48
+        const val SEGMENT_WIDTH_DP = 96
+        const val SEGMENT_GAP_DP = 8
+        const val FIXED_SEGMENT_TOP_MARGIN_DP = 8
+        const val FIXED_SEGMENT_BAR_HEIGHT_DP = FIXED_SEGMENT_TOP_MARGIN_DP + SEGMENT_HEIGHT_DP
+        const val FIRST_ROW_TOP_MARGIN_DP = 12
+        const val ROW_HEIGHT_DP = 88
+        const val ROW_GAP_DP = 4
+        const val THUMB_SIZE_DP = 48
+        const val THUMB_RADIUS_DP = 12
+        const val TEXT_START_GAP_DP = 16
+        const val TEXT_END_GAP_DP = 8
+        const val DESC_TOP_MARGIN_DP = 4
+        const val META_TOP_MARGIN_DP = 4
+        const val META_GAP_DP = 12
+        const val CHEVRON_WIDTH_DP = 24
+        const val EMPTY_HEIGHT_DP = 160
+        const val BOTTOM_SPACER_DP = 24
 
-        const val FONT_SEGMENT_SP = 17
-        const val FONT_LIST_TITLE_SP = 17
-        const val FONT_LIST_DESC_SP = 13
+        const val FONT_SEGMENT_SP = 14
+        const val FONT_LIST_TITLE_SP = 16
+        const val FONT_LIST_DESC_SP = 14
         const val FONT_META_SP = 12
         const val FONT_EMPTY_SP = 16
         const val FONT_CHEVRON_SP = 24
