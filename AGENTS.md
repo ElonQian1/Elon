@@ -8,6 +8,10 @@
 2. 只读命中文档；Codex CLI 读 `CODEX.md`。
 3. 禁止全读 instructions、docs、Prompt、Agent、Skill。
 
+## 移动设计 V2
+
+Android/PWA UI 先读 `docs/design/mobile-design-system-v2.md`、`docs/Design.md` 和 `.agents/skills/apk-ui/SKILL.md`。旧视觉规范、旧组件外观和历史截图没有设计优先权；业务、安全及工程隔离规则继续有效。系统级重构按 V2 先取得关键运行证据再正式发布，不进入低风险快速通道。旧索引链接通过退役文档跳转，不再把旧颜色表当当前标准。
+
 ## 路由
 
 | 任务类型 | 读取/执行 |
@@ -27,12 +31,12 @@
 | Win 节点/升级 | `docs/node-agent-upgrade-compatibility.md`、Git/发布手册、相关源码 |
 | 复杂流程/卡住 | `docs/ai-agent-workflow.md` |
 | 非简单功能/重构/迁移/生产修复 | `.agents/skills/deliver-feature-end-to-end/SKILL.md`，再叠加领域 Skill |
-| Android APK 发布 | Git/发布手册的发布入口；环境异常再读 `docs/android-setup.md` |
+| Android APK 发布 | Git/发布手册的发布入口；系统级 UI 先满足 V2 运行证据；环境异常再读 `docs/android-setup.md` |
 | Android WebView/MCP/ADB | `.agents/skills/android-webview-feature-delivery/SKILL.md` |
 | 量化/币安 | 先读 `docs/requirements/android-exchange-session-host-v2.md` |
 | 子项目 Git 工作流 | `scripts/templates/subproject-lite-workflow/README.md`；单代理顺序子项目复制此模板，不套用完整 worktree 隔离 |
-| APP 低风险视觉微调 | `docs/app-ui-fast-lane.md` |
-| Stitch/Figma 导出、APP 复杂 UI/按图还原 | `docs/stitch-design-import.md`（导入）、`docs/Design.md`、`docs/APP 颜色规范.md`；双端再读 `.github/instructions/apk-web-ui-sync.instructions.md` |
+| APP 低风险视觉微调 | `docs/app-ui-fast-lane.md`；不含 V2 主题、组件、导航或系统级重构 |
+| Stitch/Figma 导出、APP 复杂 UI/按图还原 | `docs/design/mobile-design-system-v2.md`、`docs/Design.md`、`docs/stitch-design-import.md`（导入证据）；双端再读 `.github/instructions/apk-web-ui-sync.instructions.md` |
 | APP 版本记忆 | `docs/app-version-memory.md` |
 | 一龙 Logo 替换 | `docs/brand-logo-workflow.md`；统一运行 `scripts/replace-brand-logo.ps1` |
 | Prompt/Agent/Skill | 仅按目标读取；去重先运行 `scripts/audit-ai-prompt-assets.ps1` |
@@ -54,3 +58,5 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-ai-task-preflight-workflow.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\audit-ai-prompt-assets.ps1
 ```
+
+V2 文档和入口另运行 `python scripts/check-mobile-design-v2.py --self-test` 与 `python scripts/check-mobile-design-v2.py`；它们不能替代上面的项目验证或 APK 验收。

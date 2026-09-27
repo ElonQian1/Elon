@@ -2,6 +2,17 @@
 
 > 本文件只保留共享不变量；专项细节由 `AGENTS.md` 按需路由。
 
+## 移动设计重建 V2：专项覆盖
+
+`MOBILE_DESIGN_SYSTEM=2.0`
+`APP_UI_SYSTEM_REFACTOR_POLICY=runtime-evidence-before-release`
+
+Android 与移动 PWA 的设计依据是 `docs/design/mobile-design-system-v2.md` 和 `docs/Design.md`。旧轨道金属、强制深色、旧 HEX、旧组件外观、旧截图及旧精确尺寸检查不再是设计标准。新 UI 优先 Compose + Material 3，按页面渐进迁移，不改变业务、安全或工程隔离合同。
+
+系统级主题/公共组件/信息架构/导航/框架迁移，以及整页设计导入，必须先内部构建并取得关键原生运行证据，再走原受控正式发布；不适用下文普通微调的 `publish_before_optional_renderer`。缺少证据时可以提交待审代码，但不能公开发布该重构或报告视觉通过。
+
+APK/PWA 按受影响能力和语义对齐，允许平台适配与独立提交；不再要求每次 Android 修改都改 `server/src/assets/web_page.html`。上述范围明确覆盖旧 UI 快速通道、同步规则、低优先级模板及历史说明中的冲突要求，其他 `WF-*` 和签名/版本/装机机制不变。
+
 ## 项目边界
 
 一龙是云端 APK 开发平台。本仓库中的 `android/`、`server/`、`pc-frontend/`、`scripts/` 都属于一龙自项目；用户子项目位于独立项目目录，不能套用一龙自身的发布脚本。
@@ -58,12 +69,12 @@ Windows 隔离 worktree 默认放在当前仓库盘符的 `\wt\<短ID>`；机器
 | 后端运行代码 | 默认运行 `publish-server.*`，除非用户明确只同步代码 | `Server`；只同步时 `CodePushed` |
 | PC 前端 | 纯前端用 `publish-pc-frontend.ps1`；含 API 用 `publish-server.*` | `PcFrontend`；只同步用 `CodePushed` |
 | Win 节点客户端用户可见改动 | 默认 `publish-node-agent.ps1` | `NodeAgent`；只同步时 `CodePushed` |
-| Android 可安装端用户可见改动 | 默认 `publish-apk.*` | `AndroidFeature`；只同步时 `CodePushed` |
-| Android + 移动 PWA 视觉同步 | `publish-app-ui-fast-lane.ps1` | `AndroidFeature` |
+| Android 可安装端用户可见改动 | 默认 `publish-apk.*`；系统级 UI 先满足 V2 运行证据 | `AndroidFeature`；只同步时 `CodePushed` |
+| Android + 移动 PWA 低风险视觉同步 | `publish-app-ui-fast-lane.ps1`；系统级重构除外 | `AndroidFeature` |
 
 APK 发布后必须检查主项目登记的调试手机：探测 USB、已有无线 ADB、登记的无线端点及匹配硬件身份的 mDNS；在线且已授权则自动 `adb install -r` 并回读版本，同一硬件只更新一次，不降级。逐台记录已更新、离线、未授权或失败及安装包摘要；不能因本机没有配置文件就跳过。离线可报告延期，在线安装失败、设备档案读取失败或 ADB 缺失必须明确失败，不能用视觉验收延期参数掩盖。默认读取主项目设备档案，显式本机配置仅作覆盖；细节见 `docs/apk-debug-device-delivery.md`。
 
-APP UI：`APP_UI_RELEASE_POLICY=publish_before_optional_renderer`。默认不做物理设备视觉或交互验收；上述发布后 ADB 安装与版本回读始终执行。push 后先验证并发布 Server/PWA 和 APK。仅当用户反馈修改不对或明确要求时设置 `realDeviceRequired=true`；同一 MCP 会话只准备一次、最多 30 秒，失败记 `VERIFICATION_DEFERRED`，不重建会话或阻塞已发布结果。用户要求发布前验收时除外；无真帧不得称视觉已验收。
+仅满足 `docs/app-ui-fast-lane.md` 进入条件的普通微调适用 `APP_UI_RELEASE_POLICY=publish_before_optional_renderer`。该范围默认不做物理设备视觉或交互验收；上述发布后 ADB 安装与版本回读始终执行。push 后先验证并发布受影响的 Server/PWA 和 APK。仅当用户反馈修改不对或明确要求时设置 `realDeviceRequired=true`；同一 MCP 会话只准备一次、最多 30 秒，失败记 `VERIFICATION_DEFERRED`，不重建会话或阻塞已发布结果。用户要求发布前验收时除外；无真帧不得称视觉已验收。系统级重构遵守本文件开头的 V2 专项覆盖，不能用 Renderer 忙碌跳过发布前证据。
 
 发布期间主线前进：未构建的旧 Android 候选让位；已验证 APK 若仍是主线祖先且线上无更新后代，可先发布。发布类型互不阻塞，失联由短租约回收。业务已入主线的结论不变，不循环 rebase 或重跑旧构建。
 
@@ -74,7 +85,7 @@ APP UI：`APP_UI_RELEASE_POLICY=publish_before_optional_renderer`。默认不做
 - Rust/Cargo 验证必须走 `scripts/validate-rust.ps1`（Git Bash/非 Windows 由 `cargo-dev.sh` 适配）；入口先执行廉价门禁，再按精确指纹复用或运行 `cargo-dev`。发布构建走发布脚本，不能共享裸 Cargo 写入。
 - 经仓库脚本确认的全量纯 rustfmt 先独立提交；业务改动另提，不为缩小 diff 反复撤销。
 - 新建源文件目标不超过 500 行，超过 800 行必须拆分；入口文件只做组装。
-- APP 纯视觉微调读 `docs/app-ui-fast-lane.md`；复杂 UI 再读完整设计规则。
+- APP 纯视觉微调读 `docs/app-ui-fast-lane.md`；复杂 UI 先读 V2 及产品规则。
 - 带 `#requires -Version 7.0` 的脚本必须用 `pwsh`，不能删要求或降级脚本来绕过。
 
 专项文档和命令从 `AGENTS.md` 路由。

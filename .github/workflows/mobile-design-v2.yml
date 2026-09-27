@@ -1,0 +1,32 @@
+# 文件名：.github/workflows/mobile-design-v2.yml
+# 只运行只读治理校验，不接触 Android 签名、账户、设备或发布。
+name: Mobile design V2 governance
+on:
+  pull_request:
+    paths:
+      - 'AGENTS.md'
+      - '.github/copilot-instructions.md'
+      - '.github/instructions/apk-web-ui-sync.instructions.md'
+      - '.agents/skills/apk-ui/**'
+      - 'docs/Design.md'
+      - 'docs/APP 颜色规范.md'
+      - 'docs/app-ui-fast-lane.md'
+      - 'docs/design/**'
+      - 'docs/requirements/mobile-design-v2-adoption.md'
+      - 'scripts/check-mobile-design-v2.py'
+      - '.github/workflows/mobile-design-v2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Synthetic regression tests
+        run: python3 scripts/check-mobile-design-v2.py --self-test
+      - name: Validate design authority and routing
+        run: python3 scripts/check-mobile-design-v2.py
