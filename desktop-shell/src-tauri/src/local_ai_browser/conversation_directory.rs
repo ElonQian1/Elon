@@ -3,6 +3,22 @@ use std::collections::{HashMap, HashSet};
 use serde_json::{json, Map, Value};
 
 pub(super) fn merge(previous: Option<&Value>, mut incoming: Value) -> Value {
+    if incoming
+        .pointer("/collection/source")
+        .and_then(Value::as_str)
+        == Some("official_private")
+    {
+        for key in ["conversations", "projects"] {
+            if let Some(rows) = incoming.get_mut(key).and_then(Value::as_array_mut) {
+                for row in rows.iter_mut().filter_map(Value::as_object_mut) {
+                    row.insert(
+                        "metadataSource".into(),
+                        Value::String("official_private".into()),
+                    );
+                }
+            }
+        }
+    }
     let complete = is_complete(&incoming);
     let previous_conversations = records(previous, "conversations");
     let incoming_conversations = records(Some(&incoming), "conversations");
@@ -114,7 +130,10 @@ fn merge_conversations(previous: Vec<Value>, incoming: Vec<Value>, complete: boo
         if observed_paths.contains(&identity) {
             continue;
         }
-        if !complete || is_project_conversation(&previous) {
+        if !complete
+            || is_project_conversation(&previous)
+            || previous.get("metadataSource").and_then(Value::as_str) == Some("official_private")
+        {
             if let Some(previous) = previous.as_object_mut() {
                 previous.insert("active".to_string(), Value::Bool(false));
             }
@@ -167,6 +186,7 @@ fn combine_conversation(old: &Value, mut next: Value, _complete: bool) -> Value 
     let Some(old_object) = old.as_object() else {
         return next;
     };
+    preserve_authoritative_metadata(next_object, old_object);
     preserve_text(next_object, old_object, "title");
     preserve_text(next_object, old_object, "groupLabel");
     preserve_nullable(next_object, old_object, "projectId");
@@ -192,11 +212,36 @@ fn combine_project(old: &Value, mut next: Value) -> Value {
     let Some(old_object) = old.as_object() else {
         return next;
     };
+    preserve_authoritative_metadata(next_object, old_object);
     preserve_text(next_object, old_object, "title");
     preserve_nullable(next_object, old_object, "pinned");
     preserve_nullable(next_object, old_object, "pinOrder");
     preserve_nullable(next_object, old_object, "pinnedAt");
     next
+}
+
+fn preserve_authoritative_metadata(next: &mut Map<String, Value>, old: &Map<String, Value>) {
+    if old.get("metadataSource").and_then(Value::as_str) != Some("official_private")
+        || next.get("metadataSource").and_then(Value::as_str) == Some("official_private")
+    {
+        return;
+    }
+    // DOM visibility is not authoritative for pins or names of virtualized rows.
+    for key in [
+        "title",
+        "pinned",
+        "pinOrder",
+        "pinnedAt",
+        "updatedAt",
+        "projectId",
+        "projectTitle",
+        "projectPath",
+        "metadataSource",
+    ] {
+        if let Some(value) = old.get(key).filter(|v| !v.is_null()).cloned() {
+            next.insert(key.into(), value);
+        }
+    }
 }
 
 fn preserve_text(next: &mut Map<String, Value>, old: &Map<String, Value>, key: &str) {
@@ -266,6 +311,30 @@ fn is_project_conversation(value: &Value) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn private_metadata_survives_late_dom_but_accepts_explicit_private_changes() {
+        let private = |pinned, title| {
+            json!({
+            "conversations":[{"id":"one","path":"/c/one","title":title,"pinned":pinned}],
+            "projects":[{"id":"g-p-one","path":"/g/g-p-one/project","title":title,"pinned":pinned}],
+            "collection":{"source":"official_private","complete":false}})
+        };
+        let old = merge(None, private(true, "Known title"));
+        let dom = json!({"conversations":[{"id":"one","path":"/c/one","pinned":false,"title":"stale"}],
+            "projects":[{"id":"g-p-one","path":"/g/g-p-one/project","pinned":false,"title":"Skip to content"}],
+            "collection":{"complete":false}});
+        let retained = merge(Some(&old), dom);
+        for key in ["conversations", "projects"] {
+            assert_eq!(retained[key][0]["pinned"], true);
+            assert_eq!(retained[key][0]["title"], "Known title");
+        }
+        let unpinned = merge(Some(&retained), private(false, "Renamed"));
+        for key in ["conversations", "projects"] {
+            assert_eq!(unpinned[key][0]["pinned"], false);
+            assert_eq!(unpinned[key][0]["title"], "Renamed");
+        }
+    }
 
     #[test]
     fn typed_metadata_merges_by_id_and_explicit_unpin_wins() {

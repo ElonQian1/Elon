@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 216;
+pub(super) const ADAPTER_VERSION: u32 = 217;
 const WIN_DIRECTORY: &str = include_str!("chatgpt_win_directory.js");
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
@@ -51,6 +51,18 @@ const ADAPTER_ASSETS: &[(&str, &str)] = &[
     (
         "chatgpt_web_private_conversation_directory.js",
         include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_conversation_directory.js"),
+    ),
+    (
+        "chatgpt_web_private_directory_pages.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_directory_pages.js"),
+    ),
+    (
+        "chatgpt_web_private_directory_refresh.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_private_directory_refresh.js"),
+    ),
+    (
+        "chatgpt_web_adapter_conversation_directory_requests.js",
+        include_str!("../../../../android/app/src/main/assets/chatgpt_web_adapter_conversation_directory_requests.js"),
     ),
     (
         "chatgpt_web_adapter_project_policy.js",
@@ -493,6 +505,24 @@ mod tests {
         // Android's manifest moved out of PageAdapter and now includes mobile-only
         // capabilities. The desktop baseline intentionally retains its reviewed subset.
         assert!(ADAPTER_ASSETS.len() > 40);
+        for dependency in [
+            "chatgpt_web_private_directory_pages.js",
+            "chatgpt_web_private_directory_refresh.js",
+            "chatgpt_web_adapter_conversation_directory_requests.js",
+        ] {
+            let position = ADAPTER_ASSETS
+                .iter()
+                .position(|(name, _)| *name == dependency)
+                .unwrap();
+            let entry = ADAPTER_ASSETS
+                .iter()
+                .position(|(name, _)| *name == "chatgpt_web_adapter.js")
+                .unwrap();
+            assert!(
+                position < entry,
+                "directory dependency must precede adapter: {dependency}"
+            );
+        }
         for (name, _) in ADAPTER_ASSETS {
             assert!(
                 android_assets.contains(&format!("\"{name}\""))

@@ -427,6 +427,7 @@ pub(super) fn sanitize_conversation_collection(value: Option<&Value>) -> Value {
             1_000,
         ),
         "complete": complete,
+        "source": if collection.and_then(|c| c.get("source")).and_then(Value::as_str) == Some("official_private") { "official_private" } else { "official_dom" },
         "refreshSettled": collection.and_then(|c| c.get("refreshSettled")).and_then(Value::as_bool),
         "continueRefresh": collection.and_then(|c| c.get("continueRefresh")).and_then(Value::as_bool),
     })

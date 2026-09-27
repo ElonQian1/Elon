@@ -66,3 +66,42 @@ test('late conversation prefetch cannot navigate back or publish into a newer ta
   pending[1][1]({ type:'message_snapshot' }); pending[1][2]();
   assert.equal(events.length,1); assert.equal(navigated[0],'https://chatgpt.com/c/second');
 });
+
+test('production Win dependency graph performs private directory reads and emits typed pins', async () => {
+  const { fixture, response, assets } = require('./fixtures/chatgpt-directory-refresh');
+  const { root } = fixture();
+  const calls = [], events = [];
+  root.fetch = async url => {
+    calls.push(url);
+    const payload = url.includes('/pins?') ? (url.endsWith('conversation') ? [conversation] : [project]) :
+      url.includes('/snorlax/') ? { items:[{ gizmo:{ gizmo:project.item.gizmo }, conversations:[] }], cursor:null } :
+        { items:[conversation.item], offset:0, limit:28, total:100 };
+    const result = response(payload); result.clone = () => response(payload); return result;
+  };
+  const context = vm.createContext({ window:root, location:root.location, URL, TextDecoder, TextEncoder,
+    setTimeout, clearTimeout, console });
+  const bootstrap = fs.readFileSync(path.join(__dirname,
+    '../desktop-shell/src-tauri/src/local_ai_browser/chatgpt_adapter_bootstrap.rs'),'utf8');
+  const modules = ['chatgpt_web_private_conversation_directory.js','chatgpt_web_private_directory_pages.js',
+    'chatgpt_web_private_directory_refresh.js','chatgpt_web_adapter_conversation_directory_requests.js'];
+  for (const name of modules) {
+    assert.ok(bootstrap.includes(`"${name}",`), `missing production dependency ${name}`);
+    vm.runInContext(fs.readFileSync(path.join(assets,name),'utf8'),context);
+    if (name === modules[0]) vm.runInContext(fs.readFileSync(file,'utf8'),context);
+  }
+  const requests = root.__elonChatGptConversationDirectoryRequests.create({
+    privateDirectory:root.__elonChatGptPrivateConversationDirectory,
+    conversationAdapter:{ requestList() { throw Error('unexpected DOM fallback'); } },
+    emitEvent:event => events.push(event), optional:(_, action) => action(),
+  });
+  requests.installListener();
+  const receipt = await new Promise(resolve => requests.requestList({ requestId:'fixture' }, (...args) => resolve(args)));
+  assert.equal(receipt[1],true);
+  const result = events.at(-1);
+  assert.equal(result.collection.source,'official_private');
+  assert.equal(result.collection.refreshSettled,true);
+  assert.equal(result.conversations[0].pinned,true);
+  assert.equal(result.projects[0].pinned,true);
+  assert.equal(calls.filter(url => url.includes('/conversations?')).length,1);
+  assert.equal(calls.filter(url => url.includes('/pins?')).length,2);
+});
