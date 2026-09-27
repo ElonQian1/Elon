@@ -62,7 +62,7 @@ class AppUpdateDeliveryContractTest {
         assertTrue(sheet.contains("primary = \"收起下载面板\""))
         assertTrue(layout.contains("@drawable/bg_update_sheet"))
         assertTrue(sheetBackground.contains("@color/elon_surface_card"))
-        assertTrue(primaryBackground.contains("@color/elon_button_primary_bg"))
+        assertTrue(primaryBackground.contains("@color/mobile_primary"))
         assertTrue(layout.contains("android:text=\"后台下载\"").not())
         assertTrue(web.contains("网页版自动更新"))
         assertTrue(web.contains("APK 安装包"))

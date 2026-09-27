@@ -10,7 +10,7 @@ import android.view.WindowManager
 import com.elon.app.BuildConfig
 
 /** Foreground-only, read-only platform ledger. Never exports a result to another application. */
-class EskPlatformAssetsActivity : Activity() {
+class EskPlatformAssetsActivity : com.elon.app.MobileActivity() {
     private val gate = EskPlatformRequestGate()
     private val handler = Handler(Looper.getMainLooper())
     private var foreground = false

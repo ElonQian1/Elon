@@ -12,13 +12,14 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 
-/** Explicit native colors: the application window is dark even in system day mode. */
+/** Shared appearance for the host's existing compatibility pages. */
 internal class BinanceGridAppearance(private val activity: Activity) {
-    val background = 0xFF0B111B.toInt()
-    val surface = 0xFF1C2737.toInt()
-    val text = 0xFFF0F5FA.toInt()
-    val muted = 0xFFB2BFCF.toInt()
-    val accent = 0xFF3BDAA6.toInt()
+    private val uiColors = com.elon.app.MobileColors(activity)
+    val background = uiColors.surface
+    val surface = uiColors.container
+    val text = uiColors.text
+    val muted = uiColors.muted
+    val accent = uiColors.primary
     fun dp(value: Int) = (value * activity.resources.displayMetrics.density).toInt()
     fun shape(color: Int) = GradientDrawable().apply {
         setColor(color); cornerRadius = dp(12).toFloat()
@@ -38,7 +39,7 @@ internal class BinanceGridAppearance(private val activity: Activity) {
             intArrayOf(if (primary) accent else surface, surface))
         setTextColor(ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_enabled), intArrayOf()),
-            intArrayOf(if (primary) this@BinanceGridAppearance.background else this@BinanceGridAppearance.text, muted)))
+            intArrayOf(if (primary) uiColors.onPrimary else this@BinanceGridAppearance.text, muted)))
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5); bottomMargin = dp(5) }
         setOnClickListener { action() }
     }

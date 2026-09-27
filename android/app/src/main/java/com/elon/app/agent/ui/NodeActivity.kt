@@ -27,18 +27,6 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
-private const val BG = "#0B1118"
-private const val CARD = "#0E1116"
-private const val TEXT_PRIMARY = "#F8F7F4"
-private const val TEXT_SECONDARY = "#B3DDDBD5"
-private const val TEXT_TERTIARY = "#80BEBEBA"
-private const val PRIMARY_BG = "#67BEA0"
-private const val ACTION_BG = "#F8F7F4"
-private const val PRIMARY_TEXT = "#0B1118"
-private const val ACCENT_BG = "#20262E"
-private const val SECONDARY_BG = "#20262E"
-private const val SECONDARY_TEXT = "#F8F7F4"
-private const val BORDER = "#667B8793"
 
 /**
  * 节点管理界面：
@@ -46,7 +34,9 @@ private const val BORDER = "#667B8793"
  * - 查看节点积分余额和收益流水
  * - 下载 elon-node-agent 二进制（一键复制启动命令）
  */
-class NodeActivity : Activity() {
+class NodeActivity : com.elon.app.MobileActivity() {
+    private val uiColors by lazy { com.elon.app.MobileColors(this) }
+
 
     private lateinit var authService: AuthService
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -73,10 +63,10 @@ class NodeActivity : Activity() {
 
     private fun createLayout(): View {
         return ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor(BG))
+            setBackgroundColor(uiColors.surface)
             addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                setBackgroundColor(Color.parseColor(BG))
+                setBackgroundColor(uiColors.surface)
                 setPadding(0, 0, 0, 80)
 
                 addView(createHeader())
@@ -96,7 +86,7 @@ class NodeActivity : Activity() {
 
                 tvError = TextView(context).apply {
                     visibility = View.GONE
-                    setTextColor(Color.parseColor("#E07B84"))
+                    setTextColor(uiColors.error)
                     textSize = 14f
                     gravity = Gravity.CENTER
                     layoutParams = LinearLayout.LayoutParams(
@@ -112,14 +102,14 @@ class NodeActivity : Activity() {
     private fun createHeader(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor(CARD))
+            setBackgroundColor(uiColors.container)
             gravity = Gravity.CENTER_VERTICAL
             setPadding(24, 48, 24, 24)
 
             addView(ImageButton(context).apply {
                 setImageResource(android.R.drawable.ic_menu_revert)
                 setBackgroundColor(Color.TRANSPARENT)
-                setColorFilter(Color.parseColor(TEXT_SECONDARY))
+                setColorFilter(uiColors.muted)
                 layoutParams = LinearLayout.LayoutParams(80, 80)
                 setOnClickListener { finish() }
             })
@@ -128,7 +118,7 @@ class NodeActivity : Activity() {
                 text = "🖥️ 我的节点"
                 textSize = 20f
                 setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.parseColor(TEXT_PRIMARY))
+                setTextColor(uiColors.text)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -140,7 +130,7 @@ class NodeActivity : Activity() {
     private fun createBalanceCard(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(24, 24, 24, 24)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -150,14 +140,14 @@ class NodeActivity : Activity() {
             addView(TextView(context).apply {
                 text = "💰 节点积分收益"
                 textSize = 14f
-                setTextColor(Color.parseColor(TEXT_SECONDARY))
+                setTextColor(uiColors.muted)
             })
 
             balanceView = TextView(context).apply {
                 text = "加载中..."
                 textSize = 28f
                 setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.parseColor(PRIMARY_BG))
+                setTextColor(uiColors.primary)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -168,7 +158,7 @@ class NodeActivity : Activity() {
             addView(TextView(context).apply {
                 text = "贡献算力后，每 1k tokens 可获得平台积分奖励"
                 textSize = 12f
-                setTextColor(Color.parseColor(TEXT_TERTIARY))
+                setTextColor(uiColors.muted)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -181,7 +171,7 @@ class NodeActivity : Activity() {
         val serverUrl = authService.getServerUrl().replace("http://", "").replace("https://", "")
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(24, 24, 24, 24)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -192,13 +182,13 @@ class NodeActivity : Activity() {
                 text = "📦 安装一龙 PC 节点"
                 textSize = 14f
                 setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.parseColor(TEXT_PRIMARY))
+                setTextColor(uiColors.text)
             })
 
             addView(TextView(context).apply {
                 text = "Windows 下载客户端包后双击安装，登录一次即可自动注册为 PC 节点并贡献算力。"
                 textSize = 13f
-                setTextColor(Color.parseColor(TEXT_SECONDARY))
+                setTextColor(uiColors.muted)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -215,8 +205,8 @@ class NodeActivity : Activity() {
                 addView(Button(context).apply {
                     text = "🐧 Linux 下载"
                     textSize = 13f
-                    setBackgroundColor(Color.parseColor(SECONDARY_BG))
-                    setTextColor(Color.parseColor(SECONDARY_TEXT))
+                    setBackgroundColor(uiColors.elevated)
+                    setTextColor(uiColors.text)
                     layoutParams = LinearLayout.LayoutParams(0, 100, 1f).also { it.marginEnd = 8 }
                     setOnClickListener {
                         copyToClipboard(
@@ -229,8 +219,8 @@ class NodeActivity : Activity() {
                 addView(Button(context).apply {
                     text = "🪟 Windows 客户端包"
                     textSize = 13f
-                    setBackgroundColor(Color.parseColor(SECONDARY_BG))
-                    setTextColor(Color.parseColor(SECONDARY_TEXT))
+                    setBackgroundColor(uiColors.elevated)
+                    setTextColor(uiColors.text)
                     layoutParams = LinearLayout.LayoutParams(0, 100, 1f)
                     setOnClickListener {
                         copyToClipboard(
@@ -255,7 +245,7 @@ class NodeActivity : Activity() {
                 text = "我的节点"
                 textSize = 16f
                 setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.parseColor(TEXT_PRIMARY))
+                setTextColor(uiColors.text)
                 setPadding(0, 0, 0, 12)
             })
 
@@ -271,8 +261,8 @@ class NodeActivity : Activity() {
             text = "＋ 注册新节点"
             textSize = 16f
             setTypeface(null, Typeface.BOLD)
-            setBackgroundColor(Color.parseColor(ACTION_BG))
-            setTextColor(Color.parseColor(PRIMARY_TEXT))
+            setBackgroundColor(uiColors.primary)
+            setTextColor(uiColors.onPrimary)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 130
             ).also { it.topMargin = 24; it.marginStart = 16; it.marginEnd = 16 }
@@ -357,7 +347,7 @@ class NodeActivity : Activity() {
         if (nodes.isEmpty()) {
             nodeListView.addView(TextView(this).apply {
                 text = "暂无节点。点击下方按钮注册第一台 PC 节点 →"
-                setTextColor(Color.parseColor(TEXT_TERTIARY))
+                setTextColor(uiColors.muted)
                 textSize = 13f
                 setPadding(0, 8, 0, 8)
             })
@@ -371,7 +361,7 @@ class NodeActivity : Activity() {
     private fun createNodeCard(node: NodeInfo): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(20, 16, 20, 16)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -395,21 +385,21 @@ class NodeActivity : Activity() {
                     text = node.displayName.ifBlank { node.shortId.ifBlank { node.agentId } }
                     textSize = 15f
                     setTypeface(null, Typeface.BOLD)
-                    setTextColor(Color.parseColor(TEXT_PRIMARY))
+                    setTextColor(uiColors.text)
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 })
 
                 addView(TextView(context).apply {
                     text = if (node.online) "在线" else "离线"
                     textSize = 12f
-                    setTextColor(if (node.online) Color.parseColor(PRIMARY_BG) else Color.parseColor(TEXT_TERTIARY))
+                    setTextColor(if (node.online) uiColors.primary else uiColors.muted)
                 })
             })
 
             addView(TextView(context).apply {
                 text = node.subtitle()
                 textSize = 12f
-                setTextColor(Color.parseColor(TEXT_TERTIARY))
+                setTextColor(uiColors.muted)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -423,7 +413,7 @@ class NodeActivity : Activity() {
                     "暂无可用模型，确认 PC 端 Ollama / LM Studio 已启动"
                 }
                 textSize = 12f
-                setTextColor(Color.parseColor(TEXT_SECONDARY))
+                setTextColor(uiColors.muted)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -437,9 +427,9 @@ class NodeActivity : Activity() {
     private fun showRegisterDialog() {
         val editLabel = EditText(this).apply {
             hint = "节点昵称（可选，如：工作台 / 游戏主机）"
-            setTextColor(Color.parseColor(TEXT_PRIMARY))
-            setHintTextColor(Color.parseColor(TEXT_TERTIARY))
-            setBackgroundColor(Color.parseColor(SECONDARY_BG))
+            setTextColor(uiColors.text)
+            setHintTextColor(uiColors.muted)
+            setBackgroundColor(uiColors.elevated)
             setPadding(20, 20, 20, 20)
         }
 

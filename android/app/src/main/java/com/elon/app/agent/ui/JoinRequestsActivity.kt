@@ -26,18 +26,6 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
-private const val JR_BG = "#0B1118"
-private const val JR_CARD = "#0E1116"
-private const val JR_TEXT_PRIMARY = "#F8F7F4"
-private const val JR_TEXT_SECONDARY = "#B3DDDBD5"
-private const val JR_TEXT_TERTIARY = "#80BEBEBA"
-private const val JR_PRIMARY_BG = "#67BEA0"
-private const val JR_ACTION_BG = "#F8F7F4"
-private const val JR_PRIMARY_TEXT = "#0B1118"
-private const val JR_SECONDARY_BG = "#20262E"
-private const val JR_SECONDARY_TEXT = "#F8F7F4"
-private const val JR_PENDING = "#F0A030"
-private const val JR_DANGER = "#E07B84"
 
 /**
  * 加入申请审批界面 — 项目 owner 专用。
@@ -46,7 +34,9 @@ private const val JR_DANGER = "#E07B84"
  *   - "project_id"   String 必填
  *   - "project_name" String 可选（用于标题显示）
  */
-class JoinRequestsActivity : Activity() {
+class JoinRequestsActivity : com.elon.app.MobileActivity() {
+    private val uiColors by lazy { com.elon.app.MobileColors(this) }
+
 
     private lateinit var authService: AuthService
     private val scope = CoroutineScope(Dispatchers.Main)
@@ -76,7 +66,7 @@ class JoinRequestsActivity : Activity() {
     private fun buildLayout(): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(JR_BG))
+            setBackgroundColor(uiColors.surface)
 
             addView(buildHeader())
 
@@ -96,14 +86,14 @@ class JoinRequestsActivity : Activity() {
     private fun buildHeader(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor(JR_CARD))
+            setBackgroundColor(uiColors.container)
             gravity = Gravity.CENTER_VERTICAL
             setPadding(24, 48, 24, 24)
 
             addView(Button(context).apply {
                 text = "← 返回"
                 setBackgroundColor(Color.TRANSPARENT)
-                setTextColor(Color.parseColor("#67BEA0"))
+                setTextColor(uiColors.primary)
                 setOnClickListener { finish() }
             })
 
@@ -111,7 +101,7 @@ class JoinRequestsActivity : Activity() {
                 text = "加入申请 · $projectName"
                 textSize = 16f
                 setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.parseColor(JR_TEXT_PRIMARY))
+                setTextColor(uiColors.text)
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 maxLines = 1
@@ -131,8 +121,8 @@ class JoinRequestsActivity : Activity() {
             val result = withContext(Dispatchers.IO) { fetchRequests() }
             listContainer.removeAllViews()
             when {
-                result == null -> listContainer.addView(buildMsgView("加载失败，请检查网络", JR_DANGER))
-                result.length() == 0 -> listContainer.addView(buildMsgView("暂无加入申请", JR_TEXT_TERTIARY))
+                result == null -> listContainer.addView(buildMsgView("加载失败，请检查网络", uiColors.error))
+                result.length() == 0 -> listContainer.addView(buildMsgView("暂无加入申请", uiColors.muted))
                 else -> {
                     for (i in 0 until result.length()) {
                         listContainer.addView(buildRequestCard(result.getJSONObject(i)))
@@ -165,15 +155,15 @@ class JoinRequestsActivity : Activity() {
         val createdAt = req.optString("created_at", "").take(10)
 
         val (statusText, statusColor) = when (status) {
-            "pending" -> Pair("⏳ 待审核", JR_PENDING)
-            "approved" -> Pair("✅ 已通过", JR_PRIMARY_BG)
-            "rejected" -> Pair("❌ 已拒绝", JR_DANGER)
-            else -> Pair(status, JR_TEXT_SECONDARY)
+            "pending" -> Pair("⏳ 待审核", uiColors.warning)
+            "approved" -> Pair("✅ 已通过", uiColors.primary)
+            "rejected" -> Pair("❌ 已拒绝", uiColors.error)
+            else -> Pair(status, uiColors.muted)
         }
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(JR_CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(24, 20, 24, 20)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -193,14 +183,14 @@ class JoinRequestsActivity : Activity() {
                     text = userAccount
                     textSize = 15f
                     setTypeface(null, Typeface.BOLD)
-                    setTextColor(Color.parseColor(JR_TEXT_PRIMARY))
+                    setTextColor(uiColors.text)
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 })
 
                 addView(TextView(context).apply {
                     text = statusText
                     textSize = 13f
-                    setTextColor(Color.parseColor(statusColor))
+                    setTextColor(statusColor)
                 })
             })
 
@@ -209,7 +199,7 @@ class JoinRequestsActivity : Activity() {
                 addView(TextView(context).apply {
                     text = "留言：$message"
                     textSize = 13f
-                    setTextColor(Color.parseColor(JR_TEXT_SECONDARY))
+                    setTextColor(uiColors.muted)
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
@@ -220,7 +210,7 @@ class JoinRequestsActivity : Activity() {
             addView(TextView(context).apply {
                 text = "申请时间：$createdAt"
                 textSize = 12f
-                setTextColor(Color.parseColor(JR_TEXT_TERTIARY))
+                setTextColor(uiColors.muted)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -239,8 +229,8 @@ class JoinRequestsActivity : Activity() {
                     addView(Button(context).apply {
                         text = "✓ 通过"
                         textSize = 14f
-                        setBackgroundColor(Color.parseColor(JR_ACTION_BG))
-                        setTextColor(Color.parseColor(JR_PRIMARY_TEXT))
+                        setBackgroundColor(uiColors.primary)
+                        setTextColor(uiColors.onPrimary)
                         layoutParams = LinearLayout.LayoutParams(0, 110, 1f)
                         setOnClickListener { doReview(reqId, "approve") }
                     })
@@ -248,8 +238,8 @@ class JoinRequestsActivity : Activity() {
                     addView(Button(context).apply {
                         text = "✗ 拒绝"
                         textSize = 14f
-                        setBackgroundColor(Color.parseColor(JR_DANGER))
-                        setTextColor(Color.WHITE)
+                        setBackgroundColor(uiColors.errorContainer)
+                        setTextColor(uiColors.error)
                         layoutParams = LinearLayout.LayoutParams(0, 110, 1f).apply {
                             marginStart = 12
                         }
@@ -311,11 +301,11 @@ class JoinRequestsActivity : Activity() {
         }
     }
 
-    private fun buildMsgView(msg: String, color: String): TextView {
+    private fun buildMsgView(msg: String, color: Int): TextView {
         return TextView(this).apply {
             text = msg
             textSize = 14f
-            setTextColor(Color.parseColor(color))
+            setTextColor(color)
             gravity = Gravity.CENTER
             setPadding(32, 80, 32, 80)
         }

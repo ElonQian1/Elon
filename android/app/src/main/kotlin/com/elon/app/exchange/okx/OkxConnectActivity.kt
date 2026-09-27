@@ -17,7 +17,7 @@ import com.elon.app.grid.ui.BinanceGridAppearance
 import java.util.concurrent.Executors
 
 /** The main APK owns API credential entry only; grid product screens remain in the quant APK. */
-class OkxConnectActivity : Activity() {
+class OkxConnectActivity : com.elon.app.MobileActivity() {
     private val ui by lazy { BinanceGridAppearance(this) }
     private val worker = Executors.newSingleThreadExecutor()
     private var epoch = 0L

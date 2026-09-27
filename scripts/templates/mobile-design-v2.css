@@ -64,6 +64,16 @@ html, body, .app, .content, .page, .project-space-ai-menu,
 .agent-step-action, #profilePage .profile-account-action, .project-refresh-btn,
 .input-bar .model-btn, .input-bar .plan-btn { background: var(--panel-2); color: var(--ink); border-color: var(--line); }
 .tabs-panel { background: transparent; border: 0; box-shadow: none; }
+.tab.active::before { background: var(--mobile-primary-container); box-shadow: none; }
+.conversation-item .sub, .conversation-item .trailing { color: var(--ink-soft); }
+.conversation-item .home-row-badge.ai { color: var(--brand); border-color: var(--line); }
+.conversation-item .home-row-badge.project { background: var(--mobile-primary-container); color: var(--mobile-on-primary-container); }
+:root { --mobile-icon-filter: brightness(0); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --mobile-icon-filter: brightness(0) invert(1); }
+}
+:root[data-theme="dark"] { --mobile-icon-filter: brightness(0) invert(1); }
+.toolbar img, .tab .ic img, .bottom-menu-tab .ic img { filter: var(--mobile-icon-filter); opacity: .8; }
 .bottom-compose-button { background: var(--brand); color: var(--brand-ink); border: 0; box-shadow: none; }
 .bottom-compose-button::before, .bottom-compose-button::after { background: var(--brand-ink); }
 .project-plaza-inline-root::before, .project-plaza-inline-root::after { display: none; }

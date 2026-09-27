@@ -17,6 +17,8 @@ class WebChatSendOwnershipContractTest {
             "com/elon/app/chatgptweb/ChatGptWebSendOwner.kt",
             "com/elon/app/GoogleWebSocialChatController.kt",
             "com/elon/app/googleweb/GoogleWebBackgroundSession.kt",
+            "com/elon/app/chatgptweb/GroupWebAiSession.kt",
+            "com/elon/app/chatgptweb/GroupWebAiExecutor.kt",
         )
         val violations = mutableListOf<String>()
         Files.walk(sourceRoot).use { paths ->
@@ -33,6 +35,12 @@ class WebChatSendOwnershipContractTest {
         violations.sort()
 
         assertEquals(emptyList<String>(), violations)
+        val group = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/GroupWebAiExecutor.kt")
+        val send = group.indexOf("session?.sendPrompt(prompt, commandId)")
+        assertTrue(send > group.indexOf("authorize { permitted ->"))
+        assertTrue(send > group.indexOf("session?.verifyForSend { verified ->"))
+        assertTrue(group.contains("if (!permitted) { fail(); return@authorize }"))
+        assertTrue(group.contains("return@verifyForSend"))
     }
 
     @Test

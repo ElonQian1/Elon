@@ -60,7 +60,10 @@ class ChatGptWebProjectAndMenuContractTest {
         val adapter = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt")
 
         assertTrue(adapter.contains(".put(\"documentToken\", documentSession.snapshot().documentToken)"))
-        assertTrue(adapter.contains("window.__elonChatGptBridge.command(\$encoded)"))
+        assertTrue(adapter.contains("commandDelivery.send(command)"))
+        assertTrue(adapter.contains("ChatGptWebCommandDelivery.Binding(document.documentToken, webView.url ?: return null)"))
+        val delivery = read("android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebCommandDelivery.kt")
+        assertTrue(delivery.contains("delivery.epoch == epoch && binding() == delivery.binding"))
         assertFalse(adapter.contains("command.documentToken=window.__elonChatGptDocumentToken"))
     }
 

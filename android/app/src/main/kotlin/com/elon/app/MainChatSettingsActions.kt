@@ -34,6 +34,8 @@ internal class MainChatSettingsActions(
     private val showGroupSummaryPosts: ((AppGroup) -> Unit)? = null,
     private val showGroupAssistant: ((AppGroup) -> Unit)? = null
 ) {
+    private val uiColors by lazy { MobileColors(activity) }
+
     private val prefs by lazy { AuthManager.userDataPrefs(activity) }
     private var pageAnimator: AnimatorSet? = null
 
@@ -138,7 +140,7 @@ internal class MainChatSettingsActions(
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#0B1118"))
+            setBackgroundColor(uiColors.surface)
             translationX = activity.resources.displayMetrics.widthPixels.toFloat()
         }
         root.addView(topBar(title) { dismissWithAnimation(dialog) })
@@ -227,7 +229,7 @@ internal class MainChatSettingsActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(50)
             )
-            setBackgroundColor(Color.parseColor("#0B1118"))
+            setBackgroundColor(uiColors.surface)
             addView(TextView(activity).apply {
                 layoutParams = FrameLayout.LayoutParams(dp(50), FrameLayout.LayoutParams.MATCH_PARENT).apply {
                     gravity = Gravity.START or Gravity.CENTER_VERTICAL
@@ -235,7 +237,7 @@ internal class MainChatSettingsActions(
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "‹"
-                setTextColor(Color.parseColor("#F8F7F4"))
+                setTextColor(uiColors.text)
                 textSize = 31f
                 isClickable = true
                 foreground = selectableForeground()
@@ -251,7 +253,7 @@ internal class MainChatSettingsActions(
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = title
-                setTextColor(Color.parseColor("#F8F7F4"))
+                setTextColor(uiColors.text)
                 textSize = 17f
             })
         }
@@ -263,7 +265,7 @@ internal class MainChatSettingsActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(108)
             )
-            setBackgroundColor(Color.parseColor("#0E1116"))
+            setBackgroundColor(uiColors.container)
             overScrollMode = View.OVER_SCROLL_NEVER
             isHorizontalScrollBarEnabled = false
             addView(LinearLayout(activity).apply {
@@ -282,7 +284,7 @@ internal class MainChatSettingsActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(126)
             )
-            setBackgroundColor(Color.parseColor("#0E1116"))
+            setBackgroundColor(uiColors.container)
             overScrollMode = View.OVER_SCROLL_NEVER
             isHorizontalScrollBarEnabled = false
             addView(LinearLayout(activity).apply {
@@ -317,7 +319,7 @@ internal class MainChatSettingsActions(
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 text = name
-                setTextColor(Color.parseColor("#B3DDDBD5"))
+                setTextColor(uiColors.muted)
                 textSize = 12f
             })
         }
@@ -333,11 +335,11 @@ internal class MainChatSettingsActions(
             setOnClickListener { onClick() }
             addView(TextView(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(46), dp(46))
-                background = roundedBg("#20262E", 8)
+                background = roundedBg(uiColors.elevated, 8)
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "+"
-                setTextColor(Color.parseColor("#F8F7F4"))
+                setTextColor(uiColors.text)
                 textSize = 27f
             })
             addView(TextView(activity).apply {
@@ -350,7 +352,7 @@ internal class MainChatSettingsActions(
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "添加"
-                setTextColor(Color.parseColor("#B3DDDBD5"))
+                setTextColor(uiColors.muted)
                 textSize = 12f
             })
         }
@@ -370,11 +372,11 @@ internal class MainChatSettingsActions(
         }
         return TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
-            background = roundedBg("#F8F7F4", 8)
+            background = roundedBg(uiColors.primary, 8)
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = UserProfileStore.avatarInitial(name)
-            setTextColor(Color.parseColor("#20262E"))
+            setTextColor(uiColors.onPrimary)
             textSize = textSizeSp
             setTypeface(typeface, Typeface.BOLD)
         }
@@ -393,7 +395,7 @@ internal class MainChatSettingsActions(
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = title
-                setTextColor(Color.parseColor("#E66B6B"))
+                setTextColor(uiColors.error)
                 textSize = 15.5f
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(chevron())
@@ -412,7 +414,7 @@ internal class MainChatSettingsActions(
                 includeFontPadding = false
                 background = toggleBg(enabled)
                 text = if (enabled) "开" else "关"
-                setTextColor(Color.parseColor(if (enabled) "#0B1118" else "#B3DDDBD5"))
+                setTextColor(if (enabled) uiColors.onPrimary else uiColors.muted)
                 textSize = 13f
             }
             addView(status, LinearLayout.LayoutParams(dp(48), dp(26)))
@@ -421,7 +423,7 @@ internal class MainChatSettingsActions(
                 prefs.edit().putBoolean(key, enabled).apply()
                 status.background = toggleBg(enabled)
                 status.text = if (enabled) "开" else "关"
-                status.setTextColor(Color.parseColor(if (enabled) "#0B1118" else "#B3DDDBD5"))
+                status.setTextColor(if (enabled) uiColors.onPrimary else uiColors.muted)
             }
         }
     }
@@ -435,7 +437,7 @@ internal class MainChatSettingsActions(
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(18), 0, dp(18), 0)
-            setBackgroundColor(Color.parseColor("#0E1116"))
+            setBackgroundColor(uiColors.container)
             isClickable = true
             foreground = selectableForeground()
         }
@@ -448,14 +450,14 @@ internal class MainChatSettingsActions(
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = title
-                setTextColor(Color.parseColor("#F8F7F4"))
+                setTextColor(uiColors.text)
                 textSize = 15.5f
             })
             if (!subtitle.isNullOrBlank()) {
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = subtitle
-                    setTextColor(Color.parseColor("#80BEBEBA"))
+                    setTextColor(uiColors.muted)
                     textSize = 12f
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
@@ -468,7 +470,7 @@ internal class MainChatSettingsActions(
         return TextView(activity).apply {
             includeFontPadding = false
             text = "›"
-            setTextColor(Color.parseColor("#80BEBEBA"))
+            setTextColor(uiColors.muted)
             textSize = 24f
         }
     }
@@ -481,7 +483,7 @@ internal class MainChatSettingsActions(
             ).apply {
                 marginStart = dp(18)
             }
-            setBackgroundColor(Color.parseColor("#2D2D2D"))
+            setBackgroundColor(uiColors.divider)
         }
     }
 
@@ -491,21 +493,21 @@ internal class MainChatSettingsActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(10)
             )
-            setBackgroundColor(Color.parseColor("#0B1118"))
+            setBackgroundColor(uiColors.surface)
         }
     }
 
-    private fun roundedBg(color: String, radiusDp: Int): GradientDrawable {
+    private fun roundedBg(color: Int, radiusDp: Int): GradientDrawable {
         return GradientDrawable().apply {
             cornerRadius = dp(radiusDp).toFloat()
-            setColor(Color.parseColor(color))
+            setColor(color)
         }
     }
 
     private fun toggleBg(enabled: Boolean): GradientDrawable {
         return GradientDrawable().apply {
             cornerRadius = dp(13).toFloat()
-            setColor(Color.parseColor(if (enabled) "#F8F7F4" else "#20262E"))
+        setColor(if (enabled) uiColors.primary else uiColors.elevated)
         }
     }
 

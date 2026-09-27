@@ -39,6 +39,7 @@
                 android:contentDescription="返回"
                 android:padding="14dp"
                 android:scaleType="fitCenter"
+                android:tint="@color/mobile_on_surface"
                 android:src="@drawable/ic_toolbar_back_custom"
                 android:visibility="gone" />
 
@@ -52,6 +53,7 @@
                 android:contentDescription="主菜单"
                 android:padding="8dp"
                 android:scaleType="fitCenter"
+                android:tint="@color/mobile_on_surface"
                 android:src="@drawable/ic_home_menu_custom"
                 android:visibility="gone" />
 
@@ -209,6 +211,7 @@
                 android:contentDescription="搜索"
                 android:padding="8dp"
                 android:scaleType="fitCenter"
+                android:tint="@color/mobile_on_surface"
                 android:src="@drawable/ic_top_search_custom" />
 
             <FrameLayout
@@ -230,7 +233,8 @@
                     android:layout_height="match_parent"
                     android:contentDescription="@null"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/ic_top_add_button_new" />
+                    android:tint="@color/mobile_on_surface"
+                android:src="@drawable/ic_top_add_button_new" />
             </FrameLayout>
 
             <ImageButton
@@ -256,6 +260,7 @@
                 android:contentDescription="实时语音通话"
                 android:padding="0dp"
                 android:scaleType="fitCenter"
+                android:tint="@color/mobile_on_surface"
                 android:src="@drawable/ic_top_add_ring_custom"
                 android:visibility="gone" />
 

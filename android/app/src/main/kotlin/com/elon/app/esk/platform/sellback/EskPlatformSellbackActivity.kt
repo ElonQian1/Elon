@@ -14,7 +14,7 @@ import com.elon.app.esk.platform.eskPlatformEndpoint
 import java.util.UUID
 
 /** Independent native requests. No Intent credentials, IPC authority, Paper balance, or settlement. */
-class EskPlatformSellbackActivity : Activity() {
+class EskPlatformSellbackActivity : com.elon.app.MobileActivity() {
     private val gate = EskPlatformRequestGate()
     private val state = EskPlatformSellbackState()
     private val handler = Handler(Looper.getMainLooper())

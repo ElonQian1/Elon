@@ -277,4 +277,8 @@ jobs:
       - name: Unit Tests and Debug APK
         working-directory: android
         shell: pwsh
-        run: .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug
+        run: |
+          node --test ..\scripts\test-android-gradle-wrapper.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug
+          exit $LASTEXITCODE

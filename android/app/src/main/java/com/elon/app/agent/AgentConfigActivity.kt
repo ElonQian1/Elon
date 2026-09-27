@@ -16,24 +16,15 @@ import android.view.View
 import android.widget.*
 import com.elon.app.agent.infrastructure.auth.AuthService
 
-// Elon 暗色冷灰体系色常量，和 docs/APP 颜色规范.md 保持一致。
-private const val BG          = "#0B1118"
-private const val SURFACE     = "#0E1116"
-private const val SURFACE2    = "#20262E"
-private const val ACCENT      = "#67BEA0"
-private const val ACCENT2     = "#67BEA0"
-private const val TEXT_PRIM   = "#F8F7F4"
-private const val TEXT_SEC    = "#B3DDDBD5"
-private const val TEXT_DIM    = "#80BEBEBA"
-private const val DIVIDER     = "#667B8793"
-private const val BTN_PRIMARY = "#F8F7F4"
-private const val BTN_DANGER  = "#B71C1C"
+// Shared semantic roles follow the user's appearance preference.
 
 /**
- * Agent 配置界面 V2.0 — 暗黑主题
+ * Agent 配置界面
  * 支持多种 AI API Key 配置 + 语音助手模式选择 + 账号状态
  */
-class AgentConfigActivity : Activity() {
+class AgentConfigActivity : com.elon.app.MobileActivity() {
+    private val uiColors by lazy { com.elon.app.MobileColors(this) }
+
 
     // 语音模式常量
     companion object {
@@ -99,12 +90,12 @@ class AgentConfigActivity : Activity() {
         authService = AuthService(this)
 
         val scrollView = ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor(BG))
+            setBackgroundColor(uiColors.surface)
         }
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(16), dp(20), dp(32))
-            setBackgroundColor(Color.parseColor(BG))
+            setBackgroundColor(uiColors.surface)
         }
 
         // === 顶部标题栏 ===
@@ -125,7 +116,7 @@ class AgentConfigActivity : Activity() {
         statusText = TextView(this).apply {
             text = "检查中..."
             textSize = 13f
-            setTextColor(Color.parseColor(TEXT_SEC))
+            setTextColor(uiColors.muted)
             setPadding(0, 0, 0, dp(8))
         }
         layout.addView(statusText)
@@ -161,7 +152,7 @@ class AgentConfigActivity : Activity() {
                 android.R.layout.simple_spinner_dropdown_item,
                 listOf("不使用视觉服务", "通义千问 VL", "OpenAI GPT-4V")
             )
-            setBackgroundColor(Color.parseColor(SURFACE2))
+            setBackgroundColor(uiColors.elevated)
         }
         apiKeySection.addView(visionProviderSpinner)
 
@@ -220,7 +211,7 @@ class AgentConfigActivity : Activity() {
         layout.addView(createActionButtons())
 
         // 无障碍设置
-        layout.addView(createDarkButton("⚙️ 打开无障碍设置", color = "#37474F") {
+        layout.addView(createDarkButton("⚙️ 打开无障碍设置", color = uiColors.elevated) {
             openAccessibilitySettings()
         })
 
@@ -228,7 +219,7 @@ class AgentConfigActivity : Activity() {
         layout.addView(TextView(this).apply {
             text = "Android AI Agent V2.0"
             textSize = 11f
-            setTextColor(Color.parseColor(TEXT_DIM))
+            setTextColor(uiColors.muted)
             gravity = Gravity.CENTER
             setPadding(0, dp(24), 0, 0)
         })
@@ -258,7 +249,7 @@ class AgentConfigActivity : Activity() {
         addView(Button(this@AgentConfigActivity).apply {
             text = "← 返回"
             textSize = 14f
-            setTextColor(Color.parseColor(ACCENT))
+            setTextColor(uiColors.primary)
             setBackgroundColor(Color.TRANSPARENT)
             setPadding(0, 0, dp(8), 0)
             setOnClickListener { finish() }
@@ -268,7 +259,7 @@ class AgentConfigActivity : Activity() {
             text = "🤖 AI Agent 配置"
             textSize = 20f
             setTypeface(null, Typeface.BOLD)
-            setTextColor(Color.parseColor(TEXT_PRIM))
+            setTextColor(uiColors.text)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         })
     }
@@ -281,7 +272,7 @@ class AgentConfigActivity : Activity() {
         accountCard = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.parseColor(SURFACE))
+            setBackgroundColor(uiColors.container)
             setPadding(dp(16), dp(12), dp(16), dp(12))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -307,12 +298,12 @@ class AgentConfigActivity : Activity() {
                     text = if (isLoggedIn) (user?.nickname ?: user?.username ?: "已登录") else "未登录"
                     textSize = 15f
                     setTypeface(null, Typeface.BOLD)
-                    setTextColor(Color.parseColor(TEXT_PRIM))
+                    setTextColor(uiColors.text)
                 })
                 addView(TextView(this@AgentConfigActivity).apply {
                     text = if (isLoggedIn) "@${user?.username ?: ""}  ☁️ 已同步" else "登录后可同步配置、使用服务器 CLI"
                     textSize = 12f
-                    setTextColor(Color.parseColor(if (isLoggedIn) ACCENT else TEXT_SEC))
+                    setTextColor(if (isLoggedIn) uiColors.primary else uiColors.muted)
                 })
             })
 
@@ -321,8 +312,8 @@ class AgentConfigActivity : Activity() {
                 accountStatusText = this
                 text = if (isLoggedIn) "登出" else "登录"
                 textSize = 13f
-                setTextColor(Color.parseColor(if (isLoggedIn) TEXT_PRIM else "#0B1118"))
-                setBackgroundColor(Color.parseColor(if (isLoggedIn) BTN_DANGER else BTN_PRIMARY))
+                setTextColor(if (isLoggedIn) uiColors.error else uiColors.onPrimary)
+                setBackgroundColor(if (isLoggedIn) uiColors.errorContainer else uiColors.primary)
                 setPadding(dp(16), dp(4), dp(16), dp(4))
                 setOnClickListener {
                     if (authService.isLoggedIn()) {
@@ -360,20 +351,20 @@ class AgentConfigActivity : Activity() {
 
         val lp = LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(dp(4), 0, dp(4), 0) }
 
-        addView(createDarkButton("💾 保存", color = BTN_PRIMARY, lp = lp) { saveConfig() })
-        addView(createDarkButton("🔍 检查", color = SURFACE2, lp = lp) { testConnection() })
+        addView(createDarkButton("💾 保存", color = uiColors.primary, lp = lp) { saveConfig() })
+        addView(createDarkButton("🔍 检查", color = uiColors.elevated, lp = lp) { testConnection() })
     }
 
     private fun createDarkButton(
         label: String,
-        color: String = BTN_PRIMARY,
+        color: Int = uiColors.primary,
         lp: LinearLayout.LayoutParams? = null,
         onClick: () -> Unit
     ): Button = Button(this).apply {
         text = label
         textSize = 14f
-        setTextColor(Color.parseColor(if (color == BTN_PRIMARY) "#0B1118" else TEXT_PRIM))
-        setBackgroundColor(Color.parseColor(color))
+        setTextColor(if (color == uiColors.primary) uiColors.onPrimary else uiColors.text)
+        setBackgroundColor(color)
         layoutParams = lp ?: LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, dp(44)
         ).apply { setMargins(0, dp(4), 0, dp(4)) }
@@ -384,7 +375,7 @@ class AgentConfigActivity : Activity() {
         text = "🤖 AI Agent 配置中心"
         textSize = 22f
         setTypeface(null, Typeface.BOLD)
-        setTextColor(Color.parseColor(TEXT_PRIM))
+        setTextColor(uiColors.text)
         gravity = Gravity.CENTER
         setPadding(0, 0, 0, dp(12))
     }
@@ -393,21 +384,21 @@ class AgentConfigActivity : Activity() {
         text = title
         textSize = 16f
         setTypeface(null, Typeface.BOLD)
-        setTextColor(Color.parseColor(ACCENT))
+        setTextColor(uiColors.primary)
         setPadding(0, dp(16), 0, dp(6))
     }
 
     private fun createLabel(text: String, required: Boolean): TextView = TextView(this).apply {
         this.text = if (required) "$text *" else text
         textSize = 13f
-        setTextColor(Color.parseColor(if (required) ACCENT2 else TEXT_SEC))
+        setTextColor(if (required) uiColors.primary else uiColors.muted)
         setPadding(0, dp(12), 0, dp(2))
     }
 
     private fun createHint(hint: String): TextView = TextView(this).apply {
         text = hint
         textSize = 11f
-        setTextColor(Color.parseColor(TEXT_DIM))
+        setTextColor(uiColors.muted)
         setPadding(0, 0, 0, dp(4))
     }
 
@@ -420,9 +411,9 @@ class AgentConfigActivity : Activity() {
         this.inputType = if (password) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
                         else inputType
         isSingleLine = true
-        setTextColor(Color.parseColor(TEXT_PRIM))
-        setHintTextColor(Color.parseColor(TEXT_DIM))
-        setBackgroundColor(Color.parseColor(SURFACE2))
+        setTextColor(uiColors.text)
+        setHintTextColor(uiColors.muted)
+        setBackgroundColor(uiColors.elevated)
         setPadding(dp(12), dp(10), dp(12), dp(10))
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -434,7 +425,7 @@ class AgentConfigActivity : Activity() {
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, 1
         ).apply { setMargins(0, dp(16), 0, dp(16)) }
-        setBackgroundColor(Color.parseColor(DIVIDER))
+        setBackgroundColor(uiColors.divider)
     }
 
     private fun dp(dp: Int): Int = (dp * resources.displayMetrics.density + 0.5f).toInt()
@@ -447,7 +438,7 @@ class AgentConfigActivity : Activity() {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setBackgroundColor(Color.parseColor(SURFACE))
+                setBackgroundColor(uiColors.container)
                 setPadding(dp(12), dp(8), dp(8), dp(8))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -457,7 +448,7 @@ class AgentConfigActivity : Activity() {
             val label = TextView(this).apply {
                 text = "#${index + 1}  ${modeName(mode)}"
                 textSize = 14f
-                setTextColor(Color.parseColor(if (mode == VOICE_MODE_SIMPLE) TEXT_SEC else TEXT_PRIM))
+                setTextColor(if (mode == VOICE_MODE_SIMPLE) uiColors.muted else uiColors.text)
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             row.addView(label)
@@ -485,8 +476,8 @@ class AgentConfigActivity : Activity() {
     private fun createOrderBtn(label: String, onClick: () -> Unit): Button = Button(this).apply {
         text = label
         textSize = 14f
-        setTextColor(Color.parseColor(ACCENT))
-        setBackgroundColor(Color.parseColor(SURFACE2))
+        setTextColor(uiColors.primary)
+        setBackgroundColor(uiColors.elevated)
         setPadding(dp(12), dp(2), dp(12), dp(2))
         layoutParams = LinearLayout.LayoutParams(dp(52), dp(36)).apply { setMargins(dp(4), 0, 0, 0) }
         setOnClickListener { onClick() }
@@ -603,7 +594,7 @@ class AgentConfigActivity : Activity() {
             v1Enabled -> "✅ V1 无障碍服务运行中"
             else      -> "⚠️ 无障碍服务未启用 — 点击下方按钮前往开启"
         }
-        statusText.setTextColor(Color.parseColor(if (v1Enabled || v2Enabled) ACCENT else "#FF7043"))
+        statusText.setTextColor(if (v1Enabled || v2Enabled) uiColors.primary else uiColors.warning)
     }
 
     private fun isServiceEnabled(serviceName: String): Boolean {

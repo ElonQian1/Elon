@@ -18,25 +18,15 @@ import com.elon.app.MainActivity
 import com.elon.app.agent.AgentConfigActivity
 import com.elon.app.agent.infrastructure.auth.AuthService
 
-private const val SETTINGS_BG = "#0B1118"
-private const val SETTINGS_CARD = "#0E1116"
-private const val SETTINGS_BORDER = "#667B8793"
-private const val SETTINGS_TEXT_PRIMARY = "#F8F7F4"
-private const val SETTINGS_TEXT_SECONDARY = "#B3DDDBD5"
-private const val SETTINGS_TEXT_TERTIARY = "#80BEBEBA"
-private const val SETTINGS_PRIMARY_BG = "#F8F7F4"
-private const val SETTINGS_PRIMARY_TEXT = "#0B1118"
-private const val SETTINGS_SECONDARY_BG = "#20262E"
-private const val SETTINGS_SECONDARY_TEXT = "#F8F7F4"
-private const val SETTINGS_LINK = "#67BEA0"
-private const val SETTINGS_DANGER = "#E07B84"
 
 /**
  * 设置页面
  * - 未登录：显示"登录/注册"按钮，引导用户开启云端同步
  * - 已登录：显示账号信息和登出选项
  */
-class SettingsActivity : Activity() {
+class SettingsActivity : com.elon.app.MobileActivity() {
+    private val uiColors by lazy { com.elon.app.MobileColors(this) }
+
     
     private lateinit var authService: AuthService
     
@@ -56,11 +46,11 @@ class SettingsActivity : Activity() {
         val isLoggedIn = authService.isLoggedIn()
         
         return ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor(SETTINGS_BG))
+            setBackgroundColor(uiColors.surface)
 
             addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                setBackgroundColor(Color.parseColor(SETTINGS_BG))
+                setBackgroundColor(uiColors.surface)
                 
                 // 标题栏
                 addView(createHeader())
@@ -81,14 +71,14 @@ class SettingsActivity : Activity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.parseColor(SETTINGS_CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(32, 32, 32, 32)
             elevation = 4f
 
             addView(Button(context).apply {
                 text = "← 返回"
                 setBackgroundColor(Color.TRANSPARENT)
-                setTextColor(Color.parseColor(SETTINGS_LINK))
+                setTextColor(uiColors.primary)
                 setOnClickListener { finish() }
             })
 
@@ -96,7 +86,7 @@ class SettingsActivity : Activity() {
                 text = "设置"
                 textSize = 18f
                 setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.parseColor(SETTINGS_TEXT_PRIMARY))
+                setTextColor(uiColors.text)
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             })
@@ -113,7 +103,7 @@ class SettingsActivity : Activity() {
     private fun createNotLoggedInCard(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(SETTINGS_CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(32, 32, 32, 32)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -134,7 +124,7 @@ class SettingsActivity : Activity() {
                 text = "开启云端同步"
                 textSize = 18f
                 setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.parseColor(SETTINGS_TEXT_PRIMARY))
+                setTextColor(uiColors.text)
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -145,7 +135,7 @@ class SettingsActivity : Activity() {
             addView(TextView(context).apply {
                 text = "登录后可以：\n• 数据云端备份，换机不丢失\n• 多设备同步任务和配置\n• 查看采集的评论线索"
                 textSize = 14f
-                setTextColor(Color.parseColor(SETTINGS_TEXT_SECONDARY))
+                setTextColor(uiColors.muted)
                 gravity = Gravity.CENTER
                 setLineSpacing(8f, 1f)
                 layoutParams = LinearLayout.LayoutParams(
@@ -157,8 +147,8 @@ class SettingsActivity : Activity() {
             addView(Button(context).apply {
                 text = "登录 / 注册"
                 textSize = 16f
-                setBackgroundColor(Color.parseColor(SETTINGS_PRIMARY_BG))
-                setTextColor(Color.parseColor(SETTINGS_PRIMARY_TEXT))
+                setBackgroundColor(uiColors.primary)
+                setTextColor(uiColors.onPrimary)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, 140
                 )
@@ -170,7 +160,7 @@ class SettingsActivity : Activity() {
             addView(TextView(context).apply {
                 text = "暂不登录也可正常使用本地功能"
                 textSize = 12f
-                setTextColor(Color.parseColor(SETTINGS_TEXT_TERTIARY))
+                setTextColor(uiColors.muted)
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -188,7 +178,7 @@ class SettingsActivity : Activity() {
         
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(SETTINGS_CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(32, 32, 32, 32)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -221,25 +211,25 @@ class SettingsActivity : Activity() {
                         text = user?.nickname ?: user?.username ?: "用户"
                         textSize = 18f
                         setTypeface(null, Typeface.BOLD)
-                        setTextColor(Color.parseColor(SETTINGS_TEXT_PRIMARY))
+                        setTextColor(uiColors.text)
                     })
                     addView(TextView(context).apply {
                         text = "@${user?.username ?: ""}"
                         textSize = 14f
-                        setTextColor(Color.parseColor(SETTINGS_TEXT_TERTIARY))
+                        setTextColor(uiColors.muted)
                     })
                 })
 
                 addView(TextView(context).apply {
                     text = "☁️ 已同步"
                     textSize = 12f
-                    setTextColor(Color.parseColor(SETTINGS_LINK))
+                    setTextColor(uiColors.primary)
                 })
             })
 
             // 分隔线
             addView(View(context).apply {
-                setBackgroundColor(Color.parseColor(SETTINGS_BORDER))
+                setBackgroundColor(uiColors.divider)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, 1
                 ).apply { bottomMargin = 24 }
@@ -249,8 +239,8 @@ class SettingsActivity : Activity() {
             addView(Button(context).apply {
                 text = "切换账号"
                 textSize = 16f
-                setBackgroundColor(Color.parseColor(SETTINGS_SECONDARY_BG))
-                setTextColor(Color.parseColor(SETTINGS_SECONDARY_TEXT))
+                setBackgroundColor(uiColors.elevated)
+                setTextColor(uiColors.text)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, 120
                 ).apply { bottomMargin = 12 }
@@ -261,8 +251,8 @@ class SettingsActivity : Activity() {
             addView(Button(context).apply {
                 text = "退出登录"
                 textSize = 16f
-                setBackgroundColor(Color.parseColor(SETTINGS_SECONDARY_BG))
-                setTextColor(Color.parseColor(SETTINGS_DANGER))
+                setBackgroundColor(uiColors.elevated)
+                setTextColor(uiColors.error)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, 120
                 )
@@ -274,7 +264,7 @@ class SettingsActivity : Activity() {
     private fun createFunctionCard(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(SETTINGS_CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(32, 32, 32, 32)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -284,7 +274,7 @@ class SettingsActivity : Activity() {
             addView(TextView(context).apply {
                 text = "功能设置"
                 textSize = 14f
-                setTextColor(Color.parseColor(SETTINGS_TEXT_TERTIARY))
+                setTextColor(uiColors.muted)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -294,8 +284,8 @@ class SettingsActivity : Activity() {
             addView(Button(context).apply {
                 text = "🤖 AI 配置"
                 textSize = 16f
-                setBackgroundColor(Color.parseColor(SETTINGS_PRIMARY_BG))
-                setTextColor(Color.parseColor(SETTINGS_PRIMARY_TEXT))
+                setBackgroundColor(uiColors.primary)
+                setTextColor(uiColors.onPrimary)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, 120
                 )
@@ -307,8 +297,8 @@ class SettingsActivity : Activity() {
             addView(Button(context).apply {
                 text = "🖥️ 我的节点"
                 textSize = 16f
-                setBackgroundColor(Color.parseColor(SETTINGS_SECONDARY_BG))
-                setTextColor(Color.parseColor(SETTINGS_SECONDARY_TEXT))
+                setBackgroundColor(uiColors.elevated)
+                setTextColor(uiColors.text)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, 120
                 ).apply { topMargin = 12 }
@@ -320,8 +310,8 @@ class SettingsActivity : Activity() {
             addView(Button(context).apply {
                 text = "🏪 项目广场"
                 textSize = 16f
-                setBackgroundColor(Color.parseColor("#20262E"))
-                setTextColor(Color.parseColor("#F8F7F4"))
+                setBackgroundColor(uiColors.elevated)
+                setTextColor(uiColors.text)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, 120
                 ).apply { topMargin = 12 }
@@ -339,7 +329,7 @@ class SettingsActivity : Activity() {
         return TextView(this).apply {
             text = "营销助手 v1.0.0"
             textSize = 12f
-            setTextColor(Color.parseColor(SETTINGS_TEXT_TERTIARY))
+            setTextColor(uiColors.muted)
             gravity = Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
