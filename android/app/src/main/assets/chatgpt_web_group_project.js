@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 2, create: factory });
+  const api = Object.freeze({ version: 3, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptGroupProject = api;
 })(typeof window === 'object' ? window : null, function (page, options) {
@@ -63,12 +63,24 @@
     }
     throw Error('project_reconciliation_incomplete');
   }
+  async function readCurrent(owner, input) {
+    const submit = page.__elonChatGptRspackSubmit;
+    const binding = submit?.readAccepted?.();
+    if (!binding || binding.accountId !== owner.accountId || binding.projectId !== input.projectId ||
+        binding.token !== page.__elonChatGptDocumentToken) throw Error('project_conversation_mismatch');
+    const id = binding.scope.get(binding.runtime.conversation.i, binding.id);
+    if (!policy.uuid.test(id || '')) throw Error('project_conversation_mismatch');
+    const result = await read(owner, { ...input, conversationId: id });
+    if (submit.readAccepted?.() !== binding ||
+        binding.scope.get(binding.runtime.conversation.i, binding.id) !== id) throw Error('project_conversation_mismatch');
+    return result;
+  }
   async function run(input) {
     if (busy) return { ok: false, code: 'project_busy' };
     busy = true;
     let writeStarted = false;
     try {
-      if (!input || !['identity', 'read', 'create', 'reconcile'].includes(input.operation)) throw Error('project_input_invalid');
+      if (!input || !['identity', 'read', 'read_current', 'create', 'reconcile'].includes(input.operation)) throw Error('project_input_invalid');
       const owner = await identity.bind();
       if (input.operation === 'identity') return { ok: true, code: 'project_identity_ready', accountScope: owner.accountScope };
       if (typeof policy?.scope?.test !== 'function') throw Error('project_adapter_unavailable');
@@ -83,7 +95,8 @@
         const id = response?.resource?.gizmo?.id;
         if (!policy.project.test(id || '')) throw Error('project_response_invalid');
         result = await read(owner, { ...input, projectId: id, conversationId: null }, true);
-      } else result = await (input.operation === 'read' ? read(owner, input) : reconcile(owner, input));
+      } else result = await (input.operation === 'read' ? read(owner, input)
+        : input.operation === 'read_current' ? readCurrent(owner, input) : reconcile(owner, input));
       return { ok: true, code: 'project_ready', accountScope: owner.accountScope, ...result };
     } catch (error) {
       const raw = String(error?.message || '');
@@ -98,5 +111,5 @@
         ? { identityReason: error.identityReason } : {}) };
     } finally { busy = false; }
   }
-  return Object.freeze({ version: 2, run });
+  return Object.freeze({ version: 3, run });
 });

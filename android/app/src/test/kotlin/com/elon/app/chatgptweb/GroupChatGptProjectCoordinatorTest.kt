@@ -116,6 +116,37 @@ class GroupChatGptProjectCoordinatorTest {
         }
     }
 
+    @Test fun acceptedRuntimeThreadIsSavedWithoutRequiringPageNavigation() {
+        val h = Harness(); h.start(); h.success()
+        h.coordinator.snapshot(h.snapshot(), h.url); h.success()
+        var published = 0
+        h.coordinator.complete(h.url) { published++ }
+        assertEquals("read_current", h.commands.last().first.getString("operation"))
+        val id = "22222222-2222-4222-8222-222222222222"
+        h.reply(JSONObject().put("ok", true).put("projectId", h.project).put("conversationId", id))
+        assertEquals("remember", h.actions.last())
+        assertEquals(id, h.commands.last().first.getString("conversationId"))
+        h.success()
+        assertEquals("conversation", h.actions.last())
+        assertEquals(1, published)
+    }
+
+    @Test fun unresolvedOrWrongProjectThreadCannotDiscardAnAnswerOrBindAnotherThread() {
+        for (wrongProject in listOf(false, true)) {
+            val h = Harness(); h.start(); h.success()
+            h.coordinator.snapshot(h.snapshot(), h.url); h.success()
+            var published = 0
+            h.coordinator.complete(h.url) { published++ }
+            if (wrongProject) h.reply(JSONObject().put("ok", true).put("projectId", "g-p-" + "b".repeat(32))
+                .put("conversationId", "22222222-2222-4222-8222-222222222222"))
+            else h.reply(JSONObject().put("ok", false).put("code", "project_conversation_mismatch"))
+            assertEquals(1, published)
+            assertFalse(h.actions.contains("remember"))
+            assertFalse(h.actions.contains("conversation"))
+            assertTrue(h.failures.isEmpty())
+        }
+    }
+
     @Test fun unconfirmedCreateDoesNotRestartWithoutExplicitUserConfirmation() {
         val h = Harness("creating"); h.start()
         h.reply(JSONObject().put("ok", false).put("code", "project_create_unresolved"))

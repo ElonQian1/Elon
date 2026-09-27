@@ -104,9 +104,20 @@ internal class GroupChatGptProjectCoordinator(
     fun complete(documentUrl: String, done: () -> Unit) {
         if (closed || committed) return
         committed = true
-        val id = GroupChatGptProjectRoute.conversationId(documentUrl) ?: run {
-            observe("project_thread_unconfirmed"); done(); return
+        val id = GroupChatGptProjectRoute.conversationId(documentUrl)
+        if (id != null) { rememberConversation(id, done); return }
+        // The official transaction may acquire a server ID without navigating.
+        // Resolve only this host's accepted request, never a directory's newest thread.
+        privateRequest("read_current") { result ->
+            val current = result.optString("conversationId")
+            if (!result.optBoolean("ok") || result.optString("accountScope") != scope ||
+                result.optString("projectId") != binding?.optString("project_id") || current.isBlank()) {
+                observe("project_thread_unconfirmed"); done()
+            } else rememberConversation(current, done)
         }
+    }
+
+    private fun rememberConversation(id: String, done: () -> Unit) {
         server(leasePayload("remember").put("conversation_id", id)) { journal ->
             if (closed) return@server
             if (journal.isFailure) { observe("project_thread_journal_failed"); done(); return@server }

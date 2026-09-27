@@ -50,6 +50,41 @@ async function input(f, operation, more = {}) {
   assert.equal(JSON.stringify(identity).includes('user_fixture'), false);
   return { ...base, accountScope: identity.accountScope, operation, ...more };
 }
+
+test('accepted runtime conversation is read without a URL change or new write', async () => {
+  const f = fixture(), command = await input(f, 'read_current', { projectId });
+  const binding = { accountId: 'workspace_fixture', projectId, token: f.page.__elonChatGptDocumentToken,
+    id: 'local-fixture', runtime: { conversation: { i: 'id-atom' } }, scope: { get: () => conversationId } };
+  f.page.__elonChatGptRspackSubmit = { readAccepted: () => binding };
+  f.replies.push(resource(), { conversation_id: conversationId, gizmo_id: projectId, is_do_not_remember: false });
+  const result = await f.core.run(command);
+  assert.equal(result.ok, true);
+  assert.equal(result.conversationId, conversationId);
+  assert.equal(f.calls.length, 2);
+  assert.ok(f.calls.every(call => call.init.method === 'GET'));
+});
+
+test('runtime conversation requires exact accepted owner before and after reading', async () => {
+  for (const kind of ['missing', 'account', 'project', 'document', 'id', 'expired', 'membership']) {
+    const f = fixture(), command = await input(f, 'read_current', { projectId });
+    const binding = { accountId: 'workspace_fixture', projectId, token: f.page.__elonChatGptDocumentToken,
+      id: 'local-fixture', runtime: { conversation: { i: 'id-atom' } }, scope: { get: () => conversationId } };
+    if (kind === 'account') binding.accountId = 'other';
+    if (kind === 'project') binding.projectId = 'g-p-' + 'b'.repeat(32);
+    if (kind === 'document') binding.token = 'doc_other';
+    if (kind === 'id') binding.scope.get = () => 'invalid';
+    let active = kind !== 'missing';
+    f.page.__elonChatGptRspackSubmit = { readAccepted: () => active ? binding : null };
+    f.replies.push(resource(), () => {
+      if (kind === 'expired') active = false;
+      return { payload: { conversation_id: conversationId, is_do_not_remember: false,
+        gizmo_id: kind === 'membership' ? 'g-p-' + 'b'.repeat(32) : projectId } };
+    });
+    assert.equal((await f.core.run(command)).ok, false, kind);
+    assert.ok(f.calls.every(call => call.init.method === 'GET'));
+    if (!['expired', 'membership'].includes(kind)) assert.equal(f.calls.length, 0);
+  }
+});
 test('create uses reviewed projects contract, private memory, then verifies resource', async () => {
   const f = fixture(), command = await input(f, 'create');
   f.replies.push({ resource: resource() }, resource());
