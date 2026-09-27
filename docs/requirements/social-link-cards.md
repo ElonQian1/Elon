@@ -6,6 +6,8 @@ implementation_status: in_progress
 
 # 社交聊天外链卡片与阅读窗口
 
+视频卡片的下一阶段入口、平台能力路由及扩展边界见[跨平台视频接入方案](social-video-provider-plan.md)。该方案尚未整体实现，实际证据与上线状态分别登记。
+
 用户已要求在 Windows、Android APK、PWA 实现公众号、抖音、小红书、哔哩哔哩、币安广场、X 的外链分享体验。本文是本次接受范围，交付状态另记验收报告。
 
 ## 用户行为与验收
