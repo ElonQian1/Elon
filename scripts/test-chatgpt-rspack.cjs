@@ -38,7 +38,7 @@ test('captures only the committed AppScope and excludes credentials from receipt
   assert.equal(f.context.owns(binding), true);
   assert.equal(binding.accessToken, undefined);
   const probe = await f.submit.inspect(f.editor);
-  assert.deepEqual(probe, { profile: 'web_20260925_rspack', stage: 'ready', code: 'ready' });
+  assert.deepEqual(probe, { schema: 'elon.fresh_text_admission.v1', stage: 'ready', code: 'ready' });
 });
 
 for (const kind of ['uncommitted', 'detached', 'identity', 'account_switch', 'busy', 'upload', 'tools', 'project', 'route', 'server', 'ambiguous']) {

@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 8, create: factory });
+  const api = Object.freeze({ version: 9, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptRspackContext = api;
 })(typeof window === 'object' ? window : null, function (page) {
@@ -8,6 +8,8 @@
   const UUID = '[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}';
   const idPattern = new RegExp('^(?:local-chatgpt:)?' + UUID + '$', 'i');
   const conversationPath = new RegExp('^/c/(' + UUID + ')$', 'i');
+  const projectPath = new RegExp('^/g/(g-p-[a-f0-9]{32})(?:-[A-Za-z0-9_-]+)?/(?:project|c/(' + UUID + '))$', 'i');
+  const projectIdPattern = /^g-p-[a-f0-9]{32}$/i;
   const ownerPath = page.__elonChatGptCommittedOwnerPath ||
     (typeof module === 'object' && module.exports ? require('./chatgpt_web_committed_owner_path') : null);
   let code = 'not_observed';
@@ -22,10 +24,11 @@
     return [];
   }
   function owners(node, runtime) {
-    const scopes = new Set(), ids = new Set();
+    const scopes = new Set(), ids = new Set(), projects = new Set();
     for (const fiber of ancestors(node)) {
       const props = fiber.memoizedProps;
       if (idPattern.test(props?.conversationId || '')) ids.add(props.conversationId);
+      if (projectIdPattern.test(props?.projectId || '')) projects.add(props.projectId);
       // X9.z retains the live AppScope in a useRef. Never invoke a hook or component.
       let hook = fiber.memoizedState;
       const seen = new Set();
@@ -41,15 +44,19 @@
     // Multiple useScope refs may share the same committed scope node and chain.
     const nodes = new Set([...scopes].map(scope => scope.node));
     if (nodes.size !== 1 || ids.size !== 1) return fail(nodes.size > 1 || ids.size > 1 ? 'owner_ambiguous' : 'owner_pending');
-    return { scope: scopes.values().next().value, id: ids.values().next().value };
+    if (projects.size > 1) return fail('project_mismatch');
+    return { scope: scopes.values().next().value, id: ids.values().next().value,
+      project: projects.values().next().value || null };
   }
   function capture(node, reading = false, expectedUploads = []) {
     const runtime = page.__elonChatGptRspackRuntime?.peek();
     if (!runtime) return fail('runtime_pending');
     if (!node?.isConnected) return fail('composer_detached');
-    const url = new URL(page.location.href), pathId = conversationPath.exec(url.pathname)?.[1] || null;
+    const url = new URL(page.location.href), projectRoute = projectPath.exec(url.pathname);
+    const pathId = conversationPath.exec(url.pathname)?.[1] || projectRoute?.[2] || null;
     if (url.origin !== 'https://chatgpt.com' || url.hash || url.username || url.password ||
-        url.pathname !== '/' && !pathId || url.search && url.search !== '?temporary-chat=true') return fail('route_unsupported');
+        url.pathname !== '/' && !pathId && !projectRoute ||
+        url.search && (projectRoute || url.search !== '?temporary-chat=true')) return fail('route_unsupported');
     const token = page.__elonChatGptDocumentToken;
     if (!/^doc_[a-z0-9_]{3,80}$/.test(token || '')) return fail('document_unavailable');
     const owner = owners(node, runtime);
@@ -61,19 +68,28 @@
         scope.get(runtime.identity.d) !== identity.accountId || scope.get(runtime.identity.i) !== identity.userId ||
         scope.get(runtime.identity.j)?.status !== 'allowed') return fail('identity_unavailable');
     const serverId = scope.get(runtime.conversation.i, id) || null;
+    const storedProject = scope.get(runtime.conversation.K, id) || null;
+    // A new project's local thread has no persisted project atom until submit.
+    // Require both the committed composer ancestry and exact project route.
+    const projectId = storedProject || (!pathId && projectRoute && owner.project) || null;
+    if (projectId !== null && !projectIdPattern.test(projectId) ||
+        projectRoute && projectId !== projectRoute[1] ||
+        owner.project && owner.project !== projectId ||
+        projectId !== null && (url.search || !pathId && !projectRoute)) return fail('project_mismatch');
     // A temporary/new local thread acquires a server ID before its URL changes.
     // Its committed owner remains authoritative; never accept a malformed server ID.
     const committedServerOwner = reading && serverId !== null && id === serverId;
     if (pathId ? serverId !== pathId : !id.startsWith('local-chatgpt:') && !committedServerOwner ||
         serverId !== null && !new RegExp('^' + UUID + '$', 'i').test(serverId)) return fail('conversation_mismatch');
-    const binding = { scope, id, node, runtime, token, href: url.href, serverId,
+    const binding = { scope, id, node, runtime, token, href: url.href, serverId, projectId,
       accountId: identity.accountId, userId: identity.userId, generation: auth.getBrowserChatGptAuthGeneration(),
       temporary: url.search === '?temporary-chat=true', parent: scope.get(runtime.conversation.z, id) || null };
     // Reading the active branch must not wait for an idle or empty composer.
     // The send entry continues to apply every write-admission guard below.
     if (reading) { code = 'ready'; return binding; }
-    // Work, custom GPTs and project sends have additional context contracts.
-    if (scope.get(runtime.conversation.K, id) != null || scope.get(runtime.conversation.w, id) != null) return fail('mode_unsupported');
+    // Project identity comes from the committed conversation atom, not a URL override.
+    // Work and custom GPT contexts still have separate contracts.
+    if (scope.get(runtime.conversation.w, id) != null) return fail('mode_unsupported');
     if (scope.get(runtime.conversation.T, id) !== 'idle' || scope.get(runtime.composer.h, id)) return fail('busy');
     const uploads = scope.get(runtime.composer.f, id), hints = scope.get(runtime.composer.u, id);
     const draft = scope.get(runtime.composer.r, id), model = scope.get(runtime.composer.s, id);
@@ -88,7 +104,7 @@
   function current(binding) {
     try {
       const next = capture(binding.node, false, binding.uploads);
-      return !!next && ['id', 'token', 'href', 'serverId', 'draft', 'accountId', 'userId', 'generation', 'parent']
+      return !!next && ['id', 'token', 'href', 'serverId', 'projectId', 'draft', 'accountId', 'userId', 'generation', 'parent']
         .every(key => next[key] === binding[key]) && next.scope.node === binding.scope.node &&
         next.model.slug === binding.model.slug && next.model.thinkingEffort === binding.model.thinkingEffort;
     } catch (_) { return false; }
@@ -103,8 +119,14 @@
         auth.getBrowserChatGptAuthGeneration() === binding.generation &&
         identity?.accountId === binding.accountId && identity?.userId === binding.userId &&
         binding.scope.get(binding.runtime.identity.d) === binding.accountId &&
-        binding.scope.get(binding.runtime.identity.i) === binding.userId;
+        binding.scope.get(binding.runtime.identity.i) === binding.userId &&
+        projectCurrent(binding, owner);
     } catch (_) { return false; }
+  }
+  function projectCurrent(binding, owner) {
+    const stored = binding.scope.get(binding.runtime.conversation.K, binding.id) || null;
+    return stored === binding.projectId || stored === null && binding.serverId === null &&
+      binding.projectId !== null && owner?.project === binding.projectId;
   }
   function visibleComposers() {
     const selectors = ['#prompt-textarea', '[data-testid="prompt-textarea"]', 'form [contenteditable="true"]',
@@ -122,20 +144,22 @@
           binding.scope.get(binding.runtime.conversation.i, binding.id) !== serverId) return false;
       const allowedUrl = new URL(binding.href);
       allowedUrl.pathname = '/c/' + serverId;
+      const projectUrl = new URL(allowedUrl.href);
+      if (binding.projectId) projectUrl.pathname = '/g/' + binding.projectId + '/c/' + serverId;
       // The official server-ID callback may remount the editor and change its
       // committed owner. Only that exact alias, scope and account may continue.
       const next = visibleComposers().map(node => capture(node, true)).filter(Boolean);
-      return next.length === 1 && ['token', 'accountId', 'userId', 'generation'].every(key => next[0][key] === binding[key]) &&
+      return next.length === 1 && ['token', 'accountId', 'userId', 'generation', 'projectId'].every(key => next[0][key] === binding[key]) &&
         next[0].scope.node === binding.scope.node && next[0].serverId === serverId &&
         [binding.id, serverId].includes(next[0].id) &&
-        [binding.href, allowedUrl.href].includes(next[0].href);
+        [binding.href, allowedUrl.href, projectUrl.href].includes(next[0].href);
     } catch (_) { return false; }
   }
   function refreshOwner(binding) {
     try {
       const next = visibleComposers().map(node => capture(node, true)).filter(Boolean);
       if (next.length !== 1 || next[0].scope.node !== binding.scope.node ||
-          !['id', 'token', 'href', 'serverId', 'accountId', 'userId', 'generation']
+          !['id', 'token', 'href', 'serverId', 'projectId', 'accountId', 'userId', 'generation']
             .every(key => next[0][key] === binding[key])) return null;
       return { ...binding, node: next[0].node };
     } catch (_) { return null; }
@@ -154,6 +178,7 @@
         identity?.accountId === binding.accountId && identity?.userId === binding.userId &&
         binding.scope.get(binding.runtime.identity.d) === binding.accountId &&
         binding.scope.get(binding.runtime.identity.i) === binding.userId &&
+        projectCurrent(binding, owners(binding.node, binding.runtime)) &&
         binding.scope.get(binding.runtime.identity.j)?.status === 'allowed';
     } catch (_) { return false; }
   }

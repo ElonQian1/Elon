@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const api = Object.freeze({ version: 6, create: factory });
+  const api = Object.freeze({ version: 7, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root?.location?.origin === 'https://chatgpt.com' && !root.__elonChatGptRspackSubmit) {
     root.__elonChatGptRspackSubmit = factory(root);
@@ -64,6 +64,7 @@
       const request = binding.runtime.submit.a(binding.scope, {
         conversationId: binding.id, prompt: command.prompt, selectedModel: binding.model,
         isTemporaryChat: binding.temporary, preserveDraft: true, requireDispatchAcceptance: true,
+        ...(binding.projectId ? { projectId: binding.projectId } : {}),
         ...(attachmentLease ? { additionalAttachments: attachmentLease.attachments } : {}),
         isSubmissionCurrent: current, isRequestCurrent: requestGuard, signal: controller.signal,
         onServerThreadIdChange: id => { job.serverId = id; },
@@ -99,12 +100,21 @@
       const attachmentState = page.__elonChatGptRspackAttachments?.state();
       const reason = binding ? 'ready' : loaded ? attachmentState?.count > 0 && !lease ? attachmentState.code
         : context?.state().code || 'context_unavailable' : runtime.state().code;
-      return { profile: runtime.profile, stage: binding ? 'ready' : 'runtime', code: reason };
-    } catch (_) { return { profile: runtime.profile, stage: 'runtime', code: 'context_unavailable' }; }
+      return admission(reason);
+    } catch (_) { return admission('context_unavailable'); }
+  }
+  function admission(reason) {
+    const result = (code, stage) => ({ schema: 'elon.fresh_text_admission.v1', code, stage });
+    if (reason === 'ready') return result('ready', 'ready');
+    if (reason === 'project_mismatch') return result('context_changed', 'base_project');
+    if (reason === 'route_unsupported' || reason === 'mode_unsupported') return result('scope_unsupported', 'base_route');
+    if (reason === 'busy') return result('conversation_busy', 'base_composer');
+    if (reason.startsWith('identity')) return result('identity_unavailable', 'base_owner');
+    return result('context_unavailable', 'base_context');
   }
   // A hidden group job reads its submitted thread, never a replacement home editor.
   const readAccepted = () => page.__elonChatGptGroupRequestOwnershipEnabled === true &&
     code === 'accepted' && requestGuard?.() === true ? acceptedBinding : null;
-  return Object.freeze({ version: 6, submit, inspect, readAccepted, state: () => ({ pending: !!active, code,
+  return Object.freeze({ version: 7, submit, inspect, readAccepted, state: () => ({ pending: !!active, code,
     requestCurrent: requestGuard ? requestGuard() : null }) });
 });
