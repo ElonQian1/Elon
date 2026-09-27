@@ -1,32 +1,32 @@
 .project-plaza-inline-root {
-  --plaza-bg: #07090d;
-  --plaza-card: #0e1116;
-  --plaza-card-mid: #171c22;
-  --plaza-card-high: #252b33;
-  --plaza-surface: #171c22;
-  --plaza-header: #151a20;
-  --plaza-search: #12161c;
-  --plaza-segment: #20262e;
-  --plaza-text: rgba(248, 247, 244, 0.94);
-  --plaza-text-secondary: rgba(221, 219, 213, 0.70);
-  --plaza-text-tertiary: rgba(190, 190, 186, 0.50);
-  --plaza-thumb: #8ea7d5;
-  --plaza-divider: rgba(127, 137, 148, 0.18);
-  --plaza-border: rgba(108, 120, 132, 0.32);
-  --plaza-metal-highlight: rgba(174, 184, 196, 0.24);
-  --plaza-calibration: rgba(127, 175, 186, 0.35);
-  --plaza-primary: #8ea7d5;
-  --plaza-primary-ink: #10151d;
-  --plaza-primary-soft: rgba(142, 167, 213, 0.13);
-  --plaza-accent-text: #b4c5e3;
-  --plaza-accent: #8bb8c3;
-  --plaza-action: #c2cbd6;
-  --plaza-action-mid: #95a6b9;
-  --plaza-action-end: #71879f;
-  --plaza-action-ink: #0b1118;
-  --plaza-constellation: rgba(127, 175, 186, 0.17);
-  --plaza-success: #67bea0;
-  --plaza-danger: #e07b84;
+  --plaza-bg: var(--bg);
+  --plaza-card: var(--panel);
+  --plaza-card-mid: var(--panel-2);
+  --plaza-card-high: var(--panel-3);
+  --plaza-surface: var(--panel-2);
+  --plaza-header: var(--panel);
+  --plaza-search: var(--input-pill-bg);
+  --plaza-segment: var(--nav-active-bg);
+  --plaza-text: var(--ink);
+  --plaza-text-secondary: var(--ink-soft);
+  --plaza-text-tertiary: var(--ink-muted);
+  --plaza-thumb: var(--brand);
+  --plaza-divider: var(--line);
+  --plaza-border: var(--line);
+  --plaza-metal-highlight: var(--metal-highlight);
+  --plaza-calibration: var(--calibration);
+  --plaza-primary: var(--brand);
+  --plaza-primary-ink: var(--brand-ink);
+  --plaza-primary-soft: var(--badge-info-bg);
+  --plaza-accent-text: var(--link);
+  --plaza-accent: var(--accent);
+  --plaza-action: var(--brand);
+  --plaza-action-mid: var(--brand);
+  --plaza-action-end: var(--brand);
+  --plaza-action-ink: var(--brand-ink);
+  --plaza-constellation: var(--calibration);
+  --plaza-success: var(--success);
+  --plaza-danger: var(--danger);
   --plaza-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   position: relative;
   isolation: isolate;
@@ -822,13 +822,13 @@ main.app:has(.project-page.project-plaza-mode) > .toolbar {
 
 /* 图 1：项目广场极简复原。这里有意覆盖旧观测舱装饰，保留原交互结构。 */
 .project-plaza-inline-root {
-  --plaza-bg: #050609;
-  --plaza-card: #1b1e24;
-  --plaza-search: #1b1e24;
-  --plaza-text: rgba(244, 244, 245, 0.88);
-  --plaza-text-secondary: rgba(244, 244, 245, 0.42);
-  --plaza-text-tertiary: rgba(244, 244, 245, 0.30);
-  --plaza-action: #dedede;
+  --plaza-bg: var(--bg);
+  --plaza-card: var(--panel);
+  --plaza-search: var(--input-pill-bg);
+  --plaza-text: var(--ink);
+  --plaza-text-secondary: var(--ink-soft);
+  --plaza-text-tertiary: var(--ink-muted);
+  --plaza-action: var(--brand);
   background: var(--plaza-bg);
 }
 
@@ -974,15 +974,15 @@ main.app:has(.project-page.project-plaza-mode) > .toolbar {
 
 /* Stitch 项目广场：深色玻璃卡片、青色信号与紧凑移动端层级。 */
 .project-plaza-inline-root {
-  --plaza-bg: #0e0e0e;
-  --plaza-card: #1c1b1b;
-  --plaza-search: #181717;
-  --plaza-text: #f8f8f8;
-  --plaza-text-secondary: rgba(212, 212, 216, .72);
-  --plaza-text-tertiary: #8f9298;
-  --plaza-primary: #00f0ff;
-  --plaza-primary-soft: rgba(0, 240, 255, .15);
-  --plaza-action: #2a2929;
+  --plaza-bg: var(--bg);
+  --plaza-card: var(--panel);
+  --plaza-search: var(--input-pill-bg);
+  --plaza-text: var(--ink);
+  --plaza-text-secondary: var(--ink-soft);
+  --plaza-text-tertiary: var(--ink-muted);
+  --plaza-primary: var(--brand);
+  --plaza-primary-soft: var(--badge-info-bg);
+  --plaza-action: var(--brand);
   background: var(--plaza-bg);
 }
 

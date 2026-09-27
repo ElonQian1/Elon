@@ -24,16 +24,30 @@
     },
     getOwnPropertyDescriptor(_, key) { return { configurable: true, enumerable: true, value: storage.getItem(key) }; },
   });
+  const appearanceKey = 'elon.mobile.appearance.v2';
+  function appearance(value) {
+    const mode = ['light', 'dark'].includes(value) ? value : 'system';
+    if (mode === 'system') document.documentElement?.removeAttribute?.('data-theme');
+    else document.documentElement?.setAttribute?.('data-theme', mode);
+    return mode;
+  }
+  const initialAppearance = appearance(storage.getItem(appearanceKey));
+  document.addEventListener('DOMContentLoaded', () => {
+    const select = document.getElementById('mobileAppearance');
+    if (!select) return;
+    select.value = initialAppearance;
+    select.addEventListener('change', () => storage.setItem(appearanceKey, appearance(select.value)));
+  }, { once: true });
   let ready = false, failed = false, watchdog;
   function mount() {
     if (!document.body || document.getElementById('mobileStartup') || ready) return;
     const panel = document.createElement('aside');
     panel.id = 'mobileStartup'; panel.setAttribute('role', 'status');
-    panel.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:grid;place-content:center;gap:16px;padding:28px;background:#0b1017;color:#edf3f7;text-align:center;font:16px system-ui';
+    panel.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:grid;place-content:center;gap:16px;padding:28px;background:var(--bg,#fffbfe);color:var(--ink,#1c1b1f);text-align:center;font:16px system-ui';
     const title = document.createElement('strong'); title.textContent = '一龙ai';
     const text = document.createElement('p'); text.id = 'mobileStartupText'; text.textContent = '正在打开聊天…';
     const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = '重新打开';
-    retry.style.cssText = 'padding:12px 24px;border:1px solid #667788;border-radius:12px;background:#243345;color:white;font:inherit';
+    retry.style.cssText = 'padding:12px 24px;border:1px solid var(--line,#cac4d0);border-radius:12px;background:var(--brand,#6750a4);color:var(--brand-ink,#ffffff);font:inherit';
     retry.onclick = () => {
       const target = new URL(location.href);
       target.searchParams.set('tab', 'chat'); target.searchParams.set('pwa_retry', String(Date.now()));

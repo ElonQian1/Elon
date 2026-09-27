@@ -8,6 +8,10 @@
 2. 只读命中文档；Codex CLI 读 `CODEX.md`。
 3. 禁止全读 instructions、docs、Prompt、Agent、Skill。
 
+## 移动设计 V2
+
+Android/PWA 读 `.agents/skills/apk-ui/SKILL.md`，以 `docs/design/mobile-design-system-v2.md` 替代旧视觉规范；产品规则见 `docs/Design.md`。发布门槛见共享契约。
+
 ## 路由
 
 | 任务类型 | 读取/执行 |
@@ -18,7 +22,7 @@
 | 聊天/分叉/脑图 | `.github/instructions/discussion-knowledge.instructions.md` |
 | Git/worktree/发布 | `.github/instructions/git-deploy-workflow.instructions.md` |
 | Rust/Cargo | Git/发布手册；`scripts/validate-rust.ps1` |
-| Rust 缓存/磁盘/跨机 | `.agents/skills/manage-shared-build-cache/SKILL.md`、`docs/rust-cache-platform.md`、`docs/rust-cache-fleet-operations.md`、`scripts/rust-cache.ps1` |
+| Rust 缓存/磁盘/跨机 | `.agents/skills/manage-shared-build-cache/SKILL.md` |
 | PowerShell 版本兼容 | `docs/powershell-version-policy.md` |
 | 模块化/巨型文件 | `.github/instructions/modular-architecture.instructions.md` |
 | 后端/API | `docs/system-architecture.md` 和相关源码 |
@@ -27,12 +31,12 @@
 | Win 节点/升级 | `docs/node-agent-upgrade-compatibility.md`、Git/发布手册、相关源码 |
 | 复杂流程/卡住 | `docs/ai-agent-workflow.md` |
 | 非简单功能/重构/迁移/生产修复 | `.agents/skills/deliver-feature-end-to-end/SKILL.md`，再叠加领域 Skill |
-| Android APK 发布 | Git/发布手册的发布入口；环境异常再读 `docs/android-setup.md` |
+| Android APK 发布 | Git/发布手册；环境异常读 `docs/android-setup.md` |
 | Android WebView/MCP/ADB | `.agents/skills/android-webview-feature-delivery/SKILL.md` |
 | 量化/币安 | 先读 `docs/requirements/android-exchange-session-host-v2.md` |
-| 子项目 Git 工作流 | `scripts/templates/subproject-lite-workflow/README.md`；单代理顺序子项目复制此模板，不套用完整 worktree 隔离 |
+| 子项目 Git 工作流 | `scripts/templates/subproject-lite-workflow/README.md` |
 | APP 低风险视觉微调 | `docs/app-ui-fast-lane.md` |
-| Stitch/Figma 导出、APP 复杂 UI/按图还原 | `docs/stitch-design-import.md`（导入）、`docs/Design.md`、`docs/APP 颜色规范.md`；双端再读 `.github/instructions/apk-web-ui-sync.instructions.md` |
+| APP 复杂 UI/按图还原 | V2 入口；导入读 `docs/stitch-design-import.md`，双端读 `.github/instructions/apk-web-ui-sync.instructions.md` |
 | APP 版本记忆 | `docs/app-version-memory.md` |
 | 一龙 Logo 替换 | `docs/brand-logo-workflow.md`；统一运行 `scripts/replace-brand-logo.ps1` |
 | Prompt/Agent/Skill | 仅按目标读取；去重先运行 `scripts/audit-ai-prompt-assets.ps1` |
@@ -44,8 +48,6 @@
 - Gradle/Cargo/npm/发布长命令用 `scripts/invoke-ai-logged-command.ps1`；成功最多 20 行、失败 80 行。
 - commit 前运行 `scripts/check-source-size.ps1`，pre-push 兜底；禁止提交后才处理巨型入口增长。
 - 收尾必须执行预检输出的 `FINISH_COMMAND_*`，只有 `FINALIZABLE=true` 才可正常宣告完成。
-- 仅 non-fast-forward 时 rebase；不追车，只补受影响验证。
-- 保留未知文件；业务/本机状态分报。
 - 脚本头有 `#requires -Version 7.0` 时使用 `pwsh`；其他 Windows bootstrap 脚本可用 `powershell.exe`。
 
 修改预检、统一收尾、worktree 清理或这些工作流文档后，必须运行：
@@ -54,3 +56,5 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-ai-task-preflight-workflow.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\audit-ai-prompt-assets.ps1
 ```
+
+V2 检查见 apk-ui skill。

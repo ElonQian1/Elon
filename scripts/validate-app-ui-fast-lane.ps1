@@ -1,6 +1,7 @@
 param(
     [string[]]$ContractTest = @(),
     [string]$NoContractReason = "",
+    [string]$NoPwaImpactReason = "",
     [switch]$PlanOnly
 )
 
@@ -67,17 +68,16 @@ $changedPaths = @(Get-ChangedPaths -Root $repoRoot)
 $androidUiChanged = @($changedPaths | Where-Object {
     $_ -like "android/app/src/main/*"
 }).Count -gt 0
-$mobilePwaChanged = @(
-    "server/src/assets/web_page.html",
-    "server/src/assets/ic_app_brand.b64"
-) | Where-Object { $changedPaths -contains $_ } | Select-Object -First 1
+$mobilePwaChanged = $changedPaths | Where-Object {
+    $_ -like 'server/src/assets/*' -or $_ -eq 'server/src/mobile_pwa_template.rs'
+} | Select-Object -First 1
 $mobilePwaChanged = -not [string]::IsNullOrWhiteSpace([string]$mobilePwaChanged)
 
 Write-Host "FAST_LANE_ANDROID_CHANGED=$($androidUiChanged.ToString().ToLowerInvariant())"
 Write-Host "FAST_LANE_MOBILE_PWA_CHANGED=$($mobilePwaChanged.ToString().ToLowerInvariant())"
 
-if ($androidUiChanged -and -not $mobilePwaChanged) {
-    throw "Android UI changed without a matching mobile PWA source or brand asset. Keep Android and mobile PWA in the same commit."
+if ($androidUiChanged -and -not $mobilePwaChanged -and [string]::IsNullOrWhiteSpace($NoPwaImpactReason)) {
+    throw "Review affected PWA semantics or provide -NoPwaImpactReason for an Android-only adaptation."
 }
 if ($PlanOnly) {
     Write-Host "FAST_LANE_PLAN=contract_then_parallel_android_and_mobile_pwa"
