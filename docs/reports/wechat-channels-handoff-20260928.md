@@ -87,9 +87,27 @@ implementation_status: in_progress
 | 真实同源合同 | 用共享解析器读取真实预览接口，获得有效、未来到期的 feed scheme |
 | 小米微信 | 已核对登记硬件；相同 scheme 进入 `FinderShareFeedRelUI`，截图看到指定视频播放 |
 | Windows 微信 | 注册了 `weixin` 协议；真实调用后只打开聊天主窗口，未进入指定视频，也无视频子窗口 |
-| 新 APK 按钮全链路 | 待发布安装后验收，不能用上述直接 Intent 验收替代 |
-| Win Rust | `validate-rust.ps1 ... test ... internal_browser` 6 项通过，含隐藏/关闭/导航取消；发布与运行版本待回执 |
-| PC 前端 | TypeScript 检查与 Vite 生产构建通过；不代表已运行的新 Win 客户端 |
+| 新 APK 按钮全链路 | 1822 已安装；MCP 可达但 `activity_bound=false`，新卡片点按验收延期，不能用直接 Intent 验收替代 |
+| Win Rust | `validate-rust.ps1 ... test ... internal_browser` 6 项通过，含隐藏/关闭/导航取消；运行身份已核对，见下方发布记录 |
+| PC 前端 | TypeScript 检查与 Vite 生产构建通过；线上 `/pc` 和前端发布标记检查通过 |
+
+## 发布记录
+
+- 功能提交 `14940f7ee5abcc645a3f26c79942dee6effbc297` 已推送主线。
+- 服务端与 PC 前端正式发布 `0.3.1783`，来源为功能提交；健康检查、`/pc` HTTP 200
+  和 `PcFrontend` 完成门禁通过。
+- APK `1.1.1822 (1822)` 已正式发布。SHA-256：
+  `296a5d08a67a3f99412c3e9adf21ea8c92797602be959eedaba6b9f7d9d48d01`。
+  主项目登记小米通过 `adb install -r` 更新并回读版本一致；荣耀离线，未清数据。
+- Win 本次单独发布被已有发布锁拒绝，未抢锁、未重复构建。确认正在发布的主线后代
+  `e2b17ce145c91603c568eaa6722f38742f5741a6` 包含全部功能提交，新增 6 个路径不改动
+  视频号模块，因此复用该正式包。远端 outbox 首次执行为 `synced`，`NodeAgent`
+  完成门禁通过。
+- Win 无人值守更新回执 `1b828046-ada2-4e9c-b5d5-86349379823f` 为 `passed`：节点与
+  实际桌面进程均为 `0.3.69+e2b17ce145c91603c568eaa6722f38742f5741a6`，并非仅校验
+  磁盘候选。该回执只证明安装和运行版本，不证明微信直达指定视频或站内播放。
+- 正式发布全部完成；新卡片的安装端交互验收仍延期，Windows 精确视频定位与站内
+  播放能力仍按下方边界登记未完成。
 
 ## 剩余边界
 
