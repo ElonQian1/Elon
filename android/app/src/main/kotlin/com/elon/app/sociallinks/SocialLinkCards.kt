@@ -60,6 +60,8 @@ internal object SocialLinkCards {
                     host.post { busy = false; if (valid()) { draw(result); retry.isEnabled = true; retry.visibility = if (result.ready || compact) View.GONE else View.VISIBLE } }
                     val bitmap = result.image?.let { SocialLinkPreviewApi.cover(app, it) }
                     host.post { if (valid() && current.image == result.image) { card.cover.setImageBitmap(bitmap); card.cover.visibility = if (bitmap == null) View.GONE else View.VISIBLE } }
+                    val avatar = result.authorAvatar?.let { SocialLinkPreviewApi.cover(app, it) }
+                    host.post { if (valid() && current.authorAvatar == result.authorAvatar) card.bindAvatar(avatar) }
                 }
             }
             // Chat owns long-press and multi-select for every card descendant.

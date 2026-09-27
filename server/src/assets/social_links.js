@@ -131,6 +131,7 @@
     return { ...fallback, title,
       description: typeof value.description === 'string' ? value.description.slice(0, 300) : '',
       author: typeof value.author === 'string' && value.author.trim() ? value.author.slice(0, 80) : fallback.author,
+      author_avatar_data_url: typeof value.author_avatar_data_url === 'string' && value.author_avatar_data_url.length <= 12288 ? inlineCover(value.author_avatar_data_url) : null,
       image: inlineCover(value.cover_data_url) || safeUrl(value.image)?.href || null, embed: trustedEmbed(value.embed) || fallback.embed,
       status: value.status === 'ready' && title ? 'ready' : 'unavailable', source: value.source === 'member' ? 'member' : 'server' };
   }
@@ -174,6 +175,19 @@
       cover.onerror = () => { cover.hidden = true; cover.removeAttribute('src'); };
       const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'social-link-retry'; retry.textContent = '更新预览'; retry.hidden = true;
       copy.append(title, summary, source, time); media.append(badge, cover); button.append(copy, media); wrap.append(button, retry); host.append(wrap);
+      let avatar, initial;
+      if (channels) {
+        const play = document.createElement('span'); play.className = 'social-link-play'; play.textContent = '\u25b6'; play.setAttribute('aria-hidden', 'true');
+        media.append(play);
+        const footer = document.createElement('span'); footer.className = 'social-link-video-footer';
+        const identity = document.createElement('span'); identity.className = 'social-link-avatar'; identity.setAttribute('aria-hidden', 'true');
+        initial = document.createElement('span'); identity.append(initial);
+        avatar = document.createElement('img'); avatar.alt = ''; avatar.hidden = true; avatar.loading = 'lazy';
+        avatar.onerror = () => { avatar.hidden = true; avatar.removeAttribute('src'); initial.hidden = false; }; identity.append(avatar);
+        const author = document.createElement('span'); author.className = 'social-link-video-author';
+        const action = document.createElement('span'); action.className = 'social-link-video-action'; action.textContent = options.channelsHandoff ? '在微信中观看' : '打开视频号';
+        source.remove(); author.append(source, action); footer.append(identity, author); button.append(footer);
+      }
       if (channels && options.openOriginal) {
         const original = document.createElement('button'); original.type = 'button'; original.className = 'social-link-original-action'; original.textContent = '查看原网页';
         original.onclick = () => options.openOriginal(current); wrap.append(original);
@@ -183,7 +197,13 @@
         title.textContent = view.title; button.title = view.title;
         summary.textContent = view.summary; summary.hidden = !view.summary || options.compact === true;
         source.textContent = view.source; source.title = view.source;
-        if (channels) { source.textContent = (value.author || '视频号') + (options.channelsHandoff ? ' · 微信打开' : ''); source.title = source.textContent; }
+        if (channels) {
+          source.textContent = value.author || '视频号作者'; source.title = source.textContent;
+          initial.textContent = Array.from(value.author || '视')[0];
+          const picture = value.author_avatar_data_url;
+          avatar.hidden = !picture; initial.hidden = !!picture;
+          if (picture) avatar.src = picture; else avatar.removeAttribute('src');
+        }
         time.textContent = view.time; time.hidden = !view.time;
         badge.textContent = view.badge; media.setAttribute('data-site', value.site);
         button.setAttribute('aria-label', `${channels && options.channelsHandoff ? '在微信打开' : '打开'}${view.title}（${view.source}${view.time ? '，' + view.time : ''}）`);

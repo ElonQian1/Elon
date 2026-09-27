@@ -14,13 +14,21 @@ const JPEG_QUALITY: u8 = 72;
 pub(super) const MAX_DATA_URL: usize = 96 * 1024;
 
 pub(super) async fn fetch(url: &Url) -> Option<String> {
-    tokio::time::timeout(Duration::from_secs(4), download(url))
+    fetch_sized(url, THUMB_SIDE, MAX_DATA_URL).await
+}
+
+pub(super) async fn fetch_avatar(url: &Url) -> Option<String> {
+    fetch_sized(url, 64, 12 * 1024).await
+}
+
+async fn fetch_sized(url: &Url, side: u32, max_data: usize) -> Option<String> {
+    tokio::time::timeout(Duration::from_secs(4), download(url, side, max_data))
         .await
         .ok()?
         .ok()
 }
 
-async fn download(url: &Url) -> Result<String> {
+async fn download(url: &Url, side: u32, max_data: usize) -> Result<String> {
     let target = crate::open_commerce_outbound_security::pinned_public_https_target(
         url.as_str(),
         Duration::from_secs(2),
@@ -49,10 +57,15 @@ async fn download(url: &Url) -> Result<String> {
         }
         bytes.extend_from_slice(&chunk);
     }
-    tokio::task::spawn_blocking(move || thumbnail(&bytes)).await?
+    tokio::task::spawn_blocking(move || thumbnail_sized(&bytes, side, max_data)).await?
 }
 
+#[cfg(test)]
 pub(super) fn thumbnail(bytes: &[u8]) -> Result<String> {
+    thumbnail_sized(bytes, THUMB_SIDE, MAX_DATA_URL)
+}
+
+fn thumbnail_sized(bytes: &[u8], side: u32, max_data: usize) -> Result<String> {
     let reader = ImageReader::new(Cursor::new(bytes)).with_guessed_format()?;
     let (width, height) = reader.into_dimensions()?;
     if width == 0 || height == 0 || width > MAX_SIDE || height > MAX_SIDE {
@@ -61,7 +74,7 @@ pub(super) fn thumbnail(bytes: &[u8]) -> Result<String> {
     let decoded = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()?
         .decode()?
-        .thumbnail(THUMB_SIDE, THUMB_SIDE)
+        .thumbnail(side, side)
         .to_rgb8();
     let mut out = Vec::new();
     image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY)
@@ -70,7 +83,7 @@ pub(super) fn thumbnail(bytes: &[u8]) -> Result<String> {
         "data:image/jpeg;base64,{}",
         base64::engine::general_purpose::STANDARD.encode(out)
     );
-    if data.len() > MAX_DATA_URL {
+    if data.len() > max_data {
         bail!("thumbnail too large");
     }
     Ok(data)

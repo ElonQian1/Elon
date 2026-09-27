@@ -98,9 +98,29 @@ pub(super) async fn preview(url: Url) -> Result<Preview> {
     let id = short_id(&url).ok_or_else(|| anyhow::anyhow!("not a Channels link"))?;
     let value = fetch(&id).await?;
     let mut preview = project(&url, &value);
-    if let Some(image) = preview.image.as_deref().and_then(policy::public_url) {
-        preview.cover_data_url = cover::fetch(&image).await;
-    }
+    let image = preview.image.as_deref().and_then(policy::public_url);
+    let avatar = value["data"]["authorInfo"]["headImgUrl"]
+        .as_str()
+        .and_then(policy::public_url);
+    // Optional images share one timeout window; an unavailable avatar must not hide the card.
+    let (poster, avatar) = tokio::join!(
+        async {
+            if let Some(url) = image {
+                cover::fetch(&url).await
+            } else {
+                None
+            }
+        },
+        async {
+            if let Some(url) = avatar {
+                cover::fetch_avatar(&url).await
+            } else {
+                None
+            }
+        }
+    );
+    preview.cover_data_url = poster;
+    preview.author_avatar_data_url = avatar;
     Ok(preview)
 }
 
@@ -223,10 +243,14 @@ mod tests {
         assert!(!preview.title.is_empty());
         assert!(preview.image.is_some());
         assert!(preview.cover_data_url.is_some());
+        assert!(preview
+            .author_avatar_data_url
+            .as_ref()
+            .is_some_and(|s| s.len() <= 12 * 1024));
         let handoff = handoff(url).await.unwrap();
         assert!(handoff
             .launch_url
             .starts_with("weixin://biz/finder/openFinderFeed/"));
-        println!("channels live: metadata=true cover=true fresh_handoff=true");
+        println!("channels live: metadata=true cover=true creator_avatar=true fresh_handoff=true");
     }
 }

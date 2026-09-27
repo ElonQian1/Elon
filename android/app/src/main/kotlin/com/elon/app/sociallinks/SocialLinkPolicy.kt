@@ -4,7 +4,7 @@ import java.net.URI
 import java.net.URLDecoder
 import org.json.JSONObject
 
-internal data class SocialLink(val url: String, val site: String, val title: String = "", val author: String = "", val image: String? = null, val player: String? = null, val xId: String? = null, val ready: Boolean = false, val summary: String = "", val member: Boolean = false)
+internal data class SocialLink(val url: String, val site: String, val title: String = "", val author: String = "", val image: String? = null, val player: String? = null, val xId: String? = null, val ready: Boolean = false, val summary: String = "", val member: Boolean = false, val authorAvatar: String? = null)
 
 internal object SocialLinkPolicy {
     private val sites = mapOf(
@@ -79,6 +79,7 @@ internal object SocialLinkPolicy {
         val title = value.optString("title").trim().take(160).takeUnless { SocialLinkShareText.isGeneric(it, fallback.site) } ?: fallback.title
         return fallback.copy(title = title, author = value.optString("author").take(80).ifBlank { fallback.author },
             image = inlineCover(value.optString("cover_data_url")) ?: safeUrl(value.optString("image"))?.toString(), player = resolved?.player ?: fallback.player, xId = resolved?.xId ?: fallback.xId, ready = value.optString("status") == "ready" && title.isNotBlank(),
-            summary = value.optString("description").trim().take(300), member = value.optString("source") == "member")
+            summary = value.optString("description").trim().take(300), member = value.optString("source") == "member",
+            authorAvatar = inlineCover(value.optString("author_avatar_data_url"))?.takeIf { it.length <= 12288 })
     }
 }

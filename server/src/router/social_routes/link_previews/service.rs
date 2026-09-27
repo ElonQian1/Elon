@@ -38,6 +38,8 @@ pub(super) struct Preview {
     image: Option<String>,
     /// Inline thumbnail copied by the server; clients prefer it over hot-linking `image`.
     cover_data_url: Option<String>,
+    /// Small public creator avatar, separate from the poster and the group sender.
+    author_avatar_data_url: Option<String>,
     embed: Option<policy::Embed>,
     status: &'static str,
     /// `server` = fetched here; `member` = re-validated read-back from a signed-in client.
@@ -54,6 +56,7 @@ impl Preview {
             author: String::new(),
             image: None,
             cover_data_url: None,
+            author_avatar_data_url: None,
             embed: policy::embed(url),
             status: "unavailable",
             source: "server",

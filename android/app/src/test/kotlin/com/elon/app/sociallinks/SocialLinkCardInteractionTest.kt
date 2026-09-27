@@ -100,4 +100,25 @@ class SocialLinkCardInteractionTest {
         assertEquals(SocialLinkBrowserActivity::class.java.name, intent.component?.className)
         assertEquals(item.url, intent.getStringExtra("url"))
     }
+    @Test fun videoChromeIsVisibleBeforeCoverAndDoesNotBreakSelection() {
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        var opened = 0; var selected = 0; var held = 0
+        val item = SocialLinkPolicy.link("https://weixin.qq.com/sph/example")!!.copy(author = "Long creator name", authorAvatar = "first")
+        val card = SocialLinkCardView(activity, true) { opened++ }
+        card.bind(item)
+        val root = screen(card)
+        assertEquals(View.VISIBLE, card.play.visibility); assertEquals(View.GONE, card.cover.visibility)
+        assertEquals("视频号", card.badge.text); assertEquals(item.author, card.source.text)
+        assertTrue(card.source.bottom <= card.height); assertTrue(card.play.width > 0)
+        card.bindAvatar(Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888))
+        assertEquals(View.VISIBLE, card.creatorAvatar.visibility)
+        bindChatSelectionLongPress(root, View.OnLongClickListener { held++; true })
+        for (target in listOf(card.play, card.badge, card.source, card.creatorAvatar)) touch(root, target)
+        assertEquals(4, opened)
+        touch(root, card.play, true); assertEquals(1, held); assertEquals(4, opened)
+        bindChatSelectionContent(root, View.OnClickListener { selected++ })
+        touch(root, card.play); assertEquals(1, selected); assertEquals(4, opened)
+        card.bind(item.copy(authorAvatar = null))
+        assertEquals(View.GONE, card.creatorAvatar.visibility)
+    }
 }

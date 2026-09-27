@@ -81,11 +81,24 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 10));
 {
   const host = new Node('host'); let main = 0, original = 0;
   const item = links.links(channelsUrl)[0];
-  const dispose = links.mount(host, channelsUrl, { owner: 'channels', api: async () => ({ ...item, title: 'Video', author: 'Creator', status: 'ready', image: 'https://finder.video.qq.com/cover' }), open: () => main++, openOriginal: () => original++ });
+  const avatarData = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+  const dispose = links.mount(host, channelsUrl, { owner: 'channels', channelsHandoff: true, api: async () => ({ ...item, title: 'Video', author: 'Creator', author_avatar_data_url: avatarData, status: 'ready', image: 'https://finder.video.qq.com/cover' }), open: () => main++, openOriginal: () => original++ });
+  const fallbackCard = host.children[0].children[0].children[0];
+  assert.equal(fallbackCard.children[1].children[2].className, 'social-link-play', 'video identity appears before network');
   await flush();
   const wrap = host.children[0].children[0]; const card = wrap.children[0];
   assert.match(card.className, /social-link-channels/);
   assert.equal(card.children[1].children[1].src, 'https://finder.video.qq.com/cover');
+  const identity = card.children[2].children[0], creator = card.children[2].children[1];
+  assert.equal(creator.children[0].textContent, 'Creator');
+  assert.equal(creator.children[1].textContent, '在微信中观看');
+  assert.equal(identity.children[1].src, avatarData);
+  identity.children[1].onerror();
+  assert.equal(identity.children[1].hidden, true); assert.equal(identity.children[0].hidden, false);
+  assert.equal(identity.children[0].textContent, 'C', 'failed creator image has a neutral fallback');
+  for (const invalid of ['javascript:alert(1)', 'https://example.org/avatar', 'data:image/svg+xml;base64,AAAA', 'data:image/png;base64,' + 'A'.repeat(12288)]) {
+    assert.equal(links.sanitize({ ...item, author_avatar_data_url: invalid }, item).author_avatar_data_url, null);
+  }
   card.onclick({ preventDefault() {} });
   assert.equal(main, 1); assert.equal(original, 0, 'main tap does not open the reader');
   wrap.children[2].onclick(); assert.equal(original, 1, 'original reader remains separately accessible');

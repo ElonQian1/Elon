@@ -61,4 +61,14 @@ class SocialLinkPolicyTest {
         assertEquals(1, SocialLinkPolicy.extract("$url $url").size)
         assertTrue(SocialLinkPolicy.extract("【一龙文章】\n{\"url\":\"$url\"}").isEmpty())
     }
+    @Test fun creatorAvatarIsBoundedRasterDataSeparateFromPoster() {
+        val item = SocialLinkPolicy.link("https://weixin.qq.com/sph/example")!!
+        val inline = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+        val value = JSONObject().put("schema", 1).put("url", item.url).put("author_avatar_data_url", inline)
+        assertEquals(inline, SocialLinkPolicy.merge(value, item).authorAvatar)
+        assertNull(SocialLinkPolicy.merge(value, item).image)
+        for (bad in listOf("https://example.org/avatar", "data:image/svg+xml;base64,AAAA", "data:image/png;base64," + "A".repeat(12288))) {
+            assertNull(SocialLinkPolicy.merge(value.put("author_avatar_data_url", bad), item).authorAvatar)
+        }
+    }
 }
