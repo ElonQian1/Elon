@@ -35,7 +35,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route_layer(middleware::from_fn(private_response))
 }
 
-async fn private_response(request: Request, next: Next) -> Response {
+pub(super) async fn private_response(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     response.headers_mut().insert(
         "cache-control",

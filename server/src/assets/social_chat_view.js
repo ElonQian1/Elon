@@ -58,7 +58,8 @@
               avatarFallback: outgoing ? (options.user()?.nickname || options.user()?.account || '我') : (msg.sender_name || options.friendName(contact)),
             });
             const compactLink = !recalled && !msg.attachments?.length && root.ElonSocialLinks?.prepareBubble(bubble, text);
-            const shared = !recalled && kind === 'group' && root.ElonAiConversationShare?.mount(bubble, msg, { api: options.api, groupId: contact.id, list, isCurrent: () => scope === key });
+            const recordOwner = options.user()?.id;
+            const shared = !recalled && kind === 'group' && (root.ElonChatRecords?.mount(bubble, text, { api: options.api, group: contact.id, owner: recordOwner, current: () => scope === key && options.user()?.id === recordOwner }) || root.ElonAiConversationShare?.mount(bubble, msg, { api: options.api, groupId: contact.id, list, isCurrent: () => scope === key }));
             if (!recalled && !shared) { root.ElonArticles.mount(bubble, text, options.api, options.user()?.id); media(bubble, msg.attachments); if (!msg.attachments?.length) root.ElonSourceLinks?.text(bubble, text); }
             if (kind === 'group' && msg.id && !shared) root.ElonGroupMessageRevisions.mount(bubble, contact.id, msg, options.api, () => options.changed(contact.id));
             if (kind === 'group' && !recalled) root.ElonGroupAiReplyContext?.mount(bubble, msg, { api: options.api, group: contact.id, owner: options.user()?.id, list, current: () => scope === key && options.user()?.id === owner, changed: () => options.changed(contact.id) }, media);

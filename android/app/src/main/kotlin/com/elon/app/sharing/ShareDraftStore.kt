@@ -11,7 +11,8 @@ import org.json.JSONObject
 import java.io.File
 import java.util.UUID
 
-internal data class ShareDraft(val id: String, var text: String, val files: List<PendingAttachment>, var state: String = "ready", var owner: String = "", var target: String = "")
+internal data class ShareDraft(val id: String, var text: String, val files: List<PendingAttachment>, var state: String = "ready", var owner: String = "", var target: String = "",
+    var record: com.elon.app.chatrecords.ChatRecordDocument? = null, var recordTargetId: String = "", var publishedRecord: com.elon.app.chatrecords.ChatRecordDocument? = null)
 
 internal class ShareDraftStore(private val context: Context) {
     private val root = File(context.cacheDir, "external_shares").apply { mkdirs() }
@@ -30,6 +31,7 @@ internal class ShareDraftStore(private val context: Context) {
         val id = UUID.randomUUID().toString()
         val dir = File(root, id).apply { mkdirs() }
         try {
+            ChatRecordShareImport.import(context, intent, uris, id, dir)?.let { return it.also(::save) }
             val files = uris.mapIndexed { index, uri ->
                 require(uri.scheme == "content") { "分享附件地址不受支持，请重新选择文件" }
                 val type = context.contentResolver.getType(uri).orEmpty().ifBlank { intent.type.orEmpty() }
@@ -58,6 +60,7 @@ internal class ShareDraftStore(private val context: Context) {
         val dir = directory(draft.id) ?: return
         val files = JSONArray(); draft.files.forEach { a -> files.put(JSONObject().put("file", a.file.name).put("name", a.displayName).put("mime", a.mimeType).put("kind", a.kind).put("width", a.imageWidth).put("height", a.imageHeight).put("source_link", a.sourceLink?.json())) }
         val json = JSONObject().put("text", draft.text).put("state", draft.state).put("owner", draft.owner).put("target", draft.target).put("files", files)
+            .put("record", draft.record?.json()).put("record_target_id", draft.recordTargetId).put("published_record", draft.publishedRecord?.json())
         val atomic = android.util.AtomicFile(File(dir, "draft.json"))
         var output: java.io.FileOutputStream? = null
         try { output = atomic.startWrite(); output.write(json.toString().toByteArray(Charsets.UTF_8)); atomic.finishWrite(output) }
@@ -73,7 +76,9 @@ internal class ShareDraftStore(private val context: Context) {
             PendingAttachment(a.getString("kind"), "分享附件", a.getString("name"), a.getString("name"), a.getString("mime"), file,
                 a.optInt("width").takeIf { it > 0 }, a.optInt("height").takeIf { it > 0 }, sourceLink = SourceLink.fromJson(a.optJSONObject("source_link")))
         }
-        ShareDraft(id, json.getString("text"), files, json.optString("state", "ready"), json.optString("owner"), json.optString("target"))
+        ShareDraft(id, json.getString("text"), files, json.optString("state", "ready"), json.optString("owner"), json.optString("target"),
+            json.optJSONObject("record")?.let(com.elon.app.chatrecords.ChatRecordDocument::read), json.optString("record_target_id"),
+            json.optJSONObject("published_record")?.let(com.elon.app.chatrecords.ChatRecordDocument::read))
     }.getOrNull()
     fun remove(draft: ShareDraft) { directory(draft.id)?.let { dir -> dir.listFiles()?.forEach { it.delete() }; dir.delete() } }
     private fun removeExpired() {

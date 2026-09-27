@@ -10,6 +10,14 @@ pub(in crate::store) fn insert_message(
 ) -> Result<FriendGroupMessage> {
     if content
         .trim_start()
+        .starts_with(crate::store::articles::chat_records::PREFIX.trim_end())
+    {
+        return Err(anyhow!(
+            "Reserved chat record card; use the chat record endpoint"
+        ));
+    }
+    if content
+        .trim_start()
         .starts_with(crate::store::articles::snapshots::CARD_PREFIX.trim_end())
     {
         return Err(anyhow!(
@@ -28,6 +36,20 @@ pub(in crate::store) fn insert_snapshot_message(
     let content = format!(
         "{}{}",
         crate::store::articles::snapshots::CARD_PREFIX,
+        serde_json::to_string(card)?
+    );
+    insert_content(conn, user, group, &content, None)
+}
+
+pub(in crate::store) fn insert_chat_record_message(
+    conn: &Connection,
+    user: &str,
+    group: &str,
+    card: &crate::store::articles::chat_records::Card,
+) -> Result<FriendGroupMessage> {
+    let content = format!(
+        "{}{}",
+        crate::store::articles::chat_records::PREFIX,
         serde_json::to_string(card)?
     );
     insert_content(conn, user, group, &content, None)

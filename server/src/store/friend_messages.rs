@@ -402,6 +402,7 @@ pub(super) fn message_preview_from_parts(
     if let Some(content) = content.map(str::trim).filter(|value| !value.is_empty()) {
         return Ok(Some(
             super::articles::snapshots::message_preview(content)
+                .or_else(|| super::articles::chat_records::message_preview(content))
                 .or_else(|| super::articles::message_preview(content))
                 .unwrap_or_else(|| content.to_string()),
         ));

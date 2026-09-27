@@ -7,6 +7,8 @@ import MarkdownContent from '../markdown/MarkdownContent'
 import { TextSourceCard } from './source-links/SourceLinkView'
 import ArticleMessage from '../articles/ArticleMessage'
 import { articleReference } from '../articles/articleApi'
+import ChatRecordMessage from './chat-records/ChatRecordMessage'
+import { recordCard } from './chat-records/recordApi'
 import type { ActiveConversation, Friend, FriendGroup, SocialMessage } from './socialMessageTypes'
 import { conversationId } from './socialChatCache'
 import { isPending, isRecalled, messageText } from './socialChatOperations'
@@ -32,7 +34,7 @@ interface Props {
   input: string; setInput: Dispatch<SetStateAction<string>>; targets: SocialTarget[]
   loading: boolean; error: string; retry: () => void; onSent: () => void
 }
-const specialMessage = (m: SocialMessage) => !!articleReference(m.content) || m.content.startsWith('【一龙项目卡片】')
+const specialMessage = (m: SocialMessage) => !!recordCard(m.content) || !!articleReference(m.content) || m.content.startsWith('【一龙项目卡片】')
 const selectable = (m: SocialMessage) => !isPending(m) && !isRecalled(m) && !specialMessage(m)
 
 export default function SocialConversation(props: Props) {
@@ -110,7 +112,7 @@ export default function SocialConversation(props: Props) {
           <div className={styles.avatar}><SocialAvatar userId={m.sender_user_id} name={name} avatar={avatar} /></div>
           <div className={styles.msgBody} data-social-content>
             <div className={styles.msgMeta}><strong>{name}</strong><span>{formatTime(m.created_at)}</span></div>
-            {content && (articleReference(content) && !m.ai_reply ? <ArticleMessage content={content} /> : <div id={copyId} className={styles.msgContent} hidden={compactLink}>
+            {content && (recordCard(content) && conversation.kind === 'group' && !m.ai_reply ? <ChatRecordMessage content={content} group={conversation.id} /> : articleReference(content) && !m.ai_reply ? <ArticleMessage content={content} /> : <div id={copyId} className={styles.msgContent} hidden={compactLink}>
               {(!own || content.startsWith('>')) && /[#*`\[\]>|]/.test(content) ? <MarkdownContent content={content} copy={false} /> : content}
               {!recalled && m.ai_reply && conversation.kind === 'group' && <GroupAiReplyContext owner={me.id} group={conversation.id} message={m.id} metadata={m.ai_reply} part="footer" />}
             </div>)}

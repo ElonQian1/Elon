@@ -8,6 +8,8 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         ("cache-control", "no-cache"),
     ];
     Router::new()
+        .route("/assets/chat_records.js", get(move || async move { (headers, include_str!("../../assets/chat_records.js")) }))
+        .route("/assets/chat_records.css", get(|| async { ([("content-type", "text/css; charset=utf-8"), ("cache-control", "no-cache")], include_str!("../../assets/chat_records.css")) }))
         .route("/assets/group_ai_reply_context.js", get(move || async move { (headers, include_str!("../../assets/group_ai_reply_context.js")) }))
         .route("/assets/social_source_links.js", get(move || async move { (headers, include_str!("../../assets/social_source_links.js")) }))
         .route("/assets/social_source_compose.js", get(move || async move { (headers, include_str!("../../assets/social_source_compose.js")) }))

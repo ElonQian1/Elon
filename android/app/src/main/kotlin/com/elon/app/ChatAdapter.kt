@@ -109,6 +109,7 @@ class ChatAdapter(
         }
         if (messages[position].isRecalled()) return if (messages[position].role == "user") 0 else 4
         if (AiConversationShareCodec.parseCard(messages[position].content) != null) return 5
+        if (com.elon.app.chatrecords.ChatRecordDocument.card(messages[position].content) != null) return 5
         if (messages[position].projectPostCard != null) return 6
         if (parseChatProjectShareMessage(messages[position].content) != null) return 5
         return when (messages[position].role) {
@@ -164,7 +165,7 @@ class ChatAdapter(
         val shareCardBound = !recalled && AiConversationShareCardViews.bind(
             holder.attachmentList, holder.text, message, onAiConversationShareOpen, onAiConversationShareCoverLoad,
             onLongPress = onAiConversationShareLongPress)
-        val postCardBound = shareCardBound || (!recalled && (com.elon.app.sharing.SourceLinkViews.bindCard(holder.attachmentList, holder.text, message) || com.elon.app.articles.ArticleCardViews.bind(holder.attachmentList, holder.text, message) || bindChatProjectPostCardView(holder.attachmentList, holder.text, message)))
+        val postCardBound = shareCardBound || (!recalled && (com.elon.app.chatrecords.ChatRecordCardViews.bind(holder.attachmentList, holder.text, message) || com.elon.app.sharing.SourceLinkViews.bindCard(holder.attachmentList, holder.text, message) || com.elon.app.articles.ArticleCardViews.bind(holder.attachmentList, holder.text, message) || bindChatProjectPostCardView(holder.attachmentList, holder.text, message)))
         val projectShareBound = if (postCardBound) {
             false
         } else {

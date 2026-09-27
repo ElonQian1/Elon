@@ -18,7 +18,7 @@ mod rich_card;
 mod tests;
 #[cfg(test)]
 mod validation_tests;
-mod writes;
+pub(super) mod writes;
 pub(crate) use model::*;
 
 pub(crate) const SCHEMA: &str = "elon.ai_conversation_share.v1";

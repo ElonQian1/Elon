@@ -40,11 +40,27 @@ class ExternalShareActivity : AppCompatActivity() {
         if (d == null) return
         if (d.state in setOf("sent", "uncertain", "sending")) {
             content.addView(ui.text(if (d.state == "sent") "已发送到 ${d.target}" else "发送结果未确认，请打开聊天核对。此页面不会自动重发。"))
+            if (d.record != null && d.state == "uncertain") content.addView(ui.button("重试发送到 ${d.target}") {
+                model.send(ShareTarget("group", d.recordTargetId, d.target), d.text)
+            })
             content.addView(ui.button("打开一龙聊天") { startActivity(Intent(this, MainActivity::class.java)); finish() }); return
         }
-        val input = EditText(this).apply { hint = "分享文字或文章链接"; setText(d.text); minLines = 2; maxLines = 6; contentDescription = "分享内容" }
-        input.addTextChangedListener(watcher { d.text = input.text.toString() }); content.addView(input)
-        d.files.forEachIndexed { index, attachment ->
+        val record = d.record
+        if (record != null) {
+            val title = EditText(this).apply { setText(record.title); hint = "聊天记录标题"; contentDescription = "聊天记录标题"; setSingleLine(); filters = arrayOf(android.text.InputFilter.LengthFilter(120)) }
+            title.addTextChangedListener(watcher { d.record = d.record?.copy(title = title.text.toString()) }); content.addView(title)
+            val outer = record.children(null).size
+            content.addView(ui.text("$outer 条消息 · 含 ${record.messages.size - outer} 条转发内容 · ${d.files.size} 个附件", 14f, true))
+            content.addView(ui.button("预览聊天记录") { model.store.save(d); com.elon.app.chatrecords.ChatRecordReaderActivity.preview(this, d.id) })
+            if (record.warnings.isNotEmpty()) content.addView(ui.button("查看 ${record.warnings.size} 项导入提示") {
+                AlertDialog.Builder(this).setTitle("导入提示").setMessage(record.warnings.joinToString("\n")).setPositiveButton("关闭", null).show()
+            })
+            content.addView(ui.text("发送后，所选群的成员可阅读这些记录和附件。", 14f, true))
+        } else {
+            val input = EditText(this).apply { hint = "分享文字或文章链接"; setText(d.text); minLines = 2; maxLines = 6; contentDescription = "分享内容" }
+            input.addTextChangedListener(watcher { d.text = input.text.toString() }); content.addView(input)
+        }
+        (if (record == null) d.files else emptyList()).forEachIndexed { index, attachment ->
             content.addView(ui.text(attachment.displayName, 15f))
             if (attachment.mimeType.startsWith("image/")) {
                 val image = android.widget.ImageView(this).apply { adjustViewBounds = true; maxHeight = ui.dp(180); contentDescription = "待发送图片 ${index + 1}" }
@@ -66,16 +82,17 @@ class ExternalShareActivity : AppCompatActivity() {
             content.addView(ui.button("登录后继续") { model.store.save(d); startActivity(Intent(this, LoginActivity::class.java).putExtra("external_share_draft", d.id)) }); return
         }
         if (d.owner.isNotBlank() && d.owner != AuthManager.userId(this)) { content.addView(ui.text("账号已变化，请重新分享，防止发到错误账号。")); return }
-        content.addView(ui.text("选择好友或群聊", 18f))
+        content.addView(ui.text(if (record == null) "选择好友或群聊" else "选择群聊", 18f))
         val search = EditText(this).apply { hint = "搜索好友、群聊"; setSingleLine(); contentDescription = "搜索分享接收方" }; content.addView(search)
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; content.addView(list)
         fun results() {
             list.removeAllViews(); val query = search.text.toString().trim()
-            val matches = model.targets.filter { it.name.contains(query, true) }
+            val matches = model.targets.filter { it.name.contains(query, true) && (d.recordTargetId.isBlank() || it.id == d.recordTargetId) }
             matches.forEach { target -> list.addView(ui.button("${if (target.kind == "group") "群聊" else "好友"} · ${target.name}") {
                 val text = d.text.trim()
-                if (text.codePointCount(0, text.length) > 4000 || (text.isBlank() && d.files.isEmpty())) { model.notice = "请填写不超过 4000 字的内容"; render(); return@button }
-                AlertDialog.Builder(this).setTitle("发送给 ${target.name}？").setMessage("${d.files.size} 个附件" + if (text.isNotBlank()) "\n${text.take(160)}" else "")
+                if (d.record?.title?.isBlank() == true) { model.notice = "请填写聊天记录标题"; render(); return@button }
+                if (record == null && (text.codePointCount(0, text.length) > 4000 || (text.isBlank() && d.files.isEmpty()))) { model.notice = "请填写不超过 4000 字的内容"; render(); return@button }
+                AlertDialog.Builder(this).setTitle("发送给 ${target.name}？").setMessage(if (record != null) "${record.children(null).size} 条记录及其中的转发内容，${d.files.size} 个附件。请确认所选内容可以向群成员分享。" else "${d.files.size} 个附件" + if (text.isNotBlank()) "\n${text.take(160)}" else "")
                     .setNegativeButton("取消", null).setPositiveButton("发送") { _, _ -> model.send(target, text) }.show()
             }) }
             if (matches.isEmpty()) list.addView(ui.text("没有匹配的会话"))

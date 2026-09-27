@@ -151,6 +151,10 @@ fn edit(
             .content
             .starts_with(crate::store::articles::snapshots::CARD_PREFIX.trim_end())
         || content.starts_with(crate::store::articles::snapshots::CARD_PREFIX.trim_end())
+        || original
+            .content
+            .starts_with(crate::store::articles::chat_records::PREFIX.trim_end())
+        || content.starts_with(crate::store::articles::chat_records::PREFIX.trim_end())
     {
         return Err(RevisionError::Invalid.into());
     }

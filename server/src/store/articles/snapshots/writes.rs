@@ -109,7 +109,7 @@ impl Store {
     }
 }
 
-fn read_message(
+pub(in crate::store::articles) fn read_message(
     conn: &Connection,
     user: &str,
     group: &str,

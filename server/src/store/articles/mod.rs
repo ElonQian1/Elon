@@ -2,6 +2,7 @@
 use super::{new_id, now, Store};
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
+pub(crate) mod chat_records;
 mod drafts;
 pub(crate) mod group_assistant;
 mod media;
