@@ -32,7 +32,8 @@ class AppUiPaletteContractTest {
         assertFalse(inlineRoot.contains("--brand:"))
         assertTrue(theme.contains("prefers-color-scheme: dark"))
         assertTrue(theme.contains("--bg: var(--mobile-surface)"))
-        assertTrue(web.lastIndexOf("/assets/orbital_mobile_theme.css") > web.lastIndexOf("</style>"))
+        val head = web.substringBefore("</head>")
+        assertTrue(head.lastIndexOf("/assets/orbital_mobile_theme.css") > head.lastIndexOf("</style>"))
     }
 
     private fun contrast(a: String, b: String): Double {

@@ -10,17 +10,18 @@ import org.junit.Test
 
 class BorderlessRippleContractTest {
     @Test
-    fun androidThemesDisableBorderlessRippleAcrossTheApp() {
+    fun materialThemeRetainsPlatformInteractionFeedback() {
         val themes = readRepositoryFile("android/app/src/main/res/values/themes.xml")
 
+        assertTrue(themes.contains("Theme.Material3.DayNight.NoActionBar"))
         assertEquals(
-            2,
+            0,
             Regex("""<item name="selectableItemBackgroundBorderless">@null</item>""")
                 .findAll(themes)
                 .count()
         )
         assertEquals(
-            2,
+            0,
             Regex("""<item name="android:selectableItemBackgroundBorderless">@null</item>""")
                 .findAll(themes)
                 .count()
