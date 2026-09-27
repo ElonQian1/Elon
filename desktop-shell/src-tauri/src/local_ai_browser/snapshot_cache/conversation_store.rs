@@ -17,8 +17,8 @@ use super::{
 const SCHEMA: &str = "elon.local_ai_web_conversation_snapshot.v1";
 const MAX_FILE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_PROTECTED_BYTES: usize = MAX_FILE_BYTES * 2;
-const MAX_TOTAL_BYTES: u64 = 24 * 1024 * 1024;
-const MAX_ENTRIES: usize = 48;
+const MAX_TOTAL_BYTES: u64 = 128 * 1024 * 1024;
+const MAX_ENTRIES: usize = 200;
 const CACHE_TTL_MS: u64 = 30 * 24 * 60 * 60 * 1_000;
 
 #[derive(Deserialize, Serialize)]

@@ -2,7 +2,7 @@
   'use strict';
 
   const existing = window.__elonChatGptPrivateConversationDirectory;
-  if (existing && Number(existing.version) >= 15) return;
+  if (existing && Number(existing.version) >= 16) return;
   if (location.origin !== 'https://chatgpt.com') return;
 
   const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
@@ -429,7 +429,7 @@
   }
 
   window.__elonChatGptPrivateConversationDirectory = Object.freeze({
-    version: 15,
+    version: 16,
     browsePage: (scope, handle) => {
       if (!directoryBrowser && window.__elonChatGptPrivateDirectoryBrowser) {
         directoryBrowser = window.__elonChatGptPrivateDirectoryBrowser.create(window, originalFetch, (scope, items) => {

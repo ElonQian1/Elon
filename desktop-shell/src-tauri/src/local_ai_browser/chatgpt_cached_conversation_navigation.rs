@@ -15,12 +15,17 @@ fn script(provider_id: &str, path: &str) -> Option<String> {
     Some(format!(
         r#"(function(path){{
 'use strict';
-function navigate(){{location.assign(new URL(path,location.origin).href);}}
+var generation=(Number(window.__elonWinConversationReadGeneration)||0)+1;
+window.__elonWinConversationReadGeneration=generation;
+var documentToken=String(window.__elonChatGptDocumentToken||'');
+function current(){{return window.__elonWinConversationReadGeneration===generation&&
+  String(window.__elonChatGptDocumentToken||'')===documentToken;}}
+function navigate(){{if(current()&&location.pathname!==path)location.assign(new URL(path,location.origin).href);}}
 try{{
   var transport=window.__elonChatGptPrivateTransport;
   var nativeBridge=window.elonChatGptNative;
   var emit=function(event){{
-    if(!nativeBridge||typeof nativeBridge.postMessage!=='function')return;
+    if(!current()||!nativeBridge||typeof nativeBridge.postMessage!=='function')return;
     var adapterVersion=Number(window.__elonChatGptAdapterVersion||0);
     var documentToken=String(window.__elonChatGptDocumentToken||'');
     if(!Number.isFinite(adapterVersion)||adapterVersion<=0||

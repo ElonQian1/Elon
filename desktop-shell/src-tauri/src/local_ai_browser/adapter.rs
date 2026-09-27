@@ -17,7 +17,7 @@ mod scalar;
 const MAX_EVENT_BYTES: usize = 512 * 1024;
 const MAX_MESSAGES: usize = 80;
 const MAX_DRAFT_CHARS: usize = 20_000;
-const MAX_OPTIONS: usize = 100;
+const MAX_OPTIONS: usize = 200;
 const MAX_PROJECTS: usize = 40;
 
 use scalar::{
@@ -379,7 +379,10 @@ pub(super) fn sanitize_conversations(value: Option<&Value>) -> Vec<Value> {
                 "title": clean_string(item.get("title"), 160),
                 "path": path,
                 "active": item.get("active").and_then(Value::as_bool).unwrap_or(false),
-                "pinned": item.get("pinned").and_then(Value::as_bool).unwrap_or(false),
+                "pinned": item.get("pinned").and_then(Value::as_bool),
+                "pinOrder": item.get("pinOrder").and_then(Value::as_u64).filter(|n| *n < 1000),
+                "pinnedAt": item.get("pinnedAt").and_then(Value::as_u64),
+                "updatedAt": item.get("updatedAt").and_then(Value::as_f64).filter(|n| n.is_finite() && *n >= 0.0),
                 "groupLabel": clean_string(item.get("groupLabel"), 80),
                 "projectId": is_safe_project_id(&project_id).then_some(project_id),
                 "projectTitle": clean_string(item.get("projectTitle"), 160),
@@ -424,6 +427,8 @@ pub(super) fn sanitize_conversation_collection(value: Option<&Value>) -> Value {
             1_000,
         ),
         "complete": complete,
+        "refreshSettled": collection.and_then(|c| c.get("refreshSettled")).and_then(Value::as_bool),
+        "continueRefresh": collection.and_then(|c| c.get("continueRefresh")).and_then(Value::as_bool),
     })
 }
 
@@ -446,6 +451,9 @@ fn sanitize_projects(value: Option<&Value>) -> Vec<Value> {
                 "title": title,
                 "path": path,
                 "active": item.get("active").and_then(Value::as_bool).unwrap_or(false),
+                "pinned": item.get("pinned").and_then(Value::as_bool),
+                "pinOrder": item.get("pinOrder").and_then(Value::as_u64).filter(|n| *n < 1000),
+                "pinnedAt": item.get("pinnedAt").and_then(Value::as_u64),
             }))
         })
         .collect()

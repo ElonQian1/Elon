@@ -267,7 +267,7 @@ fn merge_conversation_snapshots(
         values.push(entry);
     }
     values.sort_by_key(|entry| std::cmp::Reverse(entry.updated_at_ms));
-    values.truncate(48);
+    values.truncate(200);
     values
 }
 
@@ -354,7 +354,7 @@ fn sanitize_stored_conversations_with_ttl(
         })
         .collect::<Vec<_>>();
     values.sort_by_key(|entry| std::cmp::Reverse(entry.updated_at_ms));
-    values.truncate(48);
+    values.truncate(200);
     values
 }
 

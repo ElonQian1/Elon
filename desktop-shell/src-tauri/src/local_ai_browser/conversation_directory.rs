@@ -10,11 +10,8 @@ pub(super) fn merge(previous: Option<&Value>, mut incoming: Value) -> Value {
     let previous_projects = records(previous, "projects");
     let incoming_projects = records(Some(&incoming), "projects");
 
-    let conversations = merge_conversations(
-        previous_conversations,
-        incoming_conversations,
-        complete,
-    );
+    let conversations =
+        merge_conversations(previous_conversations, incoming_conversations, complete);
     let projects = merge_projects(previous_projects, incoming_projects);
     let observed_count = incoming
         .get("collection")
@@ -32,17 +29,26 @@ pub(super) fn merge(previous: Option<&Value>, mut incoming: Value) -> Value {
             .or_insert_with(|| json!({}))
             .as_object_mut();
         if let Some(collection) = collection {
+            if let Some(old) = previous
+                .and_then(|v| v.get("collection"))
+                .and_then(Value::as_object)
+            {
+                preserve_nullable(collection, old, "refreshSettled");
+                preserve_nullable(collection, old, "continueRefresh");
+            }
             collection.insert("complete".to_string(), Value::Bool(complete));
             collection.insert("observedCount".to_string(), Value::from(observed_count));
             collection.insert("availableCount".to_string(), Value::from(available_count));
             collection.insert(
                 "source".to_string(),
-                Value::String(if complete {
-                    "official_complete"
-                } else {
-                    "official_partial"
-                }
-                .to_string()),
+                Value::String(
+                    if complete {
+                        "official_complete"
+                    } else {
+                        "official_partial"
+                    }
+                    .to_string(),
+                ),
             );
         }
     }
@@ -84,11 +90,7 @@ fn records(snapshot: Option<&Value>, key: &str) -> Vec<Value> {
         .unwrap_or_default()
 }
 
-fn merge_conversations(
-    previous: Vec<Value>,
-    incoming: Vec<Value>,
-    complete: bool,
-) -> Vec<Value> {
+fn merge_conversations(previous: Vec<Value>, incoming: Vec<Value>, complete: bool) -> Vec<Value> {
     let previous_by_path = indexed(&previous);
     let observed_paths = incoming
         .iter()
@@ -119,7 +121,7 @@ fn merge_conversations(
             merged.push(previous);
         }
     }
-    merged.truncate(100);
+    merged.truncate(200);
     merged
 }
 
@@ -158,7 +160,7 @@ fn indexed(values: &[Value]) -> HashMap<String, Value> {
     indexed
 }
 
-fn combine_conversation(old: &Value, mut next: Value, complete: bool) -> Value {
+fn combine_conversation(old: &Value, mut next: Value, _complete: bool) -> Value {
     let Some(next_object) = next.as_object_mut() else {
         return next;
     };
@@ -170,16 +172,12 @@ fn combine_conversation(old: &Value, mut next: Value, complete: bool) -> Value {
     preserve_nullable(next_object, old_object, "projectId");
     preserve_text(next_object, old_object, "projectTitle");
     preserve_nullable(next_object, old_object, "projectPath");
-    let pinned = next_object
-        .get("pinned")
-        .and_then(Value::as_bool)
-        .unwrap_or(false)
-        || (!complete
-            && old_object
-                .get("pinned")
-                .and_then(Value::as_bool)
-                .unwrap_or(false));
-    next_object.insert("pinned".to_string(), Value::Bool(pinned));
+    // List completeness does not establish field completeness. Explicit false
+    // unpins even on a partial page; absent/null preserves the last known value.
+    preserve_nullable(next_object, old_object, "pinned");
+    preserve_nullable(next_object, old_object, "pinOrder");
+    preserve_nullable(next_object, old_object, "pinnedAt");
+    preserve_nullable(next_object, old_object, "updatedAt");
     next_object.insert(
         "activityDates".to_string(),
         Value::Array(merged_dates(old_object, next_object)),
@@ -195,6 +193,9 @@ fn combine_project(old: &Value, mut next: Value) -> Value {
         return next;
     };
     preserve_text(next_object, old_object, "title");
+    preserve_nullable(next_object, old_object, "pinned");
+    preserve_nullable(next_object, old_object, "pinOrder");
+    preserve_nullable(next_object, old_object, "pinnedAt");
     next
 }
 
@@ -243,7 +244,16 @@ fn merged_dates(old: &Map<String, Value>, next: &Map<String, Value>) -> Vec<Valu
 }
 
 fn path(value: &Value) -> Option<&str> {
-    value.get("path").and_then(Value::as_str).filter(|path| !path.is_empty())
+    value
+        .get("id")
+        .and_then(Value::as_str)
+        .filter(|id| !id.is_empty())
+        .or_else(|| {
+            value
+                .get("path")
+                .and_then(Value::as_str)
+                .filter(|path| !path.is_empty())
+        })
 }
 
 fn is_project_conversation(value: &Value) -> bool {
@@ -258,6 +268,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn typed_metadata_merges_by_id_and_explicit_unpin_wins() {
+        let old = json!({"conversations":[{"id":"one","path":"/c/one","pinned":true}],
+            "projects":[{"id":"g-p-one","path":"/g/g-p-one/project","pinned":true}],
+            "collection":{"refreshSettled":true,"continueRefresh":false}});
+        let next = json!({"conversations":[{"id":"one","path":"/g/g-p-one/c/one","pinned":false}],
+            "projects":[{"id":"g-p-one","path":"/g/g-p-one/project","pinned":false}],
+            "collection":{"complete":false,"refreshSettled":null,"continueRefresh":null}});
+        let merged = merge(Some(&old), next);
+        assert_eq!(merged["conversations"].as_array().unwrap().len(), 1);
+        assert_eq!(merged["conversations"][0]["pinned"], false);
+        assert_eq!(merged["projects"][0]["pinned"], false);
+        assert_eq!(merged["collection"]["refreshSettled"], true);
+        assert_eq!(merged["collection"]["continueRefresh"], false);
+    }
+
+    #[test]
     fn partial_directory_retains_cached_items_projects_and_pins() {
         let previous = json!({
             "type":"conversation_snapshot",
@@ -269,14 +295,20 @@ mod tests {
         });
         let incoming = json!({
             "type":"conversation_snapshot",
-            "conversations":[{"path":"/c/one","title":"One now","pinned":false,"active":true,"activityDates":["2026-08-16"]}],
+            "conversations":[{"path":"/c/one","title":"One now","pinned":null,"active":true,"activityDates":["2026-08-16"]}],
             "projects":[],
             "collection":{"complete":false,"observedCount":1}
         });
         let merged = merge(Some(&previous), incoming);
         assert_eq!(merged["conversations"].as_array().unwrap().len(), 2);
         assert_eq!(merged["conversations"][0]["pinned"], true);
-        assert_eq!(merged["conversations"][0]["activityDates"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            merged["conversations"][0]["activityDates"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
         assert_eq!(merged["projects"].as_array().unwrap().len(), 1);
         assert_eq!(merged["collection"]["source"], "official_partial");
     }

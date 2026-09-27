@@ -9,6 +9,9 @@ import {
   Search,
   ShieldCheck,
   SquarePen,
+  MoreHorizontal,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import type { AiWebChatBackend } from './useAiWebChatBackend'
 import { requestReturnToAiChat } from './internalBrowserApi'
@@ -17,19 +20,17 @@ import {
   localAiDirectoryNeedsAutoSync,
 } from './localAiDirectoryAutoSync'
 import styles from './AiWebChatSidebar.module.css'
+import { localAiDirectoryModel, type LocalAiDirectoryRow } from './localAiDirectoryModel'
+import AiWebDirectoryProjectRow from './AiWebDirectoryProjectRow'
+import AiWebProviderAvatar from './AiWebProviderAvatar'
 
 export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
   const busy = Boolean(web.controller.busyAction)
   const directory = web.controller.navigationSnapshot
   const conversations = directory?.conversations ?? []
   const [query, setQuery] = useState('')
-  const normalizedQuery = query.trim().toLocaleLowerCase()
-  const filtered = normalizedQuery
-    ? conversations.filter((item) => item.title.toLocaleLowerCase().includes(normalizedQuery))
-    : conversations
-  const pinned = filtered.filter((item) => item.pinned || /pinned|置顶/i.test(item.groupLabel))
-  const recent = filtered.filter((item) => !item.pinned && !/pinned|置顶/i.test(item.groupLabel))
-  const projects = directory?.projects ?? []
+  const { pinned, recent, projects } = localAiDirectoryModel(directory, query)
+  const [menuOpen, setMenuOpen] = useState(false)
   const cachedConversations = web.controller.sessionState?.localConversations ?? []
   const directoryNeedsAutoSync = localAiDirectoryNeedsAutoSync({
     navigationEvent: directory,
@@ -127,11 +128,15 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
           disabled={!web.userState.canNewConversation || busy}
         >
           <SquarePen size={17} />
-          <span><strong>新聊天</strong><small>在 {web.provider?.displayName || '网页 AI'} 新建会话</small></span>
+          <span><strong>新聊天</strong></span>
         </button>
+        <button type="button" title="ChatGPT 会话选项" aria-label="会话选项" aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(value => !value)}><MoreHorizontal size={18} /></button>
+      </section>
+      {menuOpen && <section className={styles.sessionMenu} aria-label="会话选项">
         <button type="button" onClick={() => void web.controller.openOfficial()} disabled={!web.ready || busy}>
           <MonitorUp size={16} />
-          <span><strong>显示官方页（登录可选）</strong><small>仅检查限制、登录、验证或故障回退时显示</small></span>
+          <span>打开官网 / 登录账号</span>
         </button>
         <button
           type="button"
@@ -139,9 +144,9 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
           disabled={!web.ready || busy}
         >
           <EyeOff size={16} />
-          <span><strong>收起官方页到后台</strong><small>继续使用当前一龙聊天界面</small></span>
+          <span>收起官网</span>
         </button>
-      </section>
+      </section>}
       <div className={styles.providerPane}>
         <div className={styles.heading}>聊天来源</div>
         <div className={styles.providerTabs} role="tablist" aria-label="网页 AI 来源">
@@ -157,7 +162,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
                 aria-selected={provider.id === web.provider?.id}
                 onClick={() => web.selectProvider(provider.id)}
               >
-                <span className={styles.logo}>{provider.id === 'chatgpt' ? '◎' : 'G'}</span>
+                <span className={styles.logo}><AiWebProviderAvatar providerId={provider.id} /></span>
                 <span className={styles.providerLabel}>
                   <strong>{provider.id === 'chatgpt' ? 'ChatGPT' : 'Google AI'}</strong>
                   {activity?.label && (
@@ -181,7 +186,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
             <div className={styles.directoryTitle}>
               <span>ChatGPT 网页聊天</span>
               {directory?.collection && (
-                <small>{directory.collection.complete ? '已完整同步' : '后台同步中'}</small>
+                <small>{web.controller.busyAction === 'list_conversations' ? '同步中' : directory.collection.refreshSettled || directory.collection.complete ? '已更新' : '本机目录'}</small>
               )}
               <button
                 type="button"
@@ -202,7 +207,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
               icon={<Pin size={13} />}
               title="置顶"
               items={pinned}
-              empty={directory ? '官网暂无可见置顶聊天' : '登录后可同步官网置顶聊天'}
+              empty="暂无已同步的置顶"
               action="open_conversation"
               web={web}
             />
@@ -210,18 +215,22 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
               icon={<FolderClosed size={13} />}
               title="项目"
               items={projects}
-              empty={directory ? '官网暂无可见项目' : '登录后可同步官网项目'}
+              empty="尚无已同步项目"
               action="open_project"
               web={web}
             />
             <DirectorySection
               icon={<MessageSquare size={13} />}
-              title="聊天"
+              title="最近"
               items={recent}
-              empty={directory ? '官网暂无可见聊天' : '访客可直接聊天；登录后自动同步历史'}
+              empty="尚无已同步聊天"
               action="open_conversation"
               web={web}
             />
+            <button className={styles.directoryItem} type="button" disabled={busy || !web.userState.canConversationHistory}
+              onClick={() => void web.controller.run('list_conversations', 'history')}>
+              <ChevronDown size={16} /><span>加载更早会话</span>
+            </button>
             {!conversations.length && cachedConversations.length > 0 && (
               <CachedConversationSection items={cachedConversations} web={web} />
             )}
@@ -281,7 +290,7 @@ export default function AiWebChatSidebar({ web }: { web: AiWebChatBackend }) {
                 ? '已立即显示本机缓存；正在后台同步官网会话与项目。'
                 : '已立即显示本机缓存；官网目录最近已验证，无需重复同步。'
               : directory?.collection && !directory.collection.complete
-              ? `已显示 ${conversations.length} 个缓存/可见会话；完整官网目录正在后台同步。`
+              ? `本机已同步 ${conversations.length} 个会话。`
               : web.contextSummary || web.userState.detail}
           </span>
         </div>
@@ -310,7 +319,6 @@ function CachedConversationSection({
           data-active={item.active}
           title={`${item.title} · 本机加密缓存`}
           onClick={() => void web.controller.openCachedConversation(item.id)}
-          disabled={Boolean(web.controller.busyAction)}
         >
           <span>{item.title}</span>
         </button>
@@ -331,32 +339,37 @@ function DirectorySection({
 }: {
   icon: ReactNode
   title: string
-  items?: Array<{
-    id: string
-    title: string
-    path: string
-    active: boolean
-  }>
+  items?: LocalAiDirectoryRow[]
   empty: string
   action?: 'open_conversation' | 'open_project'
   web: AiWebChatBackend
 }) {
   const visibleItems = items ?? []
+  const [expanded, setExpanded] = useState(false)
+  const shown = title === '项目' && !expanded ? visibleItems.slice(0, 5) : visibleItems
   return (
     <section className={styles.directorySection}>
       <div className={styles.sectionHeading}>{icon}<span>{title}</span>{visibleItems.length > 0 && <em>{visibleItems.length}</em>}</div>
-      {visibleItems.length ? visibleItems.map((item) => (
+      {visibleItems.length ? shown.map((item) => item.kind === 'project' ? <AiWebDirectoryProjectRow key={`${web.controller.sessionIdentity}:${item.id}`} item={item} web={web} /> : (
         <button
           className={styles.directoryItem}
           type="button"
           key={item.path}
           data-active={item.active}
           title={item.title}
-          onClick={() => action && void web.controller.run(action, item.path)}
+          onClick={() => web.provider?.id === 'chatgpt'
+              ? void web.controller.run('open_conversation', item.path)
+              : action && void web.controller.run(action, item.path)}
         >
+          <MessageSquare size={16} />
           <span>{item.title}</span>
         </button>
       )) : <p className={styles.empty}>{empty}</p>}
+      {title === '项目' && visibleItems.length > 5 && <button className={styles.directoryItem}
+        type="button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>
+        {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        <span>{expanded ? '收起' : '展开显示'}</span>
+      </button>}
     </section>
   )
 }

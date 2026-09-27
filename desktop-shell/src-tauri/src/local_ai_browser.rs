@@ -308,26 +308,46 @@ pub async fn open_local_ai_cached_conversation(
     let provider = provider(&provider_id)?;
     let fingerprint = resolve_owner_fingerprint(&app, provider, &owner_key)?;
     ensure_session_webview(&webview, provider, &fingerprint)?;
-    if conversation_id.len() != 16 || !conversation_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+    let is_path =
+        provider.id == "chatgpt" && adapter_command::is_safe_conversation_path(&conversation_id);
+    let cached_id = if is_path {
+        semantic_context::target_context_key(provider.id, &conversation_id)
+            .ok_or_else(|| "会话地址无效。".to_string())?
+    } else if conversation_id.len() == 16
+        && conversation_id.bytes().all(|byte| byte.is_ascii_hexdigit())
     {
+        conversation_id.clone()
+    } else {
         return Err("本机会话缓存标识无效。".to_string());
-    }
+    };
     let label = window_label(provider, &fingerprint);
     ensure_runtime_session(&app, runtime.inner(), provider, &fingerprint, &label)?;
-    let page = app
-        .get_webview(&label)
-        .ok_or_else(|| format!("请先打开 {} 官方网页。", provider.display_name))?;
-    let restorable_url = runtime
-        .activate_cached_conversation(&label, &conversation_id)
-        .ok_or_else(|| "本机会话缓存已失效，请刷新会话列表。".to_string())?;
+    let cached_url = runtime.activate_cached_conversation(&label, &cached_id);
+    let restorable_url = match cached_url.as_ref() {
+        Some(url) => url.clone(),
+        None if is_path => {
+            runtime.mark_command_pending_with_value(
+                &label,
+                "open_conversation",
+                None,
+                Some(&conversation_id),
+            );
+            format!("https://chatgpt.com{conversation_id}")
+        }
+        None => return Err("本机会话缓存已失效，请刷新会话列表。".to_string()),
+    };
     let url = restorable_url
         .parse::<Url>()
         .map_err(|error| format!("本机会话缓存地址无效：{error}"))?;
     if !allows_navigation(provider, &url) {
         return Err("本机会话缓存不再属于当前 AI 厂商。".to_string());
     }
-    if !chatgpt_cached_conversation_navigation::start(&page, provider.id, &url) {
-        page.navigate(url).map_err(display_error)?;
+    if let Some(page) = app.get_webview(&label) {
+        if !chatgpt_cached_conversation_navigation::start(&page, provider.id, &url) {
+            page.navigate(url).map_err(display_error)?;
+        }
+    } else if cached_url.is_none() {
+        return Err("当前会话尚未缓存，请连接 ChatGPT 后重试。".to_string());
     }
     runtime
         .snapshot(&label)

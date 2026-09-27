@@ -24,11 +24,13 @@ export function localAiDirectoryNeedsAutoSync({
   navigationUpdatedAtMs,
   nowMs = Date.now(),
 }: {
-  navigationEvent?: { collection?: { complete?: boolean } } | null
+  navigationEvent?: { collection?: { complete?: boolean; refreshSettled?: boolean; continueRefresh?: boolean } } | null
   navigationUpdatedAtMs?: number
   nowMs?: number
 }) {
-  if (navigationEvent?.collection?.complete !== true) return true
+  const collection = navigationEvent?.collection
+  if (collection?.continueRefresh === true) return true
+  if (collection?.complete !== true && collection?.refreshSettled !== true) return true
   const updatedAt = Number(navigationUpdatedAtMs) || 0
   if (updatedAt <= 0) return true
   return Math.max(0, nowMs - updatedAt) >= LOCAL_AI_DIRECTORY_FRESHNESS_MS

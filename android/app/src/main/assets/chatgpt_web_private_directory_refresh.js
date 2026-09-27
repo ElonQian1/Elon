@@ -1,6 +1,6 @@
 (function (root, factory) {
   'use strict';
-  const exported = Object.freeze({ version: 5, create: factory });
+  const exported = Object.freeze({ version: 6, create: factory });
   if (typeof module === 'object' && module.exports) module.exports = exported;
   if (root?.location?.origin === 'https://chatgpt.com') root.__elonChatGptPrivateDirectoryRefresh = exported;
 })(typeof window === 'object' ? window : null, function (root, accept, fetch) {
@@ -82,6 +82,11 @@
         state.pages += 1;
         state.complete = decoded.knownEnd && !state.truncated;
         state.finished = state.complete || decoded.next === null || state.truncated;
+        // Desktop renders its durable history cache and refreshes the recent head.
+        // Older pages remain an explicit request, never an idle full-history scan.
+        if (root.__elonWinDirectoryRecentOnly === true && job.scope === 'global' && scope === 'conversations') {
+          state.finished = true;
+        }
         if (state.finished) break;
         if (items.size >= page.maximum) { state.truncated = true; state.finished = true; break; }
         if (before === items.size) throw new Error('directory_cursor_stalled');

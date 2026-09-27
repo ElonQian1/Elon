@@ -1,0 +1,5 @@
+.status { padding: 24px 16px; color: var(--text-secondary, #aaa); }
+.status p { margin: 0 0 12px; }
+.status div { display: flex; gap: 12px; flex-wrap: wrap; }
+.status button { display: inline-flex; align-items: center; gap: 6px; background: transparent; color: inherit; border: 1px solid var(--border-color, #444); padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+.status button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

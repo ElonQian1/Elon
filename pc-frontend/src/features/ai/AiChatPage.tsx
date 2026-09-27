@@ -29,7 +29,7 @@ import useAiWebChatBackend from '../user-browser/useAiWebChatBackend'
 import GroupAiContinuation from '../friends/group-ai/GroupAiContinuation'
 import useLocalAiOwnerIdentity from '../user-browser/useLocalAiOwnerIdentity'
 import AiChatTopbar from './AiChatTopbar'
-import AiChatWelcome from './AiChatWelcome'
+import AiChatEmptyState from './AiChatEmptyState'
 import AiBrowserExperience from '../user-browser/AiBrowserExperience'
 import type { AiHomeMode } from './AiHomeModeSwitch'
 import AiPinnedTools from './AiPinnedTools'
@@ -784,7 +784,7 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
           <span>一龙 AI</span>
           <button className={styles.newBtn} onClick={newConversation} title="新对话" type="button" disabled={visibleSending || (chatMode && !web.userState.canNewConversation)}>+</button>
         </div>
-        <WorkspaceFeatureNav excludedPaths={['/doctor']} />{chatMode ? <AiWebChatSidebar web={web} /> : <><AiPinnedTools
+        {!chatMode && <WorkspaceFeatureNav excludedPaths={['/doctor']} />}{chatMode ? <AiWebChatSidebar web={web} /> : <><AiPinnedTools
             sending={sending}
             onNewConversation={newConversation}
             onOpenDoctor={() => navigate('/doctor')}
@@ -865,18 +865,9 @@ export default function AiChatPage({ mode, onModeChange }: { mode: AiHomeMode; o
         >
           {chatMode && <AiWebClientUpgradeNotice web={web} />}
           {!chatMode && onlineNodeId && <NodeStatusBanner onlineNodeId={onlineNodeId} onlineNodeName={onlineNodeName} />}
-          {visibleMessages.length === 0 && !visibleMessageLoading && (
-            <AiChatWelcome
-              chatMode={chatMode}
-              identityReady={visibleIdentityReady}
-              onlineNodeId={onlineNodeId || ''}
-              onlineNodeName={onlineNodeName}
-              sending={visibleSending}
-              web={web}
-              onLogin={() => setLoginDialogOpen(true)}
-            />
-          )}
-          {visibleMessageLoading && <p className={styles.hint}>{chatMode ? '正在连接本地网页 AI…' : '读取消息…'}</p>}
+          <AiChatEmptyState hasMessages={visibleMessages.length > 0} loading={visibleMessageLoading}
+            chatMode={chatMode} identityReady={visibleIdentityReady} onlineNodeId={onlineNodeId || ''}
+            onlineNodeName={onlineNodeName} sending={visibleSending} web={web} onLogin={() => setLoginDialogOpen(true)} />
           <AiChatMessageRows
             messages={visibleMessages}
             chatMode={chatMode}

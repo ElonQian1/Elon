@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   localAiBrowserErrorMessage,
   openLocalAiCachedConversation,
@@ -30,14 +30,16 @@ export default function useLocalAiCachedConversationNavigation({
   onMessage,
   onState,
 }: Options) {
+  const [selection, setSelection] = useState({ sessionIdentity: '', target: '' })
   const queue = useMemo(
     () => new LocalAiConversationOpenQueue(sessionIdentity),
     [sessionIdentity],
   )
 
-  return useCallback(async (conversationId: string) => {
+  const open = useCallback(async (conversationId: string) => {
     if (!provider || !ownerKey) return
     if (busyAction && busyAction !== 'open_cached_conversation') return
+    setSelection({ sessionIdentity, target: conversationId })
     const startsDrain = queue.enqueue(conversationId)
     if (!startsDrain) {
       onMessage('已更新为最近选择的会话；当前导航完成后会立即切换，不会串入旧会话。')
@@ -50,16 +52,16 @@ export default function useLocalAiCachedConversationNavigation({
       let request = queue.take()
       while (request) {
         if (!isSessionCurrent(request.sessionIdentity)) break
-        onMessage('正在从本机缓存恢复会话，并在后台连接官方上下文…')
+        onMessage('正在读取会话；已有记录会先从本机显示。')
         try {
           const next = await openLocalAiCachedConversation(
             provider.id,
             ownerKey,
             request.conversationId,
           )
-          if (isSessionCurrent(request.sessionIdentity)) onState(next)
+          if (isSessionCurrent(request.sessionIdentity) && !queue.hasPending()) onState(next)
           if (isSessionCurrent(request.sessionIdentity) && !queue.hasPending()) {
-            onMessage('已立即恢复本机会话缓存；官方页面正在后台同步最新内容。')
+            onMessage(next.semanticEvent ? '正在后台更新会话。' : '正在读取会话正文。')
           }
         } catch (error) {
           if (isSessionCurrent(request.sessionIdentity) && !queue.hasPending()) {
@@ -74,4 +76,6 @@ export default function useLocalAiCachedConversationNavigation({
     }
   }, [beforeOpen, busyAction, isSessionCurrent, onBusyAction, onMessage, onState, ownerKey,
     provider, queue, sessionIdentity])
+  return { open, readTarget: selection.sessionIdentity === sessionIdentity ? selection.target : '',
+    clearReadTarget: () => setSelection({ sessionIdentity: '', target: '' }) }
 }

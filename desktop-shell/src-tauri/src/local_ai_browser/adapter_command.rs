@@ -84,6 +84,14 @@ pub fn build(
     }
     if action == "list_conversations" {
         command.insert("fastDirectoryAck".to_string(), Value::Bool(true));
+        if provider_name == "ChatGPT" {
+            if let Some(project_id) = value.as_deref().filter(|v| is_safe_project_id(v)) {
+                command.insert(
+                    "projectScopeId".to_string(),
+                    Value::String(project_id.to_string()),
+                );
+            }
+        }
     }
     if let Some(request_id) = request_id {
         if !is_safe_request_id(&request_id) {

@@ -1,6 +1,8 @@
 use super::*;
 use serde_json::json;
 
+#[path = "tests/attachment_transport.rs"]
+mod attachment_transport;
 #[path = "tests/document.rs"]
 mod document;
 #[path = "tests/new_conversation.rs"]
@@ -9,8 +11,6 @@ mod new_conversation;
 mod provider_diagnostics;
 #[path = "tests/realtime_voice.rs"]
 mod realtime_voice;
-#[path = "tests/attachment_transport.rs"]
-mod attachment_transport;
 
 #[test]
 fn private_stream_state_is_authoritative_over_stale_dom_streaming() {
@@ -100,7 +100,7 @@ fn partial_official_directory_updates_do_not_erase_cached_sidebar_items() {
         "conversation_snapshot",
         json!({
             "type":"conversation_snapshot",
-            "conversations":[{"path":"/c/one","title":"One updated","pinned":false}],
+            "conversations":[{"path":"/c/one","title":"One updated","pinned":null}],
             "projects":[],
             "collection":{"complete":false,"observedCount":1}
         }),
@@ -129,7 +129,13 @@ fn only_complete_official_directory_advances_verified_freshness() {
             "collection":{"complete":false,"observedCount":1}
         }),
     );
-    assert_eq!(runtime.snapshot("session").unwrap().navigation_updated_at_ms, 0);
+    assert_eq!(
+        runtime
+            .snapshot("session")
+            .unwrap()
+            .navigation_updated_at_ms,
+        0
+    );
 
     runtime.record_adapter_event(
         "session",
@@ -141,7 +147,10 @@ fn only_complete_official_directory_advances_verified_freshness() {
             "collection":{"complete":true,"observedCount":1}
         }),
     );
-    let verified_at = runtime.snapshot("session").unwrap().navigation_updated_at_ms;
+    let verified_at = runtime
+        .snapshot("session")
+        .unwrap()
+        .navigation_updated_at_ms;
     assert!(verified_at > 0);
 
     runtime.record_adapter_event(
@@ -155,12 +164,21 @@ fn only_complete_official_directory_advances_verified_freshness() {
         }),
     );
     assert_eq!(
-        runtime.snapshot("session").unwrap().navigation_updated_at_ms,
+        runtime
+            .snapshot("session")
+            .unwrap()
+            .navigation_updated_at_ms,
         verified_at
     );
 
     runtime.mark_command_pending("session", "new_conversation", Some("new-chat"));
-    assert_eq!(runtime.snapshot("session").unwrap().navigation_updated_at_ms, 0);
+    assert_eq!(
+        runtime
+            .snapshot("session")
+            .unwrap()
+            .navigation_updated_at_ms,
+        0
+    );
 }
 
 #[test]
@@ -404,10 +422,8 @@ fn google_conversation_cache_exposes_only_opaque_metadata_and_restores_messages(
 fn google_cached_conversation_rejects_a_partial_live_history_overwrite() {
     let runtime = LocalAiBrowserRuntime::default();
     runtime.ensure_session("session", "google-ai-mode", "active");
-    let url = Url::parse(
-        "https://www.google.com/search?q=first&udm=50&csuir=thread_history_1234",
-    )
-    .unwrap();
+    let url = Url::parse("https://www.google.com/search?q=first&udm=50&csuir=thread_history_1234")
+        .unwrap();
     runtime.mark_navigation("session", &url, true, None);
     let context_key = semantic_context::page_context_key("google-ai-mode", url.as_str());
     runtime.record_adapter_event_with_context(

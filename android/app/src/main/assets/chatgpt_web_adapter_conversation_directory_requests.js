@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 13) return;
+  if (Number(window.__elonChatGptConversationDirectoryRequests?.version) >= 14) return;
 
   const PROJECT_ID = /^g-p-[A-Za-z0-9_-]{1,160}$/;
   const CONVERSATION_PATH = /^\/(?:c\/[A-Za-z0-9_-]{1,160}|g\/g-p-[A-Za-z0-9_-]{1,160}\/c\/[A-Za-z0-9_-]{1,160})$/;
@@ -25,7 +25,8 @@
       const projectId = PROJECT_ID.test(String(requestedProjectId || ''))
         ? String(requestedProjectId)
         : '';
-      const conversations = projectId
+      const desktop = privateDirectory?.winDirectoryVersion >= 1;
+      const conversations = projectId && !desktop
         ? value.conversations.filter((item) => item && item.projectId === projectId)
         : value.conversations;
       const removedConversationIds = Array.isArray(value.removedConversationIds)
@@ -33,7 +34,7 @@
         : [];
       const deletedConversationIds = Array.isArray(value.deletedConversationIds)
         ? value.deletedConversationIds.slice(0, 200) : [];
-      const complete = Boolean(projectId && scopedComplete === true);
+      const complete = Boolean(projectId && scopedComplete === true && !desktop);
       const scopeKey = projectId || 'global';
       const fingerprint = JSON.stringify({
         conversations,
@@ -66,6 +67,8 @@
           steps: outcome?.pages || 0,
           complete,
           source: 'official_private',
+          refreshSettled: outcome ? outcome.ok === true && outcome.continueRefresh !== true : null,
+          continueRefresh: outcome ? outcome.continueRefresh === true : null,
           officialLoadState: 'ready'
         }
       });
@@ -100,7 +103,7 @@
         return;
       }
       if (!projectId && !privateDisabled && typeof privateDirectory?.refresh === 'function') {
-        Promise.resolve().then(() => privateDirectory.refresh()).then((result) => {
+        Promise.resolve().then(() => privateDirectory.refresh(command?.value === 'history' ? 'history' : undefined)).then((result) => {
           if (!current()) return;
           if (result?.ok) emitSnapshot(null, false, result, command.requestId);
           respond('list_conversations', result?.ok === true, result?.code || 'directory_refresh_failed');
@@ -189,5 +192,5 @@
     return Object.freeze({ cancel, emitSnapshot, handleCommand, installListener, probeMembership, requestList });
   }
 
-  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 13, create });
+  window.__elonChatGptConversationDirectoryRequests = Object.freeze({ version: 14, create });
 })();

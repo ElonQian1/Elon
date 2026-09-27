@@ -414,7 +414,7 @@ export default function useLocalAiWebChatController(
     onMessage: setMessage, onState: setSessionState,
   })
 
-  const openCachedConversation = useLocalAiCachedConversationNavigation({
+  const { open: openCachedConversation, readTarget, clearReadTarget } = useLocalAiCachedConversationNavigation({
     provider,
     ownerKey,
     sessionIdentity: requestedSessionIdentity,
@@ -469,6 +469,10 @@ export default function useLocalAiWebChatController(
       return visibleSessionState
     }
     if (busyAction || (action === 'send_prompt' && !composerAvailability.canSubmit)) return null
+    if (action === 'open_conversation' && provider.id === 'chatgpt' && value) {
+      await openCachedConversation(value)
+      return null
+    }
     if (action === 'new_conversation') {
       return startNewConversation()
     }
@@ -549,6 +553,7 @@ export default function useLocalAiWebChatController(
   })
 
   function beginLocalNewConversation() {
+    clearReadTarget()
     const previousDraft = draftRef.current
     beginNewConversationTransition(visibleSessionState?.activeConversationId ?? '')
     sendFlightLedger.invalidate()
@@ -773,6 +778,7 @@ export default function useLocalAiWebChatController(
     openResearchDirectory,
     control,
     openCachedConversation,
+    readTarget,
     run,
     refreshComposerControls,
     refreshFeatureNavigation,

@@ -43,7 +43,7 @@ assert(directoryRequestsSource.includes("action === 'probe_conversation_project'
 assert(directoryRequestsSource.includes("source: 'official_private'"));
 assert(directoryRequestsSource.includes("scopeProjectId: projectId || null"));
 assert.match(directoryRequestsSource, /emitSnapshot\(projectId, true, \{ ok: true/);
-assert(directoryRequestsSource.includes('const complete = Boolean(projectId && scopedComplete === true)'));
+assert(directoryRequestsSource.includes('const complete = Boolean(projectId && scopedComplete === true && !desktop)'));
 assert(directoryRequestsSource.includes("value.conversations.filter((item) => item && item.projectId === projectId)"));
 assert(source.includes('replaceProjectConversations(projectId, text)'));
 assert.match(pageAdapterSource, /internal const val ADAPTER_VERSION = \d+/);
@@ -180,7 +180,7 @@ async function flush() {
 (async () => {
   const directory = window.__elonChatGptPrivateConversationDirectory;
   assert(directory);
-  assert.strictEqual(directory.version, 15);
+  assert.strictEqual(directory.version, 16);
   let notifications = 0;
   directory.setListener(() => { notifications += 1; });
 

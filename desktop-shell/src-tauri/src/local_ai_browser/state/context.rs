@@ -65,6 +65,15 @@ impl SessionRecord {
             self.last_event_kind = "new_conversation_transition_timed_out".to_string();
             return;
         }
+        if matches!(
+            self.pending_context_action.as_str(),
+            "open_conversation" | "open_cached_conversation"
+        ) {
+            // A read timeout cannot select the previous conversation again.
+            // Retain the target and fail closed for sends until its body arrives.
+            self.last_event_kind = "conversation_read_pending".to_string();
+            return;
+        }
         self.active_conversation_id = self.semantic_conversation_id.clone();
         self.active_page_context_key = self.semantic_page_context_key.clone();
         self.pending_context_action.clear();

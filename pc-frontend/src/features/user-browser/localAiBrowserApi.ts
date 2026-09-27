@@ -167,7 +167,10 @@ export interface LocalAiConversationDirectoryItem {
   title: string
   path: string
   active: boolean
-  pinned?: boolean
+  pinned?: boolean | null
+  pinOrder?: number | null
+  pinnedAt?: number | null
+  updatedAt?: number | null
   groupLabel: string
   projectId?: string | null
   projectTitle?: string
@@ -186,6 +189,8 @@ export interface LocalAiConversationCollection {
   availableCount?: number
   steps: number
   complete: boolean
+  refreshSettled?: boolean
+  continueRefresh?: boolean
   source?: 'official_partial' | 'official_complete'
 }
 
@@ -194,6 +199,9 @@ export interface LocalAiProjectDirectoryItem {
   title: string
   path: string
   active: boolean
+  pinned?: boolean | null
+  pinOrder?: number | null
+  pinnedAt?: number | null
 }
 
 export interface LocalAiConversationSnapshot {
@@ -473,7 +481,10 @@ export async function openLocalAiCachedConversation(
   conversationId: string,
 ): Promise<LocalAiWebSessionState> {
   assertIdentity(providerId, ownerKey)
-  if (!/^[a-f0-9]{16}$/i.test(conversationId)) throw new Error('本机会话缓存标识无效。')
+  if (!/^[a-f0-9]{16}$/i.test(conversationId)
+    && !/^\/(?:g\/g-p-[A-Za-z0-9_-]{1,160}\/)?c\/[A-Za-z0-9_-]{1,160}$/.test(conversationId)) {
+    throw new Error('会话地址或本机缓存标识无效。')
+  }
   const state = await invokeDesktop<LocalAiWebSessionState>('open_local_ai_cached_conversation', {
     providerId,
     ownerKey,

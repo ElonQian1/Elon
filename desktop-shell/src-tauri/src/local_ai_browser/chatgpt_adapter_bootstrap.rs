@@ -1,5 +1,6 @@
 const ALLOWED_ORIGIN: &str = "https://chatgpt.com";
-pub(super) const ADAPTER_VERSION: u32 = 215;
+pub(super) const ADAPTER_VERSION: u32 = 216;
+const WIN_DIRECTORY: &str = include_str!("chatgpt_win_directory.js");
 
 const WIN_RICH_CONTENT_ADAPTER: &str = include_str!("chatgpt_rich_content_adapter.js");
 const WIN_COMMON_RICH_CONTENT_ADAPTER: &str = include_str!("rich_content_dom_adapter.js");
@@ -278,7 +279,9 @@ pub(super) fn initialization_script() -> String {
                 "window.__elonChatGptBootstrapStage = '{}';\n{}",
                 name, source
             );
-            if *name == "chatgpt_web_adapter_messages.js" {
+            if *name == "chatgpt_web_private_conversation_directory.js" {
+                format!("{}\n{}", shared, WIN_DIRECTORY)
+            } else if *name == "chatgpt_web_adapter_messages.js" {
                 format!(
                     "window.__elonChatGptBootstrapStage = 'rich_content_dom_adapter.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_rich_content_adapter.js';\n{}\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_realtime_voice_json_delta.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_realtime_voice_transcript.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_citation_adapter.js';\n{}\nwindow.__elonChatGptBootstrapStage = 'chatgpt_win_new_conversation_guard.js';\n{}",
                     WIN_COMMON_RICH_CONTENT_ADAPTER,
@@ -484,12 +487,16 @@ mod tests {
         let android_assets = include_str!(
             "../../../../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAdapterAssets.kt"
         );
+        let android_page_assets = include_str!(
+            "../../../../android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt"
+        );
         // Android's manifest moved out of PageAdapter and now includes mobile-only
         // capabilities. The desktop baseline intentionally retains its reviewed subset.
         assert!(ADAPTER_ASSETS.len() > 40);
         for (name, _) in ADAPTER_ASSETS {
             assert!(
-                android_assets.contains(&format!("\"{name}\"")),
+                android_assets.contains(&format!("\"{name}\""))
+                    || android_page_assets.contains(&format!("\"{name}\"")),
                 "unreviewed asset {name}"
             );
             assert!(script.contains(&format!("window.__elonChatGptBootstrapStage = '{name}';")));
