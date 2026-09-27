@@ -36,7 +36,7 @@ Android/PWA 读 `.agents/skills/apk-ui/SKILL.md`，以 `docs/design/mobile-desig
 | 量化/币安 | 先读 `docs/requirements/android-exchange-session-host-v2.md` |
 | 子项目 Git 工作流 | `scripts/templates/subproject-lite-workflow/README.md` |
 | APP 低风险视觉微调 | `docs/app-ui-fast-lane.md` |
-| APP 复杂 UI/按图还原 | V2 入口；导入读 `docs/stitch-design-import.md`，双端读 `.github/instructions/apk-web-ui-sync.instructions.md` |
+| Stitch/Figma、APP UI | V2 入口；导入读 `docs/stitch-design-import.md`，双端读 `.github/instructions/apk-web-ui-sync.instructions.md` |
 | APP 版本记忆 | `docs/app-version-memory.md` |
 | 一龙 Logo 替换 | `docs/brand-logo-workflow.md`；统一运行 `scripts/replace-brand-logo.ps1` |
 | Prompt/Agent/Skill | 仅按目标读取；去重先运行 `scripts/audit-ai-prompt-assets.ps1` |

@@ -81,7 +81,9 @@ class ProfilePageLayoutContractTest {
         assertTrue(web.contains("id=\"logoutRow\""))
         assertTrue(orbitalTheme.contains("--profile-account-action: var(--link)"))
         assertTrue(web.contains("color: var(--profile-account-action)"))
-        listOf("PC 节点", "AI 记忆", "AI 代理设置", "Agent 自动化", "分享推广", "检测更新", "退出登录")
+        assertTrue(web.contains("id=\"checkUpdateRow\""))
+        assertTrue(web.contains("checkUpdateRow.addEventListener('click'"))
+        listOf("PC 节点", "AI 记忆", "AI 代理设置", "Agent 自动化", "分享推广", "退出登录")
             .forEach { label -> assertTrue(web.contains(label)) }
     }
 

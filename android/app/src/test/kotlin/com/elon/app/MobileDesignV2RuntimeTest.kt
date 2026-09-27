@@ -16,6 +16,42 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = android.app.Application::class)
 class MobileDesignV2RuntimeTest {
+    @Test fun featuredCardKeepsActionsReachableAndDoesNotInventRuntimeStatus() {
+        for (mode in listOf("light", "dark")) for (scale in listOf(1f, 2f)) {
+            val context = android.view.ContextThemeWrapper(context(mode, scale), R.style.Theme_ElonApp)
+            val density = context.resources.displayMetrics.density
+            val project = StoreProject(id = "v2-preview", name = "很长的中文项目名称用于布局检查",
+                description = "用于验证大字体的项目简介，加入项目不代表项目正在运行。", template = "android",
+                ownerAccount = "preview", memberCount = 12, isPublic = true, joinMode = "open", lastTaskStatus = null)
+            val prefs = context.getSharedPreferences("mobile_v2_plaza", Context.MODE_PRIVATE)
+            prefs.edit().clear().commit()
+            var opened = false
+            val root = ProjectPlazaFeaturedSection(context, { (it * density).toInt() }, { null },
+                prefs, {}, { true }, { projectPlazaPrimaryAction(it, joined = true) }, { opened = true })
+                .build(listOf(project))
+            root.measure(View.MeasureSpec.makeMeasureSpec((320 * density).toInt(), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            root.layout(0, 0, root.measuredWidth, root.measuredHeight)
+            val views = descendants(root)
+            val action = views.filterIsInstance<TextView>().single { it.text == "进入空间" }
+            assertTrue(action.height >= (48 * density).toInt())
+            assertTrue(action.right <= (action.parent as View).width)
+            assertTrue(action.bottom <= (action.parent as View).height)
+            action.performClick()
+            assertTrue(opened)
+            for (label in listOf("收藏", "点赞")) {
+                val button = views.single { it.contentDescription == label }
+                assertTrue(button.width >= (48 * density).toInt())
+                assertTrue(button.height >= (48 * density).toInt())
+                assertTrue(button.right <= (button.parent as View).width)
+                button.performClick()
+                assertEquals("取消$label", button.contentDescription)
+            }
+            assertTrue(views.filterIsInstance<TextView>().any { it.text == "已加入" })
+            assertFalse(views.filterIsInstance<TextView>().any { it.text == "运行中" })
+        }
+    }
+
     @Test fun productionProjectRowsReflowAndTabsRemainUsableAtLargeFontSizes() {
         for (widthDp in listOf(320, 411, 600)) for (scale in listOf(1f, 2f)) {
             val context = context("light", scale)

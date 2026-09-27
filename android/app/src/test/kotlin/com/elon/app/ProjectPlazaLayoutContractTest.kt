@@ -44,14 +44,10 @@ class ProjectPlazaLayoutContractTest {
             "R.drawable.project_plaza_ui5_star"
         ).forEach { resource -> assertTrue(featured.contains(resource)) }
         assertTrue(marketplace.contains("featuredSection.build(projects.take(5))"))
-        assertTrue(featured.contains("text = \"精选项目\""))
         assertTrue(featured.contains("val action = primaryAction(project)"))
         assertTrue(featured.contains("projectPlazaProjectCover("))
-        assertTrue(featured.contains("val build = projectPlazaBuildStatus(project.lastTaskStatus)"))
-        assertTrue(featured.contains("text = \"精选节点\""))
-        assertTrue(featured.contains("text = \"NODE "))
-        assertTrue(featured.contains("R.color.elon_plaza_surface_header"))
-        assertTrue(featured.contains("R.color.elon_plaza_signal"))
+        assertTrue(featured.contains("projectPlazaAccessStatus(project, isProjectJoined(project))"))
+        assertFalse(featured.contains("\"运行中\""))
         assertTrue(featured.contains("R.color.elon_plaza_status_success"))
         assertTrue(featured.contains("R.color.elon_plaza_status_danger"))
         assertFalse(featured.contains("R.drawable.project_plaza_ui1_card"))
@@ -81,7 +77,6 @@ class ProjectPlazaLayoutContractTest {
         assertTrue(styles.contains("--plaza-action-end: var(--brand);"))
         assertTrue(styles.contains("--plaza-success: var(--success);"))
         assertTrue(styles.contains("--plaza-danger: var(--danger);"))
-        assertTrue(script.contains("<strong>精选节点</strong><span>NODE"))
     }
 
     @Test
@@ -117,8 +112,9 @@ class ProjectPlazaLayoutContractTest {
             .substringBefore("private fun projectThumbnail")
 
         assertTrue(projectListRow.contains("LinearLayout.LayoutParams(dp(48), dp(48))"))
-        assertTrue(featuredSource.contains("ACTION_HEIGHT_DP = 48"))
-        assertTrue(featuredSource.contains("LinearLayout.LayoutParams(0, dp(ACTION_HEIGHT_DP), 1f)"))
+        val actionHeight = Regex("ACTION_HEIGHT_DP = (\\d+)").find(featuredSource)!!.groupValues[1].toInt()
+        assertTrue(actionHeight >= 48)
+        assertTrue(featuredSource.contains("dp(ACTION_HEIGHT_DP)"))
         assertTrue(webStyles.contains(".project-plaza-featured-primary"))
         assertTrue(webStyles.contains(".project-plaza-reaction"))
         assertTrue(webStyles.contains(".project-plaza-open"))
@@ -136,8 +132,8 @@ class ProjectPlazaLayoutContractTest {
         assertTrue(androidSource.contains("shell.addView(buildSearchBar())"))
         assertTrue(androidSource.contains("shell.addView(buildFilterScroller()"))
         assertTrue(androidSource.contains("R.drawable.ic_top_search_custom"))
-        assertTrue(webScript.contains("placeholder=\"搜索项目、作者\""))
-        assertTrue(mobileWeb.contains("data-search-artwork=\"/assets/project_view_search_icon.png\""))
+        assertTrue(webScript.contains("data-plaza-action=\"search\""))
+        assertTrue(webScript.contains("aria-label=\"搜索项目\""))
     }
 
     @Test
