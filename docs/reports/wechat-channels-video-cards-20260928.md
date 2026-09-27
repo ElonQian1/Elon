@@ -31,7 +31,21 @@ Win 和 PWA 复用 `social_links.js/css`，APK 使用原生 `SocialLinkCardView`
   作者栏不覆盖封面、无横向溢出、点击与键盘打开、头像失败、长作者名。
 - Android 15 项定向测试通过，包含实际触摸命中播放图标/作者/头像、长按、多选和头像清空。
 - 生产 Rust 显式网络测试通过：真实封面、64px 作者头像下载及新鲜微信跳转参数。
-- 微信跳转共享 JS 的 6 项测试通过。发布与设备安装回执另行补记。
+- 微信跳转共享 JS 的 6 项测试通过。
+
+## 发布回执
+
+- 功能提交：`2780a004110212de354056a1f595865364fc3f4a`，已推送 `origin/main`。
+- Server `0.3.1784` 与 PC 前端同 SHA 发布；`/pc/assets/release.json`、群聊懒加载
+  JS/CSS、PWA 卡片资源实读确认新播放标识及头像字段。TypeScript/Vite 生产构建通过。
+- APK `1.1.1823` / build `1823` 已发布；SHA-256：
+  `ed6ae71c09dce471d3172f7f905593bc21a8062270e93e5e5a6f586a6b3cc924`。
+- APK 内 177 项官网聊天资源逐项 SHA 校验、manifest 版本校验通过。
+- 登记小米自动覆盖安装成功，回读 build `1823`；荣耀离线，未操作未清数据。
+- 真机卡片视觉与 Win 外壳当前窗口未重新截图验收；浏览器渲染和 Android 触摸测试
+  不能写成两台实机均已验收。视频号播放/Windows 精确定位仍沿用原有能力边界。
+- 本机 PowerShell 5.1 发布进程丢失 `Get-FileHash` 函数可见性，切换已安装的
+  PowerShell 7 后发布完成；复用已有 Gradle 产物，不跳过哈希或版本校验。
 
 可重复检查：`node scripts/test-social-link-cards.mjs`；安装 Playwright 后运行
 `node scripts/test-channels-card-render.mjs`（需要访问明确的公开视频号样本；支持
