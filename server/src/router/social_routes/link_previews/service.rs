@@ -1,4 +1,7 @@
 //! Bounded, disposable public link metadata, shared by HTTP and the production-source harness.
+#[path = "channels.rs"]
+mod channels;
+pub(super) use channels::handoff as channels_handoff;
 #[path = "cover.rs"]
 mod cover;
 #[path = "fetch.rs"]

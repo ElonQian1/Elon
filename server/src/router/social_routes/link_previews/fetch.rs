@@ -63,6 +63,9 @@ async fn body(mut response: reqwest::Response, head: bool) -> Result<String> {
 }
 
 pub(super) async fn resolve(mut url: Url) -> Result<Preview> {
+    if super::channels::short_id(&url).is_some() {
+        return super::channels::preview(url).await;
+    }
     let original = url.clone();
     let mut page = None;
     // X exposes an official oEmbed endpoint. Do not parse its application HTML shell.

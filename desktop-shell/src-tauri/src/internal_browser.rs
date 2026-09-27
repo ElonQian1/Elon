@@ -22,6 +22,8 @@ use crate::{
 mod popout;
 #[path = "internal_browser_read_preview.rs"]
 mod read_preview;
+#[path = "internal_browser_wechat.rs"]
+pub(crate) mod wechat;
 
 const LABEL_PREFIX: &str = "internal-browser-";
 const DEFAULT_TAB_ID: &str = "source";
@@ -286,6 +288,7 @@ pub async fn control_internal_browser_tab(
             let current = runtime.snapshot(&tab_id)?.current_url;
             external_navigation::open_in_system_browser(&parse_external_url(&current)?)?;
         }
+        "wechat" => wechat::open(&tab, &runtime, &tab_id).await?,
         "close" => {
             close_tab(&app, &runtime, &tab_id);
             return Ok(None);

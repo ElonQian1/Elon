@@ -39,6 +39,7 @@ class SocialLinkBrowserActivity : AppCompatActivity(), SocialLinkReaderSessions.
     private var session: SocialLinkReaderSessions.Session? = null
     private var full: View? = null
     private var closing = false
+    private val wechat by lazy { WechatChannelsHandoff(this, ::onStatus) }
     private val pipSupported by lazy { packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,7 +57,9 @@ class SocialLinkBrowserActivity : AppCompatActivity(), SocialLinkReaderSessions.
         button("返回聊天", R.id.external_reader_chat) { minimize() }
         button("后退", R.id.external_reader_back) { session?.web?.let { if (it.canGoBack()) it.goBack() } }
         button("刷新", R.id.external_reader_refresh) { session?.web?.reload() }
-        button("打开原文", R.id.external_reader_original) { external(link.url) }
+        button(if (WechatChannelsPolicy.isChannels(link.url)) "微信打开" else "打开原文", R.id.external_reader_original) {
+            if (WechatChannelsPolicy.isChannels(link.url)) session?.web?.let(wechat::openCurrent) else external(link.url)
+        }
         link.xId?.let { id -> button("嵌入查看", R.id.external_reader_embed) { embeddedX(id) } }
         button("关闭", R.id.external_reader_close) { close() }
         status = TextView(this).apply { textSize = 12f; setTextColor(Color.parseColor("#B7BDC8")); setPadding(dp(16), dp(4), dp(16), dp(8)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
@@ -110,6 +113,7 @@ class SocialLinkBrowserActivity : AppCompatActivity(), SocialLinkReaderSessions.
     }
 
     override fun onStatus(text: String) { if (status.text.toString() != text) status.text = text }
+    override fun onWechatLink(url: String) { session?.web?.let { wechat.confirmPageLink(it, url) } }
     override fun onLoading(loading: Boolean) { progress.visibility = if (loading) View.VISIBLE else View.INVISIBLE }
     override fun onShowFullscreen(view: View, callback: WebChromeClient.CustomViewCallback) {
         full = view; main.visibility = View.GONE; root.addView(view, 0, FrameLayout.LayoutParams(-1, -1))
@@ -142,9 +146,10 @@ class SocialLinkBrowserActivity : AppCompatActivity(), SocialLinkReaderSessions.
     override fun onStart() { super.onStart(); inbox.attach() }
     override fun onStop() { inbox.detach(); super.onStop() }
     // In picture-in-picture the Activity is paused but visible; the video must keep playing.
-    override fun onPause() { if (!isInPictureInPictureMode) session?.web?.onPause(); super.onPause() }
+    override fun onPause() { wechat.cancel(); if (!isInPictureInPictureMode) session?.web?.onPause(); super.onPause() }
     override fun onResume() { super.onResume(); session?.let { it.web.onResume(); it.diagnostics.resume() } }
     override fun onDestroy() {
+        wechat.cancel()
         // System-initiated destruction (not 返回聊天/关闭) also keeps the page alive in the bubble.
         session?.let { if (!closing) SocialLinkReaderSessions.detach(it, applicationContext) }
         session = null

@@ -6,6 +6,12 @@ const base = new URL('../server/src/assets/', import.meta.url);
 vm.runInContext(readFileSync(new URL('social_links.js', base), 'utf8'), context);
 vm.runInContext(readFileSync(new URL('social_link_viewer.js', base), 'utf8'), context);
 const links = context.ElonSocialLinks;
+const channelsUrl = 'https://weixin.qq.com/sph/Aur6t4pfk3';
+assert.equal(links.channelsId(channelsUrl), 'Aur6t4pfk3');
+assert.equal(links.links(channelsUrl)[0].site, '视频号');
+assert.equal(links.channelsId('https://weixin.qq.com.evil.test/sph/Aur6t4pfk3'), null);
+assert.equal(links.channelsId('https://channels.weixin.qq.com/finder-preview/pages/sph?id=a&id=b'), null);
+assert.equal(links.embed(channelsUrl), null, 'a preview cover is not a video source');
 const example = '【高糖VS戒糖14天！真的差别很大吗？】 【精准空降到 00:02】 https://www.bilibili.com/video/BV1enYL6SEtU/?share_source=copy_web&t=2&p=3';
 assert.equal(links.links(example)[0].embed.url, 'https://player.bilibili.com/player.html?bvid=BV1enYL6SEtU&autoplay=0&poster=1&t=2&p=3');
 assert.equal(links.links(example)[0].title, '高糖VS戒糖14天！真的差别很大吗？');
@@ -49,7 +55,7 @@ assert.match(context.ElonSocialLinkViewer.frameSource(x).srcdoc, /platform\.x\.c
 
 // Exercise async mount against both PWA Response and PC decoded-JSON API contracts.
 class Node {
-  constructor(tag) { this.tag = tag; this.children = []; this.parentNode = null; this.hidden = false; this.style = {}; }
+  constructor(tag) { this.tag = tag; this.children = []; this.parentNode = null; this.hidden = false; this.style = {}; this.classList = { add: name => { this.className = ((this.className || '') + ' ' + name).trim(); } }; }
   append(...items) { for (const item of items) { item.parentNode = this; this.children.push(item); } }
   remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(n => n !== this); this.parentNode = null; }
   setAttribute(key, value) { this[key] = value; }
@@ -72,6 +78,19 @@ const xFrame = context.document.body.children[0].children.find(n => n.tag === 'i
 assert.ok(!xFrame.sandbox.includes('allow-same-origin'), 'srcdoc scripts must not inherit the privileged application origin');
 context.ElonSocialLinkViewer.close();
 const flush = () => new Promise(resolve => setTimeout(resolve, 10));
+{
+  const host = new Node('host'); let main = 0, original = 0;
+  const item = links.links(channelsUrl)[0];
+  const dispose = links.mount(host, channelsUrl, { owner: 'channels', api: async () => ({ ...item, title: 'Video', author: 'Creator', status: 'ready', image: 'https://finder.video.qq.com/cover' }), open: () => main++, openOriginal: () => original++ });
+  await flush();
+  const wrap = host.children[0].children[0]; const card = wrap.children[0];
+  assert.match(card.className, /social-link-channels/);
+  assert.equal(card.children[1].children[1].src, 'https://finder.video.qq.com/cover');
+  card.onclick({ preventDefault() {} });
+  assert.equal(main, 1); assert.equal(original, 0, 'main tap does not open the reader');
+  wrap.children[2].onclick(); assert.equal(original, 1, 'original reader remains separately accessible');
+  dispose();
+}
 for (const responseStyle of [true, false]) {
   const host = new Node('host'); let requests = 0; let opened;
   const item = links.links(example)[0];

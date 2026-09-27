@@ -29,6 +29,9 @@ pub(super) fn public_url(value: &str) -> Option<Url> {
 }
 
 pub(super) fn site(url: &Url) -> &'static str {
+    if super::channels::short_id(url).is_some() {
+        return "视频号";
+    }
     match url.host_str().unwrap_or("") {
         "mp.weixin.qq.com" => "微信公众号",
         "douyin.com" | "www.douyin.com" | "v.douyin.com" | "www.iesdouyin.com" => "抖音",
@@ -142,6 +145,9 @@ pub(super) fn image_url(value: &str, base: &Url) -> Option<String> {
         return Some(url.to_string());
     }
     let host = url.host_str()?;
+    if site(base) == "视频号" && host == "finder.video.qq.com" {
+        return Some(url.to_string());
+    }
     let allowed = [
         "qpic.cn",
         "qlogo.cn",

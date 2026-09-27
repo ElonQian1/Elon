@@ -48,7 +48,7 @@ export interface InternalBrowserTabState {
   readPreview?: unknown
 }
 
-export type InternalBrowserControlAction = 'back' | 'forward' | 'reload' | 'show' | 'hide' | 'external' | 'close' | 'popout' | 'dock'
+export type InternalBrowserControlAction = 'back' | 'forward' | 'reload' | 'show' | 'hide' | 'external' | 'wechat' | 'close' | 'popout' | 'dock'
 
 /** Tab used by the AI browser "source" surface; reading tabs pass their own ids. */
 export const DEFAULT_INTERNAL_TAB_ID = 'source'

@@ -34,6 +34,7 @@ internal object SocialLinkReaderSessions {
         fun onLoading(loading: Boolean)
         fun onShowFullscreen(view: View, callback: WebChromeClient.CustomViewCallback)
         fun onHideFullscreen()
+        fun onWechatLink(url: String) {}
     }
 
     class Session internal constructor(val link: SocialLink, val key: String, internal val context: MutableContextWrapper) {
@@ -101,6 +102,10 @@ internal object SocialLinkReaderSessions {
     private fun client(session: Session) = object : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             if (SocialLinkPolicy.safeUrl(request.url.toString()) != null) return false
+            if (request.isForMainFrame && WechatChannelsPolicy.allows(view.url.orEmpty(), request.url.toString())) {
+                session.ui?.onWechatLink(request.url.toString())
+                return true
+            }
             if (request.isForMainFrame) session.ui?.onStatus("该跳转需要原平台应用，可使用“打开原文”。")
             return true
         }

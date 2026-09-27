@@ -1,8 +1,38 @@
 use tauri::Url;
 
+#[tauri::command]
+pub fn open_wechat_feed_url(
+    webview: tauri::Webview,
+    source_url: String,
+    launch_url: String,
+    expires_at_ms: u64,
+) -> Result<(), String> {
+    if webview.label() != crate::MAIN_WINDOW_LABEL {
+        return Err("仅允许一龙主窗口打开微信。".into());
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    if expires_at_ms <= now + 1000 {
+        return Err("微信链接已过期，请重新点击。".into());
+    }
+    let source = Url::parse(&source_url).map_err(|_| "视频号来源无效。".to_string())?;
+    let target = Url::parse(&launch_url).map_err(|_| "视频号跳转无效。".to_string())?;
+    open_wechat_feed(&source, &target)
+}
+
 pub(crate) fn open_in_system_browser(url: &Url) -> Result<(), String> {
     validate_external_url(url)?;
     open_platform_url(url.as_str())
+}
+
+pub(crate) fn open_wechat_feed(source: &Url, target: &Url) -> Result<(), String> {
+    if !crate::internal_browser::wechat::valid_handoff(source, target) {
+        return Err("不支持的视频号跳转。".into());
+    }
+    open_platform_url(target.as_str())
+        .map_err(|_| "未能调用微信，请安装或更新微信，或使用页面二维码。".into())
 }
 
 pub(crate) fn validate_external_url(url: &Url) -> Result<(), String> {

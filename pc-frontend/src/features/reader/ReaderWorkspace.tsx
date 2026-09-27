@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, ExternalLink, Minus, PanelRightClose, PictureInP
 import { closeTab, dockTab, focusPopout, hideTab, navigateTab, pollTab, popOutTab, presentTab, resizeTab } from './readerNative'
 import { useReaderTabs } from './readerTabsStore'
 import type { ReaderTab } from './readerTabsModel'
+import { WechatChannelsButton } from './WechatChannelsButton'
 import styles from './ReaderTabs.module.css'
 
 /** True while any other dialog is open; the native view must yield because it always paints on top. */
@@ -19,6 +20,8 @@ function useDialogObscured(own: HTMLElement | null) {
 }
 
 function ReaderPane({ tab, dragging }: { tab: ReaderTab; dragging: boolean }) {
+  const [handoffStatus, setHandoffStatus] = useState('')
+  useEffect(() => { setHandoffStatus('') }, [tab.id, tab.url])
   const viewport = useRef<HTMLDivElement>(null)
   const root = useRef<HTMLDivElement>(null)
   const obscured = useDialogObscured(root.current)
@@ -60,6 +63,7 @@ function ReaderPane({ tab, dragging }: { tab: ReaderTab; dragging: boolean }) {
         <button type="button" onClick={() => void navigateTab(tab.id, 'forward')} title="前进"><ArrowRight size={14} /></button>
         <button type="button" onClick={() => void navigateTab(tab.id, 'reload')} title="刷新"><RefreshCw size={14} /></button>
         <strong title={tab.title}>{tab.title}</strong>
+        <WechatChannelsButton tabId={tab.id} url={tab.originalUrl} onStatus={setHandoffStatus} />
         <button type="button" onClick={() => void navigateTab(tab.id, 'external')} title="在系统浏览器打开"><ExternalLink size={14} /></button>
         {popout
           ? <button type="button" onClick={() => void dockTab(tab.id)} title="收回到主窗口"><PanelRightClose size={14} /></button>
@@ -68,7 +72,7 @@ function ReaderPane({ tab, dragging }: { tab: ReaderTab; dragging: boolean }) {
         <button type="button" onClick={() => void closeTab(tab.id)} title="关闭标签"><X size={14} /></button>
       </div>
       <p className={styles.status} role="status" data-error={tab.error ? 'true' : undefined}>
-        {tab.error || (tab.loading ? '正在加载…' : `${new URL(tab.url).hostname} · 内容由原平台提供；右键顶部标签可停靠、覆盖或弹出`)}
+        {handoffStatus || tab.error || (tab.loading ? '正在加载…' : `${new URL(tab.url).hostname} · 内容由原平台提供；右键顶部标签可停靠、覆盖或弹出`)}
       </p>
       <div ref={viewport} className={styles.viewport}>
         {popout && <div className={styles.placeholder}>已在独立窗口中阅读。<button type="button" onClick={() => void focusPopout(tab.id)}>切到该窗口</button><button type="button" onClick={() => void dockTab(tab.id)}>收回这里</button></div>}

@@ -20,6 +20,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             post(preview).layer(DefaultBodyLimit::max(8192)),
         )
         .route(
+            "/api/me/link-preview/wechat-open",
+            post(wechat_open).layer(DefaultBodyLimit::max(8192)),
+        )
+        .route(
             "/api/me/link-preview/report",
             post(report).layer(DefaultBodyLimit::max(16384)),
         )
@@ -83,6 +87,26 @@ async fn preview(
     let result = service::preview(url).await;
     // Signed share parameters stay in memory only, never in a cacheable HTTP response or log.
     ([("cache-control", "private, no-store")], Json(result)).into_response()
+}
+
+async fn wechat_open(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(input): Json<Request>,
+) -> Response {
+    if auth_from_headers(&state, &headers).is_err() {
+        return json_error(StatusCode::UNAUTHORIZED, "请先登录");
+    }
+    let Some(url) = service::public_url(&input.url) else {
+        return json_error(StatusCode::BAD_REQUEST, "视频号链接无效");
+    };
+    match service::channels_handoff(url).await {
+        Ok(value) => ([("cache-control", "private, no-store")], Json(value)).into_response(),
+        Err(_) => json_error(
+            StatusCode::BAD_GATEWAY,
+            "暂未取得微信跳转链接，请重试或查看原网页",
+        ),
+    }
 }
 
 // A member who opened the original page shares its re-validated metadata with other readers.

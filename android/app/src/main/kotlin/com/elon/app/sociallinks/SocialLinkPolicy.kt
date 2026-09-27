@@ -25,7 +25,7 @@ internal object SocialLinkPolicy {
         val host = uri.host.lowercase()
         // Any other public page becomes a generic Open Graph card labelled by its host.
         if (!host.contains('.') || host.startsWith('[') || Regex("\\d+\\.\\d+\\.\\d+\\.\\d+").matches(host)) return null
-        val site = sites[host] ?: host.removePrefix("www.")
+        val site = if (WechatChannelsPolicy.isChannels(value)) "视频号" else sites[host] ?: host.removePrefix("www.")
         val parts = uri.path.split('/').filter { it.isNotBlank() }
         fun id(segment: String): String? = parts.indexOf(segment).takeIf { it >= 0 }?.let { parts.getOrNull(it + 1) }
         val params = uri.rawQuery.orEmpty().split('&').mapNotNull {

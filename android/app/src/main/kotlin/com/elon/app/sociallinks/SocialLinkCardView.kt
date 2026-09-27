@@ -12,7 +12,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /** Every descendant handles taps, including when chat adds recursive long-press listeners. */
-internal class SocialLinkCardView(context: Context, open: () -> Unit) : LinearLayout(context) {
+internal class SocialLinkCardView(context: Context, private val channels: Boolean = false, open: () -> Unit) : LinearLayout(context) {
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
     val title = TextView(context).apply {
         tag = "social-link-title"; textSize = 16f; maxLines = 3; ellipsize = TextUtils.TruncateAt.END
@@ -46,24 +46,38 @@ internal class SocialLinkCardView(context: Context, open: () -> Unit) : LinearLa
         val headline = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.TOP }
         media.addView(badge, FrameLayout.LayoutParams(-1, -1))
         media.addView(cover, FrameLayout.LayoutParams(-1, -1)); media.clipToOutline = true
-        headline.addView(title, LayoutParams(0, -2, 1f))
-        headline.addView(media, LayoutParams(dp(56), dp(56)).apply { marginStart = dp(12) })
-        addView(headline, LayoutParams(-1, -2))
-        addView(summary, LayoutParams(-1, -2).apply { topMargin = dp(6) })
-        addView(source, LayoutParams(-1, -2).apply { topMargin = dp(8) })
-        addView(time, LayoutParams(-1, -2).apply { topMargin = dp(4) })
+        if (channels) {
+            setPadding(0, 0, 0, 0)
+            cover.scaleType = ImageView.ScaleType.FIT_CENTER
+            source.setTextColor(Color.WHITE); source.setPadding(dp(10), dp(10), dp(10), dp(10))
+            source.setBackgroundColor(Color.parseColor("#CC17191D"))
+            media.addView(source, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+            addView(media, LayoutParams(-1, dp(294)))
+        } else {
+            headline.addView(title, LayoutParams(0, -2, 1f))
+            headline.addView(media, LayoutParams(dp(56), dp(56)).apply { marginStart = dp(12) })
+            addView(headline, LayoutParams(-1, -2))
+            addView(summary, LayoutParams(-1, -2).apply { topMargin = dp(6) })
+            addView(source, LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            addView(time, LayoutParams(-1, -2).apply { topMargin = dp(4) })
+        }
         // setOnLongClickListener makes even a TextView consume ACTION_UP. All hit targets
         // therefore own the same click; selection mode can still replace these normally.
         listOf(this, headline, title, media, badge, summary, source, time, cover).forEach { child -> child.setOnClickListener { open() } }
     }
     fun bind(item: SocialLink) {
         title.text = SocialLinkPresentation.title(item); source.text = SocialLinkPresentation.source(item)
+        if (channels) source.text = "${item.author.ifBlank { "视频号" }} · 微信打开"
         summary.text = item.summary; summary.visibility = if (item.summary.isBlank()) View.GONE else View.VISIBLE
-        badge.text = SocialLinkPresentation.badge(item.site)
+        badge.text = if (channels) "视频号" else SocialLinkPresentation.badge(item.site)
         val colors = SocialLinkPresentation.colors(item.site)
         badge.setTextColor(Color.parseColor(colors.second))
         media.background = GradientDrawable().apply { setColor(Color.parseColor(colors.first)); cornerRadius = dp(4).toFloat() }
         time.text = SocialLinkPresentation.time(item); time.visibility = if (time.text.isEmpty()) View.GONE else View.VISIBLE
-        contentDescription = "打开${title.text}（${source.text}${if (time.text.isEmpty()) "" else "，${time.text}"}）"
+        contentDescription = "${if (channels) "在微信打开" else "打开"}${title.text}（${source.text}${if (time.text.isEmpty()) "" else "，${time.text}"}）"
+    }
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        if (channels) media.layoutParams.height = (MeasureSpec.getSize(widthMeasureSpec) * 4 / 3).coerceAtLeast(1)
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 }

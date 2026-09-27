@@ -45,6 +45,19 @@ internal object SocialLinkPreviewApi {
         if (AuthManager.userId(context).orEmpty() == owner) previews.put(key, (System.currentTimeMillis() + if (preview.ready) 3600000 else 30000) to preview)
         return SocialLinkReadPreview.cached(context, ServerUrlManager.getActive(context), owner, item.url) ?: preview
     }
+    /** Fresh short-lived app link; never stored in the metadata cache. */
+    fun wechatHandoff(context: Context, url: String): JSONObject {
+        require(WechatChannelsPolicy.isChannels(url))
+        val request = Request.Builder().url(ServerUrlManager.getActive(context).trimEnd('/') + "/api/me/link-preview/wechat-open")
+            .post(JSONObject().put("url", url).toString().toRequestBody("application/json".toMediaType()))
+        return http.newCall(AuthManager.applyAuth(context, request).build()).execute().use { response ->
+            check(response.isSuccessful) { "暂未取得微信跳转链接，请重试。" }
+            val bytes = response.body?.byteStream()?.use { readBounded(it, 16385) }
+            check(bytes != null && bytes.size <= 16384) { "微信跳转响应无效。" }
+            JSONObject(String(bytes, Charsets.UTF_8))
+        }
+    }
+
     /** Best effort: the member's validated read-back lets the server serve other readers. */
     fun report(context: Context, server: String, original: String, read: JSONObject) {
         val body = JSONObject().put("url", original).put("read", read).toString()

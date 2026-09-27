@@ -173,6 +173,7 @@ fn main() {
             internal_browser::control_internal_browser_tab,
             internal_browser::get_internal_browser_tab_state,
             internal_browser::list_internal_browser_tabs,
+            external_navigation::open_wechat_feed_url,
             codex_semantic_bridge::codex_win_capabilities,
             codex_semantic_bridge::codex_execute_semantic_action,
             codex_semantic_bridge::codex_read_native_events,

@@ -21,6 +21,13 @@
 .social-link-cards-desktop { width: 300px; }
 .social-link-cards-desktop .social-link-title { font-size: 14px; }
 .social-link-retry { border: 0; background: transparent; color: #b5ccea; padding: 6px 0; font-size: 12px; cursor: pointer; }
+.social-link-channels-wrap { width: min(220px, 100%); }
+.social-link-cards .social-link-channels { position: relative; display: block; padding: 0; aspect-ratio: 3 / 4; overflow: hidden; background: #17191d; }
+.social-link-channels .social-link-media { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 6px; background: #17191d; }
+.social-link-channels .social-link-cover { object-fit: contain; }
+.social-link-channels .social-link-title, .social-link-channels .social-link-summary, .social-link-channels .social-link-time { display: none; }
+.social-link-channels .social-link-source { position: absolute; bottom: 0; left: 0; right: 0; z-index: 1; padding: 10px; background: #17191dcc; color: #fff; }
+.social-link-original-action { min-height: 36px; padding: 6px 0; border: 0; background: transparent; color: #b5ccea; font: inherit; font-size: 12px; cursor: pointer; }
 .social-link-dialog { color-scheme: dark; padding: 0; border: 1px solid #434c59; border-radius: 14px; width: min(1080px, calc(100vw - 32px)); height: min(800px, calc(100dvh - 40px)); max-width: none; max-height: none; background: #15171b; color: #f1f2f5; overflow: hidden; }
 .social-link-dialog[open] { display: flex; flex-direction: column; }
 .social-link-dialog::backdrop { background: rgb(0 0 0 / 70%); }
