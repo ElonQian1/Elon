@@ -1,0 +1,106 @@
+{
+  "scope": "PWA offline synthetic fixture only; not Android runtime acceptance",
+  "captures": [
+    {
+      "image": "home-dark.png",
+      "sha256": "cf32875aed239d9060f29695b82fb34c5c9ca0a2a89054b970fcb58a108203f3",
+      "sourceRevision": "d1c5cb0e8ce80890c52184ba123c7d18c3fcb17e",
+      "routeRevision": "synthetic-local-home-dark",
+      "capturedAt": "2026-09-27T23:13:25.706007900+00:00",
+      "width": 390,
+      "height": 844,
+      "browser": "Edg/154.0.4258.37",
+      "fixtureProfile": "mobile-v2-dark",
+      "executedStepCount": 0,
+      "networkPolicy": {
+        "allowedOriginCount": 2,
+        "blockedRequestCount": 1,
+        "openWorld": false
+      },
+      "processCleanup": {
+        "browserProcessReaped": true,
+        "temporaryProfileRemoved": true,
+        "retainedForStatefulSession": false
+      },
+      "exceptionCount": 0
+    },
+    {
+      "image": "home-light.png",
+      "sha256": "ebc84cdc67e660cc7389f6115ab240e8fea9e3985ebeb33d101d280807742dce",
+      "sourceRevision": "d1c5cb0e8ce80890c52184ba123c7d18c3fcb17e",
+      "routeRevision": "synthetic-local-home-light",
+      "capturedAt": "2026-09-27T23:13:16.488736300+00:00",
+      "width": 390,
+      "height": 844,
+      "browser": "Edg/154.0.4258.37",
+      "fixtureProfile": "mobile-v2-light",
+      "executedStepCount": 0,
+      "networkPolicy": {
+        "allowedOriginCount": 2,
+        "blockedRequestCount": 1,
+        "openWorld": false
+      },
+      "processCleanup": {
+        "browserProcessReaped": true,
+        "temporaryProfileRemoved": true,
+        "retainedForStatefulSession": false
+      },
+      "exceptionCount": 0
+    },
+    {
+      "image": "summary-dark.png",
+      "sha256": "933ef1b897390567431f88da2fc6d7707963cb50d56e1fdaa172df37a4485fc4",
+      "sourceRevision": "d1c5cb0e8ce80890c52184ba123c7d18c3fcb17e",
+      "routeRevision": "synthetic-local-summary-dark",
+      "capturedAt": "2026-09-27T23:13:19.765081500+00:00",
+      "width": 320,
+      "height": 800,
+      "browser": "Edg/154.0.4258.37",
+      "fixtureProfile": "mobile-v2-dark",
+      "executedStepCount": 1,
+      "networkPolicy": {
+        "allowedOriginCount": 2,
+        "blockedRequestCount": 1,
+        "openWorld": false
+      },
+      "processCleanup": {
+        "browserProcessReaped": true,
+        "temporaryProfileRemoved": true,
+        "retainedForStatefulSession": false
+      },
+      "exceptionCount": 0
+    },
+    {
+      "image": "summary-light.png",
+      "sha256": "3eb357bb277d757de7dc3cf0bbfb9676939587dec0a6e37a70d21547281e3dab",
+      "sourceRevision": "d1c5cb0e8ce80890c52184ba123c7d18c3fcb17e",
+      "routeRevision": "synthetic-local-summary-light",
+      "capturedAt": "2026-09-27T23:13:23.372634900+00:00",
+      "width": 320,
+      "height": 800,
+      "browser": "Edg/154.0.4258.37",
+      "fixtureProfile": "mobile-v2-light",
+      "executedStepCount": 1,
+      "networkPolicy": {
+        "allowedOriginCount": 2,
+        "blockedRequestCount": 1,
+        "openWorld": false
+      },
+      "processCleanup": {
+        "browserProcessReaped": true,
+        "temporaryProfileRemoved": true,
+        "retainedForStatefulSession": false
+      },
+      "exceptionCount": 0
+    }
+  ],
+  "android": {
+    "sourceRevision": "60d313c65a2903200774dff70561800a115cae20",
+    "debugApkSha256": "1793B9861EA73A0FBF0A8D67974E6DCA1B5E80CA100CB9008369B3340DD4D387",
+    "fullUnitTests": 2400,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "note": "Full tests preceded pure project-status function extraction; final packaging after extraction passed."
+  }
+}

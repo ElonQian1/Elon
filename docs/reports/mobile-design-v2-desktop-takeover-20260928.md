@@ -33,6 +33,8 @@ implementation_status: partial_blocked_not_released
 - 修复 Windows Gradle 启动器吞掉失败退出码的问题，真实 JVM 启动失败回归通过；CI 显式传播退出码。已有下载日志子进程测试改用 Java 参数文件，仍验证进程终止后的锁恢复。媒体缓存访问拒绝符号链接，既有越界测试通过。
 - 已逐项审查旧断言与当前实现：保留群聊授权/文档代际/麦克风权限/类型化消息操作边界；发送已派发但结果不确定时，仍不自动恢复待重发草稿。旧皮肤几何断言由真实生产 View 的布局和回调检查替代。
 - PWA 工作台已产生实际截图，检查发现并修复浅色残留深底、图标对比及摘要空状态窄列。截图使用受限本地服务和合成会话，不含真实账户。它们不能替代原生 APK 验收。
+- 最终 Android 源码 `60d313c65` 的调试 APK SHA256：`1793B9861EA73A0FBF0A8D67974E6DCA1B5E80CA100CB9008369B3340DD4D387`。PWA 摘要指标随后改用浅深主题的语义状态色；截图绑定 `d1c5cb0e8ce80890c52184ba123c7d18c3fcb17e`，见 [源码、尺寸与摘要证据](assets/mobile-design-v2-20260928/evidence.json)。
+- 实际 PWA 截图：[首页浅色](assets/mobile-design-v2-20260928/home-light.png)、[首页深色](assets/mobile-design-v2-20260928/home-dark.png)、[窄屏摘要浅色](assets/mobile-design-v2-20260928/summary-light.png)、[窄屏摘要深色](assets/mobile-design-v2-20260928/summary-dark.png)。四次捕获均无脚本异常，浏览器进程和临时配置已回收。
 - 量化最新两个远程作业均失败且 `steps=null`，测试未执行，原因未确认。全仓 Rust 验证仍有缓存磁盘门禁/既有检查待处理；不称整仓 CI 通过。
 
 ## 原生验收阻塞
