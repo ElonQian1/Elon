@@ -73,7 +73,10 @@ internal fun mobileDesignV2PreviewScenario() = object : UiRuntimePreviewScenario
 
     private fun addMessage(parent: LinearLayout, layout: Int, message: String) {
         val row = LayoutInflater.from(parent.context).inflate(layout, parent, false)
-        row.findViewById<TextView>(R.id.messageText).text = message
+        row.findViewById<TextView>(R.id.messageText).apply {
+            text = message
+            uiNode(if (layout == R.layout.item_message_ai) "mobile.design_v2.result" else "mobile.design_v2.prompt")
+        }
         parent.addView(row)
     }
 

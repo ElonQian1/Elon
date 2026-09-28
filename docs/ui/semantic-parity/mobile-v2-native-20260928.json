@@ -1,0 +1,1129 @@
+{
+  "schemaVersion": 1,
+  "taskId": "mobile-v2-native-20260928",
+  "scope": "OBSERVED_CAPABILITY_STATE",
+  "designSystem": {
+    "id": "mobile-design-v2",
+    "sourceFile": "docs/design/mobile-design-system-v2.md",
+    "sha256": "df9152ba13c4569f90e7ed2bedf48de29bc21b0b96a7d2a0c29888e002628814"
+  },
+  "requirementSpec": {
+    "sourceFile": "docs/requirements/mobile-design-v2-adoption.md",
+    "sha256": "053e611bb127f8ae877f3e05c154ca3dfc75782066f8001aab1130183e87f20f"
+  },
+  "platformDifferences": [
+    "仅验收明确列出的离线能力/状态；不证明全应用视觉、真实登录、发送、账号修改、IME 或性能。",
+    "Android 使用生产组件的离线预览；PWA 使用生产页面、测试登录和不转发网络的合成服务。",
+    "Android 100%/200% 系统字体均覆盖；PWA 固定 411px 视口与默认文字大小，不冒充网页 200% 缩放验收。",
+    "项目按各端既有分组呈现，此规格验证同一长项目名称；不宣称个人/群体/联合分组语义已一致。",
+    "注册按钮文案为 Android 注册并登录、PWA 创建账号；账号展示保留 Android 离线预览标识。",
+    "PWA 气泡 title 是时间戳，因此显式断言气泡正文，并映射完成状态文字；Android 映射实际 AI 结果正文。",
+    "Android 结果节点增加仅 Debug 的稳定定位标签，沿用已观察的生产 TextView 与文本，不改变视觉或回调。"
+  ],
+  "states": [
+    {
+      "id": "login-light-100",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=login",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#loginView",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "expectedPage": {
+          "kind": "PUBLIC_LOGIN",
+          "pageId": "main-login",
+          "path": "/",
+          "readySelector": "#loginView"
+        }
+      },
+      "capabilities": [
+        {
+          "id": "login-primary",
+          "state": "未登录，显示登录动作",
+          "android": {
+            "definitionId": "elon.mobile.design_v2#com.elon.app.uitest_398d0d9d:id/loginSubmitButton",
+            "assertions": {
+              "/kind": "material.button",
+              "/text": "登录"
+            }
+          },
+          "web": {
+            "selector": "#loginBtn",
+            "assertions": {
+              "/role": "button",
+              "/label": "登录"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "register-light-100",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=register&auth=register",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#nicknameInput",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "expectedPage": {
+          "kind": "PUBLIC_LOGIN",
+          "pageId": "main-register",
+          "path": "/",
+          "readySelector": "#loginView"
+        },
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#loginBtn",
+            "text": "创建账号"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "register-primary",
+          "state": "注册表单，显示创建账号动作",
+          "android": {
+            "definitionId": "elon.mobile.design_v2#com.elon.app.uitest_398d0d9d:id/loginSubmitButton",
+            "assertions": {
+              "/kind": "material.button",
+              "/text": "注册并登录"
+            }
+          },
+          "web": {
+            "selector": "#loginBtn",
+            "assertions": {
+              "/role": "button",
+              "/label": "创建账号"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "projects-light-100",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=projects&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": ".project-browser-item[data-project-browser-index=\"1\"]",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "projects-primary",
+          "state": "长中文项目名称显示",
+          "android": {
+            "definitionId": "elon.mobile.design_v2@root/android.container[0]/android.container[1]/android.container[0]/android.container[0]/android.container[1]/android.container[2]/android.container[1]/android.text[0]",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "一个较长的项目名称，用于检查换行和大字体"
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserBody > section:nth-of-type(2) > div:nth-of-type(2) > button:nth-of-type(2) > span:nth-of-type(2)",
+            "assertions": {
+              "/role": "span",
+              "/label": "一个较长的项目名称，用于检查换行和大字体"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "empty-light-100",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=empty&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#projectBrowserBody",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#projectBrowserBody",
+            "text": "暂无个人项目"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "empty-primary",
+          "state": "项目为空，显示空状态说明",
+          "android": {
+            "definitionId": "elon.mobile.design_v2@root/android.container[0]/android.container[1]/android.container[0]/android.container[0]/android.container[1]/android.container[1]/android.text[0]",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "还没有项目，点击 + 创建"
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserBody > section:nth-of-type(1) > div:nth-of-type(2)",
+            "assertions": {
+              "/role": "div",
+              "/label": "暂无个人项目"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "chat_result-light-100",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "offline-result",
+          "state": "离线示例的已完成结果显示，不证明真实任务执行",
+          "android": {
+            "definitionId": "mobile.design_v2.result",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "已整理需求。\n\n构建结果：成功\n验证结果：请查看详细记录。\n\n这是离线布局示例，不代表实际任务已完成。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "account_security-light-100",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=account_security&tab=profile",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "load",
+          "selector": "#accountIdentityMask.active",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "waitFor",
+            "selector": "#accountSessionList .account-session-row"
+          },
+          {
+            "action": "assertText",
+            "selector": "#accountSecuritySummary",
+            "text": "密码已启用"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "account_security-primary",
+          "state": "账号安全页显示当前演示账号，不证明真实账户修改",
+          "android": {
+            "definitionId": "elon.mobile.design_v2#com.elon.app.uitest_398d0d9d:id/accountCurrentAccount",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "演示账户 · 离线预览"
+            }
+          },
+          "web": {
+            "selector": "#accountIdentityCurrentAccount",
+            "assertions": {
+              "/role": "strong",
+              "/label": "演示账户"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "login-light-200",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=login",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#loginView",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "expectedPage": {
+          "kind": "PUBLIC_LOGIN",
+          "pageId": "main-login",
+          "path": "/",
+          "readySelector": "#loginView"
+        }
+      },
+      "capabilities": [
+        {
+          "id": "login-primary",
+          "state": "未登录，显示登录动作",
+          "android": {
+            "definitionId": "elon.mobile.design_v2#com.elon.app.uitest_398d0d9d:id/loginSubmitButton",
+            "assertions": {
+              "/kind": "material.button",
+              "/text": "登录"
+            }
+          },
+          "web": {
+            "selector": "#loginBtn",
+            "assertions": {
+              "/role": "button",
+              "/label": "登录"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "register-light-200",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=register&auth=register",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#nicknameInput",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "expectedPage": {
+          "kind": "PUBLIC_LOGIN",
+          "pageId": "main-register",
+          "path": "/",
+          "readySelector": "#loginView"
+        },
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#loginBtn",
+            "text": "创建账号"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "register-primary",
+          "state": "注册表单，显示创建账号动作",
+          "android": {
+            "definitionId": "elon.mobile.design_v2#com.elon.app.uitest_398d0d9d:id/loginSubmitButton",
+            "assertions": {
+              "/kind": "material.button",
+              "/text": "注册并登录"
+            }
+          },
+          "web": {
+            "selector": "#loginBtn",
+            "assertions": {
+              "/role": "button",
+              "/label": "创建账号"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "projects-light-200",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=projects&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": ".project-browser-item[data-project-browser-index=\"1\"]",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "projects-primary",
+          "state": "长中文项目名称显示",
+          "android": {
+            "definitionId": "elon.mobile.design_v2@root/android.container[0]/android.container[1]/android.container[0]/android.container[0]/android.container[1]/android.container[2]/android.container[1]/android.text[0]",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "一个较长的项目名称，用于检查换行和大字体"
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserBody > section:nth-of-type(2) > div:nth-of-type(2) > button:nth-of-type(2) > span:nth-of-type(2)",
+            "assertions": {
+              "/role": "span",
+              "/label": "一个较长的项目名称，用于检查换行和大字体"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "empty-light-200",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=empty&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#projectBrowserBody",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#projectBrowserBody",
+            "text": "暂无个人项目"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "empty-primary",
+          "state": "项目为空，显示空状态说明",
+          "android": {
+            "definitionId": "elon.mobile.design_v2@root/android.container[0]/android.container[1]/android.container[0]/android.container[0]/android.container[1]/android.container[1]/android.text[0]",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "还没有项目，点击 + 创建"
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserBody > section:nth-of-type(1) > div:nth-of-type(2)",
+            "assertions": {
+              "/role": "div",
+              "/label": "暂无个人项目"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "chat_result-light-200",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "offline-result",
+          "state": "离线示例的已完成结果显示，不证明真实任务执行",
+          "android": {
+            "definitionId": "mobile.design_v2.result",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "已整理需求。\n\n构建结果：成功\n验证结果：请查看详细记录。\n\n这是离线布局示例，不代表实际任务已完成。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "account_security-light-200",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=account_security&tab=profile",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "load",
+          "selector": "#accountIdentityMask.active",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "waitFor",
+            "selector": "#accountSessionList .account-session-row"
+          },
+          {
+            "action": "assertText",
+            "selector": "#accountSecuritySummary",
+            "text": "密码已启用"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "account_security-primary",
+          "state": "账号安全页显示当前演示账号，不证明真实账户修改",
+          "android": {
+            "definitionId": "elon.mobile.design_v2#com.elon.app.uitest_398d0d9d:id/accountCurrentAccount",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "演示账户 · 离线预览"
+            }
+          },
+          "web": {
+            "selector": "#accountIdentityCurrentAccount",
+            "assertions": {
+              "/role": "strong",
+              "/label": "演示账户"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "login-dark-100",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=login",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#loginView",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "expectedPage": {
+          "kind": "PUBLIC_LOGIN",
+          "pageId": "main-login",
+          "path": "/",
+          "readySelector": "#loginView"
+        }
+      },
+      "capabilities": [
+        {
+          "id": "login-primary",
+          "state": "未登录，显示登录动作",
+          "android": {
+            "definitionId": "elon.mobile.design_v2#com.elon.app.uitest_398d0d9d:id/loginSubmitButton",
+            "assertions": {
+              "/kind": "material.button",
+              "/text": "登录"
+            }
+          },
+          "web": {
+            "selector": "#loginBtn",
+            "assertions": {
+              "/role": "button",
+              "/label": "登录"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "register-dark-100",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=register&auth=register",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#nicknameInput",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "expectedPage": {
+          "kind": "PUBLIC_LOGIN",
+          "pageId": "main-register",
+          "path": "/",
+          "readySelector": "#loginView"
+        },
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#loginBtn",
+            "text": "创建账号"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "register-primary",
+          "state": "注册表单，显示创建账号动作",
+          "android": {
+            "definitionId": "elon.mobile.design_v2#com.elon.app.uitest_398d0d9d:id/loginSubmitButton",
+            "assertions": {
+              "/kind": "material.button",
+              "/text": "注册并登录"
+            }
+          },
+          "web": {
+            "selector": "#loginBtn",
+            "assertions": {
+              "/role": "button",
+              "/label": "创建账号"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "projects-dark-100",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=projects&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": ".project-browser-item[data-project-browser-index=\"1\"]",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "projects-primary",
+          "state": "长中文项目名称显示",
+          "android": {
+            "definitionId": "elon.mobile.design_v2@root/android.container[0]/android.container[1]/android.container[0]/android.container[0]/android.container[1]/android.container[2]/android.container[1]/android.text[0]",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "一个较长的项目名称，用于检查换行和大字体"
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserBody > section:nth-of-type(2) > div:nth-of-type(2) > button:nth-of-type(2) > span:nth-of-type(2)",
+            "assertions": {
+              "/role": "span",
+              "/label": "一个较长的项目名称，用于检查换行和大字体"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "empty-dark-100",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=empty&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#projectBrowserBody",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#projectBrowserBody",
+            "text": "暂无个人项目"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "empty-primary",
+          "state": "项目为空，显示空状态说明",
+          "android": {
+            "definitionId": "elon.mobile.design_v2@root/android.container[0]/android.container[1]/android.container[0]/android.container[0]/android.container[1]/android.container[1]/android.text[0]",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "还没有项目，点击 + 创建"
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserBody > section:nth-of-type(1) > div:nth-of-type(2)",
+            "assertions": {
+              "/role": "div",
+              "/label": "暂无个人项目"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "chat_result-dark-100",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "offline-result",
+          "state": "离线示例的已完成结果显示，不证明真实任务执行",
+          "android": {
+            "definitionId": "mobile.design_v2.result",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "已整理需求。\n\n构建结果：成功\n验证结果：请查看详细记录。\n\n这是离线布局示例，不代表实际任务已完成。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "account_security-dark-100",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=account_security&tab=profile",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "load",
+          "selector": "#accountIdentityMask.active",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "waitFor",
+            "selector": "#accountSessionList .account-session-row"
+          },
+          {
+            "action": "assertText",
+            "selector": "#accountSecuritySummary",
+            "text": "密码已启用"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "account_security-primary",
+          "state": "账号安全页显示当前演示账号，不证明真实账户修改",
+          "android": {
+            "definitionId": "elon.mobile.design_v2#com.elon.app.uitest_398d0d9d:id/accountCurrentAccount",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "演示账户 · 离线预览"
+            }
+          },
+          "web": {
+            "selector": "#accountIdentityCurrentAccount",
+            "assertions": {
+              "/role": "strong",
+              "/label": "演示账户"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "login-dark-200",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=login",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#loginView",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "expectedPage": {
+          "kind": "PUBLIC_LOGIN",
+          "pageId": "main-login",
+          "path": "/",
+          "readySelector": "#loginView"
+        }
+      },
+      "capabilities": [
+        {
+          "id": "login-primary",
+          "state": "未登录，显示登录动作",
+          "android": {
+            "definitionId": "elon.mobile.design_v2#com.elon.app.uitest_398d0d9d:id/loginSubmitButton",
+            "assertions": {
+              "/kind": "material.button",
+              "/text": "登录"
+            }
+          },
+          "web": {
+            "selector": "#loginBtn",
+            "assertions": {
+              "/role": "button",
+              "/label": "登录"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "register-dark-200",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=register&auth=register",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#nicknameInput",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "expectedPage": {
+          "kind": "PUBLIC_LOGIN",
+          "pageId": "main-register",
+          "path": "/",
+          "readySelector": "#loginView"
+        },
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#loginBtn",
+            "text": "创建账号"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "register-primary",
+          "state": "注册表单，显示创建账号动作",
+          "android": {
+            "definitionId": "elon.mobile.design_v2#com.elon.app.uitest_398d0d9d:id/loginSubmitButton",
+            "assertions": {
+              "/kind": "material.button",
+              "/text": "注册并登录"
+            }
+          },
+          "web": {
+            "selector": "#loginBtn",
+            "assertions": {
+              "/role": "button",
+              "/label": "创建账号"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "projects-dark-200",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=projects&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": ".project-browser-item[data-project-browser-index=\"1\"]",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "projects-primary",
+          "state": "长中文项目名称显示",
+          "android": {
+            "definitionId": "elon.mobile.design_v2@root/android.container[0]/android.container[1]/android.container[0]/android.container[0]/android.container[1]/android.container[2]/android.container[1]/android.text[0]",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "一个较长的项目名称，用于检查换行和大字体"
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserBody > section:nth-of-type(2) > div:nth-of-type(2) > button:nth-of-type(2) > span:nth-of-type(2)",
+            "assertions": {
+              "/role": "span",
+              "/label": "一个较长的项目名称，用于检查换行和大字体"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "empty-dark-200",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=empty&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#projectBrowserBody",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#projectBrowserBody",
+            "text": "暂无个人项目"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "empty-primary",
+          "state": "项目为空，显示空状态说明",
+          "android": {
+            "definitionId": "elon.mobile.design_v2@root/android.container[0]/android.container[1]/android.container[0]/android.container[0]/android.container[1]/android.container[1]/android.text[0]",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "还没有项目，点击 + 创建"
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserBody > section:nth-of-type(1) > div:nth-of-type(2)",
+            "assertions": {
+              "/role": "div",
+              "/label": "暂无个人项目"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "chat_result-dark-200",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "offline-result",
+          "state": "离线示例的已完成结果显示，不证明真实任务执行",
+          "android": {
+            "definitionId": "mobile.design_v2.result",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "已整理需求。\n\n构建结果：成功\n验证结果：请查看详细记录。\n\n这是离线布局示例，不代表实际任务已完成。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "account_security-dark-200",
+      "androidScreenId": "elon.mobile.design_v2",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=account_security&tab=profile",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "load",
+          "selector": "#accountIdentityMask.active",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "waitFor",
+            "selector": "#accountSessionList .account-session-row"
+          },
+          {
+            "action": "assertText",
+            "selector": "#accountSecuritySummary",
+            "text": "密码已启用"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "account_security-primary",
+          "state": "账号安全页显示当前演示账号，不证明真实账户修改",
+          "android": {
+            "definitionId": "elon.mobile.design_v2#com.elon.app.uitest_398d0d9d:id/accountCurrentAccount",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "演示账户 · 离线预览"
+            }
+          },
+          "web": {
+            "selector": "#accountIdentityCurrentAccount",
+            "assertions": {
+              "/role": "strong",
+              "/label": "演示账户"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
