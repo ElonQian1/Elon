@@ -1,14 +1,14 @@
 ---
 version_status: current
 reviewed_at: 2026-09-28
-implementation_status: planned
+implementation_status: partial
 ---
 
 # 跨平台视频卡片与播放接入方案
 
 目标：群友贴入视频链接后看到真实封面、标题和作者；点击一次即可播放或打开对应平台，返回时不丢群聊位置和草稿。Win、APK、PWA 共用内容合同，不共用未经验证的跳转假设。
 
-本文是后续实现方案，不是新版本交付声明。继承[外链卡片基线](social-link-cards.md)；视频入口按本文的能力路由设计演进，文章阅读不改。视频号已有实现和限制继续以[视频号要求](wechat-channels-playback-handoff.md)为准。[本轮实际群链接和调查证据](../reports/social-video-provider-research-20260928.md)独立保存。
+B站、抖音、小红书已接入 Win/PWA 与 APK 共用设计的媒体卡片；具体版本与验收见[卡片实施记录](../reports/social-media-cards-delivery-20260928.md)。本文其他尚未实施的播放/跳转能力仍是计划，不等于已经交付。继承[外链卡片基线](social-link-cards.md)，文章阅读不改。视频号已有实现和限制继续以[视频号要求](wechat-channels-playback-handoff.md)为准。[实际群链接和调查证据](../reports/social-video-provider-research-20260928.md)独立保存。
 
 ## 平台策略
 

@@ -121,4 +121,26 @@ class SocialLinkCardInteractionTest {
         card.bind(item.copy(authorAvatar = null))
         assertEquals(View.GONE, card.creatorAvatar.visibility)
     }
+    @Test fun mediaProvidersUseLargeCoverAndKeepNavigationAndSelection() {
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        for (url in listOf("https://www.bilibili.com/video/BV19eYH6NEsC/?t=80", "https://v.douyin.com/example/", "https://www.xiaohongshu.com/discovery/item/example")) {
+            val item = SocialLinkPolicy.link(url)!!.copy(title = "Media title", image = "https://example.org/cover.jpg")
+            assertTrue(SocialLinkPresentation.mediaCard(item))
+            var opened = 0; var selected = 0
+            val card = SocialLinkCardView(activity, true) { opened++ }
+            card.bind(item); card.bindCover(Bitmap.createBitmap(160, 90, Bitmap.Config.ARGB_8888))
+            val root = screen(card)
+            assertEquals(View.VISIBLE, card.title.visibility)
+            assertEquals(280, card.cover.width)
+            assertEquals(157, card.cover.height)
+            bindChatSelectionLongPress(root, View.OnLongClickListener { true })
+            touch(root, card.play); touch(root, card.title); assertEquals(2, opened)
+            bindChatSelectionContent(root, View.OnClickListener { selected++ })
+            touch(root, card.play); assertEquals(1, selected); assertEquals(2, opened)
+            card.bind(item.copy(image = null)); assertEquals(View.GONE, card.cover.visibility)
+        }
+        for (url in listOf("https://www.bilibili.com/", "https://www.xiaohongshu.com/", "https://v.douyin.com.evil.test/a")) {
+            assertFalse(SocialLinkPresentation.mediaCard(SocialLinkPolicy.link(url)!!))
+        }
+    }
 }

@@ -85,7 +85,7 @@ internal object SocialLinkPreviewApi {
                 BitmapFactory.decodeByteArray(data, 0, data.size, options)
                 if (options.outWidth <= 0 || options.outHeight <= 0) return@use null
                 options.inSampleSize = 1
-                while (maxOf(options.outWidth, options.outHeight) / options.inSampleSize > 256) options.inSampleSize *= 2
+                while (maxOf(options.outWidth, options.outHeight) / options.inSampleSize > 512) options.inSampleSize *= 2
                 options.inJustDecodeBounds = false
                 BitmapFactory.decodeByteArray(data, 0, data.size, options)?.also { bitmaps.put(url, it) }
             }

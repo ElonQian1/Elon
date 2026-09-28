@@ -59,6 +59,7 @@ class Node {
   append(...items) { for (const item of items) { item.parentNode = this; this.children.push(item); } }
   remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(n => n !== this); this.parentNode = null; }
   setAttribute(key, value) { this[key] = value; }
+  getAttribute(key) { return this[key] ?? null; }
   removeAttribute(key) { delete this[key]; }
   showModal() { this.open = true; }
   close() { this.open = false; this.onclose?.(); }
@@ -78,6 +79,27 @@ const xFrame = context.document.body.children[0].children.find(n => n.tag === 'i
 assert.ok(!xFrame.sandbox.includes('allow-same-origin'), 'srcdoc scripts must not inherit the privileged application origin');
 context.ElonSocialLinkViewer.close();
 const flush = () => new Promise(resolve => setTimeout(resolve, 10));
+for (const [url, kind, symbol] of [
+  ['https://www.bilibili.com/video/BV19eYH6NEsC/', 'bilibili', '▶'],
+  ['https://v.douyin.com/_XMEsxVKKOY/', 'douyin', '▶'],
+  [xhs, 'note', '↗'],
+]) {
+  const item = links.links(url)[0], host = new Node('host'); let opened;
+  assert.equal(links.mediaPresentation(item).kind, kind);
+  const dispose = links.mount(host, url, { owner: kind, api: async () => ({ ...item, title: 'Title', status: 'ready', image: 'https://example.org/poster.jpg' }), open: p => { opened = p; } });
+  const card = host.children[0].children[0].children[0], media = card.children[1], cover = media.children[1];
+  assert.match(card.className, /social-link-poster/);
+  assert.equal(media.children[2].textContent, symbol, 'notes do not promise video playback');
+  assert.equal(card['data-cover'], 'missing');
+  await flush(); cover.naturalWidth = 1600; cover.naturalHeight = 900; cover.onload();
+  assert.equal(card['data-cover'], 'ready'); assert.equal(Number(media.style.aspectRatio), 16 / 9);
+  cover.onerror(); assert.equal(card['data-cover'], 'missing'); assert.equal(cover.hidden, true);
+  card.onclick({ preventDefault() {} }); assert.equal(opened.url, url);
+  dispose();
+}
+for (const url of ['https://www.bilibili.com/', 'https://www.douyin.com/', 'https://www.xiaohongshu.com/', 'https://xhslink.com.evil.test/item/a']) {
+  assert.equal(links.mediaPresentation(links.links(url)[0]), null, 'homepages and lookalikes stay ordinary links');
+}
 {
   const host = new Node('host'); let main = 0, original = 0;
   const item = links.links(channelsUrl)[0];

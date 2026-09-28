@@ -37,7 +37,7 @@ internal object SocialLinkCards {
         for (item in items) {
             var current = item; var busy = false
             val host = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-            val card = SocialLinkCardView(context, WechatChannelsPolicy.isChannels(item.url)) { WechatChannelsCardAction.open(host, current) }
+            val card = SocialLinkCardView(context, SocialLinkPresentation.mediaCard(item)) { WechatChannelsCardAction.open(host, current) }
             val retry = TextView(context).apply {
                 this.text = "更新预览"; textSize = 12f; minHeight = dp(48)
                 setTextColor(Color.parseColor("#B4C5E3")); setPadding(dp(4), dp(8), dp(4), dp(8)); visibility = View.GONE
@@ -59,7 +59,7 @@ internal object SocialLinkCards {
                     val result = SocialLinkPreviewApi.load(app, item, refresh)
                     host.post { busy = false; if (valid()) { draw(result); retry.isEnabled = true; retry.visibility = if (result.ready || compact) View.GONE else View.VISIBLE } }
                     val bitmap = result.image?.let { SocialLinkPreviewApi.cover(app, it) }
-                    host.post { if (valid() && current.image == result.image) { card.cover.setImageBitmap(bitmap); card.cover.visibility = if (bitmap == null) View.GONE else View.VISIBLE } }
+                    host.post { if (valid() && current.image == result.image) card.bindCover(bitmap) }
                     val avatar = result.authorAvatar?.let { SocialLinkPreviewApi.cover(app, it) }
                     host.post { if (valid() && current.authorAvatar == result.authorAvatar) card.bindAvatar(avatar) }
                 }

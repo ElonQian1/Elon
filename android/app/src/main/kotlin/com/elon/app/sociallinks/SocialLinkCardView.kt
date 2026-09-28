@@ -13,7 +13,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /** Every descendant handles taps, including when chat adds recursive long-press listeners. */
-internal class SocialLinkCardView(context: Context, private val channels: Boolean = false, open: () -> Unit) : LinearLayout(context) {
+internal class SocialLinkCardView(context: Context, private val poster: Boolean = false, open: () -> Unit) : LinearLayout(context) {
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
     val title = TextView(context).apply {
         tag = "social-link-title"; textSize = 16f; maxLines = 3; ellipsize = TextUtils.TruncateAt.END
@@ -55,6 +55,10 @@ internal class SocialLinkCardView(context: Context, private val channels: Boolea
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
     private var avatarSource: String? = null
+    private var coverSource: String? = null
+    private var channels = false
+    private var posterRatio: Float? = null
+    private val action = TextView(context).apply { textSize = 11f; setTextColor(Color.parseColor("#BFC4C6")); includeFontPadding = false }
     init {
         tag = "social-link-card"; orientation = VERTICAL; isFocusable = true
         setPadding(dp(12), dp(12), dp(12), dp(12))
@@ -62,7 +66,7 @@ internal class SocialLinkCardView(context: Context, private val channels: Boolea
         val headline = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.TOP }
         media.addView(badge, FrameLayout.LayoutParams(-1, -1))
         media.addView(cover, FrameLayout.LayoutParams(-1, -1)); media.clipToOutline = true
-        if (channels) {
+        if (poster) {
             setPadding(0, 0, 0, 0)
             cover.scaleType = ImageView.ScaleType.FIT_CENTER
             clipToOutline = true
@@ -72,6 +76,11 @@ internal class SocialLinkCardView(context: Context, private val channels: Boolea
             badge.background = GradientDrawable().apply { setColor(0x99000000.toInt()); cornerRadius = dp(4).toFloat() }
             media.addView(badge, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply { topMargin = dp(8); marginStart = dp(8) })
             addView(media, LayoutParams(-1, dp(294)))
+            title.maxLines = 2; title.textSize = 14f
+            title.setPadding(dp(12), dp(10), dp(12), 0)
+            addView(title, LayoutParams(-1, -2))
+            time.setPadding(dp(12), dp(6), dp(12), 0)
+            addView(time, LayoutParams(-1, -2))
             val footer = LinearLayout(context).apply {
                 orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = dp(58)
                 setPadding(dp(10), dp(8), dp(10), dp(8)); setBackgroundColor(Color.parseColor("#242628"))
@@ -81,7 +90,6 @@ internal class SocialLinkCardView(context: Context, private val channels: Boolea
                 addView(creatorInitial, FrameLayout.LayoutParams(-1, -1)); addView(creatorAvatar, FrameLayout.LayoutParams(-1, -1))
             }
             source.setTextColor(Color.WHITE); source.textSize = 13f
-            val action = TextView(context).apply { text = "在微信中观看"; textSize = 11f; setTextColor(Color.parseColor("#BFC4C6")); includeFontPadding = false }
             val author = LinearLayout(context).apply {
                 orientation = VERTICAL; addView(source, LayoutParams(-1, -2))
                 addView(action, LayoutParams(-1, -2).apply { topMargin = dp(2) })
@@ -103,26 +111,37 @@ internal class SocialLinkCardView(context: Context, private val channels: Boolea
         listOf(this, headline, title, media, badge, summary, source, time, cover).forEach { child -> child.setOnClickListener { open() } }
     }
     fun bind(item: SocialLink) {
+        channels = WechatChannelsPolicy.isChannels(item.url)
         title.text = SocialLinkPresentation.title(item); source.text = SocialLinkPresentation.source(item)
-        if (channels) {
-            source.text = item.author.ifBlank { "视频号作者" }
-            creatorInitial.text = item.author.ifBlank { "视" }.let { String(Character.toChars(it.codePointAt(0))) }
+        if (poster) {
+            title.visibility = if (channels) View.GONE else View.VISIBLE
+            if (channels) source.text = item.author.ifBlank { "视频号作者" }
+            action.text = SocialLinkPresentation.mediaAction(item)
+            play.setImageResource(if (item.site == "小红书") android.R.drawable.ic_menu_view else android.R.drawable.ic_media_play)
+            creatorInitial.text = item.author.ifBlank { item.site }.let { String(Character.toChars(it.codePointAt(0))) }
             if (avatarSource != item.authorAvatar) { avatarSource = item.authorAvatar; bindAvatar(null) }
+            if (coverSource != item.image) { coverSource = item.image; bindCover(null) }
         }
         summary.text = item.summary; summary.visibility = if (item.summary.isBlank()) View.GONE else View.VISIBLE
         badge.text = if (channels) "视频号" else SocialLinkPresentation.badge(item.site)
         val colors = SocialLinkPresentation.colors(item.site)
-        badge.setTextColor(if (channels) Color.WHITE else Color.parseColor(colors.second))
+        badge.setTextColor(if (poster) Color.WHITE else Color.parseColor(colors.second))
         media.background = GradientDrawable().apply { setColor(Color.parseColor(colors.first)); cornerRadius = dp(4).toFloat() }
         time.text = SocialLinkPresentation.time(item); time.visibility = if (time.text.isEmpty()) View.GONE else View.VISIBLE
         contentDescription = "${if (channels) "在微信打开视频号：" else "打开"}${title.text}（${source.text}${if (time.text.isEmpty()) "" else "，${time.text}"}）"
+    }
+    fun bindCover(bitmap: Bitmap?) {
+        cover.setImageBitmap(bitmap); cover.visibility = if (bitmap == null) View.GONE else View.VISIBLE
+        posterRatio = bitmap?.let { (it.width.toFloat() / it.height).coerceIn(2f / 3f, 16f / 9f) }
+        requestLayout()
     }
     fun bindAvatar(bitmap: Bitmap?) {
         creatorAvatar.setImageBitmap(bitmap); creatorAvatar.visibility = if (bitmap == null) View.GONE else View.VISIBLE
         creatorInitial.visibility = if (bitmap == null) View.VISIBLE else View.GONE
     }
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        if (channels) media.layoutParams.height = (MeasureSpec.getSize(widthMeasureSpec) * 4 / 3).coerceAtLeast(1)
+        if (poster) media.layoutParams.height = if (channels) (MeasureSpec.getSize(widthMeasureSpec) * 4 / 3).coerceAtLeast(1)
+            else posterRatio?.let { (MeasureSpec.getSize(widthMeasureSpec) / it).toInt().coerceAtLeast(1) } ?: dp(100)
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 }

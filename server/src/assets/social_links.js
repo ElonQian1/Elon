@@ -21,6 +21,15 @@
     return { badge, title: value.title || fallback, summary: value.description || '', source: value.site + (author && author !== value.site ? ' · ' + author : '') + origin, time: seconds !== null && /^\d+$/.test(seconds) && n <= 604800 ? `从 ${stamp} 开始` : '' };
   }
   const cache = new Map();
+  // A poster layout does not imply that the provider permits embedded playback.
+  function mediaPresentation(value) {
+    if (channelsId(value.url)) return { kind: 'channels', ratio: 3 / 4, action: '打开视频号', play: true };
+    const url = safeUrl(value.url), path = url?.pathname || '';
+    if (value.site === '哔哩哔哩' && (value.embed?.kind === 'bilibili' || url?.hostname === 'b23.tv' && path !== '/')) return { kind: 'bilibili', ratio: 16 / 9, action: '打开哔哩哔哩视频', play: true };
+    if (value.site === '抖音' && (value.embed?.kind === 'douyin' || url?.hostname === 'v.douyin.com' && path !== '/')) return { kind: 'douyin', ratio: 3 / 4, action: '打开抖音视频', play: true };
+    if (value.site === '小红书' && (/\/(?:explore|discovery\/item)\/[A-Za-z0-9]+/.test(path) || /^(?:www\.)?xhslink\.com$/.test(url?.hostname || '') && path !== '/')) return { kind: 'note', ratio: 3 / 4, action: '查看小红书笔记', play: false };
+    return null;
+  }
   const readers = new Set();
   function remember(owner, value, expires = Date.now() + 24 * 3600000) {
     if (!Number.isFinite(expires) || expires <= Date.now()) return;
@@ -162,6 +171,8 @@
       const wrap = document.createElement('div'); wrap.className = 'social-link-wrap';
       const button = document.createElement('a'); button.className = 'social-link-card'; button.href = item.url;
       const channels = !!channelsId(item.url);
+      const format = mediaPresentation(item);
+      if (format) { button.classList.add('social-link-poster'); button.setAttribute('data-kind', format.kind); }
       if (channels) { wrap.classList.add('social-link-channels-wrap'); button.classList.add('social-link-channels'); }
       button.target = '_blank'; button.rel = 'noopener noreferrer';
       const copy = document.createElement('span'); copy.className = 'social-link-copy';
@@ -172,12 +183,17 @@
       const media = document.createElement('span'); media.className = 'social-link-media'; media.setAttribute('aria-hidden', 'true');
       const badge = document.createElement('span'); badge.className = 'social-link-badge';
       const cover = document.createElement('img'); cover.className = 'social-link-cover'; cover.alt = ''; cover.hidden = true; cover.referrerPolicy = 'no-referrer'; cover.loading = 'lazy';
-      cover.onerror = () => { cover.hidden = true; cover.removeAttribute('src'); };
+      function posterState(loaded) {
+        button.setAttribute('data-cover', loaded ? 'ready' : 'missing');
+        if (format && !channels) media.style.aspectRatio = String(loaded ? Math.max(2 / 3, Math.min(16 / 9, cover.naturalWidth / cover.naturalHeight)) : 16 / 9);
+      }
+      cover.onload = () => { if (cover.naturalWidth > 0) posterState(true); };
+      cover.onerror = () => { cover.hidden = true; cover.removeAttribute('src'); posterState(false); };
       const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'social-link-retry'; retry.textContent = '更新预览'; retry.hidden = true;
       copy.append(title, summary, source, time); media.append(badge, cover); button.append(copy, media); wrap.append(button, retry); host.append(wrap);
       let avatar, initial;
-      if (channels) {
-        const play = document.createElement('span'); play.className = 'social-link-play'; play.textContent = '\u25b6'; play.setAttribute('aria-hidden', 'true');
+      if (format) {
+        const play = document.createElement('span'); play.className = 'social-link-play'; play.textContent = format.play ? '\u25b6' : '↗'; play.setAttribute('aria-hidden', 'true');
         media.append(play);
         const footer = document.createElement('span'); footer.className = 'social-link-video-footer';
         const identity = document.createElement('span'); identity.className = 'social-link-avatar'; identity.setAttribute('aria-hidden', 'true');
@@ -185,7 +201,7 @@
         avatar = document.createElement('img'); avatar.alt = ''; avatar.hidden = true; avatar.loading = 'lazy';
         avatar.onerror = () => { avatar.hidden = true; avatar.removeAttribute('src'); initial.hidden = false; }; identity.append(avatar);
         const author = document.createElement('span'); author.className = 'social-link-video-author';
-        const action = document.createElement('span'); action.className = 'social-link-video-action'; action.textContent = options.channelsHandoff ? '在微信中观看' : '打开视频号';
+        const action = document.createElement('span'); action.className = 'social-link-video-action'; action.textContent = channels && options.channelsHandoff ? '在微信中观看' : format.action;
         source.remove(); author.append(source, action); footer.append(identity, author); button.append(footer);
       }
       if (channels && options.openOriginal) {
@@ -197,9 +213,9 @@
         title.textContent = view.title; button.title = view.title;
         summary.textContent = view.summary; summary.hidden = !view.summary || options.compact === true;
         source.textContent = view.source; source.title = view.source;
-        if (channels) {
-          source.textContent = value.author || '视频号作者'; source.title = source.textContent;
-          initial.textContent = Array.from(value.author || '视')[0];
+        if (format) {
+          source.textContent = channels ? value.author || '视频号作者' : view.source; source.title = source.textContent;
+          initial.textContent = Array.from(value.author || view.badge)[0];
           const picture = value.author_avatar_data_url;
           avatar.hidden = !picture; initial.hidden = !!picture;
           if (picture) avatar.src = picture; else avatar.removeAttribute('src');
@@ -207,7 +223,9 @@
         time.textContent = view.time; time.hidden = !view.time;
         badge.textContent = view.badge; media.setAttribute('data-site', value.site);
         button.setAttribute('aria-label', `${channels && options.channelsHandoff ? '在微信打开' : '打开'}${view.title}（${view.source}${view.time ? '，' + view.time : ''}）`);
-        if (value.image) { cover.hidden = false; cover.src = value.image; } else { cover.hidden = true; cover.removeAttribute('src'); }
+        if (value.image) {
+          if (cover.getAttribute('src') !== value.image) { posterState(false); cover.hidden = false; cover.src = value.image; }
+        } else { cover.hidden = true; cover.removeAttribute('src'); posterState(false); }
       }
       async function load(refresh = false) {
         if (busy || !valid()) return; busy = true; retry.disabled = true;
@@ -233,5 +251,5 @@
     }
     return () => { active = false; cleanups.forEach(fn => fn()); host.remove(); };
   }
-  root.ElonSocialLinks = { safeUrl, channelsId, embed, trustedEmbed, links, sanitize, compact, prepareBubble, presentation, mount, remember };
+  root.ElonSocialLinks = { safeUrl, channelsId, embed, trustedEmbed, links, sanitize, compact, prepareBubble, presentation, mediaPresentation, mount, remember };
 })(globalThis);

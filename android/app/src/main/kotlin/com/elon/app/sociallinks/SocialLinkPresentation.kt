@@ -2,6 +2,21 @@ package com.elon.app.sociallinks
 
 /** Honest provider fallback; titles/covers are never inferred from unrelated articles. */
 internal object SocialLinkPresentation {
+    fun mediaCard(item: SocialLink): Boolean {
+        val url = SocialLinkPolicy.safeUrl(item.url) ?: return false
+        if (WechatChannelsPolicy.isChannels(item.url)) return true
+        return when (item.site) {
+            "哔哩哔哩" -> item.player != null || url.host == "b23.tv" && url.path != "/"
+            "抖音" -> item.player != null || url.host == "v.douyin.com" && url.path != "/"
+            "小红书" -> Regex("/(?:explore|discovery/item)/[A-Za-z0-9]+").containsMatchIn(url.path) || url.host in listOf("xhslink.com", "www.xhslink.com") && url.path != "/"
+            else -> false
+        }
+    }
+    fun mediaAction(item: SocialLink) = when (item.site) {
+        "视频号" -> "在微信中观看"
+        "小红书" -> "查看小红书笔记"
+        else -> "打开${item.site}视频"
+    }
     fun title(item: SocialLink) = item.title.ifBlank { when (item.site) {
         "微信公众号" -> "微信公众号文章"
         "小红书" -> "小红书笔记"
