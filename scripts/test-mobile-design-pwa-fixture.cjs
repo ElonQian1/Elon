@@ -10,14 +10,17 @@ const { createFixture } = require('./mobile-design-pwa-fixture.cjs');
   const fixture = externalOrigin ? null : createFixture();
   const origin = externalOrigin || await fixture.listen();
   const parsed = new URL(origin);
-  assert.equal(parsed.hostname, '127.0.0.1');
-  assert.equal(parsed.protocol, 'http:');
-  assert.equal(parsed.origin, origin);
-  assert.deepEqual(await (await fetch(origin + '/fixture/info')).json(),
-    { schema: 'elon.mobile_design_fixture.v1', synthetic: true, productionNetwork: false });
-  const browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || 'msedge', headless: true });
+  let browser;
   const results = [], errors = [], apiPaths = new Set();
   try {
+    assert.equal(parsed.hostname, '127.0.0.1');
+    assert.equal(parsed.protocol, 'http:');
+    assert.equal(parsed.origin, origin);
+    assert.deepEqual(await (await fetch(origin + '/fixture/info')).json(),
+      { schema: 'elon.mobile_design_fixture.v1', synthetic: true, productionNetwork: false });
+    assert(!/__\w+_PNG_B64__/.test(await (await fetch(origin + '/?fixture=login')).text()),
+      'fixture must render every production PNG placeholder');
+    browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || 'msedge', headless: true });
     assert.equal((await fetch(origin + '/api/me')).status, 401);
     assert.equal((await fetch(origin + '/api/auth/login', { method: 'POST', body: JSON.stringify({ account: 'wrong', password: 'wrong' }) })).status, 401);
     assert.equal((await fetch(origin + '/api/auth/login', { method: 'POST', headers: { Origin: 'https://outside.invalid' }, body: '{}' })).status, 403);
@@ -88,5 +91,5 @@ const { createFixture } = require('./mobile-design-pwa-fixture.cjs');
     console.log(JSON.stringify({ schema: 'elon.mobile_design_fixture_test.v1', status: 'passed',
       synthetic: true, productionAuthVerified: false, writesPerformed: false, scenarios: results,
       requestedApiPaths: [...apiPaths].sort() }, null, 2));
-  } finally { await browser.close(); if (fixture) await fixture.close(); }
+  } finally { if (browser) await browser.close(); if (fixture) await fixture.close(); }
 })().catch(error => { console.error(error.stack); process.exitCode = 1; });
