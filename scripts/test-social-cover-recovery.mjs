@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const browser = await chromium.launch({ channel: 'msedge', headless: true });
+try {
+  const page = await browser.newPage();
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.setContent('<main></main>');
+  await page.addScriptTag({ content: await readFile(new URL('../server/src/assets/social_links.js', import.meta.url), 'utf8') });
+  const result = await page.evaluate(async () => {
+    const api = ElonSocialLinks, url = 'https://www.bilibili.com/video/BV19eYH6NEsC/';
+    const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 9;
+    const poster = canvas.toDataURL('image/png');
+    const item = api.links(url)[0];
+    const ready = { ...item, title: 'Fixture video', status: 'ready', cover_data_url: poster };
+    const normalized = api.sanitize(ready, item);
+    const idempotent = api.sanitize(normalized, item).image === poster;
+    const unsafe = api.sanitize({ ...ready, cover_data_url: 'data:image/svg+xml;base64,PHN2Zz4=', image: 'javascript:alert(1)' }, item).image === null;
+    let calls = 0, failures = 0;
+    const host = document.querySelector('main');
+    api.remember('test', normalized);
+    const dispose = api.mount(host, url, { owner: 'test', compact: true, api: async () => { calls++; return ready; }, coverFailed: () => failures++ });
+    const until = async predicate => { for (let i = 0; i < 100; i++) { if (predicate()) return; await new Promise(r => setTimeout(r, 20)); } throw new Error('fixture timeout'); };
+    await until(() => host.querySelector('[data-cover="ready"]'));
+    const restored = calls === 0;
+    api.remember('test', { ...item, title: 'Later title', status: 'ready' });
+    const preserved = host.querySelector('img.social-link-cover').getAttribute('src') === poster;
+    host.querySelector('img.social-link-cover').dispatchEvent(new Event('error'));
+    const retryVisible = !host.querySelector('.social-link-retry').hidden;
+    host.querySelector('.social-link-retry').click();
+    await until(() => calls === 1 && host.querySelector('[data-cover="ready"]'));
+    dispose();
+    api.remember('partial', { ...item, title: 'Partial title', status: 'ready' });
+    const disposePartial = api.mount(host, url, { owner: 'partial', compact: true, api: async () => { calls++; return ready; } });
+    await until(() => host.querySelector('.social-link-title')?.textContent === 'Partial title');
+    const partialRetryVisible = !host.querySelector('.social-link-retry').hidden;
+    host.querySelector('.social-link-retry').click();
+    await until(() => calls === 2 && host.querySelector('[data-cover="ready"]'));
+    disposePartial();
+    return { idempotent, unsafe, restored, preserved, retryVisible, partialRetryVisible, calls, failures };
+  });
+  assert.deepEqual(result, { idempotent: true, unsafe: true, restored: true, preserved: true, retryVisible: true, partialRetryVisible: true, calls: 2, failures: 1 });
+  assert.deepEqual(errors, []);
+  console.log(JSON.stringify({ passed: true, ...result }));
+} finally { await browser.close(); }

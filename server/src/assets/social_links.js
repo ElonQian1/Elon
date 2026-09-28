@@ -34,10 +34,13 @@
   function remember(owner, value, expires = Date.now() + 24 * 3600000) {
     if (!Number.isFinite(expires) || expires <= Date.now()) return;
     const item = links(value?.url || '')[0]; if (!item) return;
-    const clean = sanitize(value, item); if (clean.status !== 'ready') return;
+    let clean = sanitize(value, item); if (clean.status !== 'ready') return;
     const key = String(owner || '') + '\n' + item.url;
+    const previous = cache.get(key);
+    if (!clean.image && previous?.expires > Date.now() && previous.read?.image) clean = { ...clean, image: previous.read.image };
+    const complete = !mediaPresentation(clean) || !!clean.image;
     while (cache.size >= 128) cache.delete(cache.keys().next().value);
-    cache.set(key, { expires: Math.min(expires, Date.now() + 24 * 3600000), promise: Promise.resolve(clean), read: clean });
+    cache.set(key, { expires: Math.min(expires, Date.now() + (complete ? 24 * 3600000 : 300000)), promise: Promise.resolve(clean), ...(complete ? { read: clean } : {}) });
     readers.forEach(notify => notify(key, clean));
   }
   function genericTitle(title, site) {
@@ -156,7 +159,7 @@
       description: typeof value.description === 'string' ? value.description.slice(0, 300) : '',
       author: typeof value.author === 'string' && value.author.trim() ? value.author.slice(0, 80) : fallback.author,
       author_avatar_data_url: typeof value.author_avatar_data_url === 'string' && value.author_avatar_data_url.length <= 12288 ? inlineCover(value.author_avatar_data_url) : null,
-      image: inlineCover(value.cover_data_url) || safeUrl(value.image)?.href || null, embed: trustedEmbed(value.embed) || fallback.embed,
+      image: inlineCover(value.cover_data_url) || inlineCover(value.image) || safeUrl(value.image)?.href || null, embed: trustedEmbed(value.embed) || fallback.embed,
       status: value.status === 'ready' && title ? 'ready' : 'unavailable', source: value.source === 'member' ? 'member' : 'server' };
   }
   async function preview(item, options, refresh) {
@@ -182,7 +185,7 @@
     const host = document.createElement('div'); host.className = 'social-link-cards' + (options.compact ? ' social-link-cards-compact' : '') + (options.desktop ? ' social-link-cards-desktop' : ''); container.append(host);
     const valid = () => active && host.parentNode === container && (!options.isCurrent || options.isCurrent());
     for (const item of items) {
-      let current = item, busy = false;
+      let current = item, busy = false, coverFailed = false;
       const wrap = document.createElement('div'); wrap.className = 'social-link-wrap';
       const button = document.createElement('a'); button.className = 'social-link-card'; button.href = item.url;
       const channels = !!channelsId(item.url);
@@ -202,9 +205,17 @@
         button.setAttribute('data-cover', loaded ? 'ready' : 'missing');
         if (format && !channels) media.style.aspectRatio = String(loaded ? Math.max(2 / 3, Math.min(16 / 9, cover.naturalWidth / cover.naturalHeight)) : 16 / 9);
       }
-      cover.onload = () => { if (cover.naturalWidth > 0) posterState(true); };
-      cover.onerror = () => { cover.hidden = true; cover.removeAttribute('src'); posterState(false); };
+      cover.onload = () => { if (valid() && cover.naturalWidth > 0) { posterState(true); coverFailed = false; updateRetry(); } };
+      cover.onerror = () => {
+        if (!valid()) return;
+        coverFailed = true; cover.hidden = true; cover.removeAttribute('src'); posterState(false);
+        cache.delete(String(options.owner || '') + '\n' + item.url);
+        options.coverFailed?.(current); updateRetry();
+      };
       const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'social-link-retry'; retry.textContent = '更新预览'; retry.hidden = true;
+      function updateRetry() {
+        retry.hidden = !coverFailed && current.status === 'ready' && (!format || !!current.image);
+      }
       copy.append(title, summary, source, time); media.append(badge, cover); button.append(copy, media); wrap.append(button, retry); host.append(wrap);
       let avatar, initial;
       if (format) {
@@ -239,8 +250,9 @@
         badge.textContent = view.badge; media.setAttribute('data-site', value.site);
         button.setAttribute('aria-label', `${channels && options.channelsHandoff ? '在微信打开' : '打开'}${view.title}（${view.source}${view.time ? '，' + view.time : ''}）`);
         if (value.image) {
-          if (cover.getAttribute('src') !== value.image) { posterState(false); cover.hidden = false; cover.src = value.image; }
+          if (cover.getAttribute('src') !== value.image) { coverFailed = false; posterState(false); cover.hidden = false; cover.src = value.image; }
         } else { cover.hidden = true; cover.removeAttribute('src'); posterState(false); }
+        updateRetry();
       }
       async function load(refresh = false) {
         if (busy || !valid()) return; busy = true; retry.disabled = true;
@@ -248,7 +260,7 @@
         busy = false;
         const observed = cache.get(String(options.owner || '') + '\n' + item.url);
         const latest = observed?.read && observed.expires > Date.now() ? observed.read : value;
-        if (valid()) { draw(latest); retry.disabled = false; retry.hidden = (latest.status === 'ready' && (latest.image || !['抖音', '小红书'].includes(latest.site))) || options.compact === true; }
+        if (valid()) { draw(latest); retry.disabled = false; }
       }
       button.onclick = event => {
         if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;

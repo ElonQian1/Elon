@@ -19,6 +19,14 @@ export function fromRead(original: LinkPreview, value: unknown): LinkPreview | n
   return read ? { ...original, title: read.title, author: read.author, image: read.image, status: 'ready' } : null
 }
 export function readSource(preview: LinkPreview) { return ElonSocialReadAdapter.readSource(preview.url, preview.embed?.url) }
+export function readBackComplete(original: LinkPreview, value: unknown): boolean {
+  const read = ElonSocialReadAdapter.validate(readSource(original), value)
+  const video = /^(bilibili|douyin|xiaohongshu):/.test(ElonSocialReadAdapter.identity(readSource(original)) || '')
+  return !!read && (!video || !!read.image)
+}
+export function forgetRead(scope: string, original: LinkPreview) {
+  try { localStorage.setItem(storageKey, JSON.stringify(entries().filter(e => e.scope !== scope || e.original !== original.url))) } catch { /* optional cache */ }
+}
 export function cachedRead(scope: string, original: LinkPreview): { preview: LinkPreview; expires: number } | null {
   const entry = entries().find(e => e.scope === scope && e.original === original.url)
   const source = entry?.value?.original
@@ -30,6 +38,8 @@ export function cachedRead(scope: string, original: LinkPreview): { preview: Lin
 export function rememberRead(scope: string, original: LinkPreview, value: unknown): LinkPreview | null {
   const read = ElonSocialReadAdapter.validate(readSource(original), value)
   const preview = fromRead(original, read); if (!read || !preview) return null
+  const previous = cachedRead(scope, original)
+  if (!read.image && previous?.preview.image) return previous.preview
   const list = entries().filter(e => e.scope !== scope || e.original !== original.url)
   list.push({ scope, original: original.url, saved: Date.now(), value: read })
   try { localStorage.setItem(storageKey, JSON.stringify(list.slice(-128))) } catch { /* memory cache still works */ }

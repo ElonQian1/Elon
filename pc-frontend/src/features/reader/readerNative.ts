@@ -1,7 +1,7 @@
 // All native calls for reading tabs; components only describe intent (present here / hide / close).
 import { boundsFor, controlInternalBrowserTab, getInternalBrowserTabState, openInternalBrowserTab, resizeInternalBrowserTab, type EmbeddedWebviewBounds } from '../user-browser/internalBrowserApi'
 import { applyReadBack } from '../friends/socialReadBack'
-import { readSource } from '../friends/socialReadPreview'
+import { readBackComplete, readSource } from '../friends/socialReadPreview'
 import { useReaderTabs } from './readerTabsStore'
 import type { ReaderTab } from './readerTabsModel'
 
@@ -69,6 +69,7 @@ export function closeTab(id: string) {
 export function navigateTab(id: string, action: 'back' | 'forward' | 'reload' | 'external') {
   return serialize(async () => {
     if (!opened.has(id)) return
+    if (action === 'reload') readBackDone.delete(id)
     try { await controlInternalBrowserTab(action, id) } catch (cause) { fail(id, cause) }
   })
 }
@@ -109,6 +110,6 @@ export async function pollTab(tab: ReaderTab) {
     const state = await getInternalBrowserTabState(wantRead ? source : undefined, tab.id)
     const store = useReaderTabs.getState()
     store.patch(tab.id, { loading: !!state.loading, error: state.lastError || '', ...(state.hosted ? { hosted: state.hosted } : {}), ...(state.title ? { title: state.title } : {}) })
-    if (state.readPreview && applyReadBack(tab.scope, tab.preview, state.readPreview)) readBackDone.add(tab.id)
+    if (state.readPreview && applyReadBack(tab.scope, tab.preview, state.readPreview) && readBackComplete(tab.preview, state.readPreview)) readBackDone.add(tab.id)
   } catch (cause) { fail(tab.id, cause) }
 }
