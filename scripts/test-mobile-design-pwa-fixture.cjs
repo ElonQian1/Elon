@@ -5,13 +5,29 @@ const path = require('node:path');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { createFixture } = require('./mobile-design-pwa-fixture.cjs');
 
+async function textContrast(page, selector) {
+  return page.locator(selector).evaluate(element => {
+    const rgba = value => value.match(/[\d.]+/g).map(Number);
+    const over = (front, back) => front.slice(0, 3).map((v, i) => v * (front[3] ?? 1) + back[i] * (1 - (front[3] ?? 1)));
+    const ancestors = [];
+    for (let node = element; node; node = node.parentElement) ancestors.unshift(node);
+    let background = [255, 255, 255];
+    for (const node of ancestors) background = over(rgba(getComputedStyle(node).backgroundColor), background);
+    const foreground = over(rgba(getComputedStyle(element).color), background);
+    const luminance = rgb => rgb.map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4)
+      .reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+    const a = luminance(foreground), b = luminance(background);
+    return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+  });
+}
+
 (async () => {
   const externalOrigin = process.argv.find(arg => arg.startsWith('--origin='))?.slice(9);
   const fixture = externalOrigin ? null : createFixture();
   const origin = externalOrigin || await fixture.listen();
   const parsed = new URL(origin);
   let browser;
-  const results = [], errors = [], apiPaths = new Set();
+  const results = [], errors = [], contrastMeasurements = [], apiPaths = new Set();
   try {
     assert.equal(parsed.hostname, '127.0.0.1');
     assert.equal(parsed.protocol, 'http:');
@@ -82,6 +98,13 @@ const { createFixture } = require('./mobile-design-pwa-fixture.cjs');
       await page.locator('#accountSessionList').filter({ hasText: 'Web 演示设备' }).waitFor();
       assert.equal(await page.locator('#accountGoogleBindingState').textContent(), '暂未配置');
       assert.equal(await page.locator('#accountRevokeOthers').isDisabled(), true);
+      for (const selector of ['#accountGoogleBindingState', '#federatedBindStatus']) {
+        const contrast = await textContrast(page, selector);
+        assert(contrast >= 4.5, `${selector} ${theme} text contrast ${contrast.toFixed(2)} must reach 4.5`);
+        contrastMeasurements.push({ selector, theme, ratio: Number(contrast.toFixed(2)) });
+      }
+      const close = await page.locator('#accountIdentityClose').boundingBox();
+      assert(close.width >= 48 && close.height >= 48, 'identity sheet close target must be at least 48px');
       results.push('account-security-' + theme);
     }
     const layoutFailures = [];
@@ -128,6 +151,6 @@ const { createFixture } = require('./mobile-design-pwa-fixture.cjs');
     await context.close();
     console.log(JSON.stringify({ schema: 'elon.mobile_design_fixture_test.v1', status: 'passed',
       synthetic: true, productionAuthVerified: false, writesPerformed: false, scenarios: results,
-      requestedApiPaths: [...apiPaths].sort() }, null, 2));
+      contrastMeasurements, requestedApiPaths: [...apiPaths].sort() }, null, 2));
   } finally { if (browser) await browser.close(); if (fixture) await fixture.close(); }
 })().catch(error => { console.error(error.stack); process.exitCode = 1; });

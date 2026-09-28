@@ -7,7 +7,7 @@
 .account-security-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
 .account-security-section h3 { margin: 0 0 6px; font-size: 16px; }
 .account-security-summary, .account-security-status { margin: 0 0 10px; color: var(--ink-faint); font-size: 12px; line-height: 1.55; }
-.account-security-status.error { color: #ff7f7f; }
+.account-security-status.error { color: var(--danger); }
 .account-security-form { display: grid; gap: 8px; }
 .account-recovery-codes { display: none; margin: 10px 0 0; padding: 12px; overflow: auto; border-radius: 10px; background: var(--panel); color: var(--ink); font: 12px/1.7 monospace; user-select: text; }
 .account-recovery-codes.active { display: block; }
