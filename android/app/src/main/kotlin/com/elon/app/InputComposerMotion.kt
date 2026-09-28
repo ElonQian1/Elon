@@ -142,7 +142,7 @@ internal class InputComposerMotion(
     private fun applyPanelBackground(expanded: Boolean) {
         if (expandedPanelBackgroundApplied == expanded) return
         inputPanelContainer.setBackgroundResource(
-            if (expanded) R.drawable.bg_bottom_panel_expanded else R.drawable.bg_bottom_panel_new
+            R.drawable.bg_chat_input_surface
         )
         expandedPanelBackgroundApplied = expanded
     }

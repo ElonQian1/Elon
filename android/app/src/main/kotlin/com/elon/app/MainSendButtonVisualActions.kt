@@ -49,7 +49,7 @@ internal class MainSendButtonVisualActions(
             } else {
                 R.drawable.ic_input_send_new
             }
-            activity.getDrawable(icon)?.let {
+            activity.getDrawable(icon)?.apply { setTint(activity.getColor(R.color.mobile_on_surface)) }?.let {
                 binding.sendButton.background = InsetDrawable(it, dp(3))
             }
             binding.sendButton.text = ""

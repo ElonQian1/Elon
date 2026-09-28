@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.graphics.Color
 import android.widget.TextView
 import com.elon.app.databinding.ActivityMainBinding
 
@@ -21,7 +20,7 @@ internal class MainCollapsedInputPreviewActions(
             else -> "输入内容"
         }
         preview.setTextColor(
-            Color.parseColor(if (hasDraft || hasAttachments) "#DCDCDC" else "#80BEBEBA")
+            preview.context.getColor(if (hasDraft || hasAttachments) R.color.mobile_on_surface else R.color.mobile_on_surface_variant)
         )
     }
 }

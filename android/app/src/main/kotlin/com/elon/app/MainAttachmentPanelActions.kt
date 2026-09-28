@@ -126,9 +126,9 @@ internal class MainAttachmentPanelActions(
                 }
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
-                    setColor(Color.parseColor("#2A2A2A"))
+                    setColor(context.getColor(R.color.mobile_surface_container_high))
                 }
-                setImageResource(iconRes)
+                setComposerIcon(iconRes)
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 setPadding(dp(8), dp(8), dp(8), dp(8))
             })
@@ -137,7 +137,7 @@ internal class MainAttachmentPanelActions(
                 gravity = Gravity.CENTER_VERTICAL
                 includeFontPadding = false
                 text = label
-                setTextColor(Color.parseColor("#F8F7F4"))
+                setTextColor(context.getColor(R.color.mobile_on_surface))
                 textSize = 16f
             })
             setOnClickListener {
@@ -150,7 +150,7 @@ internal class MainAttachmentPanelActions(
     private fun applyAttachmentPanelBackground(expanded: Boolean) {
         val panel = attachmentPanel() ?: return
         (panel.parent as? View)?.setBackgroundResource(
-            if (expanded) R.drawable.bg_bottom_panel_expanded else R.drawable.bg_bottom_panel_new
+            R.drawable.bg_chat_input_surface
         )
     }
 
@@ -178,7 +178,7 @@ internal class MainAttachmentPanelActions(
 
     private fun updateAttachmentButtonIcon(expanded: Boolean) {
         val button = attachmentButton() ?: return
-        button.setImageResource(R.drawable.ic_input_add_new)
+        button.setComposerIcon(R.drawable.ic_input_add_new)
         button.rotation = if (expanded) 45f else 0f
         button.contentDescription = if (expanded) "收起更多输入功能" else "展开更多输入功能"
     }

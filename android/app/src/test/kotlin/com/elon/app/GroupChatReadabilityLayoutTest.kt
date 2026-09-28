@@ -4,9 +4,11 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.view.ContextThemeWrapper
 import android.view.View
 import android.widget.TextView
+import androidx.core.graphics.ColorUtils
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -62,7 +64,22 @@ class GroupChatReadabilityLayoutTest {
                     root.offsetDescendantRectToMyCoords(fixture.composer.inputBarContainer, inputBounds)
                     assertTrue("Account and input must not overlap", accountBounds.bottom <= inputBounds.top)
                     assertTrue(inputBounds.bottom <= root.height)
-                    if (scenario == "input") assertTrue(fixture.binding.inputEdit.text.startsWith("尚未发送"))
+                    val panel = fixture.composer.inputBarContainer.parent as View
+                    val panelColor = (panel.background as GradientDrawable).color!!.defaultColor
+                    assertTrue(ColorUtils.calculateContrast(fixture.binding.inputEdit.currentTextColor, panelColor) >= 4.5)
+                    assertTrue(ColorUtils.calculateContrast(fixture.composer.collapsedInputPreview.currentTextColor, panelColor) >= 4.5)
+                    for (icon in listOf(fixture.composer.attachmentButton, fixture.composer.emojiButton,
+                        fixture.composer.inputModeButton, fixture.composer.expandEditorButton)) {
+                        assertTrue(ColorUtils.calculateContrast(icon.imageTintList!!.defaultColor, panelColor) >= 3.0)
+                    }
+                    if (scenario == "input") {
+                        assertTrue(fixture.binding.inputEdit.text.startsWith("尚未发送"))
+                        assertTrue("Expanded editor must have a visible area", fixture.binding.inputEdit.height >= (48 * density).toInt())
+                        fixture.composer.inputComposerMotion.setExpanded(false, animate = false)
+                        MainCollapsedInputPreviewActions(fixture.binding, { emptyList() }, { fixture.composer.collapsedInputPreview })
+                            .updateCollapsedInputPreview()
+                        assertTrue(ColorUtils.calculateContrast(fixture.composer.collapsedInputPreview.currentTextColor, panelColor) >= 4.5)
+                    }
                     fixture.binding.chatList.adapter = null
                 }
             }

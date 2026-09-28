@@ -129,7 +129,7 @@ internal class MainInputComposerSetup(
             clipToPadding = false
             gravity = Gravity.BOTTOM
             orientation = LinearLayout.VERTICAL
-            background = activity.getDrawable(R.drawable.bg_bottom_panel_new)
+            background = activity.getDrawable(R.drawable.bg_chat_input_surface)
             setPadding(0, 0, 0, 0)
         }
 
@@ -165,7 +165,7 @@ internal class MainInputComposerSetup(
         val inputModeButton = ImageButton(activity).apply {
             layoutParams = FrameLayout.LayoutParams(dp(48), dp(48), Gravity.END or Gravity.CENTER_VERTICAL)
             background = ColorDrawable(Color.TRANSPARENT)
-            setImageResource(R.drawable.ic_input_voice_wave_new)
+            setComposerIcon(R.drawable.ic_input_voice_wave_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(dp(9), dp(9), dp(9), dp(9))
             contentDescription = "切换语音输入"
@@ -175,7 +175,7 @@ internal class MainInputComposerSetup(
         val webDictationButton = ImageButton(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
             background = ColorDrawable(Color.TRANSPARENT)
-            setImageResource(R.drawable.ic_web_chat_dictation)
+            setComposerIcon(R.drawable.ic_web_chat_dictation)
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(dp(8), dp(9), dp(8), dp(9))
             visibility = View.GONE
@@ -221,7 +221,7 @@ internal class MainInputComposerSetup(
             ellipsize = TextUtils.TruncateAt.END
             setPadding(dp(4), 0, dp(4), 0)
             text = "输入内容"
-            setTextColor(Color.parseColor("#80BEBEBA"))
+            setTextColor(activity.getColor(R.color.mobile_on_surface_variant))
             textSize = 15f
             isClickable = true
             isFocusable = false
@@ -236,7 +236,7 @@ internal class MainInputComposerSetup(
                 marginEnd = 0
             }
             background = ColorDrawable(Color.TRANSPARENT)
-            setImageResource(R.drawable.ic_input_expand_new)
+            setComposerIcon(R.drawable.ic_input_expand_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(dp(3), dp(3), dp(3), dp(3))
             contentDescription = "全屏编辑"
@@ -261,8 +261,8 @@ internal class MainInputComposerSetup(
             includeFontPadding = false
             setHorizontallyScrolling(false)
             setPadding(dp(4), dp(2), dp(42), dp(2))
-            setTextColor(Color.parseColor("#F8F7F4"))
-            setHintTextColor(Color.parseColor("#80BEBEBA"))
+            setTextColor(activity.getColor(R.color.mobile_on_surface))
+            setHintTextColor(activity.getColor(R.color.mobile_on_surface_variant))
             textSize = 17f
             setOnFocusChangeListener { _, hasFocus ->
                 if (!isVoiceMode()) {
@@ -288,7 +288,7 @@ internal class MainInputComposerSetup(
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "按住 说话"
-            setTextColor(Color.parseColor("#F8F7F4"))
+            setTextColor(activity.getColor(R.color.mobile_on_surface))
             textSize = 15f
             visibility = View.GONE
             setOnTouchListener { _, event ->
@@ -397,7 +397,7 @@ internal class MainInputComposerSetup(
                 marginEnd = dp(4)
             }
             background = ColorDrawable(Color.TRANSPARENT)
-            setImageResource(R.drawable.ic_input_emoji_new)
+            setComposerIcon(R.drawable.ic_input_emoji_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(dp(9), dp(9), dp(9), dp(9))
             contentDescription = "打开表情"
@@ -418,7 +418,7 @@ internal class MainInputComposerSetup(
                 marginEnd = dp(4)
             }
             background = ColorDrawable(Color.TRANSPARENT)
-            setImageResource(R.drawable.ic_input_add_new)
+            setComposerIcon(R.drawable.ic_input_add_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(dp(9), dp(9), dp(9), dp(9))
             contentDescription = "展开更多输入功能"
@@ -429,7 +429,7 @@ internal class MainInputComposerSetup(
 
         sendButton.apply {
             layoutParams = FrameLayout.LayoutParams(dp(48), dp(48), Gravity.END or Gravity.CENTER_VERTICAL)
-            activity.getDrawable(R.drawable.ic_input_send_new)?.let { background = InsetDrawable(it, dp(5)) }
+            activity.getDrawable(R.drawable.ic_input_send_new)?.apply { setTint(activity.getColor(R.color.mobile_on_surface)) }?.let { background = InsetDrawable(it, dp(5)) }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = ""
@@ -441,7 +441,7 @@ internal class MainInputComposerSetup(
                 marginEnd = dp(0)
             }
             background = ColorDrawable(Color.TRANSPARENT)
-            setImageResource(
+            setComposerIcon(
                 if (VoiceSpeaker.isTtsEnabled(activity)) R.drawable.ic_input_tts_on_circle
                 else R.drawable.ic_input_tts_off_circle
             )
@@ -452,7 +452,7 @@ internal class MainInputComposerSetup(
             setOnClickListener {
                 val enabled = !VoiceSpeaker.isTtsEnabled(activity)
                 VoiceSpeaker.setTtsEnabled(activity, enabled)
-                setImageResource(
+                setComposerIcon(
                     if (enabled) R.drawable.ic_input_tts_on_circle
                     else R.drawable.ic_input_tts_off_circle
                 )
