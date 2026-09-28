@@ -38,6 +38,8 @@ Android 同时接收 `ACTION_SEND` 和 `ACTION_SEND_MULTIPLE` 的 ZIP。实际�
 
 阅读器交互与缓存修复见 [聊天记录阅读器修复](reports/wechat-record-reader-cache-20260928.md)。群里发送的始终是结构化记录引用，不是每次打开重新下载、解压 ZIP。
 
+头像、导出标签折叠、卡片复制/转发和视频缩略图见 [阅读体验与验证](reports/wechat-record-reader-presentation-20260929.md)。这些是展示层规则，`raw_text` 和原始链接保持完整。
+
 - Android：`WechatImportTest`，包含缩进层级、顺序、重复内容、缺附件、同名附件、路径穿越、体积限制。
 - 私人样本只通过进程环境 `ELON_WECHAT_TEST_SAMPLES` 指向本地 ZIP，不提交样本、原文或日志正文。
 - 后端：`store::articles::chat_records::tests`，覆盖幂等、群权限、撤回、删除、媒体绑定和保留原文。

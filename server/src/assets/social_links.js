@@ -235,7 +235,7 @@
         original.onclick = () => options.openOriginal(current); wrap.append(original);
       }
       function draw(value) {
-        current = value; const view = presentation(value);
+        current = value; const view = presentation(value); options.onPreview?.(value);
         title.textContent = view.title; button.title = view.title;
         summary.textContent = view.summary; summary.hidden = !view.summary || options.compact === true;
         source.textContent = view.source; source.title = view.source;
@@ -267,6 +267,7 @@
         event.preventDefault(); (options.open || root.ElonSocialLinkViewer?.open || (p => root.open(p.url, '_blank', 'noopener,noreferrer')))(current);
       };
       retry.onclick = () => load(true); draw(item);
+      if (options.actions) cleanups.push(options.actions(wrap, () => current));
       const notify = (key, value) => { if (valid() && key === String(options.owner || '') + '\n' + item.url) draw(value); };
       readers.add(notify); cleanups.push(() => readers.delete(notify));
       if (typeof IntersectionObserver === 'function') {

@@ -9,18 +9,23 @@ const output = path.join(root, '.ai-tmp', 'chat-record-cache-ui');
 const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+nmZkAAAAASUVORK5CYII=', 'base64');
 const rows = [
   ['one', 'text', '项目讨论\n原始消息保留', null],
-  ['article', 'link', 'https://mp.weixin.qq.com/s/fixture-article', null],
-  ['channels', 'link', 'https://weixin.qq.com/sph/fixture', null],
+  ['article', 'link', '[链接] 合成预览标题 https://mp.weixin.qq.com/s/fixture-article', null],
+  ['channels', 'channels', '[视频号] 视频描述 https://weixin.qq.com/sph/fixture', null],
   ['image', 'image', '[图片]', 'image_test'],
   ['video', 'video', '[视频]', 'video_test'],
   ['forward', 'forward', '[聊天记录]', null],
-].map(([id, kind, text, asset_id]) => ({ id, kind, text, asset_id, parent_id: null, sender: '示例用户', time: '2026-09-28 12:00', filename: id }));
+].map(([id, kind, text, asset_id]) => ({ id, kind, text, asset_id, parent_id: null, sender: '示例用户', time: '2026-09-28 12:00', filename: asset_id ? id : '' }));
 rows.push({ ...rows[0], id: 'nested', parent_id: 'forward', text: '嵌套的聊天消息' });
 const card = { schema: 'chat_record_bundle_v1', record_id: 'record_test', group_id: 'group_test', title: '微信聊天记录', summary: '示例', message_count: 6, total_count: 7 };
 const view = { card, owner_id: 'author', document: { title: card.title, raw_text: 'Original text', warnings: [], messages: rows } };
-let counts = {}, revoked = false, video = Buffer.alloc(0);
+let counts = {}, revoked = false, video = Buffer.alloc(0), sent = [];
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  if (url.pathname === '/api/me/groups') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ groups: [{ id: 'target', name: '验收群' }] })); return; }
+  if (url.pathname === '/api/me/groups/target/messages') {
+    let body = ''; for await (const part of req) body += part;
+    sent.push(JSON.parse(body)); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ message: { id: 'sent' } })); return;
+  }
   if (url.pathname.startsWith('/api/me/groups/')) {
     if (req.headers.authorization !== 'Bearer synthetic-session' || revoked) { res.writeHead(403, { 'Cache-Control': 'private, no-store' }); res.end('{}'); return; }
     const key = url.pathname.split('/').at(-1), tag = `"fixture-${key}-1"`;
@@ -71,15 +76,16 @@ const server = http.createServer(async (req, res) => {
     }));
     await source.close();
     assert.ok(video.length > 100, 'Synthetic WebM must contain encoded frames before reader tests');
+    fs.writeFileSync(path.join(output, 'record-preview.webm'), video);
     for (const kind of ['pc', 'pwa']) for (const width of [1280, 390]) {
-      counts = {}; revoked = false;
+      counts = {}; revoked = false; sent = [];
       const context = await browser.newContext({ viewport: { width, height: 900 } });
       const page = await context.newPage(); const errors = [];
       page.on('pageerror', e => errors.push(e.message));
       await page.goto(base + (kind === 'pc' ? '/pc/tests/fixtures/chat-records.html' : '/fixture-pwa'));
       if (kind === 'pwa') {
         for (const name of ['social_links.css', 'chat_records.css']) await page.addStyleTag({ content: fs.readFileSync(path.join(root, 'server/src/assets', name), 'utf8') });
-        for (const name of ['social_links.js', 'social_link_viewer.js', 'chat_records.js']) await page.addScriptTag({ content: fs.readFileSync(path.join(root, 'server/src/assets', name), 'utf8') });
+        for (const name of ['social_links.js', 'social_link_viewer.js', 'chat_record_presentation.js', 'chat_record_actions.js', 'chat_record_video.js', 'chat_record_media.js', 'chat_records.js']) await page.addScriptTag({ content: fs.readFileSync(path.join(root, 'server/src/assets', name), 'utf8') });
         await page.evaluate(c => { document.querySelector('#open').onclick = () => ElonChatRecords.open(c, { owner: 'reader', current: () => true, api: (p, init) => fetch(p, { ...init, headers: { Authorization: 'Bearer synthetic-session' } }) }); }, card);
       }
       await page.getByRole('button', { name: '打开测试记录', exact: true }).click();
@@ -89,6 +95,26 @@ const server = http.createServer(async (req, res) => {
       const channels = dialog.locator('.social-link-channels'); await channels.scrollIntoViewIfNeeded();
       await page.waitForFunction(() => document.querySelector('.social-link-channels .social-link-source')?.textContent === '示例作者');
       assert.equal(await channels.locator('.social-link-play').isVisible(), true);
+      assert.equal(await dialog.getByText('[链接]', { exact: true }).count(), 0);
+      assert.equal(await dialog.locator('p').filter({ hasText: 'https://mp.weixin.qq.com' }).count(), 0);
+      await channels.click({ button: 'right' });
+      await dialog.getByRole('button', { name: '转发到群聊', exact: true }).click();
+      const forward = page.getByRole('dialog', { name: '转发到群聊', exact: true });
+      await forward.getByLabel('转发目标').selectOption('target'); assert.equal(sent.length, 0);
+      await forward.getByRole('button', { name: '确认转发', exact: true }).click();
+      await forward.getByText('已发送到群聊', { exact: true }).waitFor();
+      assert.deepEqual(sent, [{ content: 'https://weixin.qq.com/sph/fixture' }]);
+      await forward.getByRole('button', { name: '完成', exact: true }).click();
+      await page.evaluate(() => {
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+        document.execCommand = command => {
+          if (command !== 'copy') return false;
+          window.copiedRecordLink = document.activeElement.value;
+          return true;
+        };
+      });
+      await channels.locator('..').locator('.chat-record-link-actions > button').filter({ hasText: '复制链接' }).click();
+      assert.equal(await page.evaluate(() => window.copiedRecordLink), 'https://weixin.qq.com/sph/fixture');
       if (kind === 'pc' && width > 520) {
         const before = await dialog.boundingBox(); const title = dialog.locator('h2'); const p = await title.boundingBox();
         await page.mouse.move(p.x + 40, p.y + 8); await page.mouse.down(); await page.mouse.move(p.x + 150, p.y + 50, { steps: 5 }); await page.mouse.up();
@@ -96,9 +122,12 @@ const server = http.createServer(async (req, res) => {
         await title.dblclick(); assert.ok(Math.abs((await dialog.boundingBox()).x - before.x) < 2);
       }
       async function media() {
-        const img = dialog.locator('article img').last();
-        await img.or(dialog.getByText('[图片]', { exact: true })).last().scrollIntoViewIfNeeded();
+        await dialog.locator('.chat-record-asset').first().scrollIntoViewIfNeeded();
         await page.waitForFunction(() => [...document.querySelectorAll('article img')].some(i => i.naturalWidth === 1));
+        await dialog.locator('.chat-record-video-frame').scrollIntoViewIfNeeded();
+        await page.waitForFunction(() => document.querySelector('.chat-record-video-frame img')?.naturalWidth > 1);
+        assert.equal(await dialog.locator('video').count(), 0, 'No autoplaying video before explicit play');
+        await page.screenshot({ path: path.join(output, `${kind}-${width}-poster.png`) });
         await dialog.getByRole('button', { name: '播放视频', exact: true }).click();
         try { await page.waitForFunction(() => document.querySelector('article video')?.readyState >= 1); }
         catch (e) { console.log('VIDEO_DIAGNOSTIC', { bytes: video.length, counts, state: await page.evaluate(() => { const v = document.querySelector('article video'); return { present: !!v, ready: v?.readyState, error: v?.error?.code, network: v?.networkState }; }) }); throw e; }
@@ -118,6 +147,18 @@ const server = http.createServer(async (req, res) => {
       await page.getByRole('button', { name: '打开测试记录', exact: true }).click();
       await dialog.getByText('记录已撤回，或你已不在此群聊中').waitFor();
       assert.equal(await dialog.locator('article').count(), 0); assert.deepEqual(errors, []);
+      // Preserve an explicit play click while the visible attachment is still downloading.
+      await page.evaluate(async bytes => {
+        const host = document.createElement('div'); document.body.append(host);
+        let resolveBlob;
+        const pending = new Promise(resolve => { resolveBlob = resolve; });
+        const dispose = ElonRecordMedia.mount(host, { kind: 'video', filename: 'pending.webm' }, { current: () => true, load: () => pending, scope: 'pending' });
+        host.querySelector('button').click(); host.querySelector('button').click();
+        resolveBlob(new Blob([new Uint8Array(bytes)], { type: 'video/webm' }));
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const played = !!host.querySelector('video'); dispose(); host.remove();
+        if (!played) throw Error('Play click was lost during download');
+      }, [...video]);
       console.log(`RECORD_CACHE_UI=passed ${kind} ${width} real-http-304/image/video/nesting/reopen/revoke/cards/drag`);
       await context.close();
     }

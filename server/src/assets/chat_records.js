@@ -43,8 +43,10 @@
       const closeButton = button('×', close); closeButton.title = '关闭'; closeButton.setAttribute('aria-label', '关闭');
       bar.append(backButton, el('h2', parent ? '转发的聊天记录' : view?.document.title || card.title), closeButton); dialog.append(bar);
       if (!view) return;
-      const nav = el('nav'); nav.append(el('small', `微信导出 · ${children(parent).length} 条`), button(raw ? '返回记录' : '原始文本', () => { raw = !raw; render(); }));
-      if (view.owner_id === options.owner) nav.append(button('撤回分享', async () => {
+      const nav = el('nav'), menu = el('details', null, 'chat-record-options'), summary = el('summary', '⋮'); summary.setAttribute('aria-label', '更多');
+      menu.append(summary, button(raw ? '返回记录' : '原始文本', () => { raw = !raw; render(); }));
+      nav.append(el('small', `微信导出 · ${children(parent).length} 条`), menu);
+      if (view.owner_id === options.owner) menu.append(button('撤回分享', async () => {
         if (!confirm('撤回后群成员将不能再读取此记录。确定撤回？')) return;
         try { await request('', false, 'DELETE'); view = null; render(); dialog.append(el('p', '聊天记录已撤回')); } catch (e) { dialog.append(el('p', e.message, 'chat-record-error')); }
       })); dialog.append(nav);
@@ -53,37 +55,37 @@
       if (raw) { feed.append(el('pre', view.document.raw_text)); return; }
       children(parent).forEach(row => {
         const article = el('article'), body = el('div', null, 'chat-record-body');
-        article.append(el('span', Array.from(row.sender)[0] || '?', 'chat-record-avatar'), body);
+        const identity = ElonRecordPresentation.identity(row.sender), avatar = el('span', identity.initial, 'chat-record-avatar');
+        avatar.style.background = identity.color; avatar.style.color = '#fff'; avatar.setAttribute('aria-hidden', 'true'); article.append(avatar, body);
         const meta = el('div', null, 'chat-record-meta'); meta.append(el('span', row.sender), el('time', row.time)); body.append(meta);
         if (row.kind === 'forward') body.append(button(`聊天记录 · ${children(row.id).length} 条`, () => move(row.id)));
         else {
-          const text = el('p', null, 'chat-record-text'); row.text.split(/(https?:\/\/[^\s]+)/g).forEach(part => {
-            if (/^https?:\/\//.test(part)) { const a = el('a', part); a.href = part; a.target = '_blank'; a.rel = 'noopener noreferrer'; text.append(a); } else text.append(document.createTextNode(part));
-          }); body.append(text);
+          const text = el('p', null, 'chat-record-text'), previews = new Map((window.ElonSocialLinks?.links(row.text) || []).map(p => [p.url, p]));
+          function drawText() {
+            const value = ElonRecordPresentation.text(row, [...previews.values()]); text.replaceChildren(); text.hidden = !value;
+            value.split(/(https?:\/\/[^\s]+)/g).forEach(part => {
+              if (/^https?:\/\//.test(part)) { const a = el('a', part); a.href = part; a.target = '_blank'; a.rel = 'noopener noreferrer'; text.append(a); } else text.append(document.createTextNode(part));
+            });
+          }
+          drawText(); body.append(text);
           if (window.ElonSocialLinks) {
             const cards = el('div'); body.append(cards);
-            ElonSocialLinks.prepareBubble(text, row.text);
             linkDisposers.push(ElonSocialLinks.mount(cards, row.text, { owner: options.owner, isCurrent: valid, api: async (route, init) => {
               const response = await options.api(route, init);
               if (!response.ok) throw Error('预览暂不可用'); return response.json();
-            }, compact: true, open: p => window.ElonSocialLinkViewer?.open(p) }));
+            }, compact: true, open: p => window.ElonSocialLinkViewer?.open(p), openOriginal: p => window.ElonSocialLinkViewer?.open(p),
+              onPreview: p => { previews.set(p.url, p); drawText(); },
+              actions: (host, get) => ElonRecordActions.bind(host, get, { current: valid, api: async (route, init) => {
+                if (!valid()) throw Error('会话已变化');
+                const response = await options.api(route, init); if (!response.ok) throw Error('请求失败'); return response.json();
+              } }) }));
           }
           if (row.asset_id) {
             const box = el('div', null, 'chat-record-asset'); body.append(box);
-            const load = async () => {
-              box.replaceChildren(el('small', '正在读取附件…'));
-              try {
-                const blob = await request('/assets/' + encodeURIComponent(row.asset_id), true, 'GET', signal);
-                if (current !== generation) return;
-                const url = URL.createObjectURL(blob); urls.add(url); box.replaceChildren();
-                if (row.kind === 'image' && blob.type.startsWith('image/')) { const img = el('img'); img.src = url; img.alt = row.filename; box.append(img); }
-                else if (row.kind === 'video' && blob.type.startsWith('video/')) { const video = el('video'); video.src = url; video.controls = true; video.preload = 'metadata'; box.append(video); }
-                else { const a = el('a', '下载：' + row.filename); a.href = url; a.download = row.filename || '附件'; box.append(a); }
-              } catch (e) { if (current === generation && !signal.aborted) box.replaceChildren(el('small', e.message), button('重试', load)); }
-            };
-            box.append(button(row.kind === 'image' ? '查看图片' : row.kind === 'video' ? '播放视频' : '读取附件', load));
-            if (row.kind === 'image') { const observer = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) { observer.disconnect(); void load(); } }); observer.observe(box); signal.addEventListener('abort', () => observer.disconnect(), { once: true }); }
-          } else if (row.filename) body.append(el('small', '导出包未提供可用附件'));
+            linkDisposers.push(ElonRecordMedia.mount(box, row, { current: () => valid() && current === generation && !signal.aborted,
+              scope: `${location.origin}:${options.owner}:${path}:${row.asset_id}`,
+              load: () => request('/assets/' + encodeURIComponent(row.asset_id), true, 'GET', signal) }));
+          } else if (row.filename) body.append(el('small', '导出包未提供可用附件 · ' + row.filename));
         }
         feed.append(article);
       }); feed.scrollTop = offsets.get(parent || '') || 0;

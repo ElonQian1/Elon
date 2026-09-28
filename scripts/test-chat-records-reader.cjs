@@ -24,7 +24,7 @@ const doc = {
       const failures = []; page.on('pageerror', e => failures.push(e.message));
       await page.setContent('<!doctype html><html lang="zh"><meta charset="utf-8"><body style="margin:0;background:#171717;color:#eee;font-family:Arial,sans-serif"><div id="bubble"></div></body></html>');
       await page.addStyleTag({ content: fs.readFileSync(path.join(root, 'server/src/assets/chat_records.css'), 'utf8') });
-      await page.addScriptTag({ content: fs.readFileSync(path.join(root, 'server/src/assets/chat_records.js'), 'utf8') });
+      for (const name of ['chat_record_presentation.js', 'chat_record_video.js', 'chat_record_media.js', 'chat_records.js']) await page.addScriptTag({ content: fs.readFileSync(path.join(root, 'server/src/assets', name), 'utf8') });
       await page.evaluate(value => {
         window.recordCurrent = true;
         const api = async route => {
@@ -45,6 +45,7 @@ const doc = {
       assert.equal(await page.evaluate(() => window.compromised), undefined);
       await page.getByRole('button', { name:'返回', exact:true }).click();
       assert.equal(await page.locator('.chat-record-feed article').count(), 3);
+      await page.getByLabel('更多', { exact: true }).click();
       await page.getByRole('button', { name:'原始文本', exact:true }).click();
       assert.equal(await page.locator('.chat-record-feed pre').textContent(), 'Original fixture text');
       await page.getByRole('button', { name:'关闭', exact:true }).click();

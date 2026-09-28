@@ -7,11 +7,14 @@ import { cachedRead, forgetRead } from './socialReadPreview'
 import { openWechatCard } from './wechatCardAction'
 import { copyTextToClipboard } from '../../lib/clipboard'
 import type { LinkPreview } from './socialLinks'
+import { socialRequest } from './socialChatOperations'
+import { getAuthToken } from '../../api/client'
+import '../../../../server/src/assets/chat_record_actions.js'
 import '../../../../server/src/assets/social_links.js'
 import '../../../../server/src/assets/social_link_viewer.js'
 import '../../../../server/src/assets/social_links.css'
 
-export default function SocialLinkCards({ text, owner, compact = false, onDesktopOpen }: { text: string; owner: string; compact?: boolean; onDesktopOpen?: () => void }) {
+export default function SocialLinkCards({ text, owner, compact = false, onDesktopOpen, recordActions = false, onPreview }: { text: string; owner: string; compact?: boolean; onDesktopOpen?: () => void; recordActions?: boolean; onPreview?: (value: LinkPreview) => void }) {
   const host = useRef<HTMLDivElement>(null)
   const scope = resolveApiUrl('/') + '\n' + owner
   const [status, setStatus] = useState('')
@@ -22,6 +25,7 @@ export default function SocialLinkCards({ text, owner, compact = false, onDeskto
       const cached = cachedRead(scope, item); if (cached) ElonSocialLinks.remember(scope, cached.preview, cached.expires)
     }
     let active = true
+    const token = getAuthToken()
     let pending: AbortController | null = null
     setStatus(''); setRecovery(null)
     const original = (p: LinkPreview) => {
@@ -31,7 +35,8 @@ export default function SocialLinkCards({ text, owner, compact = false, onDeskto
     }
     const cancel = () => { if (document.hidden) { pending?.abort(); pending = null; setStatus(''); } }
     document.addEventListener('visibilitychange', cancel)
-    const dispose = ElonSocialLinks.mount(host.current, text, { owner: scope, compact, desktop: true, channelsHandoff: !!getDesktopInvoke(), api: cardPreviewApi, coverFailed: p => forgetRead(scope, p), openOriginal: original, open: p => {
+    const dispose = ElonSocialLinks.mount(host.current, text, { owner: scope, compact, desktop: true, channelsHandoff: !!getDesktopInvoke(), api: cardPreviewApi, coverFailed: p => forgetRead(scope, p), openOriginal: original, onPreview,
+      actions: recordActions ? (host, get) => ElonRecordActions.bind(host, get, { current: () => active && getAuthToken() === token, api: socialRequest }) : undefined, open: p => {
       if (!ElonSocialLinks.channelsId(p.url) || !getDesktopInvoke()) { original(p); return }
       if (pending) return
       const controller = new AbortController(); pending = controller
@@ -44,7 +49,7 @@ export default function SocialLinkCards({ text, owner, compact = false, onDeskto
       }).finally(() => { clearTimeout(timer); if (pending === controller) pending = null })
     } })
     return () => { active = false; pending?.abort(); document.removeEventListener('visibilitychange', cancel); dispose() }
-  }, [text, scope, compact, onDesktopOpen])
+  }, [text, scope, compact, onDesktopOpen, recordActions, onPreview])
   useEffect(() => () => { ElonSocialLinkViewer.close() }, [scope, text])
   return <div><div ref={host} /><div role="status" style={{ maxWidth: 280, fontSize: 12, overflowWrap: 'anywhere' }}>{status}</div>
     {recovery && <button type="button" className="social-link-original-action" onClick={() => { void copyTextToClipboard(recovery.url).then(ok => setStatus(ok ? '链接已复制，可粘贴到微信。' : '复制失败，请查看原网页。')) }}>复制链接</button>}
