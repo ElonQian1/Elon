@@ -68,6 +68,11 @@ public final class SocialLinkUiAcceptance extends UiAutomatorTestCase {
             case "refresh": case "close": case "chat": case "original":
                 click(control(step));
                 break;
+            case "scroll_chat":
+                AccessibilityNodeInfo chat = node(new UiObject(new UiSelector().packageName(APP).resourceId(APP + ":id/chatList")));
+                try { result.put("moved", chat.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)); }
+                finally { chat.recycle(); }
+                break;
             case "inspect":
                 result.put("reader_visible", control("refresh").exists())
                     .put("original_available", control("original").exists())

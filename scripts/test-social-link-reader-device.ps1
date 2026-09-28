@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$DeviceSerial,
-    [ValidateSet('inspect','open_group','open_article','refresh','close','chat','original','metrics')][string]$Step = 'inspect',
+    [ValidateSet('inspect','open_group','open_article','scroll_chat','refresh','close','chat','original','metrics')][string]$Step = 'inspect',
     [string]$Group = '',
     [string]$ArticleDescription = '',
     [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe'
