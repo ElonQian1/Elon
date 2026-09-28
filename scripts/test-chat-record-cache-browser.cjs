@@ -49,21 +49,34 @@ const server = http.createServer(async (req, res) => {
   const base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
   try {
+    // Generate independently of application layout; a clipped canvas can produce no frames.
+    const source = await browser.newPage();
+    await source.setContent('<canvas width="160" height="90"></canvas>');
+    video = Buffer.from(await source.evaluate(async () => {
+      const canvas = document.querySelector('canvas'), c = canvas.getContext('2d');
+      const stream = canvas.captureStream(0), track = stream.getVideoTracks()[0];
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' }), chunks = [];
+      recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      const finished = new Promise(resolve => { recorder.onstop = resolve; });
+      try {
+        recorder.start(100);
+        for (let i = 0; i < 80 && (i < 10 || !chunks.length); i++) {
+          c.fillStyle = i % 2 ? '#308966' : '#b3d5c4'; c.fillRect(0, 0, 160, 90);
+          await new Promise(requestAnimationFrame); track.requestFrame();
+          await new Promise(r => setTimeout(r, 100));
+        }
+        recorder.stop(); await finished;
+        return Array.from(new Uint8Array(await new Blob(chunks).arrayBuffer()));
+      } finally { stream.getTracks().forEach(t => t.stop()); }
+    }));
+    await source.close();
+    assert.ok(video.length > 100, 'Synthetic WebM must contain encoded frames before reader tests');
     for (const kind of ['pc', 'pwa']) for (const width of [1280, 390]) {
       counts = {}; revoked = false;
       const context = await browser.newContext({ viewport: { width, height: 900 } });
       const page = await context.newPage(); const errors = [];
       page.on('pageerror', e => errors.push(e.message));
       await page.goto(base + (kind === 'pc' ? '/pc/tests/fixtures/chat-records.html' : '/fixture-pwa'));
-      if (!video.length) video = Buffer.from(await page.evaluate(async () => {
-        const canvas = document.createElement('canvas'); canvas.width = 160; canvas.height = 90; document.body.append(canvas);
-        const stream = canvas.captureStream(10), recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' }), chunks = [];
-        recorder.ondataavailable = e => chunks.push(e.data);
-        const finished = new Promise(resolve => { recorder.onstop = async () => resolve(Array.from(new Uint8Array(await new Blob(chunks).arrayBuffer()))); });
-        recorder.start(100); const c = canvas.getContext('2d');
-        for (let i = 0; i < 10; i++) { c.fillStyle = i % 2 ? '#308966' : '#b3d5c4'; c.fillRect(0, 0, 160, 90); stream.getVideoTracks()[0].requestFrame(); await new Promise(r => setTimeout(r, 100)); }
-        recorder.stop(); const result = await finished; stream.getTracks().forEach(t => t.stop()); canvas.remove(); return result;
-      }));
       if (kind === 'pwa') {
         for (const name of ['social_links.css', 'chat_records.css']) await page.addStyleTag({ content: fs.readFileSync(path.join(root, 'server/src/assets', name), 'utf8') });
         for (const name of ['social_links.js', 'social_link_viewer.js', 'chat_records.js']) await page.addScriptTag({ content: fs.readFileSync(path.join(root, 'server/src/assets', name), 'utf8') });
