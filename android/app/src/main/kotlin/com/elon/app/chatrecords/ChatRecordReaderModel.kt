@@ -6,7 +6,6 @@ import androidx.lifecycle.MutableLiveData
 import com.elon.app.AuthManager
 import com.elon.app.sharing.ShareDraftStore
 import java.io.File
-import java.util.UUID
 import java.util.concurrent.Executors
 
 internal class ChatRecordReaderModel(app: Application) : AndroidViewModel(app) {
@@ -22,7 +21,6 @@ internal class ChatRecordReaderModel(app: Application) : AndroidViewModel(app) {
     private val account = AuthManager.userId(app)
     private var local = emptyMap<String, File>()
     private val cache = linkedMapOf<String, File>()
-    private val directory = File(app.cacheDir, "chat_record_media/${UUID.randomUUID()}").apply { mkdirs() }
     private var group = ""; private var record = ""; private var draftId = ""
     private var closed = false
     fun start(group: String, record: String, draft: String) {
@@ -56,11 +54,7 @@ internal class ChatRecordReaderModel(app: Application) : AndroidViewModel(app) {
                 val asset = requireNotNull(row.assetId)
                 if (draftId.isNotBlank()) return@runCatching local[asset] ?: error("导出包未包含此附件")
                 api.assertOwner()
-                cache[asset] ?: run {
-                    val bytes = api.asset(group, record, asset)
-                    val suffix = when (row.kind) { "image" -> ".img"; "video" -> ".mp4"; else -> ".bin" }
-                    File(directory, "${UUID.randomUUID()}$suffix").also { it.writeBytes(bytes); cache[asset] = it }
-                }
+                cache[asset]?.takeIf { it.isFile } ?: api.assetFile(group, record, asset).also { cache[asset] = it }
             }
             if (!closed) android.os.Handler(android.os.Looper.getMainLooper()).post { if (!closed && sameAccount()) done(result) }
         }
@@ -75,7 +69,6 @@ internal class ChatRecordReaderModel(app: Application) : AndroidViewModel(app) {
     }
     override fun onCleared() {
         closed = true
-        worker.execute { directory.listFiles()?.forEach { it.delete() }; directory.delete() }
         worker.shutdown()
     }
 }

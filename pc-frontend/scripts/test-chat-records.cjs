@@ -23,7 +23,7 @@ test('versioned card rejects missing identifiers and unsupported shapes', () => 
 test('authorized fetch uses request headers rather than public media query tokens', async () => {
   token = 'test-session'; const original = global.fetch;
   global.fetch = async (url, options) => {
-    assert.equal(url, 'https://example.test' + recordPath(card)); assert.equal(options.cache, 'no-store');
+    assert.equal(url, 'https://example.test' + recordPath(card)); assert.equal(options.cache, 'no-cache');
     assert.equal(options.headers.Authorization, 'Bearer test-session');
     return new Response(JSON.stringify({ card }));
   };

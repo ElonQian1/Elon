@@ -16,15 +16,17 @@
     dialog.setAttribute('aria-label', '聊天记录');
     const lifetime = new AbortController(), urls = new Set(), offsets = new Map();
     let view, parent = null, feed, raw = false, generation = 0, pageController = null;
+    const linkDisposers = [];
+    const clearLinks = () => { linkDisposers.splice(0).forEach(dispose => dispose()); };
     const path = `/api/me/groups/${encodeURIComponent(card.group_id)}/chat-records/${encodeURIComponent(card.record_id)}`;
     const valid = () => dialog.isConnected && options.current();
-    const close = () => { lifetime.abort(); pageController?.abort(); dialog.querySelectorAll('video,audio').forEach(n => n.pause()); urls.forEach(URL.revokeObjectURL); dialog.close(); dialog.remove(); if (closeActive === close) closeActive = null; };
+    const close = () => { lifetime.abort(); pageController?.abort(); clearLinks(); dialog.querySelectorAll('video,audio').forEach(n => n.pause()); urls.forEach(URL.revokeObjectURL); dialog.close(); dialog.remove(); if (closeActive === close) closeActive = null; };
     closeActive = close;
     const check = setInterval(() => { if (!valid()) close(); }, 1500);
     lifetime.signal.addEventListener('abort', () => clearInterval(check), { once: true });
     async function request(suffix = '', binary = false, method = 'GET', signal = lifetime.signal) {
       if (!valid()) throw Error('会话已变化，请重新打开记录');
-      const r = await options.api(path + suffix, { method, signal, cache: 'no-store' });
+      const r = await options.api(path + suffix, { method, signal, cache: method === 'GET' ? 'no-cache' : 'no-store' });
       if (!r.ok) throw Error([403, 404].includes(r.status) ? '记录已撤回，或你已不在此群聊中' : `读取失败（${r.status}）`);
       if (+r.headers.get('content-length') > 12 * 1024 * 1024) throw Error('附件过大');
       const value = binary ? await r.blob() : await r.json();
@@ -34,6 +36,7 @@
     function back() { if (raw) { raw = false; render(); } else if (parent) move(view.document.messages.find(r => r.id === parent)?.parent_id || null); else close(); }
     function move(id) { offsets.set(parent || '', feed?.scrollTop || 0); parent = id; raw = false; render(); }
     function render() {
+      clearLinks();
       pageController?.abort(); pageController = new AbortController(); const signal = pageController.signal; const current = ++generation;
       dialog.querySelectorAll('video,audio').forEach(n => n.pause()); urls.forEach(URL.revokeObjectURL); urls.clear(); dialog.replaceChildren();
       const bar = el('header'); const backButton = button('‹', back); backButton.title = '返回'; backButton.setAttribute('aria-label', '返回');
@@ -57,6 +60,14 @@
           const text = el('p', null, 'chat-record-text'); row.text.split(/(https?:\/\/[^\s]+)/g).forEach(part => {
             if (/^https?:\/\//.test(part)) { const a = el('a', part); a.href = part; a.target = '_blank'; a.rel = 'noopener noreferrer'; text.append(a); } else text.append(document.createTextNode(part));
           }); body.append(text);
+          if (window.ElonSocialLinks) {
+            const cards = el('div'); body.append(cards);
+            ElonSocialLinks.prepareBubble(text, row.text);
+            linkDisposers.push(ElonSocialLinks.mount(cards, row.text, { owner: options.owner, isCurrent: valid, api: async (route, init) => {
+              const response = await options.api(route, init);
+              if (!response.ok) throw Error('预览暂不可用'); return response.json();
+            }, compact: true, open: p => window.ElonSocialLinkViewer?.open(p) }));
+          }
           if (row.asset_id) {
             const box = el('div', null, 'chat-record-asset'); body.append(box);
             const load = async () => {

@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Download, Play, X } from 'lucide-react'
 import { useAuthStore } from '../../../store/auth'
 import { recordPath, recordRequest, type RecordCard, type RecordRow, type RecordView } from './recordApi'
 import styles from './ChatRecords.module.css'
+import SocialLinkCards from '../SocialLinkCards'
+import { useRecordWindow } from './useRecordWindow'
+import { useReaderTabs } from '../../reader/readerTabsStore'
 
 function Asset({ row, card }: { row: RecordRow; card: RecordCard }) {
   const [load, setLoad] = useState(row.kind === 'image')
@@ -36,6 +39,11 @@ function Asset({ row, card }: { row: RecordRow; card: RecordCard }) {
 }
 export default function ChatRecordReader({ card, onClose }: { card: RecordCard; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null), feed = useRef<HTMLDivElement>(null)
+  useRecordWindow(dialog)
+  const [suspended, setSuspended] = useState(false)
+  const readerPresented = useReaderTabs(s => s.presented)
+  const openLink = useCallback(() => { dialog.current?.close(); setSuspended(true) }, [])
+  useEffect(() => { if (suspended && !readerPresented) { dialog.current?.showModal(); setSuspended(false) } }, [suspended, readerPresented])
   const offsets = useRef(new Map<string, number>())
   const [parent, setParent] = useState<string | null>(null), [view, setView] = useState<RecordView>()
   const [error, setError] = useState(''), [retry, setRetry] = useState(0), [raw, setRaw] = useState(false), [confirmRevoke, setConfirmRevoke] = useState(false)
@@ -59,7 +67,7 @@ export default function ChatRecordReader({ card, onClose }: { card: RecordCard; 
   }
   const messages = view?.document.messages.filter(m => m.parent_id === parent) || []
   return <dialog ref={dialog} className={styles.reader} aria-label="聊天记录" onCancel={e => { e.preventDefault(); back() }}>
-    <header><button onClick={back} title="返回" aria-label="返回"><ArrowLeft size={22} /></button><h2>{parent ? '转发的聊天记录' : view?.document.title || card.title}</h2><button onClick={onClose} title="关闭" aria-label="关闭"><X size={22} /></button></header>
+    <header data-record-drag title="拖动窗口，双击居中"><button onClick={back} title="返回" aria-label="返回"><ArrowLeft size={22} /></button><h2>{parent ? '转发的聊天记录' : view?.document.title || card.title}</h2><button onClick={onClose} title="关闭" aria-label="关闭"><X size={22} /></button></header>
     <nav><span>微信导出 · {messages.length} 条</span><button onClick={() => setRaw(v => !v)}>{raw ? '返回记录' : '原始文本'}</button>
       {view && view.owner_id === owner && <button onClick={() => setConfirmRevoke(v => !v)}>撤回分享</button>}</nav>
     {confirmRevoke && <p className={styles.notice}>撤回后群成员将不能读取此记录。<button onClick={() => void revoke()}>确认撤回</button><button onClick={() => setConfirmRevoke(false)}>取消</button></p>}
@@ -71,7 +79,8 @@ export default function ChatRecordReader({ card, onClose }: { card: RecordCard; 
         <div className={styles.avatar} aria-hidden="true">{Array.from(row.sender)[0] || '?'}</div><div className={styles.body}>
           <div className={styles.meta}><span>{row.sender}</span><time>{row.time}</time></div>
           {row.kind === 'forward' ? <button className={styles.nested} onClick={() => move(row.id)}>聊天记录 · {view?.document.messages.filter(m => m.parent_id === row.id).length} 条</button> : <>
-            <p className={styles.text}>{row.text.split(/(https?:\/\/[^\s]+)/g).map((s, i) => /^https?:\/\//.test(s) ? <a key={i} href={s} target="_blank" rel="noreferrer">{s}</a> : s)}</p>
+            {!ElonSocialLinks.compact(row.text) && <p className={styles.text}>{row.text.split(/(https?:\/\/[^\s]+)/g).map((s, i) => /^https?:\/\//.test(s) ? <a key={i} href={s} target="_blank" rel="noreferrer">{s}</a> : s)}</p>}
+            <SocialLinkCards text={row.text} owner={owner || ''} compact onDesktopOpen={openLink} />
             {row.asset_id ? <Asset key={`${owner}:${row.id}`} row={row} card={card} /> : row.filename && <small>导出包未提供可用附件</small>}
           </>}
         </div>

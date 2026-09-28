@@ -11,7 +11,7 @@ import '../../../../server/src/assets/social_links.js'
 import '../../../../server/src/assets/social_link_viewer.js'
 import '../../../../server/src/assets/social_links.css'
 
-export default function SocialLinkCards({ text, owner, compact = false }: { text: string; owner: string; compact?: boolean }) {
+export default function SocialLinkCards({ text, owner, compact = false, onDesktopOpen }: { text: string; owner: string; compact?: boolean; onDesktopOpen?: () => void }) {
   const host = useRef<HTMLDivElement>(null)
   const scope = resolveApiUrl('/') + '\n' + owner
   const [status, setStatus] = useState('')
@@ -26,7 +26,7 @@ export default function SocialLinkCards({ text, owner, compact = false }: { text
     setStatus(''); setRecovery(null)
     const original = (p: LinkPreview) => {
       pending?.abort(); pending = null; setStatus(''); setRecovery(null)
-      if (getDesktopInvoke()) useReaderTabs.getState().open(p, scope)
+      if (getDesktopInvoke()) { useReaderTabs.getState().open(p, scope); onDesktopOpen?.() }
       else ElonSocialLinkViewer.open(p)
     }
     const cancel = () => { if (document.hidden) { pending?.abort(); pending = null; setStatus(''); } }
@@ -44,7 +44,7 @@ export default function SocialLinkCards({ text, owner, compact = false }: { text
       }).finally(() => { clearTimeout(timer); if (pending === controller) pending = null })
     } })
     return () => { active = false; pending?.abort(); document.removeEventListener('visibilitychange', cancel); dispose() }
-  }, [text, scope, compact])
+  }, [text, scope, compact, onDesktopOpen])
   useEffect(() => () => { ElonSocialLinkViewer.close() }, [scope, text])
   return <div><div ref={host} /><div role="status" style={{ maxWidth: 280, fontSize: 12, overflowWrap: 'anywhere' }}>{status}</div>
     {recovery && <button type="button" className="social-link-original-action" onClick={() => { void copyTextToClipboard(recovery.url).then(ok => setStatus(ok ? '链接已复制，可粘贴到微信。' : '复制失败，请查看原网页。')) }}>复制链接</button>}

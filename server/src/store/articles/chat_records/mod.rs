@@ -4,6 +4,7 @@ use crate::store::{new_id, now, Store};
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
 use sha2::{Digest, Sha256};
+mod cache;
 mod media;
 pub(crate) mod migration;
 mod model;

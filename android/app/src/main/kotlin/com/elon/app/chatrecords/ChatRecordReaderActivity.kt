@@ -85,7 +85,11 @@ class ChatRecordReaderActivity : AppCompatActivity() {
             if (row.kind == "forward") {
                 body.addView(ui.button("聊天记录 · ${model.document?.children(row.id)?.size ?: 0} 条") { move(row.id) })
             } else {
-                body.addView(ui.text(row.text, 17f).apply { setTextIsSelectable(true); android.text.util.Linkify.addLinks(this, android.text.util.Linkify.WEB_URLS) })
+                val text = ui.text(row.text, 17f).apply { setTextIsSelectable(true); android.text.util.Linkify.addLinks(this, android.text.util.Linkify.WEB_URLS) }
+                body.addView(text)
+                val links = LinearLayout(this@ChatRecordReaderActivity).apply { orientation = LinearLayout.VERTICAL }
+                body.addView(links)
+                com.elon.app.sociallinks.SocialLinkCards.bind(links, text, com.elon.app.ChatMessage(role = "friend", content = row.text), true)
                 if (row.assetId != null && row.kind == "image") {
                     val image = android.widget.ImageView(this@ChatRecordReaderActivity).apply { adjustViewBounds = true; contentDescription = row.filename; scaleType = android.widget.ImageView.ScaleType.FIT_CENTER }
                     body.addView(image, LinearLayout.LayoutParams(-1, ui.dp(220)))

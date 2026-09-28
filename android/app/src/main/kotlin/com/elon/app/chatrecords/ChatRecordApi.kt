@@ -16,27 +16,40 @@ internal class ChatRecordApi(private val context: Context) {
     private val owner = AuthManager.userId(context)
     private val token = AuthManager.token(context)
     private val base = ServerUrlManager.getActive(context).trimEnd('/')
-    private val client = OkHttpClient.Builder().callTimeout(90, TimeUnit.SECONDS).retryOnConnectionFailure(false).build()
-    fun assertOwner() { check(!owner.isNullOrBlank() && owner == AuthManager.userId(context) && token == AuthManager.token(context)) { "账号已变化，请重新打开聊天记录" } }
+    private val cache = ChatRecordCache(File(context.cacheDir, "chat_record_cache_v1"), "$base\n$owner\n$token")
+    fun assertOwner() { check(!owner.isNullOrBlank() && owner == AuthManager.userId(context) && token == AuthManager.token(context) && base == ServerUrlManager.getActive(context).trimEnd('/')) { "账号已变化，请重新打开聊天记录" } }
     private fun path(group: String, suffix: String = ""): String {
         require(group.matches(Regex("[A-Za-z0-9_-]{1,128}")))
         return "$base/api/me/groups/$group/chat-records$suffix"
     }
     private fun id(value: String): String = value.also { require(it.matches(Regex("[A-Za-z0-9_-]{1,128}"))) }
+    private fun cached(url: String): File = cache.read(url) { etag ->
+        assertOwner()
+        val builder = Request.Builder().url(url).header("Authorization", "Bearer $token")
+        if (etag != null) builder.header("If-None-Match", etag)
+        readClient.newCall(builder.build()).execute().use { response ->
+            val bytes = if (response.isSuccessful) boundedBody(response) else byteArrayOf()
+            assertOwner()
+            ChatRecordCache.Download(response.code, response.header("ETag"), bytes)
+        }
+    }
+    private fun boundedBody(response: okhttp3.Response): ByteArray {
+        val body = response.body ?: error("服务响应为空")
+        require(body.contentLength() <= 12 * 1024 * 1024) { "附件过大" }
+        return body.byteStream().use { input ->
+            val out = java.io.ByteArrayOutputStream(); val buffer = ByteArray(16384)
+            while (true) { val n = input.read(buffer); if (n < 0) break
+                require(out.size() + n <= 12 * 1024 * 1024) { "附件过大" }; out.write(buffer, 0, n) }
+            out.toByteArray()
+        }
+    }
     private fun execute(builder: Request.Builder): ByteArray {
         assertOwner()
         client.newCall(builder.header("Authorization", "Bearer $token").build()).execute().use { response ->
             check(response.isSuccessful) { when (response.code) {
                 401 -> "请先登录一龙"; 403, 404 -> "记录已撤回，或你已不在此群聊中"; 413 -> "记录或附件超过存储限制"; else -> "聊天记录请求失败（${response.code}），请重试"
             } }
-            val body = response.body ?: error("服务响应为空")
-            require(body.contentLength() <= 12 * 1024 * 1024) { "附件过大" }
-            val bytes = body.byteStream().use { input ->
-                val out = java.io.ByteArrayOutputStream(); val buffer = ByteArray(16384)
-                while (true) { val n = input.read(buffer); if (n < 0) break
-                    require(out.size() + n <= 12 * 1024 * 1024) { "附件过大" }; out.write(buffer, 0, n) }
-                out.toByteArray()
-            }
+            val bytes = boundedBody(response)
             assertOwner(); return bytes
         }
     }
@@ -45,7 +58,11 @@ internal class ChatRecordApi(private val context: Context) {
     fun publish(group: String, operation: String, document: ChatRecordDocument): JSONObject = JSONObject(String(execute(
         Request.Builder().url(path(group)).post(JSONObject().put("operation", operation).put("document", document.json())
             .toString().toRequestBody("application/json".toMediaType()))), Charsets.UTF_8))
-    fun read(group: String, record: String): JSONObject = JSONObject(String(execute(Request.Builder().url(path(group, "/${id(record)}"))), Charsets.UTF_8))
-    fun asset(group: String, record: String, asset: String): ByteArray = execute(Request.Builder().url(path(group, "/${id(record)}/assets/${id(asset)}")))
-    fun revoke(group: String, record: String) { execute(Request.Builder().url(path(group, "/${id(record)}")).delete()) }
+    fun read(group: String, record: String): JSONObject = JSONObject(cached(path(group, "/${id(record)}")).readText())
+    fun assetFile(group: String, record: String, asset: String): File = cached(path(group, "/${id(record)}/assets/${id(asset)}"))
+    fun revoke(group: String, record: String) { execute(Request.Builder().url(path(group, "/${id(record)}")).delete()); cache.clear() }
+    companion object {
+        private val client = OkHttpClient.Builder().callTimeout(90, TimeUnit.SECONDS).retryOnConnectionFailure(false).build()
+        private val readClient = client.newBuilder().callTimeout(25, TimeUnit.SECONDS).build()
+    }
 }

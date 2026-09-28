@@ -125,7 +125,8 @@ internal fun bindChatSelectionLongPress(container: ViewGroup?, listener: View.On
     for (index in 0 until container.childCount) {
         val child = container.getChildAt(index)
         // Keep existing voice-specific long-press actions.
-        if (!child.isLongClickable) child.setOnLongClickListener(listener)
+        // Even a null listener enables long-click consumption on Android.
+        if (!child.isLongClickable && listener != null) child.setOnLongClickListener(listener)
         if (child is ViewGroup) bindChatSelectionLongPress(child, listener)
     }
 }

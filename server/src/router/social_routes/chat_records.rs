@@ -13,6 +13,8 @@ use axum::{
 };
 use serde::Deserialize;
 use std::sync::Arc;
+#[path = "chat_record_cache.rs"]
+mod cache;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -32,9 +34,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/api/me/groups/:group/chat-records/:record/assets/:asset",
             get(asset),
         )
-        .route_layer(axum::middleware::from_fn(
-            super::ai_snapshots::private_response,
-        ))
+        .route_layer(axum::middleware::from_fn(cache::private_response))
 }
 
 fn result<T: serde::Serialize>(result: anyhow::Result<T>) -> Response {
@@ -98,7 +98,19 @@ async fn read(
     Path((group, record)): Path<(String, String)>,
 ) -> Response {
     let user = user!(&state, &headers);
-    result(state.store.read_chat_record(&user.id, &group, &record))
+    let version = match state
+        .store
+        .chat_record_version(&user.id, &group, &record, None)
+    {
+        Ok(version) => version,
+        Err(error) => return failure(error),
+    };
+    let response = if cache::matches(&headers, &version) {
+        StatusCode::NOT_MODIFIED.into_response()
+    } else {
+        result(state.store.read_chat_record(&user.id, &group, &record))
+    };
+    cache::versioned(response, &version)
 }
 async fn revoke(
     State(state): State<Arc<AppState>>,
@@ -137,7 +149,17 @@ async fn asset(
     Path((group, record, asset)): Path<(String, String, String)>,
 ) -> Response {
     let user = user!(&state, &headers);
-    match state
+    let version = match state
+        .store
+        .chat_record_version(&user.id, &group, &record, Some(&asset))
+    {
+        Ok(version) => version,
+        Err(error) => return failure(error),
+    };
+    if cache::matches(&headers, &version) {
+        return cache::versioned(StatusCode::NOT_MODIFIED.into_response(), &version);
+    }
+    let response = match state
         .store
         .read_chat_record_asset(&user.id, &group, &record, &asset)
     {
@@ -158,5 +180,6 @@ async fn asset(
                 .into_response()
         }
         Err(error) => failure(error),
-    }
+    };
+    cache::versioned(response, &version)
 }

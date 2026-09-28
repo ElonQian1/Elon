@@ -157,3 +157,47 @@ fn invalid_trees_and_forged_or_edited_cards_are_rejected() {
         .read_chat_record("reader", "g1", &r.card.record_id)
         .is_err());
 }
+
+#[test]
+fn cached_versions_still_require_membership_and_live_record_asset_binding() {
+    let s = fixture();
+    let attached = s
+        .upload_chat_record_asset("author", "g1", b"attached")
+        .unwrap();
+    let detached = s
+        .upload_chat_record_asset("author", "g1", b"detached")
+        .unwrap();
+    let mut doc = document();
+    doc.messages[2].kind = "file".into();
+    doc.messages[2].asset_id = Some(attached.asset_id.clone());
+    let r = s
+        .create_chat_record("author", "g1", "cache-test-123", doc)
+        .unwrap();
+    let id = &r.card.record_id;
+    let version = s.chat_record_version("reader", "g1", id, None).unwrap();
+    assert_eq!(
+        version,
+        s.chat_record_version("author", "g1", id, None).unwrap()
+    );
+    assert!(s
+        .chat_record_version("reader", "g1", id, Some(&attached.asset_id))
+        .is_ok());
+    assert!(s
+        .chat_record_version("reader", "g1", id, Some(&detached.asset_id))
+        .is_err());
+    assert!(s.chat_record_version("other", "g1", id, None).is_err());
+    assert!(s.chat_record_version("author", "g2", id, None).is_err());
+    s.conn()
+        .unwrap()
+        .execute(
+            "DELETE FROM friend_group_members WHERE user_id='reader'",
+            [],
+        )
+        .unwrap();
+    assert!(s.chat_record_version("reader", "g1", id, None).is_err());
+    s.revoke_chat_record("author", "g1", id).unwrap();
+    assert!(s.chat_record_version("author", "g1", id, None).is_err());
+    assert!(s
+        .chat_record_version("author", "g1", id, Some(&attached.asset_id))
+        .is_err());
+}
