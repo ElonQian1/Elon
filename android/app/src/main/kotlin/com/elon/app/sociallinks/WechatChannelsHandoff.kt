@@ -79,7 +79,9 @@ internal class WechatChannelsHandoff(
     fun cancel() { ++generation; busy = false; handler.removeCallbacksAndMessages(null); dialog?.dismiss(); dialog = null }
 
     companion object {
+        // WeChat's intermediate Activity can move its whole task to the background on exit.
         internal fun intent(target: String) = Intent(Intent.ACTION_VIEW, Uri.parse(target))
             .addCategory(Intent.CATEGORY_BROWSABLE).setPackage("com.tencent.mm")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 }
