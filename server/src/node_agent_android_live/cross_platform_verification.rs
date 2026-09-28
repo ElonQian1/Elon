@@ -5,7 +5,6 @@ use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-use super::broker::LiveUiSession;
 use super::fit_run::workspace_fingerprint;
 
 const CAPABILITY: &str = "CROSS_PLATFORM_STYLE_WRITEBACK";
@@ -13,20 +12,26 @@ const CAPABILITY: &str = "CROSS_PLATFORM_STYLE_WRITEBACK";
 pub(crate) fn tool_input_schema() -> Value {
     json!({
         "type":"object",
-        "required":["taskId","androidArtifact","sourceWritebackVerified","patchFreeBuildVerified"],
+        "required":["taskId"],
         "oneOf":[
             {
                 "properties":{"verificationMode":{"enum":["VISUAL_PARITY"]}},
-                "required":["webArtifact","visualLoss","maxVisualLoss"]
+                "required":["androidArtifact","sourceWritebackVerified","patchFreeBuildVerified","webArtifact","visualLoss","maxVisualLoss"]
             },
             {
                 "properties":{"verificationMode":{"const":"NO_WEB_COUNTERPART"}},
-                "required":["verificationMode","repositoryEvidence"]
+                "required":["verificationMode","androidArtifact","sourceWritebackVerified","patchFreeBuildVerified","repositoryEvidence"]
+            },
+            {
+                "properties":{"verificationMode":{"const":"SEMANTIC_PARITY"}},
+                "required":["verificationMode","semanticContractPath","stateId"]
             }
         ],
         "properties":{
             "taskId":{"type":"string","minLength":1,"maxLength":128},
-            "verificationMode":{"enum":["VISUAL_PARITY","NO_WEB_COUNTERPART"],"default":"VISUAL_PARITY"},
+            "verificationMode":{"enum":["VISUAL_PARITY","NO_WEB_COUNTERPART","SEMANTIC_PARITY"],"default":"VISUAL_PARITY"},
+            "semanticContractPath":{"type":"string","minLength":1,"maxLength":1000,"description":"已提交的完整 V2 逐能力/状态验收规格；不得删减缺证据状态"},
+            "stateId":{"type":"string","pattern":"^[A-Za-z0-9_-]{1,128}$"},
             "androidArtifact":{"type":"string","minLength":1,"maxLength":4000},
             "webArtifact":{"type":"string","minLength":1,"maxLength":4000},
             "visualLoss":{"type":"number","minimum":0,"maximum":1},
@@ -48,8 +53,13 @@ pub(crate) fn tool_input_schema() -> Value {
     })
 }
 
-pub(crate) fn write(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
-    let task = super::design_bootstrap::design_task(session, arguments)?;
+pub(crate) async fn write(
+    broker: &super::broker::LiveUiBroker,
+    session_id: &str,
+    arguments: &Value,
+) -> Result<Value> {
+    let session = broker.session(session_id).await?;
+    let task = super::design_bootstrap::design_task(&session, arguments)?;
     let task_id = required_text(arguments, "taskId", 128)?;
     let actual_task_id = task
         .pointer("/task/task/taskId")
@@ -68,6 +78,17 @@ pub(crate) fn write(session: &LiveUiSession, arguments: &Value) -> Result<Value>
         .ok_or_else(|| anyhow!("跨端验收未绑定项目目录"))?;
     let source_revision = workspace_fingerprint(project_root)?
         .ok_or_else(|| anyhow!("无法读取当前 Git sourceRevision"))?;
+    if arguments["verificationMode"] == "SEMANTIC_PARITY" {
+        return super::semantic_parity::write(
+            broker,
+            &session,
+            Path::new(task_directory),
+            &task_id,
+            &source_revision,
+            arguments,
+        )
+        .await;
+    }
     let evidence = write_document(
         Path::new(task_directory),
         Path::new(project_root),

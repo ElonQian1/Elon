@@ -40,7 +40,7 @@ pub(super) async fn resolve(root: &Path) -> Result<RegisteredProjectIdentity> {
     let client = reqwest::Client::builder()
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(3))
         .build()?;
     let mut response = client
         .get(base.join("/api/me/projects")?)

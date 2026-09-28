@@ -96,6 +96,29 @@ pub(crate) async fn verify(
             "PASSED"
         }
     }));
+    if super::native_runtime_proof::required(
+        &effective,
+        super::design_bootstrap::project_profile(&session)
+            .is_ok_and(|profile| super::design_bootstrap::is_android_project_profile(&profile)),
+        session.device_id != "ui-design-bootstrap",
+        super::capability_requirements::task_is_launcher_only(Some(&task)),
+    ) {
+        match super::native_runtime_proof::read(
+            broker,
+            &session,
+            source_revision.as_deref().unwrap_or(""),
+        )
+        .await
+        {
+            Ok(proof) => {
+                gates.push(json!({"gate":"NATIVE_RUNTIME_SOURCE","status":"PASSED","proof":proof}))
+            }
+            Err(error) => {
+                gates.push(json!({"gate":"NATIVE_RUNTIME_SOURCE","status":"MISSING_OR_STALE","reason":format!("{error:#}")}));
+                next.push(json!("RESTORE_CURRENT_PATCH_FREE_RUNTIME_PROOF"));
+            }
+        }
+    }
     if target_required {
         let Some(target) = ir.target_design.as_ref() else {
             gates.push(json!({"gate":"TARGET_DESIGN", "status":"MISSING"}));
@@ -188,7 +211,7 @@ pub(crate) async fn verify(
         let evidence_path = Path::new(task_directory).join("cross-platform-verification.json");
         match cross_platform_evidence(&evidence_path, &task_id, source_revision.as_deref()) {
             Ok(evidence) => gates.push(json!({
-                "gate":"CROSS_PLATFORM_VISUAL_PARITY",
+                "gate": if evidence["verificationMode"] == "SEMANTIC_PARITY" { "CROSS_PLATFORM_SEMANTIC_PARITY" } else { "CROSS_PLATFORM_VISUAL_PARITY" },
                 "status": if evidence["verificationMode"] == "NO_WEB_COUNTERPART" {
                     "PASSED_NO_WEB_COUNTERPART"
                 } else {
@@ -406,6 +429,9 @@ pub(crate) fn cross_platform_evidence(
     expected_source_revision: Option<&str>,
 ) -> Result<Value> {
     let evidence: Value = serde_json::from_slice(&fs::read(path)?)?;
+    if evidence["verificationMode"] == "SEMANTIC_PARITY" {
+        return super::semantic_parity::verify_file(path, task_id, expected_source_revision);
+    }
     let schema_version = evidence["schemaVersion"].as_u64();
     let evidence_task_id = evidence["taskId"].as_str();
     let verification_mode = evidence["verificationMode"]

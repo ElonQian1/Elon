@@ -413,10 +413,9 @@ async fn call_tool(
         "ui_check_workflow_completion" => {
             super::task_completion::verify(broker, fit_runs, &session_id, &arguments).await?
         }
-        "ui_write_cross_platform_verification" => super::cross_platform_verification::write(
-            broker.session(&session_id).await?.as_ref(),
-            &arguments,
-        )?,
+        "ui_write_cross_platform_verification" => {
+            super::cross_platform_verification::write(broker, &session_id, &arguments).await?
+        }
         "ui_report_capability_gap" => {
             let session = broker.session(&session_id).await?;
             super::capability_gap::report_gap(&session, &arguments).await?

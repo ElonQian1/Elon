@@ -379,7 +379,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "ui_write_cross_platform_verification",
-            "绑定当前 Git revision 原子生成跨端验收工件。VISUAL_PARITY 必须使用独立真实 Android/Web 截图；NO_WEB_COUNTERPART 必须使用可复核的 Android 来源文件、Web 跟踪源码根和搜索词证明仓库中没有对应功能，禁止伪造 Web 截图。",
+            "绑定当前源码生成跨端证据。VISUAL_PARITY 使用独立真实截图；SEMANTIC_PARITY 按已提交的完整 V2 状态规格实时捕获双端并验证映射及无 Patch 来源，缺状态保持阻塞且不报告像素相似度；NO_WEB_COUNTERPART 必须用跟踪源码证明不存在 Web 对应功能。",
             super::cross_platform_verification::tool_input_schema(),
         ),
         tool(
