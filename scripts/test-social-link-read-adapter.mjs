@@ -24,6 +24,15 @@ try {
   result = await read('https://www.binance.com/en/square/post/123456', '<meta property="og:description" content="A text-only short post"><main>A text-only short post</main>', original);
   assert.equal(result.title, 'A text-only short post'); assert.equal(result.image, null); count++;
   const x = 'https://x.com/author/status/123456';
+  const bili = 'https://www.bilibili.com/video/BV19eYH6NEsC/?t=80';
+  const biliHtml = '<meta property="og:url" content="https://www.bilibili.com/video/BV19eYH6NEsC/"><meta property="og:title" content="Video 【nested title】_哔哩哔哩_bilibili"><meta property="og:image" content="https://i0.hdslb.com/bfs/archive/poster.jpg"><meta name="author" content="Public author"><h1 class="video-title">Video 【nested title】</h1>';
+  result = await read(bili, biliHtml);
+  assert.equal(result.title, 'Video 【nested title】'); assert.equal(result.author, 'Public author'); assert.ok(result.image.endsWith('poster.jpg')); count++;
+  assert.equal(await read(bili, biliHtml.replace('class="video-title"', 'style="display:none"')), null); count++;
+  assert.equal(await read(bili, biliHtml.replace('Video 【nested title】</h1>', 'Loading</h1>')), null); count++;
+  assert.equal(await read('https://www.bilibili.com/video/BV1BEY96vEjJ/', biliHtml, bili), null); count++;
+  result = await read(bili, biliHtml.replace('/bfs/archive/', '/bfs/face/'));
+  assert.equal(result.image, null); count++;
   result = await read(x, '<article><a href="/someone/status/999999"><time>Today</time></a><div data-testid="tweetText">Wrong recommendation</div></article><article><div data-testid="User-Name">An author</div><a href="/author/status/123456"><time>Today</time></a><div data-testid="tweetText">Public post excerpt</div><div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/fixture.jpg"></div></article>');
   assert.equal(result.title, 'Public post excerpt'); assert.equal(result.image, 'https://pbs.twimg.com/media/fixture.jpg'); count++;
   assert.equal(await read(x, '<article><a href="/author/status/123456"><time>Today</time></a><div role="link"><div data-testid="tweetText">Quoted content</div></div></article>'), null); count++;

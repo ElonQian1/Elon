@@ -56,6 +56,16 @@ pub(super) fn identity(url: &Url) -> Option<String> {
     let path = url.path().trim_end_matches('/');
     let parts: Vec<&str> = path.split('/').skip(1).collect();
     match url.host_str()? {
+        "bilibili.com" | "www.bilibili.com" | "m.bilibili.com" => match parts.as_slice() {
+            ["video", id]
+                if id.len() == 12
+                    && id.starts_with("BV")
+                    && id.bytes().all(|b| b.is_ascii_alphanumeric()) =>
+            {
+                Some(format!("bilibili:{id}"))
+            }
+            _ => None,
+        },
         "mp.weixin.qq.com" => match parts.as_slice() {
             ["s"] => Some(format!(
                 "wechat:{path}{}",
@@ -92,6 +102,7 @@ fn image(value: Option<&str>, kind: &str, base: &Url) -> Option<String> {
     let path = url.path().to_ascii_lowercase();
     let ok = match kind {
         "wechat" => suffix("qpic.cn"),
+        "bilibili" => suffix("hdslb.com") && url.path().starts_with("/bfs/archive/"),
         "binance" => {
             suffix("bnbstatic.com") && !["logo", "avatar", "icon"].iter().any(|w| path.contains(w))
         }
@@ -184,4 +195,36 @@ pub(super) fn allow(user: &str) -> bool {
     let entry = rate.entry(user.to_string()).or_insert((Instant::now(), 0));
     entry.1 += 1;
     entry.1 <= LIMIT
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn bili_read_requires_same_video_and_archive_cover() {
+        let original =
+            policy::public_url("https://www.bilibili.com/video/BV19eYH6NEsC/?t=80").unwrap();
+        let mut read = Read {
+            schema: 1,
+            original: original.to_string(),
+            url: "https://m.bilibili.com/video/BV19eYH6NEsC/".into(),
+            article: true,
+            title: "Video title".into(),
+            author: "Author".into(),
+            description: String::new(),
+            image: Some("https://i0.hdslb.com/bfs/archive/poster.jpg".into()),
+        };
+        assert!(validate(&original, &read).unwrap().image.is_some());
+        for image in [
+            "https://hdslb.com.evil.example/bfs/archive/p.jpg",
+            "https://i0.hdslb.com/bfs/face/avatar.jpg",
+        ] {
+            read.image = Some(image.into());
+            assert!(validate(&original, &read).unwrap().image.is_none());
+        }
+        read.url = "https://www.bilibili.com/video/BV1BEY96vEjJ/".into();
+        assert!(validate(&original, &read).is_err());
+        read.url = "https://www.bilibili.com.evil.example/video/BV19eYH6NEsC/".into();
+        assert!(validate(&original, &read).is_err());
+    }
 }

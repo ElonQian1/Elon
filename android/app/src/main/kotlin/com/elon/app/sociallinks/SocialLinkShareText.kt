@@ -8,6 +8,7 @@ internal object SocialLinkShareText {
             "小红书-你的生活兴趣社区", "小红书–你的生活兴趣社区", "微信公众平台", "微信公众号", "环境异常", "安全验证", "访问验证", "抖音-记录美好生活")
     }
     fun title(raw: String, site: String, nearby: String = ""): Pair<String, String> {
+        if (site == "哔哩哔哩") return (biliShareGroups(nearby)?.firstOrNull { !it.startsWith("精准空降") } ?: raw).take(160) to ""
         if (site == "抖音") {
             val match = Regex("看看【([^】]+)的作品】\\s*(\\S[\\s\\S]*)$").find(nearby)
             if (match != null) return match.groupValues[2].trim().take(160) to match.groupValues[1].take(80)
@@ -27,8 +28,28 @@ internal object SocialLinkShareText {
             "小红书" -> after.isEmpty() && Regex("^\\d{1,3}\\s+【[^】]+】\\s+.{1,8}\\s+[A-Za-z0-9]{6,32}\\s+.{1,8}$").matches(before)
             "抖音" -> Regex("^\\d+(?:\\.\\d+)?\\s+复制打开抖音[，,].+$").matches(before) &&
                 Regex("^[A-Za-z0-9]{3}:/\\s+[A-Za-z0-9@.]+\\s+:[A-Za-z0-9]+\\s+\\d{2}/\\d{2}$").matches(after)
-            "哔哩哔哩" -> after.isEmpty() && Regex("^(?:【[^】]+】\\s*){1,2}$").matches(before)
+            "哔哩哔哩" -> after.isEmpty() && biliShareGroups(before) != null
             else -> false
         }
+    }
+    private fun biliShareGroups(text: String): List<String>? {
+        if (text.isEmpty() || text.length > 300) return null
+        val groups = mutableListOf<String>()
+        var depth = 0; var start = 0
+        for ((index, ch) in text.withIndex()) {
+            when (ch) {
+                '【' -> { if (depth++ == 0) start = index + 1 }
+                '】' -> {
+                    if (depth == 0) return null
+                    if (--depth == 0) {
+                        val title = text.substring(start, index).trim()
+                        if (title.isEmpty() || groups.size == 2) return null
+                        groups.add(title)
+                    }
+                }
+                else -> if (depth == 0 && !ch.isWhitespace()) return null
+            }
+        }
+        return groups.takeIf { depth == 0 && it.isNotEmpty() }
     }
 }

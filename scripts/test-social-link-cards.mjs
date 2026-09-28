@@ -15,6 +15,12 @@ assert.equal(links.embed(channelsUrl), null, 'a preview cover is not a video sou
 const example = '【高糖VS戒糖14天！真的差别很大吗？】 【精准空降到 00:02】 https://www.bilibili.com/video/BV1enYL6SEtU/?share_source=copy_web&t=2&p=3';
 assert.equal(links.links(example)[0].embed.url, 'https://player.bilibili.com/player.html?bvid=BV1enYL6SEtU&autoplay=0&poster=1&t=2&p=3');
 assert.equal(links.links(example)[0].title, '高糖VS戒糖14天！真的差别很大吗？');
+const nestedTitle = '第三集上线！《新数码宝贝·全面战争》【15分钟管饱！】';
+const nestedShare = `【${nestedTitle}】 https://www.bilibili.com/video/BV19eYH6NEsC/`;
+assert.equal(links.compact(nestedShare), true);
+assert.equal(links.links(nestedShare)[0].title, nestedTitle);
+assert.equal(links.compact(`【精准空降到 01:20】 ${nestedShare}`), true);
+for (const value of [`我的评论 ${nestedShare}`, `${nestedShare} 评论`, `【缺少闭括号 ${nestedShare}`, `【一】【二】【三】 https://www.bilibili.com/video/BV19eYH6NEsC/`]) assert.equal(links.compact(value), false);
 const xhs = 'https://www.xiaohongshu.com/discovery/item/example?xsec_token=synthetic&xsec_source=pc_share';
 assert.equal(links.links(xhs)[0].url, xhs);
 assert.equal(links.links(xhs + ' ' + xhs).length, 1);

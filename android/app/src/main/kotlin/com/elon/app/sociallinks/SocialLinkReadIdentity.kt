@@ -14,6 +14,9 @@ internal object SocialLinkReadIdentity {
         val u = SocialLinkPolicy.safeUrl(value) ?: return null
         val path = u.path.trimEnd('/')
         if (u.host == "mp.weixin.qq.com" && Regex("/s(?:/[^/]+)?").matches(path)) return "wechat:$path" + if (path == "/s") "?${u.rawQuery.orEmpty()}" else ""
+        if (u.host in setOf("bilibili.com", "www.bilibili.com", "m.bilibili.com")) {
+            return Regex("/video/(BV[A-Za-z0-9]{10})").matchEntire(path)?.let { "bilibili:${it.groupValues[1]}" }
+        }
         if (u.host in setOf("binance.com", "www.binance.com", "app.binance.com")) {
             val m = Regex("(?:/[a-z]{2}(?:-[A-Z]{2})?)?/square/(?:post|article)/([0-9]{5,24})").matchEntire(path)
                 ?: Regex("/uni-qr/cpos/([0-9]{5,24})").matchEntire(path)
@@ -29,6 +32,7 @@ internal object SocialLinkReadIdentity {
         val u = SocialLinkPolicy.safeUrl(value) ?: return null
         val allowed = when {
             kind == "wechat" -> u.host == "qpic.cn" || u.host.endsWith(".qpic.cn")
+            kind == "bilibili" -> (u.host == "hdslb.com" || u.host.endsWith(".hdslb.com")) && u.path.startsWith("/bfs/archive/")
             kind == "binance" -> (u.host == "bnbstatic.com" || u.host.endsWith(".bnbstatic.com")) && !Regex("logo|avatar|icon", RegexOption.IGNORE_CASE).containsMatchIn(u.path)
             kind.startsWith("x-") -> u.host == "pbs.twimg.com" && Regex("^/(?:media|card_img|amplify_video_thumb|ext_tw_video_thumb|tweet_video_thumb)/").containsMatchIn(u.path)
             else -> false

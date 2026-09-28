@@ -12,6 +12,9 @@
     const u = safe(value); if (!u) return null;
     const p = u.pathname.replace(/\/$/, ''); let m;
     if (u.hostname === 'mp.weixin.qq.com' && /^\/s(?:\/[^/]+)?$/.test(p)) return 'wechat:' + p + (p === '/s' ? u.search : '');
+    if (['bilibili.com', 'www.bilibili.com', 'm.bilibili.com'].includes(u.hostname)) {
+      m = p.match(/^\/video\/(BV[A-Za-z0-9]{10})$/); if (m) return 'bilibili:' + m[1];
+    }
     if (['binance.com', 'www.binance.com', 'app.binance.com'].includes(u.hostname)) {
       m = p.match(/^(?:\/[a-z]{2}(?:-[A-Z]{2})?)?\/square\/(?:post|article)\/(\d{5,24})$/) || p.match(/^\/uni-qr\/cpos\/(\d{5,24})$/);
       if (m) return 'binance:' + m[1];
@@ -26,6 +29,7 @@
   function image(value, kind) {
     const u = safe(value); if (!u) return null;
     if (kind === 'wechat' && (u.hostname === 'qpic.cn' || u.hostname.endsWith('.qpic.cn'))) return u.href;
+    if (kind === 'bilibili' && (u.hostname === 'hdslb.com' || u.hostname.endsWith('.hdslb.com')) && /^\/bfs\/archive\//.test(u.pathname)) return u.href;
     if (kind === 'binance' && (u.hostname === 'bnbstatic.com' || u.hostname.endsWith('.bnbstatic.com')) && !/logo|avatar|icon/i.test(u.pathname)) return u.href;
     if (kind.startsWith('x-') && u.hostname === 'pbs.twimg.com' && /^\/(?:media|card_img|amplify_video_thumb|ext_tw_video_thumb|tweet_video_thumb)\//.test(u.pathname)) return u.href;
     return null;
@@ -61,6 +65,12 @@
       if (id.startsWith('wechat:')) {
         content = document.querySelector('#js_content'); if (!visible(content)) return null;
         title = txt(document.querySelector('#activity-name')); author = txt(document.querySelector('#js_name')); cover = meta('og:image'); description = meta('og:description') || meta('description');
+      } else if (id.startsWith('bilibili:')) {
+        const heading = document.querySelector('h1.video-title, h1.video-info-title, h1');
+        title = txt(heading); if (!title) return null;
+        const ogTitle = clean(meta('og:title')).replace(/[_-]哔哩哔哩.*$/, '');
+        if (!ogTitle || title !== ogTitle) return null;
+        cover = meta('og:image'); author = meta('author'); description = meta('og:description');
       } else if (id.startsWith('x-post:')) {
         // Match the permalink's own article, never a quoted post or a recommendation.
         for (const time of document.querySelectorAll('article time')) {

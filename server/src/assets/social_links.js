@@ -45,6 +45,7 @@
     return !clean || clean === site.toLowerCase() || ['小红书-你的生活兴趣社区', '小红书–你的生活兴趣社区', '微信公众平台', '微信公众号', '环境异常', '安全验证', '访问验证', '抖音-记录美好生活'].includes(clean);
   }
   function shareTitle(raw, site, nearby = '') {
+    if (site === '哔哩哔哩') raw = biliShareGroups(nearby)?.find(t => !t.startsWith('精准空降')) || raw;
     if (site === '抖音') {
       const match = nearby.match(/看看【([^】]+)的作品】\s*(\S[\s\S]*)$/u);
       if (match) return { title: match[2].trim().slice(0, 160), author: match[1].slice(0, 80) };
@@ -52,6 +53,20 @@
     if (site !== '小红书') return { title: raw.slice(0, 160), author: '' };
     const parts = raw.split(' | 小红书')[0].split(' - ');
     return parts.length > 1 ? { title: parts.slice(0, -1).join(' - ').slice(0, 160), author: parts.at(-1).slice(0, 80) } : { title: raw.slice(0, 160), author: '' };
+  }
+  // Bilibili titles can contain nested brackets; only collapse complete share wrappers.
+  function biliShareGroups(text) {
+    if (!text || text.length > 300) return null;
+    const groups = []; let depth = 0, start = 0;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === '【') { if (depth++ === 0) start = i + 1; }
+      else if (ch === '】') {
+        if (!depth) return null;
+        if (--depth === 0) { const title = text.slice(start, i).trim(); if (!title || groups.length === 2) return null; groups.push(title); }
+      } else if (!depth && !/\s/.test(ch)) return null;
+    }
+    return !depth && groups.length ? groups : null;
   }
   function compact(text) {
     const items = links(text); if (items.length !== 1) return false;
@@ -61,7 +76,7 @@
     const before = value.slice(0, index).trim(), after = value.slice(index + item.url.length).trim();
     if (item.site === '小红书') return !after && /^\d{1,3}\s+【[^】]+】\s+.{1,8}\s+[A-Za-z0-9]{6,32}\s+.{1,8}$/u.test(before);
     if (item.site === '抖音') return /^\d+(?:\.\d+)?\s+复制打开抖音[，,].+$/u.test(before) && /^[A-Za-z0-9]{3}:\/\s+[A-Za-z0-9@.]+\s+:[A-Za-z0-9]+\s+\d{2}\/\d{2}$/.test(after);
-    return item.site === '哔哩哔哩' && !after && /^(?:【[^】]+】\s*){1,2}$/.test(before);
+    return item.site === '哔哩哔哩' && !after && !!biliShareGroups(before);
   }
   function prepareBubble(bubble, text) {
     if (!compact(text)) return false;

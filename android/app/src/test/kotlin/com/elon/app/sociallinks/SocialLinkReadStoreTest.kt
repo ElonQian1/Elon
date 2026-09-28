@@ -39,6 +39,16 @@ class SocialLinkReadStoreTest {
         assertNotNull(SocialLinkReadStore.get(context, "server-a", "alice", original, 86400999))
         assertNull(SocialLinkReadStore.get(context, "server-a", "alice", original, 86401000))
     }
+    @Test fun biliReadRequiresSameVideoAndArchiveCover() {
+        val url = "https://www.bilibili.com/video/BV19eYH6NEsC/?t=80"
+        val read = value(url).put("url", "https://m.bilibili.com/video/BV19eYH6NEsC/")
+            .put("image", "https://i0.hdslb.com/bfs/archive/poster.jpg")
+        assertNotNull(SocialLinkReadPreview.parse(url, read)?.image)
+        for (image in listOf("https://hdslb.com.evil.example/bfs/archive/p.jpg", "https://i0.hdslb.com/bfs/face/avatar.jpg")) {
+            assertNull(SocialLinkReadPreview.parse(url, read.put("image", image))?.image)
+        }
+        assertNull(SocialLinkReadPreview.parse(url, read.put("url", "https://www.bilibili.com/video/BV1BEY96vEjJ/")))
+    }
     @Test fun capacityAndPersistenceOnlyKeepMetadata() {
         for (i in 100000..100128) {
             val url = "https://www.binance.com/en/square/post/$i"

@@ -5,6 +5,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SocialLinkShareTextTest {
+    @Test fun nestedBiliShareTitlesCollapseWithoutHidingComments() {
+        val title = "第三集上线！《新数码宝贝·全面战争》【15分钟管饱！】"
+        val url = "https://www.bilibili.com/video/BV19eYH6NEsC/"
+        val share = "【$title】 $url"
+        assertTrue(SocialLinkShareText.compact(share))
+        assertEquals(title, SocialLinkPolicy.extract(share).single().title)
+        assertTrue(SocialLinkShareText.compact("【精准空降到 01:20】 $share"))
+        for (value in listOf("我的评论 $share", "$share 评论", "【缺少闭括号 $share", "【一】【二】【三】 $url")) {
+            assertFalse(SocialLinkShareText.compact(value))
+        }
+    }
     private val url = "https://www.xiaohongshu.com/discovery/item/example?xsec_token=synthetic"
     private val share = "45 【一次看完多位画师卡位实拍，哪张击中你？✨ - OC猫 | 小红书 - 你的生活兴趣社区】 😆 vEtl5AZaiF1Cpm2 😆 $url"
     @Test fun preservesSpecificShareTitleWhenProviderReturnsGenericSiteTitle() {
