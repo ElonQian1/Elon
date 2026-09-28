@@ -115,8 +115,15 @@ class ChatGptWebDownloadJournalTest {
     }
 
     @Test fun osReleasesTheDownloadLockAfterARealProcessIsKilled() {
+        // Gradle's complete test classpath can exceed Windows CreateProcess's command-line limit.
+        // A Java argument file preserves the same real child process and lock recovery assertion.
+        val arguments = temporary.newFile("child-java.args")
+        arguments.writeText(listOf("-cp", System.getProperty("java.class.path"), javaClass.name,
+            temporary.root.path, id()).joinToString("\n") {
+            "\"" + it.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        })
         val child = ProcessBuilder(File(System.getProperty("java.home"), "bin/java").path,
-            "-cp", System.getProperty("java.class.path"), javaClass.name, temporary.root.path, id()).start()
+            "@${arguments.absolutePath}").start()
         try {
             val ready = File(temporary.root, "child.ready")
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)

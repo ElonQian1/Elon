@@ -22,6 +22,7 @@ internal class HomeRowStatusDecorations(
     private val activity: AppCompatActivity,
     private val dp: (Int) -> Int,
 ) {
+    private val uiColors by lazy { MobileColors(activity) }
     fun createTitle(title: String, badge: HomeRowBadge?): View = LinearLayout(activity).apply {
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -32,18 +33,15 @@ internal class HomeRowStatusDecorations(
 
         addView(TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
+                0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            )
-            maxWidth = maxOf(
-                dp(80),
-                activity.resources.displayMetrics.widthPixels - dp(204),
+                1f,
             )
             ellipsize = TextUtils.TruncateAt.END
             includeFontPadding = false
             maxLines = 1
             text = title
-            setTextColor(Color.parseColor("#F8F7F4"))
+            setTextColor(uiColors.text)
             textSize = 16f
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         })
@@ -60,7 +58,7 @@ internal class HomeRowStatusDecorations(
             layoutParams = FrameLayout.LayoutParams(dp(8), dp(8), Gravity.CENTER)
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#F8F7F4"))
+                setColor(uiColors.primary)
             }
             scaleX = WORKING_DOT_MIN_SCALE
             scaleY = WORKING_DOT_MIN_SCALE
@@ -93,25 +91,26 @@ internal class HomeRowStatusDecorations(
         val isAi = badge == HomeRowBadge.AI
         return TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
-                dp(if (isAi) 34 else 42),
-                dp(20),
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
                 marginStart = dp(7)
             }
+            setPadding(dp(6), dp(4), dp(6), dp(4))
             background = GradientDrawable().apply {
                 cornerRadius = dp(5).toFloat()
                 if (isAi) {
                     setColor(Color.TRANSPARENT)
-                    setStroke(dp(1), Color.parseColor("#8EAAC4"))
+                    setStroke(dp(1), uiColors.outline)
                 } else {
-                    setColor(Color.parseColor("#9CBAD5"))
+                    setColor(uiColors.primaryContainer)
                 }
             }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = if (isAi) "AI" else "项目"
-            setTextColor(Color.parseColor(if (isAi) "#B8CDE0" else "#111820"))
-            textSize = 11.5f
+            setTextColor(if (isAi) uiColors.primary else uiColors.onPrimaryContainer)
+            textSize = 12f
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         }
     }

@@ -1,0 +1,29 @@
+{
+  "version": "2.1.0",
+  "basis": "Material 3 baseline; project status extensions; provisional until runtime acceptance",
+  "light": {
+    "surface": "#FFFBFE", "surface_container": "#F3EDF7", "surface_container_high": "#ECE6F0",
+    "on_surface": "#1C1B1F", "on_surface_variant": "#49454F",
+    "primary": "#6750A4", "on_primary": "#FFFFFF",
+    "primary_container": "#EADDFF", "on_primary_container": "#21005D",
+    "outline": "#79747E", "outline_variant": "#CAC4D0",
+    "error": "#B3261E", "error_container": "#F9DEDC",
+    "success": "#006C45", "success_container": "#8CF8BF",
+    "warning": "#795900", "warning_container": "#FFDF99",
+    "financial_positive": "#006C45", "financial_negative": "#B3261E"
+  },
+  "dark": {
+    "surface": "#1C1B1F", "surface_container": "#211F26", "surface_container_high": "#2B2930",
+    "on_surface": "#E6E1E5", "on_surface_variant": "#CAC4D0",
+    "primary": "#D0BCFF", "on_primary": "#381E72",
+    "primary_container": "#4F378B", "on_primary_container": "#EADDFF",
+    "outline": "#938F99", "outline_variant": "#49454F",
+    "error": "#F2B8B5", "error_container": "#601410",
+    "success": "#6DDBA4", "success_container": "#005234",
+    "warning": "#F4C75E", "warning_container": "#5C4300",
+    "financial_positive": "#6DDBA4", "financial_negative": "#F2B8B5"
+  },
+  "touch_min_dp": 48,
+  "spacing_dp": [4, 8, 12, 16, 24, 32],
+  "type_sp": {"title": 22, "section": 16, "body": 16, "supporting": 14, "caption": 12}
+}

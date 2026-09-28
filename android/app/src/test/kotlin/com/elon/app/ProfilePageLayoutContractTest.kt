@@ -67,7 +67,7 @@ class ProfilePageLayoutContractTest {
         assertTrue(web.contains(".profile-action-group"))
         assertTrue(web.contains("min-height: 284px"))
         assertTrue(web.contains("grid-template-columns: repeat(3"))
-        assertTrue(orbitalTheme.contains("--profile-quota-selected: #8ea7d5"))
+        assertTrue(orbitalTheme.contains("--profile-quota-selected: var(--brand)"))
         assertTrue(web.contains("class=\"usage-period-button selected\" id=\"usageWeekBtn\""))
         assertTrue(web.contains("let profileUsageDays = 7"))
         assertTrue(web.contains("class=\"usage-gauge-progress\""))
@@ -79,9 +79,11 @@ class ProfilePageLayoutContractTest {
         assertTrue(profileGroupCss.contains("border-radius: var(--profile-action-group-radius)"))
         assertTrue(web.contains("class=\"profile-account-action\""))
         assertTrue(web.contains("id=\"logoutRow\""))
-        assertTrue(orbitalTheme.contains("--profile-account-action: #b4c5e3"))
+        assertTrue(orbitalTheme.contains("--profile-account-action: var(--link)"))
         assertTrue(web.contains("color: var(--profile-account-action)"))
-        listOf("PC 节点", "AI 记忆", "AI 代理设置", "Agent 自动化", "分享推广", "检测更新", "退出登录")
+        assertTrue(web.contains("id=\"checkUpdateRow\""))
+        assertTrue(web.contains("checkUpdateRow.addEventListener('click'"))
+        listOf("PC 节点", "AI 记忆", "AI 代理设置", "Agent 自动化", "分享推广", "退出登录")
             .forEach { label -> assertTrue(web.contains(label)) }
     }
 

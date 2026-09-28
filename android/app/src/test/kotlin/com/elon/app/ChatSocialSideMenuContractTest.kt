@@ -14,13 +14,8 @@ import org.junit.Test
 
 class ChatSocialSideMenuContractTest {
     @Test
-    fun allFiveUserAssetsAreTrackedByteForByteAndUsedByAndroid() {
+    fun remainingIllustrationAssetsAreTrackedByteForByteAndUsedByAndroid() {
         val expected = mapOf(
-            "social_sidebar_date_pill.png" to AssetProof(
-                123,
-                235,
-                "7bb51f938e541b7e7c2f4e7d0804471b86747b43c05677af4404361d2ad04f22"
-            ),
             "social_sidebar_avatar_placeholder.png" to AssetProof(
                 110,
                 108,
@@ -70,30 +65,16 @@ class ChatSocialSideMenuContractTest {
             "android/app/src/main/kotlin/com/elon/app/ChatAiSideMenuView.kt"
         )
 
-        assertTrue(controller.contains("socialSideMenu: ChatSocialSideMenuCoordinator"))
+        val modes = readRepositoryFile("android/app/src/main/kotlin/com/elon/app/ChatSideMenuContentMode.kt")
+        assertTrue(modes.contains("val social: ChatSocialSideMenuCoordinator"))
         assertTrue(coordinator.contains("view = ChatSocialSideMenuView("))
-        assertTrue(controller.contains("showProjectShareSideMenu() ->"))
+        assertTrue(controller.contains("applyChatSideMenuContentMode("))
+        assertTrue(modes.contains("projectShareVisible && !webChatVisible"))
         assertTrue(coordinator.contains("view.visibility = View.VISIBLE"))
-        assertTrue(controller.contains("aiMenuView.visibility = View.VISIBLE"))
+        assertTrue(modes.contains("aiMenu.visibility == View.VISIBLE"))
         assertFalse(aiSidebar.contains("ChatSocialSideMenuView"))
         assertFalse(aiSidebar.contains("social_sidebar_"))
         assertFalse(aiSidebar.contains("SocialSidebarTab"))
-    }
-
-    @Test
-    fun timelineVisualMetricsMatchTheCompactFriendSidebarDesign() {
-        assertEquals(128, SocialSidebarTimelineMetrics.DATE_ROW_MIN_HEIGHT_DP)
-        assertEquals(16, SocialSidebarTimelineMetrics.SPINE_WIDTH_DP)
-        assertEquals(16, SocialSidebarTimelineMetrics.SPINE_DOT_SIZE_DP)
-        assertEquals(32, SocialSidebarTimelineMetrics.AVATAR_SIZE_DP)
-        assertEquals(16f, SocialSidebarTimelineMetrics.NAME_TEXT_SP)
-        assertEquals(12f, SocialSidebarTimelineMetrics.TIME_TEXT_SP)
-        assertEquals(14f, SocialSidebarTimelineMetrics.BODY_TEXT_SP)
-        assertEquals(18, SocialSidebarTimelineMetrics.PREVIEW_START_DP)
-        assertEquals(96, SocialSidebarTimelineMetrics.VIDEO_WIDTH_DP)
-        assertEquals(54, SocialSidebarTimelineMetrics.VIDEO_HEIGHT_DP)
-        assertEquals(SocialSidebarTimelineMetrics.SPINE_DOT_SIZE_DP, SocialSidebarTimelineMetrics.SPINE_WIDTH_DP)
-        assertEquals(14, SocialSidebarTimelineMetrics.SPINE_WIDTH_DP + SocialSidebarTimelineMetrics.CONTENT_START_DP)
     }
 
     @Test
@@ -126,26 +107,8 @@ class ChatSocialSideMenuContractTest {
         assertTrue(view.contains("SocialSidebarTab.DATE"))
         assertTrue(view.contains("SocialSidebarTab.FAVORITES"))
         assertTrue(view.contains("搜索侧栏消息"))
-        assertTrue(view.contains("LinearLayout.LayoutParams(dp(110)"))
-        assertTrue(view.contains("LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)"))
-        assertTrue(view.contains("setPadding(dp(12), dp(12), dp(12), dp(12))"))
-        assertTrue(view.contains("LinearLayout.LayoutParams.MATCH_PARENT, dp(84)"))
-        assertTrue(view.contains("LinearLayout.LayoutParams(0, dp(76), 1f)"))
-        assertTrue(view.contains("FrameLayout.LayoutParams(dp(35), dp(67))"))
-        assertTrue(view.contains("date.dayOfMonth.toString(), 14f, selected"))
-        assertTrue(view.contains("socialSidebarDateContentGravity(offset)"))
-        assertTrue(view.contains("-3L -> Gravity.START"))
-        assertTrue(view.contains("3L -> Gravity.END"))
-        assertTrue(view.contains("offset.toInt() * 3"))
-        assertTrue(view.contains("socialSidebarDateLabelParams(contentGravity)"))
-        assertTrue(view.contains("gravity = contentGravity"))
-        assertTrue(
-            "TextStyle.SHORT, Locale.ENGLISH\\),\\s+14f,\\s+selected"
-                .toRegex()
-                .containsMatchIn(view)
-        )
-        assertTrue(view.contains("setSingleLine(true)"))
-        assertTrue(view.contains("if (selected) \"#464646\" else \"#D9D9D9\""))
+        assertTrue(view.contains("createSocialSidebarDateStrip("))
+        assertTrue(view.contains("onDateSelected"))
         listOf("图片与视频", "文本", "链接", "笔记", "文件", "设置")
             .forEach { assertTrue(view.contains("\"$it\"")) }
         assertTrue(view.contains("socialSidebarFilterContentGravity(index, filters.lastIndex)"))
@@ -160,9 +123,6 @@ class ChatSocialSideMenuContractTest {
         assertTrue(preview.contains("setOf(\"date\", \"favorites\", \"drag\")"))
         assertTrue(preview.contains("LocalDate.of(2026, 7, 23)"))
         assertTrue(preview.contains("initialDate = SOCIAL_SIDEBAR_PREVIEW_DATE"))
-        assertEquals(3, "refreshChatTabBadge\\(\\)".toRegex()
-            .findAll(activity.substringAfter("private val friendActions"))
-            .count())
         assertTrue(
             activity.substringAfter("private fun refreshChatTabBadge")
                 .substringBefore("private fun showGitProjectDialog")

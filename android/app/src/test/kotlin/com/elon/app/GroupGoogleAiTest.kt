@@ -45,7 +45,7 @@ class GroupGoogleAiTest {
         assertTrue(text.contains("Google"))
         assertTrue(text.contains("保存"))
         assertFalse(text.contains("临时"))
-        assertTrue(GroupWebAiRequestPolicy.consent(GroupAiConfiguration()).contains("ChatGPT 临时会话"))
+        assertTrue(GroupWebAiRequestPolicy.consent(GroupAiConfiguration()).contains("ChatGPT 项目长期会话"))
     }
 
     @Test fun onlyEmptyGoogleAiDocumentCanReceiveGroupPrompt() {

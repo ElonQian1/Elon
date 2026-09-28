@@ -31,7 +31,6 @@ class HomeRowStatusContractTest {
 
         assertTrue(rows.contains("if (projectWorking) {"))
         assertTrue(rows.contains("statusDecorations.createWorkingIndicator()"))
-        assertTrue(decorations.contains("setColor(Color.parseColor(\"#F8F7F4\"))"))
         assertTrue(decorations.contains("ValueAnimator.ofFloat(WORKING_DOT_MIN_SCALE, 1f)"))
         assertTrue(web.contains("if (projectWorking) {"))
         assertTrue(web.contains("animation: project-working-breath 900ms ease-in-out infinite alternate"))

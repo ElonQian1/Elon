@@ -7,9 +7,11 @@ import android.view.View
 import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
 
-internal fun panelBackground(color: String): GradientDrawable {
+internal fun panelBackground(color: String): GradientDrawable = panelBackground(Color.parseColor(color))
+
+internal fun panelBackground(color: Int): GradientDrawable {
     return GradientDrawable().apply {
-        setColor(Color.parseColor(color))
+        setColor(color)
         cornerRadius = 0f
     }
 }

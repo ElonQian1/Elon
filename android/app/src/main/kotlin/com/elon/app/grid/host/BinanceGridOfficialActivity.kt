@@ -10,7 +10,7 @@ import android.widget.LinearLayout
 import com.elon.app.grid.ui.BinanceGridAppearance
 
 /** Full official product in the existing session. The native bridge does not submit any action. */
-class BinanceGridOfficialActivity : Activity() {
+class BinanceGridOfficialActivity : com.elon.app.MobileActivity() {
     private var runtime: BinanceHostRuntime? = null
     private lateinit var frame: FrameLayout
     private var nonce = ""

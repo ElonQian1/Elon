@@ -1,0 +1,87 @@
+/* Compatibility aliases. All color values originate in mobile-tokens-v2.json. */
+:root {
+  --bg: var(--mobile-surface); --bg-hint: var(--mobile-surface);
+  --side-menu-bg: var(--mobile-surface-container); --panel: var(--mobile-surface-container);
+  --panel-2: var(--mobile-surface-container-high); --panel-3: var(--mobile-surface-container-high);
+  --line: var(--mobile-outline-variant); --metal-edge: var(--mobile-outline-variant);
+  --metal-highlight: transparent; --calibration: transparent;
+  --ink: var(--mobile-on-surface); --ink-strong: var(--mobile-on-surface);
+  --ink-soft: var(--mobile-on-surface-variant); --ink-muted: var(--mobile-on-surface-variant);
+  --ink-list-preview: var(--mobile-on-surface-variant); --ink-faint: var(--mobile-on-surface-variant);
+  --ink-dim: var(--mobile-on-surface-variant); --ink-quiet: var(--mobile-on-surface-variant);
+  --brand: var(--mobile-primary); --brand-hover: var(--mobile-primary); --brand-ink: var(--mobile-on-primary);
+  --accent: var(--mobile-primary); --link: var(--mobile-primary);
+  --success: var(--mobile-success); --warning: var(--mobile-warning); --danger: var(--mobile-error);
+  --pull-filter-project: var(--warning); --pull-filter-friend: var(--success); --pull-filter-light: var(--link);
+  --secondary-btn: var(--panel-2); --secondary-btn-ink: var(--ink);
+  --input-pill-bg: var(--panel-2); --project-space-page-bg: var(--bg); --project-space-panel-bg: var(--bg);
+  --project-space-info-bg: var(--panel); --project-space-info-ink: var(--ink);
+  --project-space-info-ink-soft: var(--ink-soft); --project-space-info-ink-faint: var(--ink-soft);
+  --store-detail-bg: var(--bg); --store-detail-ink: var(--ink); --store-detail-muted: var(--ink-soft);
+  --store-detail-link: var(--link); --store-detail-divider: var(--line);
+  --store-detail-button: var(--brand); --store-detail-button-ink: var(--brand-ink);
+  --badge-info-bg: var(--mobile-primary-container); --badge-info-ink: var(--mobile-on-primary-container);
+  --badge-neutral-bg: var(--panel-2); --badge-neutral-ink: var(--ink);
+  --nav-bg: var(--panel); --nav-active-bg: var(--mobile-primary-container);
+  --nav-glass-overlay: var(--panel); --nav-glass-border: var(--line); --system-nav-bg: var(--bg);
+  --popup-panel-bg: var(--panel); --bubble-user: var(--mobile-primary-container);
+  --bubble-user-ink: var(--mobile-on-primary-container); --bubble-ai-bg: var(--panel);
+  --bubble-ai-border: var(--line); --bubble-ai-ink: var(--ink);
+  --bubble-progress-bg: var(--panel-2); --bubble-progress-border: var(--line); --bubble-progress-ink: var(--ink-soft);
+  --bubble-error-bg: var(--mobile-error-container); --bubble-error-border: var(--danger); --bubble-error-ink: var(--danger);
+  --tab-icon: var(--ink-soft); --tab-active: var(--mobile-on-primary-container);
+  --profile-quota-selected: var(--brand); --profile-quota-control: var(--panel-2);
+  --profile-quota-border: var(--line); --profile-quota-control-ink: var(--ink); --profile-account-action: var(--link);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand);
+}
+html, body { font-size: 16px; }
+html, body, .app, .content, .page, .project-space-ai-menu,
+.app.stitch-home-active, .app.stitch-home-active .content,
+.app.stitch-home-active .page, .app.stitch-home-active .conversation-list {
+  background-color: var(--bg); background-image: none;
+}
+.toolbar, .app.stitch-home-active .toolbar, .tabs-bar, .input-bar {
+  background: var(--bg); border-color: var(--line);
+}
+.bubble.ai, .bubble.friend, .bubble.progress { background: var(--bubble-ai-bg); color: var(--ink); border-color: var(--line); box-shadow: none; }
+.bubble.user { background: var(--bubble-user); color: var(--bubble-user-ink); border: 0; box-shadow: none; }
+.bubble.error { background: var(--bubble-error-bg); color: var(--bubble-error-ink); border-color: var(--danger); }
+.login-card, .modal, .project-stage, .project-grid, .project-history, .usage-section,
+#profilePage .profile-user-card, #profilePage .profile-action-group, #profilePage .profile-node-resource-panel,
+.agent-step-card, .project-browser-sheet, .node-tx-sheet, .pwa-install-card, .home-nav-menu,
+.home-action-menu, .home-project-create-menu, .input-attachment-panel, .profile-row, .project-block {
+  background: var(--panel); color: var(--ink); border-color: var(--line); box-shadow: none;
+}
+.input-panel, .input-bar.has-text .input-panel, .input-bar.input-focused .input-panel,
+.input-bar.attachments-open .input-panel, .modal input, .modal textarea, .modal select,
+.login-card input, .project-browser-search { background: var(--panel-2); color: var(--ink); border-color: var(--line); }
+.modal .btn-confirm, .login-card .submit, .download-btn, .pwa-install-primary,
+.usage-action.primary, .agent-step-action.primary, .project-space-ai-menu button,
+.project-space-install, .project-space-empty-post-btn {
+  background: var(--brand); color: var(--brand-ink); border: 0; box-shadow: none;
+}
+.modal .btn-cancel, .copy-btn, .pwa-install-later, .usage-action.secondary,
+.agent-step-action, #profilePage .profile-account-action, .project-refresh-btn,
+.input-bar .model-btn, .input-bar .plan-btn { background: var(--panel-2); color: var(--ink); border-color: var(--line); }
+.tabs-panel { background: transparent; border: 0; box-shadow: none; }
+.tab.active::before { background: var(--mobile-primary-container); box-shadow: none; }
+.conversation-item .sub, .conversation-item .trailing { color: var(--ink-soft); }
+.conversation-item .home-row-badge.ai { color: var(--brand); border-color: var(--line); }
+.conversation-item .home-row-badge.project { background: var(--mobile-primary-container); color: var(--mobile-on-primary-container); }
+:root { --mobile-icon-filter: brightness(0); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --mobile-icon-filter: brightness(0) invert(1); }
+}
+:root[data-theme="dark"] { --mobile-icon-filter: brightness(0) invert(1); }
+.toolbar img, .tab .ic img, .bottom-menu-tab .ic img { filter: var(--mobile-icon-filter); opacity: .8; }
+.bottom-compose-button { background: var(--brand); color: var(--brand-ink); border: 0; box-shadow: none; }
+.bottom-compose-button::before, .bottom-compose-button::after { background: var(--brand-ink); }
+.project-plaza-inline-root::before, .project-plaza-inline-root::after { display: none; }
+.chat-timeline-label, .usage-remaining, .project-space-metric-value { font-variant-numeric: tabular-nums; }
+button, [role="button"] { min-height: 48px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--brand); outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .usage-progress, .usage-gauge-progress, .input-panel, .pwa-install-card { transition: none; }
+}

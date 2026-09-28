@@ -28,7 +28,6 @@ private val homeListClockFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale
 private val homeListMonthDayFormatter = DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)
 private val homeListYearMonthDayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA)
 private val homeListWeekdays = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
-private const val HOME_LIST_PREVIEW_COLOR = "#B9CACB"
 
 private fun formatHomeListTime(timestampMs: Long, nowMs: Long = System.currentTimeMillis()): String {
     if (timestampMs <= 0L) return ""
@@ -58,6 +57,8 @@ internal class MainHomeRows(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
 ) {
+    private val uiColors by lazy { MobileColors(activity) }
+
     private val statusDecorations = HomeRowStatusDecorations(activity, dp)
     private var conversationHomeRowAnimator: ValueAnimator? = null
     private var conversationHomeRowTarget: View? = null
@@ -80,9 +81,10 @@ internal class MainHomeRows(
         val row = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(72)
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            setBackgroundColor(Color.parseColor("#131313"))
+            minimumHeight = dp(72)
+            setBackgroundColor(uiColors.surface)
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(16), dp(12), dp(16), dp(12))
@@ -120,7 +122,7 @@ internal class MainHomeRows(
             includeFontPadding = false
             maxLines = 1
             text = friend.lastMessage ?: "\u6682\u65e0\u6d88\u606f"
-            setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
+            setTextColor(uiColors.muted)
             textSize = 14f; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         })
         row.addView(middle)
@@ -141,9 +143,10 @@ internal class MainHomeRows(
         val row = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(72)
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            setBackgroundColor(Color.parseColor("#131313"))
+            minimumHeight = dp(72)
+            setBackgroundColor(uiColors.surface)
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(16), dp(12), dp(16), dp(12))
@@ -177,7 +180,7 @@ internal class MainHomeRows(
             includeFontPadding = false
             maxLines = 1
             text = group.lastMessage ?: "${group.memberCount} 位成员"
-            setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
+            setTextColor(uiColors.muted)
             textSize = 14f; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         })
         row.addView(middle)
@@ -215,7 +218,7 @@ internal class MainHomeRows(
                     )
                     includeFontPadding = false
                     text = formatHomeListTime(value)
-                    setTextColor(Color.parseColor("#B9CACB"))
+                    setTextColor(uiColors.muted)
                     textSize = 12f; typeface = Typeface.create("sans-serif", Typeface.NORMAL); fontFeatureSettings = "tnum"
                 })
             }
@@ -253,14 +256,14 @@ internal class MainHomeRows(
             includeFontPadding = false
             maxLines = 1
             text = if (loggedIn) "暂无好友" else "登录后显示好友"
-            setTextColor(Color.parseColor("#F8F7F4"))
+            setTextColor(uiColors.text)
             textSize = 16f
         })
         middle.addView(TextView(activity).apply {
             includeFontPadding = false
             maxLines = 1
             text = if (loggedIn) "点击右上角 + 添加好友" else "点击登录后按手机号添加好友"
-            setTextColor(Color.parseColor("#B3DDDBD5"))
+            setTextColor(uiColors.muted)
             textSize = 13f
         })
         row.addView(middle)
@@ -282,7 +285,7 @@ internal class MainHomeRows(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
-            setBackgroundColor(Color.parseColor(if (index == activeProjectIndexProvider()) "#20262E" else "#0E1116"))
+            setBackgroundColor(if (index == activeProjectIndexProvider()) uiColors.elevated else uiColors.container)
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(16), 0, dp(14), 0)
@@ -312,7 +315,7 @@ internal class MainHomeRows(
             includeFontPadding = false
             maxLines = 1
             text = project.title
-            setTextColor(Color.parseColor("#F8F7F4"))
+            setTextColor(uiColors.text)
             textSize = 16f
         })
         middle.addView(TextView(activity).apply {
@@ -327,7 +330,7 @@ internal class MainHomeRows(
             maxLines = 1
             val projectKind = project.projectKindLabel()
             text = "$projectKind · ${project.projectOriginLabel()} · ${project.displayConversationCount()} 个会话 · ${project.stage}"
-            setTextColor(Color.parseColor("#B3DDDBD5"))
+            setTextColor(uiColors.muted)
             textSize = 13f
         })
         row.addView(middle)
@@ -343,7 +346,7 @@ internal class MainHomeRows(
             }
             includeFontPadding = false
             text = timeFormatter.format(Date(project.updatedAt))
-            setTextColor(Color.parseColor("#B3DDDBD5"))
+            setTextColor(uiColors.muted)
             textSize = 13f
         })
         wrapper.addView(row)
@@ -357,7 +360,7 @@ internal class MainHomeRows(
                 }
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
-                    setColor(Color.parseColor("#FF4D4F"))
+                    setColor(uiColors.error)
                 }
             })
         }
@@ -371,7 +374,7 @@ internal class MainHomeRows(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(66)
             )
-            setBackgroundColor(Color.parseColor("#0E1116"))
+            setBackgroundColor(uiColors.container)
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(14), 0, dp(14), 0)
@@ -401,7 +404,7 @@ internal class MainHomeRows(
             includeFontPadding = false
             maxLines = 1
             text = conversation.title
-            setTextColor(Color.parseColor("#F8F7F4"))
+            setTextColor(uiColors.text)
             textSize = 16f
         })
         middle.addView(TextView(activity).apply {
@@ -431,7 +434,7 @@ internal class MainHomeRows(
             }
             includeFontPadding = false
             text = timeFormatter.format(Date(conversation.updatedAt))
-            setTextColor(Color.parseColor("#B3DDDBD5"))
+            setTextColor(uiColors.muted)
             textSize = 12f
         })
         updateConversationRowShimmer(row, active, false)
@@ -454,7 +457,7 @@ internal class MainHomeRows(
             ).apply {
                 marginStart = dp(68)
             }
-            setBackgroundColor(Color.parseColor("#667B8793"))
+            setBackgroundColor(uiColors.outline)
         }
     }
 
@@ -477,8 +480,8 @@ internal class MainHomeRows(
             cancelHomeRowShimmer()
         }
 
-        val baseColor = Color.parseColor("#0E1116")
-        val highlightColor = Color.parseColor("#20262E")
+        val baseColor = uiColors.container
+        val highlightColor = uiColors.elevated
         row.setBackgroundColor(baseColor)
 
         val animator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -512,7 +515,7 @@ internal class MainHomeRows(
         if (homeRow) {
             cancelHomeRowShimmer()
         }
-        row.setBackgroundColor(Color.parseColor("#0E1116"))
+        row.setBackgroundColor(uiColors.container)
     }
 
     private fun createAvatarView(
@@ -548,7 +551,7 @@ internal class MainHomeRows(
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = avatarText(title)
-            setTextColor(Color.parseColor("#20262E"))
+            setTextColor(uiColors.onPrimary)
             textSize = textSizeSp
             setTypeface(typeface, Typeface.BOLD)
         }
@@ -575,9 +578,9 @@ internal class MainHomeRows(
                 addView(createUnreadBadge(unreadCount))
             }
             if (showProjectMarker) {
-                addView(createAvatarCornerDot("#D2B572"))
+                addView(createAvatarCornerDot(uiColors.warning))
             } else if (friend.isOnline) {
-                addView(createAvatarCornerDot("#67BEA0"))
+                addView(createAvatarCornerDot(uiColors.success))
             }
         }
     }
@@ -603,12 +606,12 @@ internal class MainHomeRows(
                 addView(createUnreadBadge(unreadCount))
             }
             if (showProjectMarker) {
-                addView(createAvatarCornerDot("#D2B572"))
+                addView(createAvatarCornerDot(uiColors.warning))
             }
         }
     }
 
-    private fun createAvatarCornerDot(colorHex: String): View {
+    private fun createAvatarCornerDot(colorHex: Int): View {
         return View(activity).apply {
             val dotSize = dp(10)
             layoutParams = FrameLayout.LayoutParams(dotSize, dotSize).apply {
@@ -618,8 +621,8 @@ internal class MainHomeRows(
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor(colorHex))
-                setStroke(dp(2), Color.parseColor("#0E1116"))
+                setColor(colorHex)
+                setStroke(dp(2), uiColors.container)
             }
         }
     }
@@ -657,12 +660,12 @@ internal class MainHomeRows(
             layoutParams = FrameLayout.LayoutParams(size, size)
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
-                setColor(Color.parseColor("#F8F7F4"))
+                setColor(uiColors.primary)
             }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "群"
-            setTextColor(Color.parseColor("#20262E"))
+            setTextColor(uiColors.onPrimary)
             textSize = 17f
             setTypeface(typeface, Typeface.BOLD)
         }
@@ -673,7 +676,7 @@ internal class MainHomeRows(
             layoutParams = FrameLayout.LayoutParams(size, size)
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
-                setColor(Color.parseColor("#F8F7F4"))
+                setColor(uiColors.primary)
             }
 
             val compactGrid = members.size <= 4
@@ -738,12 +741,12 @@ internal class MainHomeRows(
         return TextView(activity).apply {
             background = GradientDrawable().apply {
                 cornerRadius = dp(3).toFloat()
-                setColor(Color.parseColor("#EFEFEF"))
+                setColor(uiColors.primaryContainer)
             }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = UserProfileStore.avatarInitial(member.displayName)
-            setTextColor(Color.parseColor("#20262E"))
+            setTextColor(uiColors.onPrimary)
             textSize = textSizeSp
             setTypeface(typeface, Typeface.BOLD)
             maxLines = 1

@@ -56,7 +56,7 @@ class WechatChannelsNavigationTest {
         assertTrue(intent.hasCategory(android.content.Intent.CATEGORY_BROWSABLE))
         assertNull(intent.component)
         assertNull(intent.extras)
-        assertEquals(0, intent.flags)
+        assertEquals(android.content.Intent.FLAG_ACTIVITY_NEW_TASK, intent.flags)
     }
 
     @Test fun portraitCardRetainsNativeTapAndFixedAspect() {
@@ -68,7 +68,13 @@ class WechatChannelsNavigationTest {
         assertEquals(1, taps)
         assertTrue(card.contentDescription.startsWith("在微信打开"))
         card.measure(View.MeasureSpec.makeMeasureSpec(220, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
-        assertEquals(293, card.measuredHeight)
+        card.layout(0, 0, 220, card.measuredHeight)
+        val media = card.getChildAt(0)
+        val footer = card.getChildAt(card.childCount - 1)
+        assertEquals("The cover retains its 3:4 aspect independently of the author footer", 293, media.measuredHeight)
+        assertTrue(footer.height >= (48 * card.resources.displayMetrics.density).toInt())
+        assertEquals(media.bottom, footer.top)
+        assertEquals(footer.bottom, card.height)
         assertTrue(WechatChannelsPolicy.sameContent("https://weixin.qq.com/sph/example", source))
         assertFalse(WechatChannelsPolicy.sameContent("https://weixin.qq.com/sph/other", source))
     }

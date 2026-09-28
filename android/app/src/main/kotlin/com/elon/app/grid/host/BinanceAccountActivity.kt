@@ -12,7 +12,7 @@ import com.elon.app.AuthManager
 import com.elon.app.grid.ui.BinanceGridAppearance
 
 /** Internal account management uses the very same host as the quant APK. */
-class BinanceAccountActivity : Activity() {
+class BinanceAccountActivity : com.elon.app.MobileActivity() {
     private var host: BinanceHostRuntime? = null
     private lateinit var frame: FrameLayout
     private lateinit var status: TextView

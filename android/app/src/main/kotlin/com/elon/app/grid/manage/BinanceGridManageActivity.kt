@@ -16,7 +16,7 @@ import com.elon.app.grid.host.BinanceHostCaller
 import com.elon.app.grid.host.BinanceHostRuntime
 
 /** Explicit, visible user operation; exported only for the verified official quant caller. */
-open class BinanceGridManageActivity : Activity() {
+open class BinanceGridManageActivity : com.elon.app.MobileActivity() {
     protected open val protocolVersion=1
     private val state=BinanceManageState(SystemClock::elapsedRealtime)
     private val journal by lazy {BinanceCreateJournal(this,"binance-manage-attempt-v1.json")}

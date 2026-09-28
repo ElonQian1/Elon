@@ -101,7 +101,7 @@ $requiredEntries = @(
     "id: cargo-test",
     "scripts\cargo-dev.ps1 test --manifest-path server\Cargo.toml",
     "Upload Rust Validation Evidence",
-    "if: failure() && steps.cargo-test.outcome == 'failure'",
+    "if: failure()",
     "actions/upload-artifact@v4",
     'rust-validation-evidence-${{ github.run_id }}',
     "~\AppData\Local\Elon\rust-cache-v2\validation-v1\evidence",

@@ -102,6 +102,13 @@ internal class AiConversationShareMediaSources(private val cacheDir: File, priva
         if (!absolute.toPath().startsWith(cacheDir.absoluteFile.toPath())) fail(Reason.SOURCE_NOT_ALLOWED)
         val relative = cacheDir.absoluteFile.toPath().relativize(absolute.toPath()).toString()
         val segments = relative.split(File.separatorChar)
+        // File.canonicalFile does not consistently resolve Windows directory/file symlinks.
+        // Reject the selected path's links before opening; preserve the typed denial on every OS.
+        var selectedPath = cacheDir.absoluteFile.toPath()
+        for (segment in segments) {
+            selectedPath = selectedPath.resolve(segment)
+            if (Files.isSymbolicLink(selectedPath)) fail(Reason.SOURCE_NOT_ALLOWED)
+        }
         val directory = segments.firstOrNull() ?: fail(Reason.SOURCE_NOT_ALLOWED)
         if (directory !in CACHE_DIRS || canonical != File(cache, relative)) fail(Reason.SOURCE_NOT_ALLOWED)
         val knownStagingPath = directory == "chatgpt_web_uploads" && segments.size == 4 &&

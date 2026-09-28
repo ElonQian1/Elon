@@ -20,6 +20,9 @@ jobs:
     env:
       RUST_TEST_THREADS: 1
     steps:
+      - name: Enable Git Long Paths
+        shell: pwsh
+        run: git config --global core.longpaths true
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -132,12 +135,12 @@ jobs:
         run: scripts\cargo-dev.ps1 test --manifest-path server\Cargo.toml
 
       - name: Upload Rust Validation Evidence
-        if: failure() && steps.cargo-test.outcome == 'failure'
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: rust-validation-evidence-${{ github.run_id }}
           path: ~\AppData\Local\Elon\rust-cache-v2\validation-v1\evidence
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
 
   sui-move:
@@ -251,6 +254,9 @@ jobs:
     name: Android
     runs-on: windows-latest
     steps:
+      - name: Enable Git Long Paths
+        shell: pwsh
+        run: git config --global core.longpaths true
       - uses: actions/checkout@v4
 
       - name: Set up Java
@@ -261,6 +267,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
       - name: Android Build Prerequisites
         shell: pwsh
@@ -269,4 +277,8 @@ jobs:
       - name: Unit Tests and Debug APK
         working-directory: android
         shell: pwsh
-        run: .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug
+        run: |
+          node --test ..\scripts\test-android-gradle-wrapper.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug
+          exit $LASTEXITCODE

@@ -25,6 +25,8 @@ internal class ProjectSpaceMemberConversationViews(
     private val openPersonalAiChat: (Int) -> Unit,
     private val onSelfConversationsLoaded: (List<ProjectMemberConversation>) -> Unit = {}
 ) {
+    private val uiColors by lazy { MobileColors(activity) }
+
     private var latestContainer: LinearLayout? = null
 
     fun renderList(
@@ -39,7 +41,7 @@ internal class ProjectSpaceMemberConversationViews(
         container.addView(header(member, isSelf))
         container.addView(sectionTitle("项目 AI 会话"))
 
-        val loadingView = inlineStatusRow("正在加载会话...", "#B3DDDBD5")
+        val loadingView = inlineStatusRow("正在加载会话...", uiColors.muted)
         container.addView(loadingView)
 
         thread {
@@ -52,7 +54,7 @@ internal class ProjectSpaceMemberConversationViews(
                 result.onSuccess { conversations ->
                     if (isSelf) onSelfConversationsLoaded(conversations)
                     if (conversations.isEmpty()) {
-                        container.addView(inlineStatusRow("还没有项目 AI 会话", "#80BEBEBA"))
+                        container.addView(inlineStatusRow("还没有项目 AI 会话", uiColors.muted))
                     } else {
                         conversations.forEach { conversation ->
                             container.addView(card(conversation, member, isSelf, space))
@@ -65,7 +67,7 @@ internal class ProjectSpaceMemberConversationViews(
                         container.addView(createPersonalConversationRow())
                     }
                 }.onFailure { error ->
-                    container.addView(inlineStatusRow(error.message ?: "加载失败", "#E07B84"))
+                    container.addView(inlineStatusRow(error.message ?: "加载失败", uiColors.error))
                 }
             }
         }
@@ -76,14 +78,14 @@ internal class ProjectSpaceMemberConversationViews(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#0E1116")
+            background = panelBackground(uiColors.container)
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { onClick() }
             addView(TextView(activity).apply {
                 text = label
                 textSize = 15f
-                setTextColor(Color.parseColor("#8EA7D5"))
+                setTextColor(uiColors.primary)
             })
         }
     }
@@ -99,12 +101,12 @@ internal class ProjectSpaceMemberConversationViews(
                 }
                 textSize = 17f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#F8F7F4"))
+                setTextColor(uiColors.text)
             })
             addView(TextView(activity).apply {
                 text = projectRoleLabel(member.role)
                 textSize = 13f
-                setTextColor(Color.parseColor("#B3DDDBD5"))
+                setTextColor(uiColors.muted)
                 setPadding(0, dp(6), 0, 0)
             })
         }
@@ -119,7 +121,7 @@ internal class ProjectSpaceMemberConversationViews(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#0E1116")
+            background = panelBackground(uiColors.container)
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener {
@@ -134,21 +136,21 @@ internal class ProjectSpaceMemberConversationViews(
             addView(TextView(activity).apply {
                 text = conversation.title?.takeIf { it.isNotBlank() } ?: "会话 ${conversation.id.take(8)}"
                 textSize = 16f
-                setTextColor(Color.parseColor("#F8F7F4"))
+                setTextColor(uiColors.text)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
             addView(TextView(activity).apply {
                 text = conversationSummary(conversation)
                 textSize = 12f
-                setTextColor(Color.parseColor("#80BEBEBA"))
+                setTextColor(uiColors.muted)
                 setPadding(0, dp(5), 0, 0)
             })
             conversation.lastMessage?.takeIf { it.isNotBlank() }?.let { preview ->
                 addView(TextView(activity).apply {
                     text = preview
                     textSize = 13f
-                    setTextColor(Color.parseColor("#B3DDDBD5"))
+                    setTextColor(uiColors.muted)
                     setPadding(0, dp(8), 0, 0)
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
@@ -166,7 +168,7 @@ internal class ProjectSpaceMemberConversationViews(
             addView(TextView(activity).apply {
                 text = "在此基础上分叉 →"
                 textSize = 13f
-                setTextColor(Color.parseColor("#67BEA0"))
+                setTextColor(uiColors.primary)
                 setTypeface(typeface, Typeface.BOLD)
                 isClickable = true
                 setOnClickListener {
@@ -181,9 +183,9 @@ internal class ProjectSpaceMemberConversationViews(
         return TextView(activity).apply {
             text = "+ 新建个人 AI 会话"
             textSize = 15f
-            setTextColor(Color.parseColor("#F8F7F4"))
+            setTextColor(uiColors.text)
             setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#0E1116")
+            background = panelBackground(uiColors.container)
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener {
@@ -229,12 +231,12 @@ internal class ProjectSpaceMemberConversationViews(
         }
     }
 
-    private fun inlineStatusRow(text: String, colorHex: String): TextView {
+    private fun inlineStatusRow(text: String, colorHex: Int): TextView {
         return TextView(activity).apply {
             this.text = text
             textSize = 14f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor(colorHex))
+            setTextColor(colorHex)
             setPadding(dp(20), dp(36), dp(20), dp(36))
         }
     }
@@ -243,7 +245,7 @@ internal class ProjectSpaceMemberConversationViews(
         return TextView(activity).apply {
             text = textValue
             textSize = 13f
-            setTextColor(Color.parseColor("#80BEBEBA"))
+            setTextColor(uiColors.muted)
             setPadding(dp(20), dp(18), dp(20), dp(6))
         }
     }

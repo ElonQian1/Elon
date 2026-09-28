@@ -20,7 +20,7 @@ import com.elon.app.esk.platform.sellback.SellbackPage
 import com.elon.eskcontract.EskPlatformProgressContract
 
 /** One explicitly confirmed read-only page, not a login or financial operation. */
-class EskPlatformProgressConsentActivity : Activity() {
+class EskPlatformProgressConsentActivity : com.elon.app.MobileActivity() {
     private enum class Phase { NEW, CONFIRMING, READING, FAILED, FINISHED }
     private var phase = Phase.NEW
     private var foreground = false

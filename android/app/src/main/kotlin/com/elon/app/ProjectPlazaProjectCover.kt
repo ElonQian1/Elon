@@ -7,10 +7,10 @@ import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Context
 
 internal fun projectPlazaProjectCover(
-    activity: AppCompatActivity,
+    activity: Context,
     project: StoreProject,
     sizePx: Int,
     radiusPx: Float,
