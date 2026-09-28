@@ -23,6 +23,8 @@ pub(crate) use stateful::{
 };
 
 #[cfg(test)]
+mod authenticated_page_tests;
+#[cfg(test)]
 mod public_login_tests;
 #[cfg(test)]
 mod tests;

@@ -450,6 +450,12 @@ async fn wait_for_page(
             return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && rect.width > 0 && rect.height > 0;
           }};
           const loginQuery = 'input[type="password"], form[action*="login" i], form[action*="signin" i]';
+          const authenticatedReady = () => {{
+            if (!authSelector) return true;
+            try {{ const roots = document.querySelectorAll(authSelector);
+              return roots.length === 1 && visible(roots[0]);
+            }} catch (_) {{ return null; }}
+          }};
           const publicReady = () => {{
             if (!publicSelector) return true;
             try {{ const roots = document.querySelectorAll(publicSelector); const root = roots[0];
@@ -457,8 +463,9 @@ async fn wait_for_page(
                 ((root.matches(loginQuery) && visible(root)) || Array.from(root.querySelectorAll(loginQuery)).some(visible));
             }} catch (_) {{ return null; }}
           }};
-          return {{ readyState: document.readyState, waitFound: query(waitSelector), authReady: query(authSelector),
+          return {{ readyState: document.readyState, waitFound: query(waitSelector), authReady: authenticatedReady(),
             publicReady: publicReady(),
+            loginForm: Array.from(document.querySelectorAll('form[action*="login" i], form[action*="signin" i]')).some(visible),
             authForm: Array.from(document.querySelectorAll('input[type="password"], form[action*="login" i], form[action*="signin" i]')).some(visible), href: location.href }};
         }})()"#
     );
@@ -508,16 +515,22 @@ async fn wait_for_page(
                         >= Duration::from_millis(prepared.wait_for.settle_ms)
             }
         };
+        // A prepared session plus its explicit, uniquely visible ready marker
+        // distinguishes password management from a generic login challenge.
+        // Login routes/forms and HTTP denials still override this evidence.
+        let authenticated_ready = prepared.auth.profile.is_some()
+            && prepared.auth.ready_selector.is_some()
+            && value.get("authReady").and_then(Value::as_bool) == Some(true);
         let auth_failed = network
             .document_status
             .is_some_and(|status| matches!(status, 401 | 403))
             || (prepared.expected_page.is_none()
                 && (looks_like_login_route(href)
                     || (ready
-                        && value
-                            .get("authForm")
-                            .and_then(Value::as_bool)
-                            .unwrap_or(false))));
+                        && (value.get("loginForm").and_then(Value::as_bool) == Some(true)
+                            || (!authenticated_ready
+                                && value.get("authForm").and_then(Value::as_bool)
+                                    == Some(true))))));
         if auth_failed {
             return Err(auth_failure(prepared));
         }
