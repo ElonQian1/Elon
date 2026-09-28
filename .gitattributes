@@ -17,3 +17,7 @@ android/app/src/main/kotlin/com/elon/eskcontract/EskPlatformProgressRows.kt text
 android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformProgressContractTest.kt text eol=lf
 android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformProgressRowsTest.kt text eol=lf
 android/app/src/test/kotlin/com/elon/eskcontract/EskPlatformProgressFixtures.kt text eol=lf
+# Semantic verification hashes must match the committed bytes on every host.
+docs/design/mobile-design-system-v2.md text eol=lf
+docs/requirements/mobile-design-v2-adoption.md text eol=lf
+docs/ui/semantic-parity/*.json text eol=lf

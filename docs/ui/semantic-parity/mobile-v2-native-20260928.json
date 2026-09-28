@@ -5,11 +5,11 @@
   "designSystem": {
     "id": "mobile-design-v2",
     "sourceFile": "docs/design/mobile-design-system-v2.md",
-    "sha256": "df9152ba13c4569f90e7ed2bedf48de29bc21b0b96a7d2a0c29888e002628814"
+    "sha256": "56c06a578a25a582bff665d6433de96c097388ca8d2db59ee25066a6e787dc2d"
   },
   "requirementSpec": {
     "sourceFile": "docs/requirements/mobile-design-v2-adoption.md",
-    "sha256": "053e611bb127f8ae877f3e05c154ca3dfc75782066f8001aab1130183e87f20f"
+    "sha256": "c387ebed2cb4456262b30ed788ff37c1c4c99e915a93a347737ca1b4d6383ae4"
   },
   "platformDifferences": [
     "仅验收明确列出的离线能力/状态；不证明全应用视觉、真实登录、发送、账号修改、IME 或性能。",
