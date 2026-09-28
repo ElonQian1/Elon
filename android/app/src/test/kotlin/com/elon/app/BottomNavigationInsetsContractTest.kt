@@ -134,64 +134,16 @@ class BottomNavigationInsetsContractTest {
     }
 
     @Test
-    fun unifiedStitchContainerWrapsPreservedNavigationIcons() {
-        val settings = readRepositoryFile("android/settings.gradle")
-        val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
-        val controller = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/MainBottomNavigationController.kt"
-        )
-        val glass = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_glass.xml")
-        val circleGlass = readRepositoryFile(
-            "android/app/src/main/res/drawable/bg_bottom_nav_glass_circle.xml"
-        )
+    fun navigationSurfacesUseSharedSemanticRoles() {
         val colors = readRepositoryFile("android/app/src/main/res/values/colors.xml")
-        assertTrue(settings.contains("url = uri('https://jitpack.io')"))
-        assertTrue(settings.contains("includeGroup('com.github.Dimezis')"))
-        assertTrue(layout.contains("<eightbitlab.com.blurview.BlurTarget"))
-        assertTrue(!layout.contains("android:id=\"@+id/bottomNavGlass\""))
-        assertTrue(!layout.contains("android:id=\"@+id/bottomComposeGlass\""))
-        assertTrue(!controller.contains("listOf(binding.bottomNavGlass, binding.bottomComposeGlass)"))
-        assertTrue(controller.contains("binding.bottomNavContent.clipToOutline = true"))
-        assertTrue(colors.contains("<color name=\"elon_nav_glass_overlay\">#73353A42</color>"))
-        assertTrue(colors.contains("<color name=\"elon_nav_glass_border\">#1FFFFFFF</color>"))
-        assertTrue(glass.contains("android:radius=\"28dp\""))
-        assertTrue(glass.contains("android:color=\"@android:color/transparent\""))
-        assertTrue(glass.contains("android:color=\"@color/elon_nav_glass_border\""))
-        assertTrue(!glass.contains("<gradient"))
-        assertTrue(circleGlass.contains("android:shape=\"oval\""))
-        assertTrue(circleGlass.contains("android:color=\"@android:color/transparent\""))
-        assertTrue(circleGlass.contains("android:color=\"@color/elon_nav_glass_border\""))
-        assertTrue(!circleGlass.contains("<gradient"))
-
-        val web = readRepositoryFile("server/src/assets/web_page.html")
-        val panel = Regex("""\.tabs-panel\s*\{[^}]*}""", RegexOption.DOT_MATCHES_ALL)
-            .find(web)?.value ?: error("Missing tabs panel styles")
-        assertTrue(panel.contains("background: transparent;"))
-        assertTrue(!panel.contains("linear-gradient"))
-        assertTrue(panel.contains("border-radius: 0;"))
-        val compose = Regex("""\.bottom-compose-button\s*\{[^}]*}""", RegexOption.DOT_MATCHES_ALL)
-            .find(web)?.value ?: error("Missing compose button styles")
-        assertTrue(compose.contains("background: #353534;"))
-        assertTrue(!compose.contains("linear-gradient"))
-        assertTrue(compose.contains("border-radius: 50%;"))
-
         val theme = readRepositoryFile("server/src/assets/orbital_mobile_theme.css")
-        assertTrue(Regex("""\.tabs-bar\s*\{[^}]*background:\s*#201f1f;""").containsMatchIn(theme))
-        assertTrue(!Regex("""\.tabs-panel\s*\{[^}]*linear-gradient""", RegexOption.DOT_MATCHES_ALL).containsMatchIn(theme))
-        assertTrue(!Regex("""\.bottom-compose-button\s*\{[^}]*linear-gradient""", RegexOption.DOT_MATCHES_ALL).containsMatchIn(theme))
-
-        val stitchColors = readRepositoryFile("android/app/src/main/res/values/colors.xml")
-        val containerSurface = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_stitch_container.xml")
-        val composeSurface = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_compose_surface.xml")
-        val selectedSurface = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_selected_surface.xml")
-        assertTrue(stitchColors.contains("<color name=\"elon_stitch_nav_surface\">#201F1F</color>"))
-        assertTrue(stitchColors.contains("<color name=\"elon_stitch_nav_compose_surface\">#353534</color>"))
-        assertTrue(stitchColors.contains("<color name=\"elon_stitch_nav_selected_surface\">#DBFCFF</color>"))
-        assertTrue(containerSurface.contains("android:color=\"@color/elon_stitch_nav_surface\""))
-        assertTrue(composeSurface.contains("android:shape=\"oval\""))
-        assertTrue(composeSurface.contains("android:color=\"@color/elon_stitch_nav_compose_surface\""))
-        assertTrue(selectedSurface.contains("android:radius=\"24dp\""))
-        assertTrue(selectedSurface.contains("android:color=\"@color/elon_stitch_nav_selected_surface\""))
+        listOf("elon_nav_glass_overlay", "elon_nav_glass_border", "elon_stitch_nav_surface",
+            "elon_stitch_nav_compose_surface", "elon_stitch_nav_selected_surface").forEach { name ->
+            assertTrue(Regex("""<color name="$name">@color/mobile_[a-z_]+</color>""").containsMatchIn(colors))
+        }
+        assertTrue(theme.contains("--nav-bg: var(--panel)"))
+        assertTrue(theme.contains("--nav-active-bg: var(--mobile-primary-container)"))
+        assertTrue(theme.contains(".bottom-compose-button { background: var(--brand); color: var(--brand-ink)"))
     }
 
     @Test

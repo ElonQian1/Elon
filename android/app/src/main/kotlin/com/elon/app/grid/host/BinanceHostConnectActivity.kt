@@ -16,7 +16,7 @@ import android.widget.ScrollView
 import com.elon.app.grid.ui.BinanceGridAppearance
 
 /** Official page and explicit read consent; no website session leaves this application. */
-class BinanceHostConnectActivity : Activity() {
+class BinanceHostConnectActivity : com.elon.app.MobileActivity() {
     private val ui by lazy { BinanceGridAppearance(this) }
     private var host: BinanceHostRuntime? = null
     private var nonce = ""

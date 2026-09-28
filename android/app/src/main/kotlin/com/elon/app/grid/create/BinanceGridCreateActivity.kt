@@ -15,7 +15,7 @@ import com.elon.app.grid.host.BinanceHostRuntime
 import com.elon.app.grid.ui.BinanceGridAppearance
 
 /** The only native create submission entry: authenticated caller, visible final confirmation, one attempt. */
-class BinanceGridCreateActivity : Activity() {
+class BinanceGridCreateActivity : com.elon.app.MobileActivity() {
     private val ui by lazy { BinanceGridAppearance(this) }
     private var host: BinanceHostRuntime? = null
     private var session: BinanceCreateSession? = null

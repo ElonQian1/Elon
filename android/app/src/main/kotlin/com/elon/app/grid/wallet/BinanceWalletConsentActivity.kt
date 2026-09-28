@@ -19,7 +19,7 @@ import com.elon.app.grid.host.BinanceHostRuntime
 import com.elon.app.grid.ui.BinanceGridAppearance
 
 /** Explicit wallet-only consent, separate from the existing grid authorization. */
-class BinanceWalletConsentActivity:Activity() {
+class BinanceWalletConsentActivity:com.elon.app.MobileActivity() {
     private val ui by lazy {BinanceGridAppearance(this)}
     private var host:BinanceHostRuntime?=null
     private var nonce=""

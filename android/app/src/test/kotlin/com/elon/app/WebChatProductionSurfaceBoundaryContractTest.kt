@@ -176,7 +176,9 @@ class WebChatProductionSurfaceBoundaryContractTest {
         assertFalse(actions.contains("JSONObject"))
         assertFalse(actions.contains("MessageActionJson"))
         assertTrue(controller.contains("socialConsumerPort.state().controls"))
-        assertFalse(controller.contains("socialMcpPort.uiState()"))
+        // The attachment guard separately reads MCP context; message actions stay on the typed port.
+        assertTrue(controller.contains("consumerPort = { socialConsumerPort }"))
+        assertFalse(actions.contains(".uiState()"))
     }
 
     @Test

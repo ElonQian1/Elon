@@ -9,7 +9,7 @@ import android.view.WindowManager
 import com.elon.app.BuildConfig
 
 /** Authenticated native history only; no saved state, export, wallet, or payment action. */
-class EskPlatformHistoryActivity : Activity() {
+class EskPlatformHistoryActivity : com.elon.app.MobileActivity() {
     private val gate = EskPlatformRequestGate()
     private val history = EskPlatformHistoryPageState()
     private val handler = Handler(Looper.getMainLooper())

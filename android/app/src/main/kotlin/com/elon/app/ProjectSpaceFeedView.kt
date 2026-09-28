@@ -33,6 +33,8 @@ internal class ProjectSpaceFeedView(
     private val downloadProjectApk: () -> Unit,
     private val replaceProjectPreviewImage: (ProjectSpace, Int) -> Unit
 ) {
+    private val uiColors by lazy { MobileColors(activity) }
+
     private val metricPrefs = activity.getSharedPreferences(POST_METRIC_PREFS, Context.MODE_PRIVATE)
     private val playStoreHeader = ProjectSpacePlayStoreHeaderView(
         activity = activity,
@@ -66,7 +68,7 @@ internal class ProjectSpaceFeedView(
     ): LinearLayout {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(PROJECT_SPACE_STORE_BG))
+            setBackgroundColor(uiColors.surface)
             setPadding(0, 0, 0, dp(28))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -100,7 +102,7 @@ internal class ProjectSpaceFeedView(
                     textSize = 20f
                     includeFontPadding = false
                     setTypeface(typeface, Typeface.BOLD)
-                    setTextColor(Color.parseColor(PROJECT_SPACE_STORE_TEXT))
+                    setTextColor(uiColors.text)
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 addView(aboutArrowButton(), LinearLayout.LayoutParams(dp(48), dp(48)))
             }, LinearLayout.LayoutParams(
@@ -112,7 +114,7 @@ internal class ProjectSpaceFeedView(
                 text = bodyText
                 textSize = 16f
                 includeFontPadding = true
-                setTextColor(Color.parseColor(if (description == null) "#80BEBEBA" else PROJECT_SPACE_STORE_MUTED))
+                setTextColor(if (description == null) uiColors.muted else uiColors.muted)
                 setLineSpacing(dp(3).toFloat(), 1f)
                 maxLines = 4
                 ellipsize = TextUtils.TruncateAt.END
@@ -128,7 +130,7 @@ internal class ProjectSpaceFeedView(
     private fun aboutArrowButton(): FrameLayout {
         return FrameLayout(activity).apply {
             addView(FrameLayout(activity).apply {
-            background = roundedBackground("#171C22", 12)
+            background = roundedBackground(uiColors.container, 12)
                 addView(ImageView(activity).apply {
                     setImageResource(R.drawable.ic_project_space_chevron_right)
                     scaleType = ImageView.ScaleType.CENTER
@@ -142,7 +144,7 @@ internal class ProjectSpaceFeedView(
             orientation = LinearLayout.VERTICAL
             setPadding(0, 0, 0, dp(86))
             minimumHeight = dp(460)
-            setBackgroundColor(Color.parseColor(PROJECT_SPACE_STORE_BG))
+            setBackgroundColor(uiColors.surface)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -179,8 +181,8 @@ internal class ProjectSpaceFeedView(
                     textSize = 12f
                     includeFontPadding = false
                     gravity = Gravity.CENTER
-                    setTextColor(Color.parseColor(PROJECT_SPACE_STORE_MUTED))
-                    background = roundedStrokeBackground(PROJECT_SPACE_STORE_BG, 6, PROJECT_SPACE_STORE_DIVIDER, 1)
+                    setTextColor(uiColors.muted)
+                    background = roundedStrokeBackground(uiColors.surface, 6, uiColors.divider, 1)
                     setPadding(dp(7), 0, dp(7), 0)
                 }, LinearLayout.LayoutParams(
                     0,
@@ -233,7 +235,7 @@ internal class ProjectSpaceFeedView(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(25), 0, dp(14))
-            background = roundedStrokeBackground(PROJECT_SPACE_STORE_BG, 14, PROJECT_SPACE_STORE_DIVIDER, 1)
+            background = roundedStrokeBackground(uiColors.surface, 14, uiColors.divider, 1)
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openPost(post.channel, post.message) }
@@ -273,7 +275,7 @@ internal class ProjectSpaceFeedView(
             addView(TextView(activity).apply {
                 text = bodyText
                 textSize = 15f
-                setTextColor(Color.parseColor("#8E8E8E"))
+                setTextColor(uiColors.muted)
                 setLineSpacing(dp(3).toFloat(), 1f)
                 maxLines = 3
                 ellipsize = TextUtils.TruncateAt.END
@@ -319,7 +321,7 @@ internal class ProjectSpaceFeedView(
                     textSize = 12f
                     includeFontPadding = false
                     gravity = Gravity.START
-                    setTextColor(Color.parseColor("#80BEBEBA"))
+                    setTextColor(uiColors.muted)
                     setPadding(0, dp(2), 0, 0)
                 })
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -330,7 +332,7 @@ internal class ProjectSpaceFeedView(
                 setTextColor(activity.elonColor(R.color.elon_text_primary))
                 gravity = Gravity.CENTER
                 maxLines = 1
-                background = roundedBackground("#07090D", 6)
+                background = roundedBackground(uiColors.surface, 6)
                 setPadding(dp(8), 0, dp(8), 0)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -356,15 +358,15 @@ internal class ProjectSpaceFeedView(
             includeFontPadding = false
             textSize = 17f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#0B1118"))
-            background = roundedBackground("#C2CBD6", 17)
+            setTextColor(uiColors.onPrimary)
+            background = roundedBackground(uiColors.primary, 17)
         }
     }
 
     private fun postImagePreview(source: String): ImageView {
         val image = ImageView(activity).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
-            setBackgroundColor(Color.parseColor("#22262C"))
+            setBackgroundColor(uiColors.divider)
             setImageResource(android.R.drawable.ic_menu_gallery)
             tag = source
             layoutParams = LinearLayout.LayoutParams(
@@ -534,7 +536,7 @@ internal class ProjectSpaceFeedView(
                 text = textValue
                 textSize = 15f
                 gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#AFAFAF"))
+                setTextColor(uiColors.muted)
             })
             if (showButton) {
                 addView(TextView(activity).apply {
@@ -543,7 +545,7 @@ internal class ProjectSpaceFeedView(
                     includeFontPadding = false
                     gravity = Gravity.CENTER
                     setTextColor(activity.elonColor(R.color.elon_text_primary))
-                    background = roundedBackground("#171C22", 24)
+                    background = roundedBackground(uiColors.container, 24)
                     isClickable = true
                     foreground = selectableForeground()
                     setOnClickListener { openPostComposer() }
@@ -555,23 +557,23 @@ internal class ProjectSpaceFeedView(
         }
     }
 
-    private fun roundedBackground(colorHex: String, radiusDp: Int): GradientDrawable {
+    private fun roundedBackground(colorHex: Int, radiusDp: Int): GradientDrawable {
         return GradientDrawable().apply {
-            setColor(Color.parseColor(colorHex))
+            setColor(colorHex)
             cornerRadius = dp(radiusDp).toFloat()
         }
     }
 
     private fun roundedStrokeBackground(
-        colorHex: String,
+        colorHex: Int,
         radiusDp: Int,
-        strokeColorHex: String,
+        strokeColorHex: Int,
         strokeWidthDp: Int
     ): GradientDrawable {
         return GradientDrawable().apply {
-            setColor(Color.parseColor(colorHex))
+            setColor(colorHex)
             cornerRadius = dp(radiusDp).toFloat()
-            setStroke(dp(strokeWidthDp), Color.parseColor(strokeColorHex))
+            setStroke(dp(strokeWidthDp), strokeColorHex)
         }
     }
 
@@ -580,10 +582,10 @@ internal class ProjectSpaceFeedView(
         const val PROJECT_PREVIEW_SLOT_COUNT = 4
         const val MAX_IMAGE_PREVIEW_BYTES = 5 * 1024 * 1024
         const val POST_METRIC_PREFS = "project_post_metrics"
-        const val PROJECT_SPACE_STORE_BG = "#07090D"
-        const val PROJECT_SPACE_STORE_TEXT = "#F8F7F4"
-        const val PROJECT_SPACE_STORE_MUTED = "#ADCDDCE4"
-        const val PROJECT_SPACE_STORE_DIVIDER = "#526C7884"
+
+
+
+
     }
 
     private data class MetricButtonViews(

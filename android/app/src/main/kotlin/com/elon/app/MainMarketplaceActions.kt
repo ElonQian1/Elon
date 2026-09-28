@@ -378,7 +378,7 @@ internal class MainMarketplaceActions(
         }
         container.addView(featuredSection.build(projects.take(5)), LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            featuredSection.heightPx()
+            LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = dp(2) })
         container.addView(buildResultsHeading(projects), LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,

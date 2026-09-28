@@ -42,6 +42,8 @@ internal class NodeMarketSheet(
     private val http: OkHttpClient,
     private val serverUrl: String
 ) {
+    private val uiColors by lazy { MobileColors(activity) }
+
 
     private fun dp(n: Int): Int = (n * activity.resources.displayMetrics.density + 0.5f).toInt()
 
@@ -60,7 +62,7 @@ internal class NodeMarketSheet(
         )
         dialog.window?.setBackgroundDrawable(
             GradientDrawable().apply {
-                setColor(Color.parseColor("#080B0F"))
+                setColor(uiColors.surface)
                 cornerRadius = dp(14).toFloat()
             }
         )
@@ -71,7 +73,7 @@ internal class NodeMarketSheet(
     private fun buildRootView(onClose: () -> Unit): View {
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#080B0F"))
+            setBackgroundColor(uiColors.surface)
         }
 
         // 标题栏
@@ -97,7 +99,7 @@ internal class NodeMarketSheet(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(64)
             )
-            indeterminateTintList = ColorStateList.valueOf(Color.parseColor("#7070FF"))
+            indeterminateTintList = ColorStateList.valueOf(uiColors.primary)
         }
         listContainer.addView(spinner)
 
@@ -127,7 +129,7 @@ internal class NodeMarketSheet(
             addView(TextView(activity).apply {
                 text = "PC 节点大厅"
                 textSize = 18f
-                setTextColor(Color.parseColor("#F8F7F4"))
+                setTextColor(uiColors.text)
                 typeface = Typeface.DEFAULT_BOLD
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             })
@@ -135,7 +137,7 @@ internal class NodeMarketSheet(
             addView(TextView(activity).apply {
                 text = "✕"
                 textSize = 20f
-                setTextColor(Color.parseColor("#80BEBEBA"))
+                setTextColor(uiColors.muted)
                 setPadding(dp(10), dp(4), dp(10), dp(4))
                 isClickable = true
                 isFocusable = true
@@ -150,7 +152,7 @@ internal class NodeMarketSheet(
         return TextView(activity).apply {
             text = "积分余额：加载中…"
             textSize = 13f
-            setTextColor(Color.parseColor("#B3DDDBD5"))
+            setTextColor(uiColors.muted)
             setPadding(dp(22), dp(8), dp(22), dp(8))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -161,7 +163,7 @@ internal class NodeMarketSheet(
 
     private fun buildDivider(): View {
         return View(activity).apply {
-            setBackgroundColor(Color.parseColor("#20262E"))
+            setBackgroundColor(uiColors.elevated)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
             ).also { it.setMargins(0, dp(4), 0, dp(4)) }
@@ -300,7 +302,7 @@ internal class NodeMarketSheet(
         return TextView(activity).apply {
             this.text = text
             textSize = 12f
-            setTextColor(Color.parseColor("#80BEBEBA"))
+            setTextColor(uiColors.muted)
             setPadding(dp(22), dp(14), dp(22), dp(6))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -316,7 +318,7 @@ internal class NodeMarketSheet(
             isClickable = true
             isFocusable = true
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#0E1116"))
+                setColor(uiColors.container)
                 cornerRadius = dp(8).toFloat()
             }
             layoutParams = LinearLayout.LayoutParams(
@@ -333,25 +335,25 @@ internal class NodeMarketSheet(
         nameRow.addView(TextView(activity).apply {
             text = model.displayName.ifBlank { model.modelId }
             textSize = 15f
-            setTextColor(Color.parseColor("#F8F7F4"))
+            setTextColor(uiColors.text)
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         })
-        nameRow.addView(buildPill("${model.pricePerK} /千词", "#2A4A3A", "#50C878"))
+        nameRow.addView(buildPill("${model.pricePerK} /千词", uiColors.successContainer, uiColors.success))
         card.addView(nameRow)
 
         // 节点 & 上下文信息
         card.addView(TextView(activity).apply {
             text = "${model.nodeDisplayName} · ${model.nodeCapacityLabel} · 上下文 ${model.contextLen} tokens"
             textSize = 12f
-            setTextColor(Color.parseColor("#80BEBEBA"))
+            setTextColor(uiColors.muted)
             setPadding(0, dp(4), 0, 0)
         })
         if (model.nodeHardwareSummary.isNotBlank() && model.nodeHardwareSummary != "硬件未知") {
             card.addView(TextView(activity).apply {
                 text = model.nodeHardwareSummary
                 textSize = 12f
-                setTextColor(Color.parseColor("#80BEBEBA"))
+                setTextColor(uiColors.muted)
                 setPadding(0, dp(3), 0, 0)
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
@@ -367,11 +369,11 @@ internal class NodeMarketSheet(
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(13), dp(16), dp(13))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#0E1116"))
+                setColor(uiColors.container)
                 cornerRadius = dp(8).toFloat()
                 when (node.capacityTone.lowercase(Locale.US)) {
-                    "bad" -> setStroke(dp(1), Color.parseColor("#784242"))
-                    "warn" -> setStroke(dp(1), Color.parseColor("#6A5628"))
+                    "bad" -> setStroke(dp(1), uiColors.error)
+                    "warn" -> setStroke(dp(1), uiColors.warning)
                 }
             }
             layoutParams = LinearLayout.LayoutParams(
@@ -388,13 +390,13 @@ internal class NodeMarketSheet(
             layoutParams = LinearLayout.LayoutParams(dp(8), dp(8)).also { it.marginEnd = dp(10) }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor(if (node.online) "#67BEA0" else "#80BEBEBA"))
+                setColor(if (node.online) uiColors.success else uiColors.muted)
             }
         })
         titleRow.addView(TextView(activity).apply {
             text = node.displayName
             textSize = 15f
-            setTextColor(Color.parseColor("#F8F7F4"))
+            setTextColor(uiColors.text)
             typeface = Typeface.DEFAULT_BOLD
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
@@ -406,7 +408,7 @@ internal class NodeMarketSheet(
         card.addView(TextView(activity).apply {
             text = nodeSubtitle(node)
             textSize = 12f
-            setTextColor(Color.parseColor("#80BEBEBA"))
+            setTextColor(uiColors.muted)
             setPadding(0, dp(7), 0, 0)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
@@ -437,7 +439,7 @@ internal class NodeMarketSheet(
         card.addView(TextView(activity).apply {
             text = modelText
             textSize = 12f
-            setTextColor(Color.parseColor(if (node.models.isNotEmpty()) "#67BEA0" else "#80BEBEBA"))
+            setTextColor(if (node.models.isNotEmpty()) uiColors.success else uiColors.muted)
             setPadding(0, dp(5), 0, 0)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
@@ -445,14 +447,14 @@ internal class NodeMarketSheet(
         return card
     }
 
-    private fun buildPill(text: String, bgHex: String, textHex: String): TextView {
+    private fun buildPill(text: String, bgHex: Int, textHex: Int): TextView {
         return TextView(activity).apply {
             this.text = text
             textSize = 11f
-            setTextColor(Color.parseColor(textHex))
+            setTextColor(textHex)
             setPadding(dp(8), dp(3), dp(8), dp(3))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor(bgHex))
+                setColor(bgHex)
                 cornerRadius = dp(10).toFloat()
             }
         }
@@ -462,7 +464,7 @@ internal class NodeMarketSheet(
         return TextView(activity).apply {
             text = "暂无在线 PC 节点\n节点上线后会在这里显示"
             textSize = 14f
-            setTextColor(Color.parseColor("#80BEBEBA"))
+            setTextColor(uiColors.muted)
             gravity = Gravity.CENTER
             setPadding(dp(22), dp(40), dp(22), dp(40))
             layoutParams = LinearLayout.LayoutParams(
@@ -476,7 +478,7 @@ internal class NodeMarketSheet(
         return TextView(activity).apply {
             text = message
             textSize = 14f
-            setTextColor(Color.parseColor("#E07B84"))
+            setTextColor(uiColors.error)
             gravity = Gravity.CENTER
             setPadding(dp(22), dp(40), dp(22), dp(40))
             layoutParams = LinearLayout.LayoutParams(
@@ -510,16 +512,16 @@ internal class NodeMarketSheet(
         val modelLabel = TextView(activity).apply {
             text = "模型：${model.displayName.ifBlank { model.modelId }}"
             textSize = 13f
-            setTextColor(Color.parseColor("#80BEBEBA"))
+            setTextColor(uiColors.muted)
             setPadding(0, 0, 0, dp(10))
         }
         wrapper.addView(modelLabel)
 
         val input = EditText(activity).apply {
             hint = "输入你的问题…"
-            setHintTextColor(Color.parseColor("#80BEBEBA"))
-            setTextColor(Color.parseColor("#F8F7F4"))
-            setBackgroundColor(Color.parseColor("#0E1116"))
+            setHintTextColor(uiColors.muted)
+            setTextColor(uiColors.text)
+            setBackgroundColor(uiColors.container)
             setPadding(dp(12), dp(10), dp(12), dp(10))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             minLines = 2
@@ -536,14 +538,14 @@ internal class NodeMarketSheet(
         }
         val progress = ProgressBar(activity).apply {
             layoutParams = FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER)
-            indeterminateTintList = ColorStateList.valueOf(Color.parseColor("#7070FF"))
+            indeterminateTintList = ColorStateList.valueOf(uiColors.primary)
         }
         progressRow.addView(progress)
         wrapper.addView(progressRow)
 
         val resultText = TextView(activity).apply {
             textSize = 14f
-            setTextColor(Color.parseColor("#F8F7F4"))
+            setTextColor(uiColors.text)
             setPadding(0, dp(12), 0, 0)
             visibility = View.GONE
         }
@@ -621,32 +623,31 @@ internal class NodeMarketSheet(
         }
     }
 
-    private fun nodeStatusBg(node: NodeMarketNode): String {
+    private fun nodeStatusBg(node: NodeMarketNode): Int {
         return when (node.capacityTone.lowercase(Locale.US)) {
-            "ok" -> "#151A20"
-            "bad" -> "#2A1F1F"
-            "warn" -> "#20262E"
-            else -> "#151A20"
+            "ok" -> uiColors.container
+            "bad" -> uiColors.errorContainer
+            "warn" -> uiColors.elevated
+            else -> uiColors.container
         }
     }
 
-    private fun nodeStatusColor(node: NodeMarketNode): String {
+    private fun nodeStatusColor(node: NodeMarketNode): Int {
         return when (node.capacityTone.lowercase(Locale.US)) {
-            "ok" -> "#67BEA0"
-            "bad" -> "#E07B84"
-            "warn" -> "#D2B572"
-            else -> "#67BEA0"
+            "ok" -> uiColors.success
+            "bad" -> uiColors.error
+            "warn" -> uiColors.warning
+            else -> uiColors.success
         }
     }
 
     private fun nodeMetricColor(node: NodeMarketNode): Int {
-        return Color.parseColor(
-            when (node.capacityTone.lowercase(Locale.US)) {
-                "bad" -> "#E07B84"
-                "warn" -> "#D2B572"
-                else -> "#80BEBEBA"
+        return when (node.capacityTone.lowercase(Locale.US)) {
+                "bad" -> uiColors.error
+                "warn" -> uiColors.warning
+                else -> uiColors.muted
             }
-        )
+
     }
 
     private fun nodeProjectSlotsText(node: NodeMarketNode): String {

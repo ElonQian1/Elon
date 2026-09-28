@@ -22,20 +22,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-private const val LOGIN_BG = "#0B1118"
-private const val LOGIN_CARD = "#0E1116"
-private const val LOGIN_TEXT_PRIMARY = "#F8F7F4"
-private const val LOGIN_TEXT_SECONDARY = "#B3DDDBD5"
-private const val LOGIN_TEXT_TERTIARY = "#80BEBEBA"
-private const val LOGIN_PRIMARY_BG = "#F8F7F4"
-private const val LOGIN_PRIMARY_TEXT = "#0B1118"
-private const val LOGIN_LINK = "#67BEA0"
-private const val LOGIN_ERROR = "#E07B84"
 
 /**
  * 登录/注册界面（使用程序化布局）
  */
-class LoginActivity : Activity() {
+class LoginActivity : com.elon.app.MobileActivity() {
+    private val uiColors by lazy { com.elon.app.MobileColors(this) }
+
     
     companion object {
         private const val TAG = "LoginActivity"
@@ -78,7 +71,7 @@ class LoginActivity : Activity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setBackgroundColor(Color.parseColor(LOGIN_BG))
+            setBackgroundColor(uiColors.surface)
             
             addView(ProgressBar(context).apply {
                 layoutParams = LinearLayout.LayoutParams(
@@ -89,7 +82,7 @@ class LoginActivity : Activity() {
             
             addView(TextView(context).apply {
                 text = "验证登录状态..."
-                setTextColor(Color.parseColor(LOGIN_TEXT_SECONDARY))
+                setTextColor(uiColors.muted)
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -101,7 +94,7 @@ class LoginActivity : Activity() {
     
     private fun createLayout(): View {
         return ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor(LOGIN_BG))
+            setBackgroundColor(uiColors.surface)
             
             addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
@@ -113,13 +106,13 @@ class LoginActivity : Activity() {
                     text = "营销助手"
                     textSize = 28f
                     setTypeface(null, Typeface.BOLD)
-                    setTextColor(Color.parseColor(LOGIN_TEXT_PRIMARY))
+                    setTextColor(uiColors.text)
                 })
                 
                 addView(TextView(context).apply {
                     text = "小红书智能运营工具"
                     textSize = 14f
-                    setTextColor(Color.parseColor(LOGIN_TEXT_SECONDARY))
+                    setTextColor(uiColors.muted)
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
@@ -132,9 +125,9 @@ class LoginActivity : Activity() {
                     inputType = InputType.TYPE_CLASS_TEXT
                     setSingleLine(true)
                     imeOptions = EditorInfo.IME_ACTION_NEXT
-                    setTextColor(Color.parseColor(LOGIN_TEXT_PRIMARY))
-                    setHintTextColor(Color.parseColor(LOGIN_TEXT_TERTIARY))
-                    setBackgroundColor(Color.parseColor(LOGIN_CARD))
+                    setTextColor(uiColors.text)
+                    setHintTextColor(uiColors.muted)
+                    setBackgroundColor(uiColors.container)
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
@@ -148,9 +141,9 @@ class LoginActivity : Activity() {
                     inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
                     setSingleLine(true)
                     imeOptions = EditorInfo.IME_ACTION_DONE
-                    setTextColor(Color.parseColor(LOGIN_TEXT_PRIMARY))
-                    setHintTextColor(Color.parseColor(LOGIN_TEXT_TERTIARY))
-                    setBackgroundColor(Color.parseColor(LOGIN_CARD))
+                    setTextColor(uiColors.text)
+                    setHintTextColor(uiColors.muted)
+                    setBackgroundColor(uiColors.container)
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
@@ -171,9 +164,9 @@ class LoginActivity : Activity() {
                         hint = "昵称（选填）"
                         inputType = InputType.TYPE_CLASS_TEXT
                         setSingleLine(true)
-                        setTextColor(Color.parseColor(LOGIN_TEXT_PRIMARY))
-                        setHintTextColor(Color.parseColor(LOGIN_TEXT_TERTIARY))
-                        setBackgroundColor(Color.parseColor(LOGIN_CARD))
+                        setTextColor(uiColors.text)
+                        setHintTextColor(uiColors.muted)
+                        setBackgroundColor(uiColors.container)
                     }
                     addView(etNickname)
                 }
@@ -181,7 +174,7 @@ class LoginActivity : Activity() {
                 
                 // 错误提示
                 tvError = TextView(context).apply {
-                    setTextColor(Color.parseColor(LOGIN_ERROR))
+                    setTextColor(uiColors.error)
                     textSize = 14f
                     visibility = View.GONE
                     layoutParams = LinearLayout.LayoutParams(
@@ -195,8 +188,8 @@ class LoginActivity : Activity() {
                 btnLogin = Button(context).apply {
                     text = "登 录"
                     textSize = 16f
-                    setBackgroundColor(Color.parseColor(LOGIN_PRIMARY_BG))
-                    setTextColor(Color.parseColor(LOGIN_PRIMARY_TEXT))
+                    setBackgroundColor(uiColors.primary)
+                    setTextColor(uiColors.onPrimary)
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         160
@@ -208,8 +201,8 @@ class LoginActivity : Activity() {
                 btnRegister = Button(context).apply {
                     text = "注 册"
                     textSize = 16f
-                    setBackgroundColor(Color.parseColor(LOGIN_PRIMARY_BG))
-                    setTextColor(Color.parseColor(LOGIN_PRIMARY_TEXT))
+                    setBackgroundColor(uiColors.primary)
+                    setTextColor(uiColors.onPrimary)
                     visibility = View.GONE
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
@@ -232,7 +225,7 @@ class LoginActivity : Activity() {
                 tvSwitchMode = TextView(context).apply {
                     text = "没有账号？点击注册"
                     textSize = 14f
-                    setTextColor(Color.parseColor(LOGIN_LINK))
+                    setTextColor(uiColors.primary)
                     setPadding(16, 32, 16, 16)
                 }
                 addView(tvSwitchMode)

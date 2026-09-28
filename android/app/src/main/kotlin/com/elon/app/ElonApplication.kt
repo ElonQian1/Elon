@@ -55,6 +55,8 @@ class ElonApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        MobileThemePreference.apply(this)
+        registerActivityLifecycleCallbacks(MobileSystemBars)
         com.elon.app.chatgptweb.ChatGptWebFileByteRecovery.start(this)
         ChatMessageNotifications.createChannel(this)
         ChatBackgroundService.ensureChannel(this)

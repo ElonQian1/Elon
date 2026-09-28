@@ -1,0 +1,57 @@
+---
+version_status: current
+decision_status: evidence
+reviewed_at: 2026-09-28
+implementation_status: partial_blocked_not_released
+---
+
+# 双 APK 桌面接管与验证记录
+
+用户要求撤销错误的旧视觉规范、学习移动技能并完成两套 APK 系统重构。本记录区分已实施源码、离线测试、实际运行和发布；当前尚未完成全应用迁移与原生视觉验收。
+
+## 来源与审查入口
+
+接管云端草稿 #6、#212 的 V2 治理工作，结合本地项目规则、当前代码和命中技能实施。8 个外部技能的来源、固定版本与适用边界见 [采用矩阵](../design/mobile-skill-adoption.md) 和 `mobile-skills.lock.json`。两个生产 APK 均为 View/XML/WebView，不为套用 Compose/Expo 技能重写框架。没有假定云端具备本机未提交文件或全部本地记忆。
+
+审查入口：[主项目 #7](https://github.com/ElonQian1/Elon/pull/7)、[量化 #213](https://github.com/ElonQian1/yilong-quant/pull/213)。均为草稿。主项目本轮从 `e2b17ce145c91603c568eaa6722f38742f5741a6` 隔离工作，通过合并 `4e0bb70dfe06416f3f7b6fc5009ac15adb3426b1` 保留最新聊天、群聊与分享能力。
+
+## 交付矩阵
+
+| 能力 | 实施 | 验证 | 发布/验收 |
+|---|---|---|---|
+| 共同规范与主题 | 退役旧皮肤权威，统一语义 token、浅深主题和系统跟随 | 两仓治理、资源生成检查通过 | 草稿，未发布 |
+| 主项目首页与摘要 | 内容高度、真实项目/未读统计、完整宽度动作；摘要展示与 Activity 分离 | 320dp、浅深主题、100%/200% 字体的生产 View 测量与动作测试通过 | 原生截图待补 |
+| 主项目项目/聊天界面 | 项目行、消息 XML、侧栏、广场、项目空间和部分对话框采用语义颜色；日期选择器可滚动且最小 48dp | Android 回归通过；PWA 首页/摘要实际渲染并修复空状态窄列问题 | 仍有后续页面未完成迁移 |
+| 主项目主题生命周期 | 21 个既有平台 Activity 接入外观配置；系统栏图标配合明暗主题 | 编译、完整回归通过 | 系统栏/返回栈/键盘原生验收待补 |
+| 量化公共界面 | 统一 Material 按钮、语义颜色、独立检查 ID、返回矢量图标与 48dp 触控 | 320dp 浅深主题和大字体，资产/个人/持仓/成交/错误/空状态及创建草稿通过 | 原生截图待补 |
+| PWA 行为连续性 | 主题选择、首页、摘要空状态和真实统计 | 登录、群聊、存储不可用、离线、503、刷新、退出与恢复提示均通过，测试 API 写入为 0 | 仅离线合成账户，不代表线上验收 |
+
+## 检查与构建
+
+- 主项目完整 Android 回归：**2400 项，0 失败、0 错误、0 跳过**。日志任务名 `mobile-phase2-final-android`。其后仅将项目状态文案纯函数移出巨型入口，另执行最终打包验证；没有再改聊天业务行为。
+- 量化提交 `03e6b1d1830f84fd136236d9cc2dd90e0b4a1759`：**698 项，0 失败、0 错误、10 跳过**，调试 APK 成功；SHA256 `4F2C1C9FD73F6ED871FE3C03A8155D97AAC5591CB823D4AE79BB6C46AE4E71AD`。详细范围见量化 `docs/delivery/mobile-design-v2-layout-20260928.md`。
+- 修复 Windows Gradle 启动器吞掉失败退出码的问题，真实 JVM 启动失败回归通过；CI 显式传播退出码。已有下载日志子进程测试改用 Java 参数文件，仍验证进程终止后的锁恢复。媒体缓存访问拒绝符号链接，既有越界测试通过。
+- 已逐项审查旧断言与当前实现：保留群聊授权/文档代际/麦克风权限/类型化消息操作边界；发送已派发但结果不确定时，仍不自动恢复待重发草稿。旧皮肤几何断言由真实生产 View 的布局和回调检查替代。
+- PWA 工作台已产生实际截图，检查发现并修复浅色残留深底、图标对比及摘要空状态窄列。截图使用受限本地服务和合成会话，不含真实账户。它们不能替代原生 APK 验收。
+- 最终 Android 源码 `60d313c65` 的调试 APK SHA256：`1793B9861EA73A0FBF0A8D67974E6DCA1B5E80CA100CB9008369B3340DD4D387`。PWA 摘要指标随后改用浅深主题的语义状态色；截图绑定 `d1c5cb0e8ce80890c52184ba123c7d18c3fcb17e`，见 [源码、尺寸与摘要证据](assets/mobile-design-v2-20260928/evidence.json)。
+- 实际 PWA 截图：[首页浅色](assets/mobile-design-v2-20260928/home-light.png)、[首页深色](assets/mobile-design-v2-20260928/home-dark.png)、[窄屏摘要浅色](assets/mobile-design-v2-20260928/summary-light.png)、[窄屏摘要深色](assets/mobile-design-v2-20260928/summary-dark.png)。四次捕获均无脚本异常，浏览器进程和临时配置已回收。
+- 量化最新两个远程作业均失败且 `steps=null`，测试未执行，原因未确认。全仓 Rust 验证仍有缓存磁盘门禁/既有检查待处理；不称整仓 CI 通过。
+
+## 原生验收阻塞
+
+工作台缺口 **`gap_2436684bc84d4a36a31de942e468dace`**，类型 `FAILED_PREPARATION_SESSION_RECOVERY`，影响 `DELIVERY_BLOCKING`。两个准备任务失败：主项目模拟器框架启动超时；量化节点 JDK 环回连接失败。失败后的子会话仍占用渲染器，新请求先选设备而不能先返回已有失败结果。已核对平台实现及槽位状态，不再把它笼统归为“设备暂忙”。
+
+仅报告问题，没有在 APK 业务任务中修改平台、重启节点、操作物理手机或绕过租约。独立修复应：先允许查询已有准备结果，回收本任务拥有的失败子会话，保留已验证会话，再诊断准备环境。恢复后核对包名、源码、generation 和零补丁证据，然后继续原生验收。独立任务创建尚待用户明确授权，未偷偷派发。
+
+工作台门禁：主项目 `BUSINESS_DELIVERY_READY=false`、`PLATFORM_EVOLUTION_PENDING=true`；量化 `BUSINESS_DELIVERY_READY=false`，同一阻塞记录在主任务。两者 `FIT_RUN_STATUS=not_run`、`FINAL_VISUAL_LOSS=unavailable`、`VISUAL_ACCEPTANCE_THRESHOLD=unavailable`、`CROSS_PLATFORM_VISUAL_PARITY=unverified`、`EVOLUTION_THREAD=not_created`。`REAL_DEVICE_STATUS=not_requested`；`ANDROID_RENDERER=preparation_failed`。
+
+## 整套重构剩余范围
+
+1. 恢复隔离原生渲染器，先验收已改的代表流程；检查 320/411/600dp、长中文、200% 字体、返回栈、键盘及离线/错误状态。
+2. 主项目还有媒体/录音、浮层、资源卡、商城、部分项目成员与文档对话框需要逐项迁移和视觉检查。当前 Kotlin 审计有 96 个文件、594 处颜色字面量候选，其中包含合法媒体/图标颜色；不能按数量批量替换或据此认定全部有缺陷。
+3. 补完整导航、真实账户只读状态和性能证据，保持聊天、授权、量化/主 APK 分工及交易边界。没有执行真实交易、资金或发布操作。
+4. 补齐远程 CI 与完整仓库检查；必要验证通过后才合并、正式构建、发布和安装。
+
+## 仓库状态
+
+两套代码仅推送审查分支，未合并到 main、未正式发布、未装机。统一收尾仍需按脚本输出分别记录业务、主线、任务工作区与未知文件状态；仅有草稿和构建不满足 `FINALIZABLE=true`，不宣告整套重构完成。

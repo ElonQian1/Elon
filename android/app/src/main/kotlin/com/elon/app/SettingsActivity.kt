@@ -42,6 +42,7 @@ class SettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
         installChatNotificationSettings(this)
+        findViewById<Button>(R.id.mobileAppearanceButton).setOnClickListener { MobileThemePreference.show(this) }
         supportActionBar?.apply {
             title = "AI 代理设置"
             setDisplayHomeAsUpEnabled(true)

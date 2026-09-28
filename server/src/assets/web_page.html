@@ -14,7 +14,6 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="stylesheet" href="/assets/project_plaza.css" />
   <link rel="stylesheet" href="/assets/project_home.css" />
-  <link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />
   <link rel="stylesheet" href="/assets/esk_exchange.css" />
   <link rel="stylesheet" href="/assets/ai_provider_accounts.css" />
   <link rel="stylesheet" href="/assets/social_links.css?v=media-card-6"><script src="/assets/social_links.js?v=media-card-6"></script><script src="/assets/social_link_viewer.js"></script><script src="/assets/social_chat_cache.js"></script><script src="/assets/social_chat_recovery.js"></script><script src="/assets/social_source_links.js"></script><script src="/assets/social_source_compose.js"></script><script src="/assets/social_chat_view.js"></script>
@@ -29,79 +28,8 @@
     <script src="/assets/group_ai_reply_context.js"></script>
   <style>
     :root {
-      color-scheme: dark;
-      --bg: #0B1017;
-      --bg-hint: #070B10;
-      --side-menu-bg: #0A0F16;
-      --panel: #111923;
-      --panel-2: #172231;
-      --panel-3: #1D2A39;
-      --line: rgba(151, 174, 204, 0.20);
-      --ink: rgba(243, 248, 251, 0.94);
-      --ink-strong: #F3F8FB;
-      --ink-soft: rgba(205, 220, 228, 0.68);
-      --ink-muted: rgba(181, 201, 211, 0.48);
-      --ink-list-preview: rgba(181, 201, 211, 0.48);
-      --ink-faint: rgba(181, 201, 211, 0.48);
-      --ink-dim: rgba(181, 201, 211, 0.48);
-      --brand: #7AA7FF;
-      --brand-hover: #91B7FF;
-      --brand-ink: #070B10;
-      --accent: #73C7E8;
-      --link: #A8C5FF;
-      --success: #5AC8A0;
-      --warning: #E7B86A;
-      --danger: #F07884;
-      --pull-filter-project: #E7B86A;
-      --pull-filter-friend: #5AC8A0;
-      --pull-filter-light: #A8C5FF;
-      --secondary-btn: #172231;
-      --secondary-btn-ink: rgba(243, 248, 251, 0.94);
-      --input-pill-bg: #1D2A39;
-      --project-space-page-bg: #0B1017;
-      --project-space-panel-bg: #0B1017;
-      --project-space-info-bg: #172231;
-      --project-space-info-ink: rgba(243, 248, 251, 0.94);
-      --project-space-info-ink-soft: rgba(205, 220, 228, 0.68);
-      --project-space-info-ink-faint: rgba(181, 201, 211, 0.48);
-      --store-detail-bg: #0B1017;
-      --store-detail-ink: rgba(243, 248, 251, 0.94);
-      --store-detail-muted: rgba(205, 220, 228, 0.68);
-      --store-detail-link: #A8C5FF;
-      --store-detail-divider: rgba(151, 174, 204, 0.20);
-      --store-detail-button: #7AA7FF;
-      --store-detail-button-ink: #070B10;
-      --badge-info-bg: rgba(122, 167, 255, 0.12);
-      --badge-info-ink: #73C7E8;
-      --badge-neutral-bg: #172231;
-      --badge-neutral-ink: rgba(243, 248, 251, 0.94);
-      --nav-bg: #0A0F16;
-      --nav-active-bg: rgba(122, 167, 255, 0.13);
-      --nav-glass-overlay: rgb(53 58 66 / 45%);
-      --nav-glass-border: rgb(255 255 255 / 12%);
-      --system-nav-bg: #070B10;
-      --popup-panel-bg: #172231;
-      --bubble-user: #7AA7FF;
-      --bubble-user-ink: #070B10;
-      --bubble-ai-bg: #111923;
-      --bubble-ai-border: rgba(151, 174, 204, 0.20);
-      --bubble-ai-ink: rgba(243, 248, 251, 0.94);
-      --bubble-progress-bg: #172231;
-      --bubble-progress-border: rgba(151, 174, 204, 0.20);
-      --bubble-progress-ink: rgba(205, 220, 228, 0.68);
-      --bubble-error-bg: #2B151B;
-      --bubble-error-border: #6B2E3A;
-      --bubble-error-ink: #F07884;
-      --tab-icon: rgba(205, 220, 228, 0.68);
-      --tab-active: #A8C5FF;
       --bottom-menu-height: 72px;
       --profile-action-group-radius: 18px;
-      --profile-quota-selected: #7AA7FF;
-      --profile-quota-control: #172231;
-      --profile-quota-border: rgba(122, 167, 255, 0.30);
-      --profile-quota-control-ink: rgba(243, 248, 251, 0.94);
-      --profile-account-action: #A8C5FF;
-      --focus-ring: 0 0 0 2px #0B1017, 0 0 0 4px rgba(122, 167, 255, 0.78);
       --top-safe-area: env(safe-area-inset-top);
     }
     * {
@@ -179,7 +107,7 @@
     .app.stitch-home-active .toolbar {
       height: calc(64px + var(--top-safe-area));
       padding: var(--top-safe-area) 8px 0 0;
-      background: #131313;
+      background: var(--bg);
       border-bottom: 0;
     }
     .app.stitch-home-active .toolbar h1 {
@@ -195,7 +123,7 @@
     .app.stitch-home-active #homeMenuBtn { width:48px; height:48px; flex:0 0 48px; margin-left:0; padding:8px; }
     .app.stitch-home-active #searchBtn { width:48px; height:48px; margin-left:auto; padding:8px; }
     .app.stitch-home-active #chatPage,
-    .app.stitch-home-active .conversation-list { background:#131313; }
+    .app.stitch-home-active .conversation-list { background:var(--bg); }
     .project-top-tabs {
       flex: 1;
       display: flex;
@@ -370,66 +298,61 @@
       will-change: transform;
     }
     .conversation-list.pulling { transition: none; }
-    .home-filter-tabs { height: 95px; padding: 24px 16px 33px; display: flex; gap: 16px; overflow-x: auto; box-sizing: border-box; background:#131313; }
-    .home-filter-tab { flex:none; min-width: 0; height: 38px; padding: 0 16px; border: 1px solid transparent; border-radius: 24px; background: transparent; color: #b9cacb; display: flex; align-items: center; justify-content: center; font: inherit; cursor: pointer; }
-    .home-filter-tab.active { border-color: rgba(219,252,255,.3); background: #2a2a2a; color: #dbfcff; }
-    .home-filter-label { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight:500; letter-spacing:.05em; white-space: nowrap; }
-    .home-filter-count { min-width: 20px; height: 18px; margin-left: 8px; padding: 0 8px; border-radius: 999px; background: #353534; color: #b9cacb; display: inline-grid; place-items: center; box-sizing: border-box; font-size: 12px; line-height: 1; font-variant-numeric: tabular-nums; }
-    .home-filter-tab.active .home-filter-count { background: rgba(219,252,255,.2); color:#dbfcff; }
-    .home-filter-tab:focus-visible { outline: 2px solid #9cbad5; outline-offset: -2px; border-radius: 8px; }
-    /* Keep native asymmetric CSS border geometry: border thickness tapers to zero
-       at the right/bottom ends. Android mirrors this filled ring, not a stroke. */
-    .work-summary-entry { position:relative; overflow:hidden; min-height:192px; margin: 0 16px 32px; padding: 20px; border: 0; border-top: 1px solid rgba(255,255,255,.1); border-left: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: rgba(26,26,26,.4); box-shadow:0 0 30px rgba(0,240,255,.15); color: #e5e2e1; width: calc(100% - 32px); box-sizing:border-box; text-align: left; display: flex; align-items: flex-start; gap: 16px; }
-    .work-summary-entry-icon { width:48px; height:48px; flex:none; border-radius:12px; background:#2a2a2a; display:grid; place-items:center; color:#b9cacb; font-size:20px; }
-    .work-summary-entry-icon img { width:32px; height:32px; object-fit:contain; }
-    .work-summary-entry-copy { flex: 1; min-width: 0; display: grid; gap: 8px; }
-    .work-summary-entry-title-row { display:flex; align-items:center; gap:8px; }
-    .work-summary-entry-title { font-size: 18px; font-weight:700; }
-    .work-summary-entry-beta { padding:2px 8px; border:1px solid rgba(86,51,152,.5); border-radius:999px; background:rgba(86,51,152,.3); color:#d2bbff; font-size:12px; }
-    .work-summary-entry-attention { color:#e5e2e1; font-size:16px; font-weight:500; }
-    .work-summary-entry-meta { color: #b9cacb; font-size: 14px; }
-    .work-summary-entry-action { padding: 6px 12px; border-radius: 999px; background: #353534; white-space: nowrap; font-size:14px; }
-    .work-summary-page { position: absolute; inset: 0; overflow-y: auto; z-index: 20; padding: 0 19px max(40px, env(safe-area-inset-bottom)) 15px; background: #07090d; color: #f8f7f4; box-sizing: border-box; }
+    .home-filter-tabs { padding:8px 16px; display:flex; gap:8px; overflow-x:auto; box-sizing:border-box; background:var(--bg); }
+    .home-filter-tab { flex:none; min-width:48px; min-height:48px; padding:12px 16px; border:0; border-radius:16px; background:transparent; color:var(--ink-soft); display:flex; align-items:center; justify-content:center; font:inherit; cursor:pointer; }
+    .home-filter-tab.active { background:var(--mobile-primary-container); color:var(--mobile-on-primary-container); }
+    .home-filter-label { font-size:14px; white-space:nowrap; }
+    .home-filter-count { margin-left:8px; font-size:14px; font-variant-numeric:tabular-nums; }
+    .home-filter-tab:focus-visible { outline:2px solid var(--brand); outline-offset:-2px; }
+    .work-summary-entry { margin:8px 16px 16px; padding:16px; border:0; border-radius:16px; background:var(--panel); color:var(--ink); width:calc(100% - 32px); box-sizing:border-box; text-align:left; display:flex; flex-wrap:wrap; align-items:flex-start; gap:12px; cursor:pointer; }
+    .work-summary-entry-icon, .work-summary-entry-beta { display:none; }
+    .work-summary-entry-copy { flex:1 1 100%; min-width:0; display:grid; gap:8px; }
+    .work-summary-entry-title { font-size:20px; font-weight:700; }
+    .work-summary-entry-attention { font-size:16px; }
+    .work-summary-entry-meta { color:var(--ink-soft); font-size:14px; }
+    .work-summary-entry-action { color:var(--brand); font-size:14px; }
+    .work-summary-page { position: absolute; inset: 0; overflow-y: auto; z-index: 20; padding: 0 19px max(40px, env(safe-area-inset-bottom)) 15px; background: var(--bg); color: var(--ink); box-sizing: border-box; }
     .work-summary-page.hidden { display: none; }
-    .work-summary-date { position: relative; display: grid; place-items: center; height: 38px; font-size: 15px; }
-    .work-summary-date-picker { width: 96px; height: 48px; border: 0; padding: 0; background: transparent; color: #e7eceb; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; cursor: pointer; }
+    .work-summary-date { position: relative; display: grid; place-items: center; min-height: 48px; font-size: 15px; }
+    .work-summary-date-picker { min-width: 96px; min-height: 48px; border: 0; padding: 0; background: transparent; color: var(--ink); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; cursor: pointer; }
     .work-summary-date-picker svg { width: 14px; height: 14px; flex: none; }
     .work-summary-calendar { position: absolute; right: 0; width: 24px; height: 24px; padding: 12px; object-fit: contain; cursor: pointer; }
     .work-summary-greeting { position: relative; height: 94px; margin: 11px 0 13px; }
     .work-summary-avatar { position: absolute; left: 16px; top: 4px; width: 86px; height: 86px; display:block; object-fit: contain; }
     .work-summary-greeting > div { position: absolute; left: 106px; top: 50%; transform: translateY(-50%); }
     .work-summary-greeting strong { display: block; font-size: 17px; font-weight: 400; margin-bottom: 6px; }
-    .work-summary-greeting span { font-size: 14px; color: #cdd2d1; }
-    .work-summary-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; height: 82px; margin-bottom: 22px; }
-    .work-summary-metric { padding: 13px 4px; border-radius: 12px; background: #353a42; display:grid; place-content:center; justify-items:center; text-align: center; font-size: 13px; }
-    .work-summary-metric b { display: block; color: #8eaed0; font-size: 16px; font-weight: 400; margin-bottom: 6px; }
-    .work-summary-heading { display: flex; align-items: center; gap: 9px; height: 34px; font-size: 16px; }
-    .work-summary-heading span { width: 20px; height: 21px; padding: 0; border-radius: 999px; background: #1a1f27; display:grid; place-items:center; text-align: center; font-size: 12px; }
-    .work-summary-card { display: flex; flex-direction: column; min-height: 258px; height: auto; margin-bottom: 16px; padding: 21px 30px; border-radius: 18px; background: #181d25; box-sizing: border-box; }
+    .work-summary-greeting span { font-size: 14px; color: var(--ink-soft); }
+    .work-summary-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; min-height: 82px; margin-bottom: 22px; }
+    .work-summary-metric { padding: 13px 4px; border-radius: 12px; background: var(--panel-2); display:grid; place-content:center; justify-items:center; text-align: center; font-size: 14px; }
+    .work-summary-metric b { display: block; color: var(--brand); font-size: 16px; font-weight: 400; margin-bottom: 6px; }
+    .work-summary-heading { display: flex; align-items: center; gap: 9px; min-height: 48px; font-size: 16px; }
+    .work-summary-heading span { min-width: 20px; min-height: 21px; padding: 0; border-radius: 999px; background: var(--panel-2); display:grid; place-items:center; text-align: center; font-size: 12px; }
+    .work-summary-card { display: flex; flex-direction: column; min-height: 258px; height: auto; margin-bottom: 16px; padding: 16px; border-radius: 18px; background: var(--panel); box-sizing: border-box; }
     .work-summary-card:last-of-type { margin-bottom: 0; }
     .work-summary-card.high { min-height: 268px; }
     .work-summary-card-head { display: grid; grid-template-columns: 48px 1fr auto; gap: 17px; align-items: center; }
-    .work-summary-project-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: #e8e8e7; color: #312c2b; font-size: 21px; }
+    .work-summary-project-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: var(--mobile-primary-container); color: var(--mobile-on-primary-container); font-size: 21px; }
     .work-summary-card h3 { margin: 0 0 7px; font-size: 14px; font-weight: 400; }
-    .work-summary-card p { margin: 0; color: #737877; line-height: 1.5; font-size: 13px; white-space: pre-line; }
-    .work-summary-card-head p { color: #e2e6e5; font-size: 14px; }
+    .work-summary-card p { margin: 0; color: var(--ink-soft); line-height: 1.5; font-size: 14px; white-space: pre-line; }
+    .work-summary-card-head p { color: var(--ink); font-size: 14px; }
     .work-summary-card .reason { margin-top: 15px; padding-left: 4px; }
     .work-summary-card .summary-spacer { flex: 1; min-height: 16px; }
-    .work-summary-card .advice { padding-left: 4px; color: #8faec5; font-size: 14px; }
+    .work-summary-card .advice { padding-left: 4px; color: var(--brand); font-size: 14px; }
     .work-summary-card .suggestion { margin-top: 7px; padding-left: 4px; }
-    .work-summary-priority { width: 60px; height: 20px; margin-bottom: 7px; border-radius: 5px; background: #40201e; color: #de5a4a; display: grid; place-items: center; font-size: 11px; }
-    .work-summary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; height: 42px; margin-top: 8px; align-items: center; }
-    .work-summary-actions button { min-height: 36px; border: 0; border-radius: 11px; background: #353a42; color: #e8eceb; font-size: 13px; }
-    .work-summary-actions button.primary { background: #3d83ed; color: #f2f5f4; }
+    .work-summary-priority { align-self: flex-start; padding: 4px 8px; margin-bottom: 7px; border-radius: 5px; background: var(--mobile-error-container); color: var(--danger); display: grid; place-items: center; font-size: 14px; }
+    .work-summary-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 8px; align-items: center; }
+    .work-summary-actions button { min-height: 48px; padding: 12px 16px; border: 0; border-radius: 11px; background: var(--panel-2); color: var(--ink); font-size: 14px; }
+    .work-summary-actions button.primary { background: var(--brand); color: var(--brand-ink); }
     .work-summary-chevron-right { width:18px; height:18px; flex:none; }
-    .work-summary-fold { border: 0; width: 100%; height: 55px; margin-top: 5px; padding: 0 9px 0 13px; display: flex; justify-content: space-between; align-items: center; background: transparent; color: #f8f7f4; font-size: 16px; }
-    .work-summary-fold-chevron { width:14px; height:14px; flex:none; color:#e1e5e4; transition:transform 160ms ease; transform:rotate(180deg); }
+    .work-summary-fold { border: 0; width: 100%; min-height: 55px; margin-top: 5px; padding: 0 9px 0 13px; display: flex; justify-content: space-between; align-items: center; background: transparent; color: var(--ink); font-size: 16px; }
+    .work-summary-fold-chevron { width:14px; height:14px; flex:none; color:var(--ink-soft); transition:transform 160ms ease; transform:rotate(180deg); }
     .work-summary-fold[aria-expanded="false"] .work-summary-fold-chevron { transform:rotate(0deg); }
-    .work-summary-update { min-height: 76px; height:auto; padding: 14px 4px 14px 29px; color: #818786; display: grid; grid-template-columns: 48px minmax(0, 1fr) 68px; gap: 16px; align-items: center; box-sizing: border-box; }
-    .work-summary-update-copy strong { display:block; color:#e8eceb; font-size:16px; font-weight:400; margin-bottom:8px; }
+    .work-summary-update { min-height: 76px; height:auto; padding: 16px; color: var(--ink-soft); display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; align-items: center; box-sizing: border-box; }
+    .work-summary-update-copy strong { display:block; color:var(--ink); font-size:16px; font-weight:400; margin-bottom:8px; }
     .work-summary-update-copy span { display:block; overflow-wrap:anywhere; font-size:14px; line-height:1.45; }
-    .work-summary-update-date { align-self:start; text-align:right; color:#707574; font-size:13px; }
-    .work-summary-view-all { width:100%; height:48px; border:0; background:transparent; display:flex; justify-content:flex-end; gap:8px; align-items:center; padding-right:22px; color:#8faec5; font-size:15px; }
+    .work-summary-update-date { grid-column:2; align-self:start; text-align:right; color:var(--ink-soft); font-size:13px; }
+    .work-summary-empty { padding:16px; color:var(--ink-soft); font-size:14px; line-height:1.5; overflow-wrap:anywhere; }
+    .work-summary-view-all { width:100%; height:48px; border:0; background:transparent; display:flex; justify-content:flex-end; gap:8px; align-items:center; padding-right:22px; color:var(--brand); font-size:15px; }
     .work-summary-view-all svg { width:18px; height:18px; }
     .conversation-filter-pull {
       position: absolute;
@@ -481,8 +404,8 @@
     .search-bar input { width: 100%; background: var(--bg-hint,var(--panel-2)); border: 1px solid var(--line); border-radius: 20px; padding: 7px 14px; color: var(--ink); font-size: 14px; outline: none; box-sizing: border-box; }
     .search-bar input::placeholder { color: var(--ink-soft); }
     .conversation-item {
-      height: 72px;
-      background: #131313;
+      min-height: 72px; height:auto;
+      background: var(--bg);
       display: flex;
       align-items: center;
       padding: 12px 16px;
@@ -495,8 +418,8 @@
       overflow: visible;
       border-bottom: 1px solid var(--line);
     }
-    .conversation-item:hover { background: #2A2A2A; }
-    .conversation-item.active { background: #2A2A2A; }
+    .conversation-item:hover { background: var(--panel-2); }
+    .conversation-item.active { background: var(--panel-2); }
     .conversation-item.working {
       animation: working-row-pulse 1.35s linear infinite;
     }
@@ -4551,8 +4474,9 @@
   </style>
   <link rel="stylesheet" href="/assets/ai_conversation_share.css" />
   <link rel="stylesheet" href="/assets/group_mentions.css" /><script src="/assets/group_mentions.js"></script><link rel="stylesheet" href="/assets/articles.css" /><script src="/assets/article_square_media.js"></script><script src="/assets/article_square.js"></script><script src="/assets/articles.js"></script>
+  <link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />
 </head>
-<body data-ui-system="apk-orbital-metal-workbench-v1">
+<body data-ui-system="mobile-design-v2">
 
 <!-- ============ 登录视图 ============ -->
 <section id="loginView" class="login">
@@ -4947,6 +4871,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <div class="download-link-box" id="downloadLinkBox">生成中…</div>
       </div>
 
+      <label class="profile-row" for="mobileAppearance">
+        <span>外观</span>
+        <select id="mobileAppearance" aria-label="外观" style="min-height:48px;background:var(--panel);color:var(--ink)">
+          <option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option>
+        </select>
+      </label>
       <div class="profile-action-group profile-primary-group">
       <div class="profile-node-resource-panel" id="profileNodeResourcePanel">
         <button class="profile-node-resource-header" id="profileNodeResourceToggle" type="button" aria-expanded="false">
@@ -7512,9 +7442,9 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   }
   function renderWorkSummary() {
     const summary = workSummaryForDate(workSummarySelectedDate);
-    $('workSummaryAnalyzed').textContent = `AI 已分析你的 ${summary.projectCount} 个项目`;
-    $('workSummaryMetrics').innerHTML = `<div class="work-summary-metric"><b>${summary.attention.length}</b>需要你关注</div><div class="work-summary-metric"><b style="color:#70bb7e">${summary.progress.length}</b>有新进展</div><div class="work-summary-metric"><b style="color:#f08a3c">${summary.confirm.length}</b>待确认</div>`;
-    const empty = (text) => `<div class="work-summary-update"><span class="work-summary-update-copy"><span>${escapeHtml(text)}</span></span></div>`;
+    $('workSummaryAnalyzed').textContent = `根据 ${summary.projectCount} 个项目的状态整理`;
+    $('workSummaryMetrics').innerHTML = `<div class="work-summary-metric"><b>${summary.attention.length}</b>需要你关注</div><div class="work-summary-metric"><b style="color:var(--mobile-success)">${summary.progress.length}</b>有新进展</div><div class="work-summary-metric"><b style="color:var(--mobile-warning)">${summary.confirm.length}</b>待确认</div>`;
+    const empty = (text) => `<div class="work-summary-empty">${escapeHtml(text)}</div>`;
     const card = (item) => { const id = String(item.project.id || ''); const title = projectTitleOf(item.project); const prompt = `请处理${title}的事项：${item.reason}。${item.suggestion}。`; return `<article class="work-summary-card${item.high ? ' high' : ''}">${item.high ? '<div class="work-summary-priority">高优先级</div>' : ''}<div class="work-summary-card-head" data-summary-project-id="${escapeHtml(id)}"><span class="work-summary-project-icon">${escapeHtml(title.charAt(0) || '项')}</span><div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(item.reason)}</p></div><span>›</span></div><div class="summary-spacer"></div><div class="advice">AI 建议</div><p class="suggestion">${escapeHtml(item.suggestion)}</p><div class="work-summary-actions"><button type="button" data-summary-project-id="${escapeHtml(id)}">进入项目</button><button class="primary" type="button" data-summary-project-id="${escapeHtml(id)}" data-summary-prompt="${escapeHtml(prompt)}">交给 AI 处理</button></div></article>`; };
     const row = (item) => { const title = projectTitleOf(item.project); const d = new Date(item.updatedAt); return `<div class="work-summary-update"><span class="work-summary-project-icon">${escapeHtml(title.charAt(0) || '项')}</span><span class="work-summary-update-copy"><strong>${escapeHtml(title)}</strong><span>• ${escapeHtml(item.reason)}</span></span><span class="work-summary-update-date">${d.getMonth() + 1}月${d.getDate()}日</span></div>`; };
     const section = (key, title, items) => `<button class="work-summary-fold" type="button" data-summary-fold="${key}" aria-expanded="true"><span>${title}　${items.length}</span><span class="work-summary-fold-chevron">⌄</span></button><div id="summary${key === 'progress' ? 'Progress' : 'Confirm'}">${items.length ? items.map(row).join('') : empty(`这一天没有${title}`)}</div>`;
@@ -7959,14 +7889,15 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       updateChatTabBadge();
       return;
     }
+    const summaryUnread = [...friends, ...groups].reduce((sum, item) => sum + Math.max(0, Number(item.unread_count || 0) || 0), 0);
     const summaryEntry = document.createElement('button');
     summaryEntry.type = 'button';
     summaryEntry.className = 'work-summary-entry';
     const todaySummary = workSummaryForDate(new Date());
     const summaryMeta = todaySummary.attention.length > 0
       ? `今天有 ${todaySummary.attention.length} 个项目需要你关注`
-      : `今天暂无待处理事项，已分析 ${todaySummary.projectCount} 个项目`;
-    summaryEntry.innerHTML = `<span class="work-summary-entry-icon" aria-hidden="true"><img src="data:image/png;base64,__HOME_AI_AVATAR_PNG_B64__" alt=""></span><span class="work-summary-entry-copy"><span class="work-summary-entry-title-row"><span class="work-summary-entry-title">AI 工作摘要</span><span class="work-summary-entry-beta">Beta</span></span><span class="work-summary-entry-attention">${escapeHtml(summaryMeta)}</span><span class="work-summary-entry-meta">${todaySummary.attention.length} 条重要消息 · ${todaySummary.projectCount} 个待处理事项</span></span><span class="work-summary-entry-action">查看详情 ›</span>`;
+      : `今天暂无待处理事项，共 ${todaySummary.projectCount} 个项目`;
+    summaryEntry.innerHTML = `<span class="work-summary-entry-icon" aria-hidden="true"><img src="data:image/png;base64,__HOME_AI_AVATAR_PNG_B64__" alt=""></span><span class="work-summary-entry-copy"><span class="work-summary-entry-title-row"><span class="work-summary-entry-title">AI 工作摘要</span><span class="work-summary-entry-beta">Beta</span></span><span class="work-summary-entry-attention">${escapeHtml(summaryMeta)}</span><span class="work-summary-entry-meta">${todaySummary.projectCount} 个项目 · ${summaryUnread} 条未读消息</span></span><span class="work-summary-entry-action">查看详情 ›</span>`;
     summaryEntry.addEventListener('click', openWorkSummaryPage);
     conversationList.appendChild(summaryEntry);
     allItems.forEach((item) => conversationList.appendChild(createContactRow(item)));

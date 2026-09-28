@@ -49,6 +49,8 @@ internal class MainProjectActions(
     private val isLoggedIn: () -> Boolean,
     private val removeSentProjectShareCards: (Set<String>) -> Int
 ) {
+    private val uiColors by lazy { MobileColors(activity) }
+
     private data class ProjectMenuAction(
         val title: String,
         val subtitle: String,
@@ -65,8 +67,8 @@ internal class MainProjectActions(
         private const val PROJECT_DIALOG_ENTER_MS = 220L
         private const val PROJECT_DIALOG_EXIT_MS = 170L
         private const val PROJECT_DIALOG_START_SCALE = 0.22f
-        const val MENU_ICON_COLOR = "#F8F7F4"
-        const val MENU_ICON_BACKGROUND = "#20262E"
+
+
     }
 
     fun showCreateProjectDialog() {
@@ -390,8 +392,8 @@ internal class MainProjectActions(
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
                 cornerRadius = dp(18).toFloat()
-                setColor(Color.parseColor("#0E1116"))
-                setStroke(dp(1), Color.parseColor("#667B8793"))
+                setColor(uiColors.container)
+                setStroke(dp(1), uiColors.divider)
             }
             setPadding(0, dp(18), 0, dp(8))
 
@@ -437,7 +439,7 @@ internal class MainProjectActions(
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = project.title.ifBlank { "未命名项目" }
-                    setTextColor(Color.parseColor("#F8F7F4"))
+                    setTextColor(uiColors.text)
                     setTypeface(typeface, Typeface.BOLD)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
                     maxLines = 1
@@ -445,12 +447,12 @@ internal class MainProjectActions(
                 })
                 addView(TextView(activity).apply {
                     includeFontPadding = false
-                    text = projectStatusText(project, isJoint)
-                    setTextColor(Color.parseColor(if (isJoint) "#67BEA0" else "#7FAFBA"))
+                    text = projectActionStatusText(project, isJoint)
+                    setTextColor(if (isJoint) uiColors.primary else uiColors.primary)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                     background = GradientDrawable().apply {
                         cornerRadius = dp(9).toFloat()
-                        setColor(Color.parseColor(if (isJoint) "#17351E" else "#151A20"))
+                        setColor(if (isJoint) uiColors.primaryContainer else uiColors.primaryContainer)
                     }
                     setPadding(dp(8), dp(4), dp(8), dp(4))
                 }, LinearLayout.LayoutParams(
@@ -479,7 +481,7 @@ internal class MainProjectActions(
             clipToOutline = true
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor(MENU_ICON_BACKGROUND))
+                setColor(uiColors.elevated)
             }
             val iconBitmap = UserProfileStore.decodeAvatar(project.iconDataUrl)
             if (iconBitmap != null) {
@@ -493,19 +495,19 @@ internal class MainProjectActions(
             } else {
                 addView(ImageView(activity).apply {
                     setImageResource(R.drawable.ic_popup_project)
-                    imageTintList = ColorStateList.valueOf(Color.parseColor(MENU_ICON_COLOR))
+                    imageTintList = ColorStateList.valueOf(uiColors.text)
                 }, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
             }
             if (canEdit) {
                 addView(FrameLayout(activity).apply {
                     background = GradientDrawable().apply {
                         shape = GradientDrawable.OVAL
-                        setColor(Color.parseColor("#1D2632"))
-                        setStroke(dp(1), Color.parseColor("#3A4554"))
+                        setColor(uiColors.container)
+                        setStroke(dp(1), uiColors.outline)
                     }
                     addView(ImageView(activity).apply {
                         setImageResource(R.drawable.ic_attach_photos)
-                        imageTintList = ColorStateList.valueOf(Color.parseColor("#F8F7F4"))
+                        imageTintList = ColorStateList.valueOf(uiColors.text)
                     }, FrameLayout.LayoutParams(dp(12), dp(12), Gravity.CENTER))
                 }, FrameLayout.LayoutParams(dp(18), dp(18), Gravity.BOTTOM or Gravity.END))
                 setOnClickListener {
@@ -545,11 +547,11 @@ internal class MainProjectActions(
             addView(FrameLayout(activity).apply {
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
-                    setColor(Color.parseColor(MENU_ICON_BACKGROUND))
+                    setColor(uiColors.elevated)
                 }
                 addView(ImageView(activity).apply {
                     setImageResource(action.iconRes)
-                    imageTintList = ColorStateList.valueOf(Color.parseColor(MENU_ICON_COLOR))
+                    imageTintList = ColorStateList.valueOf(uiColors.text)
                 }, FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER))
             }, LinearLayout.LayoutParams(dp(40), dp(40)))
 
@@ -559,7 +561,7 @@ internal class MainProjectActions(
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = action.title
-                    setTextColor(Color.parseColor("#F8F7F4"))
+                    setTextColor(uiColors.text)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
@@ -567,7 +569,7 @@ internal class MainProjectActions(
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = action.subtitle
-                    setTextColor(Color.parseColor("#B3DDDBD5"))
+                    setTextColor(uiColors.muted)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
@@ -592,7 +594,7 @@ internal class MainProjectActions(
     private fun createProjectActionsDivider(marginStart: Int = 0, marginEnd: Int = 0): View {
         return View(activity).apply {
             alpha = 0.75f
-            setBackgroundColor(Color.parseColor("#667B8793"))
+            setBackgroundColor(uiColors.divider)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 1
@@ -600,19 +602,6 @@ internal class MainProjectActions(
                 this.marginStart = marginStart
                 this.marginEnd = marginEnd
             }
-        }
-    }
-
-    private fun projectStatusText(project: AppProject, isJoint: Boolean): String {
-        if (project.isSystemArchiveProject()) {
-            return "${project.systemArchiveDisplayName()} · 专属会话归档"
-        }
-        if (!isJoint) return "个人项目"
-        return when (normalizeProjectJoinMode(project.collaborationJoinMode)) {
-            "open" -> "联合项目 · 商城公开"
-            "readonly" -> "联合项目 · 广场只读"
-            "approval" -> "联合项目 · 加入需审批"
-            else -> "联合项目 · 邀请协作"
         }
     }
 

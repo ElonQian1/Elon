@@ -18,8 +18,8 @@ $uiSkill = Get-Content -Raw -LiteralPath (Join-Path $repoRoot ".agents\skills\yi
 
 Assert-Contains $validator ':app:testDebugUnitTest'
 Assert-Contains $validator ':app:assembleDebug'
-Assert-Contains $validator 'server/src/assets/web_page.html'
-Assert-Contains $validator 'server/src/assets/ic_app_brand.b64'
+Assert-Contains $validator 'server/src/assets/*'
+Assert-Contains $validator 'NoPwaImpactReason'
 Assert-Contains $validator 'FAST_LANE_RENDERER=skipped'
 Assert-Contains $validator 'Start-Process'
 Assert-Contains $validator '[void]$androidProcess.Handle'
@@ -51,26 +51,30 @@ Assert-Contains $fullServerBranch 'publish-mobile-pwa-static.ps1'
 if ($publisher.IndexOf('publish-server.ps1') -gt $publisher.IndexOf('publish-apk.ps1')) {
     throw "Mobile PWA/server must publish before APK."
 }
-Assert-Contains $workflow 'ADB'
-Assert-Contains $workflow 'pc-frontend'
-Assert-Contains $workflow 'publish Server/PWA'
-Assert-Contains $workflow 'publish APK'
-Assert-Contains $workflow 'optional Renderer verification'
-Assert-Contains $workflow 'VERIFICATION_DEFERRED'
+Assert-Contains $workflow 'mobile-design-system-v2.md'
+Assert-Contains $workflow 'NoPwaImpactReason'
+Assert-Contains $workflow 'NoContractReason'
+Assert-Contains $workflow 'publish-before-optional-renderer'
 Assert-Contains $workflow 'invoke-ai-logged-command.ps1'
-Assert-Contains $workflow 'ui_get_runtime_status'
-Assert-Contains $workflow 'ui_check_capabilities'
-Assert-Contains $workflow 'VERIFICATION_DEFERRED=renderer_capacity_unavailable'
-Assert-Contains $workflow 'RENDERER_PREPARATION_ATTEMPTS=0'
+Assert-Contains $workflow 'AndroidFeature'
 Assert-Contains $sharedContract 'APP_UI_RELEASE_POLICY=publish_before_optional_renderer'
 Assert-Contains $sharedContract 'VERIFICATION_DEFERRED'
 Assert-Contains $rendererWorkflow 'VERIFICATION_DEFERRED'
 Assert-Contains $rendererWorkflow 'realDeviceRequired=true'
 Assert-Contains $rendererWorkflow 'RENDERER_PREPARATION_ATTEMPTS=0'
-Assert-Contains $uiSkill 'must not block Server/PWA or APK publication or repository finish'
+Assert-Contains $uiSkill 'native runtime evidence precede formal publication'
+Assert-Contains $publisher 'SYSTEM_UI_REFACTOR_REQUIRES_RUNTIME_EVIDENCE'
+. (Join-Path $repoRoot 'scripts/mobile-ui-design-scope.ps1')
+foreach ($path in @('docs/design/mobile-tokens-v2.json', 'android/app/src/main/res/values-night/themes.xml',
+    'scripts/templates/mobile-design-v2.css')) {
+    if (-not (Test-ElonSystemicMobileDesignChange -Paths @($path))) { throw "Systemic change entered fast lane: $path" }
+}
+if (Test-ElonSystemicMobileDesignChange -Paths @('android/app/src/main/res/drawable/ic_search.xml')) {
+    throw 'An isolated icon correction was incorrectly classified as a system reconstruction.'
+}
 $postflight = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts\apk-publish-postflight.ps1')
-Assert-Contains $postflight 'VERIFICATION_DEFERRED=real_device_unavailable'
-Assert-Contains $postflight "Arguments @('kill-server')"
+Assert-Contains $postflight 'apk-adb-autodeploy.ps1'
+Assert-Contains $postflight 'Invoke-ElonApkAdbAutodeploy -ApkPath $ApkPath -ExpectedVersionCode $ExpectedVersionCode'
 $lanDistClient = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts\lan-dist-client.ps1')
 Assert-Contains $lanDistClient '-RedirectStandardOutput "$LogFile.stdout"'
 

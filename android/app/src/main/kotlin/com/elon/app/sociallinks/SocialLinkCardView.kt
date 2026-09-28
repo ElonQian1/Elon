@@ -11,21 +11,23 @@ import android.widget.ImageView
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.elon.app.MobileColors
 
 /** Every descendant handles taps, including when chat adds recursive long-press listeners. */
 internal class SocialLinkCardView(context: Context, private val poster: Boolean = false, open: () -> Unit) : LinearLayout(context) {
+    private val palette = MobileColors(context)
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
     val title = TextView(context).apply {
         tag = "social-link-title"; textSize = 16f; maxLines = 3; ellipsize = TextUtils.TruncateAt.END
-        setTextColor(Color.parseColor("#F8F7F4")); includeFontPadding = false
+        setTextColor(palette.text); includeFontPadding = false
     }
     val source = TextView(context).apply {
         tag = "social-link-source"; textSize = 12f; maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-        setTextColor(Color.parseColor("#B7BDC8")); includeFontPadding = false
+        setTextColor(palette.muted); includeFontPadding = false
     }
     val summary = TextView(context).apply {
         tag = "social-link-summary"; textSize = 13f; maxLines = 2; ellipsize = TextUtils.TruncateAt.END; visibility = View.GONE
-        setTextColor(Color.parseColor("#C9CED8")); includeFontPadding = false
+        setTextColor(palette.muted); includeFontPadding = false
     }
     val cover = ImageView(context).apply {
         tag = "social-link-cover"; visibility = View.GONE; scaleType = ImageView.ScaleType.CENTER_CROP
@@ -37,7 +39,7 @@ internal class SocialLinkCardView(context: Context, private val poster: Boolean 
     }
     val time = TextView(context).apply {
         tag = "social-link-time"; textSize = 12f; includeFontPadding = false
-        setTextColor(Color.parseColor("#B5CCEA"))
+        setTextColor(palette.primary)
     }
     private val media = FrameLayout(context)
     val creatorAvatar = ImageView(context).apply {
@@ -45,7 +47,7 @@ internal class SocialLinkCardView(context: Context, private val poster: Boolean 
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
     private val creatorInitial = TextView(context).apply {
-        gravity = Gravity.CENTER; textSize = 13f; setTextColor(Color.WHITE)
+        gravity = Gravity.CENTER; textSize = 13f; setTextColor(palette.onPrimaryContainer)
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
     val play = ImageView(context).apply {
@@ -58,11 +60,11 @@ internal class SocialLinkCardView(context: Context, private val poster: Boolean 
     private var coverSource: String? = null
     private var channels = false
     private var posterRatio: Float? = null
-    private val action = TextView(context).apply { textSize = 11f; setTextColor(Color.parseColor("#BFC4C6")); includeFontPadding = false }
+    private val action = TextView(context).apply { textSize = 12f; setTextColor(palette.muted); includeFontPadding = false }
     init {
         tag = "social-link-card"; orientation = VERTICAL; isFocusable = true
         setPadding(dp(12), dp(12), dp(12), dp(12))
-        background = GradientDrawable().apply { setColor(Color.parseColor("#252B33")); cornerRadius = dp(6).toFloat() }
+        background = GradientDrawable().apply { setColor(palette.container); cornerRadius = dp(12).toFloat() }
         val headline = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.TOP }
         media.addView(badge, FrameLayout.LayoutParams(-1, -1))
         media.addView(cover, FrameLayout.LayoutParams(-1, -1)); media.clipToOutline = true
@@ -83,18 +85,18 @@ internal class SocialLinkCardView(context: Context, private val poster: Boolean 
             addView(time, LayoutParams(-1, -2))
             val footer = LinearLayout(context).apply {
                 orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = dp(58)
-                setPadding(dp(10), dp(8), dp(10), dp(8)); setBackgroundColor(Color.parseColor("#242628"))
+                setPadding(dp(10), dp(8), dp(10), dp(8)); setBackgroundColor(palette.elevated)
             }
             val identity = FrameLayout(context).apply {
-                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#44484A")) }; clipToOutline = true
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(palette.primaryContainer) }; clipToOutline = true
                 addView(creatorInitial, FrameLayout.LayoutParams(-1, -1)); addView(creatorAvatar, FrameLayout.LayoutParams(-1, -1))
             }
-            source.setTextColor(Color.WHITE); source.textSize = 13f
+            source.setTextColor(palette.text); source.textSize = 13f
             val author = LinearLayout(context).apply {
                 orientation = VERTICAL; addView(source, LayoutParams(-1, -2))
                 addView(action, LayoutParams(-1, -2).apply { topMargin = dp(2) })
             }
-            footer.addView(identity, LayoutParams(dp(28), dp(28)))
+            footer.addView(identity, LayoutParams(dp(40), dp(40)))
             footer.addView(author, LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
             addView(footer, LayoutParams(-1, -2))
             listOf(footer, identity, creatorInitial, creatorAvatar, author, action, play).forEach { child -> child.setOnClickListener { open() } }

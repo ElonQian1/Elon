@@ -223,7 +223,7 @@ class ChatGptWebProductIntegrationContractTest {
         val watchdogProbe = read(
             "android/app/src/main/assets/chatgpt_web_stream_watchdog_probe.js",
         )
-        assertTrue(baseAdapter.contains("if (fingerprint !== lastSnapshot)"))
+        assertTrue(baseAdapter.contains("if (force === true || fingerprint !== lastSnapshot)"))
         assertTrue(baseAdapter.indexOf("layoutAdapter.emitSnapshot") > baseAdapter.indexOf("emitEvent(event)"))
         assertTrue(baseAdapter.contains("privateStreamingSnapshotMode"))
         assertTrue(baseAdapter.contains("if (!forced && privateStreamingSnapshotMode) return"))
@@ -270,7 +270,7 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(session.contains("observedMcpState.accept(event)"))
         assertTrue(session.contains("onDocumentChanged = ::handleDocumentChanged"))
         assertTrue(session.contains("uiManifest = { latestUiManifest }"))
-        assertTrue(controller.contains("override fun mcpPort(): WebChatSocialMcpPort = socialMcpPort"))
+        assertTrue(controller.contains("override fun mcpPort(): WebChatSocialMcpPort = gridAttachment.guardMcp(socialMcpPort)"))
         assertTrue(controller.contains("ChatGptSocialMessageRevealCoordinator("))
         assertTrue(controller.contains("revealMessage = messageReveal::reveal"))
         assertTrue(messageReveal.contains("requestChildRectangleOnScreen"))
@@ -306,7 +306,8 @@ class ChatGptWebProductIntegrationContractTest {
         assertTrue(controller.contains("audioPermissionController = audioPermissionController"))
         assertTrue(backgroundWebView.contains("override fun onPermissionRequest(request: PermissionRequest)"))
         assertTrue(backgroundWebView.contains("audioPermissionController.handle(request)"))
-        assertTrue(backgroundWebView.contains("audioPermissionController.cancel(request)"))
+        assertTrue(backgroundWebView.contains("if (audioPermissionController == null) request.deny()"))
+        assertTrue(backgroundWebView.contains("audioPermissionController?.cancel(request)"))
         assertTrue(portFactory.contains("audioPermissionState = audioPermissionController::snapshot"))
         assertTrue(portFactory.contains("microphone_permission_denied"))
     }

@@ -32,19 +32,6 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
-private const val BG = "#0B1118"
-private const val CARD = "#0E1116"
-private const val TEXT_PRIMARY = "#F8F7F4"
-private const val TEXT_SECONDARY = "#B3DDDBD5"
-private const val TEXT_TERTIARY = "#80BEBEBA"
-private const val PRIMARY_BG = "#67BEA0"
-private const val ACTION_BG = "#F8F7F4"
-private const val PRIMARY_TEXT = "#0B1118"
-private const val SECONDARY_BG = "#20262E"
-private const val SECONDARY_TEXT = "#F8F7F4"
-private const val BORDER = "#667B8793"
-private const val PENDING_COLOR = "#F0A030"
-private const val DANGER = "#E07B84"
 private const val STORE_PAGE_LIMIT = 50
 private const val STORE_MAX_PROJECTS = 200
 
@@ -55,7 +42,9 @@ private const val STORE_MAX_PROJECTS = 200
  *   - 发现：浏览公开项目列表，可搜索
  *   - 我的申请：查看自己提交的加入申请状态
  */
-class ProjectPlazaActivity : Activity() {
+class ProjectPlazaActivity : com.elon.app.MobileActivity() {
+    private val uiColors by lazy { com.elon.app.MobileColors(this) }
+
 
     private lateinit var authService: AuthService
     private val scope = CoroutineScope(Dispatchers.Main)
@@ -89,7 +78,7 @@ class ProjectPlazaActivity : Activity() {
     private fun buildLayout(): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(BG))
+            setBackgroundColor(uiColors.surface)
 
             addView(buildHeader())
             addView(buildTabs())
@@ -112,14 +101,14 @@ class ProjectPlazaActivity : Activity() {
     private fun buildHeader(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor(CARD))
+            setBackgroundColor(uiColors.container)
             gravity = Gravity.CENTER_VERTICAL
             setPadding(24, 48, 24, 24)
 
             addView(Button(context).apply {
                 text = "← 返回"
                 setBackgroundColor(Color.TRANSPARENT)
-                setTextColor(Color.parseColor("#67BEA0"))
+                setTextColor(uiColors.primary)
                 setOnClickListener { finish() }
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -131,7 +120,7 @@ class ProjectPlazaActivity : Activity() {
                 text = "🏪 项目广场"
                 textSize = 18f
                 setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.parseColor(TEXT_PRIMARY))
+                setTextColor(uiColors.text)
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             })
@@ -145,14 +134,14 @@ class ProjectPlazaActivity : Activity() {
     private fun buildTabs(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor(CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(16, 0, 16, 0)
 
             tabDiscover = Button(context).apply {
                 text = "发现"
                 textSize = 14f
                 setBackgroundColor(Color.TRANSPARENT)
-                setTextColor(Color.parseColor(PRIMARY_BG))
+                setTextColor(uiColors.primary)
                 setOnClickListener { switchTab("discover") }
             }
             addView(tabDiscover, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -161,7 +150,7 @@ class ProjectPlazaActivity : Activity() {
                 text = "我的申请"
                 textSize = 14f
                 setBackgroundColor(Color.TRANSPARENT)
-                setTextColor(Color.parseColor(TEXT_SECONDARY))
+                setTextColor(uiColors.muted)
                 setOnClickListener { switchTab("my_requests") }
             }
             addView(tabMyRequests, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -170,7 +159,7 @@ class ProjectPlazaActivity : Activity() {
                 text = "我管理的"
                 textSize = 14f
                 setBackgroundColor(Color.TRANSPARENT)
-                setTextColor(Color.parseColor(TEXT_SECONDARY))
+                setTextColor(uiColors.muted)
                 setOnClickListener { switchTab("owner_review") }
             }
             addView(tabOwnerReview, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -179,8 +168,8 @@ class ProjectPlazaActivity : Activity() {
 
     private fun switchTab(tab: String) {
         currentTab = tab
-        val activeColor = Color.parseColor(PRIMARY_BG)
-        val inactiveColor = Color.parseColor(TEXT_SECONDARY)
+        val activeColor = uiColors.primary
+        val inactiveColor = uiColors.muted
         tabDiscover.setTextColor(if (tab == "discover") activeColor else inactiveColor)
         tabMyRequests.setTextColor(if (tab == "my_requests") activeColor else inactiveColor)
         tabOwnerReview.setTextColor(if (tab == "owner_review") activeColor else inactiveColor)
@@ -208,23 +197,23 @@ class ProjectPlazaActivity : Activity() {
         val searchInput = EditText(this).apply {
             hint = "搜索项目名称或描述"
             textSize = 14f
-            setTextColor(Color.parseColor(TEXT_PRIMARY))
-            setHintTextColor(Color.parseColor(TEXT_TERTIARY))
-            setBackgroundColor(Color.parseColor(SECONDARY_BG))
+            setTextColor(uiColors.text)
+            setHintTextColor(uiColors.muted)
+            setBackgroundColor(uiColors.elevated)
             setPadding(24, 20, 24, 20)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor(CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(16, 16, 16, 16)
             gravity = Gravity.CENTER_VERTICAL
 
             addView(searchInput)
             addView(Button(context).apply {
                 text = "搜索"
-                setBackgroundColor(Color.parseColor(ACTION_BG))
-                setTextColor(Color.parseColor(PRIMARY_TEXT))
+                setBackgroundColor(uiColors.primary)
+                setTextColor(uiColors.onPrimary)
                 setPadding(24, 0, 24, 0)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, 120
@@ -306,7 +295,7 @@ class ProjectPlazaActivity : Activity() {
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(24, 24, 24, 20)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -326,7 +315,7 @@ class ProjectPlazaActivity : Activity() {
                     text = displayName
                     textSize = 16f
                     setTypeface(null, Typeface.BOLD)
-                    setTextColor(Color.parseColor(TEXT_PRIMARY))
+                    setTextColor(uiColors.text)
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 })
 
@@ -334,8 +323,8 @@ class ProjectPlazaActivity : Activity() {
                 addView(TextView(context).apply {
                     text = template
                     textSize = 11f
-                    setTextColor(Color.parseColor(SECONDARY_TEXT))
-                    setBackgroundColor(Color.parseColor(SECONDARY_BG))
+                    setTextColor(uiColors.text)
+                    setBackgroundColor(uiColors.elevated)
                     setPadding(10, 4, 10, 4)
                 })
             })
@@ -345,7 +334,7 @@ class ProjectPlazaActivity : Activity() {
                 addView(TextView(context).apply {
                     text = description
                     textSize = 13f
-                    setTextColor(Color.parseColor(TEXT_SECONDARY))
+                    setTextColor(uiColors.muted)
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
@@ -366,14 +355,14 @@ class ProjectPlazaActivity : Activity() {
                 addView(TextView(context).apply {
                     text = "👤 $ownerAccount"
                     textSize = 12f
-                    setTextColor(Color.parseColor(TEXT_TERTIARY))
+                    setTextColor(uiColors.muted)
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 })
 
                 addView(TextView(context).apply {
                     text = "👥 $memberCount 人"
                     textSize = 12f
-                    setTextColor(Color.parseColor(TEXT_TERTIARY))
+                    setTextColor(uiColors.muted)
                 })
             })
 
@@ -390,8 +379,8 @@ class ProjectPlazaActivity : Activity() {
         return Button(this).apply {
             text = "进入空间"
             textSize = 14f
-            setBackgroundColor(Color.parseColor(ACTION_BG))
-            setTextColor(Color.parseColor(PRIMARY_TEXT))
+            setBackgroundColor(uiColors.primary)
+            setTextColor(uiColors.onPrimary)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 110
             ).apply { topMargin = 16 }
@@ -401,17 +390,17 @@ class ProjectPlazaActivity : Activity() {
 
     private fun buildJoinButton(projectId: String, projectName: String, joinMode: String): View {
         val (btnText, btnColor) = when (joinMode) {
-            "open" -> Pair("直接加入", ACTION_BG)
-            "approval" -> Pair("审批加入", ACTION_BG)
-            "readonly" -> Pair("只读访问", SECONDARY_BG)
-            else -> Pair("加入", ACTION_BG)
+            "open" -> Pair("直接加入", uiColors.primary)
+            "approval" -> Pair("审批加入", uiColors.primary)
+            "readonly" -> Pair("只读访问", uiColors.elevated)
+            else -> Pair("加入", uiColors.primary)
         }
 
         return Button(this).apply {
             text = btnText
             textSize = 14f
-            setBackgroundColor(Color.parseColor(btnColor))
-            setTextColor(if (joinMode == "readonly") Color.parseColor(SECONDARY_TEXT) else Color.parseColor(PRIMARY_TEXT))
+            setBackgroundColor(btnColor)
+            setTextColor(if (joinMode == "readonly") uiColors.text else uiColors.onPrimary)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 110
             ).apply { topMargin = 16 }
@@ -433,8 +422,8 @@ class ProjectPlazaActivity : Activity() {
         val msgInput = EditText(this).apply {
             hint = "申请留言（可选）"
             textSize = 14f
-            setTextColor(Color.parseColor(TEXT_PRIMARY))
-            setHintTextColor(Color.parseColor(TEXT_TERTIARY))
+            setTextColor(uiColors.text)
+            setHintTextColor(uiColors.muted)
             maxLines = 3
         }
         AlertDialog.Builder(this)
@@ -569,15 +558,15 @@ class ProjectPlazaActivity : Activity() {
             contentArea.addView(TextView(this@ProjectPlazaActivity).apply {
                 text = if (totalPending > 0) "共有 $totalPending 个待审批申请" else "暂无待审批申请"
                 textSize = 13f
-                setTextColor(Color.parseColor(if (totalPending > 0) PENDING_COLOR else TEXT_SECONDARY))
+                setTextColor(if (totalPending > 0) uiColors.warning else uiColors.muted)
                 setPadding(24, 20, 24, 8)
             })
             // 注册本地项目按钮（用于把外部本地路径项目注册到云端）
             contentArea.addView(Button(this@ProjectPlazaActivity).apply {
                 text = "+ 注册本地项目（外部路径）"
                 textSize = 13f
-                setTextColor(Color.WHITE)
-                setBackgroundColor(Color.parseColor(ACTION_BG))
+                setTextColor(uiColors.onPrimary)
+                setBackgroundColor(uiColors.primary)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -627,7 +616,7 @@ class ProjectPlazaActivity : Activity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.parseColor(CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(24, 24, 24, 24)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -645,12 +634,12 @@ class ProjectPlazaActivity : Activity() {
                     text = projectName
                     textSize = 15f
                     setTypeface(null, Typeface.BOLD)
-                    setTextColor(Color.parseColor(TEXT_PRIMARY))
+                    setTextColor(uiColors.text)
                 })
                 addView(TextView(context).apply {
                     text = if (pendingCount > 0) "$pendingCount 条待审批" else "已全部处理"
                     textSize = 12f
-                    setTextColor(Color.parseColor(if (pendingCount > 0) PENDING_COLOR else TEXT_TERTIARY))
+                    setTextColor(if (pendingCount > 0) uiColors.warning else uiColors.muted)
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
@@ -664,8 +653,8 @@ class ProjectPlazaActivity : Activity() {
                     text = if (pendingCount > 99) "99+" else pendingCount.toString()
                     textSize = 12f
                     setTypeface(null, Typeface.BOLD)
-                    setTextColor(Color.WHITE)
-                    setBackgroundColor(Color.parseColor(DANGER))
+                    setTextColor(uiColors.onPrimary)
+                    setBackgroundColor(uiColors.error)
                     setPadding(16, 6, 16, 6)
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -677,7 +666,7 @@ class ProjectPlazaActivity : Activity() {
             addView(TextView(context).apply {
                 text = "›"
                 textSize = 22f
-                setTextColor(Color.parseColor(TEXT_TERTIARY))
+                setTextColor(uiColors.muted)
             })
 
             setOnClickListener {
@@ -693,15 +682,15 @@ class ProjectPlazaActivity : Activity() {
         val message = req.optString("message", "")
 
         val (statusText, statusColor) = when (status) {
-            "pending" -> Pair("⏳ 待审核", PENDING_COLOR)
-            "approved" -> Pair("✅ 已通过", PRIMARY_BG)
-            "rejected" -> Pair("❌ 已拒绝", DANGER)
-            else -> Pair(status, TEXT_SECONDARY)
+            "pending" -> Pair("⏳ 待审核", uiColors.warning)
+            "approved" -> Pair("✅ 已通过", uiColors.primary)
+            "rejected" -> Pair("❌ 已拒绝", uiColors.error)
+            else -> Pair(status, uiColors.muted)
         }
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(CARD))
+            setBackgroundColor(uiColors.container)
             setPadding(24, 20, 24, 20)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -720,14 +709,14 @@ class ProjectPlazaActivity : Activity() {
                     text = projectName
                     textSize = 15f
                     setTypeface(null, Typeface.BOLD)
-                    setTextColor(Color.parseColor(TEXT_PRIMARY))
+                    setTextColor(uiColors.text)
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 })
 
                 addView(TextView(context).apply {
                     text = statusText
                     textSize = 13f
-                    setTextColor(Color.parseColor(statusColor))
+                    setTextColor(statusColor)
                 })
             })
 
@@ -735,7 +724,7 @@ class ProjectPlazaActivity : Activity() {
                 addView(TextView(context).apply {
                     text = "留言：$message"
                     textSize = 13f
-                    setTextColor(Color.parseColor(TEXT_SECONDARY))
+                    setTextColor(uiColors.muted)
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
@@ -746,7 +735,7 @@ class ProjectPlazaActivity : Activity() {
             addView(TextView(context).apply {
                 text = "申请时间：$createdAt"
                 textSize = 12f
-                setTextColor(Color.parseColor(TEXT_TERTIARY))
+                setTextColor(uiColors.muted)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -759,8 +748,8 @@ class ProjectPlazaActivity : Activity() {
                 addView(Button(context).apply {
                     text = "撤销申请"
                     textSize = 13f
-                    setBackgroundColor(Color.parseColor(SECONDARY_BG))
-                    setTextColor(Color.parseColor(SECONDARY_TEXT))
+                    setBackgroundColor(uiColors.elevated)
+                    setTextColor(uiColors.text)
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
@@ -817,27 +806,27 @@ class ProjectPlazaActivity : Activity() {
         val nameInput = EditText(this).apply {
             hint = "项目名称（如：bb64a）"
             textSize = 14f
-            setTextColor(Color.parseColor(TEXT_PRIMARY))
-            setHintTextColor(Color.parseColor(TEXT_TERTIARY))
+            setTextColor(uiColors.text)
+            setHintTextColor(uiColors.muted)
         }
         val pathInput = EditText(this).apply {
             hint = "本机绝对路径（如：D:\\rust\\active-projects\\bb64a）"
             textSize = 14f
-            setTextColor(Color.parseColor(TEXT_PRIMARY))
-            setHintTextColor(Color.parseColor(TEXT_TERTIARY))
+            setTextColor(uiColors.text)
+            setHintTextColor(uiColors.muted)
         }
         val descInput = EditText(this).apply {
             hint = "描述（可选）"
             textSize = 14f
-            setTextColor(Color.parseColor(TEXT_PRIMARY))
-            setHintTextColor(Color.parseColor(TEXT_TERTIARY))
+            setTextColor(uiColors.text)
+            setHintTextColor(uiColors.muted)
             maxLines = 3
         }
         val publishCheck = CheckBox(this).apply {
             text = "发布到项目广场"
             textSize = 14f
             isChecked = true
-            setTextColor(Color.parseColor(TEXT_PRIMARY))
+            setTextColor(uiColors.text)
         }
         val joinModeSpinner = Spinner(this).apply {
             val labels = arrayOf("只读体验", "直接加入", "审批加入")
@@ -947,7 +936,7 @@ class ProjectPlazaActivity : Activity() {
         return TextView(this).apply {
             text = msg
             textSize = 14f
-            setTextColor(Color.parseColor(DANGER))
+            setTextColor(uiColors.error)
             gravity = Gravity.CENTER
             setPadding(32, 80, 32, 80)
         }
@@ -957,7 +946,7 @@ class ProjectPlazaActivity : Activity() {
         return TextView(this).apply {
             text = msg
             textSize = 14f
-            setTextColor(Color.parseColor(TEXT_TERTIARY))
+            setTextColor(uiColors.muted)
             gravity = Gravity.CENTER
             setPadding(32, 80, 32, 80)
         }

@@ -39,6 +39,14 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.locator('#loginView').isVisible(), true);
       assert.equal(await page.locator('#mobileStartup').count(), 0);
       await page.locator('#accountInput').fill('fixture'); await page.locator('#passwordInput').fill('fixture-only'); await page.locator('#loginBtn').click();
+      await page.locator('.work-summary-entry').click();
+      await page.setViewportSize({ width: 320, height: 800 });
+      const emptySummary = page.getByText('这一天没有需要处理的项目', { exact: true });
+      await emptySummary.waitFor();
+      const emptyBounds = await emptySummary.boundingBox();
+      assert(emptyBounds.width > 200 && emptyBounds.height < 80, 'empty summary must use the content width, not the icon column');
+      await page.locator('#backBtn').click();
+      await page.setViewportSize({ width: 390, height: 844 });
       await page.locator('.conversation-item').filter({ hasText: group.name }).click({ timeout: 6000 });
       await page.locator('#chatList').getByText('群聊可以打开').waitFor({ timeout: 6000 });
       if (!denied) {

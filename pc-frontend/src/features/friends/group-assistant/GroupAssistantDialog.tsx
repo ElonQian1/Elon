@@ -57,7 +57,6 @@ export default function GroupAssistantDialog({ groupId, onClose }: { groupId: st
   useEffect(() => {
     setBinding(null); setActive(null); setItems([]); list()
     return () => { epoch.current++; abort.current?.abort() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId])
   function back() { cancel(); setError(''); if (active) setActive(null); else { setBinding(null); setUpdates([]); list() } }
   return <SocialDialog title={binding ? '更新动态' : '群 AI 助手'} onClose={() => { cancel(); onClose() }}>

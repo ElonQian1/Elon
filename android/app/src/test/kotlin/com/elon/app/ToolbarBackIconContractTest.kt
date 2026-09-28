@@ -27,7 +27,7 @@ class ToolbarBackIconContractTest {
 
     @Test
     fun androidUsesCompactImageInsideAccessibleTouchTarget() {
-        val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
+        val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml").replace("\r\n", "\n")
         val backButton = layout.substring(
             layout.indexOf("<ImageButton\n                android:id=\"@+id/backButton\""),
             layout.indexOf("/>", layout.indexOf("android:id=\"@+id/backButton\"")) + 2

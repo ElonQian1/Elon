@@ -19,7 +19,7 @@ import com.elon.app.esk.platform.EskPlatformSessionStore
 import com.elon.app.esk.platform.eskPlatformEndpoint
 
 /** Explicit native approval returns one PKCE code, never the main account credential. */
-class GridAccessConsentActivity : Activity() {
+class GridAccessConsentActivity : com.elon.app.MobileActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private var started = 0L
     private var foreground = false

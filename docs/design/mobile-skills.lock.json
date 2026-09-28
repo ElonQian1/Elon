@@ -1,0 +1,62 @@
+{
+  "schema": "mobile-skill-sources.v1",
+  "reviewed_at": "2026-09-28",
+  "skills": [
+    {
+      "name": "mobile-android-design",
+      "repository": "wshobson/agents",
+      "commit": "9b15b34b0bfc13a815cbfc2366e14ea549e09422",
+      "path": "plugins/ui-design/skills/mobile-android-design",
+      "entry_sha256": "1afa0052905f3e8fa376da7dfa5bcdf6574ca2c4fba2af7838134768509225cd"
+    },
+    {
+      "name": "mobile-design",
+      "repository": "vudovn/ag-kit",
+      "commit": "549ba3dc2eb1d40fccb5b6d792eba4101c80cd69",
+      "path": ".agents/skills/mobile-design",
+      "entry_sha256": "6a0ba04d0ed2c125c23347c6b4d012ac93e1ef5b6230c506dd885dc94f1c20d4"
+    },
+    {
+      "name": "ui-ux-pro-max",
+      "repository": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "commit": "09170eec67eefd46a7ae85de61b40c194020f997",
+      "path": ".claude/skills/ui-ux-pro-max",
+      "entry_sha256": "88aadd21220542083a455e373bd162ffe7843266a71f06f4d837bb3b34f9c9c7"
+    },
+    {
+      "name": "frontend-design",
+      "repository": "anthropics/skills",
+      "commit": "33375500bcea98d610eb30ce10ac4e59b89c390d",
+      "path": "skills/frontend-design",
+      "entry_sha256": "b8009ae690dfa69edc7f08bb8715f32db8817112cfa4388741dbaf876c237df8"
+    },
+    {
+      "name": "android-cli",
+      "repository": "android/skills",
+      "commit": "42dc2270e96032bd860bb94511e440aa00a43125",
+      "path": "devtools/android-cli",
+      "entry_sha256": "9a6b79454760bdf6bb37245b248b1dd43e40cbf81c4b3652fd92fd2cacdd9ed2"
+    },
+    {
+      "name": "edge-to-edge",
+      "repository": "android/skills",
+      "commit": "42dc2270e96032bd860bb94511e440aa00a43125",
+      "path": "system/edge-to-edge",
+      "entry_sha256": "6bcd3515e20f94464928c77baa65eb789812e214e4d3f54fd094d27de453e0cc"
+    },
+    {
+      "name": "expo-native-ui",
+      "repository": "expo/skills",
+      "commit": "efa52f0a9d2176db75992736281c77da1b714fa3",
+      "path": "plugins/expo/skills/expo-native-ui",
+      "entry_sha256": "d7d799958a683b9b04f153d051c32bcfdb750fc363f45e22cb4e356b09a1d18b"
+    },
+    {
+      "name": "expo-design-system",
+      "repository": "expo/skills",
+      "commit": "efa52f0a9d2176db75992736281c77da1b714fa3",
+      "path": "plugins/expo/skills/expo-design-system",
+      "entry_sha256": "d9b5db4b465bc2b402a9352654b646a71050b2ed5499a40fdd71824a1bf31456"
+    }
+  ]
+}

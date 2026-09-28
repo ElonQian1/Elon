@@ -123,13 +123,16 @@ class GoogleWebPendingSendStateTest {
     }
 
     @Test
-    fun failedSubmissionReturnsPromptOnce() {
+    fun uncertainDispatchedSubmissionNeverRestoresAResendDraft() {
         val state = WebChatPendingSendState()
         state.begin("retry me")
 
-        assertEquals("retry me", state.failSubmission())
+        // begin() records dispatch. An unconfirmed failure cannot prove the prompt was unsent.
         assertNull(state.failSubmission())
-        assertFalse(state.confirmSubmission())
+        assertNull(state.failSubmission())
+        assertEquals("retry me", state.prompt())
+        assertTrue(state.confirmSubmission())
+        assertEquals(WebChatPendingSendState.Phase.AWAITING_RESPONSE, state.phase())
     }
 
     @Test

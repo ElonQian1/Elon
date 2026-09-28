@@ -1,106 +1,51 @@
 package com.elon.app
 
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.json.JSONObject
+import org.junit.Assert.*
 import org.junit.Test
+import kotlin.math.pow
 
+/** Test readable roles and a single source, rather than freezing a retired visual style. */
 class AppUiPaletteContractTest {
-    @Test
-    fun androidAndMobilePwaShareTheOrbitalMetalPalette() {
-        val colors = readRepositoryFile("android/app/src/main/res/values/colors.xml")
-        val web = readRepositoryFile("server/src/assets/orbital_mobile_theme.css")
-
-        listOf(
-            "<color name=\"elon_bg_app\">#07090D</color>",
-            "<color name=\"elon_surface_card\">#0E1116</color>",
-            "<color name=\"elon_surface_header\">#171C22</color>",
-            "<color name=\"elon_button_primary_bg\">#C2CBD6</color>",
-            "<color name=\"elon_signal_mist\">#8EA7D5</color>",
-            "<color name=\"elon_instrument_cyan\">#7FAFBA</color>",
-            "<color name=\"elon_status_success\">#67BEA0</color>",
-            "<color name=\"elon_status_danger\">#E07B84</color>"
-        ).forEach { token -> assertTrue("missing Android token $token", colors.contains(token)) }
-
-        listOf(
-            "--bg: #07090d;",
-            "--panel: #0e1116;",
-            "--panel-2: #171c22;",
-            "--brand: #c2cbd6;",
-            "--accent: #7fafba;",
-            "--success: #67bea0;",
-            "--warning: #d2b572;",
-            "--danger: #e07b84;"
-        ).forEach { token -> assertTrue("missing PWA token $token", web.contains(token)) }
-
-        assertFalse(colors.contains("<color name=\"elon_button_primary_bg\">#7AA7FF</color>"))
-        assertFalse(web.contains("--brand: #7AA7FF;"))
+    @Test fun semanticTextPairsHaveEnoughContrastInBothModes() {
+        val tokens = JSONObject(read("docs/design/mobile-tokens-v2.json"))
+        for (mode in listOf("light", "dark")) {
+            val colors = tokens.getJSONObject(mode)
+            for (surface in listOf("surface", "surface_container", "surface_container_high")) {
+                for (ink in listOf("on_surface", "on_surface_variant", "success", "warning", "error")) {
+                    assertTrue("$mode $ink/$surface", contrast(colors.getString(ink), colors.getString(surface)) >= 4.5)
+                }
+            }
+            assertTrue(contrast(colors.getString("on_primary"), colors.getString("primary")) >= 4.5)
+            assertTrue(contrast(colors.getString("on_primary_container"), colors.getString("primary_container")) >= 4.5)
+        }
     }
 
-    @Test
-    fun apkProjectSurfacesReadCentralColorResources() {
-        val projectHome = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/ProjectManagementHomeView.kt"
-        )
-        val marketplace = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
-        )
-        val featured = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/ProjectPlazaFeaturedSection.kt"
-        )
-        val metal = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/ProjectPlazaMetalDrawables.kt"
-        )
-
-        assertTrue(projectHome.contains("R.color.elon_bg_app"))
-        assertTrue(projectHome.contains("R.color.elon_segment_selected"))
-        assertTrue(marketplace.contains("R.color.elon_plaza_surface_search"))
-        assertTrue(marketplace.contains("R.color.elon_plaza_signal"))
-        assertTrue(featured.contains("ProjectPlazaMetalActionDrawable"))
-        assertTrue(metal.contains("R.color.elon_plaza_action"))
-        assertTrue(featured.contains("R.color.elon_plaza_status_success"))
-        assertFalse(projectHome.contains("const val COLOR_BG ="))
-        assertFalse(featured.contains("const val COLOR_CARD ="))
+    @Test fun pwaDoesNotOverrideTheSharedPaletteWithInlineColors() {
+        val web = read("server/src/assets/web_page.html")
+        val theme = read("server/src/assets/orbital_mobile_theme.css")
+        val inlineRoot = web.substringAfter(":root {").substringBefore("}")
+        assertFalse(inlineRoot.contains("--bg:"))
+        assertFalse(inlineRoot.contains("--brand:"))
+        assertTrue(theme.contains("prefers-color-scheme: dark"))
+        assertTrue(theme.contains("--bg: var(--mobile-surface)"))
+        val head = web.substringBefore("</head>")
+        assertTrue(head.lastIndexOf("/assets/orbital_mobile_theme.css") > head.lastIndexOf("</style>"))
     }
 
-    @Test
-    fun projectPlazaSharesTheDeepSpaceObservatoryPalette() {
-        val colors = readRepositoryFile("android/app/src/main/res/values/colors.xml")
-        val styles = readRepositoryFile("server/src/assets/project_plaza.css")
-
-        listOf(
-            "<color name=\"elon_bg_plaza\">#07090D</color>",
-            "<color name=\"elon_plaza_surface_card\">#0E1116</color>",
-            "<color name=\"elon_plaza_surface_card_mid\">#171C22</color>",
-            "<color name=\"elon_plaza_surface_card_high\">#252B33</color>",
-            "<color name=\"elon_plaza_surface_header\">#151A20</color>",
-            "<color name=\"elon_plaza_signal\">#8EA7D5</color>",
-            "<color name=\"elon_plaza_action\">#C2CBD6</color>",
-            "<color name=\"elon_plaza_action_end\">#71879F</color>"
-        ).forEach { token -> assertTrue("missing Android plaza token $token", colors.contains(token)) }
-        listOf(
-            "--plaza-bg: #07090d;",
-            "--plaza-card: #0e1116;",
-            "--plaza-card-mid: #171c22;",
-            "--plaza-card-high: #252b33;",
-            "--plaza-header: #151a20;",
-            "--plaza-primary: #8ea7d5;",
-            "--plaza-action: #c2cbd6;",
-            "--plaza-action-end: #71879f;"
-        ).forEach { token -> assertTrue("missing PWA plaza token $token", styles.contains(token)) }
+    private fun contrast(a: String, b: String): Double {
+        fun luminance(hex: String): Double {
+            val rgb = hex.removePrefix("#").chunked(2).map { it.toInt(16) / 255.0 }
+                .map { if (it <= .04045) it / 12.92 else ((it + .055) / 1.055).pow(2.4) }
+            return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722
+        }
+        val x = luminance(a); val y = luminance(b)
+        return (maxOf(x, y) + .05) / (minOf(x, y) + .05)
     }
-
-    private fun readRepositoryFile(relativePath: String): String =
-        String(Files.readAllBytes(repositoryRoot().resolve(relativePath)), StandardCharsets.UTF_8)
-
-    private fun repositoryRoot(): Path {
-        val cwd = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize()
-        return generateSequence(cwd) { it.parent }
-            .take(6)
-            .firstOrNull { Files.isRegularFile(it.resolve("android/app/build.gradle")) }
-            ?: error("Unable to locate repository root from $cwd")
-    }
+    private fun read(path: String): String = String(Files.readAllBytes(root().resolve(path)), Charsets.UTF_8)
+    private fun root(): Path = generateSequence(Paths.get(System.getProperty("user.dir")).toAbsolutePath()) { it.parent }
+        .first { Files.isRegularFile(it.resolve("android/app/build.gradle")) }
 }

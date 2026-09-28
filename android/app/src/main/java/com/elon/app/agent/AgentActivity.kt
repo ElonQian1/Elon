@@ -1,4 +1,4 @@
-﻿// interface/AgentActivity.kt
+// interface/AgentActivity.kt
 package com.elon.app.agent
 
 import android.app.Activity
@@ -13,7 +13,7 @@ import com.google.android.material.snackbar.Snackbar
 /**
  * Agent 配置界面
  */
-class AgentActivity : Activity() {
+class AgentActivity : com.elon.app.MobileActivity() {
     
     private lateinit var statusText: TextView
     private lateinit var goalInput: EditText
