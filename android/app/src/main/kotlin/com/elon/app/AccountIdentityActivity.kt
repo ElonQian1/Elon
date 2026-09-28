@@ -1,7 +1,6 @@
 package com.elon.app
 
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
@@ -12,6 +11,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.launch
 
 class AccountIdentityActivity : AppCompatActivity() {
@@ -106,18 +106,18 @@ class AccountIdentityActivity : AppCompatActivity() {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
-            setPadding(16, 12, 8, 12)
-            setBackgroundResource(R.drawable.bg_orbital_panel)
+            setPadding(mobileAuthDp(context, 16), mobileAuthDp(context, 12), mobileAuthDp(context, 8), mobileAuthDp(context, 12))
+            setBackgroundResource(R.drawable.bg_mobile_account_panel)
         }
         val label = TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             text = "${identity.displayName ?: "Google"}\n${identity.email ?: "已绑定 Google 身份"}"
-            setTextColor(Color.parseColor("#F8F7F4"))
+            setTextColor(MobileColors(context).text)
             textSize = 14f
         }
-        val unlink = Button(this).apply {
+        val unlink = MaterialButton(this).apply {
             text = "解绑"
-            minHeight = 48
+            minHeight = mobileAuthDp(context, 48)
             setOnClickListener { confirmUnlink(identity) }
         }
         row.addView(label)

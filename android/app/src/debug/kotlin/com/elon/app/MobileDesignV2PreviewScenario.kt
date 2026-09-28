@@ -14,10 +14,13 @@ import com.elon.uiruntime.view.uiNode
 /** Production components with offline fixtures. This does not exercise account or build services. */
 internal fun mobileDesignV2PreviewScenario() = object : UiRuntimePreviewScenario {
     override val screenId = "elon.mobile.design_v2"
-    override val supportedScenarios = setOf("projects", "empty", "chat_result")
+    override val supportedScenarios = setOf("projects", "empty", "chat_result", "login", "register", "account_security")
 
     override fun createView(context: Context, request: UiRuntimePreviewRequest): View {
         val themed = ContextThemeWrapper(context, R.style.Theme_ElonApp)
+        if (request.scenario in setOf("login", "register", "account_security")) {
+            return mobileAccountPreview(themed, request.scenario).uiNode("mobile.design_v2.${request.scenario}")
+        }
         val content = LinearLayout(themed).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(themed.elonColor(R.color.mobile_surface))

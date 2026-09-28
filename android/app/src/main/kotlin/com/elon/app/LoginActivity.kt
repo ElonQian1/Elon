@@ -2,12 +2,12 @@ package com.elon.app
 
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ScrollView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -25,7 +25,6 @@ class LoginActivity : AppCompatActivity() {
 
     private lateinit var tabLogin: TextView
     private lateinit var tabRegister: TextView
-    private lateinit var nicknameRow: LinearLayout
     private lateinit var accountInput: EditText
     private lateinit var nicknameInput: EditText
     private lateinit var passwordInput: EditText
@@ -49,7 +48,6 @@ class LoginActivity : AppCompatActivity() {
 
         tabLogin = findViewById(R.id.loginTabLogin)
         tabRegister = findViewById(R.id.loginTabRegister)
-        nicknameRow = findViewById(R.id.loginNicknameRow)
         accountInput = findViewById(R.id.loginAccountInput)
         nicknameInput = findViewById(R.id.loginNicknameInput)
         passwordInput = findViewById(R.id.loginPasswordInput)
@@ -71,26 +69,7 @@ class LoginActivity : AppCompatActivity() {
 
     private fun switchMode(register: Boolean) {
         isRegisterMode = register
-        if (register) {
-            tabRegister.setBackgroundColor(Color.parseColor("#20262E"))
-            tabRegister.setTextColor(Color.parseColor("#F8F7F4"))
-            tabLogin.setBackgroundColor(Color.parseColor("#0E1116"))
-            tabLogin.setTextColor(Color.parseColor("#80BEBEBA"))
-            nicknameRow.visibility = View.VISIBLE
-            submitButton.text = "注册并登录"
-            googleButton.visibility = View.GONE
-            recoveryButton.visibility = View.GONE
-        } else {
-            tabLogin.setBackgroundColor(Color.parseColor("#20262E"))
-            tabLogin.setTextColor(Color.parseColor("#F8F7F4"))
-            tabRegister.setBackgroundColor(Color.parseColor("#0E1116"))
-            tabRegister.setTextColor(Color.parseColor("#80BEBEBA"))
-            nicknameRow.visibility = View.GONE
-            submitButton.text = "登录"
-            googleButton.visibility = View.VISIBLE
-            recoveryButton.visibility = View.VISIBLE
-        }
-        errorText.visibility = View.GONE
+        applyLoginMode(findViewById(android.R.id.content), register)
     }
 
     private fun signInWithGoogle() {
@@ -117,7 +96,7 @@ class LoginActivity : AppCompatActivity() {
     private fun showRecoveryDialog() {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(40, 4, 40, 0)
+            setPadding(mobileAuthDp(context, 24), mobileAuthDp(context, 4), mobileAuthDp(context, 24), 0)
         }
         val account = recoveryInput("账号", "username", accountInput.text.toString().trim())
         val code = recoveryInput("离线恢复码", null, "")
@@ -125,9 +104,9 @@ class LoginActivity : AppCompatActivity() {
         val confirm = recoveryInput("再次输入新密码", "newPassword", "", true)
         val note = TextView(this).apply {
             text = "恢复成功后所有现有会话都会撤销。邮件/短信找回接口已保留，但尚未配置。"
-            setTextColor(Color.parseColor("#80BEBEBA"))
-            textSize = 12f
-            setPadding(0, 16, 0, 0)
+            setTextColor(MobileColors(context).muted)
+            textSize = 14f
+            setPadding(0, mobileAuthDp(context, 16), 0, 0)
         }
         container.addView(account)
         container.addView(code)
@@ -136,7 +115,7 @@ class LoginActivity : AppCompatActivity() {
         container.addView(note)
         val dialog = AlertDialog.Builder(this)
             .setTitle("使用恢复码重置密码")
-            .setView(container)
+            .setView(ScrollView(this).apply { addView(container) })
             .setNeutralButton("检查邮件/短信恢复", null)
             .setNegativeButton("取消", null)
             .setPositiveButton("重置密码", null)
@@ -189,8 +168,10 @@ class LoginActivity : AppCompatActivity() {
         if (autofillHint != null) setAutofillHints(autofillHint)
         inputType = if (password) android.text.InputType.TYPE_CLASS_TEXT or
             android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD else android.text.InputType.TYPE_CLASS_TEXT
-        setTextColor(Color.parseColor("#F8F7F4"))
-        setHintTextColor(Color.parseColor("#80BEBEBA"))
+        setTextColor(MobileColors(context).text)
+        setHintTextColor(MobileColors(context).muted)
+        minHeight = mobileAuthDp(context, 56)
+        textSize = 16f
         setSingleLine(true)
     }
 
