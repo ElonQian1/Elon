@@ -8,6 +8,8 @@ reviewed_at: 2026-09-05
 
 ## 当前产品主链
 
+- 双 APK V2 仍未正式发布：主项目代表页面已有离线原生截图，PWA 六类合成状态的 10 组浏览器检查通过，正式跨端语义验收仍缺。量化最新布局修正 `a39b3ed` 的原生源码门禁与 700 项 Android 检查通过，PR #214 未合并；整仓检查和发布/装机仍待完成。见[本轮网页夹具与边界](docs/reports/mobile-design-v2-web-fixtures-20260929.md)。
+
 - [Win WebView AI 接管](docs/reports/win-webview-ai-takeover-20260923.md)：研究宿主挂交易所登录窗口、Binance 只读观察器、`export`/开发门控 `evaluate` 已合入，待现场验收；合同见 `docs/win-browser-research-mcp.md`。
 
 - [欧易余额](docs/okx-account-balance-delivery.md)：37 项通过，1801 已装机，待验收。
