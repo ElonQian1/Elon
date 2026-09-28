@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.content.res.ColorStateList
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -70,6 +71,11 @@ internal class MainNavigationDesignMetrics(
         listOf(binding.tabChat, binding.tabProject, binding.tabProfile).forEach {
             updateBottomTabVisual(it, it.isSelected)
         }
+        binding.bottomMenuIcon.imageTintList = ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_activated), intArrayOf()),
+            intArrayOf(activity.elonColor(R.color.mobile_primary), activity.elonColor(R.color.mobile_on_surface_variant))
+        )
+        binding.bottomActionPlusIcon.imageTintList = ColorStateList.valueOf(activity.elonColor(R.color.mobile_on_surface))
     }
 
     fun setProjectToolbarExpanded(expanded: Boolean) {
@@ -91,7 +97,9 @@ internal class MainNavigationDesignMetrics(
                 if (selected) R.drawable.ic_bottom_nav_chat_active else R.drawable.ic_bottom_nav_chat
             )
         }
-        icon.imageTintList = null
+        icon.imageTintList = ColorStateList.valueOf(activity.elonColor(
+            if (selected) R.color.mobile_on_primary_container else R.color.mobile_on_surface_variant
+        ))
         icon.isSelected = selected
     }
 
