@@ -2,10 +2,45 @@
 version_status: current
 decision_status: evidence
 reviewed_at: 2026-09-29
-implementation_status: fixture_verified_parity_pending
+implementation_status: representative_semantic_parity_verified_published
 ---
 
 # V2 网页离线状态验收夹具
+
+## 9 月 29 日发布与补验更新
+
+以下更新取代本文后半部分“仍须执行正式回执”和“两套尚未发布”的历史状态；
+后文保留发现问题时的证据，不作为当前发布结论。
+
+- 主 APK **1.1.1830 / 1830** 已正式发布，源码
+  `85b1aee2de67a159c6fa1862a616be10babb1fd6`，APK SHA-256
+  `7a28c70170a342384ec6ea896c71b43f92e11aae6317feb0b371cd9b5221d920`。
+  服务器版本、包摘要、大小及 177 份嵌入源码资源核验通过。小米 23116PN5BC
+  保留数据覆盖安装并回读 build 1830；荣耀 AAK-AN00 离线待补装，未发生在线安装失败。
+- PWA 同源码原子发布，模板 SHA-256
+  `b58e8242b8fb574b14e00750e25719e9f5c5b40f56f33458cbf73c81091e4865`；
+  远端摘要与大小一致，HTTP 200 且 `X-Elon-Mobile-Pwa-Source=runtime`。
+- 实际读取的前版 1.1.1829 / `dbf6b9e7` 已包含初始 V2 及登录、账号安全改造；
+  因而此前“主 V2 尚未发布”的笼统表述不准确。1830 新增本批导航图标语义颜色及
+  聊天矢量图标修正，也包含主线此前合入的聊天记录卡片改进。
+- 上述固定源码在隔离模拟器 generation 6 完成同代源码/安装校验，Patch/redo 为 0。
+  六类场景 × 浅深主题 × Android 100%/200% 字体共 **24/24** 正式语义回执通过，
+  无缺失状态。最终 run `f415205938744cccbc75fd542bf0ba8f`，规格 SHA-256
+  `d8e5eb03b5642bce64632154d5167e38e8bb089c887eab1581b517c280623d82`。
+  每份回执的原生/网页截图、控件树和网页清单均核对摘要后保存在本任务桌面附件。
+- 工作台 `VERIFIED`，原生源码及跨端语义门禁通过，`businessDeliveryReady=true`、
+  `completionReady=true`、`platformEvolutionPending=false`。无干净目标图，
+  `FIT_RUN_STATUS=NOT_REQUIRED_WITHOUT_CLEAN_TARGET`、`FINAL_VISUAL_LOSS=NOT_MEASURED`、
+  `VISUAL_ACCEPTANCE_THRESHOLD=NOT_EVALUATED`；不宣称像素一致或整套应用视觉完成。
+- `AndroidFeature` 发布收尾通过，`BUSINESS_STATUS=complete`（本批）、
+  `LOCAL_MAIN_STATUS=current:85b1aee`、`TASK_WORKTREE_STATUS=skipped_by_option`、
+  `MAIN_UNTRACKED_STATUS=clean`、`FINALIZABLE=true`。工作区为继续重构而保留。
+- 量化另补前端 70/70、类型检查、生产构建及主站托管资源合同；详情大字体原生、
+  整仓 Rust、PR #214 合并及正式发布仍未完成。远程作业无执行步骤即失败，原因未确认。
+
+范围仍为离线合成数据与已声明观察状态；网页采用 411px 默认字体，不冒充网页 200%
+缩放验证。真实登录、账户修改、消息发送、交易、完整返回栈和性能尚未全部验收。
+手机安装成功不等于已完成手机上的视觉与业务验收。
 
 需求为 [移动设计 V2](../requirements/mobile-design-v2-adoption.md)。本批补齐主项目网页的
 可重复观察环境，供后续工作台原生/网页语义验收；并修复该环境复现的生产网页布局缺陷。
