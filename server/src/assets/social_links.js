@@ -260,7 +260,7 @@
         busy = false;
         const observed = cache.get(String(options.owner || '') + '\n' + item.url);
         const latest = observed?.read && observed.expires > Date.now() ? observed.read : value;
-        if (valid()) { draw(latest); retry.disabled = false; }
+        if (valid()) { draw(latest); retry.disabled = false; options.enrichPreview?.(latest); }
       }
       button.onclick = event => {
         if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;

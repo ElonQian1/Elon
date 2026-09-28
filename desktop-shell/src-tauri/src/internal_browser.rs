@@ -21,7 +21,7 @@ use crate::{
 #[path = "internal_browser_popout.rs"]
 mod popout;
 #[path = "internal_browser_read_preview.rs"]
-mod read_preview;
+pub(crate) mod read_preview;
 #[path = "internal_browser_wechat.rs"]
 pub(crate) mod wechat;
 

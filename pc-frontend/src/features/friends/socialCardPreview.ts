@@ -1,6 +1,7 @@
 import { getDesktopInvoke } from '../shell/desktopShell'
 import { previewApi } from './socialReadBack'
 import type { LinkPreview } from './socialLinks'
+import { readMediaCover } from './socialMediaCover'
 
 // The native endpoint accepts only a BV id; never send cloud auth or an arbitrary URL.
 export async function cardPreviewApi(path: string, init: RequestInit): Promise<unknown> {
@@ -33,7 +34,13 @@ export async function inspectCardPreviews(links: string[]) {
   const results = []
   for (const url of links.slice(0, 2)) {
     try {
-      const value = await cardPreviewApi('/api/me/link-preview', { method: 'POST', body: JSON.stringify({ url }), signal: AbortSignal.timeout(15000) }) as LinkPreview & { cover_data_url?: string }
+      let value = await cardPreviewApi('/api/me/link-preview', { method: 'POST', body: JSON.stringify({ url }), signal: AbortSignal.timeout(15000) }) as LinkPreview & { cover_data_url?: string }
+      if (!value.image && !value.cover_data_url) {
+        const scope = 'media-cover-inspection'
+        const read = await readMediaCover(scope, value, () => true)
+        // Diagnostics exercise the production resolver without persisting another account's cache.
+        if (read) value = ElonSocialReadAdapter.validate(ElonSocialReadAdapter.readSource(value.url, value.embed?.url), read) ? { ...value, ...(read as { image: string; title: string; author: string }), url, status: 'ready' } : value
+      }
       const image = value.cover_data_url || value.image
       const decoded = image ? await new Promise<boolean>(resolve => {
         const img = new Image(); const timer = setTimeout(() => finish(false), 6000)

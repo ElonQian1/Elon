@@ -3,6 +3,7 @@ import { resolveApiUrl } from '../../api/runtime'
 import { getDesktopInvoke } from '../shell/desktopShell'
 import { useReaderTabs } from '../reader/readerTabsStore'
 import { cardPreviewApi } from './socialCardPreview'
+import { enrichMediaCover } from './socialMediaCover'
 import { cachedRead, forgetRead } from './socialReadPreview'
 import { openWechatCard } from './wechatCardAction'
 import { copyTextToClipboard } from '../../lib/clipboard'
@@ -36,6 +37,7 @@ export default function SocialLinkCards({ text, owner, compact = false, onDeskto
     const cancel = () => { if (document.hidden) { pending?.abort(); pending = null; setStatus(''); } }
     document.addEventListener('visibilitychange', cancel)
     const dispose = ElonSocialLinks.mount(host.current, text, { owner: scope, compact, desktop: true, channelsHandoff: !!getDesktopInvoke(), api: cardPreviewApi, coverFailed: p => forgetRead(scope, p), openOriginal: original, onPreview,
+      enrichPreview: p => { void enrichMediaCover(scope, p, () => active && !document.hidden && getAuthToken() === token) },
       actions: recordActions ? (host, get) => ElonRecordActions.bind(host, get, { current: () => active && getAuthToken() === token, api: socialRequest }) : undefined, open: p => {
       if (!ElonSocialLinks.channelsId(p.url) || !getDesktopInvoke()) { original(p); return }
       if (pending) return
