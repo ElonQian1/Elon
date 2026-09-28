@@ -8,8 +8,7 @@ use tauri::{webview::NewWindowResponse, AppHandle, Manager, Webview, WebviewBuil
 
 static BUSY: AtomicBool = AtomicBool::new(false);
 const LABEL: &str = "social-media-preview";
-const SILENT: &str =
-    "HTMLMediaElement.prototype.play=function(){this.muted=true;return Promise.resolve()};";
+const SILENT: &str = include_str!("social_media_preview_silent.js");
 const MOBILE_UA: &str = "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36";
 
 fn source(raw: &str) -> Option<(tauri::Url, bool)> {

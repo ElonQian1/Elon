@@ -19,6 +19,18 @@ function setup(invoke) {
   return { ...result, saved, remembered }
 }
 const preview = id => ({ url: 'https://www.douyin.com/video/' + id, image: null })
+test('temporary reader stops script play and attribute-driven autoplay', async () => {
+  class Media { muted = false; autoplay = true; paused = false; pause() { this.paused = true } }
+  const events = new Map()
+  const script = fs.readFileSync(path.join(__dirname, '../../desktop-shell/src-tauri/src/social_media_preview_silent.js'), 'utf8')
+  vm.runInNewContext(script, { HTMLMediaElement: Media, Promise, document: { addEventListener: (event, handler) => events.set(event, handler) } })
+  const media = new Media(); await media.play()
+  assert.equal(media.muted, true); assert.equal(media.autoplay, false); assert.equal(media.paused, true)
+  for (const event of ['loadstart', 'play', 'playing']) {
+    const nativeAutoplay = new Media(); events.get(event)({ target: nativeAutoplay })
+    assert.equal(nativeAutoplay.muted, true); assert.equal(nativeAutoplay.paused, true)
+  }
+})
 test('single flight, serial queue, bounded backlog and cancelled queued cards', async () => {
   const releases = [], calls = []
   const m = setup((command, args) => new Promise(resolve => { calls.push([command, args]); releases.push(resolve) }))
