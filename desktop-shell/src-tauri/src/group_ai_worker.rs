@@ -150,7 +150,7 @@ mod tests {
         assert_eq!(capability["windows"], serde_json::json!([LABEL]));
         assert_eq!(
             capability["permissions"],
-            serde_json::json!(["group-ai-worker-session"])
+            serde_json::json!(["group-ai-worker-session", "public-media-preview"])
         );
         let patterns: Vec<tauri::utils::acl::RemoteUrlPattern> = capability["remote"]["urls"]
             .as_array()

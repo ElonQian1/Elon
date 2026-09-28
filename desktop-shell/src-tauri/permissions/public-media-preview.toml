@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "public-media-preview"
+description = "Read public Bilibili poster metadata by a validated BV identifier only."
+commands.allow = ["get_bilibili_public_preview"]

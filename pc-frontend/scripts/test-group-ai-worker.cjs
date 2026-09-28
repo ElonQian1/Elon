@@ -33,6 +33,8 @@ function fixture() {
       return {}
     } },
     '../socialChatOperations': { socialRequest() {} },
+    '../socialCardPreview': { inspectCardPreviews() { throw new Error('unexpected_preview_probe') } },
+    '../../../../../server/src/assets/social_links.js': {},
     './groupAiStore': { getGroupAiTask() {}, startGroupAi() {} },
     './groupAiControlModel': { GroupAiControlError: Error, GroupAiControlModel: Model },
   })

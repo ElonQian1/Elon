@@ -5,6 +5,20 @@ const ts = require('typescript')
 const { test } = require('node:test')
 const path = require('node:path')
 const root = path.resolve(__dirname, '../..')
+test('public poster command is permitted in both production card hosts, with no broader commands', () => {
+  const native = path.join(root, 'desktop-shell/src-tauri')
+  for (const name of ['main', 'group-ai-worker']) {
+    const capability = JSON.parse(fs.readFileSync(path.join(native, `capabilities/${name}.json`), 'utf8'))
+    assert.ok(capability.permissions.includes('public-media-preview'))
+  }
+  const permission = fs.readFileSync(path.join(native, 'permissions/public-media-preview.toml'), 'utf8')
+  assert.match(permission, /commands.allow = \["get_bilibili_public_preview"\]/)
+  assert.doesNotMatch(permission, /commands.deny|shell:|fs:|http:/)
+  assert.match(fs.readFileSync(path.join(native, 'build.rs'), 'utf8'), /"get_bilibili_public_preview"/)
+  assert.match(fs.readFileSync(path.join(native, 'src/main.rs'), 'utf8'), /bilibili_preview::get_bilibili_public_preview/)
+  const command = fs.readFileSync(path.join(native, 'src/bilibili_preview.rs'), 'utf8')
+  assert.match(command, /ensure_caller\(&webview\)\?/)
+})
 function load(relative, globals = {}) {
   const exports = {}
   const context = vm.createContext({ exports, require: () => ({}), URL, Date, console, ...globals })
