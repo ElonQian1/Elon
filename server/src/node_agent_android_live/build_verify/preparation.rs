@@ -51,6 +51,7 @@ pub(crate) struct PrepareDebugRuntimeProgress {
 
 struct PreparationState {
     owner_session_id: String,
+    runtime_session_id: Option<String>,
     device_id: String,
     operation_id: String,
     status: String,
@@ -88,6 +89,10 @@ pub(super) struct PreparationReporter {
 }
 
 impl PreparationReporter {
+    pub(super) async fn bind_runtime(&self, session_id: &str) {
+        self.state.write().await.runtime_session_id = Some(session_id.to_string());
+    }
+
     pub(super) async fn phase(&self, phase: &str, detail: impl AsRef<str>) {
         let mut state = self.state.write().await;
         state.phase = phase.to_string();
@@ -147,6 +152,27 @@ pub(crate) struct PreparationRegistry {
 }
 
 impl PreparationRegistry {
+    pub(crate) async fn owned_runtime_session_ids(
+        &self,
+        owner_session_id: &str,
+    ) -> std::collections::HashSet<String> {
+        let states = self
+            .operations
+            .lock()
+            .await
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut owned = std::collections::HashSet::new();
+        for state in states {
+            let state = state.read().await;
+            if state.owner_session_id == owner_session_id {
+                owned.extend(state.runtime_session_id.iter().cloned());
+            }
+        }
+        owned
+    }
+
     pub(crate) async fn busy_device_ids_except(
         &self,
         owner_session_id: &str,
@@ -161,7 +187,10 @@ impl PreparationRegistry {
         let mut busy = std::collections::HashSet::new();
         for state in states {
             let state = state.read().await;
-            if state.owner_session_id != owner_session_id && state.status == "IN_PROGRESS" {
+            if state.owner_session_id != owner_session_id
+                && state.runtime_session_id.as_deref() != Some(owner_session_id)
+                && state.status == "IN_PROGRESS"
+            {
                 busy.insert(state.device_id.clone());
             }
         }
@@ -177,6 +206,22 @@ impl PreparationRegistry {
         owner_session_id: &str,
     ) -> Result<PrepareDebugRuntimeProgress> {
         let mut operations = self.operations.lock().await;
+        for (key, state) in operations
+            .iter()
+            .filter(|(key, _)| key.device_id == request.device_id.trim())
+        {
+            let state = state.read().await;
+            let owns_renderer = match state.runtime_session_id.as_deref() {
+                Some(id) => broker.session(id).await.is_ok(),
+                None => false,
+            };
+            anyhow::ensure!(
+                (!owns_renderer && state.status != "IN_PROGRESS")
+                    || state.owner_session_id == owner_session_id
+                    || state.runtime_session_id.as_deref() == Some(owner_session_id),
+                "ANDROID_RENDERER_BUSY: device={} belongs to another preparation session; retry after its owner releases the renderer", key.device_id
+            );
+        }
         let mut plan = prepare_integration_plan(&broker, &request)?;
         let key = PreparationKey {
             slot_id: plan.slot_id.clone(),
@@ -184,11 +229,21 @@ impl PreparationRegistry {
             device_id: request.device_id.trim().to_string(),
             lkg_enabled: plan.lkg_enabled,
         };
+        let mut runtime_session_id = None;
+        let mut preparation_owner = owner_session_id.to_string();
         if let Some(existing) = operations.get(&key).cloned() {
-            let progress = existing.read().await.progress();
+            let existing = existing.read().await;
+            let same_owner = existing.owner_session_id == owner_session_id
+                || existing.runtime_session_id.as_deref() == Some(owner_session_id);
+            if same_owner {
+                preparation_owner = existing.owner_session_id.clone();
+                runtime_session_id = existing.runtime_session_id.clone();
+            }
+            let progress = existing.progress();
             let source_revision = Some(plan.source_revision.clone());
             let source_unchanged = progress.source_revision == source_revision;
             if progress.generation == plan.generation
+                && same_owner
                 && (progress.status == "IN_PROGRESS" || (!restart && source_unchanged))
             {
                 return observable_progress(&broker, &plan.slot_id, progress);
@@ -206,7 +261,8 @@ impl PreparationRegistry {
         request.integration_plan = Some(plan.clone());
         let operation_id = format!("runtime_prepare_{}", uuid::Uuid::new_v4().simple());
         let state = Arc::new(RwLock::new(PreparationState {
-            owner_session_id: owner_session_id.to_string(),
+            owner_session_id: preparation_owner,
+            runtime_session_id,
             device_id: request.device_id.trim().to_string(),
             operation_id,
             status: "IN_PROGRESS".to_string(),
@@ -353,6 +409,7 @@ mod tests {
     async fn reporter_keeps_failure_phase_and_bounded_evidence() {
         let state = Arc::new(RwLock::new(PreparationState {
             owner_session_id: "session-a".into(),
+            runtime_session_id: None,
             device_id: "device-a".into(),
             operation_id: "op-1".into(),
             status: "IN_PROGRESS".into(),
@@ -391,3 +448,7 @@ mod tests {
         assert!(progress.error.unwrap().contains("phase=BUILD"));
     }
 }
+
+#[cfg(test)]
+#[path = "preparation/recovery_tests.rs"]
+mod recovery_tests;

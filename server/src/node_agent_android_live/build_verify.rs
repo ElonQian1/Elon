@@ -240,6 +240,7 @@ async fn prepare_debug_runtime_inner(
             }
         };
         if let Some(reporter) = reporter {
+            reporter.bind_runtime(&session.id).await;
             reporter
                 .evidence(
                     "SESSION",

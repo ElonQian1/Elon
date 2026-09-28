@@ -9,12 +9,17 @@ impl LiveUiBroker {
         &self,
         owner_session_id: &str,
     ) -> HashSet<String> {
+        let owned = self
+            .debug_runtime_preparations
+            .owned_runtime_session_ids(owner_session_id)
+            .await;
         self.sessions
             .read()
             .await
             .values()
             .filter(|session| {
                 session.id != owner_session_id
+                    && !owned.contains(&session.id)
                     && session.device_id != "ui-design-bootstrap"
                     && session.package_name != "ui.design.bootstrap"
             })
