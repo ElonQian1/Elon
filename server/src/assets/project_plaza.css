@@ -86,8 +86,8 @@
 }
 
 .project-page.project-plaza-mode,
-main.app:has(.project-page.project-plaza-mode) > .toolbar {
-  background: var(--plaza-bg, #04070b);
+main.app:has(.project-page.active.project-plaza-mode) > .toolbar {
+  background: var(--bg);
 }
 
 .project-plaza-search-bar {

@@ -20,6 +20,12 @@ const { createFixture } = require('./mobile-design-pwa-fixture.cjs');
       { schema: 'elon.mobile_design_fixture.v1', synthetic: true, productionNetwork: false });
     assert(!/__\w+_PNG_B64__/.test(await (await fetch(origin + '/?fixture=login')).text()),
       'fixture must render every production PNG placeholder');
+    for (const asset of ['ic_project_members_toolbar.png', 'ic_side_menu_folder_closed.png']) {
+      const response = await fetch(origin + '/assets/' + asset);
+      assert.equal(response.status, 200, asset);
+      assert.equal(response.headers.get('content-type'), 'image/png');
+      assert.equal(Buffer.from(await response.arrayBuffer()).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+    }
     browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || 'msedge', headless: true });
     assert.equal((await fetch(origin + '/api/me')).status, 401);
     assert.equal((await fetch(origin + '/api/auth/login', { method: 'POST', body: JSON.stringify({ account: 'wrong', password: 'wrong' }) })).status, 401);
@@ -78,6 +84,38 @@ const { createFixture } = require('./mobile-design-pwa-fixture.cjs');
       assert.equal(await page.locator('#accountRevokeOthers').isDisabled(), true);
       results.push('account-security-' + theme);
     }
+    const layoutFailures = [];
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(value => localStorage.setItem('elon.mobile.appearance.v2', value), theme);
+      for (const width of [320, 411, 720]) {
+        await page.setViewportSize({ width, height: 842 });
+        await page.goto(origin + '/?fixture=chat_result&tab=projects');
+        await page.locator('#chatList .bubble.ai').filter({ hasText: '这是离线布局示例' }).waitFor();
+        const layout = await page.evaluate(() => {
+          const app = document.querySelector('#appView'), toolbar = app.querySelector('.toolbar');
+          const rect = element => element.getBoundingClientRect();
+          return { appWidth: rect(app).width, toolbarWidth: rect(toolbar).width,
+            contentWidth: rect(app.querySelector('.content')).width,
+            viewportWidth: innerWidth, scrollWidth: document.documentElement.scrollWidth,
+            toolbarColor: getComputedStyle(toolbar).backgroundColor,
+            surfaceColor: getComputedStyle(app).backgroundColor,
+            misplacedProjectAction: !!document.querySelector('#projectSpaceAiMenu').getClientRects().length,
+            brokenImages: [...document.images].filter(image => {
+              const r = rect(image);
+              return r.width && r.height && r.x < innerWidth && r.right > 0 && r.y < innerHeight && r.bottom > 0 &&
+                getComputedStyle(image).visibility !== 'hidden' && (!image.complete || !image.naturalWidth);
+            }).map(image => image.getAttribute('src')) };
+        });
+        if (Math.abs(layout.appWidth - layout.toolbarWidth) > 1 ||
+            Math.abs(layout.appWidth - layout.contentWidth) > 1 ||
+            layout.scrollWidth > layout.viewportWidth + 1 ||
+            layout.toolbarColor !== layout.surfaceColor || layout.misplacedProjectAction || layout.brokenImages.length) {
+          layoutFailures.push({ theme, width, ...layout });
+        }
+        results.push('chat-layout-and-images-' + theme + '-' + width);
+      }
+    }
+    assert.deepEqual(layoutFailures, [], 'chat must use the full surface and theme without hidden-page actions or broken images');
     assert.deepEqual(errors, []);
     if (process.argv.includes('--prepare-profile')) {
       assert(externalOrigin, 'profile requires a separately running fixture so its session remains valid');

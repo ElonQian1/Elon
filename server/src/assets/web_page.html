@@ -64,15 +64,15 @@
     .app {
       display: grid;
       min-height: 100vh;
-      grid-template-rows: calc(50px + var(--top-safe-area)) 1fr auto;
+      grid-template-rows: calc(50px + var(--top-safe-area)) 1fr auto auto;
       grid-template-columns: 1fr;
       grid-template-areas:
         "toolbar"
         "content"
-        "input";
+        "input" "tabs";
     }
     .app.project-tabs-visible {
-      grid-template-rows: calc(62px + var(--top-safe-area)) 1fr auto;
+      grid-template-rows: calc(62px + var(--top-safe-area)) 1fr auto auto;
     }
     /* 平板 / 桌面：限定宽度居中，Tab 始终在底部（与 APK 一致） */
     @media (min-width: 720px) {
@@ -103,7 +103,7 @@
       color: var(--ink);
     }
     .app.stitch-home-active {
-      grid-template-rows: calc(64px + var(--top-safe-area)) 1fr auto;
+      grid-template-rows: calc(64px + var(--top-safe-area)) 1fr auto auto;
     }
     .app.stitch-home-active .toolbar {
       height: calc(64px + var(--top-safe-area));
@@ -9270,10 +9270,12 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     currentProjectSpaceLatestApkIdentity = String(p.latest_apk_identity || p.latestApkIdentity || '').trim();
     currentProjectSpaceLatestApkUpdatedAt = String(p.latest_apk_updated_at || p.latestApkUpdatedAt || '').trim();
     projectSpaceAnnouncementExpanded = false;
-    setMoreButtonMode('project-members');
-    moreBtn.style.display = '';
-    setHomeChromeVisible(false);
-    if (projectSpaceAiMenu) {
+    if (projectPage.classList.contains('active')) {
+      setMoreButtonMode('project-members');
+      moreBtn.style.display = '';
+      setHomeChromeVisible(false);
+    }
+    if (projectSpaceAiMenu && projectPage.classList.contains('active')) {
       projectSpaceAiMenu.classList.remove('hidden', 'compact', 'animating');
       syncProjectSpaceAiMenuMotion();
     }

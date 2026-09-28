@@ -21,18 +21,26 @@ const EMPTY_READS = new Set(['/api/me/friends', '/api/me/groups', '/api/me/asset
   '/api/store/joined', '/api/store/projects', '/api/user/mobile-v2-fixture/agent',
   '/api/user/mobile-v2-fixture/usage/stats']);
 
-function productionTemplate() {
+function productionIncludes() {
   const declarations = fs.readFileSync(path.join(ROOT, 'server/src/web.rs'), 'utf8');
   const includes = new Map();
   for (const match of declarations.matchAll(/const\s+(\w+):[^=]+?=\s*include_(str|bytes)!\(\s*"([^"]+)"\s*\);/g)) {
     includes.set(match[1], { kind: match[2], file: path.resolve(ROOT, 'server/src', match[3]) });
   }
+  return includes;
+}
+
+function productionAsset(includes, name) {
+  const source = includes.get(name);
+  if (!source || path.relative(ROOT, source.file).startsWith('..')) throw Error('Unknown production asset: ' + name);
+  return { kind: source.kind, content: fs.readFileSync(source.file) };
+}
+
+function productionTemplate(includes) {
   return fs.readFileSync(path.join(ASSETS, 'web_page.html'), 'utf8')
     .replace(/__(\w+_PNG_B64)__/g, (_, name) => {
-      const source = includes.get(name) || includes.get(name.replace(/_B64$/, ''));
-      if (!source || path.relative(ROOT, source.file).startsWith('..')) throw Error('Unknown production asset: ' + name);
-      const content = fs.readFileSync(source.file);
-      return source.kind === 'bytes' ? content.toString('base64') : content.toString('utf8').trim();
+      const source = productionAsset(includes, includes.has(name) ? name : name.replace(/_B64$/, ''));
+      return source.kind === 'bytes' ? source.content.toString('base64') : source.content.toString('utf8').trim();
     })
     .replace(/__UI_TUNER_[A-Z0-9_]+__/g, '')
     .replace('</body>', '<script src="/fixture-navigation.js"></script></body>');
@@ -41,7 +49,12 @@ function productionTemplate() {
 function createFixture() {
   const sessions = new Set(), sockets = new Set();
   const audit = { logins: 0, rejectedWrites: 0, outgoingMessagesRejected: 0 };
-  const html = productionTemplate();
+  const includes = productionIncludes(), html = productionTemplate(includes);
+  // These production routes use Android resources rather than files in server/src/assets.
+  const routedImages = new Map([
+    ['/assets/ic_project_members_toolbar.png', 'PROJECT_MEMBERS_TOOLBAR_ICON_PNG'],
+    ['/assets/ic_side_menu_folder_closed.png', 'SIDE_MENU_FOLDER_CLOSED_ICON_PNG']
+  ].map(([route, name]) => [route, productionAsset(includes, name).content]));
   const scenario = req => {
     const ref = new URL(req.headers.referer || '/', 'http://127.0.0.1');
     return ref.searchParams.get('fixture') || 'projects';
@@ -84,6 +97,9 @@ function createFixture() {
     if (p === '/fixture-navigation.js') {
       res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
       res.end(fs.readFileSync(path.join(__dirname, 'mobile-design-pwa-navigation.js'))); return;
+    }
+    if (routedImages.has(p)) {
+      res.writeHead(200, { 'content-type': 'image/png' }); res.end(routedImages.get(p)); return;
     }
     if (/^\/assets\/[\w.-]+\.(js|css|png|svg)$/.test(p)) {
       const file = path.join(ASSETS, path.basename(p));
