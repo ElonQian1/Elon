@@ -27,6 +27,14 @@ pub(super) async fn select_or_start(
     require_visual_ready: bool,
     excluded_device_ids: &HashSet<String>,
 ) -> Result<DeviceSelection> {
+    if !fallback_to_emulator {
+        if let Some(device_id) = requested
+            .as_deref()
+            .filter(|id| excluded_device_ids.contains(*id))
+        {
+            bail!("ANDROID_RENDERER_BUSY: device={device_id}; wait for the owning session to release it; fallbackToEmulator=false");
+        }
+    }
     let devices =
         crate::node_agent_android_inspector::adb_wireless::list_device_inventory().await?;
     let available = devices
@@ -36,7 +44,11 @@ pub(super) async fn select_or_start(
         })
         .collect::<Vec<_>>();
 
-    if prefer_emulator {
+    if prefer_emulator
+        && requested
+            .as_deref()
+            .is_none_or(|id| !id.starts_with("emulator-"))
+    {
         return select_emulator_or_start(
             &available,
             auto_start_emulator,
@@ -198,6 +210,15 @@ fn choose_emulator_serial<'a>(
 }
 
 async fn start_default_emulator(excluded_device_ids: &HashSet<String>) -> Result<DeviceSelection> {
+    // An occupied renderer is contention, not a missing emulator. Starting a
+    // second copy of the same AVD can wait through BOOT_TIMEOUT without ever
+    // obtaining a usable slot. Return a bounded retry diagnostic instead.
+    if excluded_device_ids
+        .iter()
+        .any(|id| id.starts_with("emulator-"))
+    {
+        bail!("ANDROID_RENDERER_BUSY: no idle emulator slot; wait for the owning session to release the renderer or select another existing idle slot");
+    }
     let executable = find_emulator_executable()?;
     let avds = list_avds(&executable).await?;
     let requested = std::env::var("ELON_ANDROID_AVD")
@@ -348,6 +369,34 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
+
+    #[tokio::test]
+    async fn occupied_emulator_returns_busy_without_booting_or_waiting_for_adb() {
+        let excluded = HashSet::from(["emulator-5554".to_string()]);
+        let error = tokio::time::timeout(
+            Duration::from_millis(100),
+            start_default_emulator(&excluded),
+        )
+        .await
+        .unwrap()
+        .unwrap_err();
+        assert!(error.to_string().contains("ANDROID_RENDERER_BUSY"));
+        let error = tokio::time::timeout(
+            Duration::from_millis(100),
+            select_or_start(
+                Some("emulator-5554".into()),
+                true,
+                false,
+                true,
+                false,
+                &excluded,
+            ),
+        )
+        .await
+        .unwrap()
+        .unwrap_err();
+        assert!(error.to_string().contains("ANDROID_RENDERER_BUSY"));
+    }
 
     #[test]
     fn avd_name_filter_rejects_argument_injection() {
