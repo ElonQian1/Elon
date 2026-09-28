@@ -2,10 +2,7 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -166,7 +163,7 @@ fn common_dir(root: &Path) -> Result<PathBuf> {
 }
 
 fn git(root: &Path, args: &[&str]) -> Result<String> {
-    let mut command = Command::new("git");
+    let mut command = elon_pc_dev_runtime::git_command();
     command.current_dir(root).args(args);
     #[cfg(windows)]
     {

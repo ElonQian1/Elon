@@ -6,7 +6,6 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Component, Path},
-    process::Command,
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -386,7 +385,7 @@ pub(crate) fn tracked_bytes(root: &Path, relative: &str, limit: usize) -> Result
     if bytes.len() > limit {
         bail!("SEMANTIC_SOURCE_TOO_LARGE");
     }
-    let mut command = Command::new("git");
+    let mut command = elon_pc_dev_runtime::git_command();
     command
         .current_dir(&root)
         .args(["show", &format!("HEAD:{relative}")]);

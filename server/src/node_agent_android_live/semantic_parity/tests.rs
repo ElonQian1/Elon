@@ -1,7 +1,7 @@
 //! Synthetic fixtures exercise validators only; they are never business evidence.
 use super::{contract, evidence, signing, validate_native};
 use serde_json::{json, Value};
-use std::{collections::BTreeMap, path::PathBuf, process::Command};
+use std::{collections::BTreeMap, path::PathBuf};
 const KEY: &[u8] = b"isolated-test-key-never-a-node-credential";
 fn revision() -> String {
     format!("workspace-sha256:{}", "a".repeat(64))
@@ -70,7 +70,7 @@ impl Fixture {
                 "fixture",
             ],
         ] {
-            assert!(Command::new("git")
+            assert!(elon_pc_dev_runtime::git_command()
                 .current_dir(&root)
                 .args(args)
                 .output()
