@@ -112,6 +112,7 @@ object AuthManager {
             remove(KEY_AUTH_EXPIRES_AT)
         }.apply()
         SocialChatSnapshotStore.clear(ctx)
+        runCatching { com.elon.app.chatrecords.ChatRecordCache.clearAll(java.io.File(ctx.cacheDir, "chat_record_cache_v1")) }
         refreshGlobalWsAuth(ctx)
     }
 

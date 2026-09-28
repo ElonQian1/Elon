@@ -17,7 +17,7 @@ implementation_status: implemented_and_tested
 - 版本：`chat_record_bundle_v1`。Android 位于 `chatrecords`；后端位于 `store/articles/chat_records`；PC 位于 `friends/chat-records`。
 - `messages` 为保序数组，以 `parent_id` 表达转发层级。保留发送者显示名、导出时间字符串、正文、来源类型、附件文件名及受权限保护的附件 ID。
 - 不按时间重新排序、不合并重复正文、不从文件名推断消息时间。`raw_text` 保留完整导出文本。
-- 群消息只包含 `【一龙聊天记录】` 卡片引用及摘要，不复制整个文档。读取文档及附件均重新核验群成员资格；附件不是公开地址。
+- 群消息只包含 `【一龙聊天记录】` 卡片引用及摘要，不复制整个文档。服务器读取文档及附件均核验群成员资格；附件不是公开地址。Android 最近验证的本地缓存使用下述短期权限窗口。
 - `operation` 为导入草稿的稳定标识；同用户、同群、同操作和同内容只生成一次群消息。内容冲突返回 409；撤回、删除后不能通过同操作重发。
 
 ## 输入与限制
@@ -37,6 +37,8 @@ Android 同时接收 `ACTION_SEND` 和 `ACTION_SEND_MULTIPLE` 的 ZIP。实际�
 ## 验证入口
 
 阅读器交互与缓存修复见 [聊天记录阅读器修复](reports/wechat-record-reader-cache-20260928.md)。群里发送的始终是结构化记录引用，不是每次打开重新下载、解压 ZIP。
+
+Android 二次打开采用 [近期缓存先显示与本地管理](reports/wechat-record-cache-reopen-20260929.md)：5 分钟验证窗口、正文与媒体分队列、关闭即取消、128 MiB/7 天回收及手动清理。该策略替代旧报告中 Android 每次等待网络复核的规则；PC/PWA 策略不变。
 
 头像、导出标签折叠、卡片复制/转发和视频缩略图见 [阅读体验与验证](reports/wechat-record-reader-presentation-20260929.md)。这些是展示层规则，`raw_text` 和原始链接保持完整。
 

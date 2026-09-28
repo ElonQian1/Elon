@@ -7,6 +7,8 @@ reviewed_at: 2026-09-28
 
 `capability_id: social_wechat_record_reader_cache_v1`
 
+Android 的逐次网络等待策略已由 [2026-09-29 二次打开优化](wechat-record-cache-reopen-20260929.md) 替代；下文保留本批次历史验证，PC/PWA 每次复核规则不变。
+
 ## 根因与改动
 
 - APK 卡片子文字被 `setOnLongClickListener(null)` 激活了长按消费，吞掉父卡片点击。共享选择绑定不再为 null 监听启用长按，保留已有语音长按和多选行为。

@@ -57,7 +57,7 @@ class ChatRecordReaderActivity : AppCompatActivity() {
         top.addView(ui.text(if (model.parent == null) model.document?.title ?: "聊天记录" else "转发的聊天记录", 20f), LinearLayout.LayoutParams(0, -2, 1f))
         top.addView(ImageButton(this).apply { setImageResource(com.elon.app.R.drawable.ic_more_vertical); contentDescription = "更多"; background = null; setColorFilter(com.elon.app.MobileColors(this@ChatRecordReaderActivity).text); setOnClickListener { options(this) } }, LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)))
         header.addView(top)
-        if (model.loading) header.addView(ui.text("正在读取…", 14f, true))
+        if (model.loading) header.addView(ui.text(if (model.document == null) "正在读取…" else "正在后台校验…", 14f, true))
         if (model.notice.isNotBlank()) header.addView(ui.text(model.notice, 14f))
         if (model.document == null && !model.loading) header.addView(ui.button("重试") { model.refresh() })
         val doc = model.document
@@ -67,13 +67,17 @@ class ChatRecordReaderActivity : AppCompatActivity() {
                 AlertDialog.Builder(this).setTitle("导入提示").setMessage(doc.warnings.joinToString("\n")).setPositiveButton("关闭", null).show()
             })
         }
-        rows.clear(); rows.addAll(doc?.children(model.parent).orEmpty()); list.adapter?.notifyDataSetChanged()
-        list.scrollToPosition(model.offsets[model.parent.orEmpty()] ?: 0)
+        val nextRows = doc?.children(model.parent).orEmpty()
+        if (rows != nextRows) {
+            rows.clear(); rows.addAll(nextRows); list.adapter?.notifyDataSetChanged()
+            list.scrollToPosition(model.offsets[model.parent.orEmpty()] ?: 0)
+        }
     }
     private fun options(anchor: View) {
-        val doc = model.document ?: return
+        val doc = model.document
         android.widget.PopupMenu(this, anchor).apply {
-            menu.add("原始文本").setOnMenuItemClickListener {
+            menu.add("缓存管理").setOnMenuItemClickListener { ChatRecordCacheDialog.show(this@ChatRecordReaderActivity, model); true }
+            if (doc != null) menu.add("原始文本").setOnMenuItemClickListener {
                 AlertDialog.Builder(this@ChatRecordReaderActivity).setTitle("导出原文")
                     .setView(android.widget.ScrollView(this@ChatRecordReaderActivity).apply { addView(ui.text(doc.rawText, 14f).apply { setTextIsSelectable(true) }) })
                     .setPositiveButton("关闭", null).show(); true

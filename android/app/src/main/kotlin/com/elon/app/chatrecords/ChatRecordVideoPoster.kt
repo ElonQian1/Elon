@@ -31,8 +31,10 @@ internal object ChatRecordVideoPoster {
             val bitmap = Bitmap.createScaledBitmap(original, (original.width * scale).toInt().coerceAtLeast(1), (original.height * scale).toInt().coerceAtLeast(1), true)
             if (bitmap !== original) original.recycle()
             runCatching {
-                atomic(image) { bitmap.compress(Bitmap.CompressFormat.JPEG, 75, it) }
-                atomic(metadata) { it.write(JSONObject().put("size", file.length()).put("duration", duration).toString().toByteArray()) }
+                ChatRecordCache.storeDerived(file) {
+                    atomic(image) { bitmap.compress(Bitmap.CompressFormat.JPEG, 75, it) }
+                    atomic(metadata) { it.write(JSONObject().put("size", file.length()).put("duration", duration).toString().toByteArray()) }
+                }
             }
             return Poster(bitmap, duration)
         } finally { retriever.release() }
