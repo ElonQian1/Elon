@@ -49,3 +49,10 @@ PC：RecordMessage、RecordAsset；通过共享 chat_record_presentation/actions
 ## 发布边界
 
 本任务不撤销 [主线 V2 原生运行证据门槛](mobile-design-v2-desktop-takeover-20260928.md)。阅读器的合成数据检查不能替代整个主题迁移、生产登录、键盘和业务实测。正式发布、设备安装以及未验证项须以本批最终回执更新，不能根据源码或调试包推断。
+
+## 本批回执
+
+- Android 源码提交 `85ecd3bae`，PC/PWA 与共享资源提交 `55ee1b753`，均已推送主线。合并保留同期封面恢复逻辑，并重跑 PC 构建、四组阅读器浏览器验收和封面恢复专项，全部通过。
+- `publish-server.ps1` 正式发布 `0.3.1790`。线上服务端版本与 PC `assets/release.json` 均绑定 `55ee1b753de33c6d63b00bab99c6579c31a7e647`，四个新增 JS 资源逐一与本地源码内容比对一致。
+- APK 生产发布未执行；独立调试包安装失败，真机视觉及业务验收延期。不得将网页发布回执解读为 APK 已更新，也没有确认当前已经打开的 Win 窗口热刷新。
+- 可检索日志名：`record-reader-actions`、`record-reader-merged-browser`、`record-card-cover-merge`、`record-reader-merged-pc`、`record-reader-release`。这批不需要重新研究或重做已完成展示能力，只补后续安装与原生验收。
