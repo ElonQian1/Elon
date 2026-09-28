@@ -32,6 +32,7 @@ mod operation;
 mod preparation;
 mod runtime_preparation;
 mod runtime_reconnect;
+mod session_package;
 mod source_parity;
 
 pub(crate) use operation::{BuildVerifyOperationProgress, BuildVerifyOperationRegistry};
@@ -364,11 +365,7 @@ async fn build_and_verify_inner(
     let install_id = broker
         .node_install_id()
         .context("PC 节点缺少稳定安装标识，拒绝部署调试 APK")?;
-    let normalized_package =
-        super::normalize_debug_package_name(&session.package_name, install_id, &session.device_id)?;
-    if normalized_package != session.package_name {
-        bail!("DEBUG_SESSION_PACKAGE_NOT_CANONICAL: 旧会话包 {} 会产生第二个真机应用；请用固定包 {} 重新连接", session.package_name, normalized_package);
-    }
+    let isolated_emulator = session_package::validate(broker, &session, &source_project_root)?;
     let integration_plan = broker.debug_integration.register_candidate(
         source_project_root.to_string_lossy().as_ref(),
         &session.debug_project_id,
@@ -417,11 +414,12 @@ async fn build_and_verify_inner(
         .debug_application_id_suffix
         .as_deref()
         .map(|requested| {
-            super::resolve_debug_application_id_suffix(
+            super::debug_package::resolve_existing_session_suffix(
                 requested,
+                &session.package_name,
                 install_id,
                 &session.device_id,
-                false,
+                isolated_emulator,
             )
         })
         .transpose()?

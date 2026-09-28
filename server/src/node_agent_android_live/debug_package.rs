@@ -60,6 +60,49 @@ pub(crate) fn debug_base_package_name(package_name: &str) -> &str {
         .unwrap_or_else(|| package_name.trim())
 }
 
+/// Existing emulator isolation is trusted only through a matching deployed integration.
+/// This does not change the normalization policy for new sessions or physical devices.
+pub(crate) fn verify_existing_debug_package(
+    package: &str,
+    install_id: &str,
+    device: &str,
+    deployed_package: Option<&str>,
+) -> Result<bool> {
+    let canonical = normalize_debug_package_name(package, install_id, device)?;
+    if canonical == package {
+        return Ok(false);
+    }
+    if device.starts_with("emulator-") && deployed_package == Some(package) {
+        if let Some((_, suffix)) = split_known_debug_package(package) {
+            let scope = format!("_{}", node_debug_fingerprint(install_id)?);
+            if let Some(requested) = suffix.strip_suffix(&scope) {
+                if resolve_debug_application_id_suffix(requested, install_id, device, true)?
+                    == suffix
+                {
+                    return Ok(true);
+                }
+            }
+        }
+    }
+    bail!("DEBUG_SESSION_PACKAGE_NOT_CANONICAL: session package {package} is neither fixed package {canonical} nor a deployed isolated emulator package for this node");
+}
+
+pub(crate) fn resolve_existing_session_suffix(
+    requested: &str,
+    package: &str,
+    install_id: &str,
+    device: &str,
+    isolated: bool,
+) -> Result<String> {
+    let suffix = resolve_debug_application_id_suffix(requested, install_id, device, isolated)?;
+    if format!("{}{suffix}", debug_base_package_name(package)) != package {
+        bail!(
+            "DEBUG_SESSION_SUFFIX_MISMATCH: rebuilding must preserve the current session package"
+        );
+    }
+    Ok(suffix)
+}
+
 fn split_known_debug_package(package_name: &str) -> Option<(&str, &str)> {
     [".uitest_anim", ".uituner", ".uitest"]
         .into_iter()
@@ -110,6 +153,83 @@ mod tests {
         debug_base_package_name, fixed_node_debug_suffix, normalize_debug_package_name,
         resolve_debug_application_id_suffix, scoped_debug_application_id_suffix,
     };
+
+    #[test]
+    fn prepared_isolated_emulator_package_survives_reverification() {
+        for requested in [".uitest", ".uitest_anim", ".uitest_preview"] {
+            let suffix =
+                resolve_debug_application_id_suffix(requested, "install-a", "emulator-5554", true)
+                    .unwrap();
+            let package = format!("com.example{suffix}");
+            assert!(super::verify_existing_debug_package(
+                &package,
+                "install-a",
+                "emulator-5554",
+                Some(&package)
+            )
+            .unwrap());
+            assert_eq!(
+                super::resolve_existing_session_suffix(
+                    requested,
+                    &package,
+                    "install-a",
+                    "emulator-5554",
+                    true
+                )
+                .unwrap(),
+                suffix
+            );
+            assert!(super::verify_existing_debug_package(
+                &package,
+                "install-a",
+                "emulator-5554",
+                None
+            )
+            .is_err());
+            assert!(super::verify_existing_debug_package(
+                &package,
+                "install-b",
+                "emulator-5554",
+                Some(&package)
+            )
+            .is_err());
+            assert!(super::verify_existing_debug_package(
+                &package,
+                "install-a",
+                "phone-a",
+                Some(&package)
+            )
+            .is_err());
+            assert!(super::resolve_existing_session_suffix(
+                ".uituner",
+                &package,
+                "install-a",
+                "emulator-5554",
+                true
+            )
+            .is_err());
+        }
+    }
+
+    #[test]
+    fn fixed_package_remains_canonical_and_unscoped_isolation_is_rejected() {
+        let package = format!(
+            "com.example{}",
+            fixed_node_debug_suffix("install-a").unwrap()
+        );
+        for device in ["phone-a", "emulator-5554"] {
+            assert!(
+                !super::verify_existing_debug_package(&package, "install-a", device, None).unwrap()
+            );
+        }
+        assert!(super::verify_existing_debug_package(
+            "com.example.uitest",
+            "install-a",
+            "emulator-5554",
+            Some("com.example.uitest")
+        )
+        .is_err());
+    }
 
     #[test]
     fn suffix_is_stable_and_isolated_per_node() {

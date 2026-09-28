@@ -1,5 +1,7 @@
 //! Pure production validators; never starts a node, cloud request, or Android.
 #![allow(dead_code)]
+#[path = "../../../src/node_agent_android_live/debug_package.rs"]
+mod debug_package;
 #[path = "../../../src/node_agent_android_live/native_runtime_proof_validation.rs"]
 mod native_proof;
 #[path = "../../../src/node_agent_android_live/registered_project_identity/validation.rs"]
