@@ -8,7 +8,7 @@ reviewed_at: 2026-09-05
 
 ## 当前产品主链
 
-- 主 APK V2 本批已正式发布为 1.1.1830（源码 `85b1aee2d`），小米测试手机已保留数据覆盖安装，荣耀离线待补装；配套 PWA 同源码发布并核对摘要及运行入口。六类离线场景 × 浅深主题 × Android 100%/200% 字体共 24 个跨端语义状态通过，不代表全应用视觉、真实业务或性能验收完成。量化布局修正 `a39b3ed` 的原生源码门禁与 700 项 Android 检查通过，另补前端 70 项及生产构建；PR #214 未合并，整仓 Rust、详情大字体原生、发布和装机仍待完成。见[本轮证据与边界](docs/reports/mobile-design-v2-web-fixtures-20260929.md)。
+- 主 APK 1.1.1830（`85b1aee2d`）及配套 PWA 已发布，小米已覆盖安装，荣耀离线。V2 六类离线场景的浅深主题、Android 100%/200% 字体共 24 个语义状态通过，整套视觉/业务/性能验收未完成。量化 Android 700 项、前端 70 项及构建通过；PR #214、整仓 Rust、详情大字体原生、发布装机仍待完成。见[证据与边界](docs/reports/mobile-design-v2-web-fixtures-20260929.md)。
 
 - [Win WebView AI 接管](docs/reports/win-webview-ai-takeover-20260923.md)：研究宿主挂交易所登录窗口、Binance 只读观察器、`export`/开发门控 `evaluate` 已合入，待现场验收；合同见 `docs/win-browser-research-mcp.md`。
 
