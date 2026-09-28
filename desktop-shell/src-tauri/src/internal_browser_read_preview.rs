@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::{sync::mpsc, time::Duration};
 use tauri::Webview;
 
-pub(crate) const ADAPTER: &str =
+pub(super) const ADAPTER: &str =
     include_str!("../../../android/app/src/main/assets/social_link_read_adapter.js");
 
 pub(crate) async fn read(tab: &Webview, original: &str) -> Option<Value> {

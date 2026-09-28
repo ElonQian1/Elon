@@ -158,7 +158,7 @@ pub async fn open_internal_browser_tab(
         .map_err(display_error)?
         .join(PROFILE_DIR);
     let builder = WebviewBuilder::new(&label, WebviewUrl::External(url.clone()))
-        .initialization_script(crate::internal_browser_read_preview::ADAPTER)
+        .initialization_script(read_preview::ADAPTER)
         .data_directory(profile)
         .enable_clipboard_access()
         .on_navigation(|next| external_navigation::validate_external_url(next).is_ok())
