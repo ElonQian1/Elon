@@ -35,7 +35,9 @@ implementation_status: representative_semantic_parity_verified_published
 - `AndroidFeature` 发布收尾通过，`BUSINESS_STATUS=complete`（本批）、
   `LOCAL_MAIN_STATUS=current:85b1aee`、`TASK_WORKTREE_STATUS=skipped_by_option`、
   `MAIN_UNTRACKED_STATUS=clean`、`FINALIZABLE=true`。工作区为继续重构而保留。
-- 量化另补前端 70/70、类型检查、生产构建及主站托管资源合同；详情大字体原生、
+- 量化另补前端 70/70、类型检查、生产构建及主站托管资源合同；`11c732b` 只新增离线
+  调试入口，并取得详情浅深主题 200% 原生截图。详情自动重建后回到验收首页的画面
+  比较失败已保留，源码门禁随后在验收首页通过，不宣称详情自动回页通过。
   整仓 Rust、PR #214 合并及正式发布仍未完成。远程作业无执行步骤即失败，原因未确认。
 
 范围仍为离线合成数据与已声明观察状态；网页采用 411px 默认字体，不冒充网页 200%
