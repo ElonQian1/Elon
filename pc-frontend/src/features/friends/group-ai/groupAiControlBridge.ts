@@ -6,6 +6,8 @@ import { postWinEvent } from '../../codex-control/codexControlApi'
 import { safeNodeAdminUrl } from '../../../lib/utils'
 import { nodeApi, probeLocalNode } from '../../node/localNodeApi'
 import { socialRequest } from '../socialChatOperations'
+import { inspectCardPreviews } from '../socialCardPreview'
+import '../../../../../server/src/assets/social_links.js'
 import { getGroupAiTask, startGroupAi } from './groupAiStore'
 import { GroupAiControlError, GroupAiControlModel, type GroupAiCommand } from './groupAiControlModel'
 
@@ -16,6 +18,7 @@ let lastWorkerErrorAt = 0
 const model = new GroupAiControlModel({
   owner: () => useAuthStore.getState().token ? useAuthStore.getState().user?.id || '' : '',
   uuid: uuidv4, read: socialRequest, task: getGroupAiTask, start: startGroupAi,
+  inspectLinks: inspectCardPreviews,
   async checkIdentity(owner) {
     const me = await socialRequest<{ user: { id: string } }>('/api/me')
     if (me.user?.id !== owner) throw new GroupAiControlError('account_changed')

@@ -12,6 +12,7 @@ pub(crate) fn definitions() -> Vec<Value> {
                 "group_id":{"type":"string","maxLength":100},
                 "message_ids":{"type":"array","minItems":1,"maxItems":50,"uniqueItems":true,"items":{"type":"string","maxLength":100}},
                 "message_revisions":{"type":"object","maxProperties":50,"additionalProperties":{"type":"integer","minimum":1}},
+                "include_preview":{"type":"boolean","default":false,"description":"Only for links: fetch public card metadata and check image decode in the Win WebView. Returns bounded status booleans, no image URL or page body. May take up to 45 seconds."},
                 "question":{"type":"string","maxLength":2000},
                 "task_id":{"type":"string","format":"uuid"},
                 "confirmed":{"type":"boolean","default":false},

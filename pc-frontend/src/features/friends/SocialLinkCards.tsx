@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { resolveApiUrl } from '../../api/runtime'
 import { getDesktopInvoke } from '../shell/desktopShell'
 import { useReaderTabs } from '../reader/readerTabsStore'
-import { previewApi } from './socialReadBack'
-import { cachedRead } from './socialReadPreview'
+import { cardPreviewApi } from './socialCardPreview'
+import { cachedRead, forgetRead } from './socialReadPreview'
 import { openWechatCard } from './wechatCardAction'
 import { copyTextToClipboard } from '../../lib/clipboard'
 import type { LinkPreview } from './socialLinks'
@@ -31,7 +31,7 @@ export default function SocialLinkCards({ text, owner, compact = false, onDeskto
     }
     const cancel = () => { if (document.hidden) { pending?.abort(); pending = null; setStatus(''); } }
     document.addEventListener('visibilitychange', cancel)
-    const dispose = ElonSocialLinks.mount(host.current, text, { owner: scope, compact, desktop: true, channelsHandoff: !!getDesktopInvoke(), api: previewApi, openOriginal: original, open: p => {
+    const dispose = ElonSocialLinks.mount(host.current, text, { owner: scope, compact, desktop: true, channelsHandoff: !!getDesktopInvoke(), api: cardPreviewApi, coverFailed: p => forgetRead(scope, p), openOriginal: original, open: p => {
       if (!ElonSocialLinks.channelsId(p.url) || !getDesktopInvoke()) { original(p); return }
       if (pending) return
       const controller = new AbortController(); pending = controller

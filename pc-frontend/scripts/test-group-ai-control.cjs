@@ -24,6 +24,7 @@ function fixture() {
       return { messages: f.messages }
     },
     checkIdentity: async () => {}, task: () => f.task,
+    inspectLinks: async links => { f.calls.push('inspectLinks'); if (f.onInspect) f.onInspect(); return links.map(() => ({ status: 'ready', has_image: true, image_decoded: true })) },
     start(input, operation) {
       f.calls.push('start')
       f.task = { input, operation, stage: 'preparing', progress: { phase: 'preparing', busy: true }, answer: '',
@@ -63,6 +64,8 @@ test('explicit links reads full selected share URL without truncating its query'
   const c = { action: 'links', owner_binding: 'binding-1', group_id: 'g', message_ids: ['image'] }
   const r = await f.model.execute(c)
   assert.deepEqual(r.links, [url]); assert.equal(f.task, null)
+  assert.equal(f.calls.includes('inspectLinks'), false)
+  assert.equal((await f.model.execute({ ...c, include_preview: true })).previews[0].image_decoded, true)
   f.messages[0].content = 'https://www.xiaohongshu.com.evil.example/note https://user:secret@www.douyin.com/video/12345 https://127.0.0.1/'
   assert.deepEqual((await f.model.execute(c)).links, [])
   f.messages[0].recalled_at = 'now'

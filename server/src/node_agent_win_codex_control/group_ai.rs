@@ -29,6 +29,8 @@ pub(crate) struct Command {
     pub confirmed: bool,
     #[serde(default)]
     pub offset: usize,
+    #[serde(default)]
+    pub include_preview: bool,
 }
 
 fn identifier(value: &str) -> bool {
@@ -40,6 +42,9 @@ fn identifier(value: &str) -> bool {
 }
 impl Command {
     fn validate(&self) -> Result<(), String> {
+        if self.include_preview && self.action != "links" {
+            return Err("preview_requires_links".into());
+        }
         if uuid::Uuid::parse_str(&self.command_id).is_err() || self.offset > 10000 {
             return Err("invalid_command_id_or_offset".into());
         }
@@ -322,6 +327,17 @@ fn sanitize_result(v: Value) -> Result<Value, String> {
             })
             .collect::<Vec<_>>());
     }
+    if let Some(previews) = v["previews"].as_array() {
+        out["previews"] = json!(previews
+            .iter()
+            .take(2)
+            .map(|p| json!({
+                "status": if p["status"] == "ready" { "ready" } else { "unavailable" },
+                "has_image": p["has_image"].as_bool().unwrap_or(false),
+                "image_decoded": p["image_decoded"].as_bool().unwrap_or(false)
+            }))
+            .collect::<Vec<_>>());
+    }
     Ok(out)
 }
 
@@ -485,5 +501,15 @@ mod tests {
         assert!(result.to_string().contains(&link));
         assert!(!result.to_string().contains("evil.example"));
         assert!(!result.to_string().contains("secret"));
+    }
+    #[test]
+    fn preview_diagnostics_are_opt_in_and_body_free() {
+        let mut c = command("groups");
+        c.include_preview = true;
+        assert!(c.validate().is_err());
+        let out = sanitize_result(json!({"schema":"elon.win_group_ai_result.v1","ok":true,
+            "previews":[{"status":"ready","has_image":true,"image_decoded":false,"url":"secret","body":"secret"}]})).unwrap();
+        assert_eq!(out["previews"][0]["has_image"], true);
+        assert!(!out.to_string().contains("secret"));
     }
 }

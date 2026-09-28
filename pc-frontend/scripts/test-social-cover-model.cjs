@@ -33,3 +33,27 @@ test('failed local poster can be evicted without erasing another account cache',
   model.forgetRead('owner-a', { url: 'https://example.com/' })
   assert.deepEqual(JSON.parse(rows).map(e => e.scope), ['owner-b'])
 })
+test('Win public metadata uses native BV-only calls; old shells and short links retain server resolution', async () => {
+  const calls = []
+  let item = { url: 'https://www.bilibili.com/video/BV19eYH6NEsC/?t=30', site: '哔哩哔哩', embed: { kind: 'bilibili', id: 'BV19eYH6NEsC' } }
+  let oldShell = false
+  const server = { ...item, title: 'Server', image: null }
+  const { exports: model } = load('pc-frontend/src/features/friends/socialCardPreview.ts', {
+    DOMException,
+    ElonSocialLinks: { links: () => [item] },
+    require: name => name.includes('desktopShell') ? { getDesktopInvoke: () => async (command, args) => {
+      calls.push({ command, args }); if (oldShell) throw new Error('Unknown command')
+      return { title: 'Native', author: 'Public', image: 'https://i0.hdslb.com/bfs/archive/poster.jpg' }
+    } } : { previewApi: async () => { calls.push('server'); return server } },
+  })
+  const request = () => model.cardPreviewApi('/api/me/link-preview', { method: 'POST', body: JSON.stringify({ url: item.url }) })
+  assert.equal((await request()).title, 'Native')
+  assert.equal(calls.includes('server'), false)
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[0].args)), { bvid: 'BV19eYH6NEsC' })
+  oldShell = true
+  assert.equal((await request()).title, 'Server')
+  oldShell = false; calls.length = 0
+  item = { ...item, url: 'https://b23.tv/fixture', embed: null }; server.url = item.url
+  assert.equal((await request()).title, 'Native')
+  assert.equal(calls[0], 'server')
+})

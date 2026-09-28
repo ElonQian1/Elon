@@ -7,6 +7,7 @@ export interface GroupAiCommand {
   owner_binding?: string | null; group_id?: string | null; task_id?: string | null
   question?: string | null; confirmed?: boolean; offset?: number
   message_ids?: string[]; message_revisions?: Record<string, number>
+  include_preview?: boolean
 }
 export interface GroupAiControlPort {
   owner(): string
@@ -15,6 +16,7 @@ export interface GroupAiControlPort {
   start(input: GroupAiInput, operation: string): GroupAiTask
   task(): GroupAiTask | null
   checkIdentity(owner: string): Promise<void>
+  inspectLinks?(links: string[]): Promise<unknown>
 }
 export class GroupAiControlError extends Error {}
 const fail = (code: string): never => { throw new GroupAiControlError(code) }
@@ -70,7 +72,9 @@ export class GroupAiControlModel {
         if (c.message_ids?.length !== 1) return fail('single_message_required')
         const message = messages.find(m => m.id === c.message_ids![0])
         if (!message || recalled(message)) return fail('selection_changed_or_unavailable')
-        return output({ group_id: group.id, links: selectedLinks(message.content) })
+        const links = selectedLinks(message.content)
+        const previews = c.include_preview ? await this.port.inspectLinks?.(links) : undefined
+        return output({ group_id: group.id, links, ...(previews ? { previews } : {}) })
       }
       if (c.action === 'messages') return output({ group_id: group.id, messages: [...messages].reverse().slice(offset, offset + 30).map(m => ({
         id: m.id, revision: m.revision ?? 1, preview: recalled(m) ? '' : m.content.slice(0, 240), created_at: m.created_at,
