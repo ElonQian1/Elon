@@ -40,25 +40,33 @@ internal object SocialLinkReadPreview {
     fun reportable(value: JSONObject): JSONObject = JSONObject().put("schema", 1).put("original", value.optString("original"))
         .put("url", value.optString("url")).put("article", true).put("title", value.optString("title")).put("author", value.optString("author"))
         .put("description", value.optString("description")).put("image", value.optString("image").ifBlank { null })
-    fun capture(web: WebView, original: String, server: String, owner: String?, stillCurrent: () -> Boolean = { true }, complete: (Boolean) -> Unit = {}) {
+    private fun script(context: Context): String = adapter ?: synchronized(this) {
+        adapter ?: context.assets.open("social_link_read_adapter.js").bufferedReader().use { it.readText() }.also { adapter = it }
+    }
+    fun install(web: WebView) {
+        if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) runCatching {
+            androidx.webkit.WebViewCompat.addDocumentStartJavaScript(web, script(web.context), setOf("https://www.douyin.com", "https://douyin.com", "https://www.iesdouyin.com"))
+        }
+    }
+    fun capture(web: WebView, original: String, server: String, owner: String?, stillCurrent: () -> Boolean = { true }, complete: (Boolean) -> Unit = {}, cacheOriginal: String = original) {
         if (SocialLinkReadIdentity.identity(original) == null) { complete(true); return }
+        if (!SocialLinkReadIdentity.cacheAlias(cacheOriginal, original)) { complete(true); return }
         val app = web.context.applicationContext
         runCatching {
-            val script = adapter ?: synchronized(this) {
-                adapter ?: app.assets.open("social_link_read_adapter.js").bufferedReader().use { it.readText() }.also { adapter = it }
-            }
+            val script = script(app)
             web.evaluateJavascript("$script.read(${JSONObject.quote(original)})") { encoded ->
                 val success = runCatching read@ {
                     if (!stillCurrent() || encoded.length > 16384 || AuthManager.userId(app) != owner || ServerUrlManager.getActive(app) != server) return@read false
                     if (SocialLinkReadIdentity.identity(web.url.orEmpty()) != SocialLinkReadIdentity.identity(original)) return@read false
                     val value = JSONObject(encoded)
                     val item = parse(original, value) ?: return@read false
-                    remember(server, owner, item)
+                    remember(server, owner, item.copy(url = cacheOriginal))
                     val read = reportable(value)
                     diskWorker.execute {
                         if (AuthManager.userId(app) == owner && ServerUrlManager.getActive(app) == server) {
-                            SocialLinkReadStore.put(app, server, owner, read)
-                            SocialLinkPreviewApi.loader.execute { SocialLinkPreviewApi.report(app, server, original, read) }
+                            SocialLinkReadStore.put(app, server, owner, read, cacheOriginal = cacheOriginal)
+                            if (SocialLinkReadIdentity.identity(original)?.substringBefore(':') !in setOf("douyin", "xiaohongshu"))
+                                SocialLinkPreviewApi.loader.execute { SocialLinkPreviewApi.report(app, server, original, read) }
                         }
                     }
                     true

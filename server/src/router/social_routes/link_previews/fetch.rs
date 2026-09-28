@@ -1,4 +1,4 @@
-use super::{cover, metadata, policy, Preview};
+use super::{cover, media_page, metadata, policy, Preview};
 use anyhow::{bail, Result};
 use reqwest::Url;
 use std::time::Duration;
@@ -23,7 +23,15 @@ async fn response(url: &Url) -> Result<reqwest::Response> {
         .await?)
 }
 
-async fn body(mut response: reqwest::Response, head: bool) -> Result<String> {
+async fn body(response: reqwest::Response, head: bool) -> Result<String> {
+    read_body(response, head, head, MAX_HEAD).await
+}
+async fn read_body(
+    mut response: reqwest::Response,
+    html: bool,
+    head: bool,
+    limit: usize,
+) -> Result<String> {
     if !response.status().is_success() {
         bail!("preview unavailable");
     }
@@ -32,7 +40,7 @@ async fn body(mut response: reqwest::Response, head: bool) -> Result<String> {
         .get("content-type")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
-    if !mime.contains(if head { "text/html" } else { "json" }) {
+    if !mime.contains(if html { "text/html" } else { "json" }) {
         bail!("unsupported preview");
     }
     // Bilibili and others gzip regardless of Accept-Encoding; reqwest has no decoder enabled.
@@ -43,9 +51,9 @@ async fn body(mut response: reqwest::Response, head: bool) -> Result<String> {
         .is_some_and(|v| v.eq_ignore_ascii_case("gzip"));
     let mut bytes = Vec::new();
     while let Some(chunk) = response.chunk().await? {
-        let remaining = MAX_HEAD.saturating_sub(bytes.len());
+        let remaining = limit.saturating_sub(bytes.len());
         bytes.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
-        if bytes.len() >= MAX_HEAD
+        if bytes.len() >= limit
             || (head && !gzip && bytes.windows(7).any(|s| s.eq_ignore_ascii_case(b"</head>")))
         {
             break;
@@ -55,7 +63,7 @@ async fn body(mut response: reqwest::Response, head: bool) -> Result<String> {
         use std::io::Read;
         let mut out = Vec::new();
         let _ = flate2::read::GzDecoder::new(bytes.as_slice())
-            .take(4 * MAX_HEAD as u64)
+            .take((4 * limit).min(2 * 1024 * 1024) as u64)
             .read_to_end(&mut out);
         bytes = out;
     }
@@ -90,14 +98,19 @@ pub(super) async fn resolve(mut url: Url) -> Result<Preview> {
                 .ok_or_else(|| anyhow::anyhow!("unsafe redirect"))?;
             continue;
         }
-        page = Some(body(res, true).await?);
+        page = Some(if media_page::identity(&url).is_some() {
+            read_body(res, true, false, 1024 * 1024).await?
+        } else {
+            body(res, true).await?
+        });
         break;
     }
     let mut preview = Preview::fallback(&original);
     preview.site = policy::label(&url);
     preview.embed = policy::embed(&url);
     if let Some(page) = page {
-        let metadata = metadata::parse(&page, &url);
+        let metadata =
+            media_page::parse(&page, &url).unwrap_or_else(|| metadata::parse(&page, &url));
         preview.title = metadata.title;
         preview.description = metadata.description;
         preview.author = metadata.author;
@@ -145,6 +158,29 @@ async fn douyin_preview(original: &Url, resolved: &Url) -> Result<Preview> {
                         160,
                     );
                 }
+            }
+        }
+        // The iframe contract has no poster field; try the public desktop page's hydration data.
+        let page_url = Url::parse(&format!("https://www.douyin.com/video/{}", embed.id))?;
+        let enrichment = tokio::time::timeout(Duration::from_secs(3), async {
+            let html = read_body(response(&page_url).await.ok()?, true, false, 1024 * 1024)
+                .await
+                .ok()?;
+            media_page::parse(&html, &page_url)
+        })
+        .await
+        .ok()
+        .flatten();
+        if let Some(meta) = enrichment {
+            preview.title = meta.title;
+            preview.author = meta.author;
+            preview.image = meta.image;
+            if let Some(image) = preview.image.as_deref().and_then(policy::public_url) {
+                preview.cover_data_url =
+                    tokio::time::timeout(Duration::from_secs(1), cover::fetch(&image))
+                        .await
+                        .ok()
+                        .flatten();
             }
         }
     }

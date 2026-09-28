@@ -60,4 +60,24 @@ class SocialLinkReadStoreTest {
         assertNull(SocialLinkReadStore.get(context, "server", "alice", "https://www.binance.com/en/square/post/100000", 100129))
         assertNotNull(SocialLinkReadStore.get(context, "server", "alice", "https://www.binance.com/en/square/post/100128", 100129))
     }
+    @Test fun mediaReadPreservesShareUrlAndIsAccountLocal() {
+        val share = "https://v.douyin.com/fixture/"
+        val resolved = "https://www.douyin.com/video/12345678"
+        val link = SocialLinkPolicy.merge(JSONObject().put("schema", 1).put("url", share)
+            .put("embed", JSONObject().put("kind", "douyin").put("id", "12345678")), SocialLinkPolicy.link(share)!!)
+        assertEquals(resolved, SocialLinkReadIdentity.readSource(link))
+        assertEquals(resolved, SocialLinkReaderSessions.key(link))
+        val read = value(resolved).put("url", resolved).put("image", "https://p3.douyinpic.com/poster.jpg")
+        SocialLinkReadStore.put(context, "server", "alice", read, 1000, cacheOriginal = share)
+        assertEquals(share, SocialLinkReadStore.get(context, "server", "alice", share, 1001)?.url)
+        assertNotNull(SocialLinkReadStore.get(context, "server", "alice", share, 1001)?.image)
+        assertNull(SocialLinkReadStore.get(context, "server", "bob", share, 1001))
+        assertFalse(SocialLinkReadIdentity.cacheAlias("https://v.douyin.com.evil.example/fixture", resolved))
+        assertFalse(SocialLinkReadIdentity.cacheAlias("https://www.douyin.com/video/99999999", resolved))
+        val xhs = "https://www.xiaohongshu.com/discovery/item/0123456789abcdef01234567?xsec_token=fixture"
+        val note = value(xhs).put("url", xhs.replace("discovery/item", "explore")).put("image", "https://sns-webpic-qc.xhscdn.com/poster.jpg?sign=fixture")
+        assertNotNull(SocialLinkReadPreview.parse(xhs, note)?.image)
+        assertNull(SocialLinkReadPreview.parse(xhs, note.put("image", "https://xhscdn.com.evil.example/poster.jpg"))?.image)
+        assertNull(SocialLinkReadPreview.parse(xhs, note.put("url", xhs.replace("0123456789abcdef01234567", "000000000000000000000000"))))
+    }
 }

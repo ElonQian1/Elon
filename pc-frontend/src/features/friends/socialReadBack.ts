@@ -12,6 +12,8 @@ export async function previewApi(path: string, init: RequestInit) {
 
 // Share what this member actually saw so readers whose server fetch was blocked get a real card.
 function reportRead(url: string, value: unknown) {
+  // Signed-in video/note observations are device-local, not published to other members.
+  if (/^(?:douyin|xiaohongshu):/.test(ElonSocialReadAdapter.identity(url) || '')) return
   const read = ElonSocialReadAdapter.validate(url, value); if (!read) return
   previewApi('/api/me/link-preview/report', { method: 'POST', body: JSON.stringify({ url, read }) }).catch(() => undefined)
 }

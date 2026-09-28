@@ -44,7 +44,8 @@ internal object SocialLinkPreviewApi {
         }.getOrDefault(item)
         // The embedded player has no article DOM. Fetch its public metadata once per cache miss.
         val preview = if (serverPreview.image == null) BilibiliPublicPreview.load(serverPreview) ?: serverPreview else serverPreview
-        if (AuthManager.userId(context).orEmpty() == owner) previews.put(key, (System.currentTimeMillis() + if (preview.ready) 3600000 else 30000) to preview)
+        val ttl = if (!preview.ready) 30000 else if (preview.image == null && preview.site in setOf("抖音", "小红书")) 300000 else 3600000
+        if (AuthManager.userId(context).orEmpty() == owner) previews.put(key, (System.currentTimeMillis() + ttl) to preview)
         return SocialLinkReadPreview.cached(context, ServerUrlManager.getActive(context), owner, item.url) ?: preview
     }
     /** Fresh short-lived app link; never stored in the metadata cache. */

@@ -3,7 +3,7 @@ import type { GroupAiInput, GroupAiTask } from './groupAiTask'
 import type { GroupAiSources } from './groupAiContext'
 
 export interface GroupAiCommand {
-  command_id: string; action: 'groups' | 'messages' | 'start' | 'status' | 'resume' | 'cancel'
+  command_id: string; action: 'groups' | 'messages' | 'links' | 'start' | 'status' | 'resume' | 'cancel'
   owner_binding?: string | null; group_id?: string | null; task_id?: string | null
   question?: string | null; confirmed?: boolean; offset?: number
   message_ids?: string[]; message_revisions?: Record<string, number>
@@ -20,6 +20,25 @@ export class GroupAiControlError extends Error {}
 const fail = (code: string): never => { throw new GroupAiControlError(code) }
 const path = (group: string) => `/api/me/groups/${encodeURIComponent(group)}`
 const recalled = (m: SocialMessage) => !!(m.recalled_at || m.recalledAt)
+
+// Explicit read of one selected message; never reconstruct a URL from its truncated preview.
+function selectedLinks(content: string): string[] {
+  const hosts = new Set(['www.xiaohongshu.com', 'xiaohongshu.com', 'xhslink.com', 'www.xhslink.com',
+    'www.douyin.com', 'douyin.com', 'v.douyin.com', 'www.iesdouyin.com',
+    'www.bilibili.com', 'bilibili.com', 'm.bilibili.com', 'b23.tv', 'weixin.qq.com'])
+  const links: string[] = []
+  for (const match of content.slice(0, 50000).matchAll(/https:\/\/[^\s<>"'\]\)]+/g)) {
+    const raw = match[0].replace(/[，。！？；：、）】》”’.,!;]+$/g, '')
+    if (raw.length > 4096) continue
+    try {
+      const u = new URL(raw)
+      if (!hosts.has(u.hostname) || u.username || u.password || u.port || u.hash || /[\u0000-\u001f\u007f]/.test(raw)) continue
+      if (!links.includes(u.href)) links.push(u.href)
+      if (links.length === 2) break
+    } catch { /* not a complete URL */ }
+  }
+  return links
+}
 
 export class GroupAiControlModel {
   private binding = ''
@@ -38,7 +57,7 @@ export class GroupAiControlModel {
     const output = (data: Record<string, unknown>) => { check(); return { schema: 'elon.win_group_ai_result.v1', ok: true, owner_binding: binding, ...data } }
     if (c.action !== 'groups' && c.owner_binding !== binding) return fail('owner_binding_stale')
     if (c.action === 'groups') { await this.port.checkIdentity(owner); check() }
-    if (['groups', 'messages', 'start'].includes(c.action)) {
+    if (['groups', 'messages', 'links', 'start'].includes(c.action)) {
       const { groups } = await read<{ groups: FriendGroup[] }>('/api/me/groups')
       if (!Array.isArray(groups)) return fail('invalid_group_directory')
       const offset = c.offset ?? 0
@@ -47,6 +66,12 @@ export class GroupAiControlModel {
       if (!group) return fail('group_not_accessible')
       const { messages } = await read<{ messages: SocialMessage[] }>(path(group.id) + '/messages?limit=120&preserve_unread=true')
       if (!Array.isArray(messages)) return fail('invalid_message_list')
+      if (c.action === 'links') {
+        if (c.message_ids?.length !== 1) return fail('single_message_required')
+        const message = messages.find(m => m.id === c.message_ids![0])
+        if (!message || recalled(message)) return fail('selection_changed_or_unavailable')
+        return output({ group_id: group.id, links: selectedLinks(message.content) })
+      }
       if (c.action === 'messages') return output({ group_id: group.id, messages: [...messages].reverse().slice(offset, offset + 30).map(m => ({
         id: m.id, revision: m.revision ?? 1, preview: recalled(m) ? '' : m.content.slice(0, 240), created_at: m.created_at,
         recalled: recalled(m), attachment_count: m.attachments?.length ?? 0,

@@ -8,6 +8,7 @@ const browser = await chromium.launch({ headless: true, ...(process.env.CARD_BRO
 let count = 0;
 try {
   const page = await browser.newPage();
+  await page.addInitScript({ content: script });
   let markup = '';
   await page.route('**/*', r => r.request().resourceType() === 'document' ? r.fulfill({ contentType: 'text/html; charset=utf-8', body: markup }) : r.abort());
   const original = 'https://app.binance.com/uni-qr/cpos/123456?r=synthetic';
@@ -46,5 +47,32 @@ try {
   // A later read observes asynchronously rendered content; no stale empty result is cached.
   await page.evaluate(() => { document.body.innerHTML = '<article><a href="/author/status/123456"><time>Today</time></a><div data-testid="tweetText">Late content</div></article>'; });
   assert.equal((await page.evaluate(u => ElonSocialReadAdapter.read(u), x)).title, 'Late content'); count++;
-  console.log(JSON.stringify({ cases: count, passed: true, adapter: 'production', fixtureOnly: true, officialSitesVerified: false }));
+  const note = 'https://www.xiaohongshu.com/discovery/item/0123456789abcdef01234567?xsec_token=fixture';
+  const noteHtml = '<div class="note-content"><h1 id="detail-title">Selected note</h1></div><script>window.__INITIAL_STATE__={note:{noteDetailMap:{"0123456789abcdef01234567":{note:{noteId:"0123456789abcdef01234567",title:"Selected note",user:{nickname:"Author"},imageList:[{urlDefault:"http://sns-webpic-qc.xhscdn.com/poster.jpg?sign=fixture"}]}}}}}</script>';
+  result = await read(note, noteHtml);
+  assert.equal(result.original, note); assert.match(result.image, /^https:/); assert.equal(result.author, 'Author'); count++;
+  assert.equal(await read(note, noteHtml.replace('noteId:"0123456789abcdef01234567"', 'noteId:"000000000000000000000000"')), null); count++;
+  assert.equal(await read(note, noteHtml.replace('class="note-content"', 'class="note-content" style="display:none"')), null); count++;
+  assert.equal(await read(note, noteHtml.replace('sns-webpic-qc.xhscdn.com', 'xhscdn.com.evil.example')), null); count++;
+  const dy = 'https://www.douyin.com/video/12345678';
+  const payload = { status_code: 0, aweme_detail: { aweme_id: '12345678', desc: 'Selected video', author: {nickname:'Author'}, video:{cover:{url_list:['https://p3.douyinpic.com/poster.jpg']}} } };
+  let requests = 0;
+  await page.route('**/aweme/v1/web/aweme/detail/**', r => { requests++; return r.fulfill({ json: payload }); });
+  const videoHtml = '<div class="video_12345678"></div><div data-e2e="detail-video-info">Selected video</div>';
+  assert.equal(await read(dy, videoHtml), null);
+  assert.equal(requests, 0); count++;
+  await page.evaluate(() => fetch('/aweme/v1/web/aweme/detail/?aweme_id=12345678').then(r=>r.json()));
+  await page.waitForFunction(() => !!ElonSocialReadAdapter.read(location.href));
+  result = await page.evaluate(() => ElonSocialReadAdapter.read(location.href));
+  assert.equal(result.title, 'Selected video'); assert.equal(result.image, 'https://p3.douyinpic.com/poster.jpg');
+  for(let n=0;n<10;n++) await page.evaluate(() => ElonSocialReadAdapter.read(location.href));
+  assert.equal(requests, 1); count++;
+  assert.equal(await page.evaluate(() => ElonSocialReadAdapter.readSource('https://v.douyin.com/test/', 'https://open.douyin.com/player/video?vid=12345678')), dy); count++;
+  assert.equal(await page.evaluate(() => ElonSocialReadAdapter.cacheAlias('https://v.douyin.com.evil.example/test/', location.href)), false); count++;
+  await read(dy, videoHtml);
+  await page.evaluate(() => new Promise(resolve => {const x = new XMLHttpRequest();x.open('GET','/aweme/v1/web/aweme/detail/?aweme_id=12345678');x.onload=resolve;x.send();}));
+  assert.ok(await page.evaluate(() => ElonSocialReadAdapter.read(location.href))); count++;
+  await page.evaluate(() => history.replaceState({}, '', '/video/87654321'));
+  assert.equal(await page.evaluate(() => ElonSocialReadAdapter.read(location.href)), null); count++;
+  console.log(JSON.stringify({ cases: count, passed: true, adapter: 'production', passiveRequestsOnly: true, fixtureOnly: true, officialSitesVerified: false }));
 } finally { await browser.close(); }

@@ -45,14 +45,14 @@ impl Command {
         }
         if !matches!(
             self.action.as_str(),
-            "groups" | "messages" | "start" | "status" | "resume" | "cancel"
+            "groups" | "messages" | "links" | "start" | "status" | "resume" | "cancel"
         ) {
             return Err("unsupported_group_action".into());
         }
         if self.action != "groups" && !self.owner_binding.as_deref().is_some_and(identifier) {
             return Err("owner_binding_required".into());
         }
-        let selecting = matches!(self.action.as_str(), "messages" | "start");
+        let selecting = matches!(self.action.as_str(), "messages" | "links" | "start");
         if selecting != self.group_id.is_some()
             || self.group_id.as_deref().is_some_and(|id| !identifier(id))
         {
@@ -66,6 +66,11 @@ impl Command {
                 .is_some_and(|id| uuid::Uuid::parse_str(id).is_err())
         {
             return Err("invalid_task_id".into());
+        }
+        if self.action == "links"
+            && (self.message_ids.len() != 1 || !self.message_ids.iter().all(|id| identifier(id)))
+        {
+            return Err("single_message_required".into());
         }
         if self.action == "start" {
             if !self.confirmed
@@ -88,7 +93,7 @@ impl Command {
                 return Err("invalid_or_unconfirmed_selection".into());
             }
         } else if self.question.is_some()
-            || !self.message_ids.is_empty()
+            || (self.action != "links" && !self.message_ids.is_empty())
             || !self.message_revisions.is_empty()
             || self.confirmed
         {
@@ -282,6 +287,41 @@ fn sanitize_result(v: Value) -> Result<Value, String> {
         }
     }
     out["runtime_diagnostic"] = runtime_diagnostic(&v["runtime_diagnostic"]);
+    if let Some(links) = v["links"].as_array() {
+        out["links"] = json!(links
+            .iter()
+            .take(2)
+            .filter_map(|v| {
+                let raw = v.as_str()?;
+                if raw.len() > 4096 || raw.chars().any(char::is_control) {
+                    return None;
+                }
+                let u = reqwest::Url::parse(raw).ok()?;
+                let hosts = [
+                    "www.xiaohongshu.com",
+                    "xiaohongshu.com",
+                    "xhslink.com",
+                    "www.xhslink.com",
+                    "www.douyin.com",
+                    "douyin.com",
+                    "v.douyin.com",
+                    "www.iesdouyin.com",
+                    "www.bilibili.com",
+                    "bilibili.com",
+                    "m.bilibili.com",
+                    "b23.tv",
+                    "weixin.qq.com",
+                ];
+                (u.scheme() == "https"
+                    && u.username().is_empty()
+                    && u.password().is_none()
+                    && u.port().is_none()
+                    && u.fragment().is_none()
+                    && hosts.contains(&u.host_str()?))
+                .then(|| u.to_string())
+            })
+            .collect::<Vec<_>>());
+    }
     Ok(out)
 }
 
@@ -416,5 +456,34 @@ mod tests {
             .claim(&c.command_id, &uuid::Uuid::new_v4().to_string())
             .is_err());
         assert_eq!(q.enqueue(Path::new("a"), c).unwrap()["status"], "expired");
+    }
+    #[test]
+    fn links_are_read_only_selected_and_preserve_complete_query() {
+        let q = GroupAiControl::default();
+        let mut c = command("links");
+        c.owner_binding = Some("binding".into());
+        c.group_id = Some("group".into());
+        assert!(q.enqueue(Path::new("a"), c.clone()).is_err());
+        c.message_ids = vec!["one".into(), "two".into()];
+        assert!(q.enqueue(Path::new("a"), c.clone()).is_err());
+        c.message_ids = vec!["one".into()];
+        q.enqueue(Path::new("a"), c.clone()).unwrap();
+        let worker = uuid::Uuid::new_v4().to_string();
+        q.claim(&c.command_id, &worker).unwrap();
+        let link = format!(
+            "https://www.xiaohongshu.com/explore/0123456789abcdef01234567?xsec_token={}",
+            "fixture".repeat(50)
+        );
+        q.receipt(
+            &c.command_id,
+            &worker,
+            json!({"schema":"elon.win_group_ai_result.v1","ok":true,
+            "links":[link,"https://xiaohongshu.com.evil.example/unsafe"],"cookie":"secret"}),
+        )
+        .unwrap();
+        let result = q.status(Path::new("a"), &c.command_id).unwrap();
+        assert!(result.to_string().contains(&link));
+        assert!(!result.to_string().contains("evil.example"));
+        assert!(!result.to_string().contains("secret"));
     }
 }

@@ -6,6 +6,8 @@ pub(super) use channels::handoff as channels_handoff;
 mod cover;
 #[path = "fetch.rs"]
 mod fetch;
+#[path = "media_page.rs"]
+mod media_page;
 #[path = "metadata.rs"]
 mod metadata;
 #[path = "policy.rs"]
@@ -117,11 +119,19 @@ async fn cached(url: reqwest::Url) -> Preview {
     .clone()
 }
 fn ttl(value: &Preview) -> Duration {
-    Duration::from_secs(if value.status == "ready" {
-        24 * 3600
-    } else {
-        30
-    })
+    Duration::from_secs(
+        if value.status == "ready"
+            && matches!(value.site.as_str(), "抖音" | "小红书")
+            && value.image.is_none()
+            && value.cover_data_url.is_none()
+        {
+            300
+        } else if value.status == "ready" {
+            24 * 3600
+        } else {
+            30
+        },
+    )
 }
 
 /// Stores a member read-back unless the server already holds its own complete result.

@@ -142,6 +142,12 @@ fn social_link_preview_shares_keep_required_parameters_and_cache_is_disposable()
     assert!(fallback.url.contains("xsec_token=synthetic"));
     assert_eq!(ttl(&fallback), Duration::from_secs(30));
     assert!(fallback.embed.is_none());
+    let mut partial = fallback.clone();
+    partial.status = "ready";
+    partial.title = "Note without cover".into();
+    assert_eq!(ttl(&partial), Duration::from_secs(300));
+    partial.image = Some("https://sns-webpic-qc.xhscdn.com/poster.jpg".into());
+    assert_eq!(ttl(&partial), Duration::from_secs(24 * 3600));
 }
 
 #[test]

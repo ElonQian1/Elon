@@ -56,7 +56,8 @@ internal object SocialLinkReaderSessions {
     // Recency must be strictly ordered; several sessions can be touched within one millisecond.
     private fun tick(): Long = synchronized(this) { ++clock }
 
-    fun key(link: SocialLink): String = SocialLinkPolicy.safeUrl(link.player)?.toString() ?: SocialLinkReadIdentity.readingUrl(link.url)
+    fun key(link: SocialLink): String = if (link.site == "抖音") SocialLinkReadIdentity.readSource(link)
+        else SocialLinkPolicy.safeUrl(link.player)?.toString() ?: SocialLinkReadIdentity.readingUrl(link.url)
     @Synchronized fun all(): List<Session> = sessions.values.sortedByDescending { it.lastUsed }
     @Synchronized fun minimized(): List<Session> = all().filter { it.minimized }
     fun addListener(listener: () -> Unit) { synchronized(this) { listeners += listener } }
@@ -82,10 +83,15 @@ internal object SocialLinkReaderSessions {
             settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
             settings.mediaPlaybackRequiresUserGesture = true
             settings.setSupportMultipleWindows(false)
+            if (SocialLinkReadIdentity.identity(key)?.startsWith("douyin:") == true) {
+                val version = Regex("Chrome/([0-9.]+)").find(settings.userAgentString)?.groupValues?.get(1)
+                if (version != null) settings.userAgentString = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$version Safari/537.36"
+            }
+            SocialLinkReadPreview.install(this)
         }
         val app = activity.applicationContext
         session.readBack = SocialLinkReaderReadBack { current, complete ->
-            SocialLinkReadPreview.capture(session.web, session.link.url, ServerUrlManager.getActive(app), AuthManager.userId(app), current, complete)
+            SocialLinkReadPreview.capture(session.web, SocialLinkReadIdentity.readSource(session.link), ServerUrlManager.getActive(app), AuthManager.userId(app), current, complete, session.link.url)
         }
         session.diagnostics = SocialLinkPageDiagnostics(session.web, SystemClock.elapsedRealtime() - started, { loading, status ->
             val changed = session.loading != loading
@@ -154,6 +160,8 @@ internal object SocialLinkReaderSessions {
         (session.web.parent as? ViewGroup)?.removeView(session.web)
         container.addView(session.web, ViewGroup.LayoutParams(-1, -1))
         session.web.onResume()
+        // A login/slow page may become readable after the first bounded observation expired.
+        session.readBack.reset(); session.readBack.start()
         ui.onLoading(session.loading)
         session.diagnostics.resume()
         notifyChanged()

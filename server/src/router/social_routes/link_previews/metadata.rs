@@ -162,7 +162,7 @@ pub(super) fn parse(html: &str, base: &Url) -> Metadata {
     out
 }
 
-fn tag_end(html: &str, start: usize) -> Option<usize> {
+pub(super) fn tag_end(html: &str, start: usize) -> Option<usize> {
     let mut quote = 0;
     for (offset, b) in html.as_bytes()[start + 1..].iter().copied().enumerate() {
         if quote != 0 {
@@ -178,7 +178,7 @@ fn tag_end(html: &str, start: usize) -> Option<usize> {
     None
 }
 
-fn attributes(tag: &str) -> Vec<(String, String)> {
+pub(super) fn attributes(tag: &str) -> Vec<(String, String)> {
     let b = tag.as_bytes();
     let mut i = 0;
     let mut attrs = Vec::new();

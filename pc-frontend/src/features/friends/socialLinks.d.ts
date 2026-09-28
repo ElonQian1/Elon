@@ -5,6 +5,7 @@ declare global {
   var ElonSocialLinks: {
     safeUrl(value: string): URL | null;
     channelsId(value: string): string | null;
+    embed(value: string): LinkEmbed | null;
     links(text: string): LinkPreview[];
     compact(text: string): boolean;
     remember(owner: string, preview: LinkPreview, expires?: number): void;

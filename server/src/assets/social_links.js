@@ -172,7 +172,7 @@
       if (typeof value?.json === 'function') { if (!value.ok) throw new Error('preview unavailable'); return value.json(); }
       return value;
     }).then(value => sanitize(value, item), () => item).then(value => {
-      record.expires = Date.now() + (value.status === 'ready' ? 3600000 : 30000); return value;
+      record.expires = Date.now() + (value.status === 'ready' ? (!value.image && ['抖音', '小红书'].includes(value.site) ? 300000 : 3600000) : 30000); return value;
     }).finally(() => clearTimeout(timer));
     cache.set(key, record); return record.promise;
   }
@@ -248,7 +248,7 @@
         busy = false;
         const observed = cache.get(String(options.owner || '') + '\n' + item.url);
         const latest = observed?.read && observed.expires > Date.now() ? observed.read : value;
-        if (valid()) { draw(latest); retry.disabled = false; retry.hidden = latest.status === 'ready' || options.compact === true; }
+        if (valid()) { draw(latest); retry.disabled = false; retry.hidden = (latest.status === 'ready' && (latest.image || !['抖音', '小红书'].includes(latest.site))) || options.compact === true; }
       }
       button.onclick = event => {
         if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;

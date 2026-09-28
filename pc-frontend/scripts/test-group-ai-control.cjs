@@ -56,6 +56,19 @@ test('same production start receives exact selection/revisions and sharing remai
   assert.equal(f.task.input.provider, 'chatgpt')
   assert.equal(receipt.delivery_verified, undefined)
 })
+test('explicit links reads full selected share URL without truncating its query', async () => {
+  const f = fixture(); await f.model.execute({ action: 'groups' })
+  const url = 'https://www.xiaohongshu.com/discovery/item/0123456789abcdef01234567?xsec_token=' + 'a'.repeat(300) + '&xsec_source=pc_share'
+  f.messages[0].content = 'Share ' + url
+  const c = { action: 'links', owner_binding: 'binding-1', group_id: 'g', message_ids: ['image'] }
+  const r = await f.model.execute(c)
+  assert.deepEqual(r.links, [url]); assert.equal(f.task, null)
+  f.messages[0].content = 'https://www.xiaohongshu.com.evil.example/note https://user:secret@www.douyin.com/video/12345 https://127.0.0.1/'
+  assert.deepEqual((await f.model.execute(c)).links, [])
+  f.messages[0].recalled_at = 'now'
+  await assert.rejects(f.model.execute(c), /selection_changed/)
+  await assert.rejects(f.model.execute({ ...c, message_ids: ['image', 'other'] }), /single_message/)
+})
 test('rejects stale owner and a switch during directory read before dispatch', async () => {
   for (const during of [false, true]) {
     const f = fixture(); await f.model.execute({ action: 'groups' })

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import '../friends/socialReadPreview'
+import { readSource } from '../friends/socialReadPreview'
 import type { LinkPreview } from '../friends/socialLinks'
 import {
   activateTab, clampDockWidth, closeTab, initialReaderTabsState, nextTabId, openTab, setLayout, setPresented, updateTab,
@@ -55,8 +55,8 @@ export const useReaderTabs = create<ReaderTabsStore>((set, get) => ({
   },
 }))
 
-// X posts open the official page (the adapter reads it); other embeds use their player URL.
+// Douyin's public iframe has no poster; its original page supplies the actual metadata.
 function readingUrlFor(preview: LinkPreview) {
-  const original = ElonSocialReadAdapter.readingUrl(preview.url)
-  return preview.embed?.kind === 'x' ? original : preview.embed?.url || original
+  const original = ElonSocialReadAdapter.readingUrl(readSource(preview))
+  return preview.embed?.kind === 'x' || preview.embed?.kind === 'douyin' ? original : preview.embed?.url || original
 }

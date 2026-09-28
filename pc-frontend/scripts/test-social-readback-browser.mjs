@@ -34,8 +34,8 @@ try {
   await binance.click(); await strip.waitFor()
   // Chat stays interactive: the reading tab is a docked pane, not a modal.
   assert.equal(await page.locator('dialog[open]').count(), 0)
-  await page.getByRole('textbox').first().fill('边读边聊')
   await binance.getByText('Read Binance article', { exact: true }).waitFor()
+  await page.getByRole('textbox').first().fill('边读边聊')
   await page.getByRole('button', { name: '关闭标签', exact: true }).first().click()
   await strip.waitFor({ state: 'hidden' })
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('elon-social-read-preview-v1')).length), 1)
@@ -50,14 +50,21 @@ try {
   await page.getByRole('menuitem', { name: /覆盖整个工作区/ }).click()
   assert.equal(await page.evaluate(() => localStorage.getItem('elon.pc.readerLayout')), 'overlay')
   await page.getByRole('button', { name: '关闭标签', exact: true }).first().click(); await strip.waitFor({ state: 'hidden' })
-  assert.ok((await page.evaluate(() => window.__readCalls.filter(c => c.command === 'control_internal_browser_tab' && c.args.action === 'close').length)) >= 2)
+  // Reload above resets the test transport history; verify the close in this document.
+  assert.ok((await page.evaluate(() => window.__readCalls.filter(c => c.command === 'control_internal_browser_tab' && c.args.action === 'close').length)) >= 1)
   const checks = await page.evaluate(async () => {
-    const { cachedRead, rememberRead } = await import('/pc/src/features/friends/socialReadPreview.ts')
+    const { cachedRead, rememberRead, readSource } = await import('/pc/src/features/friends/socialReadPreview.ts')
     const original = ElonSocialLinks.links('https://x.com/example/status/123456')[0]
     const value = { schema: 1, original: original.url, url: original.url, article: true, title: 'A post', author: '', image: null }
     rememberRead('scope-a', original, value)
     const isolated = cachedRead('scope-b', original) === null
     const wrongPost = rememberRead('scope-a', original, { ...value, url: 'https://x.com/example/status/999999' }) === null
+    const short = ElonSocialLinks.links('https://v.douyin.com/fixture/')[0]
+    const resolved = {...short, embed:ElonSocialLinks.embed('https://www.douyin.com/video/12345678')}
+    const source = readSource(resolved)
+    rememberRead('scope-a', resolved, {...value,original:source,url:source,title:'Selected video',image:'https://p3.douyinpic.com/poster.jpg'})
+    const media = cachedRead('scope-a', short)?.preview
+    const mediaAlias = media?.url === short.url && media?.image === 'https://p3.douyinpic.com/poster.jpg' && media?.embed?.id === '12345678' && source === 'https://www.douyin.com/video/12345678'
     let rows = JSON.parse(localStorage.getItem('elon-social-read-preview-v1'))
     rows = rows.map(row => ({ ...row, saved: Date.now() - 24 * 3600000 - 1 }))
     localStorage.setItem('elon-social-read-preview-v1', JSON.stringify(rows))
@@ -66,9 +73,9 @@ try {
       const item = ElonSocialLinks.links('https://x.com/example/status/' + i)[0]
       rememberRead('scope-a', item, { ...value, original: item.url, url: item.url })
     }
-    return { isolated, wrongPost, expired, capacity: JSON.parse(localStorage.getItem('elon-social-read-preview-v1')).length }
+    return { isolated, wrongPost, expired, mediaAlias, capacity: JSON.parse(localStorage.getItem('elon-social-read-preview-v1')).length }
   })
-  assert.deepEqual(checks, { isolated: true, wrongPost: true, expired: true, capacity: 128 })
+  assert.deepEqual(checks, { isolated: true, wrongPost: true, expired: true, mediaAlias: true, capacity: 128 })
   assert.deepEqual(errors, [])
   console.log(JSON.stringify({ passed: true, checks, reloadRestoresPreview: true, xOriginalRoute: true, readingTabs: 'docked+overlay', nativeTransport: 'test double', realSiteVerified: false }))
 } finally { await browser.close() }

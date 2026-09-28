@@ -4,10 +4,10 @@ pub(crate) fn definitions() -> Vec<Value> {
     vec![
         json!({
             "name":"win_group_ai_action",
-            "description":"Use the signed-in Win user's production group AI workflow without clicks. groups/messages are read-only, returning bounded previews and an owner binding. start sends selected original attachments and the question to ChatGPT and publishes the completed answer to the same group; requires explicit user authorization and confirmed=true. It never enables conversation sharing. Reuse command_id after a transport failure; do not create another start. status verifies the group result; resume only checks an already-dispatched task without resending. Queued/completed command receipts are NOT proof the AI task completed.",
+            "description":"Use the signed-in Win user's production group AI workflow without clicks. groups/messages are read-only, returning bounded previews and an owner binding. links reads up to two complete supported-platform URLs from exactly one selected message; retain access query parameters for navigation but never log them. start sends selected original attachments and the question to ChatGPT and publishes the completed answer to the same group; requires explicit user authorization and confirmed=true. It never enables conversation sharing. Reuse command_id after a transport failure; do not create another start. status verifies the group result; resume only checks an already-dispatched task without resending. Queued/completed command receipts are NOT proof the AI task completed.",
             "inputSchema":{"type":"object","additionalProperties":false,"required":["command_id","action"],"properties":{
                 "command_id":{"type":"string","format":"uuid"},
-                "action":{"type":"string","enum":["groups","messages","start","status","resume","cancel"]},
+                "action":{"type":"string","enum":["groups","messages","links","start","status","resume","cancel"]},
                 "owner_binding":{"type":"string","maxLength":100},
                 "group_id":{"type":"string","maxLength":100},
                 "message_ids":{"type":"array","minItems":1,"maxItems":50,"uniqueItems":true,"items":{"type":"string","maxLength":100}},

@@ -17,18 +17,22 @@ internal object SocialLinkReadStore {
             if (raw.length > 16384) { store.edit().remove(key).apply(); return null }
             val value = JSONObject(raw); val saved = value.getLong("saved")
             if (saved > now || now - saved >= TTL) { store.edit().remove(key).apply(); return null }
-            SocialLinkReadPreview.parse(url, value.getJSONObject("preview"))
+            val preview = value.getJSONObject("preview")
+            val source = preview.optString("original", url)
+            if (!SocialLinkReadIdentity.cacheAlias(url, source)) return null
+            SocialLinkReadPreview.parse(source, preview)?.copy(url = url)
         }.getOrNull()
     }
-    @Synchronized fun put(context: Context, server: String, owner: String?, value: JSONObject, now: Long = System.currentTimeMillis()) {
+    @Synchronized fun put(context: Context, server: String, owner: String?, value: JSONObject, now: Long = System.currentTimeMillis(), cacheOriginal: String = value.optString("original")) {
         val original = value.optString("original")
+        if (!SocialLinkReadIdentity.cacheAlias(cacheOriginal, original)) return
         val item = SocialLinkReadPreview.parse(original, value) ?: return
         // Rebuild the record to prevent unexpected adapter fields from becoming persisted data.
         val preview = JSONObject().put("schema", 1).put("original", original).put("url", value.optString("url"))
             .put("article", true).put("title", item.title).put("author", item.author).put("description", item.summary).put("image", item.image)
         val record = JSONObject().put("saved", now).put("preview", preview).toString()
         if (record.length > 16384) return
-        val store = prefs(context); val editor = store.edit(); val id = key(server, owner, original)
+        val store = prefs(context); val editor = store.edit(); val id = key(server, owner, cacheOriginal)
         val remaining = store.all.mapNotNull { (k, v) ->
             val time = runCatching { JSONObject(v as String).getLong("saved") }.getOrDefault(0)
             if (time > now || now - time >= TTL || k == id) { editor.remove(k); null } else k to time

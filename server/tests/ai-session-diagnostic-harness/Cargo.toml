@@ -17,6 +17,7 @@ sha2 = "0.10"
 axum = "0.7"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tower = { version = "0.4", features = ["util"] }
+reqwest = { version = "0.12", default-features = false }
 
 [[test]]
 name = "node_agent_win_group_ai"
