@@ -26,6 +26,7 @@ pub(super) struct PreparedCapture {
     pub(super) steps: Vec<CaptureInteractionStep>,
     pub(super) interaction_timeout_ms: u64,
     pub(super) auth: PreparedAuth,
+    pub(super) expected_page: Option<super::expected_page::ExpectedPage>,
     pub(super) fixture: super::fixture::PreparedFixture,
     pub(super) evidence: CaptureEvidence,
 }
@@ -76,6 +77,7 @@ pub(super) fn prepare(
     let interaction_timeout_ms = validate_steps(&input.steps)?;
     let config = read_config(&project_root)?;
     let (url, allowed_origins) = validate_url(&input.url, &config.allowed_origins)?;
+    super::expected_page::validate(&input, config.default_auth_profile.as_deref(), &url)?;
     let auth = super::auth::prepare_auth(
         &project_root,
         input.auth_profile.or(config.default_auth_profile),
@@ -107,6 +109,7 @@ pub(super) fn prepare(
         steps: input.steps,
         interaction_timeout_ms,
         auth,
+        expected_page: input.expected_page,
         fixture,
         evidence,
     })

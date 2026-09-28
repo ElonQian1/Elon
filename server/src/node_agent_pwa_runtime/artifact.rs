@@ -86,6 +86,8 @@ struct CaptureManifest<'a> {
     process_cleanup: &'a ProcessCleanup,
     page_diagnostics: &'a PageDiagnostics,
     authentication_mode: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    expected_page: Option<&'a super::expected_page::ExpectedPage>,
     fixture_profile: Option<&'a str>,
     executed_step_count: usize,
     base64_embedded: bool,
@@ -223,6 +225,7 @@ pub(super) fn persist(
         process_cleanup: &rendered.process_cleanup,
         page_diagnostics: &rendered.page_diagnostics,
         authentication_mode: prepared.auth.mode,
+        expected_page: prepared.expected_page.as_ref(),
         fixture_profile: prepared.fixture.profile.as_deref(),
         executed_step_count: rendered.executed_step_count,
         base64_embedded: false,

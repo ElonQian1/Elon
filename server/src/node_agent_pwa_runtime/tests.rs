@@ -43,6 +43,7 @@ fn input(url: String) -> PwaCaptureInput {
         capture: CaptureScope::default(),
         auth_profile: None,
         fixture_profile: None,
+        expected_page: None,
         steps: Vec::new(),
         evidence: CaptureEvidenceInput {
             source_revision: Some(format!("fixture-sha256:{}", "a".repeat(64))),

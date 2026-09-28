@@ -8,6 +8,7 @@ mod artifact;
 mod auth;
 mod browser;
 mod cdp;
+mod expected_page;
 mod fixture;
 mod interaction;
 mod process;
@@ -21,6 +22,8 @@ pub(crate) use stateful::{
     start as start_stateful_browser, stop as stop_stateful_browser,
 };
 
+#[cfg(test)]
+mod public_login_tests;
 #[cfg(test)]
 mod tests;
 
@@ -43,6 +46,8 @@ pub(crate) struct PwaCaptureInput {
     pub(crate) auth_profile: Option<String>,
     #[serde(default)]
     pub(crate) fixture_profile: Option<String>,
+    #[serde(default)]
+    pub(crate) expected_page: Option<expected_page::ExpectedPage>,
     #[serde(default)]
     pub(crate) steps: Vec<CaptureInteractionStep>,
     pub(crate) evidence: CaptureEvidenceInput,
@@ -255,6 +260,7 @@ pub(crate) fn tool_definition() -> Value {
                 },
                 "authProfile":{"type":"string","pattern":"^[A-Za-z0-9_-]{1,64}$","description":"只传 profile 名；秘密保存在项目 .elon/ui-tuner/pwa-sessions/<profile>.json"},
                 "fixtureProfile":{"type":"string","pattern":"^[A-Za-z0-9_-]{1,64}$","description":"引用 .elon/ui-tuner/pwa-fixtures/<profile>.json 的非秘密确定性测试数据"},
+                "expectedPage": expected_page::schema(),
                 "steps":{
                     "type":"array","maxItems":32,
                     "description":"可复现的安全交互重放；表单值只能引用 fixtureProfile.formValues，不在 MCP 参数中传秘密",
@@ -428,6 +434,7 @@ pub(crate) async fn capture(project_root: &str, input: PwaCaptureInput) -> Value
                 "viewport": result.viewport,
                 "networkPolicy": result.network_policy,
                 "authentication": {"mode": prepared.auth.mode, "profile": prepared.auth.profile},
+                "expectedPage": prepared.expected_page,
                 "testData": {"fixtureProfile": prepared.fixture.profile},
                 "interaction": {"executedStepCount": result.executed_step_count},
                 "processCleanup": result.process_cleanup,

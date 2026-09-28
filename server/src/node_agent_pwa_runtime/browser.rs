@@ -432,16 +432,33 @@ async fn wait_for_page(
     let wait_selector = serde_json::to_string(&prepared.wait_for.selector).unwrap_or("null".into());
     let auth_selector =
         serde_json::to_string(&prepared.auth.ready_selector).unwrap_or("null".into());
+    let public_selector = serde_json::to_string(
+        &prepared
+            .expected_page
+            .as_ref()
+            .map(|page| &page.ready_selector),
+    )
+    .unwrap_or("null".into());
     let expression = format!(
         r#"(() => {{
           const waitSelector = {wait_selector}; const authSelector = {auth_selector};
+          const publicSelector = {public_selector};
           const query = (selector) => {{ if (!selector) return true; try {{ return !!document.querySelector(selector); }} catch (_) {{ return null; }} }};
           const visible = (element) => {{
             if (!element) return false;
             const style = getComputedStyle(element); const rect = element.getBoundingClientRect();
             return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && rect.width > 0 && rect.height > 0;
           }};
+          const loginQuery = 'input[type="password"], form[action*="login" i], form[action*="signin" i]';
+          const publicReady = () => {{
+            if (!publicSelector) return true;
+            try {{ const roots = document.querySelectorAll(publicSelector); const root = roots[0];
+              return roots.length === 1 && visible(root) &&
+                ((root.matches(loginQuery) && visible(root)) || Array.from(root.querySelectorAll(loginQuery)).some(visible));
+            }} catch (_) {{ return null; }}
+          }};
           return {{ readyState: document.readyState, waitFound: query(waitSelector), authReady: query(authSelector),
+            publicReady: publicReady(),
             authForm: Array.from(document.querySelectorAll('input[type="password"], form[action*="login" i], form[action*="signin" i]')).some(visible), href: location.href }};
         }})()"#
     );
@@ -465,6 +482,7 @@ async fn wait_for_page(
             .ok_or_else(|| protocol_error("页面状态探测没有返回 value"))?;
         if value.get("waitFound").is_some_and(Value::is_null)
             || value.get("authReady").is_some_and(Value::is_null)
+            || value.get("publicReady").is_some_and(Value::is_null)
         {
             return Err(invalid_selector());
         }
@@ -493,12 +511,13 @@ async fn wait_for_page(
         let auth_failed = network
             .document_status
             .is_some_and(|status| matches!(status, 401 | 403))
-            || looks_like_login_route(href)
-            || (ready
-                && value
-                    .get("authForm")
-                    .and_then(Value::as_bool)
-                    .unwrap_or(false));
+            || (prepared.expected_page.is_none()
+                && (looks_like_login_route(href)
+                    || (ready
+                        && value
+                            .get("authForm")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false))));
         if auth_failed {
             return Err(auth_failure(prepared));
         }
@@ -510,7 +529,12 @@ async fn wait_for_page(
             .get("authReady")
             .and_then(Value::as_bool)
             .unwrap_or(false);
-        if ready && wait_found && auth_ready && !href.is_empty() {
+        if ready
+            && wait_found
+            && auth_ready
+            && !href.is_empty()
+            && super::expected_page::ready(prepared, href, value)?
+        {
             return Ok(href.to_string());
         }
         short_pause().await;
@@ -670,6 +694,7 @@ fn wait_timeout(
         },
         "waitCondition": prepared.wait_for.condition,
         "documentStatus": network.document_status,
+        "expectedPage": prepared.expected_page,
         "pendingRequestCount": network.inflight.len(),
         "pendingRequestTypes": network.pending_types(),
     });

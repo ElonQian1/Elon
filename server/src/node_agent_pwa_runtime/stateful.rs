@@ -31,6 +31,7 @@ struct StatefulBrowser {
     project_root: PathBuf,
     target_origin: String,
     auth_profile: Option<String>,
+    expected_page: Option<super::expected_page::ExpectedPage>,
     fixture_profile: Option<String>,
     viewport: (u32, u32, u64),
     page_session_id: String,
@@ -134,6 +135,7 @@ pub(crate) async fn start(
         project_root: prepared.project_root.clone(),
         target_origin: security::origin(&prepared.url).unwrap_or_default(),
         auth_profile: prepared.auth.profile.clone(),
+        expected_page: prepared.expected_page.clone(),
         fixture_profile: prepared.fixture.profile.clone(),
         viewport: viewport_key(&prepared),
         page_session_id,
@@ -283,6 +285,7 @@ fn validate_reuse(
     let same = runtime.project_root == prepared.project_root
         && runtime.target_origin == security::origin(&prepared.url)?
         && runtime.auth_profile == prepared.auth.profile
+        && runtime.expected_page == prepared.expected_page
         && runtime.fixture_profile == prepared.fixture.profile
         && runtime.viewport == viewport_key(prepared);
     if !same {
@@ -318,6 +321,7 @@ fn runtime_view(runtime: &StatefulBrowser) -> Value {
     json!({
         "runtimeId":runtime.runtime_id,"status":"READY","projectRoot":runtime.project_root,
         "targetOrigin":runtime.target_origin,"authProfile":runtime.auth_profile,
+        "expectedPage":runtime.expected_page,
         "fixtureProfile":runtime.fixture_profile,"operationCount":runtime.operation_count,
         "createdAt":runtime.created_at,"lastUsedAt":runtime.last_used_at,
         "limits":{"maxActiveSessions":MAX_ACTIVE_SESSIONS,"maxOperations":MAX_OPERATIONS,
@@ -343,6 +347,7 @@ fn captured_response(
         "networkPolicy":result.network_policy,
         "authentication":{"mode":prepared.auth.mode,"profile":prepared.auth.profile},
         "testData":{"fixtureProfile":prepared.fixture.profile,"formValuesEmbedded":false},
+        "expectedPage":prepared.expected_page,
         "interaction":{"executedStepCount":result.executed_step_count},
         "processLifecycle":result.process_cleanup,
         "pageDiagnostics":result.page_diagnostics,
