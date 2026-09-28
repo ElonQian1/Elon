@@ -89,7 +89,7 @@
     const first = item.imageList?.[0];
     const covers = kind === 'douyin' ? [...(video.origin_cover?.url_list || []), ...(video.cover?.url_list || [])]
       : [first?.urlDefault, first?.url, first?.infoList?.find(v => v.imageScene === 'WB_DFT')?.url];
-    const author = clean(kind === 'douyin' ? item.author?.nickname : item.user?.nickname, 80);
+    const author = clean(kind === 'douyin' ? item.author?.nickname : item.user?.nickname || item.user?.nickName, 80);
     const poster = covers.slice(0, 8).map(c => image(typeof c === 'string' ? c.replace(/^http:/, 'https:') : c, kind)).find(Boolean);
     return meaningful(title) && poster ? { title, author, image: poster, description: '' } : null;
   }
@@ -147,11 +147,11 @@
     const [kind, key] = id.split(':'); let item;
     if (kind === 'xiaohongshu') {
       const state = root.__INITIAL_STATE__?.note;
-      item = state?.noteDetailMap?.[key]?.note;
+      item = state?.noteDetailMap?.[key]?.note || root.__INITIAL_STATE__?.noteData?.data?.noteData;
       if (!item) return null;
       // Map keys alone are not proof of the selected note's identity.
       if (String(item.noteId || item.note_id) !== key) return null;
-      const content = document.querySelector('.note-content, #detail-desc');
+      const content = document.querySelector('.note-content, #detail-desc, .author-desc');
       const title = txt(document.querySelector('#detail-title')) || txt(content);
       const result = mediaFields(item, kind);
       return visible(content) && result && title.includes(result.title.slice(0, 24)) ? result : null;

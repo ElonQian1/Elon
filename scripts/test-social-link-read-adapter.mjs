@@ -54,6 +54,11 @@ try {
   assert.equal(await read(note, noteHtml.replace('noteId:"0123456789abcdef01234567"', 'noteId:"000000000000000000000000"')), null); count++;
   assert.equal(await read(note, noteHtml.replace('class="note-content"', 'class="note-content" style="display:none"')), null); count++;
   assert.equal(await read(note, noteHtml.replace('sns-webpic-qc.xhscdn.com', 'xhscdn.com.evil.example')), null); count++;
+  const mobileNote = '<div class="author-desc">Selected mobile note</div><script>window.__INITIAL_STATE__={noteData:{data:{noteData:{noteId:"0123456789abcdef01234567",title:"Selected mobile note",user:{nickName:"Mobile author"},imageList:[{url:"https://sns-webpic-qc.xhscdn.com/mobile.webp"}]},relatedNotes:[{noteId:"999999999999999999999999",title:"Other",imageList:[{url:"https://sns-webpic-qc.xhscdn.com/other.webp"}]}]}}}</script>';
+  result = await read(note, mobileNote);
+  assert.equal(result.author, 'Mobile author'); assert.ok(result.image.endsWith('mobile.webp')); count++;
+  assert.equal(await read(note, mobileNote.replace('class="author-desc"', 'style="display:none" class="author-desc"')), null); count++;
+  assert.equal(await read(note, mobileNote.replace('noteId:"0123456789abcdef01234567"', 'noteId:"000000000000000000000000"')), null); count++;
   const dy = 'https://www.douyin.com/video/12345678';
   const payload = { status_code: 0, aweme_detail: { aweme_id: '12345678', desc: 'Selected video', author: {nickname:'Author'}, video:{cover:{url_list:['https://p3.douyinpic.com/poster.jpg']}} } };
   let requests = 0;

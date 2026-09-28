@@ -44,7 +44,7 @@ class SocialLinkBrowserActivity : AppCompatActivity(), SocialLinkReaderSessions.
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val link = SocialLinkPolicy.link(intent.getStringExtra("url").orEmpty(), intent.getStringExtra("title").orEmpty())
+        val link = SocialLinkReaderInput.parse(intent.getStringExtra("url").orEmpty(), intent.getStringExtra("title").orEmpty(), intent.getStringExtra("player"), intent.getStringExtra("x_id"))
         if (link == null) { finish(); return }
         root = FrameLayout(this).apply { setBackgroundColor(Color.parseColor("#15171B")) }
         main = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
