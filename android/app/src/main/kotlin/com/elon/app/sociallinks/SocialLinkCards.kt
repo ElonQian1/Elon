@@ -14,7 +14,8 @@ import com.elon.app.ChatMessage
 import com.elon.app.ServerUrlManager
 
 internal object SocialLinkCards {
-    fun bind(container: LinearLayout?, text: TextView, message: ChatMessage, enabled: Boolean, bubble: LinearLayout? = null) {
+    fun bind(container: LinearLayout?, text: TextView, message: ChatMessage, enabled: Boolean, bubble: LinearLayout? = null,
+        readerActions: ((LinearLayout, View, () -> SocialLink) -> Unit)? = null, onPreview: ((SocialLink) -> Unit)? = null) {
         if (!enabled || container == null || message.role !in listOf("user", "friend") || message.webChatMessage != null) return
         val items = SocialLinkPolicy.extract(message.content)
         if (items.isEmpty()) return
@@ -43,14 +44,14 @@ internal object SocialLinkCards {
                 setTextColor(Color.parseColor("#B4C5E3")); setPadding(dp(4), dp(8), dp(4), dp(8)); visibility = View.GONE
             }
             host.addView(card, LinearLayout.LayoutParams(-1, -2)); host.addView(retry)
-            if (WechatChannelsPolicy.isChannels(item.url)) host.addView(TextView(context).apply {
+            if (readerActions == null && WechatChannelsPolicy.isChannels(item.url)) host.addView(TextView(context).apply {
                 this.text = "查看原网页"; textSize = 12f; minHeight = dp(44); gravity = android.view.Gravity.CENTER_VERTICAL
                 setTextColor(Color.parseColor("#B4C5E3")); setOnClickListener { SocialLinkBrowserActivity.open(context, current) }
             })
             val width = minOf(dp(if (WechatChannelsPolicy.isChannels(item.url)) 220 else 280), (context.resources.displayMetrics.widthPixels - dp(if (compact) 104 else 128)).coerceAtLeast(1))
             container.addView(host, LinearLayout.LayoutParams(width, -2).apply { topMargin = if (compact) 0 else dp(8) }); container.visibility = View.VISIBLE
             fun valid() = host.parent === container && AuthManager.userId(app) == owner && ServerUrlManager.getActive(app) == server
-            fun draw(value: SocialLink) { current = value; card.bind(value) }
+            fun draw(value: SocialLink) { current = value; card.bind(value); onPreview?.invoke(value) }
             fun load(refresh: Boolean) {
                 if (busy || !valid()) return
                 busy = true; retry.isEnabled = false
@@ -66,6 +67,7 @@ internal object SocialLinkCards {
             }
             // Chat owns long-press and multi-select for every card descendant.
             retry.setOnClickListener { load(true) }; draw(item)
+            readerActions?.invoke(host, card) { current }
             val focus = ViewTreeObserver.OnWindowFocusChangeListener { hasFocus -> if (hasFocus) load(false) }
             host.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
                 override fun onViewAttachedToWindow(v: View) { v.viewTreeObserver.addOnWindowFocusChangeListener(focus); load(false) }

@@ -1,0 +1,14 @@
+[
+  {"kind":"image","text":"[图片] photo.jpg","filename":"photo.jpg","expected":""},
+  {"kind":"video","text":"[视频] movie.mp4","filename":"movie.mp4","expected":""},
+  {"kind":"audio","text":"[语音] voice.amr","filename":"voice.amr","expected":""},
+  {"kind":"file","text":"[文件] notes.pdf","filename":"notes.pdf","expected":""},
+  {"kind":"forward","text":"[聊天记录] 讨论","expected":"讨论"},
+  {"kind":"text","text":"[图片] 这是我手写的提示","expected":"[图片] 这是我手写的提示"},
+  {"kind":"unknown","text":"[新类型] 内容","expected":"[新类型] 内容"},
+  {"kind":"link","text":"[链接] 测试文章 https://mp.weixin.qq.com/s?a=1&b=2#rd","cards":[{"url":"https://mp.weixin.qq.com/s?a=1&b=2#rd","title":"测试文章","site":"微信公众号"}],"expected":""},
+  {"kind":"link","text":"[链接] 测试文章 https://mp.weixin.qq.com/s?a=1\n我的补充","cards":[{"url":"https://mp.weixin.qq.com/s?a=1","title":"测试文章","site":"微信公众号"}],"expected":"我的补充"},
+  {"kind":"channels","text":"[视频号] 这是视频描述 https://weixin.qq.com/sph/test","cards":[{"url":"https://weixin.qq.com/sph/test","title":"这是视频描述","site":"视频号"}],"expected":"这是视频描述"},
+  {"kind":"link","text":"[链接] 不支持的链接 http://example.com/a","expected":"不支持的链接 http://example.com/a"},
+  {"kind":"image","text":"[图片] photo.jpg\n补充说明","filename":"photo.jpg","expected":"photo.jpg\n补充说明"}
+]

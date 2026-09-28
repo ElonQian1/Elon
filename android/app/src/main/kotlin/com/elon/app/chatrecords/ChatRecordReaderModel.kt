@@ -59,6 +59,14 @@ internal class ChatRecordReaderModel(app: Application) : AndroidViewModel(app) {
             if (!closed) android.os.Handler(android.os.Looper.getMainLooper()).post { if (!closed && sameAccount()) done(result) }
         }
     }
+    fun poster(row: RecordRow, done: (Result<ChatRecordVideoPoster.Poster>) -> Unit) {
+        file(row) { file -> file.onSuccess { source ->
+            worker.execute {
+                val result = runCatching { ChatRecordVideoPoster.read(source) }
+                android.os.Handler(android.os.Looper.getMainLooper()).post { if (!closed && sameAccount()) done(result) }
+            }
+        }.onFailure { done(Result.failure(it)) } }
+    }
     fun revoke() {
         loading = true; changed.value = (changed.value ?: 0) + 1
         worker.execute {

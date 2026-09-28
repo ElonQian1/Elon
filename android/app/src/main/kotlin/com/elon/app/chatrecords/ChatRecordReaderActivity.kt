@@ -21,11 +21,13 @@ class ChatRecordReaderActivity : AppCompatActivity() {
     private lateinit var ui: ArticleUi
     private lateinit var header: LinearLayout
     private lateinit var list: RecyclerView
+    private lateinit var rowView: ChatRecordRowView
     private val rows = mutableListOf<RecordRow>()
     private var video: android.widget.VideoView? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         model = ViewModelProvider(this)[ChatRecordReaderModel::class.java]; ui = ArticleUi(this)
+        rowView = ChatRecordRowView(ui, model, ::openMedia, ::move)
         if (savedInstanceState != null) model.parent = savedInstanceState.getString("parent")
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         header = ui.column(); root.addView(header)
@@ -51,8 +53,9 @@ class ChatRecordReaderActivity : AppCompatActivity() {
     private fun render() {
         header.removeAllViews()
         val top = ui.row()
-        top.addView(ImageButton(this).apply { setImageResource(android.R.drawable.ic_media_previous); contentDescription = "返回"; setOnClickListener { back() } }, LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)))
+        top.addView(ImageButton(this).apply { setImageResource(androidx.appcompat.R.drawable.abc_ic_ab_back_material); contentDescription = "返回"; background = null; setColorFilter(com.elon.app.MobileColors(this@ChatRecordReaderActivity).text); setOnClickListener { back() } }, LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)))
         top.addView(ui.text(if (model.parent == null) model.document?.title ?: "聊天记录" else "转发的聊天记录", 20f), LinearLayout.LayoutParams(0, -2, 1f))
+        top.addView(ImageButton(this).apply { setImageResource(com.elon.app.R.drawable.ic_more_vertical); contentDescription = "更多"; background = null; setColorFilter(com.elon.app.MobileColors(this@ChatRecordReaderActivity).text); setOnClickListener { options(this) } }, LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)))
         header.addView(top)
         if (model.loading) header.addView(ui.text("正在读取…", 14f, true))
         if (model.notice.isNotBlank()) header.addView(ui.text(model.notice, 14f))
@@ -60,15 +63,6 @@ class ChatRecordReaderActivity : AppCompatActivity() {
         val doc = model.document
         if (doc != null && model.parent == null) {
             header.addView(ui.text("${doc.children(null).size} 条记录 · 微信导出", 13f, true))
-            val options = ui.row()
-            options.addView(ui.button("原始文本") { AlertDialog.Builder(this).setTitle("导出原文")
-                .setView(android.widget.ScrollView(this).apply { addView(ui.text(doc.rawText, 14f).apply { setTextIsSelectable(true) }) })
-                .setPositiveButton("关闭", null).show() })
-            if (model.owner.isNotBlank() && model.owner == AuthManager.userId(this)) options.addView(ui.button("撤回分享") {
-                AlertDialog.Builder(this).setMessage("撤回后群成员将不能再读取此记录。已保存到其他位置的内容不会删除。")
-                    .setNegativeButton("取消", null).setPositiveButton("撤回") { _, _ -> model.revoke() }.show()
-            })
-            header.addView(options)
             if (doc.warnings.isNotEmpty()) header.addView(ui.button("${doc.warnings.size} 项导入提示") {
                 AlertDialog.Builder(this).setTitle("导入提示").setMessage(doc.warnings.joinToString("\n")).setPositiveButton("关闭", null).show()
             })
@@ -76,31 +70,25 @@ class ChatRecordReaderActivity : AppCompatActivity() {
         rows.clear(); rows.addAll(doc?.children(model.parent).orEmpty()); list.adapter?.notifyDataSetChanged()
         list.scrollToPosition(model.offsets[model.parent.orEmpty()] ?: 0)
     }
+    private fun options(anchor: View) {
+        val doc = model.document ?: return
+        android.widget.PopupMenu(this, anchor).apply {
+            menu.add("原始文本").setOnMenuItemClickListener {
+                AlertDialog.Builder(this@ChatRecordReaderActivity).setTitle("导出原文")
+                    .setView(android.widget.ScrollView(this@ChatRecordReaderActivity).apply { addView(ui.text(doc.rawText, 14f).apply { setTextIsSelectable(true) }) })
+                    .setPositiveButton("关闭", null).show(); true
+            }
+            if (model.owner.isNotBlank() && model.owner == AuthManager.userId(this@ChatRecordReaderActivity)) menu.add("撤回分享").setOnMenuItemClickListener {
+                AlertDialog.Builder(this@ChatRecordReaderActivity).setMessage("撤回后群成员将不能再读取此记录。已保存到其他位置的内容不会删除。")
+                    .setNegativeButton("取消", null).setPositiveButton("撤回") { _, _ -> model.revoke() }.show(); true
+            }
+        }.show()
+    }
     private inner class RecordAdapter : RecyclerView.Adapter<RecordHolder>() {
         override fun getItemCount() = rows.size
         override fun onCreateViewHolder(parent: android.view.ViewGroup, type: Int) = RecordHolder(ui.column().apply { layoutParams = RecyclerView.LayoutParams(-1, -2) })
         override fun onBindViewHolder(holder: RecordHolder, position: Int) {
-            val row = rows[position]; val body = holder.body; body.removeAllViews(); body.tag = row.id
-            body.addView(ui.text("${row.sender}    ${row.time}", 13f, true))
-            if (row.kind == "forward") {
-                body.addView(ui.button("聊天记录 · ${model.document?.children(row.id)?.size ?: 0} 条") { move(row.id) })
-            } else {
-                val text = ui.text(row.text, 17f).apply { setTextIsSelectable(true); android.text.util.Linkify.addLinks(this, android.text.util.Linkify.WEB_URLS) }
-                body.addView(text)
-                val links = LinearLayout(this@ChatRecordReaderActivity).apply { orientation = LinearLayout.VERTICAL }
-                body.addView(links)
-                com.elon.app.sociallinks.SocialLinkCards.bind(links, text, com.elon.app.ChatMessage(role = "friend", content = row.text), true)
-                if (row.assetId != null && row.kind == "image") {
-                    val image = android.widget.ImageView(this@ChatRecordReaderActivity).apply { adjustViewBounds = true; contentDescription = row.filename; scaleType = android.widget.ImageView.ScaleType.FIT_CENTER }
-                    body.addView(image, LinearLayout.LayoutParams(-1, ui.dp(220)))
-                    model.file(row) { result -> if (body.tag == row.id) result.onSuccess { f ->
-                        com.elon.app.ChatImagePreviewLoader.load(this@ChatRecordReaderActivity, f.path) { bitmap -> image.post { if (body.tag == row.id) image.setImageBitmap(bitmap) } }
-                    }.onFailure { image.contentDescription = "图片加载失败，点击重试" } }
-                    image.setOnClickListener { openMedia(row) }
-                } else if (row.assetId != null) body.addView(ui.button(if (row.kind == "video") "播放视频" else "打开附件") { openMedia(row) })
-                else if (row.filename.isNotBlank()) body.addView(ui.text("导出包未提供可用附件", 13f, true))
-            }
-            body.addView(View(this@ChatRecordReaderActivity).apply { setBackgroundColor(0x22555555) }, LinearLayout.LayoutParams(-1, ui.dp(1)))
+            rowView.bind(holder.body, rows[position])
         }
     }
     private class RecordHolder(val body: LinearLayout) : RecyclerView.ViewHolder(body)
