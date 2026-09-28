@@ -17,7 +17,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Context
 import com.elon.app.databinding.ActivityMainBinding
 
 internal data class MainInputComposerViews(
@@ -51,7 +51,7 @@ internal data class MainInputComposerViews(
 }
 
 internal class MainInputComposerSetup(
-    private val activity: AppCompatActivity,
+    private val activity: Context,
     private val binding: ActivityMainBinding,
     private val dp: (Int) -> Int,
     private val currentModelLabel: () -> String,
@@ -100,7 +100,7 @@ internal class MainInputComposerSetup(
         root.clipChildren = false
         root.clipToPadding = false
         root.setPadding(0, dp(12), 0, bottomEdgeGap)
-        root.setBackgroundColor(Color.TRANSPARENT)
+        root.setBackgroundColor(activity.getColor(R.color.mobile_surface))
 
         val modeButtonRow = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(

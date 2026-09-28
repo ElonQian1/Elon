@@ -17,7 +17,7 @@ internal object GroupAiReplyViews {
         val context = bubble.context
         fun label(value: String) = TextView(context).apply {
             text = value; textSize = 14f
-            minHeight = (44 * resources.displayMetrics.density).toInt()
+            minHeight = (48 * resources.displayMetrics.density).toInt()
             gravity = android.view.Gravity.CENTER_VERTICAL
             setTextColor(ContextCompat.getColor(context, R.color.elon_link_primary))
         }

@@ -3,9 +3,7 @@ package com.elon.app
 import android.animation.ValueAnimator
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Matrix
-import android.graphics.Shader
 import android.graphics.drawable.ColorDrawable
 import android.text.method.LinkMovementMethod
 import android.text.util.Linkify
@@ -18,7 +16,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import androidx.recyclerview.widget.RecyclerView
-import kotlin.math.sin
 
 
 class ChatAdapter(
@@ -194,7 +191,7 @@ class ChatAdapter(
             } else {
                 View.VISIBLE
             }
-            holder.text.setTextColor(if (recalled) Color.parseColor("#8A8A8A") else messageTextColor(message.role))
+            holder.text.setTextColor(ChatMessagePalette(holder.text.context).foreground(message.role, recalled))
             if (recalled) {
                 holder.text.movementMethod = null
             } else if (webChatTextBound) {
@@ -285,9 +282,7 @@ class ChatAdapter(
         }
         status.visibility = if (text == null) View.GONE else View.VISIBLE
         status.text = text.orEmpty()
-        status.setTextColor(Color.parseColor(
-            if (canRetry) "#E07B84" else if (message.isRead && message.role == "user") "#67BEA0" else "#66111111"
-        ))
+        status.setTextColor(ChatMessagePalette(status.context).status(canRetry, message.isRead && message.role == "user"))
         status.isClickable = canRetry
         status.isFocusable = canRetry
         status.setOnClickListener(
@@ -509,14 +504,6 @@ class ChatAdapter(
         avatar.contentDescription = "我的头像"
     }
 
-    private fun messageTextColor(role: String): Int = when (role) {
-        "ai", "ai-intent", "friend" -> Color.parseColor("#F8F7F4")
-        "ai-stopped" -> Color.parseColor("#D9B66B")
-        "ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete" -> Color.parseColor("#B3DDDBD5")
-        "error" -> Color.parseColor("#E07B84")
-        else -> Color.parseColor("#0B1118")
-    }
-
     private fun startShimmer(holder: VH, expectedRole: String) {
         val text = holder.text
         text.post {
@@ -525,21 +512,7 @@ class ChatAdapter(
             if (width <= 0 || position == RecyclerView.NO_POSITION) return@post
             if (messages.getOrNull(position)?.role != expectedRole) return@post
 
-            val shader = LinearGradient(
-                0f,
-                0f,
-                width.toFloat(),
-                0f,
-                intArrayOf(
-                    Color.parseColor("#B3DDDBD5"),
-                    Color.parseColor("#F8F7F4"),
-                    Color.parseColor("#F8F7F4"),
-                    Color.parseColor("#F8F7F4"),
-                    Color.parseColor("#B3DDDBD5")
-                ),
-                floatArrayOf(0f, 0.28f, 0.5f, 0.72f, 1f),
-                Shader.TileMode.CLAMP
-            )
+            val shader = ChatMessagePalette(text.context).shimmer(width)
             val matrix = Matrix()
             text.paint.shader = shader
 
@@ -553,7 +526,7 @@ class ChatAdapter(
                     val fraction = animator.animatedFraction
                     matrix.setTranslate(width * (fraction * 2f - 1f), 0f)
                     shader.setLocalMatrix(matrix)
-                    text.alpha = 0.76f + 0.24f * sin(Math.PI * fraction).toFloat()
+                    text.alpha = 1f
                     text.invalidate()
                 }
                 start()
@@ -657,7 +630,7 @@ class ChatAdapter(
             val width = summary.width.coerceAtLeast(summary.measuredWidth)
             if (width <= 0) return@post
 
-            val shader = buildEvidenceShader(width)
+            val shader = ChatMessagePalette(summary.context).shimmer(width)
             val matrix = Matrix()
             holder.evidenceShimmerAnimator?.cancel()
             holder.evidenceShimmerAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -670,7 +643,7 @@ class ChatAdapter(
                     matrix.setTranslate(width * (fraction * 2f - 1f), 0f)
                     shader.setLocalMatrix(matrix)
                     summary.paint.shader = shader
-                    summary.alpha = 0.76f + 0.24f * sin(Math.PI * fraction).toFloat()
+                    summary.alpha = 1f
                     summary.invalidate()
                 }
                 start()
@@ -689,7 +662,7 @@ class ChatAdapter(
             val width = lastEntry.width.coerceAtLeast(lastEntry.measuredWidth)
             if (width <= 0) return@post
 
-            val shader = buildEvidenceShader(width)
+            val shader = ChatMessagePalette(lastEntry.context).shimmer(width)
             val matrix = Matrix()
             holder.evidenceShimmerAnimator?.cancel()
             holder.evidenceShimmerAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -702,26 +675,13 @@ class ChatAdapter(
                     matrix.setTranslate(width * (fraction * 2f - 1f), 0f)
                     shader.setLocalMatrix(matrix)
                     lastEntry.paint.shader = shader
-                    lastEntry.alpha = 0.76f + 0.24f * sin(Math.PI * fraction).toFloat()
+                    lastEntry.alpha = 1f
                     lastEntry.invalidate()
                 }
                 start()
             }
         }
     }
-
-    private fun buildEvidenceShader(width: Int): LinearGradient = LinearGradient(
-        0f, 0f, width.toFloat(), 0f,
-        intArrayOf(
-            Color.parseColor("#80BEBEBA"),
-            Color.parseColor("#F8F7F4"),
-            Color.parseColor("#F8F7F4"),
-            Color.parseColor("#F8F7F4"),
-            Color.parseColor("#80BEBEBA")
-        ),
-        floatArrayOf(0f, 0.28f, 0.5f, 0.72f, 1f),
-        Shader.TileMode.CLAMP
-    )
 
     private fun shouldReplaceLastMessage(msg: ChatMessage): Boolean {
         if (messages.isEmpty()) return false

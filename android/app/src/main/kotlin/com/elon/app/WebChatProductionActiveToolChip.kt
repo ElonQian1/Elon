@@ -8,10 +8,10 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Context
 
 internal class WebChatProductionActiveToolChip(
-    activity: AppCompatActivity,
+    activity: Context,
     private val dp: (Int) -> Int,
 ) : LinearLayout(activity) {
     private val icon = ImageView(activity).apply {

@@ -39,8 +39,8 @@ class GroupChatGptConnectionPromptTest {
                     assertEquals(0, label.layout.getEllipsisCount(label.lineCount - 1))
                 }
             }
-            assertTrue(prompt.root.contentDescription.contains("聊天不耗算力，又可训练群聊记忆"))
-            assertTrue(prompt.root.contentDescription.contains("每群独立项目 · 分析时建立"))
+            assertTrue(prompt.root.contentDescription.contains("ChatGPT"))
+            assertTrue(prompt.root.contentDescription.contains("账号与群聊记忆"))
             prompt.close()
             assertNull(prompt.root.parent)
         } finally { lifecycle.pause().stop().destroy() }

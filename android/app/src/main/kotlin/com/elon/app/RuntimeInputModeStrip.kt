@@ -7,10 +7,10 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Context
 
 internal class RuntimeInputModeStrip(
-    private val activity: AppCompatActivity,
+    private val activity: Context,
     private val dp: (Int) -> Int,
     private val onModeSelected: (RunningInputMode) -> Unit
 ) {

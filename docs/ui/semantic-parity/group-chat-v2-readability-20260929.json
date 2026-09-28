@@ -1,0 +1,575 @@
+{
+  "schemaVersion": 1,
+  "taskId": "group-chat-v2-readability-20260929",
+  "scope": "OBSERVED_CAPABILITY_STATE",
+  "designSystem": {
+    "id": "mobile-design-v2",
+    "sourceFile": "docs/design/mobile-design-system-v2.md",
+    "sha256": "56c06a578a25a582bff665d6433de96c097388ca8d2db59ee25066a6e787dc2d"
+  },
+  "requirementSpec": {
+    "sourceFile": "docs/requirements/group-chat-readability-20260929.md",
+    "sha256": "260bf9d1973fe5bea607892db49c3293c075825b3638b847209a99ae63d1e498"
+  },
+  "platformDifferences": [
+    "本批修复 Android 运行时颜色覆盖和透明输入区，不改变共享 Token、网页或消息协议。",
+    "Android 使用实际消息绑定、输入组件与 inset 处理的合成群聊；PWA 使用生产页面的合成项目对话。夹具文案不同，只对应共同的已显示回答与阅读能力。",
+    "Android 群聊账号入口、来源卡片与输入展开为原生单独验收项，不冒充网页有相同群聊账号入口。",
+    "两端各自捕获浅深主题；Android 100%、150%、200% 字体，PWA 为 411px 默认字体，不声称网页 200% 缩放或像素一致。",
+    "不证明真实消息发送、登录、账号切换、群权限和完整键盘行为已验收。"
+  ],
+  "states": [
+    {
+      "id": "answer-light-100",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "visible-ai-answer",
+          "state": "AI 回答已显示；Android 输入收起，不执行发送",
+          "android": {
+            "definitionId": "group.readability.answer",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "图片信息整理：\n\n先列出能够确认的内容，再标注尚待核对的细节。文字、引用来源和后续讨论入口应该清楚可读。\n\n这是离线布局示例，没有发送任何群消息。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "input-light-100",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "visible-ai-answer",
+          "state": "AI 回答已显示；Android 输入展开并保留草稿，不执行发送",
+          "android": {
+            "definitionId": "group.readability.answer",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "图片信息整理：\n\n先列出能够确认的内容，再标注尚待核对的细节。文字、引用来源和后续讨论入口应该清楚可读。\n\n这是离线布局示例，没有发送任何群消息。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "answer-light-150",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 1.5,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "visible-ai-answer",
+          "state": "AI 回答已显示；Android 输入收起，不执行发送",
+          "android": {
+            "definitionId": "group.readability.answer",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "图片信息整理：\n\n先列出能够确认的内容，再标注尚待核对的细节。文字、引用来源和后续讨论入口应该清楚可读。\n\n这是离线布局示例，没有发送任何群消息。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "input-light-150",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 1.5,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "visible-ai-answer",
+          "state": "AI 回答已显示；Android 输入展开并保留草稿，不执行发送",
+          "android": {
+            "definitionId": "group.readability.answer",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "图片信息整理：\n\n先列出能够确认的内容，再标注尚待核对的细节。文字、引用来源和后续讨论入口应该清楚可读。\n\n这是离线布局示例，没有发送任何群消息。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "answer-light-200",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "visible-ai-answer",
+          "state": "AI 回答已显示；Android 输入收起，不执行发送",
+          "android": {
+            "definitionId": "group.readability.answer",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "图片信息整理：\n\n先列出能够确认的内容，再标注尚待核对的细节。文字、引用来源和后续讨论入口应该清楚可读。\n\n这是离线布局示例，没有发送任何群消息。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "input-light-200",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "visible-ai-answer",
+          "state": "AI 回答已显示；Android 输入展开并保留草稿，不执行发送",
+          "android": {
+            "definitionId": "group.readability.answer",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "图片信息整理：\n\n先列出能够确认的内容，再标注尚待核对的细节。文字、引用来源和后续讨论入口应该清楚可读。\n\n这是离线布局示例，没有发送任何群消息。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "answer-dark-100",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "visible-ai-answer",
+          "state": "AI 回答已显示；Android 输入收起，不执行发送",
+          "android": {
+            "definitionId": "group.readability.answer",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "图片信息整理：\n\n先列出能够确认的内容，再标注尚待核对的细节。文字、引用来源和后续讨论入口应该清楚可读。\n\n这是离线布局示例，没有发送任何群消息。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "input-dark-100",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "visible-ai-answer",
+          "state": "AI 回答已显示；Android 输入展开并保留草稿，不执行发送",
+          "android": {
+            "definitionId": "group.readability.answer",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "图片信息整理：\n\n先列出能够确认的内容，再标注尚待核对的细节。文字、引用来源和后续讨论入口应该清楚可读。\n\n这是离线布局示例，没有发送任何群消息。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "answer-dark-150",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 1.5,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "visible-ai-answer",
+          "state": "AI 回答已显示；Android 输入收起，不执行发送",
+          "android": {
+            "definitionId": "group.readability.answer",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "图片信息整理：\n\n先列出能够确认的内容，再标注尚待核对的细节。文字、引用来源和后续讨论入口应该清楚可读。\n\n这是离线布局示例，没有发送任何群消息。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "input-dark-150",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 1.5,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "visible-ai-answer",
+          "state": "AI 回答已显示；Android 输入展开并保留草稿，不执行发送",
+          "android": {
+            "definitionId": "group.readability.answer",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "图片信息整理：\n\n先列出能够确认的内容，再标注尚待核对的细节。文字、引用来源和后续讨论入口应该清楚可读。\n\n这是离线布局示例，没有发送任何群消息。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "answer-dark-200",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "visible-ai-answer",
+          "state": "AI 回答已显示；Android 输入收起，不执行发送",
+          "android": {
+            "definitionId": "group.readability.answer",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "图片信息整理：\n\n先列出能够确认的内容，再标注尚待核对的细节。文字、引用来源和后续讨论入口应该清楚可读。\n\n这是离线布局示例，没有发送任何群消息。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "input-dark-200",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=chat_result&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.ai",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "assertText",
+            "selector": "#chatList .bubble.ai",
+            "text": "这是离线布局示例，不代表实际任务已完成。"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "visible-ai-answer",
+          "state": "AI 回答已显示；Android 输入展开并保留草稿，不执行发送",
+          "android": {
+            "definitionId": "group.readability.answer",
+            "assertions": {
+              "/kind": "android.text",
+              "/text": "图片信息整理：\n\n先列出能够确认的内容，再标注尚待核对的细节。文字、引用来源和后续讨论入口应该清楚可读。\n\n这是离线布局示例，没有发送任何群消息。"
+            }
+          },
+          "web": {
+            "selector": "#stageHintText",
+            "assertions": {
+              "/role": "span",
+              "/label": "✓ 任务完成，可以继续描述新需求。"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -21,24 +21,7 @@ internal class GroupChatGptConnectionPrompt(
     private var unsubscribe: (() -> Unit)? = null
     private var sheet: BottomSheetDialog? = null
     private var selected = false
-    private val title = label(14f, R.color.elon_text_primary)
-    private val subtitle = label(11f, R.color.elon_text_secondary)
-    private val memoryStatus = label(11f, R.color.elon_text_secondary).apply { text = "每群独立项目 · 分析时建立" }
-    val root = LinearLayout(activity).apply {
-        orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER_VERTICAL
-        minimumHeight = dp(48)
-        setPadding(0, dp(4), dp(4), dp(4))
-        isClickable = true
-        isFocusable = true
-        val value = android.util.TypedValue()
-        activity.theme.resolveAttribute(android.R.attr.selectableItemBackground, value, true)
-        if (value.resourceId != 0) setBackgroundResource(value.resourceId)
-        addView(title, LinearLayout.LayoutParams(-1, -2))
-        addView(subtitle, LinearLayout.LayoutParams(-1, -2))
-        addView(memoryStatus, LinearLayout.LayoutParams(-1, -2))
-        setOnClickListener { if (selected && valid()) showDetails() }
-    }
+    val root = GroupChatGptAccountView(activity) { if (selected && valid()) showDetails() }
 
     fun attach(row: LinearLayout, useChatGpt: Boolean) {
         selected = useChatGpt
@@ -60,11 +43,7 @@ internal class GroupChatGptConnectionPrompt(
     private fun render() {
         root.visibility = if (selected && valid()) View.VISIBLE else View.GONE
         val connected = connection.state() == ChatGptWebAccountConnection.State.CONNECTED
-        title.text = if (connected) "我的 ChatGPT ›" else "接入我的 ChatGPT ›"
-        subtitle.text = "聊天不耗算力，又可训练群聊记忆"
-        memoryStatus.visibility = View.VISIBLE
-        root.contentDescription = "${title.text}；${subtitle.text}；${memoryStatus.text}"
-        root.tag = "group-chatgpt-account"
+        root.render(connected)
     }
 
     private fun showDetails() {
@@ -76,7 +55,7 @@ internal class GroupChatGptConnectionPrompt(
             setPadding(dp(20), dp(20), dp(20), dp(24))
             setBackgroundColor(activity.getColor(R.color.elon_bg_app))
             addView(label(20f, R.color.elon_text_primary).apply { text = "接入我的 ChatGPT" })
-            addView(paragraph("聊天不耗算力，又可训练群聊记忆", true))
+            addView(paragraph("使用你的 ChatGPT 账号", true))
             addView(paragraph("网页 ChatGPT 聊天不扣一龙工作 AI 算力；实际用量、模型和工具仍受你的 ChatGPT 账号规则约束。切换工作 AI 时会另行确认。"))
             addView(paragraph("每群独立项目与长期会话", true))
             addView(paragraph("首次分析时，在你自己的 ChatGPT 账号内为本群建立独立项目和长期会话，以后继续沿用，群改名仍保持关联。登录本身不会上传群消息。多选分析时可取消加入项目，仅分析所选消息，不使用本群既有记忆。"))
