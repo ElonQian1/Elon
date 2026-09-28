@@ -2,11 +2,9 @@
 use super::broker::{LiveUiBroker, LiveUiSession};
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-};
+use std::{collections::BTreeMap, path::Path};
 
+mod capture_result;
 mod contract;
 mod evidence;
 mod signing;
@@ -71,12 +69,10 @@ pub(super) async fn write(
             web["diagnostic"]["code"].as_str().unwrap_or("UNKNOWN")
         );
     }
-    let capture_root = root
-        .join(".elon/ui-tuner/pwa-runtime/captures")
-        .canonicalize()?;
-    let web_png = captured_file(&capture_root, &web["artifact"]["path"])?;
-    let web_tree_bytes = captured_file(&capture_root, &web["semanticTree"]["path"])?;
-    let web_manifest = captured_file(&capture_root, &web["artifact"]["manifestPath"])?;
+    let captured = capture_result::read(&root, &web)?;
+    let web_png = captured.image;
+    let web_tree_bytes = captured.tree;
+    let web_manifest = captured.manifest;
     let web_tree: Value = serde_json::from_slice(&web_tree_bytes)?;
     let result = contract::evaluate(state, &android_nodes, &web_tree)?;
     let current = super::native_runtime_proof::read(broker, session, revision).await?;
@@ -213,17 +209,6 @@ async fn native_snapshot(
         }
     }
     bail!("SEMANTIC_NATIVE_STATE_UNSTABLE: tree changed during all three captures");
-}
-fn captured_file(capture_root: &Path, value: &Value) -> Result<Vec<u8>> {
-    let path =
-        PathBuf::from(value.as_str().context("SEMANTIC_WEB_ARTIFACT_MISSING")?).canonicalize()?;
-    if !path.starts_with(capture_root)
-        || !path.is_file()
-        || path.metadata()?.len() > 16 * 1024 * 1024
-    {
-        bail!("SEMANTIC_WEB_ARTIFACT_PATH_INVALID");
-    }
-    Ok(std::fs::read(path)?)
 }
 fn create_artifact_directory(root: &Path, relative: &str) -> Result<()> {
     let destination = root.join(relative);

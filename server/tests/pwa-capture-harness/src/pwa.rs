@@ -9,6 +9,10 @@ mod node_agent_cli_redaction {
 #[path = "../../../src/node_agent_pwa_runtime/mod.rs"]
 mod node_agent_pwa_runtime;
 
+mod capture_contract;
+#[path = "../../../src/node_agent_android_live/semantic_parity/capture_result.rs"]
+mod semantic_capture_result;
+
 mod node_agent_exec {
     pub(crate) fn hide_tokio_command_window(command: &mut tokio::process::Command) {
         #[cfg(windows)]
