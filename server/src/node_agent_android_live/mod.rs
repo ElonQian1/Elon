@@ -64,6 +64,7 @@ mod mcp_tools;
 mod node_selector;
 mod preview;
 mod protocol;
+mod registered_project_identity;
 mod relational_layout_geometry;
 mod routes;
 mod runtime_binding;

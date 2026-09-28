@@ -65,4 +65,8 @@ owner/project/node/workspace 登记模型，可作为新增可信来源的接入
 - 旧 supervision/finish-contract 绑定继续有效；历史 schema 可读且不扩大信任范围。
 - 模拟器空闲后，通过正式工具完成真实构建、捕获、持久化和新连接重绑，分别保存阶段证据。
 
-本轮仅完成源码诊断和方案评审，没有提交运行绑定实现，也没有重启或发布节点。
+后续源码实现已接入现有账号/节点项目登记接口，逐次在线校验登记 checkout 与当前 worktree
+的 Git common dir/origin；不增加离线凭据签发，也不伪造 task root。绑定记录使用
+`REGISTERED_PROJECT_WORKSPACE` 独立来源，保存已验证 build/generation，旧 schema 1 可读。
+首次绑定要求当前无 Patch 的源码证明；恢复需要同源码、同登记身份和同 build 的历史记录。
+登记缺失、歧义、失联或身份变化均失败。源码专项测试和节点编译通过，尚待发布及真实重绑验收。

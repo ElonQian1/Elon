@@ -144,6 +144,9 @@ async fn prepare_debug_runtime_inner(
     let requested_base_package_name = validate_package_name(request.base_package_name.trim())?;
     let base_package_name = super::debug_base_package_name(requested_base_package_name);
     let project_root = request.project_root.trim();
+    if keep_session {
+        super::runtime_binding::project_identity(project_root).await?;
+    }
     let install_id = broker
         .node_install_id()
         .context("PC 节点缺少稳定安装标识，拒绝创建会话级临时调试包")?;
@@ -270,9 +273,11 @@ async fn prepare_debug_runtime_inner(
         }
         match result {
             Ok(build) if keep_session => {
-                super::runtime_binding::persist_verified(&session).context(
-                    "RUNTIME_REBIND_PERSIST_FAILED: Debug Runtime 已 LIVE，但绑定持久化失败",
-                )?;
+                super::runtime_binding::persist_verified(&session)
+                    .await
+                    .context(
+                        "RUNTIME_REBIND_PERSIST_FAILED: Debug Runtime 已 LIVE，但绑定持久化失败",
+                    )?;
                 let integration = broker
                     .debug_integration
                     .status(&integration_plan.slot_id)?

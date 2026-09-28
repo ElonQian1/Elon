@@ -13,7 +13,7 @@ use super::broker::{LiveUiBroker, LiveUiSession};
 use super::build_verify::wait_for_runtime;
 use super::fit_run::workspace_fingerprint;
 
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 const MAX_BINDINGS: usize = 64;
 static STORE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
@@ -25,6 +25,8 @@ pub(crate) struct DurableRuntimeBinding {
     pub package_name: String,
     pub source_revision: String,
     pub root_task_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub registered_runtime: Option<super::registered_project_identity::RegisteredRuntime>,
     pub updated_at: String,
 }
 
@@ -62,7 +64,7 @@ fn read(path: &Path) -> Result<BindingFile> {
     }
     let file: BindingFile = serde_json::from_slice(&bytes)
         .with_context(|| format!("解析 Runtime 绑定失败: {}", path.display()))?;
-    if file.schema_version != SCHEMA_VERSION {
+    if !matches!(file.schema_version, 1 | SCHEMA_VERSION) {
         bail!(
             "RUNTIME_BINDING_STORE_INVALID: 不支持 schemaVersion={}",
             file.schema_version
@@ -77,19 +79,33 @@ fn write(path: &Path, file: &BindingFile) -> Result<()> {
         .with_context(|| format!("持久化 Runtime 绑定失败: {}", path.display()))
 }
 
-pub(crate) fn project_identity(project_root: &str) -> Result<(String, String, String)> {
+pub(crate) async fn project_identity(
+    project_root: &str,
+) -> Result<(
+    String,
+    String,
+    String,
+    Option<super::registered_project_identity::RegisteredProjectIdentity>,
+)> {
     let canonical = PathBuf::from(project_root)
         .canonicalize()
         .with_context(|| format!("项目目录不存在: {project_root}"))?;
     let canonical_text = canonical.to_string_lossy().to_string();
     let source_revision = workspace_fingerprint(&canonical_text)?
         .ok_or_else(|| anyhow::anyhow!("RUNTIME_BINDING_STALE: 无法计算项目源码 revision"))?;
-    let root_task_id =
-        crate::node_agent_supervision_project_identity::resolve_root_task_id(&canonical)?;
-    Ok((canonical_text, source_revision, root_task_id))
+    let (root_task_id, registered) =
+        match crate::node_agent_supervision_project_identity::resolve_root_task_id(&canonical) {
+            Ok(root) => (root, None),
+            Err(error) if format!("{error:#}").contains("RUNTIME_BINDING_MISSING_ROOT:") => {
+                let identity = super::registered_project_identity::resolve(&canonical).await?;
+                (identity.scope_id()?, Some(identity))
+            }
+            Err(error) => return Err(error),
+        };
+    Ok((canonical_text, source_revision, root_task_id, registered))
 }
 
-pub(crate) fn persist_verified(session: &LiveUiSession) -> Result<DurableRuntimeBinding> {
+pub(crate) async fn persist_verified(session: &LiveUiSession) -> Result<DurableRuntimeBinding> {
     if session.device_id == "ui-design-bootstrap" || session.package_name == "ui.design.bootstrap" {
         bail!("RUNTIME_BINDING_PSEUDO_REJECTED: 伪 Runtime 永不持久化");
     }
@@ -97,13 +113,39 @@ pub(crate) fn persist_verified(session: &LiveUiSession) -> Result<DurableRuntime
         .project_root
         .as_deref()
         .ok_or_else(|| anyhow::anyhow!("RUNTIME_BINDING_MISSING: session 没有项目目录"))?;
-    let (project_root, source_revision, root_task_id) = project_identity(project_root)?;
+    let (project_root, source_revision, root_task_id, registered) =
+        project_identity(project_root).await?;
+    let view = serde_json::to_value(session.view().await)?;
+    let registered_runtime = registered
+        .map(|identity| {
+            let previous = candidates_for(
+                &store_path(),
+                &project_root,
+                &source_revision,
+                &root_task_id,
+            )
+            .ok()
+            .and_then(|items| {
+                items.into_iter().find(|item| {
+                    item.device_id == session.device_id && item.package_name == session.package_name
+                })
+            })
+            .and_then(|item| item.registered_runtime);
+            super::registered_project_identity::bind_runtime(
+                identity,
+                &source_revision,
+                &view,
+                previous.as_ref(),
+            )
+        })
+        .transpose()?;
     let binding = DurableRuntimeBinding {
         project_root,
         device_id: session.device_id.clone(),
         package_name: session.package_name.clone(),
         source_revision,
         root_task_id,
+        registered_runtime,
         updated_at: Utc::now().to_rfc3339(),
     };
     let _guard = lock()
@@ -111,6 +153,7 @@ pub(crate) fn persist_verified(session: &LiveUiSession) -> Result<DurableRuntime
         .map_err(|_| anyhow::anyhow!("Runtime 绑定锁已损坏"))?;
     let path = store_path();
     let mut file = read(&path)?;
+    file.schema_version = SCHEMA_VERSION;
     // A project/root/source tuple has exactly one active Runtime device. Rebinding
     // from an offline phone to an online emulator must replace the old candidate;
     // retaining both would make the next bootstrap fail as ambiguous.
@@ -208,6 +251,7 @@ fn candidates_with_legacy_fit_runs(
                         package_name,
                         source_revision: source_revision.to_string(),
                         root_task_id: root_task_id.to_string(),
+                        registered_runtime: None,
                         updated_at,
                     },
                 )
@@ -316,7 +360,7 @@ pub(crate) async fn reconnect_or_rebind(
         .await
         {
             Ok(Ok(view)) if view.connected && view.node_count > 0 => {
-                persist_verified(&session).context(
+                persist_verified(&session).await.context(
                     "RUNTIME_REBIND_PERSIST_FAILED: 新 Runtime 已 LIVE，但绑定持久化失败",
                 )?;
                 return Ok((session, start, rebound));
@@ -385,7 +429,7 @@ pub(crate) async fn restore_unique(
     project_root: &str,
     host_port: u16,
 ) -> Result<(std::sync::Arc<LiveUiSession>, DurableRuntimeBinding)> {
-    let (project_root, source_revision, root_task_id) = project_identity(project_root)?;
+    let (project_root, source_revision, root_task_id, _) = project_identity(project_root).await?;
     let mut selected = candidates_with_legacy_fit_runs(
         &store_path(),
         &project_root,
@@ -437,12 +481,12 @@ pub(crate) async fn select_or_restore(
         .await
     {
         Ok(session) => {
-            let binding = persist_verified(&session)?;
+            let binding = persist_verified(&session).await?;
             Ok((session, binding, false))
         }
         Err(error) if error.to_string().contains("项目没有已连接") => {
             let (session, binding) = restore_unique(broker, project_root, host_port).await?;
-            let persisted = persist_verified(&session)?;
+            let persisted = persist_verified(&session).await?;
             debug_assert_eq!(binding.device_id, persisted.device_id);
             Ok((session, persisted, true))
         }
@@ -484,6 +528,7 @@ fn recoverable_control_diagnostic(error: &anyhow::Error) -> Option<String> {
     let message = format!("{error:#}");
     [
         "RUNTIME_BINDING_MISSING",
+        "RUNTIME_BINDING_REGISTRY",
         "RUNTIME_BINDING_AMBIGUOUS_ROOT",
         "RUNTIME_BINDING_STALE",
         "RUNTIME_BINDING_DEVICE_MISSING",
@@ -573,6 +618,7 @@ mod tests {
             package_name: "com.elon.app.uitest".into(),
             source_revision: revision.into(),
             root_task_id: "root-1".into(),
+            registered_runtime: None,
             updated_at: device.into(),
         }
     }
