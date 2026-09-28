@@ -140,9 +140,14 @@ pub(super) async fn report(
         .unwrap_or_else(|e| e.into_inner())
         .get(&key)
         .and_then(|cell| cell.get().cloned());
+    let mut preserved = None;
     if let Some((at, value)) = existing {
         if value.status == "ready" && value.source == "server" && at.elapsed() < ttl(&value) {
-            return Ok(value);
+            if value.cover_data_url.is_some() || value.image.is_some() || accepted.image.is_none() {
+                return Ok(value);
+            }
+            // A title-only cache entry must not block a later validated poster observation.
+            preserved = Some(value);
         }
     }
     let mut preview = Preview::fallback(&url);
@@ -155,8 +160,22 @@ pub(super) async fn report(
     preview.image = accepted.image;
     preview.status = "ready";
     preview.source = "member";
+    preview = merge_report(preserved, preview);
     store(key, preview.clone());
     Ok(preview)
+}
+
+fn merge_report(preserved: Option<Preview>, member: Preview) -> Preview {
+    let Some(mut server) = preserved else {
+        return member;
+    };
+    server.cover_data_url = member.cover_data_url;
+    server.image = member.image;
+    server.source = "member";
+    if server.author.is_empty() {
+        server.author = member.author;
+    }
+    server
 }
 
 fn store(key: [u8; 32], value: Preview) {

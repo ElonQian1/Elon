@@ -134,6 +134,9 @@ async fn douyin_preview(original: &Url, resolved: &Url) -> Result<Preview> {
         if let Ok(res) = response(&endpoint).await {
             if let Ok(text) = body(res, false).await {
                 if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
+                    if value.get("err_no").and_then(|v| v.as_i64()) != Some(0) {
+                        return Ok(preview);
+                    }
                     preview.title = metadata::clean(
                         value
                             .pointer("/data/video_title")

@@ -1,5 +1,42 @@
 use super::*;
 #[test]
+fn poster_read_back_enriches_title_only_server_metadata_without_replacing_identity() {
+    let url = policy::public_url("https://mp.weixin.qq.com/s/poster-merge").unwrap();
+    let mut server = Preview::fallback(&url);
+    server.title = "Server title".into();
+    server.status = "ready";
+    let mut member = Preview::fallback(&url);
+    member.title = "Observed title".into();
+    member.author = "Author".into();
+    member.image = Some("https://mmbiz.qpic.cn/poster.jpg".into());
+    member.cover_data_url = Some("data:image/jpeg;base64,AAAA".into());
+    let enriched = merge_report(Some(server), member);
+    assert_eq!(enriched.title, "Server title");
+    assert_eq!(enriched.author, "Author");
+    assert_eq!(enriched.url, url.as_str());
+    assert_eq!(enriched.source, "member");
+    assert!(enriched.image.is_some());
+    assert!(enriched.cover_data_url.is_some());
+}
+#[test]
+fn xiaohongshu_login_and_generic_shells_are_not_note_posters() {
+    let url = policy::public_url("https://www.xiaohongshu.com/discovery/item/example").unwrap();
+    for title in ["小红书 - 你的生活兴趣社区", "小红书登录", "页面不存在"] {
+        let html = format!("<title>{title}</title><meta property='og:image' content='https://sns-webpic-qc.xhscdn.com/splash.jpg'>");
+        let result = metadata::parse(&html, &url);
+        assert!(result.title.is_empty());
+        assert!(result.image.is_none());
+    }
+    let login = policy::public_url("https://www.xiaohongshu.com/login").unwrap();
+    assert!(metadata::parse("<title>Welcome</title>", &login)
+        .title
+        .is_empty());
+    assert_eq!(
+        metadata::parse("<title>Actual note</title>", &url).title,
+        "Actual note"
+    );
+}
+#[test]
 fn binance_app_shares_preserve_url_and_only_allow_exact_host() {
     let url = policy::public_url("https://app.binance.com/uni-qr/cpos/123456?r=synthetic&l=zh-CN")
         .unwrap();

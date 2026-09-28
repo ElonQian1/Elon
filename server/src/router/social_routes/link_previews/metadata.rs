@@ -142,6 +142,23 @@ pub(super) fn parse(html: &str, base: &Url) -> Metadata {
     if out.title.is_empty() {
         out.title = fallback;
     }
+    if policy::site(base) == "小红书" {
+        let title = out.title.replace(char::is_whitespace, "").to_lowercase();
+        if base.path().starts_with("/login")
+            || [
+                "小红书-你的生活兴趣社区",
+                "小红书–你的生活兴趣社区",
+                "小红书登录",
+                "登录小红书",
+                "登录",
+                "页面不存在",
+                "404",
+            ]
+            .contains(&title.as_str())
+        {
+            return Metadata::default();
+        }
+    }
     out
 }
 
