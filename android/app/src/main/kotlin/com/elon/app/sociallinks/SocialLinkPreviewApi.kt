@@ -35,13 +35,15 @@ internal object SocialLinkPreviewApi {
         if (!refresh && old != null && old.first > System.currentTimeMillis()) return old.second
         val request = Request.Builder().url(ServerUrlManager.getActive(context).trimEnd('/') + "/api/me/link-preview")
             .post(JSONObject().put("url", item.url).toString().toRequestBody("application/json".toMediaType()))
-        val preview = runCatching {
+        val serverPreview = runCatching {
             http.newCall(AuthManager.applyAuth(context, request).build()).execute().use { response ->
                 if (!response.isSuccessful) return@use item
                 val bytes = response.body?.byteStream()?.use { readBounded(it, 131072) } ?: return@use item
                 SocialLinkPolicy.merge(JSONObject(String(bytes, Charsets.UTF_8)), item)
             }
         }.getOrDefault(item)
+        // The embedded player has no article DOM. Fetch its public metadata once per cache miss.
+        val preview = if (serverPreview.image == null) BilibiliPublicPreview.load(serverPreview) ?: serverPreview else serverPreview
         if (AuthManager.userId(context).orEmpty() == owner) previews.put(key, (System.currentTimeMillis() + if (preview.ready) 3600000 else 30000) to preview)
         return SocialLinkReadPreview.cached(context, ServerUrlManager.getActive(context), owner, item.url) ?: preview
     }
