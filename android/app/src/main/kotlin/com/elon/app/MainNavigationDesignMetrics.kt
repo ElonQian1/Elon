@@ -93,9 +93,7 @@ internal class MainNavigationDesignMetrics(
         }
         selection.isSelected = selected
         if (tab === binding.tabChat) {
-            icon.setImageResource(
-                if (selected) R.drawable.ic_bottom_nav_chat_active else R.drawable.ic_bottom_nav_chat
-            )
+            icon.setImageResource(R.drawable.ic_tab_chat_refined)
         }
         icon.imageTintList = ColorStateList.valueOf(activity.elonColor(
             if (selected) R.color.mobile_on_primary_container else R.color.mobile_on_surface_variant
