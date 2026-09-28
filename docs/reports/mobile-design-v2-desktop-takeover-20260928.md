@@ -2,7 +2,7 @@
 version_status: current
 decision_status: evidence
 reviewed_at: 2026-09-28
-implementation_status: partial_blocked_not_released
+implementation_status: partial_merged_not_released
 ---
 
 # 双 APK 桌面接管与验证记录
@@ -13,13 +13,24 @@ implementation_status: partial_blocked_not_released
 
 接管云端草稿 #6、#212 的 V2 治理工作，结合本地项目规则、当前代码和命中技能实施。8 个外部技能的来源、固定版本与适用边界见 [采用矩阵](../design/mobile-skill-adoption.md) 和 `mobile-skills.lock.json`。两个生产 APK 均为 View/XML/WebView，不为套用 Compose/Expo 技能重写框架。没有假定云端具备本机未提交文件或全部本地记忆。
 
-审查入口：[主项目 #7](https://github.com/ElonQian1/Elon/pull/7)、[量化 #213](https://github.com/ElonQian1/yilong-quant/pull/213)。均为草稿。主项目本轮从 `e2b17ce145c91603c568eaa6722f38742f5741a6` 隔离工作，通过合并 `4e0bb70dfe06416f3f7b6fc5009ac15adb3426b1` 保留最新聊天、群聊与分享能力。
+审查入口：[主项目 #7](https://github.com/ElonQian1/Elon/pull/7)、[量化 #213](https://github.com/ElonQian1/yilong-quant/pull/213)。两者已按用户要求合并当前阶段源码，未正式发布。主项目此前从 `e2b17ce145c91603c568eaa6722f38742f5741a6` 隔离工作，通过合并 `4e0bb70dfe06416f3f7b6fc5009ac15adb3426b1` 保留聊天、群聊与分享能力；最新复核见下节。
+
+## 主线合并复核
+
+2026-09-28：主项目合并为 `3e7284065917b8e8ada24d4cf13b7368b869a290`，量化为 `6a9e83d0c8896e7db8f006a636f18a34611d8a34`。本节更新此前的草稿状态；后文原生验收缺口和剩余范围仍有效。
+
+- 主项目以 `b69b0d5a7` 最新主线整合设计源码 `d5081a662`，保留新增媒体封面、作者栏及微信独立任务跳转。媒体卡片改用明暗主题，并修复 200% 字体下头像首字裁切；测试分别检查封面比例、作者栏和无 URI 授权边界。
+- 最新完整 Android 回归 **2411 项，0 失败、0 错误、0 跳过**，调试包成功。SHA256：`0DB785DDDA48D1065510136FAF6102D6E00102263AFCC6E187977138A6A1EC8E`。量化 Android 源码和 698 项测试证据未变化。
+- 合并后的 PWA 登录、群聊、存储不可用、离线、503、刷新和退出恢复通过；规范 12 项回归、双仓规范一致性、生成资源、源码规模/所有权、文档模块和 CI 合同通过。
+- 主项目本地 PWA Rust 定向测试在编译服务端时因 `rustc-LLVM ERROR: out of memory` 失败，未执行到测试。远程整仓检查仍需独立确认；已通过规范、PC 前端和 Sui 作业。前置 Rust 失败现在也上传完整诊断，未放宽测试。
+- 量化完整验证重新执行：收尾合同 14 项通过，随后被缓存磁盘门禁阻止（6.09% 可用，门槛 8%）；Cargo 和后续前端检查未执行。GitHub 作业注释明确为账户付款或 Actions 消费限额阻止启动，不能算测试通过。
+- 工作台复核仍为 `businessDeliveryReady=false`、`platformEvolutionPending=true`；新整合工作区也没有有效原生运行证据。源码合并不代表整套 UI 验收、发布或安装完成。
 
 ## 交付矩阵
 
 | 能力 | 实施 | 验证 | 发布/验收 |
 |---|---|---|---|
-| 共同规范与主题 | 退役旧皮肤权威，统一语义 token、浅深主题和系统跟随 | 两仓治理、资源生成检查通过 | 草稿，未发布 |
+| 共同规范与主题 | 退役旧皮肤权威，统一语义 token、浅深主题和系统跟随 | 两仓治理、资源生成检查通过 | 已合入，未发布 |
 | 主项目首页与摘要 | 内容高度、真实项目/未读统计、完整宽度动作；摘要展示与 Activity 分离 | 320dp、浅深主题、100%/200% 字体的生产 View 测量与动作测试通过 | 原生截图待补 |
 | 主项目项目/聊天界面 | 项目行、消息 XML、侧栏、广场、项目空间和部分对话框采用语义颜色；日期选择器可滚动且最小 48dp | Android 回归通过；PWA 首页/摘要实际渲染并修复空状态窄列问题 | 仍有后续页面未完成迁移 |
 | 主项目主题生命周期 | 21 个既有平台 Activity 接入外观配置；系统栏图标配合明暗主题 | 编译、完整回归通过 | 系统栏/返回栈/键盘原生验收待补 |
@@ -35,7 +46,7 @@ implementation_status: partial_blocked_not_released
 - PWA 工作台已产生实际截图，检查发现并修复浅色残留深底、图标对比及摘要空状态窄列。截图使用受限本地服务和合成会话，不含真实账户。它们不能替代原生 APK 验收。
 - 最终 Android 源码 `60d313c65` 的调试 APK SHA256：`1793B9861EA73A0FBF0A8D67974E6DCA1B5E80CA100CB9008369B3340DD4D387`。PWA 摘要指标随后改用浅深主题的语义状态色；截图绑定 `d1c5cb0e8ce80890c52184ba123c7d18c3fcb17e`，见 [源码、尺寸与摘要证据](assets/mobile-design-v2-20260928/evidence.json)。
 - 实际 PWA 截图：[首页浅色](assets/mobile-design-v2-20260928/home-light.png)、[首页深色](assets/mobile-design-v2-20260928/home-dark.png)、[窄屏摘要浅色](assets/mobile-design-v2-20260928/summary-light.png)、[窄屏摘要深色](assets/mobile-design-v2-20260928/summary-dark.png)。四次捕获均无脚本异常，浏览器进程和临时配置已回收。
-- 量化最新两个远程作业均失败且 `steps=null`，测试未执行，原因未确认。全仓 Rust 验证仍有缓存磁盘门禁/既有检查待处理；不称整仓 CI 通过。
+- 量化远程作业 `steps=null` 的原因已在合并复核中查明。全仓 Rust 验证仍有缓存磁盘门禁/内存失败待处理；不称整仓 CI 通过。
 
 ## 原生验收阻塞
 
@@ -50,8 +61,8 @@ implementation_status: partial_blocked_not_released
 1. 恢复隔离原生渲染器，先验收已改的代表流程；检查 320/411/600dp、长中文、200% 字体、返回栈、键盘及离线/错误状态。
 2. 主项目还有媒体/录音、浮层、资源卡、商城、部分项目成员与文档对话框需要逐项迁移和视觉检查。当前 Kotlin 审计有 96 个文件、594 处颜色字面量候选，其中包含合法媒体/图标颜色；不能按数量批量替换或据此认定全部有缺陷。
 3. 补完整导航、真实账户只读状态和性能证据，保持聊天、授权、量化/主 APK 分工及交易边界。没有执行真实交易、资金或发布操作。
-4. 补齐远程 CI 与完整仓库检查；必要验证通过后才合并、正式构建、发布和安装。
+4. 补齐远程 CI 与完整仓库检查；当前批次已源码合并，正式发布和安装仍须满足系统级运行验收。
 
 ## 仓库状态
 
-两套代码仅推送审查分支，未合并到 main、未正式发布、未装机。统一收尾仍需按脚本输出分别记录业务、主线、任务工作区与未知文件状态；仅有草稿和构建不满足 `FINALIZABLE=true`，不宣告整套重构完成。
+两套当前阶段代码均已合入 main，未正式发布、未装机。统一收尾分别记录源码集成、主线、任务工作区与未知文件状态；`CodePushed` 收尾只证明源码集成，不证明全部 UI 验收完成。
