@@ -1,0 +1,348 @@
+{
+  "schemaVersion": 1,
+  "taskId": "mobile-conversation-polish-20260929",
+  "scope": "OBSERVED_CAPABILITY_STATE",
+  "designSystem": {
+    "id": "mobile-design-v2",
+    "sourceFile": "docs/design/mobile-design-system-v2.md",
+    "sha256": "56c06a578a25a582bff665d6433de96c097388ca8d2db59ee25066a6e787dc2d"
+  },
+  "requirementSpec": {
+    "sourceFile": "docs/requirements/mobile-conversation-polish-20260929.md",
+    "sha256": "36dccbf595727040c53fc0e21695338734bc29e7efdf05016e5275d0bb4dc419"
+  },
+  "platformDifferences": [
+    "同源 token 2.2；Android 默认暗色，PWA 默认跟随系统，显式选择均保留。",
+    "生产组件与脱敏离线样例；两端样例内容不同，不宣称数据、像素或系统键盘一致。",
+    "首页普通/空态、100%/200% 字体及输入场景有原生帧；PWA 字体、键盘相关布局另由浏览器回归检查。",
+    "无干净目标图；本合同验证可见能力，真实截图审查与主题/几何/交互测试另存证，不用语义证据代替视觉。"
+  ],
+  "states": [
+    {
+      "id": "normal-dark-100",
+      "androidScreenId": "elon.home.conversations",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43782/?fixture=login&home=1",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": ".work-summary-entry",
+          "settleMs": 700
+        },
+        "fixtureProfile": "polish-dark",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "message-home",
+          "state": "消息首页与列表入口可见，使用离线样例",
+          "android": {
+            "definitionId": "home.conversations.title",
+            "assertions": {
+              "/properties/visibility/effective/value": "visible"
+            }
+          },
+          "web": {
+            "selector": "#topTitle",
+            "assertions": {
+              "/role": "h1",
+              "/label": "消息"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "normal-dark-200",
+      "androidScreenId": "elon.home.conversations",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43782/?fixture=login&home=1",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": ".work-summary-entry",
+          "settleMs": 700
+        },
+        "fixtureProfile": "polish-dark",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "message-home",
+          "state": "消息首页与列表入口可见，使用离线样例",
+          "android": {
+            "definitionId": "home.conversations.title",
+            "assertions": {
+              "/properties/visibility/effective/value": "visible"
+            }
+          },
+          "web": {
+            "selector": "#topTitle",
+            "assertions": {
+              "/role": "h1",
+              "/label": "消息"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "normal-light-100",
+      "androidScreenId": "elon.home.conversations",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43782/?fixture=login&home=1",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": ".work-summary-entry",
+          "settleMs": 700
+        },
+        "fixtureProfile": "polish-light",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "message-home",
+          "state": "消息首页与列表入口可见，使用离线样例",
+          "android": {
+            "definitionId": "home.conversations.title",
+            "assertions": {
+              "/properties/visibility/effective/value": "visible"
+            }
+          },
+          "web": {
+            "selector": "#topTitle",
+            "assertions": {
+              "/role": "h1",
+              "/label": "消息"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "normal-light-200",
+      "androidScreenId": "elon.home.conversations",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43782/?fixture=login&home=1",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": ".work-summary-entry",
+          "settleMs": 700
+        },
+        "fixtureProfile": "polish-light",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "message-home",
+          "state": "消息首页与列表入口可见，使用离线样例",
+          "android": {
+            "definitionId": "home.conversations.title",
+            "assertions": {
+              "/properties/visibility/effective/value": "visible"
+            }
+          },
+          "web": {
+            "selector": "#topTitle",
+            "assertions": {
+              "/role": "h1",
+              "/label": "消息"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "empty-dark-100",
+      "androidScreenId": "elon.home.conversations",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43782/?fixture=empty&home=1",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": ".empty-tip",
+          "settleMs": 700
+        },
+        "fixtureProfile": "polish-dark",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "message-home",
+          "state": "消息首页与列表入口可见，使用离线样例",
+          "android": {
+            "definitionId": "home.conversations.title",
+            "assertions": {
+              "/properties/visibility/effective/value": "visible"
+            }
+          },
+          "web": {
+            "selector": "#topTitle",
+            "assertions": {
+              "/role": "h1",
+              "/label": "消息"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "empty-light-100",
+      "androidScreenId": "elon.home.conversations",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43782/?fixture=empty&home=1",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": ".empty-tip",
+          "settleMs": 700
+        },
+        "fixtureProfile": "polish-light",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "message-home",
+          "state": "消息首页与列表入口可见，使用离线样例",
+          "android": {
+            "definitionId": "home.conversations.title",
+            "assertions": {
+              "/properties/visibility/effective/value": "visible"
+            }
+          },
+          "web": {
+            "selector": "#topTitle",
+            "assertions": {
+              "/role": "h1",
+              "/label": "消息"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "input-dark-100",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43782/?fixture=login&conversation=group",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.friend",
+          "settleMs": 700
+        },
+        "fixtureProfile": "polish-dark",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "click",
+            "selector": "#inputPlaceholder"
+          },
+          {
+            "action": "fill",
+            "selector": "#messageInput",
+            "fixtureKey": "draft"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "message-composer",
+          "state": "离线草稿与输入操作可见，没有发送",
+          "android": {
+            "definitionId": "group.readability.composer",
+            "assertions": {
+              "/properties/visibility/effective/value": "visible"
+            }
+          },
+          "web": {
+            "selector": "#messageInput",
+            "assertions": {
+              "/role": "textbox",
+              "/disabled": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "input-light-100",
+      "androidScreenId": "elon.group.readability",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43782/?fixture=login&conversation=group",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#chatList .bubble.friend",
+          "settleMs": 700
+        },
+        "fixtureProfile": "polish-light",
+        "authProfile": "mobile-v2-offline",
+        "steps": [
+          {
+            "action": "click",
+            "selector": "#inputPlaceholder"
+          },
+          {
+            "action": "fill",
+            "selector": "#messageInput",
+            "fixtureKey": "draft"
+          }
+        ]
+      },
+      "capabilities": [
+        {
+          "id": "message-composer",
+          "state": "离线草稿与输入操作可见，没有发送",
+          "android": {
+            "definitionId": "group.readability.composer",
+            "assertions": {
+              "/properties/visibility/effective/value": "visible"
+            }
+          },
+          "web": {
+            "selector": "#messageInput",
+            "assertions": {
+              "/role": "textbox",
+              "/disabled": false
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -8,7 +8,7 @@ import android.view.View
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Context
 
 internal data class HomeConversationCounts(
     val all: Int, val friends: Int, val projects: Int, val conversations: Int, val unread: Int
@@ -16,7 +16,7 @@ internal data class HomeConversationCounts(
 
 /** Content-sized header: filters scroll horizontally and the summary grows with system text. */
 internal class HomeConversationHeaderView(
-    private val activity: AppCompatActivity,
+    private val activity: Context,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
 ) {
@@ -29,23 +29,30 @@ internal class HomeConversationHeaderView(
             setBackgroundColor(colors.surface)
             addView(filters(selected, counts, onSelect))
             addView(LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(16), dp(16), dp(16), dp(16))
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(16), dp(14), dp(16), dp(14))
                 background = rounded(colors.container)
                 isClickable = true; isFocusable = true
                 foreground = selectableForeground()
                 setOnClickListener { onOpenSummary() }
                 contentDescription = "AI 工作摘要，${counts.projects}个项目，${counts.unread}条未读消息，查看详情"
-                addView(label("AI 工作摘要", 20f, colors.text, true))
-                addView(label("${counts.projects}个项目 · ${counts.unread}条未读消息", 16f, colors.muted).apply {
-                    setPadding(0, dp(8), 0, dp(12))
+                addView(LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(label("AI 工作摘要", 16f, colors.text, true))
+                    addView(label("${counts.projects}个项目 · ${counts.unread}条未读消息", 13f, colors.muted).apply {
+                        setPadding(0, dp(5), 0, 0)
+                    })
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(label("›", 24f, colors.muted).apply {
+                    setPadding(dp(12), 0, 0, 0)
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 })
-                addView(label("查看详情 ›", 14f, colors.primary, true))
             }, LinearLayout.LayoutParams(-1, -2).apply {
                 marginStart = dp(16); marginEnd = dp(16); topMargin = dp(8)
             })
             addView(label("最近", 14f, colors.muted, true).apply {
-                setPadding(dp(16), dp(24), dp(16), dp(8))
+                setPadding(dp(16), dp(18), dp(16), dp(6))
                 androidx.core.view.ViewCompat.setAccessibilityHeading(this, true)
             })
         }
@@ -55,7 +62,7 @@ internal class HomeConversationHeaderView(
         isHorizontalScrollBarEnabled = false
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(16), dp(8), dp(16), dp(8))
+            setPadding(dp(16), dp(4), dp(16), dp(4))
             listOf(
                 Triple(HomeListFilterMode.All, "全部", counts.all),
                 Triple(HomeListFilterMode.Friends, "好友", counts.friends),
@@ -63,17 +70,17 @@ internal class HomeConversationHeaderView(
                 Triple(HomeListFilterMode.Conversations, "群聊", counts.conversations)
             ).forEachIndexed { index, (mode, title, count) ->
                 addView(label("$title ${count.coerceAtMost(99)}", 14f,
-                    if (mode == selected) colors.onPrimaryContainer else colors.muted, mode == selected).apply {
+                    if (mode == selected) colors.text else colors.muted, mode == selected).apply {
                     minimumWidth = dp(48); minimumHeight = dp(48)
                     gravity = Gravity.CENTER
-                    setPadding(dp(16), dp(12), dp(16), dp(12))
+                    setPadding(dp(14), dp(8), dp(14), dp(8))
                     isSelected = mode == selected
-                    background = rounded(if (isSelected) colors.primaryContainer else colors.surface)
+                    background = rounded(if (isSelected) colors.elevated else colors.surface)
                     isClickable = true; isFocusable = true
                     foreground = selectableForeground()
                     contentDescription = "$title，$count"
                     setOnClickListener { onSelect(mode) }
-                }, LinearLayout.LayoutParams(-2, -2).apply { if (index > 0) marginStart = dp(8) })
+                }, LinearLayout.LayoutParams(-2, -2).apply { if (index > 0) marginStart = dp(4) })
             }
         })
     }

@@ -13,7 +13,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Context
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import java.text.DateFormat
 import java.time.Instant
@@ -47,7 +47,7 @@ private fun formatHomeListTime(timestampMs: Long, nowMs: Long = System.currentTi
 }
 
 internal class MainHomeRows(
-    private val activity: AppCompatActivity,
+    private val activity: Context,
     private val timeFormatter: DateFormat,
     private val activeProjectIndexProvider: () -> Int,
     private val openProject: (Int) -> Unit,
@@ -547,11 +547,11 @@ internal class MainHomeRows(
 
         return TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
-            setBackgroundResource(R.drawable.bg_mock_avatar)
+            background = GradientDrawable().apply { setColor(uiColors.elevated); cornerRadius = dp(10).toFloat() }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = avatarText(title)
-            setTextColor(uiColors.onPrimary)
+            setTextColor(uiColors.muted)
             textSize = textSizeSp
             setTypeface(typeface, Typeface.BOLD)
         }
@@ -567,8 +567,8 @@ internal class MainHomeRows(
             layoutParams = LinearLayout.LayoutParams(size, size)
             clipChildren = false
             clipToPadding = false
-            elevation = dp(4).toFloat()
-            translationZ = dp(4).toFloat()
+            elevation = 0f
+            translationZ = 0f
             val avatar = createAvatarView(friend.name, 48, 18f, friend.avatarDataUrl).apply {
                 layoutParams = FrameLayout.LayoutParams(size, size)
             }
@@ -595,8 +595,8 @@ internal class MainHomeRows(
             layoutParams = LinearLayout.LayoutParams(size, size)
             clipChildren = false
             clipToPadding = false
-            elevation = dp(4).toFloat()
-            translationZ = dp(4).toFloat()
+            elevation = 0f
+            translationZ = 0f
             addView(
                 if (group.members.isEmpty()) createGroupFallbackAvatar(size)
                 else createGroupMemberGrid(group.members.take(9), size)
@@ -660,12 +660,12 @@ internal class MainHomeRows(
             layoutParams = FrameLayout.LayoutParams(size, size)
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
-                setColor(uiColors.primary)
+                setColor(uiColors.elevated)
             }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "群"
-            setTextColor(uiColors.onPrimary)
+            setTextColor(uiColors.muted)
             textSize = 17f
             setTypeface(typeface, Typeface.BOLD)
         }
@@ -676,7 +676,7 @@ internal class MainHomeRows(
             layoutParams = FrameLayout.LayoutParams(size, size)
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
-                setColor(uiColors.primary)
+                setColor(uiColors.elevated)
             }
 
             val compactGrid = members.size <= 4
@@ -741,12 +741,12 @@ internal class MainHomeRows(
         return TextView(activity).apply {
             background = GradientDrawable().apply {
                 cornerRadius = dp(3).toFloat()
-                setColor(uiColors.primaryContainer)
+                setColor(uiColors.container)
             }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = UserProfileStore.avatarInitial(member.displayName)
-            setTextColor(uiColors.onPrimary)
+            setTextColor(uiColors.muted)
             textSize = textSizeSp
             setTypeface(typeface, Typeface.BOLD)
             maxLines = 1

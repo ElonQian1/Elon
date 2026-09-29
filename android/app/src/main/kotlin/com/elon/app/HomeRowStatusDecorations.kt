@@ -11,7 +11,7 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Context
 
 internal enum class HomeRowBadge {
     AI,
@@ -19,7 +19,7 @@ internal enum class HomeRowBadge {
 }
 
 internal class HomeRowStatusDecorations(
-    private val activity: AppCompatActivity,
+    private val activity: Context,
     private val dp: (Int) -> Int,
 ) {
     private val uiColors by lazy { MobileColors(activity) }
@@ -43,7 +43,7 @@ internal class HomeRowStatusDecorations(
             text = title
             setTextColor(uiColors.text)
             textSize = 16f
-            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         })
 
         badge?.let { addView(createBadge(it)) }
@@ -96,21 +96,21 @@ internal class HomeRowStatusDecorations(
             ).apply {
                 marginStart = dp(7)
             }
-            setPadding(dp(6), dp(4), dp(6), dp(4))
+            setPadding(dp(5), dp(2), dp(5), dp(2))
             background = GradientDrawable().apply {
                 cornerRadius = dp(5).toFloat()
                 if (isAi) {
                     setColor(Color.TRANSPARENT)
-                    setStroke(dp(1), uiColors.outline)
+                    setStroke(dp(1), uiColors.divider)
                 } else {
-                    setColor(uiColors.primaryContainer)
+                    setColor(uiColors.elevated)
                 }
             }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = if (isAi) "AI" else "项目"
-            setTextColor(if (isAi) uiColors.primary else uiColors.onPrimaryContainer)
-            textSize = 12f
+            setTextColor(uiColors.muted)
+            textSize = 11f
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         }
     }
