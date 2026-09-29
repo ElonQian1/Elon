@@ -1,4 +1,6 @@
 use anyhow::{anyhow, Result};
+#[path = "social_quotes.rs"]
+pub(crate) mod social_quotes;
 use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::project_ws_protocol::ProjectAttachmentRef;
@@ -42,11 +44,15 @@ impl Store {
         let limit = limit.clamp(1, 200);
         let after = after.map(str::trim).filter(|value| !value.is_empty());
         let conn = self.conn()?;
-        let messages = if friend_id == SOCIAL_AI_USER_ID {
+        let mut messages = if friend_id == SOCIAL_AI_USER_ID {
             list_direct_social_ai_messages(&conn, user_id, after, limit)?
         } else {
             list_regular_friend_messages(&conn, user_id, friend_id, after, limit)?
         };
+        for message in &mut messages {
+            message.quote =
+                social_quotes::read(&conn, "friend", &message.id, message.recalled_at.is_some())?;
+        }
         if mark_read {
             mark_friend_messages_read(&conn, user_id, friend_id)?;
         }
@@ -60,6 +66,17 @@ impl Store {
         content: &str,
         attachments: Option<&[ProjectAttachmentRef]>,
     ) -> Result<FriendChatMessage> {
+        self.send_friend_message_with_quote(user_id, friend_id, content, attachments, None)
+    }
+
+    pub(crate) fn send_friend_message_with_quote(
+        &self,
+        user_id: &str,
+        friend_id: &str,
+        content: &str,
+        attachments: Option<&[ProjectAttachmentRef]>,
+        source: Option<&social_quotes::QuoteSource>,
+    ) -> Result<FriendChatMessage> {
         self.ensure_friend_pair(user_id, friend_id)?;
         let content = content.trim();
         let attachments_json = attachments_to_json(attachments)?;
@@ -72,8 +89,10 @@ impl Store {
 
         let id = new_id("fmsg");
         let created_at = now();
-        let conn = self.conn()?;
-        conn.execute(
+        let mut conn = self.conn()?;
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let quote = social_quotes::prepare(&tx, user_id, "friend", friend_id, source)?;
+        tx.execute(
             "INSERT INTO friend_messages (
                 id, sender_user_id, receiver_user_id, content, attachments_json, created_at
              )
@@ -88,7 +107,10 @@ impl Store {
             ],
         )?;
 
+        social_quotes::save(&tx, "friend", &id, quote.as_ref())?;
+        tx.commit()?;
         Ok(FriendChatMessage {
+            quote,
             id,
             sender_user_id: user_id.to_string(),
             receiver_user_id: friend_id.to_string(),
@@ -353,6 +375,7 @@ fn row_to_friend_message(
     let recalled_at: Option<String> = row.get(8)?;
     let recalled_by: Option<String> = row.get(9)?;
     Ok(FriendChatMessage {
+        quote: None,
         id: row.get(0)?,
         receiver_user_id: row.get(2)?,
         sender_name: Some(if sender_user_id == SOCIAL_AI_USER_ID {

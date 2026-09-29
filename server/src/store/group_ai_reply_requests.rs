@@ -154,6 +154,7 @@ impl Store {
             (id, created_at)
         };
         let mut message = FriendGroupMessage {
+            quote: None,
             id,
             group_id,
             sender_user_id: SOCIAL_AI_USER_ID.to_owned(),

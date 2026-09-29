@@ -1,5 +1,28 @@
 (function (root) {
   'use strict';
+  function quotePreview(bubble, quote, own, list) {
+    if (!quote) return;
+    const button = document.createElement('button'); button.type = 'button'; button.title = '查看引用消息';
+    button.style.cssText = `display:flex;align-items:center;gap:8px;max-width:min(100%,320px);min-height:48px;margin-top:6px;padding:4px 8px;border:0;border-${own ? 'right' : 'left'}:2px solid var(--line-soft,#555);border-radius:0;background:transparent;color:var(--text-secondary,#aaa);font:inherit;font-size:13px;line-height:1.5;text-align:left;${own ? 'margin-left:auto;' : ''}`;
+    const label = document.createElement('span');
+    label.style.cssText = 'min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere';
+    label.textContent = (quote.sender_name ? quote.sender_name + '：' : '') + (quote.unavailable ? '原消息已撤回或不可用' : quote.content || '[附件]');
+    button.append(label);
+    const cover = !quote.unavailable && quote.attachments?.find(a => a.kind === 'image' || a.mime_type?.startsWith('image/'))?.url;
+    if (cover && (/^https?:\/\//i.test(cover) || /^\/(?!\/)/.test(cover))) {
+      const image = document.createElement('img'); image.src = cover; image.alt = ''; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer';
+      image.style.cssText = 'width:40px;height:40px;flex:none;object-fit:cover;border-radius:3px';
+      image.onerror = () => image.remove(); button.append(image);
+    }
+    button.onclick = () => {
+      const original = Array.from(list.children).find(row => row.dataset.messageId === quote.message_id);
+      if (original && !quote.unavailable) { original.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+      const dialog = document.createElement('dialog'), text = document.createElement('p'), close = document.createElement('button');
+      text.textContent = label.textContent; text.style.whiteSpace = 'pre-wrap'; close.textContent = '关闭'; close.onclick = () => dialog.close();
+      dialog.append(text, close); dialog.onclose = () => dialog.remove(); document.body.append(dialog); dialog.showModal();
+    };
+    bubble.after(button);
+  }
   function media(bubble, attachments) {
     (attachments || []).forEach(item => {
       const name = item.display_name || item.file_name || '附件';
@@ -72,7 +95,9 @@
             if (kind === 'group' && !recalled) root.ElonGroupAiReplyContext?.mount(bubble, msg, { api: options.api, group: contact.id, owner: options.user()?.id, list, current: () => scope === key && options.user()?.id === owner, changed: () => options.changed(contact.id) }, media);
             if (msg.send_status) { const status = document.createElement('small'); status.textContent = msg.send_status; status.style.display = 'block'; bubble.append(status); }
             const owner = options.user()?.id, cleanup = !recalled && !shared && root.ElonSocialLinks?.mount(bubble, text, { api: options.api, owner, compact: !!compactLink, isCurrent: () => scope === key && options.user()?.id === owner });
+            if (!recalled) quotePreview(bubble, msg.quote, outgoing, list);
             entry = { signature, block: bubble.closest('.chat-message-block'), cleanup: typeof cleanup === 'function' ? cleanup : undefined };
+            entry.block.dataset.messageId = id;
           }
           if (entry.block !== cursor) list.insertBefore(entry.block, cursor);
           cursor = entry.block.nextSibling; next.set(id, entry);

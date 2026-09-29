@@ -12,6 +12,7 @@ export interface SocialAttachment {
 }
 
 export interface SocialMessage {
+  quote?: import('./quotes/socialQuote').SocialQuote | null
   ai_reply?: import('./group-ai/groupAiContext').GroupAiReplyMetadata | null
   id: string
   sender_user_id: string

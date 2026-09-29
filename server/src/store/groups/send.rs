@@ -95,6 +95,7 @@ fn insert_content(
     )?;
     mark_group_messages_read(conn, user, group)?;
     Ok(FriendGroupMessage {
+        quote: None,
         ai_reply: None,
         id,
         group_id: group.to_owned(),
@@ -120,6 +121,25 @@ impl Store {
         attachments: Option<&[ProjectAttachmentRef]>,
         operation: &str,
     ) -> Result<(FriendGroupMessage, WebGroupRequest)> {
+        self.send_group_web_ai_message_with_quote(
+            user,
+            group,
+            content,
+            attachments,
+            operation,
+            None,
+        )
+    }
+
+    pub(crate) fn send_group_web_ai_message_with_quote(
+        &self,
+        user: &str,
+        group: &str,
+        content: &str,
+        attachments: Option<&[ProjectAttachmentRef]>,
+        operation: &str,
+        source: Option<&super::super::friend_messages::social_quotes::QuoteSource>,
+    ) -> Result<(FriendGroupMessage, WebGroupRequest)> {
         let hash = web::operation_hash(operation)?;
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
@@ -127,13 +147,30 @@ impl Store {
             "SELECT id,trigger_message_id FROM group_ai_reply_requests WHERE operation_hash=?1 AND requester_id=?2 AND group_id=?3",
             params![hash,user,group], |r| Ok((r.get(0)?,r.get(1)?)),
         ).optional()?;
-        let result = if let Some((id, source)) = prior {
+        let result = if let Some((id, trigger_id)) = prior {
             let request = web::read_owned(&tx, user, group, &id, operation)?;
-            let message = tx.query_row(
+            let mut message = tx.query_row(
                 "SELECT m.id,m.group_id,m.sender_user_id,COALESCE(u.nickname,u.email,u.phone,u.id),m.content,m.attachments_json,m.created_at,m.recalled_at,m.recalled_by,m.revision,m.edited_at
                  FROM friend_group_messages m JOIN users u ON u.id=m.sender_user_id WHERE m.id=?1 AND m.group_id=?2",
-                params![source,group], |r| row_to_group_message(r,user),
+                params![trigger_id,group], |r| row_to_group_message(r,user),
             )?;
+            message.quote = super::super::friend_messages::social_quotes::read(
+                &tx,
+                "group",
+                &message.id,
+                message.recalled_at.is_some(),
+            )?;
+            if message.quote.as_ref().map(|q| q.message_id.as_str())
+                != source.map(|s| s.message_id.as_str())
+            {
+                return Err(anyhow!("重复操作的引用不一致"));
+            }
+            if let (Some(quote), Some(revision)) = (&message.quote, source.and_then(|s| s.revision))
+            {
+                if quote.revision != revision {
+                    return Err(anyhow!("重复操作的引用版本不一致"));
+                }
+            }
             if message.content != content.trim()
                 || attachments_to_json(Some(&message.attachments))?
                     != attachments_to_json(attachments)?
@@ -142,7 +179,17 @@ impl Store {
             }
             (message, request)
         } else {
-            let message = insert_message(&tx, user, group, content, attachments)?;
+            let quote = super::super::friend_messages::social_quotes::prepare(
+                &tx, user, "group", group, source,
+            )?;
+            let mut message = insert_message(&tx, user, group, content, attachments)?;
+            super::super::friend_messages::social_quotes::save(
+                &tx,
+                "group",
+                &message.id,
+                quote.as_ref(),
+            )?;
+            message.quote = quote;
             let request = web::prepare_in_transaction(&tx, user, group, &message.id, operation)?;
             (message, request)
         };

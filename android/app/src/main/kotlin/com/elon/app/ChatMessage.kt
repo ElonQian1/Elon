@@ -41,4 +41,5 @@ data class ChatMessage(
     var webChatMessage: WebChatProductionMessage? = null,
     var senderUserId: String? = null,
     var groupAiReply: String? = null,
+    var quote: com.elon.app.socialquotes.SocialQuote? = null,
 )

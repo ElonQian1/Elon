@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import type { User } from '../../store/auth'
 import type { ActiveConversation, SocialMessage } from './socialMessageTypes'
 import { conversationId } from './socialChatCache'
-import { quoteText, sendSocialMessage, socialRequest } from './socialChatOperations'
+import { sendSocialMessage, socialRequest } from './socialChatOperations'
+import SocialQuotePreview from './quotes/SocialQuotePreview'
+import { quoteFromMessage } from './quotes/socialQuote'
 import { useSocialAttachments } from './useSocialAttachments'
 import { socialLocalId } from './socialLocalId'
 import SocialDialog from './SocialDialog'
@@ -56,8 +58,8 @@ export default function SocialComposer({ conversation, title, me, input, setInpu
     event.preventDefault()
     const text = input.trim()
     if (inFlight.current.has(key) || sending || blocked || (!text && !files.length)) return
-    const content = pendingQuote ? `${quoteText(pendingQuote.message, pendingQuote.author)}\n\n${text}` : text
-    if (Array.from(content).length > 4000) { showError('正文与引用合计不能超过 4000 字，请精简后发送'); return }
+    const content = text
+    if (Array.from(content).length > 4000) { showError('正文不能超过 4000 字，请精简后发送'); return }
     inFlight.current.add(key)
     let id = ''
     try {
@@ -65,23 +67,25 @@ export default function SocialComposer({ conversation, title, me, input, setInpu
       const attachments = capturedFiles.map(file => file.attachment!)
       id = `tmp-${socialLocalId()}`
       setBusy(old => ({ ...old, [key]: true })); showError('')
-      setInput(''); setQuotes(old => ({ ...old, [key]: undefined }))
-      const optimistic: SocialMessage = { id, content, attachments, created_at: new Date().toISOString(), sender_user_id: me.id, sender_name: me.nickname || me.account, outgoing: true }
+      setInput('')
+      const reference = pendingQuote ? quoteFromMessage(pendingQuote.message, pendingQuote.author) : null
+      const optimistic: SocialMessage = { id, content, attachments, quote: reference, created_at: new Date().toISOString(), sender_user_id: me.id, sender_name: me.nickname || me.account, outgoing: true }
       setMessages(old => [...old, optimistic])
-      const data = await sendSocialMessage(conversation, { content, attachments })
+      const data = await sendSocialMessage(conversation, { content, attachments, quote_source: reference ? { message_id: reference.message_id, revision: reference.revision } : undefined })
       if (!data.message?.id) throw new Error('发送结果未确认，请同步消息后检查')
       if (mounted.current) {
-        setMessages(old => {
+        setQuotes(old => old[key]?.nonce === pendingQuote?.nonce ? { ...old, [key]: undefined } : old)
+        if (currentKey.current === key) setMessages(old => {
           const received = old.find(m => m.id === data.message.id) ?? data.message
           return old.filter(m => m.id !== received.id).map(m => m.id === id ? received : m)
         })
-        media.remove(conversation, capturedFiles.map(file => file.id)); onSent()
+        media.remove(conversation, capturedFiles.map(file => file.id)); if (currentKey.current === key) onSent()
       }
     } catch (failure) {
       if (mounted.current) {
         showError((failure as Error).message, key)
-        setInput(old => old && old !== content ? `${content}\n${old}` : content)
-        setMessages(old => old.filter(m => m.id !== id))
+        if (currentKey.current === key) setInput(old => old && old !== content ? `${content}\n${old}` : content)
+        if (currentKey.current === key) setMessages(old => old.filter(m => m.id !== id))
       }
     } finally { inFlight.current.delete(key); if (mounted.current) setBusy(old => ({ ...old, [key]: false })) }
   }
@@ -94,17 +98,19 @@ export default function SocialComposer({ conversation, title, me, input, setInpu
       {conversation.kind === 'group' && <button type="button" onClick={() => void loadMembers()}>@ 群成员</button>}
       <span className={styles.hint}>可粘贴图片或拖入文件 · 每个最多 12 MB</span>
     </div>
-    {pendingQuote && <div className={styles.quote} aria-label="待发送引用"><button type="button" className={styles.more} onClick={() => setQuotes(old => ({ ...old, [key]: undefined }))}>取消引用</button>{quoteText(pendingQuote.message, pendingQuote.author)}</div>}
     {files.length > 0 && <div className={styles.status}>{files.map(file => <div className={styles.attachment} key={file.id}>
       <span>{file.file.name} · {file.status === 'uploading' ? '上传中…' : file.status === 'error' ? '上传失败' : '待发送'}</span>
       {file.status === 'error' && <button type="button" title={file.error} onClick={() => void media.retry(conversation, file)}>重试上传</button>}
       <button type="button" disabled={sending} aria-label={`移除附件 ${file.file.name}`} onClick={() => media.remove(conversation, [file.id])}>×</button>
     </div>)}</div>}
-    <form className={pageStyles.composer} onSubmit={event => void send(event)}>
+    <form className={`${pageStyles.composer} ${styles.replyComposer}`} onSubmit={event => void send(event)}>
+      <div className={styles.replyInput}>
       <textarea ref={textarea} className={pageStyles.composerInput} value={input} rows={2} placeholder={`发送消息到 ${title}…`}
         onChange={event => { setInput(event.target.value); event.target.style.height = '46px'; event.target.style.height = `${Math.min(event.target.scrollHeight,150)}px` }}
         onPaste={event => { const files = Array.from(event.clipboardData.files); if (files.length) { event.preventDefault(); addFiles(files) } }}
         onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) { event.preventDefault(); void send(event) } }} />
+      {pendingQuote && <SocialQuotePreview quote={quoteFromMessage(pendingQuote.message, pendingQuote.author)} owner={`${me.id}:${key}`} onCancel={() => setQuotes(old => ({ ...old, [key]: undefined }))} />}
+      </div>
       <button type="submit" className={pageStyles.sendBtn} disabled={sending || blocked || (!input.trim() && !files.length)}>{sending ? '发送中…' : '发送'}</button>
     </form>
     {errors[key] && <p className={`${styles.error} ${styles.status}`} role="alert">{errors[key]}</p>}

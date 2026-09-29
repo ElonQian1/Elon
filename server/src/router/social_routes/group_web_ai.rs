@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub(super) struct SendRequest {
+    quote_source: Option<crate::store::friend_messages::social_quotes::QuoteSource>,
     operation_id: String,
     content: String,
     attachments: Option<Vec<ProjectAttachmentRef>>,
@@ -81,12 +82,13 @@ pub(super) async fn send(
         Ok(v) => v,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    match state.store.send_group_web_ai_message(
+    match state.store.send_group_web_ai_message_with_quote(
         &user.id,
         &group,
         &req.content,
         req.attachments.as_deref(),
         &req.operation_id,
+        req.quote_source.as_ref(),
     ) {
         Ok((message, request)) => {
             if let Ok(members) = state.store.friend_group_member_ids(&user.id, &group) {

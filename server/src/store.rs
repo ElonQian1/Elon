@@ -155,7 +155,7 @@ mod external_app_tool_executions;
 mod external_apps;
 #[cfg(test)]
 mod external_apps_tests;
-mod friend_messages;
+pub(crate) mod friend_messages;
 mod friends;
 mod group_ai;
 mod group_ai_flow;

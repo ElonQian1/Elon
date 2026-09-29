@@ -31,3 +31,6 @@
 .latest { align-self: center; color: #fff; background: #266646; border: 1px solid #76ac8e; border-radius: 16px; padding: 6px 16px; cursor: pointer; }
 .conversation [data-message-id]:focus-visible { outline: 2px solid #85bdf5; outline-offset: -2px; }
 .conversation [data-message-id] blockquote { color: #c7d9cd; border-color: #82b396; }
+.replyComposer { align-items: flex-end; }
+.replyInput { flex: 1; min-width: 0; border-radius: 8px; background: var(--surface-input, #ffffff08); border: 1px solid var(--border, #555861); }
+.replyInput textarea { box-sizing: border-box; width: 100%; border: 0; background: transparent; }

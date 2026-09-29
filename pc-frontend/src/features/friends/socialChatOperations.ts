@@ -43,7 +43,7 @@ export async function socialRequest<T>(path: string, init: RequestInit = {}, tim
   } finally { clearTimeout(timer); parent?.removeEventListener('abort', abort) }
 }
 
-export function sendSocialMessage(conversation: ActiveConversation, message: Pick<SocialMessage, 'content' | 'attachments'>, signal?: AbortSignal) {
+export function sendSocialMessage(conversation: ActiveConversation, message: Pick<SocialMessage, 'content' | 'attachments'> & { quote_source?: import('./quotes/socialQuote').QuoteSource }, signal?: AbortSignal) {
   return socialRequest<{ message: SocialMessage }>(messageEndpoint(conversation), {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(message), signal,
   })

@@ -22956,6 +22956,122 @@
       "updated_at_ms": 1789558460536
     },
     {
+      "id": "social-message-quotes-v1",
+      "title": "Compact structured social message quotes",
+      "summary": "Separate reply drafts and source previews on Win and Android; persist authorized snapshots and preserve AI context.",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/social-message-quotes-v1.md",
+        "content_hash": "5362068fc7b81ab7ae3b01537315fcc97145c73706b12eb9f1b279468b017b58",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "14650e9a6f685c3b519e4d6f05e5a061244b9085",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "72a16636f86b0f6693234dd8ad642c7f32739614",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/socialquotes",
+        "pc-frontend/src/features/friends/quotes",
+        "server/src/store/social_quotes.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Draft cancel and failures preserve typed content",
+        "Source previews appear below bubbles with bounded layout",
+        "Server enforces scope and revision and preserves AI history"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/socialquotes/SocialQuoteRows.kt",
+          "content_hash": "b3277a34ad857c503747fe27b0de4c962bc5b34c977ac26f3876b3547f9a89aa",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "14650e9a6f685c3b519e4d6f05e5a061244b9085",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "84a1533be7143c81f5079bdb017d9e20a6eb30e7",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/socialquotes/SocialQuoteLayoutTest.kt",
+          "content_hash": "9842e2976cceee0d2f6a3d1948beb9efff33050e3279d80e45dfb5537747c68c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "14650e9a6f685c3b519e4d6f05e5a061244b9085",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "8b86e5494325bc5b9a4d2b4e524f2451c9a9410e",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/quotes/SocialQuotePreview.tsx",
+          "content_hash": "9a228978b61a7e1a3cac46340bb3a098363dcf1b4ab66856ee257576c0734205",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "14650e9a6f685c3b519e4d6f05e5a061244b9085",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2d8a8a1c576efa7e0b1ac2bb5e684db5b4ac6f71",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "scripts/test-social-quotes-ui.cjs",
+          "content_hash": "06fe60f5b27ee64d6220f960258444653e6bf0879a6f1ad8f4b32b5414716c04",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "14650e9a6f685c3b519e4d6f05e5a061244b9085",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e992a98546e4593dc39fe57b0bdae908c53b2471",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/social_quotes.rs",
+          "content_hash": "88105c5660465afb5c3c5e081d37899683503db6797c3187c31377e112851ca8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "14650e9a6f685c3b519e4d6f05e5a061244b9085",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "051e59c9f6dfd8d90938a5def970b4bc5bcb58e4",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/store/social_quotes/tests.rs",
+          "content_hash": "35b23aae19b84dee9df9b65b2aa447def1b22c699d3c488eb22bfb65edba7545",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "14650e9a6f685c3b519e4d6f05e5a061244b9085",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "5e6d578ab35dde489195b0e6b431646b988f4d59",
+            "state": "untracked"
+          }
+        }
+      ],
+      "created_at_ms": 1790661658181,
+      "updated_at_ms": 1790661923616
+    },
+    {
       "id": "social-sync-status-lifecycle-v1",
       "title": "APK 社交同步提示生命周期修复",
       "summary": "修复 AI 聊天交接、暂停及消息已出现时仍显示好友或群聊同步提示",
@@ -31520,66 +31636,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_30cd29378a164dbd847d102c4aa8f1d9",
-      "feature_id": "binance_wallet_summary_host_v1",
-      "action": "evidence_recorded",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789357017549
-    },
-    {
-      "id": "feature_event_d9df1babc60a4515ab941b0e586636c3",
-      "feature_id": "binance-wallet-consent-recovery-v1",
-      "action": "registered",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789376269315
-    },
-    {
-      "id": "feature_event_4a9ad33d6ae3445b98e2275f84c343b2",
-      "feature_id": "binance-wallet-consent-recovery-v1",
-      "action": "claimed",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789376269480
-    },
-    {
-      "id": "feature_event_7782a6f0de904103bf71ec567baf8961",
-      "feature_id": "binance-wallet-consent-recovery-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789376866814
-    },
-    {
-      "id": "feature_event_02f158c3ed8041368a9522290dd3ae49",
-      "feature_id": "binance-wallet-consent-recovery-v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789377128068
-    },
-    {
-      "id": "feature_event_99555ef8730d48079fee498563c5a68a",
-      "feature_id": "binance-wallet-consent-recovery-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789377128211
-    },
-    {
       "id": "feature_event_0d7f67bd0fa648eebcf737cffc15f7e6",
       "feature_id": "binance-wallet-permission-diagnostics-v1",
       "action": "registered",
@@ -33518,6 +33574,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1790655218483
+    },
+    {
+      "id": "feature_event_3aedcb36f90e456f9dd7380092351778",
+      "feature_id": "social-message-quotes-v1",
+      "action": "registered",
+      "actor": "Codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790661658181
+    },
+    {
+      "id": "feature_event_5d16fd33283244f1934a2c0d08b5102e",
+      "feature_id": "social-message-quotes-v1",
+      "action": "claimed",
+      "actor": "Codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790661769114
+    },
+    {
+      "id": "feature_event_b21c8e65599c439a9562906762ab55e1",
+      "feature_id": "social-message-quotes-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790661921322
+    },
+    {
+      "id": "feature_event_0e80a82be9cc47819da3ee7c6c5ac868",
+      "feature_id": "social-message-quotes-v1",
+      "action": "evidence_recorded",
+      "actor": "Codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790661923502
+    },
+    {
+      "id": "feature_event_6edd9894d3c549eaa34de9b1ce1f4771",
+      "feature_id": "social-message-quotes-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "Targeted quote SQL, Android layout/codec and browser interaction tests passed; full server unit suite blocked by unrelated existing test visibility errors.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790661923561
+    },
+    {
+      "id": "feature_event_c22b84fc9859413782f9396068353735",
+      "feature_id": "social-message-quotes-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "Targeted quote SQL, Android layout/codec and browser interaction tests passed; full server unit suite blocked by unrelated existing test visibility errors.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1790661923616
     }
   ]
 }

@@ -40,7 +40,7 @@ impl Store {
             "SELECT m.sender_user_id,
                     COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
                     m.content,
-                    m.attachments_json
+                    m.attachments_json,m.id
              FROM friend_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              WHERE (
@@ -66,7 +66,13 @@ impl Store {
                         user_id,
                         &sender_user_id,
                         &sender_name,
-                        row.get::<_, String>(2)?,
+                        super::friend_messages::social_quotes::context_text(
+                            &conn,
+                            "friend",
+                            &row.get::<_, String>(4)?,
+                            row.get(2)?,
+                        )
+                        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?,
                         parse_attachments(row.get::<_, Option<String>>(3)?.as_deref())?,
                     ))
                 },
@@ -96,6 +102,7 @@ impl Store {
         )?;
 
         Ok(FriendChatMessage {
+            quote: None,
             id,
             sender_user_id: SOCIAL_AI_USER_ID.to_string(),
             receiver_user_id: user_id.to_string(),
@@ -122,7 +129,7 @@ impl Store {
             "SELECT m.sender_user_id,
                     COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
                     m.content,
-                    m.attachments_json
+                    m.attachments_json,m.id
              FROM friend_group_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              WHERE m.group_id = ?1
@@ -138,7 +145,13 @@ impl Store {
                     user_id,
                     &sender_user_id,
                     &sender_name,
-                    row.get::<_, String>(2)?,
+                    super::friend_messages::social_quotes::context_text(
+                        &conn,
+                        "group",
+                        &row.get::<_, String>(4)?,
+                        row.get(2)?,
+                    )
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?,
                     parse_attachments(row.get::<_, Option<String>>(3)?.as_deref())?,
                 ))
             })?
@@ -223,6 +236,7 @@ impl Store {
         )?;
 
         Ok(FriendGroupMessage {
+            quote: None,
             ai_reply: None,
             id,
             group_id: group_id.to_string(),
@@ -273,6 +287,7 @@ fn social_ai_friend_message(
     created_at: &str,
 ) -> FriendChatMessage {
     FriendChatMessage {
+        quote: None,
         id,
         sender_user_id: SOCIAL_AI_USER_ID.to_string(),
         receiver_user_id: receiver_user_id.to_string(),
@@ -352,7 +367,7 @@ fn list_recent_direct_social_ai_messages(
         "SELECT m.sender_user_id,
                 COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
                 m.content,
-                m.attachments_json
+                m.attachments_json,m.id
          FROM friend_messages m
          LEFT JOIN users u ON u.id = m.sender_user_id
          WHERE (
@@ -381,7 +396,13 @@ fn list_recent_direct_social_ai_messages(
                     user_id,
                     &sender_user_id,
                     &sender_name,
-                    row.get::<_, String>(2)?,
+                    super::friend_messages::social_quotes::context_text(
+                        conn,
+                        "friend",
+                        &row.get::<_, String>(4)?,
+                        row.get(2)?,
+                    )
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?,
                     parse_attachments(row.get::<_, Option<String>>(3)?.as_deref())?,
                 ))
             },

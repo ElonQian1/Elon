@@ -31,6 +31,9 @@ mod context_share;
 #[path = "../../../src/store/group_chatgpt_project.rs"]
 mod group_chatgpt_project;
 mod store {
+    pub mod friend_messages {
+        pub(crate) use crate::social_quotes;
+    }
     pub mod articles {
         // This harness covers ordinary selected messages. Imported-record SQL and
         // permissions are exercised against the full store in group_web_ai_record_tests.
@@ -65,12 +68,22 @@ mod store {
         pub ai_reply: Option<serde_json::Value>,
     }
 }
+mod project_ws_protocol {
+    pub type ProjectAttachmentRef = QuoteAttachment;
+    use serde::{Deserialize, Serialize};
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct QuoteAttachment {
+        pub display_name: Option<String>,
+    }
+}
 #[path = "../../../src/store/group_web_ai_attachments.rs"]
 mod attachments;
 #[path = "../../../src/store/group_ai_selection_schema.rs"]
 mod migration;
 #[path = "../../../src/store/group_web_ai_selection.rs"]
 mod selection;
+#[path = "../../../src/store/social_quotes.rs"]
+pub(crate) mod social_quotes;
 #[path = "../../../src/store/group_web_ai_requests.rs"]
 mod web;
 

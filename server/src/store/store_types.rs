@@ -135,6 +135,7 @@ pub struct AddFriendResult {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FriendChatMessage {
+    pub quote: Option<super::friend_messages::social_quotes::SocialQuote>,
     pub id: String,
     pub sender_user_id: String,
     pub receiver_user_id: String,
@@ -173,6 +174,7 @@ pub struct FriendGroupProfile {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FriendGroupMessage {
+    pub quote: Option<super::friend_messages::social_quotes::SocialQuote>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ai_reply: Option<serde_json::Value>,
     pub id: String,

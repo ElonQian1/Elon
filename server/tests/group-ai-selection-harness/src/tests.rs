@@ -35,6 +35,7 @@ impl Fixture {
                 VALUES('legacy','g','b','u','dispatched','now','now');
             INSERT INTO group_ai_work_options VALUES('legacy','model',1);").unwrap();
         migration::migrate(&conn).unwrap();
+        social_quotes::migrate(&conn).unwrap();
         context::migrate(&conn).unwrap();
         drop(conn);
         Self { store }

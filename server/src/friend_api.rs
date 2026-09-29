@@ -58,6 +58,7 @@ pub struct FriendMessagesQuery {
 
 #[derive(Deserialize)]
 pub struct SendFriendMessageRequest {
+    pub quote_source: Option<crate::store::friend_messages::social_quotes::QuoteSource>,
     pub content: String,
     pub attachments: Option<Vec<ProjectAttachmentRef>>,
 }
@@ -76,6 +77,7 @@ pub struct FriendGroupMessagesQuery {
 
 #[derive(Deserialize)]
 pub struct SendFriendGroupMessageRequest {
+    pub quote_source: Option<crate::store::friend_messages::social_quotes::QuoteSource>,
     pub content: String,
     pub attachments: Option<Vec<ProjectAttachmentRef>>,
 }
@@ -322,11 +324,12 @@ pub async fn send_friend_message(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    match state.store.send_friend_message(
+    match state.store.send_friend_message_with_quote(
         &user.id,
         &friend_id,
         &req.content,
         req.attachments.as_deref(),
+        req.quote_source.as_ref(),
     ) {
         Ok(message) => {
             crate::friend_events::publish_friend_message(&message);
@@ -439,11 +442,12 @@ pub async fn send_friend_group_message(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    match state.store.send_friend_group_message(
+    match state.store.send_friend_group_message_with_quote(
         &user.id,
         &group_id,
         &req.content,
         req.attachments.as_deref(),
+        req.quote_source.as_ref(),
     ) {
         Ok(message) => {
             if let Ok(recipient_user_ids) = state.store.friend_group_member_ids(&user.id, &group_id)

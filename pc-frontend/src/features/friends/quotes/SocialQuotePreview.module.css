@@ -1,0 +1,13 @@
+.quote { display: flex; align-items: center; gap: 6px; width: fit-content; max-width: min(100%, 480px); margin-top: 6px; color: var(--text-secondary, #aeb2bb); font-size: 13px; line-height: 1.5; }
+.source { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; padding: 2px 0 2px 9px; border: 0; border-left: 3px solid var(--border, #555861); border-radius: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.source:disabled { opacity: 1; cursor: default; }
+.source:focus-visible, .close:focus-visible { outline: 2px solid var(--accent, #4285f4); outline-offset: 2px; }
+.own { margin-left: auto; }
+.own .source { padding-left: 0; padding-right: 9px; border-left: 0; border-right: 3px solid var(--border, #555861); }
+.text { flex: 1; min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.thumbnail { flex: 0 0 40px; width: 40px; height: 40px; object-fit: cover; border-radius: 3px; }
+.draft { width: 100%; max-width: 100%; margin: 0; padding: 4px 12px 10px; box-sizing: border-box; }
+.draft .source { flex: 1; }
+.close { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; border: 0; background: transparent; color: inherit; cursor: pointer; border-radius: 4px; }
+.close:hover { background: var(--surface-hover, #ffffff0a); }
+@media (pointer: coarse) { .close { width: 48px; height: 48px; flex-basis: 48px; } .source { min-height: 48px; } }

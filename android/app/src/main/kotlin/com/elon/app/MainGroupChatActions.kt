@@ -37,6 +37,8 @@ internal class MainGroupChatActions(
         protectSocialChatRows(messagesByGroup[key.removePrefix("group:")].orEmpty(), rows)
     }
     private var owner = AuthManager.userId(activity)
+    private val quotes = com.elon.app.socialquotes.SocialQuoteComposer(binding)
+    fun quoteMessage(message: ChatMessage): Boolean = isActive() && quotes.select(message)
     private val messagesByGroup = linkedMapOf<String, MutableList<ChatMessage>>()
     private val readPositions = linkedMapOf<String, android.os.Parcelable>()
     private var pendingReadPosition: android.os.Parcelable? = null
@@ -110,6 +112,7 @@ internal class MainGroupChatActions(
             binding.chatList.jumpToLatestMessageBeforeNextDraw()
         }
         showFriendChat(group.name, animate)
+        quotes.open("group:${group.id}")
         aiComposer.open(group.id)
         summaryPosts.openGroup(group)
         com.elon.app.articles.ArticleCardViews.openGroup(binding.groupSummaryStrip, group.id)
@@ -120,6 +123,7 @@ internal class MainGroupChatActions(
     }
 
     fun closeGroupChat() {
+        quotes.close()
         activeGroup?.id?.let { id -> binding.chatList.layoutManager?.onSaveInstanceState()?.let { readPositions[id] = it } }
         while (readPositions.size > 30) readPositions.remove(readPositions.keys.first())
         showSocialChatStatus(binding, null)
@@ -192,9 +196,11 @@ internal class MainGroupChatActions(
         if (text.isBlank() && attachmentsToSend.isEmpty()) return true
 
         val messages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
+        val quote = quotes.current()
         val pending = ChatMessage(
             role = "user",
             content = text,
+            quote = quote,
             attachments = localAttachments.takeIf { it.isNotEmpty() },
             sendStatus = SENDING_STATUS
         )
@@ -210,12 +216,13 @@ internal class MainGroupChatActions(
         thread {
             val result = runCatching {
                 val attachments = uploadGroupAttachments(group, attachmentsToSend)
-                postMessage(group, text, attachments, webAiConfirmed, configuration)
+                postMessage(group, text, attachments, webAiConfirmed, configuration, quote)
             }
             activity.runOnUiThread {
                 if (result.isFailure && webAiConfirmed) webAi.release()
                 if (sendingSession != socialSession(activity)) return@runOnUiThread
                 result.onSuccess { sentMessage ->
+                    quotes.sent("group:${group.id}", quote)
                     sentMessage.withMissingImageAnnotationsFrom(localAttachments)
                     completeSocialChatSend(messages, pending, sentMessage)
                     reader.invalidate("group:${group.id}")
@@ -458,8 +465,9 @@ internal class MainGroupChatActions(
     }
 
     private fun postMessage(group: AppGroup, text: String, attachments: JsonArray, useWebAi: Boolean = false,
-        configuration: GroupAiConfiguration = GroupAiConfiguration()): ChatMessage {
+        configuration: GroupAiConfiguration = GroupAiConfiguration(), quote: com.elon.app.socialquotes.SocialQuote? = null): ChatMessage {
         val payloadJson = JSONObject().put("content", text)
+        quote?.let { payloadJson.put("quote_source", it.source()) }
         if (attachments.size() > 0) {
             payloadJson.put("attachments", JSONArray(attachments.toString()))
         }
@@ -518,7 +526,7 @@ internal class MainGroupChatActions(
         } else {
             group.members.firstOrNull { it.id == senderUserId }?.avatarDataUrl
         }
-        return ChatMessage(
+        return com.elon.app.socialquotes.SocialQuoteCodec.bind(ChatMessage(
             role = if (outgoing) "user" else if (isElAssistant) "ai" else "friend",
             content = json.optString("content", ""),
             attachments = chatAttachmentsFromJsonArray(json.optJSONArray("attachments")).takeIf { it.isNotEmpty() },
@@ -533,7 +541,7 @@ internal class MainGroupChatActions(
             revision = json.optLong("revision", 1).coerceAtLeast(1),
             editedAt = json.cleanRecallString("edited_at"),
             recalledBy = json.cleanRecallString("recalled_by")
-        )
+        ), json)
     }
 
     private fun JSONObject.cleanRecallString(key: String): String? {

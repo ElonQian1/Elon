@@ -1318,7 +1318,7 @@ class MainActivity : AppCompatActivity() {
             deleteMessage = { message -> deletePopupMessage(message, friendChatActions, groupChatActions, projectSpaceController, messageActions) },
             startMultiSelect = { message -> messageSelectionActions.startSelection(message) },
             revokeProjectShare = { message, share -> chatProjectShareActions.revokePublishedShare(message, share) },
-            quoteMessage = { text -> messageActions.quoteMessage(text) },
+            quoteMessage = { m -> if (!groupChatActions.quoteMessage(m) && !friendChatActions.quoteMessage(m)) messageActions.quoteMessage(m.content) },
             favoriteMessage = chatSocialSidebarActions::favoriteMessage,
             canRequestAiReply = {
                 friendChatActions.isActive() || groupChatActions.isActive()

@@ -39,6 +39,8 @@ internal class MainFriendChatActions(
         protectSocialChatRows(messagesByFriend[key.removePrefix("friend:")].orEmpty(), rows)
     }
     private var owner = AuthManager.userId(activity)
+    private val quotes = com.elon.app.socialquotes.SocialQuoteComposer(binding)
+    fun quoteMessage(message: ChatMessage): Boolean = isActive() && quotes.select(message)
     private val messagesByFriend = linkedMapOf<String, MutableList<ChatMessage>>()
     private val pollHandler = Handler(Looper.getMainLooper())
     private var activeFriend: AppFriend? = null
@@ -93,12 +95,14 @@ internal class MainFriendChatActions(
         binding.inputEdit.removeTextChangedListener(typingWatcher)
         binding.inputEdit.addTextChangedListener(typingWatcher)
         showFriendChat(friend.name, animate)
+        quotes.open("friend:${friend.id}")
         onActiveFriendChanged(friend)
         loadMessages(friend, silent = false, scrollToBottom = true)
         startPolling()
     }
 
     fun closeFriendChat() {
+        quotes.close()
         showSocialChatStatus(binding, null)
         binding.inputEdit.removeTextChangedListener(typingWatcher)
         typingHandler.removeCallbacks(hideTypingRunnable)
@@ -125,6 +129,7 @@ internal class MainFriendChatActions(
         foreground = true
         if (!ensureOwner()) return
         val friend = activeFriend ?: return
+        quotes.open("friend:${friend.id}")
         val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
         val adapter = createAdapter(messages)
         activeAdapter = adapter
@@ -140,6 +145,7 @@ internal class MainFriendChatActions(
     }
 
     fun suspendForExternalChat() {
+        quotes.close()
         binding.inputEdit.removeTextChangedListener(typingWatcher)
         typingHandler.removeCallbacks(hideTypingRunnable)
         typingShowing = false
@@ -225,9 +231,11 @@ internal class MainFriendChatActions(
         if (text.isBlank() && attachmentsToSend.isEmpty()) return true
 
         val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
+        val quote = quotes.current()
         val pending = ChatMessage(
             role = "user",
             content = text,
+            quote = quote,
             attachments = localAttachments.takeIf { it.isNotEmpty() },
             sendStatus = SENDING_STATUS
         )
@@ -243,11 +251,12 @@ internal class MainFriendChatActions(
         thread {
             val result = runCatching {
                 val attachments = uploadFriendAttachments(friend, attachmentsToSend)
-                postMessage(friend, text, attachments)
+                postMessage(friend, text, attachments, quote)
             }
             activity.runOnUiThread {
                 if (sendingSession != socialSession(activity)) return@runOnUiThread
                 result.onSuccess { sentMessage ->
+                    quotes.sent("friend:${friend.id}", quote)
                     sentMessage.withMissingImageAnnotationsFrom(localAttachments)
                     completeSocialChatSend(messages, pending, sentMessage)
                     reader.invalidate("friend:${friend.id}")
@@ -473,8 +482,9 @@ internal class MainFriendChatActions(
         ) ?: error("附件上传失败")
     }
 
-    private fun postMessage(friend: AppFriend, text: String, attachments: JsonArray): ChatMessage {
+    private fun postMessage(friend: AppFriend, text: String, attachments: JsonArray, quote: com.elon.app.socialquotes.SocialQuote? = null): ChatMessage {
         val payloadJson = JSONObject().put("content", text)
+        quote?.let { payloadJson.put("quote_source", it.source()) }
         if (attachments.size() > 0) {
             payloadJson.put("attachments", JSONArray(attachments.toString()))
         }
@@ -527,7 +537,7 @@ internal class MainFriendChatActions(
         val senderUserId = json.optString("sender_user_id", "").trim()
         val isElAssistant = SocialAiIdentity.matches(senderUserId)
         val senderName = json.optString("sender_name", "").trim().takeIf { it.isNotEmpty() }
-        return ChatMessage(
+        return com.elon.app.socialquotes.SocialQuoteCodec.bind(ChatMessage(
             role = if (outgoing) "user" else if (isElAssistant) "ai" else "friend",
             content = json.optString("content", ""),
             attachments = chatAttachmentsFromJsonArray(json.optJSONArray("attachments")).takeIf { it.isNotEmpty() },
@@ -537,7 +547,7 @@ internal class MainFriendChatActions(
             createdAtMs = parseChatMessageCreatedAt(json.optString("created_at", "")) ?: 0L,
             recalledAt = json.cleanRecallString("recalled_at"),
             recalledBy = json.cleanRecallString("recalled_by")
-        )
+        ), json)
     }
 
     private fun JSONObject.cleanRecallString(key: String): String? {

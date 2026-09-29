@@ -212,8 +212,8 @@ class ChatAdapter(
             selectionMode && selectionIdentity.contains(message))
         bindMessageActions(holder, message, projectCardBound && com.elon.app.chatrecords.ChatRecordDocument.card(message.content) == null)
         WebChatProductionMessageActionBinder.bind(holder.itemView, message, onWebChatMessageAction.takeUnless { selectionMode })
-        bindFinalReplyLabel(holder, message)
-        bindEvidence(holder, message, position)
+        bindFinalReplyLabel(holder, message); bindEvidence(holder, message, position)
+        com.elon.app.socialquotes.SocialQuoteRows.bind(holder.itemView, message, messages, !selectionMode)
         bindModelAttribution(holder, message)
         if (message.role in shimmerWorkflowRoles) startShimmer(holder, message.role)
         val canPause = position == messages.lastIndex && message.role in activeWorkflowRoles && onPauseWork != null

@@ -124,6 +124,8 @@ fn context_prompt(conn: &Connection, group: &str, source: &str) -> Result<String
         if remaining == 0 {
             break;
         }
+        let body =
+            crate::store::friend_messages::social_quotes::context_text(conn, "group", &id, body)?;
         let content: String = body.chars().take(remaining.min(4000)).collect();
         remaining = remaining.saturating_sub(content.chars().count());
         let speaker: String = speaker.chars().take(100).collect();

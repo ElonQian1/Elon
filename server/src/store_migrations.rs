@@ -409,6 +409,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (305, "Consented group assistant subscriptions and updates", crate::store::articles::group_assistant::migrate),
     (306, "Account-scoped persistent group ChatGPT projects", crate::store::social_ai_messages::group_project::migrate),
     (307, "Permissioned imported chat record bundles", crate::store::articles::chat_records::migration::migrate),
+    (308, "Structured social message quotes", crate::store::friend_messages::social_quotes::migrate),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

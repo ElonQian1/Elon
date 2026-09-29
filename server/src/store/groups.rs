@@ -244,6 +244,14 @@ impl Store {
         };
         drop(stmt);
         super::social_ai_messages::requests::context::decorate(&conn, &mut messages)?;
+        for message in &mut messages {
+            message.quote = super::friend_messages::social_quotes::read(
+                &conn,
+                "group",
+                &message.id,
+                message.recalled_at.is_some(),
+            )?;
+        }
         if mark_read {
             mark_group_messages_read(&conn, user_id, group_id)?;
         }
@@ -257,9 +265,25 @@ impl Store {
         content: &str,
         attachments: Option<&[ProjectAttachmentRef]>,
     ) -> Result<FriendGroupMessage> {
+        self.send_friend_group_message_with_quote(user_id, group_id, content, attachments, None)
+    }
+
+    pub(crate) fn send_friend_group_message_with_quote(
+        &self,
+        user_id: &str,
+        group_id: &str,
+        content: &str,
+        attachments: Option<&[ProjectAttachmentRef]>,
+        source: Option<&super::friend_messages::social_quotes::QuoteSource>,
+    ) -> Result<FriendGroupMessage> {
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        let message = send::insert_message(&tx, user_id, group_id, content, attachments)?;
+        let quote = super::friend_messages::social_quotes::prepare(
+            &tx, user_id, "group", group_id, source,
+        )?;
+        let mut message = send::insert_message(&tx, user_id, group_id, content, attachments)?;
+        super::friend_messages::social_quotes::save(&tx, "group", &message.id, quote.as_ref())?;
+        message.quote = quote;
         tx.commit()?;
         Ok(message)
     }
@@ -533,6 +557,7 @@ fn row_to_group_message(
     let recalled_at: Option<String> = row.get(7)?;
     let recalled_by: Option<String> = row.get(8)?;
     Ok(FriendGroupMessage {
+        quote: None,
         ai_reply: None,
         id: row.get(0)?,
         group_id: row.get(1)?,

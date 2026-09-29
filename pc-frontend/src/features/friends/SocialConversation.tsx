@@ -14,6 +14,9 @@ import { conversationId } from './socialChatCache'
 import { isPending, isRecalled, messageText } from './socialChatOperations'
 import { localMessageKey, useSocialLocalState, type SavedSocialMessage } from './socialLocalState'
 import SocialAvatar from './SocialAvatar'
+import SocialQuotePreview from './quotes/SocialQuotePreview'
+import { splitSocialQuote, type SocialQuote } from './quotes/socialQuote'
+import SocialDialog from './SocialDialog'
 import SocialLinkCards from './SocialLinkCards'
 import SocialMessageAttachments from './SocialMessageAttachments'
 import SocialMessageMenu from './SocialMessageMenu'
@@ -45,6 +48,7 @@ export default function SocialConversation(props: Props) {
   const [selectionMode, setSelectionMode] = useState(false)
   const [notice, setNotice] = useState('')
   const [quote, setQuote] = useState<QuoteRequest | null>(null)
+  const [quoteDetail, setQuoteDetail] = useState<SocialQuote | null>(null)
   const [forward, setForward] = useState<SavedSocialMessage[] | null>(null)
   const [menu, setMenu] = useState<SocialMenuRequest | null>(null)
   const [aiSelection, setAiSelection] = useState<SocialMessage[] | null>(null)
@@ -54,6 +58,7 @@ export default function SocialConversation(props: Props) {
   const [newMessages, setNewMessages] = useState(false)
   useEffect(() => {
     setAiSelection(null)
+    setQuoteDetail(null)
     setQuery(''); setSelectedIds([]); setSelectionMode(false); setMenu(null); setNotice(''); follow.current = true; setNewMessages(false)
     const node = feed.current, saved = readSocialPosition(me.id, key)
     if (node) { node.scrollTop = saved ?? node.scrollHeight; follow.current = saved == null || node.scrollHeight - node.clientHeight - saved < 80 }
@@ -92,7 +97,8 @@ export default function SocialConversation(props: Props) {
         const recalled = isRecalled(m)
         const name = own ? me.nickname || me.account : conversation.kind === 'group' ? m.sender_name || '群成员' : title
         const avatar = own ? me.avatar_data_url : conversation.kind === 'group' ? props.group?.members?.find(member => member.id === m.sender_user_id)?.avatar_data_url : props.friend?.avatar_data_url
-        const content = recalled ? (own ? '你撤回了一条消息' : `${name} 撤回了一条消息`) : displayMessageContentOrAttachment(m.content)
+        const split = m.sender_user_id === 'usr_elon_ai' && !m.quote ? { body: m.content, quote: null } : splitSocialQuote(m)
+        const content = recalled ? (own ? '你撤回了一条消息' : `${name} 撤回了一条消息`) : displayMessageContentOrAttachment(split.body)
         const compactLink = !m.ai_reply && !recalled && !m.attachments?.length && ElonSocialLinks.compact(content)
         const copyId = messageCopySourceId(`friends:${key}`, m.id)
         const savedKey = localMessageKey(conversation, m.id)
@@ -117,9 +123,14 @@ export default function SocialConversation(props: Props) {
               {!recalled && m.ai_reply && conversation.kind === 'group' && <GroupAiReplyContext owner={me.id} group={conversation.id} message={m.id} metadata={m.ai_reply} part="footer" />}
             </div>)}
             {!recalled && m.ai_reply && conversation.kind === 'group' && <GroupAiReplyContext owner={me.id} group={conversation.id} message={m.id} metadata={m.ai_reply} part="sources" />}
-            {!recalled && !m.attachments?.length && <TextSourceCard text={m.content} />}
+            {!recalled && !m.attachments?.length && <TextSourceCard text={split.body} />}
             {!recalled && <SocialMessageAttachments attachments={m.attachments} />}
             {!recalled && !specialMessage(m) && <SocialLinkCards text={content} owner={`${me.id}:${key}`} compact={compactLink} />}
+            {!recalled && split.quote && <SocialQuotePreview quote={split.quote} owner={`${me.id}:${key}`} own={own} onOpen={() => {
+              const source = Array.from(feed.current?.querySelectorAll<HTMLElement>('[data-message-id]') || []).find(row => row.dataset.messageId === split.quote!.message_id)
+              if (source) { follow.current = false; source.scrollIntoView({ block: 'center', behavior: 'smooth' }); source.focus({ preventScroll: true }) }
+              else setQuoteDetail(split.quote)
+            }} />}
             <SocialMessageMenu conversation={conversation} message={m} own={own} compactLink={compactLink} special={specialMessage(m)} copySourceId={copyId} request={menu} onMenu={setMenu} favorite={favorites.has(savedKey)}
               onQuote={() => setQuote({ conversation: key, message: m, author: name, nonce: Date.now() })}
               onForward={() => setForward([saveItem(m)])} onSelect={() => select(m)}
@@ -136,6 +147,7 @@ export default function SocialConversation(props: Props) {
     {newMessages && <button type="button" className={tools.latest} onClick={latest}>有新消息 · 回到最新</button>}
     <SocialComposer conversation={conversation} title={title} me={me} input={input} setInput={setInput} setMessages={setMessages} onSent={() => { latest(); props.onSent() }} quote={quote} />
     {forward && <SocialForwardDialog messages={forward} targets={props.targets} onClose={() => setForward(null)} onSent={props.retry} />}
+    {quoteDetail && <SocialDialog title="引用的消息" onClose={() => setQuoteDetail(null)}><p>{quoteDetail.sender_name}</p><MarkdownContent content={quoteDetail.unavailable ? '原消息已撤回或不可用' : quoteDetail.content} copy={false} />{!quoteDetail.unavailable && <SocialMessageAttachments attachments={quoteDetail.attachments} />}</SocialDialog>}
     {aiSelection && conversation.kind === 'group' && <GroupAiSelectionDialog key={key} owner={me.id} group={conversation.id} title={title} messages={aiSelection} onClose={() => setAiSelection(null)} />}
   </div>
 }

@@ -28,7 +28,7 @@ internal class MainActionPopups(
     private val deleteMessage: (ChatMessage) -> Unit,
     private val startMultiSelect: (ChatMessage) -> Unit,
     private val revokeProjectShare: (ChatMessage, ChatProjectShare) -> Unit,
-    private val quoteMessage: (String) -> Unit,
+    private val quoteMessage: (ChatMessage) -> Unit,
     private val favoriteMessage: (ChatMessage) -> Unit,
     private val canRequestAiReply: () -> Boolean,
     private val requestAiReply: (ChatMessage) -> Unit,
@@ -114,8 +114,8 @@ internal class MainActionPopups(
         }
         actions.add(TopAction("删除", R.drawable.ic_msg_delete) { deleteMessage(message) })
         actions.add(TopAction("多选", R.drawable.ic_msg_multi) { startMultiSelect(message) })
+        if (hasText || isRecord || !message.attachments.isNullOrEmpty()) actions.add(TopAction("引用", R.drawable.ic_msg_quote) { quoteMessage(message) })
         if (hasText) {
-            actions.add(TopAction("引用", R.drawable.ic_msg_quote) { quoteMessage(text) })
             actions.add(TopAction("提醒", R.drawable.ic_msg_remind) { shareActions().toastMessageAction("提醒准备中") })
             actions.add(TopAction("搜一搜", R.drawable.ic_msg_search) { shareActions().searchMessageText(text) })
             actions.add(TopAction("从当前听", R.drawable.ic_msg_listen) { shareActions().toastMessageAction("从当前听准备中") })
