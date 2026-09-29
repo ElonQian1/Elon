@@ -6,7 +6,7 @@ param(
     [ValidateSet('inspect','open_create','create_fixture','open_fixture','open_model','model_default','model_latest','send_first','send_second',
         'select_fixture','submit_selection','submit_project_selection','retry_selection','confirm_project_restart','share_answer','share_target','share_choose_group','share_submit',
         'open_card','open_sources','open_sharing','allow_discussion','disable_discussion',
-        'continue_private','confirm_private','return_group','cancel','back')][string]$Step = 'inspect',
+        'continue_private','confirm_private','return_group','cancel','back','quote_draft','quote_cancel')][string]$Step = 'inspect',
     [string]$GroupName = '',
     [string]$Adb = 'D:/Android/sdk/platform-tools/adb.exe'
 )
