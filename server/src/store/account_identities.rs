@@ -252,6 +252,11 @@ impl Store {
                         timestamp,
                     ],
                 )?;
+                super::users::registration_groups::join_new_user(
+                    &transaction,
+                    &user_id,
+                    &timestamp,
+                )?;
                 (user_id, true)
             }
         } else {

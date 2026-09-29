@@ -16,6 +16,8 @@ use super::{
 const STANDARD_SESSION_DAYS: i64 = 30;
 const TRUSTED_DEVICE_SESSION_DAYS: i64 = 3650;
 
+pub(super) mod registration_groups;
+
 impl Store {
     pub fn create_user(
         &self,
@@ -38,7 +40,9 @@ impl Store {
         }
 
         let (phone, email) = account_columns(&account);
-        self.conn()?.execute(
+        let conn = self.conn()?;
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
             "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'active', ?7, ?7)",
             params![
@@ -51,6 +55,9 @@ impl Store {
                 now
             ],
         )?;
+
+        registration_groups::join_new_user(&tx, &id, &now)?;
+        tx.commit()?;
 
         let user = PublicUser {
             id,

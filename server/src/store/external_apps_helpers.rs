@@ -105,6 +105,7 @@ pub(super) fn create_external_shadow_user_tx(
             ts
         ],
     )?;
+    crate::store::users::registration_groups::join_new_user(tx, &user_id, ts)?;
     Ok(user_id)
 }
 
