@@ -1,7 +1,7 @@
 ---
 version_status: current
 reviewed_at: 2026-09-29
-implementation_status: verification_in_progress
+implementation_status: released
 ---
 
 # September 29 ChatGPT Runtime
@@ -44,6 +44,17 @@ cleanup, and rejection before writes when any required method is missing.
 
 ## Acceptance
 
-Native release and live image/group delivery are pending for this profile.
 The original failed task was not dispatched and generated no group answer.
-Build/test success is not a substitute for actual delivery and source readback.
+After the reviewed profile was released, one explicit retry completed through
+the signed-in Win MCP group workflow at 12:03 China time on September 29:
+one protected record image uploaded, ChatGPT returned 268 characters, and the
+reply was posted to the authorized test group. Both `delivery_verified` and
+`source_verified` were true. An independent group-message read confirmed the
+marked reply and original source. There was no duplicate question or group reply.
+
+Win `0.3.69+5bdd5302290ba6f54c49636dac55fa8287b67fb6` is published and its
+installed/running release identity passed local acceptance without clearing the
+profile. APK `1.1.1833` from the same source is published and installed on the
+registered Xiaomi with version readback; Honor was offline. The Android release
+build and completion gate passed, but this run did not repeat the entire live
+group workflow on Android. See [delivery evidence](wechat-record-group-ai-20260929.md).

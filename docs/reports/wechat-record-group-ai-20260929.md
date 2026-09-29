@@ -1,7 +1,7 @@
 ---
 version_status: current
 reviewed_at: 2026-09-29
-implementation_status: verification_in_progress
+implementation_status: released
 ---
 
 # 微信记录群 AI 分析
@@ -19,10 +19,22 @@ implementation_status: verification_in_progress
 ## 已验证
 
 - 后端全量 Store 测试中的 5 个定向用例通过：完整嵌套记录和受保护媒体、撤回、退群/旧客户端、伪造卡片、超限不截断；续聊草稿完整文本断言也已通过。
+- 既有群 AI 选区链路 26 项回归通过。
 - PC 上传、控制和任务状态机 38 项测试通过；TypeScript/Vite 构建通过。
 - `scripts/test-chat-record-ai-ui.cjs` 在 1280 和 390 宽度使用真实 React 组件验证直接按钮、右键、多选和预览；截图位于本机 `.ai-tmp/record-ai-ui`，无私人内容。
 - Android 14 项定向测试通过。首次实际卡片测试发现项目卡片布局没有多选勾选框，改为用户/群友消息布局后，卡片长按、选中、取消选中及 ID/版本保留全部通过；其他项目卡片不变。
+- 现场遇到官网新构建的图片上传兼容门禁；新增独立的已审查 runtime profile，98 项适配回归通过，见 [运行时验收](chatgpt-rspack-runtime-20260929.md)。
 
-## 待验证
+## 发布与真实验收
 
-正式发布/安装、线上 MCP 真实 ChatGPT 分析和群消息回读尚未完成，不以离线测试替代。
+- Server/PC 已发布 `0.3.1793`，业务源提交 `e444c1ce8c0fd4c0b582faf7559a3af786f2e232`；健康检查、PC 入口和发布完成门禁通过。
+- Win 已发布 `0.3.69+5bdd5302290ba6f54c49636dac55fa8287b67fb6`。本机保留登录态更新；升级后桌面未自动重新打开，由无人值守流程核对 EXE 摘要后启动，最终安装版本及运行版本验收通过。本次没有宣称修复升级器的自动重开问题。
+- APK 已发布 `1.1.1833 (1833)`，源提交 `5bdd5302290ba6f54c49636dac55fa8287b67fb6`；SHA-256 `c66786063b1ebdeea581ca82dd4f2c30b74f5a84cfa991d8362a1b86d0517e67`。Release 构建、线上摘要和版本回读、AndroidFeature 完成门禁均通过；已保留数据更新白名单小米并回读版本，荣耀离线延期。
+- 2026-09-29 12:03（北京时间），使用已登录 Win 群账号，通过 MCP 选择原 09:55 微信记录并完成私有图片上传、ChatGPT 分析和回复回群。业务状态为 `completed`，`attachment_count=1`、`source_count=1`、`answer_chars=268`，`delivery_verified=true`、`source_verified=true`。
+- 随后独立读取群消息，确认“微信记录分析验收”回复及原始来源均在群内。失败的首次尝试停在上传前置兼容检查，`dispatched=false`，没有发送问题；适配后仅重试一次，未产生重复群回复。
+
+## 范围与边界
+
+真实全业务闭环已在 Win MCP 验证；Android 已完成定向卡片交互测试、Release 构建和真机更新，本轮未在手机再次发送同一验收任务，不能将 Win 结果冒充 Android 全流程实测。发布日志另有局域网分发防火墙权限和 worktree 自动清理警告，不影响线上发布及小米安装；任务清理由统一收尾复核。
+
+支持平台已导入的完整记录文本、嵌套关系及可上传图片/文件。音视频、未导出的附件和链接指向的网页内容不会冒充已读；超限显式阻止，不静默截断。继续讨论草稿包含记录全文，但不会自动重新上传原附件。

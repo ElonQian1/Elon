@@ -23847,7 +23847,7 @@
       "id": "wechat-record-group-ai-v1",
       "title": "微信记录群 AI 分析",
       "summary": "补齐已导入记录的 AI 入口、全文和媒体展开、私有上传与幂等回群",
-      "status": "implemented",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/wechat-record-group-ai.md",
@@ -23879,39 +23879,78 @@
       ],
       "implementation_evidence": [
         {
-          "path": "android/app/src/main/kotlin/com/elon/app/ChatAdapter.kt",
-          "content_hash": "3bee48d9c0e183c6567e9cd5eed0830de8ac85e6a8256f8246fcb1adcd97f926",
+          "path": "android/app/src/main/assets/chatgpt_web_rspack_runtime.js",
+          "content_hash": "1140c74ba8a5e2d8916290329c1331757a9e939d3a40198e0a2bc868d760eb1e",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "57b26568c0fbda0f02a58739594f62c948741dfc",
-            "head_blob_oid": "c7973702ada8880a1963b77d1dbb400b1c0ce2be",
+            "head_commit": "5bdd5302290ba6f54c49636dac55fa8287b67fb6",
+            "head_blob_oid": "2bb73ffeb06f14ea27e28f1515d2b5982ee80548",
+            "worktree_blob_oid": "2bb73ffeb06f14ea27e28f1515d2b5982ee80548",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/ChatAdapter.kt",
+          "content_hash": "9a3ece65e07fec3aa81d8a2d01bb24d4f8d065a25bfaa21c26d646da5892f7af",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5bdd5302290ba6f54c49636dac55fa8287b67fb6",
+            "head_blob_oid": "3ca0b7cc6fcdf87c9eb33ae5309a708fb5f67726",
             "worktree_blob_oid": "3ca0b7cc6fcdf87c9eb33ae5309a708fb5f67726",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/ChatRecordAiSelectionTest.kt",
-          "content_hash": "ebe63394b3bce5d6b2cd2df9b534060dc6055cc5779dbc57d1082109dcd612bf",
+          "content_hash": "3ef9295e6856dee505993127d085ffd0ca1b3eaafcb10aaa5b2893fa23d78c25",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "57b26568c0fbda0f02a58739594f62c948741dfc",
-            "head_blob_oid": "",
+            "head_commit": "5bdd5302290ba6f54c49636dac55fa8287b67fb6",
+            "head_blob_oid": "1a02aa68b129e8f6a55b90c54893a6b6bd11d931",
             "worktree_blob_oid": "1a02aa68b129e8f6a55b90c54893a6b6bd11d931",
-            "state": "untracked"
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/reports/chatgpt-rspack-runtime-20260929.md",
+          "content_hash": "573f4bb02fae3064fb7bee6ff8e0147396ff406644b13ac6325a14c0eeb73e67",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5bdd5302290ba6f54c49636dac55fa8287b67fb6",
+            "head_blob_oid": "3aff795f9425203080225423411cfc73ba118e60",
+            "worktree_blob_oid": "58673722b73ea99a2a754a6cef14142e7b3c999b",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "docs/reports/wechat-record-group-ai-20260929.md",
+          "content_hash": "4e7e9c5ab35859124fb8745ee0c9e4aef79bcf71a8cdcd4ac617818c45d5780e",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5bdd5302290ba6f54c49636dac55fa8287b67fb6",
+            "head_blob_oid": "6813bc0711b02555cbf69593888772b45cf4de0d",
+            "worktree_blob_oid": "dc15ed6401c7d31b5154a90729d2625bbf200fa6",
+            "state": "tracked_modified"
           }
         },
         {
           "path": "pc-frontend/src/features/friends/chat-records/ChatRecordMessage.tsx",
-          "content_hash": "f68ceb913a8e14b8e94c1999d3b5566b57abab68202609327cd3a060c02d92e1",
+          "content_hash": "b70c1dee9382f6ff80ad8e1c3f6b4e740ffd484aeec0375e87a2952ffef4c1f5",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "57b26568c0fbda0f02a58739594f62c948741dfc",
+            "head_commit": "5bdd5302290ba6f54c49636dac55fa8287b67fb6",
             "head_blob_oid": "ac33ecb6de86924390cd0c97f6522639212677fa",
             "worktree_blob_oid": "ac33ecb6de86924390cd0c97f6522639212677fa",
             "state": "tracked_clean"
@@ -23919,14 +23958,27 @@
         },
         {
           "path": "scripts/test-chat-record-ai-ui.cjs",
-          "content_hash": "fb225e48c70bbbd950a874375d06a195e79a815382a8b17d0345cf0cdc839709",
+          "content_hash": "38b6683f2e57e00a92c344b96448ece9f07a6ea518b9ae55624979488f58710e",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "57b26568c0fbda0f02a58739594f62c948741dfc",
+            "head_commit": "5bdd5302290ba6f54c49636dac55fa8287b67fb6",
             "head_blob_oid": "fbd800cc0adcdb9badb224aed58b2f58882fdf43",
             "worktree_blob_oid": "fbd800cc0adcdb9badb224aed58b2f58882fdf43",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "scripts/test-chatgpt-rspack-attachments.cjs",
+          "content_hash": "64d7e4932934cad128558423264cabdf01816ae02e197ec278e7699318d44a1f",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5bdd5302290ba6f54c49636dac55fa8287b67fb6",
+            "head_blob_oid": "b1c96d4e27d4e27d381bb89822be226c4c7b6294",
+            "worktree_blob_oid": "b1c96d4e27d4e27d381bb89822be226c4c7b6294",
             "state": "tracked_clean"
           }
         },
@@ -23937,7 +23989,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "57b26568c0fbda0f02a58739594f62c948741dfc",
+            "head_commit": "5bdd5302290ba6f54c49636dac55fa8287b67fb6",
             "head_blob_oid": "2cfcfe7a6c874ef29e300ddd3b99e75c5e28b8bb",
             "worktree_blob_oid": "2cfcfe7a6c874ef29e300ddd3b99e75c5e28b8bb",
             "state": "tracked_clean"
@@ -23950,7 +24002,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "57b26568c0fbda0f02a58739594f62c948741dfc",
+            "head_commit": "5bdd5302290ba6f54c49636dac55fa8287b67fb6",
             "head_blob_oid": "48427bda1fc2618c00827eab5b7596a516d2818f",
             "worktree_blob_oid": "48427bda1fc2618c00827eab5b7596a516d2818f",
             "state": "tracked_clean"
@@ -23958,7 +24010,7 @@
         }
       ],
       "created_at_ms": 1790648800389,
-      "updated_at_ms": 1790651510162
+      "updated_at_ms": 1790655218483
     },
     {
       "id": "win-ai-child-webview-capability-v1",
@@ -31468,36 +31520,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_c5ebafa572cd439e8f03451da8a05465",
-      "feature_id": "binance_wallet_summary_host_v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789354538281
-    },
-    {
-      "id": "feature_event_97049c9e09f14a268c19d10e835da5dc",
-      "feature_id": "binance_wallet_summary_host_v1",
-      "action": "evidence_recorded",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789355312129
-    },
-    {
-      "id": "feature_event_ef0320b7a1714f8aa56ebffc194b62ab",
-      "feature_id": "binance_wallet_summary_host_v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789355312219
-    },
-    {
       "id": "feature_event_30cd29378a164dbd847d102c4aa8f1d9",
       "feature_id": "binance_wallet_summary_host_v1",
       "action": "evidence_recorded",
@@ -33466,6 +33488,36 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1790651510162
+    },
+    {
+      "id": "feature_event_70c5d8ea7abb4638ac7af62ca4bb8714",
+      "feature_id": "wechat-record-group-ai-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-record-ai",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1790655197689
+    },
+    {
+      "id": "feature_event_2fc61707b63d4bf489d2fba57e2c6bc7",
+      "feature_id": "wechat-record-group-ai-v1",
+      "action": "transitioned",
+      "actor": "codex-record-ai",
+      "reason": "Targeted tests and live Win MCP protected-image analysis, group delivery and independent source readback passed. Android full business resend not claimed.",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1790655218015
+    },
+    {
+      "id": "feature_event_af96b1b21f6f48608eb165d72badd9bb",
+      "feature_id": "wechat-record-group-ai-v1",
+      "action": "transitioned",
+      "actor": "codex-record-ai",
+      "reason": "Server/PC 0.3.1793, Win 0.3.69, APK 1.1.1833 published; local Win and Xiaomi updated with identity checks. Honor offline.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1790655218483
     }
   ]
 }
