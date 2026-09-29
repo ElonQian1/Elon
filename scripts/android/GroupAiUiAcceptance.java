@@ -135,7 +135,6 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
                 UiObject composer = openComposer();
                 assertTrue("existing_draft", composer.getText().isEmpty() || composer.getText().equals("输入内容"));
                 fill(composer, "ELON QUOTE DRAFT ACCEPTANCE - NOT SENT");
-                getUiDevice().pressBack();
                 action(id("messageText"), true);
                 action(text("引用"), false);
                 assertTrue("quote_cancel_missing", desc("取消引用").waitForExists(3000));

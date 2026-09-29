@@ -56,7 +56,7 @@ async function run({page,row,root}) {
   const audio = row('media').locator('[data-social-attachment="1"]')
   const file = row('media').locator('[data-social-attachment="2"]')
   await rightClick(image); assert.equal(await menu.getByRole('menuitem',{name:'播放语音'}).count(),0)
-  await act('复制图片'); await row('media').getByRole('status').waitFor({timeout:4000}); assert.equal(await row('media').getByRole('status').innerText(),'已复制图片')
+  await act('复制图片'); await row('media').getByRole('status').filter({hasText:'已复制图片'}).waitFor({timeout:4000})
   assert.ok(await page.evaluate(async()=>(await navigator.clipboard.read())[0].types.includes('image/png')))
   await rightClick(image); await act('查看图片'); await page.getByRole('dialog',{name:'图片预览：测试图片.png'}).waitFor()
   await page.getByRole('dialog').locator('img').evaluate(el=>el.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true})))

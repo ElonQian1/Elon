@@ -58,7 +58,9 @@ createRoot(document.getElementById('root')).render(React.createElement(React.Str
           const body = req.postDataJSON(); sends.push({p,body})
           if (holdSend) { sendRoute = route; return }
           if (body.content.includes('第二条可转发文字') && body.content.startsWith('转发自') && forwardFailure) return route.fulfill({status:503,json:{error:'目标暂时忙，请重试剩余消息'}})
-          const saved = message(`sent-${sends.length}`,body.content,true,{attachments:body.attachments})
+          const source = body.quote_source && (p.includes('/groups/') ? groups : friends).find(m => m.id === body.quote_source.message_id)
+          const quote = source ? { message_id: source.id, sender_name: source.sender_name, content: source.content, attachments: source.attachments || [], revision: source.revision, unavailable: false } : undefined
+          const saved = message(`sent-${sends.length}`,body.content,true,{attachments:body.attachments,quote})
           if (p.includes('/groups/')) groups.push(saved); else friends.push(saved)
           return route.fulfill({json:{message:saved}})
         }
@@ -96,12 +98,13 @@ createRoot(document.getElementById('root')).render(React.createElement(React.Str
     await page.locator('textarea').fill('原有草稿')
     await menu('peer'); await act('引用')
     assert.equal(await page.locator('textarea').inputValue(),'原有草稿')
-    await page.getByLabel('待发送引用').getByText('第 2 版',{exact:false}).waitFor()
+    await page.getByLabel('待发送引用').getByText('成员修改后的文字',{exact:false}).waitFor()
     await page.getByRole('button',{name:'取消引用',exact:true}).click(); assert.equal(await page.locator('textarea').inputValue(),'原有草稿')
     await menu('peer'); await act('引用'); await page.getByRole('button',{name:'发送',exact:true}).click()
     await page.waitForFunction(()=>document.querySelector('textarea').value==='')
-    assert.match(sends.at(-1).body.content,/> 引用 测试成员 · 第 2 版\n> 成员修改后的文字\n\n原有草稿/)
-    assert.ok(await page.locator('blockquote').count() >= 1)
+    assert.equal(sends.at(-1).body.content,'原有草稿')
+    assert.deepEqual(sends.at(-1).body.quote_source,{message_id:'peer',revision:2})
+    await row(`sent-${sends.length}`).getByLabel('引用的消息').waitFor()
     await menu('peer'); await act('收藏'); await page.getByRole('button',{name:'本机收藏',exact:true}).click()
     await page.getByRole('dialog').getByText('成员修改后的文字',{exact:true}).waitFor(); await close()
     await menu('peer'); await act('隐藏消息'); assert.equal(await row('peer').count(),0)
