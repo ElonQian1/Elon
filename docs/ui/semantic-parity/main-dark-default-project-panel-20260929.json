@@ -43,13 +43,17 @@
           "android": {
             "definitionId": "project.browser.search",
             "assertions": {
-              "/text": ""
+              "/kind": "android.text",
+              "/properties/visibility/effective/value": "visible"
             }
           },
           "web": {
             "selector": "#projectBrowserSearchInput",
             "assertions": {
-              "/role": "input"
+              "/role": "textbox",
+              "/label": "搜索项目",
+              "/inputType": "search",
+              "/disabled": false
             }
           }
         }
@@ -80,13 +84,17 @@
           "android": {
             "definitionId": "project.browser.search",
             "assertions": {
-              "/text": ""
+              "/kind": "android.text",
+              "/properties/visibility/effective/value": "visible"
             }
           },
           "web": {
             "selector": "#projectBrowserSearchInput",
             "assertions": {
-              "/role": "input"
+              "/role": "textbox",
+              "/label": "搜索项目",
+              "/inputType": "search",
+              "/disabled": false
             }
           }
         }
@@ -117,13 +125,17 @@
           "android": {
             "definitionId": "project.browser.search",
             "assertions": {
-              "/text": ""
+              "/kind": "android.text",
+              "/properties/visibility/effective/value": "visible"
             }
           },
           "web": {
             "selector": "#projectBrowserSearchInput",
             "assertions": {
-              "/role": "input"
+              "/role": "textbox",
+              "/label": "搜索项目",
+              "/inputType": "search",
+              "/disabled": false
             }
           }
         }
@@ -154,13 +166,17 @@
           "android": {
             "definitionId": "project.browser.search",
             "assertions": {
-              "/text": ""
+              "/kind": "android.text",
+              "/properties/visibility/effective/value": "visible"
             }
           },
           "web": {
             "selector": "#projectBrowserSearchInput",
             "assertions": {
-              "/role": "input"
+              "/role": "textbox",
+              "/label": "搜索项目",
+              "/inputType": "search",
+              "/disabled": false
             }
           }
         }
@@ -191,13 +207,17 @@
           "android": {
             "definitionId": "project.browser.search",
             "assertions": {
-              "/text": ""
+              "/kind": "android.text",
+              "/properties/visibility/effective/value": "visible"
             }
           },
           "web": {
             "selector": "#projectBrowserSearchInput",
             "assertions": {
-              "/role": "input"
+              "/role": "textbox",
+              "/label": "搜索项目",
+              "/inputType": "search",
+              "/disabled": false
             }
           }
         }
@@ -228,13 +248,17 @@
           "android": {
             "definitionId": "project.browser.search",
             "assertions": {
-              "/text": ""
+              "/kind": "android.text",
+              "/properties/visibility/effective/value": "visible"
             }
           },
           "web": {
             "selector": "#projectBrowserSearchInput",
             "assertions": {
-              "/role": "input"
+              "/role": "textbox",
+              "/label": "搜索项目",
+              "/inputType": "search",
+              "/disabled": false
             }
           }
         }
