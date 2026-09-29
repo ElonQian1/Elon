@@ -63,6 +63,36 @@ fn op() -> String {
 }
 
 #[test]
+fn selection_keeps_structured_quote_without_expanding_group_window() {
+    let f = Fixture::new();
+    let quote = social_quotes::SocialQuote {
+        message_id: "b".into(),
+        sender_name: "member".into(),
+        content: "QUOTED_SNAPSHOT".into(),
+        attachments: vec![],
+        revision: 1,
+        unavailable: false,
+    };
+    social_quotes::save(&f.store.conn().unwrap(), "group", "a", Some(&quote)).unwrap();
+    let request = f.prepare(&op(), &Fixture::input(&["a"])).unwrap();
+    assert!(request.prompt.contains("QUOTED_SNAPSHOT"));
+    assert!(request.prompt.contains("quoted_context"));
+    assert!(!request.prompt.contains("EXCLUDED_B") && !request.prompt.contains("SELECTED_C"));
+    let f = Fixture::new();
+    social_quotes::save(&f.store.conn().unwrap(), "group", "a", Some(&quote)).unwrap();
+    f.store
+        .conn()
+        .unwrap()
+        .execute(
+            "UPDATE friend_group_messages SET recalled_at='now' WHERE id='b'",
+            [],
+        )
+        .unwrap();
+    let request = f.prepare(&op(), &Fixture::input(&["a"])).unwrap();
+    assert!(!request.prompt.contains("QUOTED_SNAPSHOT"));
+}
+
+#[test]
 fn attachment_manifest_preserves_scope_and_requires_updated_client() {
     let f = Fixture::new();
     let raw = serde_json::json!([{"attachment_id":"fixture", "display_name":"chart.png", "mime_type":"image/png",

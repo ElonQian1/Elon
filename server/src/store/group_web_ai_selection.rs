@@ -93,6 +93,15 @@ fn prompt(
             .iter()
             .map(|f| serde_json::json!({"name":f.name,"mime_type":f.mime_type}))
             .collect::<Vec<_>>());
+        let quoted = crate::store::friend_messages::social_quotes::context_text(
+            conn,
+            "group",
+            &row.1,
+            String::new(),
+        )?;
+        if !quoted.is_empty() {
+            row.3["quoted_context"] = serde_json::json!(quoted);
+        }
     }
     ensure!(
         files.is_empty() || selection.attachment_transport_version == 1,

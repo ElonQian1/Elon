@@ -130,6 +130,22 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
                 fill(new UiObject(new UiSelector().packageName(APP).className("android.widget.EditText")), GROUP);
                 action(ai, false); action(text("完成"), false); break;
             case "open_fixture": openFixture(); break;
+            case "quote_draft": {
+                fixtureOpen();
+                UiObject composer = openComposer();
+                assertTrue("existing_draft", composer.getText().isEmpty() || composer.getText().equals("输入内容"));
+                fill(composer, "ELON QUOTE DRAFT ACCEPTANCE - NOT SENT");
+                getUiDevice().pressBack();
+                action(id("messageText"), true);
+                action(text("引用"), false);
+                assertTrue("quote_cancel_missing", desc("取消引用").waitForExists(3000));
+                assertEquals("quote_overwrote_draft", "ELON QUOTE DRAFT ACCEPTANCE - NOT SENT", id("inputEdit").getText());
+                break;
+            }
+            case "quote_cancel":
+                fixtureOpen(); action(desc("取消引用"), false);
+                assertEquals("quote_cancel_lost_draft", "ELON QUOTE DRAFT ACCEPTANCE - NOT SENT", id("inputEdit").getText());
+                fill(id("inputEdit"), ""); break;
             case "open_model": fixtureOpen(); action(id("modelButton"), false); break;
             case "model_default": action(desc("web-chat-model-default"), false); break;
             case "model_latest": action(text("最新"), false); break;
