@@ -23,9 +23,25 @@ async function main() {
     await page.goto(origin + '/?fixture=empty&home=1');
     await page.locator('.empty-tip').waitFor();
     assert.equal(await page.locator('.conversation-item').count(), 0, 'empty fixture must not show synthetic contacts');
+    await page.goto(origin + '/?fixture=login&conversation=group&draft=1');
+    await page.locator('#inputBar.has-text #messageInput').waitFor();
+    assert.equal(await page.locator('#messageInput').inputValue(), '尚未发送的群聊草稿\n检查输入区展开后的布局');
     for (const theme of ['light', 'dark']) for (const width of [320, 390, 411]) {
       await page.evaluate(value => localStorage.setItem('elon.mobile.appearance.v2', value), theme);
       await page.setViewportSize({ width, height: 844 });
+      await page.goto(origin + '/?fixture=login&home=1');
+      const badge = page.locator('.avatar-badge').first();
+      await badge.waitFor();
+      await page.waitForLoadState('networkidle');
+      const contrast = await page.evaluate(() => {
+        const node = document.querySelector('.avatar-badge');
+        const luminance = color => color.match(/[0-9.]+/g).slice(0, 3).map(value => Number(value) / 255)
+          .map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
+          .reduce((sum, value, index) => sum + value * [.2126, .7152, .0722][index], 0);
+        const style = getComputedStyle(node), a = luminance(style.color), b = luminance(style.backgroundColor);
+        return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+      });
+      assert.ok(contrast >= 4.5, 'unread count must be readable in both themes');
       await page.goto(origin + '/?fixture=login&conversation=group');
       await page.locator('#chatList .bubble.friend').last().waitFor();
       await page.locator('#inputPlaceholder').tap();

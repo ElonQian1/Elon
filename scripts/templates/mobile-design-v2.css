@@ -123,6 +123,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .chat-timeline-label { color: var(--ink-soft); font-size: 12px; line-height: 1.4; }
 .conversation-item .brand, .conversation-item .brand.group, .conversation-item .brand.round,
 .group-avatar-grid, .group-avatar-tile { background: var(--panel-2); color: var(--ink-soft); }
+.conversation-item .brand .avatar-badge { background: var(--mobile-error-container); color: var(--mobile-error); }
 .home-filter-tabs { padding-block: 4px; gap: 4px; }
 .home-filter-tab { border-radius: 12px; }
 .home-filter-tab.active { background: var(--panel-2); color: var(--ink); }

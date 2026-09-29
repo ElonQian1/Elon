@@ -257,29 +257,18 @@
       "androidScreenId": "elon.group.readability",
       "androidFontScale": 1,
       "webCapture": {
-        "url": "http://127.0.0.1:43782/?fixture=login&conversation=group",
+        "url": "http://127.0.0.1:43782/?fixture=login&conversation=group&draft=1",
         "viewport": {
           "width": 390,
           "height": 844
         },
         "waitFor": {
           "condition": "domcontentloaded",
-          "selector": "#chatList .bubble.friend",
+          "selector": "#inputBar.has-text #messageInput",
           "settleMs": 700
         },
         "fixtureProfile": "polish-dark",
-        "authProfile": "mobile-v2-offline",
-        "steps": [
-          {
-            "action": "click",
-            "selector": "#inputPlaceholder"
-          },
-          {
-            "action": "fill",
-            "selector": "#messageInput",
-            "fixtureKey": "draft"
-          }
-        ]
+        "authProfile": "mobile-v2-offline"
       },
       "capabilities": [
         {
@@ -307,29 +296,18 @@
       "androidScreenId": "elon.group.readability",
       "androidFontScale": 1,
       "webCapture": {
-        "url": "http://127.0.0.1:43782/?fixture=login&conversation=group",
+        "url": "http://127.0.0.1:43782/?fixture=login&conversation=group&draft=1",
         "viewport": {
           "width": 390,
           "height": 844
         },
         "waitFor": {
           "condition": "domcontentloaded",
-          "selector": "#chatList .bubble.friend",
+          "selector": "#inputBar.has-text #messageInput",
           "settleMs": 700
         },
         "fixtureProfile": "polish-light",
-        "authProfile": "mobile-v2-offline",
-        "steps": [
-          {
-            "action": "click",
-            "selector": "#inputPlaceholder"
-          },
-          {
-            "action": "fill",
-            "selector": "#messageInput",
-            "fixtureKey": "draft"
-          }
-        ]
+        "authProfile": "mobile-v2-offline"
       },
       "capabilities": [
         {

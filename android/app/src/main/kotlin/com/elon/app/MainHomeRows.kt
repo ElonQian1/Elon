@@ -644,12 +644,12 @@ internal class MainHomeRows(
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = badgeHeight / 2f
-                setColor(activity.elonColor(R.color.elon_status_danger))
+                setColor(uiColors.errorContainer)
             }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = badgeText
-            setTextColor(Color.WHITE)
+            setTextColor(uiColors.error)
             textSize = 12f
             setTypeface(typeface, Typeface.BOLD)
         }

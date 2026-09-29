@@ -58,6 +58,11 @@ class HomeConversationPolishTest {
             val title = HomeRowStatusDecorations(context) { it }.createTitle("移动端项目", HomeRowBadge.PROJECT)
             val badge = descendants(title).filterIsInstance<TextView>().first { it.text == "项目" }
             assertEquals(c.muted, badge.currentTextColor)
+            val rows = MainHomeRows(context, java.text.DateFormat.getTimeInstance(), { -1 }, {}, { _, _ -> }, {}, {}, { it }, { null })
+            val group = AppGroup("unread-fixture", "未读消息", 0, emptyList(), 0, "离线样例", null, 8)
+            val unread = descendants(rows.createGroupRow(group, false) {}).filterIsInstance<TextView>().first { it.text == "8" }
+            val fill = (unread.background as android.graphics.drawable.GradientDrawable).color!!.defaultColor
+            assertTrue("Unread count must be legible", ColorUtils.calculateContrast(unread.currentTextColor, fill) >= 4.5)
         }
     }
 
