@@ -14,6 +14,17 @@ pub(crate) fn content_type_for_file(filename: &str) -> &'static str {
         "png" => "image/png",
         "webp" => "image/webp",
         "gif" => "image/gif",
+        "heic" => "image/heic",
+        "heif" => "image/heif",
+        "m4a" => "audio/mp4",
+        "mp3" => "audio/mpeg",
+        "wav" | "wave" => "audio/wav",
+        "aac" => "audio/aac",
+        "ogg" | "opus" => "audio/ogg",
+        "amr" => "audio/amr",
+        "mp4" | "m4v" => "video/mp4",
+        "mov" => "video/quicktime",
+        "webm" => "video/webm",
         "txt" | "md" | "log" => "text/plain; charset=utf-8",
         "json" => "application/json",
         "pdf" => "application/pdf",
@@ -116,6 +127,19 @@ pub(crate) fn safe_attachment_artifact_id(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn media_downloads_have_playable_content_types() {
+        assert_eq!(content_type_for_file("voice.M4A"), "audio/mp4");
+        assert_eq!(content_type_for_file("voice.wav"), "audio/wav");
+        assert_eq!(content_type_for_file("clip.MOV"), "video/quicktime");
+        assert_eq!(content_type_for_file("clip.mp4"), "video/mp4");
+        assert_eq!(content_type_for_file("photo.HEIC"), "image/heic");
+        assert_eq!(
+            content_type_for_file("unknown.bin"),
+            "application/octet-stream"
+        );
+    }
 
     #[test]
     fn sanitizes_project_attachment_file_names() {

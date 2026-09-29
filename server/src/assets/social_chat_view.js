@@ -18,6 +18,10 @@
         player.style.cssText = 'max-width:100%;display:block';
         player.setAttribute('aria-label', '播放语音：' + name);
         player.onplay = () => document.querySelectorAll('audio').forEach(other => { if (other !== player) other.pause(); });
+      } else if (kind === 'video' || mime.startsWith('video/')) {
+        player = document.createElement('video'); player.controls = true; player.preload = 'none'; player.playsInline = true;
+        player.style.cssText = 'max-width:100%;max-height:320px;display:block';
+        player.setAttribute('aria-label', '播放视频：' + name);
       }
       if (player) {
         const retry = document.createElement('button'); retry.type = 'button'; retry.hidden = true;

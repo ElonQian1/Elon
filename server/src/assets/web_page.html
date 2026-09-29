@@ -5199,7 +5199,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           <button class="input-placeholder" type="button" id="inputPlaceholder">输入内容</button>
         </div>
         <span class="input-row-spacer" aria-hidden="true"></span>
-        <button class="voice-btn" type="button" id="voiceBtn" title="语音输入">
+        <button class="voice-btn" type="button" id="voiceBtn" title="发送语音">
           <img src="data:image/png;base64,__INPUT_VOICE_WAVE_PNG_B64__" alt="" aria-hidden="true" />
         </button>
         <button class="send-btn" type="submit" id="sendBtn" title="发送">
@@ -5213,7 +5213,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         </button>
         <button class="input-attachment-action" type="button" data-native-note="图片选择请在 Android APK 中使用。网页版已同步入口样式。">
           <img src="data:image/png;base64,__INPUT_PHOTO_PNG_B64__" alt="" aria-hidden="true" />
-          <span>图片</span>
+          <span>相册</span>
         </button>
         <button class="input-attachment-action" type="button" data-native-note="文件选择请在 Android APK 中使用。网页版已同步入口样式。">
           <img src="data:image/png;base64,__INPUT_FILE_PNG_B64__" alt="" aria-hidden="true" />
@@ -7580,7 +7580,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   nativeOnlyMask.addEventListener('click', (e) => {
     if (e.target === nativeOnlyMask) nativeOnlyMask.classList.remove('active');
   });
-  document.querySelectorAll('[data-native-note]').forEach((button) => {
+  document.querySelectorAll('[data-native-note]:not(.input-attachment-action)').forEach((button) => {
     button.addEventListener('click', () => showNativeOnly(button.dataset.nativeNote));
   });
   function showAgentCenter() {
@@ -9617,7 +9617,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   inputAttachmentActions.forEach((button) => {
     button.addEventListener('click', () => {
       setInputAttachmentPanelOpen(false);
-      if ((currentFriend || currentGroup) && inputAttachmentActions.indexOf(button) < 3) { window.ElonSourceCompose.open({ api, owner: () => token, userId: currentUser?.id, kind: currentFriend ? 'friend' : 'group', contact: currentFriend || currentGroup, send: (...args) => socialRecovery.send(...args) }); return; }
+      if ((currentFriend || currentGroup) && inputAttachmentActions.indexOf(button) < 3) { window.ElonSourceCompose.open({ api, mode: ['camera', 'media', 'file'][inputAttachmentActions.indexOf(button)], owner: () => token, userId: currentUser?.id, kind: currentFriend ? 'friend' : 'group', contact: currentFriend || currentGroup, send: (...args) => socialRecovery.send(...args) }); return; }
       showNativeOnly(button.dataset.nativeNote || '附件上传请在 Android APK 中使用。网页版已同步入口样式。');
     });
   });
@@ -9636,7 +9636,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   if (voiceBtn) {
     voiceBtn.addEventListener('click', () => {
       setInputAttachmentPanelOpen(false);
-      showNativeOnly('语音输入请在 Android APK 中使用。网页版已同步入口位置。');
+      if (currentFriend || currentGroup) window.ElonSourceCompose.openVoice({ api, owner: () => token, userId: currentUser?.id, kind: currentFriend ? 'friend' : 'group', contact: currentFriend || currentGroup, send: (...args) => socialRecovery.send(...args) }); else showNativeOnly('项目语音输入请在 Android APK 中使用。');
     });
   }
   if (inputPlaceholder) {

@@ -46,7 +46,7 @@ function productionTemplate(includes) {
     .replace('</body>', '<script src="/fixture-navigation.js"></script></body>');
 }
 
-function createFixture() {
+function createFixture({ handleSyntheticRequest } = {}) {
   const sessions = new Set(), sockets = new Set();
   const audit = { logins: 0, rejectedWrites: 0, outgoingMessagesRejected: 0 };
   const includes = productionIncludes(), html = productionTemplate(includes);
@@ -86,12 +86,13 @@ function createFixture() {
         json({ token, user: USER }); return;
       } catch { json({ error: 'invalid fixture login' }, 400); return; }
     }
+    if (handleSyntheticRequest && await handleSyntheticRequest(req, res, url, authenticated(req))) return;
     if (req.method !== 'GET') { audit.rejectedWrites++; json({ error: 'fixture is read-only' }, 405); return; }
     if (p === '/fixture/info') { json({ schema: 'elon.mobile_design_fixture.v1', synthetic: true, productionNetwork: false }); return; }
     if (p === '/') {
       if (!SCENARIOS.has(url.searchParams.get('fixture') || 'login')) { json({ error: 'unknown fixture' }, 400); return; }
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
-        'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:" + server.address().port + "; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'" });
+        'content-security-policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws://127.0.0.1:" + server.address().port + "; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'" });
       res.end(html); return;
     }
     if (p === '/fixture-navigation.js') {
