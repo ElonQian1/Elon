@@ -104,6 +104,22 @@ async function main() {
     });
     await open('group-photo'); await menu().getByRole('button', { name: '复制', exact: true }).tap();
     await page.waitForFunction(() => Array.isArray(window.copied)); assert.deepEqual(await page.evaluate(() => copied), Array.from(png)); cases.push('clipboard-receives-image-bytes');
+    await page.evaluate(async item => {
+      const url = new URL(item.url); url.protocol = 'http:'; url.port = '1'; window.copied = null;
+      await ElonSocialMessageTransfer.copy([{ attachments: [{ ...item, url: url.href }] }], { api: (...args) => fetch(...args), current: () => true });
+    }, image);
+    assert.deepEqual(await page.evaluate(() => copied), Array.from(png)); cases.push('attachment-http-port-rebased-to-current-ingress');
+    const jpeg = await page.evaluate(async url => {
+      const bitmap = await createImageBitmap(await (await fetch(url)).blob()), canvas = document.createElement('canvas');
+      canvas.width = bitmap.width; canvas.height = bitmap.height; canvas.getContext('2d').drawImage(bitmap, 0, 0); bitmap.close();
+      return canvas.toDataURL('image/jpeg').split(',')[1];
+    }, image.url);
+    const jpegRef = { ...image, file_name: 'photo.jpg', mime_type: 'image/jpeg', url: origin + '/api/user/mobile-v2-fixture/chat-attachments/download/' + state.uploads.length };
+    state.uploads.push({ attachment: jpegRef, buffer: Buffer.from(jpeg, 'base64') });
+    state.messages.push({ path: '/api/me/groups/attach-group/messages', message: { ...original, id: 'jpeg', attachments: [jpegRef] } });
+    await row('jpeg').waitFor(); await page.evaluate(() => { window.copied = null; });
+    await open('jpeg'); await menu().getByRole('button', { name: '复制', exact: true }).tap(); await page.waitForFunction(() => Array.isArray(window.copied));
+    assert.deepEqual((await page.evaluate(() => copied)).slice(0, 8), [137, 80, 78, 71, 13, 10, 26, 10]); cases.push('jpeg-copied-as-browser-compatible-png');
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {} }));
     await open('group-photo'); await menu().getByRole('button', { name: '复制', exact: true }).tap();
     await menu().getByRole('status').filter({ hasText: '不支持复制' }).waitFor(); await page.keyboard.press('Escape'); cases.push('clipboard-unsupported-explicit');

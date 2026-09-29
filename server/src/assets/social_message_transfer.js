@@ -5,13 +5,14 @@
   function button(label, action) { const el = node('button', label); el.type = 'button'; el.onclick = action; return el; }
   function attachmentUrl(item) {
     const url = new URL(item.url, location.origin);
-    if (url.hostname === location.hostname && location.protocol === 'https:') url.protocol = 'https:';
-    if (url.origin !== location.origin || !/^\/api\/user\/[^/]+\/chat-attachments\//.test(url.pathname) || url.username || url.password) throw Error('附件地址不受信任，请下载原文件后重新发送');
+    // The HTTPS PWA ingress and the public HTTP attachment URL use different ports.
+    // Reuse only a recognized same-host attachment path, never send auth to its origin.
+    if (!['http:', 'https:'].includes(url.protocol) || url.hostname !== location.hostname || !/^\/api\/user\/[^/]+\/chat-attachments\//.test(url.pathname) || url.username || url.password) throw Error('附件地址不受信任，请下载原文件后重新发送');
     return url.pathname + url.search;
   }
   async function file(item, options, signal) {
     if (item.size_bytes > MAX_BYTES) throw Error('单个附件不能超过 12 MB');
-    const response = await options.api(attachmentUrl(item), { signal });
+    const response = await options.api(attachmentUrl(item), { signal, redirect: 'error' });
     if (!response.ok) throw Error('附件读取失败，请重试');
     if (Number(response.headers.get('content-length')) > MAX_BYTES) throw Error('附件超过大小限制');
     const reader = response.body.getReader(), chunks = []; let size = 0;
@@ -32,18 +33,33 @@
     try { if (!document.execCommand('copy')) throw Error('浏览器不允许复制，请选择文字复制'); }
     finally { input.remove(); focus?.focus({ preventScroll: true }); }
   }
+  async function clipboardImage(item, options, signal, type) {
+    const original = await file(item, options, signal);
+    if (type === original.type) return original;
+    const bitmap = await createImageBitmap(original);
+    try {
+      if (bitmap.width * bitmap.height > 16000000) throw Error('图片太大，无法复制，请转发原图');
+      const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height;
+      canvas.getContext('2d').drawImage(bitmap, 0, 0);
+      const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!png || png.size > MAX_BYTES || !options.current()) throw Error('图片无法复制，请转发原图');
+      return png;
+    } finally { bitmap.close(); }
+  }
   async function copy(messages, options) {
     const attachments = messages.flatMap(m => m.attachments || []);
     const text = messages.map(m => m.content || '').filter(Boolean).join('\n\n');
     if (!attachments.length) { await textCopy(text); return; }
     if (attachments.length !== 1 || text) throw Error('图文或多附件请使用转发，不会只复制部分内容');
     const item = attachments[0], mime = item.mime_type || '';
-    if (!navigator.clipboard?.write || !root.ClipboardItem || !mime.startsWith('image/') || (ClipboardItem.supports && !ClipboardItem.supports(mime))) throw Error('当前浏览器不支持复制此图片格式，可转发或下载原图');
+    if (!navigator.clipboard?.write || !root.ClipboardItem || !['image/png', 'image/jpeg', 'image/webp'].includes(mime)) throw Error('当前浏览器不支持复制此图片格式，可转发或下载原图');
+    const type = mime === 'image/png' || ClipboardItem.supports?.(mime) ? mime : 'image/png';
+    if (ClipboardItem.supports && !ClipboardItem.supports(type)) throw Error('当前浏览器不支持复制此图片格式，可转发或下载原图');
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 15000);
     try {
       // Pass the promise during the activation event, including on WebKit.
-      const blob = file(item, options, controller.signal); blob.catch(() => {});
-      await navigator.clipboard.write([new ClipboardItem({ [mime]: blob })]);
+      const blob = clipboardImage(item, options, controller.signal, type); blob.catch(() => {});
+      await navigator.clipboard.write([new ClipboardItem({ [type]: blob })]);
     } finally { clearTimeout(timer); }
   }
   function forward(messages, options) {
