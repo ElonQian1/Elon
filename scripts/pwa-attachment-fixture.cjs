@@ -55,6 +55,12 @@ async function attachmentFixture(context) {
         if (state.failSend) return json({ error: 'synthetic uncertain send' }, 503);
         const message = { ...request.postDataJSON(), id: 'message-' + state.messages.length,
           outgoing: true, sender_user_id: 'mobile-v2-fixture', created_at: new Date().toISOString() };
+        if (message.quote_source) {
+          const source = state.messages.find(item => item.path === p && item.message.id === message.quote_source.message_id)?.message;
+          if (!source || source.recalled_at || (source.revision || 1) !== message.quote_source.revision) return json({ error: '原消息已修改或不可用' }, 400);
+          message.quote = { message_id: source.id, sender_name: source.sender_name || '演示成员', content: source.content,
+            attachments: source.attachments || [], revision: source.revision || 1, unavailable: false };
+        }
         state.messages.push({ path: p, message }); return json({ message });
       }
       return json({ messages: state.messages.filter(item => item.path === p).map(item => item.message),

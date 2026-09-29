@@ -66,6 +66,7 @@
     return {
       render(messages, kind, contact, scroll) {
         const list = options.list, key = kind + ':' + contact.id;
+        options.actions?.update(messages, kind, contact);
         const previousScroll = list.scrollTop, follow = scroll || list.scrollHeight - list.clientHeight - previousScroll < 70;
         if (scope !== key) { nodes.forEach(entry => entry.cleanup?.()); root.ElonSocialImageViewer?.close(); root.ElonSocialLinkViewer?.close(); root.ElonAiConversationShare?.reset(); list.replaceChildren(); nodes.clear(); scope = key; }
         if (kind === 'group') root.ElonAiConversationReader?.reconcile(contact.id, messages);
@@ -97,7 +98,8 @@
             if (msg.send_status) { const status = document.createElement('small'); status.textContent = msg.send_status; status.style.display = 'block'; bubble.append(status); }
             const owner = options.user()?.id, cleanup = !recalled && !shared && root.ElonSocialLinks?.mount(bubble, text, { api: options.api, owner, compact: !!compactLink, isCurrent: () => scope === key && options.user()?.id === owner });
             if (!recalled) quotePreview(bubble, msg.quote, outgoing, list);
-            entry = { signature, block: bubble.closest('.chat-message-block'), cleanup: typeof cleanup === 'function' ? cleanup : undefined };
+            const block = bubble.closest('.chat-message-block'), actionCleanup = options.actions?.bind(block, msg);
+            entry = { signature, block, cleanup: () => { if (typeof cleanup === 'function') cleanup(); actionCleanup?.(); } };
             entry.block.dataset.messageId = id;
           }
           if (entry.block !== cursor) list.insertBefore(entry.block, cursor);
@@ -107,7 +109,7 @@
         Array.from(list.children).forEach(node => { if (!keep.has(node)) node.remove(); });
         nodes.forEach((entry, id) => { if (!next.has(id)) entry.cleanup?.(); }); nodes = next; root.ElonAiConversationShare?.prune(); list.scrollTop = follow ? list.scrollHeight : previousScroll;
       },
-      reset() { root.ElonSocialImageViewer?.close(); root.ElonSocialVoice?.stopWithin(options.list); nodes.forEach(entry => entry.cleanup?.()); root.ElonSocialLinkViewer?.close(); root.ElonAiConversationShare?.reset(); scope = ''; nodes.clear(); },
+      reset() { options.actions?.reset(); root.ElonSocialImageViewer?.close(); root.ElonSocialVoice?.stopWithin(options.list); nodes.forEach(entry => entry.cleanup?.()); root.ElonSocialLinkViewer?.close(); root.ElonAiConversationShare?.reset(); scope = ''; nodes.clear(); },
     };
   }
   root.ElonSocialChatView = { create };

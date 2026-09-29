@@ -75,6 +75,8 @@ async function main() {
     await thumbnail().focus(); await page.keyboard.press('Shift+F10');
     assert(await page.getByRole('button', { name: '识别二维码', exact: true }).first().isVisible());
     assert.equal(await dialog().count(), 0); cases.push('keyboard-open-qr-menu-preserved');
+    const messageMenu = page.getByRole('dialog', { name: '消息操作', exact: true });
+    if (await messageMenu.count()) { await page.keyboard.press('Escape'); await messageMenu.waitFor({ state: 'detached' }); await page.waitForTimeout(750); }
     await opened(); await page.goBack(); await closed(); assert.equal(new URL(page.url()).origin, origin); cases.push('browser-back-closes-only-preview');
     await opened(); const stage = page.locator('.chat-image-stage'), box = await stage.boundingBox();
     await stage.tap({ position: { x: box.width / 2, y: box.height / 2 } }); await stage.tap({ position: { x: box.width / 2, y: box.height / 2 } });

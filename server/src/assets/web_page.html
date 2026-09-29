@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="/assets/esk_exchange.css" />
   <link rel="stylesheet" href="/assets/ai_provider_accounts.css" />
   <link rel="stylesheet" href="/assets/social_links.css?v=media-card-6"><script src="/assets/social_links.js?v=media-card-6"></script><script src="/assets/social_link_viewer.js"></script><script src="/assets/social_chat_cache.js"></script><script src="/assets/social_chat_recovery.js"></script><script src="/assets/social_source_links.js"></script><script src="/assets/social_source_compose.js"></script><script src="/assets/social_voice_player.js"></script><script src="/assets/social_image_viewer.js"></script><script src="/assets/social_chat_view.js"></script>
+  <link rel="stylesheet" href="/assets/social_message_actions.css"><script src="/assets/social_message_transfer.js"></script><script src="/assets/social_message_actions.js"></script>
   <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
   <link rel="stylesheet" href="/assets/federated_auth.css" />
   <link rel="stylesheet" href="/assets/account_security.css" />
@@ -6392,7 +6393,9 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   let userByokApiEnabled = false;
   let lastChatTimelineMs = 0;
   const socialCache = window.ElonSocialChatCache.create(localStorage);
-  const socialView = window.ElonSocialChatView.create({ list: chatList, append: appendBubble, api, user: () => currentUser,
+  const socialActions = window.ElonSocialMessageActions.create({ list: chatList, input: messageInput, api, owner: () => token, userId: () => currentUser?.id,
+    send: (...args) => socialRecovery.send(...args), changed: () => { socialRecovery.refresh(); socialRecovery.directories(); } });
+  const socialView = window.ElonSocialChatView.create({ list: chatList, append: appendBubble, api, actions: socialActions, user: () => currentUser,
     time: parseServerTime, friendName: friendDisplayName, resetTimeline: () => { lastChatTimelineMs = 0; },
     changed: id => { socialRecovery.invalidate('group', id); return currentGroup?.id === id ? loadGroupMessages(false) : Promise.resolve(); } });
   const socialStatus = document.createElement('button');
@@ -8356,8 +8359,8 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     document.body.appendChild(dlg);
   }
 
-  async function sendFriendMessage(text) { if (currentFriend) return socialRecovery.send('friend', currentFriend, text); }
-  async function sendGroupMessage(text) { if (currentGroup) return socialRecovery.send('group', currentGroup, text); }
+  async function sendFriendMessage(text) { if (currentFriend) return socialActions.send('friend', currentFriend, text); }
+  async function sendGroupMessage(text) { if (currentGroup) return socialActions.send('group', currentGroup, text); }
   async function loadFriends() { return socialRecovery.directory('friends'); }
   async function loadGroups() { return socialRecovery.directory('groups'); }
   async function loadSocialChats() { return socialRecovery.directories(); }
@@ -9612,7 +9615,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   inputAttachmentActions.forEach((button) => {
     button.addEventListener('click', () => {
       setInputAttachmentPanelOpen(false);
-      if ((currentFriend || currentGroup) && inputAttachmentActions.indexOf(button) < 3) { window.ElonSourceCompose.open({ api, mode: ['camera', 'media', 'file'][inputAttachmentActions.indexOf(button)], owner: () => token, userId: currentUser?.id, kind: currentFriend ? 'friend' : 'group', contact: currentFriend || currentGroup, send: (...args) => socialRecovery.send(...args) }); return; }
+      if ((currentFriend || currentGroup) && inputAttachmentActions.indexOf(button) < 3) { window.ElonSourceCompose.open({ api, mode: ['camera', 'media', 'file'][inputAttachmentActions.indexOf(button)], owner: () => token, userId: currentUser?.id, kind: currentFriend ? 'friend' : 'group', contact: currentFriend || currentGroup, send: socialActions.sender(currentFriend ? 'friend' : 'group', currentFriend || currentGroup) }); return; }
       showNativeOnly(button.dataset.nativeNote || '附件上传请在 Android APK 中使用。网页版已同步入口样式。');
     });
   });
@@ -9631,7 +9634,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   if (voiceBtn) {
     voiceBtn.addEventListener('click', () => {
       setInputAttachmentPanelOpen(false);
-      if (currentFriend || currentGroup) window.ElonSourceCompose.openVoice({ api, owner: () => token, userId: currentUser?.id, kind: currentFriend ? 'friend' : 'group', contact: currentFriend || currentGroup, send: (...args) => socialRecovery.send(...args) }); else showNativeOnly('项目语音输入请在 Android APK 中使用。');
+      if (currentFriend || currentGroup) window.ElonSourceCompose.openVoice({ api, owner: () => token, userId: currentUser?.id, kind: currentFriend ? 'friend' : 'group', contact: currentFriend || currentGroup, send: socialActions.sender(currentFriend ? 'friend' : 'group', currentFriend || currentGroup) }); else showNativeOnly('项目语音输入请在 Android APK 中使用。');
     });
   }
   messageInput.addEventListener('keydown', (e) => {
