@@ -74,7 +74,11 @@ class GroupChatReadabilityLayoutTest {
                     }
                     if (scenario == "input") {
                         assertTrue(fixture.binding.inputEdit.text.startsWith("尚未发送"))
-                        assertTrue("Expanded editor must have a visible area", fixture.binding.inputEdit.height >= (48 * density).toInt())
+                        assertTrue("Expanded editor must have a visible area", fixture.binding.inputEdit.height >= (42 * density).toInt())
+                        val editor = fixture.binding.inputEdit
+                        val editorBounds = Rect(0, 0, editor.width, editor.height)
+                        root.offsetDescendantRectToMyCoords(editor, editorBounds)
+                        assertTrue("Draft text must end before the action row", editorBounds.bottom <= inputBounds.top)
                         fixture.composer.inputComposerMotion.setExpanded(false, animate = false)
                         MainCollapsedInputPreviewActions(fixture.binding, { emptyList() }, { fixture.composer.collapsedInputPreview })
                             .updateCollapsedInputPreview()

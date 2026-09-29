@@ -49,7 +49,7 @@
         android:gravity="center"
         android:includeFontPadding="false"
         android:text="友"
-        android:textColor="#2F2F2F"
+        android:textColor="@color/mobile_surface"
         android:textSize="15sp"
         android:textStyle="bold" />
 

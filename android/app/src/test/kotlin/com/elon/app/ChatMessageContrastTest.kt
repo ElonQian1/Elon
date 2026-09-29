@@ -28,6 +28,11 @@ class ChatMessageContrastTest {
                 val adapter = ChatAdapter(mutableListOf(message))
                 val holder = adapter.onCreateViewHolder(FrameLayout(context), adapter.getItemViewType(0))
                 adapter.onBindViewHolder(holder, 0)
+                holder.friendAvatar?.let { avatar ->
+                    val avatarBackground = (avatar.background as GradientDrawable).color!!.defaultColor
+                    assertTrue("Fallback sender avatar must remain readable in night=$night",
+                        ColorUtils.calculateContrast(avatar.currentTextColor, avatarBackground) >= 4.5)
+                }
                 val background = (holder.bubble?.background as? GradientDrawable)?.color?.defaultColor
                     ?: (holder.text.background as? GradientDrawable)?.color?.defaultColor
                     ?: context.getColor(R.color.mobile_surface)

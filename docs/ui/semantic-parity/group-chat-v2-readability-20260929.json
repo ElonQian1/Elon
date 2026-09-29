@@ -9,7 +9,7 @@
   },
   "requirementSpec": {
     "sourceFile": "docs/requirements/group-chat-readability-20260929.md",
-    "sha256": "defcacaece2a1f6a2e3471c61ed00123e48fb39f0efea1cfd6c9b5667d9750ae"
+    "sha256": "03878b949657a11e08af1fea3a81f292b1e8343732f5b3e10a7a9bfc7d73bc97"
   },
   "platformDifferences": [
     "本批修复 Android 运行时颜色覆盖和透明输入区，不改变共享 Token、网页或消息协议。",

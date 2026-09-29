@@ -86,8 +86,16 @@ internal class GroupChatReadabilityPreview(context: Context, scenario: String) {
         keyboard.install()
         if (scenario == "input") {
             binding.inputEdit.setText("尚未发送的群聊草稿\n检查输入区展开后的布局")
-            composer.inputComposerMotion.updateExpandedTextHeight(dp(132), animate = false)
-            composer.inputComposerMotion.expandForTextInput(animate = false)
+            val adaptive = MainAdaptiveInputHeightActions(binding, dp,
+                { composer.inputCenterContainer }, { composer.inputBarContainer },
+                { composer.inputComposerMotion }, { false })
+            binding.inputEdit.addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+                if (right - left != oldRight - oldLeft) adaptive.updateAdaptiveInputHeight()
+            }
+            binding.inputEdit.post {
+                adaptive.updateAdaptiveInputHeight()
+                binding.inputEdit.post { composer.inputComposerMotion.expandForTextInput(animate = false) }
+            }
         }
         binding.root.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(view: View) = Unit
