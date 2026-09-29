@@ -73,7 +73,7 @@ async function main() {
         await buttons().first().tap(); assert.equal(await audio().first().evaluate(el => el.paused), true);
         await playing(); await playing(1);
         assert.equal(await audio().first().evaluate(el => el.paused), true, 'only one voice plays');
-        await page.waitForFunction(() => document.querySelectorAll('#chatList audio')[1].ended);
+        await page.waitForFunction(() => document.querySelectorAll('#chatList audio')[1].ended && document.querySelectorAll('#chatList .voice-message-play')[1].dataset.state === 'ready');
         assert.equal(await buttons().nth(1).getAttribute('data-state'), 'ready');
         await playing(1); await buttons().nth(1).tap();
         await page.locator('#chatList .voice-message-options summary').first().tap();
