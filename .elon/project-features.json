@@ -22959,7 +22959,7 @@
       "id": "social-message-quotes-v1",
       "title": "Compact structured social message quotes",
       "summary": "Separate reply drafts and source previews on Win and Android; persist authorized snapshots and preserve AI context.",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/social-message-quotes-v1.md",
@@ -23069,7 +23069,7 @@
         }
       ],
       "created_at_ms": 1790661658181,
-      "updated_at_ms": 1790661923616
+      "updated_at_ms": 1790668106266
     },
     {
       "id": "social-sync-status-lifecycle-v1",
@@ -31636,16 +31636,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_0d7f67bd0fa648eebcf737cffc15f7e6",
-      "feature_id": "binance-wallet-permission-diagnostics-v1",
-      "action": "registered",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789381434074
-    },
-    {
       "id": "feature_event_5650a1db41d74b5a82f67b72500dbf00",
       "feature_id": "binance-wallet-permission-diagnostics-v1",
       "action": "claimed",
@@ -33634,6 +33624,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1790661923616
+    },
+    {
+      "id": "feature_event_58ca5d340dae4da5a9ea4c20917f6434",
+      "feature_id": "social-message-quotes-v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "Win quote UI published with backend 0.3.1796; final backend 0.3.1798 verified healthy; APK 1.1.1835 installed with data preserved. Quote/cancel device acceptance passed on 1834; 1835 foreground-switch recheck limit recorded in the report.",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1790668106266
     }
   ]
 }
