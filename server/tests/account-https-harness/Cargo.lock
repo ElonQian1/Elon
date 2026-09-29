@@ -360,6 +360,8 @@ dependencies = [
  "axum",
  "chrono",
  "hex",
+ "hyper",
+ "hyper-util",
  "instant-acme",
  "rcgen 0.13.2",
  "reqwest",

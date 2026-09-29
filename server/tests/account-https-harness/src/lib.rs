@@ -12,12 +12,16 @@ mod auth_safety_store;
 mod config;
 #[path = "../../../src/federated_auth_idempotency.rs"]
 mod federated_auth_idempotency;
+#[path = "../../../src/account_security/https/mobile_pwa.rs"]
+mod mobile_pwa;
 #[path = "../../../src/account_security/https/policy.rs"]
 mod policy;
 #[path = "../../../src/router/quant_http_preview.rs"]
 pub mod quant_http_preview;
 #[path = "../../../src/account_security/https/quant_public.rs"]
 mod quant_public;
+#[path = "../../../src/account_security/https/transport.rs"]
+mod transport;
 mod router {
     pub(crate) use crate::quant_http_preview;
 }

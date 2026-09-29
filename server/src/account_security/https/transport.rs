@@ -62,7 +62,7 @@ impl Server {
         let mut tasks = JoinSet::new();
         let mut refresh = interval(Duration::from_secs(60));
         refresh.tick().await;
-        tracing::info!(listen=%self.config.listen,"account-only native HTTPS listening");
+        tracing::info!(listen=%self.config.listen,"native HTTPS listening");
         loop {
             tokio::select! {
                 _=refresh.tick() => {
@@ -84,10 +84,14 @@ impl Server {
                         let service=TowerToHyperService::new(app);
                         let mut builder=http1::Builder::new();
                         builder.max_buf_size(16 * 1024);
-                        let _=timeout(Duration::from_secs(60),builder.serve_connection(TokioIo::new(tls),service)).await;
+                        let _=timeout(Duration::from_secs(60),builder.serve_connection(TokioIo::new(tls),service).with_upgrades()).await;
                     });
                 },
             }
         }
     }
 }
+
+#[cfg(test)]
+#[path = "transport_tests.rs"]
+mod tests;

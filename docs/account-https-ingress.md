@@ -1,8 +1,9 @@
 # Native account HTTPS ingress
 
 This optional Rust listener lets first-party child backends validate main accounts
-over trusted HTTPS. It does not publish the general main API, install Nginx, change
-the existing 8080 service, or copy the account/password database.
+over trusted HTTPS. By default it does not publish the general main API. The separate
+mobile PWA opt-in below can attach the existing browser router. Neither mode installs
+Nginx, changes the existing 8080 service, or copies the account/password database.
 
 ## Configuration
 
@@ -48,6 +49,31 @@ The account policy above is unchanged, including query rejection. Public quant
 requests strip Cookie/Authorization, retain the original API allowlist and add
 bounded paths/queries, HSTS and `X-Yilong-Quant-Transport: https-public-v1`.
 Private quant, account-admin, node and execution routes are not added.
+
+### Optional mobile PWA attachment
+
+`MOBILE_PWA_HTTPS_ENABLED=true` requires account TLS and defaults off. It attaches
+the existing HTTP browser router as the TLS router's fallback, including its original
+authentication, request limits, project APIs and WebSocket handlers. This explicitly
+enables the broader browser API surface; it is not the restricted account-only mode.
+Existing explicit account and public-quant routes retain precedence and their own
+policies. No credentials, database or certificate are copied. HTTP 8080 stays available.
+
+After publishing the matching code with `publish-server.ps1`, deploy
+`configure-mobile-pwa-https.sh`, `mobile_pwa_https_config.py` and
+`account_https_target.py` together. Run `plan`, `enable`, then `verify` with the
+existing HTTPS origin. The script takes the official deployment lock, compares and
+sets only this flag, preserves other environment keys, restarts the service and
+checks account authorization, PWA assets and anonymous social API denial. Failed
+activation restores the previous flag; `disable` restores the restricted surface.
+
+The PWA entry is `/web`; its manifest starts at `/`. Use the actual trusted HTTPS
+origin, including the configured port. The new browser origin needs a fresh login
+and a new home-screen installation; server-side account/chat data remain shared.
+The media renderer resolves same-host legacy chat attachment links through the
+current HTTPS origin, preserving their server paths and keeping foreign URLs intact.
+Certificate renewal continues through the existing TLS implementation. Real iPhone
+file-picker and microphone acceptance remain separate from desktop browser tests.
 
 After publishing the matching server code, deploy `configure-quant-public-https.sh`,
 `quant_public_https_config.py` and the existing `account_https_target.py` together.

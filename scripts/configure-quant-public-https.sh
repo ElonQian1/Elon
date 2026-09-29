@@ -21,9 +21,16 @@ verify_account() {
     python3 -c 'import json,sys; assert json.load(sys.stdin)["service"] == "elon-account-https"' || return 1
   [[ "$(code /api/me)" == 401 ]] || return 1
   [[ "$(code '/api/me?token=probe')" == 404 ]] || return 1
-  for route in /api/nodes /mcp /quant/api/v1/grid-center/robots /quant/api/v1/paper/orders; do
-    [[ "$(code "$route")" == 404 ]] || return 1
-  done
+  # A separately enabled browser surface deliberately publishes the existing main router.
+  # Keep the restricted-surface assertions when that explicit opt-in is absent.
+  if [[ "$(code /web)" == 404 ]]; then
+    for route in /api/nodes /mcp /quant/api/v1/grid-center/robots /quant/api/v1/paper/orders; do
+      [[ "$(code "$route")" == 404 ]] || return 1
+    done
+  else
+    curl --silent --show-error --fail --max-time 15 -D - -o /dev/null "$ORIGIN/web" |
+      grep -qi '^x-elon-pwa-transport: https-v1' || return 1
+  fi
 }
 verify_public() {
   local headers

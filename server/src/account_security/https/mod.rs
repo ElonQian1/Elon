@@ -11,6 +11,7 @@ use crate::types::AppState;
 
 mod acme;
 mod config;
+mod mobile_pwa;
 mod policy;
 mod quant_public;
 mod square;
@@ -19,6 +20,10 @@ mod transport;
 
 pub(crate) async fn serve(legacy_app: Router, state: Arc<AppState>) -> Result<()> {
     let config = config::Config::from_env()?;
+    let browser_https = mobile_pwa::enabled(
+        std::env::var("MOBILE_PWA_HTTPS_ENABLED").ok().as_deref(),
+        config.is_some(),
+    )?;
     let public_quant = quant_public::enabled(
         std::env::var("QUANT_PUBLIC_HTTPS_ENABLED").ok().as_deref(),
         config.is_some(),
@@ -30,7 +35,11 @@ pub(crate) async fn serve(legacy_app: Router, state: Arc<AppState>) -> Result<()
     acme::bootstrap(&config).await?;
     let server = transport::Server::bind(config).await?;
     acme::spawn()?;
-    let app = routes(state.clone(), public_quant);
+    let app = mobile_pwa::attach(
+        routes(state.clone(), public_quant),
+        legacy_app.clone(),
+        browser_https,
+    );
     tokio::try_join!(
         crate::node_endpoint_transport::serve(legacy_app, state),
         server.serve(app),

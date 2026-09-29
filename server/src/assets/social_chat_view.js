@@ -5,6 +5,9 @@
       const name = item.display_name || item.file_name || '附件';
       let url; try { url = new URL(item.url, location.origin); } catch { return; }
       if (!item.url || !['http:', 'https:'].includes(url.protocol)) return;
+      if (location.protocol === 'https:' && url.hostname === location.hostname && /^\/api\/user\/[^/]+\/chat-attachments\//.test(url.pathname)) {
+        url = new URL(url.pathname + url.search, location.origin);
+      }
       const mime = item.mime_type || '', kind = item.kind || '';
       const box = document.createElement('div'); box.style.marginTop = '8px';
       const link = document.createElement('a'); link.href = url.href; link.textContent = '下载：' + name;
