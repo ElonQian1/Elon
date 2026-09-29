@@ -102,7 +102,7 @@ const output = path.resolve(process.env.PWA_LAYOUT_OUTPUT || '.ai-tmp/group-layo
       await page.locator('#moreBtn').tap(); await page.keyboard.press('Escape');
       assert.equal(await page.locator('#moreBtn').evaluate(el => document.activeElement === el), true);
       assert.equal(await page.locator('#moreBtn').getAttribute('aria-expanded'), 'false');
-      await page.locator('#inputPlaceholder').tap(); await page.locator('#messageInput').fill('保留草稿\n第二行内容');
+      await page.locator('#messageInput').tap(); await page.locator('#messageInput').fill('保留草稿\n第二行内容');
       // Synthetic VisualViewport changes reproduce the geometry contract, not an iPhone keyboard.
       await page.evaluate(() => {
         Object.defineProperties(visualViewport, { height: { configurable: true, get: () => 420 },
@@ -139,13 +139,13 @@ const output = path.resolve(process.env.PWA_LAYOUT_OUTPUT || '.ai-tmp/group-layo
       // Explicit text-size stress avoids pretending desktop text-size-adjust emulates iOS settings.
       for (const scale of [1.5, 2]) {
         const style = await page.addStyleTag({ content: `#topTitle{font-size:${18 * scale}px!important}
-          .summary-title{font-size:${14 * scale}px!important}.summary-action,.bubble,#inputPlaceholder,#messageInput{font-size:${16 * scale}px!important}
+          .summary-title{font-size:${14 * scale}px!important}.summary-action,.bubble,#messageInput{font-size:${16 * scale}px!important}
           .group-chat-tools{font-size:${16 * scale}px!important}` });
         const large = await measure(`text-${scale}-320`); assert(!large.horizontalOverflow && large.inputVisible);
         const title = await page.locator('#topTitle').boundingBox(); assert(title.height <= large.toolbar.height);
         await page.locator('#moreBtn').tap(); await menu.getByRole('button', { name: '关闭', exact: true }).tap();
         await page.screenshot({ path: path.join(output, `${engine}-text-${scale}.png`) });
-        await page.locator('#inputPlaceholder').tap(); await page.locator('#messageInput').fill('大字体输入\n保留完整文字');
+        await page.locator('#messageInput').tap(); await page.locator('#messageInput').fill('大字体输入\n保留完整文字');
         assert((await measure(`text-${scale}-input`)).inputVisible);
         await page.locator('#messageInput').fill(''); await page.locator('#messageInput').blur();
         await style.evaluate(el => el.remove());

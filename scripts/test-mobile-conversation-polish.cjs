@@ -52,7 +52,7 @@ async function main() {
       await page.goto(origin + '/?fixture=login&conversation=group', { waitUntil: 'networkidle' });
       await page.locator('#chatList .bubble.friend').last().waitFor();
       await page.locator('button[title="查看引用消息"]').waitFor();
-      await page.locator('#inputPlaceholder').tap();
+      await page.locator('#messageInput').tap();
       const input = page.locator('#messageInput');
       await input.fill('检查输入体验');
       const state = await page.evaluate(() => {
@@ -67,7 +67,7 @@ async function main() {
       const out = path.resolve(__dirname, '../.ai-tmp/conversation-polish'); fs.mkdirSync(out, { recursive: true });
       await page.screenshot({ path: path.join(out, `${engine}-${theme}-${width}.png`) });
       assert.equal(state.focused, 'messageInput');
-      assert.ok(state.panel.height <= 112, 'single-line focused composer should stay compact');
+      assert.ok(state.panel.height <= 58, 'single-line focused composer should stay compact');
       assert.equal(state.outline, '0px', 'focus is conveyed by the composer boundary');
       assert.ok(Math.abs(state.avatar.width - state.avatar.height) < 1, 'non-square photos must remain square avatars');
       assert.notEqual(state.iconFilter, 'none', 'legacy icon images must follow the theme');
@@ -83,6 +83,7 @@ async function main() {
       const editor = await input.boundingBox(), send = await page.locator('#sendBtn').boundingBox();
       assert.ok(editor.y >= 0 && editor.y + editor.height <= 430, 'editor stays inside reduced viewport');
       assert.ok(send && send.y >= 0 && send.y + send.height <= 430, 'send remains inside reduced viewport');
+      await page.waitForLoadState('networkidle');
     }
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ status: 'passed', engine, cases: samples.length, synthetic: true, physicalIosKeyboardVerified: false }));

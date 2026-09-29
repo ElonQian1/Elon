@@ -42,9 +42,9 @@ function createConversationFixture() {
               if(new URLSearchParams(location.search).get('draft')==='1'){
                 let waits=0;
                 const draft=setInterval(()=>{
-                  const input=document.querySelector('#messageInput'), placeholder=document.querySelector('#inputPlaceholder');
-                  if(placeholder?.getBoundingClientRect().height>0){
-                    clearInterval(draft);placeholder.click();input.value='尚未发送的群聊草稿\\n检查输入区展开后的布局';
+                  const input=document.querySelector('#messageInput');
+                  if(input?.getBoundingClientRect().height>0){
+                    clearInterval(draft);input.focus();input.value='尚未发送的群聊草稿\\n检查输入区展开后的布局';
                     input.dispatchEvent(new Event('input',{bubbles:true}));
                   }else if(++waits>100)clearInterval(draft);
                 },100);

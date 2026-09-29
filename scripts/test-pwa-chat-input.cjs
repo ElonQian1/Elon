@@ -49,10 +49,9 @@ async function main() {
     await page.locator('#loginBtn').tap();
     await page.locator('#appView:not(.hidden)').waitFor();
     const input = page.locator('#messageInput');
-    const placeholder = page.locator('#inputPlaceholder');
     const focused = () => input.evaluate(element => document.activeElement === element);
     async function openEmpty() {
-      await placeholder.tap();
+      await input.tap();
       assert.equal(await focused(), true, 'a single tap on the empty composer must focus the real textarea');
       assert.equal(await input.isVisible(), true);
       assert.equal(await input.isEditable(), true);

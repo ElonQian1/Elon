@@ -11,6 +11,7 @@
     const active = () => !!currentGroup() && !summary.classList.contains('hidden');
     const list = document.getElementById('chatList');
     let pinned = true, layoutGroup;
+    let viewportWidth = root.innerWidth, restingHeight = root.visualViewport?.height || root.innerHeight;
     list?.addEventListener('scroll', () => {
       pinned = list.scrollHeight - list.scrollTop - list.clientHeight <= 24;
     }, { passive: true });
@@ -23,9 +24,20 @@
         const visual = root.visualViewport;
         if (!active() || (visual && Math.abs(visual.scale - 1) > .01)) return;
         const height = visual?.height || root.innerHeight;
+        // iOS may shrink innerHeight alongside VisualViewport, so retain the pre-keyboard
+        // height. Rotation changes the width and starts a fresh baseline. Browser bars
+        // alone do not open the keyboard; only a focused editor can begin that state.
+        const resizedWidth = Math.abs(root.innerWidth - viewportWidth) > 1;
+        const wasOpen = !resizedWidth && app.classList.contains('group-keyboard-open');
+        if (resizedWidth) { viewportWidth = root.innerWidth; restingHeight = height; }
+        const typing = document.activeElement === document.getElementById('messageInput');
+        const keyboard = (typing || wasOpen) && Math.max(root.innerHeight, restingHeight) - height > 120;
+        // Keep the baseline through the opening animation, including its first small frames.
+        if (!typing && !wasOpen) restingHeight = height;
+        else restingHeight = Math.max(restingHeight, height);
         app.style.setProperty('--group-viewport-height', height + 'px');
         app.style.setProperty('--group-viewport-top', (visual?.offsetTop || 0) + 'px');
-        app.classList.toggle('group-keyboard-open', root.innerHeight - height > 120);
+        app.classList.toggle('group-keyboard-open', keyboard);
       });
     }
     function sync() {
@@ -68,6 +80,7 @@
       document.body.append(dialog); dialog.showModal(); more.setAttribute('aria-expanded', 'true');
     }, true);
     root.addEventListener('resize', viewport);
+    document.getElementById('messageInput')?.addEventListener('focus', viewport);
     root.visualViewport?.addEventListener('resize', viewport);
     root.visualViewport?.addEventListener('scroll', viewport);
     return sync;
