@@ -39,7 +39,12 @@ internal class SocialQuoteComposer(private val binding: ActivityMainBinding) {
         val panel = expanded.parent as? LinearLayout ?: return
         val preview = SocialQuotePreview(binding.root.context)
         preview.bind(quote, cancel = { scope?.let(pending::remove); render() })
-        panel.addView(preview, (panel.indexOfChild(expanded) + 2).coerceAtMost(panel.childCount), LinearLayout.LayoutParams(-1, -2))
+        val density = binding.root.resources.displayMetrics.density
+        val layout = LinearLayout.LayoutParams(-1, -2).apply {
+            marginStart = (18 * density).toInt(); marginEnd = (10 * density).toInt()
+            bottomMargin = (10 * density).toInt()
+        }
+        panel.addView(preview, (panel.indexOfChild(expanded) + 2).coerceAtMost(panel.childCount), layout)
         view = preview
     }
 }
