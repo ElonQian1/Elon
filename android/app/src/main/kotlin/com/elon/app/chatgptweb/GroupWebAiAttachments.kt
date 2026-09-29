@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.content.FileProvider
 import com.elon.app.PendingAttachment
+import com.elon.app.AuthManager
 import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -17,7 +18,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
-/** Downloads only server-selected platform files. No login headers cross to a file URL. */
+/** Credentials only reach the exact protected platform route, never the provider or redirects. */
 internal class GroupWebAiAttachments(
     private val context: Context,
     private val http: OkHttpClient,
@@ -26,6 +27,7 @@ internal class GroupWebAiAttachments(
     private val ownerCurrent: () -> Boolean,
 ) : AutoCloseable {
     private val handler = Handler(Looper.getMainLooper())
+    private val recordToken = AuthManager.token(context)
     private val directory = File(context.cacheDir, "chatgpt_web_uploads/group_${UUID.randomUUID()}")
     @Volatile private var closed = false
     @Volatile private var call: Call? = null
@@ -39,20 +41,27 @@ internal class GroupWebAiAttachments(
             val result = runCatching {
                 check(manifest.length() in 1..9)
                 check(directory.mkdirs())
-                // The platform download route is already readable by its opaque attachment URL.
+                // Disable redirects before adding credentials for protected record media.
                 val client = http.newBuilder().followRedirects(false).followSslRedirects(false)
                     .callTimeout(45, TimeUnit.SECONDS).build()
                 (0 until manifest.length()).map { index ->
                     check(!closed && ownerCurrent())
                     val item = manifest.getJSONObject(index)
                     val path = item.getString("download_path")
-                    check(Regex("^/api/user/[^/]+/chat-attachments/[^/]+/[^/?#]+$").matches(path))
+                    val privateRecord = Regex("^/api/me/groups/[\\w-]+/chat-records/[\\w-]+/assets/[\\w-]+$").matches(path)
+                    check(privateRecord || Regex("^/api/user/[^/]+/chat-attachments/[^/]+/[^/?#]+$").matches(path))
                     check(listOf("%2f", "%5c", "%00", "%25").none { path.contains(it, true) })
+                    check('\\' !in path && path.split('/').none { it == "." || it == ".." })
                     val expected = item.getLong("size_bytes")
                     check(expected in 1..8L * 1024 * 1024)
                     val target = File(directory, "file_$index")
                     val digest = MessageDigest.getInstance("SHA-256")
-                    val download = client.newCall(Request.Builder().url(server.trimEnd('/') + path).get().build())
+                    val request = Request.Builder().url(server.trimEnd('/') + path).get()
+                    if (privateRecord) {
+                        check(!recordToken.isNullOrBlank() && AuthManager.token(context) == recordToken)
+                        request.header("Authorization", "Bearer $recordToken")
+                    }
+                    val download = client.newCall(request.build())
                     call = download
                     download.execute().use { response ->
                         check(response.isSuccessful)
@@ -73,6 +82,7 @@ internal class GroupWebAiAttachments(
                             check(total == expected)
                         } }
                     }
+                    check(!closed && ownerCurrent() && (!privateRecord || AuthManager.token(context) == recordToken))
                     val hash = item.optString("sha256").takeIf { it.matches(Regex("[a-fA-F0-9]{64}")) }
                     check(hash == null || hash.equals(digest.digest().joinToString("") { "%02x".format(it) }, true))
                     val mime = item.getString("mime_type")

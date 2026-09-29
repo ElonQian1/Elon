@@ -301,7 +301,7 @@ internal class MainGroupChatActions(
             return
         }
         val configuration = aiComposer.configuration()
-        if (configuration.usesWebAi) analyzeSelectedMessages(listOf(message)) {}
+        if (configuration.usesWebAi || com.elon.app.chatrecords.ChatRecordDocument.card(message.content) != null) analyzeSelectedMessages(listOf(message)) {}
         else webAi.prepareWork(group, messageId, configuration)
     }
 
@@ -309,6 +309,10 @@ internal class MainGroupChatActions(
         val group = activeGroup ?: return
         val owner = socialSession(activity)
         val configuration = aiComposer.configuration()
+        if (configuration.engine != GroupAiEngine.CHATGPT && messages.any { com.elon.app.chatrecords.ChatRecordDocument.card(it.content) != null }) {
+            Toast.makeText(activity, "请在 AI 设置中选择 ChatGPT，再分析聊天记录及其附件", Toast.LENGTH_LONG).show()
+            return
+        }
         if (!configuration.usesWebAi) {
             Toast.makeText(activity, "请先在 AI 设置中选择网页 AI，再分析所选消息", Toast.LENGTH_LONG).show()
             return

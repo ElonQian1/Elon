@@ -89,9 +89,10 @@ internal class MainActionPopups(
     }
 
     fun showMessageActionPopup(anchor: View, message: ChatMessage, text: String) {
-        val hasText = text.isNotBlank()
+        val isRecord = com.elon.app.chatrecords.ChatRecordDocument.card(message.content) != null
+        val hasText = text.isNotBlank() && !isRecord
         val actions = mutableListOf<TopAction>()
-        actions.addAll(groupRevisionActions(message))
+        if (!isRecord) actions.addAll(groupRevisionActions(message))
         if (hasText) {
             actions.add(TopAction("复制", R.drawable.ic_msg_copy) { shareActions().copyMessageText(text) })
         }
@@ -119,8 +120,8 @@ internal class MainActionPopups(
             actions.add(TopAction("搜一搜", R.drawable.ic_msg_search) { shareActions().searchMessageText(text) })
             actions.add(TopAction("从当前听", R.drawable.ic_msg_listen) { shareActions().toastMessageAction("从当前听准备中") })
         }
-        if (hasText && canRequestAiReply()) {
-            actions.add(TopAction("AI回复", R.drawable.ic_msg_ai_reply) { requestAiReply(message) })
+        if ((hasText || isRecord) && canRequestAiReply()) {
+            actions.add(TopAction(if (isRecord) "AI分析记录" else "AI回复", R.drawable.ic_msg_ai_reply) { requestAiReply(message) })
         }
         setActionPopup(renderer().showMessageActionPopup(anchor, getActionPopup(), actions))
     }

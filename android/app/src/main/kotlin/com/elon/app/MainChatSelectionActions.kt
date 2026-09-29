@@ -178,6 +178,11 @@ internal class MainChatSelectionActions(
     }
 
     private fun setSelectionActionsEnabled(enabled: Boolean) {
+        val hasRecords = currentAdapterOrNull()?.selectedMessagesInOrder().orEmpty().any {
+            com.elon.app.chatrecords.ChatRecordDocument.card(it.content) != null
+        }
+        binding.selectionCopyButton.visibility = if (hasRecords) View.GONE else View.VISIBLE
+        binding.selectionForwardButton.visibility = if (hasRecords) View.GONE else View.VISIBLE
         listOf(
             binding.selectionCopyButton,
             binding.selectionForwardButton,

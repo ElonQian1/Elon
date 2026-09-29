@@ -30,7 +30,9 @@ internal object GroupAiSelectionPreview {
             orientation = LinearLayout.VERTICAL
             setPadding(space, 0, space, 0)
             addView(TextView(activity).apply {
-                text = "发送选中的 ${ids.size} 条消息及其图片、文件，回答将发布到当前群。不会附带未选择的消息。"
+                text = if (messages.any { com.elon.app.chatrecords.ChatRecordDocument.card(it.content) != null })
+                    "发送所选记录全文、嵌套记录和已导出的图片及支持的文件，回答发布到当前群。不读取音视频、链接页面和未选择的群消息；内容或附件超限会停止发送。"
+                else "发送选中的 ${ids.size} 条消息及其图片、文件，回答将发布到当前群。不会附带未选择的消息。"
                 setPadding(0, space / 2, 0, space)
             })
             addView(question)

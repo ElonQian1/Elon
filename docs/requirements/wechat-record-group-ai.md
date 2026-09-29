@@ -1,7 +1,6 @@
 ---
 version_status: current
 decision_status: accepted
-implementation_status: in_progress
 ---
 
 # 微信记录的群 AI 分析

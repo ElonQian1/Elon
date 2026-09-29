@@ -106,7 +106,7 @@ class ChatAdapter(
         }
         if (messages[position].isRecalled()) return if (messages[position].role == "user") 0 else 4
         if (AiConversationShareCodec.parseCard(messages[position].content) != null) return 5
-        if (com.elon.app.chatrecords.ChatRecordDocument.card(messages[position].content) != null) return 5
+        if (com.elon.app.chatrecords.ChatRecordDocument.card(messages[position].content) != null) return if (messages[position].role == "user") 0 else 4
         if (messages[position].projectPostCard != null) return 6
         if (parseChatProjectShareMessage(messages[position].content) != null) return 5
         return when (messages[position].role) {
@@ -208,9 +208,9 @@ class ChatAdapter(
         bindUserAvatar(holder.userAvatar)
         bindSenderAvatar(holder.friendAvatar, message)
         bindGroupMentionAvatar(holder.friendAvatar ?: holder.itemView.findViewById(R.id.groupAiAvatar), message, onSenderAvatarLongPress)
-        bindChatSelectionVisual(holder, selectionMode, !projectCardBound && isSelectableMessage(message),
+        bindChatSelectionVisual(holder, selectionMode, (!projectCardBound || com.elon.app.chatrecords.ChatRecordDocument.card(message.content) != null) && isSelectableMessage(message),
             selectionMode && selectionIdentity.contains(message))
-        bindMessageActions(holder, message, projectCardBound)
+        bindMessageActions(holder, message, projectCardBound && com.elon.app.chatrecords.ChatRecordDocument.card(message.content) == null)
         WebChatProductionMessageActionBinder.bind(holder.itemView, message, onWebChatMessageAction.takeUnless { selectionMode })
         bindFinalReplyLabel(holder, message)
         bindEvidence(holder, message, position)

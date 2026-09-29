@@ -19,9 +19,10 @@ implementation_status: verification_in_progress
 ## 已验证
 
 - 后端全量 Store 测试中的 5 个定向用例通过：完整嵌套记录和受保护媒体、撤回、退群/旧客户端、伪造卡片、超限不截断；续聊草稿完整文本断言也已通过。
-- PC 上传、控制和任务状态机测试通过；TypeScript/Vite 构建通过。
+- PC 上传、控制和任务状态机 38 项测试通过；TypeScript/Vite 构建通过。
 - `scripts/test-chat-record-ai-ui.cjs` 在 1280 和 390 宽度使用真实 React 组件验证直接按钮、右键、多选和预览；截图位于本机 `.ai-tmp/record-ai-ui`，无私人内容。
+- Android 14 项定向测试通过。首次实际卡片测试发现项目卡片布局没有多选勾选框，改为用户/群友消息布局后，卡片长按、选中、取消选中及 ID/版本保留全部通过；其他项目卡片不变。
 
 ## 待验证
 
-Android 定向测试、正式发布/安装、线上 MCP 真实 ChatGPT 分析和群消息回读尚未完成，不以离线测试替代。
+正式发布/安装、线上 MCP 真实 ChatGPT 分析和群消息回读尚未完成，不以离线测试替代。
