@@ -21,6 +21,12 @@ function setup(options = {}) {
     f.removed.push(uploadId);
     scope.set(f.composer.f, id, entries => entries.filter(e => e.uploadId !== uploadId));
   };
+  if (options.latest === 'sep29') {
+    f.composer.P = f.composer.N;
+    f.composer.F = f.composer.E;
+    f.composer.y = () => true;
+    f.composer.N = f.composer.E = () => { throw Error('obsolete alias must never execute'); };
+  }
   f.attachments = api.create(f.page, options);
   f.page.__elonChatGptRspackAttachments = f.attachments;
   f.upload = () => f.attachments.upload(f.files, f.descriptor, new AbortController().signal);
@@ -86,6 +92,42 @@ test('current live manifest resolves its reviewed conversation alias and image s
   f.command.requireNativeAttachment = true;
   assert.equal((await f.submit.submit(f.command).completion).status, 'accepted');
   assert.equal(f.calls[0][1].additionalAttachments.length, 1);
+});
+
+test('September 29 profile normalizes upload methods without mutating official exports', async () => {
+  const f = setup({ latest: 'sep29' });
+  const original = { ...f.composer };
+  await f.upload();
+  const runtime = f.page.__elonChatGptRspackRuntime;
+  assert.equal(runtime.profile, 'web_20260929_rspack');
+  assert.equal(runtime.peek().conversation, f.cache.ar.exports);
+  assert.equal(runtime.peek().composer.N, f.composer.P);
+  assert.equal(runtime.peek().composer.E, f.composer.F);
+  assert.deepEqual(f.composer, original);
+  f.values.set(f.composer.s, { slug: 'hydrated-model', thinkingEffort: null });
+  f.command.requireNativeAttachment = true;
+  assert.equal((await f.submit.submit(f.command).completion).status, 'accepted');
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0][1].additionalAttachments[0].id, 'file-0');
+  assert.equal(f.values.get(f.composer.f).length, 0);
+});
+
+test('September 29 cancellation uses the reviewed remove method', async () => {
+  const f = setup({ latest: 'sep29' });
+  await f.upload();
+  assert.equal(f.attachments.remove('private_attachment_fixture-0'), true);
+  assert.deepEqual(f.removed, ['fixture-0']);
+});
+
+test('September 29 rejects missing or old aliases before upload', async () => {
+  for (const field of ['P', 'F', 'y']) {
+    const f = setup({ latest: 'sep29' });
+    delete f.composer[field];
+    await assert.rejects(f.upload());
+    assert.equal(f.page.__elonChatGptRspackRuntime.state().code, 'contract_mismatch');
+    assert.equal(f.uploads.length, 0);
+    assert.equal(f.calls.length, 0);
+  }
 });
 
 test('uploads from the committed composer when the legacy element ID is absent', async () => {

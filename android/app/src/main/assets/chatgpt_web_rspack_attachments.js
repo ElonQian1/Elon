@@ -26,7 +26,7 @@
   async function upload(files, descriptor, signal) {
     if (active) throw Error('attachment_busy');
     const loaded = await runtime?.load();
-    if (!['web_20260926_rspack', 'web_20260926b_rspack'].includes(runtime?.profile) || typeof loaded?.composer.N !== 'function' ||
+    if (!['web_20260926_rspack', 'web_20260926b_rspack', 'web_20260929_rspack'].includes(runtime?.profile) || typeof loaded?.composer.N !== 'function' ||
         typeof loaded?.composer.E !== 'function' || typeof loaded?.attachments.m !== 'function') throw Error('attachment_runtime_pending');
     let binding = context.find();
     if (!binding || binding.href !== descriptor.href || binding.token !== descriptor.documentToken ||
@@ -50,7 +50,7 @@
         timer = page.setTimeout(() => { code = 'upload_timeout'; cancel(); }, options.timeoutMs || 90000);
         guard = page.setInterval(() => { if (!current()) cancel(); }, 500);
       });
-      // vG.N is the reviewed official upload transaction: quota, conversion,
+      // The profile resolves the reviewed upload transaction: quota, conversion,
       // reservation, bytes, processing and scoped ready entries stay together.
       const request = Promise.resolve().then(() => {
         if (!current() || !context.current(binding)) throw Error('attachment_context_changed');
@@ -106,7 +106,7 @@
       // Model hydration may finish after upload. Use the reviewed website's
       // routing check, not slug equality, to validate these exact ready files.
       try {
-        if (runtime.profile !== 'web_20260926b_rspack' || typeof binding.runtime.composer.x !== 'function' ||
+        if (!['web_20260926b_rspack', 'web_20260929_rspack'].includes(runtime.profile) || typeof binding.runtime.composer.x !== 'function' ||
             binding.runtime.composer.x(binding.scope, binding.id, binding.model,
               binding.scope.get(binding.runtime.conversation.w, binding.id), value.ready) !== true) {
           return fail('attachment_model_changed');

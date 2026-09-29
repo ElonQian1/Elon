@@ -27,7 +27,13 @@
       identity: ['376616.5a8098a4e7.js', 'sA'], conversation: ['184143.0e420b28d4.js', 'JqV'],
       composer: ['109686.cd293bd41c.js', 'vG'], submit: ['934244.b068731984.js', 'CUv'],
       attachments: ['184143.0e420b28d4.js', 'q4q'],
-    } }];
+    } }, { id: 'web_20260929_rspack', runtime: '633146.681744a17f.js',
+    anchors: ['908190.8e6a26feba.js', '238022.7e88f56120.js'], modules: {
+      auth: ['238022.7e88f56120.js', 'OS'], scope: ['434385.a7f2495691.js', 'c3'],
+      identity: ['908766.3f419afb2f.js', 'sA'], conversation: ['184143.2270b2c39e.js', 'ar'],
+      composer: ['869553.f7b4b2b625.js', 'vG8'], submit: ['934244.436d1e7992.js', 'CUv'],
+      attachments: ['184143.2270b2c39e.js', 'q4q'],
+    }, composerMethods: { N: 'P', E: 'F', x: 'y' } }];
   const importer = options.importModule || (url => import(url));
   let loader = null, pending = null, owner = null, code = 'not_observed', retryAt = 0;
   const knownUrls = new Set(profiles.flatMap(p => [p.runtime, ...p.anchors,
@@ -79,6 +85,15 @@
         code = role + '_pending'; return null;
       }
       result[role] = cached.exports;
+    }
+    if (selected.composerMethods) {
+      // Keep the adapter contract stable without modifying official exports.
+      const original = result.composer;
+      const methods = Object.entries(selected.composerMethods);
+      if (!methods.every(([, name]) => typeof original[name] === 'function')) {
+        code = 'contract_mismatch'; return null;
+      }
+      result.composer = { ...original, ...Object.fromEntries(methods.map(([name, source]) => [name, original[source]])) };
     }
     if (typeof result.auth.getBrowserChatGptAuthSnapshot !== 'function' ||
         typeof result.auth.getBrowserChatGptAuthGeneration !== 'function' ||

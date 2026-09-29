@@ -11,6 +11,9 @@ const newFiles = ['633146.6ed5d111e4.js', '908190.d446cd6dfd.js', '238022.59b5f5
   '376616.59ccddcc11.js', '36750.72bb8d082e.js', '498514.937d7074b7.js', '934244.c57697fda7.js'];
 const currentFiles = ['633146.e8647fddbe.js', '908190.80f53e7a66.js', '238022.33322e145f.js',
   '376616.5a8098a4e7.js', '184143.0e420b28d4.js', '109686.cd293bd41c.js', '934244.b068731984.js'];
+const sep29Files = ['633146.681744a17f.js', '908190.8e6a26feba.js', '238022.7e88f56120.js',
+  '434385.a7f2495691.js', '908766.3f419afb2f.js', '184143.2270b2c39e.js',
+  '869553.f7b4b2b625.js', '934244.436d1e7992.js'];
 function fixture(options = {}) {
   const values = new Map(), calls = [], imports = [];
   const scopeToken = { id: Symbol(), __scopeBrand: 'AppScope' };
@@ -29,14 +32,15 @@ function fixture(options = {}) {
     LGwv: conversation, vG: composer, CUv: officialSubmit }).map(([id, exports]) => [id, { exports }]));
   if (options.latest) {
     cache.sA = cache.sAW; delete cache.sAW;
-    cache[options.latest === 'current' ? 'JqV' : 'wg'] = cache.LGwv; delete cache.LGwv;
+    cache[options.latest === 'sep29' ? 'ar' : options.latest === 'current' ? 'JqV' : 'wg'] = cache.LGwv; delete cache.LGwv;
     cache.q4q = { exports: { m: entries => entries.filter(e => e.status === 'ready').map(({ uploadId, status, ...spec }) => spec) } };
   }
+  if (options.latest === 'sep29') { cache.vG8 = cache.vG; delete cache.vG; }
   const loader = () => { throw Error('Must not execute require'); };
   loader.c = cache; loader.m = {};
   const page = { location: new URL('https://chatgpt.com/'), __elonChatGptDocumentToken: 'doc_rspack_fixture',
     __elonChatGptPrivateTextTransactionsEnabled: true,
-    performance: { getEntriesByType: () => (options.latest === 'current' ? currentFiles : options.latest ? newFiles : files)
+    performance: { getEntriesByType: () => (options.latest === 'sep29' ? sep29Files : options.latest === 'current' ? currentFiles : options.latest ? newFiles : files)
       .map(file => ({ name: CDN + file })) },
     setTimeout, clearTimeout, setInterval, clearInterval, AbortController, document: { body: {}, documentElement: {} } };
   const id = 'local-chatgpt:11111111-1111-4111-8111-111111111111';
