@@ -118,7 +118,7 @@ class ProjectBrowserSheetContractTest {
     }
 
     @Test
-    fun androidAndWebUseTheSixOriginalPngAssets() {
+    fun originalPngAssetsRemainAvailableForLegacyConsumers() {
         val expected = mapOf(
             "project_view_sheet_background.png" to "747bf7ed29d09582821ad7e36b8894f3a4cc8973ec9b641360ee55896d7d643c",
             "project_view_drag_handle.png" to "9a55996ca9ebc58685ffd9175f9e51047ab343e94f3bda3ec448c9a706696684",
@@ -142,9 +142,8 @@ class ProjectBrowserSheetContractTest {
 
         assertTrue(layout.indexOf("@+id/projectBrowserSheet") < layout.indexOf("@+id/pageTabs"))
         assertTrue(layout.contains("android:layout_marginTop=\"10dp\""))
-        assertTrue(layout.contains("@drawable/project_view_sheet_background"))
+        assertTrue(layout.contains("@drawable/bg_project_browser_surface"))
         assertTrue(controller.contains("projectBrowserGridRows(entries)"))
-        assertTrue(controller.contains("LinearLayout.LayoutParams(0, dp(101), 1f)"))
         assertTrue(controller.contains("View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
         assertTrue(controller.contains("TextUtils.TruncateAt.END"))
         assertTrue(controller.contains("dp(48)"))

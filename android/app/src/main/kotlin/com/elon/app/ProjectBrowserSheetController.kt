@@ -1,5 +1,7 @@
 package com.elon.app
 
+import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.text.Editable
@@ -18,12 +20,11 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import kotlin.math.roundToInt
 
 internal class ProjectBrowserSheetController(
-    private val activity: AppCompatActivity,
+    private val activity: Context,
     private val binding: ActivityMainBinding,
     private val dp: (Int) -> Int,
     private val dependencies: ProjectBrowserSheetDependencies,
@@ -162,6 +163,7 @@ internal class ProjectBrowserSheetController(
                 contentDescription = "项目查看拖拽条"
                 scaleType = ImageView.ScaleType.FIT_XY
                 setImageResource(R.drawable.project_view_drag_handle)
+                imageTintList = ColorStateList.valueOf(activity.getColor(R.color.mobile_on_surface_variant))
             }, FrameLayout.LayoutParams(designPx(232), designPx(16)).apply {
                 gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
                 topMargin = designPx(49)
@@ -179,7 +181,7 @@ internal class ProjectBrowserSheetController(
                     id = R.id.projectBrowserSearchBackground
                     contentDescription = "项目搜索框背景"
                     scaleType = ImageView.ScaleType.FIT_XY
-                    setImageResource(R.drawable.project_view_search_field)
+                    setImageResource(R.drawable.bg_project_browser_search)
                 }, FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT
@@ -189,6 +191,7 @@ internal class ProjectBrowserSheetController(
                     contentDescription = "搜索项目图标"
                     scaleType = ImageView.ScaleType.FIT_CENTER
                     setImageResource(R.drawable.project_view_search_icon)
+                    imageTintList = ColorStateList.valueOf(activity.getColor(R.color.mobile_on_surface_variant))
                 }, FrameLayout.LayoutParams(designPx(97), designPx(97)).apply {
                     gravity = Gravity.START or Gravity.CENTER_VERTICAL
                     leftMargin = designPx(34)
@@ -291,6 +294,7 @@ internal class ProjectBrowserSheetController(
                 rotation = if (expanded) 90f else 0f
                 scaleType = ImageView.ScaleType.CENTER
                 setImageResource(R.drawable.project_view_chevron)
+                imageTintList = ColorStateList.valueOf(activity.getColor(R.color.mobile_on_surface_variant))
                 setOnClickListener { toggle() }
             }, LinearLayout.LayoutParams(dp(48), dp(48)))
         }
@@ -304,18 +308,19 @@ internal class ProjectBrowserSheetController(
                     orientation = LinearLayout.HORIZONTAL
                     rowEntries.forEach { entry ->
                         addView(FrameLayout(activity).apply {
+                            minimumHeight = dp(101)
                             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                             entry?.let { project ->
                                 addView(projectCell(project), FrameLayout.LayoutParams(
                                     FrameLayout.LayoutParams.MATCH_PARENT,
-                                    FrameLayout.LayoutParams.MATCH_PARENT
+                                    FrameLayout.LayoutParams.WRAP_CONTENT
                                 ))
                             }
-                        }, LinearLayout.LayoutParams(0, dp(101), 1f))
+                        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
                     }
                 }, LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(101)
+                    ViewGroup.LayoutParams.WRAP_CONTENT
                 ))
             }
         }
@@ -328,25 +333,30 @@ internal class ProjectBrowserSheetController(
             orientation = LinearLayout.VERTICAL
             isClickable = true
             isFocusable = true
+            setPadding(dp(2), 0, dp(2), dp(12))
             foreground = dependencies.selectableForeground()
             contentDescription = "打开项目 ${project.title}"
             addView(ImageView(activity).apply {
                 contentDescription = "${project.title} 项目图标"
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 setImageResource(R.drawable.project_view_avatar_placeholder)
-                decodeDataUrlBitmap(project.iconDataUrl)?.let(::setImageBitmap)
+                imageTintList = ColorStateList.valueOf(activity.getColor(R.color.mobile_surface_container_high))
+                decodeDataUrlBitmap(project.iconDataUrl)?.let { bitmap ->
+                    imageTintList = null
+                    setImageBitmap(bitmap)
+                }
             }, LinearLayout.LayoutParams(designPx(156), designPx(156)))
             addView(TextView(activity).apply {
                 ellipsize = TextUtils.TruncateAt.END
                 gravity = Gravity.CENTER
                 includeFontPadding = false
-                maxLines = 1
+                maxLines = 2
                 text = project.title.ifBlank { "未命名项目" }
                 setTextColor(activity.getColor(R.color.elon_text_primary))
                 textSize = 13f
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(30)
+                ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(7) })
             setOnClickListener {
                 close()

@@ -6,6 +6,7 @@ import android.view.View
 import android.view.Window
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import com.elon.app.databinding.ActivityMainBinding
@@ -26,7 +27,9 @@ internal fun applyMainSystemBarChrome(activity: AppCompatActivity, binding: Acti
     }
     var flags = window.decorView.systemUiVisibility
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        flags = flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+        flags = if (ColorUtils.calculateLuminance(window.statusBarColor) > 0.5) {
+            flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        } else flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
     }
     window.decorView.systemUiVisibility = flags
     applyMainNavigationBarChrome(
@@ -69,7 +72,8 @@ internal fun applyMainNavigationBarChrome(
     window.decorView.systemUiVisibility = resolveMainSystemUiVisibility(
         currentFlags = window.decorView.systemUiVisibility,
         drawChatBehindNavigationBar = drawChatBehindNavigationBar,
-        sdkInt = Build.VERSION.SDK_INT
+        sdkInt = Build.VERSION.SDK_INT,
+        lightNavigationBar = ColorUtils.calculateLuminance(opaqueColor) > 0.5
     )
     root?.let(ViewCompat::requestApplyInsets)
 }
@@ -77,7 +81,8 @@ internal fun applyMainNavigationBarChrome(
 internal fun resolveMainSystemUiVisibility(
     currentFlags: Int,
     drawChatBehindNavigationBar: Boolean,
-    sdkInt: Int
+    sdkInt: Int,
+    lightNavigationBar: Boolean = false
 ): Int {
     var flags = currentFlags and View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN.inv()
     flags = flags and View.SYSTEM_UI_FLAG_FULLSCREEN.inv()
@@ -87,7 +92,8 @@ internal fun resolveMainSystemUiVisibility(
         flags and View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION.inv()
     }
     if (sdkInt >= Build.VERSION_CODES.O) {
-        flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
+        flags = if (lightNavigationBar) flags or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+            else flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
     }
     return flags
 }

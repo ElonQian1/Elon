@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 1,
+  "taskId": "main-dark-default-project-panel-20260929",
+  "scope": "OBSERVED_CAPABILITY_STATE",
+  "designSystem": {
+    "id": "mobile-design-v2",
+    "sourceFile": "docs/design/mobile-design-system-v2.md",
+    "sha256": "56c06a578a25a582bff665d6433de96c097388ca8d2db59ee25066a6e787dc2d"
+  },
+  "requirementSpec": {
+    "sourceFile": "docs/requirements/main-dark-default-project-panel-20260929.md",
+    "sha256": "03fd9b26fc92c07deb5c6f595ddfd3ff6bffc171e1dea167271f952c01c74054"
+  },
+  "platformDifferences": [
+    "仅主 APK 未设置外观时默认深色；保留用户显式浅色/深色/跟随系统。PWA 默认策略未变，本契约验证显式深浅主题。",
+    "Android 使用生产项目面板和底部导航的离线夹具；PWA 使用生产页面与离线服务。样例项目不同，仅对应浏览与搜索入口语义，不宣称像素或数据一致。",
+    "Android 字体 100%/200% 原生帧；320/411dp、150% 字体与搜索/展开/路由另由组件测试覆盖。PWA 此契约仅 411px 默认字体。",
+    "不执行真实项目、账号、群消息或权限写操作；预览不证明真实手机系统栏或性能验收。"
+  ],
+  "states": [
+    {
+      "id": "normal-dark-100",
+      "androidScreenId": "elon.project.browser",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=projects&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#projectBrowserSheet.active",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "project-search",
+          "state": "项目面板与搜索入口已显示，离线样例",
+          "android": {
+            "definitionId": "project.browser.search",
+            "assertions": {
+              "/text": ""
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserSearchInput",
+            "assertions": {
+              "/role": "input"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "normal-dark-200",
+      "androidScreenId": "elon.project.browser",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=projects&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#projectBrowserSheet.active",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "project-search",
+          "state": "项目面板与搜索入口已显示，离线样例",
+          "android": {
+            "definitionId": "project.browser.search",
+            "assertions": {
+              "/text": ""
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserSearchInput",
+            "assertions": {
+              "/role": "input"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "empty-dark-100",
+      "androidScreenId": "elon.project.browser",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=empty&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#projectBrowserSheet.active",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-dark",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "project-search",
+          "state": "项目面板与搜索入口已显示，离线样例",
+          "android": {
+            "definitionId": "project.browser.search",
+            "assertions": {
+              "/text": ""
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserSearchInput",
+            "assertions": {
+              "/role": "input"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "normal-light-100",
+      "androidScreenId": "elon.project.browser",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=projects&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#projectBrowserSheet.active",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "project-search",
+          "state": "项目面板与搜索入口已显示，离线样例",
+          "android": {
+            "definitionId": "project.browser.search",
+            "assertions": {
+              "/text": ""
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserSearchInput",
+            "assertions": {
+              "/role": "input"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "normal-light-200",
+      "androidScreenId": "elon.project.browser",
+      "androidFontScale": 2,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=projects&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#projectBrowserSheet.active",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "project-search",
+          "state": "项目面板与搜索入口已显示，离线样例",
+          "android": {
+            "definitionId": "project.browser.search",
+            "assertions": {
+              "/text": ""
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserSearchInput",
+            "assertions": {
+              "/role": "input"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "empty-light-100",
+      "androidScreenId": "elon.project.browser",
+      "androidFontScale": 1,
+      "webCapture": {
+        "url": "http://127.0.0.1:43781/?fixture=empty&tab=projects",
+        "viewport": {
+          "width": 411,
+          "height": 842
+        },
+        "waitFor": {
+          "condition": "domcontentloaded",
+          "selector": "#projectBrowserSheet.active",
+          "settleMs": 700
+        },
+        "fixtureProfile": "mobile-v2-light",
+        "authProfile": "mobile-v2-offline"
+      },
+      "capabilities": [
+        {
+          "id": "project-search",
+          "state": "项目面板与搜索入口已显示，离线样例",
+          "android": {
+            "definitionId": "project.browser.search",
+            "assertions": {
+              "/text": ""
+            }
+          },
+          "web": {
+            "selector": "#projectBrowserSearchInput",
+            "assertions": {
+              "/role": "input"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

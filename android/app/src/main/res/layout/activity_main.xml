@@ -1360,7 +1360,7 @@
                 android:layout_height="match_parent"
                 android:importantForAccessibility="no"
                 android:scaleType="fitXY"
-                android:src="@drawable/project_view_sheet_background" />
+                android:src="@drawable/bg_project_browser_surface" />
 
             <FrameLayout
                 android:id="@+id/projectBrowserSheetContent"

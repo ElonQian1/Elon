@@ -12,8 +12,8 @@ internal object MobileThemePreference {
         AppCompatDelegate.MODE_NIGHT_NO, AppCompatDelegate.MODE_NIGHT_YES)
     private val labels = arrayOf("跟随系统", "浅色", "深色")
     private fun prefs(context: Context) = context.getSharedPreferences("mobile_appearance", Context.MODE_PRIVATE)
-    private fun selected(context: Context) = prefs(context).getInt("mode", modes[0]).let {
-        if (it in modes) it else modes[0]
+    private fun selected(context: Context) = prefs(context).getInt("mode", AppCompatDelegate.MODE_NIGHT_YES).let {
+        if (it in modes) it else AppCompatDelegate.MODE_NIGHT_YES
     }
     fun apply(context: Context) = AppCompatDelegate.setDefaultNightMode(selected(context))
     fun night(context: Context): Int = when (selected(context)) {

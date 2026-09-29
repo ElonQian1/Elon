@@ -7,12 +7,12 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Context
 import com.elon.app.databinding.ActivityMainBinding
 import kotlin.math.roundToInt
 
 internal class MainNavigationDesignMetrics(
-    private val activity: AppCompatActivity,
+    private val activity: Context,
     private val binding: ActivityMainBinding,
     private val updateBottomTabVisual: (TextView, Boolean) -> Unit
 ) {
