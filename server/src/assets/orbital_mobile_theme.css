@@ -228,3 +228,60 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .group-summary-strip .summary-meta { font-size: 12px; }
 .group-summary-strip .summary-action { display: grid; place-items: center; min-width: 48px; padding: 0 8px; background: transparent; color: var(--brand); }
 .chat-view > .chat-list { grid-column: 1 / -1; grid-row: 4; min-height: 0; }
+
+/* Group conversations: keep the editor in layout so it never consumes space twice.
+   Safe areas belong to the toolbar/editor; VisualViewport supplies keyboard bounds. */
+.app.group-chat-active {
+  position: fixed; top: var(--group-viewport-top, 0px); left: 0; right: 0; width: 100%;
+  height: var(--group-viewport-height, 100dvh); min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+}
+.app.group-chat-active .toolbar {
+  height: auto; min-height: calc(48px + var(--top-safe-area)); padding: var(--top-safe-area) 4px 0;
+}
+.app.group-chat-active .toolbar h1 {
+  flex: 1; min-width: 0; height: auto; line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.app.group-chat-active #moreBtn { width: 48px; height: 48px; flex-basis: 48px; }
+.group-chat-active .chat-view:not(.hidden) {
+  grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr);
+}
+.group-chat-active .chat-view > .group-assistant-entry,
+.group-chat-active .chat-view > .article-entry,
+.group-chat-active .input-mode-row { display: none; }
+.group-chat-active .chat-view > .group-summary-strip {
+  grid-row: 1; grid-column: 1; min-height: 48px; margin: 0; padding: 0 12px; gap: 8px;
+}
+.group-chat-active .group-summary-strip .summary-title { font-weight: 500; line-height: 1.4; }
+.group-chat-active .group-summary-strip .summary-meta {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+.group-chat-active .group-summary-strip .summary-action { min-height: 48px; }
+.group-chat-active .chat-view > .chat-list {
+  grid-row: 2; grid-column: 1; padding-bottom: 10px; scroll-padding-bottom: 10px;
+}
+.group-chat-active #inputBar {
+  position: relative; left: auto; bottom: auto; transform: none; max-width: none;
+  padding: 4px 12px max(8px, env(safe-area-inset-bottom)); gap: 0;
+}
+.group-chat-active #chatSideMenuHandle { bottom: 12px; }
+.group-chat-active .input-placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+.group-chat-active #messageInput { line-height: 1.5; }
+.group-keyboard-open #inputBar { padding-bottom: 4px; }
+.group-keyboard-open .chat-view > .group-summary-strip { display: none; }
+.group-chat-tools {
+  width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 12px;
+  border: 1px solid var(--line); border-radius: 20px; background: var(--panel); color: var(--ink);
+}
+.group-chat-tools::backdrop { background: #0008; }
+.group-chat-tools header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.group-chat-tools h2 { margin: 0 8px; font-size: 18px; line-height: 1.4; }
+.group-chat-tools button {
+  display: block; min-height: 48px; padding: 10px 12px; border: 0; border-radius: 12px;
+  background: transparent; color: var(--ink); font: inherit; line-height: 1.5; overflow-wrap: anywhere;
+}
+.group-chat-tools > button { width: 100%; text-align: left; }
+.group-chat-tools button:hover { background: var(--panel-2); }

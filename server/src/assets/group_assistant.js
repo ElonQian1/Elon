@@ -2,10 +2,81 @@
   'use strict';
   const states = { ready: '已同步', no_update: '暂无新结果', missing: '原任务已删除或不可访问', auth_required: '分享者需登录原账号', requires_action: '需分享者处理', unavailable: '同步暂不可用' };
   const date = value => value ? new Date(value).toLocaleString() : '尚未同步';
+  // Group-only chrome shares the existing feature triggers and their permission checks.
+  function installLayout(currentGroup, session, trigger, summary) {
+    const app = document.getElementById('appView'), more = document.getElementById('moreBtn');
+    if (!app || !more || !summary) return () => {};
+    const { el, button } = root.ElonAiShareRich;
+    let menu, menuGroup, menuOwner, forwarding = false, frame;
+    const active = () => !!currentGroup() && !summary.classList.contains('hidden');
+    const list = document.getElementById('chatList');
+    let pinned = true, layoutGroup;
+    list?.addEventListener('scroll', () => {
+      pinned = list.scrollHeight - list.scrollTop - list.clientHeight <= 24;
+    }, { passive: true });
+    if (list && root.ResizeObserver) new ResizeObserver(() => {
+      if (active() && pinned) list.scrollTop = list.scrollHeight;
+    }).observe(list);
+    function viewport() {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const visual = root.visualViewport;
+        if (!active() || (visual && Math.abs(visual.scale - 1) > .01)) return;
+        const height = visual?.height || root.innerHeight;
+        app.style.setProperty('--group-viewport-height', height + 'px');
+        app.style.setProperty('--group-viewport-top', (visual?.offsetTop || 0) + 'px');
+        app.classList.toggle('group-keyboard-open', root.innerHeight - height > 120);
+      });
+    }
+    function sync() {
+      const enabled = active(); app.classList.toggle('group-chat-active', enabled);
+      if (layoutGroup !== currentGroup()?.id) { layoutGroup = currentGroup()?.id; pinned = true; }
+      if (enabled) {
+        more.title = '群聊工具'; more.setAttribute('aria-label', '群聊工具');
+        more.setAttribute('aria-haspopup', 'dialog'); more.setAttribute('aria-expanded', String(!!menu?.open));
+      } else {
+        app.classList.remove('group-keyboard-open');
+        app.style.removeProperty('--group-viewport-height'); app.style.removeProperty('--group-viewport-top');
+        if (more.title === '群聊工具') { more.title = '聊天设置'; more.setAttribute('aria-label', more.title); }
+        more.removeAttribute('aria-haspopup'); more.removeAttribute('aria-expanded');
+      }
+      if (menu && (!enabled || menuGroup !== currentGroup()?.id || menuOwner !== session())) menu.close();
+      viewport();
+    }
+    more.addEventListener('click', event => {
+      if (!active() || forwarding || more.classList.contains('project-members-mode')) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      if (menu?.open) return;
+      const dialog = el('dialog', null, 'group-chat-tools'), heading = el('header');
+      let chosen = false;
+      menu = dialog; menuGroup = currentGroup().id; menuOwner = session();
+      dialog.setAttribute('aria-label', '群聊工具');
+      heading.append(el('h2', '群聊工具'), button('关闭', () => dialog.close())); dialog.append(heading);
+      const action = (label, run) => dialog.append(button(label, () => {
+        const valid = active() && menuGroup === currentGroup()?.id && menuOwner === session();
+        chosen = true; dialog.close(); if (valid) run();
+      }));
+      action('群 AI 助手', () => trigger.click());
+      action('文章', () => document.querySelector('#chatView > .article-entry')?.click());
+      action(summary.querySelector('.summary-action')?.textContent === '生成' ? '生成总结帖' : '总结帖', () => summary.click());
+      action('群聊设置', () => { forwarding = true; try { more.click(); } finally { forwarding = false; } });
+      dialog.addEventListener('close', () => {
+        dialog.remove(); if (menu === dialog) menu = null;
+        more.setAttribute('aria-expanded', 'false');
+        if (!chosen && active()) more.focus({ preventScroll: true });
+      }, { once: true });
+      document.body.append(dialog); dialog.showModal(); more.setAttribute('aria-expanded', 'true');
+    }, true);
+    root.addEventListener('resize', viewport);
+    root.visualViewport?.addEventListener('resize', viewport);
+    root.visualViewport?.addEventListener('scroll', viewport);
+    return sync;
+  }
   function install(api, currentGroup, session, trigger, summary) {
     let dialog, controller, epoch = 0;
     const { el, button, markdown } = root.ElonAiShareRich;
-    const visible = () => { trigger.hidden = !currentGroup() || summary.classList.contains('hidden'); };
+    const syncLayout = installLayout(currentGroup, session, trigger, summary);
+    const visible = () => { trigger.hidden = !currentGroup() || summary.classList.contains('hidden'); syncLayout(); };
     new MutationObserver(visible).observe(summary, { attributes: true, attributeFilter: ['class'] });
     visible();
     trigger.onclick = () => {
