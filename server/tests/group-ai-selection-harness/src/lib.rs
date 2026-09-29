@@ -32,6 +32,29 @@ mod context_share;
 mod group_chatgpt_project;
 mod store {
     pub mod articles {
+        // This harness covers ordinary selected messages. Imported-record SQL and
+        // permissions are exercised against the full store in group_web_ai_record_tests.
+        pub mod chat_records {
+            pub fn message_preview(_: &str) -> Option<String> {
+                None
+            }
+            pub mod ai_context {
+                pub fn expand(
+                    _: &rusqlite::Connection,
+                    _: &str,
+                    _: &str,
+                    _: &str,
+                    content: &str,
+                    _: &mut Vec<crate::attachments::GroupAiAttachment>,
+                ) -> anyhow::Result<Option<serde_json::Value>> {
+                    anyhow::ensure!(
+                        !content.starts_with("【一龙聊天记录】"),
+                        "record cases require the full store tests"
+                    );
+                    Ok(None)
+                }
+            }
+        }
         pub mod snapshots {
             pub(crate) use crate::snapshot_privacy::validate_text as validate_shared_text;
         }

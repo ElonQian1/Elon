@@ -8,10 +8,12 @@ import { getDesktopInvoke } from '../../shell/desktopShell'
 import { startGroupAi } from './groupAiStore'
 import type { GroupAiInput } from './groupAiTask'
 import styles from './GroupAi.module.css'
+import { recordCard } from '../chat-records/recordApi'
 
 interface Props { owner: string; group: string; title: string; messages: SocialMessage[]; onClose: () => void }
 
 export default function GroupAiSelectionDialog(props: Props) {
+  const hasRecords = props.messages.some(m => recordCard(m.content))
   const [question, setQuestion] = useState('请结合所选消息，分析并回答。')
   const [provider, setProvider] = useState<GroupAiInput['provider']>('chatgpt')
   const [error, setError] = useState('')
@@ -22,7 +24,7 @@ export default function GroupAiSelectionDialog(props: Props) {
   function submit() {
     try {
       if (unavailable) throw new Error(unavailable)
-      if (provider !== 'chatgpt' && props.messages.some(m => m.attachments?.length)) throw new Error('群聊图片和文件请使用 ChatGPT 分析；未发送任何消息')
+      if (provider !== 'chatgpt' && (hasRecords || props.messages.some(m => m.attachments?.length))) throw new Error('聊天记录、图片和文件请使用 ChatGPT 分析；未发送任何消息')
       startGroupAi({
         owner: props.owner, group: props.group, title: props.title, source: props.messages[0].id, provider,
         selection: {
@@ -46,9 +48,10 @@ export default function GroupAiSelectionDialog(props: Props) {
       <option value="chatgpt">ChatGPT</option><option value="google-ai-mode">Google AI 模式</option>
     </select></label>
     <details className={styles.context}><summary>已选择 {props.messages.length} 条消息</summary>
-      {props.messages.map(message => <article key={message.id}><strong>{message.sender_name || '群成员'}</strong><pre>{messageText(message)}</pre></article>)}
+      {props.messages.map(message => { const card = recordCard(message.content); return <article key={message.id}><strong>{message.sender_name || '群成员'}</strong><pre>{card ? `${card.title} · 共 ${card.total_count || card.message_count} 条（含嵌套记录）\n${card.summary}` : messageText(message)}</pre></article> })}
     </details>
     {props.messages.some(m => m.attachments?.length) && <p className={styles.warning}>本次会将所选消息的图片和文件发送给 ChatGPT，上传失败不会改为纯文字分析。</p>}
+    {hasRecords && <p className={styles.warning}>将发送记录全文、嵌套记录和已导出的图片及支持的文件，回答发布到当前群。音视频和链接页面不在本次读取范围；内容过长或附件超限会停止发送。</p>}
     <label className={styles.question}>想问什么<textarea rows={4} maxLength={2000} value={question} onChange={event => setQuestion(event.target.value)} /></label>
     {provider === 'chatgpt' && <label><input type="checkbox" checked={allowContinue} onChange={e => setAllowContinue(e.target.checked)} />允许群成员用自己的 ChatGPT 继续讨论所选记录、问题和回答</label>}
     {(error || unavailable) && <p className={styles.warning} role="alert">{error || unavailable}</p>}

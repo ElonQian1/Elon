@@ -32,7 +32,15 @@ fn malformed_unsupported_and_oversize_files_fail_closed() {
         item[field] = value;
         assert!(append(&mut Vec::new(), "m", &json!([item])).is_err());
     }
-    assert!(download_path("/api/user/u/chat-attachments/g/%2fsecret").is_err());
-    assert!(download_path("/api/user/u/chat-attachments/g/a?token=secret").is_err());
+    assert!(download_path("/api/user/u/chat-attachments/g/%2fsecret", false).is_err());
+    assert!(download_path("/api/user/u/chat-attachments/g/a?token=secret", false).is_err());
     assert!(append(&mut Vec::new(), "m", &json!(vec![image(); 10])).is_err());
+}
+
+#[test]
+fn ordinary_attachment_cannot_request_private_record_credentials() {
+    let mut item = image();
+    item["url"] = json!("/api/me/groups/g/chat-records/record/assets/asset");
+    assert!(append(&mut Vec::new(), "m", &json!([item.clone()])).is_err());
+    assert!(append_record(&mut Vec::new(), "m", &json!([item])).is_ok());
 }

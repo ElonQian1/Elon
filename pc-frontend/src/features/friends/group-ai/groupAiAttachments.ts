@@ -1,4 +1,5 @@
 import { resolveApiUrl } from '../../../api/runtime'
+import { getAuthToken } from '../../../api/client'
 import type { PrivateUploadFile } from '../../user-browser/privateAttachmentUpload'
 
 export interface GroupAiAttachment {
@@ -9,15 +10,19 @@ export interface GroupAiAttachment {
 export function groupAttachmentFiles(manifest: GroupAiAttachment[]): PrivateUploadFile[] {
   return manifest.map(file => {
     const path = file.download_path
-    if (!/^\/api\/user\/[^/]+\/chat-attachments\/[^/]+\/[^/?#]+$/.test(path)
+    const privateRecord = /^\/api\/me\/groups\/[\w-]+\/chat-records\/[\w-]+\/assets\/[\w-]+$/.test(path)
+    if ((!privateRecord && !/^\/api\/user\/[^/]+\/chat-attachments\/[^/]+\/[^/?#]+$/.test(path))
       || /%2f|%5c|%00|%25/i.test(path) || path.includes('\\') || path.split('/').some(p => p === '.' || p === '..'))
       throw new Error('附件地址无效，未发送给 AI')
+    const token = privateRecord ? getAuthToken() : null
     return { name: file.name, type: file.mime_type, size: file.size_bytes, sha256: file.sha256,
       async load() {
         const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 45000)
         try {
-          // Never forward app tokens, cookies or a server-supplied origin to an attachment.
-          const response = await fetch(resolveApiUrl(path), { signal: controller.signal, redirect: 'error', credentials: 'omit' })
+          if (privateRecord && (!token || getAuthToken() !== token)) throw new Error('账号已变化，请重新选择记录')
+          // Credentials go only to the exact protected platform record route, never to ChatGPT or redirects.
+          const response = await fetch(resolveApiUrl(path), { signal: controller.signal, redirect: 'error', credentials: 'omit',
+            cache: 'no-store', headers: token ? { Authorization: `Bearer ${token}` } : undefined })
           if (!response.ok || !response.body) throw new Error('无法读取所选附件，未发送给 AI')
           const reader = response.body.getReader(), parts: Uint8Array<ArrayBuffer>[] = []
           let length = 0
@@ -31,6 +36,7 @@ export function groupAttachmentFiles(manifest: GroupAiAttachment[]): PrivateUplo
             }
           } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
           if (length !== file.size_bytes) throw new Error('附件未完整下载，未发送给 AI')
+          if (privateRecord && getAuthToken() !== token) throw new Error('账号已变化，请重新选择记录')
           return new Blob(parts, { type: file.mime_type })
         } finally { clearTimeout(timer) }
       },

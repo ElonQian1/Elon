@@ -10,6 +10,8 @@ import SocialMessageAttachments from '../SocialMessageAttachments'
 import { TextSourceCard } from '../source-links/SourceLinkView'
 import { contextPath, continuationDraft, prepareGroupContinuation, type GroupAiDiscussion, type GroupAiReplyMetadata, type GroupAiSources } from './groupAiContext'
 import styles from './GroupAiReplyContext.module.css'
+import ChatRecordMessage from '../chat-records/ChatRecordMessage'
+import { recordCard } from '../chat-records/recordApi'
 
 interface Props { owner: string; group: string; message: string; metadata: GroupAiReplyMetadata; part: 'footer' | 'sources' }
 export default function GroupAiReplyContext(props: Props) {
@@ -77,7 +79,7 @@ export default function GroupAiReplyContext(props: Props) {
       </label>}
       {sources?.sources.map(source => <article className={styles.record} key={source.id}>
         <header><SocialAvatar userId={source.sender_user_id} name={source.sender_name || '群成员'} /><strong>{source.sender_name}</strong><time>{new Date(source.created_at).toLocaleString()}</time></header>
-        <MarkdownContent content={source.content} copy={false} />
+        {!source.recalled_at && recordCard(source.content) ? <ChatRecordMessage content={source.content} group={group} /> : <MarkdownContent content={source.content} copy={false} />}
         {!source.recalled_at && <><TextSourceCard text={source.content} /><SocialMessageAttachments attachments={source.attachments} /></>}
       </article>)}
     </SocialDialog>}

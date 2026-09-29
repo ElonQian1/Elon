@@ -78,7 +78,8 @@ pub(crate) fn decorate(
             message.ai_reply = Some(json!({"schema":1,"requester_id":owner,"provider":provider,
                 "allow_continue":allowed,"version":version,"source_count":sources.len(),
                 "previews":sources.iter().take(3).map(|s| json!({"sender_name":s["sender_name"],
-                    "text":s["content"].as_str().unwrap_or("").chars().take(90).collect::<String>()})).collect::<Vec<_>>() }));
+                    "text":crate::store::articles::chat_records::message_preview(s["content"].as_str().unwrap_or(""))
+                        .unwrap_or_else(||s["content"].as_str().unwrap_or("").chars().take(90).collect::<String>())})).collect::<Vec<_>>() }));
         }
     }
     Ok(())

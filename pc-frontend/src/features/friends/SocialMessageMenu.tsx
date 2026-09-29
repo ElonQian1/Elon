@@ -10,6 +10,7 @@ import { attachmentKind, copyImageAttachment, downloadAttachment, messageMenuReq
 import { canRecall, isPending, isRecalled, messageEndpoint, messageText, socialRequest } from './socialChatOperations'
 import styles from './SocialMessageMenu.module.css'
 import tools from './SocialTools.module.css'
+import { recordCard } from './chat-records/recordApi'
 
 interface Props {
   conversation: ActiveConversation; message: SocialMessage; own: boolean; special?: boolean; compactLink?: boolean; copySourceId: string
@@ -51,6 +52,10 @@ export default function SocialMessageMenu(props: Props) {
   }
   function render(edit?: () => void, history?: () => void) {
     const common: SocialMenuItem[] = [], revisions: SocialMenuItem[] = [], details: SocialMenuItem[] = []
+    if (request && !isRecalled(message) && !isPending(message) && recordCard(message.content)) {
+      if (props.onAiReply) common.push({ label: 'AI 分析记录…', icon: <Bot />, action: props.onAiReply })
+      details.push({ label: '多选', icon: <ListChecks />, action: props.onSelect })
+    }
     if (usable && request) {
       const link = request.link
       if (link) common.push(

@@ -78,6 +78,17 @@ fn prompt(
     for row in &mut rows {
         let start = files.len();
         super::attachments::append(&mut files, &row.1, &row.3["attachments"])?;
+        if let Some(record) = crate::store::articles::chat_records::ai_context::expand(
+            conn,
+            user,
+            group,
+            &row.1,
+            row.3["text"].as_str().unwrap_or(""),
+            &mut files,
+        )? {
+            row.3["text"] = serde_json::json!("[微信聊天记录，正文见 chat_record]");
+            row.3["chat_record"] = record;
+        }
         row.3["attachments"] = serde_json::json!(files[start..]
             .iter()
             .map(|f| serde_json::json!({"name":f.name,"mime_type":f.mime_type}))
@@ -118,6 +129,19 @@ pub(crate) fn validate_sources(
             |r| r.get(0),
         )?;
         ensure!(current == revision, "所选消息已编辑，请重新选择后分析");
+        let content: String = conn.query_row(
+            "SELECT content FROM friend_group_messages WHERE id=?1",
+            [&id],
+            |r| r.get(0),
+        )?;
+        crate::store::articles::chat_records::ai_context::expand(
+            conn,
+            user,
+            group,
+            &id,
+            &content,
+            &mut Vec::new(),
+        )?;
     }
     Ok(())
 }

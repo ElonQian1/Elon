@@ -7,6 +7,7 @@ import { localMessageKey, type SavedSocialMessage } from './socialLocalState'
 import { messageText, socialRequest } from './socialChatOperations'
 import SocialDialog from './SocialDialog'
 import GroupAssistantDialog from './group-assistant/GroupAssistantDialog'
+import { recordCard } from './chat-records/recordApi'
 import styles from './SocialTools.module.css'
 
 interface Summary { id: string; title: string; summary?: string; pinned_at?: string | null; status?: string }
@@ -20,6 +21,7 @@ interface Props {
 
 export default function SocialConversationTools(props: Props) {
   const { conversation, query, onQuery, selected } = props
+  const hasRecords = selected.some(item => !!recordCard(item.message.content))
   const [panel, setPanel] = useState<'favorites' | 'search' | 'summaries' | null>(null)
   const [assistantGroup, setAssistantGroup] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -75,8 +77,8 @@ export default function SocialConversationTools(props: Props) {
     </div>
     {props.selectionMode && <div className={styles.toolbar} aria-label="多选消息操作"><strong>已选 {selected.length} 条</strong>
       {props.onAiReply && <button type="button" disabled={!selected.length} onClick={props.onAiReply}><Bot size={16} aria-hidden="true" /> AI 分析</button>}
-      <button type="button" disabled={!selected.length} onClick={() => void copyTextToClipboard(selected.map(item => messageText(item.message)).join('\n\n')).then(ok => setNotice(ok ? '已复制所选消息' : '复制失败'))}>复制所选</button>
-      <button type="button" disabled={!selected.length} onClick={() => props.onForward(selected)}>转发所选</button><button type="button" disabled={!selected.length} onClick={() => props.onSave(selected)}>收藏所选</button><button type="button" onClick={props.onClearSelection}>退出多选</button>
+      {!hasRecords && <><button type="button" disabled={!selected.length} onClick={() => void copyTextToClipboard(selected.map(item => messageText(item.message)).join('\n\n')).then(ok => setNotice(ok ? '已复制所选消息' : '复制失败'))}>复制所选</button>
+      <button type="button" disabled={!selected.length} onClick={() => props.onForward(selected)}>转发所选</button><button type="button" disabled={!selected.length} onClick={() => props.onSave(selected)}>收藏所选</button></>}<button type="button" onClick={props.onClearSelection}>退出多选</button>
     </div>}
     {notice && <p className={styles.hint} role="status">{notice}</p>}
     {panel && <SocialDialog title={panel === 'favorites' ? '本机收藏' : panel === 'search' ? '群历史检索' : '置顶与群聊总结'} onClose={() => { epoch.current++; setBusy(false); setPanel(null) }}>

@@ -21,6 +21,11 @@ const initial: SocialMessage[] = [...samples, `附加评论必须保留 ${sample
   id: `fixture-${i}`, content, sender_user_id: i % 2 ? 'fixture-friend' : me.id,
   sender_name: '示例群友', outgoing: i % 2 === 0, created_at: '2026-09-16T08:00:00Z',
 }))
+if (new URLSearchParams(location.search).has('records')) initial.splice(0, initial.length, {
+  id: 'fixture-record', sender_user_id: 'fixture-friend', sender_name: '示例群友', revision: 1, created_at: '2026-09-29T01:55:00Z',
+  content: '【一龙聊天记录】\n' + JSON.stringify({ schema: 'chat_record_bundle_v1', record_id: 'fixture_record', group_id: 'fixture-group',
+    title: '微信聊天记录', summary: '讨论输入框与图片问题', message_count: 2, total_count: 3 }),
+})
 function PwaCards() {
   const host = useRef<HTMLDivElement>(null)
   useEffect(() => {

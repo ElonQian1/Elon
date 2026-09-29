@@ -23844,6 +23844,50 @@
       "updated_at_ms": 1789547772895
     },
     {
+      "id": "wechat-record-group-ai-v1",
+      "title": "微信记录群 AI 分析",
+      "summary": "补齐已导入记录的 AI 入口、全文和媒体展开、私有上传与幂等回群",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/wechat-record-group-ai.md",
+        "content_hash": "65eff17cd533d4331ba54853f72b57dfc76063f936f11da0b5230c4873decede",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "6a677264ef0ab7a61d00c331e2a89e51d6a55975",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "d7095e7acd7f0fb68c37e2f00907beb4a078be50",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "codex",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/ChatAdapter.kt",
+        "pc-frontend/src/features/friends/chat-records",
+        "server/src/store/articles/chat_records/ai_context.rs",
+        "server/src/store/group_web_ai_selection.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "记录全文与嵌套参与分析，原图私有上传",
+        "PC右键及Android长按多选可用",
+        "权限撤回及真实MCP回群核验"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_4778a206998a4222bae5d12fcbf626d0",
+        "agent_id": "codex-record-ai",
+        "claimed_at_ms": 1790648824970,
+        "expires_at_ms": 1790663224970
+      },
+      "created_at_ms": 1790648800389,
+      "updated_at_ms": 1790649632833
+    },
+    {
       "id": "win-ai-child-webview-capability-v1",
       "title": "Win 官方 AI 子 WebView 权限绑定 V1",
       "summary": "修复官方 AI 子 WebView 按宿主窗口匹配 capability 导致语义事件 IPC 被拒绝、原生输入与新会话永久禁用的问题。",
@@ -31351,36 +31395,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_393cb10a61a14bc8a2690d17ec748a9f",
-      "feature_id": "quant-public-https-v1",
-      "action": "claimed",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789328575451
-    },
-    {
-      "id": "feature_event_7cd45069eff64d6b8d02c7094094f819",
-      "feature_id": "quant-public-https-v1",
-      "action": "transitioned",
-      "actor": "codex-quant-grid",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789328575489
-    },
-    {
-      "id": "feature_event_b544222208874fbe8f388b58fd9658a7",
-      "feature_id": "quant-public-https-v1",
-      "action": "claim_released",
-      "actor": "codex-quant-grid",
-      "reason": "补齐单字段配置更新与回退测试的文件认领，业务范围不变",
-      "from_status": "in_progress",
-      "to_status": "ready",
-      "at_ms": 1789329365003
-    },
-    {
       "id": "feature_event_45c47ca625f2432b979d35c86c3a075d",
       "feature_id": "quant-public-https-v1",
       "action": "metadata_updated",
@@ -33349,6 +33363,36 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1790408742409
+    },
+    {
+      "id": "feature_event_c5346a5bb17642c5ad0ffb76caee8908",
+      "feature_id": "wechat-record-group-ai-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790648800389
+    },
+    {
+      "id": "feature_event_d532c9ee3b504f289a9dd0c955a9bd0f",
+      "feature_id": "wechat-record-group-ai-v1",
+      "action": "claimed",
+      "actor": "codex-record-ai",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790648824971
+    },
+    {
+      "id": "feature_event_20188a7554664cc6afb3a21747df77d7",
+      "feature_id": "wechat-record-group-ai-v1",
+      "action": "transitioned",
+      "actor": "codex-record-ai",
+      "reason": "UI and full record transport implemented; focused tests passed; release and live acceptance pending",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790649632833
     }
   ]
 }

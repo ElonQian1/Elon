@@ -17,11 +17,34 @@ function load(relative, stubs = {}) {
   return compiled.exports
 }
 const { uploadPrivateAttachments, privateUploadDiagnostic } = load('features/user-browser/privateAttachmentUpload.ts')
+let recordToken = 'synthetic-token'
 const { groupAttachmentFiles } = load('features/friends/group-ai/groupAiAttachments.ts', {
   '../../../api/runtime': { resolveApiUrl: path => 'https://platform.invalid' + path },
+  '../../../api/client': { getAuthToken: () => recordToken },
 })
 const manifest = { name: 'group_01_file.txt', mime_type: 'text/plain', size_bytes: 3,
   download_path: '/api/user/u/chat-attachments/g/file.txt', message_id: 'm', attachment_id: 'f' }
+
+test('protected record media uses only platform auth and rejects changed identity or redirects', async () => {
+  const previous = global.fetch
+  const file = { ...manifest, download_path: '/api/me/groups/g/chat-records/r/assets/a' }
+  try {
+    global.fetch = async (url, options) => {
+      assert.equal(url, 'https://platform.invalid' + file.download_path)
+      assert.equal(options.headers.Authorization, 'Bearer synthetic-token')
+      assert.equal(options.redirect, 'error')
+      assert.equal(options.cache, 'no-store')
+      return new Response('abc')
+    }
+    assert.equal(await (await groupAttachmentFiles([file])[0].load()).text(), 'abc')
+    const old = groupAttachmentFiles([file])[0]
+    recordToken = 'changed'
+    await assert.rejects(old.load(), /账号已变化/)
+    for (const path of ['/api/me/groups/g/chat-records/r/assets/a?token=x', '/api/me/groups/g/chat-records/r/assets/..', '//evil/api/me/groups/g/chat-records/r/assets/a']) {
+      assert.throws(() => groupAttachmentFiles([{ ...file, download_path: path }]), /地址无效/)
+    }
+  } finally { recordToken = 'synthetic-token'; global.fetch = previous }
+})
 
 test('frontend chunks flow through the production Win byte bridge and shared native reader', async () => {
   const factory = require('../../desktop-shell/src-tauri/src/local_ai_browser/win_attachment_source.js')

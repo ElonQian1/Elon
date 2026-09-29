@@ -25,25 +25,36 @@ impl Store {
             .sources
             .iter()
             .map(|source| {
+                let content = source["content"].as_str().unwrap_or("");
+                let record = crate::store::articles::chat_records::ai_context::expand(
+                    &tx,
+                    user,
+                    group,
+                    source["id"].as_str().unwrap_or(""),
+                    content,
+                    &mut Vec::new(),
+                )?;
+                let expanded = record.as_ref().map(serde_json::to_string).transpose()?;
                 let mut text = format!(
                     "{}:\n{}",
                     source["sender_name"].as_str().unwrap_or("群成员"),
-                    source["content"].as_str().unwrap_or("")
+                    expanded.as_deref().unwrap_or(content)
                 );
                 if source["attachments"]
                     .as_array()
                     .is_some_and(|a| !a.is_empty())
+                    || record.is_some()
                 {
                     text.push_str("\n[原消息包含附件；本次继续讨论不自动上传附件原文件]");
                 }
-                row(
+                Ok(row(
                     source["id"].as_str().unwrap_or("source"),
                     "user",
                     text,
                     source["created_at"].as_str().unwrap_or(""),
-                )
+                ))
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
         ensure!(!messages.is_empty(), "选区记录不可用");
         if !context.question.is_empty() {
             messages.push(row(

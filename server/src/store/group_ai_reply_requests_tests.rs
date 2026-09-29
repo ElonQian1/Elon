@@ -1,6 +1,8 @@
 use super::*;
 use uuid::Uuid;
 
+#[path = "group_web_ai_record_tests.rs"]
+mod record_cases;
 #[path = "group_web_ai_selection_tests.rs"]
 mod selection_cases;
 #[path = "group_web_ai_requests_tests.rs"]

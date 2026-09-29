@@ -20,6 +20,23 @@ pub(crate) fn append(
     message: &str,
     attachments: &Value,
 ) -> Result<()> {
+    append_manifest(files, message, attachments, false)
+}
+
+pub(crate) fn append_record(
+    files: &mut Vec<GroupAiAttachment>,
+    message: &str,
+    attachments: &Value,
+) -> Result<()> {
+    append_manifest(files, message, attachments, true)
+}
+
+fn append_manifest(
+    files: &mut Vec<GroupAiAttachment>,
+    message: &str,
+    attachments: &Value,
+    record: bool,
+) -> Result<()> {
     let items = attachments
         .as_array()
         .ok_or_else(|| anyhow::anyhow!("附件记录无效，请重新选择"))?;
@@ -40,7 +57,7 @@ pub(crate) fn append(
         );
         let id = item["attachment_id"].as_str().unwrap_or("");
         ensure!(!id.is_empty(), "附件缺少标识，请重新上传");
-        let path = download_path(item["url"].as_str().unwrap_or(""))?;
+        let path = download_path(item["url"].as_str().unwrap_or(""), record)?;
         let original = item["display_name"]
             .as_str()
             .or(item["file_name"].as_str())
@@ -88,7 +105,7 @@ fn supported(mime: &str) -> bool {
     )
 }
 
-fn download_path(raw: &str) -> Result<String> {
+fn download_path(raw: &str, allow_record: bool) -> Result<String> {
     let url = reqwest::Url::parse(raw)
         .or_else(|_| reqwest::Url::parse("https://attachments.invalid")?.join(raw))?;
     ensure!(
@@ -99,14 +116,24 @@ fn download_path(raw: &str) -> Result<String> {
     );
     let path = url.path();
     let parts: Vec<_> = path.split('/').collect();
+    let ordinary = parts.len() == 7
+        && parts[1] == "api"
+        && parts[2] == "user"
+        && parts[4] == "chat-attachments"
+        && parts[3..]
+            .iter()
+            .all(|p| !p.is_empty() && *p != "." && *p != "..");
+    let record = parts.len() == 9
+        && parts[1..4] == ["api", "me", "groups"]
+        && parts[5] == "chat-records"
+        && parts[7] == "assets"
+        && [parts[4], parts[6], parts[8]].iter().all(|s| {
+            !s.is_empty()
+                && s.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"_-".contains(&b))
+        });
     ensure!(
-        parts.len() == 7
-            && parts[1] == "api"
-            && parts[2] == "user"
-            && parts[4] == "chat-attachments"
-            && parts[3..]
-                .iter()
-                .all(|p| !p.is_empty() && *p != "." && *p != "..")
+        (ordinary || (allow_record && record))
             && !["%2f", "%5c", "%00", "%25"]
                 .iter()
                 .any(|p| path.to_ascii_lowercase().contains(p)),
@@ -117,21 +144,33 @@ fn download_path(raw: &str) -> Result<String> {
 }
 
 pub(crate) fn for_request(conn: &Connection, request: &str) -> Result<Vec<GroupAiAttachment>> {
+    let (user, group): (String, String) = conn.query_row(
+        "SELECT requester_id,group_id FROM group_ai_reply_requests WHERE id=?1",
+        [request],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
     let mut stmt = conn.prepare(
-        "SELECT m.id,m.attachments_json FROM group_ai_selected_sources s
+        "SELECT m.id,m.attachments_json,m.content FROM group_ai_selected_sources s
         JOIN friend_group_messages m ON m.id=s.message_id WHERE s.request_id=?1 ORDER BY m.rowid",
     )?;
     let rows = stmt
         .query_map([request], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?))
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, Option<String>>(1)?,
+                r.get::<_, String>(2)?,
+            ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     let mut files = Vec::new();
-    for (id, raw) in rows {
+    for (id, raw, content) in rows {
         append(
             &mut files,
             &id,
             &serde_json::from_str::<Value>(raw.as_deref().unwrap_or("[]"))?,
+        )?;
+        crate::store::articles::chat_records::ai_context::expand(
+            conn, &user, &group, &id, &content, &mut files,
         )?;
     }
     Ok(files)
