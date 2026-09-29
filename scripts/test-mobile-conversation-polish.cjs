@@ -15,21 +15,22 @@ async function main() {
   page.setDefaultTimeout(8000);
   page.on('pageerror', error => errors.push(error.message));
   try {
-    await page.goto(origin + '/?fixture=login');
+    await page.goto(origin + '/?fixture=login', { waitUntil: 'networkidle' });
     await page.locator('#accountInput').fill('mobile-v2-fixture');
     await page.locator('#passwordInput').fill('offline-fixture-only');
     await page.locator('#loginBtn').click();
     await page.locator('#appView:not(.hidden)').waitFor({ state: 'visible' });
-    await page.goto(origin + '/?fixture=empty&home=1');
+    await page.waitForLoadState('networkidle');
+    await page.goto(origin + '/?fixture=empty&home=1', { waitUntil: 'networkidle' });
     await page.locator('.empty-tip').waitFor();
     assert.equal(await page.locator('.conversation-item').count(), 0, 'empty fixture must not show synthetic contacts');
-    await page.goto(origin + '/?fixture=login&conversation=group&draft=1');
+    await page.goto(origin + '/?fixture=login&conversation=group&draft=1', { waitUntil: 'networkidle' });
     await page.locator('#inputBar.has-text #messageInput').waitFor();
     assert.equal(await page.locator('#messageInput').inputValue(), '尚未发送的群聊草稿\n检查输入区展开后的布局');
     for (const theme of ['light', 'dark']) for (const width of [320, 390, 411]) {
       await page.evaluate(value => localStorage.setItem('elon.mobile.appearance.v2', value), theme);
       await page.setViewportSize({ width, height: 844 });
-      await page.goto(origin + '/?fixture=login&home=1');
+      await page.goto(origin + '/?fixture=login&home=1', { waitUntil: 'networkidle' });
       const badge = page.locator('.avatar-badge').first();
       await badge.waitFor();
       await page.waitForLoadState('networkidle');
@@ -48,8 +49,9 @@ async function main() {
         });
       });
       contrasts.forEach(({ selector, ratio }) => assert.ok(ratio >= 4.5, `${selector} must be readable in both themes`));
-      await page.goto(origin + '/?fixture=login&conversation=group');
+      await page.goto(origin + '/?fixture=login&conversation=group', { waitUntil: 'networkidle' });
       await page.locator('#chatList .bubble.friend').last().waitFor();
+      await page.locator('button[title="查看引用消息"]').waitFor();
       await page.locator('#inputPlaceholder').tap();
       const input = page.locator('#messageInput');
       await input.fill('检查输入体验');

@@ -76,6 +76,7 @@
   --metal-highlight: transparent; --calibration: transparent;
   --ink: var(--mobile-on-surface); --ink-strong: var(--mobile-on-surface);
   --ink-soft: var(--mobile-on-surface-variant); --ink-muted: var(--mobile-on-surface-variant);
+  --text-secondary: var(--mobile-on-surface-variant); --line-soft: var(--mobile-outline-variant);
   --ink-list-preview: var(--mobile-on-surface-variant); --ink-faint: var(--mobile-on-surface-variant);
   --ink-dim: var(--mobile-on-surface-variant); --ink-quiet: var(--mobile-on-surface-variant);
   --brand: var(--mobile-primary); --brand-hover: var(--mobile-primary); --brand-ink: var(--mobile-on-primary);

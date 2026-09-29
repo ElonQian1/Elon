@@ -11,7 +11,8 @@ const messages = [{ id: 'polish-1', sender_user_id: 'polish-member', sender_name
   content: '新版页面已整理好，先检查输入和阅读体验。', created_at: '2026-09-29T03:20:00Z' },
 { id: 'polish-2', sender_user_id: 'mobile-v2-fixture', outgoing: true, content: '好的，重点看手机上的文字、附件和输入区域。', created_at: '2026-09-29T03:21:00Z' },
 { id: 'polish-3', sender_user_id: 'polish-member', sender_name: '林悦', sender_avatar_data_url: avatar,
-  content: '这是离线布局示例，不连接真实群聊。', created_at: '2026-09-29T03:22:00Z' }];
+  content: '这是离线布局示例，不连接真实群聊。', created_at: '2026-09-29T03:22:00Z',
+  quote: { message_id: 'polish-1', sender_name: '林悦', content: '新版页面已整理好，先检查输入和阅读体验。', attachments: [] } }];
 function createConversationFixture() {
   const fixture = createFixture();
   const [base] = fixture.server.listeners('request');
