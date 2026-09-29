@@ -3425,6 +3425,7 @@
       display: none;
     }
     .input-main-row {
+      position: relative;
       height: 56px;
       display: flex;
       align-items: center;
@@ -9641,6 +9642,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   if (inputPlaceholder) {
     inputPlaceholder.addEventListener('click', () => {
       setInputAttachmentPanelOpen(false);
+      inputBar.classList.add('input-focused');
       messageInput.focus();
     });
   }
