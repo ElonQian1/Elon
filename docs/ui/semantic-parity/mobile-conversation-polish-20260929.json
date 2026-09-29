@@ -43,6 +43,7 @@
           "android": {
             "definitionId": "home.conversations.title",
             "assertions": {
+              "/kind": "android.text",
               "/properties/visibility/effective/value": "visible"
             }
           },
@@ -81,6 +82,7 @@
           "android": {
             "definitionId": "home.conversations.title",
             "assertions": {
+              "/kind": "android.text",
               "/properties/visibility/effective/value": "visible"
             }
           },
@@ -119,6 +121,7 @@
           "android": {
             "definitionId": "home.conversations.title",
             "assertions": {
+              "/kind": "android.text",
               "/properties/visibility/effective/value": "visible"
             }
           },
@@ -157,6 +160,7 @@
           "android": {
             "definitionId": "home.conversations.title",
             "assertions": {
+              "/kind": "android.text",
               "/properties/visibility/effective/value": "visible"
             }
           },
@@ -195,6 +199,7 @@
           "android": {
             "definitionId": "home.conversations.title",
             "assertions": {
+              "/kind": "android.text",
               "/properties/visibility/effective/value": "visible"
             }
           },
@@ -233,6 +238,7 @@
           "android": {
             "definitionId": "home.conversations.title",
             "assertions": {
+              "/kind": "android.text",
               "/properties/visibility/effective/value": "visible"
             }
           },
@@ -282,6 +288,7 @@
           "android": {
             "definitionId": "group.readability.composer",
             "assertions": {
+              "/kind": "android.container",
               "/properties/visibility/effective/value": "visible"
             }
           },
@@ -331,6 +338,7 @@
           "android": {
             "definitionId": "group.readability.composer",
             "assertions": {
+              "/kind": "android.container",
               "/properties/visibility/effective/value": "visible"
             }
           },
