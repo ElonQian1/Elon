@@ -18,6 +18,7 @@ internal class ChatRecordReaderModel(app: Application) : AndroidViewModel(app) {
     val offsets = mutableMapOf<String, Int>()
     private val worker = Executors.newSingleThreadExecutor()
     private val media = Executors.newFixedThreadPool(2)
+    private val storage = Executors.newSingleThreadExecutor()
     private val main = android.os.Handler(android.os.Looper.getMainLooper())
     private val api = ChatRecordApi(app)
     private val account = AuthManager.userId(app)
@@ -32,7 +33,13 @@ internal class ChatRecordReaderModel(app: Application) : AndroidViewModel(app) {
     }
     fun sameAccount() = account == AuthManager.userId(getApplication()) &&
         (draftId.isNotBlank() || runCatching { api.assertOwner() }.isSuccess)
-    private fun post(epoch: Int, block: () -> Unit) { main.post { if (!closed && epoch == generation && sameAccount()) block() } }
+    private fun post(epoch: Int, block: () -> Unit) { main.post {
+        if (closed || epoch != generation) return@post
+        if (sameAccount()) block() else {
+            generation++; document = null; owner = ""; loading = false; pending.clear(); api.cancelPending()
+            notice = "登录状态或服务器已变化，请返回群聊重新打开记录"; notifyChanged()
+        }
+    } }
     private fun notifyChanged() { changed.value = (changed.value ?: 0) + 1 }
     fun refresh() {
         if (loading || closed) return
@@ -116,17 +123,17 @@ internal class ChatRecordReaderModel(app: Application) : AndroidViewModel(app) {
     }
     fun cacheUsage(done: (Result<Pair<Long, Long>>) -> Unit) {
         val epoch = generation
-        media.execute { val result = runCatching { api.usage(group, record) }; post(epoch) { done(result) } }
+        storage.execute { val result = runCatching { api.usage(group, record) }; post(epoch) { done(result) } }
     }
     fun clearCache(all: Boolean) {
         val epoch = ++generation; api.cancelPending(); pending.clear(); loading = true; notifyChanged()
-        worker.execute {
+        storage.execute {
             val result = runCatching { api.clearCache(group, record, all) }
             post(epoch) { document = null; loading = false; notice = result.exceptionOrNull()?.message ?: "本地缓存已清理，群里的记录没有删除"; notifyChanged() }
         }
     }
     override fun onCleared() {
         closed = true; generation++; pending.clear(); api.close()
-        worker.shutdownNow(); media.shutdownNow(); main.removeCallbacksAndMessages(null)
+        worker.shutdownNow(); media.shutdownNow(); storage.shutdownNow(); main.removeCallbacksAndMessages(null)
     }
 }

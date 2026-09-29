@@ -92,4 +92,17 @@ class ChatRecordReaderCacheTest {
         assertNotNull(request.get(2, TimeUnit.SECONDS))
         assertTrue(runCatching { api.read("fixture-group", "fixture-record") }.isFailure)
     }
+    @Test fun sessionChangeDuringValidationClearsContentAndEndsLoading() {
+        val model = open(); assertTrue(entered.await(2, TimeUnit.SECONDS)); until { model.document != null }
+        AuthManager.prefs(app).edit().putString("auth_token", "another-synthetic-session").commit()
+        release.countDown(); until { !model.loading }; assertNull(model.document); assertTrue(model.notice.isNotBlank())
+    }
+    @Test fun cacheManagementRemainsAvailableDuringBlockedValidation() {
+        val model = open(); assertTrue(entered.await(2, TimeUnit.SECONDS)); until { model.document != null }
+        var usage: Pair<Long, Long>? = null
+        model.cacheUsage { usage = it.getOrThrow() }; until { usage != null }
+        assertTrue(usage!!.first > 0); assertTrue(model.loading)
+        model.clearCache(false); until { !model.loading }; assertNull(model.document)
+        assertNull(ChatRecordApi(app).peek("fixture-group", "fixture-record"))
+    }
 }
