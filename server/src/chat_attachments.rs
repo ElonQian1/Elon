@@ -1,12 +1,13 @@
 use axum::{
     body::{Body, Bytes},
-    extract::{Path as AxumPath, Query, State},
+    extract::{Path as AxumPath, Query, Request, State},
     http::{header, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
 use sha2::{Digest, Sha256};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use tower_http::services::ServeFile;
 
 use crate::{
     project_attachment_paths::{
@@ -124,12 +125,30 @@ async fn upload_chat_attachment_impl(
 pub async fn download_user_chat_attachment(
     State(state): State<Arc<AppState>>,
     AxumPath((user_id, conversation_id, filename)): AxumPath<(String, String, String)>,
+    request: Request,
+) -> Response {
+    serve_chat_attachment(
+        &state.workspace_root,
+        &user_id,
+        &conversation_id,
+        &filename,
+        request,
+    )
+    .await
+}
+
+async fn serve_chat_attachment(
+    workspace_root: &str,
+    user_id: &str,
+    conversation_id: &str,
+    filename: &str,
+    request: Request,
 ) -> Response {
     if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
         return json_error(StatusCode::BAD_REQUEST, "invalid filename");
     }
 
-    let attachments_dir = chat_attachment_dir(&state.workspace_root, &user_id, &conversation_id);
+    let attachments_dir = chat_attachment_dir(workspace_root, user_id, conversation_id);
     let path = attachments_dir.join(&filename);
     let valid_path = std::fs::canonicalize(&attachments_dir)
         .ok()
@@ -143,19 +162,24 @@ pub async fn download_user_chat_attachment(
         return json_error(StatusCode::NOT_FOUND, "attachment not found");
     }
 
-    let data = match tokio::fs::read(&path).await {
-        Ok(data) => data,
+    // Safari probes/seeks MP4 audio with byte ranges. ServeFile preserves 206/416,
+    // Content-Range, Content-Length and HEAD instead of always returning the whole file.
+    let mime = content_type_for_file(filename)
+        .parse()
+        .expect("static attachment MIME");
+    let mut response = match ServeFile::new_with_mime(&path, &mime)
+        .try_call(request)
+        .await
+    {
+        Ok(response) => response.map(Body::new),
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-    axum::response::Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, content_type_for_file(&filename))
-        .header(
-            header::CONTENT_DISPOSITION,
-            format!("inline; filename=\"{}\"", filename),
-        )
-        .body(Body::from(data))
-        .unwrap_or_else(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    if let Ok(value) = format!("inline; filename=\"{}\"", filename).parse() {
+        response
+            .headers_mut()
+            .insert(header::CONTENT_DISPOSITION, value);
+    }
+    response
 }
 
 fn chat_attachment_dir(workspace_root: &str, user_id: &str, conversation_id: &str) -> PathBuf {
@@ -168,3 +192,7 @@ fn chat_attachment_dir(workspace_root: &str, user_id: &str, conversation_id: &st
 fn parse_positive_u32(value: &str) -> Option<u32> {
     value.trim().parse::<u32>().ok().filter(|value| *value > 0)
 }
+
+#[cfg(test)]
+#[path = "chat_attachments_tests.rs"]
+mod tests;

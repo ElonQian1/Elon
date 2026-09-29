@@ -70,7 +70,9 @@ async function main() {
       await page.locator('#chatList img[alt="测试图片.png"]').last().waitFor(); cases.push(kind + '-image');
       const files = [document, { name: '计划.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from('synthetic-docx') }, audioFile()];
       await select('文件', files); await sendAndCheck(kind, files);
-      await page.locator('#chatList audio').last().evaluate(async audio => { audio.load(); await audio.play(); audio.pause(); });
+      await page.locator('#chatList .voice-message-play').last().tap();
+      await page.waitForFunction(() => [...document.querySelectorAll('#chatList audio')].at(-1).currentTime > 0);
+      await page.locator('#chatList .voice-message-play').last().tap();
       cases.push(kind + '-documents-and-playable-audio');
     }
     await enter();
@@ -182,7 +184,9 @@ async function main() {
       await voice().getByRole('button', { name: '使用录音', exact: true }).tap();
       await dialog().locator('audio').evaluate(async audio => { await audio.play(); audio.pause(); });
       await dialog().getByRole('button', { name: '发送', exact: true }).tap(); await dialog().waitFor({ state: 'detached' });
-      await page.locator('#chatList audio').last().evaluate(async audio => { audio.load(); await audio.play(); audio.pause(); });
+      await page.locator('#chatList .voice-message-play').last().tap();
+      await page.waitForFunction(() => [...document.querySelectorAll('#chatList audio')].at(-1).currentTime > 0);
+      await page.locator('#chatList .voice-message-play').last().tap();
       cases.push('real-recorder-generated-microphone-playback');
     }
     await page.waitForLoadState('networkidle');

@@ -81,4 +81,8 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/assets/social_chat_view.js",
             get(move || async move { (headers, include_str!("../../assets/social_chat_view.js")) }),
         )
+        .route(
+            "/assets/social_voice_player.js",
+            get(move || async move { (headers, include_str!("../../assets/social_voice_player.js")) }),
+        )
 }

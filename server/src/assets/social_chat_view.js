@@ -40,6 +40,7 @@
         player = document.createElement('img'); player.alt = name; player.loading = 'lazy';
         player.style.cssText = 'max-width:100%;max-height:320px;display:block;border-radius:8px';
       } else if (['audio', 'voice'].includes(kind) || mime.startsWith('audio/')) {
+        if (root.ElonSocialVoice) { root.ElonSocialVoice.mount(box, item, url.href, link); bubble.append(box); return; }
         player = document.createElement('audio'); player.controls = true; player.preload = 'none';
         player.style.cssText = 'max-width:100%;display:block';
         player.setAttribute('aria-label', '播放语音：' + name);
@@ -106,7 +107,7 @@
         Array.from(list.children).forEach(node => { if (!keep.has(node)) node.remove(); });
         nodes.forEach((entry, id) => { if (!next.has(id)) entry.cleanup?.(); }); nodes = next; root.ElonAiConversationShare?.prune(); list.scrollTop = follow ? list.scrollHeight : previousScroll;
       },
-      reset() { nodes.forEach(entry => entry.cleanup?.()); root.ElonSocialLinkViewer?.close(); root.ElonAiConversationShare?.reset(); scope = ''; nodes.clear(); },
+      reset() { root.ElonSocialVoice?.stopWithin(options.list); nodes.forEach(entry => entry.cleanup?.()); root.ElonSocialLinkViewer?.close(); root.ElonAiConversationShare?.reset(); scope = ''; nodes.clear(); },
     };
   }
   root.ElonSocialChatView = { create };
