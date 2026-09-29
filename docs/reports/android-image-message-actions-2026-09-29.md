@@ -35,10 +35,15 @@ Windows transport, login, proxy, or private-API changes.
   validation was weakened to make fixtures pass.
 - Source-size guard, document-modularity guard, and mobile V2 governance checks
   passed. Governance checks do not constitute visual acceptance.
-- Release build and registered-device installation: pending.
+- Release build passed (`image-message-apk-20260929-163441-732`, Gradle 9m10s).
+- APK 1.1.1836 installed on the registered Xiaomi with data-preserving replacement;
+  registered Honor offline, verification deferred. Remote APK SHA-256 and size checked.
 - Device semantic acceptance: `image_quote` checks copy, forward, quote, multi-select,
   favorite, AI reply, and QR menu entries, then quotes and cancels without changing
-  the existing draft or sending any message. Pending on the updated APK.
+  the existing draft or sending any message. Passed on the updated Xiaomi APK.
+- Post-install app launch returned to the conversation list; `open_fixture` restored
+  the authorized test group before `image_quote`. No existing messages were sent,
+  edited, or deleted. No screenshot or coordinate input was needed.
 - Tests cover original-byte preservation, file URI/MIME grants, multi-file payloads,
   image import through the existing share receiver, invalid/oversize files, bounded
   cache expiry, listener recycling, selection exit, and full-size image tapping.
@@ -47,4 +52,9 @@ Windows transport, login, proxy, or private-API changes.
 
 ## Delivery
 
-- Code commit and release version: pending.
+- Code commit: `90100fb23` (rebased after a real non-fast-forward rejection).
+  Concurrent PWA media changes were preserved; they did not change APK sources.
+- Published APK: 1.1.1836, source `90100fb23`.
+- SHA-256: `491e3854dbcfdee0d241650c1b20737646f3027c0779d3bec06eeadce82bcab3`.
+- The Windows checkout is retained clean after finalization to preserve the verified
+  build and avoid the preceding task's Windows residual-directory cleanup failure.
