@@ -1,0 +1,4 @@
+<resources>
+    <item name="social_media_open_app" type="id" />
+    <item name="social_media_open_reader" type="id" />
+</resources>

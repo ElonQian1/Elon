@@ -33,14 +33,16 @@ class WechatChannelsNavigationTest {
             override fun onWechatLink(url: String) { assertEquals(target, url); offered++ }
         }
         session.web.loadUrl(source)
-        fun request(main: Boolean) = object : WebResourceRequest {
+        fun request(main: Boolean, gesture: Boolean = true) = object : WebResourceRequest {
             override fun getUrl() = Uri.parse(target)
             override fun isForMainFrame() = main
             override fun isRedirect() = false
-            override fun hasGesture() = false // Official handler awaits its scene request first.
+            override fun hasGesture() = gesture
             override fun getMethod() = "GET"
             override fun getRequestHeaders() = emptyMap<String, String>()
         }
+        assertTrue(session.web.webViewClient.shouldOverrideUrlLoading(session.web, request(true, false)))
+        assertEquals("Staying in the reader must not prompt an automatic app handoff", 0, offered)
         assertTrue(session.web.webViewClient.shouldOverrideUrlLoading(session.web, request(true)))
         assertEquals(1, offered)
         assertTrue(session.web.webViewClient.shouldOverrideUrlLoading(session.web, request(false)))
@@ -66,14 +68,15 @@ class WechatChannelsNavigationTest {
         card.bind(SocialLinkPolicy.link("https://weixin.qq.com/sph/example")!!.copy(author = "Creator", title = "Video"))
         card.performClick()
         assertEquals(1, taps)
-        assertTrue(card.contentDescription.startsWith("在微信打开"))
+        assertTrue(card.contentDescription.startsWith("打开"))
+        card.bindCover(android.graphics.Bitmap.createBitmap(300, 400, android.graphics.Bitmap.Config.ARGB_8888))
         card.measure(View.MeasureSpec.makeMeasureSpec(220, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
         card.layout(0, 0, 220, card.measuredHeight)
         val media = card.getChildAt(0)
         val footer = card.getChildAt(card.childCount - 1)
         assertEquals("The cover retains its 3:4 aspect independently of the author footer", 293, media.measuredHeight)
         assertTrue(footer.height >= (48 * card.resources.displayMetrics.density).toInt())
-        assertEquals(media.bottom, footer.top)
+        assertTrue(media.bottom < footer.top)
         assertEquals(footer.bottom, card.height)
         assertTrue(WechatChannelsPolicy.sameContent("https://weixin.qq.com/sph/example", source))
         assertFalse(WechatChannelsPolicy.sameContent("https://weixin.qq.com/sph/other", source))

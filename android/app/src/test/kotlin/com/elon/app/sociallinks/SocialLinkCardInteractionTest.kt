@@ -108,7 +108,7 @@ class SocialLinkCardInteractionTest {
         card.bind(item)
         val root = screen(card)
         assertEquals(View.VISIBLE, card.play.visibility); assertEquals(View.GONE, card.cover.visibility)
-        assertEquals("视频号", card.badge.text); assertEquals(item.author, card.source.text)
+        assertEquals("视频号", card.badge.text); assertEquals("视频号 · ${item.author}", card.source.text)
         assertTrue(card.source.bottom <= card.height); assertTrue(card.play.width > 0)
         card.bindAvatar(Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888))
         assertEquals(View.VISIBLE, card.creatorAvatar.visibility)

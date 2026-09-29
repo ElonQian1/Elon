@@ -11,8 +11,6 @@ import android.widget.Toast
 import com.elon.app.articles.ArticleUi
 import com.elon.app.sharing.ExternalShareActivity
 import com.elon.app.sociallinks.SocialLink
-import com.elon.app.sociallinks.SocialLinkBrowserActivity
-import com.elon.app.sociallinks.WechatChannelsPolicy
 
 internal object ChatRecordLinkActions {
     fun bind(host: LinearLayout, card: View, current: () -> SocialLink) {
@@ -39,7 +37,6 @@ internal object ChatRecordLinkActions {
             text = label; textSize = 13f; isAllCaps = false; minHeight = ui.dp(48); minimumWidth = 0
             setTextColor(com.elon.app.MobileColors(host.context).primary); setPadding(ui.dp(2), 0, ui.dp(2), 0); setOnClickListener { callback() }
         }
-        if (WechatChannelsPolicy.isChannels(current().url)) actions.addView(action("查看原网页") { SocialLinkBrowserActivity.open(host.context, current()) }, LinearLayout.LayoutParams(0, -2, 1f))
         actions.addView(action("复制链接", ::copy), LinearLayout.LayoutParams(0, -2, 1f))
         host.addView(actions)
     }

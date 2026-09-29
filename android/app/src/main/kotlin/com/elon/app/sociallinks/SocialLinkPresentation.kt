@@ -18,6 +18,7 @@ internal object SocialLinkPresentation {
         else -> "打开${item.site}视频"
     }
     fun title(item: SocialLink) = item.title.ifBlank { when (item.site) {
+        "视频号" -> "视频号视频"
         "微信公众号" -> "微信公众号文章"
         "小红书" -> "小红书笔记"
         "抖音" -> "抖音视频"

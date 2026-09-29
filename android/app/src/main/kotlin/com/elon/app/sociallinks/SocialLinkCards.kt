@@ -29,7 +29,7 @@ internal object SocialLinkCards {
             val item = SocialLinkPolicy.link(span.url) ?: return@forEach
             val start = spans.getSpanStart(span); val end = spans.getSpanEnd(span)
             spans.removeSpan(span)
-            spans.setSpan(object : URLSpan(span.url) { override fun onClick(widget: View) { WechatChannelsCardAction.open(widget, item) } }, start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            spans.setSpan(object : URLSpan(span.url) { override fun onClick(widget: View) { SocialMediaCardAction.open(widget, item) } }, start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         text.text = spans
         val context = container.context; val app = context.applicationContext
@@ -38,17 +38,18 @@ internal object SocialLinkCards {
         for (item in items) {
             var current = item; var busy = false
             val host = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-            val card = SocialLinkCardView(context, SocialLinkPresentation.mediaCard(item)) { WechatChannelsCardAction.open(host, current) }
+            val card = SocialLinkCardView(context, SocialLinkPresentation.mediaCard(item)) { SocialMediaCardAction.open(host, current) }
             val retry = TextView(context).apply {
                 this.text = "更新预览"; textSize = 12f; minHeight = dp(48)
                 setTextColor(Color.parseColor("#B4C5E3")); setPadding(dp(4), dp(8), dp(4), dp(8)); visibility = View.GONE
             }
             host.addView(card, LinearLayout.LayoutParams(-1, -2)); host.addView(retry)
-            if (readerActions == null && WechatChannelsPolicy.isChannels(item.url)) host.addView(TextView(context).apply {
-                this.text = "查看原网页"; textSize = 12f; minHeight = dp(44); gravity = android.view.Gravity.CENTER_VERTICAL
-                setTextColor(Color.parseColor("#B4C5E3")); setOnClickListener { SocialLinkBrowserActivity.open(context, current) }
-            })
-            val width = minOf(dp(if (WechatChannelsPolicy.isChannels(item.url)) 220 else 280), (context.resources.displayMetrics.widthPixels - dp(if (compact) 104 else 128)).coerceAtLeast(1))
+            SocialMediaOpenPolicy.platform(item)?.let { platform ->
+                host.addView(SocialMediaOpenBar(context, platform, { current }) { mode ->
+                    SocialMediaCardAction.open(host, current, mode)
+                }, LinearLayout.LayoutParams(-1, -2))
+            }
+            val width = minOf(dp(280), (context.resources.displayMetrics.widthPixels - dp(if (compact) 104 else 128)).coerceAtLeast(1))
             container.addView(host, LinearLayout.LayoutParams(width, -2).apply { topMargin = if (compact) 0 else dp(8) }); container.visibility = View.VISIBLE
             fun valid() = host.parent === container && AuthManager.userId(app) == owner && ServerUrlManager.getActive(app) == server
             fun draw(value: SocialLink) { current = value; card.bind(value); onPreview?.invoke(value) }

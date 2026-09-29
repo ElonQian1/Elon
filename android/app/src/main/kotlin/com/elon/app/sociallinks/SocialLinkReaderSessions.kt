@@ -108,7 +108,7 @@ internal object SocialLinkReaderSessions {
     private fun client(session: Session) = object : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             if (SocialLinkPolicy.safeUrl(request.url.toString()) != null) return false
-            if (request.isForMainFrame && WechatChannelsPolicy.allows(view.url.orEmpty(), request.url.toString())) {
+            if (request.isForMainFrame && request.hasGesture() && WechatChannelsPolicy.allows(view.url.orEmpty(), request.url.toString())) {
                 session.ui?.onWechatLink(request.url.toString())
                 return true
             }

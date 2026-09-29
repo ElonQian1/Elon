@@ -58,7 +58,6 @@ internal class SocialLinkCardView(context: Context, private val poster: Boolean 
     }
     private var avatarSource: String? = null
     private var coverSource: String? = null
-    private var channels = false
     private var posterRatio: Float? = null
     private val action = TextView(context).apply { textSize = 12f; setTextColor(palette.muted); includeFontPadding = false }
     init {
@@ -113,12 +112,11 @@ internal class SocialLinkCardView(context: Context, private val poster: Boolean 
         listOf(this, headline, title, media, badge, summary, source, time, cover).forEach { child -> child.setOnClickListener { open() } }
     }
     fun bind(item: SocialLink) {
-        channels = WechatChannelsPolicy.isChannels(item.url)
+        val channels = WechatChannelsPolicy.isChannels(item.url)
         title.text = SocialLinkPresentation.title(item); source.text = SocialLinkPresentation.source(item)
         if (poster) {
-            title.visibility = if (channels) View.GONE else View.VISIBLE
-            if (channels) source.text = item.author.ifBlank { "视频号作者" }
-            action.text = SocialLinkPresentation.mediaAction(item)
+            title.visibility = View.VISIBLE
+            action.text = if (item.site == "小红书") "笔记" else "视频"
             play.setImageResource(if (item.site == "小红书") android.R.drawable.ic_menu_view else android.R.drawable.ic_media_play)
             creatorInitial.text = item.author.ifBlank { item.site }.let { String(Character.toChars(it.codePointAt(0))) }
             if (avatarSource != item.authorAvatar) { avatarSource = item.authorAvatar; bindAvatar(null) }
@@ -130,7 +128,7 @@ internal class SocialLinkCardView(context: Context, private val poster: Boolean 
         badge.setTextColor(if (poster) Color.WHITE else Color.parseColor(colors.second))
         media.background = GradientDrawable().apply { setColor(Color.parseColor(colors.first)); cornerRadius = dp(4).toFloat() }
         time.text = SocialLinkPresentation.time(item); time.visibility = if (time.text.isEmpty()) View.GONE else View.VISIBLE
-        contentDescription = "${if (channels) "在微信打开视频号：" else "打开"}${title.text}（${source.text}${if (time.text.isEmpty()) "" else "，${time.text}"}）"
+        contentDescription = "打开${title.text}（${source.text}${if (time.text.isEmpty()) "" else "，${time.text}"}）"
     }
     fun bindCover(bitmap: Bitmap?) {
         cover.setImageBitmap(bitmap); cover.visibility = if (bitmap == null) View.GONE else View.VISIBLE
@@ -142,8 +140,7 @@ internal class SocialLinkCardView(context: Context, private val poster: Boolean 
         creatorInitial.visibility = if (bitmap == null) View.VISIBLE else View.GONE
     }
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        if (poster) media.layoutParams.height = if (channels) (MeasureSpec.getSize(widthMeasureSpec) * 4 / 3).coerceAtLeast(1)
-            else posterRatio?.let { (MeasureSpec.getSize(widthMeasureSpec) / it).toInt().coerceAtLeast(1) } ?: dp(100)
+        if (poster) media.layoutParams.height = posterRatio?.let { (MeasureSpec.getSize(widthMeasureSpec) / it).toInt().coerceAtLeast(1) } ?: dp(100)
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 }
