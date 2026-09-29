@@ -46,8 +46,12 @@ const output = path.resolve(process.env.PWA_LAYOUT_OUTPUT || '.ai-tmp/group-layo
     await page.locator('#passwordInput').fill('offline-fixture-only');
     await page.locator('#loginBtn').tap();
     await page.locator('#appView:not(.hidden)').waitFor();
+    // Finish fixture reads before replacing the document; WebKit reports aborted
+    // fetches during a full-page navigation as access-control page errors.
+    await page.waitForLoadState('networkidle');
     async function openGroup() {
-      await page.goto(origin + '/?fixture=login');
+      await page.waitForLoadState('networkidle');
+      await page.goto(origin + '/?fixture=login', { waitUntil: 'networkidle' });
       await page.locator('.conversation-item').filter({ hasText: '产品讨论群' }).tap();
       await page.locator('#chatList').getByText('可以了，希望给聊天内容多留一些空间。', { exact: true }).waitFor();
       await page.locator('#groupSummaryAction').getByText(summaryMode === 'error' ? '重试' : summaryMode === 'empty' ? '生成' : '查看', { exact: true }).waitFor();
