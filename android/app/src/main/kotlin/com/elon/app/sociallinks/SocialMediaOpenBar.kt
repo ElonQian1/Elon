@@ -19,6 +19,7 @@ internal class SocialMediaOpenBar(
 ) : LinearLayout(context) {
     private val palette = MobileColors(context)
     private val store = SocialMediaOpenPreferences(context)
+    private val readerOffered = SocialMediaOpenPolicy.readerOffered(platform)
     private var notice: Pair<SocialMediaOpenMode, SocialMediaOpenMode>? = null
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun button(label: String, semanticId: Int, mode: SocialMediaOpenMode) =
@@ -29,7 +30,9 @@ internal class SocialMediaOpenBar(
             setTextColor(palette.primary); setOnClickListener { select(mode) }
         }
     val appButton = button(platform.appLabel, R.id.social_media_open_app, SocialMediaOpenMode.APP)
-    val readerButton = button("在一龙内打开", R.id.social_media_open_reader, SocialMediaOpenMode.READER)
+    val readerButton = button("在一龙内打开", R.id.social_media_open_reader, SocialMediaOpenMode.READER).apply {
+        visibility = if (readerOffered) VISIBLE else GONE
+    }
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> refresh() }
     private val focusListener = ViewTreeObserver.OnWindowFocusChangeListener { focus ->
         if (focus) { refresh(); showNotice() }
@@ -41,12 +44,13 @@ internal class SocialMediaOpenBar(
     }
     private fun select(mode: SocialMediaOpenMode) {
         if (!store.current()) return
+        if (mode == SocialMediaOpenMode.READER && !readerOffered) return
         if (mode == SocialMediaOpenMode.APP && SocialMediaAppLauncher.availability(context, platform) != SocialMediaAppLauncher.Availability.AVAILABLE) {
             refresh(); return
         }
         val before = store.get(platform)
         store.set(platform, mode)
-        if (before != mode) notice = before to mode
+        if (before != mode && readerOffered) notice = before to mode
         refresh(); navigate(mode)
     }
     private fun showNotice() {
@@ -60,11 +64,11 @@ internal class SocialMediaOpenBar(
     internal fun refresh() {
         val availability = SocialMediaAppLauncher.availability(context, platform)
         val available = availability == SocialMediaAppLauncher.Availability.AVAILABLE
-        val mode = SocialMediaOpenPolicy.effective(store.get(platform), available)
+        val mode = SocialMediaOpenPolicy.requestedMode(platform, SocialMediaOpenPolicy.effective(store.get(platform), available))
         val state = when (availability) {
             SocialMediaAppLauncher.Availability.MISSING -> "未安装"
             SocialMediaAppLauncher.Availability.DISABLED -> "不可用"
-            else -> if (mode == SocialMediaOpenMode.APP) "默认" else ""
+            else -> if (mode == SocialMediaOpenMode.APP && readerOffered) "默认" else ""
         }
         appButton.text = platform.appLabel + if (state.isNotEmpty()) "\n$state" else ""
         readerButton.text = "在一龙内打开" + if (mode == SocialMediaOpenMode.READER) "\n默认" else ""
@@ -75,7 +79,7 @@ internal class SocialMediaOpenBar(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val required = maxOf(appButton.paint.measureText(platform.appLabel), readerButton.paint.measureText("在一龙内打开")) + dp(12)
-        val next = if (width / 2f < required) VERTICAL else HORIZONTAL
+        val next = if (readerOffered && width / 2f < required) VERTICAL else HORIZONTAL
         if (orientation != next) {
             orientation = next
             for (button in listOf(appButton, readerButton)) button.layoutParams =

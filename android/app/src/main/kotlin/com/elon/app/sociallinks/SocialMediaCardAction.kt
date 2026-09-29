@@ -29,7 +29,8 @@ internal object SocialMediaCardAction {
         val context = view.context
         val platform = SocialMediaOpenPolicy.platform(item)
         val preferences = SocialMediaOpenPreferences(context)
-        val mode = requested ?: platform?.let(preferences::get) ?: SocialMediaOpenMode.READER
+        val mode = SocialMediaOpenPolicy.requestedMode(platform,
+            requested ?: platform?.let(preferences::get) ?: SocialMediaOpenMode.READER)
         val activity = activity(context)
         if (activity != null && mode == SocialMediaOpenMode.APP && pending[activity]?.isActive == true && pendingUrls[activity] == item.url) return
         activity?.let { pending.remove(it)?.cancel() }
@@ -37,6 +38,10 @@ internal object SocialMediaCardAction {
             SocialLinkBrowserActivity.open(context, item); return
         }
         fun reader(reason: String) {
+            if (!SocialMediaOpenPolicy.readerOffered(platform)) {
+                Toast.makeText(context, "$reason，请重试或长按卡片复制链接到微信", Toast.LENGTH_LONG).show()
+                return
+            }
             Toast.makeText(context, "$reason，已在一龙内打开", Toast.LENGTH_SHORT).show()
             SocialLinkBrowserActivity.open(context, item)
         }

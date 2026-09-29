@@ -3,6 +3,7 @@ package com.elon.app.sociallinks
 import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
@@ -105,7 +106,7 @@ class SocialMediaOpeningTest {
         assertTrue(SocialMediaAppLauncher.open(activity, SocialLinkPolicy.link(note)!!))
         val sent = shadowOf(activity).nextStartedActivity
         assertEquals(platform.packageName, sent.`package`); assertEquals(note, sent.dataString)
-        assertEquals(Intent.FLAG_ACTIVITY_NEW_TASK, sent.flags); assertNull(sent.extras)
+        assertEquals(0, sent.flags); assertNull(sent.extras)
         SocialMediaCardAction.open(View(activity), SocialLinkPolicy.link(note)!!, SocialMediaOpenMode.READER)
         assertEquals(SocialLinkBrowserActivity::class.java.name, shadowOf(activity).nextStartedActivity.component?.className)
     }
@@ -135,14 +136,40 @@ class SocialMediaOpeningTest {
                 bar.appButton.textSize = size; bar.readerButton.textSize = size
                 bar.measure(View.MeasureSpec.makeMeasureSpec(220, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
                 bar.layout(0, 0, 220, bar.measuredHeight)
-                for (button in listOf(bar.appButton, bar.readerButton)) {
+                for (button in listOf(bar.appButton, bar.readerButton).filter { it.visibility == View.VISIBLE }) {
                     assertTrue(button.height >= 48); assertTrue(button.width >= 48)
                     val bounds = "$url size=$size button=${button.left},${button.top},${button.right},${button.bottom} bar=${bar.width}x${bar.height}"
                     assertTrue(bounds, button.bottom <= bar.height); assertTrue(bounds, button.right <= bar.width)
                     assertTrue(button.layout.height <= button.height - button.paddingTop - button.paddingBottom)
                 }
-                if (size >= 21f) assertEquals(LinearLayout.VERTICAL, bar.orientation)
+                if (size >= 21f && bar.readerButton.visibility == View.VISIBLE) assertEquals(LinearLayout.VERTICAL, bar.orientation)
             }
         }
+    }
+    @Test fun wrappedActivityPreservesCallerTaskButApplicationContextRequiresNewTask() {
+        val platform = SocialMediaPlatform.XIAOHONGSHU
+        install(platform)
+        shadowOf(activity.packageManager).addResolveInfoForIntent(SocialMediaAppLauncher.intent(platform, note), ResolveInfo().apply {
+            activityInfo = ActivityInfo().apply { packageName = platform.packageName; name = "Router"; exported = true; enabled = true }
+        })
+        assertTrue(SocialMediaAppLauncher.open(ContextWrapper(activity), SocialLinkPolicy.link(note)!!))
+        assertEquals(0, shadowOf(activity).nextStartedActivity.flags)
+        assertTrue(SocialMediaAppLauncher.open(activity.applicationContext, SocialLinkPolicy.link(note)!!))
+        assertEquals(Intent.FLAG_ACTIVITY_NEW_TASK, shadowOf(activity.application as Application).nextStartedActivity.flags)
+        assertEquals(Intent.FLAG_ACTIVITY_NEW_TASK, WechatChannelsHandoff.intent("weixin://fixture").flags)
+    }
+    @Test fun wechatHidesReaderIgnoresOldDefaultAndDoesNotFallBackIntoWebView() {
+        val platform = SocialMediaPlatform.WECHAT
+        val url = "https://weixin.qq.com/sph/example"
+        SocialMediaOpenPreferences(activity).set(platform, SocialMediaOpenMode.READER)
+        val opened = mutableListOf<SocialMediaOpenMode>()
+        val bar = bar(url) { opened += it }
+        assertEquals(View.GONE, bar.readerButton.visibility)
+        bar.readerButton.performClick()
+        assertTrue(opened.isEmpty())
+        assertEquals(SocialMediaOpenMode.APP, SocialMediaOpenPolicy.requestedMode(platform, SocialMediaOpenMode.READER))
+        SocialMediaCardAction.open(View(activity), SocialLinkPolicy.link(url)!!)
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertTrue(org.robolectric.shadows.ShadowToast.getTextOfLatestToast().contains("微信"))
     }
 }

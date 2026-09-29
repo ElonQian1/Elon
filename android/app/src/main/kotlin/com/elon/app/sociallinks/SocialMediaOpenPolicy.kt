@@ -11,6 +11,10 @@ internal enum class SocialMediaPlatform(val key: String, val appLabel: String, v
 
 /** Routing derives only from validated source hosts, never from server-provided labels. */
 internal object SocialMediaOpenPolicy {
+    fun readerOffered(platform: SocialMediaPlatform?) = platform != SocialMediaPlatform.WECHAT
+    fun requestedMode(platform: SocialMediaPlatform?, preferred: SocialMediaOpenMode) =
+        if (readerOffered(platform)) preferred else SocialMediaOpenMode.APP
+
     fun platform(item: SocialLink): SocialMediaPlatform? {
         val parsed = SocialLinkPolicy.link(item.url) ?: return null
         if (WechatChannelsPolicy.isChannels(parsed.url)) return SocialMediaPlatform.WECHAT

@@ -1,6 +1,8 @@
 package com.elon.app.sociallinks
 
 import android.content.Context
+import android.app.Activity
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -20,16 +22,23 @@ internal object SocialMediaAppLauncher {
         if (info.enabled && info.flags and android.content.pm.ApplicationInfo.FLAG_SUSPENDED == 0) Availability.AVAILABLE else Availability.DISABLED
     } catch (_: PackageManager.NameNotFoundException) { Availability.MISSING }
       catch (_: SecurityException) { Availability.DISABLED }
-    fun intent(platform: SocialMediaPlatform, url: String) = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    private fun caller(context: Context): Activity? = when (context) {
+        is Activity -> context
+        is ContextWrapper -> if (context.baseContext !== context) caller(context.baseContext) else null
+        else -> null
+    }
+    // Preserve the calling chat task. Only non-Activity callers require a new task.
+    fun intent(platform: SocialMediaPlatform, url: String, newTask: Boolean = false) = Intent(Intent.ACTION_VIEW, Uri.parse(url))
         .addCategory(Intent.CATEGORY_BROWSABLE).setPackage(platform.packageName)
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        .apply { if (newTask) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
     fun open(context: Context, item: SocialLink): Boolean {
         val platform = SocialMediaOpenPolicy.platform(item) ?: return false
+        val activity = caller(context)
         for (target in SocialMediaOpenPolicy.candidates(item)) {
-            val request = intent(platform, target)
+            val request = intent(platform, target, newTask = activity == null)
             val info = context.packageManager.resolveActivity(request, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo
             if (info?.packageName != platform.packageName || !info.exported || !info.enabled) continue
-            try { context.startActivity(request); return true }
+            try { (activity ?: context).startActivity(request); return true }
             catch (_: android.content.ActivityNotFoundException) { /* Try the next validated content URL. */ }
             catch (_: SecurityException) { /* Disabled or denied by the device policy. */ }
         }
