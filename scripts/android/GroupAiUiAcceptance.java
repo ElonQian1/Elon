@@ -130,6 +130,29 @@ public final class GroupAiUiAcceptance extends UiAutomatorTestCase {
                 fill(new UiObject(new UiSelector().packageName(APP).className("android.widget.EditText")), GROUP);
                 action(ai, false); action(text("完成"), false); break;
             case "open_fixture": openFixture(); break;
+            case "image_quote": {
+                fixtureOpen();
+                UiObject composer = openComposer();
+                String draft = composer.getText();
+                assertFalse("existing_quote", desc("取消引用").exists());
+                for (int attempt = 0; attempt < 5 && !id("chatMessageImage").exists(); attempt++) {
+                    AccessibilityNodeInfo list = node(id("chatList"));
+                    try { if (!list.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)) break; }
+                    finally { list.recycle(); }
+                    getUiDevice().waitForIdle(1000);
+                }
+                action(id("chatMessageImage"), true);
+                for (String title : new String[]{"复制", "转发", "引用", "多选", "收藏", "AI回复", "识别二维码"}) {
+                    assertTrue("image_menu_missing_" + title, text(title).exists());
+                }
+                action(text("引用"), false);
+                assertTrue("image_quote_missing", desc("取消引用").waitForExists(3000));
+                assertEquals("image_quote_changed_draft", draft, id("inputEdit").getText());
+                action(desc("取消引用"), false);
+                assertFalse("image_quote_not_cancelled", desc("取消引用").exists());
+                assertEquals("image_quote_cancel_changed_draft", draft, id("inputEdit").getText());
+                break;
+            }
             case "quote_draft": {
                 fixtureOpen();
                 UiObject composer = openComposer();

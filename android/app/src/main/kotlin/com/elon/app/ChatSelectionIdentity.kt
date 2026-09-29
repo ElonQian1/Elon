@@ -115,6 +115,8 @@ internal fun bindChatSelectionContent(container: ViewGroup?, click: View.OnClick
         val child = container.getChildAt(index)
         child.setOnClickListener(click)
         child.setOnLongClickListener(null)
+        child.isLongClickable = false
+        child.setTag(R.id.chatMessageLongPressOwner, null)
         if (child is android.widget.TextView) child.movementMethod = null
         if (child is ViewGroup) bindChatSelectionContent(child, click)
     }
@@ -124,9 +126,13 @@ internal fun bindChatSelectionLongPress(container: ViewGroup?, listener: View.On
     container ?: return
     for (index in 0 until container.childCount) {
         val child = container.getChildAt(index)
-        // Keep existing voice-specific long-press actions.
-        // Even a null listener enables long-click consumption on Android.
-        if (!child.isLongClickable && listener != null) child.setOnLongClickListener(listener)
+        // Refresh our recycled listeners without replacing voice-specific actions.
+        val owned = child.getTag(R.id.chatMessageLongPressOwner) == true
+        if (owned || (!child.isLongClickable && listener != null)) {
+            child.setOnLongClickListener(listener)
+            child.isLongClickable = listener != null
+            child.setTag(R.id.chatMessageLongPressOwner, if (listener != null) true else null)
+        }
         if (child is ViewGroup) bindChatSelectionLongPress(child, listener)
     }
 }

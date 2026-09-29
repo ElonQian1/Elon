@@ -15,6 +15,16 @@ internal class MainShareActions(
     private val activity: AppCompatActivity,
     private val dp: (Int) -> Int
 ) {
+    fun copyMessage(message: ChatMessage, text: String) {
+        if (message.attachments.isNullOrEmpty()) copyMessageText(text)
+        else ChatAttachmentShareActions.start(activity, message, text, copy = true)
+    }
+
+    fun forwardMessage(message: ChatMessage, text: String) {
+        if (message.attachments.isNullOrEmpty()) forwardMessageText(text)
+        else ChatAttachmentShareActions.start(activity, message, text, copy = false)
+    }
+
     fun searchMessageText(text: String) {
         Toast.makeText(activity, "搜一搜：${summarize(text, 12)}", Toast.LENGTH_SHORT).show()
     }

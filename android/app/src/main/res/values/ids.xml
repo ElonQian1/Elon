@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <item name="chatMessageImage" type="id" />
+    <item name="chatMessageLongPressOwner" type="id" />
+    <item name="chatAttachmentShareJob" type="id" />
     <item name="projectBrowserDragTarget" type="id" />
     <item name="projectBrowserDragHandle" type="id" />
     <item name="projectBrowserSearch" type="id" />

@@ -198,6 +198,10 @@ gradle.taskGraph.whenReady { graph ->
 
 android {
     testOptions.unitTests.includeAndroidResources = true
+    testOptions.unitTests.all {
+        // Robolectric's ParcelFileDescriptor closes Java file descriptors reflectively.
+        jvmArgs '--add-opens=java.base/java.io=ALL-UNNAMED'
+    }
     namespace 'com.elon.app'
     compileSdk 34
 

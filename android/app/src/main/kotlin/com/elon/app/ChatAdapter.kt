@@ -156,7 +156,8 @@ class ChatAdapter(
             isSent = message.role == "user",
             onVoiceLongPress = onVoiceAttachmentLongPress?.let { cb ->
                 { attachment -> cb.invoke(message, attachment) }
-            }
+            },
+            messageActionsEnabled = onMessageLongPress != null
         )
         if (!recalled) bindChatSuggestionStatus(holder.attachmentList, message, onSuggestionResolve)
         val shareCardBound = !recalled && AiConversationShareCardViews.bind(

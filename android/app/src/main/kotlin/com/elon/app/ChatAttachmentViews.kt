@@ -27,12 +27,13 @@ internal fun bindChatAttachmentViews(
     container: LinearLayout?,
     attachments: List<ChatAttachment>?,
     isSent: Boolean = false,
-    onVoiceLongPress: ((ChatAttachment) -> Unit)? = null
+    onVoiceLongPress: ((ChatAttachment) -> Unit)? = null,
+    messageActionsEnabled: Boolean = false
 ) {
     if (container == null) return
     val items = attachments.orEmpty()
     val visibleItems = items.take(MAX_CHAT_ATTACHMENTS)
-    val signature = visibleItems.attachmentRenderSignature()
+    val signature = visibleItems.attachmentRenderSignature().let { if (it.isEmpty()) it else "$messageActionsEnabled:$it" }
     if (signature.isNotEmpty() && container.tag == signature && container.childCount == visibleItems.size) {
         container.visibility = View.VISIBLE
         return
@@ -46,7 +47,8 @@ internal fun bindChatAttachmentViews(
     container.visibility = View.VISIBLE
     visibleItems.forEachIndexed { index, attachment ->
         val view = when {
-            attachment.isImage() -> com.elon.app.sharing.SourceLinkViews.wrapImage(container.context, attachment, createImageAttachmentView(container.context, attachment))
+            attachment.isImage() -> com.elon.app.sharing.SourceLinkViews.wrapImage(container.context, attachment,
+                createImageAttachmentView(container.context, attachment), messageActionsEnabled)
             attachment.isVoice() -> createVoiceAttachmentView(container.context, attachment, isSent, onVoiceLongPress)
             else -> createFileAttachmentView(container.context, attachment)
         }
@@ -59,6 +61,7 @@ internal fun bindChatAttachmentViews(
 
 private fun createImageAttachmentView(context: Context, attachment: ChatAttachment): View {
     val image = ImageView(context).apply {
+        id = R.id.chatMessageImage
         layoutParams = imageAttachmentLayoutParams(context, attachment)
         background = GradientDrawable().apply {
             cornerRadius = context.dp(7).toFloat()

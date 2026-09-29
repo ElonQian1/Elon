@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="message_exports" path="message_exports/" />
     <cache-path name="chat_record_media" path="chat_record_media/" />
     <cache-path name="external_share_media" path="external_shares/" />
     <cache-path

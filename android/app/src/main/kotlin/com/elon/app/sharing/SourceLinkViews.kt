@@ -15,7 +15,7 @@ import java.util.concurrent.Executors
 
 internal object SourceLinkViews {
     private val scanner = Executors.newSingleThreadExecutor()
-    fun wrapImage(context: Context, attachment: ChatAttachment, image: View): View {
+    fun wrapImage(context: Context, attachment: ChatAttachment, image: View, messageActionsEnabled: Boolean = false): View {
         val ui = ArticleUi(context)
         val host = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -25,19 +25,25 @@ internal object SourceLinkViews {
         attachment.sourceLink?.takeIf { SourceLink.webUrl(it.url) != null }?.let { link ->
             host.addView(ui.button(link.label) { ArticleLinkActivity.open(context, link.url) })
         }
-        image.setOnLongClickListener {
+        if (!messageActionsEnabled) image.setOnLongClickListener {
             AlertDialog.Builder(context).setItems(arrayOf("识别二维码")) { _, _ ->
-                val source = chatAttachmentImageSource(attachment)
-                if (source == null) Toast.makeText(context, "图片暂不可用，请重新加载", Toast.LENGTH_SHORT).show()
-                else ChatImagePreviewLoader.load(context, source) { bitmap ->
-                    scanner.execute {
-                        val links = bitmap?.let(ImageQrLinks::decode).orEmpty()
-                        image.post { choose(context, links) { ArticleLinkActivity.open(context, it.url) } }
-                    }
-                }
+                recognizeImage(image, attachment)
             }.show(); true
         }
         return host
+    }
+    fun recognizeImage(anchor: View, attachment: ChatAttachment) {
+        val context = anchor.context
+        val source = chatAttachmentImageSource(attachment)
+        if (source == null) { Toast.makeText(context, "图片暂不可用，请重新加载", Toast.LENGTH_SHORT).show(); return }
+        ChatImagePreviewLoader.load(context, source) { bitmap ->
+            scanner.execute {
+                val links = bitmap?.let(ImageQrLinks::decode).orEmpty()
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    if (anchor.isAttachedToWindow) choose(context, links) { ArticleLinkActivity.open(context, it.url) }
+                }
+            }
+        }
     }
     fun choose(context: Context, links: List<SourceLink>, chosen: (SourceLink) -> Unit) {
         if (links.isEmpty()) { Toast.makeText(context, "未识别到网页二维码，可尝试原图或复制链接", Toast.LENGTH_LONG).show(); return }

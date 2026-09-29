@@ -89,16 +89,17 @@ internal class MainActionPopups(
     }
 
     fun showMessageActionPopup(anchor: View, message: ChatMessage, text: String) {
-        val isRecord = com.elon.app.chatrecords.ChatRecordDocument.card(message.content) != null
-        val hasText = text.isNotBlank() && !isRecord
+        val contentActions = ChatMessageContentActions(message, text)
+        val isRecord = contentActions.isRecord
+        val hasText = contentActions.hasText
         val actions = mutableListOf<TopAction>()
         if (!isRecord) actions.addAll(groupRevisionActions(message))
-        if (hasText) {
-            actions.add(TopAction("复制", R.drawable.ic_msg_copy) { shareActions().copyMessageText(text) })
+        if (contentActions.canCopy) {
+            actions.add(TopAction("复制", R.drawable.ic_msg_copy) { shareActions().copyMessage(message, text) })
         }
-        if (hasText || !message.webChatMessage?.contentParts.isNullOrEmpty()) {
+        if (contentActions.canForward) {
             actions.add(TopAction("转发", R.drawable.ic_msg_forward) {
-                val plain = { shareActions().forwardMessageText(text); Unit }
+                val plain = { shareActions().forwardMessage(message, text); Unit }
                 if (shareAiMessage?.invoke(message, plain) != true) plain()
             })
         }
@@ -120,9 +121,17 @@ internal class MainActionPopups(
             actions.add(TopAction("搜一搜", R.drawable.ic_msg_search) { shareActions().searchMessageText(text) })
             actions.add(TopAction("从当前听", R.drawable.ic_msg_listen) { shareActions().toastMessageAction("从当前听准备中") })
         }
-        if ((hasText || isRecord) && canRequestAiReply()) {
+        if (contentActions.canAnalyze && canRequestAiReply()) {
             actions.add(TopAction(if (isRecord) "AI分析记录" else "AI回复", R.drawable.ic_msg_ai_reply) { requestAiReply(message) })
         }
+        if (contentActions.images.isNotEmpty()) actions.add(TopAction("识别二维码", R.drawable.ic_msg_search) {
+            val images = contentActions.images
+            fun recognize(index: Int) = com.elon.app.sharing.SourceLinkViews.recognizeImage(anchor, images[index])
+            if (images.size == 1) recognize(0)
+            else AlertDialog.Builder(activity).setTitle("选择图片")
+                .setItems(images.mapIndexed { index, item -> item.displayName ?: "图片 ${index + 1}" }.toTypedArray()) { _, index -> recognize(index) }
+                .setNegativeButton("取消", null).show()
+        })
         setActionPopup(renderer().showMessageActionPopup(anchor, getActionPopup(), actions))
     }
 
