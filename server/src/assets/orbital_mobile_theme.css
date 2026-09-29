@@ -134,7 +134,7 @@ html, body, .app, .content, .page, .project-space-ai-menu,
 .input-bar .model-btn, .input-bar .plan-btn { background: var(--panel-2); color: var(--ink); border-color: var(--line); }
 .tabs-panel { background: transparent; border: 0; box-shadow: none; }
 .tab.active::before { background: var(--mobile-primary-container); box-shadow: none; }
-.conversation-item .sub, .conversation-item .trailing { color: var(--ink-soft); }
+.conversation-item .sub, .conversation-item .trailing, .conversation-item .time { color: var(--ink-soft); }
 .conversation-item .home-row-badge.ai { color: var(--brand); border-color: var(--line); }
 .conversation-item .home-row-badge.project { background: var(--panel-2); color: var(--ink-soft); }
 :root { --mobile-icon-filter: brightness(0); }
@@ -193,6 +193,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .conversation-item .brand, .conversation-item .brand.group, .conversation-item .brand.round,
 .group-avatar-grid, .group-avatar-tile { background: var(--panel-2); color: var(--ink-soft); }
 .conversation-item .brand .avatar-badge { background: var(--mobile-error-container); color: var(--mobile-error); }
+/* The retained navigation badge declares these two colors inline. */
+#tabChatBadge { background: var(--mobile-error-container) !important; color: var(--mobile-error) !important; }
 .home-filter-tabs { padding-block: 4px; gap: 4px; }
 .home-filter-tab { border-radius: 12px; }
 .home-filter-tab.active { background: var(--panel-2); color: var(--ink); }

@@ -33,15 +33,21 @@ async function main() {
       const badge = page.locator('.avatar-badge').first();
       await badge.waitFor();
       await page.waitForLoadState('networkidle');
-      const contrast = await page.evaluate(() => {
-        const node = document.querySelector('.avatar-badge');
+      const contrasts = await page.evaluate(() => {
         const luminance = color => color.match(/[0-9.]+/g).slice(0, 3).map(value => Number(value) / 255)
           .map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
           .reduce((sum, value, index) => sum + value * [.2126, .7152, .0722][index], 0);
-        const style = getComputedStyle(node), a = luminance(style.color), b = luminance(style.backgroundColor);
-        return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+        return ['.avatar-badge', '#tabChatBadge', '.conversation-item .time'].map(selector => {
+          const node = document.querySelector(selector), style = getComputedStyle(node);
+          let background = style.backgroundColor, parent = node.parentElement;
+          while (['transparent', 'rgba(0, 0, 0, 0)'].includes(background) && parent) {
+            background = getComputedStyle(parent).backgroundColor; parent = parent.parentElement;
+          }
+          const a = luminance(style.color), b = luminance(background);
+          return { selector, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05) };
+        });
       });
-      assert.ok(contrast >= 4.5, 'unread count must be readable in both themes');
+      contrasts.forEach(({ selector, ratio }) => assert.ok(ratio >= 4.5, `${selector} must be readable in both themes`));
       await page.goto(origin + '/?fixture=login&conversation=group');
       await page.locator('#chatList .bubble.friend').last().waitFor();
       await page.locator('#inputPlaceholder').tap();
