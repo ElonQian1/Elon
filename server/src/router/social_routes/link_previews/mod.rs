@@ -37,6 +37,15 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             }),
         )
         .route(
+            "/assets/social_wechat_handoff.js",
+            get(|| async {
+                asset(
+                    "application/javascript",
+                    include_str!("../../../assets/social_wechat_handoff.js"),
+                )
+            }),
+        )
+        .route(
             "/assets/social_link_viewer.js",
             get(|| async {
                 asset(

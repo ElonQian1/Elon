@@ -1,6 +1,6 @@
 .social-link-cards { display: grid; gap: 8px; margin-top: 8px; width: 280px; max-width: 100%; }
 .social-link-cards-compact { margin-top: 0; }
-.bubble.social-link-only.social-link-only { background: transparent; border: 0; box-shadow: none; padding: 0; min-width: 0; width: min(280px, calc(100vw - 104px)); }
+.bubble.social-link-only.social-link-only { background: transparent; border: 0; box-shadow: none; padding: 0; min-width: 0; width: min(var(--social-card-width, 280px), calc(100vw - 104px)); }
 .social-link-original[hidden] { display: none; }
 .social-link-cards .social-link-card { display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: 8px 12px; box-sizing: border-box; width: 100%; padding: 12px; border: 0; border-radius: 6px; background: #252b33; color: #f8f7f4; text-decoration: none; cursor: pointer; text-align: left; }
 .social-link-cards .social-link-card:hover { background: #20262e; }
@@ -40,7 +40,7 @@
 .social-link-cards .social-link-poster { display: flex; flex-direction: column; gap: 0; padding: 0; overflow: hidden; background: #242628; }
 .social-link-poster .social-link-copy { display: flex; flex-direction: column; order: 1; padding: 10px 12px 0; gap: 6px; }
 .social-link-poster .social-link-media { order: 0; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 0; }
-.social-link-poster .social-link-cover { object-fit: contain; }
+.social-link-poster .social-link-cover { object-fit: contain; inset: 0; margin: auto; }
 .social-link-poster .social-link-badge { position: absolute; z-index: 1; top: 8px; left: 8px; height: auto; padding: 3px 7px; border-radius: 4px; background: #0009; color: white; font-size: 11px; line-height: 16px; }
 .social-link-poster .social-link-title { font-size: 14px; line-height: 1.5; -webkit-line-clamp: 2; }
 .social-link-poster .social-link-summary { display: none; }
@@ -50,6 +50,11 @@
 .social-link-poster[data-cover="missing"]:not(.social-link-channels) .social-link-media { aspect-ratio: auto !important; height: 100px; }
 .social-link-poster.social-link-channels .social-link-media { aspect-ratio: 3 / 4; }
 .social-link-poster.social-link-channels .social-link-copy { display: none; }
+.social-link-handoff { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 12px; line-height: 1.5; color: #b7bdc8; }
+.social-link-handoff[hidden] { display: none; }
+.social-link-handoff span { flex-basis: 100%; overflow-wrap: anywhere; }
+.social-link-handoff button, .social-link-handoff a { min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; padding: 4px 0; border: 0; background: transparent; color: #b5ccea; font: inherit; text-decoration: none; cursor: pointer; }
+.social-link-handoff [hidden] { display: none; }
 .social-link-dialog { color-scheme: dark; padding: 0; border: 1px solid #434c59; border-radius: 14px; width: min(1080px, calc(100vw - 32px)); height: min(800px, calc(100dvh - 40px)); max-width: none; max-height: none; background: #15171b; color: #f1f2f5; overflow: hidden; }
 .social-link-dialog[open] { display: flex; flex-direction: column; }
 .social-link-dialog::backdrop { background: rgb(0 0 0 / 70%); }

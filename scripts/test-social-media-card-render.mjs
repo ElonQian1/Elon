@@ -52,7 +52,7 @@ try {
         const r = selector => { const b = node.querySelector(selector).getBoundingClientRect(); return { top: b.top, bottom: b.bottom, width: b.width, height: b.height, right: b.right }; };
         return { media: r('.social-link-media'), title: r('.social-link-title'), footer: r('.social-link-video-footer'), play: r('.social-link-play') };
       });
-      assert.ok(bounds.media.width >= 260);
+      assert.ok(bounds.media.width >= 144 && bounds.media.width <= 280);
       assert.ok(bounds.title.top >= bounds.media.bottom && bounds.footer.top >= bounds.title.bottom);
       assert.ok(bounds.play.top > bounds.media.top && bounds.play.bottom < bounds.media.bottom);
       if (id !== 'bili') assert.equal(bounds.media.height, 100, 'missing covers stay compact');

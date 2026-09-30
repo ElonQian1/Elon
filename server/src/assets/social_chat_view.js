@@ -96,7 +96,7 @@
             if (kind === 'group' && msg.id && !shared) root.ElonGroupMessageRevisions.mount(bubble, contact.id, msg, options.api, () => options.changed(contact.id));
             if (kind === 'group' && !recalled) root.ElonGroupAiReplyContext?.mount(bubble, msg, { api: options.api, group: contact.id, owner: options.user()?.id, list, current: () => scope === key && options.user()?.id === owner, changed: () => options.changed(contact.id) }, media);
             if (msg.send_status) { const status = document.createElement('small'); status.textContent = msg.send_status; status.style.display = 'block'; bubble.append(status); }
-            const owner = options.user()?.id, cleanup = !recalled && !shared && root.ElonSocialLinks?.mount(bubble, text, { api: options.api, owner, compact: !!compactLink, isCurrent: () => scope === key && options.user()?.id === owner });
+            const owner = options.user()?.id, cleanup = !recalled && !shared && root.ElonSocialLinks?.mount(bubble, text, { api: options.api, owner, compact: !!compactLink, pwaHandoff: true, isCurrent: () => scope === key && options.user()?.id === owner });
             if (!recalled) quotePreview(bubble, msg.quote, outgoing, list);
             const block = bubble.closest('.chat-message-block'), actionCleanup = options.actions?.bind(block, msg);
             entry = { signature, block, cleanup: () => { if (typeof cleanup === 'function') cleanup(); actionCleanup?.(); } };

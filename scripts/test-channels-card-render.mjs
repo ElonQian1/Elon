@@ -46,9 +46,11 @@ try {
     await page.waitForFunction(() => [...document.querySelectorAll('img:not([hidden])')].every(i => i.complete && i.naturalWidth > 0));
     const bounds = await page.evaluate(() => {
       const box = s => { const r = document.querySelector(s).getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom }; };
-      return { card: box('.social-link-card'), media: box('.social-link-media'), footer: box('.social-link-video-footer'), play: box('.social-link-play'), author: box('.social-link-source'), overflow: document.documentElement.scrollWidth > innerWidth };
+      const image = document.querySelector('.social-link-cover');
+      return { ratio: image.naturalWidth / image.naturalHeight, card: box('.social-link-card'), media: box('.social-link-media'), footer: box('.social-link-video-footer'), play: box('.social-link-play'), author: box('.social-link-source'), overflow: document.documentElement.scrollWidth > innerWidth };
     });
-    assert.ok(Math.abs(bounds.media.height / bounds.media.width - 4 / 3) < 0.01);
+    assert.ok(Math.abs(bounds.media.width / bounds.media.height - Math.max(.5, Math.min(2, bounds.ratio))) < 0.01);
+    assert.ok(bounds.media.height <= 281 && bounds.media.width <= 220);
     assert.ok(bounds.footer.y >= bounds.media.bottom); assert.equal(bounds.overflow, false);
     assert.ok(bounds.play.y > bounds.media.y && bounds.play.bottom < bounds.media.bottom);
     assert.ok(bounds.author.right <= bounds.card.right);

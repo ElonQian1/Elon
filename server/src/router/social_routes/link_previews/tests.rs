@@ -287,7 +287,39 @@ fn social_link_cover_thumbnail_is_small_inline_jpeg() {
     let data = cover::thumbnail(&png).unwrap();
     assert!(data.starts_with("data:image/jpeg;base64,"));
     assert!(data.len() < cover::MAX_DATA_URL);
+    use base64::Engine;
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(data.split_once(',').unwrap().1)
+        .unwrap();
+    let thumb = image::load_from_memory(&decoded).unwrap();
+    assert_eq!((thumb.width(), thumb.height()), (640, 427));
     assert!(cover::thumbnail(b"not an image").is_err());
+}
+
+#[test]
+fn social_link_cover_detailed_images_keep_budget_and_small_images_are_not_enlarged() {
+    use base64::Engine;
+    let mut seed = 7_u32;
+    for (width, height) in [(900, 1200), (32, 24)] {
+        let image = image::RgbImage::from_fn(width, height, |_, _| {
+            seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+            image::Rgb([(seed >> 24) as u8, (seed >> 16) as u8, (seed >> 8) as u8])
+        });
+        let mut png = Vec::new();
+        image
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+        let data = cover::thumbnail(&png).unwrap();
+        assert!(data.len() <= cover::MAX_DATA_URL);
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(data.split_once(',').unwrap().1)
+            .unwrap();
+        let result = image::load_from_memory(&bytes).unwrap();
+        assert!(result.width() <= width && result.height() <= height);
+        if width == 32 {
+            assert_eq!((result.width(), result.height()), (32, 24));
+        }
+    }
 }
 
 #[tokio::test]

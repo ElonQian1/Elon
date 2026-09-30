@@ -49,7 +49,9 @@ internal object SocialLinkCards {
                     SocialMediaCardAction.open(host, current, mode)
                 }, LinearLayout.LayoutParams(-1, -2))
             }
-            val width = minOf(dp(280), (context.resources.displayMetrics.widthPixels - dp(if (compact) 104 else 128)).coerceAtLeast(1))
+            val maxWidth = (context.resources.displayMetrics.widthPixels - dp(if (compact) 104 else 128)).coerceAtLeast(1)
+            val poster = SocialLinkPresentation.mediaCard(item)
+            val width = minOf(dp(if (poster) SocialPosterSize.widthDp(0, 0, 1f) else 280), maxWidth)
             container.addView(host, LinearLayout.LayoutParams(width, -2).apply { topMargin = if (compact) 0 else dp(8) }); container.visibility = View.VISIBLE
             fun valid() = host.parent === container && AuthManager.userId(app) == owner && ServerUrlManager.getActive(app) == server
             fun draw(value: SocialLink) { current = value; card.bind(value); onPreview?.invoke(value) }
@@ -61,7 +63,15 @@ internal object SocialLinkCards {
                     val result = SocialLinkPreviewApi.load(app, item, refresh)
                     host.post { busy = false; if (valid()) { draw(result); retry.isEnabled = true; retry.visibility = if (result.ready || compact) View.GONE else View.VISIBLE } }
                     val bitmap = result.image?.let { SocialLinkPreviewApi.cover(app, it) }
-                    host.post { if (valid() && current.image == result.image) card.bindCover(bitmap) }
+                    host.post {
+                        if (valid() && current.image == result.image) {
+                            if (poster) {
+                                val compactWidth = SocialPosterSize.widthDp(bitmap?.width ?: 0, bitmap?.height ?: 0, context.resources.displayMetrics.density)
+                                host.layoutParams = host.layoutParams.apply { this.width = minOf(dp(compactWidth), maxWidth) }
+                            }
+                            card.bindCover(bitmap)
+                        }
+                    }
                     val avatar = result.authorAvatar?.let { SocialLinkPreviewApi.cover(app, it) }
                     host.post { if (valid() && current.authorAvatar == result.authorAvatar) card.bindAvatar(avatar) }
                 }

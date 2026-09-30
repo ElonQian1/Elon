@@ -21,6 +21,13 @@
     return { badge, title: value.title || fallback, summary: value.description || '', source: value.site + (author && author !== value.site ? ' · ' + author : '') + origin, time: seconds !== null && /^\d+$/.test(seconds) && n <= 604800 ? `从 ${stamp} 开始` : '' };
   }
   const cache = new Map();
+  function posterGeometry(width, height, density = 1) {
+    const ready = Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0;
+    const ratio = ready ? Math.max(0.5, Math.min(2, width / height)) : 3 / 4;
+    const limit = ratio < 1 ? 208 : ratio === 1 ? 220 : 280;
+    const pixels = ready ? width / Math.max(1, Math.min(2, density || 1)) : limit;
+    return { ratio, width: Math.round(Math.min(limit, 280 * ratio, Math.max(144, pixels))) };
+  }
   // A poster layout does not imply that the provider permits embedded playback.
   function mediaPresentation(value) {
     if (channelsId(value.url)) return { kind: 'channels', ratio: 3 / 4, action: '打开视频号', play: true };
@@ -203,7 +210,18 @@
       const cover = document.createElement('img'); cover.className = 'social-link-cover'; cover.alt = ''; cover.hidden = true; cover.referrerPolicy = 'no-referrer'; cover.loading = 'lazy';
       function posterState(loaded) {
         button.setAttribute('data-cover', loaded ? 'ready' : 'missing');
-        if (format && !channels) media.style.aspectRatio = String(loaded ? Math.max(2 / 3, Math.min(16 / 9, cover.naturalWidth / cover.naturalHeight)) : 16 / 9);
+        if (format) {
+          const size = posterGeometry(loaded ? cover.naturalWidth : 0, loaded ? cover.naturalHeight : 0, root.devicePixelRatio);
+          wrap.style.width = `min(${size.width}px, 100%)`;
+          media.style.aspectRatio = String(size.ratio);
+          // Keep very small legacy posters at their actual resolution, without shrinking controls.
+          cover.style.maxWidth = loaded ? `${cover.naturalWidth}px` : '100%';
+          cover.style.maxHeight = loaded ? `${cover.naturalHeight}px` : '100%';
+          if (items.length === 1 && options.compact) {
+            host.style.width = `${size.width}px`;
+            container.style.setProperty('--social-card-width', `${size.width}px`);
+          }
+        }
       }
       cover.onload = () => { if (valid() && cover.naturalWidth > 0) { posterState(true); coverFailed = false; updateRetry(); } };
       cover.onerror = () => {
@@ -262,9 +280,11 @@
         const latest = observed?.read && observed.expires > Date.now() ? observed.read : value;
         if (valid()) { draw(latest); retry.disabled = false; options.enrichPreview?.(latest); }
       }
+      const handoff = channels && options.pwaHandoff && root.ElonWechatHandoff?.create(wrap, () => current, { api: options.api, isCurrent: valid });
+      if (handoff) cleanups.push(handoff.dispose);
       button.onclick = event => {
         if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-        event.preventDefault(); (options.open || root.ElonSocialLinkViewer?.open || (p => root.open(p.url, '_blank', 'noopener,noreferrer')))(current);
+        event.preventDefault(); (options.open || handoff?.open || root.ElonSocialLinkViewer?.open || (p => root.open(p.url, '_blank', 'noopener,noreferrer')))(current);
       };
       retry.onclick = () => load(true); draw(item);
       if (options.actions) cleanups.push(options.actions(wrap, () => current));
@@ -279,5 +299,5 @@
     }
     return () => { active = false; cleanups.forEach(fn => fn()); host.remove(); };
   }
-  root.ElonSocialLinks = { safeUrl, channelsId, embed, trustedEmbed, links, sanitize, compact, prepareBubble, presentation, mediaPresentation, mount, remember };
+  root.ElonSocialLinks = { safeUrl, channelsId, embed, trustedEmbed, links, sanitize, compact, prepareBubble, presentation, mediaPresentation, posterGeometry, mount, remember };
 })(globalThis);

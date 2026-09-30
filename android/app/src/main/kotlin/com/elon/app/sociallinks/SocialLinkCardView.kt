@@ -69,7 +69,7 @@ internal class SocialLinkCardView(context: Context, private val poster: Boolean 
         media.addView(cover, FrameLayout.LayoutParams(-1, -1)); media.clipToOutline = true
         if (poster) {
             setPadding(0, 0, 0, 0)
-            cover.scaleType = ImageView.ScaleType.FIT_CENTER
+            cover.scaleType = ImageView.ScaleType.CENTER_INSIDE
             clipToOutline = true
             media.addView(play, FrameLayout.LayoutParams(dp(52), dp(52), Gravity.CENTER))
             media.removeView(badge)
@@ -132,7 +132,7 @@ internal class SocialLinkCardView(context: Context, private val poster: Boolean 
     }
     fun bindCover(bitmap: Bitmap?) {
         cover.setImageBitmap(bitmap); cover.visibility = if (bitmap == null) View.GONE else View.VISIBLE
-        posterRatio = bitmap?.let { (it.width.toFloat() / it.height).coerceIn(2f / 3f, 16f / 9f) }
+        posterRatio = bitmap?.let { (it.width.toFloat() / it.height).coerceIn(.5f, 2f) }
         requestLayout()
     }
     fun bindAvatar(bitmap: Bitmap?) {

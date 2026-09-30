@@ -7,6 +7,11 @@ vm.runInContext(readFileSync(new URL('social_links.js', base), 'utf8'), context)
 vm.runInContext(readFileSync(new URL('social_link_viewer.js', base), 'utf8'), context);
 const links = context.ElonSocialLinks;
 const channelsUrl = 'https://weixin.qq.com/sph/Aur6t4pfk3';
+for (const [w, h, dpr, expected] of [[480, 640, 3, 208], [192, 256, 3, 144], [900, 1600, 2, 158], [1280, 720, 2, 280], [640, 640, 2, 220], [32, 64, 2, 140]]) {
+  const size = links.posterGeometry(w, h, dpr);
+  assert.equal(size.width, expected);
+  assert.ok(size.width / size.ratio <= 281, 'poster height stays compact');
+}
 assert.equal(links.channelsId(channelsUrl), 'Aur6t4pfk3');
 assert.equal(links.links(channelsUrl)[0].site, '视频号');
 assert.equal(links.channelsId('https://weixin.qq.com.evil.test/sph/Aur6t4pfk3'), null);
@@ -61,7 +66,7 @@ assert.match(context.ElonSocialLinkViewer.frameSource(x).srcdoc, /platform\.x\.c
 
 // Exercise async mount against both PWA Response and PC decoded-JSON API contracts.
 class Node {
-  constructor(tag) { this.tag = tag; this.children = []; this.parentNode = null; this.hidden = false; this.style = {}; this.classList = { add: name => { this.className = ((this.className || '') + ' ' + name).trim(); } }; }
+  constructor(tag) { this.tag = tag; this.children = []; this.parentNode = null; this.hidden = false; this.style = { setProperty(key, value) { this[key] = value; } }; this.classList = { add: name => { this.className = ((this.className || '') + ' ' + name).trim(); } }; }
   append(...items) { for (const item of items) { item.parentNode = this; this.children.push(item); } }
   remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(n => n !== this); this.parentNode = null; }
   setAttribute(key, value) { this[key] = value; }
@@ -117,6 +122,9 @@ for (const url of ['https://www.bilibili.com/', 'https://www.douyin.com/', 'http
   const wrap = host.children[0].children[0]; const card = wrap.children[0];
   assert.match(card.className, /social-link-channels/);
   assert.equal(card.children[1].children[1].src, 'https://finder.video.qq.com/cover');
+  const poster = card.children[1].children[1]; poster.naturalWidth = 900; poster.naturalHeight = 1600; poster.onload();
+  assert.equal(Number(card.children[1].style.aspectRatio), 9 / 16, 'Channels uses actual cover ratio');
+  assert.equal(wrap.style.width, 'min(158px, 100%)');
   const identity = card.children[2].children[0], creator = card.children[2].children[1];
   assert.equal(creator.children[0].textContent, 'Creator');
   assert.equal(creator.children[1].textContent, '在微信中观看');

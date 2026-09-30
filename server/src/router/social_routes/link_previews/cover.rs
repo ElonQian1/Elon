@@ -9,7 +9,7 @@ use std::{io::Cursor, time::Duration};
 
 const MAX_BYTES: usize = 1024 * 1024;
 const MAX_SIDE: u32 = 6000;
-const THUMB_SIDE: u32 = 256;
+const THUMB_SIDE: u32 = 640;
 const JPEG_QUALITY: u8 = 72;
 pub(super) const MAX_DATA_URL: usize = 96 * 1024;
 
@@ -73,18 +73,23 @@ fn thumbnail_sized(bytes: &[u8], side: u32, max_data: usize) -> Result<String> {
     }
     let decoded = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()?
-        .decode()?
-        .thumbnail(side, side)
-        .to_rgb8();
-    let mut out = Vec::new();
-    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY)
-        .encode_image(&decoded)?;
-    let data = format!(
-        "data:image/jpeg;base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(out)
-    );
-    if data.len() > max_data {
-        bail!("thumbnail too large");
+        .decode()?;
+    // Retina cards need more than 256 pixels. Keep the wire budget unchanged and
+    // reduce dimensions for detailed/noisy covers instead of dropping the image.
+    let mut edge = side.min(width.max(height));
+    for _ in 0..5 {
+        let thumb = decoded.thumbnail(edge, edge).to_rgb8();
+        let mut out = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY)
+            .encode_image(&thumb)?;
+        let data = format!(
+            "data:image/jpeg;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(out)
+        );
+        if data.len() <= max_data {
+            return Ok(data);
+        }
+        edge = (edge * 7 / 10).max(1);
     }
-    Ok(data)
+    bail!("thumbnail too large")
 }
