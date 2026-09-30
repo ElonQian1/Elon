@@ -15,8 +15,12 @@ internal data class ProjectIntroductionContent(
     val targetUsers: List<String>,
     val updates: List<String>,
     val requirements: List<String>,
-    val privacy: List<String>
+    val privacy: List<String>,
+    val description: String? = null,
+    val resources: List<ProjectIntroductionLink> = emptyList()
 )
+
+internal data class ProjectIntroductionLink(val label: String, val url: String)
 
 internal fun parseProjectIntroduction(landing: JSONObject?): ProjectIntroductionContent? {
     if (landing == null) return null
@@ -27,15 +31,35 @@ internal fun parseProjectIntroduction(landing: JSONObject?): ProjectIntroduction
             values.optString(it).trim().takeIf { value -> value.isNotBlank() && value != "null" }
         }
     }
+    val links = mutableListOf<ProjectIntroductionLink>()
+    fun link(label: String, url: String) {
+        if ((url.startsWith("https://") || url.startsWith("http://") || (url.startsWith("/") && !url.startsWith("//")))
+            && links.none { it.url == url }) links.add(ProjectIntroductionLink(label, url))
+    }
+    text("custom_landing_url")?.let { link("完整项目介绍", it) }
+    text("web_url")?.let { link("打开网页端", it) }
+    landing.optJSONArray("resources")?.let { values ->
+        for (index in 0 until minOf(values.length(), 12)) values.optJSONObject(index)?.let {
+            link(it.optString("label", "项目资料"), it.optString("url"))
+        }
+    }
+    landing.optJSONArray("downloads")?.let { values ->
+        for (index in 0 until minOf(values.length(), 12)) values.optJSONObject(index)?.let {
+            if (it.optString("status") in listOf("available", "external"))
+                link(it.optString("label", "版本入口"), it.optString("url"))
+        }
+    }
     return ProjectIntroductionContent(text("tagline"), text("summary") ?: text("description"),
         items("highlights"), items("target_users"), items("recent_updates"),
-        items("system_requirements"), items("privacy_notes"))
+        items("system_requirements"), items("privacy_notes"), text("description"), links)
 }
 
 internal class ProjectIntroductionView(
     private val activity: Context,
     private val dp: (Int) -> Int,
-    private val openMembers: () -> Unit
+    private val openMembers: () -> Unit,
+    private val openChannel: ((ProjectChannel) -> Unit)? = null,
+    private val openDescription: (() -> Unit)? = null
 ) {
     private val colors = MobileColors(activity)
 
@@ -44,8 +68,6 @@ internal class ProjectIntroductionView(
         setBackgroundColor(colors.surface)
         setPadding(dp(24), dp(20), dp(24), dp(20))
         val content = space.introduction
-        content?.tagline?.let { addView(label(it, heading = true)) }
-        content?.summary?.let { addView(label(it)) }
         addView(label("团队协作", heading = true))
         val joining = when (space.project.joinMode) {
             PROJECT_JOIN_MODE_OPEN -> "加入同一个项目，按角色权限共同参与。"
@@ -58,13 +80,25 @@ internal class ProjectIntroductionView(
         addView(label(if (development)
             "围绕需求共同讨论、参与 AI 功能开发，查看项目资料和交付记录。管理、发布和节点执行分别受权限与环境约束。"
             else "共同交流需求，查看项目资料与交付记录。可操作范围以当前成员权限为准。"))
-        addView(label("查看项目成员 ›").apply {
+        addView(label(if (canManageProjectMembers(space.project.role)) "管理与邀请成员 ›" else "查看团队成员 ›").apply {
             setTextColor(colors.primary)
             minimumHeight = dp(48)
             isClickable = true
             isFocusable = true
             setOnClickListener { openMembers() }
         })
+        openChannel?.let { select ->
+            space.channels.firstOrNull { it.kind == "ai_development" }?.let { channel ->
+                addView(action("进入 AI 开发") { select(channel) })
+            }
+            space.channels.firstOrNull { it.kind == "discussion" || it.kind == "chat" }?.let { channel ->
+                addView(action("参与项目讨论") { select(channel) })
+            }
+            space.channels.firstOrNull { it.kind == "builds" }?.let { channel ->
+                addView(action("查看构建与交付") { select(channel) })
+            }
+        }
+        addView(label("加入同一个项目 → 围绕需求共同参与 → 查看进度与交付"))
         if (content != null) {
             if (content.highlights.isNotEmpty()) {
                 addView(label("核心能力", heading = true))
@@ -75,7 +109,17 @@ internal class ProjectIntroductionView(
             if (content.updates.isNotEmpty()) addView(expandable("最近更新", content.updates))
             if (content.requirements.isNotEmpty()) addView(expandable("使用条件与环境", content.requirements))
             if (content.privacy.isNotEmpty()) addView(expandable("隐私、权限与使用边界", content.privacy))
+            content.description?.takeIf { it != content.summary }?.let { addView(expandable("完整项目介绍", listOf(it))) }
         }
+        openDescription?.let { open -> addView(action(if (canEditProjectDescription(space.project.role)) "编辑项目简介" else "查看项目简介", open)) }
+    }
+
+    private fun action(title: String, onClick: () -> Unit) = label("$title ›").apply {
+        setTextColor(colors.primary)
+        minimumHeight = dp(48)
+        isClickable = true
+        isFocusable = true
+        setOnClickListener { onClick() }
     }
 
     private fun expandable(title: String, items: List<String>): LinearLayout = LinearLayout(activity).apply {

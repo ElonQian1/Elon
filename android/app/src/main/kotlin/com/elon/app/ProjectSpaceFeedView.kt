@@ -23,6 +23,7 @@ internal class ProjectSpaceFeedView(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val openPost: (ProjectChannel, ProjectChannelMessage) -> Unit,
+    private val openChannel: (ProjectChannel) -> Unit,
     private val openPostComposer: () -> Unit,
     private val openProjectDescription: (ProjectSpace) -> Unit,
     private val openProjectMembers: () -> Unit,
@@ -41,6 +42,8 @@ internal class ProjectSpaceFeedView(
         dp = dp,
         selectableForeground = selectableForeground,
         openProjectMembers = openProjectMembers,
+        openChannel = openChannel,
+        openProjectDescription = openProjectDescription,
         joinProject = joinProject,
         openProjectDocuments = openProjectDocuments,
         openProjectResources = openProjectResources,
@@ -57,7 +60,7 @@ internal class ProjectSpaceFeedView(
         loading: Boolean
     ) {
         val posts = feedPosts(space, messagesByChannel)
-        container.addView(playStoreHeader.render(space, posts.size, projectPreviewImages(space)))
+        container.addView(playStoreHeader.render(space, projectPreviewImages(space)))
         container.addView(projectStoreContent(space, posts, loading))
     }
 
@@ -75,67 +78,8 @@ internal class ProjectSpaceFeedView(
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
 
-            addView(projectAboutSection(space))
+            addView(TextView(activity).apply { text = "项目动态"; textSize = 20f; setTextColor(uiColors.text); setPadding(dp(24), dp(16), dp(24), dp(8)) })
             addView(projectFeedPanel(posts, loading))
-        }
-    }
-
-    private fun projectAboutSection(space: ProjectSpace): LinearLayout {
-        val editable = canEditProjectDescription(space.project.role)
-        val description = space.project.description
-            ?.trim()
-            ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
-        val bodyText = description ?: if (editable) "添加项目简介" else "暂无项目简介"
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), 0, dp(24), 0)
-            isClickable = true
-            foreground = selectableForeground()
-            contentDescription = if (editable) "编辑项目简介" else "查看项目简介"
-            setOnClickListener { openProjectDescription(space) }
-
-            addView(LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                addView(TextView(activity).apply {
-                    text = "关于此应用"
-                    textSize = 20f
-                    includeFontPadding = false
-                    setTypeface(typeface, Typeface.BOLD)
-                    setTextColor(uiColors.text)
-                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(aboutArrowButton(), LinearLayout.LayoutParams(dp(48), dp(48)))
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(48)
-            ))
-
-            addView(TextView(activity).apply {
-                text = bodyText
-                textSize = 16f
-                includeFontPadding = true
-                setTextColor(if (description == null) uiColors.muted else uiColors.muted)
-                setLineSpacing(dp(3).toFloat(), 1f)
-                maxLines = 4
-                ellipsize = TextUtils.TruncateAt.END
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = dp(8)
-            })
-        }
-    }
-
-    private fun aboutArrowButton(): FrameLayout {
-        return FrameLayout(activity).apply {
-            addView(FrameLayout(activity).apply {
-            background = roundedBackground(uiColors.container, 12)
-                addView(ImageView(activity).apply {
-                    setImageResource(R.drawable.ic_project_space_chevron_right)
-                    scaleType = ImageView.ScaleType.CENTER
-                }, FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER))
-            }, FrameLayout.LayoutParams(dp(36), dp(36), Gravity.CENTER))
         }
     }
 

@@ -80,14 +80,14 @@ internal class ProjectSpaceController(
         activity = activity,
         dp = dp,
         selectableForeground = selectableForeground,
-        openPost = { channel, post -> openChannel(channel, postMessage = post) },
+        openPost = { channel, post -> openChannel(channel, postMessage = post) }, openChannel = { channel -> openChannel(channel) },
         openPostComposer = { renderPostComposer() },
         openProjectDescription = { space -> showProjectDescriptionDialog(space) },
         openProjectMembers = { showMembers() },
         joinProject = { handleProjectSpaceJoin() },
         openProjectDocuments = { showProjectDocumentsDialog() },
         openProjectResources = {
-            Toast.makeText(activity, "项目资源入口正在整理。", Toast.LENGTH_SHORT).show()
+            showProjectSpaceResources(activity, activeSpace, serverUrl)
         },
         projectApkActionLabel = {
             val space = activeSpace

@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.ContextThemeWrapper
 import android.view.View
 import android.widget.ScrollView
+import android.widget.LinearLayout
 import com.elon.uiruntime.view.UiRuntimePreviewRequest
 import com.elon.uiruntime.view.UiRuntimePreviewScenario
 import com.elon.uiruntime.view.uiNode
@@ -30,7 +31,7 @@ internal fun projectIntroductionPreviewScenario() = object : UiRuntimePreviewSce
             put("privacy_notes", org.json.JSONArray(listOf("本页仅用于离线布局验收，不代表真实任务完成。")))
         })
         val space = ProjectSpace(
-            project = ProjectSpaceSummary("offline-preview", "项目介绍离线验收", null, "member",
+            project = ProjectSpaceSummary("offline-preview", "项目介绍离线验收", null, if (request.scenario == "readonly") "visitor" else "member",
                 if (request.scenario == "readonly") PROJECT_JOIN_MODE_READONLY else PROJECT_JOIN_MODE_INVITE,
                 3, null, ""),
             channels = if (request.scenario == "empty") emptyList() else listOf(
@@ -42,7 +43,11 @@ internal fun projectIntroductionPreviewScenario() = object : UiRuntimePreviewSce
         val dp: (Int) -> Int = { (it * themed.resources.displayMetrics.density).toInt() }
         return ScrollView(themed).apply {
             setBackgroundColor(MobileColors(themed).surface)
-            addView(ProjectIntroductionView(themed, dp) {}.render(space))
+            addView(LinearLayout(themed).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(ProjectSpaceOverviewView(themed, dp, {}, {}, {}).render(space))
+                addView(ProjectIntroductionView(themed, dp, {}, {}).render(space))
+            })
         }.uiNode("project.introduction.root")
     }
 }
