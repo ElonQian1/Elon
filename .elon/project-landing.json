@@ -36,6 +36,15 @@
       "status": "available",
       "note": "安装后登录一次即可把本机注册为 PC 节点，承接本地项目 AI 开发任务"
     },
+    "macos": {
+      "label": "一龙 Mac 测试版",
+      "short": "Mac",
+      "kind": "desktop_client",
+      "version": "0.1.6",
+      "url": "https://github.com/ElonQian1/Elon/releases/download/macos-preview-v0.1.6-r1/elon-macos-preview-0.1.6-universal.dmg",
+      "status": "partial",
+      "note": "macOS 14+，通用包支持 Apple Silicon 与 Intel。打开 DMG 后拖入 Applications；未 Apple 公证，首次打开方法见安装说明。连接现有工作台，不包含本地 PC 节点；真实账号、语音与附件尚待验收。"
+    },
     "linux": {
       "label": "Linux PC 节点二进制",
       "short": "Linux",
@@ -57,6 +66,7 @@
   "system_requirements": [
     "Android 8.0+ 可安装一龙 APK",
     "Windows 10/11 64 位可运行 PC 节点客户端",
+    "macOS 14+，Apple Silicon 或 Intel 可安装 Mac 测试版；研究 MCP/CDP、自启动和本地 Windows 节点安装升级尚未移植",
     "Linux x86_64 可运行 PC 节点二进制",
     "执行 AI 开发任务的节点需要可用的 Git、Codex/Copilot CLI 或对应模型配置"
   ],
@@ -70,6 +80,14 @@
     "PC 节点路径与运行状态只用于受控执行和健康检查，不作为公开下载内容泄露"
   ],
   "resources": [
+    {
+      "label": "Mac 测试版安装说明、已知限制与验收清单",
+      "url": "https://github.com/ElonQian1/Elon/releases/tag/macos-preview-v0.1.6-r1"
+    },
+    {
+      "label": "Mac 测试版 SHA256 校验清单",
+      "url": "https://github.com/ElonQian1/Elon/releases/download/macos-preview-v0.1.6-r1/SHA256SUMS.txt"
+    },
     {
       "label": "网页版入口",
       "url": "/web"
