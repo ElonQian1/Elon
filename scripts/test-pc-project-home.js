@@ -30,7 +30,7 @@ assert.match(projectPlaza, /<MarketplaceErpInstallDialog/, 'plaza should use the
 assert.match(marketplaceInstall, /\/api\/store\/projects\/\$\{encodeURIComponent\(project\.id\)\}\/erp-instances/, 'ERP onboarding should call the marketplace instance endpoint')
 assert.match(marketplaceInstall, /平台账号登录和商户经营数据不会写入公开模板项目/, 'ERP onboarding should explain tenant data isolation')
 
-for (const contract of ['workflowGrid', 'landing?.highlights', 'landing?.target_users', 'quickChannels', 'projectResources']) {
+for (const contract of ['workflowGrid', 'ProjectIntroduction', 'quickChannels', 'projectResources']) {
   assert.ok(landing.includes(contract), `project landing should include ${contract}`)
 }
 assert.ok(landing.includes('ProjectLandingDownloads'), 'project landing should render the complete download surface')

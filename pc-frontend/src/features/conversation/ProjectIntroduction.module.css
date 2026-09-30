@@ -1,0 +1,31 @@
+.introduction { margin: 24px 0; color: var(--text); }
+.navigation { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 12px 0 20px; }
+.navigation a { color: var(--text-soft); text-decoration: none; padding: 10px 0; }
+.navigation a:hover { color: var(--blue); }
+.navigation a:focus-visible, .actions button:focus-visible, .details summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; }
+.collaboration { display: grid; grid-template-columns: 1.3fr 1fr; gap: 32px; padding: 28px; border: 1px solid var(--border-strong); border-radius: 16px; background: var(--surface); }
+.eyebrow { display: flex; align-items: center; gap: 8px; color: var(--blue); font-size: 13px; }
+.introduction h3 { font-size: 22px; line-height: 1.5; margin: 12px 0; overflow-wrap: anywhere; }
+.introduction p { color: var(--text-soft); font-size: 14px; line-height: 1.8; margin: 8px 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.actions button { display: flex; align-items: center; gap: 10px; padding: 12px 16px; min-height: 44px; color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-2); cursor: pointer; }
+.actions button:hover { border-color: var(--blue); }
+.introduction .permission { font-size: 12px; }
+.steps { list-style: none; display: grid; gap: 18px; align-content: center; }
+.steps li { display: flex; gap: 16px; }
+.steps li > span { color: var(--blue); font-size: 18px; font-variant-numeric: tabular-nums; }
+.steps strong { font-size: 15px; }
+.steps p { margin: 4px 0 0; }
+.capabilities { padding: 32px 0; scroll-margin-top: 20px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); list-style: none; gap: 12px; }
+.grid li { display: flex; gap: 14px; padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.grid li > span { color: var(--blue); padding-top: 8px; font-size: 12px; }
+.grid p { margin: 0; }
+.audience { margin-top: 20px; line-height: 1.8; }
+.audience ul, .details ul { padding-left: 22px; color: var(--text-soft); font-size: 14px; line-height: 1.9; margin-top: 10px; }
+.details { border-top: 1px solid var(--border-strong); }
+.details details { border-bottom: 1px solid var(--border); padding: 8px 0; }
+.details summary { padding: 12px 0; cursor: pointer; font-size: 15px; }
+.details ul { padding-bottom: 16px; }
+.collaboration, .details { scroll-margin-top: 20px; }
+@media (max-width: 700px) { .collaboration { grid-template-columns: 1fr; padding: 20px; gap: 24px; } .grid { grid-template-columns: 1fr; } .introduction h3 { font-size: 20px; } }

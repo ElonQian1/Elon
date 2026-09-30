@@ -1266,7 +1266,7 @@ export default function ConversationPage() {
                   project={activeProject}
                   channels={channels}
                   landing={landing}
-                  onSelectChannel={(id) => { void openDevelopmentDraft(id) }}
+                  onSelectChannel={(id) => { void openDevelopmentDraft(id) }} onOpenMembers={() => navigate(`/projects/${activeProjectId}/members`)}
                 />
               )
             )}

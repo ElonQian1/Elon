@@ -109,8 +109,11 @@
 }
 
 .summary {
-  color: #929dab;
-  font-size: 12.5px;
+  display: block;
+  color: #b8c2d0;
+  font-size: 14px;
+  overflow: visible;
+  -webkit-line-clamp: unset;
 }
 
 .metaRow {
@@ -352,7 +355,7 @@
 
 .overviewGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(300px, .75fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   margin-top: 14px;
 }
@@ -677,8 +680,7 @@
     border-radius: 10px;
   }
 
-  .kicker span + span,
-  .summary {
+  .kicker span + span {
     display: none;
   }
 

@@ -8,7 +8,6 @@ import {
   Hash,
   PackageCheck,
   Rocket,
-  Sparkles,
   UsersRound,
   Wrench,
 } from 'lucide-react'
@@ -19,6 +18,7 @@ import ProjectLandingDownloads, {
   isLandingDownloadEnabled,
 } from './ProjectLandingDownloads'
 import QuantPaperLaunch from './QuantPaperLaunch'
+import ProjectIntroduction from './ProjectIntroduction'
 import styles from './ProjectLanding.module.css'
 
 interface Props {
@@ -26,6 +26,7 @@ interface Props {
   channels: Channel[]
   landing: ProjectLandingData | null
   onSelectChannel: (id: string) => void
+  onOpenMembers?: () => void
 }
 
 interface PrimaryAction {
@@ -47,7 +48,7 @@ interface WorkflowItem {
   onClick: () => void
 }
 
-export default function ProjectLanding({ project, channels, landing, onSelectChannel }: Props) {
+export default function ProjectLanding({ project, channels, landing, onSelectChannel, onOpenMembers }: Props) {
   const devChannel = channels.find((channel) => channel.kind === 'ai_development')
   const buildChannel = channels.find((channel) => channel.kind === 'builds')
   const downloads = landing?.downloads ?? []
@@ -59,11 +60,6 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
     .slice(0, 6)
   const tagline = landing?.tagline || project.description || '项目空间'
   const description = landing?.summary || landing?.description || project.description || '这个项目由一龙平台托管，已接入项目协作、AI 开发和交付流程。'
-  const highlights = (landing?.highlights ?? []).filter(Boolean).slice(0, 4)
-  const targetUsers = (landing?.target_users ?? []).filter(Boolean).slice(0, 4)
-  const recentUpdates = (landing?.recent_updates ?? []).filter(Boolean).slice(0, 6)
-  const privacyNotes = (landing?.privacy_notes ?? []).filter(Boolean)
-  const systemRequirements = (landing?.system_requirements ?? []).filter(Boolean)
   const updatedAt = project.updated_at ? formatTime(project.updated_at) : ''
   const primaryAction = buildPrimaryAction({ devChannel, buildChannel, firstDownload, resources, onSelectChannel })
   const workflow = buildWorkflow({ devChannel, buildChannel, availableDownloads, onSelectChannel })
@@ -116,37 +112,20 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
 
       {quantPaperLaunch && <QuantPaperLaunch integration={quantPaperLaunch} />}
 
-      <section className={styles.startSection} aria-label="项目工作流程">
+      <ProjectIntroduction project={project} channels={channels} landing={landing} onSelectChannel={onSelectChannel} onOpenMembers={onOpenMembers} />
+
+      {workflow.length > 0 && <section className={styles.startSection} aria-label="项目工作流程">
         <div className={styles.startHeader}>
           <span className={styles.sectionEyebrow}>从这里继续</span>
-          <strong>需求、构建和安装，一页看清下一步</strong>
+          <strong>从参与项目到获取交付，找到下一步</strong>
           <p>第一次进入可以按顺序完成；回来继续时，直接点击当前可用步骤。</p>
         </div>
         <div className={styles.workflowGrid}>
           {workflow.map((item) => <WorkflowStep key={item.number} item={item} />)}
         </div>
-      </section>
+      </section>}
 
       <div className={styles.overviewGrid}>
-        <section className={styles.infoPanel}>
-          <PanelHeader icon={Sparkles} title="项目介绍" note="了解项目定位与适用场景" />
-          <p className={styles.overviewText}>{description}</p>
-          {highlights.length > 0 && (
-            <div className={styles.highlightGrid}>
-              {highlights.map((highlight) => <span className={styles.highlightItem} key={highlight}>{highlight}</span>)}
-            </div>
-          )}
-          {targetUsers.length > 0 && (
-            <div className={styles.targetList}>
-              <strong>适用人群</strong>
-              {targetUsers.map((target) => <span key={target}>{target}</span>)}
-            </div>
-          )}
-          <LandingList title="最近更新" items={recentUpdates} />
-          <LandingList title="隐私与风险说明" items={privacyNotes} tone="warning" />
-          <LandingList title="系统要求" items={systemRequirements} />
-        </section>
-
         <section className={styles.infoPanel}>
           <PanelHeader icon={Hash} title="项目入口" note="快速前往常用频道与资料" />
           {quickChannels.length > 0 && (
@@ -210,16 +189,6 @@ function PanelHeader({ icon: Icon, title, note }: { icon: LucideIcon; title: str
   )
 }
 
-function LandingList({ title, items, tone }: { title: string; items: string[]; tone?: 'warning' }) {
-  if (!items.length) return null
-  return (
-    <div className={styles.detailList} data-tone={tone}>
-      <strong>{title}</strong>
-      <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul>
-    </div>
-  )
-}
-
 function WorkflowStep({ item }: { item: WorkflowItem }) {
   return (
     <button
@@ -251,7 +220,7 @@ function buildWorkflow({
   return [
     {
       number: '1',
-      title: '开始做应用',
+      title: '参与功能开发',
       detail: devChannel ? '描述需求、修复问题或继续上次开发。' : '项目还没有配置 AI 开发频道。',
       action: devChannel ? '开始' : '未配置',
       current: !!devChannel,
@@ -260,7 +229,7 @@ function buildWorkflow({
     },
     {
       number: '2',
-      title: '生成安装包',
+      title: '查看构建与交付',
       detail: buildChannel ? '查看构建、发布和交付进度。' : '项目还没有配置构建频道。',
       action: buildChannel ? '查看' : '未配置',
       disabled: !buildChannel,
@@ -274,7 +243,7 @@ function buildWorkflow({
       disabled: !hasDownload,
       onClick: () => document.getElementById('project-landing-downloads')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
     },
-  ]
+  ].filter(item => !item.disabled).map((item, index) => ({ ...item, number: String(index + 1) }))
 }
 
 function buildPrimaryAction({
