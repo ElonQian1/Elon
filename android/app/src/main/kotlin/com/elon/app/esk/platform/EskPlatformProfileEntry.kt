@@ -19,6 +19,15 @@ internal object EskPlatformProfileEntry {
         val density = activity.resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
         host.addView(TextView(activity).apply {
+            text = "ESK 与算力  ›\n购入登记、参考估值、AI 用量与实际账单"
+            textSize = 16f
+            setTextColor(activity.getColor(R.color.elon_text_primary))
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            minimumHeight = dp(48)
+            isFocusable = true
+            setOnClickListener { activity.startActivity(Intent(activity, com.elon.app.esk.compute.EskComputeActivity::class.java)) }
+        })
+        host.addView(TextView(activity).apply {
             tag = ENTRY_TAG
             text = "正式 ESK 平台登记  ›\n查看经审核数量与流水 · 尚未上链"
             textSize = 16f

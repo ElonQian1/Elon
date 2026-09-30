@@ -133,6 +133,11 @@
         </activity>
 
         <activity
+            android:name=".esk.compute.EskComputeActivity"
+            android:exported="false"
+            android:allowTaskReparenting="false" />
+
+        <activity
             android:name=".esk.platform.EskPlatformAssetsActivity"
             android:exported="false"
             android:allowTaskReparenting="false"

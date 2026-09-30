@@ -7,6 +7,7 @@ import AccountSecurityCard from './AccountSecurityCard'
 import ChatGptAccountCard from './ChatGptAccountCard'
 import OpenAiChatKitCard from './OpenAiChatKitCard'
 import EskAssetCard from '../assets/EskAssetCard'
+import EskComputeCenter from '../billing/EskComputeCenter'
 import WindowsExchangeWebviewLaunch from '../exchange-webview/WindowsExchangeWebviewLaunch'
 import styles from './AccountPage.module.css'
 
@@ -103,6 +104,7 @@ export default function AccountPage() {
       <div className={styles.sections}>
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>我的 ESK 资产</h2>
+          <EskComputeCenter />
           <EskAssetCard />
         </section>
 

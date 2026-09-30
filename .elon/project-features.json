@@ -10617,6 +10617,124 @@
       "updated_at_ms": 1788366843075
     },
     {
+      "id": "esk-compute-center-v1",
+      "title": "ESK ??????? V1",
+      "summary": "?? ESK ???????????Token ??????????????????ESK ?????????????????? Paper?",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/esk-compute-center-v1.md",
+        "content_hash": "30dc846c98a3a65202eb136c92b619f90101f7968f813d38086e8262f9f8e4a2",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "bf4d140c66600d34999e5973a54baa422eb92838",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "platform-assets,ai-billing",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/esk/compute",
+        "pc-frontend/src/features/billing",
+        "server/src/esk_platform/compute_center",
+        "server/src/store/common/esk_platform_assets/compute_center.rs"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "???????????????",
+        "??????????Paper??",
+        "???????????",
+        "??????????????"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/esk/compute/EskComputeParserTest.kt",
+          "content_hash": "500cceb035607a644775ed27b265ff673ffeee1c06f8b4147935d9b78cf32d69",
+          "locator": "test:EskComputeParserTest",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a46523d4dbf9cdf8c4c87575864202fb8cf0a1e1",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "docs/reports/esk-compute-center-v1-verification.md",
+          "content_hash": "e3b438fe10dcc57cffcc7efa4b14c74fa323e177bcd0ea4caae4309dd8769c95",
+          "locator": "document:verification",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a0f2c4b936d131f8456f3c817a03ac1b52125052",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-esk-compute-center.cjs",
+          "content_hash": "acd875db33ca9cde2fd1f4c8322e6a76afeabbf527bdb7f89f45b23714fb1b3d",
+          "locator": "test:17_contract_cases",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9e163bc82bfe0af3ea4dd8392e0d7bb9ab55e574",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/esk_platform/compute_center/api.rs",
+          "content_hash": "656e22c84c9d1b3f9435c5cb7ec56f19abc24cac58dc3b81be15f913ece49b14",
+          "locator": "route:/api/me/esk-compute-center",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "c2e0b9bf19274c0099f77bfebed218d3f1188379",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/common/esk_platform_assets/compute_center.rs",
+          "content_hash": "3b66453efab7f0dee121e829c1051916969012f61b224a864d10dfc4c474a729",
+          "locator": "symbol:Store::esk_compute_center",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "68ab535b41b69c130dafa075d55d36c2044c13b8",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/tests/esk-platform-harness/src/tests/compute_center.rs",
+          "content_hash": "6f4fd574477b65be07161e6d5211c0423ce5393ec6cdfcf43dabdfd5c1ebfdbc",
+          "locator": "test:compute_center",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a29309e5a9a60044443451309e61bf4a66ac02a2",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1790758918843,
+      "updated_at_ms": 1790758922616
+    },
+    {
       "id": "esk-early-support-policy-foundation-v1",
       "title": "ESK 两年保障政策草案合同与离线检查 V1",
       "summary": "当前主任务主导新工作；建立版本化 ESK 两年保障政策草案及无网络检查器，保留未决条款并区分草案完整、资金证明及生产授权，不运行真实经济操作。",
@@ -31726,56 +31844,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8de479558ce5453b86f4fdc48236faab",
-      "feature_id": "quant-native-grid-issuer-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "11项生产源码SQL/签名测试和4项完整Store/Router测试通过；量化消费者互操作通过，正式配置和客户端待接线",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789397945935
-    },
-    {
-      "id": "feature_event_e1da6fdfec414cbd93aa1376fe2b7ee4",
-      "feature_id": "quant-native-grid-issuer-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "11项生产源码SQL/签名测试和4项完整Store/Router测试通过；量化消费者互操作通过，正式配置和客户端待接线",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789397946053
-    },
-    {
-      "id": "feature_event_9dd70cc3c14c45258cfac6358466771b",
-      "feature_id": "quant-native-grid-issuer-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "实际8443入口白名单漏项返回404，重新认领修复并补生产组装回归",
-      "from_status": "implemented",
-      "to_status": "ready",
-      "at_ms": 1789399572040
-    },
-    {
-      "id": "feature_event_bd75b3bfada141ddaa56ae8fd9a13346",
-      "feature_id": "quant-native-grid-issuer-v1",
-      "action": "claimed",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789399572380
-    },
-    {
-      "id": "feature_event_d7f78107fcc940bdbe85cb77fc14c0e7",
-      "feature_id": "quant-native-grid-issuer-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "仅补实际账号HTTPS入口放行和全服务集成测试",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789399572442
-    },
-    {
       "id": "feature_event_ff54734275a748d39cf249bc1d87417f",
       "feature_id": "quant-native-grid-issuer-v1",
       "action": "evidence_recorded",
@@ -33724,6 +33792,56 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1790756342642
+    },
+    {
+      "id": "feature_event_8e6b2dd25c7c4d0ab43ab9cd0735306d",
+      "feature_id": "esk-compute-center-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790758918844
+    },
+    {
+      "id": "feature_event_b9601b0a42e547a4a0701794044570cd",
+      "feature_id": "esk-compute-center-v1",
+      "action": "claimed",
+      "actor": "codex-esk-compute-center",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790758919437
+    },
+    {
+      "id": "feature_event_897bf9268e964209a0905242c7b5cd7f",
+      "feature_id": "esk-compute-center-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790758920046
+    },
+    {
+      "id": "feature_event_bfd9c8a4b21b4d829455dd2e4406c192",
+      "feature_id": "esk-compute-center-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790758922047
+    },
+    {
+      "id": "feature_event_0622a0691ba148139ed64238d31f64f6",
+      "feature_id": "esk-compute-center-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "????????????HTTP??????????APK??????????????",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790758922616
     }
   ]
 }

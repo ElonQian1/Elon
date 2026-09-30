@@ -5,6 +5,7 @@ use std::{fs, path::PathBuf};
 mod account_snapshot_auth;
 mod auth;
 mod cancellation;
+mod compute_center;
 mod history;
 mod history_boundaries;
 mod reconciliation_snapshot;

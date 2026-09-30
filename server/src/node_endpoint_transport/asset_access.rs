@@ -38,11 +38,15 @@ pub(crate) fn browser_routes(
     data_dir: &std::path::Path,
 ) -> Router<Arc<AppState>> {
     crate::esk_asset::platform::game_access::browser::routes(data_dir)
+        .merge(crate::esk_asset::platform::compute_center::browser::routes(
+            data_dir,
+        ))
         .layer(Extension(proof(public_url)))
 }
 
 pub(crate) fn routes(public_url: &str) -> Router<Arc<AppState>> {
     access::routes()
+        .merge(crate::esk_asset::platform::compute_center::routes())
         .merge(crate::router::quant_native_grid_access::routes())
         .merge(crate::esk_asset::platform::game_access::routes())
         .merge(crate::esk_asset::platform::game_rewards::routes())

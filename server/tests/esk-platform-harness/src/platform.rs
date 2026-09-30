@@ -1,3 +1,5 @@
+#[path = "../../../src/esk_platform/compute_center/domain.rs"]
+pub(crate) mod compute_center;
 #[path = "../../../src/esk_platform/history_model.rs"]
 pub(crate) mod history_model;
 #[path = "../../../src/esk_platform/model.rs"]

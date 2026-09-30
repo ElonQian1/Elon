@@ -11,6 +11,7 @@ use crate::types::AppState;
 pub(crate) mod access;
 mod access_projection;
 mod api;
+pub(crate) mod compute_center;
 pub(crate) mod game_access;
 pub(crate) mod game_rewards;
 mod history_api;
@@ -33,6 +34,7 @@ pub(crate) use validation::{validate_policy_integrity, validate_prepared_input};
 pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .merge(access::routes())
+        .merge(compute_center::routes())
         .merge(game_access::routes())
         .merge(game_rewards::routes())
         .merge(sui_address_binding::routes())

@@ -13,6 +13,23 @@ mod write;
 
 pub(super) use snapshot::scan_delegated_on;
 
+pub(super) fn center_summary_on(
+    conn: &Connection,
+    user: &str,
+    token: &str,
+    config: &SellbackConfiguration,
+) -> Result<SellbackSummary> {
+    Ok(snapshot::scan_on(
+        conn,
+        user,
+        token,
+        config,
+        snapshot::Selection::Page(1, None),
+    )?
+    .page
+    .summary)
+}
+
 fn authenticate(conn: &Connection, user_id: &str, token: &str) -> Result<()> {
     ensure_session(conn, user_id, token, false).map_err(platform_error)
 }

@@ -1,0 +1,33 @@
+{
+  "schema": "yilong.esk.compute_center.v1",
+  "observed_at_ms": 1000,
+  "fresh_until_ms": 61000,
+  "asset_source": "platform_recorded",
+  "chain_status": "not_deployed",
+  "simulated": false,
+  "funds_moved": false,
+  "asset": {
+    "total_base_units": "80000000", "reserved_base_units": "2000000", "remaining_base_units": "78000000",
+    "entry_count": "1", "snapshot_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "entries": [{"entry_id":"eskp_entry_00000000000000000000000000000000", "allocation_id":"synthetic-allocation", "amount_base_units":"80000000", "created_at":"2026-09-30T00:00:00Z"}],
+    "history_next_cursor": null
+  },
+  "quote": {
+    "quote_id":"synthetic-reference", "source":"测试夹具平台报价", "observed_at_ms":1000, "valid_until_ms":31000,
+    "usdt_per_esk_base_units":"1000000", "cny_per_usdt_base_units":"7300000"
+  },
+  "quote_status":"fresh", "valuation":{"usdt_base_units":"80000000", "cny_base_units":"584000000"},
+  "valuation_basis":"reference_only", "month_basis":"UTC_calendar_month",
+  "usage_sources":[
+    {"billing_source":"platform", "total_tokens":"12000", "input_tokens":"10000", "cached_input_tokens":"0", "output_tokens":"2000", "call_count":"1"},
+    {"billing_source":"client_reported", "total_tokens":"900000", "input_tokens":"900000", "cached_input_tokens":"0", "output_tokens":"0", "call_count":"1"}
+  ],
+  "billing": {
+    "currency":"CNY", "balance_fen":"1234", "month_cost_fen":"4", "page":1, "has_more":false, "holds_has_more":false,
+    "bills":[{"id":"synthetic-bill", "token_usage_event_id":"synthetic-meter", "task_reference":"synthetic-task", "feature":"开发商城首页", "model":"test-model", "input_tokens":"10000", "cached_input_tokens":"0", "output_tokens":"2000", "cost_fen":"4", "price_rule_version":1, "price_source":"rule", "created_at":"2026-09-30T00:00:00Z"}],
+    "holds":[{"id":"synthetic-hold", "task_reference":"synthetic-running-task", "feature":"修复登录问题", "model":"test-model", "reserved_fen":"200", "status":"dispatch_hold", "expires_at":null}]
+  },
+  "capabilities":{"purchase":false, "esk_service_spending":false},
+  "esk_service_reserved_base_units":null, "esk_service_spent_base_units":null,
+  "payment_status":"collection_channel_not_configured", "service_status":"esk_settlement_not_connected"
+}

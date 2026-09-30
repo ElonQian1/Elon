@@ -11,6 +11,7 @@ use super::{hash_token, new_id, now};
 mod access;
 mod access_projection;
 mod cancel;
+mod compute_center;
 mod history;
 mod read;
 mod reconciliation;
