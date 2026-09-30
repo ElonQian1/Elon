@@ -190,8 +190,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .chat-avatar img { display: block; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover; }
 .bubble { font-size: 16px; line-height: 1.5; padding: 10px 13px; border-radius: 16px; }
 .bubble.ai, .bubble.friend { border: 0; }
-.chat-sender-name { font-size: 12px; margin-bottom: 6px; }
-.chat-timeline-label { color: var(--ink-soft); font-size: 12px; line-height: 1.4; }
+.chat-view > .chat-list { gap: 6px; }
+.chat-message-block { gap: 4px; }
+.chat-sender-name { font-size: 12px; margin-bottom: 2px; }
+.chat-timeline-label { color: var(--ink-soft); font-size: 12px; line-height: 1.4; padding: 4px 0 2px; }
 .conversation-item .brand, .conversation-item .brand.group, .conversation-item .brand.round,
 .group-avatar-grid, .group-avatar-tile { background: var(--panel-2); color: var(--ink-soft); }
 .conversation-item .brand .avatar-badge { background: var(--mobile-error-container); color: var(--mobile-error); }

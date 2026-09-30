@@ -59,6 +59,10 @@
       dialog.append(button('引用', () => { quote = structuredClone(message); paintQuote(); dismiss(); options.input.focus(); }),
         button('复制', () => copyMessages([message])), button('转发', () => transfer([message])),
         button('多选', () => { selecting = true; selected.set(message.id, message); paintSelection(); dismiss(); }));
+      block.querySelectorAll('.chat-message-content > .bubble > .group-revision-actions button').forEach(action => {
+        const label = action.textContent.startsWith('已编辑') ? '查看修改记录' : action.textContent;
+        dialog.append(button(label, () => { dismiss(); action.click(); }));
+      });
       block.querySelectorAll('button').forEach(action => {
         if (action.textContent === '识别二维码') dialog.append(button('识别二维码', () => { dismiss(); action.hidden = false; action.click(); }));
       });
@@ -71,6 +75,10 @@
       const more = button('⋯', () => show(message, block), 'social-message-more'); more.title = '消息操作'; more.setAttribute('aria-label', '消息操作');
       const check = node('input'); check.type = 'checkbox'; check.className = 'social-message-check'; check.setAttribute('aria-label', '选择消息'); check.onchange = () => toggle(message);
       block.prepend(check); (block.querySelector('.chat-message-content') || block).append(more); bindings.set(message.id, { block, check }); paintSelection();
+      block.classList.add('social-message-compact');
+      const edited = [...block.querySelectorAll('.chat-message-content > .bubble > .group-revision-actions button')].some(action => action.textContent.startsWith('已编辑'))
+        ? node('span', ' · 已编辑', 'social-message-edited') : null;
+      if (edited) { edited.title = '可在消息操作中查看修改记录'; block.querySelector('.chat-sender-name')?.append(edited); }
       let timer, start;
       const cancelHold = () => { clearTimeout(timer); start = null; };
       const open = event => { if (event.target.closest('input,textarea') || !valid(message)) return; event.preventDefault(); event.stopPropagation(); cancelHold(); suppress = Date.now() + 700; show(message, block); };
@@ -89,7 +97,7 @@
         },
       };
       Object.entries(events).forEach(([name, fn]) => block.addEventListener(name, fn, true));
-      return () => { cancelHold(); Object.entries(events).forEach(([name, fn]) => block.removeEventListener(name, fn, true)); bindings.delete(message.id); more.remove(); check.remove(); };
+      return () => { cancelHold(); Object.entries(events).forEach(([name, fn]) => block.removeEventListener(name, fn, true)); bindings.delete(message.id); more.remove(); check.remove(); edited?.remove(); block.classList.remove('social-message-compact'); };
     }
     function reset() { dismiss(); closeTransfer?.(); closeTransfer = null; quote = null; selecting = false; selected.clear(); key = ''; rows.clear(); ordered = []; paintQuote(); paintSelection(); report(''); }
     function update(messages, kind, contact) {
