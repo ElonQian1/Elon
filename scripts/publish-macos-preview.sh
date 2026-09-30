@@ -44,7 +44,7 @@ bundle_root="${CARGO_TARGET_DIR:?}/universal-apple-darwin/release/bundle"
 app="$bundle_root/macos/一龙工作台 Mac 测试版.app"
 binary="$app/Contents/MacOS/elon-desktop"
 [[ -f "$binary" ]] || { echo 'Bundled executable missing' >&2; exit 1; }
-lipo -verify_arch arm64 x86_64 "$binary"
+lipo "$binary" -verify_arch arm64 x86_64
 codesign --verify --deep --strict --verbose=2 "$app"
 /usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Contents/Info.plist" | grep -qx '14.0'
 /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist" | grep -qx "$version"

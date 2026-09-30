@@ -98,3 +98,12 @@ jobs:
             .ai-tmp/macos-smoke.json
           if-no-files-found: ignore
           retention-days: 7
+      - name: Save trusted Mac compiler cache after verification failures
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ runner.temp }}/elon-macos-target
+          key: macos-preview-rust-1.97-${{ hashFiles('desktop-shell/src-tauri/Cargo.lock') }}-${{ github.sha }}
