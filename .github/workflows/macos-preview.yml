@@ -61,8 +61,8 @@ jobs:
             tail -n 2 .ai-tmp/macos-build.log
             sleep 30
           done
-          wait "$build_pid"
-          result=$?
+          result=0
+          wait "$build_pid" || result=$?
           if [[ "$result" -ne 0 ]]; then
             tail -n 80 .ai-tmp/macos-build.log
             exit "$result"
