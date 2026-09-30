@@ -12,7 +12,7 @@ interface Props {
 
 export default function ProjectIntroduction({ project, channels, landing, onSelectChannel, onOpenMembers }: Props) {
   const development = channels.find(channel => channel.kind === 'ai_development')
-  const discussion = channels.find(channel => channel.kind === 'discussion')
+  const discussion = channels.find(channel => channel.kind === 'discussion' || channel.kind === 'chat')
   const highlights = (landing?.highlights ?? []).filter(Boolean)
   const role = project.role || project.my_role
   const joining = project.join_mode === 'readonly' ? '当前项目提供只读体验，开发操作以授权为准。'
@@ -22,9 +22,10 @@ export default function ProjectIntroduction({ project, channels, landing, onSele
 
   return <section className={styles.introduction} aria-label="项目能力与团队协作">
     <nav className={styles.navigation} aria-label="介绍页导航">
-      <a href="#project-capabilities">核心能力</a>
       <a href="#project-collaboration">团队协作</a>
+      <a href="#project-capabilities">核心能力</a>
       <a href="#project-details">使用与更新</a>
+      <a href="#project-landing-downloads">资料与版本</a>
     </nav>
     <div className={styles.collaboration} id="project-collaboration">
       <div>
@@ -33,11 +34,11 @@ export default function ProjectIntroduction({ project, channels, landing, onSele
         <p>{joining}</p>
         <p>成员可在授权范围内交流需求、查看项目资料和交付记录{development ? '，并参与 AI 开发' : ''}。管理、发布和节点执行分别受权限与环境约束。</p>
         <div className={styles.actions}>
-          {onOpenMembers && <button type="button" onClick={onOpenMembers}>查看团队成员<UsersRound size={16} aria-hidden="true" /></button>}
+          {onOpenMembers && <button type="button" onClick={onOpenMembers}>{['owner', 'admin'].includes(role || '') ? '管理与邀请成员' : '查看团队成员'}<UsersRound size={16} aria-hidden="true" /></button>}
           {development && <button type="button" onClick={() => onSelectChannel(development.id)}>进入 AI 开发<ArrowRight size={16} aria-hidden="true" /></button>}
           {discussion && <button type="button" onClick={() => onSelectChannel(discussion.id)}>参与项目讨论<ArrowRight size={16} aria-hidden="true" /></button>}
         </div>
-        {role && <p className={styles.permission}>你已进入项目空间；可操作范围以当前成员权限为准。</p>}
+        <p className={styles.permission}>{role && !['visitor', 'guest'].includes(role) ? '你已加入项目；可操作范围以当前成员权限为准。' : '你正在浏览项目；加入方式和可操作范围以项目设置为准。'} 手机与 Windows 使用同一个项目空间。</p>
       </div>
       <ol className={styles.steps}>
         <li><span>01</span><div><strong>加入同一个项目</strong><p>按项目设置接受邀请、申请或加入。</p></div></li>

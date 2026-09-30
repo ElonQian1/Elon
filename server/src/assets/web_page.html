@@ -5766,7 +5766,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   }
   if (projectSpaceResourcesBtn) {
     projectSpaceResourcesBtn.addEventListener('click', () => {
-      showNativeOnly('项目资源入口正在整理。');
+      document.getElementById('projectIntroductionSections')?.scrollIntoView({ block: 'end' });
     });
   }
   if (projectSpaceJoinBtn) {

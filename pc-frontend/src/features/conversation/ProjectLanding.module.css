@@ -702,3 +702,13 @@
     transition: none;
   }
 }
+
+/* Both platforms emphasize project identity and work through semantic surfaces. */
+.heroBand { background: var(--surface); border-color: var(--border); box-shadow: none; }
+.identityCopy h2 { color: var(--text); }
+.identityCopy p, .summary { color: var(--text-soft); }
+.kicker, .kicker svg { color: var(--blue); }
+.primaryAction { background: var(--blue); border-color: var(--blue); color: white; }
+.metaRow { flex-wrap: wrap; }
+.primaryAction:hover:not(:disabled) { background: var(--blue); border-color: var(--blue); }
+.primaryIcon, .primaryCopy strong, .primaryCopy small, .primaryAction em { color: #102e65; }

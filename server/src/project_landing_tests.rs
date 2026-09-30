@@ -1,4 +1,14 @@
 use super::*;
+
+#[test]
+fn official_introduction_is_shared_and_does_not_leak_into_subprojects() {
+    let landing = official_project_landing("elon-self").unwrap();
+    assert_eq!(landing["source"]["mode"], "official_manifest");
+    assert_eq!(landing["tagline"], "和团队一起，把想法做成应用");
+    assert!(landing["highlights"].as_array().unwrap().len() >= 6);
+    assert!(landing["downloads"].is_array());
+    assert!(official_project_landing("child-project").is_none());
+}
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]

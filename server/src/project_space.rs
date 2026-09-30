@@ -552,6 +552,9 @@ fn project_landing_manifest(
     user_id: &str,
     project: &crate::store::ProjectAccess,
 ) -> Option<serde_json::Value> {
+    if let Some(landing) = project_landing::official_project_landing(&project.id) {
+        return Some(landing);
+    }
     let workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     let workspace_landing = project_landing::load_workspace_landing(&workspace);

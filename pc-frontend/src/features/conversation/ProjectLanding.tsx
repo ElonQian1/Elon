@@ -61,9 +61,9 @@ export default function ProjectLanding({ project, channels, landing: configuredL
     .filter((channel) => channel.id !== devChannel?.id && channel.id !== buildChannel?.id)
     .slice(0, 6)
   const tagline = landing?.tagline || project.description || '项目空间'
-  const description = landing?.summary || landing?.description || project.description || '这个项目由一龙平台托管，已接入项目协作、AI 开发和交付流程。'
+  const description = landing?.summary || landing?.description || project.description || '项目尚未提供介绍，可从现有频道和资料了解当前内容。'
   const updatedAt = project.updated_at ? formatTime(project.updated_at) : ''
-  const primaryAction = buildPrimaryAction({ devChannel, buildChannel, firstDownload, resources, onSelectChannel })
+  const primaryAction = buildPrimaryAction({ project, devChannel, buildChannel, firstDownload, resources, onSelectChannel, onOpenMembers })
   const workflow = buildWorkflow({ devChannel, buildChannel, availableDownloads, onSelectChannel })
   const quantPaperLaunch = project.id === 'yilong-quant'
     && landing?.paper_launch?.schema === 'yilong.quant.paper_launch.v1'
@@ -88,6 +88,7 @@ export default function ProjectLanding({ project, channels, landing: configuredL
             <p>{tagline}</p>
             {description !== tagline && <span className={styles.summary}>{description}</span>}
             <div className={styles.metaRow}>
+              <MetaPill icon={UsersRound} label={`我的身份：${projectRoleLabel(project.role || project.my_role)}`} />
               <MetaPill icon={UsersRound} label={project.member_count ? `${project.member_count} 位成员` : '项目成员'} />
               <MetaPill icon={Hash} label={`${channels.length} 个频道`} />
               <MetaPill icon={Download} label={availableDownloads.length ? `${availableDownloads.length} 个可用入口` : '等待交付'} />
@@ -129,7 +130,7 @@ export default function ProjectLanding({ project, channels, landing: configuredL
 
       <div className={styles.overviewGrid}>
         <section className={styles.infoPanel}>
-          <PanelHeader icon={Hash} title="项目入口" note="快速前往常用频道与资料" />
+          <PanelHeader icon={Hash} title="资料与项目入口" note="快速前往常用频道与资料" />
           {quickChannels.length > 0 && (
             <div className={styles.quickGrid}>
               {quickChannels.map((channel) => (
@@ -249,23 +250,37 @@ function buildWorkflow({
 }
 
 function buildPrimaryAction({
+  project,
   devChannel,
   buildChannel,
   firstDownload,
   resources,
   onSelectChannel,
+  onOpenMembers,
 }: {
+  project: Project
   devChannel?: Channel
   buildChannel?: Channel
   firstDownload?: ProjectLandingDownload
   resources: Array<{ label: string; url: string }>
   onSelectChannel: (id: string) => void
+  onOpenMembers?: () => void
 }): PrimaryAction {
-  if (devChannel) return { icon: Rocket, title: '继续开发', detail: devChannel.description || '进入 AI 开发频道', label: devChannel.name, onClick: () => onSelectChannel(devChannel.id) }
+  const role = project.role || project.my_role
+  if (!role || role === 'visitor' || role === 'guest') return {
+    icon: UsersRound, title: '了解加入方式', detail: project.join_mode === 'readonly' ? '当前项目提供只读体验' : '查看团队与项目加入规则',
+    label: '查看', onClick: () => document.getElementById('project-collaboration')?.scrollIntoView({ block: 'start' }),
+  }
+  if (devChannel) return { icon: Rocket, title: ['viewer', 'observer'].includes(role) ? '查看开发进度' : '继续开发', detail: devChannel.description || '进入 AI 开发频道', label: devChannel.name, onClick: () => onSelectChannel(devChannel.id) }
+  if (onOpenMembers && !buildChannel && !firstDownload && !resources.length) return { icon: UsersRound, title: '查看团队成员', detail: '了解同一项目中的成员', label: '查看', onClick: onOpenMembers }
   if (buildChannel) return { icon: PackageCheck, title: '查看交付', detail: buildChannel.description || '进入构建与安装包频道', label: buildChannel.name, onClick: () => onSelectChannel(buildChannel.id) }
   if (firstDownload) return { icon: Download, title: '安装使用', detail: firstDownload.label || '下载可用客户端', label: '下载', onClick: () => document.getElementById('project-landing-downloads')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
   if (resources[0]) return { icon: ExternalLink, title: '打开项目', detail: '查看项目主页或外部入口', label: '打开', onClick: () => openUrl(resources[0].url) }
   return { icon: Wrench, title: '等待配置', detail: '项目入口会在频道或交付配置后出现', label: '未就绪', disabled: true, onClick: () => undefined }
+}
+
+function projectRoleLabel(role?: string) {
+  return ({ owner: '项目所有者', admin: '管理员', editor: '开发成员', viewer: '只读成员', member: '项目成员' } as Record<string, string>)[role || ''] || '访客'
 }
 
 function projectResources(landing: ProjectLandingData | null) {

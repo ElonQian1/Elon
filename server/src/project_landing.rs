@@ -12,6 +12,22 @@ const MAX_URL: usize = 2048;
 const MAX_ITEMS: usize = 12;
 const MAX_VARIANTS: usize = 8;
 
+/// All clients receive the official platform introduction through project-space API.
+/// User projects keep their own workspace/snapshot content.
+pub(crate) fn official_project_landing(project_id: &str) -> Option<Value> {
+    if project_id != "elon-self" {
+        return None;
+    }
+    let manifest: Value =
+        serde_json::from_str(include_str!("../../.elon/project-landing.json")).ok()?;
+    let mut landing = normalize_manifest(manifest)?;
+    landing.insert(
+        "source".into(),
+        json!({"mode": "official_manifest", "status": "available"}),
+    );
+    Some(Value::Object(landing))
+}
+
 pub(crate) fn load_workspace_landing(workspace: &Path) -> Option<Value> {
     for relative_path in MANIFEST_PATHS {
         let manifest_path = workspace.join(relative_path);

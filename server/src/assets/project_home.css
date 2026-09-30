@@ -343,3 +343,14 @@
     padding-right: 28px;
   }
 }
+
+/* Shared project-space hierarchy; storefront-only mock metrics are retired. */
+.project-space-summary[data-layout="project-space"] .project-space-metric:first-child,
+.project-space-summary[data-layout="project-space"] .project-space-metric:last-child,
+.project-space-summary[data-layout="project-space"] .project-space-metric-divider { display: none; }
+.project-space-summary[data-layout="project-space"] .project-space-heading { align-items: flex-start; }
+.project-space-summary[data-layout="project-space"] .project-space-name { white-space: normal; overflow-wrap: anywhere; }
+.project-introduction-sections > a { display: flex; align-items: center; min-height: 48px; color: var(--ink); overflow-wrap: anywhere; }
+#projectSpaceFeedHeading { padding: 16px 24px 0; color: var(--ink); font-size: 20px; }
+.project-introduction-sections button, .project-introduction-sections summary { min-height: 48px; }
+.project-space-install, .project-space-join, .project-space-action { min-height: 48px; height: auto; padding: 12px; }

@@ -445,6 +445,13 @@
       root.className = 'project-introduction-sections';
       root.setAttribute('aria-label', '项目能力与团队协作');
       const landing = space?.landing || {};
+      // Keep overview identity first; installation is a project result, not its identity.
+      const download = document.getElementById('projectSpaceDownloadBtn');
+      const summaryCard = document.getElementById('projectSpaceSummary');
+      const title = document.getElementById('projectSpaceStoreSubtitle');
+      if (title) title.textContent = '项目协作空间';
+      if (summaryCard) summaryCard.dataset.layout = 'project-space';
+      if (cleanText(landing.summary)) { anchor.textContent = '编辑项目简介'; if (anchor.disabled) anchor.classList.add('hidden'); }
       const label = (text, heading = false) => {
         const node = document.createElement(heading ? 'h3' : 'p');
         node.textContent = text;
@@ -484,7 +491,34 @@
       list('最近更新', landing.recent_updates);
       list('使用条件与环境', landing.system_requirements);
       list('隐私、权限与使用边界', landing.privacy_notes);
+      if (cleanText(landing.description) && landing.description !== landing.summary) list('完整项目介绍', [landing.description]);
+      label('手机与 Windows 使用同一个项目空间，按权限参与讨论、开发和查看交付。');
+      label('资料与版本', true);
+      const links = [...(Array.isArray(landing.resources) ? landing.resources : []),
+        ...(Array.isArray(landing.downloads) ? landing.downloads.filter(item => ['available', 'external'].includes(item.status)) : [])];
+      if (landing.custom_landing_url) links.unshift({ label: '完整项目介绍', url: landing.custom_landing_url });
+      if (landing.web_url) links.unshift({ label: '打开网页端', url: landing.web_url });
+      const seen = new Set();
+      for (const item of links) {
+        const url = typeof item?.url === 'string' ? item.url : '';
+        if (!/^(https?:\/\/|\/(?!\/))/.test(url) || seen.has(url)) continue;
+        seen.add(url);
+        const link = document.createElement('a');
+        link.href = url;
+        link.textContent = item.label || '项目资料';
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        root.appendChild(link);
+      }
       (document.getElementById('projectSpacePreviewGrid') || anchor).before(root);
+      if (download) root.after(download);
+      const feed = document.getElementById('projectSpaceFeed');
+      if (feed && !document.getElementById('projectSpaceFeedHeading')) {
+        const heading = document.createElement('h3');
+        heading.id = 'projectSpaceFeedHeading';
+        heading.textContent = '项目动态';
+        feed.before(heading);
+      }
     }
   };
 

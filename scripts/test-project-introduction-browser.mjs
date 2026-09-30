@@ -29,6 +29,13 @@ try {
     assert.ok((await page.locator('#project-collaboration').innerText()).includes(message))
   }
   await page.getByLabel('加入方式').selectOption('invite')
+  await page.getByLabel('成员身份').selectOption('visitor')
+  assert.equal(await page.getByRole('button', { name: /继续开发/ }).count(), 0)
+  await page.getByRole('button', { name: /了解加入方式/ }).click()
+  assert.ok((await page.locator('#project-collaboration').innerText()).includes('你正在浏览项目'))
+  await page.getByLabel('成员身份').selectOption('viewer')
+  assert.equal(await page.getByRole('button', { name: /查看开发进度/ }).count(), 1)
+  await page.getByLabel('成员身份').selectOption('member')
   for (const width of [1280, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 900 })
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `horizontal overflow at ${width}`)
@@ -45,20 +52,26 @@ try {
 
   // Exercise the actual PWA renderer with hostile text and rerendering.
   await page.goto('about:blank')
-  await page.setContent('<main><div id="projectSpacePreviewGrid"></div><button id="projectIntroCard">简介</button></main>')
+  await page.setContent('<main><div id="projectSpaceSummary"><button id="projectSpaceDownloadBtn">安装</button></div><div id="projectSpacePreviewGrid"></div><button id="projectIntroCard">简介</button><div id="projectSpaceFeed"></div></main>')
   await page.addStyleTag({ content: fs.readFileSync(path.join(root, 'server/src/assets/project_home.css'), 'utf8') })
   await page.addScriptTag({ content: fs.readFileSync(path.join(root, 'server/src/assets/project_home.js'), 'utf8') })
   await page.evaluate(() => {
     window.ElonProjectIntroduction.render({ join_mode: 'invite' }, { channels: [{ kind: 'ai_development' }], landing: {
-      tagline: '<img src=x onerror=window.__injected=true>', highlights: ['真实能力', '第二项'], recent_updates: ['布局示例']
+      tagline: '<img src=x onerror=window.__injected=true>', highlights: ['真实能力', '第二项'], recent_updates: ['布局示例'],
+      resources: [{ label: '真实资料', url: 'https://example.com/docs' }, { label: '无效入口', url: 'javascript:alert(1)' }]
     } })
   })
   assert.equal(await page.locator('#projectIntroductionSections img').count(), 0)
   assert.ok((await page.locator('#projectIntroductionSections').innerText()).includes('<img src=x'))
+  assert.equal(await page.locator('#projectIntroductionSections a').count(), 1)
+  assert.equal(await page.locator('#projectIntroductionSections + #projectSpaceDownloadBtn').count(), 1)
   await page.getByText('最近更新', { exact: true }).click()
   assert.ok(await page.getByText('布局示例', { exact: true }).isVisible())
   await page.evaluate(() => window.ElonProjectIntroduction.render({ join_mode: 'readonly' }, { channels: [], landing: {} }))
   assert.equal(await page.locator('#projectIntroductionSections').count(), 1)
+  assert.equal(await page.locator('#projectSpaceDownloadBtn').count(), 1)
+  assert.equal(await page.locator('#projectSpaceFeedHeading').count(), 1)
+  assert.equal(await page.locator('#projectIntroductionSections a').count(), 0)
   assert.ok((await page.locator('#projectIntroductionSections').innerText()).includes('只读体验'))
   await page.evaluate(() => window.ElonProjectIntroduction.clear())
   assert.equal(await page.locator('#projectIntroductionSections').count(), 0)

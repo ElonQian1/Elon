@@ -10,13 +10,13 @@ import './styles/globals.css'
 function Preview() {
   const [scenario, setScenario] = useState('main')
   const [mode, setMode] = useState('invite')
+  const [role, setRole] = useState('member')
   const [selection, setSelection] = useState('')
   const source = scenario === 'main' ? manifest
     : scenario === 'child' ? catalog.projects.find(project => project.id === 'yilong-quant')?.landing
     : null
   const landing = source ? {
     ...source,
-    ...(scenario === 'main' ? { tagline: '旧节点快照', summary: '旧节点摘要', highlights: ['旧节点能力'] } : {}),
     downloads: Object.entries(source.downloads).map(([platform, value]) => ({ ...value, platform })),
     paper_launch: undefined,
     windows_webview: undefined,
@@ -32,12 +32,13 @@ function Preview() {
       <label>项目 <select aria-label="预览项目" value={scenario} onChange={event => setScenario(event.target.value)}>
         <option value="main">一龙主项目</option><option value="child">子项目</option><option value="empty">无介绍配置</option>
       </select></label>
+      <label>身份 <select aria-label="成员身份" value={role} onChange={event => setRole(event.target.value)}><option value="member">成员</option><option value="visitor">访客</option><option value="viewer">只读成员</option></select></label>
       <label>加入方式 <select aria-label="加入方式" value={mode} onChange={event => setMode(event.target.value)}>
         <option value="invite">邀请</option><option value="open">开放加入</option><option value="approval">申请审批</option><option value="readonly">只读体验</option>
       </select></label>
       <output aria-live="polite">{selection && `已选择频道：${selection}`}</output>
     </aside>
-    <ProjectLanding project={{ id: scenario === 'main' ? 'elon-self' : 'offline-preview', name: scenario === 'main' ? '一龙 AI' : scenario === 'child' ? '子项目介绍示例' : '尚未配置介绍的项目', role: 'member', join_mode: mode, member_count: 3 }} channels={channels} landing={landing} onSelectChannel={setSelection} onOpenMembers={() => setSelection('members')} />
+    <ProjectLanding project={{ id: scenario === 'main' ? 'elon-self' : 'offline-preview', name: scenario === 'main' ? '一龙 AI' : scenario === 'child' ? '子项目介绍示例' : '尚未配置介绍的项目', role, join_mode: mode, member_count: 3 }} channels={channels} landing={landing} onSelectChannel={setSelection} onOpenMembers={() => setSelection('members')} />
   </>
 }
 
