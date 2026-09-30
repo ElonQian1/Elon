@@ -30,10 +30,19 @@
 - PWA code can preserve its document and remove the intermediate browser tab. It cannot force WeChat's Back behavior, receive a made-up video-ended callback, or restore a document already killed by the OS.
 - The user confirmed the reported return problem is on iPhone. iOS-specific handoff has been added and covered by unit tests, but real iPhone installed-PWA -> WeChat video -> Back acceptance remains pending. Android testing must not substitute for this result. Desktop retains its native path.
 - Embedded Channels playback remains unsupported; thumbnail availability does not mean an authorized video source exists.
-- Release and registered-device installation results are recorded separately after publishing.
+- Release and registered-device installation results are recorded below; browser-engine checks do not replace physical iPhone acceptance.
 
 ## iPhone Evidence And Boundary
 
 - Re-read the live public frontend on 2026-09-30: `https://res.wx.qq.com/t/wx_fed/finder/web/finder-preview/res/assets/mmfinderopenwebapisvr.dd823d0e.js` detects iPhone/iPad as mobile, builds `weixin://biz/finder/openFinderFeed/` with a single URI-encoded scene, then clicks an anchor. It contains no usable third-party return callback in that flow. This supports the launch scheme, not a claim that Back returns to our PWA.
 - [Apple WWDC23 web apps documentation](https://developer.apple.com/videos/play/wwdc2023/10120/) describes out-of-scope links opening in Safari View Controller on iOS Home Screen web apps. Avoiding the intermediate HTTPS page addresses our extra navigation layer, but WeChat/iOS still own external-app return behavior.
 - No spoofed browser identity, fabricated `return_url`, history trap, timers that relaunch the app, or notification-based return workaround was introduced.
+
+## Release Evidence
+
+- Android `1.1.1838 (1838)` published from `00ed7aa68701b058927c15104368434a606fee9e`, which contains both feature commits. The publisher fast-forwarded over unrelated macOS workflow/test changes before building. APK SHA-256: `7e98c53f22b26b40fd2cb4f44812e8bbc568bf42a1bc18fbfd8845e177b375d8`.
+- Release source-asset and manifest checks passed. Registry-driven postflight installed with data preserved and read back build 1838 on the Xiaomi; Honor was offline. `check-task-complete.ps1 -Kind AndroidFeature` passed with exact APK source provenance before this documentation update.
+- Server `0.3.1802` and its PC bundle published from `706f0137732bda8ada28d9a7720857f2ed8ed792`; health and release markers matched. All three individual media asset endpoints matched source (normalized line endings), with `no-cache`. Server and PC input diffs between this source and APK source `00ed7aa` are empty; the only intervening paths are a macOS workflow and a desktop Rust test. The generic Server/PcFrontend completion checks reject this unrelated HEAD advancement, so their strict SHA check did not pass; no duplicate server rebuild was used to hide this distinction.
+- Live-page verification caught a separate stale runtime template: the asset endpoint was current, but the PWA homepage still embedded the Android-only handoff generation. `publish-mobile-pwa-static.ps1` atomically published the complete source `00ed7aa` generation, hash `79999b6168028096cab3a81bcbf9fa8287ef625d4f2227301a064f5dcf15f5f3`.
+- Added `scripts/test-live-pwa-media-assets.mjs` to parse the served page without executing its application code. Card JS, CSS and the iOS-capable handoff module now match the actual inline runtime on both `http://43.139.149.158:8080/web` and `https://43.139.149.158:8443/web`. Checking only separate asset URLs is insufficient when the runtime template is active.
+- No physical iPhone was available: installed PWA -> exact WeChat video -> return to the same PWA remains explicitly unverified. The user was asked to confirm the destination and return behavior after reopening the PWA. No login state was cleared.
