@@ -16,6 +16,7 @@ function Preview() {
     : null
   const landing = source ? {
     ...source,
+    ...(scenario === 'main' ? { tagline: '旧节点快照', summary: '旧节点摘要', highlights: ['旧节点能力'] } : {}),
     downloads: Object.entries(source.downloads).map(([platform, value]) => ({ ...value, platform })),
     paper_launch: undefined,
     windows_webview: undefined,
@@ -36,7 +37,7 @@ function Preview() {
       </select></label>
       <output aria-live="polite">{selection && `已选择频道：${selection}`}</output>
     </aside>
-    <ProjectLanding project={{ id: 'offline-preview', name: scenario === 'main' ? '一龙 AI' : scenario === 'child' ? '子项目介绍示例' : '尚未配置介绍的项目', role: 'member', join_mode: mode, member_count: 3 }} channels={channels} landing={landing} onSelectChannel={setSelection} onOpenMembers={() => setSelection('members')} />
+    <ProjectLanding project={{ id: scenario === 'main' ? 'elon-self' : 'offline-preview', name: scenario === 'main' ? '一龙 AI' : scenario === 'child' ? '子项目介绍示例' : '尚未配置介绍的项目', role: 'member', join_mode: mode, member_count: 3 }} channels={channels} landing={landing} onSelectChannel={setSelection} onOpenMembers={() => setSelection('members')} />
   </>
 }
 

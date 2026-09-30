@@ -19,6 +19,7 @@ import ProjectLandingDownloads, {
 } from './ProjectLandingDownloads'
 import QuantPaperLaunch from './QuantPaperLaunch'
 import ProjectIntroduction from './ProjectIntroduction'
+import { resolveProjectLandingContent } from './projectLandingContent'
 import styles from './ProjectLanding.module.css'
 
 interface Props {
@@ -48,7 +49,8 @@ interface WorkflowItem {
   onClick: () => void
 }
 
-export default function ProjectLanding({ project, channels, landing, onSelectChannel, onOpenMembers }: Props) {
+export default function ProjectLanding({ project, channels, landing: configuredLanding, onSelectChannel, onOpenMembers }: Props) {
+  const landing = resolveProjectLandingContent(project.id, configuredLanding)
   const devChannel = channels.find((channel) => channel.kind === 'ai_development')
   const buildChannel = channels.find((channel) => channel.kind === 'builds')
   const downloads = landing?.downloads ?? []

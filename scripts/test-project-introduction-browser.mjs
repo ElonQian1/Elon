@@ -16,6 +16,8 @@ try {
   await page.goto(`${process.env.INTRO_PREVIEW_ORIGIN || 'http://127.0.0.1:5177'}/pc/project-introduction-preview.html`)
   await page.getByRole('heading', { name: '核心能力', exact: true }).waitFor()
   assert.equal(await page.locator('#project-capabilities > ul > li').count(), 6)
+  assert.ok((await page.locator('body').innerText()).includes('和团队一起，把想法做成应用'))
+  assert.equal((await page.locator('body').innerText()).includes('旧节点摘要'), false)
   await page.getByRole('button', { name: '查看团队成员' }).click()
   assert.match(await page.locator('output').innerText(), /members/)
   await page.getByRole('button', { name: '参与项目讨论' }).click()
