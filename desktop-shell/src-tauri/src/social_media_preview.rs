@@ -82,14 +82,14 @@ pub async fn get_social_media_read_preview(
         .app_local_data_dir()
         .map_err(|_| "profile_unavailable")?
         .join("reading-tabs-profile");
-    let mut builder = WebviewBuilder::new(LABEL, WebviewUrl::External(target))
-        .data_directory(profile)
-        .initialization_script(crate::internal_browser::read_preview::ADAPTER)
-        .initialization_script(SILENT)
-        .on_navigation(move |next| {
-            next.scheme() == "https" && next.host_str() == Some(host.as_str())
-        })
-        .on_new_window(|_, _| NewWindowResponse::Deny);
+    let mut builder = crate::browser_profile::persistent(
+        WebviewBuilder::new(LABEL, WebviewUrl::External(target)),
+        &profile,
+    )
+    .initialization_script(crate::internal_browser::read_preview::ADAPTER)
+    .initialization_script(SILENT)
+    .on_navigation(move |next| next.scheme() == "https" && next.host_str() == Some(host.as_str()))
+    .on_new_window(|_, _| NewWindowResponse::Deny);
     if mobile {
         builder = builder.user_agent(MOBILE_UA);
     }

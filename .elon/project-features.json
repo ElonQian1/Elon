@@ -17990,6 +17990,49 @@
       "updated_at_ms": 1789415272360
     },
     {
+      "id": "macos_desktop_preview_v1",
+      "title": "macOS 工作台通用测试包",
+      "summary": "通过 macOS CI 构建并发布桌面测试包，补 WKWebView Profile 隔离与系统浏览器跳转，用户协助验收，保留 Windows 专属能力边界。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/macos-desktop-preview-v1.md",
+        "content_hash": "a5202997ed557b32043766d5bec8665fe56e950f118c9e108350c36e65c2c892",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "804d579c27bb12bb21fd17503dc9221ab5954be1",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "0c50187b96646af28671b5f9d7a96f245019d3dc",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "Codex",
+      "tags": [],
+      "task_paths": [
+        ".github/workflows/macos-preview.yml",
+        "desktop-shell/src-tauri/src/browser_profile.rs",
+        "scripts/publish-macos-preview.sh"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "macOS CI 测试通过并构建双架构 DMG",
+        "GitHub prerelease 提供工件 SHA-256 和验收边界",
+        "用户实机验收独立标为待验收"
+      ],
+      "implementation_evidence": [],
+      "claim": {
+        "claim_id": "claim_e5cf6d166a24407e828dbcf66edf18bd",
+        "agent_id": "Codex-macos-preview",
+        "claimed_at_ms": 1790753012336,
+        "expires_at_ms": 1790767412336
+      },
+      "created_at_ms": 1790752913433,
+      "updated_at_ms": 1790753454697
+    },
+    {
       "id": "merchant-erp-open-commerce-runtime-bridge-v1",
       "title": "通用 ERP 开放商业商户运行时桥 V1",
       "summary": "把通用 ERP 能力编译为签名商户运行时绑定，以能力合同统一动作确认、平台幂等键和标准订单业务回执。",
@@ -31636,36 +31679,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_5650a1db41d74b5a82f67b72500dbf00",
-      "feature_id": "binance-wallet-permission-diagnostics-v1",
-      "action": "claimed",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789381434160
-    },
-    {
-      "id": "feature_event_7401deaa8e2a403dab0d234fb8bf0ff9",
-      "feature_id": "binance-wallet-permission-diagnostics-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "固定事实分类及MCP接线已完成，正在验证钱包和宿主回归",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789381481029
-    },
-    {
-      "id": "feature_event_6ca4ff3f1b7343f3bd3dc6103f31a5f7",
-      "feature_id": "binance-wallet-permission-diagnostics-v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789381881055
-    },
-    {
       "id": "feature_event_5d9cbd5b53bd4bf5b91167826d9deed7",
       "feature_id": "binance-wallet-permission-diagnostics-v1",
       "action": "transitioned",
@@ -33634,6 +33647,36 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1790668106266
+    },
+    {
+      "id": "feature_event_f424b8b001914eebbd248b89143e30e8",
+      "feature_id": "macos_desktop_preview_v1",
+      "action": "registered",
+      "actor": "Codex",
+      "reason": "用户明确授权编译发布 Mac 包供用户测试",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790752913433
+    },
+    {
+      "id": "feature_event_3250b1a20ece46359f2ba1abac180359",
+      "feature_id": "macos_desktop_preview_v1",
+      "action": "claimed",
+      "actor": "Codex-macos-preview",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790753012337
+    },
+    {
+      "id": "feature_event_4f42f166ed284f5eab13a9782640fab4",
+      "feature_id": "macos_desktop_preview_v1",
+      "action": "transitioned",
+      "actor": "Codex",
+      "reason": "已实现 Mac Profile 和发布入口，进入验证",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790753454697
     }
   ]
 }

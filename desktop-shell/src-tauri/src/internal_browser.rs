@@ -157,36 +157,38 @@ pub async fn open_internal_browser_tab(
         .app_local_data_dir()
         .map_err(display_error)?
         .join(PROFILE_DIR);
-    let builder = WebviewBuilder::new(&label, WebviewUrl::External(url.clone()))
-        .initialization_script(read_preview::ADAPTER)
-        .data_directory(profile)
-        .enable_clipboard_access()
-        .on_navigation(|next| external_navigation::validate_external_url(next).is_ok())
-        .on_new_window(|next, _features| {
-            let _ = external_navigation::open_in_system_browser(&next);
-            NewWindowResponse::Deny
-        })
-        .on_page_load(move |_webview, payload| {
-            let current_url = payload.url().as_str().to_string();
-            let current_host = payload.url().host_str().unwrap_or_default().to_string();
-            let loading = payload.event() == PageLoadEvent::Started;
-            let loaded = payload.event() == PageLoadEvent::Finished;
-            let failed = payload.url().scheme() == "edge-error";
-            let last_error = failed.then(|| "页面加载失败，建议改用系统浏览器。".to_string());
-            page_runtime.update(&page_tab, |state| {
-                if !failed {
-                    state.current_url = current_url;
-                    state.current_host = current_host;
-                }
-                state.loading = loading;
-                state.loaded = loaded;
-                state.last_error = last_error;
-            });
-        })
-        .on_document_title_changed(move |_webview, title| {
-            let title = safe_title(Some(&title), "网页");
-            title_runtime.update(&title_tab, |state| state.title = title);
+    let builder = crate::browser_profile::persistent(
+        WebviewBuilder::new(&label, WebviewUrl::External(url.clone())),
+        &profile,
+    )
+    .initialization_script(read_preview::ADAPTER)
+    .enable_clipboard_access()
+    .on_navigation(|next| external_navigation::validate_external_url(next).is_ok())
+    .on_new_window(|next, _features| {
+        let _ = external_navigation::open_in_system_browser(&next);
+        NewWindowResponse::Deny
+    })
+    .on_page_load(move |_webview, payload| {
+        let current_url = payload.url().as_str().to_string();
+        let current_host = payload.url().host_str().unwrap_or_default().to_string();
+        let loading = payload.event() == PageLoadEvent::Started;
+        let loaded = payload.event() == PageLoadEvent::Finished;
+        let failed = payload.url().scheme() == "edge-error";
+        let last_error = failed.then(|| "页面加载失败，建议改用系统浏览器。".to_string());
+        page_runtime.update(&page_tab, |state| {
+            if !failed {
+                state.current_url = current_url;
+                state.current_host = current_host;
+            }
+            state.loading = loading;
+            state.loaded = loaded;
+            state.last_error = last_error;
         });
+    })
+    .on_document_title_changed(move |_webview, title| {
+        let title = safe_title(Some(&title), "网页");
+        title_runtime.update(&title_tab, |state| state.title = title);
+    });
     let main_window = app
         .get_window(MAIN_WINDOW_LABEL)
         .ok_or_else(|| "一龙主窗口不可用。".to_string())?;

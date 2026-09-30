@@ -1,0 +1,98 @@
+name: macOS Desktop Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/macos-preview.yml
+      - scripts/publish-macos-preview.sh
+      - scripts/smoke-macos-preview.mjs
+      - desktop-shell/src-tauri/tauri.macos.conf.json
+      - desktop-shell/src-tauri/Info.macos.plist
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-desktop-preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      CARGO_TARGET_DIR: ${{ runner.temp }}/elon-macos-target
+      MACOSX_DEPLOYMENT_TARGET: '14.0'
+      RUST_TEST_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.0
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ runner.temp }}/elon-macos-target
+          key: macos-preview-rust-1.97-${{ hashFiles('desktop-shell/src-tauri/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            macos-preview-rust-1.97-${{ hashFiles('desktop-shell/src-tauri/Cargo.lock') }}-
+      - name: Test, build, smoke and verify universal package
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p .ai-tmp
+          bash scripts/publish-macos-preview.sh > .ai-tmp/macos-build.log 2>&1 &
+          build_pid=$!
+          while kill -0 "$build_pid" 2>/dev/null; do
+            echo "macOS preview build running: $(date -u +%FT%TZ)"
+            tail -n 2 .ai-tmp/macos-build.log
+            sleep 30
+          done
+          wait "$build_pid"
+          result=$?
+          if [[ "$result" -ne 0 ]]; then
+            tail -n 80 .ai-tmp/macos-build.log
+            exit "$result"
+          fi
+          tail -n 20 .ai-tmp/macos-build.log
+      - name: Preserve verified preview artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: elon-macos-preview-universal
+          path: .ai-tmp/macos-preview/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish test release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="0.1.${GITHUB_RUN_NUMBER}"
+          tag="macos-preview-v${version}-r${GITHUB_RUN_ATTEMPT}"
+          gh release create "$tag" .ai-tmp/macos-preview/* \
+            --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "一龙 Mac 测试版 ${version}" \
+            --notes-file .ai-tmp/macos-preview/TESTING.md
+          gh release view "$tag" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve bounded build diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-preview-build-diagnostics
+          path: |
+            .ai-tmp/macos-build.log
+            .ai-tmp/macos-smoke.json
+          if-no-files-found: ignore
+          retention-days: 7

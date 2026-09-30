@@ -118,10 +118,12 @@ pub(super) async fn open(
                 display_error(error)
             })?
     };
-    let mut builder = WebviewBuilder::new(&window_label, WebviewUrl::External(bootstrap_url))
-        .data_directory(profile_directory)
-        .incognito(false)
-        .enable_clipboard_access();
+    let mut builder = crate::browser_profile::persistent(
+        WebviewBuilder::new(&window_label, WebviewUrl::External(bootstrap_url)),
+        &profile_directory,
+    )
+    .incognito(false)
+    .enable_clipboard_access();
     if let Some(adapter) = provider.adapter {
         builder = builder.initialization_script(if task_id.is_some() && provider.id == "chatgpt" {
             group_text_bootstrap::initialization_script()

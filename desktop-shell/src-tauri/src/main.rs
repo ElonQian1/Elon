@@ -26,13 +26,14 @@
 
 mod autostart;
 mod bilibili_preview;
-mod social_media_preview;
+mod browser_profile;
 mod browser_research;
 mod codex_semantic_bridge;
 mod external_navigation;
 mod group_ai_worker;
 mod internal_browser;
 mod local_ai_browser;
+mod social_media_preview;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -291,7 +292,7 @@ fn main() {
                 handle,
                 "autostart",
                 "开机自动启动",
-                true,
+                cfg!(windows),
                 autostart::is_enabled(),
                 None::<&str>,
             )?;

@@ -85,7 +85,19 @@ fn open_platform_url(value: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+fn open_platform_url(value: &str) -> Result<(), String> {
+    let status = std::process::Command::new("/usr/bin/open")
+        .arg(value)
+        .status()
+        .map_err(|_| "无法启动 macOS 系统浏览器".to_string())?;
+    if !status.success() {
+        return Err("macOS 系统浏览器拒绝打开链接".to_string());
+    }
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn open_platform_url(_value: &str) -> Result<(), String> {
     Err("当前桌面壳只在 Windows 上提供系统浏览器跳转".to_string())
 }
