@@ -75,7 +75,7 @@ async fn guard(request: Request, next: Next) -> Response {
     response
 }
 
-fn throttle(request: &Request) -> Option<Response> {
+pub(super) fn throttle(request: &Request) -> Option<Response> {
     if request.method() == Method::GET {
         return None;
     }

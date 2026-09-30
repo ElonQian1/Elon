@@ -60,6 +60,10 @@ pub(super) fn build(
     };
     router
         .merge(super::asset_access::routes(&state.public_url))
+        .merge(super::asset_access::compute_center_routes(
+            &state.public_url,
+            &state.data_dir,
+        ))
         .merge(super::asset_access::browser_routes(
             &state.public_url,
             &state.data_dir,

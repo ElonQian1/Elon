@@ -11,6 +11,12 @@ use tower::ServiceExt;
 fn secure(f: &Fixture) -> Router {
     crate::node_endpoint_transport::asset_access::test_routes("https://main.example.test")
         .merge(
+            crate::node_endpoint_transport::asset_access::compute_center_routes(
+                "https://main.example.test",
+                &f.state.data_dir,
+            ),
+        )
+        .merge(
             crate::node_endpoint_transport::asset_access::browser_routes(
                 "https://main.example.test",
                 &f.state.data_dir,

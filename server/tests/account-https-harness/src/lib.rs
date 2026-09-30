@@ -10,6 +10,8 @@ mod auth_request_guard;
 mod auth_safety_store;
 #[path = "../../../src/account_security/https/config.rs"]
 mod config;
+#[path = "../../../src/account_security/https/esk_compute_policy.rs"]
+mod esk_compute_policy;
 #[path = "../../../src/federated_auth_idempotency.rs"]
 mod federated_auth_idempotency;
 #[path = "../../../src/account_security/https/mobile_pwa.rs"]

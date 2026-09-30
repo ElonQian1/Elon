@@ -10659,23 +10659,23 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
-            "head_blob_oid": "",
+            "head_commit": "53eb8dfaaa71125e6d3be58fde616f4352e701cb",
+            "head_blob_oid": "a46523d4dbf9cdf8c4c87575864202fb8cf0a1e1",
             "worktree_blob_oid": "a46523d4dbf9cdf8c4c87575864202fb8cf0a1e1",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "docs/reports/esk-compute-center-v1-verification.md",
-          "content_hash": "e3b438fe10dcc57cffcc7efa4b14c74fa323e177bcd0ea4caae4309dd8769c95",
+          "content_hash": "ce86349f9f3a65ee0a0b7bddfaf4032eadf168d695d4faad2bac18f7f8b37ee0",
           "locator": "document:verification",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "a0f2c4b936d131f8456f3c817a03ac1b52125052",
-            "state": "index_only"
+            "head_commit": "53eb8dfaaa71125e6d3be58fde616f4352e701cb",
+            "head_blob_oid": "a0f2c4b936d131f8456f3c817a03ac1b52125052",
+            "worktree_blob_oid": "eda18549c39e2cc2f458da6ed49656d673b863b9",
+            "state": "tracked_modified"
           }
         },
         {
@@ -10685,10 +10685,36 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
-            "head_blob_oid": "",
+            "head_commit": "53eb8dfaaa71125e6d3be58fde616f4352e701cb",
+            "head_blob_oid": "9e163bc82bfe0af3ea4dd8392e0d7bb9ab55e574",
             "worktree_blob_oid": "9e163bc82bfe0af3ea4dd8392e0d7bb9ab55e574",
-            "state": "index_only"
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "server/src/account_security/https/esk_compute_policy.rs",
+          "content_hash": "d0cf60d1cfb6459128aa0248a6dc1fed38f7fc4fcd391788f850c1975e7d53e9",
+          "locator": "test:exact_account_center_routes_reach_auth_and_reject_query_credentials",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "53eb8dfaaa71125e6d3be58fde616f4352e701cb",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "84947278e6fc427731d3185cfb071d540cfd931c",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "server/src/account_security/https/mod.rs",
+          "content_hash": "585d1ff5af184a43735aa4ef57179d291044b0bce7cd12042014690c0eb09862",
+          "locator": "symbol:routes",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "53eb8dfaaa71125e6d3be58fde616f4352e701cb",
+            "head_blob_oid": "36a4a24d6ccf1e9f0e4a3ce7b65b91afab2cb7f8",
+            "worktree_blob_oid": "747b1c14ad4e364216a45381e045f5709f29e4cc",
+            "state": "tracked_modified"
           }
         },
         {
@@ -10698,10 +10724,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
-            "head_blob_oid": "",
+            "head_commit": "53eb8dfaaa71125e6d3be58fde616f4352e701cb",
+            "head_blob_oid": "c2e0b9bf19274c0099f77bfebed218d3f1188379",
             "worktree_blob_oid": "c2e0b9bf19274c0099f77bfebed218d3f1188379",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -10711,10 +10737,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
-            "head_blob_oid": "",
+            "head_commit": "53eb8dfaaa71125e6d3be58fde616f4352e701cb",
+            "head_blob_oid": "68ab535b41b69c130dafa075d55d36c2044c13b8",
             "worktree_blob_oid": "68ab535b41b69c130dafa075d55d36c2044c13b8",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -10724,15 +10750,15 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "c1ca1cd5336896094154312ee3eb66b5d060198d",
-            "head_blob_oid": "",
+            "head_commit": "53eb8dfaaa71125e6d3be58fde616f4352e701cb",
+            "head_blob_oid": "a29309e5a9a60044443451309e61bf4a66ac02a2",
             "worktree_blob_oid": "a29309e5a9a60044443451309e61bf4a66ac02a2",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1790758918843,
-      "updated_at_ms": 1790758922616
+      "updated_at_ms": 1790760306215
     },
     {
       "id": "esk-early-support-policy-foundation-v1",
@@ -31844,56 +31870,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_ff54734275a748d39cf249bc1d87417f",
-      "feature_id": "quant-native-grid-issuer-v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789399764246
-    },
-    {
-      "id": "feature_event_44d11b10e10f42b3a0d05386772d4bda",
-      "feature_id": "quant-native-grid-issuer-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "17项完整服务测试通过；修复真实HTTPS白名单，正式签发及客户端仍保持部分完成",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789399764314
-    },
-    {
-      "id": "feature_event_7ae8f37cf5bd43bf90b966959a3a6fd9",
-      "feature_id": "group-message-revisions-v1",
-      "action": "registered",
-      "actor": "codex-group-message-revisions",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789411581680
-    },
-    {
-      "id": "feature_event_46e362aa79d64d93a3017701cb2ecccf",
-      "feature_id": "group-message-revisions-v1",
-      "action": "claimed",
-      "actor": "codex-group-message-revisions",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789411609505
-    },
-    {
-      "id": "feature_event_f0048b249d4b4fe08a9281fc34376928",
-      "feature_id": "group-message-revisions-v1",
-      "action": "transitioned",
-      "actor": "codex-group-message-revisions",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789412271854
-    },
-    {
       "id": "feature_event_fc15cd3dec7446f883c2bee7ddd83feb",
       "feature_id": "group-message-revisions-v1",
       "action": "evidence_recorded",
@@ -33842,6 +33818,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1790758922616
+    },
+    {
+      "id": "feature_event_6966343c79fc48e8be278b6ea18e2006",
+      "feature_id": "esk-compute-center-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "??????HTTPS???????????",
+      "from_status": "implemented",
+      "to_status": "ready",
+      "at_ms": 1790760144685
+    },
+    {
+      "id": "feature_event_bfb92e3c5e8d4a0fa9a27d057e9a07ba",
+      "feature_id": "esk-compute-center-v1",
+      "action": "claimed",
+      "actor": "codex-esk-compute-center",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790760145472
+    },
+    {
+      "id": "feature_event_f2ba70678c3b472a8c4377b54c90ae0d",
+      "feature_id": "esk-compute-center-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790760146096
+    },
+    {
+      "id": "feature_event_7de877f804c341589ebeee0bf7e4716a",
+      "feature_id": "esk-compute-center-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790760305614
+    },
+    {
+      "id": "feature_event_2ac8c9e3ebb34b978d274ceb4e731c51",
+      "feature_id": "esk-compute-center-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "????????????HTTP??????????APK??????????????",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790760306215
     }
   ]
 }

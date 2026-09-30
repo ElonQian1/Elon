@@ -11,6 +11,7 @@ use crate::types::AppState;
 
 mod acme;
 mod config;
+mod esk_compute_policy;
 mod mobile_pwa;
 mod policy;
 mod quant_public;
@@ -65,6 +66,13 @@ pub(crate) fn routes(state: Arc<AppState>, public_quant: bool) -> Router {
         ))
         .with_state(state.clone());
     quant_public::attach(policy::protect(app), &state.data_dir, public_quant)
+        .merge(esk_compute_policy::protect(
+            crate::node_endpoint_transport::asset_access::compute_center_routes(
+                &esk_compute_policy::origin(&state.public_url),
+                &state.data_dir,
+            )
+            .with_state(state.clone()),
+        ))
         .merge(square::routes(state))
         .merge(square_page::routes())
 }
