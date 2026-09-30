@@ -97,6 +97,46 @@ Restore-ElonVerifiedTreeArchive -ArchiveDirectory <one-verified-archive> `
 
 恢复会重验清单和 payload 哈希。成功归档不代表当前安装、回滚或 pending 发布可以删除。
 
+## 退役回滚快照
+
+`scripts/maintain-node-rollback.ps1` 是独立、显式运行的回滚维护入口，不修改历史发布状态，
+不随升级自动执行。它只枚举旧用户目录和通过节点归属校验的现用发布根。
+默认保留当前安装相关快照、最近两个不同的 prior 版本及 30 天内快照；
+缺清单、无可信成功升级回执、失败或非终态引用、内容或身份不一致时保留原件。
+候选必须绑定 `activated/complete`、`outcome=activated` 和 `rollback_state=not_required`，
+并核对清单、独立回执和发布记录的摘要、版本、时间与快照名称。
+
+```powershell
+& .\scripts\maintain-node-rollback.ps1 -Mode Preview `
+  -PlanPath <new-local-plan.json> -ArchiveRoot <shared-archive-root> `
+  -PrivateRoot <dedicated-local-private-directory>
+& .\scripts\maintain-node-rollback.ps1 -Mode Apply `
+  -PlanPath <same-local-plan.json> -ExpectedPlanSha256 <printed-sha256>
+```
+
+计划绑定本机、实际运行身份、受管根、候选证据、PowerShell 主版本和归档目标，24 小时过期。
+预演与执行使用相同 PowerShell 主版本；恢复归档支持 PowerShell 5.1 和 7。
+执行持有已有发布根的激活锁及安装更新锁，在复制前后重验候选与实际节点身份。
+这些锁覆盖现有受管激活和自动更新；独立手动 repair 不完整遵循同一锁协议，
+因此操作期间不得同时手动安装或切换版本，检测到相关进程或身份变化即停止。
+
+归档按内容职责拆分：共享盘只接收清单允许的三个固定程序 EXE；原始清单、
+`node-agent.env`、其他配置、脚本和静态资源保存在本机专用目录，ACL 限制为当前用户、
+SYSTEM 和管理员。已有未知目录不能被强行接管或改 ACL；私有根不能位于 UNC 或映射网络盘。
+两部分全部核验、回执持久化、源快照再次完整校验后才回收原快照。
+统计分别记录原快照大小、共享程序字节和本地保留字节，不能把原快照总量全算作净释放。
+
+恢复必须同时具备共享程序文件和本机私有回执/文件，并使用原机器和用户：
+
+```powershell
+. .\scripts\node-storage-rollback-archive.ps1
+Restore-ElonRollbackSplitArchive -ReceiptPath <local-private-receipt.json> `
+  -Path <new-local-restore-directory> -AllowedRoot <approved-local-parent>
+```
+
+恢复只重建并验证快照，不启动安装或回滚；拒绝覆盖现有目标。
+本机私有目录是恢复材料，不再是可随意删除的临时缓存。维护没有放宽通用发布归档入口的回滚保护。
+
 ## 避免再次积累
 
 - Cargo 用户 include、项目 wrapper、launcher 和用户环境必须指向同一个预期根。
