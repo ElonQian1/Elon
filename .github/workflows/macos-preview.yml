@@ -26,11 +26,13 @@ jobs:
     permissions:
       contents: write
     env:
-      CARGO_TARGET_DIR: ${{ runner.temp }}/elon-macos-target
       MACOSX_DEPLOYMENT_TARGET: '14.0'
       RUST_TEST_THREADS: '1'
     steps:
       - uses: actions/checkout@v4
+      - name: Configure ephemeral Mac build directory
+        shell: bash
+        run: echo "CARGO_TARGET_DIR=${RUNNER_TEMP}/elon-macos-target" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
