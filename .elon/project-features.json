@@ -21017,6 +21017,109 @@
       "updated_at_ms": 1788827163625
     },
     {
+      "id": "profile-ai-account-clarity-v1",
+      "title": "个人中心AI账户易用性",
+      "summary": "正式账户优先，模拟交易默认折叠，采用余额、到账、用量与账单文案；不启用真实充值或扣费",
+      "status": "implemented",
+      "priority": "p2",
+      "requirement": {
+        "path": "docs/requirements/profile-ai-account-clarity-v1.md",
+        "content_hash": "5067c4936c8349a8ad290d98b9c4943f605aa16b169f62e2527d9d9e4e925729",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "544d9ecf4f37af9ccdab600253a7176b2d1dc512",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "050f8b1d32325bc90b44bb11ca25032fc507ef3f",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/ProfileAiAccountSection.kt",
+        "android/app/src/main/kotlin/com/elon/app/esk/EskAssetCard.kt",
+        "android/app/src/main/kotlin/com/elon/app/esk/compute/EskComputeView.kt"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "正式账户优先，模拟交易默认折叠并明确不能支付AI",
+        "未开放充值和扣费明确禁用",
+        "保留原有查询与模拟交易入口"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/ProfileAiAccountSection.kt",
+          "content_hash": "02edfa86f9c4001b9d580b021a0842930a643e3d9a734f37c85a743f2a150188",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "544d9ecf4f37af9ccdab600253a7176b2d1dc512",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "dffa9e17d6c10de0e07a3ea9b4889e397f21b8a6",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/EskAssetCard.kt",
+          "content_hash": "949338f3e05b714377bf5042d63d4ecafa285b0d46ec0c8d1018d0dcfcf4a7ad",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "544d9ecf4f37af9ccdab600253a7176b2d1dc512",
+            "head_blob_oid": "ab8fc0433561c48a1a5d4186dd771d1b75dc0b3b",
+            "worktree_blob_oid": "193cc6a97a84aaf71665e42060ad6e1ba1bed5dd",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/compute/EskComputeParser.kt",
+          "content_hash": "3430e9e953c273f023aa041e066f849e1f7d3f80447c83e930bfe012851bbbae",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "544d9ecf4f37af9ccdab600253a7176b2d1dc512",
+            "head_blob_oid": "7e8f2bc673f53e923498b7a4b1338fb89c0b9d39",
+            "worktree_blob_oid": "2ce9f06e0a9945f26cc1e7d8161edcbc623d6f87",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/compute/EskComputeView.kt",
+          "content_hash": "95e400ccbc88a378f8c0d5e1fc4072dee787199f3de9997dba5ce1587c29d0a1",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "544d9ecf4f37af9ccdab600253a7176b2d1dc512",
+            "head_blob_oid": "17c008f10c21f03a679004a3b49c5012488d207b",
+            "worktree_blob_oid": "d1934f6842fe81cb918d71c7aedad72145ed266c",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/esk/platform/EskPlatformProfileEntry.kt",
+          "content_hash": "e55626ffc468de03088badc7fc82511c3c0bae2ed1537fc97bfa3b46cb5cd356",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "544d9ecf4f37af9ccdab600253a7176b2d1dc512",
+            "head_blob_oid": "e3b748158f3cf40f4ba705b1dba02d99040458ff",
+            "worktree_blob_oid": "fde05455941d36698c5348626698bc6f15feffa8",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1790769045872,
+      "updated_at_ms": 1790769894994
+    },
+    {
       "id": "project-feature-registry-adoption-v1",
       "title": "一龙项目功能注册表启用 V1",
       "summary": "为一龙项目自身启用低 token、Git 共享、证据绑定的功能注册表，减少代理重复实现和误用旧议案。",
@@ -31870,56 +31973,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_fc15cd3dec7446f883c2bee7ddd83feb",
-      "feature_id": "group-message-revisions-v1",
-      "action": "evidence_recorded",
-      "actor": "codex-group-message-revisions",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789414092784
-    },
-    {
-      "id": "feature_event_da6178b7aa1a4ec5840e0a7527af2689",
-      "feature_id": "group-message-revisions-v1",
-      "action": "transitioned",
-      "actor": "codex-group-message-revisions",
-      "reason": "三端实现、完整修订测试、并发权限测试、PC/PWA交互和合并后APK与服务端编译检查通过；设备视觉验收单独延期。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789414108381
-    },
-    {
-      "id": "feature_event_3d32da6fe0f7425a86a81258997273a3",
-      "feature_id": "group-message-revisions-v1",
-      "action": "transitioned",
-      "actor": "codex-group-message-revisions",
-      "reason": "三端实现、完整修订测试、并发权限测试、PC/PWA交互和合并后APK与服务端编译检查通过；设备视觉验收单独延期。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1789414108498
-    },
-    {
-      "id": "feature_event_f008a0e6623b47fbba2de4ea12d6cec0",
-      "feature_id": "group-message-revisions-v1",
-      "action": "transitioned",
-      "actor": "codex-group-message-revisions",
-      "reason": "后端 0.3.1752、PC/PWA 及 APK 1.1.1744 已发布，来源提交 3ef6654dc7c18c7871618f408808aca655d2d983 一致；健康、资源哈希和版本清单核对通过，真机视觉验收延期。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1789415272360
-    },
-    {
-      "id": "feature_event_8fadd087cf7848b595b7983cd9c7d803",
-      "feature_id": "pc-social-chat-recovery-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789456185467
-    },
-    {
       "id": "feature_event_7b8ef40d888f4521b28f11fce38cfda2",
       "feature_id": "pc-social-chat-recovery-v1",
       "action": "claimed",
@@ -33868,6 +33921,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1790760306215
+    },
+    {
+      "id": "feature_event_aa90286a9e404112a02e7ea94c6443af",
+      "feature_id": "profile-ai-account-clarity-v1",
+      "action": "registered",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790769045872
+    },
+    {
+      "id": "feature_event_fc6ecdf00896461aa5f3fefbe2b1a1c9",
+      "feature_id": "profile-ai-account-clarity-v1",
+      "action": "claimed",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790769078325
+    },
+    {
+      "id": "feature_event_04e442c4a374478f89dcd719389a5789",
+      "feature_id": "profile-ai-account-clarity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790769078568
+    },
+    {
+      "id": "feature_event_51f5244031a042829095535959f41cf1",
+      "feature_id": "profile-ai-account-clarity-v1",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790769894716
+    },
+    {
+      "id": "feature_event_81997308847245e88cba09d472b9a1b3",
+      "feature_id": "profile-ai-account-clarity-v1",
+      "action": "transitioned",
+      "actor": "codex",
+      "reason": "界面已实现，原生验收因工作台准备超时未执行，暂不发布APK",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790769894994
     }
   ]
 }

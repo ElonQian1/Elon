@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.AuthManager
+import com.elon.app.R
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
 import kotlin.concurrent.thread
@@ -24,6 +25,7 @@ internal class EskAssetCard(
     private var root: LinearLayout? = null
     private var loadSerial = 0
     private var snapshot: EskAssetSnapshot? = null
+    private var expanded = false
     private lateinit var totalValue: TextView
     private lateinit var availableValue: TextView
     private lateinit var sellbackReservedValue: TextView
@@ -41,9 +43,24 @@ internal class EskAssetCard(
         if (card.parent !== host) {
             (card.parent as? ViewGroup)?.removeView(card)
             host.removeAllViews()
+            host.addView(TextView(activity).apply {
+                text = "模拟交易（不用于 AI 支付）  ▸"
+                textSize = 16f
+                setTextColor(activity.getColor(R.color.elon_text_primary))
+                minimumHeight = dp(56)
+                setPadding(dp(16), dp(12), dp(16), dp(12))
+                isFocusable = true
+                setOnClickListener {
+                    expanded = !expanded
+                    card.visibility = if (expanded) View.VISIBLE else View.GONE
+                    text = if (expanded) "模拟交易（不用于 AI 支付）  ▾" else "模拟交易（不用于 AI 支付）  ▸"
+                    if (expanded) refresh()
+                }
+            })
             host.addView(card)
+            card.visibility = if (expanded) View.VISIBLE else View.GONE
         }
-        refresh()
+        if (expanded) refresh()
     }
 
     private fun refresh() {

@@ -33,11 +33,12 @@ internal class EskComputeView(
         root.addView(column)
         root.setOnApplyWindowInsetsListener { view, insets ->
             view.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop, insets.systemWindowInsetRight, insets.systemWindowInsetBottom); insets }
-        column.addView(text("ESK 与算力", 24)); column.addView(account)
+        column.addView(text("我的 AI 账户", 24)); column.addView(account)
+        column.addView(text("ESK 是平台 AI 服务的支付单位。你可以在这里查看余额、到账记录和每笔 AI 使用费用。", 14))
         val actions = LinearLayout(activity)
         actions.addView(button("返回", onBack)); actions.addView(button("刷新账户", refresh)); column.addView(actions)
         val nav = LinearLayout(activity)
-        listOf("账户", "购入登记", "AI 用量", "账单").forEachIndexed { index, label ->
+        listOf("余额", "到账记录", "AI 用量", "消费账单").forEachIndexed { index, label ->
             nav.addView(button(label) { section = index; render() }.also { tabs.add(it) })
         }
         column.addView(HorizontalScrollView(activity).apply { isHorizontalScrollBarEnabled = false; addView(nav) })
@@ -53,32 +54,32 @@ internal class EskComputeView(
         body.removeAllViews()
         tabs.forEachIndexed { i, b -> b.isSelected = i == section; b.contentDescription = b.text.toString() + if (i == section) "，已选中" else "" }
         val s = snapshot ?: return
-        status.text = "正式平台登记 · 尚未上链 · ${time(s.observedAt)}读取 · 60 秒有效"
+        status.text = "更新于 ${time(s.observedAt)}"
         when (section) {
             0 -> {
-                body.addView(text("正式 ESK 总登记", 14)); body.addView(text("${amount(s.total)} ESK", 28))
+                body.addView(text("我的 ESK 余额", 14)); body.addView(text("${amount(s.total)} ESK", 28))
                 val q = s.quote
                 quote.text = if (q != null && q.validUntil > System.currentTimeMillis() && q.usdt != null && q.cny != null)
                     "参考估值 ${amount(q.usdt)} USDT · ¥${amount(q.cny)} CNY\n来源：${q.source} · ${time(q.observedAt)}"
                     else "USDT / 人民币参考估值暂不可用"
                 body.addView(quote)
-                metric("卖回申请占用", "${amount(s.reserved)} ESK"); metric("剩余正式登记", "${amount(s.remaining)} ESK")
-                metric("本月 AI 实际消费", "¥${amount(s.monthCost, 2)} CNY")
-                metric("原人民币可用余额", s.balance?.let { "¥${amount(it, 2)} CNY" } ?: "未开通")
-                body.addView(text("平台后续主要使用 ESK 支付 AI 服务，人民币和 USDT 用于参考折算。ESK 服务支付尚未接入；当前 AI 仍以人民币结算，剩余正式登记尚不能用于 AI 扣费。", 14))
-                body.addView(button("购买 ESK · 收款渠道待配置", {}).apply { isEnabled = false })
-                body.addView(button("查看正式资产与占用", assets))
-                rows("当前 AI 预占 · CNY", s.holds)
-                if (s.holdsHaveMore) body.addView(text("当前显示最近 20 项，另有预占未展示。", 14))
+                metric("申请处理中 · 暂时冻结", "${amount(s.reserved)} ESK"); metric("未冻结余额", "${amount(s.remaining)} ESK")
+                metric("本月 AI 消费", "¥${amount(s.monthCost, 2)} CNY")
+                metric("人民币账户余额", s.balance?.let { "¥${amount(it, 2)} CNY" } ?: "未开通")
+                body.addView(text("ESK 是平台 AI 服务的支付单位。充值和 ESK 支付暂未开放，当前 AI 费用仍从人民币账户结算。这里的 ESK 是平台账户记录，尚未上链。", 14))
+                body.addView(button("充值 ESK · 暂未开放", {}).apply { isEnabled = false })
+                body.addView(button("查看 ESK 余额明细", assets))
+                rows("AI 任务处理中 · 暂时冻结的人民币", s.holds)
+                if (s.holdsHaveMore) body.addView(text("这里显示最近 20 项，更多处理中任务未展示。", 14))
             }
             1 -> {
-                body.addView(text("正式登记 ${s.entryCount} 笔 · 管理员审核到账", 16)); rows("购入登记", s.purchases)
-                if (s.purchasesHaveMore) body.addView(text("当前显示最近 20 笔，可查看完整审核流水。", 14))
-                body.addView(button("查看完整审核流水", history))
+                body.addView(text("已审核记录 ${s.entryCount} 笔", 16)); rows("ESK 到账与余额变动", s.purchases)
+                if (s.purchasesHaveMore) body.addView(text("这里显示最近 20 笔，更多记录请查看全部记录。", 14))
+                body.addView(button("查看全部到账与审核记录", history))
             }
-            2 -> { body.addView(text("按 UTC 自然月统计。Token 是用量单位，具体价格由模型与服务决定。", 14)); rows("本月 AI 用量", s.usage) }
+            2 -> { body.addView(text("Token 是 AI 处理文字的计量单位。发送内容和 AI 回复分别计量，不同模型的价格不同。以下按世界标准时间（UTC）统计本月用量。", 14)); rows("本月 AI 用量", s.usage) }
             3 -> {
-                body.addView(text("历史账单保留真实币种和当时价格版本，不按当前报价改写为 ESK。", 14)); rows("AI 实际账单 · CNY", s.bills)
+                body.addView(text("这里展示每笔 AI 使用的实际费用。历史人民币账单仍按人民币显示。", 14)); rows("AI 消费记录 · 人民币", s.bills)
                 body.addView(text("第 ${s.page} 页", 14))
                 body.addView(button("上一页") { changePage(s.page - 1) }.apply { isEnabled = s.page > 1 })
                 body.addView(button("下一页") { changePage(s.page + 1) }.apply { isEnabled = s.billsHasMore && s.page < 1000 })
@@ -95,7 +96,7 @@ internal class EskComputeView(
             body.addView(details)
         }
     }
-    private fun metric(label: String, value: String) { body.addView(text("$label\n$value", 16)) }
+    private fun metric(label: String, value: String) { body.addView(text("$label\n$value", 16).apply { setPadding(dp(16), dp(12), dp(16), dp(12)); setBackgroundResource(R.color.elon_surface_card); layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) } }) }
     private fun text(value: String, sp: Int) = TextView(activity).apply {
         text = value; textSize = sp.toFloat(); setTextColor(activity.getColor(R.color.elon_text_primary))
         setPadding(0, dp(8), 0, dp(8)); setLineSpacing(dp(2).toFloat(), 1f); isSaveEnabled = false

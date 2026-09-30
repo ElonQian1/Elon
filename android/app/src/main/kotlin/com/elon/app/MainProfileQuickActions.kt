@@ -95,6 +95,7 @@ internal class MainProfileQuickActions(
             )
             tokenUsageCard.attachAndRefresh()
             eskAssetCard.attachAndRefresh()
+            ProfileAiAccountSection.attach(activity, binding)
             EskPlatformProfileEntry.attach(activity, binding)
             renderNodeResourcePanel()
             if (nodeResourceExpanded) {

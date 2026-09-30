@@ -97,5 +97,5 @@ internal object EskComputeParser {
             .map { it as? Map<String, Any?> ?: error("Invalid row") }
     private val sourceLabels = mapOf("platform" to "平台 AI", "own_codex" to "本人 AI 账号", "shared_codex" to "共享 AI 账号",
         "user_api_key" to "自带 API Key", "client_reported" to "客户端参考上报", "other" to "其他来源")
-    private val holdLabels = mapOf("reserved" to "调用前预占", "dispatch_hold" to "任务执行中", "verification_hold" to "待核验")
+    private val holdLabels = mapOf("reserved" to "等待 AI 开始", "dispatch_hold" to "AI 任务执行中", "verification_hold" to "费用核对中")
 }

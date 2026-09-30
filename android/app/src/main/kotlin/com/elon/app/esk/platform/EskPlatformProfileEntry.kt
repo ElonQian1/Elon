@@ -19,17 +19,17 @@ internal object EskPlatformProfileEntry {
         val density = activity.resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
         host.addView(TextView(activity).apply {
-            text = "ESK 与算力  ›\n购入登记、参考估值、AI 用量与实际账单"
+            text = "ESK 余额与记录  ›\n查看已审核到账的 ESK 和余额变动"
             textSize = 16f
             setTextColor(activity.getColor(R.color.elon_text_primary))
             setPadding(dp(16), dp(14), dp(16), dp(14))
             minimumHeight = dp(48)
             isFocusable = true
-            setOnClickListener { activity.startActivity(Intent(activity, com.elon.app.esk.compute.EskComputeActivity::class.java)) }
+            setOnClickListener { activity.startActivity(Intent(activity, EskPlatformAssetsActivity::class.java)) }
         })
         host.addView(TextView(activity).apply {
             tag = ENTRY_TAG
-            text = "正式 ESK 平台登记  ›\n查看经审核数量与流水 · 尚未上链"
+            text = "到账与审核记录  ›\n查看每笔 ESK 的审核结果"
             textSize = 16f
             setTextColor(activity.getColor(R.color.elon_text_primary))
             setPadding(dp(16), dp(16), dp(16), dp(16))
@@ -39,9 +39,9 @@ internal object EskPlatformProfileEntry {
             isSaveFromParentEnabled = false
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(12) }
-            contentDescription = "查看正式 ESK 平台登记，与 Paper 模拟余额分开"
+            contentDescription = "查看 ESK 到账与审核记录"
             isFocusable = true
-            setOnClickListener { activity.startActivity(Intent(activity, EskPlatformAssetsActivity::class.java)) }
+            setOnClickListener { activity.startActivity(Intent(activity, EskPlatformHistoryActivity::class.java)) }
         })
     }
 }
