@@ -61,6 +61,13 @@ for (const action of ['cancel', 'hidden', 'dispose', 'account']) {
 test = create(async () => { throw new Error('offline'); }); await test.opener.open();
 assert.match(test.status(), /暂时无法/); assert.equal(test.controls[1].disabled, false);
 test.opener.dispose();
+for (const [agent, touch] of [['iPhone OS 18_0 like Mac OS X', 5], ['Mozilla/5.0 (Macintosh; Intel Mac OS X)', 5]]) {
+  context.navigator.userAgent = agent; context.navigator.maxTouchPoints = touch;
+  test = create(async () => scene()); await test.opener.open();
+  assert.match(navigations.at(-1), /^weixin:\/\/biz\/finder\/openFinderFeed\//, 'iOS/iPadOS uses the provider mobile scheme, not Android Intent');
+  assert.ok(!navigations.at(-1).includes('#Intent'));
+  test.opener.dispose();
+}
 context.navigator.userAgent = 'Windows';
 assert.equal(handoff.create(new Node(), () => ({ url }), {}), null, 'desktop keeps its existing native handoff');
 assert.equal(listeners.size, 0);

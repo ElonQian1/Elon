@@ -1,6 +1,8 @@
 (function (root) {
   'use strict';
   const android = () => /Android/i.test(root.navigator?.userAgent || '');
+  const ios = () => /iPhone|iPad|iPod/i.test(root.navigator?.userAgent || '') ||
+    /Macintosh/i.test(root.navigator?.userAgent || '') && root.navigator?.maxTouchPoints > 1;
   function intent(value, url, now = Date.now()) {
     if (value?.schema !== 1 || !root.ElonSocialLinks.channelsId(url) ||
         root.ElonSocialLinks.channelsId(value.source_url) !== root.ElonSocialLinks.channelsId(url) ||
@@ -21,7 +23,7 @@
     return 'intent://biz/finder/openFinderFeed/' + encoded + '#Intent;scheme=weixin;package=com.tencent.mm;end';
   }
   function create(host, current, options) {
-    if (!android()) return null;
+    if (!android() && !ios()) return null;
     let active = true, controller, timer, pending, ready, generation = 0;
     const bar = document.createElement('div'); bar.className = 'social-link-handoff'; bar.hidden = true;
     const status = document.createElement('span'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
@@ -30,6 +32,11 @@
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '取消'; cancel.hidden = true;
     bar.append(status, launch, copy, cancel); host.append(bar);
     const valid = () => active && options.isCurrent() && !document.hidden;
+    const target = value => {
+      const checked = intent(value, current().url);
+      // The public WeChat mobile frontend uses this same encoded feed scheme on iOS.
+      return checked ? (ios() ? value.launch_url : checked) : null;
+    };
     function stop() { generation++; controller?.abort(); clearTimeout(timer); controller = null; pending = null; ready = null; launch.disabled = false; cancel.hidden = true; }
     function jump(url) {
       if (!valid()) return;
@@ -42,7 +49,7 @@
       if (!valid() || pending) return;
       bar.hidden = false;
       const url = current().url;
-      const cached = ready && intent(ready, url);
+      const cached = ready && target(ready);
       if (cached) { jump(cached); return; }
       ready = null; const ticket = ++generation;
       controller = new AbortController(); const signal = controller.signal;
@@ -56,10 +63,10 @@
         let value = await pending;
         if (typeof value?.json === 'function') { if (!value.ok) throw new Error('unavailable'); value = await value.json(); }
         if (!valid() || generation !== ticket || signal.aborted) return;
-        const target = intent(value, url);
-        if (!target) throw new Error('invalid scene');
+        const destination = target(value);
+        if (!destination) throw new Error('invalid scene');
         ready = value;
-        if (root.navigator.userActivation?.isActive) jump(target);
+        if (root.navigator.userActivation?.isActive) jump(destination);
         else status.textContent = '已准备好，请点击“在微信打开”';
       } catch {
         if (valid() && generation === ticket) status.textContent = '暂时无法打开微信，请重试或复制链接';
