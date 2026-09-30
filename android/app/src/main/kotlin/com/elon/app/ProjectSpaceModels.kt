@@ -8,7 +8,8 @@ internal data class ProjectSpace(
     val latestApkIdentity: String?,
     val latestApkUpdatedAt: String?,
     val galleryImages: List<String>,
-    val landingPreviewImages: List<String>
+    val landingPreviewImages: List<String>,
+    val introduction: ProjectIntroductionContent? = null
 )
 
 internal data class ProjectSpaceSummary(

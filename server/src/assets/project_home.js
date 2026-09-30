@@ -433,6 +433,61 @@
 
   window.ElonProjectHome = { render };
 
+  // Project-space introduction consumes the same sanitized manifest as /pc.
+  window.ElonProjectIntroduction = {
+    clear() { document.getElementById('projectIntroductionSections')?.remove(); },
+    render(project, space) {
+      const anchor = document.getElementById('projectIntroCard');
+      if (!anchor || !project) return this.clear();
+      this.clear();
+      const root = document.createElement('section');
+      root.id = 'projectIntroductionSections';
+      root.className = 'project-introduction-sections';
+      root.setAttribute('aria-label', '项目能力与团队协作');
+      const landing = space?.landing || {};
+      const label = (text, heading = false) => {
+        const node = document.createElement(heading ? 'h3' : 'p');
+        node.textContent = text;
+        root.appendChild(node);
+      };
+      if (cleanText(landing.tagline)) label(landing.tagline, true);
+      if (cleanText(landing.summary)) label(landing.summary);
+      label('团队协作', true);
+      const mode = project.join_mode || project.joinMode || 'invite';
+      label(mode === 'readonly' ? '当前项目提供只读体验；开发操作以授权为准。'
+        : mode === 'open' ? '加入同一个项目，按角色权限共同参与。'
+        : mode === 'approval' ? '申请通过后加入项目，按角色权限共同参与。'
+        : '接受项目邀请后，在同一个项目空间按角色权限共同参与。');
+      const development = (space?.channels || []).some(channel => channel.kind === 'ai_development');
+      label(development
+        ? '围绕需求共同讨论、参与 AI 功能开发，查看项目资料和交付记录。管理、发布和节点执行分别受权限与环境约束。'
+        : '共同交流需求，查看项目资料与交付记录。可操作范围以当前成员权限为准。');
+      const list = (title, values, expanded = false) => {
+        const items = Array.isArray(values) ? values.filter(value => typeof value === 'string' && cleanText(value)).slice(0, 12) : [];
+        if (!items.length) return;
+        const details = document.createElement('details');
+        details.open = expanded;
+        const summary = document.createElement('summary');
+        summary.textContent = title;
+        details.appendChild(summary);
+        const ul = document.createElement('ul');
+        for (const value of items) {
+          const li = document.createElement('li');
+          li.textContent = value;
+          ul.appendChild(li);
+        }
+        details.appendChild(ul);
+        root.appendChild(details);
+      };
+      list('核心能力', landing.highlights, true);
+      list('适合谁使用', landing.target_users);
+      list('最近更新', landing.recent_updates);
+      list('使用条件与环境', landing.system_requirements);
+      list('隐私、权限与使用边界', landing.privacy_notes);
+      (document.getElementById('projectSpacePreviewGrid') || anchor).before(root);
+    }
+  };
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', render, { once: true });
   } else {

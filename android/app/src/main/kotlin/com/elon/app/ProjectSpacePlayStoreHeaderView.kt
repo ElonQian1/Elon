@@ -61,6 +61,7 @@ internal class ProjectSpacePlayStoreHeaderView(
                 topMargin = dp(20)
                 rightMargin = dp(24)
             })
+            addView(ProjectIntroductionView(activity, dp, openProjectMembers).render(space))
             addView(previewStrip(space, previewImages), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(167)

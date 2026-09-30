@@ -463,7 +463,8 @@ private fun parseProjectSpace(json: JSONObject): ProjectSpace {
                 ?: project.optJSONArray("galleryImages")
                 ?: JSONArray()
         ),
-        landingPreviewImages = parseLandingPreviewImages(json.optJSONObject("landing"))
+        landingPreviewImages = parseLandingPreviewImages(json.optJSONObject("landing")),
+        introduction = parseProjectIntroduction(json.optJSONObject("landing"))
     )
 }
 
