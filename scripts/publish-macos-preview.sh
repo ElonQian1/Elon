@@ -38,7 +38,7 @@ bash scripts/cargo-dev.sh test --manifest-path desktop-shell/src-tauri/Cargo.tom
 (
   cd desktop-shell
   npx --yes @tauri-apps/cli@2.12.0 build --ci --target universal-apple-darwin \
-    --config "$repo_root/.ai-tmp/tauri.macos.release.json" --bundles app,dmg
+    --config "$repo_root/.ai-tmp/tauri.macos.release.json" --bundles app
 )
 bundle_root="${CARGO_TARGET_DIR:?}/universal-apple-darwin/release/bundle"
 app="$bundle_root/macos/一龙工作台 Mac 测试版.app"
@@ -50,10 +50,16 @@ codesign --verify --deep --strict --verbose=2 "$app"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist" | grep -qx "$version"
 node scripts/smoke-macos-preview.mjs "$binary"
 cp .ai-tmp/macos-smoke.json "$output/renderer-smoke.json"
-images=("$bundle_root"/dmg/*.dmg)
-[[ ${#images[@]} -eq 1 && -f "${images[0]}" ]] || { echo 'Expected exactly one DMG' >&2; exit 1; }
-hdiutil verify "${images[0]}"
-cp "${images[0]}" "$output/elon-macos-preview-${version}-universal.dmg"
+# Avoid the Finder/AppleScript-dependent decorative DMG bundler on hosted runners.
+# A standard read-only image keeps the app and the Applications drag-install link.
+image_stage="$repo_root/.ai-tmp/macos-dmg-stage"
+mkdir -p "$image_stage"
+ditto "$app" "$image_stage/一龙工作台 Mac 测试版.app"
+ln -s /Applications "$image_stage/Applications"
+image="$output/elon-macos-preview-${version}-universal.dmg"
+hdiutil create -volname "一龙 Mac 测试版 ${version}" -srcfolder "$image_stage" \
+  -format UDZO -ov -o "$image"
+hdiutil verify "$image"
 ditto -c -k --sequesterRsrc --keepParent "$app" "$output/elon-macos-preview-${version}-universal.app.zip"
 cp docs/requirements/macos-desktop-preview-v1.md "$output/ACCEPTANCE.md"
 node --input-type=module <<'JS'
