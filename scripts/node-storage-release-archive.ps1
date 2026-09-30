@@ -6,7 +6,7 @@ Set-StrictMode -Version 2.0
 function Read-ElonReleaseArchiveJson {
     param([string]$Path)
     Assert-ElonArchivePath $Path
-    return (Get-Content -LiteralPath $Path -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop)
+    return (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop)
 }
 
 function Assert-ElonReleaseArchiveIdle {

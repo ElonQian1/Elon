@@ -35,6 +35,11 @@ reviewed_at: 2026-09-30
 7. 验证通过后才激活用户配置和 launcher。既有进程可能仍持有旧环境变量，
    当前任务应显式传 `-CacheRoot`；新会话再次检查解析结果。
 
+已有一龙工作树会加载各自仓库内的完整缓存模块，安装新 launcher 或重启 Codex 不会自动更新它们。
+启用 UNC 前，由所属任务按正常 Git 流程更新包含网络存储支持的脚本（首次支持提交 `1b845b11a`）；
+旧模块中的 `DriveInfo(UNC)` 会在 Cargo 启动前失败，`-SkipCacheGc` 也不能绕过全部旧调用。
+已接入轻量包装脚本的独立子项目使用安装版平台。不要为迁移缓存而修改其他任务的活动工作树。
+
 优先使用 UNC，不依赖只在某个登录会话可见的映射盘符。共享盘断线时，当前实现不会静默
 回退 C/D 并重新生成大缓存；必须报告故障，再由操作者选择可用且有足够空余的本地根。
 锁重试有上限，底层 SMB I/O 仍受操作系统网络超时影响。长构建必须继续使用项目日志执行器。
@@ -53,6 +58,11 @@ Invoke-ElonVerifiedTreeArchive -Path <exact-candidate-directory> `
 归档按机器和操作 ID 隔离，保存 `payload`、逐文件 SHA-256 `manifest.json` 与
 `verified.json` 回执。源与目标不得重叠，拒绝重解析点与嵌入的 Git 仓库。
 复制失败、目标校验失败、源目录变化或状态失效时保留源，不把半份副本标记成成功。
+Windows 大量小文件可在归档或恢复入口显式加 `-CopyEngine Robocopy`，以系统工具的
+8 线程复制替代逐文件串行复制，并在本机工具支持时请求 SMB 传输压缩；默认仍为 `Serial`。
+压缩不改变归档格式。目标必须不存在，禁止镜像删除与移动，
+复制返回成功后仍执行完整树与 SHA-256 复验。固定复制参数的语义见
+[Microsoft Robocopy 文档](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy)。
 
 `ArchiveOnly` 不回收原件。归档成功后若需释放本地空间：
 

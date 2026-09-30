@@ -133,12 +133,37 @@ function Copy-ElonArchiveFile {
     [IO.File]::Copy($Source, $Destination, $false)
 }
 
+function Invoke-ElonArchiveRobocopy {
+    param([string]$Source, [string]$Destination)
+    if ($env:OS -ne 'Windows_NT') { throw 'Robocopy archive engine requires Windows.' }
+    $executable = Join-Path ([Environment]::SystemDirectory) 'robocopy.exe'
+    if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw 'Windows robocopy.exe is unavailable.' }
+    # Robocopy uses 1-7 for nonfatal success states, so inspect its exit code ourselves.
+    $PSNativeCommandUseErrorActionPreference = $false
+    $copyOptions = @('/E', '/COPY:DAT', '/DCOPY:T', '/R:0', '/W:0', '/MT:8', '/XJ', '/SL', '/NP', '/NFL', '/NDL')
+    # Request SMB transport compression where this Windows version supports it;
+    # the archive stays ordinary files and older Robocopy versions retain compatibility.
+    if ((& $executable /? | Out-String) -match '(?m)^\s*/COMPRESS\s') { $copyOptions += '/COMPRESS' }
+    & $executable $Source $Destination @copyOptions | Out-Host
+    return [int]$LASTEXITCODE
+}
+
 function Copy-ElonArchiveInventory {
-    param([string]$Source, [string]$Destination, $Inventory)
+    param([string]$Source, [string]$Destination, $Inventory,
+        [ValidateSet('Serial', 'Robocopy')][string]$CopyEngine = 'Serial')
     $progress = [Diagnostics.Stopwatch]::StartNew()
     $copiedFiles = 0; $createdDirectories = 0; [long]$copiedBytes = 0
     Assert-ElonArchivePath $Destination
+    Assert-ElonArchivePath $Source
+    if (Test-Path -LiteralPath $Destination) { throw 'Archive copy refuses an existing destination.' }
     New-Item -ItemType Directory -Path $Destination -ErrorAction Stop | Out-Null
+    if ($CopyEngine -eq 'Robocopy') {
+        Write-Host "ARCHIVE_COPY_ENGINE=Robocopy FILES=$($Inventory.Files.Count) BYTES=$($Inventory.Bytes)"
+        $exitCode = Invoke-ElonArchiveRobocopy -Source $Source -Destination $Destination
+        if ($exitCode -lt 0 -or $exitCode -ge 8) { throw "Robocopy copy failed (exit $exitCode); source retained." }
+        # The caller always re-inventories and hashes both trees; exit code alone is not verification.
+        return
+    }
     foreach ($dir in $Inventory.Directories) {
         $target = Get-ElonArchiveFullPath (Join-Path $Destination $dir.RelativePath)
         if (-not (Test-ElonArchiveWithin $target $Destination)) { throw 'Directory escaped archive payload.' }
@@ -180,6 +205,7 @@ function Invoke-ElonVerifiedTreeArchive {
         [Parameter(Mandatory = $true)][string]$AllowedRoot,
         [Parameter(Mandatory = $true)][string]$ArchiveRoot,
         [ValidateSet('ArchiveOnly', 'ArchiveAndReclaim')][string]$Mode = 'ArchiveOnly',
+        [ValidateSet('Serial', 'Robocopy')][string]$CopyEngine = 'Serial',
         [scriptblock]$ValidateSource,
         [scriptblock]$RemoveSource
     )
@@ -201,7 +227,7 @@ function Invoke-ElonVerifiedTreeArchive {
         New-Item -ItemType Directory -Path $directory -Force -ErrorAction Stop | Out-Null
         $payload = Join-Path $directory 'payload'
         Write-Host "ARCHIVE_PHASE=copy BYTES=$($before.Bytes) SOURCE=$source"
-        Copy-ElonArchiveInventory -Source $source -Destination $payload -Inventory $before
+        Copy-ElonArchiveInventory -Source $source -Destination $payload -Inventory $before -CopyEngine $CopyEngine
         Write-Host "ARCHIVE_PHASE=verify BYTES=$($before.Bytes) SOURCE=$source"
         $copied = Get-ElonArchiveInventory -Root $payload -HashFiles
         if ($before.ContentDigest -ne $copied.ContentDigest) { throw 'Archive payload verification failed; source retained.' }
@@ -221,7 +247,7 @@ function Invoke-ElonVerifiedTreeArchive {
             Source = $source; ContentDigest = $before.ContentDigest; Bytes = $before.Bytes; VerifiedUtc = [DateTime]::UtcNow.ToString('o')
         })
         # Read the durable receipt back before the owning workflow can remove anything.
-        $receipt = Get-Content -LiteralPath $receiptPath -Raw -ErrorAction Stop | ConvertFrom-Json
+        $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json
         if ($receipt.ManifestSha256 -ne (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash -or
             $receipt.Source -ne $source -or $receipt.ContentDigest -ne $before.ContentDigest -or $receipt.Bytes -ne $before.Bytes) {
             throw 'Archive receipt read-back mismatch.'
@@ -244,13 +270,14 @@ function Invoke-ElonVerifiedTreeArchive {
 }
 
 function Restore-ElonVerifiedTreeArchive {
-    param([string]$ArchiveDirectory, [string]$Path, [string]$AllowedRoot)
+    param([string]$ArchiveDirectory, [string]$Path, [string]$AllowedRoot,
+        [ValidateSet('Serial', 'Robocopy')][string]$CopyEngine = 'Serial')
     $ErrorActionPreference = 'Stop'
     Assert-ElonArchivePath $ArchiveDirectory
     $manifestPath = Join-Path $ArchiveDirectory 'manifest.json'
-    $receipt = Get-Content -LiteralPath (Join-Path $ArchiveDirectory 'verified.json') -Raw -ErrorAction Stop | ConvertFrom-Json
+    $receipt = Get-Content -LiteralPath (Join-Path $ArchiveDirectory 'verified.json') -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json
     if ($receipt.ManifestSha256 -ne (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash) { throw 'Archive manifest integrity mismatch.' }
-    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($manifest.Schema -ne 'elon.verified_tree_archive.v1' -or $receipt.Schema -ne 'elon.verified_tree_archive_receipt.v1') { throw 'Unknown archive schema.' }
     $target = Get-ElonArchiveFullPath $Path
     if ($target -eq (Get-ElonArchiveFullPath $AllowedRoot) -or -not (Test-ElonArchiveWithin $target $AllowedRoot)) { throw 'Restore target escaped allowed root.' }
@@ -260,7 +287,7 @@ function Restore-ElonVerifiedTreeArchive {
     $payload = Join-Path $ArchiveDirectory 'payload'
     $inventory = Get-ElonArchiveInventory -Root $payload -HashFiles
     if ($inventory.ContentDigest -ne $receipt.ContentDigest -or $inventory.ContentDigest -ne $manifest.Inventory.ContentDigest) { throw 'Archive payload is corrupt.' }
-    Copy-ElonArchiveInventory -Source $payload -Destination $target -Inventory $inventory
+    Copy-ElonArchiveInventory -Source $payload -Destination $target -Inventory $inventory -CopyEngine $CopyEngine
     if ((Get-ElonArchiveInventory -Root $target -HashFiles).ContentDigest -ne $inventory.ContentDigest) { throw 'Restored tree verification failed.' }
     return [pscustomobject]@{ Path = $target; Bytes = $inventory.Bytes; Restored = $true }
 }

@@ -3,6 +3,8 @@ Set-StrictMode -Version 2.0
 . (Join-Path $PSScriptRoot 'node-storage-release-archive.ps1')
 
 $script:Assertions = 0
+# Code points avoid PS5 interpreting this script's BOM-less source as ANSI.
+$script:ArchiveTestUnicode = -join @([char]0x4E2D, [char]0x6587)
 function Assert-ArchiveTest {
     param([bool]$Condition, [string]$Message)
     $script:Assertions++
@@ -21,6 +23,7 @@ function New-ArchiveTestTree {
     param([string]$Path)
     New-Item -ItemType Directory -Path (Join-Path $Path 'nested\empty') -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $Path 'nested\data.txt'), 'preserve exact bytes and empty directories')
+    [IO.File]::WriteAllText((Join-Path $Path ($script:ArchiveTestUnicode + '.txt')), $script:ArchiveTestUnicode)
     return $Path
 }
 function Set-ArchiveTestOld {
@@ -30,12 +33,13 @@ function Set-ArchiveTestOld {
     }
 }
 
-$fixture = Join-Path (Join-Path $PSScriptRoot '..\.ai-tmp') ('storage-archive-test-' + [Guid]::NewGuid().ToString('N'))
+$fixture = Join-Path (Join-Path $PSScriptRoot '..\.ai-tmp') ('storage-archive-test-' + $script:ArchiveTestUnicode + '-' + [Guid]::NewGuid().ToString('N'))
 $fixture = [IO.Path]::GetFullPath($fixture)
 New-Item -ItemType Directory -Path $fixture -Force | Out-Null
 $savedLocal = $env:LOCALAPPDATA
 $savedNodeRoot = $env:ELON_NODE_DATA_ROOT
 $copyFunction = ${function:Copy-ElonArchiveFile}
+$robocopyFunction = ${function:Invoke-ElonArchiveRobocopy}
 $idleFunction = ${function:Assert-ElonReleaseArchiveIdle}
 try {
     $allowed = Join-Path $fixture 'owned'
@@ -103,6 +107,7 @@ try {
     Restore-ElonVerifiedTreeArchive -ArchiveDirectory $result.ArchiveDirectory -Path $restored -AllowedRoot $allowed | Out-Null
     Assert-ArchiveTest ([IO.File]::ReadAllText((Join-Path $restored 'nested\data.txt')) -eq $expected) 'restored bytes must match'
     Assert-ArchiveTest (Test-Path -LiteralPath (Join-Path $restored 'nested\empty')) 'restore preserves empty directories'
+    Assert-ArchiveTest ([IO.File]::ReadAllText((Join-Path $restored ($script:ArchiveTestUnicode + '.txt'))) -eq $script:ArchiveTestUnicode) 'UTF-8 manifest and receipt round-trip non-ASCII paths, names, and bytes'
     Assert-ArchiveThrows { Restore-ElonVerifiedTreeArchive -ArchiveDirectory $result.ArchiveDirectory -Path $restored -AllowedRoot $allowed } 'overwrite'
     [IO.File]::AppendAllText((Join-Path $result.ArchiveDirectory 'payload\nested\data.txt'), 'corrupt')
     Assert-ArchiveThrows { Restore-ElonVerifiedTreeArchive -ArchiveDirectory $result.ArchiveDirectory -Path (Join-Path $allowed 'corrupt-restore') -AllowedRoot $allowed } 'corrupt'
@@ -110,6 +115,40 @@ try {
     Assert-ArchiveTest ($reclaimed.Reclaimed -and -not (Test-Path -LiteralPath $source)) 'verified reclaim removes only source'
     Restore-ElonVerifiedTreeArchive -ArchiveDirectory $reclaimed.ArchiveDirectory -Path $source -AllowedRoot $allowed | Out-Null
     Assert-ArchiveTest ([IO.File]::ReadAllText((Join-Path $source 'nested\data.txt')) -eq $expected) 'reclaimed source remains recoverable'
+
+    # The parallel engine must retain the same verification and preservation gates.
+    $parallelSource = New-ArchiveTestTree (Join-Path $allowed 'parallel-source')
+    $parallel = Invoke-ElonVerifiedTreeArchive -Path $parallelSource -AllowedRoot $allowed -ArchiveRoot $archive -CopyEngine Robocopy
+    $parallelRestore = Join-Path $allowed 'parallel-restore'
+    Restore-ElonVerifiedTreeArchive -ArchiveDirectory $parallel.ArchiveDirectory -Path $parallelRestore -AllowedRoot $allowed -CopyEngine Robocopy | Out-Null
+    Assert-ArchiveTest ((Get-ElonArchiveInventory $parallelSource -HashFiles).ContentDigest -eq (Get-ElonArchiveInventory $parallelRestore -HashFiles).ContentDigest) 'Robocopy archive and restore preserve bytes and empty directories'
+    ${function:Invoke-ElonArchiveRobocopy} = { param($Source, $Destination) return 8 }
+    Assert-ArchiveThrows { Invoke-ElonVerifiedTreeArchive -Path $parallelSource -AllowedRoot $allowed -ArchiveRoot $archive -CopyEngine Robocopy -Mode ArchiveAndReclaim -ValidateSource $validate -RemoveSource $remove } 'Robocopy copy failed'
+    Assert-ArchiveTest (Test-Path -LiteralPath $parallelSource) 'Robocopy failure must preserve source'
+    ${function:Invoke-ElonArchiveRobocopy} = {
+        param($Source, $Destination)
+        $code = & $robocopyFunction $Source $Destination
+        [IO.File]::AppendAllText((Join-Path $Destination 'nested\data.txt'), 'corruption')
+        return $code
+    }
+    Assert-ArchiveThrows { Invoke-ElonVerifiedTreeArchive -Path $parallelSource -AllowedRoot $allowed -ArchiveRoot $archive -CopyEngine Robocopy -Mode ArchiveAndReclaim -ValidateSource $validate -RemoveSource $remove } 'verification failed'
+    Assert-ArchiveTest (Test-Path -LiteralPath $parallelSource) 'Robocopy payload corruption must preserve source'
+    ${function:Invoke-ElonArchiveRobocopy} = {
+        param($Source, $Destination)
+        $code = & $robocopyFunction $Source $Destination
+        $script:archiveInjectedLink = Join-Path $Destination 'payload-junction'
+        New-Item -ItemType Junction -Path $script:archiveInjectedLink -Target $outside -ErrorAction Stop | Out-Null
+        return $code
+    }
+    Assert-ArchiveThrows { Invoke-ElonVerifiedTreeArchive -Path $parallelSource -AllowedRoot $allowed -ArchiveRoot $archive -CopyEngine Robocopy -Mode ArchiveAndReclaim -ValidateSource $validate -RemoveSource $remove } 'reparse'
+    Assert-ArchiveTest (Test-Path -LiteralPath $parallelSource) 'Robocopy post-copy reparse rejection must preserve source'
+    [IO.Directory]::Delete($script:archiveInjectedLink)
+    ${function:Invoke-ElonArchiveRobocopy} = $robocopyFunction
+    $parallelJunction = Join-Path $parallelSource 'junction'
+    New-Item -ItemType Junction -Path $parallelJunction -Target $outside -ErrorAction Stop | Out-Null
+    Assert-ArchiveThrows { Invoke-ElonVerifiedTreeArchive -Path $parallelSource -AllowedRoot $allowed -ArchiveRoot $archive -CopyEngine Robocopy } 'reparse'
+    [IO.Directory]::Delete($parallelJunction)
+    Assert-ArchiveTest (Test-Path -LiteralPath $parallelSource) 'Robocopy source reparse rejection must preserve source'
 
     # Exercise the public entrypoint with isolated release metadata and a tempting Rust root.
     $env:LOCALAPPDATA = Join-Path $fixture 'local'
@@ -120,7 +159,7 @@ try {
     Set-ArchiveTestOld $event
     $rust = New-ArchiveTestTree (Join-Path $elon 'rust-cache-v2')
     Set-ArchiveTestOld $rust
-    $planPath = Join-Path $fixture 'release-plan.json'
+    $planPath = Join-Path $fixture ($script:ArchiveTestUnicode + '-release-plan.json')
     $inspect = Join-Path $PSScriptRoot 'inspect-node-disk-usage.ps1'
     ${function:Assert-ElonReleaseArchiveIdle} = { param($Path, $Sha) }
     $plan = & $inspect -ReleaseHistoryOnly -ArchiveRoot $archive -ArchivePlanPath $planPath -MinAgeDays 7
@@ -185,6 +224,7 @@ try {
     $env:LOCALAPPDATA = $savedLocal
     $env:ELON_NODE_DATA_ROOT = $savedNodeRoot
     ${function:Copy-ElonArchiveFile} = $copyFunction
+    ${function:Invoke-ElonArchiveRobocopy} = $robocopyFunction
     ${function:Assert-ElonReleaseArchiveIdle} = $idleFunction
     if ((Get-ElonArchiveFullPath $fixture).StartsWith((Get-ElonArchiveFullPath (Join-Path $PSScriptRoot '..\.ai-tmp')) + '\', [StringComparison]::OrdinalIgnoreCase)) {
         Remove-Item -LiteralPath $fixture -Recurse -Force -ErrorAction Stop
