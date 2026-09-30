@@ -1,6 +1,7 @@
 Import-Module "$PSScriptRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.NetworkStorage.psm1" -DisableNameChecking
 
 function Get-RustCacheBytesHash {
     param([Parameter(Mandatory)][AllowEmptyCollection()][byte[]]$Bytes)
@@ -409,8 +410,7 @@ function Get-RustCacheDoctor {
         $checks.Add((New-RustCacheDoctorCheck "user-launcher" "fail" "Portable user launcher is $($launcher.status): $($launcher.path)" "Re-run install from a trusted current checkout."))
     }
 
-    $drive = New-Object System.IO.DriveInfo ([System.IO.Path]::GetPathRoot($root))
-    $freePercent = if ($drive.TotalSize -gt 0) { [math]::Round(100 * $drive.AvailableFreeSpace / $drive.TotalSize, 2) } else { 0 }
+    $freePercent = (Get-RustCacheStorageVolume -CacheRoot $root).free_percent
     $policyPath = Get-RustCachePolicyPath -CacheRoot $root
     $policy = if (Test-Path -LiteralPath $policyPath -PathType Leaf) { Get-RustCachePolicy -CacheRoot $root } else { Get-DefaultRustCachePolicy }
     $diskStatus = if ($freePercent -lt [double]$policy.critical_free_percent) { "fail" } elseif ($freePercent -lt [double]$policy.warning_free_percent) { "warn" } else { "pass" }

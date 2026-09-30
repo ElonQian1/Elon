@@ -9,12 +9,37 @@ param(
     [ValidateRange(7, 3650)]
     [int]$MinAgeDays = 30,
     [ValidateRange(1, 20)]
-    [int]$ReleaseKeepNewest = 3
+    [int]$ReleaseKeepNewest = 3,
+    [switch]$ReleaseHistoryOnly,
+    [ValidateSet('Legacy', 'Managed')]
+    [string]$ReleaseLocation = 'Legacy',
+    [ValidateSet('Preview', 'ArchiveOnly', 'ArchiveAndReclaim')]
+    [string]$ArchiveMode = 'Preview',
+    [string]$ArchiveRoot,
+    [string]$ArchivePlanPath,
+    [string]$ExpectedPlanSha256,
+    [ValidateSet('terminal_outbox_event', 'terminal_local_release')]
+    [string[]]$CandidateKind = @(),
+    [string[]]$CandidatePath = @()
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 . (Join-Path $PSScriptRoot 'node-storage-paths.ps1')
+
+if ($ReleaseHistoryOnly -or $ReleaseLocation -ne 'Legacy' -or $ArchiveRoot -or $ArchivePlanPath -or $ExpectedPlanSha256 -or
+    $ArchiveMode -ne 'Preview' -or $CandidateKind.Count -or $CandidatePath.Count) {
+    if (-not $ReleaseHistoryOnly -or $Apply -or $IncludeActiveBuildCaches -or $IncludeExpiredTemp) {
+        throw 'Archive operations require -ReleaseHistoryOnly and cannot combine with Apply/cache/Temp cleanup.'
+    }
+    . (Join-Path $PSScriptRoot 'node-storage-release-archive.ps1')
+    Invoke-ElonReleaseHistoryArchive -Mode $ArchiveMode -ArchiveRoot $ArchiveRoot `
+        -ReleaseLocation $ReleaseLocation `
+        -PlanPath $ArchivePlanPath -ExpectedPlanSha256 $ExpectedPlanSha256 `
+        -MinAgeDays $MinAgeDays -ReleaseKeepNewest $ReleaseKeepNewest `
+        -CandidateKind $CandidateKind -CandidatePath $CandidatePath -WhatIf:$WhatIfPreference
+    return
+}
 
 function Get-NormalizedFullPath {
     param([Parameter(Mandatory = $true)][string]$Path)

@@ -3,6 +3,7 @@ Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Registry.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Sccache.psm1" -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Scope.psm1" -Force -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.NetworkStorage.psm1" -DisableNameChecking
 
 function Resolve-RustCacheWorkspaceRoot {
     param(
@@ -180,10 +181,17 @@ function Get-RustCacheLockState {
     }
     $owner = Get-RustCacheLockOwner -LockPath $LockPath
     if ($owner) {
+        $locality = Get-RustCacheLockOwnerLocality -Owner $owner -LockPath $LockPath
+        if ($locality -ne 'local') {
+            return [pscustomobject]@{ state = 'active'; active = $true; owner = $owner; reason = $locality }
+        }
         if (Test-RustCacheOwnerProcessAlive -Owner $owner) {
             return [pscustomobject]@{ state = "active"; active = $true; owner = $owner; reason = "owner-process-active" }
         }
         return [pscustomobject]@{ state = "stale"; active = $false; owner = $owner; reason = "owner-process-missing-or-reused" }
+    }
+    if ((Get-RustCacheLockOwnerLocality -Owner $null -LockPath $LockPath) -ne 'local') {
+        return [pscustomobject]@{ state = 'active'; active = $true; owner = $null; reason = 'unknown-network-owner' }
     }
     $lockDirectory = Get-Item -LiteralPath $LockPath -Force -ErrorAction SilentlyContinue
     $ageSeconds = if ($lockDirectory) { ([DateTime]::UtcNow - $lockDirectory.LastWriteTimeUtc).TotalSeconds } else { 0 }
@@ -202,32 +210,42 @@ function Enter-RustCacheLock {
     )
 
     Assert-RustCacheManagedPath -CacheRoot $CacheRoot -CandidatePath $BuildDir
-    New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
+    Assert-RustCacheNetworkRootOwner -CacheRoot $CacheRoot
+    New-Item -ItemType Directory -Force -Path $BuildDir -ErrorAction Stop | Out-Null
     $lockPath = Join-Path $BuildDir ".rust-cache.lockdir"
-    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $deadline = [DateTime]::UtcNow.AddSeconds([math]::Max(0, $TimeoutSeconds))
+    $recoveredStaleLock = $false
     while ($true) {
         try {
             New-Item -ItemType Directory -Path $lockPath -ErrorAction Stop | Out-Null
             $owner = [ordered]@{
                 pid = $PID
+                machine_id_sha256 = Get-RustCacheMachineIdentity
                 started_utc = [DateTime]::UtcNow.ToString("o")
                 process_started_utc = (Get-Process -Id $PID).StartTime.ToUniversalTime().ToString("o")
                 workspace_root = $WorkspaceRoot
             }
-            $owner | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $lockPath "owner.json") -Encoding UTF8
+            $owner | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $lockPath "owner.json") -Encoding UTF8 -ErrorAction Stop
             return $lockPath
         } catch {
+            $failure = $_.Exception.Message
             $lockState = Get-RustCacheLockState -LockPath $lockPath
-            if (-not $lockState.active) {
+            if (-not $lockState.active -and $lockState.state -in @('stale', 'invalid') -and -not $recoveredStaleLock) {
                 Remove-Item -LiteralPath $lockPath -Recurse -Force -ErrorAction SilentlyContinue
+                $recoveredStaleLock = $true
+                # Preserve a single immediate stale-lock recovery for GC's zero timeout.
                 continue
             }
             if ([DateTime]::UtcNow -ge $deadline) {
                 $existingOwner = $lockState.owner
                 $ownerText = if ($existingOwner) { $existingOwner | ConvertTo-Json -Compress } else { "unknown" }
-                throw "Timed out waiting for Rust cache lock: $lockPath owner=$ownerText"
+                throw "RUST_CACHE_LOCK_TIMEOUT: Timed out waiting for Rust cache lock: $lockPath owner=$ownerText reason=$($lockState.reason) last_error=$failure. Verify shared-storage connectivity and ownership."
             }
-            Start-Sleep -Seconds 2
+            if (-not $lockState.active) {
+                Remove-Item -LiteralPath $lockPath -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            $remainingMs = [math]::Max(1, ($deadline - [DateTime]::UtcNow).TotalMilliseconds)
+            Start-Sleep -Milliseconds ([int][math]::Min(200, $remainingMs))
         }
     }
 }
@@ -239,7 +257,7 @@ function Exit-RustCacheLock {
         return
     }
     $owner = Get-RustCacheLockOwner -LockPath $LockPath
-    if ($owner -and [int]$owner.pid -eq $PID) {
+    if ($owner -and [int]$owner.pid -eq $PID -and (Get-RustCacheLockOwnerLocality -Owner $owner -LockPath $LockPath) -eq 'local') {
         Remove-Item -LiteralPath $LockPath -Recurse -Force -ErrorAction SilentlyContinue
     }
 }

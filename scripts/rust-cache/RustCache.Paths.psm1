@@ -1,3 +1,5 @@
+Import-Module "$PSScriptRoot\RustCache.NetworkStorage.psm1" -DisableNameChecking
+
 function Test-RustCacheAbsolutePath {
     param([AllowNull()][string]$PathValue)
 
@@ -97,11 +99,12 @@ function Resolve-RustCacheRoot {
     $fullPath = [System.IO.Path]::GetFullPath($candidate)
     $driveRoot = [System.IO.Path]::GetPathRoot($fullPath)
     if ($driveRoot -and -not (Test-Path -LiteralPath $driveRoot)) {
-        throw "Rust cache drive/root does not exist: $fullPath"
+        throw "RUST_CACHE_STORAGE_UNAVAILABLE: Rust cache drive/root does not exist or is offline: $fullPath. Reconnect the share or explicitly select an available local cache root."
     }
     if (-not $NoCreate) {
-        New-Item -ItemType Directory -Force -Path $fullPath | Out-Null
+        New-Item -ItemType Directory -Force -Path $fullPath -ErrorAction Stop | Out-Null
     }
+    Assert-RustCacheNetworkRootOwner -CacheRoot $fullPath -ClaimEmptyRoot:(-not $NoCreate)
     return $fullPath
 }
 
@@ -126,8 +129,8 @@ function Get-RustCacheDefaultCargoConfigPath {
 function Get-RustCacheMigrationAdvice {
     param([Parameter(Mandatory)][string]$CacheRoot, [int]$LowWatermarkPercent=15, [string]$ManagedAlternativeRoot)
     $full = [IO.Path]::GetFullPath($CacheRoot)
-    $drive = New-Object IO.DriveInfo ([IO.Path]::GetPathRoot($full))
-    $freePercent = if ($drive.TotalSize -gt 0) { [math]::Round(100 * $drive.AvailableFreeSpace / $drive.TotalSize, 2) } else { 0 }
+    $volume = Get-RustCacheStorageVolume -CacheRoot $full
+    $freePercent = $volume.free_percent
     $recommended = $freePercent -lt $LowWatermarkPercent -and -not [string]::IsNullOrWhiteSpace($ManagedAlternativeRoot)
     return [pscustomobject]@{
         schema="elon.rust_cache.migration_advice.v1"; current_root=$full; free_percent=$freePercent

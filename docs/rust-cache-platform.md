@@ -2,6 +2,9 @@
 
 最后更新：2026-08-16
 
+网络盘接入、断线边界和校验归档见 [网络缓存与冷归档](rust-cache-network-storage.md)。
+UNC 根需要本机归属标记；不能让多台 PC 共写同一个 Cargo/sccache 根。
+
 ## 目标
 
 本平台解决同一台 Windows 开发机上多个 Rust 项目、多个 worktree 和多个发布目标同时使用缓存时的三个问题：

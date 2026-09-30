@@ -3,6 +3,7 @@ Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Registry.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.TaskLifecycle.psm1" -Force -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.NetworkStorage.psm1" -DisableNameChecking
 
 function Get-RustCacheDirectorySize {
     param([Parameter(Mandatory)][string]$Path)
@@ -30,15 +31,7 @@ function Get-RustCacheDirectorySize {
 function Get-RustCacheVolumeState {
     param([Parameter(Mandatory)][string]$CacheRoot)
 
-    $rootPath = [System.IO.Path]::GetPathRoot([System.IO.Path]::GetFullPath($CacheRoot))
-    $drive = [System.IO.DriveInfo]::new($rootPath)
-    $freePercent = if ($drive.TotalSize -gt 0) { [math]::Round(($drive.AvailableFreeSpace * 100.0) / $drive.TotalSize, 2) } else { 0 }
-    [pscustomobject]@{
-        root = $rootPath
-        total_bytes = [int64]$drive.TotalSize
-        free_bytes = [int64]$drive.AvailableFreeSpace
-        free_percent = $freePercent
-    }
+    Get-RustCacheStorageVolume -CacheRoot $CacheRoot
 }
 
 function Remove-RustCachePartition {
@@ -57,12 +50,7 @@ function Remove-RustCachePartition {
                 # Windows PowerShell 5.1 Remove-Item can fail while traversing
                 # already-removed incremental children. .NET deletes the
                 # verified managed partition without reusing that enumerator.
-                $fullPath = [System.IO.Path]::GetFullPath($Path)
-                $deletePath = if ($env:OS -eq "Windows_NT" -and -not $fullPath.StartsWith('\\?\')) {
-                    "\\?\$fullPath"
-                } else {
-                    $fullPath
-                }
+                $deletePath = ConvertTo-RustCacheExtendedPath -Path $Path
                 [System.IO.Directory]::Delete($deletePath, $true)
                 return
             } catch {
@@ -85,8 +73,8 @@ function Move-RustCachePartitionToTrash {
     New-Item -ItemType Directory -Force -Path $trashRoot | Out-Null
     $trashPath = Join-Path $trashRoot ([Guid]::NewGuid().ToString("N"))
     Assert-RustCacheManagedPath -CacheRoot $CacheRoot -CandidatePath $trashPath
-    $sourcePath = if ($env:OS -eq "Windows_NT" -and -not $Path.StartsWith('\\?\')) { "\\?\$Path" } else { $Path }
-    $destinationPath = if ($env:OS -eq "Windows_NT" -and -not $trashPath.StartsWith('\\?\')) { "\\?\$trashPath" } else { $trashPath }
+    $sourcePath = ConvertTo-RustCacheExtendedPath -Path $Path
+    $destinationPath = ConvertTo-RustCacheExtendedPath -Path $trashPath
     [System.IO.Directory]::Move($sourcePath, $destinationPath)
     return $trashPath
 }
@@ -276,7 +264,7 @@ function Clear-RustCacheTaskPartitions {
             try {
                 Remove-RustCachePartitionSafely -CacheRoot $root -Path $partition.path -WorkspaceRoot $TaskWorktree
             } catch {
-                if ($_.Exception.Message -like "Timed out waiting for Rust cache lock:*") {
+                if ($_.Exception.Message -match '^(RUST_CACHE_LOCK_TIMEOUT: )?Timed out waiting for Rust cache lock:') {
                     $action.action = "preserve"
                     $action.reason = "lock-appeared"
                 } else {
@@ -581,7 +569,7 @@ function Invoke-RustCacheGc {
             try {
                 Remove-RustCachePartitionSafely -CacheRoot $root -Path $partition.path -WorkspaceRoot $RepoRoot
             } catch {
-                if ($_.Exception.Message -like "Timed out waiting for Rust cache lock:*") {
+                if ($_.Exception.Message -match '^(RUST_CACHE_LOCK_TIMEOUT: )?Timed out waiting for Rust cache lock:') {
                     $partition.selected = $false
                     $partition.action = "preserve"
                     $partition.reason = "lock-appeared"
