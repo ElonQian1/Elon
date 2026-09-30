@@ -6,6 +6,8 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ImageView
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 
 /** Adaptive overview inside the existing View host; navigation uses its real controller. */
 internal class ProjectSpaceOverviewView(
@@ -21,8 +23,25 @@ internal class ProjectSpaceOverviewView(
         orientation = LinearLayout.VERTICAL
         setBackgroundColor(colors.surface)
         setPadding(dp(24), dp(20), dp(24), dp(8))
-        addView(label("项目空间 · ${roleLabel(space.project.role)}", 14, muted = true))
-        addView(label(space.project.name.ifBlank { "项目空间" }, 26, bold = true))
+        addView(LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            val bitmap = UserProfileStore.decodeAvatar(space.project.iconDataUrl)
+            val icon = if (bitmap != null) ImageView(context).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageDrawable(RoundedBitmapDrawableFactory.create(resources, bitmap).apply { cornerRadius = dp(12).toFloat() })
+            } else label(space.project.name.firstOrNull()?.toString() ?: "项", 24, bold = true).apply {
+                gravity = Gravity.CENTER
+                background = GradientDrawable().apply { setColor(this@ProjectSpaceOverviewView.colors.container); cornerRadius = dp(12).toFloat() }
+            }
+            icon.importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(icon, LinearLayout.LayoutParams(dp(56), dp(56)).apply { marginEnd = dp(16) })
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(label("项目空间 · ${roleLabel(space.project.role)}", 14, muted = true))
+                addView(label(space.project.name.ifBlank { "项目空间" }, 26, bold = true))
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        })
         space.introduction?.tagline?.let { addView(label(it, 20, bold = true)) }
         (space.introduction?.summary ?: space.project.description)?.takeIf { it.isNotBlank() }
             ?.let { addView(label(it, 16, muted = true)) }
@@ -82,7 +101,7 @@ internal class ProjectSpaceOverviewView(
         "owner" -> "项目所有者"
         "admin" -> "管理员"
         "editor" -> "开发成员"
-        "viewer" -> "只读成员"
+        "viewer", "observer" -> "只读成员"
         "visitor", "guest", "" -> "访客"
         else -> "项目成员"
     }
