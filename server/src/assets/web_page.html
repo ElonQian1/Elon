@@ -6394,7 +6394,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   let lastChatTimelineMs = 0;
   const socialCache = window.ElonSocialChatCache.create(localStorage);
   const socialActions = window.ElonSocialMessageActions.create({ list: chatList, input: messageInput, api, owner: () => token, userId: () => currentUser?.id,
-    send: (...args) => socialRecovery.send(...args), changed: () => { socialRecovery.refresh(); socialRecovery.directories(); } });
+    send: (...args) => socialRecovery.send(...args), changed: () => { socialRecovery.refresh(); socialRecovery.directories(); } }); window.ElonSourceCompose.bindTransfers(messageInput, chatList, () => (currentFriend || currentGroup) && inputBar.classList.contains('active') ? { api, owner: () => [token, currentFriend?.id, currentGroup?.id].join(':'), userId: currentUser?.id, kind: currentFriend ? 'friend' : 'group', contact: currentFriend || currentGroup, send: socialActions.sender(currentFriend ? 'friend' : 'group', currentFriend || currentGroup) } : null);
   const socialView = window.ElonSocialChatView.create({ list: chatList, append: appendBubble, api, actions: socialActions, user: () => currentUser,
     time: parseServerTime, friendName: friendDisplayName, resetTimeline: () => { lastChatTimelineMs = 0; },
     changed: id => { socialRecovery.invalidate('group', id); return currentGroup?.id === id ? loadGroupMessages(false) : Promise.resolve(); } });

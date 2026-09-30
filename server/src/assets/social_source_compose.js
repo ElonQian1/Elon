@@ -28,6 +28,43 @@
     document.body.append(dialog); dialog.showModal();
   }
   function capture(options) { return { ...options, contact: { ...options.contact }, identity: options.owner() }; }
+  function transferFiles(data) {
+    // Read synchronously during paste/drop: WebKit protects the data after the event returns.
+    let files = Array.from(data.files || []);
+    if (!files.length) files = Array.from(data.items || []).filter(item => item.kind === 'file').map(item => item.getAsFile()).filter(Boolean);
+    const imageTypes = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', avif: 'image/avif', bmp: 'image/bmp', tiff: 'image/tiff', heic: 'image/heic' };
+    return files.map((file, index) => {
+      const type = file.type || imageTypes[(file.name || '').split('.').pop().toLowerCase()] || '';
+      const extension = Object.keys(imageTypes).find(ext => imageTypes[ext] === type);
+      const name = file.name || (extension ? `粘贴图片-${index + 1}.${extension}` : `附件-${index + 1}`);
+      return name === file.name && type === file.type ? file : new File([file], name, { type, lastModified: file.lastModified });
+    });
+  }
+  function bindTransfers(input, list, context) {
+    const targets = [input.closest('form') || input, list];
+    const available = () => !input.disabled && !input.readOnly && context();
+    const hasFiles = data => Array.from(data?.types || []).includes('Files');
+    function receive(event) {
+      if (event.defaultPrevented) return;
+      const options = available(), data = event.clipboardData || event.dataTransfer;
+      if (!options || !data) return;
+      const files = transferFiles(data);
+      if (!files.length && !hasFiles(data)) return; // Leave text, links and HTML to the input's native behavior.
+      event.preventDefault(); // In particular, don't let a file drop navigate away from the chat.
+      if (active?.open) return;
+      // The dialog's close event is queued; a quick second paste must not be lost meanwhile.
+      if (active) active = null;
+      preview({ ...capture(options), initialText: data.getData('text/plain') }, files,
+        files.length ? '' : '未能读取图片或文件，请重新复制图片，或使用附件按钮选择文件。');
+    }
+    input.addEventListener('paste', receive);
+    targets.forEach(target => {
+      target.addEventListener('dragover', event => {
+        if (available() && hasFiles(event.dataTransfer)) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }
+      });
+      target.addEventListener('drop', receive);
+    });
+  }
   function open(options) {
     if (active) return;
     const snapshot = capture(options), mode = options.mode || 'media';
@@ -46,11 +83,12 @@
     // Keep the picker attached and activate it synchronously inside the user's tap.
     picker = input; document.body.append(input); input.click();
   }
-  function preview(options, files) {
+  function preview(options, files, error = '') {
     if (active || options.identity !== options.owner()) return;
     const dialog = panel('分享预览'), notice = document.createElement('p'); notice.setAttribute('role', 'status');
     const target = document.createElement('p'); target.textContent = '发送给 ' + (options.contact.name || options.contact.nickname || options.contact.account || '当前会话');
     const text = document.createElement('textarea'); text.placeholder = '添加文字或文章链接'; text.setAttribute('aria-label', '附件说明'); text.maxLength = 4000;
+    text.value = options.initialText || '';
     text.style.cssText = 'width:100%;box-sizing:border-box;min-height:88px;padding:12px;background:var(--panel-2);color:var(--ink);border:1px solid var(--line);border-radius:8px;font:inherit';
     const items = [], urls = []; let busy = false, uncertain = false, disposed = false, upload = null;
     const current = () => !disposed && dialog.isConnected && options.identity === options.owner();
@@ -58,6 +96,7 @@
     const cancel = button('取消', () => { cleanup(); dialog.close(); }), send = button('发送', submit);
     send.style.background = 'var(--brand)'; send.style.color = 'var(--brand-ink)';
     dialog.append(target, text, notice, cancel, send); mount(dialog, options, cleanup);
+    if (error) { notice.textContent = error; send.disabled = true; return; }
     if (files.length > 6 || files.some(file => file.size > MAX_BYTES || !file.size)) {
       notice.textContent = '每次最多 6 个附件，单个附件不超过 12 MB 且不能为空'; send.disabled = true; return;
     }
@@ -193,5 +232,5 @@
     document.addEventListener('visibilitychange', visibility);
     dialog.addEventListener('close', () => document.removeEventListener('visibilitychange', visibility), { once: true });
   }
-  root.ElonSourceCompose = { open, openVoice };
+  root.ElonSourceCompose = { open, openVoice, bindTransfers };
 })(globalThis);
