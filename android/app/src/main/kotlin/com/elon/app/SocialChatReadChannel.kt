@@ -28,6 +28,8 @@ internal class SocialChatReadChannel(private val context: Context, private val h
     private var timelineSession = ""
     private val timelines = linkedMapOf<String, MessageTimelineWindow>()
     var canMarkRead: () -> Boolean = { false }
+    var onIdle: () -> Unit = {}
+    fun isReading(key: String) = call != null && requestKey == key
     fun timeline(key: String): MessageTimelineWindow? = timelines[key]
     private fun window(key: String): MessageTimelineWindow {
         val session = socialSession(context)
@@ -54,7 +56,12 @@ internal class SocialChatReadChannel(private val context: Context, private val h
              cached: (JSONArray) -> Unit = {}, value: (JSONArray) -> Unit, error: (Throwable) -> Unit) {
         if (!AuthManager.isLoggedIn(context)) { cancel(); error(SocialChatReadError(401, "请重新登录后同步消息")); return }
         if (call != null && requestKey == key && requestSession == socialSession(context)) {
-            followUp = { read(key, path, field, false, cached, value, error) }
+            val requested = timelines[key]?.nextDirection
+            followUp = {
+                if (requested == "older") timelines[key]?.older()
+                if (requested == "latest") timelines[key]?.latest()
+                read(key, path, field, false, cached, value, error)
+            }
             return
         }
         cancel()
@@ -107,6 +114,7 @@ internal class SocialChatReadChannel(private val context: Context, private val h
                 if (valid()) {
                     if (trailing != null) trailing.invoke()
                     else if (accepted.isSuccess && timeline?.moreChanges == true) read(key, path, field, false, cached, value, error)
+                    if (call == null) onIdle()
                 }
             }
         }

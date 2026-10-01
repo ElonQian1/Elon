@@ -16,11 +16,38 @@
     nav.hidden = true; nav.setAttribute('aria-label', '聊天历史'); older.textContent = '加载更早消息'; latest.textContent = '回到最新消息';
     [older, latest].forEach(button => { button.type = 'button'; button.style.minHeight = '48px'; nav.append(button); });
     options.list?.before(nav);
-    function navigation() { const state = timeline.snapshot(); nav.hidden = !active; older.hidden = !state.hasOlder; latest.hidden = !state.hasNewer; }
-    function followPosition() { if (options.list) timeline.follow(options.list.scrollHeight - options.list.clientHeight - options.list.scrollTop < 80); }
+    let edgePending = false, historyLoading = false, lastTop = 0, intentUntil = 0, touchY = 0, edgeFrame = 0;
+    function navigation() { const state = timeline.snapshot(); nav.hidden = !active; older.hidden = !state.hasOlder; latest.hidden = !state.hasNewer; older.disabled = historyLoading || edgePending; older.textContent = older.disabled ? '正在加载…' : '加载更早消息'; }
+    function requestOlder() {
+      if (historyLoading) return;
+      if (!active || !visible() || !timeline.snapshot().hasOlder) { edgePending = false; return; }
+      if (jobs.has(active.key)) { edgePending = true; navigation(); return; }
+      edgePending = false; intentUntil = 0;
+      if (edgeFrame) root.cancelAnimationFrame(edgeFrame); edgeFrame = 0;
+      historyLoading = true; timeline.follow(false); void refresh(false, 'older');
+    }
+    function atEdge() { if (Date.now() < intentUntil && options.list?.scrollTop <= 96) requestOlder(); }
+    function scheduleEdge() {
+      if (historyLoading) return;
+      intentUntil = Date.now() + 800;
+      if (edgeFrame) root.cancelAnimationFrame(edgeFrame);
+      edgeFrame = root.requestAnimationFrame(() => { edgeFrame = root.requestAnimationFrame(() => { edgeFrame = 0; atEdge(); }); });
+    }
+    function followPosition() {
+      const list = options.list; if (!list) return;
+      timeline.follow(list.scrollHeight - list.clientHeight - list.scrollTop < 80);
+      if (list.scrollTop < lastTop && Date.now() < intentUntil) atEdge();
+      lastTop = list.scrollTop; if (lastTop > 96) edgePending = false;
+    }
+    const wheel = event => { if (event.deltaY < 0) scheduleEdge(); else edgePending = false; };
+    const touchStart = event => { touchY = event.touches[0]?.clientY || 0; };
+    const touchMove = event => { if ((event.touches[0]?.clientY || 0) > touchY + 24) scheduleEdge(); };
+    const keyboard = event => { if (['ArrowUp', 'PageUp', 'Home'].includes(event.key)) scheduleEdge(); };
+    const edgeListeners = [['wheel', wheel], ['touchstart', touchStart], ['touchmove', touchMove], ['keydown', keyboard]];
+    edgeListeners.forEach(([name, listener]) => options.list?.addEventListener(name, listener, { passive: true }));
     options.list?.addEventListener('scroll', followPosition, { passive: true });
-    older.onclick = () => { timeline.follow(false); void refresh(false, 'older'); };
-    latest.onclick = () => { timeline.follow(true); void refresh(true, 'latest'); };
+    older.onclick = requestOlder;
+    latest.onclick = () => { edgePending = false; timeline.follow(true); void refresh(true, 'latest'); };
     const jobs = new Map(), snapshots = new Map(), outbox = new Map();
     let owner = '', epoch = 0, active = null, rendered = '', timer = null, wakeTimer = null, ticks = 0;
     const visible = options.visible || (() => document.visibilityState !== 'hidden');
@@ -91,7 +118,7 @@
       if (!active || !visible()) return Promise.resolve();
       const { key, kind, contact } = active;
       const existing = jobs.get(key);
-      if (existing) { existing.again = () => refresh(scroll, direction); return existing.promise; }
+      if (existing) { if (direction !== 'sync' || !existing.again) existing.again = () => refresh(scroll, direction); return existing.promise; }
       const ticket = epoch, identity = owner;
       const job = { controller: new AbortController(), again: null };
       const valid = () => ticket === epoch && identity === session() && jobs.get(key) === job && active?.key === key;
@@ -121,14 +148,16 @@
           await json('/api/me/message-timeline/read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, id: contact.id, message_id: id }) }, job.controller);
           if (valid()) lastRead = id;
         }
-        if (mode === 'sync' && page.has_more && valid()) job.again = () => refresh();
+        if (mode === 'sync' && page.has_more && valid() && !job.again) job.again = () => refresh();
       }).catch(error => {
         if (!valid()) return;
         if ([401, 403, 404].includes(error.status)) { timeline.reset(); cache.remove(scopeKey(key)); snapshots.delete(key); outbox.delete(key); rendered = ''; paint(false); }
-        options.status([401, 403, 404].includes(error.status) ? '无法访问此会话，请检查账号或成员权限' : '同步暂时失败，已保留现有消息 · 点击重试', () => refresh());
+        options.status([401, 403, 404].includes(error.status) ? '无法访问此会话，请检查账号或成员权限' : '同步暂时失败，已保留现有消息 · 点击重试', () => refresh(false, mode));
       }).finally(() => {
         if (!valid()) return;
-        jobs.delete(key); older.disabled = false; if (job.again) job.again();
+        jobs.delete(key); if (mode === 'older') historyLoading = false; navigation();
+        if (job.again) job.again();
+        if (edgePending) requestOlder();
       });
       return job.promise;
     }
@@ -144,7 +173,7 @@
       });
     }
     function directories() { return Promise.all([directory('friends'), directory('groups')]); }
-    function close() { cancel(); active = null; rendered = ''; timeline.reset(); lastRead = ''; nav.hidden = true; options.status(''); }
+    function close() { cancel(); active = null; rendered = ''; timeline.reset(); lastRead = ''; nav.hidden = true; options.status(''); edgePending = false; historyLoading = false; intentUntil = 0; if (edgeFrame) root.cancelAnimationFrame(edgeFrame); edgeFrame = 0; }
     function open(kind, contact) {
       ensureOwner(); close();
       const key = contactKey(kind, contact); active = { key, kind, contact };
@@ -180,7 +209,7 @@
         throw error;
       }
     }
-    function pause() { cancel(); clearInterval(timer); timer = null; clearTimeout(wakeTimer); }
+    function pause() { cancel(); historyLoading = false; edgePending = false; navigation(); clearInterval(timer); timer = null; clearTimeout(wakeTimer); }
     function wake() {
       if (!visible() || !session()) return;
       cancel(); refresh(); directories(); options.wake?.();
@@ -196,7 +225,7 @@
     return {
       open, close, refresh, directory, directories, invalidate, send, wake, json,
       reset() { pause(); close(); snapshots.clear(); outbox.clear(); cache.clear(); owner = ''; },
-      destroy() { pause(); nav.remove(); options.list?.removeEventListener('scroll', followPosition); listeners.forEach(([event, fn, target]) => target?.removeEventListener(event, fn)); },
+      destroy() { pause(); close(); nav.remove(); options.list?.removeEventListener('scroll', followPosition); edgeListeners.forEach(([event, fn]) => options.list?.removeEventListener(event, fn)); listeners.forEach(([event, fn, target]) => target?.removeEventListener(event, fn)); },
     };
   }
   root.ElonSocialChatRecovery = { create, reconcile };

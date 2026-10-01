@@ -1,4 +1,5 @@
 import { useTimelineAnchor } from '../message-timeline/useTimelineAnchor'
+import { useHistoryPagination } from '../message-timeline/useHistoryPagination'
 import type { useMessageTimeline } from '../message-timeline/useMessageTimeline'
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { User } from '../../store/auth'
@@ -62,6 +63,8 @@ export default function SocialConversation(props: Props) {
   const captureAnchor = useTimelineAnchor(feed, messages)
   const follow = useRef(true)
   const [newMessages, setNewMessages] = useState(false)
+  function older() { captureAnchor(); follow.current = false; props.timeline.follow(false); void props.timeline.older() }
+  useHistoryPagination(feed, key, { hasOlder: props.timeline.hasOlder, loading: props.timeline.loading, load: older })
   useEffect(() => {
     setAiSelection(null)
     setQuoteDetail(null)
@@ -95,9 +98,7 @@ export default function SocialConversation(props: Props) {
     {(notice || local.error) && <p className={tools.status} role="status">{local.error || notice}</p>}
     <GroupAiStatus owner={me.id} group={conversation.kind === 'group' ? conversation.id : ''} onDelivered={props.onSent} />
     <div className={`${styles.feed} ${tools.feed}`} ref={feed} onScroll={() => { const node = feed.current!; follow.current = node.scrollHeight - node.clientHeight - node.scrollTop < 80; props.timeline.follow(follow.current); if (follow.current) setNewMessages(false) }}>
-      {props.timeline.hasOlder && <button type="button" disabled={props.timeline.loading} onClick={() => {
-        captureAnchor(); follow.current = false; props.timeline.follow(false); void props.timeline.older()
-      }}>{props.timeline.loading ? '正在加载…' : '加载更早消息'}</button>}
+      {props.timeline.hasOlder && <button type="button" disabled={props.timeline.loading} onClick={older}>{props.timeline.loading ? '正在加载…' : '加载更早消息'}</button>}
       {props.timeline.hasNewer && <button type="button" onClick={latest}>回到最新消息</button>}
       {props.error && <p className={styles.syncStatus} role="status">{props.error} <button type="button" className={styles.syncRetry} onClick={props.retry}>重试</button></p>}
       {props.loading && <p className={styles.hint}>读取消息…</p>}

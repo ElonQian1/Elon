@@ -19365,6 +19365,177 @@
       "updated_at_ms": 1786879547042
     },
     {
+      "id": "message-history-edge-loading-v1",
+      "title": "三端聊天上翻自动加载历史",
+      "summary": "修复 APK/PWA/Win 上翻到当前窗口顶部不会自动加载历史消息，并保护分页请求、重试和阅读锚点。",
+      "status": "verified",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/message-history-edge-loading-v1.md",
+        "content_hash": "f371d99deb2e3157d855d34b031852ea832a4650f45b31a9b87702e4cc9e9ec5",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "c9d97c7662a5c59736656e98a418540a93749436",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "b919bd554b2c5edb7023fcedba1f0510b949782c",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "conversation-platform",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/MessageTimelineNavigation.kt",
+        "android/app/src/main/kotlin/com/elon/app/SocialChatReadChannel.kt",
+        "pc-frontend/src/features/friends/SocialConversation.tsx",
+        "pc-frontend/src/features/message-timeline",
+        "server/src/assets/social_chat_recovery.js"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "三端好友群聊用户上翻到顶自动分页，保留手动入口",
+        "连续翻页保持可见锚点与有界窗口，无重复并发读取",
+        "轮询不吞掉历史读取，失败可重试，会话隔离有效",
+        "回归、构建、发布与装机分别记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/MessageHistoryScroll.kt",
+          "content_hash": "5de6bbf198dc743ce530a12c4f7caac8a58a58aacfe5bbe9ad231f220c726470",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c9d97c7662a5c59736656e98a418540a93749436",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "cfbff57f241eeb26e0422f7c37fbc5f30a7d579f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/MessageTimelineNavigation.kt",
+          "content_hash": "cae73d4079acb85d88b8cc33f79042e0b201cbb3b7d914fce80abaaf45db7eed",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c9d97c7662a5c59736656e98a418540a93749436",
+            "head_blob_oid": "d158056fa032709461b71c83b62b2285022cb3c7",
+            "worktree_blob_oid": "43ceb49e4da2ab63e06be0359a606c3a86d9ebb0",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/SocialChatReadChannel.kt",
+          "content_hash": "d7068d5d74ddf0fe50a878c087a4df4b911a32940c63b96a9af7dfe8ba2f607f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c9d97c7662a5c59736656e98a418540a93749436",
+            "head_blob_oid": "56f7fedbb4ee691270104678270619263a0eb399",
+            "worktree_blob_oid": "60f35fd55e32caefaf7de732f8d284ccd60f9a41",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/MessageHistoryNavigationTest.kt",
+          "content_hash": "45eccf267c3b20a8d7bec0259b87bb66a141ca42d07a255fc3e58b8cfc8a2fb3",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c9d97c7662a5c59736656e98a418540a93749436",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1bf9ecfbe255494d71d4e05c9310485ad8cf346e",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/SocialConversation.tsx",
+          "content_hash": "bd604932b756f3655a14cc3d172457cce7048394ab0fa4f0df3176761327bf6e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c9d97c7662a5c59736656e98a418540a93749436",
+            "head_blob_oid": "54a95138e231b4a73bc73e69dab0575f5e0af399",
+            "worktree_blob_oid": "9439ec1b191564b78735a80a1b5e2c18a428f992",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/message-timeline/useHistoryPagination.ts",
+          "content_hash": "045a8faaaa0f6d48b6d1778538a2fc32ea37e1bf84177b717a8b03d62d67c1df",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c9d97c7662a5c59736656e98a418540a93749436",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9f7d8181bfcb246aea1c637c31f95314b50fb353",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/message-timeline/useMessageTimeline.ts",
+          "content_hash": "fdddeac4b59b3355d74806d8276f6a960fc4d692e7dfb3e234bf985eff502f41",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c9d97c7662a5c59736656e98a418540a93749436",
+            "head_blob_oid": "9cf78ac4c14d3ac374e8a9baa24cc30ae5003448",
+            "worktree_blob_oid": "26f5e9da37ecce9f2a386d07ce3a408a70d5a816",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-message-timeline-browser.cjs",
+          "content_hash": "eeff777ded45ab518b8eff30193cdc55b61bb6cdb1bf3f6a5a797395a2dd4d22",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c9d97c7662a5c59736656e98a418540a93749436",
+            "head_blob_oid": "1fbfa228512f6940bea6bbafd047f720a677cae6",
+            "worktree_blob_oid": "55cdeb6b39b37acc9db28e62092e1ceb7bf50321",
+            "state": "tracked_modified"
+          }
+        },
+        {
+          "path": "scripts/test-pc-history-pagination.cjs",
+          "content_hash": "a78cf7b620ec848825b12a62d2c41e910c02915067a4d6730ae741fbb0ef152a",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c9d97c7662a5c59736656e98a418540a93749436",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "896344277b829db63b27aa54995333267c569f2c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/assets/social_chat_recovery.js",
+          "content_hash": "dad2665f5e845ca72331ddf77b406079a8ca915018183d03677a1eb6d4ce8233",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "c9d97c7662a5c59736656e98a418540a93749436",
+            "head_blob_oid": "c31f205884e52b7596486aed9e4284a0382d3083",
+            "worktree_blob_oid": "5ae5a48e3b181a4db128261835b5dddc5315d28d",
+            "state": "tracked_modified"
+          }
+        }
+      ],
+      "created_at_ms": 1790859263399,
+      "updated_at_ms": 1790859267332
+    },
+    {
       "id": "message-reading-bookmarks-v1",
       "title": "多书签与独立历史阅读进度",
       "summary": "拟在统一时间线上增加固定消息书签、每书签独立继续阅读位置、按消息定位和双向翻页；书签进度与已读回执分离。当前为方案，未实现 API 或界面。",
@@ -32852,66 +33023,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_549ef060e7484209b83a2859a4ed278e",
-      "feature_id": "social-sync-status-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "空态提示生命周期已修复；先复现 7 项中 6 项失败，再通过状态、读取通道和恢复回归共 14 项。正式 APK 发布待执行。",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789472724013
-    },
-    {
-      "id": "feature_event_d0932864da3e415bb135597ba343569c",
-      "feature_id": "social-sync-status-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "空态提示生命周期已修复；先复现 7 项中 6 项失败，再通过状态、读取通道和恢复回归共 14 项。正式 APK 发布待执行。",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1789472724067
-    },
-    {
-      "id": "feature_event_858d00461a6a46d4a1901dae0b02ee8c",
-      "feature_id": "social-sync-status-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "APK 1.1.1768（build 1768）正式发布，来源 87cb47386fc87ddb4f8bff7d314dadfe815df85c；14 项回归通过；线上版本及包 SHA-256 一致，下载 HTTP 200。物理设备复核 deferred，详见 docs/reports/social-sync-status-lifecycle-2026-09-15.md。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1789473285654
-    },
-    {
-      "id": "feature_event_e08a2dcbb54a4a4d90df49a50cda9146",
-      "feature_id": "binance-grid-chinese-symbols-v1",
-      "action": "registered",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789487950958
-    },
-    {
-      "id": "feature_event_cc2c8de7337d4ad6bfe2aa6daff8c1b3",
-      "feature_id": "binance-grid-chinese-symbols-v1",
-      "action": "claimed",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789487951025
-    },
-    {
-      "id": "feature_event_ffa3096fff5a4ab19a9b11297a97adfb",
-      "feature_id": "binance-grid-chinese-symbols-v1",
-      "action": "transitioned",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789487951091
-    },
-    {
       "id": "feature_event_b03c5e2d1fd449e69f5f2784325438db",
       "feature_id": "binance-grid-chinese-symbols-v1",
       "action": "evidence_recorded",
@@ -34850,6 +34961,66 @@
       "from_status": "verified",
       "to_status": "released",
       "at_ms": 1790857339674
+    },
+    {
+      "id": "feature_event_8fe4af1366e64e0287f5cb562c117782",
+      "feature_id": "message-history-edge-loading-v1",
+      "action": "registered",
+      "actor": "codex-history-edge",
+      "reason": "NFF 冲突保留上游注册表，通过官方工具重放本任务登记与已完成证据",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790859263399
+    },
+    {
+      "id": "feature_event_11ce36e9d3274b8ab0baf57596a2d694",
+      "feature_id": "message-history-edge-loading-v1",
+      "action": "claimed",
+      "actor": "codex-history-edge",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790859263591
+    },
+    {
+      "id": "feature_event_d7e83570a7c04fe382921d20cc6ca1b2",
+      "feature_id": "message-history-edge-loading-v1",
+      "action": "transitioned",
+      "actor": "codex-history-edge",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790859263782
+    },
+    {
+      "id": "feature_event_3a283510aa2a4a918ab0383d5c23b21b",
+      "feature_id": "message-history-edge-loading-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-history-edge",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790859266911
+    },
+    {
+      "id": "feature_event_1fa427ee81114882be48d9c8b40ba0ed",
+      "feature_id": "message-history-edge-loading-v1",
+      "action": "transitioned",
+      "actor": "codex-history-edge",
+      "reason": "仅注册表与上游文档冲突，运行代码无变化，复用定向验证",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790859267138
+    },
+    {
+      "id": "feature_event_1dc6667bbdd8400085e93935eaedb99c",
+      "feature_id": "message-history-edge-loading-v1",
+      "action": "transitioned",
+      "actor": "codex-history-edge",
+      "reason": "仅注册表与上游文档冲突，运行代码无变化，复用定向验证",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1790859267332
     }
   ]
 }

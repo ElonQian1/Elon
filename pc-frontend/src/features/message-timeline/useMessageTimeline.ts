@@ -57,7 +57,7 @@ export function useMessageTimeline<T extends TimelineMessage>(scope: TimelineSco
           setStatus({ loading: false, error: '', hasOlder: next.hasOlder, hasNewer: next.hasNewer, unread: next.unread })
           acknowledgeAfterPaint()
           if (mode !== 'sync' || !page.has_more) break
-          if (pages === 3) pending = 'sync'
+          if (pages === 3 && !pending) pending = 'sync'
         }
       } catch (error) {
         if (!current()) return

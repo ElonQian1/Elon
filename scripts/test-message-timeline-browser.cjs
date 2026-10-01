@@ -13,15 +13,18 @@ async function main() {
       const message = n => ({ id: String(n).padStart(6,'0'), created_at:'2026-10-01', content:'测试消息 ' + n, timeline_cursor: String(n) });
       window.newMessages = []; window.reads = []; window.requests = [];
       window.chat = ElonSocialChatRecovery.create({ list, cache: {get:key=>cache.get(key), put:(key,value)=>cache.set(key,value), remove:key=>cache.delete(key), clear:()=>cache.clear()},
-        session:()=> 'fixture-session', userId:()=> 'fixture-user', status:()=>{}, directory:()=>{},
+        session:()=> 'fixture-session', userId:()=> 'fixture-user', status:text=>{window.lastStatus=text;}, directory:()=>{},
         api: async (path, options) => {
           const url = new URL(path, 'https://test.invalid'); window.requests.push(path);
+          if (url.searchParams.has('sync') && window.holdSync) await new Promise(resolve => window.releaseSync = resolve);
+          if (url.searchParams.has('before') && window.holdOlder) await new Promise(resolve => window.releaseOlder = resolve);
+          if (url.searchParams.has('before') && window.failOlder) { window.failOlder = false; return new Response('{"error":"fixture offline"}', {status:503}); }
           if (path.endsWith('/window')) return new Response(JSON.stringify({schema:'elon.message_timeline.v1',messages:JSON.parse(options.body).message_ids.map(id=>message(Number(id))),removed_ids:[],sync:'recovered',has_more:false}));
           if (options.method === 'POST') { window.reads.push(JSON.parse(options.body)); return new Response('{}'); }
           if (window.expired && url.searchParams.has('sync')) { window.expired=false; return new Response(JSON.stringify({schema:'elon.message_timeline.v1',messages:[],removed_ids:[],reset:true})); }
           let messages = [], more = false;
           if (url.searchParams.has('sync')) { messages = window.newMessages; window.newMessages = []; }
-          else { const end = Number(url.searchParams.get('before') || 100000); messages = Array.from({length:Math.min(50,end)},(_,i)=>message(end-Math.min(50,end)+i)); more = end > 50; }
+          else { const end = Number(url.searchParams.get('before') || window.sourceSize || 100000); messages = Array.from({length:Math.min(50,end)},(_,i)=>message(end-Math.min(50,end)+i)); more = end > 50; }
           return new Response(JSON.stringify({schema:'elon.message_timeline.v1',messages,removed_ids:[],has_more:more,before:messages[0]?.timeline_cursor,sync:url.searchParams.has('before')?null:'live'}));
         }, render:(rows,kind,contact,scroll)=> {
           const old = list.scrollTop;
@@ -34,12 +37,39 @@ async function main() {
     assert.equal(await page.locator('#list>div').count(), 50);
     for (let i=0;i<5;i++) {
       const anchor = await page.evaluate(() => { const list=document.getElementById('list'); list.scrollTop=0; return list.firstChild.dataset.messageId; });
-      await page.getByRole('button',{name:'加载更早消息',exact:true}).click();
-      await page.waitForFunction(previous=>document.querySelector('#list>div').dataset.messageId!==previous, anchor);
+      await page.locator('#list').hover();
+      await page.mouse.wheel(0, -300);
+      await page.waitForFunction(previous=>document.querySelector('#list>div').dataset.messageId!==previous, anchor, { timeout: 2500 });
       const offset = await page.locator(`[data-message-id="${anchor}"]`).evaluate(node=>node.getBoundingClientRect().top-document.getElementById('list').getBoundingClientRect().top);
       assert.ok(Math.abs(offset)<2, `history anchor moved ${offset}px`);
       assert.ok(await page.locator('#list>div').count()<=150);
     }
+    const olderCount = () => page.evaluate(() => window.requests.filter(path => new URL(path, 'https://test.invalid').searchParams.has('before')).length);
+    const settleGesture = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
+    const edge = async () => {
+      const first = await page.locator('#list').evaluate(list => { list.scrollTop = 0; return list.firstChild.dataset.messageId; });
+      await page.locator('#list').hover(); await page.mouse.wheel(0, -300); await settleGesture(); return first;
+    };
+    await page.evaluate(() => { window.holdSync = true; window.chat.refresh(); });
+    await page.waitForFunction(() => typeof window.releaseSync === 'function');
+    const count = await olderCount(), busyAnchor = await edge(); assert.equal(await olderCount(), count);
+    await page.evaluate(() => { window.holdSync = false; window.releaseSync(); });
+    await page.waitForFunction(id => document.querySelector('#list>div').dataset.messageId !== id, busyAnchor);
+    assert.equal(await olderCount(), count + 1);
+    await page.evaluate(() => window.holdOlder = true); const heldAnchor = await edge();
+    await page.waitForFunction(() => typeof window.releaseOlder === 'function'); const heldCount = await olderCount();
+    for (let n = 0; n < 4; n++) await page.mouse.wheel(0, -50);
+    await settleGesture();
+    assert.equal(await olderCount(), heldCount);
+    await page.evaluate(() => { window.holdOlder = false; window.releaseOlder(); });
+    await page.waitForFunction(id => document.querySelector('#list>div').dataset.messageId !== id, heldAnchor);
+    assert.equal(await olderCount(), heldCount);
+    await page.evaluate(() => window.failOlder = true); const failedAnchor = await edge();
+    await page.waitForFunction(() => window.lastStatus.includes('同步暂时失败'));
+    await page.getByRole('button', {name:'加载更早消息', exact:true}).waitFor();
+    assert.equal(await page.locator('#list>div').first().getAttribute('data-message-id'), failedAnchor);
+    await page.getByRole('button', {name:'加载更早消息', exact:true}).click();
+    await page.waitForFunction(id => document.querySelector('#list>div').dataset.messageId !== id, failedAnchor);
     const before = await page.locator('#list>div').allTextContents();
     const readCount = await page.evaluate(()=>window.reads.length);
     await page.evaluate(async()=> { window.newMessages=[{id:'100000',created_at:'2026-10-02',content:'new',timeline_cursor:'100000'}]; await window.chat.refresh(); });
@@ -53,9 +83,18 @@ async function main() {
     assert.equal(await page.evaluate(()=>window.reads.length),readCount);
     await page.getByRole('button',{name:'回到最新消息',exact:true}).click();
     await page.waitForFunction(()=>document.querySelectorAll('#list>div').length===50);
+    await page.evaluate(async () => { window.sourceSize = 55; await window.chat.open('friend', {id:'friend-fixture'}); });
+    await page.locator('#list').evaluate(list => { list.scrollTop = 0; });
+    const touch = await page.context().newCDPSession(page);
+    const box = await page.locator('#list').boundingBox(), x = box.x + box.width / 2, y = box.y + 40;
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{x,y}] });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{x,y:y+120}] });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitForFunction(() => document.querySelector('#list>div').dataset.messageId === '000000');
+    const endCount = await olderCount(); await edge(); await page.waitForTimeout(100); assert.equal(await olderCount(), endCount);
     assert.deepEqual(errors,[]);
     await page.evaluate(()=>window.chat.destroy());
-    console.log('PASS PWA timeline: 100000-row source, five historical pages, <=150 DOM rows, stable visible anchor, background changes and read receipt isolation, return to latest');
+    console.log('PASS PWA timeline: 100000-row source, wheel/touch paging, <=150 rows, stable anchor, serial polling/history, dedup, retry, background/read isolation, latest and exhaustion');
   } finally { await browser.close(); }
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
