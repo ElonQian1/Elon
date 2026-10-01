@@ -119,11 +119,25 @@ try {
 
     $adoptionRoot = Join-Path $tempRoot "adopted-child"
     New-Item -ItemType Directory -Force -Path $adoptionRoot | Out-Null
+    $existingAiRules = @{}
+    foreach ($relative in @('AGENTS.md', 'CLAUDE.md', '.github\copilot-instructions.md')) {
+        $rulePath = Join-Path $adoptionRoot $relative
+        New-Item -ItemType Directory -Force -Path (Split-Path $rulePath -Parent) | Out-Null
+        [IO.File]::WriteAllBytes($rulePath, [Text.Encoding]::UTF8.GetBytes("Existing project-owned rule: $relative`r`n"))
+        $existingAiRules[$rulePath] = [Convert]::ToBase64String([IO.File]::ReadAllBytes($rulePath))
+    }
     $adoptionPreview = New-RustCacheProjectAdoption -ProjectRoot $adoptionRoot -ProjectId "portable-child" -AllowedDomains @("dev-windows-msvc", "agent-validation")
     Assert-Equal "preview" $adoptionPreview.mode "child-project adoption should preview by default"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $adoptionRoot "rust-cache.project.json"))) "adoption preview must not create a manifest"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $adoptionRoot "scripts\rust-cache.ps1"))) "adoption preview must not create a wrapper"
     Assert-True (@($adoptionPreview.files.action | Where-Object { $_ -eq "would-create" }).Count -eq 2) "adoption preview should plan both portable files"
+    Assert-Equal 3 @(Get-ChildItem -LiteralPath $adoptionRoot -Recurse -File).Count "AI entry guidance must not write files during preview"
+    Assert-True ($adoptionPreview.ai_entry.review_required -and -not $adoptionPreview.ai_entry.writes_files) "AI entry is an explicit review suggestion"
+    Assert-True (-not [string]::IsNullOrWhiteSpace($adoptionPreview.ai_entry.content)) "adoption returns a usable AI entry suggestion"
+    Assert-True (($adoptionPreview.next_steps -join "`n").Contains($adoptionPreview.ai_entry.content)) "CLI next steps expose the reviewable AI entry"
+    foreach ($machinePath in @($tempRoot, $env:LOCALAPPDATA, $env:ELON_RUST_CACHE_CONTROL_ROOT, $env:ELON_RUST_CACHE_ROOT)) {
+        if ($machinePath) { Assert-True (-not $adoptionPreview.ai_entry.content.Contains($machinePath)) "AI entry must not capture this machine's paths" }
+    }
 
     $adoption = New-RustCacheProjectAdoption -ProjectRoot $adoptionRoot -ProjectId "portable-child" -AllowedDomains @("dev-windows-msvc", "agent-validation") -Apply
     Assert-Equal "apply" $adoption.mode "child-project adoption apply mode"
@@ -133,6 +147,10 @@ try {
     $projectWrapperContent = Get-Content -Raw -LiteralPath $projectWrapper -Encoding UTF8
     Assert-True ($projectWrapperContent -notmatch [regex]::Escape($tempRoot)) "project wrapper must not contain the generating PC path"
     Assert-True ($projectWrapperContent -notmatch 'Start-Process|powershell\.exe|pwsh\.exe') "project wrapper must not open a nested visible shell"
+    Assert-Equal 5 @(Get-ChildItem -LiteralPath $adoptionRoot -Recurse -File).Count "adoption apply adds only the manifest and wrapper"
+    foreach ($rulePath in $existingAiRules.Keys) {
+        Assert-Equal $existingAiRules[$rulePath] ([Convert]::ToBase64String([IO.File]::ReadAllBytes($rulePath))) "adoption preserves each existing AI rule byte-for-byte"
+    }
 
     $projectAdoptionAgain = New-RustCacheProjectAdoption -ProjectRoot $adoptionRoot -ProjectId "portable-child" -AllowedDomains @("agent-validation", "dev-windows-msvc") -Apply
     Assert-True (@($projectAdoptionAgain.files.action | Where-Object { $_ -eq "unchanged" }).Count -eq 2) "child-project adoption must be idempotent"
@@ -270,5 +288,9 @@ try {
 
     Write-Host "PASS: Rust cache portability tests ($script:Assertions assertions)." -ForegroundColor Green
 } finally {
-    Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    $cleanup = [IO.Path]::GetFullPath($tempRoot)
+    $temporaryPrefix = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
+    if (-not $cleanup.StartsWith($temporaryPrefix, [StringComparison]::OrdinalIgnoreCase) -or
+        (Split-Path -Leaf $cleanup) -notmatch '^rust-cache-portability-[a-f0-9]{32}$') { throw 'Refusing fixture cleanup outside its temporary root.' }
+    Remove-Item -LiteralPath $cleanup -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -59,7 +59,7 @@ implementation_refs:
 | workspace build-dir | 单个 workspace | 默认 | 机器缓存平台 |
 | named shared build-dir | 同一 rustc 代际、项目、domain 和稳定命名分区 | 是 | 机器缓存平台与项目适配器共同保证 |
 | quarantine | 未注册项目或裸 Cargo | 自动 | 机器缓存平台 |
-| target-dir | workspace 最终产物，或发布脚本的专用绝对目录 | 显式 | 项目/发布流程 |
+| target-dir | 旧安装用 workspace；工作室 profile 用选定根的 targets；也可显式指定 | 随路由或显式 | 项目/发布流程 |
 | legacy cache | 平台外旧目录 | 只登记 | 原目录所有者 |
 
 命名共享 build-dir **不会跨不同 `project_id` 复用**。真正跨项目的编译对象复用由 sccache 提供；命名共享分区解决的是同一项目多个 worktree 的重复 Cargo 中间产物。
@@ -73,7 +73,9 @@ implementation_refs:
 3. `SharedBuildPartition` 表示稳定用途，例如 `dev-windows`、`validation-light-0` 或 `windows-release`；名称必须已经是小写 slug，只使用字母、数字、点、下划线或连字符。
 4. Cargo 的整个进程生命周期都由 `Invoke-RustCacheCargo` 或 `rust-cache.ps1 run` 包裹。
 5. 不传 `-NoLock`；平台会对命名共享分区串行写入。
-6. 最终 `target-dir` 仍保持 workspace 本地，或使用发布流程专属的绝对路径。
+6. 没有机器 profile 的旧安装默认将 `target-dir` 保持在 workspace 本地；启用工作室 profile 后，
+   默认使用本轮选定缓存根的 `targets/<workspace-hash>`。发布流程可显式指定专属绝对路径，
+   所在卷仍需通过容量接纳。
 7. 首次启用先选一个低风险入口，观察命中率、等待时间和磁盘增长，再扩大范围。
 8. 会被多个入口调用的稳定分区必须登记到 `shared_partition_domains`，由平台把分区
    名称绑定到唯一 allowlist domain；不能只靠包装器约定 domain。

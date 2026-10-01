@@ -5,6 +5,8 @@ Import-Module "$PSScriptRoot\RustCache.SccacheTiers.psm1" -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Studio.psm1" -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.CargoIncludeMigration.psm1" -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.ControlFiles.psm1" -DisableNameChecking
 
 function ConvertTo-RustCacheTomlPath {
     param([Parameter(Mandatory)][string]$Path)
@@ -39,22 +41,23 @@ function Set-RustCacheParentCargoConfig {
 
     $fullCargoConfig = [System.IO.Path]::GetFullPath($CargoConfigPath)
     $includeTomlPath = ConvertTo-RustCacheTomlPath $IncludeConfigPath
-    $existing = if (Test-Path -LiteralPath $fullCargoConfig) { Get-Content -LiteralPath $fullCargoConfig -Encoding UTF8 } else { @() }
+    $before = Read-RustCacheCargoControlSnapshot -Path $fullCargoConfig -AllowMissing
+    $existing = if ($before.exists) { [regex]::Split($before.text,'\r?\n') } else { @() }
+    $previousInclude = Get-RustCacheParentIncludePath -Lines $existing
+    $migration = if ($previousInclude -and $previousInclude -ine [IO.Path]::GetFullPath($IncludeConfigPath)) {
+        Get-RustCacheManagedIncludeMigration -CargoConfigPath $fullCargoConfig -PreviousIncludePath $previousInclude
+    } else { $null }
     $result = New-Object System.Collections.Generic.List[string]
     $section = ""
-    $foundOtherInclude = $false
     $removedSourceReplacements = New-Object System.Collections.Generic.List[string]
     foreach ($line in $existing) {
         if ($line -match '^\s*include\s*=') {
-            if ($line -notlike "*$includeTomlPath*") {
-                $foundOtherInclude = $true
-            }
             continue
         }
         if ($line -match '^\s*\[([^]]+)\]\s*$') {
             $section = $Matches[1].Trim().ToLowerInvariant()
         }
-        if ($section -eq "build" -and $line -match '^\s*(target-dir|rustflags)\s*=') {
+        if ($null -eq $migration -and $section -eq "build" -and $line -match '^\s*(target-dir|rustflags)\s*=') {
             continue
         }
         if ($ResetSourceReplacement -and $section -eq 'source.crates-io' -and $line -match '^\s*replace-with\s*=\s*["'']([^"'']+)["'']') {
@@ -62,9 +65,6 @@ function Set-RustCacheParentCargoConfig {
             continue
         }
         $result.Add($line)
-    }
-    if ($foundOtherInclude) {
-        throw "Cargo config already contains an unrelated include entry; merge it manually before activation: $fullCargoConfig"
     }
     while ($result.Count -gt 0 -and [string]::IsNullOrWhiteSpace($result[0])) {
         $result.RemoveAt(0)
@@ -75,22 +75,26 @@ function Set-RustCacheParentCargoConfig {
 
     $backupPath = $null
     if ($Apply) {
+        if ($null -ne $migration) { Assert-RustCacheIncludeMigrationCurrent $migration }
+        $current = Read-RustCacheCargoControlSnapshot -Path $fullCargoConfig -AllowMissing
+        if ($current.exists -ne $before.exists -or $current.sha256 -ne $before.sha256) { throw 'RUST_CACHE_CARGO_CONFIG_DRIFT: Cargo configuration changed during planning.' }
         $parent = Split-Path $fullCargoConfig -Parent
         New-Item -ItemType Directory -Force -Path $parent | Out-Null
         if (Test-Path -LiteralPath $fullCargoConfig) {
-            $stamp = [DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss-fff")
+            $stamp = [Guid]::NewGuid().ToString('N')
             $backupPath = "$fullCargoConfig.before-rust-cache-$stamp.bak"
-            Copy-Item -LiteralPath $fullCargoConfig -Destination $backupPath -Force
+            [IO.File]::WriteAllBytes($backupPath,$before.bytes)
         }
-        $temporary = "$fullCargoConfig.$PID.tmp"
-        Set-Content -LiteralPath $temporary -Value $content -Encoding UTF8 -NoNewline
-        Move-Item -LiteralPath $temporary -Destination $fullCargoConfig -Force
+        $encoding=[Text.UTF8Encoding]::new($PSVersionTable.PSVersion.Major -lt 6)
+        [byte[]]$bytes=@($encoding.GetPreamble()) + @($encoding.GetBytes($content))
+        Write-RustCacheBoundControlFile -Path $fullCargoConfig -ExpectedSha256 $before.sha256 -ExpectedMissing:(-not $before.exists) -Bytes $bytes | Out-Null
     }
     [pscustomobject]@{
         cargo_config_path = $fullCargoConfig
         include_config_path = $includeTomlPath
         applied = [bool]$Apply
         backup_path = $backupPath
+        include_migration = $migration
         removed_source_replacements = @($removedSourceReplacements)
         content = $content
     }

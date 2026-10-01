@@ -1,5 +1,7 @@
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot '..\rust-cache\RustCache.NetworkStorage.psm1') -DisableNameChecking
+Import-Module (Join-Path $PSScriptRoot '..\rust-cache\RustCache.SccacheTiers.psm1') -DisableNameChecking
+Import-Module (Join-Path $PSScriptRoot '..\rust-cache\RustCache.ControlFiles.psm1') -DisableNameChecking
 
 function Get-StudioBootstrapFileHash {
     param([string]$Path)
@@ -87,6 +89,17 @@ function Assert-StudioBootstrapSource {
         if ([string]::IsNullOrWhiteSpace($relative) -or $relative -match '(^/|\\|:|[*?]|(^|/)\.\.?(/|$))' -or $file.sha256 -notmatch '^[a-fA-F0-9]{64}$' -or $expected.ContainsKey($relative)) { throw 'STUDIO_BUNDLE_PATH: Invalid or duplicate file.' }
         $expected[$relative]=[string]$file.sha256
     }
+    foreach ($required in @('scripts/studio-cache/StudioCache.Bootstrap.psm1','scripts/rust-cache.ps1','rust-cache.project.json',
+        'scripts/rust-cache/native/rustc_sccache_wrapper.rs',
+        '.agents/skills/manage-shared-build-cache/SKILL.md','.agents/skills/manage-shared-build-cache/agents/openai.yaml',
+        'docs/studio-cache-ai-entry.md','docs/studio-cache-operations.md','docs/design/studio-build-cache-v1.md',
+        'docs/rust-cache-platform.md','docs/rust-cache-on-demand-adoption.md','docs/rust-cache-network-storage.md','docs/rust-cache-fleet-operations.md')) {
+        if (-not $expected.ContainsKey($required)) { throw "STUDIO_BUNDLE_CONTENT: Required installation file missing: $required" }
+    }
+    foreach($name in @('Capacity','CargoIncludeMigration','ControlFiles','Fleet','FleetQueue','GcApproval','Help','Install','Inventory','Launcher','Legacy','NetworkStorage',
+        'Paths','Policy','Portability','ProjectAdoption','Registry','Run','Runtime','Sccache','SccacheTiers','Scope','Studio','TaskLifecycle')){
+        if(-not $expected.ContainsKey("scripts/rust-cache/RustCache.$name.psm1")){throw "STUDIO_BUNDLE_CONTENT: Required import module missing: $name"}
+    }
     $pending=New-Object 'Collections.Generic.Stack[string]'; $pending.Push($SourceRoot); $seen=0
     while ($pending.Count) {
         foreach ($item in Get-ChildItem -LiteralPath $pending.Pop() -Force) {
@@ -107,9 +120,13 @@ function Get-StudioBootstrapEnvironment {
 }
 
 function Set-StudioBootstrapEnvironment {
-    param([string]$Name,[AllowNull()][string]$Value,[string]$Scope)
-    if ($Scope -eq 'Process' -and [string]::IsNullOrEmpty($Value)) { Remove-Item -LiteralPath ('Env:' + $Name) -ErrorAction SilentlyContinue; return }
-    [Environment]::SetEnvironmentVariable($Name,$Value,$Scope)
+    param([string]$Name,[AllowNull()]$Value,[string]$Scope)
+    if ($null -eq $Value) {
+        if ($Scope -eq 'Process') { Remove-Item -LiteralPath ('Env:' + $Name) -ErrorAction SilentlyContinue }
+        else { [Environment]::SetEnvironmentVariable($Name,[NullString]::Value,$Scope) }
+        return
+    }
+    [Environment]::SetEnvironmentVariable($Name,[string]$Value,$Scope)
 }
 
 function Get-StudioBootstrapControlFiles {
@@ -184,21 +201,21 @@ function Restore-StudioBootstrapControlFiles {
         if (-not $exists -or $current -ne $file.expected_installer_sha256) { $results+=@{kind=$file.kind;status='preserved-drift'};continue }
         if ($file.existed) {
             $expectedBackup=Join-Path $Snapshot.backup_root ($file.kind + '.before')
-            if ($file.backup_path -ne $expectedBackup -or (Get-StudioBootstrapFileHash $expectedBackup) -ne $file.before_sha256) { throw 'STUDIO_BACKUP_HASH: Original control backup changed.' }
-            $temporary=$file.path + '.' + [guid]::NewGuid().ToString('N') + '.restore-tmp'
+            if ($file.backup_path -ne $expectedBackup) { throw 'STUDIO_BACKUP_HASH: Original control backup path changed.' }
+            $backupBytes=[IO.File]::ReadAllBytes($expectedBackup)
+            if ((Get-RustCacheControlBytesHash $backupBytes) -ne $file.before_sha256) { throw 'STUDIO_BACKUP_HASH: Original control backup changed.' }
             try {
-                [IO.File]::Copy($expectedBackup,$temporary,$false)
-                if ((Get-StudioBootstrapFileHash $file.path) -ne $current) { throw 'STUDIO_ROLLBACK_DRIFT: Control file changed before restoration.' }
-                [IO.File]::Replace($temporary,$file.path,[NullString]::Value)
-            } finally { if ([IO.File]::Exists($temporary)) { [IO.File]::Delete($temporary) } }
-            if ((Get-StudioBootstrapFileHash $file.path) -ne $file.before_sha256) { throw 'STUDIO_ROLLBACK_VERIFY: Original bytes were not restored.' }
+                Write-RustCacheBoundControlFile -Path $file.path -ExpectedSha256 $file.expected_installer_sha256 -Bytes $backupBytes | Out-Null
+            } catch {
+                if($_.Exception.Message -match '^RUST_CACHE_CONTROL_(DRIFT|BUSY):'){$results+=@{kind=$file.kind;status='preserved-drift'};continue}
+                throw
+            }
         } else {
-            if ((Get-StudioBootstrapFileHash $file.path) -ne $current) { throw 'STUDIO_ROLLBACK_DRIFT: New control file changed before removal.' }
-            [IO.File]::Delete($file.path)
+            $results+=@{kind=$file.kind;status='preserved-new-file-needs-review'};continue
         }
         $results+=@{kind=$file.kind;status='restored'}
     }
-    return [pscustomobject]@{complete=(@($results|Where-Object {$_.status -eq 'preserved-drift'}).Count -eq 0);files=$results}
+    return [pscustomobject]@{complete=(@($results|Where-Object {$_.status -like 'preserved-*'}).Count -eq 0);files=$results}
 }
 
 function New-StudioCacheBootstrapPlan {
@@ -268,9 +285,13 @@ function Invoke-StudioCacheBootstrap {
     foreach ($file in @($plan.profile_path,$profile.sccache_tiers_path)) { if (Test-Path -LiteralPath $file) { throw 'STUDIO_ALREADY_CONFIGURED: Preserve the existing machine profile; use a reviewed upgrade workflow.' } }
     $runId = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ') + '-' + [guid]::NewGuid().ToString('N')
     $report = [ordered]@{schema='elon.studio_cache.bootstrap_report.v1';run_id=$runId;role=$profile.role;machine_id_sha256=$profile.machine_id_sha256;source_sha256=$SourceSha256;created_utc=[DateTime]::UtcNow.ToString('o');status='started';stage='claim';error_code=$null;hardware=(Get-StudioBootstrapHardware);physical_share_path=$plan.physical_share_path;shared_volume=$plan.shared_volume;control_volume=$plan.control_volume;l1_max_bytes=$profile.l1_max_bytes;remote_build_ready=$false;end_to_end_network_verified=$false}
-    $names = @('ELON_RUST_CACHE_CONTROL_ROOT','ELON_RUST_CACHE_SCCACHE_TIERS','ELON_STUDIO_CACHE_PROFILE','ELON_RUST_CACHE_ROOT','SCCACHE_DIR','SCCACHE_CACHE_SIZE','SCCACHE_CONF','SCCACHE_SERVER_PORT','SCCACHE_CACHED_CONF','ELON_DEV_CARGO_TARGET_DIR')
+    $userNames = @('ELON_RUST_CACHE_CONTROL_ROOT','ELON_RUST_CACHE_SCCACHE_TIERS','ELON_STUDIO_CACHE_PROFILE','ELON_RUST_CACHE_ROOT','SCCACHE_DIR','SCCACHE_CACHE_SIZE','SCCACHE_CONF','SCCACHE_SERVER_PORT','SCCACHE_CACHED_CONF','ELON_DEV_CARGO_TARGET_DIR')
+    $names = @($userNames) + @(Get-RustCacheSccacheEnvironmentNames | Where-Object {$_ -notin $userNames})
     $old = [ordered]@{}
-    foreach ($name in $names) { $old[$name] = @{Process=(Get-StudioBootstrapEnvironment -Name $name -Scope Process);User=(Get-StudioBootstrapEnvironment -Name $name -Scope User)} }
+    foreach ($name in $names) {
+        $old[$name] = @{Process=(Get-StudioBootstrapEnvironment -Name $name -Scope Process)}
+        if($name -in $userNames){$old[$name].User=Get-StudioBootstrapEnvironment -Name $name -Scope User}
+    }
     $localReport = $null; $sharedReport = $null; $controlSnapshot=$null
     try {
         Assert-StudioBootstrapOwner -Path $profile.control_root -MachineHash $profile.machine_id_sha256 -Control -Claim
@@ -295,7 +316,10 @@ function Invoke-StudioCacheBootstrap {
     } catch {
         $report.status='failed'; $report.error_code=($_.Exception.Message -split ':',2)[0]
         if ($report.error_code -notmatch '^STUDIO_[A-Z_]+$') { $report.error_code='STUDIO_OPERATION_FAILED' }
-        foreach ($name in $names) { Set-StudioBootstrapEnvironment -Name $name -Value $old[$name].Process -Scope Process; Set-StudioBootstrapEnvironment -Name $name -Value $old[$name].User -Scope User }
+        foreach ($name in $names) {
+            Set-StudioBootstrapEnvironment -Name $name -Value $old[$name].Process -Scope Process
+            if($name -in $userNames){Set-StudioBootstrapEnvironment -Name $name -Value $old[$name].User -Scope User}
+        }
         $report['environment_restored']=$true
         $report['configuration_rollback_required']=($report.stage -eq 'install-and-doctor')
         if ($controlSnapshot) {

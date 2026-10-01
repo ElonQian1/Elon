@@ -18,12 +18,30 @@ $fixtureCargo=Join-Path $fixtureUser 'cargo-config.toml';$fixtureLauncher=Join-P
 [byte[]]$originalCargoBytes=65,66,67,13,10
 [IO.File]::WriteAllBytes($fixtureCargo,$originalCargoBytes)
 $arguments=@{Role='Host';HostName=$hostName;ShareName='fixture-share';CacheDirectory='cache';LocalControlRoot=$control}
+$requiredBundleFiles=@('scripts/studio-cache/StudioCache.Bootstrap.psm1','scripts/rust-cache.ps1','rust-cache.project.json',
+    'scripts/rust-cache/native/rustc_sccache_wrapper.rs',
+    '.agents/skills/manage-shared-build-cache/SKILL.md','.agents/skills/manage-shared-build-cache/agents/openai.yaml',
+    'docs/studio-cache-ai-entry.md','docs/studio-cache-operations.md','docs/design/studio-build-cache-v1.md',
+    'docs/rust-cache-platform.md','docs/rust-cache-on-demand-adoption.md','docs/rust-cache-network-storage.md','docs/rust-cache-fleet-operations.md')
+foreach($name in @('Capacity','CargoIncludeMigration','ControlFiles','Fleet','FleetQueue','GcApproval','Help','Install','Inventory','Launcher','Legacy','NetworkStorage',
+    'Paths','Policy','Portability','ProjectAdoption','Registry','Run','Runtime','Sccache','SccacheTiers','Scope','Studio','TaskLifecycle')){$requiredBundleFiles+="scripts/rust-cache/RustCache.$name.psm1"}
+function Add-FixtureRequiredFiles([string]$Root) {
+    foreach($relative in $requiredBundleFiles){$path=Join-Path $Root $relative;if(-not(Test-Path -LiteralPath $path)){[IO.Directory]::CreateDirectory((Split-Path $path -Parent))|Out-Null;[IO.File]::WriteAllText($path,'fixture')}}
+}
+function Write-FixtureBundleManifest([string]$Root) {
+    $manifestPath=Join-Path $Root 'studio-cache-bundle.json'
+    $files=@(Get-ChildItem -LiteralPath $Root -Recurse -File -Force|Where-Object FullName -ne $manifestPath|ForEach-Object{@{path=$_.FullName.Substring($Root.Length+1).Replace('\','/');sha256=(Get-TestFileHash $_.FullName)}})
+    [IO.File]::WriteAllText($manifestPath,(@{schema='elon.studio_cache.bundle.v1';files=$files}|ConvertTo-Json -Depth 5))
+}
 try {
     $temporaryEnvironment='ELON_STUDIO_BOOTSTRAP_TEST_' + [guid]::NewGuid().ToString('N')
     try {
         & $module {param($n) Set-StudioBootstrapEnvironment -Name $n -Value 'fixture' -Scope Process;Set-StudioBootstrapEnvironment -Name $n -Value $null -Scope Process} $temporaryEnvironment
         Assert-True ($null -eq [Environment]::GetEnvironmentVariable($temporaryEnvironment,'Process')) 'null process values are removed rather than restored as empty strings'
-    } finally { Remove-Item -LiteralPath ('Env:'+$temporaryEnvironment) -ErrorAction SilentlyContinue }
+        & $module {param($n) Set-StudioBootstrapEnvironment -Name $n -Value 'fixture' -Scope User;Set-StudioBootstrapEnvironment -Name $n -Value $null -Scope User} $temporaryEnvironment
+        $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment')
+        try {Assert-True ($key.GetValueNames() -notcontains $temporaryEnvironment) 'null user environment rollback deletes the registry value rather than storing an empty string'}finally{$key.Dispose()}
+    } finally { Remove-Item -LiteralPath ('Env:'+$temporaryEnvironment) -ErrorAction SilentlyContinue;[Environment]::SetEnvironmentVariable($temporaryEnvironment,[NullString]::Value,'User') }
     & $module {
         param($Physical,$Cargo,$Launcher)
         $script:FixtureShare=$Physical; $script:InstallerCalls=0; $script:EnvironmentValues=@{}; $script:FailInstall=$false
@@ -34,7 +52,13 @@ try {
         function script:Get-RustCacheStorageVolume { param($CacheRoot) [pscustomobject]@{root=[IO.Path]::GetPathRoot($CacheRoot);total_bytes=[int64](500GB);free_bytes=$script:FreeBytes;free_percent=40} }
         function script:Get-StudioBootstrapHardware { [pscustomobject]@{verified=$false;fixture=$true} }
         function script:Get-StudioBootstrapControlFiles { $script:ControlFiles }
-        function script:Invoke-StudioBootstrapPlatform { param($SourceRoot,$ProjectRoot,$CacheRoot) $script:InstallerCalls++; foreach($file in $script:ControlFiles){[IO.File]::WriteAllText($file.path,$file.expected_content,[Text.UTF8Encoding]::new($PSVersionTable.PSVersion.Major -lt 6))}; if ($script:FailInstall) { throw 'STUDIO_TEST_INSTALL: Deliberate failure.' } }
+        function script:Invoke-StudioBootstrapPlatform {
+            param($SourceRoot,$ProjectRoot,$CacheRoot)
+            $script:InstallerCalls++
+            foreach($file in $script:ControlFiles){[IO.File]::WriteAllText($file.path,$file.expected_content,[Text.UTF8Encoding]::new($PSVersionTable.PSVersion.Major -lt 6))}
+            foreach($name in Get-RustCacheSccacheEnvironmentNames){Set-StudioBootstrapEnvironment -Name $name -Value 'mutated-by-sync' -Scope Process}
+            if ($script:FailInstall) { throw 'STUDIO_TEST_INSTALL: Deliberate failure.' }
+        }
         function script:Get-StudioBootstrapEnvironment { param($Name,$Scope) if ($script:EnvironmentValues.ContainsKey("$Scope/$Name")) { return $script:EnvironmentValues["$Scope/$Name"] }; return 'old-value' }
         function script:Set-StudioBootstrapEnvironment { param($Name,$Value,$Scope) $script:EnvironmentValues["$Scope/$Name"]=$Value }
     } $physical $fixtureCargo $fixtureLauncher
@@ -81,7 +105,17 @@ try {
     $source=Join-Path $fixture 'bundle'; [IO.Directory]::CreateDirectory($source) | Out-Null
     $sourceFile=Join-Path $source 'trusted.txt'; [IO.File]::WriteAllText($sourceFile,'reviewed')
     $manifest=Join-Path $source 'studio-cache-bundle.json'
-    [IO.File]::WriteAllText($manifest,([ordered]@{schema='elon.studio_cache.bundle.v1';files=@(@{path='trusted.txt';sha256=(Get-TestFileHash $sourceFile)})} | ConvertTo-Json -Depth 4))
+    Add-FixtureRequiredFiles $source
+    Write-FixtureBundleManifest $source
+    $sourceHash=Get-TestFileHash $manifest
+    foreach($missing in @('.agents/skills/manage-shared-build-cache/agents/openai.yaml','docs/studio-cache-ai-entry.md','scripts/rust-cache/RustCache.CargoIncludeMigration.psm1','scripts/rust-cache/RustCache.ControlFiles.psm1')){
+        $path=Join-Path $source $missing;Remove-Item -LiteralPath $path;Write-FixtureBundleManifest $source
+        $missingHash=Get-TestFileHash $manifest
+        Assert-Throws {Invoke-StudioCacheBootstrap @arguments -Apply -SourceRoot $source -SourceSha256 $missingHash} 'STUDIO_BUNDLE_CONTENT' 'self-consistent incomplete bundle is rejected before mutation'
+        Assert-Equal 0 (& $module {$script:InstallerCalls}) 'missing required file never invokes installer'
+        Assert-True (-not(Test-Path -LiteralPath (Join-Path $control 'machine.json'))) 'missing required file leaves profile absent'
+        Add-FixtureRequiredFiles $source;Write-FixtureBundleManifest $source
+    }
     $sourceHash=Get-TestFileHash $manifest
     & $module { $script:FreeBytes=[long](21GB) }
     Assert-Throws { Invoke-StudioCacheBootstrap @arguments -Apply -SourceRoot $source -SourceSha256 $sourceHash } 'STUDIO_CAPACITY' 'twenty-one GiB does not fit floor plus L1'
@@ -94,9 +128,13 @@ try {
     Assert-Throws { Invoke-StudioCacheBootstrap @arguments -Apply -SourceRoot $source -SourceSha256 $sourceHash } 'STUDIO_TEST_INSTALL' 'installer failure propagates'
     Assert-Equal 1 (& $module {$script:InstallerCalls}) 'only Apply invokes installer'
     Assert-Equal ([Convert]::ToBase64String($originalCargoBytes)) ([Convert]::ToBase64String([IO.File]::ReadAllBytes($fixtureCargo))) 'failed install restores original Cargo bytes'
-    Assert-True (-not(Test-Path -LiteralPath $fixtureLauncher)) 'failed install removes only its newly created known launcher'
+    Assert-True (Test-Path -LiteralPath $fixtureLauncher) 'failed install preserves newly created launcher pending reviewed removal'
     $envValues=& $module {$script:EnvironmentValues}
     Assert-True (@($envValues.Values | Where-Object { $_ -cne 'old-value' }).Count -eq 0) 'all managed environment restored on failure'
+    foreach($name in @('SCCACHE_BASEDIRS','SCCACHE_IDLE_TIMEOUT','SCCACHE_BUCKET')){
+        Assert-Equal 'old-value' $envValues["Process/$name"] 'extended sccache process environment is restored'
+        Assert-True (-not $envValues.ContainsKey("User/$name")) 'process-only overrides never mutate user environment'
+    }
     $localReceipts=@(Get-ChildItem -LiteralPath (Join-Path $control 'bootstrap-receipts') -Filter '*.json')
     Assert-Equal 1 $localReceipts.Count 'failure report durable alongside private rollback directory'
     $privateReceipts=@(Get-ChildItem -LiteralPath (Join-Path $control 'bootstrap-receipts') -Directory)
@@ -108,8 +146,9 @@ try {
     $report=Get-Content -LiteralPath $reportFile.FullName -Raw | ConvertFrom-Json
     Assert-Equal 'failed' $report.status 'failure is not success'
     Assert-True $report.environment_restored 'restoration recorded'
-    Assert-True (-not $report.configuration_rollback_required) 'known Cargo and launcher changes restored'
-    Assert-True $report.control_files_rollback.complete 'both control files restore verified'
+    Assert-True $report.configuration_rollback_required 'new launcher requires reviewed removal'
+    Assert-True (-not $report.control_files_rollback.complete) 'preserved new launcher is not falsely reported fully rolled back'
+    Assert-Equal 'preserved-new-file-needs-review' (@($report.control_files_rollback.files|Where-Object kind -eq 'user-launcher')[0].status) 'rollback explains why the new file remains'
     Assert-True $report.installed_cache_files_retained 'installation files remain for diagnosis'
     $sharedReports=@(Get-ChildItem -LiteralPath (Join-Path $cache 'studio-bootstrap-reports') -Recurse -File)
     Assert-Equal 1 $sharedReports.Count 'safe shared machine report written'
@@ -140,6 +179,7 @@ try {
     [IO.File]::WriteAllText($fakeModule,"function Invoke-StudioCacheBootstrap { [pscustomobject]@{mode='fixture-preview'} }; Export-ModuleMember -Function Invoke-StudioCacheBootstrap")
     [IO.File]::WriteAllText((Join-Path $cliScripts 'rust-cache.ps1'),'throw "Preview must not execute installer"')
     [IO.File]::WriteAllText((Join-Path $cliBundle 'rust-cache.project.json'),'{"schema_version":1,"project_id":"fixture"}')
+    Add-FixtureRequiredFiles $cliBundle
     $cliFiles=@(Get-ChildItem -LiteralPath $cliBundle -Recurse -File | ForEach-Object { @{path=$_.FullName.Substring($cliBundle.Length+1).Replace('\','/');sha256=(Get-TestFileHash $_.FullName)} })
     $cliManifest=Join-Path $cliBundle 'studio-cache-bundle.json'
     [IO.File]::WriteAllText($cliManifest,(@{schema='elon.studio_cache.bundle.v1';files=$cliFiles} | ConvertTo-Json -Depth 5))

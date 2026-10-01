@@ -30,6 +30,23 @@ function ConvertTo-RustCacheComparableText {
     return $Text.TrimStart([char]0xFEFF).Replace("`r`n", "`n").Replace("`r", "`n")
 }
 
+function Get-RustCacheProjectAiEntryGuidance {
+    $content = @(
+        'For Rust builds, cache placement or disk pressure, use this project''s scripts/rust-cache.ps1.'
+        'Read docs/studio-cache-ai-entry.md under the installed platform management root: ELON_RUST_CACHE_CONTROL_ROOT, or ELON_RUST_CACHE_ROOT for a legacy installation without a separate control root.'
+        'If the configured root or document is missing, obtain the trusted current platform entry; do not guess a shared path.'
+        'Run scripts/rust-cache.ps1 doctor before a long build, then use the existing project build wrapper or the platform run command.'
+        'Keep machine paths out of Git. Use official routing, locks and reviewed GC; do not copy their implementation into this project.'
+    ) -join [Environment]::NewLine
+    return [pscustomobject]@{
+        review_required = $true
+        writes_files = $false
+        suggested_files = @('AGENTS.md', 'CLAUDE.md', '.github/copilot-instructions.md')
+        relative_document = 'docs/studio-cache-ai-entry.md'
+        content = $content
+    }
+}
+
 function Get-RustCacheProjectWrapperPlan {
     param([Parameter(Mandatory)][string]$ProjectRoot)
 
@@ -88,6 +105,7 @@ function New-RustCacheProjectAdoption {
         -DefaultDomain $DefaultDomain -AllowedDomains $AllowedDomains `
         -UnknownDomainFallback $UnknownDomainFallback -SharedPartitionDomains $SharedPartitionDomains
     $wrapperPlan = Get-RustCacheProjectWrapperPlan -ProjectRoot $root
+    $aiEntry = Get-RustCacheProjectAiEntryGuidance
 
     if ($Apply) {
         $manifestPlan = New-RustCacheProjectManifest -ProjectRoot $root -ProjectId $ProjectId `
@@ -118,6 +136,7 @@ function New-RustCacheProjectAdoption {
         project_root = $root
         project_id = [string]$manifestPlan.manifest.project_id
         portable = $true
+        ai_entry = $aiEntry
         files = @(
             [pscustomobject]@{ path = $manifestPlan.path; relative_path = "rust-cache.project.json"; action = $manifestPlan.action }
             [pscustomobject]@{ path = $wrapperPlan.path; relative_path = $wrapperPlan.relative_path; action = $wrapperPlan.action }
@@ -126,6 +145,7 @@ function New-RustCacheProjectAdoption {
             $(if ($Apply) { "Commit rust-cache.project.json and scripts/rust-cache.ps1." } else { "Review both files, then repeat with -Apply." })
             "Install or upgrade the platform and Skill once on each PC."
             "Run scripts/rust-cache.ps1 doctor before a long build."
+            ("Review and merge this portable reference into the existing AGENTS/Claude/Copilot entry; these files were not changed:" + [Environment]::NewLine + $aiEntry.content)
         )
     }
 }

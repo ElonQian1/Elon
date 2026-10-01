@@ -11,11 +11,17 @@ Use the repository cache tool as the source of truth. Do not reproduce cache rou
 
 1. Prefer `<project>/scripts/rust-cache.ps1` when it exists.
 2. Otherwise use `%LOCALAPPDATA%\Elon\bin\rust-cache.ps1`, the stable per-user launcher written by the installer.
-3. If the launcher is absent but `ELON_RUST_CACHE_ROOT` is set, use `$env:ELON_RUST_CACHE_ROOT/platform/rust-cache.ps1` and repair the launcher with a current installer.
+3. If the launcher is absent, locate `platform/rust-cache.ps1` under the configured `ELON_RUST_CACHE_CONTROL_ROOT`, or under `ELON_RUST_CACHE_ROOT` for a legacy installation without a separate control root. Verify that it exists and repair the launcher with a current installer; do not guess a shared path.
 4. If none exists, obtain a current trusted checkout of the platform repository and run its installer.
 5. Invoke the script directly from the current PowerShell session. Do not open nested visible `powershell.exe` or `pwsh.exe` windows.
 6. Run `& <entry> help` when command availability or parameter intent is unclear.
 7. Route recurring fleet reports and uploads through the installed node runtime. If a separate Windows worker is unavoidable, it must use `CreateNoWindow` or `-WindowStyle Hidden`; never implement monitoring as a visible PowerShell loop.
+
+## Studio And Cross-Project Entry
+
+For studio rollout, local-first placement, or another project's AI onboarding, read `docs/studio-cache-ai-entry.md` under the installed platform's management root: `ELON_RUST_CACHE_CONTROL_ROOT`, or the legacy `ELON_RUST_CACHE_ROOT` when no separate control root is configured. This is the local installed document, not a relative path inside this Skill folder. A trusted platform checkout also provides `docs/studio-cache-ai-entry.md`; if neither copy is available, report the missing entry and repair installation instead of inventing policy.
+
+`adopt-project` returns a reviewable `ai_entry` template and prints it in `next_steps`. Merge the reference into the project's existing AGENTS, Claude or Copilot entry as appropriate; the command does not change those files. Keep the reference portable and retain existing rules. A global Codex Skill does not make other AI products or existing projects automatically aware of this entry.
 
 ## Diagnose First
 

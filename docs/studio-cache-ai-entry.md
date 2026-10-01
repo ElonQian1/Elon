@@ -44,3 +44,17 @@ owner: platform
 启用本机 control root 后，安装副本位于该目录的 `docs/studio-cache-ai-entry.md`。
 不要复制整份政策到每个项目；平台升级时统一分发并校验版本。
 非 Rust 项目使用各自原生缓存适配器；目前不能假定所有语言已接入。
+
+## 项目入口引用模板
+
+`adopt-project` 的 `ai_entry` 和 `next_steps` 会给出可审查的引用建议，预演和应用都不会
+写入 AGENTS、CLAUDE 或 Copilot 规则。按项目已有入口合并以下短引用，不重复创建规则真源：
+
+> Rust 构建、缓存选址或磁盘不足时，使用本项目 `scripts/rust-cache.ps1`。
+> 读取已安装平台管理根内的 `docs/studio-cache-ai-entry.md`：管理根来自
+> `ELON_RUST_CACHE_CONTROL_ROOT`；没有独立控制根的旧安装使用 `ELON_RUST_CACHE_ROOT`。
+> 配置或文档缺失时获取受信平台入口，不猜共享路径。长构建前运行 `doctor`，
+> 构建使用项目包装器或平台 `run`；机器路径不进 Git，路由、锁和清理只调用官方工具。
+
+Codex、Claude、Copilot 使用的入口文件各有差异；保留项目既有规则，明确记录哪些入口
+已引用本合同。安装全局 Codex Skill 只能证明该用户可发现 Skill，不能代替逐项目接入记录。

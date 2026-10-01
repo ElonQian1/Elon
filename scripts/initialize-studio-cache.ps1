@@ -51,8 +51,16 @@ while ($pending.Count) {
     }
 }
 if ($seen -ne $expected.Count) { throw 'STUDIO_BUNDLE_CONTENT: Reviewed bundle files are missing.' }
-foreach ($required in @('scripts/studio-cache/StudioCache.Bootstrap.psm1','scripts/rust-cache.ps1','rust-cache.project.json')) {
+foreach ($required in @('scripts/studio-cache/StudioCache.Bootstrap.psm1','scripts/rust-cache.ps1','rust-cache.project.json',
+    'scripts/rust-cache/native/rustc_sccache_wrapper.rs',
+    '.agents/skills/manage-shared-build-cache/SKILL.md','.agents/skills/manage-shared-build-cache/agents/openai.yaml',
+    'docs/studio-cache-ai-entry.md','docs/studio-cache-operations.md','docs/design/studio-build-cache-v1.md',
+    'docs/rust-cache-platform.md','docs/rust-cache-on-demand-adoption.md','docs/rust-cache-network-storage.md','docs/rust-cache-fleet-operations.md')) {
     if (-not $expected.ContainsKey($required)) { throw "STUDIO_BUNDLE_CONTENT: Required file missing: $required" }
+}
+foreach($name in @('Capacity','CargoIncludeMigration','ControlFiles','Fleet','FleetQueue','GcApproval','Help','Install','Inventory','Launcher','Legacy','NetworkStorage',
+    'Paths','Policy','Portability','ProjectAdoption','Registry','Run','Runtime','Sccache','SccacheTiers','Scope','Studio','TaskLifecycle')){
+    if(-not $expected.ContainsKey("scripts/rust-cache/RustCache.$name.psm1")){throw "STUDIO_BUNDLE_CONTENT: Required import module missing: $name"}
 }
 Import-Module (Join-Path $PSScriptRoot 'studio-cache\StudioCache.Bootstrap.psm1') -Force -DisableNameChecking
 $arguments = @{ Role=$Role; HostName=$HostName; ShareName=$ShareName; CacheDirectory=$CacheDirectory; SourceRoot=$sourceRoot; SourceSha256=$ExpectedSourceSha256; AllowUncBuild=$AllowUncBuild; Apply=$Apply }
