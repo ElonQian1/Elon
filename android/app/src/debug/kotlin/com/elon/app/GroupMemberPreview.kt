@@ -69,6 +69,6 @@ internal fun groupMemberPreviewScenario() = object : UiRuntimePreviewScenario {
     override val supportedScenarios = setOf("owner", "member")
     override fun createView(context: Context, request: UiRuntimePreviewRequest): View = Button(context).apply {
         text = "打开群成员离线预览（172 人）"
-        setOnClickListener { context.startActivity(Intent(context, GroupMemberPreviewActivity::class.java).putExtra("role", request.scenario).putExtra("fontScale", request.fontScale).putExtra("theme", request.theme)) }
+        setOnClickListener { context.startActivity(Intent(context, GroupMemberPreviewActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("role", request.scenario).putExtra("fontScale", request.fontScale).putExtra("theme", request.theme)) }
     }.uiNode("group.members.preview.open")
 }
