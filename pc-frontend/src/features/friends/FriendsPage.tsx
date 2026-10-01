@@ -10,6 +10,7 @@ import SocialAvatar from './SocialAvatar'
 import type { Friend, FriendGroup } from './socialMessageTypes'
 import useSocialChat from './useSocialChat'
 import SocialConversation from './SocialConversation'
+import GroupMembersButton from './GroupMembersButton'
 import ArticleWorkspace from '../articles/ArticleWorkspace'
 import useGroupDiscussionReturn from './group-ai/useGroupDiscussionReturn'
 
@@ -385,14 +386,12 @@ function FriendsPageContent() {
               </div>
               <div>
                 <strong>{activeItem.title}</strong>
-                <span
+                {activeItem.kind === 'group' ? <GroupMembersButton key={activeItem.id} groupId={activeItem.id} count={activeItem.group?.member_count ?? 0} /> : <span
                   className={styles.onlineStatus}
                   data-status={activeItem.kind === 'friend' ? activeItem.presenceStatus ?? 'offline' : undefined}
                 >
-                  {activeItem.kind === 'group'
-                    ? `${activeItem.group?.member_count ?? 0} 位成员`
-                    : activeItem.presenceSummary ?? '离线'}
-                </span>
+                  {activeItem.presenceSummary ?? '离线'}
+                </span>}
               </div>
             </div>
           ) : (
