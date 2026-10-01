@@ -27,6 +27,7 @@ internal fun filterGroupMentions(items: List<GroupMentionTarget>, query: String)
 }
 
 internal class GroupMentionDirectory(private val context: Context, private val http: OkHttpClient, private val serverUrl: String) {
+    fun rosterRepository() = GroupMemberRepository(context, http, serverUrl)
     fun load(groupId: String, selfId: String, done: (Result<List<GroupMentionTarget>>) -> Unit): Call {
         return loadDirectory(groupId, selfId, true, done)
     }

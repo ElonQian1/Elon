@@ -8,9 +8,15 @@ use super::friend_messages::{attachments_to_json, message_preview_for_viewer, pa
 use super::message_recall::{ensure_message_recall_allowed, recalled_content};
 use super::{new_id, now, FriendGroupMemberPreview, FriendGroupMessage, FriendGroupProfile, Store};
 
+mod invitations;
 mod members;
+pub(crate) mod membership;
+pub(crate) mod membership_schema;
+#[cfg(test)]
+mod membership_tests;
 #[path = "group_message_revisions.rs"]
 pub(crate) mod revisions;
+pub(crate) mod roster;
 pub(super) mod send;
 
 impl Store {
@@ -380,46 +386,30 @@ impl Store {
         group_id: &str,
         new_member_ids: &[String],
     ) -> Result<FriendGroupProfile> {
-        self.ensure_group_member(caller_user_id, group_id)?;
-
-        // 验证所有新成员都是调用者的好友
-        for id in new_member_ids {
-            let id = id.trim();
-            if !id.is_empty() && id != caller_user_id {
-                self.ensure_group_candidate_friend(caller_user_id, id)?;
+        {
+            let conn = self.conn()?;
+            let current = roster::access(&conn, caller_user_id, group_id)?;
+            if current.role == "member" && current.policy == "approval" {
+                return Err(anyhow!("邀请需审核，请在群成员页面提交邀请"));
             }
         }
-
-        let conn = self.conn()?;
-        let joined_at = now();
-
-        // 过滤已经在群里的成员，只插入新成员
-        for id in new_member_ids {
-            let id = id.trim();
-            if id.is_empty() || id == caller_user_id {
-                continue;
-            }
-            let already_in: bool = conn
-                .query_row(
-                    "SELECT 1 FROM friend_group_members WHERE group_id = ?1 AND user_id = ?2 LIMIT 1",
-                    params![group_id, id],
-                    |_| Ok(()),
-                )
-                .optional()?
-                .is_some();
-            if !already_in {
-                conn.execute(
-                    "INSERT INTO friend_group_members (group_id, user_id, created_at, last_read_at)
-                     VALUES (?1, ?2, ?3, NULL)",
-                    params![group_id, id, joined_at],
-                )?;
-            }
-        }
-        conn.execute(
-            "UPDATE friend_groups SET updated_at = ?1 WHERE id = ?2",
-            params![joined_at, group_id],
+        self.group_membership_command(
+            caller_user_id,
+            group_id,
+            &membership::MembershipCommand {
+                request_id: new_id("legacyinvite"),
+                action: "invite".into(),
+                user_ids: new_member_ids
+                    .iter()
+                    .map(|id| id.trim().to_string())
+                    .filter(|id| !id.is_empty() && id != caller_user_id)
+                    .collect(),
+                role: None,
+                invitation_policy: None,
+                invitation_id: None,
+            },
         )?;
-
+        let conn = self.conn()?;
         let group = conn.query_row(
             "SELECT g.id, g.name, g.created_at,
                     (SELECT COUNT(*) FROM friend_group_members m WHERE m.group_id = g.id)

@@ -10,7 +10,7 @@ import SocialAvatar from './SocialAvatar'
 import type { Friend, FriendGroup } from './socialMessageTypes'
 import useSocialChat from './useSocialChat'
 import SocialConversation from './SocialConversation'
-import GroupMembersButton from './GroupMembersButton'
+import GroupMembersPanel from './members/GroupMembersPanel'; import { useMemberSidebarPreference } from './members/useMemberSidebarPreference'
 import ArticleWorkspace from '../articles/ArticleWorkspace'
 import useGroupDiscussionReturn from './group-ai/useGroupDiscussionReturn'
 
@@ -70,6 +70,7 @@ function FriendsPageContent() {
     input, setInput, selectConversation, loadSocialConversations, revisionNotice,
     listStatus, messageError, cacheWarning, retry } = useSocialChat(me!.id)
   useGroupDiscussionReturn(groups, selectConversation)
+  const [membersOpen, setMembersOpen] = useMemberSidebarPreference(me!.id)
   const [displayMode, setDisplayMode] = useState<ConversationDisplayMode>(() => readConversationDisplayMode())
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSection, boolean>>(
     () => readCollapsedSections(),
@@ -278,7 +279,7 @@ function FriendsPageContent() {
   }
 
   return (
-    <div className={styles.layout}>
+    <div className={[styles.layout, membersOpen && activeConversation?.kind === 'group' ? styles.withMembers : ''].join(' ')}>
       <aside className={styles.sidebar}>
         <div className={styles.sideHeader}>
           <span>会话</span>
@@ -386,7 +387,7 @@ function FriendsPageContent() {
               </div>
               <div>
                 <strong>{activeItem.title}</strong>
-                {activeItem.kind === 'group' ? <GroupMembersButton key={activeItem.id} groupId={activeItem.id} count={activeItem.group?.member_count ?? 0} /> : <span
+                {activeItem.kind === 'group' ? <button type="button" className={styles.membersToggle} onClick={() => setMembersOpen(value => !value)} aria-expanded={membersOpen}>群成员（{activeItem.group?.member_count ?? 0}）</button> : <span
                   className={styles.onlineStatus}
                   data-status={activeItem.kind === 'friend' ? activeItem.presenceStatus ?? 'offline' : undefined}
                 >
@@ -406,6 +407,10 @@ function FriendsPageContent() {
           : <div className={styles.welcome}><p>从左侧选择一位好友或群聊开始聊天</p></div>}
         {revisionNotice && <p className={styles.hint} role="status">{revisionNotice}</p>}
       </div>
+      {activeItem?.kind === 'group' && membersOpen && <GroupMembersPanel key={activeItem.id} groupId={activeItem.id} friends={friends}
+        onClose={() => setMembersOpen(false)} onChanged={loadSocialConversations}
+        onMention={member => { setInput(value => `${value}${value && !value.endsWith(' ') ? ' ' : ''}@${member.display_name} `); if (window.innerWidth <= 1100) setMembersOpen(false) }}
+        onMessage={member => { loadSocialConversations(); selectConversation({ kind: 'friend', id: member.id }); setMembersOpen(false) }} /> }
     </div>
   )
 }

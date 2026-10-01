@@ -29,6 +29,7 @@ class UiRuntimeDebugPreviewProvider : ContentProvider() {
         UiRuntimePreviewRegistry.register(mobileDesignV2PreviewScenario())
         UiRuntimePreviewRegistry.register(projectIntroductionPreviewScenario())
         UiRuntimePreviewRegistry.register(groupChatReadabilityPreviewScenario())
+        UiRuntimePreviewRegistry.register(groupMemberPreviewScenario())
         UiRuntimePreviewRegistry.register(projectBrowserThemePreviewScenario())
         UiRuntimePreviewRegistry.register(homeConversationPreviewScenario())
         UiRuntimePreviewRegistry.register(defaultComposeRuntimePreviewScenario())

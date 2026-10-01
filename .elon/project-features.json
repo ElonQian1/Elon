@@ -18358,6 +18358,136 @@
       "updated_at_ms": 1786638099721
     },
     {
+      "id": "group-members-management",
+      "title": "跨端群成员与管理",
+      "summary": "统一 APK/PWA/Win 的完整群成员目录、右侧成员栏和权限管理，支持大群分页搜索与名单同步",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/group-members-management.md",
+        "content_hash": "f44e05aa9d8ec13d5dfd20a1b647d0fd4a6505f23ae0ee94da623e5fc73d9d5c",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "7770f0f8eb8e603c4ee25bc801ad99afd351210d",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "group-members-management",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/GroupMemberScreen.kt",
+        "pc-frontend/src/features/friends/members",
+        "server/src/assets/group_roster.js",
+        "server/src/store/groups"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "172 与 1000 人分页和全群搜索无截断",
+        "服务端权限、原子批量操作、幂等和通知正确",
+        "三端目录及管理可用并验证发布身份"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/GroupMemberScreen.kt",
+          "content_hash": "3c571feb7d380ce90adf50c97f466d5a86c9c38c010e37ac313dc61726b35ad2",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2901325125ac18d611641c47eb1856fd13514a53",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/GroupMemberScreenTest.kt",
+          "content_hash": "795e70f71b25b608e7ecc2f6a695b9af531b970821f9f65083e4cb68fdb39e48",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f9d4e5dbe912200d4c9401a047b0928c7505490f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-group-roster-browser.mjs",
+          "content_hash": "7a68c0daf94006ad7ebb79dccc4ff79dff405f08b807de6481698f1abb227c8b",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "127ecf79a335b2c23659dbdb4dc48bd9252f9b3a",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/members/GroupMembersPanel.tsx",
+          "content_hash": "7cabaddbeb9a610d75cdcbb57e6a756f90de952b6691aadb1cfe552fd3d05a0e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f41ca8d2a9ef1dec16fdc73ba2937cf9f1db3dba",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/assets/group_roster.js",
+          "content_hash": "35fc4a011b056929e4bf97fef5381490db813de32326024a8b9d464111364e1f",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "361398e11eea5c94fae542dd621dea6acd019bf9",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/groups/membership.rs",
+          "content_hash": "b2d48e185d4459bc9a34e62b06a2cebf8cfb853596881e078a7d64afa4611510",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b5ad5a683f4b5ef915aa2b439b1e15468188f777",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/groups/membership_tests.rs",
+          "content_hash": "62f8d3030b8beb6c1a684b2d9fb84fbfd993ca632817d2a6fa53e737ae1c42bb",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "7e373089e54c3359f7bf9363aaec9237893b2b02",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1790852944443,
+      "updated_at_ms": 1790853000471
+    },
+    {
       "id": "group-message-revisions-v1",
       "title": "群聊文字编辑与完整修改记录",
       "summary": "APK、Windows、网页支持本人编辑群聊文字、公开修改标记与追加式版本历史，保护草稿和并发保存。",
@@ -32426,76 +32556,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_cc46a7c6f49d4e4faf5765827001a80f",
-      "feature_id": "mobile-social-chat-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "已核对独立 APK/PWA 代码和前轮 PC 基线，修复读取缓存与生命周期缺口",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789463221272
-    },
-    {
-      "id": "feature_event_c4a70dbc944d4e0f8b5125c3d5c94b81",
-      "feature_id": "mobile-social-chat-recovery-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789465919623
-    },
-    {
-      "id": "feature_event_c329b0115f94427293ffb3b94f6fa648",
-      "feature_id": "mobile-social-chat-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "APK/PWA 缓存、恢复、权限和迟到响应处理已实现；发布验收继续执行",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789465919824
-    },
-    {
-      "id": "feature_event_372c00969c504f37a0a28a51164a76e3",
-      "feature_id": "mobile-social-chat-recovery-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789466337631
-    },
-    {
-      "id": "feature_event_c4fda6dcf5fb4019bacc85f43a7de690",
-      "feature_id": "desktop-social-context-menu-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789468297828
-    },
-    {
-      "id": "feature_event_f590db9e6c6e4e72980475adf3b3da7a",
-      "feature_id": "desktop-social-context-menu-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789468297900
-    },
-    {
-      "id": "feature_event_cc2c79e9d74840338a9b4807ad71b4f4",
-      "feature_id": "desktop-social-context-menu-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "已核对现有菜单与桌面外壳入口，实施限定于社交消息交互",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789468392630
-    },
-    {
       "id": "feature_event_fd1d708bd58143219e3313766595b52e",
       "feature_id": "mobile-social-chat-recovery-v1",
       "action": "evidence_recorded",
@@ -34424,6 +34484,76 @@
       "from_status": "in_progress",
       "to_status": "in_progress",
       "at_ms": 1790851760928
+    },
+    {
+      "id": "feature_event_bb43601a98e347d281d280ef28f364d3",
+      "feature_id": "group-members-management",
+      "action": "registered",
+      "actor": "Codex-group-members",
+      "reason": "",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1790852944443
+    },
+    {
+      "id": "feature_event_3ddd4098d2de47c19c2a7f84d23f0c4f",
+      "feature_id": "group-members-management",
+      "action": "transitioned",
+      "actor": "Codex-group-members",
+      "reason": "用户已明确授权完整跨端成员管理；重建 rebase 中的本任务登记",
+      "from_status": "proposed",
+      "to_status": "accepted",
+      "at_ms": 1790852998376
+    },
+    {
+      "id": "feature_event_a18b4b584de14387b845c61f6ec91dd8",
+      "feature_id": "group-members-management",
+      "action": "transitioned",
+      "actor": "Codex-group-members",
+      "reason": "用户已明确授权完整跨端成员管理；重建 rebase 中的本任务登记",
+      "from_status": "accepted",
+      "to_status": "ready",
+      "at_ms": 1790852998409
+    },
+    {
+      "id": "feature_event_f50fcf7e45c84ad99c9fc545ca7d113a",
+      "feature_id": "group-members-management",
+      "action": "claimed",
+      "actor": "Codex-group-members",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790852998438
+    },
+    {
+      "id": "feature_event_8304461a2abe4c06b23f56acc32fad8b",
+      "feature_id": "group-members-management",
+      "action": "transitioned",
+      "actor": "Codex-group-members",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790852998464
+    },
+    {
+      "id": "feature_event_cb8800fbc38e45e385016bf28d34c6f6",
+      "feature_id": "group-members-management",
+      "action": "evidence_recorded",
+      "actor": "Codex-group-members",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790853000442
+    },
+    {
+      "id": "feature_event_af6e1715f7b7445caaa0d637863a9d45",
+      "feature_id": "group-members-management",
+      "action": "transitioned",
+      "actor": "Codex-group-members",
+      "reason": "三端实现和定向测试完成，继续原生运行与正式发布验收",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790853000471
     }
   ]
 }

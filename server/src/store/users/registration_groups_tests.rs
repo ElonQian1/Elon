@@ -118,6 +118,27 @@ impl Fixture {
 }
 
 #[test]
+fn dissolved_default_group_does_not_accept_new_registrations() {
+    let fixture = Fixture::new();
+    fixture.group(DEFAULT_GROUP_ID, "杀蟑螂");
+    fixture
+        .store
+        .conn()
+        .unwrap()
+        .execute(
+            "UPDATE friend_group_management SET dissolved = 1 WHERE group_id = ?1",
+            params![DEFAULT_GROUP_ID],
+        )
+        .unwrap();
+    let user = fixture
+        .store
+        .create_user("after-dissolve@example.com", "secret1", None, None)
+        .unwrap();
+    assert_eq!(fixture.memberships(&user.id), 0);
+    assert_eq!(fixture.notice_count(), 0);
+}
+
+#[test]
 fn password_registration_joins_once_without_old_unread_messages_or_backfill() {
     let fixture = Fixture::new();
     fixture.group(DEFAULT_GROUP_ID, "杀蟑螂");

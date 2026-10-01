@@ -78,6 +78,20 @@ pub fn subscribe_groups() -> broadcast::Receiver<GroupMessagePush> {
     GROUP_EVENT_TX.subscribe()
 }
 
+pub(crate) fn publish_group_members_changed(group: &str, actor: &str, recipients: Vec<String>) {
+    let _ = GROUP_EVENT_TX.send(GroupMessagePush {
+        event_type: "group_members_changed",
+        group_id: group.into(),
+        from_user_id: actor.into(),
+        message_id: String::new(),
+        content: String::new(),
+        sender_name: None,
+        created_at: chrono::Utc::now().to_rfc3339(),
+        recipient_user_ids: recipients,
+        revision: None,
+    });
+}
+
 pub fn publish_friend_message(message: &FriendChatMessage) {
     let event = FriendMessagePush {
         event_type: "friend_message",

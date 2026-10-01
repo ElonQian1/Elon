@@ -15,12 +15,14 @@ mod group_web_ai;
 mod ai_snapshots;
 mod articles;
 mod chat_records;
+mod group_management;
 mod group_members;
 mod link_previews;
 mod social_assets;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
+    .merge(group_management::routes())
     .merge(group_assistant::routes())
     .merge(articles::routes())
     .merge(social_assets::routes())

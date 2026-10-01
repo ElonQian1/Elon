@@ -605,7 +605,7 @@ class MainActivity : AppCompatActivity() {
             selectableForeground = uiTools::selectableForeground,
             clearFriendMessages = { friendChatActions.clearCurrentMessages() },
             clearGroupMessages = { groupChatActions.clearCurrentMessages() },
-            onAddGroupMember = { group, onDone -> groupActions.showAddMemberDialog(group, onDone) },
+            memberActions = GroupMemberCallbacks(changed = { groupActions.loadGroups(); groupChatActions.currentGroup()?.id?.let(groupChatActions::handleRealtimeMessage) }, exited = { groupChatActions.closeGroupChat(); groupActions.loadGroups(); navigationController.showConversationHome() }, mention = { binding.inputEdit.append("@${it.name} "); inputActions.inputFocusActions.focusInputComposer() }, message = { friendActions.loadFriends(); groupChatActions.closeGroupChat(); friendChatActions.openFriend(AppFriend(it.id, it.name, it.name, null, it.avatar, null, null, null, 0), true) }),
             showGroupSummaryPosts = { group -> groupChatActions.showSummaryPosts(group) },
             showGroupAssistant = { group -> groupAssistant.show(group) }
         )

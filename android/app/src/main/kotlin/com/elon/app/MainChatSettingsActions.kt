@@ -31,7 +31,7 @@ internal class MainChatSettingsActions(
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val clearFriendMessages: () -> Unit,
     private val clearGroupMessages: () -> Unit,
-    private val onAddGroupMember: ((AppGroup, () -> Unit) -> Unit)? = null,
+    private val memberActions: GroupMemberCallbacks = GroupMemberCallbacks(),
     private val showGroupSummaryPosts: ((AppGroup) -> Unit)? = null,
     private val showGroupAssistant: ((AppGroup) -> Unit)? = null
 ) {
@@ -77,13 +77,9 @@ internal class MainChatSettingsActions(
 
     fun showGroupSettings(group: AppGroup) {
         showSettingsPage("聊天信息") { dialog ->
-            addView(groupMemberStrip(group) {
-                onAddGroupMember?.invoke(group) { dismissWithAnimation(dialog) }
-                    ?: toast("添加群成员准备中")
-            })
-            addView(actionRow("查看全部群成员", "打开完整成员名单") {
-                GroupMembersDialog(activity, memberDirectory).show(group.id)
-            })
+            fun openMembers(mode: String = "all") { dismissWithAnimation(dialog) { GroupMemberScreen(activity, memberDirectory.rosterRepository(), memberActions).show(group.id, mode) } }
+            addView(groupMemberStrip(group) { openMembers() })
+            addView(actionRow("邀请成员", "选择好友加入群聊") { openMembers("invite") })
             addView(sectionSpacer())
             addView(actionRow("群聊名称", group.name) {
                 toast("群聊名称编辑准备中")
@@ -124,7 +120,7 @@ internal class MainChatSettingsActions(
             })
             addView(divider())
             addView(actionRow("群管理", null) {
-                toast("群管理准备中")
+                openMembers("manage")
             })
             addView(sectionSpacer())
             addView(destructiveRow("清空聊天记录") {
@@ -282,26 +278,7 @@ internal class MainChatSettingsActions(
         }
     }
 
-    private fun groupMemberStrip(group: AppGroup, onAddMember: () -> Unit): View {
-        return HorizontalScrollView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(126)
-            )
-            setBackgroundColor(uiColors.container)
-            overScrollMode = View.OVER_SCROLL_NEVER
-            isHorizontalScrollBarEnabled = false
-            addView(LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(18), 0, dp(18), 0)
-                group.members.take(12).forEach { member ->
-                    addView(personTile(member.displayName, member.avatarDataUrl))
-                }
-                addView(addTile { onAddMember() })
-            })
-        }
-    }
+    private fun groupMemberStrip(group: AppGroup, onOpen: () -> Unit): View = GroupMemberViews(activity).grid(group, onOpen)
 
     private fun personTile(name: String, avatarDataUrl: String?): View {
         return LinearLayout(activity).apply {

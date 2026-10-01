@@ -4476,7 +4476,7 @@
     #projectPlazaInlineRoot .project-plaza-results { gap: 38px; }
   </style>
   <link rel="stylesheet" href="/assets/ai_conversation_share.css" />
-  <link rel="stylesheet" href="/assets/group_mentions.css" /><script src="/assets/group_mentions.js"></script><link rel="stylesheet" href="/assets/articles.css" /><script src="/assets/article_square_media.js"></script><script src="/assets/article_square.js"></script><script src="/assets/articles.js"></script>
+  <link rel="stylesheet" href="/assets/group_roster.css" /><script src="/assets/group_roster.js"></script><link rel="stylesheet" href="/assets/group_mentions.css" /><script src="/assets/group_mentions.js"></script><link rel="stylesheet" href="/assets/articles.css" /><script src="/assets/article_square_media.js"></script><script src="/assets/article_square.js"></script><script src="/assets/articles.js"></script>
   <link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />
 </head>
 <body data-ui-system="mobile-design-v2">
@@ -7545,13 +7545,13 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   voiceCallMask.addEventListener('click', (e) => {
     if (e.target === voiceCallMask) voiceCallMask.classList.remove('active');
   });
+  const groupRoster = window.ElonGroupRoster.install({ api, getGroup: () => $('chatPage').classList.contains('active') ? currentGroup : null, getUserId: () => currentUser?.id,
+    onChanged: () => { socialRecovery.directories(); socialRecovery.refresh(); }, onExit: () => { closeContactChat(); loadGroups(); },
+    onMention: member => { messageInput.value += (messageInput.value && !messageInput.value.endsWith(' ') ? ' ' : '') + '@' + member.display_name + ' '; messageInput.dispatchEvent(new Event('input', { bubbles: true })); messageInput.focus(); },
+    onMessage: member => { loadFriends(); openFriendChat({ id: member.id, account: member.display_name, nickname: member.display_name, avatar_data_url: member.avatar_data_url }); }, onNotice: text => showNativeOnly(text) });
   moreBtn.addEventListener('click', () => {
-    if (moreBtn.classList.contains('project-members-mode')) {
-      showNativeOnly('项目成员列表请在 Android APK 中使用。');
-      return;
-    }
-    const name = currentFriend ? friendDisplayName(currentFriend) : currentGroup ? groupDisplayName(currentGroup) : '聊天';
-    showNativeOnly('「' + name + '」的聊天设置、成员管理和长按消息操作请在 Android APK 中使用。网页版已同步私聊/群聊收发。');
+    if (currentGroup) { groupRoster.open(); return; }
+    showNativeOnly(moreBtn.classList.contains('project-members-mode') ? '项目成员列表请在 Android APK 中使用。' : '私聊设置请在 Android APK 中使用。');
   });
   window.ElonGroupAssistant.install(api, () => currentGroup, () => token, $('groupAssistantEntry'), groupSummaryStrip);
   window.ElonArticles.install(api, () => currentGroup, groupSummaryStrip); if (groupSummaryStrip) {

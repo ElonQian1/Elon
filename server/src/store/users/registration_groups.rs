@@ -15,6 +15,7 @@ pub(in crate::store) fn join_new_user(
     let inserted = tx.execute(
         "INSERT INTO friend_group_members (group_id, user_id, created_at, last_read_at)
          SELECT id, ?2, ?3, ?3 FROM friend_groups WHERE id = ?1
+         AND NOT EXISTS (SELECT 1 FROM friend_group_management WHERE group_id = ?1 AND dissolved = 1)
          ON CONFLICT(group_id, user_id) DO NOTHING",
         params![DEFAULT_GROUP_ID, user_id, created_at],
     )?;

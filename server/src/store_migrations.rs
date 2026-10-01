@@ -1,6 +1,5 @@
 use anyhow::Result;
 use rusqlite::Connection;
-
 mod compute_capacity_commitment;
 mod compute_capacity_instrument;
 mod compute_delivery_allocation;
@@ -410,6 +409,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (306, "Account-scoped persistent group ChatGPT projects", crate::store::social_ai_messages::group_project::migrate),
     (307, "Permissioned imported chat record bundles", crate::store::articles::chat_records::migration::migrate),
     (308, "Structured social message quotes", crate::store::friend_messages::social_quotes::migrate),
+    (309, "Group member roles, invitation policy and durable actions", crate::store::groups::membership_schema::migrate),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
