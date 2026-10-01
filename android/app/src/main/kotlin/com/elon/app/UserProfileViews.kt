@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -12,6 +13,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -223,7 +225,7 @@ internal object UserProfileViews {
         return ProfileTextBlock(root, level, percent, progress)
     }
 
-    private fun qrThumbnail(context: Context): ImageView {
+    private fun qrThumbnail(context: Context): View {
         val size = context.dp(34)
         val bitmap = QrCodeBitmap.create(
             UserProfileStore.personalQrPayload(context),
@@ -231,13 +233,22 @@ internal object UserProfileViews {
             foreground = Color.parseColor("#0B1118"),
             background = Color.TRANSPARENT
         )
-        return ImageView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(size, size)
-            background = roundedRect(context.elonColor(R.color.elon_text_primary), context.dp(4))
+        return FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(context.dp(48), context.dp(48))
             contentDescription = "我的二维码"
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(context.dp(3), context.dp(3), context.dp(3), context.dp(3))
-            setImageBitmap(bitmap)
+            isFocusable = true
+            foreground = selectableForeground(context)
+            setOnClickListener {
+                context.startActivity(Intent(context, PersonalQrCodeActivity::class.java))
+            }
+            addView(ImageView(context).apply {
+                layoutParams = FrameLayout.LayoutParams(size, size, Gravity.CENTER)
+                background = roundedRect(context.elonColor(R.color.elon_text_primary), context.dp(4))
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                setPadding(context.dp(3), context.dp(3), context.dp(3), context.dp(3))
+                setImageBitmap(bitmap)
+            })
         }
     }
 
