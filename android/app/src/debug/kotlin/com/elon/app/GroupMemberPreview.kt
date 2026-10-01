@@ -52,9 +52,12 @@ internal class GroupMemberFixture : Interceptor {
 }
 
 class GroupMemberPreviewActivity : AppCompatActivity() {
+    companion object { internal var requestedFontScale = 1f }
     private var client: OkHttpClient? = null
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase.createConfigurationContext(Configuration(newBase.resources.configuration).apply { fontScale = requestedFontScale }))
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
-        applyOverrideConfiguration(Configuration(baseContext.resources.configuration).apply { fontScale = intent.getFloatExtra("fontScale", 1f) })
         delegate.localNightMode = if (intent.getStringExtra("theme") == "dark") AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO
         setTheme(R.style.Theme_ElonApp); super.onCreate(savedInstanceState)
         val fixture = GroupMemberFixture().apply { role = intent.getStringExtra("role") ?: "owner" }
@@ -69,6 +72,9 @@ internal fun groupMemberPreviewScenario() = object : UiRuntimePreviewScenario {
     override val supportedScenarios = setOf("owner", "member")
     override fun createView(context: Context, request: UiRuntimePreviewRequest): View = Button(context).apply {
         text = "打开群成员离线预览（172 人）"
-        setOnClickListener { context.startActivity(Intent(context, GroupMemberPreviewActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("role", request.scenario).putExtra("fontScale", request.fontScale).putExtra("theme", request.theme)) }
+        setOnClickListener {
+            GroupMemberPreviewActivity.requestedFontScale = request.fontScale
+            context.startActivity(Intent(context, GroupMemberPreviewActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("role", request.scenario).putExtra("theme", request.theme))
+        }
     }.uiNode("group.members.preview.open")
 }

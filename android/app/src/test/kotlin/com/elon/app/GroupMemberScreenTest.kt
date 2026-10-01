@@ -20,6 +20,14 @@ import java.time.Duration
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = android.app.Application::class)
 class GroupMemberScreenTest {
+    @Test fun previewCanStartAfterResourcesHaveBeenReadWithLargeFonts() {
+        GroupMemberPreviewActivity.requestedFontScale = 2f
+        val host = Robolectric.buildActivity(GroupMemberPreviewActivity::class.java)
+        try {
+            assertEquals(2f, host.get().resources.configuration.fontScale, 0.01f)
+            host.setup()
+        } finally { host.pause().stop().destroy(); GroupMemberPreviewActivity.requestedFontScale = 1f }
+    }
     private fun views(root: View): List<View> = listOf(root) + if (root is ViewGroup) (0 until root.childCount).flatMap { views(root.getChildAt(it)) } else emptyList()
     private fun await(condition: () -> Boolean) {
         repeat(400) { shadowOf(Looper.getMainLooper()).idle(); if (condition()) return; Thread.sleep(10) }
