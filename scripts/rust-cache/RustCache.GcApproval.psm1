@@ -168,7 +168,11 @@ function Read-RustCacheGcApprovalPlan {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Rust cache GC plan does not exist for request $RequestId."
     }
-    $plan = Get-Content -Raw -LiteralPath $path -Encoding UTF8 | ConvertFrom-Json
+    # The approval digest binds the original ISO text. Newer PowerShell versions
+    # otherwise parse it as DateTime and change its later string representation.
+    $jsonOptions = @{}
+    if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $jsonOptions.DateKind = 'String' }
+    $plan = Get-Content -Raw -LiteralPath $path -Encoding UTF8 | ConvertFrom-Json @jsonOptions
     if (
         $plan.schema -ne "elon.rust_cache.gc_plan.v1" -or
         $plan.request_id -ne $RequestId -or

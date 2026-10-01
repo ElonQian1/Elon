@@ -605,7 +605,9 @@ retry = 3
     '{"last_used_utc":"2000-01-01T00:00:00Z"}' | Set-Content -LiteralPath (Join-Path $activeGcQuarantine ".last-used.json") -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $activeGcQuarantine "artifact.bin") -Value "unmanaged-old"
     $fakeCargoPath = Join-Path $TempRoot "cargo.exe"
-    $currentPowerShellPath = (Get-Process -Id $PID).Path
+    # A copied pwsh.exe exits immediately without adjacent pwsh.dll/runtime files.
+    # Windows PowerShell resolves its framework from the system installation.
+    $currentPowerShellPath = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
     Copy-Item -LiteralPath $currentPowerShellPath -Destination $fakeCargoPath
     $fakeCargo = Start-Process -FilePath $fakeCargoPath -ArgumentList @('-NoProfile','-Command','Start-Sleep 60') -WindowStyle Hidden -PassThru
     try {
