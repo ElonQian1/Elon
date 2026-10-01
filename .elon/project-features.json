@@ -5944,7 +5944,7 @@
       "id": "binance-grid-group-share-v1",
       "title": "币安网格群聊分享卡片",
       "summary": "双端手动脱敏分享不可变网格快照，支持只读详情、引用讨论、群AI选区与关联更新。",
-      "status": "implemented",
+      "status": "in_progress",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/binance-grid-group-share-v1.md",
@@ -5987,7 +5987,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
             "head_blob_oid": "9ccb6d6346ef966c00b7afceb119e7bedb2564da",
             "worktree_blob_oid": "9ccb6d6346ef966c00b7afceb119e7bedb2564da",
             "state": "tracked_clean"
@@ -6000,7 +6000,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
             "head_blob_oid": "ec41f7f969bf2802a15d7ec70bb99f228c8e57c8",
             "worktree_blob_oid": "ec41f7f969bf2802a15d7ec70bb99f228c8e57c8",
             "state": "tracked_clean"
@@ -6013,23 +6013,36 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
             "head_blob_oid": "7eab1e87819ab2bd2233d40647b070587db7cf6a",
             "worktree_blob_oid": "7eab1e87819ab2bd2233d40647b070587db7cf6a",
             "state": "tracked_clean"
           }
         },
         {
-          "path": "docs/reports/binance-grid-group-share-20261001.md",
-          "content_hash": "2121038084164607129725f5d5b433893a66a6a0dc72edd28091a52b5da9f238",
+          "path": "docs/reports/binance-grid-share-qnt-20261001.md",
+          "content_hash": "6f92786b1adb23ac42ad5160081c39558f2eed40a14274e3eed7ccb1e8016e2e",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
-            "head_blob_oid": "09bdda5ad9ddf86500b5a94bb8922d11a00c392f",
-            "worktree_blob_oid": "9acd6c2fe0fb75a50827b9f75c56426ef921be99",
-            "state": "tracked_modified"
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b1d234d0c705a701c6dbf437e6af248706cc6a1d",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/scripts/test-grid-share-http.cjs",
+          "content_hash": "5971fdd1cd82fb5a45ac0e56414cb923dd8b1a06323b9892292a12317682259c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e7df2afe7ab51e48939f8d10018ccc77a3e03c3f",
+            "state": "untracked"
           }
         },
         {
@@ -6039,7 +6052,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
             "head_blob_oid": "ab052002eab96ffb52266a3d2d560e4b43bd0cd7",
             "worktree_blob_oid": "ab052002eab96ffb52266a3d2d560e4b43bd0cd7",
             "state": "tracked_clean"
@@ -6047,15 +6060,15 @@
         },
         {
           "path": "pc-frontend/src/features/grid-share/GridShareComposer.tsx",
-          "content_hash": "ec8e5312a390da650311af105b12d68a586bb9e6407e1f678d8c9f07823b353d",
+          "content_hash": "d6cd0f4981d8c666e4c6c968fd5b845d117e00a03b26c1f4951ce27d2a88a654",
           "locator": "",
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
             "head_blob_oid": "78fce9ebe6e426fba93d60d3af28c1f7fadeb09e",
-            "worktree_blob_oid": "78fce9ebe6e426fba93d60d3af28c1f7fadeb09e",
-            "state": "tracked_clean"
+            "worktree_blob_oid": "a2b734f4ab58d34723b6e19538671a473d31172b",
+            "state": "tracked_modified"
           }
         },
         {
@@ -6065,10 +6078,36 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
             "head_blob_oid": "c9abe01a3e5234f9d5783fe398511b5d0e27f680",
             "worktree_blob_oid": "c9abe01a3e5234f9d5783fe398511b5d0e27f680",
             "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/grid-share/GridSharePicker.tsx",
+          "content_hash": "1f0c7f161c0b2fba9efb4f2db1206ff80edb3f7d16340aa7335c9be91fd731d3",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1cfdaf7d79d3b9f66c5bf9e85fea9f8c36e74a96",
+            "state": "untracked"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/grid-share/gridShareIdentity.ts",
+          "content_hash": "31f76f37682d359f1c47d83792f3a156703198591d07d6fc57e3e50998aa4c77",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f92f52c898a2cbfc345156b866111d2e8ab23c9d",
+            "state": "untracked"
           }
         },
         {
@@ -6078,7 +6117,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
             "head_blob_oid": "d2eac24b2aa92c2d7c2931b4853ab638ed91f2e3",
             "worktree_blob_oid": "d2eac24b2aa92c2d7c2931b4853ab638ed91f2e3",
             "state": "tracked_clean"
@@ -6091,7 +6130,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
             "head_blob_oid": "e4cc0c6a7168fb2c950855f3506369d4ea0dc070",
             "worktree_blob_oid": "e4cc0c6a7168fb2c950855f3506369d4ea0dc070",
             "state": "tracked_clean"
@@ -6104,15 +6143,21 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
             "head_blob_oid": "4b60fed5f7f388ec3fe5f73d0fed300b2910de52",
             "worktree_blob_oid": "4b60fed5f7f388ec3fe5f73d0fed300b2910de52",
             "state": "tracked_clean"
           }
         }
       ],
+      "claim": {
+        "claim_id": "claim_4a138a79d0c64389a8d4dbb4dfab609e",
+        "agent_id": "grid-share",
+        "claimed_at_ms": 1790850784066,
+        "expires_at_ms": 1790861584066
+      },
       "created_at_ms": 1790847734398,
-      "updated_at_ms": 1790849912021
+      "updated_at_ms": 1790851760928
     },
     {
       "id": "binance-grid-observer-v1",
@@ -32381,46 +32426,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_9b8f5afcd15b477c9546b6800a33eca0",
-      "feature_id": "social-chat-desktop-parity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "真实 React 交互、缓存恢复、媒体下载、PC/PWA 修订与文章回归、ESLint 和生产构建通过",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1789462521369
-    },
-    {
-      "id": "feature_event_506b2c6079704621b857617fdc4bec56",
-      "feature_id": "social-chat-desktop-parity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "正式 PC 前端发布通过：dfc99bb09f4416743b19b1311240ea20407b6759；兼容服务端 66c411a116e37c1ec53d07c0ee0e2e437e1fe97b。此元数据提交后由正式入口重发同一已验证前端工件再收尾。",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1789462658299
-    },
-    {
-      "id": "feature_event_78d47ff97f28499fa9103f5d585f7b82",
-      "feature_id": "mobile-social-chat-recovery-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789463207304
-    },
-    {
-      "id": "feature_event_f8ae8f5b0d98442c8bddcefef256200f",
-      "feature_id": "mobile-social-chat-recovery-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789463207349
-    },
-    {
       "id": "feature_event_cc46a7c6f49d4e4faf5765827001a80f",
       "feature_id": "mobile-social-chat-recovery-v1",
       "action": "transitioned",
@@ -34379,6 +34384,46 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1790849912021
+    },
+    {
+      "id": "feature_event_07a02c25c6bf459cb59cd0f5dbdceb12",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "transitioned",
+      "actor": "grid-share",
+      "reason": "用户报告 Win QNT 分享在 HTTP 环境失败，补兼容性与币种盈亏选择体验并授权真实回群验收。",
+      "from_status": "implemented",
+      "to_status": "ready",
+      "at_ms": 1790850783940
+    },
+    {
+      "id": "feature_event_f40699c5b88f4e08ab930ee88c44eab7",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "claimed",
+      "actor": "grid-share",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790850784068
+    },
+    {
+      "id": "feature_event_3477da58e6fb4bb5add3bddb65e92199",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "transitioned",
+      "actor": "grid-share",
+      "reason": "仅修改 PC 网格分享模块与测试；保留既有服务端、APK 和分享协议。",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790850809218
+    },
+    {
+      "id": "feature_event_ae6f37f90dd54c52a94992bd14669c18",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "evidence_recorded",
+      "actor": "grid-share",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790851760928
     }
   ]
 }

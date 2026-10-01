@@ -1,6 +1,7 @@
 import { runExchangeWebAdapterCommand } from '../exchange-webview/exchangeWebviewApi'
 import { gridSource, object, sameGridSource, type GridAttachment } from '../grid-chat/gridChatSnapshot'
 import { gridReadPort } from '../grid-chat/readGridChatSnapshot'
+import { gridReadRequestId } from './gridShareIdentity'
 
 export type ShareReadSnapshot = GridAttachment & { positionNotice?: string }
 export const positionMap: Record<string, string> = { quantity: 'positionQty', notional: 'positionNotional', entry: 'entryPrice', mark: 'markPrice', liquidation: 'liquidationPrice', pnl: 'unrealizedPnl' }
@@ -19,7 +20,7 @@ export function projectPosition(report: Record<string, unknown>, symbol: string)
 }
 /** A positions report is requested only as part of the sender's explicit snapshot read. */
 export async function readSharePositions(owner: string, attachment: GridAttachment, active: () => boolean): Promise<ShareReadSnapshot> {
-  const port = gridReadPort(owner), request = crypto.randomUUID().replace(/-/g, '')
+  const port = gridReadPort(owner), request = gridReadRequestId()
   const start = Date.now()
   try {
     if (!active() || !sameGridSource(attachment.source, gridSource(await port.get()))) throw Error('币安来源已变化')

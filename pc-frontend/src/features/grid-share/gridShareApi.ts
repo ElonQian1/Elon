@@ -3,6 +3,7 @@ import { resolveApiUrl } from '../../api/runtime'
 import type { SocialMessage } from '../friends/socialMessageTypes'
 import type { GridAttachment, GridSource } from '../grid-chat/gridChatSnapshot'
 import { gridCard, shareDocument, type GridShare, type GridShareView } from './gridShareModel'
+import { gridShareDigest } from './gridShareIdentity'
 
 export const sharePath = (group: string, id = '') => {
   if (![group, ...(id ? [id] : [])].every(v => /^[\w-]{1,160}$/.test(v))) throw Error('分享地址无效')
@@ -27,8 +28,7 @@ export function readShare(group: string, id: string, signal: AbortSignal) {
 }
 export async function publishShare(group: string, grid: GridShare, signal: AbortSignal) {
   const document = shareDocument(grid)
-  const bytes = new TextEncoder().encode(JSON.stringify(document))
-  const key = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('')
+  const key = gridShareDigest(document)
   const result = await shareRequest<{ snapshot_id: string; message: SocialMessage }>(sharePath(group), signal, { idempotency_key: key, document })
   const card = gridCard(result.message?.content ?? '')
   if (!card || card.snapshot_id !== result.snapshot_id || card.group_id !== group) throw Error('发送回执不匹配，请重试确认')

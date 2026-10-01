@@ -35,8 +35,10 @@
     "lint": "eslint src --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@noble/hashes": "2.4.0",
     "@types/uuid": "^10.0.0",
     "@xyflow/react": "^12.11.2",
+    "cryptocurrency-icons": "0.18.1",
     "jsqr": "1.4.0",
     "lucide-react": "^1.22.0",
     "react": "^18.3.1",

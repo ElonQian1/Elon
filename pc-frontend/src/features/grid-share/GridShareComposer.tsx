@@ -4,12 +4,14 @@ import SocialDialog from '../friends/SocialDialog'
 import useLocalAiOwnerIdentity from '../user-browser/useLocalAiOwnerIdentity'
 import { isExchangeWebviewAvailable, openExchangeWebSession } from '../exchange-webview/exchangeWebviewApi'
 import { gridReadPort, readGridAttachment, readGridSelection } from '../grid-chat/readGridChatSnapshot'
-import { gridCaption, gridSource, sameGridSource, type GridSelection } from '../grid-chat/gridChatSnapshot'
+import { gridSource, sameGridSource, type GridSelection } from '../grid-chat/gridChatSnapshot'
 import { matchesBinding, publishShare, readBinding, rememberShare } from './gridShareApi'
 import { publicGrid, labels, value } from './gridShareModel'
 import GridShareSummary from './GridShareSummary'
 import { readSharePositions, type ShareReadSnapshot } from './readSharePositions'
 import styles from './GridShare.module.css'
+import GridSharePicker from './GridSharePicker'
+import { displayProfit, profitTone } from './gridSharePickerModel'
 
 interface Props { owner: string; group: string; title: string; previous?: string; onClose: () => void; onSent: () => void }
 export function GridShareComposeDialog(props: Props) {
@@ -60,14 +62,21 @@ export function GridShareComposeDialog(props: Props) {
     } catch (reason) { if (active()) setError((reason as Error).message) }
     finally { flight.current = false; if (active()) { setBusy(false); setSending(false) } }
   }
-  return <SocialDialog title={props.previous ? '更新网格快照' : '分享网格到群聊'} onClose={() => { if (!sending) props.onClose() }} footer={<>
+  return <SocialDialog busy={sending} title={props.previous ? '更新网格快照' : '分享网格到群聊'} onClose={() => { if (!sending) props.onClose() }} footer={<>
     <button type="button" disabled={sending} onClick={props.onClose}>取消</button><button type="button" disabled={!attachment || busy || !available} onClick={() => void submit()}>{busy ? '处理中…' : '确认发送到此群'}</button>
   </>}>
     <p>发送到：<strong>{props.title}</strong></p>
     {!available && <p className={styles.notice}>请在已登录同一一龙账号的 Win 客户端读取币安网格。</p>}
     <div className={styles.actions}><button type="button" disabled={busy || !available} onClick={() => void read()}>{attachment ? '重新读取' : '读取当前币安网格'}</button><button type="button" disabled={busy || !available} onClick={() => void openExchangeWebSession('binance', ownerKey).catch(() => setError('币安官网打开失败，请检查客户端'))}>打开币安官网</button></div>
     {busy && <p role="status">正在处理，请稍候…</p>}
-    {selection && <div className={styles.read}>{selection.rows.length ? selection.rows.map(row => <button type="button" key={row.id} disabled={busy} onClick={() => void read(row.id!)}>{gridCaption(row)}</button>) : <p>当前账户没有运行中的网格，可保留当前账户或在官网核对登录。</p>}</div>}
+    {selection && <GridSharePicker selection={selection} busy={busy} onSelect={id => void read(id)} />}
+    {attachment && <section className={styles.privateMetrics} aria-label="本次读取的收益，仅供自己预览">
+      <small>本人收益预览 · 公开范围由下方开关决定</small>
+      <div>{(['profit', 'unrealizedPnl'] as const).map(key => {
+        const metric = (attachment.facts as Record<string, string | null>)[key]
+        return <span key={key}>{key === 'profit' ? '网格利润' : '未实现盈亏'}<strong data-tone={profitTone(metric)}>{displayProfit(metric)}{metric ? ' USDT' : ''}</strong></span>
+      })}</div>
+    </section>}
     {attachment && <><div className={styles.options}><label><input type="checkbox" checked={amounts} disabled={busy} onChange={e => setAmounts(e.target.checked)} />公开金额与数量</label><label><input type="checkbox" checked={withNote} disabled={busy} onChange={e => setWithNote(e.target.checked)} />附加个人说明</label>{withNote && <textarea aria-label="个人说明" maxLength={200} value={note} disabled={busy} onChange={e => setNote(e.target.value)} />}</div><div className={styles.card}><GridShareSummary grid={publicGrid(attachment, amounts)} /></div><p className={styles.notice}>仅分享此次快照。接收者无法操作你的币安账户；未读取的持仓与收益不会推算。{props.previous ? '将发送一张新卡片，旧内容保留。' : ''}</p></>}
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {attachment?.positionNotice && <p role="status">{attachment.positionNotice}</p>}
