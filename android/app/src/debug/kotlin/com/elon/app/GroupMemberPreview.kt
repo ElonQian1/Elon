@@ -54,7 +54,7 @@ internal class GroupMemberFixture : Interceptor {
 class GroupMemberPreviewActivity : AppCompatActivity() {
     private var client: OkHttpClient? = null
     override fun onCreate(savedInstanceState: Bundle?) {
-        applyOverrideConfiguration(Configuration(resources.configuration).apply { fontScale = intent.getFloatExtra("fontScale", 1f) })
+        applyOverrideConfiguration(Configuration(baseContext.resources.configuration).apply { fontScale = intent.getFloatExtra("fontScale", 1f) })
         delegate.localNightMode = if (intent.getStringExtra("theme") == "dark") AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO
         setTheme(R.style.Theme_ElonApp); super.onCreate(savedInstanceState)
         val fixture = GroupMemberFixture().apply { role = intent.getStringExtra("role") ?: "owner" }
