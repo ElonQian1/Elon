@@ -67,6 +67,8 @@ internal object ChatImageViewer {
             override fun onCenterChanged(newCenter: PointF?, origin: Int) { overlay.invalidate() }
         })
         val status = TextView(context).apply {
+            minimumHeight = dp(context, 48)
+            setBackgroundColor(Color.parseColor("#E6000000"))
             setTextColor(Color.WHITE)
             textSize = 14f
             gravity = Gravity.CENTER
@@ -180,6 +182,7 @@ internal object ChatImageViewer {
         }
         root.addView(more, FrameLayout.LayoutParams(dp(context, 48), dp(context, 48), Gravity.TOP or Gravity.END))
         val actions = LinearLayout(context).apply {
+            setBackgroundColor(Color.parseColor("#E6000000"))
             gravity = Gravity.CENTER
             addView(retry)
             addView(icon(context, android.R.drawable.ic_menu_zoom, "原始比例").apply {
