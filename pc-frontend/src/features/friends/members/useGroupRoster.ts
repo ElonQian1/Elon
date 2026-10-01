@@ -54,6 +54,7 @@ export function useGroupRoster(group: string, query: string, filter: string) {
       setData(current.current); setError('')
     } catch (reason) {
       if (!controller.signal.aborted && serial === generation.current) {
+        if ([401, 403, 404].includes((reason as ApiError).status)) { current.current = null; setData(null) }
         setError(memberError(reason))
         if ((reason as ApiError).status === 409) void loop.current?.refresh()
       }
