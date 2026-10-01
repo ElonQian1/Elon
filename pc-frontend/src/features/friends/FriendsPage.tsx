@@ -68,7 +68,7 @@ function FriendsPageContent() {
   const me = useAuthStore((s) => s.user)
   const { friends, groups, setFriends, activeConversation, messages, setMessages, messagesLoading,
     input, setInput, selectConversation, loadSocialConversations, revisionNotice,
-    listStatus, messageError, cacheWarning, retry } = useSocialChat(me!.id)
+    listStatus, messageError, cacheWarning, retry, timeline } = useSocialChat(me!.id)
   useGroupDiscussionReturn(groups, selectConversation)
   const [membersOpen, setMembersOpen] = useMemberSidebarPreference(me!.id)
   const [displayMode, setDisplayMode] = useState<ConversationDisplayMode>(() => readConversationDisplayMode())
@@ -403,7 +403,7 @@ function FriendsPageContent() {
 
         {activeConversation ? <SocialConversation conversation={activeConversation} title={activeItem?.title ?? '会话'} me={me!}
           friend={activeItem?.friend} group={activeItem?.group} messages={messages} setMessages={setMessages} input={input} setInput={setInput}
-          targets={allConversationItems} loading={messagesLoading} error={messageError} retry={retry} onSent={() => void loadSocialConversations()} />
+          timeline={timeline} targets={allConversationItems} loading={messagesLoading} error={messageError} retry={retry} onSent={() => void loadSocialConversations()} />
           : <div className={styles.welcome}><p>从左侧选择一位好友或群聊开始聊天</p></div>}
         {revisionNotice && <p className={styles.hint} role="status">{revisionNotice}</p>}
       </div>

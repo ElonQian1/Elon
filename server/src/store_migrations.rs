@@ -410,6 +410,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (307, "Permissioned imported chat record bundles", crate::store::articles::chat_records::migration::migrate),
     (308, "Structured social message quotes", crate::store::friend_messages::social_quotes::migrate),
     (309, "Group member roles, invitation policy and durable actions", crate::store::groups::membership_schema::migrate),
+    (310, "Bounded conversation timeline and durable change cursors", crate::store::friend_messages::timeline::schema::migrate),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

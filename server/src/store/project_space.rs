@@ -100,7 +100,7 @@ impl ProjectGalleryImageUrlExt for str {
     }
 }
 
-fn project_channel_message_from_row(
+pub(super) fn project_channel_message_from_row(
     row: &rusqlite::Row<'_>,
     user_id: &str,
 ) -> rusqlite::Result<ProjectChannelMessage> {
@@ -690,4 +690,5 @@ mod permissions;
 #[cfg(test)]
 mod tests;
 
+pub(super) use self::permissions::project_member_channel_permissions_locked;
 use self::permissions::*;

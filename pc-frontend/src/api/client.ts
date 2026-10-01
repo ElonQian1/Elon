@@ -219,8 +219,8 @@ export const api = {
   get: <T>(path: string, options?: Pick<RequestInit, 'signal' | 'cache'>) => request<T>(path, options),
   getWithHeaders: <T>(path: string, headers: Record<string, string>) =>
     request<T>(path, { headers }),
-  post: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+  post: <T>(path: string, body: unknown, options?: Pick<RequestInit, 'signal'>) =>
+    request<T>(path, { ...options, method: 'POST', body: JSON.stringify(body) }),
   postWithHeaders: <T>(path: string, body: unknown, headers: Record<string, string>) =>
     request<T>(path, { method: 'POST', headers, body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) =>

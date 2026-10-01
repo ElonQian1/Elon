@@ -1,0 +1,60 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+require('../server/src/assets/message_timeline.js');
+const row = (n, extra = {}) => ({ id: String(n).padStart(6, '0'), created_at: '2026-10-01T00:00:00Z', content: '消息', timeline_cursor: 'c' + n, ...extra });
+const page = (messages, extra = {}) => ({ schema: 'elon.message_timeline.v1', messages, removed_ids: [], before: messages[0]?.timeline_cursor, sync: 'checkpoint', has_more: false, reset: false, ...extra });
+test('100000 messages retain at most the configured window, with stable equal-time order', () => {
+  const state = ElonMessageTimeline.create({ maxMessages: 150 });
+  for (let n = 0; n < 100000; n += 100) state.apply(page(Array.from({ length: 100 }, (_, i) => row(n + i))), n ? 'sync' : 'latest');
+  const result = state.snapshot();
+  assert.equal(result.messages.length, 150);
+  assert.equal(result.messages[0].id, '099850');
+  assert.equal(result.messages[149].id, '099999');
+  assert.equal(result.before, 'c99850');
+  assert.equal(result.hasOlder, true);
+});
+test('history browsing keeps its window and checkpoint when live messages arrive', () => {
+  const state = ElonMessageTimeline.create({ maxMessages: 50 });
+  state.apply(page(Array.from({ length: 50 }, (_, i) => row(i + 50)), { has_more: true }), 'latest');
+  state.follow(false);
+  state.apply(page(Array.from({ length: 50 }, (_, i) => row(i))), 'older');
+  const before = state.snapshot().messages.map(m => m.id);
+  state.apply(page([row(100)], { sync: 'new-checkpoint' }), 'sync');
+  assert.deepEqual(state.snapshot().messages.map(m => m.id), before);
+  assert.equal(state.snapshot().hasNewer, true);
+  assert.equal(state.snapshot().sync, 'new-checkpoint');
+  state.apply(page([row(100)]), 'latest');
+  assert.equal(state.snapshot().following, true);
+  assert.equal(state.snapshot().hasNewer, false);
+});
+test('edits, recall, deletion, duplicate replay and trimmed-range updates', () => {
+  const state = ElonMessageTimeline.create();
+  state.apply(page([row(10), row(11)]), 'latest');
+  state.apply(page([row(10, { revision: 3, content: 'edited' }), row(11, { recalled_at: 'now', content: '' })]), 'sync');
+  state.apply(page([row(1), row(10), row(11)]), 'sync');
+  assert.equal(state.snapshot().messages.length, 2);
+  assert.equal(state.snapshot().messages[0].revision, 3);
+  assert.equal(state.snapshot().messages[1].content, '');
+  state.apply(page([], { removed_ids: ['000010'] }), 'sync');
+  assert.equal(state.snapshot().messages[0].id, '000011');
+});
+test('history does not overwrite live cursor; byte budget evicts and reset fences identity', () => {
+  const state = ElonMessageTimeline.create({ maxBytes: 2000 });
+  state.apply(page([row(2, { content: 'x'.repeat(1200) }), row(3, { content: 'x'.repeat(1200) })]), 'latest');
+  assert.equal(state.snapshot().messages.length, 1);
+  state.apply(page([row(1)], { sync: null }), 'older');
+  assert.equal(state.snapshot().sync, 'checkpoint');
+  assert.match(state.query({ kind: 'group', id: '中文 /?' }, 'older'), /before=c1/);
+  state.reset();
+  assert.equal(state.snapshot().messages.length, 0);
+  assert.equal(state.snapshot().sync, null);
+});
+test('expired live cursors can revalidate a historical window without jumping to latest', () => {
+  const state = ElonMessageTimeline.create();
+  state.apply(page([row(20),row(21)], {has_more:true}), 'latest'); state.follow(false);
+  const result = state.apply(page([row(20,{content:'edited'})], {removed_ids:['000021'],sync:'renewed'}), 'window');
+  assert.deepEqual(result.messages.map(m=>m.id), ['000020']);
+  assert.equal(result.messages[0].content, 'edited');
+  assert.equal(result.hasOlder, true); assert.equal(result.hasNewer, true);
+  assert.equal(result.following, false); assert.equal(result.sync, 'renewed');
+});

@@ -1,3 +1,4 @@
+import { useMessageTimeline } from '../message-timeline/useMessageTimeline'
 import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react'
 import { api, type ApiError } from '../../api/client'
 import { cloudBaseUrl, isLocalWorkbench } from '../../api/runtime'
@@ -11,7 +12,6 @@ type Status = 'loading' | 'ready' | 'error'
 const apply = <T,>(value: SetStateAction<T>, previous: T): T => typeof value === 'function' ? (value as (old: T) => T)(previous) : value
 const failed = (signal: AbortSignal) => !signal.aborted || signal.reason?.name === 'TimeoutError'
 const denied = (error: unknown) => [401, 403, 404].includes((error as ApiError)?.status)
-const foreground = () => !document.hidden && document.hasFocus()
 
 async function read<T>(path: string, signal: AbortSignal): Promise<T> {
   let abort: () => void = () => {}
@@ -31,20 +31,35 @@ export default function useSocialChat(userId: string) {
   const current = useRef(snapshot)
   const [cacheWarning, setCacheWarning] = useState('')
   const [listStatus, setListStatus] = useState<Record<'friends' | 'groups', Status>>({ friends: 'loading', groups: 'loading' })
-  const [messageStatus, setMessageStatus] = useState<Status>('loading')
-  const [messageError, setMessageError] = useState('')
   const [revisionNotice, setRevisionNotice] = useState('')
   const listLoops = useRef<ReturnType<typeof startSocialRefresh>[]>([])
-  const messageLoop = useRef<ReturnType<typeof startSocialRefresh> | null>(null)
+  const cacheTimer = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => {
+    const flush = () => {
+      clearTimeout(cacheTimer.current)
+      const auth = useAuthStore.getState()
+      if (auth.user?.id === userId && auth.token) writeSocialCache(cacheKey, current.current)
+    }
+    window.addEventListener('pagehide', flush)
+    return () => { window.removeEventListener('pagehide', flush); flush() }
+  }, [cacheKey, userId])
 
   const commit = useCallback((update: (old: SocialSnapshot) => SocialSnapshot) => {
     // A late request or send receipt must not recreate caches after logout.
     const auth = useAuthStore.getState()
     if (auth.user?.id !== userId || !auth.token) return
-    const next = update(current.current)
+    const updated = update(current.current)
+    const next = { ...updated, messages: { ...updated.messages } }
+    const active = next.active && conversationId(next.active)
+    const inactive = Object.keys(next.messages).filter(id => id !== active && !next.messages[id].some(m => m.id.startsWith('tmp-')))
+    inactive.slice(0, Math.max(0, inactive.length - 9)).forEach(id => { delete next.messages[id] })
     current.current = next
     setSnapshot(next)
-    setCacheWarning(writeSocialCache(cacheKey, next) ? '' : '本地缓存暂不可用，当前消息仍可使用')
+    clearTimeout(cacheTimer.current)
+    cacheTimer.current = setTimeout(() => {
+      if (useAuthStore.getState().user?.id === userId && useAuthStore.getState().token)
+        setCacheWarning(writeSocialCache(cacheKey, current.current) ? '' : '本地缓存暂不可用，当前消息仍可使用')
+    }, 300)
   }, [cacheKey, userId])
 
   const activeConversation = snapshot.active
@@ -64,10 +79,16 @@ export default function useSocialChat(userId: string) {
     commit(old => ({ ...old, active: { kind: item.kind, id: item.id } }))
   }, [commit])
   const loadSocialConversations = useCallback(() => { listLoops.current.forEach(loop => void loop.refresh()) }, [])
+  const timeline = useMessageTimeline<SocialMessage>(activeConversation, incoming => {
+    const prior = current.current.messages[key] ?? []
+    const byId = new Map(prior.map(m => [m.id, m]))
+    if (incoming.some(m => byId.has(m.id) && revisionOf(m) > revisionOf(byId.get(m.id)!))) setRevisionNotice('群聊文字已更新，可点击“已编辑”查看修改记录')
+    commit(old => ({ ...old, messages: { ...old.messages, [key]: mergeGroupMessages(old.messages[key] ?? [], incoming) } }))
+  })
   const retry = useCallback(() => {
     loadSocialConversations()
-    void messageLoop.current?.refresh()
-  }, [loadSocialConversations])
+    void timeline.refresh()
+  }, [loadSocialConversations, timeline.refresh])
 
   useEffect(() => {
     if (!token || !userId) return
@@ -103,42 +124,10 @@ export default function useSocialChat(userId: string) {
     return () => { listLoops.current.forEach(loop => loop.stop()); listLoops.current = [] }
   }, [commit, token, userId])
 
-  useEffect(() => {
-    setMessageError('')
-    setRevisionNotice('')
-    setMessageStatus('loading')
-    if (!key || !token) return
-    const conversation = current.current.active!
-    const endpoint = `/api/me/${conversation.kind === 'friend' ? 'friends' : 'groups'}/${encodeURIComponent(conversation.id)}/messages?limit=120`
-    const loop = startSocialRefresh(async signal => {
-      try {
-        const data = await read<{ messages?: SocialMessage[] }>(`${endpoint}&preserve_unread=${!foreground()}`, signal)
-        if (signal.aborted) return
-        if (!Array.isArray(data.messages)) throw new Error('无效的消息列表')
-        const incoming = data.messages
-        const prior = current.current.messages[key] ?? []
-        const byId = new Map(prior.map(m => [m.id, m]))
-        if (incoming.some(m => byId.has(m.id) && revisionOf(m) > revisionOf(byId.get(m.id)!))) setRevisionNotice('群聊文字已更新，可点击“已编辑”查看修改记录')
-        commit(old => ({ ...old, messages: { ...old.messages, [key]: mergeGroupMessages(old.messages[key] ?? [], incoming) } }))
-        setMessageError('')
-        setMessageStatus('ready')
-        // The foreground read marks this conversation read; reflect that locally.
-        if (foreground()) commit(old => ({ ...old, [conversation.kind === 'friend' ? 'friends' : 'groups']:
-          (conversation.kind === 'friend' ? old.friends : old.groups)?.map(row => row.id === conversation.id ? { ...row, unread_count: 0 } : row) }))
-      } catch (error) {
-        if (!failed(signal)) return
-        if (denied(error)) commit(old => ({ ...old, messages: { ...old.messages, [key]: [] } }))
-        setMessageStatus('error')
-        setMessageError(denied(error) ? '无法访问此会话，请检查登录状态或成员权限' : '消息同步失败，已保留现有内容；将自动重试')
-      }
-    })
-    messageLoop.current = loop
-    return () => { loop.stop(); if (messageLoop.current === loop) messageLoop.current = null }
-  }, [commit, key, token])
 
   return { friends: snapshot.friends ?? [], groups: snapshot.groups ?? [], setFriends, activeConversation,
     messages, setMessages, input, setInput, selectConversation, loadSocialConversations, retry,
-    listStatus, messageError, cacheWarning, revisionNotice,
-    messagesLoading: !!key && messageStatus === 'loading' && messages.length === 0,
+    listStatus, messageError: timeline.error, cacheWarning, revisionNotice, timeline,
+    messagesLoading: !!key && timeline.loading && messages.length === 0,
   }
 }

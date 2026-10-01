@@ -100,7 +100,7 @@
             if (!recalled) quotePreview(bubble, msg.quote, outgoing, list);
             const block = bubble.closest('.chat-message-block'), actionCleanup = options.actions?.bind(block, msg);
             entry = { signature, block, cleanup: () => { if (typeof cleanup === 'function') cleanup(); actionCleanup?.(); } };
-            entry.block.dataset.messageId = id;
+            entry.block.dataset.messageId = id; entry.block.style.contentVisibility = 'auto'; entry.block.style.containIntrinsicSize = 'auto 120px';
           }
           if (entry.block !== cursor) list.insertBefore(entry.block, cursor);
           cursor = entry.block.nextSibling; next.set(id, entry);

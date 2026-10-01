@@ -1,6 +1,8 @@
 use anyhow::{anyhow, Result};
 #[path = "social_quotes.rs"]
 pub(crate) mod social_quotes;
+#[path = "message_timeline/mod.rs"]
+pub(crate) mod timeline;
 use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::project_ws_protocol::ProjectAttachmentRef;
@@ -366,7 +368,7 @@ fn mark_friend_messages_read(conn: &Connection, user_id: &str, friend_id: &str) 
     Ok(())
 }
 
-fn row_to_friend_message(
+pub(super) fn row_to_friend_message(
     row: &rusqlite::Row<'_>,
     user_id: &str,
 ) -> rusqlite::Result<FriendChatMessage> {

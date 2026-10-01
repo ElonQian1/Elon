@@ -39,6 +39,10 @@ createRoot(document.getElementById('root')).render(React.createElement(App));</s
       const req = route.request(), url = new URL(req.url()), pathname = url.pathname
       if (!pathname.startsWith('/api/')) return route.continue()
       requests.push({ path: pathname, query: url.search, method: req.method(), user: req.headers().authorization })
+      if (pathname === '/api/me/message-timeline') {
+        if (holdMessages) { held.push(route); return }
+        return route.fulfill({ status: denyMessages ? 403 : 200, json: denyMessages ? { error: '无权访问' } : { schema:'elon.message_timeline.v1', messages: url.searchParams.get('kind') === 'group' ? groupMessages : friendMessages, removed_ids:[], sync:'checkpoint', has_more:false } })
+      }
       if (pathname.endsWith('/messages')) {
         if (req.method() === 'POST') {
           if (!failSend) { heldSend = route; return }
@@ -94,13 +98,15 @@ createRoot(document.getElementById('root')).render(React.createElement(App));</s
     assert.equal(await text('群聊修订后的文字').count(), 1)
     await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable: true, value: true }))
     await sync(); await page.clock.runFor(500)
-    assert.ok(requests.some(r => r.path.includes('/groups/g/messages') && r.query.includes('preserve_unread=true')))
+    const hiddenReads = requests.filter(r => r.path === '/api/me/message-timeline').length
+    await page.clock.runFor(16000)
+    assert.equal(requests.filter(r => r.path === '/api/me/message-timeline').length, hiddenReads)
     groupMessages.push(makeMessage('g3', '网络恢复补齐'))
     await page.evaluate(() => { Object.defineProperty(document,'hidden',{configurable:true,value:false}); window.dispatchEvent(new Event('online')) })
     await seen('网络恢复补齐')
     holdMessages = true; await sync(); await choose('测试好友')
     // Only release the previous group's request as stale. The new friend request is current.
-    for (const route of held.splice(0)) if (route.request().url().includes('/groups/')) await route.fulfill({ json: { messages: [makeMessage('stale','不应串入当前会话')] } }).catch(() => {})
+    for (const route of held.splice(0)) if (route.request().url().includes('kind=group')) await route.fulfill({ json: { schema:'elon.message_timeline.v1', messages: [makeMessage('stale','不应串入当前会话')], removed_ids:[], sync:'stale', has_more:false } }).catch(() => {})
     assert.equal(await text('不应串入当前会话').count(), 0)
     holdMessages = false; await sync(); await seen('私聊即时更新')
     failSend = true; await page.locator('textarea').fill('失败要保留的草稿'); await page.locator('textarea').press('Enter')

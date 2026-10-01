@@ -539,7 +539,7 @@ fn mark_group_messages_read(conn: &Connection, user_id: &str, group_id: &str) ->
     Ok(())
 }
 
-fn row_to_group_message(
+pub(super) fn row_to_group_message(
     row: &rusqlite::Row<'_>,
     user_id: &str,
 ) -> rusqlite::Result<FriendGroupMessage> {

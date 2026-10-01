@@ -13,20 +13,21 @@ class Storage {
 function fixture(api = async () => response([])) {
   const target = new EventTarget(), document = new EventTarget();
   document.visibilityState = 'visible';
-  const root = vm.createContext({ console, crypto: webcrypto, TextEncoder, AbortController, setTimeout, clearTimeout, setInterval, clearInterval, document,
+  document.createElement = () => ({ style: {}, setAttribute() {}, append() {}, remove() {} });
+  const root = vm.createContext({ console, crypto: webcrypto, TextEncoder, URLSearchParams, AbortController, setTimeout, clearTimeout, setInterval, clearInterval, document,
     addEventListener: target.addEventListener.bind(target), removeEventListener: target.removeEventListener.bind(target) });
-  for (const name of ['social_chat_cache', 'social_chat_recovery']) vm.runInContext(fs.readFileSync(path.join(rootPath, 'server/src/assets', name + '.js'), 'utf8'), root);
+  for (const name of ['message_timeline', 'social_chat_cache', 'social_chat_recovery']) vm.runInContext(fs.readFileSync(path.join(rootPath, 'server/src/assets', name + '.js'), 'utf8'), root);
   const storage = new Storage(), cache = root.ElonSocialChatCache.create(storage);
   let identity = 'synthetic-a', user = 'a', wakeCount = 0;
   const frames = [], directories = [], errors = [];
-  const recovery = root.ElonSocialChatRecovery.create({ api, cache, session: () => identity, userId: () => user,
+  const recovery = root.ElonSocialChatRecovery.create({ api: (path, init) => path === '/api/me/message-timeline/read' ? Promise.resolve(new Response('{}')) : api(path, init), cache, session: () => identity, userId: () => user,
     render: (rows, kind, contact) => frames.push({ rows, kind, id: contact.id }), status: text => errors.push(text),
     directory: (kind, rows) => directories.push({ kind, rows }), wake: () => wakeCount++ });
   return { root, storage, cache, recovery, frames, directories, errors, document, target,
     account: id => { user = id; identity = 'synthetic-' + id; }, wakeCount: () => wakeCount };
 }
-const response = (messages, status = 200) => new Response(JSON.stringify({ messages, groups: messages, friends: messages }), { status });
-const msg = (id, extra = {}) => ({ id, content: id, revision: 1, ...extra });
+const response = (messages, status = 200) => new Response(JSON.stringify({ schema: 'elon.message_timeline.v1', messages, groups: messages, friends: messages, removed_ids: [], sync: 's', has_more: false }), { status });
+const msg = (id, extra = {}) => ({ id, content: id, created_at: '2026-10-01', revision: 1, ...extra });
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 function gate() { let done; const promise = new Promise(resolve => { done = resolve; }); return { promise, done }; }
 
@@ -68,12 +69,12 @@ test('one in-flight read coalesces burst and schedules a trailing refresh', asyn
   const loading = f.recovery.open('group', { id: 'g' });
   for (let i = 0; i < 10; i++) f.recovery.refresh();
   assert.equal(calls, 1); pending.done(); await loading; await delay(10);
-  assert.equal(calls, 2); assert.equal(f.frames.at(-1).rows[0].id, 'm2'); f.recovery.destroy();
+  assert.equal(calls, 2); assert.equal(f.frames.at(-1).rows.at(-1).id, 'm2'); f.recovery.destroy();
 });
 
 test('switching conversation or account drops late read and does not poison new cache', async () => {
   const pending = gate();
-  const f = fixture(async path => { if (path.includes('/old/')) await pending.promise; return response([msg(path.includes('/old/') ? 'stale' : 'new')]); });
+  const f = fixture(async path => { if (path.includes('id=old')) await pending.promise; return response([msg(path.includes('id=old') ? 'stale' : 'new')]); });
   const old = f.recovery.open('group', { id: 'old' });
   f.account('b'); await f.recovery.open('group', { id: 'new' }); pending.done(); await old;
   assert.equal(f.frames.at(-1).rows[0].id, 'new'); assert.equal(f.cache.get('b:group:old'), null);
@@ -101,7 +102,7 @@ test('pending send does not block reads and receipt follows original conversatio
   const sending = gate(); let accepted = false;
   const f = fixture(async (path, init) => {
     if (init.method === 'POST') { await sending.promise; accepted = true; return new Response(JSON.stringify({ message: msg('sent', { outgoing: true }) })); }
-    if (path.includes('/messages')) return response([msg('incoming'), ...(accepted ? [msg('sent', { outgoing: true })] : [])]);
+    if (path.includes('/message-timeline')) return response([msg('incoming'), ...(accepted ? [msg('sent', { outgoing: true })] : [])]);
     return response([]);
   });
   await f.recovery.open('group', { id: 'g' });

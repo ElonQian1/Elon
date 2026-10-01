@@ -19339,6 +19339,275 @@
       "updated_at_ms": 1786879547042
     },
     {
+      "id": "message-reading-bookmarks-v1",
+      "title": "多书签与独立历史阅读进度",
+      "summary": "拟在统一时间线上增加固定消息书签、每书签独立继续阅读位置、按消息定位和双向翻页；书签进度与已读回执分离。当前为方案，未实现 API 或界面。",
+      "status": "proposed",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/message-reading-bookmarks-v1.md",
+        "content_hash": "141f619f109896473b23f949a7b9a401f9920e1bea5e67000d212a55754fc5c7",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "236ee5725cfd0ce36da4a13b6be74f24eff634a2",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "conversation-platform",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/MessageTimelineWindow.kt",
+        "pc-frontend/src/features/message-timeline",
+        "server/src/store/message_timeline"
+      ],
+      "dependencies": [
+        "message-timeline-v1"
+      ],
+      "acceptance_criteria": [
+        "多个书签独立保存固定起点和可继续阅读位置",
+        "按消息直接定位并双向分页，不遍历整个历史",
+        "跨设备进度冲突、删除和权限撤销不错误跳转或泄露消息",
+        "书签进度不自动标记跳过的全部历史已读"
+      ],
+      "implementation_evidence": [],
+      "created_at_ms": 1790853502027,
+      "updated_at_ms": 1790853502027
+    },
+    {
+      "id": "message-timeline-v1",
+      "title": "统一聊天历史、增量同步和有界上下文",
+      "summary": "为好友、群聊、个人 AI 与项目会话提供分页、变更恢复和有界客户端窗口，保留现有权限及消息能力。",
+      "status": "in_progress",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/message-timeline-v1.md",
+        "content_hash": "8c8759516d7e6c078d5b689c79d205a49e917d5a4ca82c46c865a94a75b094ab",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "4c53a698cae65bf347facb07f588f863f359ec68",
+          "state": "index_only"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "conversation-platform",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app",
+        "pc-frontend/src/features/message-timeline",
+        "server/src/assets/message_timeline.js",
+        "server/src/router/social_routes/message_timeline.rs",
+        "server/src/store/message_timeline"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "分页和变更恢复无丢失重复，游标与权限隔离",
+        "Win/PWA/APK 好友群聊窗口有界并保留历史阅读及消息操作",
+        "个人 AI 和项目会话复用接口，AI 输入预算与显示解耦",
+        "测试、性能和发布证据分别记录"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/MessageTimelineWindow.kt",
+          "content_hash": "71aa970e75a1fcc99fff00d3a33849198f2f1efa1722b26b03f0020bd8fb6923",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "505a94fc3bde9e8d4be051eff9def1086d200fe4",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/MessageTimelineWindowTest.kt",
+          "content_hash": "672405eff006a679a9f16b102dc533387bebe8ea077095a3b4fdbdecada07ca6",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "081813bbc7713f8c6644d5ead72bfa446ad6cec5",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/message-timeline/useMessageTimeline.ts",
+          "content_hash": "c73df96f477038adb585ac399c4d5f057404e718269e9d6f66b370aa5f6e5360",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "9cf78ac4c14d3ac374e8a9baa24cc30ae5003448",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-message-timeline-browser.cjs",
+          "content_hash": "b3ea099608cba583b8c2d1d4fb1304db7d040befb98a1c329bac5f57712e4044",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1fbfa228512f6940bea6bbafd047f720a677cae6",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "scripts/test-message-timeline.cjs",
+          "content_hash": "ed45f3f28dca00ed146f99b960ec4092c7b6c0a349820e3c230ab9862b756851",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "3c98e0c41a457044080d8541b32a79ce432f35cd",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/assets/message_timeline.js",
+          "content_hash": "9245cb10ae67c187c01792565b458ab9c6df3f9675dfe80165694ebc2b380ee5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4382121a57ca484eb4c922c08efb3a9d30e8961e",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/router/social_routes/message_timeline.rs",
+          "content_hash": "2dbff94d6d217ef7ceacf6cd44b3171e991c6a31722a78aceec84d7b9648f1a4",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f719536826e02b953d2a7a9dde6e936c80cab06b",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/social_ai/context_budget.rs",
+          "content_hash": "4afa2b152b93b842113a57882b5a50607dbe7469c836845fd8291fec7a81e649",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a7e03f81e59ddcb8f2d656049e45a4d9d4442feb",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/message_timeline/integration_tests.rs",
+          "content_hash": "c8c451e2c64f09261d504e1472d049ef9074773de28dd5225dac4f794cb47640",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "26432630c3f0acdcdbc22fb826f086cfa93127c7",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/message_timeline/mod.rs",
+          "content_hash": "b04c07de454be8237bf01c3aa8407ee7662577c3e670a920b10de69b4c427249",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "b6790416b70852a68d76420eecd068d97ce5602a",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/message_timeline/query.rs",
+          "content_hash": "0f8fcd0270cdb490d03c47ffa304b39a338fe3fc2350afce203450240bb3603c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "52e6e078e867f879503244433224c80d37127f4f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/message_timeline/recovery.rs",
+          "content_hash": "8161dbb20f7a366084a7c766511c0d45a4285eaff5e4c0f9f7c1ce55a26f6082",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "e6b0a750b88f416d594e52fe5efd8d2a53229736",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/message_timeline/schema.rs",
+          "content_hash": "26796df18bb8f1b72f82c759c510964ea7117752c296b995d380683015b7c084",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "bd3cb99b30f2fce644b475c283b2b4001e350061",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/store/message_timeline/tests.rs",
+          "content_hash": "14755e5fa7f6bdddbd8512f464ebc979383fe70638465aff6079027ccb0944a4",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cac1f216fb6ebd938eb5abafeb4860af6a128ee4",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "a628f1bff0d797d0b754a64013c51e0a2a22947c",
+            "state": "index_only"
+          }
+        }
+      ],
+      "claim": {
+        "claim_id": "claim_d613a8df318f409cb1717f529d45ad03",
+        "agent_id": "codex-message-timeline",
+        "claimed_at_ms": 1790853497051,
+        "expires_at_ms": 1790939897051
+      },
+      "created_at_ms": 1790853496848,
+      "updated_at_ms": 1790853501578
+    },
+    {
       "id": "mobile-social-chat-recovery-v1",
       "title": "APK 与 PWA 社交聊天缓存及前台恢复",
       "summary": "补齐持久缓存和有界读取，修复待发阻断接收、恢复失效及重复全量渲染",
@@ -32563,56 +32832,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_dadc806c87984d328b35ae8ac03e51c6",
-      "feature_id": "mobile-social-chat-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "9 项 APK 单测、11 项 Node 测试和离线浏览器回归通过；APK 1766、服务端 1758 及 PWA runtime 发布核对通过",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1789469324559
-    },
-    {
-      "id": "feature_event_0571c37dea87489396bdf74b861557f0",
-      "feature_id": "desktop-social-context-menu-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789469328075
-    },
-    {
-      "id": "feature_event_fccc202f93b0464098d1e683cb509c30",
-      "feature_id": "desktop-social-context-menu-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "消息菜单与媒体操作、选区及键盘、缩放和已有社交流程通过浏览器回归，构建及定向 lint 通过",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789469328370
-    },
-    {
-      "id": "feature_event_5c24a0e7cf5d404c93cce7e5ca259770",
-      "feature_id": "desktop-social-context-menu-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "消息菜单与媒体操作、选区及键盘、缩放和已有社交流程通过浏览器回归，构建及定向 lint 通过",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1789469328447
-    },
-    {
-      "id": "feature_event_17554eb66e9643d38812d0b301a3ac18",
-      "feature_id": "desktop-social-context-menu-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "PC 前端业务提交 563e9066c 已发布，来源及兼容服务端 bfe6d8b 已核对；现有证据文件哈希未变化",
-      "from_status": "verified",
-      "to_status": "released",
-      "at_ms": 1789469571436
-    },
-    {
       "id": "feature_event_a7941cb9aa3046bf9b6c54a65b7db7e1",
       "feature_id": "social-sync-status-lifecycle-v1",
       "action": "registered",
@@ -34561,6 +34780,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1790853171826
+    },
+    {
+      "id": "feature_event_73330798210f4d03bdff49ae18fa1803",
+      "feature_id": "message-timeline-v1",
+      "action": "registered",
+      "actor": "codex-message-timeline",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790853496848
+    },
+    {
+      "id": "feature_event_8ec146497c5248459e0e13c2bdef2bab",
+      "feature_id": "message-timeline-v1",
+      "action": "claimed",
+      "actor": "codex-message-timeline",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790853497052
+    },
+    {
+      "id": "feature_event_dc4fdf1c213b4436a96e07bc7fc6905c",
+      "feature_id": "message-timeline-v1",
+      "action": "transitioned",
+      "actor": "codex-message-timeline",
+      "reason": "Reapply this task registration on upstream registry after non-fast-forward rebase; preserve other feature records.",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790853497236
+    },
+    {
+      "id": "feature_event_ea79ffd87b6e415f85b2024ae336387d",
+      "feature_id": "message-timeline-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-message-timeline",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790853501578
+    },
+    {
+      "id": "feature_event_18adfed48d6d43dd90f00d8dc4080caf",
+      "feature_id": "message-reading-bookmarks-v1",
+      "action": "registered",
+      "actor": "codex-message-timeline",
+      "reason": "",
+      "from_status": "",
+      "to_status": "proposed",
+      "at_ms": 1790853502027
     }
   ]
 }

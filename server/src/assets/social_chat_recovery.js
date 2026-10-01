@@ -10,6 +10,17 @@
   }
   function create(options) {
     const cache = options.cache;
+    const timeline = root.ElonMessageTimeline.create({ maxMessages: 150 });
+    let lastRead = '';
+    const nav = document.createElement('div'), older = document.createElement('button'), latest = document.createElement('button');
+    nav.hidden = true; nav.setAttribute('aria-label', '聊天历史'); older.textContent = '加载更早消息'; latest.textContent = '回到最新消息';
+    [older, latest].forEach(button => { button.type = 'button'; button.style.minHeight = '48px'; nav.append(button); });
+    options.list?.before(nav);
+    function navigation() { const state = timeline.snapshot(); nav.hidden = !active; older.hidden = !state.hasOlder; latest.hidden = !state.hasNewer; }
+    function followPosition() { if (options.list) timeline.follow(options.list.scrollHeight - options.list.clientHeight - options.list.scrollTop < 80); }
+    options.list?.addEventListener('scroll', followPosition, { passive: true });
+    older.onclick = () => { timeline.follow(false); void refresh(false, 'older'); };
+    latest.onclick = () => { timeline.follow(true); void refresh(true, 'latest'); };
     const jobs = new Map(), snapshots = new Map(), outbox = new Map();
     let owner = '', epoch = 0, active = null, rendered = '', timer = null, wakeTimer = null, ticks = 0;
     const visible = options.visible || (() => document.visibilityState !== 'hidden');
@@ -20,7 +31,7 @@
     function ensureOwner() {
       if (owner === session()) return;
       const changingAccount = !!owner;
-      cancel(); snapshots.clear(); outbox.clear(); active = null; rendered = ''; owner = session();
+      cancel(); snapshots.clear(); outbox.clear(); timeline.reset(); lastRead = ''; nav.hidden = true; active = null; rendered = ''; owner = session();
       if (changingAccount) options.accountChanged?.();
     }
     async function json(path, init = {}, controller = new AbortController(), timeout = 12000) {
@@ -75,17 +86,51 @@
       if (signature !== rendered) { options.render(shown, kind, contact, scroll); rendered = signature; }
       options.status(shown.length ? '' : '还没有消息');
     }
-    function refresh(scroll = false) {
+    function refresh(scroll = false, direction = 'sync') {
       ensureOwner();
       if (!active || !visible()) return Promise.resolve();
       const { key, kind, contact } = active;
-      return read(key, '/api/me/' + kind + 's/' + encodeURIComponent(contact.id) + '/messages?limit=120&preserve_unread=false', 'messages',
-        () => { if (active?.key === key) paint(scroll); },
-        error => {
-          if (active?.key !== key) return;
-          if ([401, 403, 404].includes(error.status)) { rendered = ''; paint(false); }
-          options.status([401, 403, 404].includes(error.status) ? '无法访问此会话，请检查账号或成员权限' : '同步暂时失败，已保留现有消息 · 点击重试', () => refresh());
-        });
+      const existing = jobs.get(key);
+      if (existing) { existing.again = () => refresh(scroll, direction); return existing.promise; }
+      const ticket = epoch, identity = owner;
+      const job = { controller: new AbortController(), again: null };
+      const valid = () => ticket === epoch && identity === session() && jobs.get(key) === job && active?.key === key;
+      jobs.set(key, job); older.disabled = true;
+      const mode = direction === 'sync' && !timeline.snapshot().sync ? 'latest' : direction;
+      const list = options.list, top = list?.getBoundingClientRect().top || 0;
+      const anchor = (mode === 'older' || mode === 'window') && Array.from(list?.children || []).find(node => node.dataset.messageId && node.getBoundingClientRect().bottom > top);
+      const saved = anchor && { id: anchor.dataset.messageId, offset: anchor.getBoundingClientRect().top - top };
+      const path = mode === 'window' ? '/api/me/message-timeline/window' : timeline.query({ kind, id: contact.id }, mode);
+      const init = mode === 'window' ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, id: contact.id, message_ids: timeline.snapshot().messages.map(m => m.id) }) } : {};
+      job.promise = json(path, init, job.controller).then(async page => {
+        if (!valid()) return;
+        if (page.reset) { const s = timeline.snapshot(), live = s.following && !s.hasNewer; job.again = () => refresh(live, live ? 'latest' : 'window'); return; }
+        const state = timeline.apply(page, mode);
+        if (mode !== 'sync' || page.messages.length || page.removed_ids.length) {
+          let rows = reconcile(snapshots.get(key) || [], state.messages);
+          if (options.normalize) rows = options.normalize(key, rows);
+          snapshots.set(key, rows); cache.put(scopeKey(key), rows); paint(scroll || mode === 'latest');
+          if (saved && list) {
+            const node = Array.from(list.children).find(node => node.dataset.messageId === saved.id);
+            if (node) list.scrollTop += node.getBoundingClientRect().top - list.getBoundingClientRect().top - saved.offset;
+          }
+        }
+        navigation();
+        const id = state.messages.at(-1)?.id;
+        if (state.following && !state.hasNewer && id && id !== lastRead && visible()) {
+          await json('/api/me/message-timeline/read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, id: contact.id, message_id: id }) }, job.controller);
+          if (valid()) lastRead = id;
+        }
+        if (mode === 'sync' && page.has_more && valid()) job.again = () => refresh();
+      }).catch(error => {
+        if (!valid()) return;
+        if ([401, 403, 404].includes(error.status)) { timeline.reset(); cache.remove(scopeKey(key)); snapshots.delete(key); outbox.delete(key); rendered = ''; paint(false); }
+        options.status([401, 403, 404].includes(error.status) ? '无法访问此会话，请检查账号或成员权限' : '同步暂时失败，已保留现有消息 · 点击重试', () => refresh());
+      }).finally(() => {
+        if (!valid()) return;
+        jobs.delete(key); older.disabled = false; if (job.again) job.again();
+      });
+      return job.promise;
     }
     function directory(kind) {
       ensureOwner(); if (!owner) return Promise.resolve();
@@ -99,13 +144,14 @@
       });
     }
     function directories() { return Promise.all([directory('friends'), directory('groups')]); }
-    function close() { cancel(); active = null; rendered = ''; options.status(''); }
+    function close() { cancel(); active = null; rendered = ''; timeline.reset(); lastRead = ''; nav.hidden = true; options.status(''); }
     function open(kind, contact) {
       ensureOwner(); close();
       const key = contactKey(kind, contact); active = { key, kind, contact };
       if (!snapshots.has(key)) {
         const saved = cache.get(scopeKey(key)); if (Array.isArray(saved)) snapshots.set(key, saved);
       }
+      while (snapshots.size > 12) { const oldKey = Array.from(snapshots.keys()).find(item => item !== key && item.includes(':')); if (!oldKey) break; snapshots.delete(oldKey); }
       rendered = ''; paint(true);
       if (!(snapshots.get(key) || []).length) options.status('正在同步消息…');
       return refresh(true);
@@ -125,7 +171,7 @@
         if (!data.message?.id) throw new Error('发送结果未确认，请刷新核对后再重试');
         Object.assign(pending, data.message, { send_status: '' });
         invalidate(kind, contact.id);
-        if (active?.key === key) { paint(true); await refresh(true); }
+        if (active?.key === key) { paint(true); await refresh(true, 'latest'); }
         directories();
       } catch (error) {
         if (identity !== session()) return;
@@ -141,7 +187,7 @@
       if (!timer) timer = setInterval(() => {
         if (!visible()) return;
         refresh(); if (++ticks % 5 === 0) directories();
-      }, 3000);
+      }, 15000);
     }
     function scheduleWake() { clearTimeout(wakeTimer); wakeTimer = setTimeout(wake, 200); }
     const visibilityChanged = () => visible() ? scheduleWake() : pause();
@@ -150,7 +196,7 @@
     return {
       open, close, refresh, directory, directories, invalidate, send, wake, json,
       reset() { pause(); close(); snapshots.clear(); outbox.clear(); cache.clear(); owner = ''; },
-      destroy() { pause(); listeners.forEach(([event, fn, target]) => target?.removeEventListener(event, fn)); },
+      destroy() { pause(); nav.remove(); options.list?.removeEventListener('scroll', followPosition); listeners.forEach(([event, fn, target]) => target?.removeEventListener(event, fn)); },
     };
   }
   root.ElonSocialChatRecovery = { create, reconcile };

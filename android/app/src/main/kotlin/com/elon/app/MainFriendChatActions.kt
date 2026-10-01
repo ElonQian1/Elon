@@ -37,7 +37,8 @@ internal class MainFriendChatActions(
 ) {
     private val reader = SocialChatReadChannel(activity, http, serverUrl) { key, rows ->
         protectSocialChatRows(messagesByFriend[key.removePrefix("friend:")].orEmpty(), rows)
-    }
+    }.apply { canMarkRead = { foreground && activity.hasWindowFocus() && !binding.chatList.canScrollVertically(1) } }
+    private val timelineNavigation by lazy { MessageTimelineNavigation(binding, reader) }
     private var owner = AuthManager.userId(activity)
     private val quotes = com.elon.app.socialquotes.SocialQuoteComposer(binding)
     fun quoteMessage(message: ChatMessage): Boolean = isActive() && quotes.select(message)
@@ -102,6 +103,7 @@ internal class MainFriendChatActions(
     }
 
     fun closeFriendChat() {
+        timelineNavigation.close()
         quotes.close()
         showSocialChatStatus(binding, null)
         binding.inputEdit.removeTextChangedListener(typingWatcher)
@@ -425,20 +427,27 @@ internal class MainFriendChatActions(
         allowPendingRefresh: Boolean = false
     ) {
         if (!foreground || !ensureOwner() || activeFriend?.id != friend.id) return
+        messagesByFriend.keys.filter { it != friend.id }.dropLast(9).forEach { id ->
+            val pending = messagesByFriend[id].orEmpty().filter { it.id.isNullOrBlank() && !it.sendStatus.isNullOrBlank() }
+            if (pending.isEmpty()) messagesByFriend.remove(id) else messagesByFriend[id] = pending.toMutableList()
+        }
         val currentMessages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
         fun apply(rows: JSONArray) {
             val remote = List(rows.length()) { friendMessageFromJson(friend, rows.getJSONObject(it)) }
             val merged = mergeSocialChatMessages(currentMessages, remote.withMissingImageAnnotationsFromCurrent(currentMessages))
             val changed = currentMessages != merged
-            val follow = scrollToBottom || !binding.chatList.canScrollVertically(1)
+            val follow = reader.timeline("friend:${friend.id}")?.following != false && (scrollToBottom || !binding.chatList.canScrollVertically(1))
+            val diff = androidx.recyclerview.widget.DiffUtil.calculateDiff(WebChatProductionMessageDiff(currentMessages.toList(), merged))
             currentMessages.clear(); currentMessages.addAll(merged)
 
-            if (changed) activeAdapter?.notifyDataSetChanged()
+            if (changed) activeAdapter?.let { diff.dispatchUpdatesTo(it) }
+            timelineNavigation.update("friend:${friend.id}", currentMessages) { loadMessages(friend, false, it) }
             if (follow && changed && currentMessages.isNotEmpty()) binding.chatList.jumpToLatestMessageBeforeNextDraw()
             showSocialChatStatus(binding, if (currentMessages.isEmpty()) "还没有消息" else null)
             if (changed || !silent || allowPendingRefresh) onFriendSummariesChanged()
         }
         showSocialChatStatus(binding, if (currentMessages.isEmpty()) "正在同步好友消息…" else null)
+        reader.timeline("friend:${friend.id}")?.let { if (it.nextDirection == "sync") it.following = !binding.chatList.canScrollVertically(1) && !it.hasNewer }
         reader.read("friend:${friend.id}", "/api/me/friends/${urlPart(friend.id)}/messages?limit=120&preserve_unread=false", "messages",
             hydrate = currentMessages.isEmpty(), cached = { if (it.length() > 0) apply(it) }, value = ::apply,
             error = { failure ->
@@ -568,7 +577,7 @@ internal class MainFriendChatActions(
     }
 
     private companion object {
-        const val POLL_INTERVAL_MS = 3000L
+        const val POLL_INTERVAL_MS = 15000L
         const val AI_REPLY_REFRESH_DELAY_MS = 1200L
         const val SENDING_STATUS = "发送中..."
         const val MAX_ATTACHMENT_BYTES = 12 * 1024 * 1024

@@ -10,6 +10,8 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 use tracing::info;
+#[path = "context_budget.rs"]
+mod context_budget;
 
 use crate::{
     intent_router,
@@ -383,18 +385,7 @@ pub(super) fn social_ai_base_prompt() -> &'static str {
 }
 
 pub(crate) fn format_history(history: &[SocialAiHistoryMessage]) -> String {
-    history
-        .iter()
-        .filter_map(|message| {
-            let content = message.content.trim();
-            if content.is_empty() {
-                None
-            } else {
-                Some(format!("{}：{content}", message.speaker))
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+    context_budget::format(history)
 }
 
 /// 若检测到开发意图（confidence ≥ 70 且 needs_code_change），返回触发文本摘要；否则 None。

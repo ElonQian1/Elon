@@ -8,6 +8,7 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         ("cache-control", "no-cache"),
     ];
     Router::new()
+        .route("/assets/message_timeline.js", get(move || async move { (headers, include_str!("../../assets/message_timeline.js")) }))
         .route("/assets/scan_pwa.js", get(move || async move { (headers, include_str!("../../assets/scan_pwa.js")) }))
         .route("/assets/scanPayload.mjs", get(move || async move { (headers, include_str!("../../../../shared/scan/scanPayload.mjs")) }))
         .route("/assets/browserScanner.mjs", get(move || async move { (headers, include_str!("../../../../shared/scan/browserScanner.mjs")) }))

@@ -48,7 +48,7 @@ pub(super) fn visitor_project_channel_permissions(channel_kind: &str) -> Project
     }
 }
 
-pub(super) fn project_member_channel_permissions_locked(
+pub(in crate::store) fn project_member_channel_permissions_locked(
     conn: &rusqlite::Connection,
     project_id: &str,
     channel_id: &str,

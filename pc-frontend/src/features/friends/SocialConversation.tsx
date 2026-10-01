@@ -1,3 +1,5 @@
+import { useTimelineAnchor } from '../message-timeline/useTimelineAnchor'
+import type { useMessageTimeline } from '../message-timeline/useMessageTimeline'
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { User } from '../../store/auth'
 import { formatTime } from '../../lib/utils'
@@ -34,6 +36,7 @@ import styles from './FriendsPage.module.css'
 import tools from './SocialTools.module.css'
 
 interface Props {
+  timeline: ReturnType<typeof useMessageTimeline<SocialMessage>>
   conversation: ActiveConversation; title: string; me: User; friend?: Friend; group?: FriendGroup
   messages: SocialMessage[]; setMessages: Dispatch<SetStateAction<SocialMessage[]>>
   input: string; setInput: Dispatch<SetStateAction<string>>; targets: SocialTarget[]
@@ -56,6 +59,7 @@ export default function SocialConversation(props: Props) {
   const [aiSelection, setAiSelection] = useState<SocialMessage[] | null>(null)
   const local = useSocialLocalState(me.id)
   const feed = useRef<HTMLDivElement>(null)
+  const captureAnchor = useTimelineAnchor(feed, messages)
   const follow = useRef(true)
   const [newMessages, setNewMessages] = useState(false)
   useEffect(() => {
@@ -81,7 +85,7 @@ export default function SocialConversation(props: Props) {
     else if (selectedIds.length < 20) setSelectedIds(old => [...old, message.id])
     else setNotice('一次最多选择 20 条消息，请分批操作')
   }
-  function latest() { follow.current = true; setNewMessages(false); if (feed.current) feed.current.scrollTop = feed.current.scrollHeight }
+  function latest() { void props.timeline.latest(); props.timeline.follow(true); follow.current = true; setNewMessages(false); if (feed.current) feed.current.scrollTop = feed.current.scrollHeight }
   return <div className={tools.conversation}>
     <SocialConversationTools conversation={conversation} query={query} onQuery={setQuery} messages={messages}
       selected={selected} selectionMode={selectionMode} onClearSelection={() => { setSelectedIds([]); setSelectionMode(false); setNotice('') }}
@@ -90,7 +94,11 @@ export default function SocialConversation(props: Props) {
       hiddenCount={local.hidden.filter(id => id.startsWith(`${key}:`)).length} onRestore={() => local.restore(`${key}:`)} />
     {(notice || local.error) && <p className={tools.status} role="status">{local.error || notice}</p>}
     <GroupAiStatus owner={me.id} group={conversation.kind === 'group' ? conversation.id : ''} onDelivered={props.onSent} />
-    <div className={`${styles.feed} ${tools.feed}`} ref={feed} onScroll={() => { const node = feed.current!; follow.current = node.scrollHeight - node.clientHeight - node.scrollTop < 80; if (follow.current) setNewMessages(false) }}>
+    <div className={`${styles.feed} ${tools.feed}`} ref={feed} onScroll={() => { const node = feed.current!; follow.current = node.scrollHeight - node.clientHeight - node.scrollTop < 80; props.timeline.follow(follow.current); if (follow.current) setNewMessages(false) }}>
+      {props.timeline.hasOlder && <button type="button" disabled={props.timeline.loading} onClick={() => {
+        captureAnchor(); follow.current = false; props.timeline.follow(false); void props.timeline.older()
+      }}>{props.timeline.loading ? '正在加载…' : '加载更早消息'}</button>}
+      {props.timeline.hasNewer && <button type="button" onClick={latest}>回到最新消息</button>}
       {props.error && <p className={styles.syncStatus} role="status">{props.error} <button type="button" className={styles.syncRetry} onClick={props.retry}>重试</button></p>}
       {props.loading && <p className={styles.hint}>读取消息…</p>}
       {!props.loading && !props.error && !shown.length && <p className={styles.hint}>{query ? '已加载消息中没有匹配内容' : messages.length ? '本机会话中的消息已隐藏，可通过上方按钮恢复' : '还没有消息，发送第一条消息吧'}</p>}
@@ -104,7 +112,7 @@ export default function SocialConversation(props: Props) {
         const compactLink = !m.ai_reply && !recalled && !m.attachments?.length && ElonSocialLinks.compact(content)
         const copyId = messageCopySourceId(`friends:${key}`, m.id)
         const savedKey = localMessageKey(conversation, m.id)
-        return <div key={`${key}:${m.id}`} data-message-id={m.id} tabIndex={0} aria-label={`${name}的消息`}
+        return <div key={`${key}:${m.id}`} data-message-id={m.id} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 120px' }} tabIndex={0} aria-label={`${name}的消息`}
           className={[styles.msgRow, own ? styles.ownRow : '', selectedIds.includes(m.id) ? tools.selected : ''].join(' ')}
           onContextMenu={event => {
             const target = event.target as HTMLElement

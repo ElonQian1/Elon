@@ -18,11 +18,13 @@ mod chat_records;
 mod group_management;
 mod group_members;
 mod link_previews;
+mod message_timeline;
 mod social_assets;
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
     .merge(group_management::routes())
+    .merge(message_timeline::routes())
     .merge(group_assistant::routes())
     .merge(articles::routes())
     .merge(social_assets::routes())
