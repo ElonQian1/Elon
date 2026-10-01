@@ -20,10 +20,15 @@
 - HTTP 能力受限环境验证：无 `randomUUID`、无 `subtle`，仍可读持仓、生成 1000 个唯一合法请求 ID、计算与 Node 一致的 SHA-256；覆盖重试键、错群回执、脱敏和精确小数排序。
 - TypeScript 和 Vite 生产构建通过。
 - 合成数据浏览器验收：Logo 加载、正负及缺失利润、排序、搜索、空匹配、默认隐藏金额及显式公开开关通过；390px 无横向溢出。
-- Win 真实 QNT 发送验收：待本次前端发布后执行。用户已授权发送到指定当前群，保留隐藏金额和数量。
+- Win 真实 QNT 发送验收：2026-10-01 19:05（北京时间）已向用户明确指定的当前群发送一张卡片，保持金额、数量和个人说明不公开。
+- 前端 `e9528b34ec6a1288bc8f6486e18a12c6fd7394b7` 已通过官方前端发布脚本原子发布，继续兼容后端 `0.3.1809 / 0919fb9660ab6f9acb23f1f3469cec576e3a1bc3`；Win MCP `reload_page` 回执 succeeded。
+- 实际 Win 读取 38 个运行中网格，QNT 本地 Logo、利润降序列表、读取持仓及发送均成功，不再触发安全上下文 API 错误。
+- MCP 从服务端群消息回读确认：`gmsg_6df220fbe3914fe7a4d0637d40fa7888`，修订 1，未撤回；快照 `ai_snapshot_87d342c265a6499ab2f17218c3a09d33`。本轮仅执行一次发送。
+- 从已发送卡片打开详情成功；参数页可读，收益页将金额显示为“未公开”，没有总收益率时显示“未读取”。未操作币安交易、未修改账户、未触发群 AI 发言。
+- 现场发现预览复选框被通用表单样式撑开，已在网格分享样式内限定复选框尺寸和文字对齐；不改变隐私开关语义。
 
 ## 交付边界
 
-implementation_status=implemented；verification_status=passed_local；delivery_status=pending；acceptance_status=pending_live。
+本次 Win 修复：implementation_status=implemented；verification_status=passed；delivery_status=published；acceptance_status=passed_live。
 
 本次未改后端或 APK。原跨平台功能的手机非空网格读取、发送验收仍需单独完成，不能由本次 Win 验收代替。

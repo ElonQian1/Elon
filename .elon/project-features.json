@@ -5944,7 +5944,7 @@
       "id": "binance-grid-group-share-v1",
       "title": "币安网格群聊分享卡片",
       "summary": "双端手动脱敏分享不可变网格快照，支持只读详情、引用讨论、群AI选区与关联更新。",
-      "status": "in_progress",
+      "status": "implemented",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/binance-grid-group-share-v1.md",
@@ -5987,7 +5987,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
             "head_blob_oid": "9ccb6d6346ef966c00b7afceb119e7bedb2564da",
             "worktree_blob_oid": "9ccb6d6346ef966c00b7afceb119e7bedb2564da",
             "state": "tracked_clean"
@@ -6000,7 +6000,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
             "head_blob_oid": "ec41f7f969bf2802a15d7ec70bb99f228c8e57c8",
             "worktree_blob_oid": "ec41f7f969bf2802a15d7ec70bb99f228c8e57c8",
             "state": "tracked_clean"
@@ -6013,7 +6013,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
             "head_blob_oid": "7eab1e87819ab2bd2233d40647b070587db7cf6a",
             "worktree_blob_oid": "7eab1e87819ab2bd2233d40647b070587db7cf6a",
             "state": "tracked_clean"
@@ -6021,15 +6021,15 @@
         },
         {
           "path": "docs/reports/binance-grid-share-qnt-20261001.md",
-          "content_hash": "6f92786b1adb23ac42ad5160081c39558f2eed40a14274e3eed7ccb1e8016e2e",
+          "content_hash": "e0b3c78f0529fc09c3c1e53cf380d41fc4151d116e7c348991d66e03dcee6801",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "b1d234d0c705a701c6dbf437e6af248706cc6a1d",
-            "state": "untracked"
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
+            "head_blob_oid": "b1d234d0c705a701c6dbf437e6af248706cc6a1d",
+            "worktree_blob_oid": "4f27b649a8f47e08f295566987792c38874368e5",
+            "state": "tracked_modified"
           }
         },
         {
@@ -6039,10 +6039,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
-            "head_blob_oid": "",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
+            "head_blob_oid": "e7df2afe7ab51e48939f8d10018ccc77a3e03c3f",
             "worktree_blob_oid": "e7df2afe7ab51e48939f8d10018ccc77a3e03c3f",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6052,10 +6052,23 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
             "head_blob_oid": "ab052002eab96ffb52266a3d2d560e4b43bd0cd7",
             "worktree_blob_oid": "ab052002eab96ffb52266a3d2d560e4b43bd0cd7",
             "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/grid-share/GridShare.module.css",
+          "content_hash": "d59358bcc912ef22b4af6a5784b585580c1cb089f3d84f8a5a4bcd180724bd0c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
+            "head_blob_oid": "0979d7b6aac7194bca67c5416872fa60275f61f2",
+            "worktree_blob_oid": "23318eda6d80dbad211b43dcf7dba35c48f946b4",
+            "state": "tracked_modified"
           }
         },
         {
@@ -6065,10 +6078,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
-            "head_blob_oid": "78fce9ebe6e426fba93d60d3af28c1f7fadeb09e",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
+            "head_blob_oid": "a2b734f4ab58d34723b6e19538671a473d31172b",
             "worktree_blob_oid": "a2b734f4ab58d34723b6e19538671a473d31172b",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6078,7 +6091,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
             "head_blob_oid": "c9abe01a3e5234f9d5783fe398511b5d0e27f680",
             "worktree_blob_oid": "c9abe01a3e5234f9d5783fe398511b5d0e27f680",
             "state": "tracked_clean"
@@ -6091,10 +6104,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
-            "head_blob_oid": "",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
+            "head_blob_oid": "1cfdaf7d79d3b9f66c5bf9e85fea9f8c36e74a96",
             "worktree_blob_oid": "1cfdaf7d79d3b9f66c5bf9e85fea9f8c36e74a96",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6104,10 +6117,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
-            "head_blob_oid": "",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
+            "head_blob_oid": "f92f52c898a2cbfc345156b866111d2e8ab23c9d",
             "worktree_blob_oid": "f92f52c898a2cbfc345156b866111d2e8ab23c9d",
-            "state": "untracked"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6117,7 +6130,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
             "head_blob_oid": "d2eac24b2aa92c2d7c2931b4853ab638ed91f2e3",
             "worktree_blob_oid": "d2eac24b2aa92c2d7c2931b4853ab638ed91f2e3",
             "state": "tracked_clean"
@@ -6130,7 +6143,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
             "head_blob_oid": "e4cc0c6a7168fb2c950855f3506369d4ea0dc070",
             "worktree_blob_oid": "e4cc0c6a7168fb2c950855f3506369d4ea0dc070",
             "state": "tracked_clean"
@@ -6143,21 +6156,15 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "5d925118d7660f0074043e2c831cff32d12a5421",
+            "head_commit": "bbfab8d6316e9049eb44b21de552c97e5566f514",
             "head_blob_oid": "4b60fed5f7f388ec3fe5f73d0fed300b2910de52",
             "worktree_blob_oid": "4b60fed5f7f388ec3fe5f73d0fed300b2910de52",
             "state": "tracked_clean"
           }
         }
       ],
-      "claim": {
-        "claim_id": "claim_4a138a79d0c64389a8d4dbb4dfab609e",
-        "agent_id": "grid-share",
-        "claimed_at_ms": 1790850784066,
-        "expires_at_ms": 1790861584066
-      },
       "created_at_ms": 1790847734398,
-      "updated_at_ms": 1790851760928
+      "updated_at_ms": 1790853171826
     },
     {
       "id": "binance-grid-observer-v1",
@@ -32556,26 +32563,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_fd1d708bd58143219e3313766595b52e",
-      "feature_id": "mobile-social-chat-recovery-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "implemented",
-      "to_status": "implemented",
-      "at_ms": 1789469256248
-    },
-    {
-      "id": "feature_event_cf0a4878bf9841488f74818d86aa1d12",
-      "feature_id": "mobile-social-chat-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "9 项 APK 单测、11 项 Node 测试和离线浏览器回归通过；APK 1766、服务端 1758 及 PWA runtime 发布核对通过",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1789469323773
-    },
-    {
       "id": "feature_event_dadc806c87984d328b35ae8ac03e51c6",
       "feature_id": "mobile-social-chat-recovery-v1",
       "action": "transitioned",
@@ -34554,6 +34541,26 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1790853000471
+    },
+    {
+      "id": "feature_event_93508a331a534dd085f0f9b535cd1cf9",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "evidence_recorded",
+      "actor": "grid-share",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790853171736
+    },
+    {
+      "id": "feature_event_8931dd9aaa174ac682f5f5947048edb5",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "transitioned",
+      "actor": "grid-share",
+      "reason": "Win QNT 已在指定群单次发送并回读、详情隐私通过，修复 HTTP 兼容与选币体验。保留并行群成员模块登记；APK 非空网格验收继续单列。",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790853171826
     }
   ]
 }
