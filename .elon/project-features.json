@@ -18368,7 +18368,7 @@
       "id": "group-members-management",
       "title": "跨端群成员与管理",
       "summary": "统一 APK/PWA/Win 的完整群成员目录、右侧成员栏和权限管理，支持大群分页搜索与名单同步",
-      "status": "implemented",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/group-members-management.md",
@@ -18406,36 +18406,49 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
-            "head_blob_oid": "",
+            "head_commit": "cc5c40be8a08ed296807397b9463ac1dc02853c6",
+            "head_blob_oid": "2901325125ac18d611641c47eb1856fd13514a53",
             "worktree_blob_oid": "2901325125ac18d611641c47eb1856fd13514a53",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
           "path": "android/app/src/test/kotlin/com/elon/app/GroupMemberScreenTest.kt",
-          "content_hash": "795e70f71b25b608e7ecc2f6a695b9af531b970821f9f65083e4cb68fdb39e48",
+          "content_hash": "57a5239ba215bd650da484ebfbc7f7e5f04667e61eda7d2a1738e85966f2a311",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "f9d4e5dbe912200d4c9401a047b0928c7505490f",
-            "state": "index_only"
+            "head_commit": "cc5c40be8a08ed296807397b9463ac1dc02853c6",
+            "head_blob_oid": "9e00e81d5d2692db1a51cb70d8ec6f478d88bd6e",
+            "worktree_blob_oid": "9e00e81d5d2692db1a51cb70d8ec6f478d88bd6e",
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/reports/group-members-management-20261001.md",
+          "content_hash": "9101b9cfc84049b165bdd6df61181ba66ad2e9a8639d5efa560f98e883cc3c07",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cc5c40be8a08ed296807397b9463ac1dc02853c6",
+            "head_blob_oid": "5e612d4f19445f8457e6d5423c1a00b8baab43b1",
+            "worktree_blob_oid": "5e612d4f19445f8457e6d5423c1a00b8baab43b1",
+            "state": "tracked_clean"
           }
         },
         {
           "path": "pc-frontend/scripts/test-group-roster-browser.mjs",
-          "content_hash": "7a68c0daf94006ad7ebb79dccc4ff79dff405f08b807de6481698f1abb227c8b",
+          "content_hash": "2847c58815f05463a47eb80b4674b0692a3b41d0256736c5ad87e472ba031a09",
           "locator": "",
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
-            "head_blob_oid": "",
-            "worktree_blob_oid": "127ecf79a335b2c23659dbdb4dc48bd9252f9b3a",
-            "state": "index_only"
+            "head_commit": "cc5c40be8a08ed296807397b9463ac1dc02853c6",
+            "head_blob_oid": "2aef3e1bfab5e43f727bd51ca85011cae816d5bf",
+            "worktree_blob_oid": "2aef3e1bfab5e43f727bd51ca85011cae816d5bf",
+            "state": "tracked_clean"
           }
         },
         {
@@ -18445,10 +18458,23 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
-            "head_blob_oid": "",
+            "head_commit": "cc5c40be8a08ed296807397b9463ac1dc02853c6",
+            "head_blob_oid": "f41ca8d2a9ef1dec16fdc73ba2937cf9f1db3dba",
             "worktree_blob_oid": "f41ca8d2a9ef1dec16fdc73ba2937cf9f1db3dba",
-            "state": "index_only"
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/friends/members/useGroupRoster.ts",
+          "content_hash": "cd6cd991869a35096300c23487ee971626bfaaa9ef18a6558182e38e98db06f8",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "cc5c40be8a08ed296807397b9463ac1dc02853c6",
+            "head_blob_oid": "63f1bd8be6e7341f5d10174f66f87de1115ed340",
+            "worktree_blob_oid": "63f1bd8be6e7341f5d10174f66f87de1115ed340",
+            "state": "tracked_clean"
           }
         },
         {
@@ -18458,10 +18484,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
-            "head_blob_oid": "",
+            "head_commit": "cc5c40be8a08ed296807397b9463ac1dc02853c6",
+            "head_blob_oid": "361398e11eea5c94fae542dd621dea6acd019bf9",
             "worktree_blob_oid": "361398e11eea5c94fae542dd621dea6acd019bf9",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -18471,10 +18497,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
-            "head_blob_oid": "",
+            "head_commit": "cc5c40be8a08ed296807397b9463ac1dc02853c6",
+            "head_blob_oid": "b5ad5a683f4b5ef915aa2b439b1e15468188f777",
             "worktree_blob_oid": "b5ad5a683f4b5ef915aa2b439b1e15468188f777",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -18484,15 +18510,15 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "345726f577c27532d38a0f8ff64429b24f7173d5",
-            "head_blob_oid": "",
+            "head_commit": "cc5c40be8a08ed296807397b9463ac1dc02853c6",
+            "head_blob_oid": "7e373089e54c3359f7bf9363aaec9237893b2b02",
             "worktree_blob_oid": "7e373089e54c3359f7bf9363aaec9237893b2b02",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1790852944443,
-      "updated_at_ms": 1790853000471
+      "updated_at_ms": 1790857339674
     },
     {
       "id": "group-message-revisions-v1",
@@ -32826,36 +32852,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b13fc0af1cc7496fa0afca90c4ab72fe",
-      "feature_id": "social-sync-status-lifecycle-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789472066009
-    },
-    {
-      "id": "feature_event_785379d1c97b42f089b43aef3d35455f",
-      "feature_id": "social-sync-status-lifecycle-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "已定位共用容器中取消请求后的空态提示残留，修复限定于社交状态清理",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789472066042
-    },
-    {
-      "id": "feature_event_a66a9d76b27f49fda1fc2a1787b93919",
-      "feature_id": "social-sync-status-lifecycle-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789472723955
-    },
-    {
       "id": "feature_event_549ef060e7484209b83a2859a4ed278e",
       "feature_id": "social-sync-status-lifecycle-v1",
       "action": "transitioned",
@@ -34824,6 +34820,36 @@
       "from_status": "in_progress",
       "to_status": "ready",
       "at_ms": 1790857155616
+    },
+    {
+      "id": "feature_event_ac8236cec9704cfb9f3152c1b2eb874b",
+      "feature_id": "group-members-management",
+      "action": "evidence_recorded",
+      "actor": "group-members-management",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1790857314914
+    },
+    {
+      "id": "feature_event_fddcec4726084b3ba3e703237b79c9f1",
+      "feature_id": "group-members-management",
+      "action": "transitioned",
+      "actor": "group-members-management",
+      "reason": "重新基于主线保留其他功能登记，恢复本功能的已验证发布记录：后端0.3.1810、PC4fecbc2、APK1.1.1846；设备离线与自动视觉门禁缺口见交付报告。",
+      "from_status": "implemented",
+      "to_status": "verified",
+      "at_ms": 1790857338973
+    },
+    {
+      "id": "feature_event_c245a7641a4b4f30943d7d0da70fd812",
+      "feature_id": "group-members-management",
+      "action": "transitioned",
+      "actor": "group-members-management",
+      "reason": "重新基于主线保留其他功能登记，恢复本功能的已验证发布记录：后端0.3.1810、PC4fecbc2、APK1.1.1846；设备离线与自动视觉门禁缺口见交付报告。",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1790857339674
     }
   ]
 }
