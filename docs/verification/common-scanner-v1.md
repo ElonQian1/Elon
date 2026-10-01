@@ -21,6 +21,7 @@ reviewed_at: 2026-10-01
 
 - `node --test shared/scan/*.test.mjs`
 - `node scripts/test-social-source-links.cjs`
+- `powershell -NoProfile -File scripts/test-mobile-pwa-runtime-template.ps1`：真实运行模板保留 module 语义、经典脚本类型、共享样式、扫码模块内容及按钮入口，5 项检查通过。
 - Android `:app:testDebugUnitTest --tests com.elon.app.scan.* --tests com.elon.app.ProfileQrNavigationTest :app:assembleDebug`
 - PC `npm run build`、`npm run lint`；开发预览 `pc-frontend/scan-preview.html` 使用合成图片，不访问业务账号。
 - PWA 预览 `scripts/fixtures/common-scan.html` 加载生产扫描模块与合成图片。
@@ -47,3 +48,9 @@ UI 工作台返回 `ANDROID_EMULATOR_NOT_INSTALLED`，归类 `VERIFICATION_DEFER
 | ANDROID_RENDERER | UNAVAILABLE |
 
 功能注册表保留 implemented，待物理相机及原生宿主验收后再推进完整验证状态。发布版本和调试手机安装结果以发布脚本收据为准。
+
+## 线上页面模板
+
+服务端 `0.3.1808` 已发布扫码模块，但 `/web` 使用独立的运行时模板，单独验证静态资源返回 200 不足以证明页面启用扫码。运行模板发布器现保留内联脚本的 `type="module"`，并从共享源码嵌入扫码样式；使用 `publish-mobile-pwa-static.ps1` 发布完整模板后，必须同时核对 HTTP 和 HTTPS 实际页面中的模块及按钮。
+
+本次服务端与 PC 产物来自 `1a382955c7979ffba6760c007dd06c3ddabf5766`，包含扫码提交 `3691e1830f727a382b3caebc4b5c55eb00f00c91`。后续发布准备快进到缓存工具提交 `84708bd2df476473b5e83a96471841d92e052aae`；其间服务端与 PC 源码没有变化。通用 PcFrontend 收尾检查要求产物包含整个新 HEAD，因此该严格 SHA 检查未通过，不重复构建相同前端来掩盖这一差异。

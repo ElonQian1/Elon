@@ -16,6 +16,7 @@ function New-ElonMobilePwaRuntimeTemplate {
         'orbital_mobile_theme.css' = $ThemeStylesPath
         'project_plaza_cache.js' = $CacheScriptPath
         'project_plaza.js' = $ScriptPath
+        'scan_pwa.css' = Join-Path $PSScriptRoot '../shared/scan/browserScanDialog.css'
     }
     $pattern = '<script\b[^>]*\bsrc="(?<js>/assets/[\w.-]+\.js)(?:\?[^"<>]*)?"[^>]*>\s*</script>|<link\b(?=[^>]*\brel="stylesheet")(?=[^>]*\bhref="(?<css>/assets/[\w.-]+\.css)(?:\?[^"<>]*)?")[^>]*>'
     $runtimeTemplate = [regex]::Replace($template, $pattern, [System.Text.RegularExpressions.MatchEvaluator]{
@@ -29,7 +30,10 @@ function New-ElonMobilePwaRuntimeTemplate {
         $tag = if ($isScript) { 'script' } else { 'style' }
         if ($isScript) { $content = [regex]::Replace($content, '(?i)</script', '<\/script') }
         elseif ($content -match '(?i)</style\s*>') { throw "PWA asset cannot be safely embedded: $name" }
-        "<$tag data-elon-runtime-asset=`"$url`">`n$content`n</$tag>"
+        # Inline modules must remain modules: their imports and deferred execution
+        # are required by startup integrations such as the shared scanner.
+        $moduleAttribute = if ($isScript -and $match.Value -match '\btype\s*=\s*["'']module["'']') { ' type="module"' } else { '' }
+        "<$tag$moduleAttribute data-elon-runtime-asset=`"$url`">`n$content`n</$tag>"
     })
     if ($runtimeTemplate -match '(?:src|href)="/assets/[\w.-]+\.(?:js|css)(?:\?[^"<>]*)?"') {
         throw 'Unbundled mobile startup asset; refuse a partial runtime generation.'
