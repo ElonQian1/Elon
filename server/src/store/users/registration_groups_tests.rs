@@ -1,4 +1,4 @@
-use super::{join_new_user, DEFAULT_GROUP_ID};
+use super::{join_new_user, DEFAULT_GROUP_ID, NOTICE_SENDER_ID};
 use crate::store::{ExternalAccountSessionInput, Store, VerifiedIdentity};
 use rusqlite::params;
 
@@ -55,6 +55,18 @@ impl Fixture {
                 params![DEFAULT_GROUP_ID, user_id],
             )
             .unwrap();
+    }
+
+    fn notice_count(&self) -> i64 {
+        self.store
+            .conn()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM friend_group_messages WHERE sender_user_id = ?1",
+                params![NOTICE_SENDER_ID],
+                |row| row.get(0),
+            )
+            .unwrap()
     }
 
     fn fail_join(&self) {
@@ -150,6 +162,7 @@ fn password_registration_joins_once_without_old_unread_messages_or_backfill() {
     drop(conn);
     assert_eq!(before, after);
     assert_eq!(fixture.memberships(&user.id), 1);
+    assert_eq!(fixture.notice_count(), 1);
     assert!(fixture
         .store
         .create_user("new@example.com", "secret1", None, None)
@@ -161,6 +174,7 @@ fn password_registration_joins_once_without_old_unread_messages_or_backfill() {
         .unwrap();
     fixture.store.create_session(&user.id, None, None).unwrap();
     assert_eq!(fixture.memberships(&user.id), 0);
+    assert_eq!(fixture.notice_count(), 1);
 }
 
 #[test]
@@ -200,6 +214,7 @@ fn first_google_registration_joins_but_repeat_login_does_not_rejoin() {
     assert!(!second.created_user);
     assert_eq!(second.user.id, first.user.id);
     assert_eq!(fixture.memberships(&first.user.id), 0);
+    assert_eq!(fixture.notice_count(), 1);
 }
 
 #[test]
@@ -213,6 +228,7 @@ fn first_external_registration_joins_but_system_owner_and_repeat_login_do_not() 
     let second = fixture.external_login().unwrap();
     assert_eq!(second.user.id, first.user.id);
     assert_eq!(fixture.memberships(&first.user.id), 0);
+    assert_eq!(fixture.notice_count(), 1);
 }
 
 #[test]
@@ -243,4 +259,70 @@ fn membership_failure_rolls_back_each_registration_path() {
         })
         .unwrap();
     assert_eq!(links, 0);
+}
+
+#[test]
+fn notice_is_readable_without_adding_a_login_or_roster_member() {
+    let fixture = Fixture::new();
+    assert_eq!(fixture.notice_count(), 0);
+    fixture.group(DEFAULT_GROUP_ID, "杀蟑螂");
+    let user = fixture
+        .store
+        .create_user("notice@example.com", "secret1", Some("新成员"), None)
+        .unwrap();
+    assert_eq!(fixture.notice_count(), 1);
+    assert_eq!(fixture.memberships(NOTICE_SENDER_ID), 0);
+    assert!(fixture
+        .store
+        .authenticate_password(NOTICE_SENDER_ID, "secret1")
+        .is_err());
+    let conn = fixture.store.conn().unwrap();
+    let row: (String, String, String, String, i64) = conn
+        .query_row(
+            "SELECT m.content, m.created_at, gm.created_at, u.status, u.password_login_enabled
+         FROM friend_group_messages m JOIN users u ON u.id = m.sender_user_id
+         JOIN friend_group_members gm ON gm.group_id = m.group_id AND gm.user_id = ?1
+         WHERE m.sender_user_id = ?2",
+            params![user.id, NOTICE_SENDER_ID],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+        )
+        .unwrap();
+    assert_eq!(row.0, "新成员 加入了群聊");
+    assert_eq!(row.1, row.2);
+    assert_eq!(row.3, "disabled");
+    assert_eq!(row.4, 0);
+}
+
+#[test]
+fn notice_failure_rolls_back_account_membership_and_system_sender() {
+    let fixture = Fixture::new();
+    fixture.group(DEFAULT_GROUP_ID, "杀蟑螂");
+    fixture
+        .store
+        .conn()
+        .unwrap()
+        .execute_batch(
+            "CREATE TRIGGER reject_join_notice BEFORE INSERT ON friend_group_messages
+         BEGIN SELECT RAISE(ABORT, 'injected notice failure'); END;",
+        )
+        .unwrap();
+    assert!(fixture
+        .store
+        .create_user("notice-rollback@example.com", "secret1", None, None)
+        .is_err());
+    assert!(fixture.google_login().is_err());
+    assert!(fixture.external_login().is_err());
+    let conn = fixture.store.conn().unwrap();
+    let members: i64 = conn
+        .query_row("SELECT COUNT(*) FROM friend_group_members", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    let users: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM users WHERE id = ?1 OR email IN
+         ('notice-rollback@example.com', 'registration-google@example.com', 'registration-external@example.com')",
+        params![NOTICE_SENDER_ID], |r| r.get(0),
+    ).unwrap();
+    assert_eq!(members, 0);
+    assert_eq!(users, 0);
 }
