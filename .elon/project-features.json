@@ -19368,7 +19368,7 @@
       "id": "message-history-edge-loading-v1",
       "title": "三端聊天上翻自动加载历史",
       "summary": "修复 APK/PWA/Win 上翻到当前窗口顶部不会自动加载历史消息，并保护分页请求、重试和阅读锚点。",
-      "status": "verified",
+      "status": "released",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/message-history-edge-loading-v1.md",
@@ -19533,7 +19533,7 @@
         }
       ],
       "created_at_ms": 1790859263399,
-      "updated_at_ms": 1790859267332
+      "updated_at_ms": 1790863663269
     },
     {
       "id": "message-reading-bookmarks-v1",
@@ -33023,16 +33023,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_b03c5e2d1fd449e69f5f2784325438db",
-      "feature_id": "binance-grid-chinese-symbols-v1",
-      "action": "evidence_recorded",
-      "actor": "quant-grid",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789488354812
-    },
-    {
       "id": "feature_event_f3f7e0d0fb8a4204b0d395ba87a1fe21",
       "feature_id": "binance-grid-chinese-symbols-v1",
       "action": "claim_released",
@@ -35021,6 +35011,16 @@
       "from_status": "implemented",
       "to_status": "verified",
       "at_ms": 1790859267332
+    },
+    {
+      "id": "feature_event_c208105958b14fa5935c148eb5732554",
+      "feature_id": "message-history-edge-loading-v1",
+      "action": "transitioned",
+      "actor": "codex-history-edge",
+      "reason": "APK 1.1.1847、PWA/Win 服务端 0.3.1811 已发布并通过来源与线上文件核验；server/pc_frontend 租约记录成功。测试设备离线，真机验收单列。详见 docs/reports/message-history-edge-loading-20261001.md",
+      "from_status": "verified",
+      "to_status": "released",
+      "at_ms": 1790863663269
     }
   ]
 }
