@@ -13,10 +13,10 @@ owner: conversation-platform
 
 | 能力 | 实现 | 验证 | 交付/验收 |
 | --- | --- | --- | --- |
-| 四类来源的分页、权限、增量和窗口重校验 | implemented | Rust 专项 11 项通过 | 待发布；真实生产历史库待验收 |
-| Win/PWA 好友、群聊及其中的 AI 消息 | implemented | Node、两套浏览器替身、最终 PC 构建与定向 lint 通过 | 待发布；真实长时体验待验收 |
-| APK 好友、群聊及其中的 AI 消息 | implemented | 原生专项 10 项通过 | 待发布/装机；真实滚动性能待验收 |
-| 社交 AI 历史输入字符预算 | implemented | Rust Unicode 与最近消息保留测试通过 | 待发布 |
+| 四类来源的分页、权限、增量和窗口重校验 | implemented | Rust 专项 11 项通过 | 后端 0.3.1810 已发布；真实账号历史阅读待验收 |
+| Win/PWA 好友、群聊及其中的 AI 消息 | implemented | Node、两套浏览器替身、最终 PC 构建与定向 lint 通过 | 已发布并核对线上源码；真实长时体验待验收 |
+| APK 好友、群聊及其中的 AI 消息 | implemented | 原生专项 10 项通过 | 1.1.1846 已发布；两台登记手机离线，装机延期 |
+| 社交 AI 历史输入字符预算 | implemented | Rust Unicode 与最近消息保留测试通过 | 随后端 0.3.1810 发布 |
 | 个人 AI、项目频道页面迁移 | partial | 后端投影等价和权限通过 | 页面仍使用既有有界读取入口 |
 | 多书签、独立阅读进度、around/双向定位 | proposed | 未实现 | 见独立方案；不得宣称上线 |
 
@@ -50,13 +50,45 @@ owner: conversation-platform
 - APK `MessageTimelineWindowTest`、`SocialChatReadChannelTest`、`SocialChatRecoveryTest`：
   含日志过期历史恢复共 10 项通过。
 - `validate-rust.ps1 ... test --bin elon-server message_timeline`：含窗口恢复、当前正文、
-  删除、游标换代及权限用例共 11 项通过；最终验证指纹
-  `29336b8dd1db3ec65ec51a9610c9f1e70b60c1b66b357adc92c6b82470d40c57`。
+  删除、游标换代及权限用例共 11 项通过；合并上游后的验证指纹
+  `608e871c21bb401dccc9137df6d1cf5748e0bfd8ea1cce4c41776ca0530652af`。
+  上游成员管理与本模块均保留，本模块迁移编号为 310。
 
 上述为定向逻辑、数据库和本机浏览器证据，不是生产负载、帧率、用户设备或一周长时实测。
 本机 Rust 验证使用平台管理的本地共享缓存入口，通过容量门禁；未绕过空间保护。
 窗口恢复增补后的首轮 Rust 验证因容量门禁中止，随后本地编译缓存和共享盘最终产物组合验证通过。
-缓存 GC 重新检测到其他活跃构建后保留该分区，本次未删除其他任务缓存或文件。
+首次缓存 GC 因其他活跃构建保留分区；后续确认无活跃写者并审阅计划后，
+平台 GC 回收闲置共享验证缓存约 2.71 GiB，回执为 `gc-20261001-114151.json`。
+未删除源码、工作区或未知目录；跨目标分区的后续 GC 仅预演，未执行。
+
+## 发布与故障恢复
+
+- 功能提交 `64f373ad43c4c6d783ee2012ed86243bdbe5b7da` 已入主线。
+  后端及 PC/PWA 发布源码为 `994e32ff36c6059e1e6c819bce5c958fc107904f`。
+  同一主线的成员管理发布流程完成该工件，包含本功能；本任务复核后复用，未重复部署。
+- `check-task-complete.ps1 -Kind Server` 和 `-Kind PcFrontend` 均通过：
+  后端 `0.3.1810`、健康 `OK`、PC 路径 HTTP 200、前端与后端发布身份匹配。
+  线上 `message_timeline.js` SHA-256 与源码一致；携带合法参数的匿名时间线读取返回 401。
+  这些只读检查不等于已验收真实账号下的全部消息操作和历史恢复。
+- 正式 APK `1.1.1846`（build 1846），发布源码
+  `4fecbc2b58c1ea41a6ddcf33184cd69f6695acd5`，相对上述源码仅新增非 Android 改动。
+  SHA-256 为 `43fe72c7aab5265179515d069682fea63b339108ed3ef0118b3a62c5215bbed0`。
+  官方恢复入口返回 `APK_RELEASE_STATUS=already_covered`，AndroidFeature 完成检查通过。
+  复用同工件发布后的主项目设备回执（2026-10-01 20:16:25，UTC+8）：
+  小米 23116PN5BC、荣耀 AAK-AN00 均 `offline`，无在线安装失败；未宣称手机已更新。
+- 首次后端发布因 UNC 对象文件路径被 MSVC linker 解析为选项而失败。
+  使用平台容量预留、锁和本地中间产物后越过此失败点；未降低磁盘容量门槛。
+- 随后的本任务构建在 `serial2`、`bytemuck` 编译时以 `0xc0000043` 退出，
+  与用户提供的 `rustc.exe` 启动错误弹窗一致。该状态为 Windows 文件共享访问冲突；
+  当时的具体文件及占用者未捕获。事后工具链文件可读，其他构建成功完成并发布。
+  结论是发布已恢复，不能宣称根因已定位或永久修复，也未将其归咎于杀软或源码。
+- 本任务 APK Release 编译成功，后续校验进程一度无法识别 `Get-FileHash`。
+  新进程对现有 APK 的 177 份 Web AI 资源校验通过；PowerShell 7 下通过官方
+  `publish-apk.ps1 -SkipBuild` 恢复时，已有上述主线正式包，脚本按输入等价复用。
+  本任务最初生成的 APK 未上传，不将其不同摘要冒充正式包。
+
+本批发布证据不代表统一时间线需求全部完成：个人 AI/项目 UI 迁移仍为 partial，
+多书签仍为 proposed；功能登记释放本轮认领后保留这些后续入口。
 
 ## 后续入口
 

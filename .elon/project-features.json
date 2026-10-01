@@ -19382,7 +19382,7 @@
       "id": "message-timeline-v1",
       "title": "统一聊天历史、增量同步和有界上下文",
       "summary": "为好友、群聊、个人 AI 与项目会话提供分页、变更恢复和有界客户端窗口，保留现有权限及消息能力。",
-      "status": "in_progress",
+      "status": "ready",
       "priority": "p1",
       "requirement": {
         "path": "docs/requirements/message-timeline-v1.md",
@@ -19598,14 +19598,8 @@
           }
         }
       ],
-      "claim": {
-        "claim_id": "claim_d613a8df318f409cb1717f529d45ad03",
-        "agent_id": "codex-message-timeline",
-        "claimed_at_ms": 1790853497051,
-        "expires_at_ms": 1790939897051
-      },
       "created_at_ms": 1790853496848,
-      "updated_at_ms": 1790853501578
+      "updated_at_ms": 1790857155616
     },
     {
       "id": "mobile-social-chat-recovery-v1",
@@ -32832,16 +32826,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_a7941cb9aa3046bf9b6c54a65b7db7e1",
-      "feature_id": "social-sync-status-lifecycle-v1",
-      "action": "registered",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "",
-      "to_status": "ready",
-      "at_ms": 1789472065970
-    },
-    {
       "id": "feature_event_b13fc0af1cc7496fa0afca90c4ab72fe",
       "feature_id": "social-sync-status-lifecycle-v1",
       "action": "claimed",
@@ -34830,6 +34814,16 @@
       "from_status": "",
       "to_status": "proposed",
       "at_ms": 1790853502027
+    },
+    {
+      "id": "feature_event_ccc241d1f0ac462b903ddc913bd66e27",
+      "feature_id": "message-timeline-v1",
+      "action": "claim_released",
+      "actor": "codex-message-timeline",
+      "reason": "首批统一分页与好友群聊接入已发布，详见 docs/reports/message-timeline-20261001.md。释放本轮认领；个人 AI/项目页面迁移及真实长时验收仍待后续，整体功能不标记完成。",
+      "from_status": "in_progress",
+      "to_status": "ready",
+      "at_ms": 1790857155616
     }
   ]
 }
