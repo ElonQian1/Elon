@@ -5987,10 +5987,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84708bd2df476473b5e83a96471841d92e052aae",
-            "head_blob_oid": "",
+            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_blob_oid": "9ccb6d6346ef966c00b7afceb119e7bedb2564da",
             "worktree_blob_oid": "9ccb6d6346ef966c00b7afceb119e7bedb2564da",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6000,10 +6000,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84708bd2df476473b5e83a96471841d92e052aae",
-            "head_blob_oid": "",
+            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_blob_oid": "ec41f7f969bf2802a15d7ec70bb99f228c8e57c8",
             "worktree_blob_oid": "ec41f7f969bf2802a15d7ec70bb99f228c8e57c8",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6013,10 +6013,23 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84708bd2df476473b5e83a96471841d92e052aae",
-            "head_blob_oid": "",
+            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_blob_oid": "7eab1e87819ab2bd2233d40647b070587db7cf6a",
             "worktree_blob_oid": "7eab1e87819ab2bd2233d40647b070587db7cf6a",
-            "state": "index_only"
+            "state": "tracked_clean"
+          }
+        },
+        {
+          "path": "docs/reports/binance-grid-group-share-20261001.md",
+          "content_hash": "2121038084164607129725f5d5b433893a66a6a0dc72edd28091a52b5da9f238",
+          "locator": "",
+          "evidence_kind": "document",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_blob_oid": "09bdda5ad9ddf86500b5a94bb8922d11a00c392f",
+            "worktree_blob_oid": "9acd6c2fe0fb75a50827b9f75c56426ef921be99",
+            "state": "tracked_modified"
           }
         },
         {
@@ -6026,10 +6039,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84708bd2df476473b5e83a96471841d92e052aae",
-            "head_blob_oid": "",
+            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_blob_oid": "ab052002eab96ffb52266a3d2d560e4b43bd0cd7",
             "worktree_blob_oid": "ab052002eab96ffb52266a3d2d560e4b43bd0cd7",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6039,10 +6052,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84708bd2df476473b5e83a96471841d92e052aae",
-            "head_blob_oid": "",
+            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_blob_oid": "78fce9ebe6e426fba93d60d3af28c1f7fadeb09e",
             "worktree_blob_oid": "78fce9ebe6e426fba93d60d3af28c1f7fadeb09e",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6052,10 +6065,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84708bd2df476473b5e83a96471841d92e052aae",
-            "head_blob_oid": "",
+            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_blob_oid": "c9abe01a3e5234f9d5783fe398511b5d0e27f680",
             "worktree_blob_oid": "c9abe01a3e5234f9d5783fe398511b5d0e27f680",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6065,10 +6078,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84708bd2df476473b5e83a96471841d92e052aae",
-            "head_blob_oid": "",
+            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_blob_oid": "d2eac24b2aa92c2d7c2931b4853ab638ed91f2e3",
             "worktree_blob_oid": "d2eac24b2aa92c2d7c2931b4853ab638ed91f2e3",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6078,10 +6091,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84708bd2df476473b5e83a96471841d92e052aae",
-            "head_blob_oid": "",
+            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_blob_oid": "e4cc0c6a7168fb2c950855f3506369d4ea0dc070",
             "worktree_blob_oid": "e4cc0c6a7168fb2c950855f3506369d4ea0dc070",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6091,15 +6104,15 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "84708bd2df476473b5e83a96471841d92e052aae",
-            "head_blob_oid": "",
+            "head_commit": "0919fb9660ab6f9acb23f1f3469cec576e3a1bc3",
+            "head_blob_oid": "4b60fed5f7f388ec3fe5f73d0fed300b2910de52",
             "worktree_blob_oid": "4b60fed5f7f388ec3fe5f73d0fed300b2910de52",
-            "state": "index_only"
+            "state": "tracked_clean"
           }
         }
       ],
       "created_at_ms": 1790847734398,
-      "updated_at_ms": 1790847764362
+      "updated_at_ms": 1790849912021
     },
     {
       "id": "binance-grid-observer-v1",
@@ -32368,16 +32381,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_8307717c764243128256dcafe9e9883e",
-      "feature_id": "social-chat-desktop-parity-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "已接入实际聊天页面，保留文章卡片与原消息恢复能力",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789462510984
-    },
-    {
       "id": "feature_event_9b8f5afcd15b477c9546b6800a33eca0",
       "feature_id": "social-chat-desktop-parity-v1",
       "action": "transitioned",
@@ -34366,6 +34369,16 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1790847764362
+    },
+    {
+      "id": "feature_event_2d9a509c63a3421893cc75e8c614a276",
+      "feature_id": "binance-grid-group-share-v1",
+      "action": "evidence_recorded",
+      "actor": "grid-share",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1790849912021
     }
   ]
 }
