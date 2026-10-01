@@ -19,7 +19,7 @@ export function GridShareComposeDialog(props: Props) {
   const ownerKey = identity.ownerKey
   const [selection, setSelection] = useState<GridSelection | null>(null)
   const [attachment, setAttachment] = useState<ShareReadSnapshot | null>(null)
-  const [amounts, setAmounts] = useState(false), [withNote, setWithNote] = useState(false), [note, setNote] = useState('')
+  const [withNote, setWithNote] = useState(false), [note, setNote] = useState('')
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const control = useRef(new AbortController()), token = useRef(getAuthToken()), flight = useRef(false)
@@ -57,7 +57,7 @@ export function GridShareComposeDialog(props: Props) {
       if (!active() || !sameGridSource(source, attachment.source)) throw Error('币安账号或页面已变化，请重新读取')
       if (!attempted.current && Date.now() - attachment.observedAtMs > 300_000) throw Error('快照已超过五分钟，请重新读取')
       attempted.current = true
-      const result = await publishShare(props.group, publicGrid(attachment, amounts, withNote ? note : '', props.previous), control.current.signal)
+      const result = await publishShare(props.group, publicGrid(attachment, true, withNote ? note : '', props.previous), control.current.signal)
       if (active()) { rememberShare(props.owner, props.group, result.snapshot_id, attachment); props.onSent(); props.onClose() }
     } catch (reason) { if (active()) setError((reason as Error).message) }
     finally { flight.current = false; if (active()) { setBusy(false); setSending(false) } }
@@ -70,17 +70,17 @@ export function GridShareComposeDialog(props: Props) {
     <div className={styles.actions}><button type="button" disabled={busy || !available} onClick={() => void read()}>{attachment ? '重新读取' : '读取当前币安网格'}</button><button type="button" disabled={busy || !available} onClick={() => void openExchangeWebSession('binance', ownerKey).catch(() => setError('币安官网打开失败，请检查客户端'))}>打开币安官网</button></div>
     {busy && <p role="status">正在处理，请稍候…</p>}
     {selection && <GridSharePicker selection={selection} busy={busy} onSelect={id => void read(id)} />}
-    {attachment && <section className={styles.privateMetrics} aria-label="本次读取的收益，仅供自己预览">
-      <small>本人收益预览 · 公开范围由下方开关决定</small>
+    {attachment && <section className={styles.privateMetrics} aria-label="本次公开的收益">
+      <small>已公开金额与数量 · 群成员将看到以下数据</small>
       <div>{(['profit', 'unrealizedPnl'] as const).map(key => {
         const metric = (attachment.facts as Record<string, string | null>)[key]
         return <span key={key}>{key === 'profit' ? '网格利润' : '未实现盈亏'}<strong data-tone={profitTone(metric)}>{displayProfit(metric)}{metric ? ' USDT' : ''}</strong></span>
       })}</div>
     </section>}
-    {attachment && <><div className={styles.options}><label><input type="checkbox" checked={amounts} disabled={busy} onChange={e => setAmounts(e.target.checked)} />公开金额与数量</label><label><input type="checkbox" checked={withNote} disabled={busy} onChange={e => setWithNote(e.target.checked)} />附加个人说明</label>{withNote && <textarea aria-label="个人说明" maxLength={200} value={note} disabled={busy} onChange={e => setNote(e.target.value)} />}</div><div className={styles.card}><GridShareSummary grid={publicGrid(attachment, amounts)} /></div><p className={styles.notice}>仅分享此次快照。接收者无法操作你的币安账户；未读取的持仓与收益不会推算。{props.previous ? '将发送一张新卡片，旧内容保留。' : ''}</p></>}
+    {attachment && <><div className={styles.options}><label><input type="checkbox" checked={withNote} disabled={busy} onChange={e => setWithNote(e.target.checked)} />附加个人说明</label>{withNote && <textarea aria-label="个人说明" maxLength={200} value={note} disabled={busy} onChange={e => setNote(e.target.value)} />}</div><div className={styles.card}><GridShareSummary grid={publicGrid(attachment, true)} /></div><p className={styles.notice}>仅分享此次快照。接收者无法操作你的币安账户；未读取的持仓与收益不会推算。{props.previous ? '将发送一张新卡片，旧内容保留。' : ''}</p></>}
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {attachment?.positionNotice && <p role="status">{attachment.positionNotice}</p>}
-    {attachment && <details><summary>检查全部公开字段</summary><dl className={styles.rows}>{Object.keys(publicGrid(attachment, amounts).fields).map(key => <div key={key} style={{ display: 'contents' }}><dt>{labels[key]}</dt><dd>{value(publicGrid(attachment, amounts), key)}</dd></div>)}</dl></details>}
+    {attachment && <details><summary>检查全部公开字段</summary><dl className={styles.rows}>{Object.keys(publicGrid(attachment, true).fields).map(key => <div key={key} style={{ display: 'contents' }}><dt>{labels[key]}</dt><dd>{value(publicGrid(attachment, true), key)}</dd></div>)}</dl></details>}
   </SocialDialog>
 }
 export default function GridShareComposer(props: Omit<Props, 'onClose'>) {

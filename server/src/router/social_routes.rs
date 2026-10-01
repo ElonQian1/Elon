@@ -15,6 +15,7 @@ mod group_web_ai;
 mod ai_snapshots;
 mod articles;
 mod chat_records;
+mod grid_share_assets;
 mod group_management;
 mod group_members;
 mod link_previews;

@@ -38,7 +38,10 @@ class GridShareApiTest {
             val grid = GridShareModel.project(mapOf("symbol" to "TESTUSDT", "id" to "private-strategy", "investment" to "1000"), 1000)
             api.publish("group_test", grid, session); api.publish("group_test", grid, session)
             assertEquals(requests[0].getString("idempotency_key"), requests[1].getString("idempotency_key"))
-            assertFalse(requests[0].toString().contains("private-strategy")); assertFalse(requests[0].toString().contains("investment"))
+            assertFalse(requests[0].toString().contains("private-strategy"))
+            val publicGrid = requests[0].getJSONObject("document").getJSONObject("grid")
+            assertTrue(publicGrid.getBoolean("show_amounts"))
+            assertEquals("1000", publicGrid.getJSONObject("fields").getString("investment"))
             AuthManager.saveSession(context, "next-token", "other", null, "Other", null)
             assertThrows(IllegalStateException::class.java) { api.publish("group_test", grid, session) }
             assertEquals(2, requests.size)

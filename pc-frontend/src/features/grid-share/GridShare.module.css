@@ -22,6 +22,35 @@
   font-weight:650;
   font-variant-numeric:tabular-nums
 }
+.sourceLabel {
+  color:var(--mobile-warning,#f4c75e);
+  font-size:.82rem;
+}
+.profitPanel {
+  padding:.85rem;
+  border-radius:12px;
+  background:color-mix(in srgb, var(--text-primary,#f1f4f8) 5%, transparent);
+}
+.amountSummary {
+  display:grid;
+  gap:.4rem;
+  margin:0;
+  font-size:.82rem;
+}
+.amountSummary > div {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:.6rem;
+}
+.amountSummary dt {
+  color:var(--text-secondary,#aeb6c4);
+}
+.amountSummary dd {
+  margin:0;
+  text-align:right;
+  overflow-wrap:anywhere;
+  font-variant-numeric:tabular-nums;
+}
 .tags {
   display:flex;
   flex-wrap:wrap;

@@ -60,10 +60,9 @@ internal class GridShareFeature(private val activity: AppCompatActivity, http: O
                     check(rows.any { it["id"] == id }) { "原网格已不在运行列表，无法更新" }
                     detail(target, previous, id, source, run, session)
                 } else {
-                    dialog = AlertDialog.Builder(activity).setTitle("选择要分享的网格")
-                        .setItems(rows.map { "${it["symbol"]} · ${it["direction"]} · ${it["count"] ?: "?"} 格" }.toTypedArray()) { _, index ->
-                            job = activity.lifecycleScope.launch { detail(target, null, rows[index]["id"]!!, source, run, session) }
-                        }.setNegativeButton("取消", null).show()
+                    dialog = GridSharePicker.show(activity, rows) { row ->
+                        job = activity.lifecycleScope.launch { detail(target, null, row["id"]!!, source, run, session) }
+                    }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { if (active(run, session)) { dialog?.dismiss(); toast(failure.message ?: "读取失败，请重试") } }
@@ -114,9 +113,9 @@ internal class GridShareFeature(private val activity: AppCompatActivity, http: O
     private fun show(target: String, id: String, message: ChatMessage, original: String) {
         close(); val run = epoch; val session = socialSession(activity)
         val ui = GridShareViews(activity); val body = ui.column().apply { addView(ui.text("正在读取…")) }
-        dialog = AlertDialog.Builder(activity).setTitle("网格快照详情")
+        dialog = AlertDialog.Builder(activity).setCustomTitle(ui.dialogTitle("网格快照详情"))
             .setView(ScrollView(activity).apply { addView(body) }).setNegativeButton("关闭", null).create()
-        dialog!!.setOnDismissListener { if (run == epoch) { epoch++; job?.cancel() } }; dialog!!.show()
+        dialog!!.setOnDismissListener { if (run == epoch) { epoch++; job?.cancel() } }; dialog!!.show(); ui.styleDialog(dialog!!)
         job = activity.lifecycleScope.launch {
             try {
                 val view = withContext(Dispatchers.IO) { api.request(target, id, session = session) }

@@ -6,13 +6,16 @@ const moduleValue = { exports: {} }
 vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: moduleValue.exports, module: moduleValue })
 const m = moduleValue.exports
 const snapshot = { observedAtMs: 1000, source: { account: 'private-account', document: 'private-proof' }, facts: { id: '123', symbol: 'TESTUSDT', account: 'private-account', cookie: 'secret', lower: '0.1', upper: '0.2', direction: 'SHORT', leverage: '4', count: '60', profit: '1.2300', investment: '1000', perGridQty: '4' } }
-test('default public payload omits quantities, money, session proof and private strategy IDs', () => {
-  const grid = m.publicGrid(snapshot)
+test('legacy hidden projection omits quantities, money, session proof and private strategy IDs', () => {
+  const grid = m.publicGrid(snapshot, false)
   for (const key of ['id', 'account', 'cookie', 'investment', 'profit', 'perGridQty']) assert.equal(key in grid.fields, false)
   assert.equal(grid.note, undefined); assert.equal(m.value(grid, 'profit'), '未公开'); assert.equal(m.value(grid, 'markPrice'), '未读取')
   assert.equal(JSON.stringify(grid).includes('private-'), false)
 })
-test('explicit public amounts retain precision and canonical cross-platform container', () => {
+test('default public amounts retain precision and canonical cross-platform container', () => {
+  const current = m.publicGrid(snapshot)
+  assert.equal(current.show_amounts, true); assert.equal(current.fields.investment, '1000'); assert.equal(current.fields.perGridQty, '4')
+  assert.equal(current.fields.profit, '1.2300'); assert.equal(JSON.stringify(current).includes('private-'), false); assert.equal(current.fields.cookie, undefined)
   const grid = m.publicGrid(snapshot, true, '', 'ai_snapshot_first'), doc = m.shareDocument(grid)
   assert.equal(grid.fields.profit, '1.2300'); assert.equal(grid.fields.positionQty, undefined)
   assert.equal(doc.summary, '做空 · 4× · 0.1–0.2 · 60 格 · 历史快照')

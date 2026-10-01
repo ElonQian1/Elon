@@ -21,7 +21,7 @@ internal object GridShareModel {
         "收益" to listOf("roi", "totalPnl", "profit", "matchedPnl", "unrealizedPnl", "fundingFee", "fee", "matchedCount"),
         "参数" to listOf("direction", "leverage", "lower", "upper", "count", "spacing", "investment", "initialNotional", "perGridQty", "perGridQuoteQty", "orderCurrency", "stopUpper", "stopLower"))
 
-    fun project(row: Map<String, String?>, observed: Long, showAmounts: Boolean = false, note: String = "", previous: String? = null): JSONObject {
+    fun project(row: Map<String, String?>, observed: Long, showAmounts: Boolean = true, note: String = "", previous: String? = null): JSONObject {
         require(row["symbol"] != null)
         val fields = JSONObject()
         labels.keys.filter { showAmounts || it !in amounts }.forEach { key -> row[key]?.let { fields.put(key, it) } }

@@ -24,7 +24,7 @@ export function shareDocument(grid: GridShare) {
   return { schema: SHARE_SCHEMA, provider: 'binance', title: `${get('symbol')} 网格快照`,
     summary: `${value(grid, 'direction') === '未读取' ? '方向未读取' : value(grid, 'direction')} · ${get('leverage')}× · ${get('lower')}–${get('upper')} · ${get('count')} 格 · 历史快照`, messages: [], grid }
 }
-export function publicGrid(attachment: GridAttachment, showAmounts = false, note = '', previous?: string): GridShare {
+export function publicGrid(attachment: GridAttachment, showAmounts = true, note = '', previous?: string): GridShare {
   const facts = attachment.facts as unknown as Record<string, string | null>
   const fields = Object.fromEntries(Object.keys(labels).filter(k => (showAmounts || !amountKeys.includes(k as typeof amountKeys[number])) && typeof facts[k] === 'string').map(k => [k, facts[k]!]))
   return { schema: 'yilong.grid_share.v1', observed_at_ms: attachment.observedAtMs, show_amounts: showAmounts, fields,

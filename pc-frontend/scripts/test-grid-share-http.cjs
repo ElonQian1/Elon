@@ -63,7 +63,7 @@ test('sending and retry use the original SHA-256 document key and reject mismatc
   await api.publishShare('group_test', grid, new AbortController().signal)
   assert.equal(bodies[0].idempotency_key, bodies[1].idempotency_key)
   assert.equal(bodies[0].idempotency_key, createHash('sha256').update(JSON.stringify(bodies[0].document)).digest('hex'))
-  assert.equal(bodies[0].document.grid.fields.profit, undefined); assert.equal(bodies[0].document.grid.fields.id, undefined)
+  assert.equal(bodies[0].document.grid.show_amounts, true); assert.equal(bodies[0].document.grid.fields.profit, '999'); assert.equal(bodies[0].document.grid.fields.id, undefined)
   await api.publishShare('group_test', { ...grid, observed_at_ms: grid.observed_at_ms + 1 }, new AbortController().signal)
   assert.notEqual(bodies[0].idempotency_key, bodies[2].idempotency_key)
   wrongReceipt = true
