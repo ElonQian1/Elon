@@ -28,6 +28,14 @@ internal fun filterGroupMentions(items: List<GroupMentionTarget>, query: String)
 
 internal class GroupMentionDirectory(private val context: Context, private val http: OkHttpClient, private val serverUrl: String) {
     fun load(groupId: String, selfId: String, done: (Result<List<GroupMentionTarget>>) -> Unit): Call {
+        return loadDirectory(groupId, selfId, true, done)
+    }
+
+    fun loadMembers(groupId: String, done: (Result<List<GroupMentionTarget>>) -> Unit): Call {
+        return loadDirectory(groupId, null, false, done)
+    }
+
+    private fun loadDirectory(groupId: String, selfId: String?, includeAi: Boolean, done: (Result<List<GroupMentionTarget>>) -> Unit): Call {
         val id = URLEncoder.encode(groupId, "UTF-8")
         val request = AuthManager.applyAuth(context, Request.Builder()
             .url("$serverUrl/api/me/groups/$id/members").get()).build()
@@ -39,8 +47,8 @@ internal class GroupMentionDirectory(private val context: Context, private val h
                         response.use {
                             val json = JSONObject(it.body?.string().orEmpty())
                             check(it.isSuccessful) { json.optString("error", "加载群成员失败") }
-                            val people = parse(json.optJSONArray("members"), false).filter { member -> member.id != selfId }
-                            val ai = parse(json.optJSONArray("ai_members"), true)
+                            val people = parse(json.getJSONArray("members"), false).filter { member -> member.id != selfId }
+                            val ai = if (includeAi) parse(json.optJSONArray("ai_members"), true) else emptyList()
                             val collator = Collator.getInstance(Locale.CHINA)
                             (ai + people.sortedWith { a, b -> collator.compare(a.name, b.name) }).distinctBy { member -> member.id }
                         }

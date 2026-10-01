@@ -26,6 +26,7 @@ import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 
 internal class MainChatSettingsActions(
     private val activity: AppCompatActivity,
+    private val memberDirectory: GroupMentionDirectory,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val clearFriendMessages: () -> Unit,
@@ -79,6 +80,9 @@ internal class MainChatSettingsActions(
             addView(groupMemberStrip(group) {
                 onAddGroupMember?.invoke(group) { dismissWithAnimation(dialog) }
                     ?: toast("添加群成员准备中")
+            })
+            addView(actionRow("查看全部群成员", "打开完整成员名单") {
+                GroupMembersDialog(activity, memberDirectory).show(group.id)
             })
             addView(sectionSpacer())
             addView(actionRow("群聊名称", group.name) {

@@ -600,7 +600,7 @@ class MainActivity : AppCompatActivity() {
 
     private val chatSettingsActions: MainChatSettingsActions by lazy {
         MainChatSettingsActions(
-            activity = this,
+            activity = this, memberDirectory = GroupMentionDirectory(this, s.http, serverUrl),
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             clearFriendMessages = { friendChatActions.clearCurrentMessages() },
