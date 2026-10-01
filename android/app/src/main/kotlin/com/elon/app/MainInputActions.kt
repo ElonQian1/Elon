@@ -469,7 +469,8 @@ internal class MainInputActions(
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions.applyVoiceMode() },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
-            refreshPendingAttachmentPreview = ::refreshPendingAttachmentPreview
+            refreshPendingAttachmentPreview = ::refreshPendingAttachmentPreview,
+            maxAttachmentBytes = { if (isSocialAiChatActive()) 12 * 1024 * 1024 else MAX_ATTACHMENT_BYTES }
         )
     }
 

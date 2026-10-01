@@ -12,6 +12,7 @@ internal object ChatGptWebAcceptanceMediaFixture {
     fun write(spec: ChatGptWebAcceptanceAttachmentFixture.Spec, target: File) {
         when (spec.name) {
             ChatGptWebAcceptanceAttachmentFixture.IMAGE_NAME -> writeImage(target)
+            ChatGptWebAcceptanceAttachmentFixture.IMAGE_FIDELITY_NAME -> writeFidelityImage(target)
             ChatGptWebAcceptanceAttachmentFixture.PDF_NAME -> writePdf(target)
             else -> error("Unknown media fixture")
         }
@@ -44,5 +45,19 @@ internal object ChatGptWebAcceptanceMediaFixture {
         } finally {
             document.close()
         }
+    }
+
+    private fun writeFidelityImage(target: File) {
+        val bitmap = Bitmap.createBitmap(1080, 6000, Bitmap.Config.ARGB_8888)
+        try {
+            val canvas = Canvas(bitmap)
+            canvas.drawColor(Color.WHITE)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; textSize = 24f }
+            for (top in 0 until 6000 step 300) {
+                canvas.drawText("IMAGE FIDELITY 1080 x 6000 / ROW $top", 32f, top + 60f, paint)
+                for (x in 32..1048 step 4) canvas.drawRect(x.toFloat(), top + 100f, x + 1f, top + 180f, paint)
+            }
+            target.outputStream().use { require(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        } finally { bitmap.recycle() }
     }
 }

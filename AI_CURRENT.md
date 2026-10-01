@@ -8,6 +8,8 @@ reviewed_at: 2026-09-05
 
 ## 当前产品主链
 
+- APK 群聊图片保真、原图缩放与缓存机制见[模块说明](docs/android-chat-image-fidelity.md)。
+
 - 主 APK 1.1.1831 已修复群友/AI 消息低对比度、底部重叠与输入区主题，小米已更新、荣耀离线。群聊离线 12 场景通过，真机视觉待复核，见[交付记录](docs/reports/group-chat-readability-20260929.md)。两 APK 全面验收及量化 PR #214、Rust/发布装机仍未完成，见[上一批边界](docs/reports/mobile-design-v2-web-fixtures-20260929.md)。
 
 - [Win WebView AI 接管](docs/reports/win-webview-ai-takeover-20260923.md)：研究宿主挂交易所登录窗口、Binance 只读观察器、`export`/开发门控 `evaluate` 已合入，待现场验收；合同见 `docs/win-browser-research-mcp.md`。

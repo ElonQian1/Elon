@@ -11,7 +11,8 @@ internal class MainPendingAttachmentActions(
     private val setVoiceMode: (Boolean) -> Unit,
     private val applyVoiceMode: () -> Unit,
     private val inputComposerMotion: () -> InputComposerMotion?,
-    private val refreshPendingAttachmentPreview: () -> Unit
+    private val refreshPendingAttachmentPreview: () -> Unit,
+    private val maxAttachmentBytes: () -> Int = { MAX_ATTACHMENT_BYTES }
 ) {
     fun attachPickedFile(kind: String, uri: Uri, fallbackName: String? = null) {
         val attachment = preparePickedAttachment(kind, uri, fallbackName) ?: return
@@ -30,7 +31,7 @@ internal class MainPendingAttachmentActions(
         }
         val name = fallbackName ?: displayNameForUri(activity, uri) ?: uri.lastPathSegment ?: kind
         return runCatching {
-            copyAttachmentToCache(activity, kind, uri, name, attachmentIndex)
+            copyAttachmentToCache(activity, kind, uri, name, attachmentIndex, maxAttachmentBytes())
         }.onFailure {
             Toast.makeText(activity, "附件读取失败，请重新选择", Toast.LENGTH_SHORT).show()
         }.getOrNull()
@@ -79,7 +80,10 @@ internal class MainPendingAttachmentActions(
             }
         }
         refreshPendingAttachmentPreview()
-        Toast.makeText(activity, "已添加 ${accepted.size} 个附件", Toast.LENGTH_SHORT).show()
+        val compressed = accepted.count { it.displayLabel == "图片（已压缩）" }
+        val limitMb = maxAttachmentBytes() / (1024 * 1024)
+        val notice = if (compressed > 0) "，其中 $compressed 张原图超过 $limitMb MB，已压缩" else ""
+        Toast.makeText(activity, "已添加 ${accepted.size} 个附件$notice", Toast.LENGTH_SHORT).show()
     }
 
     fun clearPendingAttachments(deleteFiles: Boolean = true) {

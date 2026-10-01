@@ -27,51 +27,60 @@ internal fun copyAttachmentToCache(
     displayLabel: String,
     uri: Uri,
     displayName: String,
-    attachmentIndex: Int
+    attachmentIndex: Int,
+    maxBytes: Int = MAX_ATTACHMENT_BYTES
 ): PendingAttachment {
+    require(maxBytes in 1..ChatImageDiskCache.MAX_IMAGE_BYTES)
     val mimeType = (context.contentResolver.getType(uri) ?: guessMimeType(displayName))
         .lowercase(Locale.CHINA)
-    if (isStaticPhotoAttachment(mimeType)) {
-        return normalizePhotoAttachmentToCache(
-            context,
-            displayLabel,
-            uri,
-            displayName,
-            attachmentIndex,
-            mimeType
-        )
-    }
-
     val extension = extensionForAttachment(displayName, mimeType)
-    val fileName = "attachment_${System.currentTimeMillis()}_$attachmentIndex.$extension"
     val attachmentDir = File(context.cacheDir, "pending_attachments").apply { mkdirs() }
-    val target = File(attachmentDir, fileName)
+    val target = File.createTempFile("attachment_${attachmentIndex}_", ".$extension", attachmentDir)
     var total = 0L
-    context.contentResolver.openInputStream(uri).use { input ->
-        requireNotNull(input) { "Cannot open selected file" }
-        target.outputStream().use { output ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val read = input.read(buffer)
-                if (read <= 0) break
-                total += read
-                if (total > MAX_ATTACHMENT_BYTES) {
-                    target.delete()
-                    throw IllegalArgumentException("Attachment too large")
+    try {
+        context.contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "Cannot open selected file" }
+            target.outputStream().use { output ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    total += read
+                    if (total > maxBytes) throw AttachmentSizeLimitException()
+                    output.write(buffer, 0, read)
                 }
-                output.write(buffer, 0, read)
             }
+        }
+        require(total > 0) { "Empty attachment" }
+    } catch (error: Exception) {
+        target.delete()
+        if (error is AttachmentSizeLimitException && isStaticPhotoAttachment(mimeType)) {
+            return normalizePhotoAttachmentToCache(context, "图片（已压缩）", uri, displayName, attachmentIndex, mimeType, maxBytes)
+        }
+        throw error
+    }
+    // The upload retains the encoded original, including PNG text edges and JPEG/EXIF metadata.
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    if (mimeType.startsWith("image/")) {
+        BitmapFactory.decodeFile(target.path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            target.delete()
+            throw IllegalArgumentException("Cannot decode selected photo")
         }
     }
     return PendingAttachment(
         kind = normalizedAttachmentKind(mimeType),
         displayLabel = displayLabel,
         displayName = displayName,
-        fileName = fileName,
+        fileName = target.name,
         mimeType = mimeType,
-        file = target
+        file = target,
+        imageWidth = bounds.outWidth.takeIf { it > 0 },
+        imageHeight = bounds.outHeight.takeIf { it > 0 }
     )
 }
+
+private class AttachmentSizeLimitException : IllegalArgumentException("Attachment too large")
 
 private fun isStaticPhotoAttachment(mimeType: String): Boolean {
     return mimeType in setOf("image/jpeg", "image/png", "image/webp")
@@ -83,7 +92,8 @@ private fun normalizePhotoAttachmentToCache(
     uri: Uri,
     displayName: String,
     attachmentIndex: Int,
-    sourceMimeType: String
+    sourceMimeType: String,
+    maxBytes: Int
 ): PendingAttachment {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     context.contentResolver.openInputStream(uri).use { input ->
@@ -100,12 +110,13 @@ private fun normalizePhotoAttachmentToCache(
         BitmapFactory.decodeStream(input, null, decodeOptions)
     } ?: throw IllegalArgumentException("Cannot decode selected photo")
 
-    val normalized = normalizedPhotoBytes(bitmap, sourceMimeType)
+    val normalized = try { normalizedPhotoBytes(bitmap, sourceMimeType, maxBytes) }
+        catch (error: Exception) { bitmap.recycle(); throw error }
     val finalBytes = normalized.bytes
     val width = bitmap.width
     val height = bitmap.height
     bitmap.recycle()
-    require(finalBytes.size <= MAX_ATTACHMENT_BYTES) { "Compressed photo is still too large" }
+    require(finalBytes.size <= maxBytes) { "Compressed photo is still too large" }
 
     val safeName = displayName.substringBeforeLast('.', displayName).ifBlank { "photo" }
     val attachmentDir = File(context.cacheDir, "pending_attachments").apply { mkdirs() }
@@ -130,11 +141,11 @@ private data class NormalizedPhotoBytes(
     val extension: String
 )
 
-private fun normalizedPhotoBytes(bitmap: Bitmap, sourceMimeType: String): NormalizedPhotoBytes {
+private fun normalizedPhotoBytes(bitmap: Bitmap, sourceMimeType: String, maxBytes: Int): NormalizedPhotoBytes {
     val pngBytes = if (sourceMimeType == "image/png") {
         ByteArrayOutputStream().use { output ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
-            output.toByteArray().takeIf { it.size <= MAX_ATTACHMENT_BYTES }
+            output.toByteArray().takeIf { it.size <= maxBytes }
         }
     } else {
         null
@@ -147,7 +158,7 @@ private fun normalizedPhotoBytes(bitmap: Bitmap, sourceMimeType: String): Normal
     for (quality in PHOTO_COMPRESS_QUALITIES) {
         bytes.reset()
         bitmap.compress(Bitmap.CompressFormat.JPEG, quality, bytes)
-        if (bytes.size() <= MAX_ATTACHMENT_BYTES) {
+        if (bytes.size() <= maxBytes) {
             return NormalizedPhotoBytes(bytes.toByteArray(), "image/jpeg", "jpg")
         }
     }

@@ -40,6 +40,7 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
     private val annotationBubbleRenderer = ChatImageAnnotationBubbleRenderer(context)
 
     private var imageWidth = 0
+    var imageRectProvider: (() -> RectF?)? = null
     private var imageHeight = 0
     private var annotations: List<ChatImageAnnotation> = emptyList()
     private var pressedIndex: Int? = null
@@ -197,6 +198,7 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
     }
 
     private fun displayedImageRect(): RectF? {
+        imageRectProvider?.let { return it() }
         if (imageWidth <= 0 || imageHeight <= 0 || width <= 0 || height <= 0) return null
         val scale = min(width / imageWidth.toFloat(), height / imageHeight.toFloat())
         val drawnWidth = imageWidth * scale

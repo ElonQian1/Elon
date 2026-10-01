@@ -407,7 +407,7 @@ internal object ChatImagePreviewLoader {
         val appContext = context.applicationContext
         IO.execute {
             val bitmap = runCatching { loadBitmap(appContext, source, maxPixels) }
-                .onFailure { ChatImageDiskCache.remove(appContext, source) }
+                .onFailure { if (it !is OutOfMemoryError) ChatImageDiskCache.remove(appContext, source) }
                 .getOrNull() ?: return@execute
             cache.put(cacheKey, bitmap)
             onReady(bitmap)
@@ -434,7 +434,7 @@ internal object ChatImagePreviewLoader {
     private fun thumbnailSampleSize(width: Int, height: Int, maxPixels: Int): Int {
         if (width <= 0 || height <= 0) return 1
         var sample = 1
-        while ((width / sample) * (height / sample) > maxPixels) {
+        while ((width / sample).toLong() * (height / sample) > maxPixels) {
             sample *= 2
         }
         return sample

@@ -9,17 +9,21 @@ internal object ChatGptWebAcceptanceAttachmentFixture {
     const val MEDIA_BATCH_ID = "fixed_media_batch_v1"
     const val IMAGE_NAME = "elon-chatgpt-media-fixture-v1.png"
     const val PDF_NAME = "elon-chatgpt-media-fixture-v1.pdf"
-    val supportedIds = setOf(ID, MEDIA_BATCH_ID)
+    const val IMAGE_FIDELITY_ID = "fixed_image_fidelity_v1"
+    const val IMAGE_FIDELITY_NAME = "elon-image-fidelity-v1.png"
+    val supportedIds = setOf(ID, MEDIA_BATCH_ID, IMAGE_FIDELITY_ID)
 
     internal data class Spec(val name: String, val mime: String, val label: String)
     private val text = Spec(FILE_NAME, MIME_TYPE, "测试文档")
     private val media = listOf(text, Spec(IMAGE_NAME, "image/png", "测试图片"),
         Spec(PDF_NAME, "application/pdf", "测试PDF"))
+    private val fidelity = Spec(IMAGE_FIDELITY_NAME, "image/png", "清晰度验收图片")
 
     fun supports(id: String): Boolean = id in supportedIds
     private fun specs(id: String): List<Spec> = when (id) {
         ID -> listOf(text)
         MEDIA_BATCH_ID -> media
+        IMAGE_FIDELITY_ID -> listOf(fidelity)
         else -> error("Unknown acceptance fixture")
     }
 
@@ -68,13 +72,13 @@ internal object ChatGptWebAcceptanceAttachmentFixture {
             fileName = spec.name,
             mimeType = spec.mime,
             file = target,
-            imageWidth = if (spec.mime == "image/png") 512 else null,
-            imageHeight = if (spec.mime == "image/png") 384 else null,
+            imageWidth = if (spec == fidelity) 1080 else if (spec.mime == "image/png") 512 else null,
+            imageHeight = if (spec == fidelity) 6000 else if (spec.mime == "image/png") 384 else null,
         )
     }
 
     fun matches(cacheDir: File, attachment: PendingAttachment): Boolean =
-        media.any { it.name == attachment.fileName && it.mime == attachment.mimeType } &&
+        (media + fidelity).any { it.name == attachment.fileName && it.mime == attachment.mimeType } &&
             runCatching {
                 attachment.file.canonicalFile == File(fixtureDirectory(cacheDir), attachment.fileName).canonicalFile
             }.getOrDefault(false)
