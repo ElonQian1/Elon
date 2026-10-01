@@ -34,7 +34,18 @@ impl Store {
                     content,
                     &mut Vec::new(),
                 )?;
-                let expanded = record.as_ref().map(serde_json::to_string).transpose()?;
+                let grid = crate::store::articles::snapshots::grid_versions::ai_context(
+                    &tx,
+                    user,
+                    group,
+                    source["id"].as_str().unwrap_or(""),
+                    content,
+                )?;
+                let expanded = grid
+                    .as_ref()
+                    .or(record.as_ref())
+                    .map(serde_json::to_string)
+                    .transpose()?;
                 let mut text = format!(
                     "{}:\n{}",
                     source["sender_name"].as_str().unwrap_or("群成员"),

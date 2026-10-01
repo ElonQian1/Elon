@@ -1,4 +1,5 @@
 import type { SocialAttachment, SocialMessage } from '../socialMessageTypes'
+import { gridCard } from '../../grid-share/gridShareModel'
 
 export interface SocialQuote {
   message_id: string
@@ -30,6 +31,8 @@ export function quoteFromMessage(message: SocialMessage, author: string): Social
 export function quoteSummary(quote: SocialQuote): string {
   if (quote.unavailable) return '原消息已撤回或不可用'
   let text = splitSocialQuote({ content: quote.content }).body.trim()
+  const grid = gridCard(text)
+  if (grid) return `[网格快照] ${grid.title} · ${new Date(grid.grid.observed_at_ms).toLocaleString()}`
   if (/^【一龙(?:聊天记录|.*卡片)】/.test(text)) {
     const start = text.indexOf('{')
     try { const card = JSON.parse(text.slice(start)); text = `[聊天记录] ${card.title || card.name || '聊天记录'}` } catch { text = '[聊天记录]' }

@@ -76,6 +76,16 @@ fn prompt(
     rows.sort_by_key(|row| row.0);
     let mut files = Vec::new();
     for row in &mut rows {
+        if let Some(grid) = crate::store::articles::snapshots::grid_versions::ai_context(
+            conn,
+            user,
+            group,
+            &row.1,
+            row.3["text"].as_str().unwrap_or(""),
+        )? {
+            row.3["text"] = serde_json::json!("[公开网格历史快照，正文见 grid_snapshot]");
+            row.3["grid_snapshot"] = grid;
+        }
         let start = files.len();
         super::attachments::append(&mut files, &row.1, &row.3["attachments"])?;
         if let Some(record) = crate::store::articles::chat_records::ai_context::expand(
@@ -142,6 +152,9 @@ pub(crate) fn validate_sources(
             "SELECT content FROM friend_group_messages WHERE id=?1",
             [&id],
             |r| r.get(0),
+        )?;
+        crate::store::articles::snapshots::grid_versions::ai_context(
+            conn, user, group, &id, &content,
         )?;
         crate::store::articles::chat_records::ai_context::expand(
             conn,

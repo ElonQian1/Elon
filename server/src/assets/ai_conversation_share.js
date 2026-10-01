@@ -89,6 +89,7 @@
     cards.forEach((entry, bubble) => { if (!bubble.isConnected) { entry.dispose(); cards.delete(bubble); } });
   }
   function mount(bubble, message, options) {
+    if (root.ElonGridShare?.mount(bubble, message, options)) return true;
     const ref = reference(message.content, options.groupId);
     if (!ref || message.recalled_at || message.recalledAt) return false;
     prune(); cards.get(bubble)?.dispose();
@@ -131,6 +132,7 @@
     return true;
   }
   function reset() {
+    root.ElonGridShare?.close();
     root.ElonAiConversationReader?.close(); cards.forEach(entry => entry.dispose()); cards.clear();
   }
   root.ElonAiConversationShare = { reference, mount, prune, reset, path, read, mediaScope, errorText, denied, invalidate };

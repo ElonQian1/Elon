@@ -9,11 +9,13 @@ import { startGroupAi } from './groupAiStore'
 import type { GroupAiInput } from './groupAiTask'
 import styles from './GroupAi.module.css'
 import { recordCard } from '../chat-records/recordApi'
+import { gridCard } from '../../grid-share/gridShareModel'
 
 interface Props { owner: string; group: string; title: string; messages: SocialMessage[]; onClose: () => void }
 
 export default function GroupAiSelectionDialog(props: Props) {
   const hasRecords = props.messages.some(m => recordCard(m.content))
+  const hasGrids = props.messages.some(m => gridCard(m.content))
   const [question, setQuestion] = useState('请结合所选消息，分析并回答。')
   const [provider, setProvider] = useState<GroupAiInput['provider']>('chatgpt')
   const [error, setError] = useState('')
@@ -44,6 +46,7 @@ export default function GroupAiSelectionDialog(props: Props) {
     </button>
   </>}>
     <p className={styles.destination}>发送到：<strong>{props.title}</strong></p>
+    {hasGrids && <p className={styles.warning}>只分析已公开的网格历史快照；不会读取分享者的币安账户，也不会获得未公开的金额和数量。</p>}
     <label>回答来源<select value={provider} onChange={event => setProvider(event.target.value as GroupAiInput['provider'])}>
       <option value="chatgpt">ChatGPT</option><option value="google-ai-mode">Google AI 模式</option>
     </select></label>

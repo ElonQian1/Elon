@@ -60,6 +60,21 @@ mod store {
         }
         pub mod snapshots {
             pub(crate) use crate::snapshot_privacy::validate_text as validate_shared_text;
+            pub mod grid_versions {
+                pub fn ai_context(
+                    _: &rusqlite::Connection,
+                    _: &str,
+                    _: &str,
+                    _: &str,
+                    content: &str,
+                ) -> anyhow::Result<Option<serde_json::Value>> {
+                    anyhow::ensure!(
+                        !content.starts_with("【一龙AI对话】"),
+                        "grid snapshots require the full store tests"
+                    );
+                    Ok(None)
+                }
+            }
         }
     }
     pub struct FriendGroupMessage {

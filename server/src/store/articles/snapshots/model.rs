@@ -12,6 +12,8 @@ pub(crate) struct SnapshotDocument {
     #[serde(default)]
     pub cover_asset_id: Option<String>,
     pub messages: Vec<SnapshotMessage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grid: Option<super::grid::GridShare>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -61,6 +63,7 @@ pub(crate) struct SnapshotView {
     pub owner_name: String,
     pub created_at: String,
     pub document: SnapshotDocument,
+    pub latest_snapshot_id: Option<String>,
 }
 #[derive(Serialize)]
 pub(crate) struct SnapshotCreated {
@@ -83,6 +86,8 @@ pub(crate) struct SnapshotCard {
     pub cover_asset_id: Option<String>,
     pub provider: String,
     pub message_count: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grid: Option<super::grid::GridShare>,
 }
 #[derive(Serialize)]
 pub(crate) struct SnapshotAsset {
@@ -113,6 +118,19 @@ pub(super) fn text(value: &str, max: usize) -> Result<()> {
 
 impl SnapshotDocument {
     pub(super) fn validate(&self) -> Result<String> {
+        if let Some(grid) = &self.grid {
+            grid.validate()?;
+            if self.schema != SCHEMA
+                || self.provider != "binance"
+                || !self.messages.is_empty()
+                || self.cover_asset_id.is_some()
+                || self.title != grid.title()
+                || self.summary != grid.summary()
+            {
+                return Err(fail(400, "Invalid grid snapshot container"));
+            }
+            return Ok(serde_json::to_string(self)?);
+        }
         if self.schema != SCHEMA
             || self.provider != "chatgpt"
             || self.title.trim().is_empty()

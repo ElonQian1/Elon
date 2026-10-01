@@ -27,6 +27,8 @@ import SocialConversationTools from './SocialConversationTools'
 import GroupAiSelectionDialog from './group-ai/GroupAiSelectionDialog'
 import GroupAiStatus from './group-ai/GroupAiStatus'
 import GroupAiReplyContext from './group-ai/GroupAiReplyContext'
+import GridShareMessage from '../grid-share/GridShareMessage'
+import { gridCard } from '../grid-share/gridShareModel'
 import { readSocialPosition, saveSocialPosition } from './socialReadPosition'
 import styles from './FriendsPage.module.css'
 import tools from './SocialTools.module.css'
@@ -37,8 +39,8 @@ interface Props {
   input: string; setInput: Dispatch<SetStateAction<string>>; targets: SocialTarget[]
   loading: boolean; error: string; retry: () => void; onSent: () => void
 }
-const specialMessage = (m: SocialMessage) => !!recordCard(m.content) || !!articleReference(m.content) || m.content.startsWith('【一龙项目卡片】')
-const selectable = (m: SocialMessage) => !isPending(m) && !isRecalled(m) && (!specialMessage(m) || !!recordCard(m.content))
+const specialMessage = (m: SocialMessage) => !!gridCard(m.content) || !!recordCard(m.content) || !!articleReference(m.content) || m.content.startsWith('【一龙项目卡片】')
+const selectable = (m: SocialMessage) => !isPending(m) && !isRecalled(m) && (!specialMessage(m) || !!gridCard(m.content) || !!recordCard(m.content))
 
 export default function SocialConversation(props: Props) {
   const { conversation, title, me, messages, setMessages, input, setInput } = props
@@ -118,7 +120,7 @@ export default function SocialConversation(props: Props) {
           <div className={styles.avatar}><SocialAvatar userId={m.sender_user_id} name={name} avatar={avatar} /></div>
           <div className={styles.msgBody} data-social-content>
             <div className={styles.msgMeta}><strong>{name}</strong><span>{formatTime(m.created_at)}</span></div>
-            {content && (recordCard(content) && conversation.kind === 'group' && !m.ai_reply ? <ChatRecordMessage content={content} group={conversation.id} onAnalyze={!selectionMode && !recalled && !isPending(m) ? () => setAiSelection([m]) : undefined} /> : articleReference(content) && !m.ai_reply ? <ArticleMessage content={content} /> : <div id={copyId} className={styles.msgContent} hidden={compactLink}>
+            {content && (gridCard(content) && conversation.kind === 'group' && !recalled ? <GridShareMessage key={m.id} content={content} group={conversation.id} owner={me.id} title={title} onQuote={() => setQuote({ conversation: key, message: m, author: name, nonce: Date.now() })} onAnalyze={() => setAiSelection([m])} onSent={props.onSent} /> : recordCard(content) && conversation.kind === 'group' && !m.ai_reply ? <ChatRecordMessage content={content} group={conversation.id} onAnalyze={!selectionMode && !recalled && !isPending(m) ? () => setAiSelection([m]) : undefined} /> : articleReference(content) && !m.ai_reply ? <ArticleMessage content={content} /> : <div id={copyId} className={styles.msgContent} hidden={compactLink}>
               {(!own || content.startsWith('>')) && /[#*`\[\]>|]/.test(content) ? <MarkdownContent content={content} copy={false} /> : content}
               {!recalled && m.ai_reply && conversation.kind === 'group' && <GroupAiReplyContext owner={me.id} group={conversation.id} message={m.id} metadata={m.ai_reply} part="footer" />}
             </div>)}

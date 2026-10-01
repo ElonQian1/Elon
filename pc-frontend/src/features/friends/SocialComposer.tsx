@@ -8,6 +8,7 @@ import { quoteFromMessage } from './quotes/socialQuote'
 import { useSocialAttachments } from './useSocialAttachments'
 import { socialLocalId } from './socialLocalId'
 import SocialDialog from './SocialDialog'
+import GridShareComposer from '../grid-share/GridShareComposer'
 import styles from './SocialTools.module.css'
 import pageStyles from './FriendsPage.module.css'
 
@@ -96,6 +97,7 @@ export default function SocialComposer({ conversation, title, me, input, setInpu
       <input ref={chooser} type="file" multiple hidden aria-label="选择聊天附件" onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ''; addFiles(files) }} />
       <button type="button" disabled={sending} onClick={() => chooser.current?.click()}>图片 / 文件 / 语音</button>
       {conversation.kind === 'group' && <button type="button" onClick={() => void loadMembers()}>@ 群成员</button>}
+      {conversation.kind === 'group' && <GridShareComposer owner={me.id} group={conversation.id} title={title} onSent={onSent} />}
       <span className={styles.hint}>可粘贴图片或拖入文件 · 每个最多 12 MB</span>
     </div>
     {files.length > 0 && <div className={styles.status}>{files.map(file => <div className={styles.attachment} key={file.id}>

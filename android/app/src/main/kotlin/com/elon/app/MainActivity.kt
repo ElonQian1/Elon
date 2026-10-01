@@ -1472,7 +1472,7 @@ class MainActivity : AppCompatActivity() {
             isAiChat = { socialAiChatFeature.isChatModeActive() }, currentMessages = { chatAdapter.currentMessagesForSharing() }, streaming = { socialAiChatFeature.webChatStreaming() },
             nativeChat = { socialAiChatFeature }, input = binding.inputEdit,
             sourceGroup = { groupChatActions.currentGroup() }, openGroup = { friendChatActions.closeFriendChat(); projectSpaceController.closeChannelChat(); groupChatActions.openGroup(it, true, restorePosition = true); syncVisibleChatNotificationState() },
-            groupId = { groupChatActions.currentGroup()?.id },
+            groupId = { groupChatActions.currentGroup()?.id }, quoteGrid = { groupChatActions.quoteMessage(it) }, analyzeGrid = { groupChatActions.analyzeSelectedMessages(listOf(it)) {} },
             onPublished = { groupActions.loadGroups(); groupChatActions.currentGroup()?.id?.let(groupChatActions::handleRealtimeMessage) })
     }
 

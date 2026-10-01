@@ -3,6 +3,10 @@ use super::{fail, member};
 use crate::store::{new_id, now, FriendGroupMessage, Store};
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
+mod grid;
+#[cfg(test)]
+mod grid_tests;
+pub(crate) mod grid_versions;
 mod media;
 #[cfg(test)]
 mod media_tests;
@@ -30,7 +34,12 @@ pub(crate) fn message_preview(content: &str) -> Option<String> {
         return None;
     }
     Some(format!(
-        "[AI\u{5bf9}\u{8bdd}] {}",
+        "[{}] {}",
+        if card.provider == "binance" {
+            "网格"
+        } else {
+            "AI对话"
+        },
         card.title.chars().take(120).collect::<String>()
     ))
 }
@@ -60,6 +69,7 @@ fn readable(conn: &Connection, user: &str, group: &str, id: &str) -> Result<Snap
         owner_name,
         created_at,
         document: serde_json::from_str(&json)?,
+        latest_snapshot_id: grid_versions::latest(conn, group, id)?,
     })
 }
 

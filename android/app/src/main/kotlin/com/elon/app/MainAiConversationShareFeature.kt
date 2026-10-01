@@ -26,6 +26,8 @@ internal class MainAiConversationShareFeature(
     input: android.widget.EditText,
     sourceGroup: () -> AppGroup?,
     openGroup: (AppGroup) -> Unit,
+    quoteGrid: (ChatMessage) -> Unit,
+    analyzeGrid: (ChatMessage) -> Unit,
 ) : DefaultLifecycleObserver {
     private val api = AiConversationShareApi(activity, http, server)
     private val reader = AiConversationShareReader(activity, http, server)
@@ -35,6 +37,7 @@ internal class MainAiConversationShareFeature(
     private var job: Job? = null
     private val continuation = AiConversationPrivateContinuation(activity, nativeChat, input, sourceGroup, openGroup)
     private val groupReplies = GroupAiReplyFeature(activity, api, sourceGroup, continuation, onPublished)
+    private val grids = com.elon.app.grid.share.GridShareFeature(activity, http, server, groupId, onPublished, quoteGrid, analyzeGrid)
     fun bind(adapter: ChatAdapter) {
         adapter.onAiConversationShareOpen = ::open
         adapter.onGroupAiReplyAction = groupReplies::open
@@ -169,6 +172,7 @@ internal class MainAiConversationShareFeature(
     }
 
     override fun onDestroy(owner: LifecycleOwner) {
+        grids.dispose()
         job?.cancel(); preview?.dismiss(); picker.close(); reader.dispose()
         activity.lifecycle.removeObserver(this)
     }

@@ -50,6 +50,12 @@ impl Store {
         if count >= 500 || total + request.len() as i64 > 64 * 1024 * 1024 {
             return Err(fail(413, "Snapshot owner quota exceeded"));
         }
+        if let Some(grid) = &document.grid {
+            if chrono::Utc::now().timestamp_millis() - grid.observed_at_ms > 300_000 {
+                return Err(fail(400, "Grid snapshot expired; read again"));
+            }
+            grid_versions::validate_previous(&tx, user, group, grid)?;
+        }
         for asset in document.asset_ids() {
             let valid: bool = tx.query_row(
                 "SELECT EXISTS(SELECT 1 FROM social_snapshot_asset_grants g
@@ -79,6 +85,7 @@ impl Store {
             cover_asset_id: document.cover_asset_id.clone(),
             provider: document.provider.clone(),
             message_count: document.messages.len(),
+            grid: document.grid.clone(),
         };
         tx.execute(
             "INSERT INTO social_contents
