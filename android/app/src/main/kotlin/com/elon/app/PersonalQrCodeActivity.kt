@@ -26,6 +26,12 @@ class PersonalQrCodeActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        qrBitmap?.recycle()
+        qrBitmap = null
         setContentView(buildContent())
     }
 
@@ -36,6 +42,21 @@ class PersonalQrCodeActivity : AppCompatActivity() {
     }
 
     private fun buildContent(): View {
+        if (!AuthManager.isLoggedIn(this)) return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(elonColor(R.color.elon_bg_app))
+            addView(topBar())
+            addView(TextView(this@PersonalQrCodeActivity).apply {
+                text = "登录后展示我的二维码\n游客设备身份不能被搜索或添加为好友"
+                textSize = 18f; gravity = Gravity.CENTER
+                setTextColor(elonColor(R.color.elon_text_primary))
+                setPadding(dp(24), dp(48), dp(24), dp(24))
+            })
+            addView(com.google.android.material.button.MaterialButton(this@PersonalQrCodeActivity).apply {
+                text = "登录 / 注册"
+                setOnClickListener { startActivity(android.content.Intent(this@PersonalQrCodeActivity, LoginActivity::class.java)) }
+            })
+        }
         val profile = UserProfileStore.load(this)
         val userId = AuthManager.effectiveUserId(this)
         val qrSize = (resources.displayMetrics.widthPixels - dp(112))

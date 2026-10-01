@@ -180,7 +180,7 @@ function FriendsPageContent() {
   async function handleAddFriend(result: SearchResult) {
     setAddingId(result.user.id)
     try {
-      await api.post('/api/me/friends', { query: result.user.id, search_type: 'user_id' })
+      await api.post('/api/me/friends', { query: result.user.id, search_type: 'account_id' })
       await loadSocialConversations()
       setSearchResults((prev) => prev.map((r) =>
         r.user.id === result.user.id ? { ...r, already_friend: true } : r,

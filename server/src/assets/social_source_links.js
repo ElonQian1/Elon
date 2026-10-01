@@ -42,6 +42,7 @@
     }
     const result = document.createElement('div'); result.setAttribute('role', 'status');
     action.onclick = async () => {
+      if (root.ElonScanner) { root.ElonScanner.open({ imageUrl: url }); return; }
       action.disabled = true; result.textContent = '正在本地识别…';
       try {
         const response = await fetch(url, { signal: AbortSignal.timeout(15000) }); if (!response.ok) throw new Error('图片无法读取，请尝试原图');

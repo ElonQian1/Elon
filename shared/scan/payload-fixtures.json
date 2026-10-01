@@ -1,0 +1,20 @@
+[
+  {"raw":"fedcba9876543210fedcba9876543210","kind":"friend","target":"fedcba9876543210fedcba9876543210"},
+  {"raw":"yilong://friend/v1/0123456789abcdef0123456789abcdef","kind":"friend","target":"0123456789abcdef0123456789abcdef"},
+  {"raw":"yilong://friend/v1/0123456789abcdef0123456789abcdef?add=1","kind":"text"},
+  {"raw":"https://example.com/path?q=hello","kind":"url"},
+  {"raw":"https://user:secret@example.com","kind":"text"},
+  {"raw":"https://example.com\\@evil.test","kind":"text"},
+  {"raw":"javascript:alert(1)","kind":"text"},
+  {"raw":"file:///private/file","kind":"text"},
+  {"raw":"intent://unsafe/#Intent;end","kind":"text"},
+  {"raw":"tel:+86 10086","kind":"phone","target":"tel:+8610086"},
+  {"raw":"smsto:10086:hello world","kind":"sms","target":"sms:10086?body=hello%20world"},
+  {"raw":"mailto:hello@example.com","kind":"email"},
+  {"raw":"mailto:hello@example.com?bcc=elsewhere@example.com","kind":"text"},
+  {"raw":"geo:31.2,121.5","kind":"geo"},
+  {"raw":"geo:91,181","kind":"text"},
+  {"raw":"WIFI:T:WPA;S:Example;P:sample-password;;","kind":"wifi"},
+  {"raw":"BEGIN:VCARD\nVERSION:3.0\nFN:Example\nEND:VCARD","kind":"contact"},
+  {"raw":"你好，一龙","kind":"text"}
+]

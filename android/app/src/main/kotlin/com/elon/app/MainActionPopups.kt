@@ -52,6 +52,7 @@ internal class MainActionPopups(
             listOf(
                 TopAction("发起群聊", R.drawable.ic_home_action_group) { showCreateGroupDialog() },
                 TopAction("添加好友", R.drawable.ic_home_action_add_friend) { showAddFriendDialog() },
+                TopAction("扫一扫", R.drawable.ic_add_friend_scan) { activity.startActivity(android.content.Intent(activity, com.elon.app.scan.ScanActivity::class.java)) },
                 TopAction("新建项目", R.drawable.ic_home_action_new_project) { showCreateProjectDialog() }
             )
         }

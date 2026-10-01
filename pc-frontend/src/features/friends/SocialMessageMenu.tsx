@@ -11,6 +11,8 @@ import { canRecall, isPending, isRecalled, messageEndpoint, messageText, socialR
 import styles from './SocialMessageMenu.module.css'
 import tools from './SocialTools.module.css'
 import { recordCard } from './chat-records/recordApi'
+import { openImageScan } from '../scan/scanEntry'
+import { cloudResourceUrl } from '../../lib/cloudResourceUrl'
 
 interface Props {
   conversation: ActiveConversation; message: SocialMessage; own: boolean; special?: boolean; compactLink?: boolean; copySourceId: string
@@ -69,6 +71,7 @@ export default function SocialMessageMenu(props: Props) {
       if (attachment) {
         const kind = attachmentKind(attachment)
         if (kind === 'image') {
+          common.push({ label: '识别图片二维码', icon: <Image />, action: () => openImageScan(cloudResourceUrl(attachment.url)) })
           const preview = request.media?.querySelector<HTMLButtonElement>('[data-preview-image]')
           if (preview) common.push({ label: '查看图片', icon: <Image />, action: () => preview.click() })
           common.push({ label: '复制图片', icon: <Copy />, action: () => void mediaAction(() => copyImageAttachment(attachment), '已复制图片') })

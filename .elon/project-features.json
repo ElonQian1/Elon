@@ -6923,6 +6923,240 @@
       "updated_at_ms": 1789357017549
     },
     {
+      "id": "common-scanner-v1",
+      "title": "三端通用扫一扫与图片二维码识别",
+      "summary": "统一二维码分类和结果操作，APK/PWA 相机及选图，Win 图片右键识别。",
+      "status": "implemented",
+      "priority": "p1",
+      "requirement": {
+        "path": "docs/requirements/common-scanner-v1.md",
+        "content_hash": "bc2c4bab70d14d2e6e8cee39c5cc0e533c260ff68a752b742f933ba9b13bf6d1",
+        "locator": "",
+        "evidence_kind": "document",
+        "git_identity": {
+          "schema": "elon.project_context_git_identity.v1",
+          "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+          "head_blob_oid": "",
+          "worktree_blob_oid": "3c25319125cfa92e5e35b055dcffb1d9e3605e1c",
+          "state": "untracked"
+        }
+      },
+      "knowledge_node_id": "",
+      "owner": "scan",
+      "tags": [],
+      "task_paths": [
+        "android/app/src/main/kotlin/com/elon/app/scan",
+        "pc-frontend/src/features/scan",
+        "server/src/assets/scan_*",
+        "shared/scan"
+      ],
+      "dependencies": [],
+      "acceptance_criteria": [
+        "APK/PWA相机与选图可用并释放相机",
+        "Win右键图片可识别且保留既有菜单",
+        "统一样本验证安全分类、好友码兼容和失败恢复"
+      ],
+      "implementation_evidence": [
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/scan/ScanActivity.kt",
+          "content_hash": "ebe5d6025c4d15195594a30c6a5853bdd703813ef0d1c00f784cff5ec1dc80d5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ff5312c718e00059872384b07bd803251e64d906",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/scan/ScanImageDecoder.kt",
+          "content_hash": "f19c733f167d839f1badaaa2a0da916282f6bb30f3fd4e2e4bdd39d326325ca5",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "4eaf022d4571203bd6bbcf49b8fbfe13ad6a8a0c",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/scan/ScanPayload.kt",
+          "content_hash": "0e9d6e36b371873e79159edea6ec8e30061de7f0af9c7d1c7ab3be92b887fe61",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "31f973baec2c9e742f4ce16d4dea98de8565c8c5",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/main/kotlin/com/elon/app/scan/ScanResultDialog.kt",
+          "content_hash": "6902e94c48934494b6150e12acd53e974682afc20340a42b58e0e850d7221e4d",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1ea85cfbfbf5863cb8434327b81f6e74e3fc9aa5",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/scan/ScanEntryTest.kt",
+          "content_hash": "e0a0fe55a166e4101583f53630ebbcc0d9f1008c619cb15e1bd849574d4a034e",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f1e06f1dee3f975d75fe1d7ae1225c328bc9dfb7",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/scan/ScanImageDecoderTest.kt",
+          "content_hash": "2d74096bcac1839af830c6523e9356cfe1736485cf3e7f3ec397c7b102298a18",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "83a5718c6efd503a633f1966e6214332c67208f9",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "android/app/src/test/kotlin/com/elon/app/scan/ScanPayloadTest.kt",
+          "content_hash": "5edf5b12c8155ee0b31edcf5c6ae1b21aaa2b61da7db6db1cb2f3c5c3bc94b1b",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "ace35af587632e12eebbb6784d1fb3e8a3fa8d99",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/scan/ImageScanHost.tsx",
+          "content_hash": "d9a1860a8293059216dc8852d27c51e2f9e29f10c6968681d2b04891a8803e2c",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "344b8b35566965f23d035fde0d7204b016af6af5",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "pc-frontend/src/features/scan/ScanFriendDialog.tsx",
+          "content_hash": "f2ee628326046f3575c75f5b76a702699520c271734ff2d52b0b88276fa0e29e",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2a3289827504a914748607c18e10e109c72fafea",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "server/src/assets/scan_pwa.js",
+          "content_hash": "69e8d5e991c194ed678e560d7f574e300f25dec213bf577ad51555b6c7a7a04a",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "59d5ec7501712009c73c0a3fb0a8cc503ceeb029",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "shared/scan/browserScanDialog.mjs",
+          "content_hash": "9cc21728190798180da9fdfaf27e28d91742d231c5d6499fa0b80f66da2d2490",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "23378ee048b564e6b3a8ce85576551165a786d6f",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "shared/scan/browserScanner.mjs",
+          "content_hash": "0a78b93e24e5e1b4c73c58d6286c4157fe98fe827755a0cb30bcc2bedde72ffd",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "2b9dbe3282488342107f01a146322161b0fe7a18",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "shared/scan/browserScanner.test.mjs",
+          "content_hash": "4be8c8565b9539f7a3c55829dbcfb94741802f9dca2a8b3152dfef053c25a1af",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "04aebca1440f0fa4025cad026ed0d98c0bcba363",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "shared/scan/scanPayload.mjs",
+          "content_hash": "dc8c77d1523c70ad8f3bbede6ab73103bf0f352c5215ada325e7d0d7a5fa5870",
+          "locator": "",
+          "evidence_kind": "source",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "1ad9596acb0f299c0263adab5668e336fbaa7ead",
+            "state": "index_only"
+          }
+        },
+        {
+          "path": "shared/scan/scanPayload.test.mjs",
+          "content_hash": "1b979cf88c4ca3ac365228c6c5fdd8eb22e41b8ab98a944cffaa2583aaf00a3c",
+          "locator": "",
+          "evidence_kind": "test",
+          "git_identity": {
+            "schema": "elon.project_context_git_identity.v1",
+            "head_commit": "58498880f1f5058a6791acfb508d41cc8464adb8",
+            "head_blob_oid": "",
+            "worktree_blob_oid": "f25d367a3a04419dfd66cc258d33482312aa269b",
+            "state": "index_only"
+          }
+        }
+      ],
+      "created_at_ms": 1790841029931,
+      "updated_at_ms": 1790843300683
+    },
+    {
       "id": "compute-attempt-final-usage-fence-verification-v1",
       "title": "Attempt 最终声明用量栅栏动态验收 V1",
       "summary": "动态验证 V226 在终态候选处原子封口 Provider 声明用量流，并阻止下游消费过时流头。",
@@ -31973,56 +32207,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_7b8ef40d888f4521b28f11fce38cfda2",
-      "feature_id": "pc-social-chat-recovery-v1",
-      "action": "claimed",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "ready",
-      "to_status": "claimed",
-      "at_ms": 1789456236916
-    },
-    {
-      "id": "feature_event_ba693b9ec787488f8d167c918d5dab40",
-      "feature_id": "pc-social-chat-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "claimed",
-      "to_status": "in_progress",
-      "at_ms": 1789456304977
-    },
-    {
-      "id": "feature_event_89c09acae95f4a729288321ab79beea2",
-      "feature_id": "pc-social-chat-recovery-v1",
-      "action": "evidence_recorded",
-      "actor": "codex",
-      "reason": "",
-      "from_status": "in_progress",
-      "to_status": "in_progress",
-      "at_ms": 1789457097798
-    },
-    {
-      "id": "feature_event_e03ba36323ec40afabae859539102f6f",
-      "feature_id": "pc-social-chat-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "完整页面浏览器恢复与兼容回归、生产构建通过",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789457124518
-    },
-    {
-      "id": "feature_event_6de974a5e1e54ea78c32aa9568098bb4",
-      "feature_id": "pc-social-chat-recovery-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "隔离 Edge 页面恢复、缓存、权限、竞速与原能力回归通过",
-      "from_status": "implemented",
-      "to_status": "verified",
-      "at_ms": 1789457124581
-    },
-    {
       "id": "feature_event_2dd4db5c67d542648b1936486da0ba06",
       "feature_id": "pc-social-chat-recovery-v1",
       "action": "transitioned",
@@ -33971,6 +34155,56 @@
       "from_status": "in_progress",
       "to_status": "implemented",
       "at_ms": 1790769894994
+    },
+    {
+      "id": "feature_event_b0928219c8cc4709ba3de03c115098e7",
+      "feature_id": "common-scanner-v1",
+      "action": "registered",
+      "actor": "codex-scan",
+      "reason": "",
+      "from_status": "",
+      "to_status": "ready",
+      "at_ms": 1790841029932
+    },
+    {
+      "id": "feature_event_8ebf81081b134b7080603b3de689ef1d",
+      "feature_id": "common-scanner-v1",
+      "action": "claimed",
+      "actor": "codex-scan",
+      "reason": "",
+      "from_status": "ready",
+      "to_status": "claimed",
+      "at_ms": 1790841057145
+    },
+    {
+      "id": "feature_event_4f09c6f3abfd4cab92e8c6f95eefc3a6",
+      "feature_id": "common-scanner-v1",
+      "action": "transitioned",
+      "actor": "codex-scan",
+      "reason": "",
+      "from_status": "claimed",
+      "to_status": "in_progress",
+      "at_ms": 1790841884765
+    },
+    {
+      "id": "feature_event_4ee1cc13360a4f149972be2702e6aa3d",
+      "feature_id": "common-scanner-v1",
+      "action": "evidence_recorded",
+      "actor": "codex-scan",
+      "reason": "",
+      "from_status": "in_progress",
+      "to_status": "in_progress",
+      "at_ms": 1790843245336
+    },
+    {
+      "id": "feature_event_f54580ef73624ff5945b0dd1440f198b",
+      "feature_id": "common-scanner-v1",
+      "action": "transitioned",
+      "actor": "codex-scan",
+      "reason": "Native and browser tests passed; physical camera and native visual acceptance remain deferred.",
+      "from_status": "in_progress",
+      "to_status": "implemented",
+      "at_ms": 1790843300683
     }
   ]
 }

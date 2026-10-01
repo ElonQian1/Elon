@@ -8,6 +8,11 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         ("cache-control", "no-cache"),
     ];
     Router::new()
+        .route("/assets/scan_pwa.js", get(move || async move { (headers, include_str!("../../assets/scan_pwa.js")) }))
+        .route("/assets/scanPayload.mjs", get(move || async move { (headers, include_str!("../../../../shared/scan/scanPayload.mjs")) }))
+        .route("/assets/browserScanner.mjs", get(move || async move { (headers, include_str!("../../../../shared/scan/browserScanner.mjs")) }))
+        .route("/assets/browserScanDialog.mjs", get(move || async move { (headers, include_str!("../../../../shared/scan/browserScanDialog.mjs")) }))
+        .route("/assets/scan_pwa.css", get(|| async { ([("content-type", "text/css; charset=utf-8"), ("cache-control", "no-cache")], include_str!("../../../../shared/scan/browserScanDialog.css")) }))
         .route("/assets/social_message_actions.js", get(move || async move { (headers, include_str!("../../assets/social_message_actions.js")) }))
         .route("/assets/social_message_transfer.js", get(move || async move { (headers, include_str!("../../assets/social_message_transfer.js")) }))
         .route("/assets/social_message_actions.css", get(|| async { ([("content-type", "text/css; charset=utf-8"), ("cache-control", "no-cache")], include_str!("../../assets/social_message_actions.css")) }))

@@ -65,7 +65,8 @@ internal object UserProfileStore {
     }
 
     fun personalQrPayload(context: Context): String {
-        return AuthManager.effectiveUserId(context)
+        check(AuthManager.isLoggedIn(context)) { "登录后才能展示好友二维码" }
+        return com.elon.app.scan.ScanPayloadParser.friendQr(AuthManager.effectiveUserId(context))
     }
 
     fun avatarInitial(name: String): String =

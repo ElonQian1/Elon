@@ -1,0 +1,8 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>扫一扫组件验收</title><link rel="stylesheet" href="/assets/scan_pwa.css">
+<style>body{font:16px system-ui;margin:24px;background:#f8f9fc}button{min-height:48px;padding:12px}img{max-width:100%}</style>
+<h1>扫一扫组件验收</h1><p>使用确定性测试图片，不连接账号或好友 API。</p>
+<button class="add-friend-scan-pill" type="button">扫一扫</button><button id="image" type="button">识别测试图片</button>
+<img src="/fixture.png" alt="合成二维码测试图片"><p id="friend-result"></p>
+<script type="module" src="/assets/scan_pwa.js"></script>
+<script type="module">document.getElementById('image').onclick=()=>globalThis.ElonScanner.open({imageUrl:'/fixture.png'});</script></html>

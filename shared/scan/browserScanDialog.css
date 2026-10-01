@@ -1,0 +1,18 @@
+.elon-scan-dialog { color-scheme: light dark; box-sizing: border-box; width: min(520px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); margin: auto; padding: 20px; border: 1px solid #9ca3af55; border-radius: 20px; background: light-dark(#f8f9fc,#101827); color: light-dark(#172033,#f2f5fa); font: 16px/1.5 system-ui,sans-serif; overflow: auto; }
+.elon-scan-dialog::backdrop { background: #040914a6; }
+.elon-scan-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.elon-scan-dialog h2 { font-size: 22px; margin: 0; }
+.elon-scan-dialog h3 { font-size: 16px; margin: 0 0 8px; }
+.elon-scan-hint { font-size: 14px; opacity: .75; }
+.elon-scan-dialog video { display: block; width: 100%; max-height: 36dvh; object-fit: cover; border-radius: 12px; background: #030712; }
+.elon-scan-dialog [hidden] { display: none !important; }
+.elon-scan-controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.elon-scan-dialog button,.elon-scan-dialog article a { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 14px; border: 1px solid #8092b655; border-radius: 10px; background: light-dark(#e9effb,#24344f); color: inherit; font: inherit; text-decoration: none; cursor: pointer; }
+.elon-scan-dialog button:focus-visible,.elon-scan-dialog a:focus-visible { outline: 3px solid #6ba7f7; outline-offset: 2px; }
+.elon-scan-dialog button[aria-pressed=true] { background: #2768b5; color: white; }
+.elon-scan-status { min-height: 24px; overflow-wrap: anywhere; }
+.elon-scan-results { display: grid; gap: 12px; }
+.elon-scan-results article { padding: 14px; border: 1px solid #8092b655; border-radius: 12px; }
+.elon-scan-results article button,.elon-scan-results article a { margin: 4px 8px 0 0; }
+.elon-scan-results pre { font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; user-select: text; }
+@media(max-width:400px) { .elon-scan-dialog { padding: 16px; } }

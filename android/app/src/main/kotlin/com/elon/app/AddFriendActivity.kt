@@ -63,6 +63,10 @@ class AddFriendActivity : AppCompatActivity() {
             lookup = friendSearchLookup(this, http, { serverUrl }, handler),
             publish = { renderRecommendations() }
         )
+        intent.getStringExtra("scan_account_id")?.takeIf { it.isNotBlank() }?.let {
+            searchInput.setText(it)
+            friendSearch.update(it, immediate = true)
+        }
     }
 
     override fun onResume() {
@@ -91,7 +95,7 @@ class AddFriendActivity : AppCompatActivity() {
             })
             addView(recommendationHeader(), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(44)
+                dp(48)
             ).apply {
                 leftMargin = dp(16)
                 rightMargin = dp(16)
@@ -214,7 +218,7 @@ class AddFriendActivity : AppCompatActivity() {
                 setTextColor(elonColor(R.color.elon_text_primary))
             }
             addView(recommendationTitle, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            addView(scanButton(), LinearLayout.LayoutParams(dp(88), dp(36)))
+            addView(scanButton(), LinearLayout.LayoutParams(dp(96), dp(48)))
         }
     }
 
@@ -316,6 +320,10 @@ class AddFriendActivity : AppCompatActivity() {
 
     private fun scanButton(): LinearLayout {
         return LinearLayout(this).apply {
+            contentDescription = "扫一扫"
+            isFocusable = true
+            minimumHeight = dp(48)
+            setOnClickListener { startActivity(Intent(this@AddFriendActivity, com.elon.app.scan.ScanActivity::class.java)) }
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             background = roundedRect(elonColor(R.color.elon_surface_header), 18)

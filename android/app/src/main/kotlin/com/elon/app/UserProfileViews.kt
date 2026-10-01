@@ -227,12 +227,12 @@ internal object UserProfileViews {
 
     private fun qrThumbnail(context: Context): View {
         val size = context.dp(34)
-        val bitmap = QrCodeBitmap.create(
+        val bitmap = if (AuthManager.isLoggedIn(context)) QrCodeBitmap.create(
             UserProfileStore.personalQrPayload(context),
             size,
             foreground = Color.parseColor("#0B1118"),
             background = Color.TRANSPARENT
-        )
+        ) else null
         return FrameLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(context.dp(48), context.dp(48))
             contentDescription = "我的二维码"
@@ -247,7 +247,7 @@ internal object UserProfileViews {
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 setPadding(context.dp(3), context.dp(3), context.dp(3), context.dp(3))
-                setImageBitmap(bitmap)
+                if (bitmap != null) setImageBitmap(bitmap) else setImageResource(R.drawable.ic_add_friend_scan)
             })
         }
     }

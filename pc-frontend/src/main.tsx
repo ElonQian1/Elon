@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { registerPcServiceWorker } from './registerPcServiceWorker'
 import WorkbenchErrorBoundary from './WorkbenchErrorBoundary'
+import ImageScanHost from './features/scan/ImageScanHost'
 import './styles/globals.css'
 
 const App = React.lazy<React.ComponentType>(() => location.pathname === '/pc/group-ai-worker'
@@ -14,6 +15,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <WorkbenchErrorBoundary>
       <BrowserRouter basename="/pc">
+        <ImageScanHost />
         <React.Suspense fallback={<div role="status" aria-label="正在加载工作台" />}>
           <App />
         </React.Suspense>
