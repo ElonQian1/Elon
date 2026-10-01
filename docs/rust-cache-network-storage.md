@@ -8,6 +8,10 @@ reviewed_at: 2026-09-30
 本手册补充 [Rust 缓存平台](rust-cache-platform.md) 与 [节点数据根](pc-node-data-root.md)。
 网络缓存是本机独占的可重建数据；冷归档是具有内容校验清单的恢复副本。两者不能混为一套删除策略。
 
+多电脑本地优先、共享对象服务与容量预算见
+[工作室分层构建缓存方案](design/studio-build-cache-v1.md)（提案，尚未部署）；
+各项目 AI 的简短接入入口见 [工作室缓存 AI 接入入口](studio-cache-ai-entry.md)。
+
 ## 分层与边界
 
 | 数据 | 推荐位置 | 回收条件 |

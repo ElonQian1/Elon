@@ -1,7 +1,7 @@
 ---
 title: "Rust 缓存平台跨 PC 运维与子项目接入"
 owner: platform
-reviewed_at: 2026-08-16
+reviewed_at: 2026-10-01
 review_interval_days: 60
 role: runbook
 lifecycle: active
@@ -35,17 +35,21 @@ implementation_refs:
 
 # Rust 缓存平台跨 PC 运维与子项目接入
 
-本文定义一龙项目及其子项目在多台 Windows PC 上共用同一套缓存治理能力的业务流。缓存文件不跨电脑直接共享；跨电脑共享的是版本化工具、项目身份、兼容域策略、健康报告格式和安全操作流程。
+本文定义一龙项目及其子项目在多台 Windows PC 上共用同一套缓存治理能力的业务流。
+当前允许每台电脑使用自己的本地根或独占 UNC 根，但不允许多个 PC 共同写同一个
+Cargo/sccache 根；跨机对象复用服务尚未部署。当前共享的是版本化工具、项目身份、
+兼容域策略、健康报告格式和安全流程。统一 AI 接入见
+[工作室缓存入口](studio-cache-ai-entry.md)，目标分层见其中链接的提案。
 
 ## 分层架构
 
 | 层级 | 保存内容 | 分发方式 | 权限边界 |
 |---|---|---|---|
 | 权威源码层 | `rust-cache.ps1`、模块、测试、Skill | Git 仓库 | 只有审查后的提交可作为安装源 |
-| PC 安装层 | 当前平台快照、策略、锁、报告、SCCache | 每台 PC 本地安装 | 安装锁保证单机升级串行 |
+| PC 安装层 | 当前平台快照、策略、锁、报告、SCCache | 每台 PC 独占受管根 | 安装锁保证单机升级串行 |
 | 稳定启动层 | `%LOCALAPPDATA%\Elon\bin\rust-cache.ps1` | 安装器生成 | 只转发参数，不启动第二个可见 Shell |
-| 项目合同层 | `rust-cache.project.json` | 跟随子项目 Git | 只保存稳定项目 ID 和兼容域，不保存机器路径 |
-| 构建执行层 | SCCache、workspace/shared build-dir、target | 目标 PC 本地 | Cargo 调用持有分区锁，发布产物仍由项目拥有 |
+| 项目合同层 | `rust-cache.project.json` 与薄 wrapper | 跟随子项目 Git | 只保存稳定项目 ID 和兼容域，不保存机器路径 |
+| 构建执行层 | SCCache、workspace/shared build-dir、target | 目标 PC 本地或独占 UNC 分区 | Cargo 调用持有分区锁，最终产物仍由项目拥有 |
 | Fleet 观测层 | 脱敏报告与不可变 outbox 信封 | 节点按需生成或排队 | 报告只读，不能成为删除授权 |
 | GC 审批层 | 请求状态、脱敏计划摘要、精确摘要审批和回执 | 服务端与节点轮询 | 不接收路径或命令，删除只在目标 PC 执行 |
 
@@ -62,6 +66,8 @@ SCCache 负责兼容编译对象的跨项目复用。命名 Cargo build-dir 只�
 
 安装器会分别写入规范化源码指纹与安装文件原始字节指纹，并安装固定用户启动器和 Codex Skill。源码指纹会统一 UTF-8 BOM 与 LF/CRLF，使同一 Git 内容在不同 Windows 配置和 worktree 中保持同一版本身份；安装指纹不做规范化，安装后的任何字节变化仍会被 `doctor` 识别。`doctor` 报告 `platform-version`、`platform-integrity` 或 Skill 完整性异常时，必须从当前可信提交重新安装，不能手工复制单个模块。
 
+`install` 即使不传 `-Apply` 也会写平台文件和 launcher，不能当作只读预演。
+
 调用入口必须在当前 PowerShell 会话内使用 `&`。缓存工具、用户启动器和 Skill 均不得通过 `Start-Process powershell.exe` 或 `Start-Process pwsh.exe` 打开可见窗口。节点后台服务若必须创建独立进程，应由节点宿主使用隐藏窗口和受控日志，而不是由项目包装器自行弹窗。
 
 ## 一个子项目的接入流程
@@ -70,15 +76,18 @@ SCCache 负责兼容编译对象的跨项目复用。命名 Cargo build-dir 只�
 
 ```powershell
 $cache = "$env:LOCALAPPDATA\Elon\bin\rust-cache.ps1"
-& $cache init-project -ProjectRoot D:\work\shop-app -ProjectId shop-app `
+& $cache adopt-project -ProjectRoot D:\work\shop-app -ProjectId shop-app `
   -AllowedDomain dev-windows-msvc,agent-validation
-# 审查 JSON 预览后再执行：
-& $cache init-project -ProjectRoot D:\work\shop-app -ProjectId shop-app `
+# 审查项目清单和薄 wrapper 预览后再执行：
+& $cache adopt-project -ProjectRoot D:\work\shop-app -ProjectId shop-app `
   -AllowedDomain dev-windows-msvc,agent-validation -Apply
 & $cache doctor -ProjectRoot D:\work\shop-app
 ```
 
-将生成的 `rust-cache.project.json` 提交到子项目。项目可以保留自己的 `cargo-dev.ps1`、验证和发布包装器，但它们只能选择稳定 domain/partition 并把参数转给用户启动器，不能复制锁、GC、注册表或路径算法。
+将生成的 `rust-cache.project.json` 和 `scripts/rust-cache.ps1` 提交到子项目。
+只有已经拥有缓存入口或明确只需清单的项目才使用 `init-project`。
+项目可以保留自己的 `cargo-dev.ps1`、验证和发布包装器，但它们只能选择稳定
+domain/partition 并把参数转给用户启动器，不能复制锁、GC、注册表或路径算法。
 
 首次只启用 workspace 隔离和 SCCache。确认两个 worktree 的依赖、feature、target 和并发模式兼容后，才为受控验证入口声明命名共享分区。不要把任务 ID、会话 ID、Git SHA、功能名或 PID 作为 domain/partition。
 
