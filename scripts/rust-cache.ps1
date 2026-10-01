@@ -82,6 +82,9 @@ Import-Module "$modulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 
+Import-Module "$modulesRoot\RustCache.Run.psm1" -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Studio.psm1" -DisableNameChecking
+
 if ($Command -eq "help") {
     Show-RustCacheCommandHelp
     return
@@ -96,6 +99,10 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     }
 }
 $ProjectRoot = [System.IO.Path]::GetFullPath($ProjectRoot)
+if ($Command -ne 'run' -and -not $CacheRoot -and $env:ELON_STUDIO_CACHE_PROFILE) {
+    # Management must remain available when no build candidate can be admitted.
+    $CacheRoot = [string](Get-RustCacheStudioProfile).selected_cache_root
+}
 
 switch ($Command) {
     "status" {
@@ -151,8 +158,7 @@ switch ($Command) {
         if ($RemainingArgs.Count -eq 0) {
             throw "run requires Cargo arguments."
         }
-        Invoke-RustCachePreflightGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -Skip:$SkipCacheGc | Out-Null
-        Invoke-RustCacheCargo -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -NoLock:$NoLock -DisableSccache:$DisableSccache -LockTimeoutSeconds $LockTimeoutSeconds -SharedBuildPartition $SharedBuildPartition -CargoArgs $RemainingArgs
+        Invoke-RustCachePreparedCargo -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -NoLock:$NoLock -DisableSccache:$DisableSccache -SkipCacheGc:$SkipCacheGc -LockTimeoutSeconds $LockTimeoutSeconds -SharedBuildPartition $SharedBuildPartition -CargoArgs $RemainingArgs
         exit $LASTEXITCODE
     }
     "gc" {

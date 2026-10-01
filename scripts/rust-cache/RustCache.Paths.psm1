@@ -67,6 +67,15 @@ function Resolve-RustCacheRoot {
     if (-not [string]::IsNullOrWhiteSpace($ExplicitRoot)) {
         $candidate = $ExplicitRoot.Trim()
         $source = "explicit"
+    } elseif ($env:ELON_STUDIO_CACHE_PROFILE) {
+        # Validation/network wrappers also resolve the cache before reaching the
+        # Cargo runner. Use the same selection here so an offline legacy default
+        # cannot preempt the machine's admissible local route.
+        Import-Module "$PSScriptRoot\RustCache.Studio.psm1" -DisableNameChecking
+        $workspace = if($RepoRoot){$RepoRoot}else{(Get-Location).Path}
+        $route = Select-RustCacheStudioBuildRoot -WorkspaceHash (Get-RustCacheWorkspaceHash -WorkspaceRoot $workspace)
+        $candidate = $route.root
+        $source = 'machine profile'
     } elseif (-not [string]::IsNullOrWhiteSpace($env:ELON_RUST_CACHE_ROOT)) {
         $candidate = $env:ELON_RUST_CACHE_ROOT.Trim()
         $source = "ELON_RUST_CACHE_ROOT"

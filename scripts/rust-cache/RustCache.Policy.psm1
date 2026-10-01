@@ -11,6 +11,11 @@ function Get-DefaultRustCachePolicy {
         orphan_task_grace_hours = 24
         sccache_max_size = "20G"
         auto_gc_on_run = $true
+        # Unmeasured conservative starting budgets; machine policy may tune them.
+        capacity_floor_bytes = [long]10737418240
+        capacity_build_growth_bytes = [long]8589934592
+        capacity_target_growth_bytes = [long]2147483648
+        capacity_temp_growth_bytes = [long]1073741824
         legacy_caches = @()
     }
 }
@@ -62,7 +67,27 @@ function Get-RustCachePolicy {
     if ($policy.recovery_free_percent -le $policy.warning_free_percent) {
         throw "recovery_free_percent must be greater than warning_free_percent."
     }
-    return $policy
+    return (Complete-RustCacheCapacityPolicy -Policy $policy)
+}
+
+function Complete-RustCacheCapacityPolicy {
+    param([Parameter(Mandatory)]$Policy)
+    $defaults = Get-DefaultRustCachePolicy
+    foreach ($field in @('capacity_floor_bytes', 'capacity_build_growth_bytes', 'capacity_target_growth_bytes', 'capacity_temp_growth_bytes')) {
+        if ($null -eq $Policy.PSObject.Properties[$field]) { $Policy | Add-Member -NotePropertyName $field -NotePropertyValue $defaults.$field }
+        $value = $Policy.$field
+        try {
+            if ($null -eq $value -or $value -is [bool] -or [string]::IsNullOrWhiteSpace([string]$value)) { throw 'missing integer' }
+            $number = [decimal]$value
+            if ($number -ne [decimal][long]$number -or $number -lt 0 -or ($field -ne 'capacity_floor_bytes' -and $number -eq 0)) { throw 'invalid byte budget' }
+            $Policy.$field = [long]$number
+        } catch { throw "RUST_CACHE_CAPACITY_POLICY_INVALID: $field must be a whole byte budget (growth must be positive)." }
+    }
+    try {
+        $critical = [double]$Policy.critical_free_percent
+        if ($null -eq $Policy.critical_free_percent -or $Policy.critical_free_percent -is [bool] -or [string]::IsNullOrWhiteSpace([string]$Policy.critical_free_percent) -or [double]::IsNaN($critical) -or [double]::IsInfinity($critical) -or $critical -lt 0 -or $critical -ge 100) { throw 'invalid percent' }
+    } catch { throw 'RUST_CACHE_CAPACITY_POLICY_INVALID: critical_free_percent must be between 0 (inclusive) and 100 (exclusive).' }
+    return $Policy
 }
 
 function Get-RustCacheProjectManifest {
@@ -226,4 +251,4 @@ function Add-RustCacheLegacyRecord {
     return $policyPath
 }
 
-Export-ModuleMember -Function Get-DefaultRustCachePolicy, Get-RustCachePolicyPath, Initialize-RustCachePolicy, Get-RustCachePolicy, Get-RustCacheProjectManifest, Resolve-RustCacheDomain, Resolve-RustCacheSharedPartitionDomain, Add-RustCacheLegacyRecord
+Export-ModuleMember -Function Get-DefaultRustCachePolicy, Get-RustCachePolicyPath, Initialize-RustCachePolicy, Get-RustCachePolicy, Complete-RustCacheCapacityPolicy, Get-RustCacheProjectManifest, Resolve-RustCacheDomain, Resolve-RustCacheSharedPartitionDomain, Add-RustCacheLegacyRecord

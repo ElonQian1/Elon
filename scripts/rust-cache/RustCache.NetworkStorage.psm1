@@ -96,8 +96,16 @@ function Assert-RustCacheNetworkRootOwner {
         }
         $ancestor = $ancestor.Parent
     }
-    if (-not (Test-RustCacheNetworkPath -Path $CacheRoot)) { return }
     $marker = Join-Path $CacheRoot '.rust-cache-owner.json'
+    $networkRoot = Test-RustCacheNetworkPath -Path $CacheRoot
+    $existingMarker = Get-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
+    # A host's local path can refer to the same physical directory exposed by SMB.
+    # Existing ownership is authoritative through either spelling. Unmarked legacy
+    # local roots remain compatible; only network roots are implicitly claimed.
+    if (-not $networkRoot -and $null -eq $existingMarker) { return }
+    if ($existingMarker -and ($existingMarker.PSIsContainer -or ($existingMarker.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+        throw "RUST_CACHE_SHARED_OWNER_INVALID: Cache owner marker must be a file: $marker"
+    }
     $machine = Get-RustCacheMachineIdentity
     if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) {
         if (-not $ClaimEmptyRoot) {

@@ -59,7 +59,7 @@ Assert-Fails -CargoArgs @('zigbuild', '--target', $target, '--target', 'aarch64-
 Assert-Fails -CargoArgs @('zigbuild', '--target', '.\custom-target.json') -Pattern 'standard target triple'
 
 $source = Get-Content -LiteralPath $scriptPath -Raw
-Assert-True ($source -match 'Invoke-RustCacheCargo') 'wrapper delegates to the managed Rust cache runtime'
+Assert-True ($source -match 'Invoke-RustCachePreparedCargo') 'wrapper selects its managed route before GC and Cargo'
 Assert-True ($source -match '-SharedBuildPartition \$sharedBuildPartition') 'wrapper uses a managed shared partition'
 Assert-True ($source -notmatch '\$env:CARGO_TARGET_DIR\s*=') 'wrapper never assigns a raw caller target environment'
 
@@ -68,6 +68,18 @@ $fakeBin = Join-Path $integrationRoot 'bin'
 $cacheRoot = Join-Path $integrationRoot 'cache'
 $capturePath = Join-Path $integrationRoot 'cargo-invocation.json'
 New-Item -ItemType Directory -Force -Path $fakeBin | Out-Null
+# This fixture launches a tiny fake Cargo process, not a real cross compilation.
+# Keep its declared budget small so the test is independent of a full build's
+# production waterline while still going through the capacity gate.
+Import-Module (Join-Path $PSScriptRoot 'rust-cache\RustCache.Policy.psm1') -DisableNameChecking
+$fixturePolicy = Get-DefaultRustCachePolicy
+$fixturePolicy.critical_free_percent = 1
+$fixturePolicy.capacity_floor_bytes = 1GB
+$fixturePolicy.capacity_build_growth_bytes = 1MB
+$fixturePolicy.capacity_target_growth_bytes = 1MB
+$fixturePolicy.capacity_temp_growth_bytes = 1MB
+New-Item -ItemType Directory -Force -Path (Join-Path $cacheRoot 'config') | Out-Null
+$fixturePolicy | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $cacheRoot 'config\policy.json') -Encoding UTF8
 @'
 @echo off
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-cargo.ps1" %*

@@ -106,8 +106,8 @@ if ($planOnly) {
 $rustCacheRoot = Join-Path $PSScriptRoot 'rust-cache'
 Import-Module (Join-Path $rustCacheRoot 'RustCache.Inventory.psm1') -Force -DisableNameChecking
 Import-Module (Join-Path $rustCacheRoot 'RustCache.Runtime.psm1') -Force -DisableNameChecking
-Invoke-RustCachePreflightGc -CacheRoot $cacheRoot -RepoRoot $repoRoot -Skip:$skipCacheGc | Out-Null
-Invoke-RustCacheCargo -ProjectRoot $repoRoot -Domain 'agent-validation' -TargetDir $targetDir `
+Import-Module (Join-Path $rustCacheRoot 'RustCache.Run.psm1') -DisableNameChecking
+Invoke-RustCachePreparedCargo -ProjectRoot $repoRoot -Domain 'agent-validation' -TargetDir $targetDir -SkipCacheGc:$skipCacheGc `
     -CacheRoot $cacheRoot -DisableSccache:$disableSccache -LockTimeoutSeconds $lockTimeoutSeconds `
     -SharedBuildPartition $sharedBuildPartition -CargoArgs $cargoArgs
 $cargoExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }

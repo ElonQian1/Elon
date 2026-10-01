@@ -86,8 +86,8 @@ if (-not [string]::IsNullOrWhiteSpace($env:ELON_DEV_CARGO_TARGET_DIR) -and [stri
 $modulePath = Join-Path $RepoRoot "scripts\rust-cache\RustCache.Runtime.psm1"
 Import-Module (Join-Path $RepoRoot "scripts\rust-cache\RustCache.Inventory.psm1") -Force -DisableNameChecking
 Import-Module $modulePath -Force -DisableNameChecking
-Invoke-RustCachePreflightGc -CacheRoot $CacheRoot -RepoRoot $RepoRoot -Skip:$SkipCacheGc | Out-Null
-Invoke-RustCacheCargo -ProjectRoot $RepoRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -NoLock:$NoLock -DisableSccache:$DisableSccache -LockTimeoutSeconds $LockTimeoutSeconds -SharedBuildPartition $SharedBuildPartition -CargoArgs $CargoArgs
+Import-Module (Join-Path $RepoRoot 'scripts\rust-cache\RustCache.Run.psm1') -DisableNameChecking
+Invoke-RustCachePreparedCargo -ProjectRoot $RepoRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -NoLock:$NoLock -DisableSccache:$DisableSccache -SkipCacheGc:$SkipCacheGc -LockTimeoutSeconds $LockTimeoutSeconds -SharedBuildPartition $SharedBuildPartition -CargoArgs $CargoArgs
 $cargoExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
 if ($cargoExitCode -ne 0) {
     # `exit` only leaves this script when cargo-dev.ps1 is invoked from another

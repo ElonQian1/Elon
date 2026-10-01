@@ -4,6 +4,8 @@ Import-Module "$PSScriptRoot\RustCache.Registry.psm1" -Force -DisableNameCheckin
 Import-Module "$PSScriptRoot\RustCache.Sccache.psm1" -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Scope.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.NetworkStorage.psm1" -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.Capacity.psm1" -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.Studio.psm1" -DisableNameChecking
 
 function Resolve-RustCacheWorkspaceRoot {
     param(
@@ -63,11 +65,12 @@ function Resolve-RustCacheInvocation {
     )
 
     $project = [System.IO.Path]::GetFullPath($ProjectRoot)
-    $root = Resolve-RustCacheRoot -ExplicitRoot $CacheRoot -RepoRoot $project
     $manifest = Get-RustCacheProjectManifest -ProjectRoot $project
     $requestedDomain = if ([string]::IsNullOrWhiteSpace($Domain)) { $manifest.default_domain } else { ConvertTo-RustCacheSlug $Domain }
     $workspace = Resolve-RustCacheWorkspaceRoot -ProjectRoot $project -CargoArgs $CargoArgs
     $workspaceHash = Get-RustCacheWorkspaceHash -WorkspaceRoot $workspace
+    $route = Select-RustCacheStudioBuildRoot -ExplicitRoot $CacheRoot -TargetDir $TargetDir -WorkspaceHash $workspaceHash
+    $root = Resolve-RustCacheRoot -ExplicitRoot $route.root -RepoRoot $project
     $epoch = if ([string]::IsNullOrWhiteSpace($ToolchainEpoch)) { Get-RustCacheToolchainEpoch } else { ConvertTo-RustCacheSlug $ToolchainEpoch }
     $scope = Resolve-RustCacheBuildScope -Registered $manifest.registered -WorkspaceHash $workspaceHash -SharedBuildPartition $SharedBuildPartition
     $allowedDomain = Resolve-RustCacheDomain -ProjectRoot $project -Domain $Domain -Manifest $manifest
@@ -79,7 +82,7 @@ function Resolve-RustCacheInvocation {
         $buildDir = Join-Path $root "quarantine\$workspaceHash"
     }
     $resolvedTarget = if ([string]::IsNullOrWhiteSpace($TargetDir)) {
-        Join-Path $workspace "target"
+        if ($route.managed_target) { Join-Path $root "targets\$workspaceHash" } else { Join-Path $workspace "target" }
     } else {
         if (-not (Test-RustCacheAbsolutePath $TargetDir)) {
             throw "Cargo target directory must be absolute: $TargetDir"
@@ -88,6 +91,7 @@ function Resolve-RustCacheInvocation {
     }
     [pscustomobject]@{
         cache_root = $root
+        route_reason = $route.reason
         project_id = $manifest.project_id
         project_root = $project
         workspace_root = $workspace
@@ -327,6 +331,7 @@ function Set-RustCacheBuildEnvironment {
     if ($sccache) {
         $sync = Sync-RustCacheSccacheConfiguration -CacheRoot $context.cache_root -AdditionalBaseDirs @($context.build_dir, $context.target_dir, $context.workspace_root, $context.project_root) -ConfigureProcessEnvironment -RestartIfChanged
         if ($sync.restart_pending) {
+            if ($sync.tiered) { throw 'RUST_CACHE_SCCACHE_RESTART_PENDING: Wait for existing compilers, then install or synchronize the owned instance before starting another build.' }
             Write-Warning "sccache base-directory configuration changed but restart is deferred while another Cargo/rustc process is active."
         }
         if ([string]::IsNullOrWhiteSpace($env:RUSTC_WRAPPER)) {
@@ -382,22 +387,26 @@ function Invoke-RustCacheCargo {
 
     if ($NoLock -and -not [string]::IsNullOrWhiteSpace($SharedBuildPartition)) { throw "Shared Rust build partitions require the platform partition lock; remove -NoLock." }
     $context = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -CargoArgs $CargoArgs -ToolchainEpoch $ToolchainEpoch -SharedBuildPartition $SharedBuildPartition
-    New-Item -ItemType Directory -Force -Path $context.build_dir | Out-Null
     $lockPath = $null
+    $capacityLease = $null
     $locationPushed = $false
-    $envNames = @("CARGO_BUILD_BUILD_DIR", "CARGO_TARGET_DIR", "CARGO_INCREMENTAL", "RUSTC_WRAPPER", "SCCACHE_DIR", "SCCACHE_CONF", "SCCACHE_CACHE_SIZE")
+    $envNames = @("CARGO_BUILD_BUILD_DIR", "CARGO_TARGET_DIR", "CARGO_INCREMENTAL", "RUSTC_WRAPPER") + @(Get-RustCacheSccacheEnvironmentNames)
     $environment = Save-RustCacheEnvironment -Names $envNames
     try {
+        $capacityLease = Enter-RustCacheCapacityReservation -CacheRoot $context.cache_root -BuildDir $context.build_dir -TargetDir $context.target_dir
         if (-not $NoLock) {
             Write-Host "Waiting for Rust cache partition lock: $($context.build_dir)"
             $lockPath = Enter-RustCacheLock -CacheRoot $context.cache_root -BuildDir $context.build_dir -WorkspaceRoot $context.workspace_root -TimeoutSeconds $LockTimeoutSeconds
         }
 
-        $context = Set-RustCacheBuildEnvironment -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -DisableSccache:$DisableSccache -ToolchainEpoch $ToolchainEpoch -SharedBuildPartition $SharedBuildPartition -CargoArgs $CargoArgs
+        $routeReason = $context.route_reason
+        $context = Set-RustCacheBuildEnvironment -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $context.target_dir -CacheRoot $context.cache_root -DisableSccache:$DisableSccache -ToolchainEpoch $ToolchainEpoch -SharedBuildPartition $SharedBuildPartition -CargoArgs $CargoArgs
         $sccache = if ($DisableSccache) { $null } else { Get-Command sccache -ErrorAction SilentlyContinue }
         $readiness = Get-RustCacheSccacheReadiness -Disabled:$DisableSccache
 
         Write-Host "RUST_CACHE_PROJECT=$($context.project_id)"
+        Write-Host "RUST_CACHE_ROUTE=$routeReason"
+        Write-Host "RUST_CACHE_CAPACITY_RESERVATION=$($capacityLease.id)"
         Write-Host "RUST_CACHE_DOMAIN_REQUESTED=$($context.requested_domain)"
         Write-Host "RUST_CACHE_DOMAIN=$($context.domain)"
         Write-Host "RUST_CACHE_DOMAIN_FALLBACK=$($context.domain_fallback)"
@@ -429,8 +438,11 @@ function Invoke-RustCacheCargo {
         & $CargoCommand @CargoArgs
     } finally {
         if ($locationPushed) { Pop-Location }
-        Exit-RustCacheLock -LockPath $lockPath
-        Restore-RustCacheEnvironment -Snapshot $environment
+        try { Exit-RustCacheLock -LockPath $lockPath }
+        finally {
+            try { if ($null -ne $capacityLease) { Exit-RustCacheCapacityReservation -Reservation $capacityLease } }
+            finally { Restore-RustCacheEnvironment -Snapshot $environment }
+        }
     }
 }
 

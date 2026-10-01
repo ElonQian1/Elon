@@ -2,6 +2,8 @@ Import-Module "$PSScriptRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.NetworkStorage.psm1" -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.Studio.psm1" -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.Capacity.psm1" -DisableNameChecking
 
 function Get-RustCacheBytesHash {
     param([Parameter(Mandatory)][AllowEmptyCollection()][byte[]]$Bytes)
@@ -90,7 +92,7 @@ function Get-RustCachePlatformFingerprint {
 
 function Get-RustCachePlatformInstallManifestPath {
     param([Parameter(Mandatory)][string]$CacheRoot)
-    Join-Path ([System.IO.Path]::GetFullPath($CacheRoot)) "platform\platform-install.json"
+    Join-Path (Resolve-RustCacheManagementRoot -CacheRoot $CacheRoot) "platform\platform-install.json"
 }
 
 function Read-RustCachePlatformInstallManifest {
@@ -355,7 +357,8 @@ function Get-RustCacheDoctor {
     $sccache = Get-Command sccache -ErrorAction SilentlyContinue
     $checks.Add((New-RustCacheDoctorCheck "command-sccache" $(if ($sccache) { "pass" } else { "warn" }) $(if ($sccache) { "sccache is available at $($sccache.Source)." } else { "sccache is unavailable; builds work but cross-project object reuse is disabled." }) $(if ($sccache) { $null } else { "Install sccache before activating the platform for best reuse." })))
 
-    $platformRoot = Join-Path $root "platform"
+    $managementRoot = Resolve-RustCacheManagementRoot -CacheRoot $root
+    $platformRoot = Join-Path $managementRoot "platform"
     $sourceComparison = if ($env:OS -eq "Windows_NT") { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
     $sourceIsInstalledEntry = $source.TrimEnd('\', '/').Equals($platformRoot.TrimEnd('\', '/'), $sourceComparison)
     $sourceFingerprint = Get-RustCachePlatformFingerprint -SourceScriptsRoot $source -Installed:$sourceIsInstalledEntry
@@ -376,7 +379,7 @@ function Get-RustCacheDoctor {
             $checks.Add((New-RustCacheDoctorCheck "platform-version" "fail" "Installed platform differs from this checkout." "Re-run install from this checkout before starting new builds."))
         }
         try {
-            $installedFingerprint = Get-RustCachePlatformFingerprint -SourceScriptsRoot (Join-Path $root "platform") -Installed
+            $installedFingerprint = Get-RustCachePlatformFingerprint -SourceScriptsRoot $platformRoot -Installed
             if ([string]$installManifest.installed_hash -eq [string]$installedFingerprint.hash) {
                 $checks.Add((New-RustCacheDoctorCheck "platform-integrity" "pass" "Installed platform files match their recorded fingerprint." $null))
             } else {
@@ -387,7 +390,7 @@ function Get-RustCacheDoctor {
         }
     }
 
-    $includePath = Join-Path $root "config\cargo-cache.toml"
+    $includePath = Join-Path $managementRoot "config\cargo-cache.toml"
     if (Test-Path -LiteralPath $includePath -PathType Leaf) {
         $checks.Add((New-RustCacheDoctorCheck "cargo-include" "pass" "Managed Cargo include exists." $null))
     } else {
@@ -415,6 +418,17 @@ function Get-RustCacheDoctor {
     $policy = if (Test-Path -LiteralPath $policyPath -PathType Leaf) { Get-RustCachePolicy -CacheRoot $root } else { Get-DefaultRustCachePolicy }
     $diskStatus = if ($freePercent -lt [double]$policy.critical_free_percent) { "fail" } elseif ($freePercent -lt [double]$policy.warning_free_percent) { "warn" } else { "pass" }
     $checks.Add((New-RustCacheDoctorCheck "disk-space" $diskStatus "Cache volume has $freePercent% free space." $(if ($diskStatus -eq "pass") { $null } else { "Run gc without -Apply, review the report, then apply only selected managed cleanup." })))
+
+    try {
+        $profile = Get-RustCacheStudioProfile
+        $target = if($profile){Join-Path $root 'targets'}else{Join-Path $project 'target'}
+        $capacity = Get-RustCacheCapacityPlan -CacheRoot $root -BuildDir (Join-Path $root 'build') -TargetDir $target -Policy $policy
+        $capacityStatus = if($capacity.admissible){'pass'}else{'fail'}
+        $remediation = if($capacity.admissible){$null}else{'Select an approved build location or reclaim reviewed cache; skipping GC cannot bypass admission.'}
+        $checks.Add((New-RustCacheDoctorCheck 'build-capacity' $capacityStatus 'Build, target and TEMP capacity includes safety floors and active per-user reservations.' $remediation))
+    } catch {
+        $checks.Add((New-RustCacheDoctorCheck 'build-capacity' 'fail' $_.Exception.Message 'Repair machine capacity/profile configuration before starting a build.'))
+    }
 
     $writers = @(Get-Process -Name cargo, rustc -ErrorAction SilentlyContinue | Select-Object ProcessName, Id, StartTime)
     $checks.Add((New-RustCacheDoctorCheck "active-writers" $(if ($writers.Count -eq 0) { "pass" } else { "warn" }) $(if ($writers.Count -eq 0) { "No active Cargo/rustc writers were found." } else { "$($writers.Count) Cargo/rustc writer process(es) are active." }) $(if ($writers.Count -eq 0) { $null } else { "Do not start duplicate builds or activate global Cargo configuration until they finish." })))

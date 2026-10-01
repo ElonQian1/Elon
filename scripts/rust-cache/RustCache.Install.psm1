@@ -1,6 +1,8 @@
 Import-Module "$PSScriptRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Sccache.psm1" -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.SccacheTiers.psm1" -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.Studio.psm1" -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Portability.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Launcher.psm1" -Force -DisableNameChecking
 
@@ -106,10 +108,10 @@ function Restart-RustCacheSccacheServer {
     if ($result.restart_pending) {
         return [pscustomobject]@{
             status = "deferred"
-            reason = "cargo-or-rustc-active"
+            reason = if ($result.PSObject.Properties.Name -contains 'reason') { $result.reason } else { "cargo-or-rustc-active" }
             path = $sccache.Source
             cache_dir = $result.cache_dir
-            max_cache_size = $MaxCacheSize
+            max_cache_size = $result.max_cache_size
             config_path = $result.config_path
             base_directories = $result.base_directories
             base_directory_status = $result.base_directory_status
@@ -121,7 +123,9 @@ function Restart-RustCacheSccacheServer {
         }
     }
     $normalizedLocation = if ($result.location) { ([string]$result.location).Replace("\\", "\") } else { "" }
-    if (-not $result.location -or $normalizedLocation -notlike "*$($result.cache_dir)*") {
+    $multilevel = $result.PSObject.Properties.Name -contains 'remote_configured' -and $result.remote_configured
+    $expectedLocation = if ($multilevel) { $normalizedLocation -match 'Multi-level \(2 levels\)' } else { $normalizedLocation -like "*$($result.cache_dir)*" }
+    if (-not $result.configuration_loaded -or -not $expectedLocation) {
         throw "sccache server did not bind the managed cache directory. Reported: $($result.location)"
     }
     return [pscustomobject]@{
@@ -129,7 +133,7 @@ function Restart-RustCacheSccacheServer {
         reason = $null
         path = $sccache.Source
         cache_dir = $result.cache_dir
-        max_cache_size = $MaxCacheSize
+        max_cache_size = $result.max_cache_size
         config_path = $result.config_path
         base_directories = $result.base_directories
         base_directory_status = $result.base_directory_status
@@ -161,24 +165,40 @@ function Install-RustCacheSccacheWrapper {
     $wrapperPath = Get-RustCacheSccacheWrapperPath -CacheRoot $CacheRoot
     $temporaryPath = "$wrapperPath.$PID.tmp.exe"
     New-Item -ItemType Directory -Force -Path (Split-Path $wrapperPath -Parent) | Out-Null
-    $previousSccachePath = [Environment]::GetEnvironmentVariable("ELON_RUST_CACHE_SCCACHE_PATH", "Process")
-    $previousCacheSize = [Environment]::GetEnvironmentVariable("ELON_RUST_CACHE_SCCACHE_SIZE", "Process")
+    $layout = Get-RustCacheSccacheTierLayout -CacheRoot $CacheRoot -LegacyMaxSize $MaxCacheSize
+    Initialize-RustCacheSccacheTierStorage $layout
+    Assert-RustCacheSccacheCapabilities $layout $SccachePath
+    $nativeBinding = Get-RustCacheSccacheBinding $layout
+    $compileEnvironment = [ordered]@{
+        ELON_RUST_CACHE_SCCACHE_PATH = [IO.Path]::GetFullPath($SccachePath)
+        ELON_RUST_CACHE_SCCACHE_SIZE = $layout.max_cache_size
+        ELON_RUST_CACHE_SCCACHE_CONF = $layout.config_path
+        ELON_RUST_CACHE_SCCACHE_DIR = $layout.cache_dir
+        ELON_RUST_CACHE_SCCACHE_PORT = $layout.server_port
+        ELON_RUST_CACHE_SCCACHE_CACHED_CONF = $layout.cached_config_path
+        ELON_RUST_CACHE_SCCACHE_WEBDAV_ENDPOINT = $nativeBinding.webdav_endpoint
+        ELON_RUST_CACHE_SCCACHE_WEBDAV_KEY_PREFIX = $nativeBinding.webdav_key_prefix
+    }
+    $previousEnvironment = @{}
+    foreach ($name in $compileEnvironment.Keys) { $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name,'Process') }
     try {
-        $env:ELON_RUST_CACHE_SCCACHE_PATH = [System.IO.Path]::GetFullPath($SccachePath)
-        $env:ELON_RUST_CACHE_SCCACHE_SIZE = $MaxCacheSize
+        Set-RustCacheSccacheProcessEnvironment $compileEnvironment
         & $rustc.Source --edition 2021 --crate-name rustc_sccache_wrapper $sourcePath -C opt-level=s -C strip=symbols -o $temporaryPath
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $temporaryPath)) {
             throw "rustc failed to compile the native sccache wrapper: $sourcePath"
         }
         Move-Item -LiteralPath $temporaryPath -Destination $wrapperPath -Force
-        $legacyCommandWrapper = Join-Path ([System.IO.Path]::GetFullPath($CacheRoot)) "platform\rustc-sccache-wrapper.cmd"
+        if ($layout.tiered) {
+            $binding = [ordered]@{ schema='elon.sccache_wrapper_binding.v1'; binding_sha256=(Get-RustCacheTierTextHash ((Get-RustCacheSccacheBinding $layout)|ConvertTo-Json -Compress)) }
+            [IO.File]::WriteAllText($layout.binding_path,($binding|ConvertTo-Json),(New-Object Text.UTF8Encoding($false)))
+        }
+        $legacyCommandWrapper = Join-Path (Split-Path $wrapperPath -Parent) "rustc-sccache-wrapper.cmd"
         $activeBuilds = @(Get-Process -Name cargo, rustc -ErrorAction SilentlyContinue)
         if ($activeBuilds.Count -eq 0 -and (Test-Path -LiteralPath $legacyCommandWrapper)) {
             Remove-Item -LiteralPath $legacyCommandWrapper -Force
         }
     } finally {
-        if ($null -eq $previousSccachePath) { Remove-Item Env:ELON_RUST_CACHE_SCCACHE_PATH -ErrorAction SilentlyContinue } else { $env:ELON_RUST_CACHE_SCCACHE_PATH = $previousSccachePath }
-        if ($null -eq $previousCacheSize) { Remove-Item Env:ELON_RUST_CACHE_SCCACHE_SIZE -ErrorAction SilentlyContinue } else { $env:ELON_RUST_CACHE_SCCACHE_SIZE = $previousCacheSize }
+        Set-RustCacheSccacheProcessEnvironment $previousEnvironment
         Remove-Item -LiteralPath $temporaryPath -Force -ErrorAction SilentlyContinue
     }
     return $wrapperPath
@@ -191,11 +211,18 @@ function Set-RustCacheUserEnvironment {
         [switch]$Apply
     )
 
+    $layout = Get-RustCacheSccacheTierLayout -CacheRoot $CacheRoot -LegacyMaxSize $MaxCacheSize
     $values = [ordered]@{
         ELON_RUST_CACHE_ROOT = [System.IO.Path]::GetFullPath($CacheRoot)
-        SCCACHE_DIR = Join-Path ([System.IO.Path]::GetFullPath($CacheRoot)) "sccache"
-        SCCACHE_CACHE_SIZE = $MaxCacheSize
-        SCCACHE_CONF = Get-RustCacheSccacheConfigPath -CacheRoot $CacheRoot
+        SCCACHE_DIR = $layout.cache_dir
+        SCCACHE_CACHE_SIZE = $layout.max_cache_size
+        SCCACHE_CONF = $layout.config_path
+    }
+    if ($layout.tiered) {
+        $values.ELON_RUST_CACHE_CONTROL_ROOT = $layout.control_root
+        $values.ELON_RUST_CACHE_SCCACHE_TIERS = $layout.tier.config_path
+        $values.SCCACHE_SERVER_PORT = $layout.server_port
+        $values.SCCACHE_CACHED_CONF = $layout.cached_config_path
     }
     if ($Apply -and $env:OS -eq "Windows_NT") {
         foreach ($name in $values.Keys) {
@@ -214,7 +241,7 @@ function Enter-RustCachePlatformInstallLock {
         [int]$TimeoutSeconds = 120
     )
 
-    $stateRoot = Join-Path ([System.IO.Path]::GetFullPath($CacheRoot)) "state"
+    $stateRoot = Join-Path (Resolve-RustCacheManagementRoot -CacheRoot $CacheRoot) "state"
     New-Item -ItemType Directory -Force -Path $stateRoot | Out-Null
     $lockPath = Join-Path $stateRoot "platform-install.lock"
     $deadline = [DateTime]::UtcNow.AddSeconds([math]::Max(0, $TimeoutSeconds))
@@ -252,6 +279,26 @@ function Exit-RustCachePlatformInstallLock {
     }
 }
 
+function Install-RustCacheStudioDocuments {
+    param([string]$SourceScriptsRoot, [string]$ManagementRoot)
+    $entries = @()
+    foreach ($relative in @('docs/studio-cache-ai-entry.md','docs/studio-cache-operations.md','docs/design/studio-build-cache-v1.md',
+        'docs/rust-cache-platform.md','docs/rust-cache-on-demand-adoption.md','docs/rust-cache-network-storage.md','docs/rust-cache-fleet-operations.md')) {
+        $source = Join-Path (Split-Path $SourceScriptsRoot -Parent) $relative
+        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { $source = Join-Path $SourceScriptsRoot $relative }
+        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { continue }
+        $destination = Join-Path $ManagementRoot $relative
+        New-Item -ItemType Directory -Path (Split-Path $destination -Parent) -Force | Out-Null
+        if ([IO.Path]::GetFullPath($source) -ine [IO.Path]::GetFullPath($destination)) { [IO.File]::Copy($source,$destination,$true) }
+        $entries += [pscustomobject]@{path=$relative;sha256=(Get-RustCacheFileSha256 -Path $destination)}
+    }
+    if (-not $entries.Count) { return $null }
+    $manifestPath = Join-Path $ManagementRoot 'docs/studio-cache-docs-manifest.json'
+    $manifest = [ordered]@{schema='elon.studio_cache.documents.v1';files=$entries}
+    [IO.File]::WriteAllText($manifestPath,($manifest|ConvertTo-Json -Depth 5),(New-Object Text.UTF8Encoding($false)))
+    return $manifestPath
+}
+
 function Install-RustCachePlatform {
     param(
         [Parameter(Mandatory)][string]$SourceScriptsRoot,
@@ -286,7 +333,8 @@ function Install-RustCachePlatform {
     $installLease = Enter-RustCachePlatformInstallLock -CacheRoot $root -TimeoutSeconds $InstallLockTimeoutSeconds
     try {
         Initialize-RustCachePolicy -CacheRoot $root | Out-Null
-        $platformRoot = Join-Path $root "platform"
+        $managementRoot = Resolve-RustCacheManagementRoot -CacheRoot $root
+        $platformRoot = Join-Path $managementRoot "platform"
         $targetModules = Join-Path $platformRoot "rust-cache"
         New-Item -ItemType Directory -Force -Path $targetModules | Out-Null
         Copy-Item -LiteralPath $sourceEntry -Destination (Join-Path $platformRoot "rust-cache.ps1") -Force
@@ -294,6 +342,7 @@ function Install-RustCachePlatform {
             Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $targetModules $_.Name) -Force
         }
         $userLauncher = Install-RustCacheUserLauncher -CacheRoot $root -UserLauncherPath $UserLauncherPath
+        $documentationManifest = Install-RustCacheStudioDocuments -SourceScriptsRoot $sourceRoot -ManagementRoot $managementRoot
 
     $sccache = Get-Command sccache -ErrorAction SilentlyContinue
     $policy = Get-RustCachePolicy -CacheRoot $root
@@ -301,13 +350,13 @@ function Install-RustCachePlatform {
     if ($sccache) {
         $sccacheWrapperPath = Install-RustCacheSccacheWrapper -SourceModulesRoot $sourceModules -CacheRoot $root -SccachePath $sccache.Source -MaxCacheSize ([string]$policy.sccache_max_size)
     }
-    $includePath = Join-Path $root "config\cargo-cache.toml"
+    $includePath = Join-Path $managementRoot "config\cargo-cache.toml"
+    New-Item -ItemType Directory -Force -Path (Split-Path $includePath -Parent) | Out-Null
     $includeContent = Get-RustCacheCargoIncludeContent -CacheRoot $root -SccachePath $sccacheWrapperPath
     Set-Content -LiteralPath $includePath -Value $includeContent -Encoding UTF8 -NoNewline
 
     $sccacheConfig = Sync-RustCacheSccacheConfiguration -CacheRoot $root
 
-    New-Item -ItemType Directory -Force -Path (Join-Path $root "sccache") | Out-Null
     $sccacheServer = $null
     if ($ConfigureSccacheServer -and $sccache) {
         $sccacheServer = Restart-RustCacheSccacheServer -CacheRoot $root -MaxCacheSize ([string]$policy.sccache_max_size)
@@ -343,6 +392,7 @@ function Install-RustCachePlatform {
             user_environment = $userEnvironment
             cargo_activation = $activation
             platform_manifest_path = $platformManifestPath
+            documentation_manifest_path = $documentationManifest
             source_hash = $sourceFingerprint.hash
             installed_hash = $installedFingerprint.hash
             codex_skill = $codexSkill
