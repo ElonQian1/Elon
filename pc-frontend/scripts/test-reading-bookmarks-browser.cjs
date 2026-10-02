@@ -47,6 +47,10 @@ const base = process.env.READING_FIXTURE_URL || 'http://127.0.0.1:5198/pc/tests/
     await page.getByRole('button', { name: '书签', exact: true }).click();
     await page.getByRole('button', { name: '继续阅读', exact: true }).click();
     await page.waitForFunction(id => document.activeElement?.dataset.messageId === id, bookmarks[0].anchor.message_id);
+    await page.getByRole('img', { name: '书签：Win 阅读位置', exact: true }).waitFor();
+    const markerBox = await page.getByRole('img', { name: '书签：Win 阅读位置', exact: true }).boundingBox();
+    const bubbleBox = await page.locator(`[data-message-id="${bookmarks[0].anchor.message_id}"] [data-reading-bubble]`).boundingBox();
+    assert.ok(markerBox && bubbleBox && markerBox.x >= bubbleBox.x + bubbleBox.width, 'bookmark sits beside the incoming bubble');
     await page.getByRole('button', { name: '书签', exact: true }).click();
     await page.getByRole('button', { name: '关闭', exact: true }).click();
     assert.deepEqual(errors, []);

@@ -117,7 +117,7 @@ export default function SocialConversation(props: Props) {
         const compactLink = !m.ai_reply && !recalled && !m.attachments?.length && ElonSocialLinks.compact(content)
         const copyId = messageCopySourceId(`friends:${key}`, m.id)
         const savedKey = localMessageKey(conversation, m.id)
-        return <div key={`${key}:${m.id}`} data-message-id={m.id} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 120px' }} tabIndex={0} aria-label={`${name}的消息`}
+        return <div key={`${key}:${m.id}`} data-message-id={m.id} data-reading-own={own} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 120px' }} tabIndex={0} aria-label={`${name}的消息`}
           className={[styles.msgRow, own ? styles.ownRow : '', selectedIds.includes(m.id) ? tools.selected : ''].join(' ')}
           onContextMenu={event => {
             const target = event.target as HTMLElement
@@ -133,7 +133,7 @@ export default function SocialConversation(props: Props) {
           <div className={styles.avatar}><SocialAvatar userId={m.sender_user_id} name={name} avatar={avatar} /></div>
           <div className={styles.msgBody} data-social-content>
             <div className={styles.msgMeta}><strong>{name}</strong><span>{formatTime(m.created_at)}</span></div>
-            {content && (gridCard(content) && conversation.kind === 'group' && !recalled ? <GridShareMessage key={m.id} content={content} group={conversation.id} owner={me.id} title={title} onQuote={() => setQuote({ conversation: key, message: m, author: name, nonce: Date.now() })} onAnalyze={() => setAiSelection([m])} onSent={props.onSent} /> : recordCard(content) && conversation.kind === 'group' && !m.ai_reply ? <ChatRecordMessage content={content} group={conversation.id} onAnalyze={!selectionMode && !recalled && !isPending(m) ? () => setAiSelection([m]) : undefined} /> : articleReference(content) && !m.ai_reply ? <ArticleMessage content={content} /> : <div id={copyId} className={styles.msgContent} hidden={compactLink}>
+            {content && (gridCard(content) && conversation.kind === 'group' && !recalled ? <GridShareMessage key={m.id} content={content} group={conversation.id} owner={me.id} title={title} onQuote={() => setQuote({ conversation: key, message: m, author: name, nonce: Date.now() })} onAnalyze={() => setAiSelection([m])} onSent={props.onSent} /> : recordCard(content) && conversation.kind === 'group' && !m.ai_reply ? <ChatRecordMessage content={content} group={conversation.id} onAnalyze={!selectionMode && !recalled && !isPending(m) ? () => setAiSelection([m]) : undefined} /> : articleReference(content) && !m.ai_reply ? <ArticleMessage content={content} /> : <div id={copyId} data-reading-bubble className={styles.msgContent} hidden={compactLink}>
               {(!own || content.startsWith('>')) && /[#*`\[\]>|]/.test(content) ? <MarkdownContent content={content} copy={false} /> : content}
               {!recalled && m.ai_reply && conversation.kind === 'group' && <GroupAiReplyContext owner={me.id} group={conversation.id} message={m.id} metadata={m.ai_reply} part="footer" />}
             </div>)}
