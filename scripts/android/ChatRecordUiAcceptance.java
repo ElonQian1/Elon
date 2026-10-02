@@ -51,16 +51,24 @@ public final class ChatRecordUiAcceptance extends UiAutomatorTestCase {
             assertTrue("record_group_required", !group.isEmpty() && group.length() <= 120);
             if (!text(group).exists() && text("群聊").exists()) click(text("群聊"));
             click(text(group));
-        } else if (step.equals("open") || step.equals("reopen")) {
+        } else if (step.equals("open") || step.equals("reopen") || step.startsWith("tap_")) {
             if (step.equals("reopen")) { assertTrue("record_reader_required", ready().exists()); click(desc("返回")); }
             UiObject card = new UiObject(new UiSelector().packageName(APP).descriptionStartsWith("查看聊天记录 ").instance(0));
             for (int n = 0; !card.exists() && n < 8; n++) scroll(false);
             for (int n = 0; !card.exists() && n < 16; n++) scroll(true);
             assertTrue("record_card_missing", card.exists());
             long started = SystemClock.elapsedRealtime();
-            click(card);
+            if (step.startsWith("tap_")) {
+                int index = step.equals("tap_title") ? 0 : step.equals("tap_summary") ? 1 : step.equals("tap_footer") ? 2 : -1;
+                assertTrue("record_tap_target_unknown", index >= 0);
+                // Exercise Android touch dispatch, not ACTION_CLICK on the parent card.
+                UiObject child = card.getChild(new UiSelector().className("android.widget.TextView").index(index));
+                assertTrue("record_text_target_missing", child.waitForExists(3000));
+                assertTrue("record_text_tap_failed", child.click());
+            } else { click(card); }
             result.put("ready", ready().waitForExists(15000));
             result.put("open_to_accessibility_ready_ms", SystemClock.elapsedRealtime() - started);
+            assertTrue("record_reader_not_opened", result.getBoolean("ready"));
         } else if (step.equals("cache_menu")) {
             assertTrue("record_reader_required", ready().exists()); click(desc("更多")); click(text("缓存管理"));
             assertTrue("record_cache_dialog_missing", text("清理当前").waitForExists(5000));

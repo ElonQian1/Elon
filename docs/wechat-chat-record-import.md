@@ -50,6 +50,8 @@ Android 同时接收 `ACTION_SEND` 和 `ACTION_SEND_MULTIPLE` 的 ZIP。实际�
 
 阅读器交互与缓存修复见 [聊天记录阅读器修复](reports/wechat-record-reader-cache-20260928.md)。群里发送的始终是结构化记录引用，不是每次打开重新下载、解压 ZIP。
 
+群聊启用长按后文字区域吞点击的回归及真实触摸验收见 [记录卡片点击修复](reports/wechat-record-card-tap-20261003.md)。
+
 Android 二次打开采用 [近期缓存先显示与本地管理](reports/wechat-record-cache-reopen-20260929.md)：5 分钟验证窗口、正文与媒体分队列、关闭即取消、128 MiB/7 天回收及手动清理。该策略替代旧报告中 Android 每次等待网络复核的规则；PC/PWA 策略不变。
 
 头像、导出标签折叠、卡片复制/转发和视频缩略图见 [阅读体验与验证](reports/wechat-record-reader-presentation-20260929.md)。这些是展示层规则，`raw_text` 和原始链接保持完整。

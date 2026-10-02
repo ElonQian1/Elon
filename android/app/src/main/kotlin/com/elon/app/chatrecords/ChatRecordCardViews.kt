@@ -14,13 +14,16 @@ internal object ChatRecordCardViews {
         container ?: return false
         text.text = ""; text.visibility = View.GONE; container.removeAllViews(); container.visibility = View.VISIBLE
         val ui = ArticleUi(container.context)
+        val open = View.OnClickListener { ChatRecordReaderActivity.open(container.context, card.getString("group_id"), card.getString("record_id")) }
         val body = ui.column().apply {
             layoutParams = LinearLayout.LayoutParams(minOf(ui.dp(288), resources.displayMetrics.widthPixels - ui.dp(100)), -2)
             background = android.graphics.drawable.GradientDrawable().apply { cornerRadius = ui.dp(8).toFloat(); setColor(context.elonColor(R.color.elon_surface_card)) }
             addView(ui.text(card.optString("title"), 17f).apply { maxLines = 2 })
             addView(ui.text(card.optString("summary"), 14f, true).apply { maxLines = 3; ellipsize = android.text.TextUtils.TruncateAt.END })
             addView(ui.text("聊天记录 · ${card.optInt("message_count")} 条", 12f, true))
-            isFocusable = true; contentDescription = "查看聊天记录 ${card.optString("title")}"; setOnClickListener { ChatRecordReaderActivity.open(context, card.getString("group_id"), card.getString("record_id")) }
+            isFocusable = true; contentDescription = "查看聊天记录 ${card.optString("title")}"; setOnClickListener(open)
+            // Group long-press makes each label consume touch; labels need the same tap action.
+            for (index in 0 until childCount) getChildAt(index).setOnClickListener(open)
         }
         container.addView(body); return true
     }
