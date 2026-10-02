@@ -5,8 +5,8 @@ const path = require('node:path');
 const { createFixture } = require('./mobile-design-pwa-fixture.cjs');
 const engine = process.env.BROWSER_ENGINE || 'webkit';
 let failed = true;
-function drawing(tall) {
-  const height = tall ? 2800 : 750;
+function drawing(tall, ultra) {
+  const height = ultra ? 50000 : tall ? 2800 : 750;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="${height}" viewBox="0 0 1000 ${height}">
   <rect width="1000" height="${height}" fill="#e9eef5"/>
   <path d="M0 0L1000 ${height}M1000 0L0 ${height}" stroke="#788699" stroke-width="3"/>
@@ -19,13 +19,14 @@ function drawing(tall) {
 const fixture = createFixture({ handleSyntheticRequest(req, res, url) {
   const p = url.pathname, json = value => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(value)); };
   if (p === '/api/me/groups') { json({ groups: [{ id: 'image-fixture', name: '图片查看验证群', member_count: 2 }] }); return true; }
-  if (p.startsWith('/api/me/groups/image-fixture')) {
-    json({ messages: [...Array.from({ length: 10 }, (_, i) => ({ id: 'text-' + i, content: '用于检查关闭图片后的聊天位置。', sender_name: '演示成员', created_at: '2026-09-29T08:00:00Z' })),
-      ...['normal', 'tall', 'broken'].map((kind, i) => ({ id: kind, content: '', outgoing: i === 1, sender_name: '演示成员', created_at: '2026-09-29T08:00:00Z', attachments: [{ kind: 'image', mime_type: 'image/svg+xml', display_name: kind + '-图片.svg', url: url.origin + '/fixture-image/' + kind + '.svg' }] }))], members: [], posts: [], items: [], ai_members: [] }); return true;
+  if (p === '/api/me/message-timeline/read') { json({}); return true; }
+  if (p.startsWith('/api/me/groups/image-fixture') || p === '/api/me/message-timeline') {
+    json({ schema: 'elon.message_timeline.v1', removed_ids: [], has_more: false, sync: 'image-fixture-live', messages: [...Array.from({ length: 10 }, (_, i) => ({ id: 'text-' + i, content: '用于检查关闭图片后的聊天位置。', sender_name: '演示成员', created_at: '2026-09-29T08:00:00Z' })),
+      ...['normal', 'tall', 'ultra', 'broken'].map((kind, i) => ({ id: kind, content: '', outgoing: i === 1, sender_name: '演示成员', created_at: '2026-09-29T08:00:00Z', attachments: [{ kind: 'image', mime_type: 'image/svg+xml', display_name: kind + '-图片.svg', url: url.origin + '/fixture-image/' + kind + '.svg' }] }))], members: [], posts: [], items: [], ai_members: [] }); return true;
   }
   if (p.startsWith('/fixture-image/')) {
     res.writeHead(p.includes('broken') && failed ? 503 : 200, { 'content-type': 'image/svg+xml', 'cache-control': 'no-store' });
-    res.end(p.includes('broken') && failed ? '' : drawing(p.includes('tall'))); return true;
+    res.end(p.includes('broken') && failed ? '' : drawing(p.includes('tall'), p.includes('ultra'))); return true;
   }
   return false;
 } });
@@ -46,7 +47,8 @@ async function main() {
     const scale = () => page.locator('.chat-image-stage').getAttribute('data-scale').then(Number);
     async function enter() {
       await page.goto(origin + '/?fixture=login', { waitUntil: 'networkidle' });
-      await page.locator('.conversation-item').filter({ hasText: '图片查看验证群' }).tap(); await thumbnail().waitFor();
+      await page.locator('.conversation-item').filter({ hasText: '图片查看验证群' }).tap();
+      try { await thumbnail().waitFor(); } catch (error) { console.error(JSON.stringify({ pageErrors: errors, chat: await page.locator('#chatList').innerText() })); throw error; }
     }
     async function ready() { await page.waitForFunction(() => { const img = document.querySelector('.chat-image-original'); return img && !img.hidden && img.naturalWidth > 0; }); }
     async function opened(name = 'normal') { await thumbnail(name).scrollIntoViewIfNeeded(); await thumbnail(name).tap(); await dialog().waitFor(); if (name !== 'broken') await ready(); }
@@ -56,15 +58,16 @@ async function main() {
       await page.evaluate(value => localStorage.setItem('elon.mobile.appearance.v2', value), theme);
       for (const width of [320, 390, 430]) {
         await page.setViewportSize({ width, height: 844 }); await enter(); await thumbnail().scrollIntoViewIfNeeded();
-        const previous = await page.locator('#chatList').evaluate(el => el.scrollTop);
-        await opened(); const bounds = await dialog().boundingBox(); assert(bounds.width >= width - 1 && bounds.height >= 843);
+        await opened(); const previous = await page.locator('#chatList').evaluate(el => el.scrollTop);
+        const bounds = await dialog().boundingBox(); assert(bounds.width >= width - 1 && bounds.height >= 843);
         assert.equal(await scale(), 1); assert.equal(await dialog().getByRole('link', { name: '下载原图' }).getAttribute('download'), 'normal-图片.svg');
         const before = await page.locator('.chat-image-original').boundingBox();
         await dialog().getByRole('button', { name: '放大图片', exact: true }).tap(); assert((await scale()) > 1);
         assert((await page.locator('.chat-image-original').boundingBox()).width > before.width);
         await dialog().getByRole('button', { name: '恢复适合屏幕' }).tap(); assert.equal(await scale(), 1);
         if (width === 390) await page.screenshot({ path: path.join(output, `${engine}-${theme}.png`) });
-        await close(); assert(Math.abs(await page.locator('#chatList').evaluate(el => el.scrollTop) - previous) < 2);
+        await close(); const restored = await page.locator('#chatList').evaluate(el => el.scrollTop);
+        assert(Math.abs(restored - previous) < 2, JSON.stringify({ width, previous, restored }));
         assert(await thumbnail().evaluate(el => document.activeElement === el));
         cases.push(`${theme}-${width}-open-zoom-download-close-position`);
       }
@@ -101,10 +104,37 @@ async function main() {
     assert.notEqual(await page.locator('.chat-image-original').evaluate(el => el.style.transform), transform); cases.push('zoomed-image-pan');
     while (!(await dialog().getByRole('button', { name: '放大图片', exact: true }).isDisabled())) await dialog().getByRole('button', { name: '放大图片', exact: true }).tap();
     assert.equal(await scale(), 8); await close(); cases.push('bounded-zoom');
-    await opened('tall'); assert.equal(await scale(), 1);
+    await opened('tall'); assert((await scale()) > 1);
+    assert.equal(await stage.getAttribute('data-reading'), 'true');
+    let imageBox = await page.locator('.chat-image-original').boundingBox(), stageBox = await stage.boundingBox();
+    assert(Math.abs(imageBox.width - stageBox.width) < 2 && Math.abs(imageBox.y - stageBox.y) < 2);
+    const wheel = async (deltaY, ctrlKey = false) => {
+      if (engine === 'webkit') return stage.dispatchEvent('wheel', { deltaY, ctrlKey, bubbles: true, cancelable: true });
+      if (ctrlKey) await page.keyboard.down('Control');
+      await page.mouse.wheel(0, deltaY);
+      if (ctrlKey) await page.keyboard.up('Control');
+    };
+    await stage.hover(); const readScale = await scale(); await wheel(350);
+    await page.waitForFunction(y => document.querySelector('.chat-image-original').getBoundingClientRect().y < y - 100, imageBox.y);
+    assert.equal(await scale(), readScale); cases.push('long-image-auto-width-top-and-wheel-reading');
+    await wheel(-180, true);
+    await page.waitForFunction(value => Number(document.querySelector('.chat-image-stage').dataset.scale) > value, readScale);
+    cases.push('long-image-ctrl-wheel-zoom');
+    await page.keyboard.press('End');
+    imageBox = await page.locator('.chat-image-original').boundingBox(); stageBox = await stage.boundingBox();
+    assert(Math.abs(imageBox.y + imageBox.height - stageBox.y - stageBox.height) < 2);
+    await dialog().getByRole('button', { name: '回到图片顶部' }).tap();
+    assert(Math.abs((await page.locator('.chat-image-original').boundingBox()).y - stageBox.y) < 2);
+    cases.push('long-image-bottom-and-top');
+    await dialog().getByRole('button', { name: '恢复适合屏幕' }).tap(); assert.equal(await scale(), 1);
+    await dialog().getByRole('button', { name: '长图阅读', exact: true }).tap();
     await page.setViewportSize({ width: 844, height: 390 });
-    await page.waitForFunction(() => { const img = document.querySelector('.chat-image-original'), stage = document.querySelector('.chat-image-stage'); return img.getBoundingClientRect().height <= stage.clientHeight + 1; });
+    await page.waitForFunction(() => { const img = document.querySelector('.chat-image-original').getBoundingClientRect(), stage = document.querySelector('.chat-image-stage').getBoundingClientRect(); return Math.abs(img.width - stage.width) < 2 && Math.abs(img.y - stage.y) < 2; });
     await close(); await page.setViewportSize({ width: 320, height: 844 }); cases.push('long-image-orientation');
+    await opened('ultra'); assert((await scale()) > 8);
+    assert(Math.abs((await page.locator('.chat-image-original').boundingBox()).width - 320) < 2);
+    await page.screenshot({ path: path.join(output, `${engine}-long-reading.png`) });
+    await close(); cases.push('ultra-long-image-not-limited-by-overview-zoom');
     await opened(); const fontStyle = await page.addStyleTag({ content: '.chat-image-viewer button,.chat-image-title,.chat-image-download{font-size:32px!important}' });
     const targets = await dialog().locator('button:not([hidden]),a').evaluateAll(nodes => nodes.map(el => ({ b: el.getBoundingClientRect().toJSON(), hidden: getComputedStyle(el).display === 'none' })));
     assert(targets.filter(t => !t.hidden).every(t => t.b.x >= 0 && t.b.right <= 321 && t.b.height >= 48));

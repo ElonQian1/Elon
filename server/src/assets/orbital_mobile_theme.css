@@ -323,6 +323,7 @@ dialog.chat-image-viewer[open] { display: flex; flex-direction: column; }
 .chat-image-original { display: block; max-width: none; max-height: none; object-fit: contain; transform-origin: center; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .chat-image-controls { display: flex; align-items: center; justify-content: center; flex: none; flex-wrap: wrap; gap: 8px; padding: 8px max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); }
 .chat-image-controls button:disabled { opacity: .45; cursor: default; }
+.chat-image-controls button[aria-pressed="true"] { outline: 2px solid var(--brand); outline-offset: -2px; }
 .chat-image-zoom { min-width: 4em; text-align: center; font-variant-numeric: tabular-nums; }
 .chat-image-hint { flex: none; margin: 8px 12px 0; padding-bottom: max(8px, env(safe-area-inset-bottom)); color: var(--ink-soft); text-align: center; font-size: 13px; line-height: 1.5; }
 .chat-image-status { flex: none; margin: 0; padding: 8px 16px; text-align: center; }
