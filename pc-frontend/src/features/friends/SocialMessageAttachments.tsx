@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, FileText, X } from 'lucide-react'
+import { Download, FileText } from 'lucide-react'
 import { cloudResourceUrl } from '../../lib/cloudResourceUrl'
 import type { SocialAttachment } from './socialMessageTypes'
 import styles from './SocialMessageAttachments.module.css'
-import { SourceLinkView, ManualImageQr } from './source-links/SourceLinkView'
+import { SourceLinkView } from './source-links/SourceLinkView'
+import SocialImagePreview from './SocialImagePreview'
 import { attachmentKind } from './socialMessageContext'
 
 export default function SocialMessageAttachments({ attachments }: { attachments?: SocialAttachment[] | null }) {
@@ -33,6 +34,7 @@ function Attachment({ attachment }: { attachment: SocialAttachment }) {
 }
 
 function ImageAttachment({ url, name }: { url: string; name: string }) {
+  const trigger = useRef<HTMLButtonElement>(null)
   const [failed, setFailed] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -45,27 +47,12 @@ function ImageAttachment({ url, name }: { url: string; name: string }) {
           <a href={url} download>下载图片</a>
         </div>
       ) : (
-        <button type="button" className={styles.imageButton} data-preview-image aria-label={`查看图片：${name}`} onClick={() => setExpanded(true)}>
+        <button ref={trigger} type="button" className={styles.imageButton} data-preview-image aria-label={`查看图片：${name}`} onClick={() => setExpanded(true)}>
           <img key={attempt} className={styles.image} src={url} alt={name} loading="lazy" onError={() => setFailed(true)} />
         </button>
       )}
-      {expanded && <ImagePreview url={url} name={name} onClose={() => setExpanded(false)} />}
+      {expanded && <SocialImagePreview url={url} name={name} returnFocus={trigger.current} onClose={() => setExpanded(false)} />}
     </>
-  )
-}
-
-function ImagePreview({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null)
-  useEffect(() => { dialog.current?.showModal() }, [])
-  return (
-    <dialog ref={dialog} className={styles.preview} aria-label={`图片预览：${name}`} onClose={onClose} onClick={event => {
-      if (event.target === event.currentTarget) onClose()
-    }}>
-      <header><strong>{name}</strong><a href={url} download>下载原图</a>
-        <button type="button" aria-label="关闭图片预览" autoFocus onClick={onClose}><X size={20} /></button>
-      </header>
-      <ManualImageQr url={url} /><img src={url} alt={name} />
-    </dialog>
   )
 }
 
