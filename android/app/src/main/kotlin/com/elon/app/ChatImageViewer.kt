@@ -62,9 +62,18 @@ internal object ChatImageViewer {
                 else RectF(start.x, start.y, end.x, end.y)
             }
         }
+        val readingButton = TextView(context).apply {
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            gravity = Gravity.CENTER
+            minWidth = dp(context, 88)
+            minimumHeight = dp(context, 48)
+            setPadding(dp(context, 12), 0, dp(context, 12), 0)
+        }
+        val reading = ChatImageReadingController(image, readingButton)
         image.setOnStateChangedListener(object : SubsamplingScaleImageView.DefaultOnStateChangedListener() {
-            override fun onScaleChanged(newScale: Float, origin: Int) { overlay.invalidate() }
-            override fun onCenterChanged(newCenter: PointF?, origin: Int) { overlay.invalidate() }
+            override fun onScaleChanged(newScale: Float, origin: Int) { overlay.invalidate(); reading.stateChanged() }
+            override fun onCenterChanged(newCenter: PointF?, origin: Int) { overlay.invalidate(); reading.stateChanged() }
         })
         val status = TextView(context).apply {
             minimumHeight = dp(context, 48)
@@ -81,6 +90,16 @@ internal object ChatImageViewer {
             addView(image, FrameLayout.LayoutParams(-1, -1))
             addView(overlay, FrameLayout.LayoutParams(-1, -1))
             addView(status, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
+        }
+        status.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            for (view in listOf(image, overlay)) {
+                val params = view.layoutParams as FrameLayout.LayoutParams
+                if (params.topMargin != status.height || params.bottomMargin != dp(context, 56)) {
+                    params.topMargin = status.height
+                    params.bottomMargin = dp(context, 56)
+                    view.layoutParams = params
+                }
+            }
         }
         var closed = false
         var generation = 0
@@ -99,6 +118,7 @@ internal object ChatImageViewer {
         fun load() {
             val current = ++generation
             request?.cancel(true)
+            reading.reset()
             image.recycle()
             lease?.close()
             lease = null
@@ -124,6 +144,7 @@ internal object ChatImageViewer {
             }
         }
         image.setOnImageEventListener(object : SubsamplingScaleImageView.DefaultOnImageEventListener() {
+            override fun onReady() { if (!closed) reading.ready() }
             override fun onImageLoaded() {
                 if (closed) return
                 status.text = "${image.sWidth} × ${image.sHeight}"
@@ -185,6 +206,7 @@ internal object ChatImageViewer {
             setBackgroundColor(Color.parseColor("#E6000000"))
             gravity = Gravity.CENTER
             addView(retry)
+            addView(readingButton)
             addView(icon(context, android.R.drawable.ic_menu_zoom, "原始比例").apply {
                 setOnClickListener {
                     if (image.isReady) image.setScaleAndCenter(1f, image.center)
@@ -205,6 +227,7 @@ internal object ChatImageViewer {
             generation++
             request?.cancel(true)
             image.setOnImageEventListener(null)
+            reading.release()
             image.recycle()
             lease?.close()
             lease = null
