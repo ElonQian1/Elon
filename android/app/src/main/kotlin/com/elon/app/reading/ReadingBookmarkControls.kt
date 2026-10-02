@@ -25,11 +25,15 @@ internal class ReadingBookmarkControls(private val list: RecyclerView, private v
     private var pending: Triple<String, Boolean, JSONObject?>? = null
     private var dialog: androidx.appcompat.app.AlertDialog? = null
     private var deleted: JSONObject? = null
+    private var markerDestination: String? = null
     var historical = false; private set
     init {
         strip.addView(button); strip.addView(status); strip.visibility = View.GONE
         button.setOnClickListener { show() }
         list.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(view: RecyclerView, dx: Int, dy: Int) {
+                for (index in 0 until view.childCount) (view.getChildAt(index) as? ReadingBookmarkMessageFrame)?.positionMarker()
+            }
             override fun onScrollStateChanged(view: RecyclerView, state: Int) {
                 if (state == RecyclerView.SCROLL_STATE_DRAGGING) userScrolled = true
                 if (state == RecyclerView.SCROLL_STATE_IDLE) capture()
@@ -46,6 +50,8 @@ internal class ReadingBookmarkControls(private val list: RecyclerView, private v
         val active = value.bookmarks.find { it.optString("id") == value.active }
         status.text = value.error.ifBlank { if (active != null) "正在续读：${active.optString("title")}" else if (historical) "正在阅读历史消息" else if (value.pending > 0) "阅读位置已保存到本机，待同步" else "" }
         status.visibility = if (status.text.isEmpty()) View.GONE else View.VISIBLE
+        val labels = if (value.supported && !value.denied) readingBookmarkLabels(value.bookmarks, value.active, markerDestination) else emptyMap()
+        (list.adapter as? ChatAdapter)?.setReadingBookmarkLabels(labels)
     }
     fun capture() {
         if (!userScrolled || pending != null || !list.isShown) return
@@ -55,13 +61,14 @@ internal class ReadingBookmarkControls(private val list: RecyclerView, private v
         val node = manager.findViewByPosition(index) ?: return
         val id = row.id ?: return
         val fraction = ((list.paddingTop - node.top).toDouble() / node.height.coerceAtLeast(1)).coerceIn(0.0, .99)
+        markerDestination = id
         store?.putPosition(JSONObject().put("message_id", id).put("fraction", fraction)); userScrolled = false
     }
     fun messageActions(anchor: View, message: ChatMessage, fallback: (View, ChatMessage) -> Unit) {
         if (store?.supported != true || message.id.isNullOrBlank()) { fallback(anchor, message); return }
         PopupMenu(list.context, anchor).apply {
             menu.add("添加阅读书签").setOnMenuItemClickListener { editor(store?.bookmarks?.find { it.optJSONObject("anchor")?.optString("message_id") == message.id }, message); true }
-            menu.add("将此处设为当前续读位置").setOnMenuItemClickListener { store?.putPosition(JSONObject().put("message_id", message.id).put("fraction", 0.0)); true }
+            menu.add("将此处设为当前续读位置").setOnMenuItemClickListener { markerDestination = message.id; store?.putPosition(JSONObject().put("message_id", message.id).put("fraction", 0.0)); true }
             menu.add("其他消息操作").setOnMenuItemClickListener { fallback(anchor, message); true }
             show()
         }
@@ -132,12 +139,14 @@ internal class ReadingBookmarkControls(private val list: RecyclerView, private v
         locate(value.query(id, resume)); render()
     }
     fun updated() {
+        render()
         val request = pending ?: return
         val target = reader.timeline(key)?.target ?: return
         val id = target.optString("resolved_id")
         val index = rows().indexOfFirst { it.id == id }
         if (index < 0) return
         pending = null
+        markerDestination = id
         val manager = list.layoutManager as? LinearLayoutManager ?: return
         val fraction = if (target.optString("status") == "exact") {
             if (request.third?.optString("message_id") == id) request.third?.optDouble("fraction", 0.0) ?: 0.0 else target.optDouble("fraction", 0.0)
@@ -152,5 +161,5 @@ internal class ReadingBookmarkControls(private val list: RecyclerView, private v
         if (pending != null) { pending = null; historical = historyBeforeJump; render(); status.text = "书签定位失败，请重试"; status.visibility = View.VISIBLE }
     }
     fun latest() { capture(); pending = null; historical = false; store?.activate(""); render() }
-    fun close() { capture(); store?.flush(); store?.close(); store = null; key = ""; historical = false; userScrolled = false; pending = null; deleted = null; dialog?.dismiss(); dialog = null; strip.visibility = View.GONE }
+    fun close() { capture(); store?.flush(); store?.close(); store = null; key = ""; historical = false; userScrolled = false; pending = null; deleted = null; markerDestination = null; (list.adapter as? ChatAdapter)?.setReadingBookmarkLabels(emptyMap()); dialog?.dismiss(); dialog = null; strip.visibility = View.GONE }
 }

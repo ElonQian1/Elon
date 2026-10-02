@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>阅读书签组件验收</title><link rel="stylesheet" href="/assets/reading_bookmarks.css">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101318;color:#edf0f4;font:16px/1.6 system-ui}h1{font-size:20px;margin:16px}
+#list{height:560px;overflow:auto;overflow-anchor:none;padding:12px}button{color:inherit}
+.chat-message-block{margin-bottom:24px}.bubble-row{display:flex}.bubble-row.user{justify-content:flex-end}
+.bubble{max-width:76%;padding:12px;border-radius:14px;background:#283442;white-space:pre-wrap;overflow-wrap:anywhere}
+.user .bubble{background:#254565}.reading-bookmarks-dialog{background:#1d252e}
+</style>
+<h1>阅读书签 · 合成会话</h1><div id="list"></div>
+<script src="/assets/reading_positions.js"></script><script src="/assets/reading_bookmarks_ui.js"></script>
+<script>
+const list=document.getElementById('list');
+const messages=[{id:'one',content:'这是原始标记。继续读到其他消息后，这里的书签仍然保留。'},
+ {id:'two',content:'这是另一条消息，用来验证各自的阅读位置。',own:true},
+ {id:'long',content:('长消息阅读示例：标记应保持在气泡旁，不遮住正文。\n').repeat(18)}];
+window.fixtureRows=()=>{list.replaceChildren(...messages.map(m=>{
+ const row=document.createElement('div');row.className='chat-message-block';row.dataset.messageId=m.id;
+ const line=document.createElement('div');line.className='bubble-row'+(m.own?' user':'');
+ const bubble=document.createElement('div');bubble.className='bubble';bubble.textContent=m.content;line.append(bubble);row.append(line);return row;
+}));};fixtureRows();
+let bookmarks=[{id:'a',title:'周末继续看',anchor:{message_id:'one'},progress:{position:{message_id:'long',fraction:.4},revision:1},revision:1},
+ {id:'b',title:'待回顾',anchor:{message_id:'two'},revision:1}];
+window.ui=ElonReadingBookmarksUI.mount({owner:'marker-render-fixture',scope:{kind:'group',id:'synthetic'},list,
+ messages:()=>messages,current:()=>true,request:async(method,path,op)=>{
+  if(path.endsWith('capabilities'))return {reading_bookmarks:true,timeline_around:true};
+  if(method==='GET')return {bookmarks,next:null};
+  if(op.action==='delete')bookmarks=bookmarks.filter(b=>b.id!==op.bookmark_id);
+  if(op.action==='create'){const b={id:op.bookmark_id,title:op.title,anchor:op.position,revision:1};bookmarks.push(b);return {bookmark:b};}
+  if(op.action==='progress')return {progress:{position:op.position,revision:2}};
+  return {revision:2};
+ },navigate:async q=>{const b=bookmarks.find(b=>b.id===q.bookmark),p=q.around?{message_id:q.around}:q.resume==='true'&&b.progress?b.progress.position:b.anchor;
+  return {resolved_id:p.message_id,status:'exact',fraction:p.fraction||0};},latest:async()=>{list.scrollTop=list.scrollHeight;return true;}});
+</script></html>

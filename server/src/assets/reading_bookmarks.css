@@ -7,3 +7,6 @@
 .reading-bookmarks-dialog section{padding:16px 0;border-top:1px solid #aeb7c6}.reading-bookmarks-dialog p{overflow-wrap:anywhere;font-size:14px;line-height:1.5}
 .reading-bookmarks-dialog button{margin:4px}.reading-bookmarks-dialog input,.reading-bookmarks-dialog textarea{display:block;width:100%;box-sizing:border-box;margin:10px 0;padding:12px;color:inherit;background:transparent;border:1px solid #aeb7c6;border-radius:10px}
 @media(prefers-color-scheme:dark){.reading-bookmarks-dialog{background:var(--bg-card,#1c2330);color:#e6eaf2}}
+.reading-marked-message{position:relative}
+.reading-message-marker{position:absolute;z-index:1;display:block;font:20px/1.4 "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;white-space:nowrap;user-select:none;pointer-events:none}
+@media(forced-colors:active){.reading-message-marker{color:CanvasText}}

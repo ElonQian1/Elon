@@ -47,6 +47,20 @@ class ChatAdapter(
     private val selectionIdentity = ChatSelectionIdentity()
     private var lastToggleIdentity: String? = null
     private var lastToggleAtMs = 0L
+    private var readingBookmarkLabels = emptyMap<String, String>()
+    fun setReadingBookmarkLabels(labels: Map<String, String>) {
+        val previous = readingBookmarkLabels
+        if (previous == labels) return
+        readingBookmarkLabels = labels
+        messages.forEachIndexed { index, message ->
+            if (previous[message.id] != labels[message.id]) notifyItemChanged(index, "reading-bookmark")
+        }
+    }
+    override fun onBindViewHolder(holder: VH, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isNotEmpty() && payloads.all { it == "reading-bookmark" })
+            bindReadingBookmarkMarker(holder.itemView, messages[position], readingBookmarkLabels)
+        else super.onBindViewHolder(holder, position, payloads)
+    }
 
     init {
         observeChatSelectionChanges(this, ::reconcileSelection)
@@ -137,11 +151,12 @@ class ChatAdapter(
             else -> R.layout.item_message_ai
         }
         val view = LayoutInflater.from(parent.context).inflate(layout, parent, false)
-        return VH(view)
+        return VH(ReadingBookmarkMessageFrame(view))
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val message = messages[position]
+        bindReadingBookmarkMarker(holder.itemView, message, readingBookmarkLabels)
         val recalled = message.isRecalled()
         holder.stopShimmer()
         bindTimelineLabel(holder.timelineLabel, position)

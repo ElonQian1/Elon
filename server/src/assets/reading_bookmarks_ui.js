@@ -5,6 +5,13 @@
   function mount(options) {
     const { list } = options;
     let alive = true, dialog = null, history = false, jumping = false, intent = 0, timer, deleted, generation = 0, edgeBusy = false, edgeIntent = false;
+    let markerDestination = '', markerFrame = 0;
+    const observedRows = new Set(), resize = new ResizeObserver(scheduleMarkers);
+    const mutations = new MutationObserver(records => {
+      if (records.some(record => !record.target.closest?.('.reading-message-marker') &&
+        [...record.addedNodes, ...record.removedNodes].some(n => !n.classList?.contains('reading-message-marker')))) scheduleMarkers();
+    });
+    mutations.observe(list, { childList: true, subtree: true }); resize.observe(list);
     const bar = element('div'), label = element('span'); bar.className = 'reading-bookmarks-bar'; label.setAttribute('role', 'status');
     const browse = button('书签', show), addCurrent = button('标记当前位置', () => add(currentMessage()));
     const setCurrent = button('更新续读位置', () => { intent = Date.now() + 1600; capture(); void model.flush(); });
@@ -12,13 +19,43 @@
     const model = root.ElonReadingPositions.create({ owner: options.owner, scope: options.scope, request: options.request,
       current: () => alive && (!options.current || options.current()), onChange: render });
     function rows() { return Array.from(list.querySelectorAll('[data-message-id]')); }
+    function scheduleMarkers() {
+      if (!alive || markerFrame) return;
+      markerFrame = requestAnimationFrame(() => { markerFrame = 0; renderMarkers(); });
+    }
+    function renderMarkers() {
+      if (!alive) return;
+      const state = model.snapshot(), labels = new Map(), currentRows = rows();
+      function mark(id, label) { if (id) labels.set(id, [...(labels.get(id) || []), label]); }
+      if (state.supported && !state.unavailable && (!options.current || options.current())) {
+        state.bookmarks.forEach(b => mark(b.anchor?.message_id, `书签：${b.title}`));
+        const active = state.bookmarks.find(b => b.id === state.active);
+        if (active && markerDestination !== active.anchor?.message_id) mark(markerDestination, `续读位置：${active.title}`);
+      }
+      for (const row of observedRows) if (!currentRows.includes(row)) { resize.unobserve(row); observedRows.delete(row); }
+      for (const row of currentRows) {
+        if (!observedRows.has(row)) { observedRows.add(row); resize.observe(row); }
+        const description = labels.get(row.dataset.messageId)?.join('；');
+        let marker = row.querySelector(':scope > .reading-message-marker');
+        if (!description) { marker?.remove(); row.classList.remove('reading-marked-message'); continue; }
+        if (!marker) { marker = element('span', '🔖'); marker.className = 'reading-message-marker'; marker.setAttribute('role', 'img'); row.append(marker); }
+        row.classList.add('reading-marked-message'); marker.setAttribute('aria-label', description); marker.title = description;
+        const bubble = row.querySelector('[data-reading-bubble]:not([hidden]),.bubble') || row.querySelector('[data-social-content]') || row;
+        const own = row.dataset.readingOwn === 'true' || !!row.querySelector('.bubble-row.user');
+        const rect = row.getBoundingClientRect(), anchor = bubble.getBoundingClientRect(), viewport = list.getBoundingClientRect();
+        const width = marker.offsetWidth, height = marker.offsetHeight;
+        const x = own ? anchor.left - rect.left - width - 4 : anchor.right - rect.left + 4;
+        const y = Math.min(Math.max(anchor.top - rect.top, viewport.top - rect.top + 4), Math.max(anchor.top - rect.top, anchor.bottom - rect.top - height));
+        marker.style.left = `${Math.max(0, Math.min(rect.width - width, x))}px`; marker.style.top = `${Math.max(0, y)}px`;
+      }
+    }
     function visibleRow() { const top = list.getBoundingClientRect().top; return rows().find(n => n.getBoundingClientRect().bottom > top + 1); }
     function currentMessage() { const id = visibleRow()?.dataset.messageId; return options.messages().find(m => m.id === id); }
     function capture() {
       if (!alive || jumping || Date.now() > intent || options.filtered?.()) return;
       const node = visibleRow(), message = currentMessage(); if (!node || !message) return;
       const rect = node.getBoundingClientRect(), fraction = Math.max(0, Math.min(.99, (list.getBoundingClientRect().top - rect.top) / Math.max(1, rect.height)));
-      model.putPosition({ message_id: message.id, created_at: message.created_at, fraction });
+      markerDestination = message.id; model.putPosition({ message_id: message.id, created_at: message.created_at, fraction });
     }
     async function newerAtEdge() {
       if (!edgeIntent || edgeBusy || !history || jumping || !options.newer || list.scrollHeight - list.clientHeight - list.scrollTop > 96) return;
@@ -26,7 +63,7 @@
       try { await options.newer(); } finally { edgeBusy = false; }
     }
     function userInput(event) { intent = Date.now() + 1600; if (event.type !== 'wheel' || event.deltaY > 0) edgeIntent = true; requestAnimationFrame(() => void newerAtEdge()); }
-    function scrolled() { if (Date.now() > intent) return; clearTimeout(timer); timer = setTimeout(capture, 600); void newerAtEdge(); }
+    function scrolled() { scheduleMarkers(); if (Date.now() > intent) return; clearTimeout(timer); timer = setTimeout(capture, 600); void newerAtEdge(); }
     const events = ['wheel', 'touchmove', 'keydown', 'pointerdown'];
     events.forEach(name => list.addEventListener(name, userInput, { passive: true })); list.addEventListener('scroll', scrolled, { passive: true });
     function render() {
@@ -37,6 +74,7 @@
       setCurrent.hidden = browse.hidden || !history;
       label.textContent = state.error || (active ? `正在续读：${active.title}` : history ? '正在阅读历史消息' : '') || (state.pending ? '阅读位置已存本机，待同步' : '');
       options.changed?.(state);
+      scheduleMarkers();
     }
     function closeDialog() { if (dialog) { const old = dialog; dialog = null; old.close(); old.remove(); } }
     function openDialog(title) {
@@ -71,7 +109,7 @@
         if (!node) throw new Error('定位的消息暂不可见，请关闭筛选后重试');
         const fraction = target.status === 'exact' ? (position?.message_id === target.resolved_id ? position.fraction || 0 : target.fraction || 0) : 0;
         list.scrollTop += node.getBoundingClientRect().top - list.getBoundingClientRect().top + fraction * node.getBoundingClientRect().height;
-        history = true; model.activate(id); node.setAttribute('tabindex', '-1'); node.focus({ preventScroll: true });
+        history = true; markerDestination = target.resolved_id; model.activate(id); node.setAttribute('tabindex', '-1'); node.focus({ preventScroll: true });
         if (target.status !== 'exact') label.textContent = '原消息已删除，已定位到附近消息；书签原始位置保留';
       } catch (e) { label.textContent = e.message || '跳转失败，请重试'; options.history?.(history); }
       finally { jumping = false; }
@@ -118,6 +156,8 @@
     return { add, show, latest, capture, model, historical: () => history || jumping,
       suspend() { capture(); intent = 0; clearTimeout(timer); },
       close() { capture(); void model.flush(); alive = false; generation++; clearTimeout(timer); model.close(); closeDialog(); bar.remove();
+        cancelAnimationFrame(markerFrame); mutations.disconnect(); resize.disconnect(); observedRows.clear();
+        rows().forEach(row => { row.querySelector(':scope > .reading-message-marker')?.remove(); row.classList.remove('reading-marked-message'); });
         events.forEach(name => list.removeEventListener(name, userInput)); list.removeEventListener('scroll', scrolled);
         list.removeEventListener('reading-bookmark', bookmark); root.removeEventListener('online', wake); root.removeEventListener('pagehide', pause); } };
   }

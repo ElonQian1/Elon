@@ -58,6 +58,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     await page.getByRole('button', { name: '书签', exact: true }).click();
     await page.locator('section').filter({ hasText: '周一进度' }).getByRole('button', { name: '继续阅读', exact: true }).click();
     await page.waitForFunction(() => document.activeElement?.dataset.messageId === '050000');
+    await page.getByRole('img', { name: '书签：周一进度', exact: true }).waitFor();
+    assert.equal(await page.locator('[data-message-id="050000"] > .reading-message-marker').textContent(), '🔖');
     const ackCount = await page.evaluate(() => window.readReceipts.length);
     await page.locator('#list').hover(); await page.mouse.wheel(0, 180);
     await page.waitForFunction(() => window.ops.some(op => op.action === 'progress' && op.bookmark_id === window.bookmarks[0].id), { timeout: 10000 });
@@ -88,6 +90,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright')
     assert.deepEqual(await page.evaluate(() => window.bookmarks.map(b => b.anchor.message_id)), ['050000', '075000']);
     assert.deepEqual(errors, []);
     await page.evaluate(() => window.chat.destroy());
+    assert.equal(await page.locator('.reading-message-marker').count(), 0);
     console.log('PASS: mobile browser multi-bookmarks, durable progress, bounded pages, failure recovery, send/latest detaches bookmark, no skipped-history receipts');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
