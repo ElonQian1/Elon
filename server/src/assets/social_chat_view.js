@@ -6,7 +6,7 @@
     button.style.cssText = `display:flex;align-items:center;gap:8px;max-width:min(100%,320px);min-height:48px;margin-top:6px;padding:4px 8px;border:0;border-${own ? 'right' : 'left'}:2px solid var(--line-soft,#555);border-radius:0;background:transparent;color:var(--text-secondary,#aaa);font:inherit;font-size:13px;line-height:1.5;text-align:left;${own ? 'margin-left:auto;' : ''}`;
     const label = document.createElement('span');
     label.style.cssText = 'min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere';
-    label.textContent = (quote.sender_name ? quote.sender_name + '：' : '') + (quote.unavailable ? '原消息已撤回或不可用' : quote.content || '[附件]');
+    label.textContent = (quote.sender_name ? quote.sender_name + '：' : '') + (quote.unavailable ? '原消息已撤回或不可用' : root.ElonGridShare?.summary(quote.content) || quote.content || '[附件]');
     button.append(label);
     const cover = !quote.unavailable && quote.attachments?.find(a => a.kind === 'image' || a.mime_type?.startsWith('image/'))?.url;
     if (cover && (/^https?:\/\//i.test(cover) || /^\/(?!\/)/.test(cover))) {

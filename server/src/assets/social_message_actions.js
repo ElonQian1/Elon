@@ -3,7 +3,7 @@
   const node = (tag, text, cls) => { const el = document.createElement(tag); if (text != null) el.textContent = text; if (cls) el.className = cls; return el; };
   const allowed = message => message?.id && !message.recalled_at && !message.recalledAt && !message.send_status;
   const signature = message => JSON.stringify([message?.revision || 1, message?.content, message?.attachments, message?.recalled_at, message?.recalledAt]);
-  const summary = message => (message.sender_name ? message.sender_name + '：' : '') + (message.content || (message.attachments || []).map(a => '[' + (a.kind === 'image' ? '图片' : a.kind === 'voice' ? '语音' : '附件') + '] ' + (a.display_name || a.file_name || '')).join(' '));
+  const summary = message => (message.sender_name ? message.sender_name + '：' : '') + (root.ElonGridShare?.summary(message.content) || message.content || (message.attachments || []).map(a => '[' + (a.kind === 'image' ? '图片' : a.kind === 'voice' ? '语音' : '附件') + '] ' + (a.display_name || a.file_name || '')).join(' '));
   function button(label, action, cls) { const el = node('button', label, cls); el.type = 'button'; el.onclick = action; return el; }
   function create(options) {
     let key = '', owner = '', rows = new Map(), ordered = [], quote = null, selecting = false, menu = null, closeTransfer = null, suppress = 0;

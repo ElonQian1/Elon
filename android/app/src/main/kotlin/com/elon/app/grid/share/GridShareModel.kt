@@ -47,6 +47,12 @@ internal object GridShareModel {
             .put("summary", "$direction · ${get("leverage")}× · ${get("lower")}–${get("upper")} · ${get("count")} 格 · 历史快照")
             .put("messages", JSONArray()).put("grid", grid)
     }
+    fun quoteSummary(text: String): String? = card(text)?.getJSONObject("grid")?.let { grid ->
+        val symbol = value(grid, "symbol").take(40)
+        val direction = value(grid, "direction").take(16)
+        val leverage = grid.optJSONObject("fields")?.optString("leverage")?.takeIf { it.matches(Regex("\\d{1,3}(?:\\.\\d{1,2})?")) }
+        "[网格快照] $symbol · $direction" + (leverage?.let { " $it×" } ?: "")
+    }
     fun card(text: String): JSONObject? = runCatching {
         if (!text.startsWith(PREFIX) || text.length > 8000) return null
         JSONObject(text.removePrefix(PREFIX)).takeIf { it.optString("schema") == "elon.ai_conversation_share.v1"

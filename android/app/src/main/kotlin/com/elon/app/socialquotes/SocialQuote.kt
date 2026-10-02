@@ -46,7 +46,7 @@ internal object SocialQuoteCodec {
     fun summary(quote: SocialQuote): String {
         if (quote.unavailable) return "原消息已撤回或不可用"
         val content = split(quote.content).first.trim()
-        com.elon.app.grid.share.GridShareModel.card(content)?.let { return "[网格快照] ${it.optString("title")}" }
+        com.elon.app.grid.share.GridShareModel.quoteSummary(content)?.let { return it }
         com.elon.app.chatrecords.ChatRecordDocument.card(content)?.let { return "[聊天记录] ${it.optString("title", "聊天记录")}" }
         if (content.isNotBlank()) return content
         val attachment = quote.attachments.firstOrNull() ?: return "[消息]"

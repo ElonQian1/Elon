@@ -13,6 +13,16 @@
     } catch { return null; }
   }
   function close() { const run=current;current=null;run?.abort();run?.cleanup(); }
+  function summary(text) {
+    try {
+      if (typeof text!=='string' || text.length>8000 || !text.startsWith(prefix)) return null;
+      const value=JSON.parse(text.slice(prefix.length)),ref=reference(text,value.group_id);if(!ref)return null;
+      const fields=ref.grid.fields||{},symbol=String(fields.symbol||'未读取').slice(0,40);
+      const direction={LONG:'做多',SHORT:'做空',NEUTRAL:'中性'}[fields.direction]||'方向未读取';
+      const leverage=/^\d{1,3}(?:\.\d{1,2})?$/.test(String(fields.leverage))?' '+fields.leverage+'×':'';
+      return '[网格快照] '+symbol+' · '+direction+leverage;
+    } catch { return null; }
+  }
   async function open(ref, options) {
     close(); const run=new AbortController(); current=run;
     const previousFocus=document.activeElement;
@@ -41,7 +51,7 @@
     const ref=reference(message.content,options.groupId);if(!ref)return false;
     const card=button('',()=>open(ref,options));card.className='ai-share-card grid-share-card';card.setAttribute('aria-label','查看 '+ref.title);
     card.append(root.ElonGridShareView.summary(ref.grid),el('span','查看网格详情 ›','grid-share-open'));
-    bubble.replaceChildren(card);return true;
+    bubble.replaceChildren(card);bubble.classList.add('grid-share-bubble');return true;
   }
-  root.ElonGridShare={mount,close,reference};
+  root.ElonGridShare={mount,close,reference,summary};
 })(globalThis);
