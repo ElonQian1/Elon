@@ -84,6 +84,7 @@
             const box = el('div', null, 'chat-record-asset'); body.append(box);
             linkDisposers.push(ElonRecordMedia.mount(box, row, { current: () => valid() && current === generation && !signal.aborted,
               scope: `${location.origin}:${options.owner}:${path}:${row.asset_id}`,
+              openImage: (blob, name, trigger) => ElonSocialImageViewer.openBlob(blob, { display_name: name }, trigger),
               load: () => request('/assets/' + encodeURIComponent(row.asset_id), true, 'GET', signal) }));
           } else if (row.filename) body.append(el('small', '导出包未提供可用附件 · ' + row.filename));
         }

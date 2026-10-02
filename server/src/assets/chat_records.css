@@ -17,3 +17,4 @@
 .chat-record-media-frame .chat-record-video-play{position:relative;z-index:1;border:2px solid white;border-radius:50%;width:56px;height:56px;min-height:56px;padding:0;background:#0008;color:white;font-size:24px;cursor:pointer;display:grid;place-items:center}
 .chat-record-duration{position:absolute;bottom:8px;right:8px;background:#0009;color:white;border-radius:4px;padding:3px 6px;font-size:13px}
 .chat-record-text[hidden]{display:none}.chat-record-reader a{overflow-wrap:anywhere}
+.chat-record-media-frame .chat-record-image-trigger{display:block;width:100%;padding:0;border:0;border-radius:0;background:transparent;cursor:zoom-in}.chat-record-image-trigger:focus-visible{outline:2px solid currentColor;outline-offset:-3px}

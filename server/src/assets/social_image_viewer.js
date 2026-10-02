@@ -115,10 +115,11 @@
     stage.oncontextmenu = event => event.preventDefault();
     stage.ondragstart = event => event.preventDefault();
   }
-  function open(item, url, trigger) {
+  function open(item, url, trigger, releaseBlob) {
     if (current || returning || !trigger?.isConnected) return;
     let source; try { source = new URL(url, location.href); } catch { return; }
-    if (!['http:', 'https:'].includes(source.protocol) || source.username || source.password) return;
+    const ownedBlob = releaseBlob && source.protocol === 'blob:' && source.origin === location.origin;
+    if ((!ownedBlob && !['http:', 'https:'].includes(source.protocol)) || source.username || source.password) return;
     const name = item.display_name || item.file_name || '图片';
     const dialog = element('dialog', 'chat-image-viewer'); dialog.setAttribute('aria-label', '图片预览');
     const toolbar = element('header', 'chat-image-toolbar'), title = element('span', 'chat-image-title', name);
@@ -159,7 +160,7 @@
     function finish(fromHistory = false) {
       if (disposed) return;
       disposed = true; clearTimeout(timer); observer.disconnect(); stageObserver.disconnect(); root.removeEventListener('resize', resize);
-      image.removeAttribute('src'); dialog.remove(); document.body.style.overflow = overflow; current = null;
+      image.removeAttribute('src'); dialog.remove(); releaseBlob?.(); document.body.style.overflow = overflow; current = null;
       if (chat?.isConnected && trigger.isConnected) chat.scrollTop = scrollTop;
       if (trigger.isConnected) trigger.focus({ preventScroll: true });
       if (!fromHistory && ownsHistory && history.state?.[historyKey] === token) { returning = true; history.back(); }
@@ -194,6 +195,7 @@
     stageObserver.observe(stage);
     try { history.pushState({ ...history.state, [historyKey]: token }, '', location.href); ownsHistory = true; } catch {}
     load();
+    return () => finish();
   }
   function bind(image, item, url) {
     const trigger = button('查看大图：' + (item.display_name || item.file_name || '图片'), '', () => { if (Date.now() >= suppress) open(item, url, trigger); });
@@ -208,5 +210,14 @@
     if (current && event.state?.[historyKey] !== current.token) current.finish(true);
   });
   root.addEventListener('pagehide', () => current?.finish(true));
-  root.ElonSocialImageViewer = { bind, close: () => current?.finish() };
+  function openBlob(blob, item, trigger) {
+    if (!(blob instanceof Blob) || !blob.type.startsWith('image/')) throw Error('附件类型不匹配');
+    const url = URL.createObjectURL(blob), release = () => URL.revokeObjectURL(url);
+    try {
+      const close = open(item, url, trigger, release);
+      if (!close) release();
+      return close || (() => {});
+    } catch (error) { release(); throw error; }
+  }
+  root.ElonSocialImageViewer = { bind, openBlob, close: () => current?.finish() };
 })(globalThis);

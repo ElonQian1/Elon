@@ -1,7 +1,7 @@
 /* Shared PC/PWA attachment surface. Only visible media loads; playback is always explicit. */
 (() => {
   function mount(host, row, options) {
-    let active = true, loading = false, url = '', media, observer, requestedPlay = false;
+    let active = true, loading = false, url = '', media, observer, requestedPlay = false, closeImage;
     const valid = () => active && options.current();
     const make = (tag, text) => { const n = document.createElement(tag); if (text != null) n.textContent = text; return n; };
     const action = (text, fn) => { const n = make('button', text); n.type = 'button'; n.onclick = fn; return n; };
@@ -26,7 +26,16 @@
         if (url) URL.revokeObjectURL(url); url = URL.createObjectURL(blob);
         status.textContent = ''; frame.replaceChildren();
         if (row.kind === 'image') {
-          const a = make('a'), img = make('img'); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; img.src = url; img.alt = row.filename || '图片'; a.append(img); frame.append(a);
+          const name = row.filename || '图片', img = make('img'); img.src = url; img.alt = name;
+          const preview = action('', () => {
+            if (!valid()) return;
+            try {
+              if (!options.openImage) throw Error('图片预览暂不可用，请重新打开聊天记录');
+              closeImage?.(); closeImage = options.openImage(blob, name, preview);
+            } catch { status.textContent = '图片预览暂不可用，请重新打开聊天记录'; }
+          });
+          preview.className = 'chat-record-image-trigger'; preview.setAttribute('aria-label', '查看大图：' + name);
+          preview.append(img); frame.append(preview);
         } else if (row.kind === 'video') {
           frame.classList.add('chat-record-video-frame'); frame.append(play);
           if (requestedPlay) { showVideo(); return; }
@@ -45,7 +54,7 @@
     if (['image', 'video'].includes(row.kind)) {
       observer = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) { observer.disconnect(); void load(); } }); observer.observe(host);
     } else frame.append(action('读取附件', () => load()));
-    return () => { active = false; observer?.disconnect(); media?.pause(); if (url) URL.revokeObjectURL(url); host.replaceChildren(); };
+    return () => { active = false; observer?.disconnect(); closeImage?.(); media?.pause(); if (url) URL.revokeObjectURL(url); host.replaceChildren(); };
   }
   globalThis.ElonRecordMedia = { mount };
 })();
