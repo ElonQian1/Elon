@@ -6346,7 +6346,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
             "head_blob_oid": "dae57382b243c42e8cc2411121744592bca895d6",
             "worktree_blob_oid": "dae57382b243c42e8cc2411121744592bca895d6",
             "state": "tracked_clean"
@@ -6359,7 +6359,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
             "head_blob_oid": "d604e30c2c4a5a21352c2dbf5e400c1f70f08baf",
             "worktree_blob_oid": "d604e30c2c4a5a21352c2dbf5e400c1f70f08baf",
             "state": "tracked_clean"
@@ -6372,7 +6372,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
             "head_blob_oid": "29d4ad27ff8c9511dc4f23322a5d1fcd6022aeb8",
             "worktree_blob_oid": "29d4ad27ff8c9511dc4f23322a5d1fcd6022aeb8",
             "state": "tracked_clean"
@@ -6385,7 +6385,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
             "head_blob_oid": "6119d8d5bbe1eb54926b2dc07b21d0607af20081",
             "worktree_blob_oid": "6119d8d5bbe1eb54926b2dc07b21d0607af20081",
             "state": "tracked_clean"
@@ -6393,14 +6393,14 @@
         },
         {
           "path": "docs/reports/grid-history-share-20261002.md",
-          "content_hash": "e65accc7a17a4d2c7548f6c2796f4cb79312e36885d4fe015bf2b1a4a476893c",
+          "content_hash": "7f1608e9a00cc22a6df0be06a6d91f102a5718cd28a2401863f04537ae2a2cb2",
           "locator": "",
           "evidence_kind": "document",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
-            "head_blob_oid": "339aa0acfa9744267b15e5a856913a81dbe9576a",
-            "worktree_blob_oid": "a4f4f253e156d4b757a9835098279fc61c59215f",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
+            "head_blob_oid": "a4f4f253e156d4b757a9835098279fc61c59215f",
+            "worktree_blob_oid": "1ed2f7c779ff9abb9d09901616705ca54b8d39e6",
             "state": "tracked_modified"
           }
         },
@@ -6411,7 +6411,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
             "head_blob_oid": "bd012231ef5122090bf0bbf717a922c864fdc93b",
             "worktree_blob_oid": "bd012231ef5122090bf0bbf717a922c864fdc93b",
             "state": "tracked_clean"
@@ -6424,10 +6424,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
-            "head_blob_oid": "bdb1494dcb8d39f3ed73216ee5e7ecf23ceffa3f",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
+            "head_blob_oid": "56f9d2e58cb05dfbbf6f0e1da60f33991dc23467",
             "worktree_blob_oid": "56f9d2e58cb05dfbbf6f0e1da60f33991dc23467",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6437,10 +6437,10 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
-            "head_blob_oid": "dd909e0f86fad5ac5ff50eeb9cca0d0fd1cdcedd",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
+            "head_blob_oid": "7b3c97bb881a171ad1deef45d657d8630a21ddfc",
             "worktree_blob_oid": "7b3c97bb881a171ad1deef45d657d8630a21ddfc",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6450,10 +6450,10 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
-            "head_blob_oid": "6901e29412ca8979e028a7a09ddee63aaac1d981",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
+            "head_blob_oid": "d5e909c0a8021f521fce182ce18f40225c19cdf2",
             "worktree_blob_oid": "d5e909c0a8021f521fce182ce18f40225c19cdf2",
-            "state": "tracked_modified"
+            "state": "tracked_clean"
           }
         },
         {
@@ -6463,7 +6463,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
             "head_blob_oid": "6575f88c962db78342a896b8db3d99955ed37bc1",
             "worktree_blob_oid": "6575f88c962db78342a896b8db3d99955ed37bc1",
             "state": "tracked_clean"
@@ -6476,7 +6476,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
             "head_blob_oid": "9bbe1b3efe8ffe0064bf61550bebe8aaf87a78fc",
             "worktree_blob_oid": "9bbe1b3efe8ffe0064bf61550bebe8aaf87a78fc",
             "state": "tracked_clean"
@@ -6489,7 +6489,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
             "head_blob_oid": "b29467ecd4db714e5430208b82599a54cfafe9ad",
             "worktree_blob_oid": "b29467ecd4db714e5430208b82599a54cfafe9ad",
             "state": "tracked_clean"
@@ -6502,7 +6502,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
             "head_blob_oid": "d0b8fb31c24f7bac4e5bbd2b5e3e28417e24daaa",
             "worktree_blob_oid": "d0b8fb31c24f7bac4e5bbd2b5e3e28417e24daaa",
             "state": "tracked_clean"
@@ -6515,7 +6515,7 @@
           "evidence_kind": "source",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
             "head_blob_oid": "cb243243b17a1373b8ee7593a889b293e004da12",
             "worktree_blob_oid": "cb243243b17a1373b8ee7593a889b293e004da12",
             "state": "tracked_clean"
@@ -6528,7 +6528,7 @@
           "evidence_kind": "test",
           "git_identity": {
             "schema": "elon.project_context_git_identity.v1",
-            "head_commit": "361c617dcf9be42b2f744f9d2a68d45f38f8de5e",
+            "head_commit": "d399a112131b033a7cdc66c5dad81d18115bd6c5",
             "head_blob_oid": "9d76576fdf328e0feb01f2feb10a4f56dce99ccf",
             "worktree_blob_oid": "9d76576fdf328e0feb01f2feb10a4f56dce99ccf",
             "state": "tracked_clean"
@@ -6536,7 +6536,7 @@
         }
       ],
       "created_at_ms": 1790930008305,
-      "updated_at_ms": 1790931862497
+      "updated_at_ms": 1790932235105
     },
     {
       "id": "binance-grid-observer-v1",
@@ -33528,16 +33528,6 @@
   ],
   "audit_log": [
     {
-      "id": "feature_event_105523e320d64b8fb04f0eae1a1051db",
-      "feature_id": "social-link-readback-v1",
-      "action": "transitioned",
-      "actor": "codex",
-      "reason": "Native and frontend builds, adapter fixtures and 18 Android tests passed; real official-page acceptance remains deferred.",
-      "from_status": "in_progress",
-      "to_status": "implemented",
-      "at_ms": 1789558460536
-    },
-    {
       "id": "feature_event_e665f872b71f46aeaa4985a435641205",
       "feature_id": "pwa-home-screen-startup-v1",
       "action": "registered",
@@ -35526,6 +35516,16 @@
       "from_status": "implemented",
       "to_status": "implemented",
       "at_ms": 1790931862497
+    },
+    {
+      "id": "feature_event_19feb08974644282a48a24a523fde7aa",
+      "feature_id": "binance-grid-history-share",
+      "action": "evidence_recorded",
+      "actor": "codex",
+      "reason": "",
+      "from_status": "implemented",
+      "to_status": "implemented",
+      "at_ms": 1790932235105
     }
   ]
 }
