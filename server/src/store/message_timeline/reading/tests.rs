@@ -1,6 +1,46 @@
 use super::super::v2;
 use super::*;
 
+#[test]
+fn message_timeline_reading_upgrades_existing_v310_database() {
+    let s = super::super::tests::store(10);
+    {
+        let conn = s.conn().unwrap();
+        conn.execute_batch(
+            "DROP TABLE reading_bookmarks; DROP TABLE reading_progress;
+            DROP TABLE reading_candidates; DROP TABLE reading_operations;
+            CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+            INSERT INTO schema_migrations VALUES(310, '2026-10-01T00:00:00Z');",
+        )
+        .unwrap();
+        crate::store_schema::apply_migrations(&conn).unwrap();
+        crate::store_schema::apply_migrations(&conn).unwrap();
+        let applied: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM schema_migrations WHERE version=311",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(applied, 1);
+        let retained: i64 = conn
+            .query_row("SELECT count(*) FROM friend_group_messages", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(retained, 10);
+    }
+    s.reading_command("a", &command("create", "upgrade-bookmark", 1, "m000005"))
+        .unwrap();
+    assert_eq!(
+        s.reading_list("a", &scope(), "").unwrap()["bookmarks"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
 fn scope() -> Scope {
     Scope {
         kind: "group".into(),

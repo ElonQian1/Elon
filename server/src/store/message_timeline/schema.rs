@@ -85,5 +85,5 @@ pub(crate) fn migrate(conn: &Connection) -> Result<()> {
             UPDATE friend_group_messages SET id=id WHERE id IN (SELECT r.result_message_id FROM group_ai_selected_sources s JOIN group_ai_reply_requests r ON r.id=s.request_id WHERE s.message_id=old.id);
         END;"))?;
     }
-    super::reading::schema::migrate(conn)
+    Ok(())
 }

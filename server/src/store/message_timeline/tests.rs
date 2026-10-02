@@ -27,6 +27,7 @@ pub(super) fn store(count: usize) -> Store {
     tx.commit().unwrap();
     schema::migrate(&conn).unwrap();
     schema::migrate(&conn).unwrap();
+    reading::schema::migrate(&conn).unwrap();
     Store {
         conn: std::sync::Mutex::new(conn),
     }

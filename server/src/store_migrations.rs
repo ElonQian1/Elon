@@ -411,6 +411,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (308, "Structured social message quotes", crate::store::friend_messages::social_quotes::migrate),
     (309, "Group member roles, invitation policy and durable actions", crate::store::groups::membership_schema::migrate),
     (310, "Bounded conversation timeline and durable change cursors", crate::store::friend_messages::timeline::schema::migrate),
+    (311, "Private reading bookmarks and independent progress", crate::store::friend_messages::timeline::reading::schema::migrate),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
